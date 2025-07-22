@@ -27,13 +27,10 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
-import convex.core.data.Blob;
 import convex.core.data.Hash;
-import convex.core.data.impl.ALongBlob;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 
@@ -618,7 +615,7 @@ public class Utils {
 	
 	/**
 	 * Returns the minimal number of bytes to represent the signed twos complement
-	 * long value. Return value will be at 1-8
+	 * long value. Return value will be 1-8
 	 *
 	 * @param x Long value
 	 * @return Number of bytes required for representation, in the range 1-8
@@ -834,21 +831,6 @@ public class Utils {
 		if (ix > 0) {
 			bs[ix - 1] = (byte) ((val >> 8) & 0xFF);
 		}
-	}
-
-	/**
-	 * Reads data from the Byte Buffer buffer, up to the limit.
-	 * @param bb ByteBuffer to read from
-	 * @return Blob containing bytes read from buffer
-	 */
-	public static AArrayBlob readBufferData(ByteBuffer bb) {
-		int savedPos=bb.position();
-		bb.position(0);
-		int len = bb.remaining();
-		byte[] bytes = new byte[len];
-		bb.get(bytes);
-		bb.position(savedPos);
-		return Blob.wrap(bytes);
 	}
 
 	/**
@@ -1401,7 +1383,7 @@ public class Utils {
 	}
 
 	public static long longByteAt(long value,long i) {
-		return 0xFF&(value >> ((ALongBlob.LENGTH - i - 1) * 8));
+		return 0xFF&(value >> ((8 - i - 1) * 8));
 	}
 
 	static String version=null;

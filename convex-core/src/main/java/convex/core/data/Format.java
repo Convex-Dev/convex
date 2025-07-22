@@ -316,12 +316,12 @@ public class Format {
 
 	/**
 	 * Peeks for a VLQ encoded message length at the start of a ByteBuffer, which
-	 * must contain at least 1 byte
+	 * must contain at least 1 byte to succeed
 	 * 
 	 * Does not move the buffer position.
 	 * 
 	 * @param bb ByteBuffer containing a message length
-	 * @return The message length, or negative if insufficient bytes
+	 * @return The message length, or negative if insufficient bytes available
 	 * @throws BadFormatException If the ByteBuffer does not start with a valid
 	 *                            message length, or length exceeds Integer.MAX_VALUE
 	 */
@@ -335,8 +335,7 @@ public class Format {
 		if ((len & 0x80) == 0) {
 			// Zero message length not allowed
 			if (len == 0) {
-				throw new BadFormatException(
-						"Format.peekMessageLength: Zero message length:" + Utils.readBufferData(bb));
+				throw new BadFormatException("Format.peekMessageLength: Zero message length");
 			}
 
 			// 1 byte length (without high bit set)
