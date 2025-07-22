@@ -403,8 +403,6 @@ public class JSONUtils {
 		return RT.str(key);
 	}
 
-	private static final StringShort WHITESPACE=StringShort.create("                                ");
-    private static final long WHITESPACE_LENGTH=WHITESPACE.count();
     /**
      * Appends a whitespace string of the specified length.
      *
@@ -413,14 +411,8 @@ public class JSONUtils {
      * @return Updated StringBuilder
      */
     private static BlobBuilder appendWhitespaceString(BlobBuilder sb, long count) {
-        while (count > WHITESPACE_LENGTH) {
-            sb.append(WHITESPACE);
-            count -= WHITESPACE_LENGTH;
-        }
-        sb.append(WHITESPACE.slice(0, count));
-        return sb;
+    	return sb.appendRepeatedByte((byte)' ', count);
     }
-
 
 	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
 		int n = cs.length();

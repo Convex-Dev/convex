@@ -143,7 +143,8 @@ public class Blobs {
 	}
 
 	/**
-	 * Create a Blob entirely filled with a given value
+	 * Create a Blob entirely filled with a given value. Optimised to re-use child chunks for very large blobs
+	 * 
 	 * @param value Byte value to fill with (low 8 bits used)
 	 * @param length Length of Blob to create
 	 * @return Blob filled with given value
@@ -198,7 +199,7 @@ public class Blobs {
 	}
 
 	/**
-	 * Create a 8-byte Blob representing a long value
+	 * Create a 8-byte Blob representing a long value as 64 bits
 	  */
 	public static Blob forLong(long c) {
 		byte[] bs=new byte[8];
