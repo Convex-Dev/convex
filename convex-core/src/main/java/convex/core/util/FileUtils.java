@@ -61,10 +61,6 @@ public class FileUtils {
 	public static Blob loadFileAsBlob(Path file) throws IOException {
 		return Blob.wrap(Files.readAllBytes(file));
 	}
-
-	public static byte[] loadFileAsBytes(Path file) throws IOException {
-		return Files.readAllBytes(file);
-	}
 	
 	public static <T extends ACell> T loadCAD3(Path file) throws IOException, BadFormatException {
 		Blob b=loadFileAsBlob(file);
@@ -105,6 +101,20 @@ public class FileUtils {
 		String dirPath=target.getParent();
 		Files.createDirectories(Path.of(dirPath));
 		return target;
+	}
+	
+	/**
+	 * Create a path if necessary to a File object. Interprets leading "~" as user home directory.
+	 *
+	 * @param file File object to see if the path part of the filename exists, if not then create it.
+	 * @return target File, as an absolute path, with parent directories created recursively if needed
+	 * @throws IOException In case of IO Error
+	 */
+	public static Path ensureFilePath(Path file) throws IOException {
+		// Get path of parent directory, using absolute path (may be current working directory user.dir)
+		Path parent=file.getParent();
+		Files.createDirectories(parent);
+		return file;
 	}
 
 	/**

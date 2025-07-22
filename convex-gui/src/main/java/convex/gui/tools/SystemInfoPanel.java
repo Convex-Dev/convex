@@ -42,7 +42,7 @@ public class SystemInfoPanel extends JPanel {
 				hashPanel.add(new ActionButton("Compute...,",0xe8b6, e->{
 					try {
 						String hash;
-						hash = Hashing.sha256(FileUtils.loadFileAsBytes(jarFile)).toHexString();
+						hash = Hashing.sha256(Files.readAllBytes(jarFile)).toHexString();
 						hashPanel.removeAll();
 						hashPanel.add(new JLabel(hash.toUpperCase()));
 					} catch (IOException e1) {
