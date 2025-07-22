@@ -264,6 +264,10 @@ public class BlobBuilder {
 		}
 	}
 	
+	/**
+	 * Append a byte as two hex characters
+	 * @param b Byte to append as hex
+	 */
 	public void appendHexByte(byte b) {
 		append(Utils.toHexChar((b & 0xF0) >>> 4));
 		append(Utils.toHexChar((b & 0xF)));

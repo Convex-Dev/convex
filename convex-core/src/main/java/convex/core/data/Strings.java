@@ -18,6 +18,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 public class Strings {
 	public static final StringShort EMPTY = StringShort.EMPTY;
@@ -172,7 +173,7 @@ public class Strings {
 	 * Creates a string by joining a sequence of substrings with the given separator
 	 * @param ss Sequence of Strings to join
 	 * @param separator any String to use as a separator.
-	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 * @return Concatenated String, including the separator. Will return the empty string if the sequence is empty.
 	 */
 	public static AString join(ASequence<AString> ss,AString separator) {
 		long n=ss.count();
@@ -190,7 +191,7 @@ public class Strings {
 	 * Creates a string by joining a sequence of substrings with the given separator
 	 * @param ss Sequence of Strings to join
 	 * @param separator any String to use as a separator.
-	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 * @return Concatenated String, including the separator. Will return the empty string if the array is empty.
 	 */
 	public static <T> AString join(T[] ss,Object separator) {
 		int n=ss.length;
@@ -227,12 +228,36 @@ public class Strings {
 		return Strings.create(builder.toBlob());
 	}
 
+	/**
+	 * Create a string using the UTF-8 bytes in a Blob
+	 * @param b Blob of UTF-8 bytes (assumed valid - invalid UTF-8 will create an invalid string)
+	 * @return AString instance
+	 */
 	public static AString create(ABlob b) {
 		long n=b.count();
 		if (n<=StringShort.MAX_LENGTH) {
 			return StringShort.create(b.toFlatBlob());
 		}
 		return StringTree.create(b);
+	}
+	
+	/**
+	 * Create a string repeating the specified character
+	 * @param c Java character (need not be ASCII, but must not be a surrogate)
+	 * @param count Number of times to repeat
+	 * @return String instance
+	 */
+	public static AString createRepeated(char c, int count) {
+		if (count==0) return EMPTY;
+		if (Utils.isASCIIChar(c)) {
+			return create(Blobs.createFilled(c, count));
+		} else {
+			BlobBuilder bb=new BlobBuilder();
+			for (int i=0; i<count; i++) {
+				bb.append(c);
+			}
+			return bb.getCVMString();
+		}
 	}
 	
 	/**
@@ -247,6 +272,10 @@ public class Strings {
 		return create(Blobs.fromHex(hexString));
 	}
 
+	/**
+	 * Get an empty singleton AString instance
+	 * @return Empty string
+	 */
 	public static StringShort empty() {
 		return StringShort.EMPTY;
 	}

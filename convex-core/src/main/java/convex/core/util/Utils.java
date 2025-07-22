@@ -1440,6 +1440,15 @@ public class Utils {
 		return formatter.format(timeStamp);
 	}
 
+	/**
+	 * Checks if a Unicode code point or char
+	 * @param c Unicode code point
+	 * @return True if ASCII char, false otherwise
+	 */
+	public static boolean isASCIIChar(long c) {
+		return (c&(~0x7fl))==0;
+	}
+
 
 
 
