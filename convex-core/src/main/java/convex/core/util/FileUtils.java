@@ -3,11 +3,9 @@ package convex.core.util;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -20,7 +18,7 @@ import convex.core.message.Message;
 public class FileUtils {
 
 	/**
-	 * Loads a file as a String. Handles `-` for STDIN
+	 * Loads a UTF-8 file as a String. Handles `-` for STDIN, and leading `~` for user home directory
 	 * @param fileName File to load
 	 * @return String contents of file
 	 * @throws IOException in case of IO failure
@@ -32,30 +30,13 @@ public class FileUtils {
 			byte[] bs = System.in.readAllBytes();
 			result = new String(bs);
 		} else {
-			Path path = Paths.get(fileName);
-			if (!path.toFile().exists()) {
+			Path path = getPath(fileName);
+			if (!Files.exists(path)) {
 				throw new FileNotFoundException("File does not exist: " + path);
 			}
 			result = Files.readString(path, StandardCharsets.UTF_8);
 		}
 		return result;
-	}
-	
-	/**
-	 * Loads a String from an input stream assumed to be UTF-8
-	 * @param inputStream Stream to load
-	 * @return String contents of stream
-	 * @throws IOException in case of IO failure
-	 */
-	public static String loadFileAsString(InputStream inputStream) throws IOException  {
-		 int bufferSize = 1024;
-		 char[] buffer = new char[bufferSize];
-		 StringBuilder out = new StringBuilder();
-		 java.io.Reader rdr = new java.io.InputStreamReader(inputStream, StandardCharsets.UTF_8);
-		 for (int numRead; (numRead = rdr.read(buffer, 0, buffer.length)) > 0; ) {
-		     out.append(buffer, 0, numRead);
-		 }
-		 return out.toString();
 	}
 	
 	public static Blob loadFileAsBlob(Path file) throws IOException {
@@ -104,10 +85,10 @@ public class FileUtils {
 	}
 	
 	/**
-	 * Create a path if necessary to a File object. Interprets leading "~" as user home directory.
+	 * Create a path of directories as necessary to hold a file object. Interprets leading "~" as user home directory.
 	 *
-	 * @param file File object to see if the path part of the filename exists, if not then create it.
-	 * @return target File, as an absolute path, with parent directories created recursively if needed
+	 * @param file File object to see if the directory of the filename exists, if not then create it.
+	 * @return An absolute Path to the file, with parent directories created recursively as needed
 	 * @throws IOException In case of IO Error
 	 */
 	public static Path ensureFilePath(Path file) throws IOException {
@@ -134,20 +115,19 @@ public class FileUtils {
 	
 	/**
 	 * Gets the absolute Pile for a given file name. Interprets leading "~" as user home directory.
-	 * @param path Path as a string
+	 * @param pathName Path as a string
 	 * @return Path instance representing the given absolute path
 	 */
-	public static Path getPath(String path) {
-		if (path.startsWith("~")) {
-			path=System.getProperty("user.home")+path.substring(1);
-			return Path.of(path);
+	public static Path getPath(String pathName) {
+		if (pathName.startsWith("~")) {
+			pathName=System.getProperty("user.home")+pathName.substring(1);
 		} else {
 			// ensure an absolute path
-			if (!path.startsWith("/")) {
-				path="/"+path;
+			if (!pathName.startsWith(File.separator)) {
+				pathName=File.separator+pathName;
 			}
-			return Path.of(path);
 		}
+		return new File(pathName).toPath();
 	}
 
 

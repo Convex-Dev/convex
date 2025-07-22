@@ -24,7 +24,7 @@ public class ConfigUtils {
 
 	
 	public static ACell readConfig(InputStream resource) throws IOException {
-		String config=FileUtils.loadFileAsString(resource);
+		String config=Utils.readString(resource);
 		ACell result=JSONUtils.parseJSON5(config);
 		return result;
 	}

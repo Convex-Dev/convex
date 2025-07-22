@@ -741,19 +741,11 @@ public class Utils {
 	 *
 	 * @param inputStream Stream of data to read as UTF-8 string
 	 * @return String content of stream, or null on failure
+	 * @throws IOException 
 	 */
-	public static String readString(InputStream inputStream) {
-		try {
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			for (int length; (length = inputStream.read(buffer)) != -1; ) {
-				result.write(buffer, 0, length);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			return result.toString("UTF-8");
-		} catch (IOException t) {
-			return null;
-		}
+	public static String readString(InputStream inputStream) throws IOException {
+		byte[] bytes = inputStream.readAllBytes();
+	    return new String(bytes, StandardCharsets.UTF_8);
 	}
 
 	/**
@@ -850,10 +842,12 @@ public class Utils {
 	 * @return Blob containing bytes read from buffer
 	 */
 	public static AArrayBlob readBufferData(ByteBuffer bb) {
+		int savedPos=bb.position();
 		bb.position(0);
 		int len = bb.remaining();
 		byte[] bytes = new byte[len];
 		bb.get(bytes);
+		bb.position(savedPos);
 		return Blob.wrap(bytes);
 	}
 

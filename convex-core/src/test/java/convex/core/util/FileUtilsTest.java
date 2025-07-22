@@ -67,11 +67,8 @@ public class FileUtilsTest {
 			} finally {
 				Files.delete(TEXT);
 			}
-
-			
-			
 		} finally {
-			Files.delete(DIR);
+			Files.deleteIfExists(DIR);
 		}
 	}
 }
