@@ -1,4 +1,4 @@
-package convex.core;
+package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

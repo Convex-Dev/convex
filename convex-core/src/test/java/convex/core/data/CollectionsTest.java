@@ -49,6 +49,8 @@ public class CollectionsTest {
 			assertSame(last,cells[(int) (n-1)]);
 			
 			assertEquals(Ref.get(last),a.getElementRef(n-1));
+			
+			assertEquals(a,a.reversed().reversed());
 		}
 		
 		ASequence<T> empty=a.empty();

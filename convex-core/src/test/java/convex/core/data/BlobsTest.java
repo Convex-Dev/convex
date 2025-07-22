@@ -166,6 +166,15 @@ public class BlobsTest {
 		
 		bb.append('b');
 		assertEquals("ab",bb.getCVMString().toString());
+		
+		bb.appendRepeatedByte((byte)'c', 5);
+		assertEquals("abccccc",bb.getCVMString().toString());
+		
+		bb.appendRepeatedByte((byte)0, 5000);
+		assertEquals(5007,bb.count());
+		ABlob blob=bb.toBlob();
+		assertEquals("abccccc",Strings.create(blob.slice(0,7)).toString());
+		assertEquals(Blob.EMPTY_CHUNK,blob.slice(100, 4196)); // slice of 4096 zero bytes spanning chunks
 	}
 	
 	@Test
@@ -174,7 +183,9 @@ public class BlobsTest {
 		bb.append(new byte[0]);
 		assertEquals(0,bb.count());
 		byte[] bs=new byte[1000];
-		for (int i=0; i<bs.length; i++) bs[i]=(byte)i;
+		for (int i=0; i<bs.length; i++) {
+			bs[i]=(byte)i;
+		}
 		
 		for (int i=0; i<100; i++) {
 			bb.append(bs);

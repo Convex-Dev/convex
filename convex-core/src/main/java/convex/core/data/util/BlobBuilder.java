@@ -1,6 +1,7 @@
 package convex.core.data.util;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
@@ -206,21 +207,27 @@ public class BlobBuilder {
 		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
 		ensureArray(arrayPos()+1);
 		tail[Blob.CHUNK_LENGTH-spare]=b;
-		count+=1;
+		this.count+=1;
 		if (spare==1) {
 			completeChunk();
 		}
 		return this;
 	}
 	
-	public BlobBuilder appendRepeatedByte(byte b, long count) {
+	public BlobBuilder appendRepeatedByte(byte b, long repeatCount) {
 		int spare=spare();
 		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
-		ensureArray(arrayPos()+1);
-		tail[Blob.CHUNK_LENGTH-spare]=b;
-		this.count+=1;
-		if (spare==1) {
-			completeChunk();
+		while (repeatCount>0) {
+			int batchSize=(int)Math.min(spare, repeatCount);
+			int start=arrayPos();
+			int end=start+batchSize;
+			ensureArray(end);
+			Arrays.fill(tail, start, end, b);
+			this.count+=batchSize;
+			if (spare()==0) {
+				completeChunk();
+			}
+			repeatCount-=batchSize;
 		}
 		return this;
 	}

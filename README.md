@@ -50,16 +50,22 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 | [convex-cli](https://github.com/Convex-Dev/convex/tree/develop/convex-cli/) | Command Line Tools | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-cli/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-cli) |
 | [convex-gui](https://github.com/Convex-Dev/convex/tree/develop/convex-gui/) | Convex Desktop GUI Interface | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-gui/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-gui) |
 
-For making use of Convex data structures, CVM execution etc. locally you probably just need `convex-core`. If you want to run a Peer or talk to a Peer over the network, then you will need `convex-peer` as a dependency. The other modules are mainly intended to run as standalone applications.
+For local use of Convex data structures and CVM execution, `convex-core` is typically sufficient. To run a peer or communicate with one over the network, include `convex-peer` as a dependency. Other modules are designed primarily as standalone applications or client libraries.
 
 ## Key features
 
-* *Convex Virtual Machine (CVM)* - The CVM provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
-* *Decentralised Consensus* - Similar to Blockchain technology, Convex incorporates a consensus mechanism that ensures all nodes ultimately agree on true values in the system without the control of any single entity. This property means that it is inherently tamper-proof and censorship-resistant.
-* *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (sub-second global consensus)
-* *100% Green* - No wasteful consumption of energy or computing resources
+* *Convex Virtual Machine (CVM)* - Secure, Lambda Calculus-based environment for smart contracts and autonomous agents.
+* *Decentralised Consensus* - Tamper-proof and censorship-resistant via Convergent Proof of Stake (CPoS).
+* *Performance and Scalability* - Processes tens of thousands (and sometimes up to millions) of transactions per second with sub-second global consensus.
+* *Eco-Friendly* - Minimal energy consumption with CPoS, ensuring a sustainable platform.
 
 ## Running Convex
+
+### Pre-requisities
+
+- Java JDK 21+ (for running Convex and related tools)
+- Maven 3.7+ (for building Convex from source)
+- git (for source control / contributing)
 
 ### Download
 
@@ -110,11 +116,9 @@ Using the CLI, you can start the Convex Desktop GUI for a local peer test networ
 
 ## Contributing
 
-Open Source contributions are welcome under the terms of the Convex Public License. Contributors retain copyright to their work, but must accept the terms of the license.
+Contributions are welcome under the Convex Public License. Contributors retain copyright but must accept the license terms. A Contributors Agreement is required for all submissions to the core repository.
 
-We have instituted a Contributors Agreement for all contributions to the core Convex repository.
-
-The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. Convex coins are the native coin of the Convex network, and function as a utility token that provides the right to make use of the services of the network. Convex coins may be exchangeable for other digital assets and currencies.
+The Convex Foundation may award Convex Coins to contributors for significant ecosystem contributions. These native utility tokens enable network service access and may be exchangeable for other digital assets.
 
 ## Community
 
@@ -124,7 +128,7 @@ Alternatively, email: info(at)convex.world
 
 ## Copyright
 
-Copyright 2017-2024 The Convex Foundation and Contributors
+Copyright 2017-2025 The Convex Foundation and Contributors
 
 Unless otherwise specified, source code is available under the terms of the [Convex 
 Public License](LICENSE.md)
