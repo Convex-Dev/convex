@@ -439,9 +439,4 @@ public final class CVMBigInteger extends AInteger {
 	public boolean isLong() {
 		return !isCanonical();
 	}
-
-
-
-
-
 }

@@ -279,4 +279,9 @@ public final class CVMDouble extends ANumeric {
 		return value>0;
 	}
 
+	@Override
+	public boolean isNatural() {
+		return false;
+	}
+
 }

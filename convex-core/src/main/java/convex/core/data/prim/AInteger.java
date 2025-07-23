@@ -128,6 +128,12 @@ public abstract class AInteger extends ANumeric {
 	public AInteger toInteger() {
 		return this;
 	}
+	
+	@Override
+	public boolean isNatural() {
+		// Integers are natural if positive or zero
+		return isPositive()||isZero();
+	}
 
 	/**
 	 * Create a canonical CVM integer representation of the given Java BigInteger

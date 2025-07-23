@@ -47,6 +47,12 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return true if negative
 	 */
 	public abstract boolean isPositive();
+	
+	/**
+	 * Returns true if this numeric value is a natural integer
+	 * @return true if a natural integer, false otherwise
+	 */
+	public abstract boolean isNatural();
 
 
 	/**
