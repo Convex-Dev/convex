@@ -3,6 +3,13 @@ package convex.core.util;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 
+/**
+ * Utility class for Chain Agnostic Improvement Proposals (CAIPs) 
+ * 
+ * These describe standards for DLT projects that are not specific to a single chain.
+ * 
+ * See: https://chainagnostic.org/
+ */
 public class CAIP {
 	/**
 	 * CAIP19 Asset ID using the "slip44" namespace as conventional for native coins 
@@ -13,4 +20,25 @@ public class CAIP {
 	 * Asset namespace for CAIP19, eg. as used in "cad29:6786"
 	 */
 	public static AString CAD29_ASSET_NAMESPACE=Strings.intern("cad29");
+	
+	/**
+	 * CAIP2 Chain ID for Protonet 
+	 */
+	public static AString PROTONET=Strings.intern("convex:protonet");
+	
+	/**
+	 * CAIP2 Chain ID for local test networks 
+	 */
+	public static AString LOCALNET=Strings.intern("convex:local");
+
+	/**
+	 * CAIP2 Chain ID for Testnet 
+	 */
+	public static AString TESTNET=Strings.intern("convex:testnet");
+
+	/**
+	 * CAIP2 Chain ID for MainNet 
+	 */
+	public static AString MAINNET=Strings.intern("convex:main");
+
 }
