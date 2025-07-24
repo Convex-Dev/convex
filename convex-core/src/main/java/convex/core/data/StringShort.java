@@ -229,13 +229,15 @@ public final class StringShort extends AString {
 		if (b instanceof StringShort) {
 			return equals((StringShort) b);
 		}
+		if (b==null) return false;
 		AString c=b.toCanonical();
-		if (b==c) return false;
+		if (b==c) return false; // can't be a StringShort if canonical version was the same
 		return equals(c);
 	}
 
 	public final boolean equals(StringShort a) {
 		if (a==this) return true;
+		if (a==null) return false;
 		return data.equals(a.data);
 	}
 
@@ -248,7 +250,7 @@ public final class StringShort extends AString {
 	public AString toCanonical() {
 		if (length <= MAX_LENGTH)
 			return this;
-		return Strings.create(data.toCanonical());
+		return Strings.create((ABlob)data.getCanonical());
 	}
 
 	@Override

@@ -3836,6 +3836,9 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(mod :a 7)"));
 		assertCastError(step("(mod 7 nil)"));
+		
+		assertCVMEquals(Long.MAX_VALUE,eval("(mod 9223372036854775807 (* -2 9223372036854775807))"));
+		assertCVMEquals(Long.MAX_VALUE-1,eval("(mod 9223372036854775806 (* -2 9223372036854775807))"));
 
 		assertArityError(step("(mod)"));
 		assertArityError(step("(mod 1)"));

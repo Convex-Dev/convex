@@ -166,6 +166,12 @@ public abstract class AInteger extends ANumeric {
 		if (value instanceof BigInteger) return create((BigInteger)value);
 		return CVMLong.create(value.longValue());
 	}
+	
+	/**
+	 * Negates this integer
+	 * @return Negated value
+	 */
+	public abstract AInteger negate();
 
 	/**
 	 * Returns the modulus of this integer with a given integer base

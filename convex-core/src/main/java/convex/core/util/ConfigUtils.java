@@ -8,25 +8,29 @@ import java.net.URI;
 import java.net.URL;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.lang.RT;
 
 public class ConfigUtils {
 
 	
-	public static ACell readConfig(URL url) throws IOException {	
-		ACell result=readConfig(url.openStream());
+	public static AMap<AString,ACell> readConfig(URL url) throws IOException {	
+		AMap<AString,ACell> result=readConfig(url.openStream());
 		return result;
 	}
 	
-	public static ACell readConfig(URI uri) throws IOException {	
-		ACell result=readConfig(uri.toURL());
+	public static AMap<AString,ACell> readConfig(URI uri) throws IOException {	
+		AMap<AString,ACell> result=readConfig(uri.toURL());
 		return result;
 	}
 
 	
-	public static ACell readConfig(InputStream resource) throws IOException {
+	@SuppressWarnings("unchecked")
+	public static AMap<AString,ACell> readConfig(InputStream resource) throws IOException {
 		String config=Utils.readString(resource);
-		ACell result=JSONUtils.parseJSON5(config);
-		return result;
+		AMap<AString,ACell> result=(AMap<AString, ACell>) JSONUtils.parseJSON5(config);
+		return RT.ensureMap(result);
 	}
 	
 	/**
@@ -35,7 +39,7 @@ public class ConfigUtils {
 	 * @return Parsed CAD3 config data
 	 * @throws IOException In case of IO error, e.g. FileNotFoundException
 	 */
-	public static ACell readConfigFile(String filename) throws IOException {	
+	public static AMap<AString,ACell> readConfigFile(String filename) throws IOException {	
 		File f=FileUtils.getFile(filename);
 		if (!f.exists()) throw new FileNotFoundException("File: "+filename);
 		return readConfig(f.toURI());
