@@ -12,7 +12,6 @@ import javax.swing.JPanel;
 
 import convex.core.crypto.Hashing;
 import convex.core.text.Text;
-import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.utils.Toolkit;
