@@ -1,4 +1,4 @@
-package convex.core.lattice;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

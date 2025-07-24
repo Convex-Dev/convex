@@ -527,6 +527,11 @@ public class Peer {
 		return result;
 	}
 
+	/**
+	 * Truncate the peer's sate history at a given block position. Subsequent state updates will be recalculated
+	 * @param pos End block at which to truncate
+	 * @return
+	 */
 	public Peer truncateState(long pos) {
 		if (pos>=statePosition) return this;
 		

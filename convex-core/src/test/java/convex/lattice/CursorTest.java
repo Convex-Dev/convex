@@ -34,6 +34,19 @@ public class CursorTest {
 		assertNotSame(root,root.path(Symbols.FOO));
 	}
 	
+	@Test public void testNestedUpdates() {
+		Root<AInteger> root=Cursors.of(13);
+		
+		AInteger result=root.updateAndGet(v->{
+			// We can detach the root since get() works in atomic update
+ 			ACursor<AInteger> tx=root.detach();
+			v=tx.updateAndGet(vv->vv.inc());
+			v=tx.updateAndGet(vv->vv.inc());
+			return v;
+		});
+		assertCVMEquals(15,result);
+	}
+	
 	@Test public void testPathCursor() {
 		Root<AInteger> root=new Root<>();
 		ACursor<AInteger> pc=root.path(Symbols.FOO);

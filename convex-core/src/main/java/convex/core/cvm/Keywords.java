@@ -150,6 +150,9 @@ public class Keywords {
 	// Commond trust keys
 	public static final Keyword CONTROL = Keyword.intern("control");
 	
+	// Lattice structure keys
+	public static final Keyword APP = Keyword.intern("app");
+	
 
 
 

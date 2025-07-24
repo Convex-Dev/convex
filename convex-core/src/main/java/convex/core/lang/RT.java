@@ -1426,7 +1426,8 @@ public class RT {
 		return (T) result;
 	}
 	
-	public static ACell assocIn(ACell a, ACell value, Object... keys) {
+	@SuppressWarnings("unchecked")
+	public static <T extends ADataStructure<?>> T assocIn(ACell a, ACell value, Object... keys) {
 		int n=keys.length;
 		ADataStructure<?>[] ass=new ADataStructure[n];
 		ACell[] ks=new ACell[n];
@@ -1448,10 +1449,11 @@ public class RT {
 				throw new IllegalArgumentException("Invalid structure for assocIn at depth "+i);
 			}
 		}
-		return value;
+		return (T) value;
 	}
 	
-	public static ACell assocIn(ACell a, ACell value, ACell... keys) {
+	@SuppressWarnings("unchecked")
+	public static <T extends ADataStructure<?>> T assocIn(ACell a, ACell value, ACell... keys) {
 		int n=keys.length;
 		ADataStructure<?>[] ass=new ADataStructure[n];
 		ACell[] ks=new ACell[n];
@@ -1473,7 +1475,7 @@ public class RT {
 				throw new IllegalArgumentException("Invalid structure for assocIn at depth "+i);
 			}
 		}
-		return value;
+		return (T) value;
 	}
 
 	/**

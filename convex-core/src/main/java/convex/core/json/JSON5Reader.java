@@ -195,7 +195,7 @@ public class JSON5Reader {
 		JSON5Parser parser=getParser(cs,listener);
 		
 		try {
-		parser.json();
+			parser.json();
 		} catch (ParseCancellationException pe) {
 			throw new ParseException(pe.getMessage(),pe.getCause());
 		}
