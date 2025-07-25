@@ -1,7 +1,9 @@
 package convex.core.util;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
+import convex.core.exceptions.TODOException;
 
 /**
  * Utility class for Chain Agnostic Improvement Proposals (CAIPs) 
@@ -17,7 +19,7 @@ public class CAIP {
 	public static AString CONVEX_ASSET_ID=Strings.intern("slip44:864");
 	
 	/**
-	 * Asset namespace for CAIP19, eg. as used in "cad29:6786"
+	 * Asset namespace for CAD29 assets in CAIP-19, e.g. as used in "cad29:6786"
 	 */
 	public static AString CAD29_ASSET_NAMESPACE=Strings.intern("cad29");
 	
@@ -41,4 +43,17 @@ public class CAIP {
 	 */
 	public static AString MAINNET=Strings.intern("convex:main");
 
+	
+	/**
+	 * Parse a CAIP-19 asset ID to an on-chain CVM asset ID usable with convex.asset
+	 * @param assetID CAIP-19 asset ID
+	 * @return Convex asset representation
+	 */
+	public static ACell parseAssetID(AString assetID) {
+		if (assetID.startsWith(CAD29_ASSET_NAMESPACE)) {
+			throw new TODOException();
+		} else {
+			throw new IllegalArgumentException("Unrecognised CAIP19 asset format");
+		}
+	}
 }

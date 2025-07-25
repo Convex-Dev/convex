@@ -275,6 +275,20 @@ public abstract class AString extends ABlobLike<CVMChar> {
 		return append(Strings.create(string));
 	}
 	
+	/**
+	 * Checks if this string starts with another string. May be O(n) in length of prefix
+	 */
+	public boolean startsWith(AString prefix) {
+		long pc=prefix.count();
+		if (pc==0) return true; // empty string always matches
+		if (pc>length) return false; // too big to match
+		
+		for (int i=0; i<pc; i++) {
+			if (!(this.byteAt(i)==prefix.byteAt(i))) return false;
+		}
+		return true;
+ 	}
+	
 	@Override
 	public final boolean equals(ACell o) {
 		if (!(o instanceof AString)) return false;
