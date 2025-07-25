@@ -279,7 +279,7 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	 * Checks if this string starts with another string. May be O(n) in length of prefix
 	 */
 	public boolean startsWith(AString prefix) {
-		long pc=prefix.count();
+		final long pc=prefix.count();
 		if (pc==0) return true; // empty string always matches
 		if (pc>length) return false; // too big to match
 		

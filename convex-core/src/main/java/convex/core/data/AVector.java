@@ -244,6 +244,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract AVector<T> next();
 
 	@Override
+	public AVector<T> slice(long start) {
+		return slice(start,count);
+	}
+	
+	@Override
 	public abstract AVector<T> slice(long start, long end);
 	
 	@Override
