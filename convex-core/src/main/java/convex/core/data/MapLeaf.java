@@ -240,7 +240,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		for (int i = 0; i < len; i++) {
 			MapEntry<K, V> me = entries[i];
 			if (Cells.equals(me.getKey(), key)) {
-				if (Cells.equals(me.getValue(), value)) return this;
+				if (Cells.equals(me.getValue(), value)) return this; // check for same value. We can skip if same. Saves new map creation.
 				MapEntry<K, V> newEntry = me.withValue(value);
 				if (me == newEntry) return this;
 
