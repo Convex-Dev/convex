@@ -343,7 +343,7 @@ public class RT {
 		if (n == 0)
 			return CVMLong.ONE;
 		ANumeric result = RT.ensureNumber(args[0]);
-		for (int i = 1; i < args.length; i++) {
+		for (int i = 1; i < n; i++) {
 			result = result.multiply(RT.ensureNumber(args[i]));
 			if (result==null) return null;
 		}
