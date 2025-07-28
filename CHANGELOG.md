@@ -4,6 +4,23 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - Unreleased
+
+### Added
+
+- Lattice Cursor functionality
+- Improved file / resource handling utilities
+- Improved JSON Functionality
+- New string handling functions
+
+### Changed
+
+- Better AString interning
+
+### Fixed
+
+- Potential synchronisation issue with ConvexLocal
+
 ## [0.8.1] - 2024-03-14
 
 ### Added
