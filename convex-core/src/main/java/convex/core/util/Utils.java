@@ -8,6 +8,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -1425,7 +1427,13 @@ public class Utils {
 		return (c&(~0x7fl))==0;
 	}
 
-
+	public static String urlDecode(String value) {
+	    return URLDecoder.decode(value, StandardCharsets.UTF_8);
+	}
+	
+	public static String urlEncode(String value) {
+	    return URLEncoder.encode(value, StandardCharsets.UTF_8);
+	}
 
 
 

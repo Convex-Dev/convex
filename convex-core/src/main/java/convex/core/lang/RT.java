@@ -333,6 +333,11 @@ public class RT {
 		return result;
 	}
 
+	/**
+	 * Multiply numbers
+	 * @param args
+	 * @return Numeric result, or null if out of valid numeric range
+	 */
 	public static ANumeric multiply(ACell... args) {
 		int n = args.length;
 		if (n == 0)
@@ -340,6 +345,7 @@ public class RT {
 		ANumeric result = RT.ensureNumber(args[0]);
 		for (int i = 1; i < args.length; i++) {
 			result = result.multiply(RT.ensureNumber(args[i]));
+			if (result==null) return null;
 		}
 		return result;
 	}
