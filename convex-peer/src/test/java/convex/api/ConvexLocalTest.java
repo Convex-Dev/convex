@@ -64,6 +64,9 @@ public class ConvexLocalTest {
 			assertEquals(ADDRESS, r.getValue());
 			
 			assertEquals(s+1,convex.getSequence());
+			
+			// Test another transaction that just returns a constant
+			assertEquals(CVMLong.ONE,convex.transact("1").join().getValue());
 		}
 	}
 	

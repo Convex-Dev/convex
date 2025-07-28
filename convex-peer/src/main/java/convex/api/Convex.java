@@ -593,7 +593,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @return The result of the transaction
 	 * @throws InterruptedException if operation is interrupted
 	 */
-	public final synchronized Result transactSync(ACell transaction, long timeout) throws InterruptedException {
+	public final Result transactSync(ACell transaction, long timeout) throws InterruptedException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
 		Result result;
