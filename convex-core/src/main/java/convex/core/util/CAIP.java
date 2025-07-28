@@ -55,23 +55,26 @@ public class CAIP {
 	 * Parse a CAIP-19 asset ID to an on-chain CVM asset ID usable with convex.asset
 	 * @param assetID CAIP-19 asset ID
 	 * @return Convex asset representation
+	 * @throws IllegalArgumentException If asset ID not recognised
 	 */
 	public static ACell parseAssetID(AString assetID) {
+		if (assetID==null) throw new IllegalArgumentException("Null asset ID");
+		if (assetID.equals(CONVEX_ASSET_ID)) return CONVEX_ASSET_ID;
 		if (assetID.startsWith(CAD29_ASSET_NAMESPACE)) {
 			return parseTokenID(assetID.toString());
 		} else {
-			throw new IllegalArgumentException("Unrecognised CAIP19 asset format");
+			throw new IllegalArgumentException("Unrecognised CAIP19 asset format: "+assetID);
 		}
 	}
 	
 	/**
 	 * Gets the asset ID for a CAD29 token from a CAPI-19 string
 	 * @param caip19
-	 * @return CAD29 asset ID, or null if the String refers to CVM
+	 * @return CAD29 asset ID, or CONVEX_ASSET_ID contant if the String refers to CVM
 	 * @throw IllegalArgumentException if String is not a valid token ID
 	 */
 	public static ACell parseTokenID(String caip19) {
-		if (isCVM(caip19)) return null;
+		if (isCVM(caip19)) return CONVEX_ASSET_ID;
 		String[] ss=caip19.split(":");
 		if (ss[0].equals("cad29")) try {
 			String id=ss[1];

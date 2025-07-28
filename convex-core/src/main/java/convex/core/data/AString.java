@@ -289,6 +289,13 @@ public abstract class AString extends ABlobLike<CVMChar> {
 		return true;
  	}
 	
+	/**
+	 * Checks if this string starts with a specific Java string. May be O(n) in length of prefix
+	 */
+	public boolean startsWith(String prefix) {
+		return startsWith(Strings.create(prefix));
+ 	}
+	
 	@Override
 	public final boolean equals(ACell o) {
 		if (!(o instanceof AString)) return false;
