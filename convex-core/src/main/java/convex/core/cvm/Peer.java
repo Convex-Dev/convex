@@ -16,10 +16,12 @@ import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -758,6 +760,22 @@ public class Peer {
 
 	public AVector<BlockResult> getBlockResults() {
 		return blockResults;
+	}
+
+	public Result getTransactionResult(ABlob txID) {
+		return getPeerIndex().getTransactionResult(this,txID);
+	}
+
+	// Private field for cached peer index
+	private PeerIndex peerIndex=new PeerIndex();
+	
+	private PeerIndex getPeerIndex() {
+		long cp=getFinalityPoint();
+		while (cp!=peerIndex.getFinalityPoint()) {
+			peerIndex= peerIndex.update(this);
+			if (peerIndex==null) peerIndex=new PeerIndex(); // in case we need to recompute
+		}
+		return peerIndex;
 	}
 
 
