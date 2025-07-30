@@ -106,6 +106,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return getEncoding().hashCode();
 	}
 	
+	/**
+	 * Test if this Cell is equal to another Java object, in the manner of Object.equals(...) 
+	 * 
+	 * A Cell is defined to be equal to another Object if and only if the other object is a Cell with the same encoding.
+	 */
 	@Override
 	public final boolean equals(Object a) {
 		if (a==this) return true; // Fast path, avoids cast

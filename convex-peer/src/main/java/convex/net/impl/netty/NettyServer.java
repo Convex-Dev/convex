@@ -85,20 +85,31 @@ public class NettyServer extends AServer {
          .option(ChannelOption.SO_BACKLOG, 128) // Backlog of incoming connection requests         
          .childOption(ChannelOption.SO_KEEPALIVE, true); 
 
-        ChannelFuture f=null;
         Integer port=getPort();
+        ChannelFuture f=null;
         if (port==null) try {
-        	InetSocketAddress bindAddress=new InetSocketAddress("::",Constants.DEFAULT_PEER_PORT); 
-        	f = b.bind(bindAddress).sync(); 
-        	port=Constants.DEFAULT_PEER_PORT;
+          	port=Constants.DEFAULT_PEER_PORT; // use default port in first instance
+        	InetSocketAddress bindAddress=new InetSocketAddress("::",port); 
+        	try {
+        		f = b.bind(bindAddress).sync(); 
+         	} catch (java.nio.channels.UnsupportedAddressTypeException e) {
+        		f= b.bind("0.0.0.0", port);
+        		log.warn("Unable to bind IPv6 address, falling back to IPv4");
+        	}
         } catch (Exception e) {
         	// failed so try with random port
+        	log.debug("Default peer port not available, trying random port");
         	port=0;
     	}
         
         if (f==null) {
         	InetSocketAddress bindAddress=new InetSocketAddress("::",port); 
-        	f = b.bind(bindAddress).sync(); 
+        	try {
+        		f = b.bind(bindAddress).sync(); 
+        	} catch (java.nio.channels.UnsupportedAddressTypeException e) {
+        		f= b.bind("0.0.0.0", port);
+        		log.warn("Unable to bind IPv6 address, falling back to IPv4");
+        	}
         }
     	// Check local port    	
         InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();
