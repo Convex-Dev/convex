@@ -167,11 +167,13 @@ public final class DLPath implements Path {
 
 	@Override
 	public boolean endsWith(Path other) {
-		if (!(other instanceof DLPath)) return false;
-		return endsWith((DLPath)other);
+		if (other instanceof DLPath dlp) {
+			return endsWith(dlp);
+		}
+		return false;
 	}
 	
-	public boolean endWith(DLPath other) {
+	public boolean endsWith(DLPath other) {
 		if (absolute!=other.absolute) return false;
 		int n=other.getNameCount();
 		if (n>count) return false; // can't start with a longer path!

@@ -43,7 +43,7 @@ public class ByteFlag extends AByteFlag {
 	}
 	
 	public static ByteFlag forTag(byte tag) {
-		if ((tag & 0xF0)!=(0xF0 & Tag.BYTE_FLAG_BASE)) return null;
+		if ((byte)(tag & 0xF0)!=Tag.BYTE_FLAG_BASE) return null;
 		return new ByteFlag(tag);
 	}
 	

@@ -599,7 +599,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public boolean equals(AVector<? super T> a) {
+	public boolean equals(AVector<?> a) {
 		if (a instanceof VectorLeaf) return equals((VectorLeaf<T>)a);
 		if (!(a instanceof AVector)) return false;
 		

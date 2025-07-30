@@ -173,9 +173,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
 		return result;
 	}
-
+	
 	@Override
-	public boolean equals(AVector<? super ACell> o) {
+	public boolean equals(AVector<?> o) {
 		if (o==null) return false;
 		if (o==this) return true;
 		AVector<?> v=(AVector<?>) o;

@@ -39,7 +39,7 @@ import convex.core.text.Text;
 @Execution(value = ExecutionMode.CONCURRENT)
 public class BeliefMergeTest {
 
-	public static final int NUM_PEERS = 9;
+	public static int NUM_PEERS = 9;
 
 	public static final AKeyPair[] KEY_PAIRS = new AKeyPair[NUM_PEERS];
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];

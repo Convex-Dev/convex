@@ -292,15 +292,18 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		throw new UnsupportedOperationException();
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	public final boolean equals(ACell a) {
-		if (!(a instanceof AVector)) return false;
-		
-		return equals((AVector<? super T>)a); 
+		if (a instanceof AVector v) return equals(v);
+		return false; 
 	}
 	
-	public abstract boolean equals(AVector<? super T> a);
+	/**
+	 * Tests if this vector is equals to another Vector
+	 * @param a Any vector
+	 * @return true if vectors are equal, false otherwise
+	 */
+	public abstract boolean equals(AVector<?> a);
 	
 	@Override
 	public final byte getTag() {

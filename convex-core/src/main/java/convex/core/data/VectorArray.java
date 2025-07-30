@@ -280,7 +280,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public boolean equals(AVector<? super T> a) {
+	public boolean equals(AVector<?> a) {
 		if (a==this) return true;
 		if (a==null) return false;
 		if (this.count!=a.count) return false;

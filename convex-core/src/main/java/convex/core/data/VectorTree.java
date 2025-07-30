@@ -711,7 +711,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean equals(AVector<? super T>  o) {
+	public boolean equals(AVector<?>  o) {
 		if (this==o) return true;
 		if (!(o instanceof VectorTree)) {
 			if (o==null) return false;

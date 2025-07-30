@@ -389,7 +389,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public int compareTo(CVMChar o) {
 		return Integer.compare(value, o.value);
 	}
-
+	
 	@Override public boolean equals(ACell a) {
 		if (!(a instanceof CVMChar)) return false;
 		return value==((CVMChar)a).value;

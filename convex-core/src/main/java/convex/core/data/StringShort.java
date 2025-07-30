@@ -226,12 +226,9 @@ public final class StringShort extends AString {
 
 	@Override
 	public boolean equals(AString b) {
-		if (b instanceof StringShort) {
-			return equals((StringShort) b);
-		}
 		if (b==null) return false;
-		AString c=b.toCanonical();
-		if (b==c) return false; // can't be a StringShort if canonical version was the same
+		if (this.length!=b.length) return false;
+		StringShort c=(StringShort)b.toCanonical();
 		return equals(c);
 	}
 

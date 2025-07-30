@@ -148,8 +148,9 @@ public final class Symbol extends ASymbolic {
 		// Note we sometimes call this with a fake tag, and there is a cache
 		// we only want to attach encoding if not already done, and if tag is correct
 		if (sym.cachedEncoding()==null) {
-			if (blob.byteAt(offset)==Tag.SYMBOL);
-			sym.attachEncoding(blob.slice(offset, offset+2+len));
+			if (blob.byteAt(offset)==Tag.SYMBOL) {
+				sym.attachEncoding(blob.slice(offset, offset+2+len));
+			}
 		}
 		return sym;
 	}

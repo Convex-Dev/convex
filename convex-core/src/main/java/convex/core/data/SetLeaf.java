@@ -434,14 +434,13 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public boolean equals(ACell a) {
-		if (!(a instanceof SetLeaf)) return false;
-		return equals((SetLeaf<T>) a);
+		if (a instanceof SetLeaf s) return equals(s);
+		return false;
 	}
 
-	public boolean equals(SetLeaf<T> a) {
+	public boolean equals(SetLeaf<?> a) {
 		if (this == a) return true;
 		if (count != a.count) return false;
 		int n = (int)count;

@@ -225,6 +225,15 @@ public class Message {
 		if (getType()!=other.getType()) return false;
 		return this.getMessageData().equals(other.getMessageData());
 	}
+	
+	@Override
+	public int hashCode() {
+		try {
+			return Utils.hashCode(getPayload());
+		} catch (BadFormatException e) {
+			return 0;
+		}
+	}
 
 	/**
 	 * Gets the message ID for correlation, assuming this message type supports IDs.

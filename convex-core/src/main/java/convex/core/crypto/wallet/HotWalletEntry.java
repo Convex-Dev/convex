@@ -104,7 +104,7 @@ public class HotWalletEntry extends AWalletEntry {
 	}
 
 	@Override
-	public void lock() {
+	public synchronized void lock() {
 		locked=true;
 	}
 

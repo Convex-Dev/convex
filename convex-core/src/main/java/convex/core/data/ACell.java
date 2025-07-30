@@ -116,6 +116,19 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
+	 * Checks for equality with another Cell. In general, Cells are considered equal
+	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
+	 * 
+	 * Subclasses SHOULD override this if they have a more efficient equals implementation. 
+	 * 
+	 * MUST NOT require reads from Store.
+	 * 
+	 * @param a Cell to compare with. May be null.
+	 * @return True if this cell is equal to the other object
+	 */
+	public abstract boolean equals(ACell a);
+	
+	/**
 	 * Gets the canonical encoded byte representation of this cell.
 	 * 
 	 * @return A Blob representing this cell in encoded form
@@ -142,18 +155,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return c;
 	}
 	
-	/**
-	 * Checks for equality with another Cell. In general, Cells are considered equal
-	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
-	 * 
-	 * Subclasses SHOULD override this if they have a more efficient equals implementation. 
-	 * 
-	 * MUST NOT require reads from Store.
-	 * 
-	 * @param a Cell to compare with. May be null.
-	 * @return True if this cell is equal to the other object
-	 */
-	public abstract boolean equals(ACell a);
+
 	
 	/**
 	 * Writes this Cell's CAD3 encoding to a byte array, including the tag byte which will be written first.

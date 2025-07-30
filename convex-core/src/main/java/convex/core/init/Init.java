@@ -230,20 +230,20 @@ public class Init {
 
 		// BASE_PEER_ADDRESS = accts.size();
 		{
-			long peerFunds = supply;
-			supply -= peerFunds;
+			long peerFundsLeft = supply;
+			supply = 0; // all supply used up
 			for (int i = 0; i < keyCount; i++) {
 				AccountKey peerKey = peerKeys.get(i);
 				Address peerController = getGenesisPeerAddress(i);
 	
 				// Divide funds among peers
-				long peerStake = peerFunds / (keyCount-i);
+				long peerStake = peerFundsLeft / (keyCount-i);
 	
 	            // Add peer with specified stake
 				peers = addPeer(peers, peerKey, peerController, peerStake);
-				peerFunds -= peerStake;
+				peerFundsLeft -= peerStake;
 			}
-			assert(peerFunds == 0L);
+			assert(peerFundsLeft == supply);
 		}
 		
 
