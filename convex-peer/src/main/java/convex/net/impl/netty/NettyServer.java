@@ -27,7 +27,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 public class NettyServer extends AServer {
 
-	static final Logger log = LoggerFactory.getLogger(NettyServer.class.getName());
+	static final Logger log = LoggerFactory.getLogger(NettyServer.class);
 
 	static EventLoopGroup bossGroup=null;
 	
