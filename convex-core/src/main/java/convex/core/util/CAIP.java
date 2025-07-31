@@ -69,8 +69,8 @@ public class CAIP {
 	
 	/**
 	 * Gets the asset ID for a CAD29 token from a CAPI-19 string
-	 * @param caip19
-	 * @return CAD29 asset ID, or CONVEX_ASSET_ID contant if the String refers to CVM
+	 * @param caip19 CAIP19 Format asset ID, e.g. "cad29:72"
+	 * @return CAD29 asset ID, or CONVEX_ASSET_ID constant if the String refers to CVM
 	 * @throw IllegalArgumentException if String is not a valid token ID
 	 */
 	public static ACell parseTokenID(String caip19) {
@@ -99,7 +99,7 @@ public class CAIP {
 		} catch (ParseException | IndexOutOfBoundsException e) {
 			throw new IllegalArgumentException("Invalid CAIP19 asset for Convex: "+caip19,e);
 		}
-		throw new IllegalArgumentException("Only CAD29 assets currently supported on Convex, but CAIP19 code was: "+caip19);
+		throw new IllegalArgumentException("Only CVM or CAD29 assets currently supported on Convex, but CAIP19 code was: "+caip19);
 	}
 	
 	/**

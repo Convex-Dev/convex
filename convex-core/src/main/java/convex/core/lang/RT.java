@@ -1100,7 +1100,7 @@ public class RT {
 	 * Converts a value to a Java String representation
 	 * 
 	 * @param a Any CVM value
-	 * @return Java String representation. May be "nil".
+	 * @return Java String representation. May be "nil" for null values.
 	 */
 	public static String toString(ACell a) {
 		return toString(a, Constants.PRINT_LIMIT);

@@ -416,13 +416,20 @@ public class JSONUtils {
 
 	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
 		int n = cs.length();
+		
 		for (int i = 0; i < n; i++) {
 			char c = cs.charAt(i);
 			AString rep = getReplacementString(c);
 			if (rep != null) {
 				bb.append(rep);
 			} else {
-				bb.append(c);
+				if (Character.isSurrogate(c)) {
+					int codePoint=Character.codePointAt(cs, i);
+					bb.append(CVMChar.create(codePoint));
+					i++;
+				} else {
+					bb.append(c);
+				}
 			}
 		}
 	}

@@ -63,4 +63,10 @@ public class PeerIndex {
 		return peer.getBlockResult(loc.get(0).longValue()).getResult(loc.get(1).longValue());
 	}
 
+	public SignedData<ATransaction> getTransaction(Peer peer, Hash transactionID) {
+		AVector<CVMLong> loc=txLocations.get(transactionID);
+		if (loc==null) return null;
+		return peer.getPeerOrder().getBlock(loc.get(0).longValue()).getValue().getTransactions().get(loc.get(1).longValue());
+	}
+
 }

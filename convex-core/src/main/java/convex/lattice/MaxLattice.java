@@ -9,6 +9,10 @@ import convex.core.lang.RT;
  */
 public class MaxLattice extends ALattice<AInteger> {
 
+	private MaxLattice() {
+		// private to enforce Singleton
+	}
+	
 	private static final MaxLattice INSTANCE = new MaxLattice();
 
 	@Override

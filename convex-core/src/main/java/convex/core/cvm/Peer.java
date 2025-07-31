@@ -777,5 +777,9 @@ public class Peer {
 		return peerIndex;
 	}
 
+	public SignedData<ATransaction> getTransaction(Hash transactionID) {
+		return getPeerIndex().getTransaction(this, transactionID);
+	}
+
 
 }

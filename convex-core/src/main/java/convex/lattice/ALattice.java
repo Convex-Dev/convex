@@ -7,6 +7,8 @@ import convex.core.data.ACell;
  */
 public abstract class ALattice<V extends ACell> {
 
+
+	
 	/**
 	 * Implementation of merge function
 	 * @param ownValue Own lattice value

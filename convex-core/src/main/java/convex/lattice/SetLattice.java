@@ -11,6 +11,10 @@ import convex.core.data.Sets;
  */
 public class SetLattice<V extends ACell> extends ALattice<ASet<V>> {
 
+	private SetLattice() {
+		// private to enforce Singleton
+	}
+	
 	private static final SetLattice<?> INSTANCE = new SetLattice<>();
 
 	@Override
