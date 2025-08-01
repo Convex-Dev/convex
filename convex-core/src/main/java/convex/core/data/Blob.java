@@ -287,4 +287,13 @@ public class Blob extends AArrayBlob {
 		return Blobs.toCanonical(this);
 	}
 
+	/**
+	 * Gets a blob from a UTF-8 string
+	 * @param string Any Java string
+	 * @return Blob instance
+	 */
+	public static Blob fromUTF(String string) {
+		return Strings.create(string).toFlatBlob();
+	}
+
 }

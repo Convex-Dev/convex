@@ -42,6 +42,16 @@ public class HashTest {
 	}
 	
 	@Test
+	void testBlake2b() {
+		Blob b=Hashing.blake2b160(new byte[0]);
+		assertEquals(20,b.count());
+		assertEquals("3345524abf6bbe1809449224b5972c41790b6cf2",b.toHexString());
+		
+		Blob b2=Hashing.blake2b160(Blob.fromUTF("Hello World").getBytes());
+		assertEquals("6a8489e6fd6e51fae12ab271ec7fc8134dd5d737",b2.toHexString());
+	}
+	
+	@Test
 	void testHashString() {
 		String hex="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 		Hash h=Hash.fromHex(hex);

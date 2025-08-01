@@ -114,7 +114,7 @@ public class CAIP {
 			if (v.count()!=2) throw new IllegalArgumentException("Not a valid CAD29 scoped token ID: 2 elements requires");
 			return toAssetID(v.get(0))+"-"+Utils.urlEncode(RT.print(v.get(1)).toString());
 		}
-		throw new IllegalArgumentException("Not a valid CAD29 token ID");
+		throw new IllegalArgumentException("Not a valid CAD29 token ID: "+assetID);
 	}
 	
 	/**
