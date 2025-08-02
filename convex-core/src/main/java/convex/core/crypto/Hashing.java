@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import org.bouncycastle.crypto.digests.Blake2bDigest;
 import org.bouncycastle.jcajce.provider.digest.Blake2b.Blake2b160;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
