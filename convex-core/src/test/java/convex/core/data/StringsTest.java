@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
@@ -68,7 +70,7 @@ public class StringsTest {
 	}
 
 	@Test
-	public void testStringTree() {
+	public void testStringTree() throws IOException {
 		String src = "0123456789abcdef";
 		for (int i = 0; i < 8; i++) {
 			src = src + src;
@@ -90,6 +92,8 @@ public class StringsTest {
 		AString span = twoChunk.slice(4000, 4200);
 		assertEquals(200, span.count());
 		doStringTest(span);
+		
+		assertEquals(twoChunk,Strings.create(Blobs.fromStream(twoChunk.getInputStream())));
 	}
 
 	@Test
