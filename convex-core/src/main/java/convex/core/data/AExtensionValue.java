@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.InputStream;
+
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Bits;
@@ -147,5 +149,10 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	public final int getRefCount() {
 		// No Refs
 		return 0;
+	}
+	
+	@Override
+	public InputStream getInputStream() {
+		return toFlatBlob().getInputStream();
 	}
 }

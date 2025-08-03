@@ -1,7 +1,10 @@
 package convex.core.data;
 
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.util.Enumeration;
 
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -24,6 +27,8 @@ import convex.core.util.Utils;
  * 
  */
 public class BlobTree extends ABlob {
+
+
 
 	public static final int BIT_SHIFT_PER_LEVEL = 4;
 	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
@@ -422,14 +427,36 @@ public class BlobTree extends ABlob {
 	public boolean isFullyPacked() {
 		return count==childLength()*FANOUT;
 	}
-	
-
 
 	@Override
 	public Blob getChunk(long chunkIndex) {
 		long childSize = 1 << shift;
 		int child = Utils.checkedInt(chunkIndex >> shift);
 		return getChild(child).getChunk(chunkIndex - child * childSize);
+	}
+	
+	@Override
+	public InputStream getInputStream() {
+		// TODO should be a SequenceInputStream using an Enumeration of children
+		return new SequenceInputStream(enumerateChildStreams());
+	}
+	
+	Enumeration<InputStream> enumerateChildStreams() {
+		return new ChildEnumeration();
+	}
+	
+	private class ChildEnumeration implements Enumeration<InputStream> {
+		private int i=0;
+
+		@Override
+		public boolean hasMoreElements() {
+			return i<childCount();
+		}
+
+		@Override
+		public InputStream nextElement() {
+			return getChild(i++).getInputStream();
+		}
 	}
 	
 	@Override

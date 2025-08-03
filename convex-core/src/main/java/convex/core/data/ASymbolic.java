@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.InputStream;
+
 import convex.core.Constants;
 import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.InvalidDataException;
@@ -119,6 +121,11 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	
 	public Blob toFlatBlob() {
 		return name.toFlatBlob();
+	}
+	
+	@Override
+	public InputStream getInputStream() {
+		return name.getInputStream();
 	}
 
 	@Override

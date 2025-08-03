@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharsetDecoder;
@@ -311,4 +312,9 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	
 	@Override
 	public abstract AString toCanonical();
+	
+	@Override
+	public InputStream getInputStream() {
+		return toBlob().getInputStream();
+	}
 }

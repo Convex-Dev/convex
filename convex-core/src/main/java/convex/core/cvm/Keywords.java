@@ -152,6 +152,8 @@ public class Keywords {
 	
 	// Lattice structure keys
 	public static final Keyword APP = Keyword.intern("app");
+	public static final Keyword DATA = Keyword.intern("data");
+	public static final Keyword FS = Keyword.intern("fs");
 	
 
 

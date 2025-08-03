@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
@@ -363,5 +364,8 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return result;
 	}
 
-
+	@Override
+	public InputStream getInputStream() {
+		return toFlatBlob().getInputStream();
+	}
 }

@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -412,4 +414,8 @@ public abstract class AArrayBlob extends ABlob {
 		return n;
 	}
 
+	@Override
+	public InputStream getInputStream() {
+		return new ByteArrayInputStream(store, offset, size());
+	}
 }

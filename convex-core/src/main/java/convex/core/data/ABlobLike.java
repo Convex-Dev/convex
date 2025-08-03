@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.InputStream;
+
 import convex.core.data.util.BlobBuilder;
 import convex.core.util.Utils;
 
@@ -199,5 +201,8 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
-
+	/**
+	 * Get an InputStream for the data of this BlobLike object
+	 */
+	public abstract InputStream getInputStream();
 }

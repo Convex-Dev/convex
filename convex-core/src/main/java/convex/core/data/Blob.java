@@ -296,4 +296,6 @@ public class Blob extends AArrayBlob {
 		return Strings.create(string).toFlatBlob();
 	}
 
+
+
 }

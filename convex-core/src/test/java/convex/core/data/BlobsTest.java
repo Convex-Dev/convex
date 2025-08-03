@@ -543,10 +543,11 @@ public class BlobsTest {
 
 	@Test
 	public void testBigBlob() throws InvalidDataException, BadFormatException, IOException {
-		BlobTree bb = Samples.BIG_BLOB_TREE;
+		final BlobTree bb = Samples.BIG_BLOB_TREE;
 		long len = bb.count();
 
 		assertEquals(Samples.BIG_BLOB_LENGTH, len);
+		assertTrue(bb.isCanonical());
 
 		assertSame(bb, bb.slice(0));
 		assertSame(bb, bb.slice(0, len));
@@ -574,6 +575,9 @@ public class BlobsTest {
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
 		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
+		
+		// Check streaming a BlobTree
+		assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
 
 		doBlobTests(bb);
 	}
@@ -688,6 +692,8 @@ public class BlobsTest {
 		ByteArrayInputStream bis=new ByteArrayInputStream(bs);
 		ABlob r=Blobs.fromStream(bis);
 		assertEquals(b,r);
+		
+		assertEquals(b,Blobs.fromStream(b.getInputStream()));
 	}
 
 	@Test
