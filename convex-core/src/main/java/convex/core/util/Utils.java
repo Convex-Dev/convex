@@ -1289,6 +1289,14 @@ public class Utils {
 			}
 		}
 	}
+	
+	public static <A,B> List<B> map(List<A> values, Function<A,B> mapper) {
+		ArrayList<B> result=new ArrayList<B>(values.size());
+		for (A value: values) {
+			result.add(mapper.apply(value));
+		}
+		return result;
+	}
 
 	public static String joinStrings(List<String> strings, String separator) {
 		StringBuilder sb=new StringBuilder(); 

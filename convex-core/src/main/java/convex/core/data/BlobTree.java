@@ -437,7 +437,6 @@ public class BlobTree extends ABlob {
 	
 	@Override
 	public InputStream getInputStream() {
-		// TODO should be a SequenceInputStream using an Enumeration of children
 		return new SequenceInputStream(enumerateChildStreams());
 	}
 	
