@@ -3,11 +3,11 @@ package convex.lattice;
 import convex.core.data.ACell;
 
 /**
- * Abstract base class for lattice components
+ * Abstract base class for lattice functions
+ * 
+ * @param <V> Type of values in this lattice
  */
 public abstract class ALattice<V extends ACell> {
-
-
 	
 	/**
 	 * Implementation of merge function

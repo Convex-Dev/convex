@@ -1,9 +1,10 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.util.MergeFunction;
+import convex.lattice.ALattice;
 
 public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
 

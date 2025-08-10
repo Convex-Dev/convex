@@ -1,11 +1,12 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.lattice.ALattice;
 
 /**
- * Latttice implementing a max function on natural numbers expressed as CVM integers
+ * Lattice implementing a max function on natural numbers expressed as CVM integers
  */
 public class MaxLattice extends ALattice<AInteger> {
 

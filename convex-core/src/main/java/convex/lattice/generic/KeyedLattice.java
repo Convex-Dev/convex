@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import java.util.ArrayList;
 
@@ -7,6 +7,7 @@ import convex.core.data.AMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.util.Utils;
+import convex.lattice.ALattice;
 
 /**
  * Lattice implementation that handles a set of keyword-mapped child lattices

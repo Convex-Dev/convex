@@ -1,8 +1,9 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import java.util.Comparator;
 
 import convex.core.data.ACell;
+import convex.lattice.ALattice;
 
 /**
  * Lattice node implementing a comparison function.

@@ -1,8 +1,9 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Sets;
+import convex.lattice.ALattice;
 
 /**
  * Lattice for set values that grow via set union

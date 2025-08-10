@@ -1,9 +1,10 @@
-package convex.lattice;
+package convex.lattice.generic;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
+import convex.lattice.ALattice;
 
 /**
  * Lattice node representing signed Data.
