@@ -914,7 +914,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			K k=me.getKey();
 			V v=me.getValue();
 			MapEntry<K,V> mea=this.getEntry(k);
-			if (mea!=null) continue;
+			if (mea!=null) continue; // skip, will merge in second loop
 			if (!Utils.equals(null,v)) {
 				V nv=func.merge(null,v);
 				if (nv==null) {
