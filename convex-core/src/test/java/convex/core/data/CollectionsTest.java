@@ -166,6 +166,7 @@ public class CollectionsTest {
 			V value = me.getValue();
 
 			assertEquals(a.get(key), value);
+			assertEquals(a.getIn(key), value);
 
 			// remove and add back entry
 			AMap<K, V> da = a.dissoc(key);

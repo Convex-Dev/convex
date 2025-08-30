@@ -106,6 +106,7 @@ public class RTTest {
 	public void testGetIn() {
 		assertNull(RT.getIn(null, 1));
 		assertCVMEquals(3,RT.getIn(Vectors.of(2,3), 1));
+		assertCVMEquals(3,Vectors.of(2,3).getIn(1));
 	}
 
 	@Test

@@ -13,7 +13,7 @@ import convex.core.data.StringShort;
 import convex.core.data.Symbol;
 
 /**
- * Internal caching for permanently interned Strings.
+ * Internal caching for permanently interned Strings and symbolic values
  * 
  * Don't use this for anything sent in externally!
  */

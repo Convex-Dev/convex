@@ -2,6 +2,8 @@ package convex.core.data;
 
 import java.util.function.Function;
 
+import convex.core.lang.RT;
+
 /**
  * Abstract base class for Persistent data structures. Each can be regarded as a
  * countable, immutable collection of elements.
@@ -109,6 +111,25 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 */
 	public abstract ACell get(ACell key, ACell notFound);
 
+	/**
+	 * Get the value associated with a path of keys.
+	 * 
+	 * @param keys Keys to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	public ACell getIn(Object... keys) {
+		return RT.getIn(this, keys);
+	}
+	
+	/**
+	 * Get the value associated with a path of keys.
+	 * 
+	 * @param keys Keys to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	public ACell getIn(ACell... keys) {
+		return RT.getIn(this, keys);
+	}
 	
 	/**
 	 * Checks if the data structure contains the specified key

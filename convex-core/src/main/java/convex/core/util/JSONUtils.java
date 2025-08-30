@@ -1,5 +1,6 @@
 package convex.core.util;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -151,11 +152,24 @@ public class JSONUtils {
 	
 	/**
 	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
-	 * @param jsonString String containing JSON5 data
+	 * @param jsonString String containing JSON data
 	 * @return Parsed JSON value as a CVM data structure
 	 */
 	public static ACell parse(String jsonString) {
 		return JSONReader.read(jsonString);
+	}
+	
+	/**
+	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
+	 * @param jsonString AString containing JSON data
+	 * @return Parsed JSON value as a CVM data structure
+	 */
+	public static ACell parse(AString jsonString) {
+		try {
+			return JSONReader.read(jsonString.getInputStream());
+		} catch (IOException e) {
+			throw new Error("Unexpected IO error reading JSON",e);
+		}
 	}
 
 	/**
@@ -373,7 +387,7 @@ public class JSONUtils {
                 }
             }
             appendWhitespaceString(sb, indent);
-            sb.append("}");
+            sb.append('}');
         } else if (o instanceof ASequence) {
         	ASequence<?> list = (ASequence<?>) o;
             int size = list.size();

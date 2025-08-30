@@ -1394,7 +1394,7 @@ public class RT {
 	 * Gets an element from a data structure using the given key path.
 	 * 
 	 * @param coll Collection to query
-	 * @param keys  Key to look up in collection
+	 * @param keys  Keys to look up in collection
 	 * @return Value from collection with the specified key, or null if not found / invalid path
 	 */
 	@SuppressWarnings("unchecked")
@@ -1415,7 +1415,7 @@ public class RT {
 	 * Gets an element from a data structure using the given key path.
 	 * 
 	 * @param coll Collection to query
-	 * @param keys  Key to look up in collection
+	 * @param keys  Key path to look up in collection
 	 * @return Value from collection with the specified key, or null if not found / invalid path
 	 */
 	@SuppressWarnings("unchecked")
