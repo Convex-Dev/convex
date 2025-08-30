@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -304,6 +306,10 @@ public class Strings {
 			bb.append(s);
 		}
 		return Strings.create(bb.toBlob());
+	}
+
+	public static AString fromStream(InputStream inputStream) throws IOException {
+		return create(Blobs.fromStream(inputStream));
 	}
 
 

@@ -32,7 +32,9 @@ import java.util.stream.Collectors;
 import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
+import convex.core.data.AString;
 import convex.core.data.Hash;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 
@@ -720,6 +722,10 @@ public class Utils {
 				return reader.lines().collect(Collectors.joining(System.lineSeparator()));
 			}
 		}
+	}
+	
+	public static AString readResourceAsAString(String path) throws IOException {
+		return Strings.fromStream(getResourceAsStream(path));
 	}
 	
 	/**
@@ -1442,6 +1448,8 @@ public class Utils {
 	public static String urlEncode(String value) {
 	    return URLEncoder.encode(value, StandardCharsets.UTF_8);
 	}
+
+
 
 
 

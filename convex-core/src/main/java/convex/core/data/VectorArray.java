@@ -288,7 +288,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	protected ACell toCanonical() {
+	protected AVector<T> toCanonical() {
 		return 	Vectors.create(data, Utils.checkedInt(start), Utils.checkedInt(count));
 	}
 
