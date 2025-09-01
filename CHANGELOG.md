@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved file / resource handling utilities
 - Improved JSON Functionality
 - New string handling functions
+- Base58 encoding support
 
 ### Changed
 
