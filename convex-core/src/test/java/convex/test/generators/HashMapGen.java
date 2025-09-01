@@ -25,7 +25,6 @@ public class HashMapGen extends Generator<AHashMap> {
         super(AHashMap.class);
     }
 
-    @SuppressWarnings("unchecked")
 	@Override public AHashMap generate(
         SourceOfRandomness r,
         GenerationStatus status) {
