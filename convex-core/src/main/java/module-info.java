@@ -3,6 +3,7 @@ module convex.core {
 	exports convex.core.store;
 	exports convex.core.data.util;
 	exports convex.core.crypto;
+	exports convex.core.crypto.util;
 	exports convex.core.cpos;
 	exports convex.core.data.type;
 	exports convex.core.init;
