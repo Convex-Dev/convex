@@ -30,6 +30,15 @@ public class WebApp {
 		this.server=restServer;
 	}
 	
+	public void addRoutes(Javalin app) {
+		app.get("/index.html", this::indexPage);
+		app.get("/", this::indexPage);
+		app.get("/404.html", this::missingPage);
+		app.get("/llms.txt",this::llmsTxt);
+		
+		app.error(404, this::missingPage);
+	}
+	
 	private void indexPage(Context ctx) {
 		DomContent content= html(
 				makeHeader("Convex Peer Server"),
@@ -97,11 +106,12 @@ public class WebApp {
 		);
 	}
 
-	public void addRoutes(Javalin app) {
-		app.get("/index.html", this::indexPage);
-		app.get("/", this::indexPage);
-		app.get("/404.html", this::missingPage);
-		
-		app.error(404, this::missingPage);
+	protected void llmsTxt(Context ctx) { 
+		StringBuilder sb=new StringBuilder();
+		sb.append("# Convex Peer Server");
+			
+		ctx.result(sb.toString());
+		ctx.contentType("text/plain");
+		ctx.status(200);
 	}
 }

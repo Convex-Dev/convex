@@ -142,6 +142,16 @@ public class JSONUtils {
 	}
 	
 	/**
+	 * Convert any object to a AString containing valid JSON
+	 * 
+	 * @param value Value to convert to JSON, may be Java or CVM structure
+	 * @return Java String containing valid JSON String
+	 */
+	public static AString toAString(Object value) {
+		return toJSONString(value);
+	}
+	
+	/**
 	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
 	 * @param jsonString String containing JSON5 data
 	 * @return Parsed JSON value as a CVM data structure
