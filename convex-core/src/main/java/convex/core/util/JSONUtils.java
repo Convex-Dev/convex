@@ -376,25 +376,28 @@ public class JSONUtils {
     private static BlobBuilder appendPrettyJSON(BlobBuilder sb, ACell o, int indent) {
         if (o instanceof AMap) {
             int entryIndent = indent + INDENT;
-            sb.append("{\n");
+            sb.append("{");
             AMap<?, ?> m = ((AMap<?, ?>) o);
             int size = m.size();
-            int pos = 0;
-            for (int i = 0; i < size; i++) {
-            	MapEntry<?,?> me=m.entryAt(i);
-                AString k = keyValue(me.getKey());
-                appendWhitespaceString(sb, entryIndent);
-                sb.append(toString(k));
-                sb.append(": ");
-                int vIndent = entryIndent + k.size() + 4; // indent for value
-                ACell v = me.getValue();
-                appendPrettyJSON(sb, v, vIndent);
-                pos++;
-                if (pos == size) {
-                    sb.append('\n'); // final entry
-                } else {
-                    sb.append(",\n"); // comma for next entry
-                }
+            if (size>0) {
+            	sb.append('\n');
+	            int pos = 0;
+	            for (int i = 0; i < size; i++) {
+	            	MapEntry<?,?> me=m.entryAt(i);
+	                AString k = keyValue(me.getKey());
+	                appendWhitespaceString(sb, entryIndent);
+	                sb.append(toString(k));
+	                sb.append(": ");
+	                int vIndent = entryIndent + k.size() + 4; // indent for value
+	                ACell v = me.getValue();
+	                appendPrettyJSON(sb, v, vIndent);
+	                pos++;
+	                if (pos == size) {
+	                    sb.append('\n'); // final entry
+	                } else {
+	                    sb.append(",\n"); // comma for next entry
+	                }
+	            }
             }
             appendWhitespaceString(sb, indent);
             sb.append('}');

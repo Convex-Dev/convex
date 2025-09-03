@@ -24,7 +24,7 @@ import convex.core.lang.RT;
 import convex.core.lang.TestState;
 import convex.test.Assertions;
 
-public class DIDTest extends ACVMTest {
+public class DIDRegistryTest extends ACVMTest {
 	
 	Address DID;
 	
