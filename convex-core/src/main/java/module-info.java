@@ -20,6 +20,7 @@ module convex.core {
 	exports convex.core.cvm.ops;
 	exports convex.core.data;
 	exports convex.core.lang;
+	exports convex.core.json;
 	exports convex.etch;
 	exports convex.lattice.fs;
 

@@ -1,6 +1,8 @@
 package convex.core.lang;
 
 import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +44,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -1128,10 +1131,10 @@ public class RT {
 	 * @return Name of the argument, or null if not Named
 	 */
 	public static AString name(ACell a) {
-		if (a instanceof AString)
-			return (AString) a;
-		if (a instanceof ASymbolic)
-			return ((ASymbolic) a).getName();
+		if (a instanceof AString s)
+			return s;
+		if (a instanceof ASymbolic sym)
+			return sym.getName();
 
 		return null;
 	}
@@ -1897,16 +1900,43 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> T jvm(ACell o) {
+		if (o==null) return null;
 		if (o instanceof AString)
 			return (T) o.toString();
 		if (o instanceof CVMLong)
 			return (T) (Long) ((CVMLong) o).longValue();
+		if (o instanceof CVMBigInteger bi)
+			return (T) bi.big();
 		if (o instanceof CVMDouble)
 			return (T) (Double)  ((CVMDouble) o).doubleValue();
 		if (o instanceof CVMBool)
 			return (T) (Boolean) ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)
 			return (T) (Character) ((CVMChar) o).charValue();
+		
+		if (o instanceof ASymbolic symKey) {
+			return (T) symKey.getName().toString();
+		}
+		
+		if (o instanceof AMap map) {
+			HashMap<?,?> hm=new HashMap<>();
+			long n=map.count();
+			for (int i=0; i<n ;i++) {
+				MapEntry<?,?> me=map.entryAt(i);
+				hm.put(RT.jvm(me.getKey()), RT.jvm(me.getValue()));
+			}
+			return (T) hm;
+		}
+		
+		if (o instanceof ACollection coll) {
+			ArrayList<?> jl=new ArrayList<>();
+			long n=coll.count();
+			for (int i=0; i<n ;i++) {
+				jl.add(RT.jvm(coll.get(i)));
+			}
+			return (T) jl;
+		}
+
 		return (T) o;
 	}
 

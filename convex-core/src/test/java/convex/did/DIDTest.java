@@ -151,9 +151,25 @@ public class DIDTest {
     
     @Test
     void testEncodings() {
-        DID did1 = new DID("foo","ŭ");
+    	{	// Unicode character as UTF-8 bytes
+	        DID did1 = new DID("foo","ŭ");
+	        assertEquals("did:foo:%C5%AD", did1.toString());
+	        doDIDTest(did1);
+        }
         
-        assertEquals("did:foo:%C5%AD", did1.toString());
+    	{   // + used for space in query
+    		DIDURL durl= DIDURL.create("did:foo:20?a+b");
+	        assertEquals("a b",durl.getQuery());
+	        doDIDURLTest("did:foo:20?a+b");
+    	}
+    	
+    	// TODO
+//    	{   // + used for space in fragment
+//    		DIDURL durl= DIDURL.create("did:foo:20#a+b");
+//	        assertEquals("a b",durl.getFragment());
+//	        doDIDURLTest("did:foo:20#a+b");
+//    	}
+
     }
     
     @Test

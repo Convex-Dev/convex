@@ -14,8 +14,10 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.cvm.Address;
+import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.util.JSONUtils;
+import convex.core.json.JSONReader;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
 
 /**
@@ -182,7 +184,7 @@ public class Convex {
 		if (keyPair==null) throw new IllegalArgumentException("createAccount requires a non-null valid keyPair");
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("accountKey", keyPair.getAccountKey().toHexString());
-		String json=JSONUtils.toString(req);
+		String json=JSON.toString(req);
 		Map<String,Object> response= doPost(url+"/api/v1/createAccount",json);
 		Address address=Address.parse(response.get("address"));
 		if (address==null) throw new RuntimeException("Account creation failed: "+response);
@@ -283,7 +285,7 @@ public class Convex {
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("address", address.longValue());
 		req.put("amount", requestedAmount);
-		String json=JSONUtils.toString(req);
+		String json=JSON.toString(req);
 
 		return doPost(url+"/api/v1/faucet",json);
 	}
@@ -366,7 +368,7 @@ public class Convex {
 		req.put("hash", message.toHexString());
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
-		String json=JSONUtils.toString(req);
+		String json=JSON.toString(req);
 		return doPostAsync(url+"/api/v1/transaction/submit",json);
 	}
 
@@ -384,7 +386,7 @@ public class Convex {
 		HashMap<String,Object> req=new HashMap<>();
 		if (a!=null) req.put("address", a);
 		req.put("source", code);
-		String json=JSONUtils.toString(req);
+		String json=JSON.toString(req);
 		return json;
 	}
 	
@@ -427,6 +429,7 @@ public class Convex {
 	 * @param body Body of request (as String, should normally be valid JSON)
 	 * @return Future to be filled with JSON response.
 	 */
+	@SuppressWarnings("unchecked")
 	private CompletableFuture<Map<String,Object>> doRequest(SimpleHttpRequest request) {
 		try {
 			CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
@@ -434,7 +437,8 @@ public class Convex {
 				String rbody=null;
 				try {
 					rbody=response.getBody().getBodyText();
-					return JSON.parse(rbody);
+					ACell json=JSONReader.read(response.getBody().getBodyText());
+					return (Map<String,Object>)JSON.json(json);
 				} catch (Exception e) {
 					if (rbody==null) rbody="<Body not readable as String>";
 					Result res= Result.error(ErrorCodes.FORMAT,"Error in response "+response+" because can't parse body: " +rbody);

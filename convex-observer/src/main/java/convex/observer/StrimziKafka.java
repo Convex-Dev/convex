@@ -22,7 +22,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.Result;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.peer.Server;
@@ -83,8 +83,8 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		HashMap<String,Object> val=new HashMap<>();
 		val.put("type","order");
 		
-		val.put("key",JSONUtils.json(so.getAccountKey()));
-		val.put("order-id",JSONUtils.json(so.getHash()));
+		val.put("key",JSON.json(so.getAccountKey()));
+		val.put("order-id",JSON.json(so.getHash()));
 		val.put("ts",Utils.getCurrentTimestamp());
 		
 		Order o=so.getValue();
@@ -105,7 +105,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		HashMap<String,Object> val=new HashMap<>();
 		val.put("type","tx-request");
 		
-		val.put("tx-id",JSONUtils.json(stx.getHash()));
+		val.put("tx-id",JSON.json(stx.getHash()));
 		val.put("tx",buildTXJSON(stx));
 		val.put("ts",Utils.getCurrentTimestamp());
 
@@ -124,17 +124,17 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		HashMap<String,Object> val=new HashMap<>();
 		val.put("type","tx-response");
 		
-		val.put("tx-id",JSONUtils.json(stx.getHash()));
+		val.put("tx-id",JSON.json(stx.getHash()));
 		val.put("tx",buildTXJSON(stx));
 		val.put("ts",Utils.getCurrentTimestamp());
-		val.put("result",JSONUtils.json(r));
+		val.put("result",JSON.json(r));
 		val.put("peer",peerKey);
 
 		return buildRecord(val);
 	}
 
 	protected Object buildTXJSON(SignedData<ATransaction> stx) {
-		return JSONUtils.json(stx.getValue());
+		return JSON.json(stx.getValue());
 	}
 
 	protected HashMap<String, Object> buildRecord(HashMap<String, Object> val) {

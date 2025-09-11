@@ -34,6 +34,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
 
 public class ConvexHTTP extends convex.api.Convex {
@@ -95,7 +96,7 @@ public class ConvexHTTP extends convex.api.Convex {
 				}
 			} else {
 				// assume JSON?
-				Object m = JSON.parse(response.getBodyText());
+				ACell m = JSON.parse(response.getBodyText());
 				return Result.fromJSON(m);
 			}
 		} catch (ParseException e) {

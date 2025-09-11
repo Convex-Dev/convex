@@ -8,7 +8,7 @@ import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 
 /**
  * Base class for REST client instances 
@@ -48,7 +48,7 @@ public class ARESTClient {
 				String rbody=null;
 				try {
 					rbody=response.getBody().getBodyText();
-					return Result.create(null,JSONUtils.parseJSON5(rbody));
+					return Result.create(null,JSON.parseJSON5(rbody));
 				} catch (Exception e) {
 					if (rbody==null) rbody="<Body not readable as String>";
 					Result res= Result.error(ErrorCodes.FORMAT,"Can't parse JSON body: " +rbody);

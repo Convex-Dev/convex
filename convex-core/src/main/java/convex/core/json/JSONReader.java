@@ -25,7 +25,7 @@ import convex.core.json.reader.antlr.JSONLexer;
 import convex.core.json.reader.antlr.JSONParser;
 import convex.core.json.reader.antlr.JSONParser.*;
 import convex.core.lang.reader.ConvexErrorListener;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
 
 /**
@@ -123,7 +123,7 @@ public class JSONReader {
 		public void exitString(StringContext ctx) {
 			String text=ctx.getStart().getText();
 			String content=text.substring(1, text.length()-1);
-			push(JSONUtils.unescape(content));
+			push(JSON.unescape(content));
 		}
 		
 		@Override

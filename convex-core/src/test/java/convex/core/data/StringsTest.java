@@ -17,7 +17,7 @@ import convex.core.cvm.Symbols;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 import convex.test.Samples;
 
 public class StringsTest {
@@ -275,10 +275,10 @@ public class StringsTest {
 		assertEquals(a, abs);
 
 		// JSON round trip as String
-		assertEquals(a, JSONUtils.parseJSON5(JSONUtils.toString(a)));
+		assertEquals(a, JSON.parseJSON5(JSON.toString(a)));
 
 		// JSON escape / unescape
-		assertEquals(a, JSONUtils.unescape(JSONUtils.escape(js).toString()));
+		assertEquals(a, JSON.unescape(JSON.escape(js).toString()));
 
 		// fall back to bloblike tests
 		BlobsTest.doBlobLikeTests(a);

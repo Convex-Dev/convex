@@ -3,17 +3,21 @@ package convex.core.lang;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Symbols;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -99,6 +103,31 @@ public class RTTest {
 		// CVM objects shouldn't change
 		Keyword k = Keyword.create("test-key");
 		assertSame(k, RT.cvm(k));
+
+	}
+	
+	@Test
+	public void testJVMCasts() {
+		assertEquals((Long)1L, RT.jvm(CVMLong.ONE));
+		assertEquals((Double)1.0, RT.jvm(CVMDouble.ONE));
+		assertEquals("foo", RT.jvm(Symbols.FOO));
+		assertEquals("foo", RT.jvm(Keywords.FOO));
+		
+		{
+			List<Object> e=RT.jvm(Vectors.empty());
+			assertTrue(e.isEmpty());
+		}
+		
+		{
+			List<Object> e=RT.jvm(Sets.empty());
+			assertTrue(e.isEmpty());
+		}
+		
+		{
+			List<Object> e=RT.jvm(Lists.empty());
+			assertTrue(e.isEmpty());
+		}
+
 
 	}
 	

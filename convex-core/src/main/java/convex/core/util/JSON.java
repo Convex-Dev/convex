@@ -17,7 +17,6 @@ import convex.core.data.ASequence;
 import convex.core.data.AString;
 import convex.core.data.ASymbolic;
 import convex.core.data.Blob;
-import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
@@ -37,99 +36,12 @@ import convex.core.text.Text;
  * 
  * Note than JSON is a strict subset of CAD3 data, so we expect to encode all valid JSON perfectly in CAD3 / CVM data structures
  */
-public class JSONUtils {
+public class JSON {
 
-	/**
-	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM
-	 * types.
-	 * 
-	 * Note some special one-way conversions that are required because JSON is not
-	 * sufficiently expressive for all CVM types: - Address becomes a Number (Long
-	 * type) - Lists and Vectors both become an Array (Java List type) - Characters
-	 * become a String - Blobs become a hex string representation '0x....'
-	 * 
-	 * @param o Value to convert to JSON value object
-	 * @return Java Object which represents JSON value
-	 */
-	public static Object json(ACell o) {
-		if (o == null)
-			return null;
-		if (o instanceof CVMLong cvmLong)
-			return cvmLong.longValue();
-		if (o instanceof CVMBigInteger bi)
-			return bi.big();
-		if (o instanceof CVMDouble cd)
-			return  cd.doubleValue();
-		if (o instanceof CVMBool bool)
-			return  bool.booleanValue();
-		if (o instanceof CVMChar c)
-			return  c.toString();
-		if (o instanceof Address a)
-			return (Long) a.longValue();
-		if (o instanceof AMap m) {
-			return JSONUtils.jsonMap(m);
-		}
-		if (o instanceof ASequence seq) {
-			long n = seq.count();
-			ArrayList<Object> list = new ArrayList<>();
-			for (long i = 0; i < n; i++) {
-				ACell cvmv = seq.get(i);
-				Object v = json(cvmv);
-				list.add(v);
-			}
-			return list;
-		}
-
-		return o.toString();
-	}
-
-	/**
-	 * Gets a String from a value suitable for use as a JSON map key
-	 * 
-	 * @param k Value to convert to a JSON key
-	 * @return String usable as JSON key
-	 */
-	public static String jsonKey(ACell k) {
-		if (k instanceof AString)
-			return k.toString();
-		if (k instanceof Keyword)
-			return ((Keyword) k).getName().toString();
-		return RT.toString(k);
-	}
 	
-	/**
-	 * Gets a String from a value suitable for use as a JSON map key
-	 * 
-	 * @param o Value to convert to a JSON key
-	 * @return String usable as JSON key
-	 */
-	public static String jsonKey(Object o) {
-		if (o instanceof ACell cell)
-			return jsonKey(cell);
-		
-		if (o instanceof String s) return s;
-		
-		throw new IllegalArgumentException("Invalid type for JSON key: "+Utils.getClassName(o));
-	}
 
-	/**
-	 * Converts a CVM Map to a JSON representation
-	 * 
-	 * @param m Map to convert to JSON representation
-	 * @return Java value which represents JSON object
-	 */
-	public static HashMap<String, Object> jsonMap(AMap<?, ?> m) {
-		int n = m.size();
-		HashMap<String, Object> hm = new HashMap<String, Object>(n);
-		for (long i = 0; i < n; i++) {
-			MapEntry<?, ?> me = m.entryAt(i);
-			ACell k = me.getKey();
-			String sk = jsonKey(k);
-			Object v = json(me.getValue());
-			hm.put(sk, v);
-		}
-		return hm;
-	}
+
+
 
 	/**
 	 * Convert any object to a String containing valid JSON
@@ -138,7 +50,17 @@ public class JSONUtils {
 	 * @return Java String containing valid JSON String
 	 */
 	public static String toString(Object value) {
-		return toJSONString(value).toString();
+		return print(value).toString();
+	}
+	
+	/**
+	 * Convert any object to a String containing valid JSON
+	 * 
+	 * @param value Value to convert to JSON, may be Java or CVM structure
+	 * @return Java String containing valid JSON String
+	 */
+	public static String toStringPretty(Object value) {
+		return printPretty(value).toString();
 	}
 	
 	/**
@@ -148,7 +70,7 @@ public class JSONUtils {
 	 * @return Java String containing valid JSON String
 	 */
 	public static AString toAString(Object value) {
-		return toJSONString(value);
+		return print(value);
 	}
 	
 	/**
@@ -188,7 +110,7 @@ public class JSONUtils {
 	 * @param value Value to convert to JSON, may be Java or CVM structure
 	 * @return CVM String containing valid JSON
 	 */
-	public static AString toJSONString(Object value) {
+	public static AString print(Object value) {
 		BlobBuilder bb = new BlobBuilder();
 		appendJSON(bb, value);
 		return Strings.create(bb.toBlob());
@@ -200,7 +122,7 @@ public class JSONUtils {
 	 * @param value Value to convert to JSON, may be Java or CVM structure
 	 * @return CVM String containing valid JSON
 	 */
-	public static AString toJSONPretty(Object value) {
+	public static AString printPretty(Object value) {
 		BlobBuilder bb = new BlobBuilder();
 		appendPrettyJSON(bb, RT.cvm(value),0);
 		return Strings.create(bb.toBlob());
@@ -260,7 +182,6 @@ public class JSONUtils {
 			return;
 		}
 
-
 		if (value instanceof ASymbolic cs) {
 			bb.append('\"');
 			appendCVMStringQuoted(bb, cs.getName().toString());
@@ -277,10 +198,11 @@ public class JSONUtils {
 					if (Double.isNaN(dv)) {
 						bb.append(JS_NAN);
 					} else {
-						if (dv<0) {
-							bb.append('-');
-						}
-						bb.append("Infinity");
+//						if (dv<0) {
+//							bb.append('-');
+//						}
+//						bb.append("Infinity");
+						bb.append(Strings.NULL);
 					}
 				}
 				return;
@@ -367,6 +289,17 @@ public class JSONUtils {
 			bb.append(bv.booleanValue() ? Strings.TRUE : Strings.FALSE);
 			return;
 		}
+		
+		if (value instanceof CVMChar c) {
+			appendJSON(bb,c.toString()); // TODO: check weird values?
+			return;
+		}
+		
+		if (value instanceof Address a) {
+			bb.append(Long.toString(a.longValue()));
+			return;
+		}
+
 		
 		throw new IllegalArgumentException("Can't print as JSON: "+Utils.getClassName(value));
 	}
@@ -520,5 +453,125 @@ public class JSONUtils {
 		String unes=Text.unescapeJava(content);
 		return Strings.create(unes);
 	}
+
+	/**
+	 * Gets the natural JVM Object representation of a JSON String
+	 * @param <T> Type of JVM value (typically Object, String, Map etc.)
+	 * @param json JSON String
+	 * @return JVM Object representing JSON
+	 */
+	public static <T> T jvm(String json) {
+		return RT.jvm(parse(json));
+	}
+	
+	/**
+	 * Gets the natural JVM Object representation of a JSON String
+	 * @param <T> Type of JVM value (typically Object, String, Map etc.)
+	 * @param json JSON String
+	 * @return JVM Object representing JSON
+	 */
+	public static <T> T jvm(AString json) {
+		return RT.jvm(parse(json));
+	}
+	
+	/**
+	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM
+	 * types.
+	 * 
+	 * Note some special one-way conversions that are required because JSON is not
+	 * sufficiently expressive for all CVM types: - Address becomes a Number (Long
+	 * type) - Lists and Vectors both become an Array (Java List type) - Characters
+	 * become a String - Blobs become a hex string representation '0x....'
+	 * 
+	 * @param o Value to convert to JSON value object
+	 * @return Java Object which represents JSON value
+	 */
+	public static Object json(ACell o) {
+		if (o == null)
+			return null;
+		if (o instanceof CVMLong cvmLong)
+			return cvmLong.longValue();
+		if (o instanceof CVMBigInteger bi)
+			return bi.big();
+		if (o instanceof CVMDouble cd) {
+			double dv=cd.doubleValue();
+			if (!Double.isFinite(dv)) return null; // Don't blame me.... JSON.stringify specs....
+			return dv;
+		}
+		if (o instanceof ASymbolic symKey) {
+			return symKey.getName().toString();
+		}
+			
+		if (o instanceof CVMBool bool)
+			return  bool.booleanValue();
+		if (o instanceof CVMChar c)
+			return  c.toString();
+		if (o instanceof Address a)
+			return (Long) a.longValue();
+		if (o instanceof AMap m) {
+			return JSON.jsonMap(m);
+		}
+		if (o instanceof ACollection seq) {
+			long n = seq.count();
+			ArrayList<Object> list = new ArrayList<>();
+			for (long i = 0; i < n; i++) {
+				ACell cvmv = seq.get(i);
+				Object v = json(cvmv);
+				list.add(v);
+			}
+			return list;
+		}
+
+		return o.toString();
+	}
+	
+	/**
+	 * Converts a CVM Map to a JSON representation
+	 * 
+	 * @param m Map to convert to JSON representation
+	 * @return Java value which represents JSON object
+	 */
+	public static HashMap<String, Object> jsonMap(AMap<?, ?> m) {
+		int n = m.size();
+		HashMap<String, Object> hm = new HashMap<String, Object>(n);
+		for (long i = 0; i < n; i++) {
+			MapEntry<?, ?> me = m.entryAt(i);
+			ACell k = me.getKey();
+			String sk = jsonKey(k);
+			Object v = json(me.getValue());
+			hm.put(sk, v);
+		}
+		return hm;
+	}
+	
+	/**
+	 * Gets a String from a value suitable for use as a JSON map key
+	 * 
+	 * @param k Value to convert to a JSON key
+	 * @return String usable as JSON key
+	 */
+	public static String jsonKey(ACell k) {
+		if (k instanceof AString)
+			return k.toString();
+		if (k instanceof ASymbolic symKey)
+			return symKey.getName().toString();
+		return RT.toString(k);
+	}
+	
+	/**
+	 * Gets a String from a value suitable for use as a JSON map key
+	 * 
+	 * @param o Value to convert to a JSON key
+	 * @return String usable as JSON key
+	 */
+	public static String jsonKey(Object o) {
+		if (o instanceof ACell cell)
+			return jsonKey(cell);
+		
+		if (o instanceof String s) return s;
+		
+		throw new IllegalArgumentException("Invalid type for JSON key: "+Utils.getClassName(o));
+	}
+
 
 }

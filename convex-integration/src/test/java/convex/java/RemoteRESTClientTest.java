@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 
 public class RemoteRESTClientTest {
 	
@@ -73,7 +73,7 @@ public class RemoteRESTClientTest {
 		checkValid(convex);
 		Map<String,Object> result=convex.transact ("(* 3 4)");
 		assertNotNull(result);
-		assertEquals(12L,result.get("value"),"Unexpected:"+JSONUtils.toString(result));
+		assertEquals(12L,result.get("value"),"Unexpected:"+JSON.toString(result));
 	}
 	
 	@SuppressWarnings("null")

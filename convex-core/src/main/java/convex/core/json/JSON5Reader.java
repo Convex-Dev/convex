@@ -31,7 +31,7 @@ import convex.core.json.reader.antlr.JSON5Parser.NilContext;
 import convex.core.json.reader.antlr.JSON5Parser.NumberContext;
 import convex.core.json.reader.antlr.JSON5Parser.ObjContext;
 import convex.core.json.reader.antlr.JSON5Parser.StringContext;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 
 /**
  * A reader implementation that parses JSON5 into CVM data types
@@ -127,14 +127,14 @@ public class JSON5Reader {
 		public void exitString(StringContext ctx) {
 			String text=ctx.getText();
 			String content=text.substring(1, text.length()-1);
-			push(JSONUtils.unescape(content));
+			push(JSON.unescape(content));
 		}
 		
 		@Override
 		public void exitIdentifier(IdentifierContext ctx) {
 			String text=ctx.getText();
 			// no need to take substring, should be full identifier name
-			push(JSONUtils.unescape(text));
+			push(JSON.unescape(text));
 		}
 		
 		@Override

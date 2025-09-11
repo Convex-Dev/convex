@@ -9,10 +9,10 @@ import java.util.concurrent.TimeoutException;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.util.JSON;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.java.Convex;
-import convex.java.JSON;
 
 public class StressTest extends ARESTTest {
 
@@ -66,7 +66,7 @@ public class StressTest extends ARESTTest {
 				// System.out.println(cc.queryAccount());
 				Map<String, Object> res = cc.transact("(def a 1)");
 				if (res.get("errorCode") != null)
-					throw new RuntimeException(JSON.toPrettyString(res));
+					throw new RuntimeException(JSON.toString(res));
 				return res;
 			}, clients);
 			// wait for everything to be sent

@@ -29,7 +29,7 @@ public class ConfigUtils {
 	@SuppressWarnings("unchecked")
 	public static AMap<AString,ACell> readConfig(InputStream resource) throws IOException {
 		String config=Utils.readString(resource);
-		AMap<AString,ACell> result=(AMap<AString, ACell>) JSONUtils.parseJSON5(config);
+		AMap<AString,ACell> result=(AMap<AString, ACell>) JSON.parseJSON5(config);
 		return RT.ensureMap(result);
 	}
 	

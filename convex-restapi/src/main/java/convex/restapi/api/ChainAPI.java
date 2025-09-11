@@ -38,12 +38,12 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.util.JSONUtils;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
-import convex.java.JSON;
 import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
@@ -244,7 +244,7 @@ public class ChainAPI extends ABaseAPI {
 		hm.put("sequence", as.getSequence());
 		hm.put("type", isUser ? "user" : "actor");
 
-		ctx.result(JSON.toPrettyString(hm));
+		ctx.result(JSON.toString(hm));
 	}
 
 	public void queryPeer(Context ctx) throws InterruptedException {
@@ -268,9 +268,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new NotFoundResponse("Peer does not exist: "+addrParam);
 		}
 
-		Object hm = JSON.from(as);
-
-		ctx.result(JSON.toPrettyString(hm));
+		ctx.result(JSON.toString(as));
 	}
 
 	private static Keyword K_FAUCET=Keyword.create("faucet");
@@ -333,12 +331,12 @@ public class ChainAPI extends ABaseAPI {
 		Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
 		if (r.isError()) {
 			HashMap<String, Object> hm = r.toJSON();
-			ctx.result(JSON.toPrettyString(hm));
+			ctx.result(JSON.toString(hm));
 			ctx.status(422);
 		} else {
 			req.put("address", RT.castLong(addr).longValue());
 			req.put("amount", r.getValue());
-			ctx.result(JSON.toPrettyString(req));
+			ctx.result(JSON.toString(req));
 		}
 	}
 
@@ -354,7 +352,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 	
 	protected void failBadRequest(HashMap<String, Object> result) {
-		throw new BadRequestResponse(JSON.toPrettyString(result));
+		throw new BadRequestResponse(JSON.toString(result));
 	}
 
 	private void checkFaucetAllowed() {
@@ -429,10 +427,10 @@ public class ChainAPI extends ABaseAPI {
 		Ref<ATransaction> ref = Cells.persist(trans).getRef();
 		HashMap<String, Object> rmap = new HashMap<>();
 		rmap.put("source", srcValue);
-		rmap.put("address", JSONUtils.json(addr));
+		rmap.put("address", JSON.json(addr));
 		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
 		rmap.put("sequence", sequence);
-		ctx.result(JSON.toPrettyString(rmap));
+		ctx.result(JSON.toString(rmap));
 	}
 
 
@@ -538,11 +536,7 @@ public class ChainAPI extends ABaseAPI {
 	 * @return Object to interpret as code
 	 */
 	private static ACell readCode(Object srcValue) {
-		try {
-			return Reader.read((String) srcValue);
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Source code could not be read: " + e.getMessage()));
-		}
+		return Reader.read((String) srcValue);
 	}
 
 	@OpenApi(path = ROUTE+"transaction/submit",
@@ -672,27 +666,33 @@ public class ChainAPI extends ABaseAPI {
 			}
 		)
 	public void query(Context ctx) throws InterruptedException {
-		Address addr;
-		ACell form;
-		String type=ctx.req().getContentType();
-		
-		if (ContentTypes.CVX.equals(type)) {
-			ACell rbody=getCVXBody(ctx);
-			if (!(rbody instanceof AMap)) {
-				throw new BadRequestResponse("query body is not a map.");
+		try {
+			Address addr;
+			ACell form;
+			String type=ctx.req().getContentType();
+			
+			if (ContentTypes.CVX.equals(type)) {
+				ACell rbody=getCVXBody(ctx);
+				if (!(rbody instanceof AMap)) {
+					throw new BadRequestResponse("query body is not a map.");
+				}
+				@SuppressWarnings("unchecked")
+				AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) rbody;
+				addr=Address.parse(RT.get(req, Keywords.ADDRESS));
+				form=RT.get(req, Keywords.SOURCE);
+			} else {
+				Map<String, Object> req = getJSONBody(ctx);
+				// System.out.println("query data: "+req+ " of type "+Utils.getClassName(req));
+				addr = Address.parse(req.get("address"));
+				Object srcValue = req.get("source");
+				// System.out.println("query source: "+srcValue);
+				form = readCode(srcValue);
 			}
-			@SuppressWarnings("unchecked")
-			AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) rbody;
-			addr=Address.parse(RT.get(req, Keywords.ADDRESS));
-			form=RT.get(req, Keywords.SOURCE);
-		} else {
-			Map<String, Object> req = getJSONBody(ctx);
-			addr = Address.parse(req.get("address"));
-			Object srcValue = req.get("source");
-			form = readCode(srcValue);
+	
+			Result r = convex.querySync(form, addr);
+			prepareResult(ctx,r);
+		} catch (ParseException e) {
+			throw new BadRequestResponse(e.getMessage());
 		}
-
-		Result r = convex.querySync(form, addr);
-		prepareResult(ctx,r);
 	}
 }

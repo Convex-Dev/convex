@@ -23,7 +23,7 @@ import convex.core.util.Utils;
  * Characters are Unicode code points, and can be used to construct Strings on the CVM.
  * Limited to range 0 .. 0x10ffff as per Unicode standard
  * 
- * Encoded as a single byte tag that includes the length of the codepoint value, and a VLC-encoded count
+ * Encoded with a byte tag that includes the length of the codepoint value, and a VLC-encoded count
  */
 public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public static int MAX_CODEPOINT=0x10ffff; // 21 bits max Unicode value

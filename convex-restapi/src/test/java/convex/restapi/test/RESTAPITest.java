@@ -8,12 +8,14 @@ import java.io.IOException;
 import org.apache.hc.client5.http.fluent.Content;
 import org.apache.hc.client5.http.fluent.Request;
 import org.apache.hc.client5.http.fluent.Response;
+import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Maps;
 import convex.core.init.Init;
-import convex.java.JSON;
+import convex.core.util.JSON;
 
 public class RESTAPITest extends ARESTTest {
 	
@@ -40,7 +42,7 @@ public class RESTAPITest extends ARESTTest {
 		}
 		
 		{ // should execute successfully on genesis account
-			String tx=JSON.toPrettyString(JSON.map("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
+			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
 			HttpResponse res=Request.post(API_PATH+"/transact").bodyString(tx, ContentType.APPLICATION_JSON).execute().returnResponse();
 			assertEquals(200,res.getCode());
 		}
@@ -54,14 +56,14 @@ public class RESTAPITest extends ARESTTest {
 		}
 		
 		{ // should be OK
-			String query=JSON.toPrettyString(JSON.map("address",11,"source","*balance*"));
+			String query=JSON.toStringPretty(Maps.of("address",11,"source","*balance*"));
 			Request req=Request.post(API_PATH+"/query").bodyString(query, ContentType.APPLICATION_JSON);
-			HttpResponse res=req.execute().returnResponse();
+			ClassicHttpResponse res=(ClassicHttpResponse) req.execute().returnResponse();
 			assertEquals(200,res.getCode());
 		}
 		
 		{ // should be a failure of query
-			String query=JSON.toPrettyString(JSON.map("address",11,"source","(count)"));
+			String query=JSON.toStringPretty(Maps.of("address",11,"source","(count)"));
 			Request req=Request.post(API_PATH+"/query").bodyString(query, ContentType.APPLICATION_JSON);
 			Response res=req.execute();
 			HttpResponse httpr=res.returnResponse();

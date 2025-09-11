@@ -395,6 +395,7 @@ public class AntlrReader {
 
 
 	public static ACell read(String s) {
+		if (s==null) throw new ParseException("Null input String");
 		return read(CharStreams.fromString(s));
 	}
 	

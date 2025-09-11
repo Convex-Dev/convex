@@ -17,7 +17,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.java.JSON;
+import convex.core.util.JSON;
+import convex.core.exceptions.*;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -56,9 +57,9 @@ public abstract class AGenericAPI {
 	 */
 	protected Map<String, Object> getJSONBody(Context ctx) {
 		try {
-			Map<String, Object> req= JSON.toMap(ctx.body());
+			Map<String, Object> req= RT.jvm(JSON.parse(ctx.body()));
 			return req;
-		} catch (IllegalArgumentException e) {
+		} catch (IllegalArgumentException | ParseException e) {
 			throw new BadRequestResponse(jsonError("Invalid JSON body"));
 		}
 	}
@@ -118,7 +119,7 @@ public abstract class AGenericAPI {
 		if (type.equals(ContentTypes.JSON)) {
 			ctx.contentType(ContentTypes.JSON);
 			HashMap<String, Object> resultJSON = r.toJSON();
-			ctx.result(JSON.toPrettyString(resultJSON));
+			ctx.result(JSON.toStringPretty(resultJSON));
 		} else if (type.equals(ContentTypes.CVX)) {
 			ctx.contentType(ContentTypes.CVX);
 			AString rs=RT.print(r);
