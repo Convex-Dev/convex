@@ -7,7 +7,7 @@ import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
-public class PathCursor<V extends ACell> extends ACursor<V> {
+public class PathCursor<V extends ACell> extends ABranchedCursor<V> {
 
 	ACursor<ACell> base;
 	ACell[] path;
@@ -19,7 +19,7 @@ public class PathCursor<V extends ACell> extends ACursor<V> {
 		this.path=path;
 	}
 	
-	public static <T extends ACell, V extends ACell> ACursor<T> create(ACursor<V> base, ACell[] path) {
+	public static <T extends ACell, V extends ACell> PathCursor<T> create(ACursor<V> base, ACell[] path) {
 		return new PathCursor<>(base,path);
 	}
 	

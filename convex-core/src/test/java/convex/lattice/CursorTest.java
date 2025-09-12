@@ -110,9 +110,9 @@ public class CursorTest {
 	
 	@Test public void testDetachedPath() {
 		AMap<Symbol,AInteger> INITIAL=Maps.of(Symbols.FOO,1);
-		ACursor<AInteger> root=Cursors.of(INITIAL);
-		ACursor<AInteger> path=root.path(Symbols.FOO);
-		ACursor<AInteger> det=path.detach();
+		Root<AInteger> root=Cursors.of(INITIAL);
+		ABranchedCursor<AInteger> path=root.path(Symbols.FOO);
+		ABranchedCursor<AInteger> det=path.detach();
 		
 		// modify detached path
 		assertCVMEquals(1,det.get());

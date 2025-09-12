@@ -10,7 +10,7 @@ import convex.core.data.ACell;
  * Root cursor for an atomically updatable CVM value. This is a lightweight CVM wrapper over java.util.concurrent.atomic.AtomicReference
  * @param <V> Type of cursor values
  */
-public class Root<V extends ACell> extends ACursor<V> {
+public class Root<V extends ACell> extends ABranchedCursor<V> {
 
 	final AtomicReference<V> value;
 	ACursor<V> parent;

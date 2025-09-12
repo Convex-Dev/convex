@@ -15,10 +15,7 @@ import convex.core.lang.RT;
  */
 public abstract class ACursor<V extends ACell> {
 
-	private final V initialValue;
-	
-	protected ACursor(V value) {
-		this.initialValue=value;
+	protected ACursor() {
 	}
 	
 	/**
@@ -69,13 +66,6 @@ public abstract class ACursor<V extends ACell> {
 		});
 	}
 	
-	/**
-	 * Gets the initial value of this cursor
-	 * @return Value of cursor when initialized (possibly null);
-	 */
-	public V getInitialValue() {
-		return initialValue;
-	}
 
 	/**
 	 * Gets the cursor value, and sets it to the new value atomically.
@@ -126,23 +116,13 @@ public abstract class ACursor<V extends ACell> {
 		return v.toString();
 	}
 	
-	@SuppressWarnings("unchecked")
-	public <T extends ACell> ACursor<T> path(ACell... path) {
-		if (path.length==0) return (ACursor<T>) this;
-		return PathCursor.create(this,path);
-	}
+	public abstract <T extends ACell> ACursor<T> path(ACell... path);
 	
-	public ACursor<V> detach() {
-		return Root.create(this);
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> ABranchedCursor<T> detach() {
+		return (ABranchedCursor<T>) Root.create(get());
 	}
  	
-	public boolean sync(ACursor<V> detached) {
-		V newValue=detached.get();
-		V detachedValue=detached.getInitialValue();
-		
-		boolean updated = compareAndSet(detachedValue,newValue);
-		return updated;
-	}
 
 
 }
