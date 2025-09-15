@@ -319,7 +319,9 @@ public final class CVMLong extends AInteger {
 		if (a instanceof CVMLong)  return sub((CVMLong)a);
 		BigInteger bi=big();
 		bi=bi.subtract(a.big());
-		return CVMBigInteger.wrap(bi).toCanonical();
+		CVMBigInteger big=CVMBigInteger.wrap(bi);
+		if (big==null) return null; // overflow case
+		return big.toCanonical();
 	}
 	
 	public AInteger sub(CVMLong b) {

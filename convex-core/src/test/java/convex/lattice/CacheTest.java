@@ -27,7 +27,7 @@ public class CacheTest {
 	@Test
 	public void testBasicCaching() {
 		// Create a source cursor with initial value
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(CVMLong.ONE);
 		
 		// Create TimeCache with 1000ms TTL
 		TimeCache<AInteger> cache = new TimeCache<>(source, 1000);
@@ -48,7 +48,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testCacheInvalidation() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(CVMLong.ONE);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 1000);
 		
 		// Initial fetch
@@ -76,7 +76,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testSourceValueChanges() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(CVMLong.ONE);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 1000);
 		
 		// Initial fetch
@@ -103,7 +103,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testZeroTTL() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(CVMLong.ONE);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 0);
 		
 		// First call
@@ -166,7 +166,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testUtilityMethods() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(CVMLong.ONE);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 5000);
 		
 		// Test TTL getter
@@ -187,7 +187,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testRapidCalls() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(1);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 1000);
 		
 		// Multiple rapid calls should all return same cached value
@@ -206,7 +206,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testDifferentTTLValues() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(1);
 		
 		// Test various TTL values
 		TimeCache<AInteger> cache1 = new TimeCache<>(source, 0);
@@ -228,7 +228,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testFrequentSourceChanges() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(1);
 		TimeCache<AInteger> cache = new TimeCache<>(source, 1000);
 		
 		// Initial fetch
@@ -256,7 +256,7 @@ public class CacheTest {
 	 */
 	@Test
 	public void testLargeTTLValues() {
-		Root<AInteger> source = new Root<>(CVMLong.ONE);
+		Root<AInteger> source = Cursors.of(1);
 		TimeCache<AInteger> cache = new TimeCache<>(source, Long.MAX_VALUE);
 		
 		assertEquals(Long.MAX_VALUE, cache.getTTL());
