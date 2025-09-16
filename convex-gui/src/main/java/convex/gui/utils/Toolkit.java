@@ -60,7 +60,6 @@ import com.formdev.flatlaf.util.SystemInfo;
 import convex.core.util.Utils;
 import net.miginfocom.swing.MigLayout;
 
-@SuppressWarnings("serial")
 public class Toolkit {
 
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());

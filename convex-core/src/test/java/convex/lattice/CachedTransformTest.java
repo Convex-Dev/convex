@@ -4,14 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMLong;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Tests for Cursors.cachedTransform functionality.

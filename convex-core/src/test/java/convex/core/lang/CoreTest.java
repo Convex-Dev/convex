@@ -467,6 +467,7 @@ public class CoreTest extends ACVMTest {
 		// Blob casts treat blob as extended long bits (sign extended if needed)
 		assertEquals(4096L, evalL("(int 0x1000)"));
 		assertEquals(-1L, evalL("(int 0xff)"));
+		assertEquals(0L, evalL("(int 0x)"));
 		assertEquals(-1L, evalL("(int 0xffffffff)"));
 		assertEquals(0x0cff00000050l, evalL("(int 0x0cff00000050)")); 
 		
