@@ -61,12 +61,7 @@ import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.OpenApi;
-import io.javalin.openapi.OpenApiContent;
-import io.javalin.openapi.OpenApiExampleProperty;
-import io.javalin.openapi.OpenApiParam;
-import io.javalin.openapi.OpenApiRequestBody;
-import io.javalin.openapi.OpenApiResponse;
+import io.javalin.openapi.*;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -457,15 +452,22 @@ public class ChainAPI extends ABaseAPI {
 							)}),
 			responses = {
 					@OpenApiResponse(status = "200", 
-							description = "Transaction executed sucessfully", 
+							description = "Transaction executed successfully", 
 							content = {
-								@OpenApiContent(
+								@OpenApiContent(				
 										from=ResultResponse.class,
 										type = "application/json", 
 										exampleObjects = {
-											@OpenApiExampleProperty(name = "value", value = "6")
+											@OpenApiExampleProperty(name = "value", value = "6"),
+											@OpenApiExampleProperty(name = "info", objects={ 
+												@OpenApiExampleProperty(name = "juice", value = "581"),
+												@OpenApiExampleProperty(name = "tx", value = "0x9e328480aef5490ca864c1c1d8881c34b51e8499b59145d3bd6e06bcc6f1ddaf"),
+												@OpenApiExampleProperty(name = "source", value = "SERVER"),
+												@OpenApiExampleProperty(name = "fees", value = "13810"),
+												@OpenApiExampleProperty(name = "loc", value = "[0, 0]")
+											})										
 										}
-										)}),
+								)}),
 					@OpenApiResponse(status = "422", 
 					description = "Transaction failed", 
 					content = {
@@ -544,7 +546,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST,
 			operationId = "transactionSubmit",
 			tags= {"Transactions"},
-			summary="Submit a pre-prepared Convex transaction. If sucessful, will return transaction result.",
+			summary="Submit a pre-prepared Convex transaction. If successful, will return transaction result.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction preparation request",
 					content= @OpenApiContent(
@@ -559,9 +561,16 @@ public class ChainAPI extends ABaseAPI {
 										from=ResultResponse.class,
 										type = "application/json", 
 										exampleObjects = {
-											@OpenApiExampleProperty(name = "value", value = "6")
-										}
-										)}),
+											@OpenApiExampleProperty(name = "value", value = "6"),
+											@OpenApiExampleProperty(name = "info", 
+											objects={ 
+												@OpenApiExampleProperty(name = "juice", value = "581"),
+												@OpenApiExampleProperty(name = "tx", value = "0x9e328480aef5490ca864c1c1d8881c34b51e8499b59145d3bd6e06bcc6f1ddaf"),
+												@OpenApiExampleProperty(name = "source", value = "SERVER"),
+												@OpenApiExampleProperty(name = "fees", value = "13810"),
+												@OpenApiExampleProperty(name = "loc", value = "[0, 0]")
+											})
+										})}),
 					@OpenApiResponse(status = "503", 
 							description = "Transaction service unavailable" )
 				}

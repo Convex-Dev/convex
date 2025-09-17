@@ -13,9 +13,12 @@ import org.junit.jupiter.api.Test;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
+import convex.core.cvm.Keywords;
+import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
@@ -59,6 +62,10 @@ public class ConvexHTTPTest extends ARESTTest {
 		Result r=convex.transactSync("(+ 2 3)");
 		assertFalse(r.isError());
 		assertEquals(CVMLong.create(5),r.getValue());
+		
+		// Should be a transaction hash
+		Hash tx=RT.ensureHash(RT.getIn(r,Keywords.INFO,Keywords.TX));
+		assertNotNull(tx);
 		
 		r=convex.transactSync("(+ :foo 3)");
 		assertEquals(ErrorCodes.CAST,r.getErrorCode());
