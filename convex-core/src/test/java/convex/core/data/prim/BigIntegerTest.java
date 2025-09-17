@@ -28,9 +28,14 @@ import convex.core.lang.Reader;
 import convex.test.Samples;
 
 public class BigIntegerTest {
+	
+	protected Object temp = null;
 
 	@Test public void testBigIntegerAssumptions() {
-		assertThrows(java.lang.NumberFormatException.class,()->new BigInteger(new byte[0]));
+		assertThrows(java.lang.NumberFormatException.class,()->{
+			// Double check assumption that this throws
+			temp=new BigInteger(new byte[0]);
+		});
 		assertEquals(BigInteger.ZERO,new BigInteger(new byte[1]));
 	}
 	
