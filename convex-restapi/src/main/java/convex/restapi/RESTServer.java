@@ -41,6 +41,8 @@ public class RESTServer implements Closeable {
 	protected final Server server;
 	protected final Convex convex;
 	protected Javalin javalin;
+	
+	protected static final Integer DEFAULT_PORT=8080;
 
 	private RESTServer(Server server) {
 		this.server = server;
@@ -188,7 +190,7 @@ public class RESTServer implements Closeable {
 	}
 	
 	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer, Integer port) {
-		if (port==null) port=8998;
+		if (port==null) port=DEFAULT_PORT;
 		ServerConnector connector = new ServerConnector(jettyServer);
 		connector.setPort(port);
 		jettyServer.addConnector(connector);
