@@ -13,6 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.Constants;
 import convex.core.cvm.AFn;
@@ -52,6 +54,7 @@ import convex.test.Samples;
  *
  * State setup includes only basic accounts and core library.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class CompilerTest extends ACVMTest {
 
 	protected CompilerTest() {

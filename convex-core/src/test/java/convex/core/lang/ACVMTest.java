@@ -2,6 +2,9 @@ package convex.core.lang;
 
 import static convex.test.Assertions.assertNotError;
 
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
@@ -20,6 +23,7 @@ import convex.core.util.Utils;
  *
  * Provides utility functions for CVM code execution.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public abstract class ACVMTest {
 
 	protected final State INITIAL;

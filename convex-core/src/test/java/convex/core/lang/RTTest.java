@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -33,6 +35,7 @@ import static convex.test.Assertions.*;
  * these are useful for testing utility functions, edge cases and internal
  * behaviour of the RT class itself.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class RTTest {
 
 	@Test
