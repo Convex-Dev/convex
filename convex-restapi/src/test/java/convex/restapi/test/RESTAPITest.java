@@ -2,6 +2,7 @@ package convex.restapi.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 
@@ -33,6 +34,12 @@ public class RESTAPITest extends ARESTTest {
 		Content c = Request.get("http://localhost:" + server.getPort()+"/swagger").execute().returnContent();
 		String s = c.asString();
 		assertFalse(s.isBlank());
+	}
+	
+	@Test public void testOpenAPI() throws IOException {
+		Content c = Request.get("http://localhost:" + server.getPort()+"/openapi").execute().returnContent();
+		String s = c.asString();
+		assertNotNull(JSON.parse(s));
 	}
 	
 	@Test public void testTransact() throws IOException {
