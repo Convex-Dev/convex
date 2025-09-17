@@ -99,6 +99,12 @@ public class MapsTest {
 		assertEquals(0, Bits.positionForDigit(3, (short) 0x010));
 		assertEquals(1, Bits.positionForDigit(5, (short) 0x010));
 	}
+	
+	@Test
+	public void testJVMGet() {
+		ACell r=Samples.LONG_MAP_10.get((Object)1L);
+		assertEquals(CVMLong.ONE,r);
+	}
 
 	@Test
 	public void testContains() {

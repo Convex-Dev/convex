@@ -210,7 +210,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	@Override
 	public final V get(Object key) {
 		if ((key==null)||(key instanceof ACell)) return (V) get((ACell)key);
-		return null;
+		return get(RT.cvm(key));
 	}
 	
 	public abstract V get(ACell key); 

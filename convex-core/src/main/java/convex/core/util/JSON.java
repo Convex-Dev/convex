@@ -360,6 +360,8 @@ public class JSON {
      * @return
      */
     private static AString keyValue(ACell key) {
+    	if (key instanceof ASymbolic symKey)
+			return symKey.getName();
 		return RT.str(key);
 	}
 

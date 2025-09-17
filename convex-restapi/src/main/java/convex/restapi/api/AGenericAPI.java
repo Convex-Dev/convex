@@ -70,10 +70,19 @@ public abstract class AGenericAPI {
 	 * @return CVM Value
 	 * @throws BadRequestResponse if the body is invalid
 	 */
+	@SuppressWarnings("unchecked")
 	protected <T extends ACell> T getCVXBody(Context ctx) {
 		try {
-			@SuppressWarnings("unchecked")
-			T req= (T) Reader.read(ctx.body());
+			String contentType = ctx.contentType();
+			T req;
+			
+			// Check for JSON content type and use JSON.parse
+			if (ContentTypes.JSON.equals(contentType)) {
+				req = (T) JSON.parse(ctx.body());
+			} else {
+				// Default to Reader.read for other content types
+				req = (T) Reader.read(ctx.body());
+			}
 			return req;
 		} catch (Exception e) {
 			throw new BadRequestResponse(jsonError("Invalid CVX body"));

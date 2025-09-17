@@ -61,7 +61,12 @@ import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.*;
+import io.javalin.openapi.OpenApi;
+import io.javalin.openapi.OpenApiContent;
+import io.javalin.openapi.OpenApiExampleProperty;
+import io.javalin.openapi.OpenApiParam;
+import io.javalin.openapi.OpenApiRequestBody;
+import io.javalin.openapi.OpenApiResponse;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -92,6 +97,7 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "peers/<addr>", this::queryPeer);
 
 		app.get(prefix + "data/<hash>", this::getData);
+		app.get(prefix + "tx", this::getTransaction);
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
@@ -124,6 +130,52 @@ public class ChainAPI extends ABaseAPI {
 		}
 		String ds = Utils.print(d);
 		ctx.result(ds);
+	}
+
+	@OpenApi(path = ROUTE + "tx", 
+			versions="peer-v1",
+			methods = HttpMethod.GET, 
+			tags = { "Transactions"},
+			summary = "Get transaction by hash", 
+			operationId = "getTransaction", 
+			queryParams = {
+					@OpenApiParam(
+							name = "hash", 
+							description = "Transaction hash as a hex string. Leading '0x' is optional but discouraged.", 
+							required = true, 
+							type = String.class, 
+							example = "0x1234567812345678123456781234567812345678123456781234567812345678") },
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Transaction found", 
+						content = {
+							@OpenApiContent(
+									type = "application/json") }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, invalid hash format"),
+				@OpenApiResponse(
+						status = "404", 
+						description = "Transaction not found")
+			})
+	public void getTransaction(Context ctx) {
+		String hashParam = ctx.queryParam("hash");
+		if (hashParam == null) {
+			throw new BadRequestResponse(jsonError("Missing required query parameter: hash"));
+		}
+		
+		Hash h = Hash.parse(hashParam);
+		if (h == null) {
+			throw new BadRequestResponse(jsonError("Invalid hash: " + hashParam));
+		}
+
+		SignedData<ATransaction> transaction = server.getPeer().getTransaction(h);
+		if (transaction == null) {
+			throw new NotFoundResponse("Transaction not found: " + hashParam);
+		}
+
+		ctx.result(JSON.toStringPretty(transaction));
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 
@@ -453,8 +505,10 @@ public class ChainAPI extends ABaseAPI {
 			responses = {
 					@OpenApiResponse(status = "200", 
 							description = "Transaction executed successfully", 
+							
 							content = {
-								@OpenApiContent(				
+								@OpenApiContent(
+									
 										from=ResultResponse.class,
 										type = "application/json", 
 										exampleObjects = {

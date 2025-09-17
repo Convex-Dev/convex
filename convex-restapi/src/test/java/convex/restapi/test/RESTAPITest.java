@@ -50,8 +50,30 @@ public class RESTAPITest extends ARESTTest {
 		
 		{ // should execute successfully on genesis account
 			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
-			HttpResponse res=Request.post(API_PATH+"/transact").bodyString(tx, ContentType.APPLICATION_JSON).execute().returnResponse();
+			Request req=Request.post(API_PATH+"/transact").bodyString(tx, ContentType.APPLICATION_JSON);
+			ClassicHttpResponse res=(ClassicHttpResponse) req.execute().returnResponse();
 			assertEquals(200,res.getCode());
+			
+			// Parse response as JSON to verify it's valid JSON
+			String responseBody = new String(res.getEntity().getContent().readAllBytes());
+			Object parsedResponse = JSON.parse(responseBody);
+			assertNotNull(parsedResponse);
+			
+			// Extract transaction hash from the response using Convex data structures
+			@SuppressWarnings("unchecked")
+			convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell> responseMap = (convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell>) parsedResponse;
+			convex.core.data.ACell infoCell = responseMap.get(convex.core.data.Strings.create("info"));
+			assertNotNull(infoCell, "Response should contain info field");
+			
+			@SuppressWarnings("unchecked")
+			convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell> info = (convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell>) infoCell;
+			convex.core.data.ACell txCell = info.get(convex.core.data.Strings.create("tx"));
+			assertNotNull(txCell, "Info should contain tx field with transaction hash");
+			String txHash = txCell.toString();
+			
+			// Test GET tx endpoint with the extracted hash
+			HttpResponse txResponse = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnResponse();
+			assertEquals(200, txResponse.getCode());
 		}
 	}
 	
