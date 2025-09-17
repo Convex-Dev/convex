@@ -112,7 +112,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	public abstract ACell get(ACell key, ACell notFound);
 
 	/**
-	 * Get the value associated with a path of keys.
+	 * Get the value associated with a path of keys. Converts JVM keys to CVM equivalent if required.
 	 * 
 	 * @param keys Keys to look up in data structures
 	 * @return Value from collection, or null if not found
@@ -122,13 +122,33 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	}
 	
 	/**
-	 * Get the value associated with a path of keys.
+	 * Get the value associated with a path of keys. 
 	 * 
 	 * @param keys Keys to look up in data structures
 	 * @return Value from collection, or null if not found
 	 */
 	public ACell getIn(ACell... keys) {
 		return RT.getIn(this, keys);
+	}
+	
+	/**
+	 * Get the value associated with a key. Converts JVM keys to CVM equivalent if required.
+	 * 
+	 * @param key Key to look up in data structures. 
+	 * @return Value from collection, or null if not found
+	 */
+	public ACell getIn(Object key) {
+		return get(RT.cvm(key));
+	}
+	
+	/**
+	 * Get the value associated with a key.
+	 * 
+	 * @param key Key to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	public ACell getIn(ACell key) {
+		return get(key);
 	}
 	
 	/**

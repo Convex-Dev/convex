@@ -99,6 +99,11 @@ public class MapsTest {
 		assertEquals(0, Bits.positionForDigit(3, (short) 0x010));
 		assertEquals(1, Bits.positionForDigit(5, (short) 0x010));
 	}
+	
+	@Test
+	public void testGetIn() {
+		assertEquals(CVMLong.ONE,Maps.of(2,1).getIn(2));
+	}
 
 	@Test
 	public void testContains() {
