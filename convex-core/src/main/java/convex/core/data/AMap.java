@@ -66,6 +66,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return getKeyRefEntry(ref) != null;
 	}
 	
+	/**
+	 * Checks if this map contains and entry for the given key
+	 * 
+	 * @param key Key to check
+	 */
 	@SuppressWarnings("unchecked")
 	public boolean containsKey(ACell key) {
 		return getEntry((K)key)!=null;
@@ -73,11 +78,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	@Override
 	public final boolean containsKey(Object key) {
-		if ((key==null)||(key instanceof ACell)) {
-			return containsKey((ACell)key);
-		}
-		// If not a valid CVM value, cannot contain key
-		return false;
+		return containsKey(RT.cvm(key));
 	}
 	
 	@Override
@@ -87,7 +88,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	}
 
 	/**
-	 * CHecks if this map contains the given value. WARNING: probably O(n)
+	 * Checks if this map contains the given value. WARNING: probably O(n)
 	 * @param value Value to check
 	 * @return true if map contains value, false otherwise
 	 */
@@ -193,7 +194,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param i Index of entry to get
 	 * @return map entry
 	 */
-	@Override
 	public final MapEntry<K, V> get(long i) {
 		checkIndex(i);
 		return entryAt(i);
@@ -207,10 +207,17 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract MapEntry<K, V> getEntry(ACell k);
 	
+	/**
+	 * Gets the Value in this map for the given key
+	 * 
+	 * @param key Key to lookup in the map. Regular Java values will be converted to equivalent CVM type if necessary
+	 * @return The Value in the map for this key, or null if the key is not found
+	 */
 	@Override
 	public final V get(Object key) {
 		if ((key==null)||(key instanceof ACell)) return (V) get((ACell)key);
-		return get(RT.cvm(key));
+		// Note we don't want to do RT.cvm(...) here, because it breaks Map contract
+		return null;
 	}
 	
 	public abstract V get(ACell key); 
