@@ -96,7 +96,8 @@ public class RESTAPITest extends ARESTTest {
 			String query=JSON.toStringPretty(Maps.of("address",11,"source","(count)"));
 			HttpResponse<String> res = post(API_PATH+"/query", query);
 			assertEquals(200, res.statusCode());
-			AMap<AString,ACell> json=JSON.parse(res.body());
+			@SuppressWarnings("unchecked")
+			AMap<AString,ACell> json=(AMap<AString,ACell>)JSON.parse(res.body());
 			AString errorCode=RT.getIn(json,"error");
 			assertNotNull(errorCode,()->"No errorCode in result: "+json);
 			assertEquals("ARITY",errorCode.toString());
