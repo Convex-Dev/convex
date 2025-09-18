@@ -209,7 +209,7 @@ public abstract class AGenericAPI {
 		BlobBuilder bb = new BlobBuilder();
 		
 		// Minimal HTML structure
-		bb.append("<!DOCTYPE html><html><head><title>Convex API Result</title></head><body><pre>");
+		bb.append("<!DOCTYPE html>\n<html><head><title>Convex API Result</title><meta charset=\"UTF-8\"></head><body><pre>\n");
 		
 		// Format the content
 		try {
@@ -220,7 +220,7 @@ public abstract class AGenericAPI {
 			bb.append(StringUtils.escapeHtml(Strings.create(e.getMessage())));
 		}
 		
-		bb.append("</pre></body></html>");
+		bb.append("\n</pre></body></html>");
 		
 		return bb.getCVMString();
 	}
