@@ -15,8 +15,12 @@ import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Maps;
+import convex.core.cvm.Keywords;
+import convex.core.lang.RT;
 import convex.core.init.Init;
 import convex.core.util.JSON;
+import convex.java.ConvexHTTP;
+import java.net.URI;
 
 public class RESTAPITest extends ARESTTest {
 	
@@ -115,5 +119,86 @@ public class RESTAPITest extends ARESTTest {
 			HttpResponse res=req.execute().returnResponse();
 			assertEquals(200,res.getCode());
 		}
+	}
+	
+	@Test public void testBlock() throws Exception {
+		// Create convex instance
+		URI uri = new URI(HOST_PATH);
+		ConvexHTTP convex = ConvexHTTP.connect(uri, Init.GENESIS_ADDRESS, KP);
+		convex.setAddress(Init.GENESIS_ADDRESS);
+		convex.setKeyPair(KP);
+		
+		// Submit a transaction
+		convex.core.Result result = convex.transactSync("(+ 2 3)");
+		assertNotNull(result);
+		assertFalse(result.isError());
+		
+		// Extract transaction hash from result
+		convex.core.data.ACell infoCell = result.getInfo();
+		assertNotNull(infoCell, "Result should contain info field");
+		
+		@SuppressWarnings("unchecked")
+		convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell> info = 
+			(convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell>) infoCell;
+		convex.core.data.ACell txCell = info.get(Keywords.TX);
+		assertNotNull(txCell, "Info should contain tx field with transaction hash");
+		String txHash = txCell.toString();
+		
+		// Test transaction endpoint to verify transaction and get block location
+		HttpResponse txResponse = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnResponse();
+		assertEquals(200, txResponse.getCode());
+		
+		// Parse transaction response to get block information
+		Content txContent = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnContent();
+		String txResponseBody = txContent.asString();
+		convex.core.data.ACell txParsed = JSON.parse(txResponseBody);
+		assertNotNull(txParsed);
+		
+		// Get blocks to find which block contains our transaction
+		Content blocksContent = Request.get(API_PATH + "/blocks?limit=10").execute().returnContent();
+		String blocksResponseBody = blocksContent.asString();
+		convex.core.data.ACell blocksParsed = JSON.parse(blocksResponseBody);
+		assertNotNull(blocksParsed);
+		
+		// Parse blocks response to find the block with our transaction
+		convex.core.data.ACell itemsCell = RT.getIn(blocksParsed, "items");
+		assertNotNull(itemsCell, "Blocks response should contain items");
+		
+		@SuppressWarnings("unchecked")
+		convex.core.data.AVector<convex.core.data.ACell> items = 
+			(convex.core.data.AVector<convex.core.data.ACell>) itemsCell;
+		assertFalse(items.isEmpty(), "Should have at least one block");
+		
+		// Find the block that contains our transaction (should be the most recent one)
+		// Since we just submitted a transaction, it should be in the latest block
+		convex.core.data.ACell latestBlockCell = items.get(items.count() - 1);
+		convex.core.data.ACell blockIndexCell = RT.getIn(latestBlockCell, "index");
+		assertNotNull(blockIndexCell, "Block should have an index");
+		
+		// Test the specific block endpoint
+		String blockNum = blockIndexCell.toString();
+		HttpResponse blockResponse = Request.get(API_PATH + "/block/" + blockNum).execute().returnResponse();
+		assertEquals(200, blockResponse.getCode());
+		
+		// Parse block response
+		Content blockContent = Request.get(API_PATH + "/block/" + blockNum).execute().returnContent();
+		String blockResponseBody = blockContent.asString();
+		convex.core.data.ACell blockParsed = JSON.parse(blockResponseBody);
+		assertNotNull(blockParsed);
+		
+		// Verify block data structure
+		assertNotNull(RT.getIn(blockParsed, "index"));
+		assertNotNull(RT.getIn(blockParsed, "timestamp"));
+		assertNotNull(RT.getIn(blockParsed, "peer"));
+		assertNotNull(RT.getIn(blockParsed, "hash"));
+		assertNotNull(RT.getIn(blockParsed, "transactionCount"));
+		assertNotNull(RT.getIn(blockParsed, "finalised"));
+		
+		// Verify the block index matches
+		assertEquals(blockIndexCell, RT.getIn(blockParsed, "index"));
+		
+		// Test 404 for non-existent block
+		HttpResponse notFoundResponse = Request.get(API_PATH + "/block/999999").execute().returnResponse();
+		assertEquals(404, notFoundResponse.getCode());
 	}
 }
