@@ -95,12 +95,14 @@ public class ChainAPI extends ABaseAPI {
 
 		app.post(prefix + "transact", this::transact);
 
-		app.get(prefix + "accounts/<addr>", this::queryAccount);
-		app.get(prefix + "peers/<addr>", this::queryPeer);
+		app.get(prefix + "accounts/{addr}", this::queryAccount);
+		app.get(prefix + "peers/{addr}", this::queryPeer);
 
 		app.get(prefix + "data/<hash>", this::getData);
 		app.get(prefix + "tx", this::getTransaction);
+		
 		app.get(prefix + "blocks", this::getBlocks);
+		app.get(prefix + "block/{blockNum}", this::getBlock);
 		
 		convex = restServer.getConvex();
 
@@ -244,6 +246,9 @@ public class ChainAPI extends ABaseAPI {
 		AVector<SignedData<Block>> blocks = peerOrder.getBlocks();
 		long totalBlocks = blocks.count();
 		
+		// Get finality point for determining if blocks are finalised
+		long finalityPoint = server.getPeer().getFinalityPoint();
+		
 		// Calculate actual range
 		long start = Math.min(offset, totalBlocks);
 		long end = Math.min(start + limit, totalBlocks);
@@ -251,19 +256,15 @@ public class ChainAPI extends ABaseAPI {
 		// Build response
 		HashMap<String, Object> response = new HashMap<>();
 		response.put("count", totalBlocks);
+		response.put("offset", offset);
 		
 		// Extract block data for the requested range
 		java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
 		for (long i = start; i < end; i++) {
 			SignedData<Block> signedBlock = blocks.get(i);
-			Block block = signedBlock.getValue();
-			
-			HashMap<String, Object> blockData = new HashMap<>();
+			HashMap<String, Object> blockData = getBlockData(signedBlock);
 			blockData.put("index", i);
-			blockData.put("timestamp", block.getTimeStamp());
-			blockData.put("peer", signedBlock.getAccountKey().toString());
-			blockData.put("hash", signedBlock.getHash().toString());
-			blockData.put("transactionCount", block.getTransactions().count());
+			blockData.put("finalised", i < finalityPoint);
 			
 			items.add(blockData);
 		}
@@ -271,6 +272,85 @@ public class ChainAPI extends ABaseAPI {
 		response.put("items", items);
 		
 		ctx.result(JSON.toStringPretty(response));
+	}
+
+	/**
+	 * Constructs a block data map from a SignedData<Block>
+	 * @param signedBlock The signed block data
+	 * @return HashMap containing block information
+	 */
+	private HashMap<String, Object> getBlockData(SignedData<Block> signedBlock) {
+		Block block = signedBlock.getValue();
+		
+		HashMap<String, Object> blockData = new HashMap<>();
+		blockData.put("timestamp", block.getTimeStamp());
+		blockData.put("peer", signedBlock.getAccountKey().toString());
+		blockData.put("hash", signedBlock.getHash().toString());
+		blockData.put("transactionCount", block.getTransactions().count());
+		
+		return blockData;
+	}
+
+	@OpenApi(path = ROUTE + "block/{blockNum}", 
+			versions="peer-v1",
+			methods = HttpMethod.GET, 
+			tags = { "Blocks"},
+			summary = "Get a specific block by block number", 
+			operationId = "getBlock", 
+			pathParams = {
+					@OpenApiParam(
+							name = "blockNum", 
+							description = "Block number (0-based index)", 
+							required = true, 
+							type = Long.class, 
+							example = "0") },
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Block found", 
+						content = {
+							@OpenApiContent(
+									type = "application/json") }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, invalid block number format"),
+				@OpenApiResponse(
+						status = "404", 
+						description = "Block not found")
+			})
+	public void getBlock(Context ctx) {
+		String blockNumParam = ctx.pathParam("blockNum");
+		long blockNum;
+		
+		try {
+			blockNum = Long.parseLong(blockNumParam);
+			if (blockNum < 0) {
+				throw new BadRequestResponse("Block number must be non-negative");
+			}
+		} catch (NumberFormatException e) {
+			throw new BadRequestResponse("Invalid block number format: must be a number");
+		}
+		
+		// Get blocks from peer order
+		Order peerOrder = server.getPeer().getPeerOrder();
+		AVector<SignedData<Block>> blocks = peerOrder.getBlocks();
+		long totalBlocks = blocks.count();
+		
+		// Check if block exists
+		if (blockNum >= totalBlocks) {
+			throw new NotFoundResponse("Block not found: " + blockNum);
+		}
+		
+		// Get finality point for determining if block is finalised
+		long finalityPoint = server.getPeer().getFinalityPoint();
+		
+		// Get the specific block
+		SignedData<Block> signedBlock = blocks.get(blockNum);
+		HashMap<String, Object> blockData = getBlockData(signedBlock);
+		blockData.put("index", blockNum);
+		blockData.put("finalised", blockNum < finalityPoint);
+		
+		ctx.result(JSON.toStringPretty(blockData));
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 
@@ -422,7 +502,7 @@ public class ChainAPI extends ABaseAPI {
 			tags = { "Account"},
 			summary = "Request coins from a Fucet provider. Requires a peer winning to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
-				description = "Fauncet request, must provide an address for coins to be deposited in", 
+				description = "Faucet request, must provide an address for coins to be deposited in", 
 				content = {@OpenApiContent(
 								from = FaucetRequest.class, 
 								type = "application/json", 
