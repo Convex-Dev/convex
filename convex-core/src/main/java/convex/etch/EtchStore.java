@@ -5,9 +5,6 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.function.Consumer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -29,7 +26,6 @@ import convex.core.util.Utils;
  * Garbage collection is left as an exercise for the reader.
  */
 public class EtchStore extends ACachedStore {
-	private static final Logger log = LoggerFactory.getLogger(EtchStore.class.getName());
 
 	/**
 	 * Etch file instance for the current store
@@ -123,10 +119,8 @@ public class EtchStore extends ACachedStore {
 			existing = readStoreRef(hash);
 			return (Ref<T>) existing;
 		} catch (ClosedChannelException e) {
-			log.debug("Etch store closed during refForHAsh lookup");
 			return null;
 		} catch (IOException e) {
-			log.warn("IO Error in Etch store: "+e);
 			return null;
 		}
 	}
@@ -209,10 +203,6 @@ public class EtchStore extends ACachedStore {
 
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
-			if (log.isTraceEnabled()) {
-				log.trace("Etch persisting at status=" + requiredStatus + " hash = 0x" + fHash.toHexString()
-						+ " ref of class " + Utils.getClassName(cell) + " with store " + this);
-			}
 
 			// ensure status is set when we write to store
 			ref = ref.withMinimumStatus(requiredStatus);

@@ -13,9 +13,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 
@@ -25,9 +22,6 @@ import convex.core.store.Stores;
 public class ThreadUtils {
 
 	private static ExecutorService virtualExecutor = null;
-	
-	private static final Logger log=LoggerFactory.getLogger(ThreadUtils.class.getName());
-
 
 	/**
 	 * Get the current virtual thread ExecutorService, intended for IO-bound blocking operations 
@@ -48,10 +42,10 @@ public class ThreadUtils {
 				    	// These are tasks still awaiting execution
 				    	tasks=executor.shutdownNow();
 				    	if (!tasks.isEmpty()) {
-				    		log.warn("Still pending executor tasks: "+tasks);
+				    		System.err.println("Still pending executor tasks: "+tasks);
 				    	}
 				    	if (!executor.awaitTermination(10000, TimeUnit.MILLISECONDS)) {
-					    	log.warn("Slow shutdown of executor task threads");
+					    	System.err.println("Slow shutdown of executor task threads");
 				    	}     
 				    } 
 				} catch (InterruptedException e) {

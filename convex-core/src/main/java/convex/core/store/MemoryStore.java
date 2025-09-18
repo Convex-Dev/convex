@@ -5,9 +5,6 @@ import java.util.HashMap;
 import java.util.Objects;
 import java.util.function.Consumer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
@@ -15,7 +12,6 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
-import convex.core.util.Utils;
 
 /**
  * Class implementing direct in-memory caching and storage of hashed node data. 
@@ -26,8 +22,6 @@ import convex.core.util.Utils;
  */
 public class MemoryStore extends AStore {
 	public static final MemoryStore DEFAULT = new MemoryStore();
-	
-	private static final Logger log = LoggerFactory.getLogger(MemoryStore.class.getName());
 	
 	protected static final CVMEncoder encoder=new CVMEncoder();
 
@@ -112,14 +106,10 @@ public class MemoryStore extends AStore {
 		});
 		
 		ref=ref.withValue((T)cell);
-		final ACell oTemp=cell;
 
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
-			if (log.isTraceEnabled()) {
-				log.trace("Persisting ref 0x"+fHash.toHexString()+" of class "+Utils.getClassName(oTemp)+" with store "+this);
-			}
 			
 			hashRefs.put(fHash, (Ref<ACell>) ref);
 			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);

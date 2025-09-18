@@ -2,9 +2,6 @@ package convex.core.message;
 
 import java.util.function.Predicate;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
@@ -44,8 +41,6 @@ import convex.core.util.Utils;
  * <p>Messages contain a payload, which can be any data value.</p>
  */
 public class Message {
-	
-	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
 	private static final Message BYE_MESSAGE = Message.create(MessageType.GOODBYE,Vectors.create(MessageTag.BYE));
 
@@ -190,13 +185,6 @@ public class Message {
 			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
-			try {
-				ACell payload=getPayload();
-				// System.out.println(PrintUtils.printRefTree(payload.getRef()));
-				log.info("Can't infer message type with object "+Utils.getClassName(payload),e);
-			} catch (Exception ex) {
-				ex.printStackTrace();
-			}
 		}
 		
 		return MessageType.UNKNOWN;
@@ -272,7 +260,6 @@ public class Message {
 				default: return null;
 			}
 		} catch (Exception e) {
-			log.warn("Unexpected error getting request ID",e);
 			return null;
 		}
 	}
@@ -299,8 +286,7 @@ public class Message {
 			
 			// Peek at Result ID without loading whole payload
 			return Result.peekResultID(messageData,0);
-		} catch (Exception e) {
-			log.warn("Unexpected error getting result ID: "+e.getMessage());
+		} catch (BadFormatException e) {
 			return null;
 		}
 		

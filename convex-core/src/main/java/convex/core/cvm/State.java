@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -90,8 +87,6 @@ public class State extends ARecordGeneric {
 	 * An empty State
 	 */
 	public static final State EMPTY = create(Vectors.empty(), EMPTY_PEERS, Constants.INITIAL_GLOBALS, EMPTY_SCHEDULE);
-
-	private static final Logger log = LoggerFactory.getLogger(State.class.getName());
 
 	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
 			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
@@ -359,7 +354,6 @@ public class State extends ARecordGeneric {
 
 		// now apply the transactions!
 		int n = al.size();
-		log.debug("Applying {} scheduled transactions",n);
 		for (int i = 0; i < n; i++) {
 			AVector<ACell> st = (AVector<ACell>) al.get(i);
 			Address origin = (Address) st.get(0);
@@ -372,10 +366,8 @@ public class State extends ARecordGeneric {
 			if (ctx.isExceptional()) {
 				// TODO: what to do here? probably ignore
 				// we maybe need to think about reporting scheduled results?
-				log.trace("Scheduled transaction error: {}", ctx.getExceptional());
 			} else {
 				state = ctx.getState();
-				log.trace("Scheduled transaction succeeded");
 			}
 		}
 

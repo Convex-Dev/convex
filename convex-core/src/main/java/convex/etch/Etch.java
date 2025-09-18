@@ -13,9 +13,6 @@ import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.Constants;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
@@ -117,7 +114,6 @@ public class Etch {
 	static final long PTR_START = 0x8000000000000000L; // start of chained entries
 	static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
 
-	private static final Logger log=LoggerFactory.getLogger(Etch.class.getName());
 
 	/**
 	 * Temporary byte array on a thread local basis.
@@ -160,7 +156,6 @@ public class Etch {
 		FileChannel fileChannel=this.data.getChannel();
 		FileLock lock=fileChannel.tryLock();
 		if (lock==null) {
-			log.error("Unable to obtain lock on file: {}",dataFile);
 			throw new IOException("File lock failed");
 		}
 
@@ -235,7 +230,6 @@ public class Etch {
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
-		log.debug("Etch created on file: {} with data length: {}", file, etch.dataLength);
 		return etch;
 	}
 
@@ -601,9 +595,8 @@ public class Etch {
 	
 				data.close();
 	
-				log.debug("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
 			} catch (IOException e) {
-				log.error("Error closing Etch file: "+file,e);
+				// ignore
 			}
 		}
 	}
