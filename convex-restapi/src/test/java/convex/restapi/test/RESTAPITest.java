@@ -5,13 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpResponse;
 
-import org.apache.hc.client5.http.fluent.Content;
-import org.apache.hc.client5.http.fluent.Request;
-import org.apache.hc.client5.http.fluent.Response;
-import org.apache.hc.core5.http.ClassicHttpResponse;
-import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Maps;
@@ -20,10 +16,8 @@ import convex.core.lang.RT;
 import convex.core.init.Init;
 import convex.core.util.JSON;
 import convex.java.ConvexHTTP;
-import java.net.URI;
 
 public class RESTAPITest extends ARESTTest {
-	
 	
 	@Test public void testDataAPI() {
 		
@@ -35,32 +29,33 @@ public class RESTAPITest extends ARESTTest {
 //		assertNotNull(c);
 //	}
 	
-	@Test public void testSwagger() throws IOException {
-		Content c = Request.get("http://localhost:" + server.getPort()+"/swagger").execute().returnContent();
-		String s = c.asString();
+	@Test public void testSwagger() throws IOException, InterruptedException {
+		HttpResponse<String> response = get("http://localhost:" + server.getPort()+"/swagger");
+		assertEquals(200, response.statusCode());
+		String s = response.body();
 		assertFalse(s.isBlank());
 	}
 	
-	@Test public void testOpenAPI() throws IOException {
-		Content c = Request.get("http://localhost:" + server.getPort()+"/openapi").execute().returnContent();
-		String s = c.asString();
+	@Test public void testOpenAPI() throws IOException, InterruptedException {
+		HttpResponse<String> response = get("http://localhost:" + server.getPort()+"/openapi");
+		assertEquals(200, response.statusCode());
+		String s = response.body();
 		assertNotNull(JSON.parse(s));
 	}
 	
-	@Test public void testTransact() throws IOException {
+	@Test public void testTransact() throws IOException, InterruptedException {
 		{ // should be a bad request with non-parseable/missing fields
-			HttpResponse res=Request.post(API_PATH+"/transact").execute().returnResponse();
-			assertEquals(400,res.getCode());
+			HttpResponse<String> res = post(API_PATH+"/transact", "");
+			assertEquals(400, res.statusCode());
 		}
 		
 		{ // should execute successfully on genesis account
 			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
-			Request req=Request.post(API_PATH+"/transact").bodyString(tx, ContentType.APPLICATION_JSON);
-			ClassicHttpResponse res=(ClassicHttpResponse) req.execute().returnResponse();
-			assertEquals(200,res.getCode());
+			HttpResponse<String> res = post(API_PATH+"/transact", tx);
+			assertEquals(200, res.statusCode());
 			
 			// Parse response as JSON to verify it's valid JSON
-			String responseBody = new String(res.getEntity().getContent().readAllBytes());
+			String responseBody = res.body();
 			Object parsedResponse = JSON.parse(responseBody);
 			assertNotNull(parsedResponse);
 			
@@ -77,47 +72,41 @@ public class RESTAPITest extends ARESTTest {
 			String txHash = txCell.toString();
 			
 			// Test GET tx endpoint with the extracted hash
-			HttpResponse txResponse = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnResponse();
-			assertEquals(200, txResponse.getCode());
+			HttpResponse<String> txResponse = get(API_PATH + "/tx?hash=" + txHash);
+			assertEquals(200, txResponse.statusCode());
 		}
 	}
 	
-	@Test public void testQuery() throws IOException {
+	@Test public void testQuery() throws IOException, InterruptedException {
 		{ // should be a bad request with bad JSON
-			Request req=Request.post(API_PATH+"/query").bodyString("fddfgb", ContentType.APPLICATION_JSON);
-			HttpResponse res=req.execute().returnResponse();
-			assertEquals(400,res.getCode());
+			HttpResponse<String> res = post(API_PATH+"/query", "fddfgb");
+			assertEquals(400, res.statusCode());
 		}
 		
 		{ // should be OK
 			String query=JSON.toStringPretty(Maps.of("address",11,"source","*balance*"));
-			Request req=Request.post(API_PATH+"/query").bodyString(query, ContentType.APPLICATION_JSON);
-			ClassicHttpResponse res=(ClassicHttpResponse) req.execute().returnResponse();
-			assertEquals(200,res.getCode());
+			HttpResponse<String> res = post(API_PATH+"/query", query);
+			assertEquals(200, res.statusCode());
 		}
 		
 		{ // should be a failure of query
 			String query=JSON.toStringPretty(Maps.of("address",11,"source","(count)"));
-			Request req=Request.post(API_PATH+"/query").bodyString(query, ContentType.APPLICATION_JSON);
-			Response res=req.execute();
-			HttpResponse httpr=res.returnResponse();
-			assertEquals(422,httpr.getCode());
+			HttpResponse<String> res = post(API_PATH+"/query", query);
+			assertEquals(422, res.statusCode());
 			// assertEquals("ARITY",((Map<String,Object>)JSON.parse(c.asString())).get("errorCode"));
 		}
 			
 	}
 	
-	@Test public void testQueryAccount() throws IOException {
+	@Test public void testQueryAccount() throws IOException, InterruptedException {
 		{ // should be a bad request with bad JSON
-			Request req=Request.get(API_PATH+"/accounts/999999");
-			HttpResponse res=req.execute().returnResponse();
-			assertEquals(404,res.getCode());
+			HttpResponse<String> res = get(API_PATH+"/accounts/999999");
+			assertEquals(404, res.statusCode());
 		}
 		
 		{ // should be OK
-			Request req=Request.get(API_PATH+"/accounts/11");
-			HttpResponse res=req.execute().returnResponse();
-			assertEquals(200,res.getCode());
+			HttpResponse<String> res = get(API_PATH+"/accounts/11");
+			assertEquals(200, res.statusCode());
 		}
 	}
 	
@@ -145,18 +134,17 @@ public class RESTAPITest extends ARESTTest {
 		String txHash = txCell.toString();
 		
 		// Test transaction endpoint to verify transaction and get block location
-		HttpResponse txResponse = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnResponse();
-		assertEquals(200, txResponse.getCode());
+		HttpResponse<String> txResponse = get(API_PATH + "/tx?hash=" + txHash);
+		assertEquals(200, txResponse.statusCode());
 		
 		// Parse transaction response to get block information
-		Content txContent = Request.get(API_PATH + "/tx?hash=" + txHash).execute().returnContent();
-		String txResponseBody = txContent.asString();
+		String txResponseBody = txResponse.body();
 		convex.core.data.ACell txParsed = JSON.parse(txResponseBody);
 		assertNotNull(txParsed);
 		
 		// Get blocks to find which block contains our transaction
-		Content blocksContent = Request.get(API_PATH + "/blocks?limit=10").execute().returnContent();
-		String blocksResponseBody = blocksContent.asString();
+		HttpResponse<String> blocksResponse = get(API_PATH + "/blocks?limit=10");
+		String blocksResponseBody = blocksResponse.body();
 		convex.core.data.ACell blocksParsed = JSON.parse(blocksResponseBody);
 		assertNotNull(blocksParsed);
 		
@@ -177,12 +165,11 @@ public class RESTAPITest extends ARESTTest {
 		
 		// Test the specific block endpoint
 		String blockNum = blockIndexCell.toString();
-		HttpResponse blockResponse = Request.get(API_PATH + "/block/" + blockNum).execute().returnResponse();
-		assertEquals(200, blockResponse.getCode());
+		HttpResponse<String> blockResponse = get(API_PATH + "/block/" + blockNum);
+		assertEquals(200, blockResponse.statusCode());
 		
 		// Parse block response
-		Content blockContent = Request.get(API_PATH + "/block/" + blockNum).execute().returnContent();
-		String blockResponseBody = blockContent.asString();
+		String blockResponseBody = blockResponse.body();
 		convex.core.data.ACell blockParsed = JSON.parse(blockResponseBody);
 		assertNotNull(blockParsed);
 		
@@ -198,7 +185,7 @@ public class RESTAPITest extends ARESTTest {
 		assertEquals(blockIndexCell, RT.getIn(blockParsed, "index"));
 		
 		// Test 404 for non-existent block
-		HttpResponse notFoundResponse = Request.get(API_PATH + "/block/999999").execute().returnResponse();
-		assertEquals(404, notFoundResponse.getCode());
+		HttpResponse<String> notFoundResponse = get(API_PATH + "/block/999999");
+		assertEquals(404, notFoundResponse.statusCode());
 	}
 }
