@@ -2,12 +2,12 @@ package convex.demo;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 
 public class FaucetDemo {
 
 	public static void main(String[] args) {
-		Convex convex=Convex.connect("https://convex.world");
+		ConvexJSON convex=ConvexJSON.connect("https://convex.world");
 		
 		// Create a key pair to use with Convex
 		AKeyPair kp=AKeyPair.generate();

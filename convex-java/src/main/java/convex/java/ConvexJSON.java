@@ -31,7 +31,7 @@ import convex.core.util.Utils;
  * if concurrent transactions are submitted. Read-only actions (e.g. queries) do not have this
  * limitation.
  */
-public class Convex {
+public class ConvexJSON {
 
 
 	private final String url;
@@ -40,7 +40,7 @@ public class Convex {
 	private Address address;
 	private Long sequence=null;
 
-	private Convex(String peerServerURL) {
+	private ConvexJSON(String peerServerURL) {
 		this.url = peerServerURL;
 		this.httpClient = HttpClient.newBuilder()
 				.connectTimeout(Duration.ofSeconds(30))
@@ -54,8 +54,8 @@ public class Convex {
 	 * @param keyPair Key pair to use for this connection
 	 * @return New Convex instance with supplied connection details
 	 */
-	public static Convex connect(String peerServerURL, Address address,AKeyPair keyPair) {
-		Convex convex=new Convex(peerServerURL);
+	public static ConvexJSON connect(String peerServerURL, Address address,AKeyPair keyPair) {
+		ConvexJSON convex=new ConvexJSON(peerServerURL);
 		convex.setAddress(address);
 		convex.setKeyPair(keyPair);
 		return convex;
@@ -70,8 +70,8 @@ public class Convex {
 	 * @param peerServerURL Peer server address, e.g. "https://convex.world"
 	 * @return New Convex instance with supplied connection details
 	 */
-	public static Convex connect(String peerServerURL) {
-		Convex convex=new Convex(peerServerURL);
+	public static ConvexJSON connect(String peerServerURL) {
+		ConvexJSON convex=new ConvexJSON(peerServerURL);
 		return convex;
 	}
 

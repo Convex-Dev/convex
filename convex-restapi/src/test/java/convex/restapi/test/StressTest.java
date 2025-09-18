@@ -12,7 +12,7 @@ import convex.core.cvm.Address;
 import convex.core.util.JSON;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 
 public class StressTest extends ARESTTest {
 
@@ -22,14 +22,14 @@ public class StressTest extends ARESTTest {
 
 	public static void main(String... args) throws InterruptedException, ExecutionException, TimeoutException {
 		try {
-			Convex convex = Convex.connect("http://localhost:" + port);
+			ConvexJSON convex = ConvexJSON.connect("http://localhost:" + port);
 			long startTime = Utils.getTimeMillis();
 
-			ArrayList<Convex> clients = new ArrayList<>(CLIENTCOUNT);
+			ArrayList<ConvexJSON> clients = new ArrayList<>(CLIENTCOUNT);
 			for (int i = 0; i < CLIENTCOUNT; i++) {
 				AKeyPair kp = KP;
 				Address clientAddr = convex.createAccount(kp);
-				Convex cc = Convex.connect("http://localhost:" + port);
+				ConvexJSON cc = ConvexJSON.connect("http://localhost:" + port);
 				cc.setAddress(clientAddr);
 				cc.setKeyPair(kp);
 				clients.add(cc);

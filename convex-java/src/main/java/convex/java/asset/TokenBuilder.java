@@ -8,7 +8,7 @@ import convex.core.data.AMap;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 
 public class TokenBuilder {
 	private static final Keyword SUPPLY=Keyword.create("supply");
@@ -48,7 +48,7 @@ public class TokenBuilder {
 		return sb.toString();
 	}
 	
-	public Fungible deploy(Convex convex) {
+	public Fungible deploy(ConvexJSON convex) {
 		String code=generateCode();
 		
 		Map<String,Object> result= convex.transact(code);

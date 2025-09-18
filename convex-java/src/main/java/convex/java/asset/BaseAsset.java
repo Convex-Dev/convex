@@ -1,7 +1,7 @@
 package convex.java.asset;
 
 import convex.core.cvm.Address;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 
 /**
  * Abstract base class for asset instances
@@ -9,9 +9,9 @@ import convex.java.Convex;
  */
 public abstract class BaseAsset<T> {
 	
-	protected final Convex convex;
+	protected final ConvexJSON convex;
 	
-	protected BaseAsset(Convex convex) {
+	protected BaseAsset(ConvexJSON convex) {
 		this.convex=convex;
 	}
 

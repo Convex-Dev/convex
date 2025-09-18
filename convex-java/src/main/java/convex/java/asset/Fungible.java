@@ -3,17 +3,17 @@ package convex.java.asset;
 import java.util.Map;
 
 import convex.core.cvm.Address;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 
 public class Fungible extends BaseAsset<Long> {
 	private final Address tokenAddress;
 	
-	protected Fungible(Convex convex, Address address) {
+	protected Fungible(ConvexJSON convex, Address address) {
 		super(convex);
 		this.tokenAddress=address;
 	}
 	
-	public static Fungible create(Convex convex, Address tokenAddress) {
+	public static Fungible create(ConvexJSON convex, Address tokenAddress) {
 		return new Fungible(convex,tokenAddress);
 	}
 	

@@ -2,7 +2,7 @@ package example.asset;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.java.Convex;
+import convex.java.ConvexJSON;
 import convex.java.asset.Fungible;
 import convex.java.asset.TokenBuilder;
 
@@ -19,7 +19,7 @@ public class BuildAsset {
 
 	public static void main(String [] args) {
 		// Make a Convex connection to test network
-		Convex convex=Convex.connect(TEST_PEER);
+		ConvexJSON convex=ConvexJSON.connect(TEST_PEER);
 		System.out.println("Hello Convex! Connected to "+TEST_PEER);
 		
 		// Create a new account with our key pair
