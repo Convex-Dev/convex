@@ -78,8 +78,23 @@ public class JSON {
 	 * @param jsonString String containing JSON5 data
 	 * @return Parsed JSON value as a CVM data structure
 	 */
-	public static ACell parseJSON5(String jsonString) {
-		return JSON5Reader.read(jsonString);
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T parseJSON5(String jsonString) {
+		return (T) JSON5Reader.read(jsonString);
+	}
+	
+	/**
+	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
+	 * @param jsonString String containing JSON5 data
+	 * @return Parsed JSON value as a CVM data structure
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T parseJSON5(AString jsonString) {
+		try {
+			return (T) JSON5Reader.read(jsonString.getInputStream());
+		} catch (IOException e) {
+			throw new Error("Unexpected IO error reading JSON",e);
+		}
 	}
 	
 	/**
@@ -87,8 +102,9 @@ public class JSON {
 	 * @param jsonString String containing JSON data
 	 * @return Parsed JSON value as a CVM data structure
 	 */
-	public static ACell parse(String jsonString) {
-		return JSONReader.read(jsonString);
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T parse(String jsonString) {
+		return (T)JSONReader.read(jsonString);
 	}
 	
 	/**
@@ -96,9 +112,10 @@ public class JSON {
 	 * @param jsonString AString containing JSON data
 	 * @return Parsed JSON value as a CVM data structure
 	 */
-	public static ACell parse(AString jsonString) {
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T parse(AString jsonString) {
 		try {
-			return JSONReader.read(jsonString.getInputStream());
+			return (T) JSONReader.read(jsonString.getInputStream());
 		} catch (IOException e) {
 			throw new Error("Unexpected IO error reading JSON",e);
 		}

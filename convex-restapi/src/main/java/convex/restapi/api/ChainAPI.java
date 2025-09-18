@@ -11,6 +11,8 @@ import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -24,6 +26,7 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -36,9 +39,6 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.data.AVector;
-import convex.core.cpos.Block;
-import convex.core.cpos.Order;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
@@ -46,7 +46,6 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
@@ -136,8 +135,7 @@ public class ChainAPI extends ABaseAPI {
 		} catch (Exception e) {
 			throw new BadRequestResponse(jsonError("Error: " + e.getMessage()));
 		}
-		String ds = Utils.print(d);
-		ctx.result(ds);
+		setContent(ctx,d);
 	}
 
 	@OpenApi(path = ROUTE + "tx", 
@@ -401,7 +399,7 @@ public class ChainAPI extends ABaseAPI {
 				convex.transferSync(a, amt.longValue());
 			}
 		} catch (ResultException e) {
-			prepareResult(ctx,e.getResult());
+			setContent(ctx,e.getResult());
 			return;
 		}
 		ctx.result("{\"address\": " + a.longValue() + "}");
@@ -442,7 +440,7 @@ public class ChainAPI extends ABaseAPI {
 		Result r = convex.querySync(Lists.of(Symbols.ACCOUNT, addr));
 
 		if (r.isError()) {
-			prepareResult(ctx,r);
+			setContent(ctx,r);
 			return;
 		}
 
@@ -481,7 +479,7 @@ public class ChainAPI extends ABaseAPI {
 		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
-			prepareResult(ctx,r);
+			setContent(ctx,r);
 			return;
 		}
 
@@ -641,7 +639,7 @@ public class ChainAPI extends ABaseAPI {
 				sequence = convex.getSequence(addr)+1;
 			}
 		} catch (ResultException e) {
-			prepareResult(ctx,e.getResult());
+			setContent(ctx,e.getResult());
 			return;
 		}
 
@@ -652,6 +650,7 @@ public class ChainAPI extends ABaseAPI {
 		rmap.put("address", JSON.json(addr));
 		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
 		rmap.put("sequence", sequence);
+		ctx.status(200);
 		ctx.result(JSON.toString(rmap));
 	}
 
@@ -748,7 +747,7 @@ public class ChainAPI extends ABaseAPI {
 				long sequence = convex.getSequence(addr);
 				nextSeq = sequence + 1;
 			} catch (ResultException e) {
-				prepareResult(ctx,e.getResult());
+				setContent(ctx,e.getResult());
 				return;
 			} 
 		
@@ -758,7 +757,7 @@ public class ChainAPI extends ABaseAPI {
 		} 
 
 		Result r = convex.transactSync(sd);
-		prepareResult(ctx,r);
+		setContent(ctx,r);
 	}
 
 	/**
@@ -823,11 +822,11 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
 			trans = (ATransaction) maybeTrans;
 		} catch (MissingDataException e) {
-			prepareResult(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
+			setContent(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
 			ctx.status(404);
 			return;
 		} catch (BadFormatException e) {
-			prepareResult(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
+			setContent(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
 			ctx.status(400);
 			return;
 		} 
@@ -853,7 +852,7 @@ public class ChainAPI extends ABaseAPI {
 
 		SignedData<ATransaction> sd = SignedData.create(key, sig, trans.getRef());
 		Result r = convex.transactSync(sd);
-		prepareResult(ctx,r);
+		setContent(ctx,r);
 	}
 
 	@OpenApi(path = ROUTE+"query",
@@ -879,7 +878,7 @@ public class ChainAPI extends ABaseAPI {
 				}),
 		responses = {
 				@OpenApiResponse(status = "200", 
-						description = "Query executed", 
+						description = "Query executed. Result could be a CVM error, but query itself was valid", 
 						content = {
 							@OpenApiContent(
 									from=ResultResponse.class,
@@ -889,13 +888,13 @@ public class ChainAPI extends ABaseAPI {
 									}
 									)}),
 				@OpenApiResponse(status = "422", 
-				description = "Query failed", 
+				description = "Query failed due to bad input", 
 				content = {
 					@OpenApiContent(
 							from=ResultResponse.class,
 							type = "application/json", 
 							exampleObjects = {
-								@OpenApiExampleProperty(name = "errorCode", value = ":SYNTAX"),
+								@OpenApiExampleProperty(name = "error", value = "SYNTAX"),
 								@OpenApiExampleProperty(name = "value", value = "Bad syntax")
 							}
 							)}),
@@ -928,7 +927,7 @@ public class ChainAPI extends ABaseAPI {
 			}
 	
 			Result r = convex.querySync(form, addr);
-			prepareResult(ctx,r);
+			setContent(ctx,r);
 		} catch (ParseException e) {
 			throw new BadRequestResponse(e.getMessage());
 		}

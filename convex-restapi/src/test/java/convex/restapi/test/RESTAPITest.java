@@ -10,6 +10,9 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.Maps;
 import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
@@ -89,13 +92,15 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(200, res.statusCode());
 		}
 		
-		{ // should be a failure of query
+		{ // should be a failure of query due to bad code execution
 			String query=JSON.toStringPretty(Maps.of("address",11,"source","(count)"));
 			HttpResponse<String> res = post(API_PATH+"/query", query);
-			assertEquals(422, res.statusCode());
-			// assertEquals("ARITY",((Map<String,Object>)JSON.parse(c.asString())).get("errorCode"));
+			assertEquals(200, res.statusCode());
+			AMap<AString,ACell> json=JSON.parse(res.body());
+			AString errorCode=RT.getIn(json,"error");
+			assertNotNull(errorCode,()->"No errorCode in result: "+json);
+			assertEquals("ARITY",errorCode.toString());
 		}
-			
 	}
 	
 	@Test public void testQueryAccount() throws IOException, InterruptedException {

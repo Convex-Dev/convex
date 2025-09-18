@@ -11,6 +11,12 @@ public class ContentTypes {
 	public static final String TEXT="text/plain";
 	
 	/**
+	 * Content type for plain test
+	 */
+	public static final String HTML="text/html";
+
+	
+	/**
 	 * Content type for JSON
 	 */
 	public static final String JSON="application/json";

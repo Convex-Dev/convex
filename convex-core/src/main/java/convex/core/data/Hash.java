@@ -149,7 +149,12 @@ public class Hash extends AArrayBlob {
 	 * @return Hash value, or null if not parseable
 	 */
 	public static Hash parse(String s) {
-		return wrap(Blobs.parse(s));
+		ABlob b=Blobs.parse(s);
+		if (b!=null) {
+			return wrap(b);
+		}
+		
+		return null;
 	}
 	
 	/**

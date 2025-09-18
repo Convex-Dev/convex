@@ -2,7 +2,6 @@ package convex.restapi.api;
 
 import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.Map;
 
 import convex.api.ContentTypes;
@@ -15,10 +14,11 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
+import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.core.exceptions.*;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -44,6 +44,12 @@ public abstract class AGenericAPI {
 				if (a.contains(ContentTypes.CVX_RAW)) {
 					type=ContentTypes.CVX_RAW;
 					break;
+				}
+				if (a.contains(ContentTypes.TEXT)) {
+					type=ContentTypes.TEXT;
+				}
+				if (a.contains(ContentTypes.HTML)) {
+					type=ContentTypes.HTML;
 				}
 				if (a.contains(ContentTypes.CVX)) {
 					type=ContentTypes.CVX;
@@ -118,33 +124,54 @@ public abstract class AGenericAPI {
 		return "{\"error\":\"" + string + "\"}";
 	}
 
-
-	public void prepareResult(Context ctx, Result r) {
-		if (r.getSource()==null) {
-			r=r.withSource(SourceCodes.SERVER);
+	/**
+	 * Set content to a CVM Result according to requested content type. Updates status according to result error status
+	 * @param ctx Javalin context
+	 * @param resultContent 
+	 */
+	public void setResult(Context ctx, Result resultContent) {
+		if (resultContent.getSource()==null) {
+			resultContent=resultContent.withSource(SourceCodes.SERVER);
 		}
 		
-		int status=statusForResult(r);
+		int status=statusForResult(resultContent);
 		ctx.status(status);
+		
+		setContent(ctx,(ACell)resultContent);
+	}
+	
+	/**
+	 * Set content to a CVM Value according to requested content type. Updates status according to result error status
+	 * @param ctx Javalin context
+	 * @param content Return content
+	 */
+	public void setContent(Context ctx, ACell content) {
 		
 		String type = calcResponseContentType(ctx);
 		
 		if (type.equals(ContentTypes.JSON)) {
 			ctx.contentType(ContentTypes.JSON);
-			HashMap<String, Object> resultJSON = r.toJSON();
-			ctx.result(JSON.toStringPretty(resultJSON));
+			ctx.result(JSON.printPretty(content).getInputStream());
 		} else if (type.equals(ContentTypes.CVX)) {
 			ctx.contentType(ContentTypes.CVX);
-			AString rs=RT.print(r);
+			AString rs=RT.print(content);
 			if (rs==null) {
-				rs=RT.print(Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
+				setResult(ctx,Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
 				ctx.status(403); // Forbidden because of result size
+				return;
 			}
 			ctx.result(rs.toString());
 		} else if (type.equals(ContentTypes.CVX_RAW)) {
 			ctx.contentType(ContentTypes.CVX_RAW);
-			Blob b=Format.encodeMultiCell(r, true);
+			Blob b=Format.encodeMultiCell(content, true);
 			ctx.result(b.getBytes());
+		} else if (type.equals(ContentTypes.HTML)) {
+			ctx.contentType(ContentTypes.HTML);
+			AString htmlContent = formatAsHTML(content);
+			ctx.result(htmlContent.toString());
+		} else if (type.equals(ContentTypes.TEXT)) {
+			ctx.contentType(ContentTypes.TEXT);
+			ctx.result("Unsupported content type: "+type);
 		} else {
 			ctx.contentType(ContentTypes.TEXT);
 			ctx.status(415); // unsupported media type for "Accept" header
@@ -170,5 +197,56 @@ public abstract class AGenericAPI {
 		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
 		int status = 422;
 		return status;
+	}
+	
+	/**
+	 * Format CVM data as minimal HTML
+	 * @param content CVM data to format
+	 * @return HTML string representation
+	 */
+	private AString formatAsHTML(ACell content) {
+		BlobBuilder bb = new BlobBuilder();
+		
+		// Minimal HTML structure
+		bb.append("<!DOCTYPE html><html><head><title>Convex API Result</title></head><body><pre>");
+		
+		// Format the content
+		try {
+			AString jsonString = JSON.printPretty(content);
+			bb.append(escapeHtml(jsonString));
+		} catch (Exception e) {
+			bb.append("Error formatting result: ");
+			bb.append(escapeHtml(Strings.create(e.getMessage())));
+		}
+		
+		bb.append("</pre></body></html>");
+		
+		return bb.getCVMString();
+	}
+	
+	/**
+	 * Escape HTML special characters using CVM string functions
+	 * @param text Text to escape
+	 * @return HTML-escaped text
+	 */
+	private AString escapeHtml(AString text) {
+		if (text == null) return Strings.EMPTY;
+		
+		BlobBuilder bb = new BlobBuilder();
+		long len = text.count();
+		
+		for (long i = 0; i < len; i++) {
+			int c = text.charAt((int)i);
+			switch (c) {
+				case '&': bb.append("&amp;"); break;
+				case '<': bb.append("&lt;"); break;
+				case '>': bb.append("&gt;"); break;
+				case '"': bb.append("&quot;"); break;
+				case '\'': bb.append("&#39;"); break;
+				default: bb.append((char)c); break;
+			}
+		}
+		
+		return bb.getCVMString();
 	}
 }
