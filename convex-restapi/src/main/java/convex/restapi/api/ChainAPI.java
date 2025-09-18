@@ -36,6 +36,9 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.AVector;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
@@ -74,7 +77,6 @@ public class ChainAPI extends ABaseAPI {
 
 	public ChainAPI(RESTServer restServer) {
 		super(restServer);
-		convex = restServer.getConvex();
 	}
 
 	private static final String ROUTE = "/api/v1/";
@@ -98,6 +100,10 @@ public class ChainAPI extends ABaseAPI {
 
 		app.get(prefix + "data/<hash>", this::getData);
 		app.get(prefix + "tx", this::getTransaction);
+		app.get(prefix + "blocks", this::getBlocks);
+		
+		convex = restServer.getConvex();
+
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
@@ -162,12 +168,12 @@ public class ChainAPI extends ABaseAPI {
 	public void getTransaction(Context ctx) {
 		String hashParam = ctx.queryParam("hash");
 		if (hashParam == null) {
-			throw new BadRequestResponse(jsonError("Missing required query parameter: hash"));
+			throw new BadRequestResponse("Missing required query parameter: hash");
 		}
 		
 		Hash h = Hash.parse(hashParam);
 		if (h == null) {
-			throw new BadRequestResponse(jsonError("Invalid hash: " + hashParam));
+			throw new BadRequestResponse("Invalid hash: " + hashParam);
 		}
 
 		SignedData<ATransaction> transaction = server.getPeer().getTransaction(h);
@@ -176,6 +182,95 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ctx.result(JSON.toStringPretty(transaction));
+	}
+
+	@OpenApi(path = ROUTE + "blocks", 
+			versions="peer-v1",
+			methods = HttpMethod.GET, 
+			tags = { "Blocks"},
+			summary = "Get blocks with pagination", 
+			operationId = "getBlocks", 
+			queryParams = {
+					@OpenApiParam(
+							name = "offset", 
+							description = "Starting index for blocks (0-based)", 
+							required = false, 
+							type = Long.class, 
+							example = "0"),
+					@OpenApiParam(
+							name = "limit", 
+							description = "Maximum number of blocks to return", 
+							required = false, 
+							type = Long.class, 
+							example = "100") },
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Blocks retrieved successfully", 
+						content = {
+							@OpenApiContent(
+									type = "application/json") }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, invalid offset or limit parameters")
+			})
+	public void getBlocks(Context ctx) {
+		// Get pagination parameters
+		String offsetParam = ctx.queryParam("offset");
+		String limitParam = ctx.queryParam("limit");
+		
+		long offset = 0;
+		long limit = 100; // Default limit
+		
+		try {
+			if (offsetParam != null) {
+				offset = Long.parseLong(offsetParam);
+				if (offset < 0) {
+					throw new BadRequestResponse("Offset must be non-negative");
+				}
+			}
+			if (limitParam != null) {
+				limit = Long.parseLong(limitParam);
+				if (limit <= 0 || limit > 1000) {
+					throw new BadRequestResponse("Limit must be between 1 and 1000");
+				}
+			}
+		} catch (NumberFormatException e) {
+			throw new BadRequestResponse("Invalid offset or limit parameter: must be a number");
+		}
+		
+		// Get blocks from peer order
+		Order peerOrder = server.getPeer().getPeerOrder();
+		AVector<SignedData<Block>> blocks = peerOrder.getBlocks();
+		long totalBlocks = blocks.count();
+		
+		// Calculate actual range
+		long start = Math.min(offset, totalBlocks);
+		long end = Math.min(start + limit, totalBlocks);
+		
+		// Build response
+		HashMap<String, Object> response = new HashMap<>();
+		response.put("count", totalBlocks);
+		
+		// Extract block data for the requested range
+		java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
+		for (long i = start; i < end; i++) {
+			SignedData<Block> signedBlock = blocks.get(i);
+			Block block = signedBlock.getValue();
+			
+			HashMap<String, Object> blockData = new HashMap<>();
+			blockData.put("index", i);
+			blockData.put("timestamp", block.getTimeStamp());
+			blockData.put("peer", signedBlock.getAccountKey().toString());
+			blockData.put("hash", signedBlock.getHash().toString());
+			blockData.put("transactionCount", block.getTransactions().count());
+			
+			items.add(blockData);
+		}
+		
+		response.put("items", items);
+		
+		ctx.result(JSON.toStringPretty(response));
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 

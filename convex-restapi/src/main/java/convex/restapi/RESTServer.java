@@ -49,6 +49,33 @@ public class RESTServer implements Closeable {
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 	}
 	
+	protected ChainAPI chainAPI;
+	protected DepAPI depAPI;
+	protected DLAPI dlAPI;
+	protected WebApp webApp;
+	protected PeerAdminAPI peerAPI;
+	protected ExplorerAPI explorerAPI;
+
+	private void addAPIRoutes(Javalin app) {
+		chainAPI = new ChainAPI(this);
+		chainAPI.addRoutes(app);
+
+		depAPI = new DepAPI(this);
+		depAPI.addRoutes(app);
+		
+		peerAPI = new PeerAdminAPI(this);
+		peerAPI.addRoutes(app);
+
+		webApp = new WebApp(this);
+		webApp.addRoutes(app);
+
+		dlAPI = new DLAPI(this);
+		dlAPI.addRoutes(app);
+
+		explorerAPI = new ExplorerAPI(this);
+		explorerAPI.addRoutes(app);
+	}
+	
 	private Javalin buildApp(boolean useSSL) {
 		Javalin app = Javalin.create(config -> {
 			config.bundledPlugins.enableCors(cors -> {
@@ -77,6 +104,8 @@ public class RESTServer implements Closeable {
 			
 			config.useVirtualThreads=true;
 		});
+		
+
 
 		app.exception(Exception.class, (e, ctx) -> {
 			e.printStackTrace();
@@ -84,6 +113,7 @@ public class RESTServer implements Closeable {
 			ctx.result(message);
 			ctx.status(500);
 		});
+		
 		
 		app.options("/*", ctx-> {
 			ctx.status(204); // No context#
@@ -139,32 +169,7 @@ public class RESTServer implements Closeable {
 	    }
 	}
 
-	protected ChainAPI chainAPI;
-	protected DepAPI depAPI;
-	protected DLAPI dlAPI;
-	protected WebApp webApp;
-	protected PeerAdminAPI peerAPI;
-	protected ExplorerAPI explorerAPI;
 
-	private void addAPIRoutes(Javalin app) {
-		chainAPI = new ChainAPI(this);
-		chainAPI.addRoutes(app);
-
-		depAPI = new DepAPI(this);
-		depAPI.addRoutes(app);
-		
-		peerAPI = new PeerAdminAPI(this);
-		peerAPI.addRoutes(app);
-
-		webApp = new WebApp(this);
-		webApp.addRoutes(app);
-
-		dlAPI = new DLAPI(this);
-		dlAPI.addRoutes(app);
-
-		explorerAPI = new ExplorerAPI(this);
-		explorerAPI.addRoutes(app);
-	}
 
 	/**
 	 * Create a RESTServer connected to a local Convex Peer Server instance.
