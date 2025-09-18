@@ -14,8 +14,8 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
+import convex.core.text.StringUtils;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -214,10 +214,10 @@ public abstract class AGenericAPI {
 		// Format the content
 		try {
 			AString jsonString = JSON.printPretty(content);
-			bb.append(escapeHtml(jsonString));
+			bb.append(StringUtils.escapeHtml(jsonString));
 		} catch (Exception e) {
 			bb.append("Error formatting result: ");
-			bb.append(escapeHtml(Strings.create(e.getMessage())));
+			bb.append(StringUtils.escapeHtml(Strings.create(e.getMessage())));
 		}
 		
 		bb.append("</pre></body></html>");
@@ -225,47 +225,4 @@ public abstract class AGenericAPI {
 		return bb.getCVMString();
 	}
 	
-	/**
-	 * Escape HTML special characters using CVM string functions
-	 * @param text Text to escape
-	 * @return HTML-escaped text
-	 */
-	static AString escapeHtml(AString text) {
-		if (text == null) return Strings.EMPTY;
-		
-		BlobBuilder bb = new BlobBuilder();
-		final long len = text.count();
-		
-		for (long pos = 0; pos < len; ) {
-			int c = text.charAt(pos);
-			if (c == -1) {
-				// Invalid UTF-8, skip one byte
-				pos++;
-				continue;
-			}
-			
-			switch (c) {
-				case '&': bb.append("&amp;"); break;
-				case '<': bb.append("&lt;"); break;
-				case '>': bb.append("&gt;"); break;
-				case '"': bb.append("&quot;"); break;
-				case '\'': bb.append("&#39;"); break;
-				default: 
-					// For valid Unicode code points, append the character properly
-					if (Character.isValidCodePoint(c)) {
-						bb.append(CVMChar.create(c));
-					} else {
-						// Invalid code point, skip
-					}
-					break;
-			}
-			
-			// Move to next code point
-			int utfLen = CVMChar.utfLength(c);
-			if (utfLen < 0) utfLen = 1; // Move one byte for bad chars
-			pos += utfLen;
-		}
-		
-		return bb.getCVMString();
-	}
 }
