@@ -23,6 +23,10 @@ import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
+/**
+ * Base class for generic Convex REST API
+ * Contains useful common functionality for all API implementations.
+ */
 public abstract class AGenericAPI {
 
 	/**

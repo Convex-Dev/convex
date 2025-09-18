@@ -1,10 +1,12 @@
 package convex.java;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
-import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -17,11 +19,15 @@ public class ARESTClient {
 
 	
 	private final URI host;
-	private URI baseURI;
+	private final URI baseURI;
+	private final HttpClient httpClient;
 	
 	public ARESTClient(URI host,String basePath) {
-		this.host=host;
-		this.baseURI=host.resolve(basePath);
+		this.host = host;
+		this.baseURI = host.resolve(basePath);
+		this.httpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(30))
+				.build();
 	}
 
 	public URI getHost() {
@@ -41,17 +47,17 @@ public class ARESTClient {
 	 * @param request Request object
 	 * @return Future to be filled with JSON response.
 	 */
-	protected CompletableFuture<Result> doRequest(SimpleHttpRequest request) {
+	protected CompletableFuture<Result> doRequest(HttpRequest request) {
 		try {
-			CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
+			CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
 			return future.thenApply(response->{
-				String rbody=null;
+				String rbody = null;
 				try {
-					rbody=response.getBody().getBodyText();
-					return Result.create(null,JSON.parseJSON5(rbody));
+					rbody = response.body();
+					return Result.create(null, JSON.parseJSON5(rbody));
 				} catch (Exception e) {
 					if (rbody==null) rbody="<Body not readable as String>";
-					Result res= Result.error(ErrorCodes.FORMAT,"Can't parse JSON body: " +rbody);
+					Result res = Result.error(ErrorCodes.FORMAT,"Can't parse JSON body: " +rbody);
 					return res;
 				}
 			});

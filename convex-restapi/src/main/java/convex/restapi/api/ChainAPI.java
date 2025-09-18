@@ -500,7 +500,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST, 
 			operationId = "faucetRequest", 
 			tags = { "Account"},
-			summary = "Request coins from a Fucet provider. Requires a peer winning to accept faucet requests.", 
+			summary = "Request coins from a Faucet provider. Requires a peer winning to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
 				description = "Faucet request, must provide an address for coins to be deposited in", 
 				content = {@OpenApiContent(

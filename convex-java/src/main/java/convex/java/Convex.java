@@ -1,13 +1,14 @@
 package convex.java;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
-import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
-import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
-import org.apache.hc.core5.http.ContentType;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -34,12 +35,16 @@ public class Convex {
 
 
 	private final String url;
+	private final HttpClient httpClient;
 	private AKeyPair keyPair;
 	private Address address;
 	private Long sequence=null;
 
 	private Convex(String peerServerURL) {
-		this.url=peerServerURL;
+		this.url = peerServerURL;
+		this.httpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(30))
+				.build();
 	}
 
 	/**
@@ -411,37 +416,40 @@ public class Convex {
 	}
 
 	private CompletableFuture<Map<String,Object>> doPostAsync(String endPoint, String json) {
-		SimpleHttpRequest post=SimpleRequestBuilder.post(endPoint)
-				.setBody(json, ContentType.APPLICATION_JSON)
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(endPoint))
+				.header("Content-Type", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(json))
 				.build();
-		return doRequest(post);
+		return doRequest(request);
 	}
 
 	private CompletableFuture<Map<String,Object>> doGetAsync(String endPoint) {
-		SimpleHttpRequest post=SimpleRequestBuilder.get(endPoint)
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(endPoint))
+				.GET()
 				.build();
-		return doRequest(post);
+		return doRequest(request);
 	}
 
 	/**
 	 * Makes a HTTP request as a CompletableFuture
 	 * @param request Request object
-	 * @param body Body of request (as String, should normally be valid JSON)
 	 * @return Future to be filled with JSON response.
 	 */
 	@SuppressWarnings("unchecked")
-	private CompletableFuture<Map<String,Object>> doRequest(SimpleHttpRequest request) {
+	private CompletableFuture<Map<String,Object>> doRequest(HttpRequest request) {
 		try {
-			CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
+			CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
 			return future.thenApply(response->{
-				String rbody=null;
+				String rbody = null;
 				try {
-					rbody=response.getBody().getBodyText();
-					ACell json=JSONReader.read(response.getBody().getBodyText());
+					rbody = response.body();
+					ACell json = JSONReader.read(response.body());
 					return (Map<String,Object>)JSON.json(json);
 				} catch (Exception e) {
 					if (rbody==null) rbody="<Body not readable as String>";
-					Result res= Result.error(ErrorCodes.FORMAT,"Error in response "+response+" because can't parse body: " +rbody);
+					Result res = Result.error(ErrorCodes.FORMAT,"Error in response "+response+" because can't parse body: " +rbody);
 					return res.toJSON();
 				}
 			});

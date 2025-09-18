@@ -13,17 +13,11 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<maven.compiler.release>21</maven.compiler.release>
+		<maven.compiler.release>11</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
 	<dependencies>
-		<!-- https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient -->
-		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-  			<artifactId>httpclient5</artifactId>
-    		<version>${hc.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>

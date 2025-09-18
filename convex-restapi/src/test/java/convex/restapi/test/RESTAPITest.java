@@ -120,7 +120,7 @@ public class RESTAPITest extends ARESTTest {
 		// Submit a transaction
 		convex.core.Result result = convex.transactSync("(+ 2 3)");
 		assertNotNull(result);
-		assertFalse(result.isError());
+		assertFalse(result.isError(),()->"Error in result: "+result);
 		
 		// Extract transaction hash from result
 		convex.core.data.ACell infoCell = result.getInfo();
