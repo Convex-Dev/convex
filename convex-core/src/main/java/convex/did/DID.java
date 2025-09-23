@@ -140,4 +140,9 @@ public class DID {
 	public static DID create(String method, String id) {
 		return new DID(method,id);
 	}
+
+	public DID withPath(String string) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

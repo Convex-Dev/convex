@@ -55,6 +55,10 @@ public class DIDURL {
     	this.fragment=fragment;
     }
 	
+	public DIDURL(DID did) {
+		this(did,null,null,null);
+	}
+
 	/**
 	 * Creates a DIDURL from a string representation.
 	 * 
@@ -64,6 +68,11 @@ public class DIDURL {
 	 */
 	public static DIDURL create(String didURL) {
 		return create(URI.create(didURL));
+	}
+	
+
+	public static DIDURL create(DID did) {
+		return new DIDURL(did);
 	}
 
 	/**
@@ -94,6 +103,22 @@ public class DIDURL {
 		}
 		
 		return new DIDURL(did,path,query,fragment);
+	}
+	
+	public DIDURL withPath(String newPath) {
+		return new DIDURL(did,newPath,query,fragment);
+	}
+	
+	public DIDURL withQuery(String newQuery) {
+		return new DIDURL(did,path,newQuery,fragment);
+	}
+	
+	public DIDURL withFragment(String newFragment) {
+		return new DIDURL(did,path,query,newFragment);
+	}
+	
+	public DIDURL withDID(DID newDID) {
+		return new DIDURL(newDID,path,query,fragment);
 	}
 
 	/**
@@ -196,5 +221,6 @@ public class DIDURL {
 		aStringCache = result = Strings.create(toString());
 		return result;
 	}
+
 
 }
