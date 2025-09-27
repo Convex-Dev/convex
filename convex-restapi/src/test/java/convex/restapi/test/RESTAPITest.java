@@ -171,7 +171,7 @@ public class RESTAPITest extends ARESTTest {
 		
 		// Test the specific block endpoint
 		String blockNum = blockIndexCell.toString();
-		HttpResponse<String> blockResponse = get(API_PATH + "/block/" + blockNum);
+		HttpResponse<String> blockResponse = get(API_PATH + "/blocks/" + blockNum);
 		assertEquals(200, blockResponse.statusCode());
 		
 		// Parse block response
@@ -191,7 +191,7 @@ public class RESTAPITest extends ARESTTest {
 		assertEquals(blockIndexCell, RT.getIn(blockParsed, "index"));
 		
 		// Test 404 for non-existent block
-		HttpResponse<String> notFoundResponse = get(API_PATH + "/block/999999");
+		HttpResponse<String> notFoundResponse = get(API_PATH + "/blocks/999999");
 		assertEquals(404, notFoundResponse.statusCode());
 	}
 }

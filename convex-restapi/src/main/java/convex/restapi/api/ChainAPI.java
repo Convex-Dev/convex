@@ -101,7 +101,7 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "tx", this::getTransaction);
 		
 		app.get(prefix + "blocks", this::getBlocks);
-		app.get(prefix + "block/{blockNum}", this::getBlock);
+		app.get(prefix + "blocks/{blockNum}", this::getBlock);
 		
 		convex = restServer.getConvex();
 
@@ -289,7 +289,7 @@ public class ChainAPI extends ABaseAPI {
 		return blockData;
 	}
 
-	@OpenApi(path = ROUTE + "block/{blockNum}", 
+	@OpenApi(path = ROUTE + "blocks/{blockNum}", 
 			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Blocks"},
@@ -670,7 +670,7 @@ public class ChainAPI extends ABaseAPI {
 							exampleObjects = {
 									@OpenApiExampleProperty(name = "address", value = "12"),
 									@OpenApiExampleProperty(name = "source", value = "(* 2 3)"),
-									@OpenApiExampleProperty(name = "seed", value = "0x690f51d2eb7163f820fdb861b33d5b077034f09923a2d31946ac199f28639506")
+									@OpenApiExampleProperty(name = "seed", value = "0x0026a11f81cd2a7df7e00e3a55c4e9817b3bb4d3ed6252117d7d22923d4be24d")
 								}
 							),
 							@OpenApiContent(

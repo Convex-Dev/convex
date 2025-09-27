@@ -1,4 +1,4 @@
-package convex.restapi.api;
+package convex.restapi.web;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.peer.Server;
 import convex.restapi.RESTServer;
+import convex.restapi.api.ABaseAPI;
 import convex.restapi.model.CreateAccountResponse;
 import io.javalin.Javalin;
 import io.javalin.http.Context;

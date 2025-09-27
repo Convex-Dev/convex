@@ -1,4 +1,4 @@
-package convex.restapi;
+package convex.restapi.web;
 
 import static j2html.TagCreator.a;
 import static j2html.TagCreator.article;
@@ -18,6 +18,8 @@ import static j2html.TagCreator.title;
 import java.util.List;
 
 import convex.core.util.Utils;
+import convex.restapi.RESTServer;
+import convex.restapi.api.ABaseAPI;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
@@ -46,6 +48,7 @@ public class WebApp {
 					h1("Convex Peer"),
 					aside(makeLinks()).withStyle("float: right"),
 					p("Version: "+Utils.getVersion()),
+					p("Host: "+ABaseAPI.getExternalBaseUrl(ctx, null)),
 					p(a("Explorer").withHref("explorer")),
 
 					p("This is the web page for a Convex Peer Server running the REST API")

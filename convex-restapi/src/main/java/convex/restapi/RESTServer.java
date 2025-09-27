@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
 import convex.core.util.Utils;
@@ -21,8 +22,9 @@ import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
-import convex.restapi.api.ExplorerAPI;
-import convex.restapi.api.PeerAdminAPI;
+import convex.restapi.web.ExplorerAPI;
+import convex.restapi.web.PeerAdminAPI;
+import convex.restapi.web.WebApp;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
@@ -35,6 +37,9 @@ import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
 import io.javalin.util.JavalinException;
 
+/**
+ * Operates a REST API server and web application connected to a local peer server
+ */
 public class RESTServer implements Closeable {
 	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
 
@@ -272,18 +277,27 @@ public class RESTServer implements Closeable {
 		return null;
 	}
 
-	
+	/**
+	 * Main function to run a test server instance locally
+	 */
 	public static void main(String[] args) throws InterruptedException, ConfigException, LaunchException {
 		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR, AKeyPair.generate());
+		AKeyPair kp=AKeyPair.createSeeded(88888888);
+		config.put(Keywords.KEYPAIR, kp);
 		config.put(Keyword.create("faucet"), true);
 		Server s=API.launchPeer(config);
 		System.out.println("Using Ed25519 seed:   "+s.getKeyPair().getSeed());
 		System.out.println("Using peer port:      "+s.getPort());
+		
+		Convex c=Convex.connect(s);
+		c.setAddress(Address.create(12), kp);
+		c.transactSync(":test-transaction");
+		
 		try (RESTServer rs=RESTServer.create(s)) {
 			rs.start();
 			System.out.println("Started on REST port: "+rs.getPort());
 			
+			// Loop inside rest server instance
 			while (s.isRunning()) {
 				Thread.sleep(1000);
 			}

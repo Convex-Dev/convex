@@ -14,7 +14,6 @@ import convex.core.data.prim.CVMLong;
 public class PeerIndex {
 
 	private long finalityPoint;
-	
 	private Index<Hash,AVector<CVMLong>> txLocations;
 	
 	public PeerIndex() {
