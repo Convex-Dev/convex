@@ -291,8 +291,8 @@ public class ExplorerAPI extends ABaseAPI {
 		return tbody(
 			tr(
 				td("Address"),
-				td(showAddress(trans.getOrigin())),
-				td("Origion address of transaction")),
+				td(identicon(signedTx.getAccountKey().toHexString()),showAddress(trans.getOrigin())),
+				td("Origin address of transaction")),
 			tr(
 				td("Account Key"),
 				td(showID(signedTx.getAccountKey())),
@@ -338,7 +338,7 @@ public class ExplorerAPI extends ABaseAPI {
 
 	private static ImgTag identicon(String hexString) {
 		String identiconUrl = "/identicon/" + hexString;
-		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 28; image-rendering: pixelated;");
+		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 28; image-rendering: pixelated; margin: 2px;");
 		return identicon;
 	}
 	
@@ -353,7 +353,7 @@ public class ExplorerAPI extends ABaseAPI {
 			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(txLink)),
-				td(showAddress(strans.getValue().getOrigin())),
+				td(identicon(strans.getAccountKey().toHexString()),showAddress(strans.getValue().getOrigin())),
 				td(showID(strans.getHash()))
 			});
 		}
