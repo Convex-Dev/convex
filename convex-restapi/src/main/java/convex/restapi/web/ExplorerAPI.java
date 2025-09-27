@@ -12,6 +12,7 @@ import javax.imageio.ImageIO;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.IdenticonBuilder;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
@@ -19,7 +20,6 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.SignedData;
 import convex.peer.Server;
@@ -56,6 +56,7 @@ public class ExplorerAPI extends ABaseAPI {
 		app.get(prefix+"blocks/{blockNum}", this::showBlock);
 		app.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
 		app.get(prefix+"states", this::showStates);
+		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get("/identicon/{hex}", this::showIdenticon);
 	}
 	
@@ -258,6 +259,51 @@ public class ExplorerAPI extends ABaseAPI {
 		ctx.contentType("text/html");
 		ctx.result(result.render());
 	}
+	
+	/**
+	 * Show account details for a specific account number
+	 * @param ctx Javalin context
+	 */
+	public void showAccount(Context ctx) {
+		Server s=restServer.getServer();
+		long accountNum=Long.parseLong(ctx.pathParam("accountNum"));
+		
+		// Get current state from server
+		State state = s.getPeer().getConsensusState();
+		Address address = Address.create(accountNum);
+		AccountStatus account = state.getAccount(address);
+		
+		if (account == null) {
+			throw new NotFoundResponse("Account " + accountNum + " does not exist");
+		}
+		
+		// Create navigation links
+		ArrayList<DomContent> navLinks = new ArrayList<>();
+		if (accountNum > 0) {
+			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum-1));
+			navLinks.add(a("<< Prev").withHref(prevLink));
+		}
+		String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
+		navLinks.add(a("Next >>").withHref(nextLink));
+		
+		DomContent result=html(
+			makeHeader("Account: #"+accountNum),
+			body(
+				h1("Account: #"+accountNum),
+				navLinks.isEmpty() ? div() : div(
+					each(navLinks, link -> link),
+					br()
+				),
+				table(
+					thead(tr(th("Field"),th("Value"),th("Notes"))),
+					makeAccountTable(account, address)
+				)
+			)
+		);
+		
+		ctx.contentType("text/html");
+		ctx.result(result.render());
+	}
 
 	// Utility to display block summary info as a table
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
@@ -313,6 +359,52 @@ public class ExplorerAPI extends ABaseAPI {
 				td("Storage Size"),
 				td(code(""+Cells.storageSize(signedTx))),
 				td("Bytes consumed by transaction data"))
+		);
+	}
+	
+	// Utility to display account summary info as a table
+	private TbodyTag makeAccountTable(AccountStatus account, Address address) {
+		return tbody(
+			tr(
+				td("Address"),
+				td(code(address.toString())),
+				td("Account address")),
+			tr(
+				td("Account Key"),
+				td(account.getAccountKey() != null ? showID(account.getAccountKey()) : code("null")),
+				td("Ed25519 public key (null for actors)")),
+			tr(
+				td("Balance"),
+				td(code(Long.toString(account.getBalance()))),
+				td("Convex coin balance")),
+			tr(
+				td("Sequence"),
+				td(code(Long.toString(account.getSequence()))),
+				td("Number of transactions executed by this account")),
+			tr(
+				td("Memory Allowance"),
+				td(code(Long.toString(account.getMemory()))),
+				td("Memory allowance in bytes")),
+			tr(
+				td("Memory Usage"),
+				td(code(Long.toString(account.getMemoryUsage()))),
+				td("Actual memory usage in bytes")),
+			tr(
+				td("Is Actor"),
+				td(code(account.isActor() ? "true" : "false")),
+				td("Whether this is an actor account (no public key)")),
+			tr(
+				td("Controller"),
+				td(account.getController() != null ? showAddress((Address)account.getController()) : code("null")),
+				td("Controller address if any")),
+			tr(
+				td("Parent"),
+				td(account.getParent() != null ? showAddress(account.getParent()) : code("null")),
+				td("Parent account address if any")),
+			tr(
+				td("Holdings Count"),
+				td(code(Long.toString(account.getHoldings().count()))),
+				td("Number of holdings (token balances)"))
 		);
 	}
 
