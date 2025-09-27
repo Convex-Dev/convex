@@ -328,11 +328,11 @@ public class ExplorerAPI extends ABaseAPI {
 		ArrayList<DomContent> navLinks = new ArrayList<>();
 		if (blockNum > 0) {
 			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum-1));
-			navLinks.add(a("Previous Block ("+(blockNum-1)+")").withHref(prevLink));
+			navLinks.add(a("<< Previous").withHref(prevLink));
 		}
 		if (blockNum < nblocks - 1) {
 			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum+1));
-			navLinks.add(a("Next Block ("+(blockNum+1)+") →").withHref(nextLink));
+			navLinks.add(a("Next >>").withHref(nextLink));
 		}
 		return navLinks;
 	}

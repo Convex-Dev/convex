@@ -11,6 +11,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.border.BevelBorder;
 
+import convex.core.crypto.IdenticonBuilder;
 import convex.core.data.AArrayBlob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
@@ -28,49 +29,20 @@ public class Identicon extends JLabel {
 	
 	protected int displaySize=Toolkit.IDENTICON_SIZE;
 
-	protected static final int SIZE=7;
+	protected static final int SIZE=IdenticonBuilder.SIZE;
 	
 	public static BufferedImage createImage(AArrayBlob data, int renderSize) {
 		if ((data==null)||(data.isEmpty())) return  new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_RGB);
-		long n=data.count(); // must be one byte at least
 		
-		BufferedImage bi = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_RGB);
-
-		int[] cols=new int[4];
+		int[] pixData=IdenticonBuilder.build(data);
 		
-		// last 12 bytes define colours, 3 bytes per colour, we mask the first byte for ARGB
-		for (int i=0; i<4; i++) {
-			int r=(int) (0xff&(data.byteAt(Math.floorMod(n-12+i*3+0,n))));
-			int g=(int) (0xff&(data.byteAt(Math.floorMod(n-12+i*3+1,n))));
-			int b=(int) (0xff&(data.byteAt(Math.floorMod(n-12+i*3+2,n))));
-			
-			// XOR with red high bit, tends to make invalid / non-random data look suspicious
-			int col=0x800000^((r<<16)|(g<<8)|b);
-			// int col=((r<<16)|(g<<8)|b);
-			cols[i]=col;
-		}
-		
-		// number of pixels for each row
-		int width=((SIZE+1)/2);
-		
-		// First 20 bytes define bitmap. Take 2 bits for each 
-		for (int y = 0; y < SIZE; y++) {
-			for (int x = 0; x <= width; x++) {
-				int i = (x + y * width); // 4 2-byte segments per byte
-				
-				int byteIndex=i/4;
-				if (byteIndex>=n) break;
-				
-				byte b=data.byteAt(byteIndex);
-				int bits = 0x03&(b>>(2*(3-(i%4)))); // take 2 bits for colour index, high bits first
-				int rgb = cols[bits];
-				bi.setRGB(x, y, rgb);
-				bi.setRGB(SIZE-x-1, y, rgb);
-			}
-		}
+		BufferedImage bi = new BufferedImage(SIZE,SIZE,BufferedImage.TYPE_INT_RGB);
+		bi.setRGB(0, 0, SIZE, SIZE, pixData, 0, SIZE);
 
 		return Toolkit.pixelResize(bi, renderSize, renderSize); 
 	}
+
+
 	
 	/**
 	 * A weak cache for Icons
