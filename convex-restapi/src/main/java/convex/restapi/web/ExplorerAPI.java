@@ -38,13 +38,13 @@ import j2html.tags.specialized.TbodyTag;
 /**
  * On-chain explorer API 
  */
-public class ExplorerAPI extends ABaseAPI {
+public class ExplorerAPI extends AWebSite {
 	public ExplorerAPI(RESTServer restServer) {
 		super(restServer);
 
 	}
 	
-	private static final String ROUTE = "/explorer/";
+	static final String ROUTE = "/explorer/";
 	
 	private static final long DEFAULT_LIMIT = 100;
 
@@ -60,12 +60,7 @@ public class ExplorerAPI extends ABaseAPI {
 		app.get("/identicon/{hex}", this::showIdenticon);
 	}
 	
-	private DomContent makeHeader(String title) {
-		return head(
-				title(title),
-		        link().withRel("stylesheet").withHref("/css/pico.min.css")
-		);
-	}
+
 	
 	/**
 	 * Produce a table of states
@@ -75,7 +70,7 @@ public class ExplorerAPI extends ABaseAPI {
 		DomContent result=html(
 				makeHeader("Peer Explorer"),
 				body(
-					h1("Convex Explorer"),
+					topBar(),
 					article(
 						h4("Useful links: "),
 						p(a("Consensus Blocks").withHref(ROUTE+"blocks")),
@@ -115,6 +110,7 @@ public class ExplorerAPI extends ABaseAPI {
 		DomContent result=html(
 				makeHeader("States"),
 				body(
+					topBar(),
 					table(
 						thead(tr(th("Position"),th("Block Hash"))),
 						tbody(
@@ -160,6 +156,7 @@ public class ExplorerAPI extends ABaseAPI {
 		DomContent result=html(
 			makeHeader("Blocks"),
 			body(
+				topBar(),
 				table(
 					thead(tr(th("Block"),th("Peer"),th("Hash"))),
 					tbody(
@@ -196,6 +193,7 @@ public class ExplorerAPI extends ABaseAPI {
 		DomContent result=html(
 			makeHeader("Convex Block: "+blockNum),
 			body(
+				topBar(),
 				h1("Block: "+blockNum),
 				navLinks.isEmpty() ? div() : div(
 					each(navLinks, link -> link),
@@ -244,6 +242,7 @@ public class ExplorerAPI extends ABaseAPI {
 		DomContent result=html(
 			makeHeader("Transaction "+txNum+" in Block "+blockNum),
 			body(
+				topBar(),
 				h1("Transaction "+txNum+" in Block "+blockNum),
 				navLinks.isEmpty() ? div() : div(
 					each(navLinks, link -> link),
@@ -281,19 +280,17 @@ public class ExplorerAPI extends ABaseAPI {
 		ArrayList<DomContent> navLinks = new ArrayList<>();
 		if (accountNum > 0) {
 			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum-1));
-			navLinks.add(a("<< Prev").withHref(prevLink));
+			navLinks.add(makeButton("<< Prev",prevLink));
 		}
 		String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
-		navLinks.add(a("Next >>").withHref(nextLink));
+		navLinks.add(makeButton("Next >>",nextLink));
 		
 		DomContent result=html(
 			makeHeader("Account: #"+accountNum),
 			body(
+				topBar(),
 				h1("Account: #"+accountNum),
-				navLinks.isEmpty() ? div() : div(
-					each(navLinks, link -> link),
-					br()
-				),
+				each(navLinks, link -> link),
 				table(
 					thead(tr(th("Field"),th("Value"),th("Notes"))),
 					makeAccountTable(account, address)
@@ -460,11 +457,6 @@ public class ExplorerAPI extends ABaseAPI {
 			)
 		);
 	}
-	
-	private DomContent showAddress(Address origin) {
-		if (origin==null) return text("nil");
-		return a(origin.toString()).withHref(ROUTE+"accounts/"+origin.longValue());
-	}
 
 	/**
 	 * Show an identicon PNG image for the given hex data
@@ -507,15 +499,16 @@ public class ExplorerAPI extends ABaseAPI {
 		ArrayList<DomContent> navLinks = new ArrayList<>();
 		if (blockNum > 0) {
 			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum-1));
-			navLinks.add(a("<< Previous").withHref(prevLink));
+			navLinks.add(makeButton("<< Previous",prevLink));
 		}
 		if (blockNum < nblocks - 1) {
 			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum+1));
-			navLinks.add(a("Next >>").withHref(nextLink));
+			navLinks.add(makeButton("Next >>",nextLink));
 		}
 		return navLinks;
 	}
 	
+
 	private ArrayList<DomContent> makeTransactionNavigationLinks(Context ctx, long blockNum, long txNum, long txCount) {
 		ArrayList<DomContent> navLinks = new ArrayList<>();
 		String blockLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum);
@@ -523,11 +516,11 @@ public class ExplorerAPI extends ABaseAPI {
 		
 		if (txNum > 0) {
 			String prevTxLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+(txNum-1));
-			navLinks.add(a("Previous Transaction ("+(txNum-1)+")").withHref(prevTxLink));
+			navLinks.add(makeButton("<< Prev" ,prevTxLink));
 		}
 		if (txNum < txCount - 1) {
 			String nextTxLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+(txNum+1));
-			navLinks.add(a("Next Transaction ("+(txNum+1)+") →").withHref(nextTxLink));
+			navLinks.add(makeButton("Next >>",nextTxLink));
 		}
 		return navLinks;
 	}

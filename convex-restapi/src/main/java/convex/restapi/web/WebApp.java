@@ -8,12 +8,9 @@ import static j2html.TagCreator.div;
 import static j2html.TagCreator.each;
 import static j2html.TagCreator.h1;
 import static j2html.TagCreator.h4;
-import static j2html.TagCreator.head;
 import static j2html.TagCreator.html;
 import static j2html.TagCreator.join;
-import static j2html.TagCreator.link;
 import static j2html.TagCreator.p;
-import static j2html.TagCreator.title;
 
 import java.util.List;
 
@@ -24,12 +21,10 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
 
-public class WebApp {
-
-	protected RESTServer server;
+public class WebApp extends AWebSite {
 
 	public WebApp(RESTServer restServer) {
-		this.server=restServer;
+		super(restServer);
 	}
 	
 	public void addRoutes(Javalin app) {
@@ -45,7 +40,7 @@ public class WebApp {
 		DomContent content= html(
 				makeHeader("Convex Peer Server"),
 				body(
-					h1("Convex Peer"),
+					topBar(),
 					aside(makeLinks()).withStyle("float: right"),
 					p("Version: "+Utils.getVersion()),
 					p("Host: "+ABaseAPI.getExternalBaseUrl(ctx, null)),
@@ -66,6 +61,7 @@ public class WebApp {
 			DomContent content= html(
 				makeHeader("404: Not Found: "+ctx.path()),
 				body(
+					topBar(),
 					h1("404: not found: "+ctx.path()),
 					p("This is not the page you are looking for."),
 					a("Go back to index").withHref("/index.html"),
@@ -82,7 +78,7 @@ public class WebApp {
 
 	static final List<String[]> LINKS = List.of(
 		sa("Convex Documentation: ","Convex Docs" ,"https://docs.convex.world"),
-		sa("Open API documentation for this peer: ","Swagger API" ,"/swagger"),
+		sa("OpenAPI documentation for this peer: ","Swagger API" ,"/swagger"),
 		sa("General information at the ","Convex Website", "https://convex.world"),
 		sa("Chat with the community at the ","Convex Discord Server", "https://discord.com/invite/xfYGq4CT7v"),
 		sa("Join the open source development: ","Convex-Dev", "https://github.com/Convex-Dev")
@@ -102,13 +98,6 @@ public class WebApp {
 		return strings;
 	}
 
-	private DomContent makeHeader(String title) {
-		return head(
-				title(title),
-		        link().withRel("stylesheet").withHref("/css/pico.min.css")
-		);
-	}
-
 	protected void llmsTxt(Context ctx) { 
 		StringBuilder sb=new StringBuilder();
 		sb.append("# Convex Peer Server");
@@ -117,4 +106,5 @@ public class WebApp {
 		ctx.contentType("text/plain");
 		ctx.status(200);
 	}
+
 }
