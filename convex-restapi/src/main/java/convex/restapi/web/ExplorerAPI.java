@@ -67,21 +67,12 @@ public class ExplorerAPI extends AWebSite {
 	 * @param ctx Javalin context
 	 */
 	public void showExplorer(Context ctx) {
-		DomContent result=html(
-				makeHeader("Peer Explorer"),
-				body(
-					topBar(),
-					article(
-						h4("Useful links: "),
-						p(a("Consensus Blocks").withHref(ROUTE+"blocks")),
-						p(a("States").withHref(ROUTE+"states"))
-					),
-					footerBlock()
-				)
-			);
-		
-		ctx.result(result.render());
-		ctx.contentType("text/html");
+		returnPage(ctx, "Peer Explorer",
+			article(
+				p(a("Blocks").withHref(ROUTE+"blocks")),
+				p(a("States").withHref(ROUTE+"states"))
+			)
+		);
 	}
 	
 	/**
@@ -148,22 +139,14 @@ public class ExplorerAPI extends AWebSite {
 			});
 		}
 		
-		DomContent result=html(
-			makeHeader("Blocks"),
-			body(
-				topBar(),
-				table(
-					thead(tr(th("Block"),th("Peer"),th("Hash"))),
-					tbody(
-						each(rows,row->{return tr(row);})
-					)
-				),
-				footerBlock()
+		returnPage(ctx, "Blocks",
+			table(
+				thead(tr(th("Block"),th("Peer"),th("Hash"))),
+				tbody(
+					each(rows,row->{return tr(row);})
+				)
 			)
 		);
-		
-		ctx.contentType("text/html");
-		ctx.result(result.render());
 	}
 	
 	/**
@@ -186,26 +169,18 @@ public class ExplorerAPI extends AWebSite {
 		// Create navigation links
 		ArrayList<DomContent> navLinks = makeBlockNavigationLinks(ctx, blockNum, nblocks);
 		
-		DomContent result=html(
-			makeHeader("Convex Block: "+blockNum),
-			body(
-				topBar(),
-				h4("Block position: "+blockNum),
-				navLinks.isEmpty() ? div() : div(
-					each(navLinks, link -> link),
-					br()
-				),
-				table(
-					thead(tr(th("Field"),th("Value"),th("Notes"))),
-					makeBlockTable(sblock)
-				),
-				makeTransactionsSection(sblock, blockNum, ctx),
-				footerBlock()
-			)
+		returnPage(ctx, "Convex Block: "+blockNum,
+			h4("Block position: "+blockNum),
+			navLinks.isEmpty() ? div() : div(
+				each(navLinks, link -> link),
+				br()
+			),
+			table(
+				thead(tr(th("Field"),th("Value"),th("Notes"))),
+				makeBlockTable(sblock)
+			),
+			makeTransactionsSection(sblock, blockNum, ctx)
 		);
-		
-		ctx.contentType("text/html");
-		ctx.result(result.render());
 	}
 	
 	/**
@@ -236,25 +211,17 @@ public class ExplorerAPI extends AWebSite {
 		// Create navigation links
 		ArrayList<DomContent> navLinks = makeTransactionNavigationLinks(ctx, blockNum, txNum, txCount);
 		
-		DomContent result=html(
-			makeHeader("Transaction "+txNum+" in Block "+blockNum),
-			body(
-				topBar(),
-				h1("Transaction "+txNum+" in Block "+blockNum),
-				navLinks.isEmpty() ? div() : div(
-					each(navLinks, link -> link),
-					br()
-				),
-				table(
-					thead(tr(th("Field"),th("Value"),th("Notes"))),
-					makeTransactionTable(transaction)
-				),
-				footerBlock()
+		returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum,
+			h1("Transaction "+txNum+" in Block "+blockNum),
+			navLinks.isEmpty() ? div() : div(
+				each(navLinks, link -> link),
+				br()
+			),
+			table(
+				thead(tr(th("Field"),th("Value"),th("Notes"))),
+				makeTransactionTable(transaction)
 			)
 		);
-		
-		ctx.contentType("text/html");
-		ctx.result(result.render());
 	}
 	
 	/**
@@ -283,22 +250,14 @@ public class ExplorerAPI extends AWebSite {
 		String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
 		navLinks.add(makeButton("Next >>",nextLink));
 		
-		DomContent result=html(
-			makeHeader("Account: #"+accountNum),
-			body(
-				topBar(),
-				h1("Account: #"+accountNum),
-				each(navLinks, link -> link),
-				table(
-					thead(tr(th("Field"),th("Value"),th("Notes"))),
-					makeAccountTable(account, address)
-				),
-				footerBlock()
+		returnPage(ctx, "Account: #"+accountNum,
+			h1("Account: #"+accountNum),
+			each(navLinks, link -> link),
+			table(
+				thead(tr(th("Field"),th("Value"),th("Notes"))),
+				makeAccountTable(account, address)
 			)
 		);
-		
-		ctx.contentType("text/html");
-		ctx.result(result.render());
 	}
 
 	// Utility to display block summary info as a table

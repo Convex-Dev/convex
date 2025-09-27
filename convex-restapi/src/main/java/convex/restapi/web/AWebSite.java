@@ -42,19 +42,20 @@ public abstract class AWebSite extends ABaseAPI {
 					a(img().withSrc("/Convex.png")
 						.withAlt("Convex")
 						.withStyle("height: 40px; margin: 0.5em;")).withHref("/")),
-				h1("Convex"),
+				h1("Convex").withStyle("height: 40px; margin-bottom: 0.2em;"),
 				div().withStyle("flex-grow: 1;"),
 				nav(
 					a("Explorer").withHref("/explorer/"),
 					a("Peer").withHref("/"),
-					a("API").withHref("/swagger")
+					a("API").withHref("/swagger"),
+					div()
 				).withStyle("display: flex; gap: 1em; align-items: center;") // gap between nav items
-			).withStyle("display: flex; align-items: stretch; gap: 1em; margin: 1em;")
+			).withStyle("display: flex; align-items: center; gap: 1em")
 		);
 	}
 	
 	public DomContent contentBlock(DomContent... content) {
-		return main(content).withStyle("flex: 1; margin: 1em;");
+		return main(content);
 	}
 
 	
@@ -67,14 +68,14 @@ public abstract class AWebSite extends ABaseAPI {
 					div(a("Explorer").withHref("/explorer/")),
 					div(a("Blocks").withHref("/explorer/blocks")),
 					div(a("States").withHref("/explorer/states"))
-				).withStyle("flex: 1; margin: 1em;"),
+				),
 				div(
 					h4("Resources"),
 					div(a("Documentation").withHref("https://docs.convex.world")),
 					div(a("GitHub - Convex Developers").withHref("https://github.com/Convex-Dev/convex")),
 					div(a("Discord Community").withHref("https://discord.gg/convex"))
-				).withStyle("flex: 1; margin: 1em;")
-			).withStyle("display: flex; justify-content: space-around; padding: 1em 0; border-top: 1px solid #dee2e6;")
+				)
+			).withStyle("display: flex; justify-content: space-around; padding: 1em 0; border-top: solid #335;")
 		);
 	}
 	

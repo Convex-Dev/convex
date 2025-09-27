@@ -1,18 +1,12 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.a;
-import static j2html.TagCreator.body;
-import static j2html.TagCreator.div;
-import static j2html.TagCreator.h1;
-import static j2html.TagCreator.html;
-import static j2html.TagCreator.p;
+import static j2html.TagCreator.*;
 
 import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import j2html.tags.DomContent;
 
 public class WebApp extends AWebSite {
 
@@ -30,11 +24,18 @@ public class WebApp extends AWebSite {
 	}
 	
 	private void indexPage(Context ctx) {
+		String host=ABaseAPI.getExternalBaseUrl(ctx, null);
 		returnPage(ctx,"Convex Peer Server",
-			div(
-				p("Version: "+Utils.getVersion()),
-				p("Host: "+ABaseAPI.getExternalBaseUrl(ctx, null)),
-				p(a("Explorer").withHref("explorer"))
+			h6("Welcome to the Convex peer server at: "+host),
+			article(
+				details(
+				    summary("Peer Info"),
+				    table(
+				    	tr(td("Version"),td(Utils.getVersion())),
+				    	tr(td("Peer Port"),td(restServer.getServer().getPort().toString())),
+				    	tr(td("Host"),td(host))
+				    )
+				).attr("open", true)
 			)
 		);
 	}
@@ -43,18 +44,11 @@ public class WebApp extends AWebSite {
 		String type=ctx.header("Accept");
 		if ((type!=null)&&type.contains("html")) {
 			ctx.header("Content-Type", "text/html");	
-			DomContent content= html(
-				makeHeader("404: Not Found: "+ctx.path()),
-				body(
-					topBar(),
-					h1("404: not found: "+ctx.path()),
-					p("This is not the page you are looking for."),
-					a("Go back to index").withHref("/index.html"),
-					footerBlock()
-					
-				)
+			returnPage(ctx, "404: Not Found: "+ctx.path(),
+				h1("404: not found: "+ctx.path()),
+				p("This is not the page you are looking for."),
+				a("Go back to index").withHref("/index.html")
 			);
-			ctx.result(content.render());
 		} else {
 			ctx.result("404 Not found: "+ctx.path());
 		}
