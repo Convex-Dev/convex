@@ -1,20 +1,11 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.a;
-import static j2html.TagCreator.div;
-import static j2html.TagCreator.h1;
-import static j2html.TagCreator.head;
-import static j2html.TagCreator.header;
-import static j2html.TagCreator.img;
-import static j2html.TagCreator.link;
-import static j2html.TagCreator.nav;
-import static j2html.TagCreator.text;
-import static j2html.TagCreator.title;
+import static j2html.TagCreator.*;
 
 import convex.core.cvm.Address;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
-import io.javalin.Javalin;
+import io.javalin.http.Context;
 import j2html.tags.DomContent;
 
 public abstract class AWebSite extends ABaseAPI {
@@ -23,19 +14,67 @@ public abstract class AWebSite extends ABaseAPI {
 
 	}
 	
+	/**
+	 * Returns a structured page for the web application
+	 * @param ctx
+	 * @param title
+	 * @param content
+	 */
+	public void returnPage(Context ctx, String title, DomContent... content) {
+		DomContent result=html(
+				makeHeader(title),
+				body(
+					topBar(),
+					contentBlock(content),
+					div().withStyle("grow: 1"), // spacer
+					footerBlock()
+				).withStyle("height: 100%; display: flex; flex-direction: column;")
+			);
+		
+		ctx.result(result.render());
+		ctx.contentType("text/html");
+	}
 
 	public DomContent topBar() {
 		return header(
 			div(
-				a(img().withSrc("/Convex.png").withAlt("Convex").withStyle("height: 40px; margin: 6px;"))
-					.withHref("/"),
+				div(
+					a(img().withSrc("/Convex.png")
+						.withAlt("Convex")
+						.withStyle("height: 40px; margin: 0.5em;")).withHref("/")),
 				h1("Convex"),
 				div().withStyle("flex-grow: 1;"),
 				nav(
+					a("Explorer").withHref("/explorer/"),
 					a("Peer").withHref("/"),
-					a("Explorer").withHref("/explorer/")
-				).withStyle("display: flex; gap: 1em;") // gap between nav items
+					a("API").withHref("/swagger")
+				).withStyle("display: flex; gap: 1em; align-items: center;") // gap between nav items
 			).withStyle("display: flex; align-items: stretch; gap: 1em; margin: 1em;")
+		);
+	}
+	
+	public DomContent contentBlock(DomContent... content) {
+		return main(content).withStyle("flex: 1; margin: 1em;");
+	}
+
+	
+	public DomContent footerBlock() {
+		return footer(
+			div(
+				div(
+					h4("Useful Links"),
+					div(a("convex.world").withHref("https://convex.world")),
+					div(a("Explorer").withHref("/explorer/")),
+					div(a("Blocks").withHref("/explorer/blocks")),
+					div(a("States").withHref("/explorer/states"))
+				).withStyle("flex: 1; margin: 1em;"),
+				div(
+					h4("Resources"),
+					div(a("Documentation").withHref("https://docs.convex.world")),
+					div(a("GitHub - Convex Developers").withHref("https://github.com/Convex-Dev/convex")),
+					div(a("Discord Community").withHref("https://discord.gg/convex"))
+				).withStyle("flex: 1; margin: 1em;")
+			).withStyle("display: flex; justify-content: space-around; padding: 1em 0; border-top: 1px solid #dee2e6;")
 		);
 	}
 	
@@ -54,5 +93,22 @@ public abstract class AWebSite extends ABaseAPI {
 		        link().withRel("stylesheet").withHref("/css/pico.min.css")
 		);
 	}
+	
+
+	
+	protected String getVersion() {
+		try {
+			return convex.core.util.Utils.getVersion();
+		} catch (Exception e) {
+			return "Unknown";
+		}
+	}
+	
+	// Silly helper function
+	protected static String[] sa(String... strings) {
+		return strings;
+	}
+	
+
 
 }

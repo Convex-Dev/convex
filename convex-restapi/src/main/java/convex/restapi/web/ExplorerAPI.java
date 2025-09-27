@@ -75,7 +75,8 @@ public class ExplorerAPI extends AWebSite {
 						h4("Useful links: "),
 						p(a("Consensus Blocks").withHref(ROUTE+"blocks")),
 						p(a("States").withHref(ROUTE+"states"))
-					)
+					),
+					footerBlock()
 				)
 			);
 		
@@ -103,25 +104,19 @@ public class ExplorerAPI extends AWebSite {
 			State state=(i==0)?peer.getGenesisState():peer.getBlockResult(i-1).getState();
 			rows.add(new DomContent[] {
 				td(Long.toString(i)),	
-				td(code(state.getHash().toString()))	
+				td(code(state.getHash().toString())),	
+				td(state.getTimestamp().toString())	
 			});
 		}
 
-		DomContent result=html(
-				makeHeader("States"),
-				body(
-					topBar(),
+		returnPage(ctx,"States,",
 					table(
-						thead(tr(th("Position"),th("Block Hash"))),
+						thead(tr(th("Position"),th("State Hash"),th("Timestamp"))),
 						tbody(
 							each(rows,row->{return tr(row);})
 						)
 					)
-				)
 			);
-		
-		ctx.result(result.render());
-		ctx.contentType("text/html");
 	}
 	
 	/**
@@ -162,7 +157,8 @@ public class ExplorerAPI extends AWebSite {
 					tbody(
 						each(rows,row->{return tr(row);})
 					)
-				)
+				),
+				footerBlock()
 			)
 		);
 		
@@ -194,7 +190,7 @@ public class ExplorerAPI extends AWebSite {
 			makeHeader("Convex Block: "+blockNum),
 			body(
 				topBar(),
-				h1("Block: "+blockNum),
+				h4("Block position: "+blockNum),
 				navLinks.isEmpty() ? div() : div(
 					each(navLinks, link -> link),
 					br()
@@ -203,7 +199,8 @@ public class ExplorerAPI extends AWebSite {
 					thead(tr(th("Field"),th("Value"),th("Notes"))),
 					makeBlockTable(sblock)
 				),
-				makeTransactionsSection(sblock, blockNum, ctx)
+				makeTransactionsSection(sblock, blockNum, ctx),
+				footerBlock()
 			)
 		);
 		
@@ -251,7 +248,8 @@ public class ExplorerAPI extends AWebSite {
 				table(
 					thead(tr(th("Field"),th("Value"),th("Notes"))),
 					makeTransactionTable(transaction)
-				)
+				),
+				footerBlock()
 			)
 		);
 		
@@ -294,7 +292,8 @@ public class ExplorerAPI extends AWebSite {
 				table(
 					thead(tr(th("Field"),th("Value"),th("Notes"))),
 					makeAccountTable(account, address)
-				)
+				),
+				footerBlock()
 			)
 		);
 		
@@ -448,7 +447,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		return div(
-			h3("Transactions"),
+			h4("Transactions"),
 			table(
 				thead(tr(th("Index"), th("Origin Address"),th("Transaction Hash"))),
 				tbody(
