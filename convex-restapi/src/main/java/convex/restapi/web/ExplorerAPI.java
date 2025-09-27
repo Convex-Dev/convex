@@ -2,14 +2,24 @@ package convex.restapi.web;
 
 import static j2html.TagCreator.*;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+
+import javax.imageio.ImageIO;
 
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
+import convex.core.crypto.IdenticonBuilder;
+import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.SignedData;
 import convex.peer.Server;
@@ -22,6 +32,7 @@ import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
 import j2html.tags.specialized.CodeTag;
+import j2html.tags.specialized.ImgTag;
 import j2html.tags.specialized.TbodyTag;
 
 /**
@@ -45,6 +56,7 @@ public class ExplorerAPI extends ABaseAPI {
 		app.get(prefix+"blocks/{blockNum}", this::showBlock);
 		app.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
 		app.get(prefix+"states", this::showStates);
+		app.get("/identicon/{hex}", this::showIdenticon);
 	}
 	
 	private DomContent makeHeader(String title) {
@@ -252,7 +264,7 @@ public class ExplorerAPI extends ABaseAPI {
 		return tbody(
 			tr(
 				td("Peer"),
-				td(code(sblock.getAccountKey().toString())),
+				td(showID(sblock.getAccountKey())),
 				td("Peer Ed25519 public key.")),
 			tr(
 				td("Block Hash"),
@@ -278,8 +290,16 @@ public class ExplorerAPI extends ABaseAPI {
 		ATransaction trans=signedTx.getValue();
 		return tbody(
 			tr(
+				td("Address"),
+				td(showAddress(trans.getOrigin())),
+				td("Origion address of transaction")),
+			tr(
+				td("Account Key"),
+				td(showID(signedTx.getAccountKey())),
+				td("Ed25519 public key of the signer")),
+			tr(
 				td("Transaction Hash"),
-				td(code(signedTx.getHash().toString())),
+				td(showID(signedTx.getHash())),
 				td("Hash code of the transaction object")),
 			tr(
 				td("Transaction Type"),
@@ -300,28 +320,95 @@ public class ExplorerAPI extends ABaseAPI {
 		return code(value).withStyle("display: inline-block;white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
 	}
 	
+	/**
+	 * Create a div containing an identicon and corresponding data value
+	 * @param data The data to create identicon for
+	 * @return DomContent div with identicon and code
+	 */
+	public static DomContent showID(AArrayBlob data) {
+		String dataString = data.toString();
+		
+		ImgTag identicon = identicon(dataString);
+		
+		return div(
+			identicon,
+			code(dataString)
+		);
+	}
+
+	private static ImgTag identicon(String hexString) {
+		String identiconUrl = "/identicon/" + hexString;
+		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 28; image-rendering: pixelated;");
+		return identicon;
+	}
+	
 	private DomContent makeTransactionsSection(SignedData<Block> sblock, long blockNum, Context ctx) {
-		AVector<?> transactions = sblock.getValue().getTransactions();
+		AVector<SignedData<ATransaction>> transactions = sblock.getValue().getTransactions();
 		long txCount = transactions.count();
 		
 		ArrayList<DomContent[]> rows = new ArrayList<>();
 		for (long i = 0; i < txCount; i++) {
 			String txLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+i);
+			SignedData<ATransaction> strans=transactions.get(i);
+			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(txLink)),
-				td(code(transactions.get(i).getHash().toString()))
+				td(showAddress(strans.getValue().getOrigin())),
+				td(showID(strans.getHash()))
 			});
 		}
 		
 		return div(
 			h3("Transactions"),
 			table(
-				thead(tr(th("Index"), th("Transaction Hash"))),
+				thead(tr(th("Index"), th("Origin Address"),th("Transaction Hash"))),
 				tbody(
 					each(rows, row -> tr(row))
 				)
 			)
 		);
+	}
+	
+	private DomContent showAddress(Address origin) {
+		if (origin==null) return text("nil");
+		return a(origin.toString()).withHref(ROUTE+"accounts/"+origin.longValue());
+	}
+
+	/**
+	 * Show an identicon PNG image for the given hex data
+	 * @param ctx Javalin context
+	 */
+	public void showIdenticon(Context ctx) {
+		String hexParam = ctx.pathParam("hex");
+		
+		// Parse hex string to blob
+		AArrayBlob data = Blob.parse(hexParam);
+		if (data == null) {
+			throw new BadRequestResponse("Invalid hex string for identicon: " + hexParam);
+		}
+		
+		try {
+			// Generate identicon data
+			int[] identiconData = IdenticonBuilder.build(data);
+			
+			// Create BufferedImage from identicon data
+			BufferedImage image = new BufferedImage(IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, BufferedImage.TYPE_INT_RGB);
+			image.setRGB(0, 0, IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, identiconData, 0, IdenticonBuilder.SIZE);
+			
+			// Convert to PNG bytes
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ImageIO.write(image, "PNG", baos);
+			byte[] pngBytes = baos.toByteArray();
+			
+			// Set response headers for caching and content type
+			ctx.header("Content-Type", "image/png");
+			ctx.header("Cache-Control", "public, max-age=31536000"); // 1 year cache
+			ctx.header("ETag", "\"" + data.toHexString() + "\""); // Use data as ETag
+			ctx.result(pngBytes);
+			
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse("Failed to generate identicon: " + e.getMessage());
+		}
 	}
 	
 	private ArrayList<DomContent> makeBlockNavigationLinks(Context ctx, long blockNum, long nblocks) {
