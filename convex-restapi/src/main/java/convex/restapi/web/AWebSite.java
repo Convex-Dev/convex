@@ -3,10 +3,14 @@ package convex.restapi.web;
 import static j2html.TagCreator.*;
 
 import convex.core.cvm.Address;
+import convex.core.data.AArrayBlob;
+import convex.core.text.Text;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
+import j2html.tags.specialized.CodeTag;
+import j2html.tags.specialized.ImgTag;
 
 public abstract class AWebSite extends ABaseAPI {
 	public AWebSite(RESTServer restServer) {
@@ -96,7 +100,16 @@ public abstract class AWebSite extends ABaseAPI {
 		);
 	}
 	
-
+	/**
+	 * Show a formatted CVM balance
+	 * @param bal
+	 * @return
+	 */
+	protected DomContent showBalance(long bal) {
+		String s=Text.toFriendlyNumber(bal/1000000000);
+		s=Text.leftPad(s, 13);
+		return pre(rawHtml(s+"."),small(String.format("%09d", bal%1000000000))).withStyle("margin: 0; width: min-content;");
+	}
 	
 	protected String getVersion() {
 		try {
@@ -111,6 +124,43 @@ public abstract class AWebSite extends ABaseAPI {
 		return strings;
 	}
 	
+	/**
+	 * Create a div containing an identicon and corresponding data value
+	 * @param data The data to create identicon for
+	 * @return DomContent div with identicon and code
+	 */
+	public static DomContent showID(AArrayBlob data) {
+		String dataString = (data==null)?"nil":data.toString();
+		
+		ImgTag identicon = identicon((data==null)?"0x":dataString);
+		
+		return div(
+			identicon,
+			showHex(data)
+		).withStyle("display: flex; flex-direction: row; align-items: center;");
+	}
+	
+	/**
+	 * Create a div containing an identicon and corresponding data value
+	 * @param data The data to create identicon for
+	 * @return DomContent div with identicon and code
+	 */
+	public static DomContent showHex(AArrayBlob data) {
+		String dataString = (data==null)?"nil":data.toString();
+		
+		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; max-width:100%; overflow-wrap:break-word;");
+	}
+	
+	public static CodeTag wrappedCode(String value) {
+		return code(value).withStyle("display: inline-block;white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
+	}
 
 
+
+
+	protected static ImgTag identicon(String hexString) {
+		String identiconUrl = "/identicon/" + hexString;
+		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; image-rendering: pixelated; margin: 2px;");
+		return identicon;
+	}
 }

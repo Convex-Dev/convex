@@ -22,6 +22,7 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.SignedData;
+import convex.core.lang.RT;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -46,7 +47,7 @@ public class ExplorerAPI extends AWebSite {
 	
 	static final String ROUTE = "/explorer/";
 	
-	private static final long DEFAULT_LIMIT = 100;
+
 
 	@Override
 	public void addRoutes(Javalin app) {
@@ -56,8 +57,9 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"blocks/{blockNum}", this::showBlock);
 		app.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
 		app.get(prefix+"states", this::showStates);
+		app.get(prefix+"accounts", this::showAccounts);
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
-		app.get("/identicon/{hex}", this::showIdenticon);
+		app.get("/identicon/{hex}", this::getIdenticon);
 	}
 	
 
@@ -70,6 +72,7 @@ public class ExplorerAPI extends AWebSite {
 		returnPage(ctx, "Peer Explorer",
 			article(
 				p(a("Blocks").withHref(ROUTE+"blocks")),
+				p(a("Accounts").withHref(ROUTE+"accounts")),
 				p(a("States").withHref(ROUTE+"states"))
 			)
 		);
@@ -111,6 +114,76 @@ public class ExplorerAPI extends AWebSite {
 	}
 	
 	/**
+	 * Produce a table of accounts
+	 * @param ctx Javalin context
+	 */
+	public void showAccounts(Context ctx) {
+		Server s=restServer.getServer();
+		
+		// Get current state from server
+		State state = s.getPeer().getConsensusState();
+		AVector<AccountStatus> accounts = state.getAccounts();
+		long naccounts = accounts.count();
+		
+		// Get pagination parameters
+		long[] range = getPaginationRange(ctx, naccounts);
+		long start = range[0];
+		long end = range[1];
+		
+		ArrayList<DomContent[]> rows = new ArrayList<>();
+		for (long i = start; i < end; i++) {
+			Address address = Address.create(i);
+			AccountStatus account = accounts.get(i);
+			String accountLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+i);
+			
+			rows.add(new DomContent[] {
+				td(a(address.toString()).withHref(accountLink)),
+				td(showID(account.getAccountKey()) ),
+				td(div(showBalance(account.getBalance())))
+			});
+		}
+		
+		// Create pagination controls
+		ArrayList<DomContent> paginationLinks = new ArrayList<>();
+		long offset = start;
+		long limit = end-start;
+		
+		if (offset > 0) {
+			String firstLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset=0&limit="+limit);
+			paginationLinks.add(makeButton("First", firstLink));
+			
+			long prevOffset = Math.max(0, offset - limit);
+			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+prevOffset+"&limit="+limit);
+			paginationLinks.add(makeButton("Prev", prevLink));
+		}
+		
+		if (end < naccounts) {
+			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+end+"&limit="+limit);
+			paginationLinks.add(makeButton("Next", nextLink));
+			
+			long lastOffset = Math.max(0, naccounts - limit);
+			String lastLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+lastOffset+"&limit="+limit);
+			paginationLinks.add(makeButton("End", lastLink));
+		}
+		
+		returnPage(ctx, "Accounts",
+			div(
+				p("Showing accounts " + start + " to " + (end-1) + " of " + naccounts),
+				paginationLinks.isEmpty() ? div() : div(
+					each(paginationLinks, link -> link),
+					br()
+				)
+			),
+			table(
+				thead(tr(th("Address"), th("Key"), th("Balance"))),
+				tbody(
+					each(rows, row -> tr(row))
+				)
+			)
+		);
+	}
+	
+	/**
 	 * Produce a table of blocks
 	 * @param ctx Javalin context
 	 */
@@ -134,8 +207,8 @@ public class ExplorerAPI extends AWebSite {
 			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(link)),	
-				td(code(sd.getAccountKey().toString())),	
-				td(code(sd.getHash().toString()))	
+				td(showID(sd.getAccountKey())),	
+				td(showHex(sd.getHash()))	
 			});
 		}
 		
@@ -269,11 +342,11 @@ public class ExplorerAPI extends AWebSite {
 				td("Peer Ed25519 public key.")),
 			tr(
 				td("Block Hash"),
-				td(code(sblock.getHash().toString())),
+				td(showHex(sblock.getHash())),
 				td("Hash of block as signed by peer")),
 			tr(
 				td("Signature"),
-				td(wrappedCode(sblock.getSignature().toString())),
+				td(showHex(sblock.getSignature())),
 				td("Ed25519 signature of block (as signed by peer)")),
 			tr(
 				td("Tx Count"),
@@ -308,7 +381,7 @@ public class ExplorerAPI extends AWebSite {
 				td("Java class name of the transaction")),
 			tr(
 				td("Transaction Data"),
-				td(wrappedCode(signedTx.toString())),
+				td(wrappedCode(RT.print(trans).toString())),
 				td("CVX representation of the transaction")),
 			tr(
 				td("Storage Size"),
@@ -363,31 +436,8 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 
-	public static CodeTag wrappedCode(String value) {
-		return code(value).withStyle("display: inline-block;white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
-	}
 	
-	/**
-	 * Create a div containing an identicon and corresponding data value
-	 * @param data The data to create identicon for
-	 * @return DomContent div with identicon and code
-	 */
-	public static DomContent showID(AArrayBlob data) {
-		String dataString = data.toString();
-		
-		ImgTag identicon = identicon(dataString);
-		
-		return div(
-			identicon,
-			code(dataString)
-		);
-	}
 
-	private static ImgTag identicon(String hexString) {
-		String identiconUrl = "/identicon/" + hexString;
-		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 28; image-rendering: pixelated; margin: 2px;");
-		return identicon;
-	}
 	
 	private DomContent makeTransactionsSection(SignedData<Block> sblock, long blockNum, Context ctx) {
 		AVector<SignedData<ATransaction>> transactions = sblock.getValue().getTransactions();
@@ -417,10 +467,10 @@ public class ExplorerAPI extends AWebSite {
 	}
 
 	/**
-	 * Show an identicon PNG image for the given hex data
+	 * Get an identicon PNG image for the given hex data
 	 * @param ctx Javalin context
 	 */
-	public void showIdenticon(Context ctx) {
+	public void getIdenticon(Context ctx) {
 		String hexParam = ctx.pathParam("hex");
 		
 		// Parse hex string to blob
@@ -483,27 +533,6 @@ public class ExplorerAPI extends AWebSite {
 		return navLinks;
 	}
 	
-	private long[] getPaginationRange(Context ctx, long ns) {
-		long[] range=new long[2];
-		try {
-			String offsetParam=ctx.queryParam("offset");
-			long offset=(offsetParam==null)?0:Integer.parseInt(offsetParam);
-			if (offset<0) throw new BadRequestResponse("Negative offset parameter: "+offset);
-			if (offset>ns) throw new BadRequestResponse("Offset out of range: "+offset);
-			
-			String limitParam=ctx.queryParam("limit");
-			long limit=(offsetParam==null)?DEFAULT_LIMIT:Integer.parseInt(limitParam);
 
-			if (limit<0) throw new BadRequestResponse("Negative limit parameter: "+limit);
-
-			range[0]=offset;
-			range[1]=Math.min(ns, offset+limit);
-		} catch (BadRequestResponse e) {
-			throw e;
-		} catch (Exception e) {
-			throw new InternalServerErrorResponse("Error handling query parameter: "+e);
-		}
-		return range;
-	}
 
 }

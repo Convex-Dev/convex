@@ -16,7 +16,11 @@ public class IdenticonBuilder {
 		int[] cols=new int[4];
 		
 		// last 12 bytes define colours, 3 bytes per colour, we mask the first byte for ARGB
-		long n=data.count(); // must be one byte at least
+		long n=data.count(); 
+		
+		// If no bytes, all colours are black
+		if (n==0) return cols;
+		
 		for (int i=0; i<4; i++) {
 			int r=(int) (0xff&(data.byteAt(Math.floorMod(n-12+i*3+0,n))));
 			int g=(int) (0xff&(data.byteAt(Math.floorMod(n-12+i*3+1,n))));
