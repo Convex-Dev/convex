@@ -18,6 +18,17 @@ public abstract class ABaseAPI extends AGenericAPI {
 	}
 	
 
+	public static String getHostname(Context ctx) {
+		String host =ctx.header("X-Forwarded-Host");
+	    if (host == null) {
+	        host = ctx.host(); // e.g., "localhost:8080" or "my-server.org"
+	    }
+	    int colon=host.indexOf(':');
+	    if (colon>=0) {
+	    	host=host.substring(0,colon);
+	    }
+	    return host;
+	}
 
 	
 	/**
@@ -29,16 +40,13 @@ public abstract class ABaseAPI extends AGenericAPI {
 	public static String getExternalBaseUrl(Context ctx, String basePath) {
 	    // Try to get information from forwarded headers
 	    String proto = ctx.header("X-Forwarded-Proto");
-	    String host = ctx.header("X-Forwarded-Host");
+	    String host = getHostname(ctx);
 	    String port = ctx.header("X-Forwarded-Port");
 	    String prefix = ctx.header("X-Forwarded-Prefix");
 	
 	    // Fallback to local request info if headers are missing
 	    if (proto == null) {
 	        proto = ctx.scheme(); // e.g., "http" or "https"
-	    }
-	    if (host == null) {
-	        host = ctx.host(); // e.g., "localhost:8080" or "my-server.org"
 	    }
 	
 	    // Build the base URL
@@ -81,5 +89,9 @@ public abstract class ABaseAPI extends AGenericAPI {
 	
 	    return baseUrl.toString();
 	}
+
+
+
+
 
 }

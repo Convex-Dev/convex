@@ -26,9 +26,9 @@ public abstract class AWebSite extends ABaseAPI {
 				body(
 					topBar(),
 					contentBlock(content),
-					div().withStyle("grow: 1"), // spacer
+					// div().withStyle("flex-grow: 1"), // spacer
 					footerBlock()
-				).withStyle("height: 100%; display: flex; flex-direction: column;")
+				).withStyle("min-height: 100vh; display: flex; flex-direction: column;")
 			);
 		
 		ctx.result(result.render());
@@ -55,12 +55,13 @@ public abstract class AWebSite extends ABaseAPI {
 	}
 	
 	public DomContent contentBlock(DomContent... content) {
-		return main(content);
+		return main(content).withStyle("padding: 1em; flex-grow: 1;"); // grow to fill screen
 	}
 
 	
 	public DomContent footerBlock() {
 		return footer(
+			hr(),
 			div(
 				div(
 					h4("Useful Links"),
@@ -75,7 +76,7 @@ public abstract class AWebSite extends ABaseAPI {
 					div(a("GitHub - Convex Developers").withHref("https://github.com/Convex-Dev/convex")),
 					div(a("Discord Community").withHref("https://discord.gg/convex"))
 				)
-			).withStyle("display: flex; justify-content: space-around; padding: 1em 0; border-top: solid #335;")
+			).withStyle("display: flex; justify-content: space-around; padding: 1em 0")
 		);
 	}
 	

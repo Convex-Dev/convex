@@ -2,6 +2,11 @@ package convex.restapi.web;
 
 import static j2html.TagCreator.*;
 
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.data.Keyword;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -25,17 +30,35 @@ public class WebApp extends AWebSite {
 	
 	private void indexPage(Context ctx) {
 		String host=ABaseAPI.getExternalBaseUrl(ctx, null);
+		
+		AMap<Keyword,ACell> statusMap=server.getStatusMap();
 		returnPage(ctx,"Convex Peer Server",
-			h6("Welcome to the Convex peer server at: "+host),
+			tag("hgroup").with(
+				h6("Convex peer server at: "+host),
+				p("This is an operational Convex peer, a running consensus node on a Convex network. Use this server to interact with the Convex network, deploy smart contracts, query chain states, and monitor transactions in real-time.")
+			),
 			article(
 				details(
 				    summary("Peer Info"),
 				    table(
-				    	tr(td("Version"),td(Utils.getVersion())),
-				    	tr(td("Peer Port"),td(restServer.getServer().getPort().toString())),
-				    	tr(td("Host"),td(host))
+				    	tr(td("Version"),td(code(Utils.getVersion()))),
+				    	tr(td("Peer Port"),td(code(getHostname(ctx)+":"+server.getPort()))),
+				    	tr(td("Host"),td(code(host))),
+				    	tr(td("Genesis Hash"),td(code(server.getPeer().getGenesisState().getHash().toString())))
 				    )
 				).attr("open", true)
+			),
+			article(
+				details(
+				    summary("Status"),
+				    table(
+				    	each(statusMap.entryVector(),me->{
+				    		return tr(
+				    				td(me.getKey().getName().toString()),
+				    				td(code(RT.toString(me.getValue()))));
+				    	})
+				    )
+				)
 			)
 		);
 	}
