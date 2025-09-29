@@ -146,6 +146,10 @@ public class ExplorerAPI extends AWebSite {
 		long[] range = getPaginationRange(ctx, naccounts);
 		long start = range[0];
 		long end = range[1];
+		long limit = range[2]; // limit if provided. or default limit
+
+		// throw if too big
+		if (end-start>100) throw new BadRequestResponse("Too many elements requested");
 		
 		ArrayList<DomContent[]> rows = new ArrayList<>();
 		for (long i = start; i < end; i++) {
@@ -161,9 +165,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		// Create pagination controls
-		long offset = start;
-		long limit = end-start;
-		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", offset, limit, naccounts);
+		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", start, limit, naccounts);
 		
 		returnPage(ctx, "Accounts",
 			div(

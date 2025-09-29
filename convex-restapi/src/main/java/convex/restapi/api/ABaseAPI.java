@@ -102,25 +102,26 @@ public abstract class ABaseAPI extends AGenericAPI {
 	private static final long DEFAULT_LIMIT = 10;
 
 	/**
-	 * Get a pagination range from query params as an [start,end] array]
+	 * Get a pagination range from query params as an [start,end, fullLimit] array
 	 * @param ctx Javalin content
-	 * @param max Maximum element index (exclusive), typically the number of elements
+	 * @param maxIndex Maximum element index (exclusive), typically the number of elements
 	 * @return
 	 */
-	protected long[] getPaginationRange(Context ctx, long max) {
-		long[] range=new long[2];
+	protected long[] getPaginationRange(Context ctx, long maxIndex) {
+		long[] range=new long[3];
 		try {
 			String offsetParam=ctx.queryParam("offset");
 			long offset=(offsetParam==null)?0:Integer.parseInt(offsetParam);
 			if (offset<0) throw new BadRequestResponse("Negative offset parameter: "+offset);
-			if (offset>max) throw new BadRequestResponse("Offset out of range: "+offset);
+			if (offset>maxIndex) throw new BadRequestResponse("Offset out of range: "+offset);
 			
 			String limitParam=ctx.queryParam("limit");
 			long limit=(offsetParam==null)?DEFAULT_LIMIT:Integer.parseInt(limitParam);
 			if (limit<0) throw new BadRequestResponse("Negative limit parameter: "+limit);
 
 			range[0]=offset;
-			range[1]=Math.min(max, offset+limit);
+			range[1]=Math.min(maxIndex, offset+limit);
+			range[2]=limit;
 		} catch (BadRequestResponse e) {
 			throw e;
 		} catch (NumberFormatException e) {

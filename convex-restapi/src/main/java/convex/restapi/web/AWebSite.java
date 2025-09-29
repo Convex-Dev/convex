@@ -178,8 +178,8 @@ public abstract class AWebSite extends ABaseAPI {
 	
 	    return div(
 	        makeButton("<<", firstLink, hasPrev),
-	        makeButton("<", prevLink, hasPrev),
-	        makeButton(">", nextLink, hasNext),
+	        makeButton("<-", prevLink, hasPrev),
+	        makeButton("->", nextLink, hasNext),
 	        makeButton(">>", lastLink, hasNext),
 	        makePaginationInfo(offset, limit, total)
 	    );
@@ -277,7 +277,7 @@ public abstract class AWebSite extends ABaseAPI {
 			identicon,
 			div(
 				showHex(data).withStyle("align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
-			).withStyle("flex: 1; min-width: 0;")
+			).withStyle("min-width: 0;")
 		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
 	}
 	
