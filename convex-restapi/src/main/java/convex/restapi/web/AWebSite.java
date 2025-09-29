@@ -34,6 +34,7 @@ import io.javalin.http.Context;
 import j2html.tags.DomContent;
 import j2html.tags.specialized.CodeTag;
 import j2html.tags.specialized.ImgTag;
+import j2html.tags.specialized.PreTag;
 
 /**
  * Base class for website pages.
@@ -73,7 +74,7 @@ public abstract class AWebSite extends ABaseAPI {
 				div(
 					a(img().withSrc("/Convex.png")
 						.withAlt("Convex")
-						.withStyle("height: 40px; margin: 0.5em;")).withHref("/")),
+						.withStyle("width: 2.5em; height: 2.5em; margin: 0.5em;")).withHref("/")),
 				h1("Convex").withStyle("height: 40px; margin-bottom: 0.2em;"),
 				div().withStyle("flex-grow: 1;"),
 				nav(
@@ -274,8 +275,10 @@ public abstract class AWebSite extends ABaseAPI {
 		
 		return div(
 			identicon,
-			showHex(data)
-		).withStyle("display: flex; flex-direction: row; align-items: center;");
+			div(
+				showHex(data).withStyle("align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
+			).withStyle("flex: 1; min-width: 0;")
+		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
 	}
 	
 	/**
@@ -283,7 +286,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param data The data to create identicon for
 	 * @return DomContent div with identicon and code
 	 */
-	public static DomContent showHex(AArrayBlob data) {
+	public static PreTag showHex(AArrayBlob data) {
 		String dataString = (data==null)?"nil":data.toString();
 		
 		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; max-width:100%; overflow-wrap:break-word;");
@@ -293,12 +296,9 @@ public abstract class AWebSite extends ABaseAPI {
 		return code(value).withStyle("display: inline-block;white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
 	}
 
-
-
-
 	protected static ImgTag identicon(String hexString) {
 		String identiconUrl = "/identicon/" + hexString;
-		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; image-rendering: pixelated; margin: 2px;");
+		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; width: 21; image-rendering: pixelated; margin: 2px; flex-shrink: 0;");
 		return identicon;
 	}
 }
