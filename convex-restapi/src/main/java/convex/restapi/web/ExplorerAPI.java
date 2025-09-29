@@ -144,35 +144,13 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		// Create pagination controls
-		ArrayList<DomContent> paginationLinks = new ArrayList<>();
 		long offset = start;
 		long limit = end-start;
-		
-		if (offset > 0) {
-			String firstLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset=0&limit="+limit);
-			paginationLinks.add(makeButton("First", firstLink));
-			
-			long prevOffset = Math.max(0, offset - limit);
-			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+prevOffset+"&limit="+limit);
-			paginationLinks.add(makeButton("Prev", prevLink));
-		}
-		
-		if (end < naccounts) {
-			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+end+"&limit="+limit);
-			paginationLinks.add(makeButton("Next", nextLink));
-			
-			long lastOffset = Math.max(0, naccounts - limit);
-			String lastLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts?offset="+lastOffset+"&limit="+limit);
-			paginationLinks.add(makeButton("End", lastLink));
-		}
+		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", offset, limit, naccounts);
 		
 		returnPage(ctx, "Accounts",
 			div(
-				p("Showing accounts " + start + " to " + (end-1) + " of " + naccounts),
-				paginationLinks.isEmpty() ? div() : div(
-					each(paginationLinks, link -> link),
-					br()
-				)
+				paginationLinks
 			),
 			table(
 				thead(tr(th("Address"), th("Key"), th("Balance"))),
@@ -240,14 +218,12 @@ public class ExplorerAPI extends AWebSite {
 		SignedData<Block> sblock=blocks.get(blockNum);
 		
 		// Create navigation links
-		ArrayList<DomContent> navLinks = makeBlockNavigationLinks(ctx, blockNum, nblocks);
+		long blockOffset = blockNum;
+		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
 		returnPage(ctx, "Convex Block: "+blockNum,
 			h4("Block position: "+blockNum),
-			navLinks.isEmpty() ? div() : div(
-				each(navLinks, link -> link),
-				br()
-			),
+			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				makeBlockTable(sblock)
@@ -257,7 +233,7 @@ public class ExplorerAPI extends AWebSite {
 	}
 	
 	/**
-	 * Show a specific transaction within a block
+	 * Show specific transaction details within a block
 	 * @param ctx Javalin context
 	 */
 	public void showTransaction(Context ctx) {
@@ -281,15 +257,13 @@ public class ExplorerAPI extends AWebSite {
 		
 		SignedData<ATransaction> transaction = transactions.get(txNum);
 		
-		// Create navigation links
-		ArrayList<DomContent> navLinks = makeTransactionNavigationLinks(ctx, blockNum, txNum, txCount);
+		// Create navigation links for transactions within this block
+		long txOffset = txNum;
+		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Tx");
 		
 		returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum,
 			h1("Transaction "+txNum+" in Block "+blockNum),
-			navLinks.isEmpty() ? div() : div(
-				each(navLinks, link -> link),
-				br()
-			),
+			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				makeTransactionTable(transaction)
@@ -320,8 +294,10 @@ public class ExplorerAPI extends AWebSite {
 			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum-1));
 			navLinks.add(makeButton("<< Prev",prevLink));
 		}
-		String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
-		navLinks.add(makeButton("Next >>",nextLink));
+		if (accountNum<state.getAccounts().count()-1) {
+			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
+			navLinks.add(makeButton("Next >>",nextLink));
+		}
 		
 		returnPage(ctx, "Account: #"+accountNum,
 			h1("Account: #"+accountNum),
@@ -410,21 +386,21 @@ public class ExplorerAPI extends AWebSite {
 				td(code(Long.toString(account.getSequence()))),
 				td("Number of transactions executed by this account")),
 			tr(
-				td("Memory Allowance"),
+				td("Memory"),
 				td(code(Long.toString(account.getMemory()))),
-				td("Memory allowance in bytes")),
+				td("Memory allowance credit in bytes")),
 			tr(
 				td("Memory Usage"),
 				td(code(Long.toString(account.getMemoryUsage()))),
 				td("Actual memory usage in bytes")),
 			tr(
-				td("Is Actor"),
+				td("Actor?"),
 				td(code(account.isActor() ? "true" : "false")),
 				td("Whether this is an actor account (no public key)")),
 			tr(
 				td("Controller"),
-				td(account.getController() != null ? showAddress((Address)account.getController()) : code("null")),
-				td("Controller address if any")),
+				td(showAddress((Address)account.getController())),
+				td("Controller address (if any)")),
 			tr(
 				td("Parent"),
 				td(account.getParent() != null ? showAddress(account.getParent()) : code("null")),
@@ -503,35 +479,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 	}
 	
-	private ArrayList<DomContent> makeBlockNavigationLinks(Context ctx, long blockNum, long nblocks) {
-		ArrayList<DomContent> navLinks = new ArrayList<>();
-		if (blockNum > 0) {
-			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum-1));
-			navLinks.add(makeButton("<< Previous",prevLink));
-		}
-		if (blockNum < nblocks - 1) {
-			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+(blockNum+1));
-			navLinks.add(makeButton("Next >>",nextLink));
-		}
-		return navLinks;
-	}
-	
 
-	private ArrayList<DomContent> makeTransactionNavigationLinks(Context ctx, long blockNum, long txNum, long txCount) {
-		ArrayList<DomContent> navLinks = new ArrayList<>();
-		String blockLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum);
-		navLinks.add(a("Back to Block "+blockNum).withHref(blockLink));
-		
-		if (txNum > 0) {
-			String prevTxLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+(txNum-1));
-			navLinks.add(makeButton("<< Prev" ,prevTxLink));
-		}
-		if (txNum < txCount - 1) {
-			String nextTxLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+(txNum+1));
-			navLinks.add(makeButton("Next >>",nextTxLink));
-		}
-		return navLinks;
-	}
 	
 
 

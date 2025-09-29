@@ -89,15 +89,103 @@ public abstract class AWebSite extends ABaseAPI {
 		return a(origin.toString()).withHref("/explorer/accounts/"+origin.longValue());
 	}
 
-	protected DomContent makeButton(String text, String prevLink) {
-		return a(text).withHref(prevLink).withClass("button");
-	}
+    protected DomContent makeButton(String text, String href) {
+        return makeButton(text, href, true);
+    }
+
+    protected DomContent makeButton(String text, String href, boolean enabled) {
+        if (enabled && (href!=null)) {
+            return a(
+                button(text)
+                    .withClass("secondary")
+                    .withStyle("padding:.25em .6em;font-size:.8em;margin-right:.25em;")
+            ).withHref(href);
+        } else {
+            return button(text)
+                .attr("disabled")
+                .withClass("secondary")
+                .withStyle("padding:.25em .6em;font-size:.8em;margin-right:.25em;");
+        }
+    }
 	
 	protected DomContent makeHeader(String title) {
 		return head(
 				title(title),
 		        link().withRel("stylesheet").withHref("/css/pico.min.css")
 		);
+	}
+
+	/**
+	 * Build standard pagination links: First, Prev, Next, End.
+	 * Links are only included when applicable.
+	 *
+	 * @param ctx      Request context
+	 * @param basePath Base path (e.g. "/explorer/accounts") without query
+	 * @param offset   Current offset
+	 * @param limit    Page size (items per page)
+	 * @param total    Total number of items
+	 * @return DomContent containing pagination buttons
+	 */
+	protected DomContent makePaginationLinks(Context ctx, String basePath, long offset, long limit, long total) {
+		long end = Math.min(total, offset+limit);
+		if (total<=0) return div();
+
+		var links = div();
+        // First / Prev
+        String firstLink = basePath+"?offset=0&limit="+limit;
+        long prevOffset=Math.max(0, offset-limit);
+        String prevLink = basePath+"?offset="+prevOffset+"&limit="+limit;
+        boolean hasPrev = offset>0;
+        links.with(makeButton("First", firstLink, hasPrev));
+        links.with(makeButton("Prev", prevLink, hasPrev));
+
+        // Next / End
+        String nextLink = basePath+"?offset="+end+"&limit="+limit;
+        long lastOffset = Math.max(0, total - limit);
+        String lastLink = basePath+"?offset="+lastOffset+"&limit="+limit;
+        boolean hasNext = end<total;
+        links.with(makeButton("Next", nextLink, hasNext));
+        links.with(makeButton("End", lastLink, hasNext));
+
+		return div(
+			links,
+			makePaginationInfo(offset, limit, total)
+		);
+	}
+
+	/**
+	 * Build Prev/Next navigation for detail pages with compact info label.
+	 * Example: "Block 3 / 678" next to buttons.
+	 *
+	 * @param ctx      Request context
+	 * @param basePath Base path without trailing index (e.g. "/explorer/blocks")
+	 * @param index    Current zero-based index
+	 * @param total    Total count
+	 * @param label    Label to display (e.g. "Block", "Tx")
+	 * @return DomContent containing navigation buttons and info
+	 */
+	protected DomContent makeNavigationLinks(Context ctx, String basePath, long index, long total, String label) {
+		if (total<=0) return div();
+		var links = div();
+        String prevLink = basePath+"/"+(index-1);
+        String nextLink = basePath+"/"+(index+1);
+        boolean hasPrev = index>0;
+        boolean hasNext = index<total-1;
+        links.with(makeButton("Prev", prevLink, hasPrev));
+        links.with(makeButton("Next", nextLink, hasNext));
+		return div(
+			links,
+			text(label+" "+index+" / "+total)
+		);
+	}
+
+	/**
+	 * Build a compact pagination info element like: "0 - 10 / 1567".
+	 * Placed after pagination links.
+	 */
+	protected DomContent makePaginationInfo(long offset, long limit, long total) {
+		long end=Math.min(total, offset+limit);
+		return text(offset+" - "+end+" / "+total);
 	}
 	
 	/**
