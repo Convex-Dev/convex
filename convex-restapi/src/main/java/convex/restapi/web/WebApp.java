@@ -4,7 +4,6 @@ import static j2html.TagCreator.*;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -30,6 +29,8 @@ public class WebApp extends AWebSite {
 	
 	private void indexPage(Context ctx) {
 		String host=ABaseAPI.getExternalBaseUrl(ctx, null);
+		String peerKeyHex = server.getPeer().getPeerKey().toHexString();
+		String peerLink = ABaseAPI.getExternalBaseUrl(ctx, "/explorer/peers/"+peerKeyHex);
 		
 		AMap<Keyword,ACell> statusMap=server.getStatusMap();
 		returnPage(ctx,"Convex Peer Server",
@@ -44,6 +45,7 @@ public class WebApp extends AWebSite {
 				    	tr(td("Version"),td(code(Utils.getVersion()))),
 				    	tr(td("Peer Port"),td(code(getHostname(ctx)+":"+server.getPort()))),
 				    	tr(td("Host"),td(code(host))),
+				    	tr(td("Peer Key"),td(a(showID(server.getPeer().getPeerKey())).withHref(peerLink))),
 				    	tr(td("Genesis Hash"),td(code(server.getPeer().getGenesisState().getHash().toString())))
 				    )
 				).attr("open", true)

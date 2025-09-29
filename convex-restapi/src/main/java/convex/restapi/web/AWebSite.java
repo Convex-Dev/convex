@@ -1,9 +1,31 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.*;
+import static j2html.TagCreator.a;
+import static j2html.TagCreator.body;
+import static j2html.TagCreator.button;
+import static j2html.TagCreator.code;
+import static j2html.TagCreator.div;
+import static j2html.TagCreator.footer;
+import static j2html.TagCreator.h1;
+import static j2html.TagCreator.h4;
+import static j2html.TagCreator.head;
+import static j2html.TagCreator.header;
+import static j2html.TagCreator.hr;
+import static j2html.TagCreator.html;
+import static j2html.TagCreator.img;
+import static j2html.TagCreator.link;
+import static j2html.TagCreator.main;
+import static j2html.TagCreator.nav;
+import static j2html.TagCreator.pre;
+import static j2html.TagCreator.rawHtml;
+import static j2html.TagCreator.small;
+import static j2html.TagCreator.text;
+import static j2html.TagCreator.title;
 
 import convex.core.cvm.Address;
 import convex.core.data.AArrayBlob;
+import convex.core.data.ACell;
+import convex.core.lang.RT;
 import convex.core.text.Text;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -12,6 +34,11 @@ import j2html.tags.DomContent;
 import j2html.tags.specialized.CodeTag;
 import j2html.tags.specialized.ImgTag;
 
+/**
+ * Base class for website pages.
+ * 
+ * Contains common utility / formatting functionality for consistency across site
+ */
 public abstract class AWebSite extends ABaseAPI {
 	public AWebSite(RESTServer restServer) {
 		super(restServer);
@@ -49,15 +76,22 @@ public abstract class AWebSite extends ABaseAPI {
 				h1("Convex").withStyle("height: 40px; margin-bottom: 0.2em;"),
 				div().withStyle("flex-grow: 1;"),
 				nav(
-					a("Explorer").withHref("/explorer/"),
-					a("Peer").withHref("/"),
-					a("API").withHref("/swagger"),
+					topButton("Explorer","/explorer/"),
+					topButton("Peers","/explorer/peers"),
+					topButton("API","/swagger"),
 					div()
-				).withStyle("display: flex; gap: 1em; align-items: center;") // gap between nav items
+				).withStyle("display: flex; gap: 0.5em; align-items: center;") // gap between nav items
 			).withStyle("display: flex; align-items: center; gap: 1em")
 		);
 	}
 	
+	// Make a button suitable for the top bar
+	private DomContent topButton(String text, String link) {
+		return a(
+				button(text).withStyle("padding:.25em .6em;")
+		).withHref(link);
+	}
+
 	public DomContent contentBlock(DomContent... content) {
 		return main(content).withStyle("padding: 1em; flex-grow: 1;"); // grow to fill screen
 	}
@@ -193,6 +227,15 @@ public abstract class AWebSite extends ABaseAPI {
 		String s=Text.toFriendlyNumber(bal/1000000000);
 		s=Text.leftPad(s, 13);
 		return pre(rawHtml(s+"."),small(String.format("%09d", bal%1000000000))).withStyle("margin: 0; width: min-content;");
+	}
+	
+	/**
+	 * Show a value in formatted CVX format
+	 * @param trans
+	 * @return
+	 */
+	protected CodeTag showCVX(ACell trans) {
+		return wrappedCode(RT.print(trans).toString());
 	}
 	
 	protected String getVersion() {

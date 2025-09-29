@@ -175,7 +175,7 @@ public class ConnectionManager extends AThreadedComponent {
 			 * the distribution of peers tends towards the level of stake over time
 			 */
 			if ((millisSinceLastUpdate>0)&&(currentPeerCount>=targetPeerCount)) {
-				double prop=ps.getTotalStake()/totalStake; // proportion of stake represented by this Peer
+				double prop=ps.getTotalStakeShares()/totalStake; // proportion of stake represented by this Peer
 				// Very low chance of dropping a Peer with high stake (more than
 				double keepChance=Math.min(1.0, prop*targetPeerCount);
 

@@ -106,7 +106,7 @@ public class PeerStatus extends ARecordGeneric {
 	 *
 	 * @return Total stake shares, including own stake + delegated stake shares
 	 */
-	public long getTotalStake() {
+	public long getTotalStakeShares() {
 		return peerStake + delegatedStake;
 	}
 	
@@ -120,7 +120,7 @@ public class PeerStatus extends ARecordGeneric {
 	}
 
 	/**
-	 * Gets the total delegated stake of this peer 
+	 * Gets the total delegated stake in CVM for this peer 
 	 *
 	 * @return Total of delegated stake
 	 */

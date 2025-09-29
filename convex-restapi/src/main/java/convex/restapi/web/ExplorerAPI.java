@@ -28,14 +28,17 @@ import convex.core.crypto.IdenticonBuilder;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
+import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
+import convex.core.data.Index;
+import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
-import convex.core.lang.RT;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -70,6 +73,8 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"states", this::showStates);
 		app.get(prefix+"accounts", this::showAccounts);
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
+		app.get(prefix+"peers", this::showPeers);
+		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
 		app.get("/identicon/{hex}", this::getIdenticon);
 	}
 	
@@ -84,6 +89,7 @@ public class ExplorerAPI extends AWebSite {
 			article(
 				p(a("Blocks").withHref(ROUTE+"blocks")),
 				p(a("Accounts").withHref(ROUTE+"accounts")),
+				p(a("Peers").withHref(ROUTE+"peers")),
 				p(a("States").withHref(ROUTE+"states"))
 			)
 		);
@@ -193,10 +199,11 @@ public class ExplorerAPI extends AWebSite {
 		for (long i=start; i<end; i++) {
 			SignedData<Block> sd=blocks.get(i);
 			String link=ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+i);
+			String peerLink=ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+sd.getAccountKey().toHexString());
 			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(link)),	
-				td(showID(sd.getAccountKey())),	
+				td(a(showID(sd.getAccountKey())).withHref(peerLink)),	
 				td(showHex(sd.getHash()))	
 			});
 		}
@@ -265,7 +272,8 @@ public class ExplorerAPI extends AWebSite {
 		
 		if (txNum >= txCount) throw new NotFoundResponse("Transaction "+txNum+" does not exist in block "+blockNum);
 		
-		SignedData<ATransaction> transaction = transactions.get(txNum);
+		SignedData<ATransaction> signedTx = transactions.get(txNum);
+		ATransaction trans=signedTx.getValue();
 		
 		// Create navigation links for transactions within this block
 		long txOffset = txNum;
@@ -276,7 +284,32 @@ public class ExplorerAPI extends AWebSite {
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
-				makeTransactionTable(transaction)
+				tbody(
+					tr(
+						td("Address"),
+						td(identicon(signedTx.getAccountKey().toHexString()),showAddress(trans.getOrigin())),
+						td("Origin address of transaction")),
+					tr(
+						td("Account Key"),
+						td(showID(signedTx.getAccountKey())),
+						td("Ed25519 public key of the signer")),
+					tr(
+						td("Transaction Hash"),
+						td(showID(signedTx.getHash())),
+						td("Hash code of the transaction object")),
+					tr(
+						td("Transaction Type"),
+						td(code(trans.getClass().getSimpleName())),
+						td("Java class name of the transaction")),
+					tr(
+						td("Transaction Data"),
+						td(showCVX(trans)),
+						td("CVX representation of the transaction")),
+					tr(
+						td("Storage Size"),
+						td(code(""+Cells.storageSize(signedTx))),
+						td("Bytes consumed by transaction data"))
+				)
 			)
 		);
 	}
@@ -319,6 +352,131 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 
+	/**
+	 * Produce a table of peers
+	 * @param ctx Javalin context
+	 */
+	public void showPeers(Context ctx) {
+		Server s=restServer.getServer();
+		
+		// Get current state from server
+		State state = s.getPeer().getConsensusState();
+		Index<AccountKey, PeerStatus> peers = state.getPeers();
+		long npeers = peers.count();
+		
+		// Get pagination parameters
+		long[] range = getPaginationRange(ctx, npeers);
+		long start = range[0];
+		long end = range[1];
+		
+		ArrayList<DomContent[]> rows = new ArrayList<>();
+		for (long i = start; i < end; i++) {
+			MapEntry<AccountKey, PeerStatus> entry = peers.entryAt(i);
+			AccountKey peerKey = entry.getKey();
+			PeerStatus peerStatus = entry.getValue();
+			String peerLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+peerKey.toHexString());
+			
+			rows.add(new DomContent[] {
+				td(a(showID(peerKey)).withHref(peerLink)),
+				td(div(showBalance(peerStatus.getTotalStakeShares()))),
+				td(div(showBalance(peerStatus.getPeerStake()))),
+				td(div(showBalance(peerStatus.getDelegatedStake())))
+			});
+		}
+		
+		// Create pagination controls
+		String basePath = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers");
+		DomContent pagination = makePaginationLinks(ctx, basePath, start, end - start, npeers);
+		
+		returnPage(ctx, "Peers",
+			pagination,
+			table(
+				thead(tr(
+					th("Peer Key"),
+					th("Total Stake"),
+					th("Peer Stake"),
+					th("Delegated Stake")
+				)),
+				tbody(
+					each(rows, row -> tr(row))
+				)
+			)
+		);
+	}
+
+	/**
+	 * Show detailed information for a specific peer
+	 * @param ctx Javalin context
+	 */
+	public void showPeerDetail(Context ctx) {
+		String peerKeyParam = ctx.pathParam("peerKey");
+		
+		// Parse the peer key from hex string
+		AccountKey peerKey;
+		try {
+			peerKey = AccountKey.parse(peerKeyParam);
+		} catch (Exception e) {
+			throw new BadRequestResponse("Invalid peer key format: " + peerKeyParam);
+		}
+		
+		// Get current state from server
+		State state = server.getPeer().getConsensusState();
+		PeerStatus peerStatus = state.getPeer(peerKey);
+		
+		if (peerStatus == null) {
+			throw new NotFoundResponse("Peer " + peerKeyParam + " does not exist");
+		}
+		
+		returnPage(ctx, "Peer: " + peerKey.toHexString(),
+			table(
+				thead(tr(th("Field"),th("Value"),th("Notes"))),
+				makePeerTable(peerStatus, peerKey)
+			)
+		);
+	}
+	
+	// Utility to display peer summary info as a table
+	private TbodyTag makePeerTable(PeerStatus peerStatus, AccountKey peerKey) {
+		return tbody(
+			tr(
+				td("Peer Key"),
+				td(showID(peerKey)),
+				td("Public key of the peer")),
+			tr(
+				td("Controller"),
+				td(showAddress(peerStatus.getController())),
+				td("Controller address for this peer")),
+			tr(
+				td("Total Stake"),
+				td(div(showBalance(peerStatus.getBalance()))),
+				td("Total stake (peer + delegated) in CVM")),
+			tr(
+				td("Peer Stake"),
+				td(div(showBalance(peerStatus.getPeerStake()))),
+				td("Peer's own stake in CVM")),
+			tr(
+				td("Delegated Stake"),
+				td(div(showBalance(peerStatus.getDelegatedStake()))),
+				td("Stake delegated to this peer in CVM")),
+			tr(
+				td("Timestamp"),
+				td(code(Long.toString(peerStatus.getTimestamp()))),
+				td("Timestamp of last block issued by this peer")),
+			tr(
+				td("Hostname"),
+				td(peerStatus.getHostname() != null ? code(peerStatus.getHostname().toString()) : code("<not defined>")),
+				td("Hostname/URL for peer connections")),
+			tr(
+				td("Metadata"),
+				td(showCVX(peerStatus.getMetadata())),
+				td("Metadata provide by peer operator")),
+			tr(
+				td("Storage Size"),
+				td(code(""+Cells.storageSize(peerStatus))),
+				td("Bytes consumed by peer status data structure"))
+		);
+	}
+
 	// Utility to display block summary info as a table
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
 		return tbody(
@@ -345,36 +503,7 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 	
-	// Utility to display transaction summary info as a table
-	private TbodyTag makeTransactionTable(SignedData<ATransaction> signedTx) {
-		ATransaction trans=signedTx.getValue();
-		return tbody(
-			tr(
-				td("Address"),
-				td(identicon(signedTx.getAccountKey().toHexString()),showAddress(trans.getOrigin())),
-				td("Origin address of transaction")),
-			tr(
-				td("Account Key"),
-				td(showID(signedTx.getAccountKey())),
-				td("Ed25519 public key of the signer")),
-			tr(
-				td("Transaction Hash"),
-				td(showID(signedTx.getHash())),
-				td("Hash code of the transaction object")),
-			tr(
-				td("Transaction Type"),
-				td(code(trans.getClass().getSimpleName())),
-				td("Java class name of the transaction")),
-			tr(
-				td("Transaction Data"),
-				td(wrappedCode(RT.print(trans).toString())),
-				td("CVX representation of the transaction")),
-			tr(
-				td("Storage Size"),
-				td(code(""+Cells.storageSize(signedTx))),
-				td("Bytes consumed by transaction data"))
-		);
-	}
+
 	
 	// Utility to display account summary info as a table
 	private TbodyTag makeAccountTable(AccountStatus account, Address address) {
@@ -421,6 +550,8 @@ public class ExplorerAPI extends AWebSite {
 				td("Number of holdings (token balances)"))
 		);
 	}
+	
+
 
 	
 

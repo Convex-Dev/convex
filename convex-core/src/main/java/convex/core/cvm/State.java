@@ -612,7 +612,7 @@ public class State extends ARecordGeneric {
 		long timeStamp=this.getTimestamp().longValue();
 		Double totalStake = getPeers().reduceEntries((acc, e) -> {
 			PeerStatus ps=e.getValue();
-			double stake = (double) (ps.getTotalStake());
+			double stake = (double) (ps.getTotalStakeShares());
 			
 			long peerTimestamp=ps.getTimestamp();
 			double decay=Economics.stakeDecay(timeStamp,peerTimestamp);
