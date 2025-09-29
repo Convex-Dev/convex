@@ -23,6 +23,7 @@ import static j2html.TagCreator.text;
 import static j2html.TagCreator.title;
 
 import convex.core.cvm.Address;
+import java.util.Locale;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -227,6 +228,16 @@ public abstract class AWebSite extends ABaseAPI {
 		String s=Text.toFriendlyNumber(bal/1000000000);
 		s=Text.leftPad(s, 13);
 		return pre(rawHtml(s+"."),small(String.format("%09d", bal%1000000000))).withStyle("margin: 0; width: min-content;");
+	}
+
+	/**
+	 * Show a percentage value with fixed-width alignment, formatted like " 18.00 %"
+	 * @param percent Percentage value (0-100)
+	 * @return Monospace-formatted DomContent
+	 */
+	protected DomContent showPercent(double percent) {
+		String s=String.format(Locale.US, "%6.2f %%", percent);
+		return pre(s).withStyle("margin: 0; width: min-content;");
 	}
 	
 	/**
