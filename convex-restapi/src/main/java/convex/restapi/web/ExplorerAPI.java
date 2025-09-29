@@ -1,6 +1,19 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.*;
+import static j2html.TagCreator.a;
+import static j2html.TagCreator.article;
+import static j2html.TagCreator.code;
+import static j2html.TagCreator.div;
+import static j2html.TagCreator.each;
+import static j2html.TagCreator.h1;
+import static j2html.TagCreator.h4;
+import static j2html.TagCreator.p;
+import static j2html.TagCreator.table;
+import static j2html.TagCreator.tbody;
+import static j2html.TagCreator.td;
+import static j2html.TagCreator.th;
+import static j2html.TagCreator.thead;
+import static j2html.TagCreator.tr;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -32,8 +45,6 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
-import j2html.tags.specialized.CodeTag;
-import j2html.tags.specialized.ImgTag;
 import j2html.tags.specialized.TbodyTag;
 
 /**
@@ -222,7 +233,6 @@ public class ExplorerAPI extends AWebSite {
 		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
 		returnPage(ctx, "Convex Block: "+blockNum,
-			h4("Block position: "+blockNum),
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),

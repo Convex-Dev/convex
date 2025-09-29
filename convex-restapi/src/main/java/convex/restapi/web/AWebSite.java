@@ -128,29 +128,35 @@ public abstract class AWebSite extends ABaseAPI {
 	 */
 	protected DomContent makePaginationLinks(Context ctx, String basePath, long offset, long limit, long total) {
 		long end = Math.min(total, offset+limit);
-		if (total<=0) return div();
+	    if (total<=0) return div();
+	
+	    String firstLink = basePath+"?offset=0&limit="+limit;
+	    long prevOffset=Math.max(0, offset-limit);
+	    String prevLink = basePath+"?offset="+prevOffset+"&limit="+limit;
+	    boolean hasPrev = offset>0;
+	
+	    String nextLink = basePath+"?offset="+end+"&limit="+limit;
+	    long lastOffset = Math.max(0, total - limit);
+	    String lastLink = basePath+"?offset="+lastOffset+"&limit="+limit;
+	    boolean hasNext = end<total;
+	
+	    return div(
+	        makeButton("<<", firstLink, hasPrev),
+	        makeButton("<", prevLink, hasPrev),
+	        makeButton(">", nextLink, hasNext),
+	        makeButton(">>", lastLink, hasNext),
+	        makePaginationInfo(offset, limit, total)
+	    );
+	}
+	
 
-		var links = div();
-        // First / Prev
-        String firstLink = basePath+"?offset=0&limit="+limit;
-        long prevOffset=Math.max(0, offset-limit);
-        String prevLink = basePath+"?offset="+prevOffset+"&limit="+limit;
-        boolean hasPrev = offset>0;
-        links.with(makeButton("First", firstLink, hasPrev));
-        links.with(makeButton("Prev", prevLink, hasPrev));
-
-        // Next / End
-        String nextLink = basePath+"?offset="+end+"&limit="+limit;
-        long lastOffset = Math.max(0, total - limit);
-        String lastLink = basePath+"?offset="+lastOffset+"&limit="+limit;
-        boolean hasNext = end<total;
-        links.with(makeButton("Next", nextLink, hasNext));
-        links.with(makeButton("End", lastLink, hasNext));
-
-		return div(
-			links,
-			makePaginationInfo(offset, limit, total)
-		);
+	/**
+	 * Build a compact pagination info element like: "0 - 10 / 1567".
+	 * Placed after pagination links.
+	 */
+	protected DomContent makePaginationInfo(long offset, long limit, long total) {
+		long end=Math.min(total, offset+limit);
+		return small(offset+"-"+(end-1)+" / "+total);
 	}
 
 	/**
@@ -165,28 +171,18 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @return DomContent containing navigation buttons and info
 	 */
 	protected DomContent makeNavigationLinks(Context ctx, String basePath, long index, long total, String label) {
-		if (total<=0) return div();
-		var links = div();
-        String prevLink = basePath+"/"+(index-1);
-        String nextLink = basePath+"/"+(index+1);
-        boolean hasPrev = index>0;
-        boolean hasNext = index<total-1;
-        links.with(makeButton("Prev", prevLink, hasPrev));
-        links.with(makeButton("Next", nextLink, hasNext));
-		return div(
-			links,
-			text(label+" "+index+" / "+total)
-		);
+	    if (total<=0) return div();
+	    String prevLink = basePath+"/"+(index-1);
+	    String nextLink = basePath+"/"+(index+1);
+	    boolean hasPrev = index>0;
+	    boolean hasNext = index<total-1;
+	    return div(
+	        makeButton("<", prevLink, hasPrev),
+	        makeButton(">", nextLink, hasNext),
+	        small(label+" "+index+" / "+total)
+	    );
 	}
 
-	/**
-	 * Build a compact pagination info element like: "0 - 10 / 1567".
-	 * Placed after pagination links.
-	 */
-	protected DomContent makePaginationInfo(long offset, long limit, long total) {
-		long end=Math.min(total, offset+limit);
-		return text(offset+" - "+end+" / "+total);
-	}
 	
 	/**
 	 * Show a formatted CVM balance
