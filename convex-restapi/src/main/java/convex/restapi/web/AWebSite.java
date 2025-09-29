@@ -13,9 +13,12 @@ import static j2html.TagCreator.header;
 import static j2html.TagCreator.hr;
 import static j2html.TagCreator.html;
 import static j2html.TagCreator.img;
+import static j2html.TagCreator.each;
 import static j2html.TagCreator.link;
 import static j2html.TagCreator.main;
 import static j2html.TagCreator.nav;
+import static j2html.TagCreator.ul;
+import static j2html.TagCreator.li;
 import static j2html.TagCreator.pre;
 import static j2html.TagCreator.rawHtml;
 import static j2html.TagCreator.small;
@@ -25,6 +28,7 @@ import static j2html.TagCreator.title;
 import convex.core.cvm.Address;
 import java.util.Locale;
 import convex.core.data.AArrayBlob;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.text.Text;
@@ -257,6 +261,27 @@ public abstract class AWebSite extends ABaseAPI {
 			return "Unknown";
 		}
 	}
+
+	/**
+	 * Construct a breadcrumb navigation line.
+	 * Provide pairs of (label, href) for intermediate links, and the last label with null href for the current page.
+	 * Example: breadcrumb(new String[][] {{"Home", "/"}, {"Services", "/services"}, {"Design", null}})
+	 */
+	protected DomContent breadcrumb(String[][] items) {
+		return nav(
+			ul(
+				each(java.util.Arrays.asList(items), it -> {
+					String label = it[0];
+					String href = (it.length>1)?it[1]:null;
+					if (href==null) {
+						return li(text(label));
+					} else {
+						return li(a(label).withHref(href));
+					}
+				})
+			)
+		).attr("aria-label", "breadcrumb");
+	}
 	
 	// Silly helper function
 	protected static String[] sa(String... strings) {
@@ -268,13 +293,9 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param data The data to create identicon for
 	 * @return DomContent div with identicon and code
 	 */
-	public static DomContent showID(AArrayBlob data) {
-		String dataString = (data==null)?"nil":data.toString();
-		
-		ImgTag identicon = identicon((data==null)?"0x":dataString);
-		
+	public static DomContent showID(AArrayBlob data) {			
 		return div(
-			identicon,
+			identicon(data),
 			div(
 				showHex(data).withStyle("align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
 			).withStyle("min-width: 0;")
@@ -289,7 +310,7 @@ public abstract class AWebSite extends ABaseAPI {
 	public static PreTag showHex(AArrayBlob data) {
 		String dataString = (data==null)?"nil":data.toString();
 		
-		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; max-width:100%; overflow-wrap:break-word;");
+		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; overflow-wrap:break-word;");
 	}
 	
 	public static CodeTag wrappedCode(String value) {
@@ -300,5 +321,10 @@ public abstract class AWebSite extends ABaseAPI {
 		String identiconUrl = "/identicon/" + hexString;
 		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; width: 21; image-rendering: pixelated; margin: 2px; flex-shrink: 0;");
 		return identicon;
+	}
+	
+	protected static ImgTag identicon(ABlob blob) {
+		if (blob==null) return identicon((String)null);
+		return identicon(blob.toHexString());
 	}
 }

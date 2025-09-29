@@ -1,19 +1,6 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.a;
-import static j2html.TagCreator.article;
-import static j2html.TagCreator.code;
-import static j2html.TagCreator.div;
-import static j2html.TagCreator.each;
-import static j2html.TagCreator.h1;
-import static j2html.TagCreator.h4;
-import static j2html.TagCreator.p;
-import static j2html.TagCreator.table;
-import static j2html.TagCreator.tbody;
-import static j2html.TagCreator.td;
-import static j2html.TagCreator.th;
-import static j2html.TagCreator.thead;
-import static j2html.TagCreator.tr;
+import static j2html.TagCreator.*;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -86,6 +73,7 @@ public class ExplorerAPI extends AWebSite {
 	 */
 	public void showExplorer(Context ctx) {
 		returnPage(ctx, "Peer Explorer",
+			breadcrumb(new String[][] {{"Explorer","/explorer/"}}),
 			article(
 				p(a("Blocks").withHref(ROUTE+"blocks")),
 				p(a("Accounts").withHref(ROUTE+"accounts")),
@@ -121,6 +109,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 
 		returnPage(ctx,"States,",
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"States",null}}),
 					table(
 						thead(tr(th("Position"),th("State Hash"),th("Timestamp"))),
 						tbody(
@@ -168,6 +157,7 @@ public class ExplorerAPI extends AWebSite {
 		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", start, limit, naccounts);
 		
 		returnPage(ctx, "Accounts",
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Accounts",null}}),
 			div(
 				paginationLinks
 			),
@@ -211,6 +201,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		returnPage(ctx, "Blocks",
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks",null}}),
 			table(
 				thead(tr(th("Block"),th("Peer"),th("Hash"))),
 				tbody(
@@ -242,6 +233,7 @@ public class ExplorerAPI extends AWebSite {
 		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
 		returnPage(ctx, "Convex Block: "+blockNum,
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),null}}),
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
@@ -282,14 +274,17 @@ public class ExplorerAPI extends AWebSite {
 		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Tx");
 		
 		returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum,
-			h1("Transaction "+txNum+" in Block "+blockNum),
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),"/explorer/blocks/"+Long.toString(blockNum)},{"Tx "+Long.toString(txNum),null}}),
+			h5("Transaction "+txNum+" in Block "+blockNum),
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				tbody(
 					tr(
 						td("Address"),
-						td(identicon(signedTx.getAccountKey().toHexString()),showAddress(trans.getOrigin())),
+						td(identicon(signedTx.getAccountKey()),
+						   span("  "), // bit of space. How to make this 1em?
+						   showAddress(trans.getOrigin())),
 						td("Origin address of transaction")),
 					tr(
 						td("Account Key"),
@@ -345,7 +340,8 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		returnPage(ctx, "Account: #"+accountNum,
-			h1("Account: #"+accountNum),
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Accounts","/explorer/accounts"},{"#"+Long.toString(accountNum),null}}),
+			// h1("Account: #"+accountNum),
 			each(navLinks, link -> link),
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
@@ -394,6 +390,7 @@ public class ExplorerAPI extends AWebSite {
 		DomContent pagination = makePaginationLinks(ctx, basePath, start, end - start, npeers);
 		
 		returnPage(ctx, "Peers",
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Peers",null}}),
 			pagination,
 			table(
 				thead(tr(
@@ -434,6 +431,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		returnPage(ctx, "Peer: " + peerKey.toHexString(),
+			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Peers","/explorer/peers"},{peerKey.toHexString(),null}}),
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				makePeerTable(peerStatus, peerKey)
@@ -573,7 +571,7 @@ public class ExplorerAPI extends AWebSite {
 			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(txLink)),
-				td(identicon(strans.getAccountKey().toHexString()),showAddress(strans.getValue().getOrigin())),
+				td(identicon(strans.getAccountKey()),showAddress(strans.getValue().getOrigin())),
 				td(showID(strans.getHash()))
 			});
 		}
