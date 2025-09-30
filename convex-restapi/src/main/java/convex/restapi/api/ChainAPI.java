@@ -1,10 +1,14 @@
 package convex.restapi.api;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+
+import javax.imageio.ImageIO;
 
 import convex.api.ContentTypes;
 import convex.api.Convex;
@@ -16,6 +20,7 @@ import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.crypto.IdenticonBuilder;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -23,6 +28,7 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -61,6 +67,7 @@ import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
+import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
@@ -102,6 +109,8 @@ public class ChainAPI extends ABaseAPI {
 		
 		app.get(prefix + "blocks", this::getBlocks);
 		app.get(prefix + "blocks/{blockNum}", this::getBlock);
+		
+		app.get("/identicon/{hex}", this::getIdenticon);
 		
 		convex = restServer.getConvex();
 
@@ -930,6 +939,63 @@ public class ChainAPI extends ABaseAPI {
 			setContent(ctx,r);
 		} catch (ParseException e) {
 			throw new BadRequestResponse(e.getMessage());
+		}
+	}
+	
+	@OpenApi(path = "/identicon/{hex}", 
+			versions="peer-v1",
+			methods = HttpMethod.GET, 
+			tags = { "Utility"},
+			summary = "Get the identicon for a hash / public key", 
+			operationId = "getIdenticon", 
+			pathParams = {
+					@OpenApiParam(
+							name = "hex", 
+							description = "Hex string. Leading '0x' is optional but discouraged.", 
+							required = true, 
+							type = String.class, 
+							example = "0x1234567812345678123456781234567812345678123456781234567812345678") },
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Transaction found", 
+						content = {
+							@OpenApiContent(
+									type = "image/png") }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, invalid hash format")
+			})
+	public void getIdenticon(Context ctx) {
+		String hexParam = ctx.pathParam("hex");
+		
+		// Parse hex string to blob
+		AArrayBlob data = Blob.parse(hexParam);
+		if (data == null) {
+			throw new BadRequestResponse("Invalid hex string for identicon: " + hexParam);
+		}
+		
+		try {
+			// Generate identicon data
+			int[] identiconData = IdenticonBuilder.build(data);
+			
+			// Create BufferedImage from identicon data
+			BufferedImage image = new BufferedImage(IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, BufferedImage.TYPE_INT_RGB);
+			image.setRGB(0, 0, IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, identiconData, 0, IdenticonBuilder.SIZE);
+			
+			// Convert to PNG bytes
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			ImageIO.write(image, "PNG", baos);
+			byte[] pngBytes = baos.toByteArray();
+			
+			// Set response headers for caching and content type
+			ctx.header("Content-Type", "image/png");
+			ctx.header("Cache-Control", "public, max-age=31536000"); // 1 year cache
+			ctx.header("ETag", "\"" + data.toHexString() + "\""); // Use data as ETag
+			ctx.result(pngBytes);
+			
+		} catch (IOException e) {
+			throw new InternalServerErrorResponse("Failed to generate identicon: " + e.getMessage());
 		}
 	}
 }

@@ -104,6 +104,13 @@ public abstract class AWebSite extends ABaseAPI {
 					topButton("Explorer","/explorer/"),
 					topButton("Peers","/explorer/peers"),
 					topButton("API","/swagger"),
+					div(
+					    label(
+					        input().withType("checkbox").withId("theme-toggle")
+					              .attr("role","switch")
+					              .attr("onchange", "toggleTheme()")
+					    ).withClass("theme-toggle")
+					),
 					div()
 				).withStyle("display: flex; gap: 0.5em; align-items: center;") // gap between nav items
 			).withStyle("display: flex; align-items: center; gap: 0.5em"),
@@ -172,8 +179,10 @@ public abstract class AWebSite extends ABaseAPI {
 		return head(
 				title(title),
 		        link().withRel("stylesheet").withHref("/css/pico.min.css"),
+		        link().withRel("stylesheet").withHref("/css/custom.css"),
 		        // page level-style overrides. We want to make spacing not too big to get more info on screen
-		        style(":root {--pico-spacing: 0.6em}")
+		        style(":root {--pico-spacing: 0.6em}"),
+		        script().withSrc("/js/explorer.js").withType("text/javascript")
 		);
 	}
 
@@ -273,7 +282,7 @@ public abstract class AWebSite extends ABaseAPI {
 		String s=Text.toFriendlyNumber(bal/1000000000);
 		s=Text.leftPad(s, 13);
 		return preCode(
-					span(rawHtml(s)).withStyle("color: #ff0;"),
+					span(rawHtml(s)).withClass("cvm-balance"),
 					small("."+String.format("%09d", bal%1000000000))
 				);
 	}

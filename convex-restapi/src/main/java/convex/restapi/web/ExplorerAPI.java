@@ -70,7 +70,7 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get(prefix+"peers", this::showPeers);
 		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
-		app.get("/identicon/{hex}", this::getIdenticon);
+
 	}
 	
 
@@ -730,42 +730,7 @@ public class ExplorerAPI extends AWebSite {
 
 	
 
-	/**
-	 * Get an identicon PNG image for the given hex data
-	 * @param ctx Javalin context
-	 */
-	public void getIdenticon(Context ctx) {
-		String hexParam = ctx.pathParam("hex");
-		
-		// Parse hex string to blob
-		AArrayBlob data = Blob.parse(hexParam);
-		if (data == null) {
-			throw new BadRequestResponse("Invalid hex string for identicon: " + hexParam);
-		}
-		
-		try {
-			// Generate identicon data
-			int[] identiconData = IdenticonBuilder.build(data);
-			
-			// Create BufferedImage from identicon data
-			BufferedImage image = new BufferedImage(IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, BufferedImage.TYPE_INT_RGB);
-			image.setRGB(0, 0, IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, identiconData, 0, IdenticonBuilder.SIZE);
-			
-			// Convert to PNG bytes
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			ImageIO.write(image, "PNG", baos);
-			byte[] pngBytes = baos.toByteArray();
-			
-			// Set response headers for caching and content type
-			ctx.header("Content-Type", "image/png");
-			ctx.header("Cache-Control", "public, max-age=31536000"); // 1 year cache
-			ctx.header("ETag", "\"" + data.toHexString() + "\""); // Use data as ETag
-			ctx.result(pngBytes);
-			
-		} catch (IOException e) {
-			throw new InternalServerErrorResponse("Failed to generate identicon: " + e.getMessage());
-		}
-	}
+
 	
 
 	

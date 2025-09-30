@@ -1,0 +1,30 @@
+/* custom.css */
+
+/* Default styles for dark mode */
+.cvm-balance {
+    color: #ff0; /* Bright yellow for dark mode, high contrast */
+}
+
+.cvm-balance-decimal {
+    color: #880; /* Slightly darker yellow for dark mode */
+}
+
+/* Light mode styles using prefers-color-scheme */
+@media (prefers-color-scheme: light) {
+    .cvm-balance {
+        color: #b88200; /* Gold-like color for light mode, professional and warm */
+    }
+
+    .cvm-balance-decimal {
+        color: #8b6508; /* Darker gold for decimal part in light mode */
+    }
+}
+
+/* Light mode styles using class-based theme toggle (optional) */
+.light-mode .cvm-balance {
+    color: #b88200;
+}
+
+.light-mode .cvm-balance-decimal {
+    color: #8b6508;
+}
