@@ -287,12 +287,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @return DomContent div with identicon and code
 	 */
 	public static DomContent showID(AArrayBlob data) {			
-		return div(
-			identicon(data),
-			div(
-				showHex(data).withStyle("align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
-			).withStyle("min-width: 0;")
-		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
+		return showID(data,16);
 	}
 	
 	/**
@@ -300,10 +295,39 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param data The data to create identicon for
 	 * @return DomContent div with identicon and code
 	 */
+	public static DomContent showID(AArrayBlob data, int length) {			
+		return div(
+			identicon(data),
+			div(
+				showHex(data,length).withStyle("font-size: 0.75rem; align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
+			).withStyle("min-width: 0;")
+		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
+	}
+	
+	/**
+	 * Create a tag showing a hex string
+	 * @param data The data to show
+	 * @return PreTag with pre-formatted hex
+	 */
 	public static PreTag showHex(AArrayBlob data) {
 		String dataString = (data==null)?"nil":data.toString();
 		
 		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; overflow-wrap:break-word;");
+	}
+	
+	/**
+	 * Create a tag showing a hex string
+	 * @param data The data to show
+	 * @param len max number of hex digits to show
+	 * @return PreTag with pre-formatted hex
+	 */
+	public static PreTag showHex(AArrayBlob data, int len) {
+		String text = (data==null)?"nil":data.toString();
+		if (text.length()>len+2) {
+			text=text.substring(0, len+2)+"...";
+		}
+		
+		return pre(text).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; overflow-wrap:break-word;");
 	}
 	
 	public static CodeTag wrappedCode(String value) {

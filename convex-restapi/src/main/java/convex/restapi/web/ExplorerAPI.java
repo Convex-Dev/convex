@@ -35,6 +35,7 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
+import j2html.tags.specialized.TableTag;
 import j2html.tags.specialized.TbodyTag;
 
 /**
@@ -58,6 +59,7 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"blocks/{blockNum}", this::showBlock);
 		app.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
 		app.get(prefix+"states", this::showStates);
+		app.get(prefix+"states/{position}", this::showStatePage);
 		app.get(prefix+"accounts", this::showAccounts);
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get(prefix+"peers", this::showPeers);
@@ -115,12 +117,12 @@ public class ExplorerAPI extends AWebSite {
 			State state=(i==0)?peer.getGenesisState():peer.getBlockResult(i-1).getState();
 			rows.add(new DomContent[] {
 				td(Long.toString(i)),	
-				td(code(state.getHash().toString())),	
+				td(showStateID(state,i)),	
 				td(state.getTimestamp().toString())	
 			});
 		}
 
-        returnPage(ctx,"States,", new String[][] {{"Explorer","/explorer/"},{"States",null}},
+        returnPage(ctx,"States,", new String[][] {{"Explorer",ROUTE},{"States",null}},
 					table(
 						thead(tr(th("Position"),th("State Hash"),th("Timestamp"))),
 						tbody(
@@ -129,6 +131,28 @@ public class ExplorerAPI extends AWebSite {
 					)
 			);
 	}
+
+    /**
+     * Show a specific state by position
+     */
+    public void showStatePage(Context ctx) {
+        Server s=restServer.getServer();
+        Peer peer=s.getPeer();
+        long pos=Long.parseLong(ctx.pathParam("position"));
+        long nstates=peer.getStatePosition()+1;
+        if ((pos<0)||(pos>=nstates)) throw new NotFoundResponse("State position out of range: "+pos);
+        State state=(pos==0)?peer.getGenesisState():peer.getBlockResult(pos-1).getState();
+        returnPage(ctx, "State #"+pos, new String[][] {{"Explorer",ROUTE},{"States","/explorer/states"},{Long.toString(pos),null}},
+            table(
+                thead(tr(th("Field"),th("Value"),th("Notes"))),
+                tbody(
+                    tr(td("Hash"),td(code(state.getHash().toString())),td("State hash")),
+                    tr(td("Timestamp"),td(state.getTimestamp().toString()),td("State timestamp")),
+                    tr(td("Accounts"),td(code(Long.toString(state.getAccounts().count()))),td("Account count at this state"))
+                )
+            )
+        );
+    }
 	
 	/**
 	 * Produce a table of accounts
@@ -145,8 +169,20 @@ public class ExplorerAPI extends AWebSite {
 		// Get pagination parameters
 		long[] range = getPaginationRange(ctx, naccounts);
 		long start = range[0];
-		long end = range[1];
 		long limit = range[2]; // limit if provided. or default limit
+		
+		// Create pagination controls
+		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", start, limit, naccounts);
+		returnPage(ctx, "Accounts", new String[][] {{"Explorer","/explorer/"},{"Accounts",null}},
+			paginationLinks,
+			buildAccountsTable(ctx,accounts,range)
+		);
+		return ;
+	}
+	
+	public TableTag buildAccountsTable(Context ctx, AVector<AccountStatus> accounts, long[] range) {
+		long start = range[0];
+		long end = range[1];
 
 		// throw if too big
 		if (end-start>100) throw new BadRequestResponse("Too many elements requested");
@@ -164,20 +200,10 @@ public class ExplorerAPI extends AWebSite {
 			});
 		}
 		
-		// Create pagination controls
-		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", start, limit, naccounts);
-		
-        returnPage(ctx, "Accounts", new String[][] {{"Explorer","/explorer/"},{"Accounts",null}},
-			div(
-				paginationLinks
-			),
-			table(
-				thead(tr(th("Address"), th("Key"), th("Balance"))),
-				tbody(
-					each(rows, row -> tr(row))
-				)
-			)
-		);
+        return table(
+					thead(tr(th("Address"), th("Key"), th("Balance"))),
+					tbody(
+						each(rows, row -> tr(row))));
 	}
 	
 	/**
@@ -242,21 +268,23 @@ public class ExplorerAPI extends AWebSite {
 		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
         returnPage(ctx, "Convex Block: "+blockNum, new String[][] {{"Explorer",ROUTE},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),null}},
-			navLinks,
-				table(
-					thead(tr(th("Field"),th("Value"),th("Notes"))),
-					makeBlockTable(sblock)
-			),
-			makeTransactionsSection(sblock, blockNum, ctx)
-		);
+            navLinks,
+                table(
+                    thead(tr(th("Field"),th("Value"),th("Notes"))),
+                    makeBlockTable(sblock)
+            ),
+            makeStateTransitionSection(peer, blockNum, ctx),
+            makeTransactionsSection(sblock, blockNum, ctx)
+        );
 	}
 	
 	// Utility to display block summary info as a table
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
+		AccountKey peerKey=sblock.getAccountKey(); // Public key of signing peer
 		return tbody(
 			tr(
 				td("Peer"),
-				td(showID(sblock.getAccountKey())),
+				td(a(showID(peerKey)).withHref(ROUTE+"peers/"+peerKey)),
 				td("Peer Ed25519 public key.")),
 			tr(
 				td("Block Hash"),
@@ -301,6 +329,33 @@ public class ExplorerAPI extends AWebSite {
 			)
 		);
 	}
+
+    // State transition line for a block
+    private DomContent makeStateTransitionSection(Peer peer, long blockNum, Context ctx) {
+        State beforeState=null;
+        State afterState=null;
+        try {
+            beforeState=(blockNum==0)?peer.getGenesisState():peer.getBlockResult(blockNum-1).getState();
+            if (blockNum<peer.getPeerOrder().getBlockCount()) {
+                afterState=peer.getBlockResult(blockNum).getState();
+            }
+        } catch (Exception e) {
+            // leave nulls
+        }
+        return div(
+            h5("State Transition"),
+            div(
+            	showStateID(beforeState,blockNum),
+                span("  >  "),
+                showStateID(afterState,blockNum+1)
+            )
+        );
+    }
+    
+    protected DomContent showStateID(State s, long position) {
+    	return (s==null)?code("<No History>"):
+            a(showID(s.getHash())).withHref(ROUTE+"states/"+position);
+    }
 
 	
 	/**
@@ -499,7 +554,7 @@ public class ExplorerAPI extends AWebSite {
 		return tbody(
 			tr(
 				td("Peer Key"),
-				td(showID(peerKey)),
+				td(showID(peerKey,64)),
 				td("Public key of the peer")),
 			tr(
 				td("Controller"),
