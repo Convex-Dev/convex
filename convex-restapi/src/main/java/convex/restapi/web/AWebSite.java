@@ -370,7 +370,7 @@ public abstract class AWebSite extends ABaseAPI {
 	}
 	
 	public static CodeTag wrappedCode(String value) {
-		return code(value).withStyle("white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
+		return code(value).withStyle("white-space: normal;max-width:50em; word-break:break-all; overflow-wrap:break-word;");
 	}
 
 	protected static ImgTag identicon(String hexString) {

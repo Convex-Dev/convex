@@ -43,6 +43,7 @@ public class Keywords {
 	public static final Keyword NAME = Keyword.intern("name");
 
 	// source info
+	public static final Keyword DOC = Keyword.intern("doc");
 	public static final Keyword START = Keyword.intern("start");
 	public static final Keyword END = Keyword.intern("end");
 	public static final Keyword SOURCE = Keyword.intern("source");

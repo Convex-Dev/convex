@@ -367,7 +367,7 @@ public class AccountStatus extends ARecordGeneric {
 	}
 	
 	/**
-	 * Gets the Environment for this account. Defaults to the an empty map if no Environment has been created.
+	 * Gets the Environment for this account.
 	 * @return Environment map for this Account
 	 */
 	@SuppressWarnings("unchecked")

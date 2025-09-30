@@ -15,6 +15,7 @@ import convex.core.cpos.Order;
 import convex.core.crypto.IdenticonBuilder;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
@@ -36,6 +37,10 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
+import convex.core.data.Symbol;
+import convex.core.lang.RT;
+import convex.core.data.AMap;
+import convex.core.data.ACell;
 import j2html.tags.specialized.TableTag;
 import j2html.tags.specialized.TbodyTag;
 
@@ -84,7 +89,7 @@ public class ExplorerAPI extends AWebSite {
 				),
 				article(
 					p(a("Accounts").withHref(ROUTE+"accounts").withStyle("font-weight:600;font-size:1.1em;")),
-					p("Explore accounts, keys and balances with pagination and detail pages.")
+					p("Explore accounts in the latest consensus.")
 				),
 				article(
 					p(a("Peers").withHref(ROUTE+"peers").withStyle("font-weight:600;font-size:1.1em;")),
@@ -92,7 +97,7 @@ public class ExplorerAPI extends AWebSite {
 				),
 					article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
-					p("Inspect historical consensus states.")
+					p("View historical consensus states.")
 				)
 			).withClass("grid").withStyle("align-items: stretch;")
 		);
@@ -283,17 +288,17 @@ public class ExplorerAPI extends AWebSite {
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
 		AccountKey peerKey=sblock.getAccountKey(); // Public key of signing peer
 		return tbody(
+				tr(
+						td("Block Hash"),
+						td(showID(sblock.getHash(),64)),
+						td("Hash of block as signed by peer")),
 			tr(
 				td("Peer"),
 				td(a(showID(peerKey,64)).withHref(ROUTE+"peers/"+peerKey)),
 				td("Peer Ed25519 public key.")),
 			tr(
-				td("Block Hash"),
-				td(showID(sblock.getHash(),64)),
-				td("Hash of block as signed by peer")),
-			tr(
 				td("Signature"),
-				td(showHex(sblock.getSignature())),
+				td(showCVX(sblock.getSignature())),
 				td("Ed25519 signature of block (as signed by peer)")),
 			tr(
 				td("Memory"),
@@ -459,9 +464,74 @@ public class ExplorerAPI extends AWebSite {
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				makeAccountTable(account, address)
-			)
+            ),
+            article(buildEnvironmentView(account)),
+            article(buildHoldingsView(account))
 		);
 	}
+
+    /**
+     * Build a table view of the account environment (Symbol -> Value)
+     */
+    private DomContent buildEnvironmentView(AccountStatus account) {
+        AMap<Symbol, ACell> env = account.getEnvironment();
+        if (env==null) return summary("No Environment");
+        ArrayList<DomContent[]> rows = new ArrayList<>();
+        long n=env.count();
+        for (int i=0; i<n; i++) {
+            MapEntry<Symbol, ACell> me=env.entryAt(i);
+        	Symbol sym = me.getKey();
+            ACell val = me.getValue();
+            AMap<ACell,ACell> md = account.getMetadata(sym);
+            rows.add(new DomContent[] {
+                td(code(sym.getName().toString())),
+                td(showCVX(val)),
+                td(showCVX(RT.getIn(md,Keywords.DOC,Keywords.DESCRIPTION)))
+            });
+        }
+
+        return details(
+			summary("Environment ("+((n==0)?"Empty":Long.toString(n))+")"),
+            p(text("The Environment contains symbols defined in this account. These may be referenced like: "),code("#45/symbol-name")),
+			table(
+	            thead(tr(th("Symbol"), th("Value"), th("Description"))),
+	            tbody(
+	                each(rows, row -> tr(row))
+	            )
+		    )      
+		);
+    }
+
+    /**
+     * Build a table view of the holdings (Address -> Value)
+     */
+    private DomContent buildHoldingsView(AccountStatus account) {
+        var hodls = account.getHoldings();
+        if (hodls==null) {
+            hodls = Index.none();
+        }
+        long n=hodls.count();
+        ArrayList<DomContent[]> rows = new ArrayList<>();
+        for (long i=0; i<n; i++) {
+            MapEntry<Address, ACell> me = hodls.entryAt(i);
+            Address addr = me.getKey();
+            ACell val = me.getValue();
+            rows.add(new DomContent[] {
+                td(showAddress(addr)),
+                td(showCVX(val))
+            });
+        }
+        return details(
+            summary("Holdings ("+((n==0)?"Empty":Long.toString(n))+")"),
+            p(text("Holdings track token balances and other indexed values by address.")),
+            table(
+                thead(tr(th("Address"), th("Value"))),
+                tbody(
+                    each(rows, row -> tr(row))
+                )
+            )
+        );
+    }
 
 	/**
 	 * Produce a table of peers
