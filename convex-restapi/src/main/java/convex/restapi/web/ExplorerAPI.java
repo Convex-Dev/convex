@@ -149,13 +149,18 @@ public class ExplorerAPI extends AWebSite {
         if ((pos<0)||(pos>=nstates)) throw new NotFoundResponse("State position out of range: "+pos);
         State state=(pos==0)?peer.getGenesisState():peer.getBlockResult(pos-1).getState();
         returnPage(ctx, "State #"+pos, new String[][] {{"Explorer",ROUTE},{"States","/explorer/states"},{Long.toString(pos),null}},
-            table(
-                thead(tr(th("Field"),th("Value"),th("Notes"))),
-                tbody(
-                    tr(td("Hash"),td(showID(state.getHash(),64)),td("State hash")),
-                    tr(td("Timestamp"),td(timestamp(state.getTimestamp().longValue())),td("State timestamp (UTC)")),
-                    tr(td("Accounts"),td(code(Long.toString(state.getAccounts().count()))),td("Account count at this state"))
-                )
+            article(
+            	(pos==0)?
+            			h5("Genesis state")
+            			:h5(text("State after "),a("block "+(pos-1)).withHref(ROUTE+"blocks/"+(pos-1))),
+            	makeNavigationLinks(ROUTE+"states", pos, nstates, "State"),
+        		table(
+	                thead(tr(th("Field"),th("Value"),th("Notes"))),
+	                tbody(
+	                    tr(td("Hash"),td(showID(state.getHash(),64)),td("State hash")),
+	                    tr(td("Timestamp"),td(timestamp(state.getTimestamp().longValue())),td("State timestamp (UTC)")),
+	                    tr(td("Accounts"),td(code(Long.toString(state.getAccounts().count()))),td("Account count at this state"))
+	                ))
             )
         );
     }
@@ -271,19 +276,22 @@ public class ExplorerAPI extends AWebSite {
 		
 		// Create navigation links
 		long blockOffset = blockNum;
-		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
+		DomContent navLinks = makeNavigationLinks(ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
         returnPage(ctx, "Convex Block: "+blockNum, new String[][] {{"Explorer",ROUTE},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),null}},
-            navLinks,
-                table(
-                    thead(tr(th("Field"),th("Value"),th("Notes"))),
-                    makeBlockTable(sblock)
+            article(
+        		navLinks,
+				table(
+					thead(tr(th("Field"),th("Value"),th("Notes"))),
+					makeBlockTable(sblock)
+            )),
+            article(
+            		makeStateTransitionSection(peer, blockNum, ctx)
             ),
-            makeStateTransitionSection(peer, blockNum, ctx),
-            makeTransactionsSection(sblock, blockNum, ctx)
-        );
+            article(makeTransactionsSection(sblock, blockNum, ctx))
+		);
 	}
-	
+
 	// Utility to display block summary info as a table
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
 		AccountKey peerKey=sblock.getAccountKey(); // Public key of signing peer
@@ -350,6 +358,7 @@ public class ExplorerAPI extends AWebSite {
         }
         return div(
             h5("State Transition"),
+    		p("Each block updates the CVM state. For posterity, here's the record of what this block did."),
             div(
             	showStateID(beforeState,blockNum),
                 span("  >  ").withStyle("margin: 0.5em"),
@@ -392,39 +401,39 @@ public class ExplorerAPI extends AWebSite {
 		
 		// Create navigation links for transactions within this block
 		long txOffset = txNum;
-		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Transaction");
+		DomContent navLinks = makeNavigationLinks(ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Transaction");
 		
         returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum, new String[][] {{"Explorer",ROUTE},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),"/explorer/blocks/"+Long.toString(blockNum)},{"Transactions",null},{Long.toString(txNum),null}},
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				tbody(
-					tr(
-						td("Address"),
-						td(identicon(signedTx.getAccountKey()),
-						   span("  "), // bit of space. How to make this 1em?
+					row(
+						"Address",
+						div(identicon(signedTx.getAccountKey()),
+						   span().withStyle("margin-right: 0.5em;"), // bit of space
 						   showAddress(trans.getOrigin())),
-						td("Origin address of transaction")),
-					tr(
-						td("Account Key"),
-						td(showID(signedTx.getAccountKey())),
-						td("Ed25519 public key of the signer")),
-					tr(
-						td("Transaction Hash"),
-						td(showID(signedTx.getHash())),
-						td("Hash code of the transaction object")),
-					tr(
-						td("Type"),
-						td(code(trans.getClass().getSimpleName())),
-						td("Type of transaction. Most common is 'Invoke' for general purpose execution.")),
-					tr(
-						td("Transaction Data"),
-						td(showCVX(trans)),
-						td("CVX representation of the transaction")),
-					tr(
-						td("Storage Size"),
-						td(code(""+Cells.storageSize(signedTx))),
-						td("Bytes consumed by transaction data"))
+						"Origin address of transaction"),
+					row(
+						"Account Key",
+						showID(signedTx.getAccountKey()),
+						"Ed25519 public key of the signer"),
+					row(
+						"Transaction Hash",
+						showID(signedTx.getHash()),
+						"Hash code of the transaction object"),
+					row(
+						"Type",
+						code(trans.getClass().getSimpleName()),
+						"Type of transaction. Most common is 'Invoke' for general purpose execution."),
+					row(
+						"Transaction Data",
+						showCVX(trans),
+						"CVX representation of the transaction"),
+					row(
+						"Storage Size",
+						code(""+Cells.storageSize(signedTx)),
+						"Bytes consumed by transaction data")
 				)
 			)
 		);
@@ -447,28 +456,83 @@ public class ExplorerAPI extends AWebSite {
 			throw new NotFoundResponse("Account " + accountNum + " does not exist");
 		}
 		
-		// Create navigation links
-		ArrayList<DomContent> navLinks = new ArrayList<>();
-		if (accountNum > 0) {
-			String prevLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum-1));
-			navLinks.add(makeButton("<< Prev",prevLink));
-		}
-		if (accountNum<state.getAccounts().count()-1) {
-			String nextLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+(accountNum+1));
-			navLinks.add(makeButton("Next >>",nextLink));
-		}
-		
         returnPage(ctx, "Account: #"+accountNum, new String[][] {{"Explorer",ROUTE},{"Accounts","/explorer/accounts"},{"#"+Long.toString(accountNum),null}},
 			// h1("Account: #"+accountNum),
-			each(navLinks, link -> link),
-			table(
-				thead(tr(th("Field"),th("Value"),th("Notes"))),
-				makeAccountTable(account, address)
-            ),
+			article(
+					h6("Account "+address),
+					makeNavigationLinks(ROUTE+"accounts", accountNum, state.getAccounts().count(), "Account"),
+					makeAccountTable(account, address)),
+	        article(buildAccountFieldsView(account)),
             article(buildEnvironmentView(account)),
             article(buildHoldingsView(account))
-		);
+ 		);
 	}
+	
+	// Utility to display account summary info as a table
+	private DomContent makeAccountTable(AccountStatus account, Address address) {
+		return table(
+			thead(tr(th("Field"),th("Value"),th("Notes"))),
+			tbody(
+				row(
+					"Account Key",
+					account.getAccountKey() != null ? showID(account.getAccountKey()) : code("null"),
+					"Ed25519 public key (null for actors)"),
+				row(
+					"Balance",
+					showBalance(account.getBalance()),
+					"Convex coin balance")
+		));
+	}
+	
+	   /**
+     * Build a table view of Account fields (ACCOUNT_KEYS)
+     */
+    private DomContent buildAccountFieldsView(AccountStatus account) {
+        return details(
+            summary("Account Fields"),
+            table(
+                thead(tr(th("Field"), th("Value"), th("Description"))),
+                tbody(
+                    row(
+                    	code(":sequence"), 
+                    	code(Long.toString(account.getSequence())),
+                    	text("Number of transactions executed by this account to date.")),
+                    row(
+                    	code(":key"), 
+                    	account.getAccountKey()==null?code("nil"):showID(account.getAccountKey(),64),
+                    	text("Ed25519 public key of this account. If nil, account cannot execute external transactions (e.g. an actor).")),
+                    row(
+                    	code(":balance"), 
+                    	showBalance(account.getBalance()),
+                    	text("CVM balance of account. This is used for transaction fees and may be freely transferred.")),
+                    row(
+                    	code(":allowance"), 
+                    	code(Long.toString(account.getMemory())),
+                    	text("Memory allowance credit on the CVM. If positive, the account may allocated up to this amount of memory before incurring fees for additional memory.")),
+                    row(
+                    	code(":holdings"), 
+                    	Long.toString(account.getHoldings().count())+ " value(s)",
+                    	text("Storage for holdings data referenced by other accounts.")),
+                    row(
+                    	code(":controller"), 
+                    	account.getController()==null?code("nil"):showAddress((Address)account.getController()),
+                    	text("Account controller. If set, the controller can execute code in this account (e.g. change the key). If you don't trust the controller, don't trust the account!")),
+                    row(
+                    	code(":environment"), 
+                    	Long.toString(account.getEnvironment()==null?0:account.getEnvironment().count())+ " value(s)",
+                    	text("Symbols defined in this account. Typically used to store data or executable code.")),
+                    row(
+                    	code(":metadata"), 
+                    	Long.toString(account.getMetadata()==null?0:account.getMetadata().count())+ " value(s)",
+                    	text("Metadata attached to symbols defined in this account.")),
+                    row(
+                    	code(":parent"), 
+                    	account.getParent()==null?code("nil"):showAddress(account.getParent()),
+                    	text("Parent account. This defines fallback values for symbols not defined in this account."))
+                )
+            )
+        );
+    }
 
     /**
      * Build a table view of the account environment (Symbol -> Value)
@@ -476,18 +540,18 @@ public class ExplorerAPI extends AWebSite {
     private DomContent buildEnvironmentView(AccountStatus account) {
         AMap<Symbol, ACell> env = account.getEnvironment();
         if (env==null) return summary("No Environment");
-        ArrayList<DomContent[]> rows = new ArrayList<>();
+        ArrayList<DomContent> rows = new ArrayList<>();
         long n=env.count();
         for (int i=0; i<n; i++) {
             MapEntry<Symbol, ACell> me=env.entryAt(i);
         	Symbol sym = me.getKey();
             ACell val = me.getValue();
             AMap<ACell,ACell> md = account.getMetadata(sym);
-            rows.add(new DomContent[] {
-                td(code(sym.getName().toString())),
-                td(showCVX(val)),
-                td(showCVX(RT.getIn(md,Keywords.DOC,Keywords.DESCRIPTION)))
-            });
+            rows.add(row(
+                code(sym.getName().toString()),
+                showCVX(val),
+                showCVX(RT.getIn(md,Keywords.DOC,Keywords.DESCRIPTION))
+            ));
         }
 
         return details(
@@ -496,7 +560,7 @@ public class ExplorerAPI extends AWebSite {
 			table(
 	            thead(tr(th("Symbol"), th("Value"), th("Description"))),
 	            tbody(
-	                each(rows, row -> tr(row))
+	                each(rows, row -> row)
 	            )
 		    )      
 		);
@@ -532,6 +596,8 @@ public class ExplorerAPI extends AWebSite {
             )
         );
     }
+
+ 
 
 	/**
 	 * Produce a table of peers
@@ -633,95 +699,36 @@ public class ExplorerAPI extends AWebSite {
 	// Utility to display peer summary info as a table
 	private TbodyTag makePeerTable(PeerStatus peerStatus, AccountKey peerKey) {
 		return tbody(
-			tr(
-				td("Peer Key"),
-				td(showID(peerKey,64)),
-				td("Public key of the peer")),
-			tr(
-				td("Controller"),
-				td(showAddress(peerStatus.getController())),
-				td("Controller address for this peer")),
-			tr(
-				td("Total Stake"),
-				td(div(showBalance(peerStatus.getBalance()))),
-				td("Total stake (peer + delegated) in CVM")),
-			tr(
-				td("Peer Stake"),
-				td(div(showBalance(peerStatus.getPeerStake()))),
-				td("Peer's own stake in CVM")),
-			tr(
-				td("Delegated Stake"),
-				td(div(showBalance(peerStatus.getDelegatedStake()))),
-				td("Stake delegated to this peer in CVM")),
-			tr(
-				td("Timestamp"),
-				td(code(Long.toString(peerStatus.getTimestamp()))),
-				td("Timestamp of last block issued by this peer")),
-			tr(
-				td("Hostname"),
-				td(peerStatus.getHostname() != null ? code(peerStatus.getHostname().toString()) : code("<not defined>")),
-				td("Hostname/URL for peer connections")),
-			tr(
-				td("Metadata"),
-				td(showCVX(peerStatus.getMetadata())),
-				td("Metadata provide by peer operator")),
-			tr(
-				td("Storage Size"),
-				td(code(""+Cells.storageSize(peerStatus))),
-				td("Bytes consumed by peer status data structure"))
+			row("Peer Key",showID(peerKey,64),
+					"Public key of the peer"),
+			row("Controller",
+					showAddress(peerStatus.getController()),
+					"Controller address for this peer"),
+			row("Total Stake",
+					showBalance(peerStatus.getBalance()),
+					"Total stake (peer + delegated) in CVM"),
+			row("Peer Stake",
+					showBalance(peerStatus.getPeerStake()),
+					"Peer's own stake in CVM"),
+			row("Delegated Stake",
+					showBalance(peerStatus.getDelegatedStake()),
+					"Stake delegated to this peer in CVM"),
+			row("Last Block",
+					timestamp(peerStatus.getTimestamp()),
+					"Timestamp of last block issued by this peer"),
+			row("Hostname",
+					peerStatus.getHostname() != null ? code(peerStatus.getHostname().toString()) : code("<not defined>"),
+					"Hostname/URL for peer connections"),
+			row("Metadata",
+					showCVX(peerStatus.getMetadata()),
+					"Metadata provide by peer operator"),
+			row("Storage Size",
+					code(""+Cells.storageSize(peerStatus)),
+					"Bytes consumed by peer status data structure")
 		);
 	}
 
-
-
 	
-	// Utility to display account summary info as a table
-	private TbodyTag makeAccountTable(AccountStatus account, Address address) {
-		return tbody(
-			tr(
-				td("Address"),
-				td(code(address.toString())),
-				td("Account address")),
-			tr(
-				td("Account Key"),
-				td(account.getAccountKey() != null ? showID(account.getAccountKey()) : code("null")),
-				td("Ed25519 public key (null for actors)")),
-			tr(
-				td("Balance"),
-				td(code(Long.toString(account.getBalance()))),
-				td("Convex coin balance")),
-			tr(
-				td("Sequence"),
-				td(code(Long.toString(account.getSequence()))),
-				td("Number of transactions executed by this account")),
-			tr(
-				td("Memory"),
-				td(code(Long.toString(account.getMemory()))),
-				td("Memory allowance credit in bytes")),
-			tr(
-				td("Memory Usage"),
-				td(code(Long.toString(account.getMemoryUsage()))),
-				td("Actual memory usage in bytes")),
-			tr(
-				td("Actor?"),
-				td(code(account.isActor() ? "true" : "false")),
-				td("Whether this is an actor account (no public key)")),
-			tr(
-				td("Controller"),
-				td(showAddress((Address)account.getController())),
-				td("Controller address (if any)")),
-			tr(
-				td("Parent"),
-				td(account.getParent() != null ? showAddress(account.getParent()) : code("null")),
-				td("Parent account address if any")),
-			tr(
-				td("Holdings Count"),
-				td(code(Long.toString(account.getHoldings().count()))),
-				td("Number of holdings (token balances)"))
-		);
-	}
-	
-
 
 	/**
 	 * Get an identicon PNG image for the given hex data

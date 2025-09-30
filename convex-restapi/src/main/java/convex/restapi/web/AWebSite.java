@@ -36,15 +36,16 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.text.Text;
+import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
-import j2html.tags.Tag;
 import j2html.tags.specialized.CodeTag;
 import j2html.tags.specialized.ImgTag;
 import j2html.tags.specialized.LiTag;
 import j2html.tags.specialized.PreTag;
+import j2html.tags.specialized.TdTag;
 
 /**
  * Base class for website pages.
@@ -203,13 +204,31 @@ public abstract class AWebSite extends ABaseAPI {
 	
 	    return div(
 	        makeButton("<<", firstLink, hasPrev),
-	        makeButton("<-", prevLink, hasPrev),
-	        makeButton("->", nextLink, hasNext),
+	        makeButton("<", prevLink, hasPrev),
+	        makeButton(">", nextLink, hasNext),
 	        makeButton(">>", lastLink, hasNext),
 	        makePaginationInfo(offset, limit, total)
 	    );
 	}
 	
+	protected DomContent row(Object... values) {
+		int n=values.length;
+		DomContent[] tds=new DomContent[n];
+		for (int i=0; i<n; i++) {
+			Object v=values[i];
+			DomContent cell;
+			if (v instanceof String s) {
+				cell=text(s);
+			} else if (v instanceof DomContent dc) {
+				cell=dc;
+			} else {
+				throw new IllegalArgumentException("Can make table cell from "+Utils.getClassName(v));
+			}
+			if (!(cell instanceof TdTag)) cell=td(cell);
+			tds[i]=cell;
+		}
+		return tr(tds);
+	}
 
 	/**
 	 * Build a compact pagination info element like: "0 - 10 / 1567".
@@ -231,7 +250,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param label    Label to display (e.g. "Block", "Tx")
 	 * @return DomContent containing navigation buttons and info
 	 */
-	protected DomContent makeNavigationLinks(Context ctx, String basePath, long index, long total, String label) {
+	protected DomContent makeNavigationLinks(String basePath, long index, long total, String label) {
 	    if (total<=0) return div();
 	    String prevLink = basePath+"/"+(index-1);
 	    String nextLink = basePath+"/"+(index+1);
@@ -240,7 +259,7 @@ public abstract class AWebSite extends ABaseAPI {
 	    return div(
 	        makeButton("<", prevLink, hasPrev),
 	        makeButton(">", nextLink, hasNext),
-	        small(label+" "+index+" / "+total)
+	        small(label+" "+(index+1)+" / "+total)
 	    );
 	}
 
@@ -254,8 +273,8 @@ public abstract class AWebSite extends ABaseAPI {
 		String s=Text.toFriendlyNumber(bal/1000000000);
 		s=Text.leftPad(s, 13);
 		return preCode(
-								rawHtml(s+"."),
-								small(String.format("%09d", bal%1000000000))
+					span(rawHtml(s)).withStyle("color: #ff0;"),
+					small("."+String.format("%09d", bal%1000000000))
 				);
 	}
 	
@@ -371,6 +390,17 @@ public abstract class AWebSite extends ABaseAPI {
 	
 	public static CodeTag wrappedCode(String value) {
 		return code(value).withStyle("white-space: normal;max-width:50em; word-break:break-all; overflow-wrap:break-word;");
+	}
+
+	/**
+	 * Helper to build a standard three-column table row
+	 */
+	protected DomContent row(String field, DomContent value, String notes) {
+		return tr(
+			td(field),
+			td(value),
+			td(notes)
+		);
 	}
 
 	protected static ImgTag identicon(String hexString) {

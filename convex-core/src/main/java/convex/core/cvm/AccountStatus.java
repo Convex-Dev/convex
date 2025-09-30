@@ -42,7 +42,7 @@ public class AccountStatus extends ARecordGeneric {
 	private final Address parent;
 	
 	// Sequence of fields in account. 
-	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
+	public static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
 			Keywords.BALANCE,Keywords.ALLOWANCE,
 			Keywords.HOLDINGS, Keywords.CONTROLLER,
 			Keywords.ENVIRONMENT,Keywords.METADATA,
