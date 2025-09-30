@@ -251,6 +251,58 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 	
+	// Utility to display block summary info as a table
+	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
+		return tbody(
+			tr(
+				td("Peer"),
+				td(showID(sblock.getAccountKey())),
+				td("Peer Ed25519 public key.")),
+			tr(
+				td("Block Hash"),
+				td(showHex(sblock.getHash())),
+				td("Hash of block as signed by peer")),
+			tr(
+				td("Signature"),
+				td(showHex(sblock.getSignature())),
+				td("Ed25519 signature of block (as signed by peer)")),
+			tr(
+				td("Memory"),
+				td(code(""+Cells.storageSize(sblock))),
+				td("Bytes consumed by blcok data structure"))
+		);
+	}
+	
+	
+	// Transactions table for use in block
+	private DomContent makeTransactionsSection(SignedData<Block> sblock, long blockNum, Context ctx) {
+		AVector<SignedData<ATransaction>> transactions = sblock.getValue().getTransactions();
+		int txCount = transactions.size();
+		
+		ArrayList<DomContent[]> rows = new ArrayList<>();
+		for (long i = 0; i < txCount; i++) {
+			String txLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+i);
+			SignedData<ATransaction> strans=transactions.get(i);
+			
+			rows.add(new DomContent[] {
+				td(a(Long.toString(i)).withHref(txLink)),
+				td(identicon(strans.getAccountKey()),showAddress(strans.getValue().getOrigin())),
+				td(showID(strans.getHash()))
+			});
+		}
+		
+		return div(
+			h4("Transactions ("+txCount+")"),
+			table(
+				thead(tr(th("Index"), th("Origin Address"),th("Transaction Hash"))),
+				tbody(
+					each(rows, row -> tr(row))
+				)
+			)
+		);
+	}
+
+	
 	/**
 	 * Show specific transaction details within a block
 	 * @param ctx Javalin context
@@ -484,32 +536,7 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 
-	// Utility to display block summary info as a table
-	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
-		return tbody(
-			tr(
-				td("Peer"),
-				td(showID(sblock.getAccountKey())),
-				td("Peer Ed25519 public key.")),
-			tr(
-				td("Block Hash"),
-				td(showHex(sblock.getHash())),
-				td("Hash of block as signed by peer")),
-			tr(
-				td("Signature"),
-				td(showHex(sblock.getSignature())),
-				td("Ed25519 signature of block (as signed by peer)")),
-			tr(
-					td("Tx Count"),
-					td(code(""+sblock.getValue().getTransactions().count())),
-					td("Number of transactions in this block")),
-			tr(
-				td("Storage Size"),
-				td(code(""+Cells.storageSize(sblock))),
-				td("Bytes consumed by blcok data structure"))
-		);
-	}
-	
+
 
 	
 	// Utility to display account summary info as a table
@@ -559,36 +586,6 @@ public class ExplorerAPI extends AWebSite {
 	}
 	
 
-
-	
-
-	
-	private DomContent makeTransactionsSection(SignedData<Block> sblock, long blockNum, Context ctx) {
-		AVector<SignedData<ATransaction>> transactions = sblock.getValue().getTransactions();
-		long txCount = transactions.count();
-		
-		ArrayList<DomContent[]> rows = new ArrayList<>();
-		for (long i = 0; i < txCount; i++) {
-			String txLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+blockNum+"/txs/"+i);
-			SignedData<ATransaction> strans=transactions.get(i);
-			
-			rows.add(new DomContent[] {
-				td(a(Long.toString(i)).withHref(txLink)),
-				td(identicon(strans.getAccountKey()),showAddress(strans.getValue().getOrigin())),
-				td(showID(strans.getHash()))
-			});
-		}
-		
-		return div(
-			h4("Transactions"),
-			table(
-				thead(tr(th("Index"), th("Origin Address"),th("Transaction Hash"))),
-				tbody(
-					each(rows, row -> tr(row))
-				)
-			)
-		);
-	}
 
 	/**
 	 * Get an identicon PNG image for the given hex data

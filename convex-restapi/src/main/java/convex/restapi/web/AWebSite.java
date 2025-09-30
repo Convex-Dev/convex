@@ -1,29 +1,6 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.a;
-import static j2html.TagCreator.body;
-import static j2html.TagCreator.button;
-import static j2html.TagCreator.code;
-import static j2html.TagCreator.div;
-import static j2html.TagCreator.footer;
-import static j2html.TagCreator.h1;
-import static j2html.TagCreator.h4;
-import static j2html.TagCreator.head;
-import static j2html.TagCreator.header;
-import static j2html.TagCreator.hr;
-import static j2html.TagCreator.html;
-import static j2html.TagCreator.img;
-import static j2html.TagCreator.each;
-import static j2html.TagCreator.link;
-import static j2html.TagCreator.main;
-import static j2html.TagCreator.nav;
-import static j2html.TagCreator.ul;
-import static j2html.TagCreator.li;
-import static j2html.TagCreator.pre;
-import static j2html.TagCreator.rawHtml;
-import static j2html.TagCreator.small;
-import static j2html.TagCreator.text;
-import static j2html.TagCreator.title;
+import static j2html.TagCreator.*;
 
 import convex.core.cvm.Address;
 import java.util.Locale;
@@ -38,6 +15,7 @@ import io.javalin.http.Context;
 import j2html.tags.DomContent;
 import j2html.tags.specialized.CodeTag;
 import j2html.tags.specialized.ImgTag;
+import j2html.tags.specialized.LiTag;
 import j2html.tags.specialized.PreTag;
 
 /**
@@ -130,7 +108,7 @@ public abstract class AWebSite extends ABaseAPI {
 					div(a("GitHub - Convex Developers").withHref("https://github.com/Convex-Dev/convex")),
 					div(a("Discord Community").withHref("https://discord.gg/convex"))
 				)
-			).withStyle("display: flex; justify-content: space-around; padding: 1em 0")
+			).withStyle("display: flex; justify-content: space-around; padding: 0")
 		);
 	}
 	
@@ -161,7 +139,9 @@ public abstract class AWebSite extends ABaseAPI {
 	protected DomContent makeHeader(String title) {
 		return head(
 				title(title),
-		        link().withRel("stylesheet").withHref("/css/pico.min.css")
+		        link().withRel("stylesheet").withHref("/css/pico.min.css"),
+		        // page level-style overrides. We want to make spacing not too big to get more info on screen
+		        style(":root {--pico-spacing: 0.6em}")
 		);
 	}
 
@@ -284,11 +264,13 @@ public abstract class AWebSite extends ABaseAPI {
 				each(java.util.Arrays.asList(items), it -> {
 					String label = it[0];
 					String href = (it.length>1)?it[1]:null;
+					LiTag li;
 					if (href==null) {
-						return li(text(label));
+						li=li(text(label));
 					} else {
-						return li(a(label).withHref(href));
+						li=li(a(label).withHref(href));
 					}
+					return li.withStyle("padding:0 0 0 0.95em;");
 				})
 			).withStyle("margin-left: 0.5em")
 		).attr("aria-label", "breadcrumb");
