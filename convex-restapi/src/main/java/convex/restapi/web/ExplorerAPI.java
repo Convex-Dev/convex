@@ -72,14 +72,26 @@ public class ExplorerAPI extends AWebSite {
 	 * @param ctx Javalin context
 	 */
 	public void showExplorer(Context ctx) {
-		returnPage(ctx, "Peer Explorer",
-			breadcrumb(new String[][] {{"Explorer","/explorer/"}}),
-			article(
-				p(a("Blocks").withHref(ROUTE+"blocks")),
-				p(a("Accounts").withHref(ROUTE+"accounts")),
-				p(a("Peers").withHref(ROUTE+"peers")),
-				p(a("States").withHref(ROUTE+"states"))
-			)
+        returnPage(ctx, "Peer Explorer", (String[][])null,
+			div(
+				// Pico grid of cards
+				article(
+					p(a("Blocks").withHref(ROUTE+"blocks").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Browse blocks in the peer's consensus order, view details and transactions.")
+				),
+				article(
+					p(a("Accounts").withHref(ROUTE+"accounts").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Explore accounts, keys and balances with pagination and detail pages.")
+				),
+				article(
+					p(a("Peers").withHref(ROUTE+"peers").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Examine peers on the current network, including stakes and activity.")
+				),
+					article(
+					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Inspect historical consensus states.")
+				)
+			).withClass("grid").withStyle("align-items: stretch;")
 		);
 	}
 	
@@ -108,8 +120,7 @@ public class ExplorerAPI extends AWebSite {
 			});
 		}
 
-		returnPage(ctx,"States,",
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"States",null}}),
+        returnPage(ctx,"States,", new String[][] {{"Explorer","/explorer/"},{"States",null}},
 					table(
 						thead(tr(th("Position"),th("State Hash"),th("Timestamp"))),
 						tbody(
@@ -156,8 +167,7 @@ public class ExplorerAPI extends AWebSite {
 		// Create pagination controls
 		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"accounts", start, limit, naccounts);
 		
-		returnPage(ctx, "Accounts",
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Accounts",null}}),
+        returnPage(ctx, "Accounts", new String[][] {{"Explorer","/explorer/"},{"Accounts",null}},
 			div(
 				paginationLinks
 			),
@@ -200,12 +210,11 @@ public class ExplorerAPI extends AWebSite {
 			});
 		}
 		
-		returnPage(ctx, "Blocks",
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks",null}}),
-			table(
-				thead(tr(th("Block"),th("Peer"),th("Hash"))),
-				tbody(
-					each(rows,row->{return tr(row);})
+        returnPage(ctx, "Blocks", new String[][] {{"Explorer",ROUTE},{"Blocks",null}},
+				table(
+					thead(tr(th("Block"),th("Peer"),th("Hash"))),
+					tbody(
+						each(rows,row->{return tr(row);})
 				)
 			)
 		);
@@ -232,12 +241,11 @@ public class ExplorerAPI extends AWebSite {
 		long blockOffset = blockNum;
 		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks", blockOffset, nblocks, "Block");
 		
-		returnPage(ctx, "Convex Block: "+blockNum,
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),null}}),
+        returnPage(ctx, "Convex Block: "+blockNum, new String[][] {{"Explorer",ROUTE},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),null}},
 			navLinks,
-			table(
-				thead(tr(th("Field"),th("Value"),th("Notes"))),
-				makeBlockTable(sblock)
+				table(
+					thead(tr(th("Field"),th("Value"),th("Notes"))),
+					makeBlockTable(sblock)
 			),
 			makeTransactionsSection(sblock, blockNum, ctx)
 		);
@@ -271,11 +279,9 @@ public class ExplorerAPI extends AWebSite {
 		
 		// Create navigation links for transactions within this block
 		long txOffset = txNum;
-		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Tx");
+		DomContent navLinks = makeNavigationLinks(ctx, ROUTE+"blocks/"+blockNum+"/txs", txOffset, txCount, "Transaction");
 		
-		returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum,
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),"/explorer/blocks/"+Long.toString(blockNum)},{"Tx "+Long.toString(txNum),null}}),
-			h5("Transaction "+txNum+" in Block "+blockNum),
+        returnPage(ctx, "Transaction "+txNum+" in Block "+blockNum, new String[][] {{"Explorer",ROUTE},{"Blocks","/explorer/blocks"},{Long.toString(blockNum),"/explorer/blocks/"+Long.toString(blockNum)},{"Transactions",null},{Long.toString(txNum),null}},
 			navLinks,
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
@@ -295,9 +301,9 @@ public class ExplorerAPI extends AWebSite {
 						td(showID(signedTx.getHash())),
 						td("Hash code of the transaction object")),
 					tr(
-						td("Transaction Type"),
+						td("Type"),
 						td(code(trans.getClass().getSimpleName())),
-						td("Java class name of the transaction")),
+						td("Type of transaction. Most common is 'Invoke' for general purpose execution.")),
 					tr(
 						td("Transaction Data"),
 						td(showCVX(trans)),
@@ -339,8 +345,7 @@ public class ExplorerAPI extends AWebSite {
 			navLinks.add(makeButton("Next >>",nextLink));
 		}
 		
-		returnPage(ctx, "Account: #"+accountNum,
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Accounts","/explorer/accounts"},{"#"+Long.toString(accountNum),null}}),
+        returnPage(ctx, "Account: #"+accountNum, new String[][] {{"Explorer",ROUTE},{"Accounts","/explorer/accounts"},{"#"+Long.toString(accountNum),null}},
 			// h1("Account: #"+accountNum),
 			each(navLinks, link -> link),
 			table(
@@ -389,8 +394,7 @@ public class ExplorerAPI extends AWebSite {
 		String basePath = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers");
 		DomContent pagination = makePaginationLinks(ctx, basePath, start, end - start, npeers);
 		
-		returnPage(ctx, "Peers",
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Peers",null}}),
+        returnPage(ctx, "Peers", new String[][] {{"Explorer",ROUTE},{"Peers",null}},
 			pagination,
 			table(
 				thead(tr(
@@ -430,8 +434,7 @@ public class ExplorerAPI extends AWebSite {
 			throw new NotFoundResponse("Peer " + peerKeyParam + " does not exist");
 		}
 		
-		returnPage(ctx, "Peer: " + peerKey.toHexString(),
-			breadcrumb(new String[][] {{"Explorer","/explorer/"},{"Peers","/explorer/peers"},{peerKey.toHexString(),null}}),
+        returnPage(ctx, "Peer: " + peerKey.toHexString(), new String[][] {{"Explorer",ROUTE},{"Peers","/explorer/peers"},{peerKey.toHexString(8)+"...",null}},
 			table(
 				thead(tr(th("Field"),th("Value"),th("Notes"))),
 				makePeerTable(peerStatus, peerKey)
@@ -497,9 +500,9 @@ public class ExplorerAPI extends AWebSite {
 				td(showHex(sblock.getSignature())),
 				td("Ed25519 signature of block (as signed by peer)")),
 			tr(
-				td("Tx Count"),
-				td(code(""+sblock.getValue().getTransactions().count())),
-				td("Number of transactions in this block")),
+					td("Tx Count"),
+					td(code(""+sblock.getValue().getTransactions().count())),
+					td("Number of transactions in this block")),
 			tr(
 				td("Storage Size"),
 				td(code(""+Cells.storageSize(sblock))),

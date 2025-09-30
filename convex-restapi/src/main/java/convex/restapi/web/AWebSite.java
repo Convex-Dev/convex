@@ -57,22 +57,31 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param title
 	 * @param content
 	 */
-	public void returnPage(Context ctx, String title, DomContent... content) {
-		DomContent result=html(
-				makeHeader(title),
-				body(
-					topBar(),
-					contentBlock(content),
-					// div().withStyle("flex-grow: 1"), // spacer
-					footerBlock()
-				).withStyle("min-height: 100vh; display: flex; flex-direction: column;")
-			);
-		
-		ctx.result(result.render());
-		ctx.contentType("text/html");
-	}
+    public void returnPage(Context ctx, String title, DomContent... content) {
+        returnPage(ctx,title,(String[][])null,content);
+    }
 
-	public DomContent topBar() {
+    /**
+     * Returns a structured page with optional breadcrumbs
+     * @param ctx
+     * @param title
+     * @param breadcrumbs Pairs of {label, href}. Last entry should have null href for current page. If null, no breadcrumbs shown
+     * @param content
+     */
+    public void returnPage(Context ctx, String title, String[][] breadcrumbs, DomContent... content) {
+        DomContent result=html(
+                makeHeader(title),
+                body(
+                    topBar(breadcrumbs),
+                    contentBlock(content),
+                    footerBlock()
+                ).withStyle("min-height: 100vh; display: flex; flex-direction: column;")
+            );
+        ctx.result(result.render());
+        ctx.contentType("text/html");
+    }
+
+	public DomContent topBar(String[][] breadcrumbs) {
 		return header(
 			div(
 				div(
@@ -80,14 +89,15 @@ public abstract class AWebSite extends ABaseAPI {
 						.withAlt("Convex")
 						.withStyle("width: 2.5em; height: 2.5em; margin: 0.5em;")).withHref("/")),
 				h1("Convex").withStyle("height: 40px; margin-bottom: 0.2em;"),
-				div().withStyle("flex-grow: 1;"),
+				div().withStyle("flex-grow: 1;"), // spacer
 				nav(
 					topButton("Explorer","/explorer/"),
 					topButton("Peers","/explorer/peers"),
 					topButton("API","/swagger"),
 					div()
 				).withStyle("display: flex; gap: 0.5em; align-items: center;") // gap between nav items
-			).withStyle("display: flex; align-items: center; gap: 1em")
+			).withStyle("display: flex; align-items: center; gap: 0.5em"),
+			breadcrumb(breadcrumbs)
 		);
 	}
 	
@@ -196,7 +206,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 */
 	protected DomContent makePaginationInfo(long offset, long limit, long total) {
 		long end=Math.min(total, offset+limit);
-		return small(offset+"-"+(end-1)+" / "+total);
+		return small(((offset>0)?((offset+1)+"-"):"")+(end)+" / "+total);
 	}
 
 	/**
@@ -268,6 +278,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 * Example: breadcrumb(new String[][] {{"Home", "/"}, {"Services", "/services"}, {"Design", null}})
 	 */
 	protected DomContent breadcrumb(String[][] items) {
+		if (items==null) return div();
 		return nav(
 			ul(
 				each(java.util.Arrays.asList(items), it -> {
@@ -279,7 +290,7 @@ public abstract class AWebSite extends ABaseAPI {
 						return li(a(label).withHref(href));
 					}
 				})
-			)
+			).withStyle("margin-left: 0.5em")
 		).attr("aria-label", "breadcrumb");
 	}
 	
@@ -318,6 +329,7 @@ public abstract class AWebSite extends ABaseAPI {
 	}
 
 	protected static ImgTag identicon(String hexString) {
+		if (hexString==null) hexString="0x";
 		String identiconUrl = "/identicon/" + hexString;
 		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; width: 21; image-rendering: pixelated; margin: 2px; flex-shrink: 0;");
 		return identicon;
