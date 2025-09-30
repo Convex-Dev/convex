@@ -1,9 +1,36 @@
 package convex.restapi.web;
 
+import static j2html.TagCreator.a;
+import static j2html.TagCreator.body;
+import static j2html.TagCreator.button;
+import static j2html.TagCreator.code;
+import static j2html.TagCreator.div;
+import static j2html.TagCreator.each;
+import static j2html.TagCreator.footer;
+import static j2html.TagCreator.h1;
+import static j2html.TagCreator.h4;
+import static j2html.TagCreator.head;
+import static j2html.TagCreator.header;
+import static j2html.TagCreator.hr;
+import static j2html.TagCreator.html;
+import static j2html.TagCreator.img;
+import static j2html.TagCreator.li;
+import static j2html.TagCreator.link;
+import static j2html.TagCreator.main;
+import static j2html.TagCreator.nav;
+import static j2html.TagCreator.pre;
+import static j2html.TagCreator.rawHtml;
+import static j2html.TagCreator.small;
+import static j2html.TagCreator.style;
+import static j2html.TagCreator.text;
+import static j2html.TagCreator.title;
 import static j2html.TagCreator.*;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+
 import convex.core.cvm.Address;
-import java.util.Locale;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -13,6 +40,7 @@ import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
+import j2html.tags.Tag;
 import j2html.tags.specialized.CodeTag;
 import j2html.tags.specialized.ImgTag;
 import j2html.tags.specialized.LiTag;
@@ -24,6 +52,9 @@ import j2html.tags.specialized.PreTag;
  * Contains common utility / formatting functionality for consistency across site
  */
 public abstract class AWebSite extends ABaseAPI {
+    private static final DateTimeFormatter TS_FMT = DateTimeFormatter
+        .ofPattern("uuuu-MM-dd HH:mm:ss.SSS")
+        .withZone(ZoneOffset.UTC);
 	public AWebSite(RESTServer restServer) {
 		super(restServer);
 
@@ -222,17 +253,28 @@ public abstract class AWebSite extends ABaseAPI {
 	protected DomContent showBalance(long bal) {
 		String s=Text.toFriendlyNumber(bal/1000000000);
 		s=Text.leftPad(s, 13);
-		return pre(rawHtml(s+"."),small(String.format("%09d", bal%1000000000))).withStyle("margin: 0; width: min-content;");
+		return preCode(
+								rawHtml(s+"."),
+								small(String.format("%09d", bal%1000000000))
+				);
+	}
+	
+	protected static PreTag preCode(String s) {
+		return pre(code(s)).withStyle("width:min-content; margin:0;");
+	}
+	
+	protected static PreTag preCode(DomContent ...content) {
+		return pre(code(content)).withStyle("width:min-content;  margin:0;");
 	}
 
 	/**
-	 * Show a percentage value with fixed-width alignment, formatted like " 18.00 %"
-	 * @param percent Percentage value (0-100)
-	 * @return Monospace-formatted DomContent
+	 * Format a UNIX timestamp (ms) as UTC like "2025-03-15 18:23:56.345"
+	 * @param tsa Timestamp
 	 */
-	protected DomContent showPercent(double percent) {
-		String s=String.format(Locale.US, "%6.2f %%", percent);
-		return pre(s).withStyle("margin: 0; width: min-content;");
+	protected DomContent timestamp(long ts) {
+		String s=TS_FMT.format(Instant.ofEpochMilli(ts));
+		String fs=" ("+ts+")";
+		return preCode(text(s),small(fs));
 	}
 	
 	/**
@@ -298,9 +340,7 @@ public abstract class AWebSite extends ABaseAPI {
 	public static DomContent showID(AArrayBlob data, int length) {			
 		return div(
 			identicon(data),
-			div(
-				showHex(data,length).withStyle("font-size: 0.75rem; align-self: center; white-space: nowrap; margin: 0; text-overflow: ellipsis; overflow: hidden;")
-			).withStyle("min-width: 0;")
+			showHex(data,length)
 		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
 	}
 	
@@ -309,10 +349,10 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param data The data to show
 	 * @return PreTag with pre-formatted hex
 	 */
-	public static PreTag showHex(AArrayBlob data) {
+	public static DomContent showHex(AArrayBlob data) {
 		String dataString = (data==null)?"nil":data.toString();
 		
-		return pre(dataString).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; overflow-wrap:break-word;");
+		return preCode(dataString);
 	}
 	
 	/**
@@ -321,23 +361,22 @@ public abstract class AWebSite extends ABaseAPI {
 	 * @param len max number of hex digits to show
 	 * @return PreTag with pre-formatted hex
 	 */
-	public static PreTag showHex(AArrayBlob data, int len) {
+	public static DomContent showHex(AArrayBlob data, int len) {
 		String text = (data==null)?"nil":data.toString();
 		if (text.length()>len+2) {
 			text=text.substring(0, len+2)+"...";
 		}
-		
-		return pre(text).withStyle("align-self: center; white-space: normal; margin: 0; word-break:break-all; overflow-wrap:break-word;");
+		return preCode(text);
 	}
 	
 	public static CodeTag wrappedCode(String value) {
-		return code(value).withStyle("display: inline-block;white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
+		return code(value).withStyle("white-space: normal;max-width:100%; word-break:break-all; overflow-wrap:break-word;");
 	}
 
 	protected static ImgTag identicon(String hexString) {
 		if (hexString==null) hexString="0x";
 		String identiconUrl = "/identicon/" + hexString;
-		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 21; width: 21; image-rendering: pixelated; margin: 2px; flex-shrink: 0;");
+		ImgTag identicon = img().withSrc(identiconUrl).withAlt("Identicon for " + hexString).withStyle("height: 2em; width: 2em; image-rendering: pixelated; margin: 2px; flex-shrink: 0;");
 		return identicon;
 	}
 	

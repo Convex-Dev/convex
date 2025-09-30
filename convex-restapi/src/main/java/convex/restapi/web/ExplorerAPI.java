@@ -6,6 +6,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Locale;
 
 import javax.imageio.ImageIO;
 
@@ -116,9 +117,9 @@ public class ExplorerAPI extends AWebSite {
 		for (long i=start; i<end; i++) {
 			State state=(i==0)?peer.getGenesisState():peer.getBlockResult(i-1).getState();
 			rows.add(new DomContent[] {
-				td(Long.toString(i)),	
+				td(a(Long.toString(i)).withHref(ROUTE+"states/"+i)),	
 				td(showStateID(state,i)),	
-				td(state.getTimestamp().toString())	
+				td(timestamp(state.getTimestamp().longValue()))	
 			});
 		}
 
@@ -146,8 +147,8 @@ public class ExplorerAPI extends AWebSite {
             table(
                 thead(tr(th("Field"),th("Value"),th("Notes"))),
                 tbody(
-                    tr(td("Hash"),td(code(state.getHash().toString())),td("State hash")),
-                    tr(td("Timestamp"),td(state.getTimestamp().toString()),td("State timestamp")),
+                    tr(td("Hash"),td(showID(state.getHash(),64)),td("State hash")),
+                    tr(td("Timestamp"),td(timestamp(state.getTimestamp().longValue())),td("State timestamp (UTC)")),
                     tr(td("Accounts"),td(code(Long.toString(state.getAccounts().count()))),td("Account count at this state"))
                 )
             )
@@ -232,13 +233,13 @@ public class ExplorerAPI extends AWebSite {
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(link)),	
 				td(a(showID(sd.getAccountKey())).withHref(peerLink)),	
-				td(showHex(sd.getHash()))	
+				td(showID(sd.getHash()))	
 			});
 		}
 		
         returnPage(ctx, "Blocks", new String[][] {{"Explorer",ROUTE},{"Blocks",null}},
 				table(
-					thead(tr(th("Block"),th("Peer"),th("Hash"))),
+					thead(tr(th("Index"),th("Peer"),th("Block Hash"))),
 					tbody(
 						each(rows,row->{return tr(row);})
 				)
@@ -284,11 +285,11 @@ public class ExplorerAPI extends AWebSite {
 		return tbody(
 			tr(
 				td("Peer"),
-				td(a(showID(peerKey)).withHref(ROUTE+"peers/"+peerKey)),
+				td(a(showID(peerKey,64)).withHref(ROUTE+"peers/"+peerKey)),
 				td("Peer Ed25519 public key.")),
 			tr(
 				td("Block Hash"),
-				td(showHex(sblock.getHash())),
+				td(showID(sblock.getHash(),64)),
 				td("Hash of block as signed by peer")),
 			tr(
 				td("Signature"),
@@ -346,9 +347,9 @@ public class ExplorerAPI extends AWebSite {
             h5("State Transition"),
             div(
             	showStateID(beforeState,blockNum),
-                span("  >  "),
+                span("  >  ").withStyle("margin: 0.5em"),
                 showStateID(afterState,blockNum+1)
-            )
+            ).withStyle("display: flex; align-items: center;")
         );
     }
     
@@ -490,9 +491,9 @@ public class ExplorerAPI extends AWebSite {
 			
 			rows.add(new DomContent[] {
 				td(a(showID(peerKey)).withHref(peerLink)),
-				td(div(showBalance(peerStatus.getBalance()))),
-				td(div(showBalance(peerStatus.getPeerStake()))),
-				td(div(showBalance(peerStatus.getDelegatedStake()))),
+				td(showBalance(peerStatus.getBalance())),
+				td(showBalance(peerStatus.getPeerStake())),
+				td(showBalance(peerStatus.getDelegatedStake())),
 				td(showPercent(percent))
 			});
 		}
@@ -509,13 +510,23 @@ public class ExplorerAPI extends AWebSite {
 					th("Total Stake"),
 					th("Peer Stake"),
 					th("Delegated Stake"),
-					th("Stake %")
+					th("Stake")
 				)),
 				tbody(
 					each(rows, row -> tr(row))
 				)
 			)
 		);
+	}
+	
+	/**
+	 * Show a percentage value with fixed-width alignment, formatted like " 18.00 %"
+	 * @param percent Percentage value (0-100)
+	 * @return Monospace-formatted DomContent
+	 */
+	protected DomContent showPercent(double percent) {
+		String s=String.format(Locale.US, "%6.2f %%", percent);
+		return preCode(s);
 	}
 
 	/**
