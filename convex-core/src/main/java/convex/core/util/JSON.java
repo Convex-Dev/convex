@@ -29,6 +29,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.json.JSON5Reader;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
+import convex.core.lang.impl.CoreFn;
 import convex.core.text.Text;
 
 /**
@@ -316,9 +317,10 @@ public class JSON {
 			bb.append(Long.toString(a.longValue()));
 			return;
 		}
-
 		
-		throw new IllegalArgumentException("Can't print as JSON: "+Utils.getClassName(value));
+		// Fall back: render as string
+		// Catches stuff like functions etc. which don't have sensible JSON renderings
+		appendJSON(bb,RT.print(value));
 	}
 	
 	private static final int INDENT=2;

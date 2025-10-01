@@ -23,3 +23,64 @@
     color: #840;
 }
 
+/* REPL Styles */
+.repl-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 80vh;
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    overflow: hidden;
+}
+
+.repl-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1em;
+    background: var(--pico-code-background-color);
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.repl-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    padding: 1em;
+    border-top: 1px solid var(--pico-muted-border-color);
+    background: var(--pico-background-color);
+}
+
+.repl-controls {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+}
+
+.repl-input {
+    flex: 1;
+    font-family: monospace;
+    min-height: 80px;
+    resize: vertical;
+}
+
+.repl-entry {
+    margin-bottom: 1em;
+}
+
+.repl-prompt {
+    color: var(--pico-primary);
+    font-weight: bold;
+}
+
+.repl-result {
+    color: var(--pico-color);
+    margin-top: 0.25em;
+}
+
+.repl-error {
+    color: var(--pico-del-color);
+    margin-top: 0.25em;
+}

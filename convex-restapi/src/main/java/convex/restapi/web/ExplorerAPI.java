@@ -63,6 +63,7 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get(prefix+"peers", this::showPeers);
 		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
+		app.get(prefix+"repl", this::showRepl);
 		app.post(prefix+"search", this::handleSearch);
 	}
 	
@@ -92,6 +93,10 @@ public class ExplorerAPI extends AWebSite {
 				article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
 					p("View historical consensus states.")
+				),
+				article(
+					p(a("REPL").withHref(ROUTE+"repl").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Interactive Read-Eval-Print Loop for executing Convex Lisp code.")
 				)
 				
 			).withClass("grid").withStyle("align-items: stretch;"),
@@ -726,6 +731,42 @@ public class ExplorerAPI extends AWebSite {
 			row("Storage Size",
 					code(""+Cells.storageSize(peerStatus)),
 					"Bytes consumed by peer status data structure")
+		);
+	}
+
+	/**
+	 * Show the REPL (Read-Eval-Print Loop) interface
+	 * @param ctx Javalin context
+	 */
+	public void showRepl(Context ctx) {
+		returnPage(ctx, "Convex REPL", new String[][] {{"Explorer",ROUTE},{"REPL",null}},
+			div(
+				div().withId("repl-output").withClass("repl-output"),
+				div(
+					div(
+						label("Account:"),
+						input()
+							.withType("text")
+							.withId("repl-account")
+							.withValue("11")
+							.withPlaceholder("#11")
+							.attr("list", "account-list")
+							.withStyle("width: 120px; margin-right: 1em;"),
+						datalist(
+							option("8"),
+							option("11")
+						).withId("account-list"),
+						button("Execute").withId("repl-execute").withStyle("margin-right: 0.5em;"),
+						button("Clear").withId("repl-clear").withClass("secondary")
+					).withClass("repl-controls"),
+					textarea()
+						.withId("repl-input")
+						.withClass("repl-input")
+						.withPlaceholder("Enter Convex Lisp code here...\nExample: (* 2 3)")
+						.attr("rows", "4")
+				).withClass("repl-input-area")
+			).withClass("repl-container"),
+			script().withSrc("/js/repl.js").withType("text/javascript")
 		);
 	}
 
