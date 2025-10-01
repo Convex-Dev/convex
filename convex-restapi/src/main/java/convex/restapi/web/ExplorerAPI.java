@@ -741,6 +741,9 @@ public class ExplorerAPI extends AWebSite {
 	public void showRepl(Context ctx) {
 		returnPage(ctx, "Convex REPL", new String[][] {{"Explorer",ROUTE},{"REPL",null}},
 			div(
+				p("Run dynamic queries with the Convex REPL"), 
+				small("Enter: execute | Shift+Enter: new line | Ctrl+Enter: force execute | Ctrl+Up/Down: history")	,
+					
 				div().withId("repl-output").withClass("repl-output"),
 				div(
 					div(
@@ -748,7 +751,7 @@ public class ExplorerAPI extends AWebSite {
 						input()
 							.withType("text")
 							.withId("repl-account")
-							.withValue("11")
+							.withValue("#11")
 							.withPlaceholder("#11")
 							.attr("list", "account-list")
 							.attr("pattern", "^#[0-9]+$")

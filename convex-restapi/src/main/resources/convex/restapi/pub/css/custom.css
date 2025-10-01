@@ -69,13 +69,13 @@
 }
 
 .repl-prompt {
-    color: var(--pico-primary);
-    font-weight: bold;
+    
 }
 
 .repl-result {
-    color: var(--pico-color);
-    margin-top: 0.25em;
+    color: var(--pico-primary);
+    margin-bottom: 0.25em;
+	font-weight: bold;
 }
 
 .repl-error {

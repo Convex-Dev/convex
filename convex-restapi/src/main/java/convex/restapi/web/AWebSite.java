@@ -102,6 +102,7 @@ public abstract class AWebSite extends ABaseAPI {
 				div().withStyle("flex-grow: 1;"), // spacer
 				nav(
 					topButton("Explorer","/explorer/"),
+					topButton("REPL","/explorer/repl"),
 					topButton("Peers","/explorer/peers"),
 					topButton("API","/swagger"),
 					div(
