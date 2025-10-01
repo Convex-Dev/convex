@@ -99,7 +99,7 @@ public class ConvexJSONTest {
 		// Query *address*
 		Map<String,Object> res=c.query("*address*");
 		assertNotNull(res, "Query result should not be null");
-		assertEquals(addr.longValue(),res.get("result"));
+		assertEquals(addr.toString(),res.get("result"));
 		
 		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
@@ -151,7 +151,7 @@ public class ConvexJSONTest {
 		
 		Map<String,Object> rm=c.transact("(+ 1 2)");
 		assertNotNull(rm, "Transaction result should not be null");
-		assertEquals(3L,rm.get("result"));
+		assertEquals(3L,rm.get("value"));
 	}
 	
 	
@@ -165,7 +165,7 @@ public class ConvexJSONTest {
 		
 		Map<String,Object> rm=c.transact("(+ 1 2)");
 		assertNotNull(rm, "Transaction result should not be null");
-		assertEquals("JUICE",rm.get("error"));
+		assertEquals("JUICE",rm.get("errorCode"));
 		
 		c.faucet(addr, 1000000);
 		Long bal=c.queryBalance(addr);
@@ -173,7 +173,8 @@ public class ConvexJSONTest {
 		
 		rm=c.transact("(+ 1 2)");
 		assertNotNull(rm, "Transaction result should not be null");
-		assertEquals(3L,rm.get("result"));
+		assertEquals(3L,rm.get("value"));
+		assertEquals("3",rm.get("result"));
 		
 		assertTrue(c.queryBalance()<bal);
 	}

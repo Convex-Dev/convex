@@ -3,6 +3,8 @@ package convex.restapi.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,8 +16,10 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Maps;
+import convex.core.data.prim.AInteger;
 import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.init.Init;
 import convex.core.util.JSON;
 import convex.java.ConvexHTTP;
@@ -89,16 +93,22 @@ public class RESTAPITest extends ARESTTest {
 		{ // should be OK
 			String query=JSON.toStringPretty(Maps.of("address",11,"source","*balance*"));
 			HttpResponse<String> res = post(API_PATH+"/query", query);
+			AMap<AString,ACell> json=JSON.parse(res.body());
+			ACell value=json.getIn("value");
+			
+			assertTrue(value instanceof AInteger);
+			assertNull(json.getIn("errorCode"));
+			assertEquals(value,Reader.read(json.getIn("result").toString()));
 			assertEquals(200, res.statusCode());
 		}
 		
 		{ // should be a failure of query due to bad code execution
-			String query=JSON.toStringPretty(Maps.of("address",11,"source","(count)"));
+			String query=JSON.toString(Maps.of("address",11,"source","(count)"));
 			HttpResponse<String> res = post(API_PATH+"/query", query);
 			assertEquals(200, res.statusCode());
 			@SuppressWarnings("unchecked")
 			AMap<AString,ACell> json=(AMap<AString,ACell>)JSON.parse(res.body());
-			AString errorCode=RT.getIn(json,"error");
+			AString errorCode=RT.getIn(json,"errorCode");
 			assertNotNull(errorCode,()->"No errorCode in result: "+json);
 			assertEquals("ARITY",errorCode.toString());
 		}
