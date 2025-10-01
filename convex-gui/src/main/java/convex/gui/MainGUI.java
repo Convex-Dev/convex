@@ -1,5 +1,6 @@
 package convex.gui;
 
+import java.awt.Color;
 import java.awt.EventQueue;
 
 import javax.swing.ImageIcon;
@@ -14,8 +15,10 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ConnectPanel;
+import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.panels.HomePanel;
+import convex.gui.peer.PeerGUI;
 import convex.gui.peer.PeerLaunchDialog;
 import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
@@ -52,6 +55,9 @@ public class MainGUI extends AbstractGUI {
 
 		JComponent discord=createLaunchButton("Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord,"Go to the Convex community Discord (opens web browser).");
 		actionPanel.add(discord);
+		
+		JComponent explorer=createLaunchButton("Explorer",Toolkit.TERMINAL_ICON,this::launchExplorer,"Open the local peer explorer (opens web browser).");
+		actionPanel.add(explorer);
 
 		JComponent www=createLaunchButton("Documentation",Toolkit.WWW_ICON,this::launchWebsite,"Go to the Convex docs website (opens web browser).");
 		actionPanel.add(www);
@@ -77,6 +83,14 @@ public class MainGUI extends AbstractGUI {
 	
 	public void launchDiscord() {
 		Toolkit.launchBrowser("https://discord.com/invite/xfYGq4CT7v");
+	}
+	
+	public void launchExplorer() {
+		if (PeerGUI.REST_PORT==null) {
+			Toast.display(this, "No local server started!", Color.ORANGE);
+		} else {
+			Toolkit.launchBrowser("http://localhost:"+PeerGUI.REST_PORT+"/explorer");
+		}
 	}
 	
 	public void launchTerminalClient() {

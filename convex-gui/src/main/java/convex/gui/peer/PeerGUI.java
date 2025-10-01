@@ -178,6 +178,11 @@ public class PeerGUI extends AbstractGUI {
 	JPanel accountsPanel;
 	JTabbedPane tabs;
 	RESTServer restServer;
+
+	/**
+	 * Port of the most recently launched REST Server
+	 */
+	public static Integer REST_PORT=null;
 	
 
 	/**
@@ -211,6 +216,7 @@ public class PeerGUI extends AbstractGUI {
 		try {
 			restServer=RESTServer.create(first);
 			restServer.start();
+			REST_PORT=restServer.getPort();
 		} catch (Exception t) {
 			log.warn("Unable to start REST Server: ",t);
 		}
