@@ -26,13 +26,13 @@ public class SodiumKeyPair extends AKeyPair {
 	 */
 	private final byte[] secretKeyBytes;
 
-	private SodiumKeyPair(AccountKey pk, Blob seed, byte[] skBytes) {
+	private SodiumKeyPair(AccountKey pk, AArrayBlob seed, byte[] skBytes) {
 		this.publicKey=pk;
-		this.seed=seed;
+		this.seed=seed.toFlatBlob();
 		this.secretKeyBytes=skBytes;
 	}
 	
-	public static SodiumKeyPair create(Blob seed) {
+	public static SodiumKeyPair create(AArrayBlob seed) {
 		long n=seed.count();
 		if (seed.count() != SEED_LENGTH) throw new IllegalArgumentException("32 bytes private key material expected as seed but got: "+n);
 

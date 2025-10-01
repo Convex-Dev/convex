@@ -46,7 +46,7 @@ public class SodiumProvider extends AProvider {
 	}
 	
 	@Override
-	public SodiumKeyPair create(Blob seed) {
+	public SodiumKeyPair create(AArrayBlob seed) {
 		return SodiumKeyPair.create(seed);
 	}
 	

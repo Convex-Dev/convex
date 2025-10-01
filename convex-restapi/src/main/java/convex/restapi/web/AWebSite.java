@@ -367,7 +367,7 @@ public abstract class AWebSite extends ABaseAPI {
 	 */
 	public static DomContent showID(AArrayBlob data, int length) {			
 		return div(
-			identicon(data),
+			identicon(data),  //.attr("data-tooltip", RT.toString(data)),
 			showHex(data,length)
 		).withStyle("display: flex; flex-direction: row; align-items: center; gap: 0.5em; max-width: 100%; min-width: 0;");
 	}
@@ -410,6 +410,30 @@ public abstract class AWebSite extends ABaseAPI {
 			td(value),
 			td(notes)
 		);
+	}
+
+	/**
+	 * Create a search box that posts to /explorer/search
+	 * @param placeholder Placeholder text
+	 * @return Search form component
+	 */
+	protected DomContent searchBox(String placeholder) {
+		return form(
+			input()
+				.withType("search")
+				.withName("q")
+				.withPlaceholder(placeholder)
+				.attr("aria-label", "Search")
+				.attr("required", "required"),
+			button("Go").withType("submit").withStyle("width: 4em;")
+		)
+		.withAction("/explorer/search")
+		.withMethod("post")
+		.withStyle("display: flex; gap: 0.5em;");
+	}
+	
+	protected DomContent searchBox() {
+		return searchBox("Search by account #, peer key, hash, CNS name etc...");
 	}
 
 	protected static ImgTag identicon(String hexString) {

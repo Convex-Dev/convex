@@ -40,7 +40,7 @@ public class Providers {
 		currentProvider=provider;
 	}
 	
-	public static AKeyPair generate(Blob seed) {
+	public static AKeyPair generate(AArrayBlob seed) {
 		return currentProvider.create(seed);
 	}
 }

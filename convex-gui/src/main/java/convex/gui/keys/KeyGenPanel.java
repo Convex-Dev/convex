@@ -423,7 +423,8 @@ public class KeyGenPanel extends JPanel {
 		addWalletButton=new ActionButton("Add to keyring",0xe145,e -> {
 			String pks = privateKeyArea.getText();
 			pks = Utils.stripWhiteSpace(pks);
-			HotWalletEntry we = HotWalletEntry.create(AKeyPair.create(Utils.hexToBytes(pks)), "Generated via KeyGen");
+			Blob privateSeed=Blob.parse(pks);
+			HotWalletEntry we = HotWalletEntry.create(AKeyPair.create(privateSeed), "Generated via KeyGen");
 			KeyRingPanel.addWalletEntry(we);
 			if (manager!=null) manager.switchPanel("Keyring");
 		});		

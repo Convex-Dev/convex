@@ -2,17 +2,11 @@ package convex.restapi.web;
 
 import static j2html.TagCreator.*;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Locale;
 
-import javax.imageio.ImageIO;
-
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
-import convex.core.crypto.IdenticonBuilder;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -34,7 +28,6 @@ import convex.restapi.api.ABaseAPI;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
-import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
 import convex.core.data.Symbol;
@@ -70,7 +63,7 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get(prefix+"peers", this::showPeers);
 		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
-
+		app.post(prefix+"search", this::handleSearch);
 	}
 	
 
@@ -81,6 +74,7 @@ public class ExplorerAPI extends AWebSite {
 	 */
 	public void showExplorer(Context ctx) {
         returnPage(ctx, "Peer Explorer", (String[][])null,
+			searchBox(),
 			div(
 				// Pico grid of cards
 				article(
@@ -95,11 +89,18 @@ public class ExplorerAPI extends AWebSite {
 					p(a("Peers").withHref(ROUTE+"peers").withStyle("font-weight:600;font-size:1.1em;")),
 					p("Examine peers on the current network, including stakes and activity.")
 				),
-					article(
+				article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
 					p("View historical consensus states.")
 				)
-			).withClass("grid").withStyle("align-items: stretch;")
+				
+			).withClass("grid").withStyle("align-items: stretch;"),
+			article (
+				details(
+					summary("Discord Chat"),
+					rawHtml("<iframe src=\"https://discord.com/widget?id=734599663713386617&theme=dark\" width=\"100%\" height=\"300\" allowtransparency=\"true\" frameborder=\"0\" sandbox=\"allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts\"></iframe>")
+				)
+			)
 		);
 	}
 	
@@ -728,7 +729,57 @@ public class ExplorerAPI extends AWebSite {
 		);
 	}
 
+	/**
+	 * Handle search form submission
+	 * Attempts to parse input and redirect to appropriate page
+	 */
+	public void handleSearch(Context ctx) {
+		String query = ctx.formParam("q");
+		if (query == null || query.trim().isEmpty()) {
+			ctx.redirect(ROUTE);
+			return;
+		}
+		
+		Peer peer=server.getPeer(); // get the current peer snapshot
+		
+		query = query.trim();
+		
+		// Try to parse as account number (e.g., "#123" or "123")
+		try {
+			String numStr = query.startsWith("#") ? query.substring(1) : query;
+			long accountNum = Long.parseLong(numStr);
+			if (accountNum >= 0) {
+				ctx.redirect(ROUTE+"accounts/"+accountNum);
+				return;
+			}
+		} catch (NumberFormatException e) {
+			// not a number, continue
+		}
+		
+		// Try to parse as hex (peer key, hash, etc.)
+		Blob blob = Blob.parse(query);
+		if (blob!=null) {
+			// OK, it's paresable as hex
+			if (blob.count()==32) {
+				// it might be a key or hash
+				
+				// Try as peer AccountKey (peer)
+				AccountKey peerKey = AccountKey.create(blob);
+				if (peer.getConsensusState().getPeer(peerKey)!=null) {
+					ctx.redirect(ROUTE+"peers/"+peerKey.toHexString());
+					return;
+				}
 	
+			}
+			
+		}
+		
+		// If nothing matched, show error
+		returnPage(ctx,"Couldn't find what you were looking for",
+				h6("Couldn't find search term: "+query),
+				searchBox()
+		);
+	}
 
 
 	

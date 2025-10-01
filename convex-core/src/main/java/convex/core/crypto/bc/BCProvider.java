@@ -33,7 +33,7 @@ public class BCProvider extends AProvider {
 	}
 	
 	@Override
-	public BCKeyPair create(Blob seed) {
+	public BCKeyPair create(AArrayBlob seed) {
 		return BCKeyPair.create(seed);
 	}
 
