@@ -21,6 +21,56 @@ function appendOutput(prompt, result, isError = false) {
     replOutput.scrollTop = replOutput.scrollHeight;
 }
 
+function isBalanced(text) {
+    // Check if parentheses, brackets, and braces are balanced
+    let parenCount = 0;
+    let bracketCount = 0;
+    let braceCount = 0;
+    let inString = false;
+    let escape = false;
+    
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        
+        // Handle string literals
+        if (char === '"' && !escape) {
+            inString = !inString;
+        }
+        
+        // Handle escape sequences
+        if (char === '\\' && !escape) {
+            escape = true;
+            continue;
+        } else {
+            escape = false;
+        }
+        
+        // Skip characters inside strings
+        if (inString) continue;
+        
+        // Count brackets
+        if (char === '(') parenCount++;
+        else if (char === ')') parenCount--;
+        else if (char === '[') bracketCount++;
+        else if (char === ']') bracketCount--;
+        else if (char === '{') braceCount++;
+        else if (char === '}') braceCount--;
+        
+        // If any count goes negative, it's unbalanced
+        if (parenCount < 0 || bracketCount < 0 || braceCount < 0) {
+            return false;
+        }
+    }
+    
+    // All counts should be zero and not inside a string
+    return parenCount === 0 && bracketCount === 0 && braceCount === 0 && !inString;
+}
+
+function isCursorAtEnd(textarea) {
+    return textarea.selectionStart === textarea.value.length && 
+           textarea.selectionEnd === textarea.value.length;
+}
+
 async function executeCode() {
     const code = replInput.value.trim();
     if (!code) return;
@@ -40,11 +90,11 @@ async function executeCode() {
         // Remove 'Executing...' message
         replOutput.removeChild(replOutput.lastChild);
         
-		appendOutput(JSON.stringify(result), false);
+		// appendOutput(JSON.stringify(result), false);
         if (result.errorCode) {
-            appendOutput(account + '> ' + code, 'ERROR [' + result.errorCode + ']: ' + JSON.stringify(result.value), true);
+            appendOutput(account + '> ' + code, 'ERROR [' + result.errorCode + ']: ' + result.value, true);
         } else {
-            appendOutput(account + '> ' + code, '=> ' + JSON.stringify(result.value));
+            appendOutput(account + '> ' + code, '=> ' + result.result);
         }
     } catch (error) {
         replOutput.removeChild(replOutput.lastChild);
@@ -58,12 +108,24 @@ replExecute.addEventListener('click', executeCode);
 replClear.addEventListener('click', () => { replOutput.innerHTML = ''; });
 
 replInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        executeCode();
+    if (e.key === 'Enter') {
+        // Ctrl+Enter or Cmd+Enter always executes
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            executeCode();
+            return;
+        }
+        
+        // Plain Enter executes if cursor is at end and parens are balanced
+        // Shift+Enter always adds a new line (default behavior)
+        if (!e.shiftKey && isCursorAtEnd(replInput) && isBalanced(replInput.value)) {
+            e.preventDefault();
+            executeCode();
+        }
+        // Otherwise, allow default behavior (new line)
     }
 });
 
 // Welcome message
-appendOutput('Welcome to Convex REPL', 'Press Ctrl+Enter or click Execute to run code. Use the account selector to choose an account.');
+appendOutput('Welcome to Convex REPL', 'Press Enter to execute (when cursor at end and parens balanced), Shift+Enter for new line, or Ctrl+Enter to force execute.');
 

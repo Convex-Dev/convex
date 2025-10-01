@@ -152,7 +152,14 @@ public abstract class AGenericAPI {
 		
 		if (type.equals(ContentTypes.JSON)) {
 			ctx.contentType(ContentTypes.JSON);
-			ctx.result(JSON.printPretty(content).getInputStream());
+			if (content instanceof Result r) {
+				// Special format for CVM results at top level
+				Object jsonResult=r.toJSON();
+				ctx.result(JSON.printPretty(jsonResult).getInputStream());
+			} else {
+			
+				ctx.result(JSON.printPretty(content).getInputStream());
+			}
 		} else if (type.equals(ContentTypes.CVX)) {
 			ctx.contentType(ContentTypes.CVX);
 			AString rs=RT.print(content);

@@ -751,14 +751,15 @@ public class ExplorerAPI extends AWebSite {
 							.withValue("11")
 							.withPlaceholder("#11")
 							.attr("list", "account-list")
+							.attr("pattern", "^#[0-9]+$")
 							.withStyle("width: 120px; margin-right: 1em;"),
 						datalist(
-							option("8"),
-							option("11")
+							option("#8"),
+							option("#11")
 						).withId("account-list"),
 						button("Execute").withId("repl-execute").withStyle("margin-right: 0.5em;"),
 						button("Clear").withId("repl-clear").withClass("secondary")
-					).withClass("repl-controls"),
+					),
 					textarea()
 						.withId("repl-input")
 						.withClass("repl-input")

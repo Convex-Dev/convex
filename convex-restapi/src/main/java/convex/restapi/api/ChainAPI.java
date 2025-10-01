@@ -893,7 +893,7 @@ public class ChainAPI extends ABaseAPI {
 									from=ResultResponse.class,
 									type = "application/json", 
 									exampleObjects = {
-										@OpenApiExampleProperty(name = "value", value = "6")
+										@OpenApiExampleProperty(name = "result", value = "6")
 									}
 									)}),
 				@OpenApiResponse(status = "422", 
@@ -904,7 +904,7 @@ public class ChainAPI extends ABaseAPI {
 							type = "application/json", 
 							exampleObjects = {
 								@OpenApiExampleProperty(name = "error", value = "SYNTAX"),
-								@OpenApiExampleProperty(name = "value", value = "Bad syntax")
+								@OpenApiExampleProperty(name = "result", value = "Bad syntax")
 							}
 							)}),
 				@OpenApiResponse(status = "503", 

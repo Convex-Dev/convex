@@ -7,6 +7,7 @@ import io.javalin.openapi.*;
 @OpenApiByFields
 public class ResultResponse {
 	public Object value;
+	public String result;
 	public String errorCode;
 	public TransactionInfo info;
 	
