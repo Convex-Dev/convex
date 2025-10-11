@@ -92,10 +92,19 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		Message m=Message.create(returnAction,null,Blob.wrap(messageData));
 		out.add(m);
 	
-		receivedCount++;
 		if (receiveAction!=null) {
 			// Call the message receiver handler
-			receiveAction.accept(m);
+			try {
+				receiveAction.accept(m);
+			} catch (Exception e) {
+				if (e instanceof BadFormatException) {
+					// PRobably a malformed request, we can safely ignore
+				} else {
+					log.warn("Unexpected error in NettyInboundHandler",e);
+				}
+			} finally {
+				receivedCount++;
+			}
 		} else {
 			log.warn("Message ignored, no receiveAction");
 		}

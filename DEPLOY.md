@@ -41,3 +41,27 @@ sudo systemctl start caddy
 ```
 
 Peer server should be live on https://peer.your.org
+
+### Screen commands
+
+It may be helpful to use `screen` to run the peer process with a separate terminal.
+
+Start a new screen:
+
+```
+screen -S <name>
+```
+
+List available screens:
+
+```bash
+screen -ls
+```
+
+Reattach to a existing screen session
+
+```
+screen -r 
+```
+
+Detach from a screen with `Crtl+C Ctrl+D`
