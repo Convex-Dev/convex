@@ -65,3 +65,11 @@ screen -r
 ```
 
 Detach from a screen with `Crtl+C Ctrl+D`
+
+### Protonet network info
+
+`peer.convex.live` peer public key:
+
+```
+d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42
+```

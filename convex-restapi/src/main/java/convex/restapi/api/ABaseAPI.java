@@ -69,9 +69,11 @@ public abstract class ABaseAPI extends AGenericAPI {
 	    
 	    // Append port if non-standard and not already included in host
 	    if (!host.contains(":")) {
-	        if (!("https".equalsIgnoreCase(proto) && "443".equals(port)) &&
-	            !("http".equalsIgnoreCase(proto) && "80".equals(port))) {
-	            baseUrl.append(":").append(port);
+	        if (("https".equalsIgnoreCase(proto) && "443".equals(port)) ||
+	            ("http".equalsIgnoreCase(proto) && "80".equals(port))) {
+	            // Standard hostname is fine since we are using correct protocol for peer
+	        } else {
+	        	baseUrl.append(':').append(port);
 	        }
 	    }
 	
