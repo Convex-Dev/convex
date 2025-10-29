@@ -442,6 +442,205 @@ public class ExplorerAPI extends AWebSite {
 						code(""+Cells.storageSize(signedTx)),
 						"Bytes consumed by transaction data")
 				)
+			),
+			buildTransactionResultView(blockNum, txNum, trans),
+			buildTransactionLogsView(blockNum, txNum, trans)
+		);
+	}
+	
+	/**
+	 * Build a view of the transaction result
+	 */
+	private DomContent buildTransactionResultView(long blockNum, long txNum, ATransaction trans) {
+		Server s = restServer.getServer();
+		Peer peer = s.getPeer();
+		
+		// Get the BlockResult for this block
+		convex.core.cpos.BlockResult blockResult = peer.getBlockResult(blockNum);
+		
+		if (blockResult == null) {
+			// BlockResult not available (maybe too old, not stored)
+			return article(
+				details(
+					summary("Transaction Result"),
+					p(em("Result not available - block result may have been pruned from history"))
+				)
+			);
+		}
+		
+		// Get results vector from the block result
+		AVector<convex.core.Result> results = blockResult.getResults();
+		if (txNum >= results.count()) {
+			// Shouldn't happen but handle gracefully
+			return article(
+				details(
+					summary("Transaction Result"),
+					p(em("Transaction result not found in block"))
+				)
+			);
+		}
+		
+		convex.core.Result result = results.get(txNum);
+		ACell errorCode = result.getErrorCode();
+		boolean isError = errorCode != null;
+		ACell value = result.getValue();
+		AMap<convex.core.data.Keyword, ACell> info = result.getInfo();
+		
+		// Build rows dynamically based on available info
+		ArrayList<DomContent> rows = new ArrayList<>();
+		
+		// Status row
+		rows.add(row(
+			"Status",
+			code(isError ? "ERROR" : "SUCCESS").withClass(isError ? "error-text" : "success-text"),
+			isError ? "Transaction failed with error" : "Transaction executed successfully"
+		));
+		
+		// Return value / Error message
+		rows.add(row(
+			isError ? "Error Message" : "Return Value",
+			showCVX(value),
+			isError ? "Error message from failed transaction" : "Value returned by transaction"
+		));
+		
+		// Error code (if present)
+		if (isError) {
+			rows.add(row(
+				"Error Code",
+				showCVX(errorCode),
+				"CVM error code indicating type of failure"
+			));
+		}
+		
+		// Info fields (juice, fees, memory, etc.)
+		if (info != null) {
+			ACell juice = info.get(Keywords.JUICE);
+			if (juice != null) {
+				rows.add(row("Juice Used", code(juice.toString()), "Computational cost in juice units"));
+			}
+			
+			ACell fees = info.get(Keywords.FEES);
+			if (fees != null) {
+				rows.add(row("Fees Paid", showBalance(RT.castLong(fees).longValue()), "Transaction fees paid in Convex Coins"));
+			}
+			
+			ACell mem = info.get(Keywords.MEM);
+			if (mem != null) {
+				rows.add(row("Memory Used", code(mem.toString()), "Memory allocated/deallocated (bytes)"));
+			}
+			
+			ACell trace = info.get(Keywords.TRACE);
+			if (trace != null) {
+				rows.add(row("Stack Trace", showCVX(trace), "Stack trace for error location"));
+			}
+		}
+		
+		return article(
+			details(
+				summary("Transaction Result"),
+				table(
+					thead(tr(th("Field"), th("Value"), th("Notes"))),
+					tbody(
+						each(rows, r -> r)
+					)
+				)
+			)
+		);
+	}
+	
+	/**
+	 * Build a view of transaction log entries
+	 */
+	private DomContent buildTransactionLogsView(long blockNum, long txNum, ATransaction trans) {
+		Server s = restServer.getServer();
+		Peer peer = s.getPeer();
+		
+		// Get the BlockResult for this block
+		convex.core.cpos.BlockResult blockResult = peer.getBlockResult(blockNum);
+		
+		if (blockResult == null) {
+			// BlockResult not available
+			return article(
+				details(
+					summary("Log Entries (0)"),
+					p(em("Logs not available - block result may have been pruned from history"))
+				)
+			);
+		}
+		
+		// Get results vector from the block result
+		AVector<convex.core.Result> results = blockResult.getResults();
+		if (txNum >= results.count()) {
+			return article(
+				details(
+					summary("Log Entries (0)"),
+					p(em("Transaction result not found in block"))
+				)
+			);
+		}
+		
+		convex.core.Result result = results.get(txNum);
+		AVector<AVector<ACell>> log = result.getLog();
+		
+		long logCount = (log == null) ? 0 : log.count();
+		
+		if (logCount == 0) {
+			return article(
+				details(
+					summary("Log Entries (0)"),
+					p(em("No log entries were generated during transaction execution"))
+				)
+			);
+		}
+		
+		// Build log rows from the log vector
+		ArrayList<DomContent[]> logRows = new ArrayList<>();
+		if (log != null) {
+			for (long i = 0; i < logCount; i++) {
+				AVector<ACell> logEntry = log.get(i);
+			// Log entries are vectors of arbitrary cells
+			// Common format: [level, message, ...additional data]
+			if (logEntry.count() >= 2) {
+				ACell level = logEntry.get(0);
+				ACell message = logEntry.get(1);
+				
+				// Additional context (if present)
+				String context = "";
+				if (logEntry.count() > 2) {
+					StringBuilder sb = new StringBuilder();
+					for (long j = 2; j < logEntry.count(); j++) {
+						if (j > 2) sb.append(", ");
+						sb.append(logEntry.get(j).toString());
+					}
+					context = sb.toString();
+				}
+				
+				logRows.add(new DomContent[] {
+					td(showCVX(level)),
+					td(showCVX(message)),
+					td(code(context))
+				});
+			} else {
+				// Fallback for unexpected log format
+				logRows.add(new DomContent[] {
+					td(code("?")),
+					td(showCVX(logEntry)),
+					td(text(""))
+				});
+			}
+		}
+		}
+		
+		return article(
+			details(
+				summary("Log Entries (" + logCount + ")"),
+				p(text("Log entries generated during transaction execution.")),
+				table(
+					thead(tr(th("Level"), th("Message"), th("Context"))),
+					tbody(
+						each(logRows, row -> tr(row))
+					)
+				)
 			)
 		);
 	}
