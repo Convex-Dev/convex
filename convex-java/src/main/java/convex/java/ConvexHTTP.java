@@ -125,8 +125,42 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		// TODO Auto-generated method stub
-		return null;
+		String statusPath = getAPIPath() + "/status";
+		
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(statusPath))
+				.header("Accept", ContentTypes.CVX)
+				.GET()
+				.build();
+		
+		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+		CompletableFuture<Result> result = future.handle((response, ex) -> {
+			// In case of exception, convert to result
+			if (ex != null) return Result.fromException(ex).withSource(SourceCodes.NET);
+			
+			// Check HTTP status code
+			int statusCode = response.statusCode();
+			if (statusCode != 200) {
+				return Result.error(ErrorCodes.IO, "HTTP status " + statusCode + ": " + response.body())
+						.withSource(SourceCodes.NET);
+			}
+			
+			String body = response.body();
+			try {
+				// Parse the response as CVX data (should be a map)
+				ACell data = Reader.read(body);
+				if (!(data instanceof AMap)) {
+					return Result.error(ErrorCodes.FORMAT, "Expected status map but got: " + Utils.getClassName(data));
+				}
+				// Return the status map wrapped in a successful Result
+				return Result.value(data);
+			} catch (ParseException e) {
+				return Result.error(ErrorCodes.FORMAT, "Can't read CVX response: " + body);
+			} catch (Exception e) {
+				return Result.fromException(e).withSource(SourceCodes.NET);
+			}
+		});
+		return result;
 	}
 
 	@Override

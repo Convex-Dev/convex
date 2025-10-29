@@ -83,4 +83,23 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertEquals(ErrorCodes.IO,r.getErrorCode());
 		assertEquals(SourceCodes.NET,r.getSource());
 	}
+	
+	@Test public void testRequestStatus() throws ResultException, InterruptedException {
+		ConvexHTTP convex=connect();
+		
+		Result r=convex.requestStatusSync();
+		assertFalse(r.isError(), ()->"Error in status request: " + r);
+		assertNotNull(r.getValue(), "Status result should have a value");
+		assertTrue(r.getValue() instanceof convex.core.data.AMap, 
+			"Status result should be a map but got: " + Utils.getClassName(r.getValue()));
+		
+		// Check that the status map contains expected keys
+		@SuppressWarnings("unchecked")
+		convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell> statusMap = 
+			(convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell>) r.getValue();
+		
+		// Verify common status fields exist
+		assertNotNull(statusMap.get(Keywords.BELIEF), "Status should contain belief hash");
+		assertNotNull(statusMap.get(Keywords.PEER), "Status should contain peer key");
+	}
 }

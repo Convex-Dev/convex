@@ -47,7 +47,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/**
 	 * Empty Index singleton
 	 */
-	public static final Index<?, ?> EMPTY = Cells.intern(new Index<ABlob, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L));
+	public static final Index<?, ?> EMPTY = Cells.intern(new Index<ABlobLike<?>, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L));
 	
 	/**
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix

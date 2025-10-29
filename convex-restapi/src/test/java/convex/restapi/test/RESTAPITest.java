@@ -204,4 +204,29 @@ public class RESTAPITest extends ARESTTest {
 		HttpResponse<String> notFoundResponse = get(API_PATH + "/blocks/999999");
 		assertEquals(404, notFoundResponse.statusCode());
 	}
+	
+	@Test public void testStatus() throws IOException, InterruptedException {
+		// Test GET status endpoint
+		HttpResponse<String> response = get(API_PATH + "/status");
+		assertEquals(200, response.statusCode(), "Status endpoint should return 200 OK");
+		
+		// Parse response as JSON
+		String responseBody = response.body();
+		ACell parsed = JSON.parse(responseBody);
+		assertNotNull(parsed, "Response should be parseable");
+		
+		// Verify it's a map
+		assertTrue(parsed instanceof AMap, "Status response should be a map but got: " + 
+			convex.core.util.Utils.getClassName(parsed));
+		
+		@SuppressWarnings("unchecked")
+		AMap<ACell, ACell> statusMap = (AMap<ACell, ACell>) parsed;
+		
+		// Verify expected status fields exist (JSON converts keyword keys to strings)
+		assertNotNull(RT.getIn(statusMap, "belief"), "Status should contain belief field");
+		assertNotNull(RT.getIn(statusMap, "peer"), "Status should contain peer field");
+		assertNotNull(RT.getIn(statusMap, "genesis"), "Status should contain genesis field");
+		assertNotNull(RT.getIn(statusMap, "state"), "Status should contain state field");
+		assertNotNull(RT.getIn(statusMap, "consensus-point"), "Status should contain consensus-point field");
+	}
 }

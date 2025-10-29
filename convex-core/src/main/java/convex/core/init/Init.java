@@ -64,9 +64,6 @@ public class Init {
 	// First user of Protonet, i.e. @mikera
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
 	public static final AccountKey FIRST_USER_KEY = AccountKey.fromHex("89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac");
-
-	// Constants
-	private static final Index<AArrayBlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
 	
 	/**
 	 * Number of coins issued at genesis (one million)
@@ -178,7 +175,7 @@ public class Init {
 
 		// Create the initial state with static libraries and memory allowances. 
 		// We now have a functional CVM State!
-		State s = State.create(accts, peers, globals, EMPTY_SCHEDULE);
+		State s = State.create(accts, peers, globals, State.EMPTY_SCHEDULE);
 		{
 			supply-=s.getGlobalMemoryValue().longValue();
 			

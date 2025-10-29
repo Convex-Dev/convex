@@ -110,6 +110,8 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "blocks", this::getBlocks);
 		app.get(prefix + "blocks/{blockNum}", this::getBlock);
 		
+		app.get(prefix + "status", this::getStatus);
+		
 		app.get("/identicon/{hex}", this::getIdenticon);
 		
 		convex = restServer.getConvex();
@@ -190,7 +192,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new NotFoundResponse("Transaction not found: " + hashParam);
 		}
 
-		ctx.result(JSON.toStringPretty(transaction));
+		setContent(ctx,transaction);
 	}
 
 	@OpenApi(path = ROUTE + "blocks", 
@@ -358,6 +360,25 @@ public class ChainAPI extends ABaseAPI {
 		blockData.put("finalised", blockNum < finalityPoint);
 		
 		ctx.result(JSON.toStringPretty(blockData));
+	}
+
+	@OpenApi(path = ROUTE + "status", 
+			versions="peer-v1",
+			methods = HttpMethod.GET, 
+			tags = { "Peer"},
+			summary = "Get the status map from the peer server. Can be used as a heartbeat check to ensure the peer is still running.", 
+			operationId = "getStatus", 
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Status retrieved successfully", 
+						content = {
+							@OpenApiContent(
+									type = "application/json") }),
+			})
+	public void getStatus(Context ctx) {
+		AMap<Keyword,ACell> statusMap = server.getStatusMap();
+		setContent(ctx, statusMap);
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 
