@@ -1,6 +1,34 @@
 package convex.restapi.web;
 
-import static j2html.TagCreator.*;
+import static j2html.TagCreator.a;
+import static j2html.TagCreator.article;
+import static j2html.TagCreator.button;
+import static j2html.TagCreator.code;
+import static j2html.TagCreator.datalist;
+import static j2html.TagCreator.details;
+import static j2html.TagCreator.div;
+import static j2html.TagCreator.each;
+import static j2html.TagCreator.em;
+import static j2html.TagCreator.h4;
+import static j2html.TagCreator.h5;
+import static j2html.TagCreator.h6;
+import static j2html.TagCreator.input;
+import static j2html.TagCreator.label;
+import static j2html.TagCreator.option;
+import static j2html.TagCreator.p;
+import static j2html.TagCreator.rawHtml;
+import static j2html.TagCreator.script;
+import static j2html.TagCreator.small;
+import static j2html.TagCreator.span;
+import static j2html.TagCreator.summary;
+import static j2html.TagCreator.table;
+import static j2html.TagCreator.tbody;
+import static j2html.TagCreator.td;
+import static j2html.TagCreator.text;
+import static j2html.TagCreator.textarea;
+import static j2html.TagCreator.th;
+import static j2html.TagCreator.thead;
+import static j2html.TagCreator.tr;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -15,7 +43,8 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -23,6 +52,8 @@ import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
+import convex.core.data.Symbol;
+import convex.core.lang.RT;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -31,10 +62,6 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
-import convex.core.data.Symbol;
-import convex.core.lang.RT;
-import convex.core.data.AMap;
-import convex.core.data.ACell;
 import j2html.tags.specialized.TableTag;
 import j2html.tags.specialized.TbodyTag;
 
@@ -505,10 +532,12 @@ public class ExplorerAPI extends AWebSite {
 		
 		// Error code (if present)
 		if (isError) {
+			String errorDescription = convex.core.ErrorCodes.getDescription(errorCode);
+			if (errorDescription == null) errorDescription = "CVM error code indicating type of failure";
 			rows.add(row(
 				"Error Code",
 				showCVX(errorCode),
-				"CVM error code indicating type of failure"
+				errorDescription
 			));
 		}
 		
