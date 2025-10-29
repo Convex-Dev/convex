@@ -43,6 +43,7 @@ public class PeerIndex {
 
 	private PeerIndex processBlock(Peer peer, long blockNum) {
 		Index<Hash,AVector<CVMLong>> ntxLocs=txLocations;
+		
 		BlockResult br=peer.getBlockResult(blockNum);
 		AVector<SignedData<ATransaction>> txs = peer.getPeerOrder().getBlock(blockNum).getValue().getTransactions();
 		AVector<Result> rs = br.getResults();

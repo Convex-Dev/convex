@@ -622,9 +622,12 @@ public class ExplorerAPI extends AWebSite {
 			);
 		}
 		
+		// First pass: find the maximum number of values in any log entry
+		int maxValuesCount = 1; // At least 1 for the header
+
 		// Build log rows from the log vector
 		// Log entry format: [Address, Scope, Position, Values]
-		ArrayList<DomContent[]> logRows = new ArrayList<>();
+		ArrayList<DomContent> logRows = new ArrayList<>();
 		if (log != null) {
 			for (long i = 0; i < logCount; i++) {
 				AVector<ACell> logEntry = log.get(i);
@@ -634,23 +637,30 @@ public class ExplorerAPI extends AWebSite {
 					ACell address = logEntry.get(0);
 					ACell scope = logEntry.get(1);
 					ACell position = logEntry.get(2);
-					ACell values = logEntry.get(3);
+					ACell valuesCell = logEntry.get(3);
 					
-					logRows.add(new DomContent[] {
-						td(address != null ? showAddress((Address)address) : code("nil")),
-						td(scope != null ? showCVX(scope) : code("nil")),
-						td(showCVX(position)),
-						td(showCVX(values))
-					});
-				} else {
-					// Fallback for unexpected log format
-					logRows.add(new DomContent[] {
-						td(code("?")),
-						td(code("?")),
-						td(code("?")),
-						td(showCVX(logEntry))
-					});
-				}
+					// Build row with dynamic number of value cells
+					ArrayList<DomContent> cells = new ArrayList<>();
+					cells.add(td(address != null ? showAddress((Address)address) : code("nil")));
+					cells.add(td(scope != null ? showCVX(scope) : code("nil")));
+					cells.add(td(showCVX(position)));
+					
+					// Add each value from the values vector as a separate cell
+					if (valuesCell instanceof AVector) {
+						@SuppressWarnings("unchecked")
+						AVector<ACell> values = (AVector<ACell>) valuesCell;
+						int valuesCount = (int) values.count();
+						maxValuesCount = Math.max(maxValuesCount, valuesCount);
+						for (long j = 0; j < valuesCount; j++) {
+							cells.add(td(showCVX(values.get(j))));
+						}
+					} else {
+						// If not a vector, just show the value as-is
+						cells.add(td(showCVX(valuesCell)));
+					}
+					
+					logRows.add(tr(cells.toArray(new DomContent[0])));
+				} 
 			}
 		}
 		
@@ -658,9 +668,9 @@ public class ExplorerAPI extends AWebSite {
 			details(
 				summary("Log Entries (" + logCount + ")"),
 				table(
-					thead(tr(th("Address"), th("Scope"), th("Position"), th("Values"))),
+					thead(tr(th("Address"), th("Scope"), th("Position"), th("Values ...").withCondColspan(maxValuesCount > 1, String.valueOf(maxValuesCount)))),
 					tbody(
-						each(logRows, row -> tr(row))
+						each(logRows, row -> row)
 					)
 				)
 			)
