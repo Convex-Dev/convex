@@ -6,8 +6,8 @@
 			(fail :ARGUMENT "Invalid quantity")))
 	
    ;; Initial token supply - NEED TO FIX THIS AND/OR ENABLE MINTING
-   ;; For PAITEST: 1 million with 9 decimals
-   (def supply 1000000000000000)
+   ;; For PAITEST: 1 billion with 9 decimals
+   (def supply 1000000000000000000)
 
    (set-holding *caller* supply)
 

@@ -626,7 +626,7 @@ public class ExplorerAPI extends AWebSite {
 		long totalStakeAllPeers = state.getPeers().reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
 		for (long i = start; i < end; i++) {
 			MapEntry<AccountKey, PeerStatus> entry = peers.entryAt(i);
-			AccountKey peerKey = entry.getKey();
+			AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
 			PeerStatus peerStatus = entry.getValue();
 			String peerLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+peerKey.toHexString());
 			double percent = (totalStakeAllPeers>0)?(100.0*peerStatus.getBalance()/ (double)totalStakeAllPeers):0.0;
