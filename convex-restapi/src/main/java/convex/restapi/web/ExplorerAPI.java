@@ -623,49 +623,42 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		// Build log rows from the log vector
+		// Log entry format: [Address, Scope, Position, Values]
 		ArrayList<DomContent[]> logRows = new ArrayList<>();
 		if (log != null) {
 			for (long i = 0; i < logCount; i++) {
 				AVector<ACell> logEntry = log.get(i);
-			// Log entries are vectors of arbitrary cells
-			// Common format: [level, message, ...additional data]
-			if (logEntry.count() >= 2) {
-				ACell level = logEntry.get(0);
-				ACell message = logEntry.get(1);
 				
-				// Additional context (if present)
-				String context = "";
-				if (logEntry.count() > 2) {
-					StringBuilder sb = new StringBuilder();
-					for (long j = 2; j < logEntry.count(); j++) {
-						if (j > 2) sb.append(", ");
-						sb.append(logEntry.get(j).toString());
-					}
-					context = sb.toString();
+				// Expected format: [Address, Scope, Position, Values]
+				if (logEntry.count() >= 4) {
+					ACell address = logEntry.get(0);
+					ACell scope = logEntry.get(1);
+					ACell position = logEntry.get(2);
+					ACell values = logEntry.get(3);
+					
+					logRows.add(new DomContent[] {
+						td(address != null ? showAddress((Address)address) : code("nil")),
+						td(scope != null ? showCVX(scope) : code("nil")),
+						td(showCVX(position)),
+						td(showCVX(values))
+					});
+				} else {
+					// Fallback for unexpected log format
+					logRows.add(new DomContent[] {
+						td(code("?")),
+						td(code("?")),
+						td(code("?")),
+						td(showCVX(logEntry))
+					});
 				}
-				
-				logRows.add(new DomContent[] {
-					td(showCVX(level)),
-					td(showCVX(message)),
-					td(code(context))
-				});
-			} else {
-				// Fallback for unexpected log format
-				logRows.add(new DomContent[] {
-					td(code("?")),
-					td(showCVX(logEntry)),
-					td(text(""))
-				});
 			}
-		}
 		}
 		
 		return article(
 			details(
 				summary("Log Entries (" + logCount + ")"),
-				p(text("Log entries generated during transaction execution.")),
 				table(
-					thead(tr(th("Level"), th("Message"), th("Context"))),
+					thead(tr(th("Address"), th("Scope"), th("Position"), th("Values"))),
 					tbody(
 						each(logRows, row -> tr(row))
 					)

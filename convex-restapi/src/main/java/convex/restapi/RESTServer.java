@@ -291,7 +291,10 @@ public class RESTServer implements Closeable {
 		
 		Convex c=Convex.connect(s);
 		c.setAddress(Address.create(12), kp);
-		c.transactSync(":test-transaction");
+		c.transact("(log :TEST)");
+		c.transact(":test-transaction");
+		c.transact("(def TOKEN (deploy (@convex.fungible/build-token {:supply 1000000})))");
+		c.transact("(@convex.asset/transfer #13 [TOKEN 1337])");
 		
 		try (RESTServer rs=RESTServer.create(s)) {
 			rs.start();
