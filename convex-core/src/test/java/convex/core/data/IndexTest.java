@@ -293,10 +293,10 @@ public class IndexTest {
 
 	@Test
 	public void testInitialPeersIndex() {
-		Index<AccountKey, PeerStatus> bm = InitTest.STATE.getPeers();
+		Index<AArrayBlob, PeerStatus> bm = InitTest.STATE.getPeers();
 		doIndexTests(bm);
 
-		Index<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(InitTest.FIRST_PEER_KEY));
+		Index<AArrayBlob, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(InitTest.FIRST_PEER_KEY));
 		assertEquals(1L,fm.count());
 		
 		bm.isCompletelyEncoded();

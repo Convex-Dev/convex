@@ -21,6 +21,7 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -55,7 +56,7 @@ public class BeliefMergeTest {
 		long seed = 2654733563337952L;
 		// System.out.println("Generating with seed: "+seed);
 		AVector<AccountStatus> accounts = Vectors.empty();
-		Index<AccountKey, PeerStatus> peers = State.EMPTY_PEERS;
+		Index<AArrayBlob, PeerStatus> peers = State.EMPTY_PEERS;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			AKeyPair kp = AKeyPair.createSeeded(seed + i * 17777);
 			AccountKey key = kp.getAccountKey();

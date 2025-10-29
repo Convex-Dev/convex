@@ -15,6 +15,7 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AArrayBlob;
+import convex.core.data.ABlob;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -614,7 +615,7 @@ public class ExplorerAPI extends AWebSite {
 		
 		// Get current state from server
 		State state = s.getPeer().getConsensusState();
-		Index<AccountKey, PeerStatus> peers = state.getPeers();
+		Index<AArrayBlob, PeerStatus> peers = state.getPeers();
 		long npeers = peers.count();
 		
 		// Get pagination parameters
@@ -625,7 +626,7 @@ public class ExplorerAPI extends AWebSite {
 		ArrayList<DomContent[]> rows = new ArrayList<>();
 		long totalStakeAllPeers = state.getPeers().reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
 		for (long i = start; i < end; i++) {
-			MapEntry<AccountKey, PeerStatus> entry = peers.entryAt(i);
+			MapEntry<AArrayBlob, PeerStatus> entry = peers.entryAt(i);
 			AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
 			PeerStatus peerStatus = entry.getValue();
 			String peerLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+peerKey.toHexString());

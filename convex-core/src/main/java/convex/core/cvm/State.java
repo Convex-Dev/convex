@@ -14,6 +14,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -52,8 +53,8 @@ import convex.core.util.Utils;
  *
  */
 public class State extends ARecordGeneric {
-	public static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
-	public static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
+	public static final Index<AArrayBlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
+	public static final Index<AArrayBlob, PeerStatus> EMPTY_PEERS = Index.none();
 
 	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS,
 			Keywords.GLOBALS, Keywords.SCHEDULE };
@@ -88,8 +89,8 @@ public class State extends ARecordGeneric {
 	 */
 	public static final State EMPTY = create(Vectors.empty(), EMPTY_PEERS, Constants.INITIAL_GLOBALS, EMPTY_SCHEDULE);
 
-	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
+	private State(AVector<AccountStatus> accounts, Index<AArrayBlob, PeerStatus> peers,
+			AVector<ACell> globals, Index<AArrayBlob, AVector<ACell>> schedule) {
 		super(CVMTag.STATE,FORMAT,Vectors.of(accounts,peers,globals,schedule).toVector());
 	}
 	
@@ -119,8 +120,8 @@ public class State extends ARecordGeneric {
 	 * @param schedule Schedule (may be null)
 	 * @return New State instance
 	 */
-	public static State create(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
+	public static State create(AVector<AccountStatus> accounts, Index<AArrayBlob, PeerStatus> peers,
+			AVector<ACell> globals, Index<AArrayBlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, globals, schedule);
 	}
 
@@ -167,8 +168,8 @@ public class State extends ARecordGeneric {
 	 * @return A map of addresses to PeerStatus records
 	 */
 	@SuppressWarnings("unchecked")
-	public Index<AccountKey, PeerStatus> getPeers() {
-		return(Index<AccountKey, PeerStatus>) values.get(1);
+	public Index<AArrayBlob, PeerStatus> getPeers() {
+		return(Index<AArrayBlob, PeerStatus>) values.get(1);
 	}
 
 	/**
@@ -696,7 +697,7 @@ public class State extends ARecordGeneric {
 	 * @param newPeers New Peer Map
 	 * @return Updated State
 	 */
-	public State withPeers(Index<AccountKey, PeerStatus> newPeers) {
+	public State withPeers(Index<AArrayBlob, PeerStatus> newPeers) {
 		if (getPeers() == newPeers) return this;
 		return create(values.assoc(1,newPeers));
 	}

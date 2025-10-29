@@ -14,6 +14,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -61,7 +62,7 @@ public class PeerCluster {
 	private static State createInitialState() {
 		// setting up NUM_PEERS peers with accounts 0..NUM_PEERS-1
 		AVector<AccountStatus> accts = Vectors.empty();
-		Index<AccountKey, PeerStatus> peers = State.EMPTY_PEERS;
+		Index<AArrayBlob, PeerStatus> peers = State.EMPTY_PEERS;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			AccountKey peerKey = PEER_KEYPAIRS.get(i).getAccountKey();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);

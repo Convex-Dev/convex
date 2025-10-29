@@ -23,6 +23,7 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -209,7 +210,7 @@ public class ConnectionManager extends AThreadedComponent {
 		// SECURITY: stake weighted connection is important to avoid bad / irrelevant peers
 		// influencing the connection pool
 
-		Set<AccountKey> potentialPeers=s.getPeers().keySet();
+		Set<AArrayBlob> potentialPeers=s.getPeers().keySet();
 		InetSocketAddress target=null;
 		double accStake=0.0;
 		for (ACell c:potentialPeers) {
