@@ -119,7 +119,7 @@ public class NettyConnection extends AConnection {
 	@SuppressWarnings("unused")
 	@Override
 	public boolean sendMessage(Message m)  {
-		if (!channel.isActive()) return false;
+		// if (!channel.isActive()) return false;
 		
 		// Note: never call await/sync here as might block the IO thread
 		ChannelFuture cf=channel.writeAndFlush(m);
