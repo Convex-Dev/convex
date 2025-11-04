@@ -236,7 +236,7 @@ public class ExplorerAPI extends AWebSite {
 		for (long i = start; i < end; i++) {
 			Address address = Address.create(i);
 			AccountStatus account = accounts.get(i);
-			String accountLink = ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"accounts/"+i);
+			String accountLink = ROUTE+"accounts/"+i;
 			
 			rows.add(new DomContent[] {
 				td(a(address.toString()).withHref(accountLink)),
