@@ -266,13 +266,25 @@ public class ExplorerAPI extends AWebSite {
 		
 		long[] range = getPaginationRange(ctx, nblocks);
 		long start=range[0];
-		long end=range[1];
+		long limit=range[2];
 		
+		DomContent paginationLinks = makePaginationLinks(ctx, ROUTE+"blocks", start, limit, nblocks);
+		
+	        returnPage(ctx, "Blocks", new String[][] {{"Explorer",ROUTE},{"Blocks",null}},
+			paginationLinks,
+			buildBlocksTable(ctx, blocks, range)
+	);
+	}
+
+	private TableTag buildBlocksTable(Context ctx, AVector<SignedData<Block>> blocks, long[] range) {
+		long start=range[0];
+		long end=range[1];
+		if (end-start>100) throw new BadRequestResponse("Too many elements requested");
 		ArrayList<DomContent[]> rows=new ArrayList<>();
 		for (long i=start; i<end; i++) {
 			SignedData<Block> sd=blocks.get(i);
-			String link=ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"blocks/"+i);
-			String peerLink=ABaseAPI.getExternalBaseUrl(ctx, ROUTE+"peers/"+sd.getAccountKey().toHexString());
+			String link=ROUTE+"blocks/"+i;
+			String peerLink=ROUTE+"peers/"+sd.getAccountKey().toHexString();
 			
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(link)),	
@@ -280,15 +292,12 @@ public class ExplorerAPI extends AWebSite {
 				td(showID(sd.getHash()))	
 			});
 		}
-		
-        returnPage(ctx, "Blocks", new String[][] {{"Explorer",ROUTE},{"Blocks",null}},
-				table(
-					thead(tr(th("Index"),th("Peer"),th("Block Hash"))),
-					tbody(
-						each(rows,row->{return tr(row);})
-				)
-			)
-		);
+		return table(
+				thead(tr(th("Index"),th("Peer"),th("Block Hash"))),
+				tbody(
+					each(rows,row->{return tr(row);})
+		)
+	);
 	}
 	
 	/**
