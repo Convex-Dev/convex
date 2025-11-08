@@ -781,5 +781,9 @@ public class Peer {
 		return getPeerIndex().getTransaction(this, transactionID);
 	}
 
+	public AVector<CVMLong> getTransactionLocation(Hash transactionID) {
+		return getPeerIndex().getTransactionLocation(transactionID);
+	}
+
 
 }

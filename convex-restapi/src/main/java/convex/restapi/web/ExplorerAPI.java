@@ -48,11 +48,13 @@ import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 import convex.core.data.Symbol;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
@@ -1054,6 +1056,18 @@ public class ExplorerAPI extends AWebSite {
 				if (peer.getConsensusState().getPeer(peerKey)!=null) {
 					ctx.redirect(ROUTE+"peers/"+peerKey.toHexString());
 					return;
+				}
+
+				// Try as transaction hash
+				Hash txHash = Hash.wrap(blob);
+				if (txHash!=null) {
+					AVector<CVMLong> loc=peer.getTransactionLocation(txHash);
+					if ((loc!=null)&&(loc.count()>=2)) {
+						long blockIndex=loc.get(0).longValue();
+						long txIndex=loc.get(1).longValue();
+						ctx.redirect(ROUTE+"blocks/"+blockIndex+"/txs/"+txIndex);
+						return;
+					}
 				}
 	
 			}
