@@ -21,13 +21,13 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
-import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.json.JSONReader;
@@ -45,6 +45,7 @@ import io.javalin.openapi.OpenApiContent;
 import io.javalin.openapi.OpenApiExampleProperty;
 import io.javalin.openapi.OpenApiRequestBody;
 import io.javalin.openapi.OpenApiResponse;
+import convex.core.util.JSON;
 
 /**
  * Minimal MCP JSON-RPC endpoint that follows the core patterns from the Covia Venue
@@ -270,35 +271,34 @@ public class McpAPI extends ABaseAPI {
 		if (info != null) {
 			structured = structured.assoc(Strings.create("info"), info);
 		}
-		String message = result.isError()
-			? "Error: " + (errorCode == null ? "unknown" : errorCode.toString())
-			: "Value: " + (value == null ? "nil" : value.toString());
-		return protocolResult(buildToolPayload(message, structured, result.isError()));
+		return protocolResult(buildMcpResult(structured, result.isError()));
 	}
 
-	private AMap<AString, ACell> toolSuccess(String message, ACell structured) {
-		return protocolResult(buildToolPayload(message, structured, false));
+	private AMap<AString, ACell> toolSuccess(ACell structured) {
+		AMap<AString, ACell> payload = RT.ensureMap(structured);
+		if (payload == null) payload = EMPTY_MAP;
+		return protocolResult(buildMcpResult(payload, false));
 	}
 
 	private AMap<AString, ACell> toolError(String message) {
-		return protocolResult(buildToolPayload(message, EMPTY_MAP, true));
+		AMap<AString, ACell> payload = Maps.of(
+			Strings.create("message"), Strings.create(message)
+		);
+		return protocolResult(buildMcpResult(payload, true));
 	}
 
-	private AMap<AString, ACell> buildToolPayload(String message, ACell structured, boolean isError) {
-		AMap<AString, ACell> content = Maps.of(
+	private AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
+		AString jsonText = JSON.print(structured);
+		AMap<AString, ACell> textContent = Maps.of(
 			FIELD_TYPE, Strings.create("text"),
-			FIELD_TEXT, Strings.create(message)
+			FIELD_TEXT, jsonText
 		);
-		AMap<AString, ACell> result = Maps.of(
-			FIELD_CONTENT, Vectors.of(content)
+		AVector<AMap<AString, ACell>> content = Vectors.of(textContent);
+		return Maps.of(
+			FIELD_CONTENT, content,
+			FIELD_STRUCTURED_CONTENT, structured,
+			FIELD_IS_ERROR, isError?CVMBool.TRUE:CVMBool.FALSE
 		);
-		if (structured != null && structured != EMPTY_MAP) {
-			result = result.assoc(FIELD_STRUCTURED_CONTENT, structured);
-		}
-		if (isError) {
-			result = result.assoc(FIELD_IS_ERROR, CVMBool.TRUE);
-		}
-		return result;
 	}
 
 	private Address parseAddress(ACell cell) {
@@ -409,7 +409,7 @@ public class McpAPI extends ABaseAPI {
 				Strings.create("algorithm"), Strings.create(algorithm),
 				Strings.create("hash"), Strings.create(hashHex)
 			);
-			return toolSuccess("Hash (" + algorithm + "): " + hashHex, structured);
+			return toolSuccess(structured);
 		}
 	}
 
@@ -445,7 +445,7 @@ public class McpAPI extends ABaseAPI {
 					Strings.create("signature"), Strings.create(signed.getSignature().toHexString()),
 					Strings.create("accountKey"), Strings.create(accountKey.toHexString())
 				);
-				return toolSuccess("Signed value with account " + accountKey.toHexString(), structured);
+				return toolSuccess(structured);
 			} catch (Exception e) {
 				return toolError("Signing failed: " + e.getMessage());
 			}
@@ -461,7 +461,8 @@ public class McpAPI extends ABaseAPI {
 		public AMap<AString, ACell> handle(AMap<?, ?> arguments) {
 			try {
 				AMap<?, ?> status = server.getStatusMap();
-				return toolSuccess("Peer status retrieved", status);
+				AMap<AString, ACell> payload = Maps.of(Strings.create("status"), (ACell) status);
+				return toolSuccess(payload);
 			} catch (Exception e) {
 				return toolError("Failed to load peer status: " + e.getMessage());
 			}

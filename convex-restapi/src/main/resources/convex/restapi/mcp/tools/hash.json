@@ -12,10 +12,18 @@
       "algorithm": {
         "type": "string",
         "enum": ["sha256", "sha3"],
-        "description": "Hash algorithm to use (defaults to sha256)"
+        "description": "Hash algorithm to use (defaults to sha3)"
       }
     },
     "required": ["value"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "algorithm": {"type": "string"},
+      "hash": {"type": "string", "description": "Hex encoded digest"},
+      "message": {"type": "string", "description": "Optional human-readable message"}
+    }
   }
 }
 

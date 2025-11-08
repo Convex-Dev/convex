@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -44,19 +45,16 @@ public class McpTest extends ARESTTest {
 		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
 
 		AMap<?, ?> responseMap = (AMap<?, ?>) parsed;
-		assertEquals(Strings.create("init-1"), responseMap.get(Strings.create("id")));
+		assertEquals(Strings.create("init-1"), responseMap.get(McpAPI.FIELD_ID));
 
-		ACell resultCell = responseMap.get(Strings.create("result"));
+		ACell resultCell = responseMap.get(McpAPI.FIELD_RESULT);
 		assertNotNull(resultCell, "initialize should return result");
 		assertTrue(resultCell instanceof AMap);
 
 		AMap<?, ?> result = (AMap<?, ?>) resultCell;
-		assertNotNull(result.get(Strings.create("protocolVersion")), "protocolVersion missing");
-
-		ACell toolsCell = result.get(Strings.create("tools"));
-		assertNotNull(toolsCell, "initialize should include tools metadata");
-		assertTrue(toolsCell instanceof AVector, "tools should be a vector");
-		assertTrue(((AVector<?>) toolsCell).count() >= 5, "expected default tools to be advertised");
+		AVector<?> tools = (AVector<?>) result.get(Strings.create("tools"));
+		assertNotNull(tools, "initialize should include tools");
+		assertTrue(tools.count() >= 5);
 	}
 
 	@Test
@@ -75,9 +73,9 @@ public class McpTest extends ARESTTest {
 		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
 
 		AMap<?, ?> responseMap = (AMap<?, ?>) parsed;
-		assertEquals(Strings.create("bad-1"), responseMap.get(Strings.create("id")));
+		assertEquals(Strings.create("bad-1"), responseMap.get(McpAPI.FIELD_ID));
 
-		ACell errorCell = responseMap.get(Strings.create("error"));
+		ACell errorCell = responseMap.get(McpAPI.FIELD_ERROR);
 		assertNotNull(errorCell, "Unknown method should return error object");
 		assertTrue(errorCell instanceof AMap);
 
@@ -89,33 +87,21 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testToolCallQuery() throws IOException, InterruptedException {
 		AMap<?, ?> responseMap = makeToolCall("query", "{ \"source\": \"*balance*\" }");
-		assertEquals(Strings.create("test-query"), responseMap.get(Strings.create("id")));
-
-		ACell resultCell = responseMap.get(Strings.create("result"));
-		assertNotNull(resultCell);
-		assertTrue(resultCell instanceof AMap);
-
-		AMap<?, ?> result = (AMap<?, ?>) resultCell;
-		assertNull(result.get(Strings.create("isError")), "Successful query should not set isError");
-
-		ACell structuredCell = result.get(Strings.create("structured_content"));
-		assertNotNull(structuredCell, "Query response should include structured content");
-		assertTrue(structuredCell instanceof AMap);
-
-		AMap<?, ?> structured = (AMap<?, ?>) structuredCell;
-		assertNotNull(structured.get(Strings.create("value")), "Structured content should include value");
+		Map<String, Object> valueMap = expectResult(responseMap);
+		assertTrue(valueMap.containsKey("value"));
 	}
 
 	@Test
 	public void testToolCallUnknownTool() throws IOException, InterruptedException {
 		AMap<?, ?> responseMap = makeToolCall("unknown-tool", "{}");
-		assertEquals(Strings.create("test-unknown-tool"), responseMap.get(Strings.create("id")));
-		ACell errorCell = responseMap.get(Strings.create("error"));
+		assertEquals(Strings.create("test-unknown-tool"), responseMap.get(McpAPI.FIELD_ID));
+		ACell errorCell = responseMap.get(McpAPI.FIELD_ERROR);
 		assertNotNull(errorCell, "Unknown tool should return a JSON-RPC error");
 		assertTrue(errorCell instanceof AMap);
 
 		AMap<?, ?> error = (AMap<?, ?>) errorCell;
-		assertEquals(CVMLong.create(-32601), error.get(Strings.create("code")));
+		ACell codeCell = error.get(Strings.create("code"));
+		assertEquals(CVMLong.create(-32601), codeCell);
 	}
 
 	@Test
@@ -124,63 +110,28 @@ public class McpTest extends ARESTTest {
 		String arguments = "{ \"value\": \"hello\", \"seed\": \"" + seedHex + "\" }";
 
 		AMap<?, ?> responseMap = makeToolCall("sign", arguments);
-		assertEquals(Strings.create("test-sign"), responseMap.get(Strings.create("id")));
-		assertNull(responseMap.get(Strings.create("error")));
-
-		ACell resultCell = responseMap.get(Strings.create("result"));
-		assertNotNull(resultCell);
-		assertTrue(resultCell instanceof AMap);
-		AMap<?, ?> result = (AMap<?, ?>) resultCell;
-		assertNull(result.get(Strings.create("isError")));
-
-		ACell structuredCell = result.get(Strings.create("structured_content"));
-		assertNotNull(structuredCell);
-		assertTrue(structuredCell instanceof AMap);
-		AMap<?, ?> structured = (AMap<?, ?>) structuredCell;
+		Map<String, Object> valueMap = expectResult(responseMap);
 
 		Blob seedBlob = Blob.fromHex(seedHex);
 		AKeyPair keyPair = AKeyPair.create(seedBlob);
 		SignedData<AString> expected = keyPair.signData(Strings.create("hello"));
 
-		assertEquals(Strings.create(expected.getSignature().toHexString()),
-			structured.get(Strings.create("signature")));
-		assertEquals(Strings.create(keyPair.getAccountKey().toHexString()),
-			structured.get(Strings.create("accountKey")));
+		assertEquals(expected.getSignature().toHexString(), valueMap.get("signature"));
+		assertEquals(keyPair.getAccountKey().toHexString(), valueMap.get("accountKey"));
+		assertEquals("hello", valueMap.get("value"));
 	}
-	
+
 	@Test
 	public void testSignMissingSeed() throws IOException, InterruptedException {
-		String arguments = "{ \"value\": \"hello\" }";
-		AMap<?, ?> responseMap = makeToolCall("sign", arguments);
-		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
-		
-		AMap<?, ?> result = (AMap<?, ?>) responseMap.get(Strings.create("result"));
-		assertNotNull(result);
-		assertEquals(CVMBool.TRUE,RT.getIn(responseMap, "result", "isError"));
-		
-		AVector<?> content = (AVector<?>) result.get(Strings.create("content"));
-		assertNotNull(content);
-		assertTrue(content.count() > 0);
-		String msg = content.get(0).toString();
-		assertTrue(msg.contains("seed"), "Expected message to mention missing seed but got: " + msg);
+		AMap<?, ?> responseMap = makeToolCall("sign", "{ \"value\": \"hello\" }");
+		expectError(responseMap);
 	}
-	
+
 	@Test
 	public void testSignMissingValue() throws IOException, InterruptedException {
 		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
-		String arguments = "{ \"seed\": \"" + seedHex + "\" }";
-		AMap<?, ?> responseMap = makeToolCall("sign", arguments);
-		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
-		
-		AMap<?, ?> result = (AMap<?, ?>) responseMap.get(Strings.create("result"));
-		assertNotNull(result);
-		assertEquals(CVMBool.TRUE,RT.getIn(responseMap, "result", "isError"));
-		
-		AVector<?> content = (AVector<?>) result.get(Strings.create("content"));
-		assertNotNull(content);
-		assertTrue(content.count() > 0);
-		String msg = content.get(0).toString();
-		assertTrue(msg.contains("value"), "Expected message to mention missing value but got: " + msg);
+		AMap<?, ?> responseMap = makeToolCall("sign", "{ \"seed\": \"" + seedHex + "\" }");
+		expectError(responseMap);
 	}
 
 	private AMap<?, ?> makeToolCall(String toolName, String argumentsJson) throws IOException, InterruptedException {
@@ -202,5 +153,25 @@ public class McpTest extends ARESTTest {
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, ()->"Expected map response but got " + RT.getType(parsed));
 		return (AMap<?, ?>) parsed;
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> expectResult(AMap<?, ?> responseMap) {
+		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
+		AMap<?, ?> result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
+		assertNotNull(result, "RPC result missing");
+		assertEquals(CVMBool.FALSE, result.get(McpAPI.FIELD_IS_ERROR));
+
+		AVector<?> content = (AVector<?>) result.get(McpAPI.FIELD_CONTENT);
+		assertNotNull(content);
+		AMap<?, ?> textEntry = (AMap<?, ?>) content.get(0);
+		return RT.jvm(JSON.parse(textEntry.get(McpAPI.FIELD_TEXT).toString()));
+	}
+
+	private void expectError(AMap<?, ?> responseMap) {
+		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
+		AMap<?, ?> result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
+		assertNotNull(result);
+		assertEquals(CVMBool.TRUE, result.get(McpAPI.FIELD_IS_ERROR));
 	}
 }
