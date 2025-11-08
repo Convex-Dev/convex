@@ -427,6 +427,10 @@ public class McpAPI extends ABaseAPI {
 			if (valueCell == null) {
 				return toolError("Sign tool requires a 'value' hex string");
 			}
+			Blob valueBlob = Blob.parse(valueCell.toString());
+			if (valueBlob == null) {
+				return toolError("Value must be valid hex data");
+			}
 			AString seedCell = RT.ensureString(arguments.get(ARG_SEED));
 			if (seedCell == null) {
 				return toolError("Sign tool requires Ed25519 'seed' string");
@@ -438,7 +442,7 @@ public class McpAPI extends ABaseAPI {
 			}
 			try {
 				AKeyPair keyPair = AKeyPair.create(seedBlob);
-				SignedData<AString> signed = keyPair.signData(valueCell);
+				SignedData<Blob> signed = keyPair.signData(valueBlob);
 				AccountKey accountKey = keyPair.getAccountKey();
 				AMap<AString, ACell> structured = Maps.of(
 					Strings.create("value"), valueCell,

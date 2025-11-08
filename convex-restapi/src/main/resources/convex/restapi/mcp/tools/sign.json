@@ -1,13 +1,13 @@
 {
   "name": "sign",
   "title": "Value Signer",
-  "description": "Sign a value using a provided Ed25519 seed",
+  "description": "Sign raw data (provided as a hex string) using a provided Ed25519 seed",
   "inputSchema": {
     "type": "object",
     "properties": {
       "value": {
         "type": "string",
-        "description": "Value to sign"
+        "description": "Hex encoded data to sign"
       },
       "seed": {
         "type": "string",
@@ -19,7 +19,7 @@
   "outputSchema": {
     "type": "object",
     "properties": {
-      "value": {"type": "string"},
+      "value": {"type": "string", "description": "Hex encoded payload that was signed"},
       "signature": {"type": "string", "description": "Hex encoded Ed25519 signature"},
       "accountKey": {"type": "string", "description": "Hex encoded public key"},
       "message": {"type": "string", "description": "Optional human-readable message"}
