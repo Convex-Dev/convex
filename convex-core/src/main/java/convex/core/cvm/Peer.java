@@ -785,5 +785,9 @@ public class Peer {
 		return getPeerIndex().getTransactionLocation(transactionID);
 	}
 
+	public CVMLong getBlockIndex(Hash blockHash) {
+		return getPeerIndex().getBlockIndex(blockHash);
+	}
+
 
 }

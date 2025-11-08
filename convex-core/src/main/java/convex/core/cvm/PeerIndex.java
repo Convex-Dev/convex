@@ -1,6 +1,7 @@
 package convex.core.cvm;
 
 import convex.core.Result;
+import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
@@ -15,14 +16,16 @@ public class PeerIndex {
 
 	private long finalityPoint;
 	private Index<Hash,AVector<CVMLong>> txLocations;
+	private Index<Hash,CVMLong> blockLocations;
 	
 	public PeerIndex() {
-		this(0,Index.none());
+		this(0,Index.none(),Index.none());
 	}
 
-	public PeerIndex(long finalPoint, Index<Hash, AVector<CVMLong>> txLocs) {
+	public PeerIndex(long finalPoint, Index<Hash, AVector<CVMLong>> txLocs, Index<Hash,CVMLong> blockLocs) {
 		this.finalityPoint=finalPoint;
 		this.txLocations=txLocs;
+		this.blockLocations=blockLocs;
 	}
 
 	public long getFinalityPoint() {
@@ -43,9 +46,12 @@ public class PeerIndex {
 
 	private PeerIndex processBlock(Peer peer, long blockNum) {
 		Index<Hash,AVector<CVMLong>> ntxLocs=txLocations;
+		Index<Hash,CVMLong> nBlockLocs=blockLocations;
 		
 		BlockResult br=peer.getBlockResult(blockNum);
-		AVector<SignedData<ATransaction>> txs = peer.getPeerOrder().getBlock(blockNum).getValue().getTransactions();
+		SignedData<Block> blockSD=peer.getPeerOrder().getBlock(blockNum);
+		nBlockLocs=nBlockLocs.assoc(blockSD.getHash(), CVMLong.create(blockNum));
+		AVector<SignedData<ATransaction>> txs = blockSD.getValue().getTransactions();
 		AVector<Result> rs = br.getResults();
 		long n=rs.count();
 		for (long i=0; i<n; i++) {
@@ -54,7 +60,7 @@ public class PeerIndex {
 			ntxLocs=ntxLocs.assoc(txID,Vectors.createLongs(blockNum,i));
 		}
 		
-		return new PeerIndex(blockNum+1,ntxLocs);
+		return new PeerIndex(blockNum+1,ntxLocs,nBlockLocs);
 	}
 
 	public Result getTransactionResult(Peer peer,ABlob txID) {
@@ -71,6 +77,10 @@ public class PeerIndex {
 
 	public AVector<CVMLong> getTransactionLocation(Hash transactionID) {
 		return txLocations.get(transactionID);
+	}
+
+	public CVMLong getBlockIndex(Hash blockHash) {
+		return blockLocations.get(blockHash);
 	}
 
 }
