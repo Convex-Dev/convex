@@ -70,9 +70,14 @@ public class LocalTest {
 
 	@BeforeAll
 	public static void setupLocalNet() throws IOException, InterruptedException {
-		CLTester importTester = CLTester.run("key", "import", "--type", "bip39", "--storepass",
-				new String(KEYSTORE_PASSWORD), "--keystore", KEYSTORE_FILENAME, "--keypass", new String(KEY_PASSWORD),
-				"--text", bip39, "--passphrase", bipPassphrase,"-v0");
+		CLTester importTester = CLTester.run("key", "import", 
+				"--type", "bip39", 
+				"--storepass", new String(KEYSTORE_PASSWORD), 
+				"--keystore", KEYSTORE_FILENAME, 
+				"--keypass", new String(KEY_PASSWORD),
+				"--path", "m",
+				"--text", bip39, 
+				"--passphrase", bipPassphrase,"-v0");
 		importTester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals(expectedKey, importTester.getOutput().trim());
 

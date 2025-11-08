@@ -52,7 +52,6 @@ public class KeyGenerate extends AKeyCommand {
 			defaultValue=convex.core.Constants.DEFAULT_BIP39_PATH,
 			description="Derivation path for SLIP-0010 when using BIP39. Default: ${DEFAULT-VALUE}")
 	private String path;
-
 	
 	@Option(names="--passphrase",
 			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")

@@ -9,8 +9,8 @@ import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PEMTools;
-import convex.core.data.ABlob;
-import convex.core.data.Blobs;
+import convex.core.crypto.SLIP10;
+import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
@@ -50,6 +50,11 @@ public class KeyImport extends AKeyCommand {
 			description="Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect unless strict security is enabled")
 	private String type;
 	
+	@Option(names={"--path"},
+			defaultValue=convex.core.Constants.DEFAULT_BIP39_PATH,
+			description="Derivation path for SLIP-0010 when using BIP39. Default: ${DEFAULT-VALUE}")
+	private String path;
+	
 	@Option(names = { "-p","--keypass" }, 
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
@@ -76,7 +81,7 @@ public class KeyImport extends AKeyCommand {
 		}
 		
 		// Parse input as hex string, will be null if not parsed. For BIP39 is 64 bytes, Ed25519 32
-		ABlob hex=Blobs.parse(importText.trim());
+		Blob hex=Blob.parse(importText.trim());
 		if (type==null) {
 			if (isParanoid()) {
 				informError("Not permitted to infer key import type in strict mode");
@@ -107,7 +112,8 @@ public class KeyImport extends AKeyCommand {
 				}
 				hex=BIP39.getSeed(importText, importPassphrase);
 			}
-			keyPair=BIP39.seedToKeyPair(hex.toFlatBlob());
+			keyPair=SLIP10.deriveKeyPair(hex, path);
+
 		} else if ("pem".equals(type)) {
 			if (importPassphrase==null) {
 				importPassphrase=new String(readPassword("Enter passphrase for imported PEM key: "));

@@ -516,7 +516,13 @@ public class BIP39 {
 		return ABBR.get(abbr.trim().toLowerCase());
 	}
 
+	/**
+	 * Parse a string for a BNIP39 math like m/44/864/0/0/0
+	 * @param path String containing a path
+	 * @return Path as an int[] array, or null if did not parse 
+	 */
 	public static int[] parsePath(String path) {
+		if (path==null) return null;
 		try {
 			String[] es=path.split("/");
 			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
