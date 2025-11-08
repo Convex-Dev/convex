@@ -9,7 +9,7 @@
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
-		<bc.version>1.81</bc.version>
+		<bc.version>1.82</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
