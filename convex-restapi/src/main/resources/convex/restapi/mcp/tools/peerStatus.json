@@ -1,0 +1,11 @@
+{
+  "name": "peerStatus",
+  "title": "Peer Status",
+  "description": "Return current peer status information",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}
+

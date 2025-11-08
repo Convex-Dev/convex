@@ -1,0 +1,20 @@
+{
+  "name": "query",
+  "title": "Convex Query",
+  "description": "Execute a Convex Lisp query using the configured account",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "CVM source code to execute, e.g. '*balance*'"
+      },
+      "address": {
+        "type": "string",
+        "description": "Optional account address to use for the query, e.g. '#13'"
+      }
+    },
+    "required": ["source"]
+  }
+}
+

@@ -1,0 +1,21 @@
+{
+  "name": "hash",
+  "title": "Hash Calculator",
+  "description": "Compute a cryptographic hash (sha256 or sha3) of supplied data",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "string",
+        "description": "Value to hash"
+      },
+      "algorithm": {
+        "type": "string",
+        "enum": ["sha256", "sha3"],
+        "description": "Hash algorithm to use (defaults to sha256)"
+      }
+    },
+    "required": ["value"]
+  }
+}
+

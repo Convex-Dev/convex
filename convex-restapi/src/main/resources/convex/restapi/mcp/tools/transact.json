@@ -1,0 +1,16 @@
+{
+  "name": "transact",
+  "title": "Convex Transaction",
+  "description": "Submit a Convex transaction using the server's configured keypair",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "CVM source code to submit as a transaction e.g. '(transfer #13 10000000000)'"
+      }
+    },
+    "required": ["source"]
+  }
+}
+
