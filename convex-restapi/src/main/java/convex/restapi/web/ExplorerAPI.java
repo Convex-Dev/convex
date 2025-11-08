@@ -30,9 +30,14 @@ import static j2html.TagCreator.th;
 import static j2html.TagCreator.thead;
 import static j2html.TagCreator.tr;
 
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
+import convex.api.Convex;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.cvm.AccountStatus;
@@ -56,6 +61,9 @@ import convex.core.data.SignedData;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
+import convex.peer.Config;
+import convex.peer.ConnectionManager;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
@@ -93,6 +101,7 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"accounts/{accountNum}", this::showAccount);
 		app.get(prefix+"peers", this::showPeers);
 		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
+		app.get(prefix+"connections", this::showConnections);
 		app.get(prefix+"repl", this::showRepl);
 		app.post(prefix+"search", this::handleSearch);
 	}
@@ -121,6 +130,10 @@ public class ExplorerAPI extends AWebSite {
 					p("Examine peers on the current network, including stakes and activity.")
 				),
 				article(
+					p(a("Connections").withHref(ROUTE+"connections").withStyle("font-weight:600;font-size:1.1em;")),
+					p("Inspect outbound peer connections maintained by this server.")
+				),
+				article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
 					p("View historical consensus states.")
 				),
@@ -135,6 +148,141 @@ public class ExplorerAPI extends AWebSite {
 					summary("Discord Chat"),
 					rawHtml("<iframe src=\"https://discord.com/widget?id=734599663713386617&theme=dark\" width=\"100%\" height=\"300\" allowtransparency=\"true\" frameborder=\"0\" sandbox=\"allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts\"></iframe>")
 				)
+			)
+		);
+	}
+	
+	public void showConnections(Context ctx) {
+		Server s=restServer.getServer();
+		if (s==null) {
+			returnPage(ctx, "Connections", new String[][] {{"Explorer",ROUTE},{"Connections",null}},
+				p("No local peer server is configured.")
+			);
+			return;
+		}
+		
+		ConnectionManager cm=s.getConnectionManager();
+		HashMap<AccountKey, Convex> connectionMap=new HashMap<>(cm.getConnections());
+		
+		Integer targetConnections;
+		try {
+			targetConnections=Utils.toInt(s.getConfig().get(Keywords.OUTGOING_CONNECTIONS));
+		} catch (IllegalArgumentException ex) {
+			targetConnections=null;
+		}
+		if (targetConnections==null) targetConnections=Config.DEFAULT_OUTGOING_CONNECTION_COUNT;
+		
+		State state=s.getPeer().getConsensusState();
+		
+		ArrayList<Map.Entry<AccountKey, Convex>> entries=new ArrayList<>(connectionMap.entrySet());
+		entries.sort(Comparator.comparing(e -> e.getKey().toHexString()));
+		
+		ArrayList<DomContent[]> rows=new ArrayList<>();
+		
+		AccountKey localPeerKey=s.getPeerKey();
+		PeerStatus localStatus=(localPeerKey!=null)?state.getPeer(localPeerKey):null;
+		DomContent localPeerCell;
+		if (localPeerKey!=null) {
+			String localLink=ROUTE+"peers/"+localPeerKey.toHexString();
+			localPeerCell=td(a(showID(localPeerKey)).withHref(localLink));
+		} else {
+			localPeerCell=td(code("-"));
+		}
+		DomContent localStake=(localStatus!=null)?showBalance(localStatus.getBalance()):code("-");
+		DomContent localAdvertised=(localStatus!=null && localStatus.getHostname()!=null)?code(localStatus.getHostname().toString()):code("-");
+		InetSocketAddress localAddress;
+		try {
+			localAddress=s.getHostAddress();
+		} catch (Exception e) {
+			localAddress=null;
+		}
+		String localHost="-";
+		if (localAddress!=null) {
+			String hostPart=localAddress.getHostString();
+			if ((hostPart==null)||hostPart.isBlank()) {
+				if (localAddress.getAddress()!=null) {
+					hostPart=localAddress.getAddress().getHostAddress();
+				} else {
+					hostPart=localAddress.toString();
+				}
+			}
+			if (localAddress.getPort()>=0) {
+				localHost=hostPart+":"+localAddress.getPort();
+			} else {
+				localHost=hostPart;
+			}
+		}
+		String localType=s.getClass().getSimpleName();
+		rows.add(new DomContent[] {
+			localPeerCell,
+			td(code("Local")),
+			td(code(localHost)),
+			td(localAdvertised),
+			td(localStake),
+			td(code(localType))
+		});
+		
+		for (Map.Entry<AccountKey, Convex> entry: entries) {
+			AccountKey peerKey=entry.getKey();
+			if ((localPeerKey!=null) && localPeerKey.equals(peerKey)) continue;
+			Convex connection=entry.getValue();
+			InetSocketAddress remoteAddress=(connection!=null)?connection.getHostAddress():null;
+			String remoteHost="-";
+			if (remoteAddress!=null) {
+				String hostPart=remoteAddress.getHostString();
+				if ((hostPart==null)||hostPart.isBlank()) {
+					if (remoteAddress.getAddress()!=null) {
+						hostPart=remoteAddress.getAddress().getHostAddress();
+					} else {
+						hostPart=remoteAddress.toString();
+					}
+				}
+				if (remoteAddress.getPort()>=0) {
+					remoteHost=hostPart+":"+remoteAddress.getPort();
+				} else {
+					remoteHost=hostPart;
+				}
+			}
+			boolean connected=(connection!=null)&&connection.isConnected();
+			
+			PeerStatus peerStatus=state.getPeer(peerKey);
+			DomContent stakeCell=(peerStatus!=null)?showBalance(peerStatus.getBalance()):code("-");
+			DomContent advertisedHost=(peerStatus!=null && peerStatus.getHostname()!=null)?code(peerStatus.getHostname().toString()):code("-");
+			String connType=(connection!=null)?connection.getClass().getSimpleName():"-";
+			
+			String peerLink=ROUTE+"peers/"+peerKey.toHexString();
+			
+			rows.add(new DomContent[] {
+				td(a(showID(peerKey)).withHref(peerLink)),
+				td(code(connected?"Connected":"Closed")),
+				td(code(remoteHost)),
+				td(advertisedHost),
+				td(stakeCell),
+				td(code(connType))
+			});
+		}
+		
+		DomContent tableContent=table(
+				thead(tr(
+					th("Peer Key"),
+					th("Status"),
+					th("Remote Address"),
+					th("Advertised Host"),
+					th("Total Stake"),
+					th("Connection Type")
+				)),
+				tbody(
+					each(rows, row -> tr(row))
+				)
+			);
+		
+		returnPage(ctx, "Connections", new String[][] {{"Explorer",ROUTE},{"Connections",null}},
+			article(
+				p("Active connections: "+connectionMap.size()),
+				p("Target connections: "+targetConnections)
+			),
+			article(
+				tableContent
 			)
 		);
 	}
