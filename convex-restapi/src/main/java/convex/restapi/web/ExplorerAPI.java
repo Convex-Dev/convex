@@ -1058,18 +1058,25 @@ public class ExplorerAPI extends AWebSite {
 					return;
 				}
 
-				// Try as transaction hash
-				Hash txHash = Hash.wrap(blob);
-				if (txHash!=null) {
-					AVector<CVMLong> loc=peer.getTransactionLocation(txHash);
-					if ((loc!=null)&&(loc.count()>=2)) {
-						long blockIndex=loc.get(0).longValue();
-						long txIndex=loc.get(1).longValue();
-						ctx.redirect(ROUTE+"blocks/"+blockIndex+"/txs/"+txIndex);
-						return;
+					Hash hash = Hash.wrap(blob);
+					if (hash!=null) {
+						// Try as block hash via PeerIndex
+						CVMLong blockIndexCell = peer.getBlockIndex(hash);
+						if (blockIndexCell!=null) {
+							ctx.redirect(ROUTE+"blocks/"+blockIndexCell.longValue());
+							return;
+						}
+
+						// Try as transaction hash
+						AVector<CVMLong> loc=peer.getTransactionLocation(hash);
+						if ((loc!=null)&&(loc.count()>=2)) {
+							long blockIndex=loc.get(0).longValue();
+							long txIndex=loc.get(1).longValue();
+							ctx.redirect(ROUTE+"blocks/"+blockIndex+"/txs/"+txIndex);
+							return;
+						}
 					}
-				}
-	
+
 			}
 			
 		}
