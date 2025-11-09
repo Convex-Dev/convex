@@ -20,19 +20,20 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Hash;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.mcp.McpTool;
@@ -45,7 +46,6 @@ import io.javalin.openapi.OpenApiContent;
 import io.javalin.openapi.OpenApiExampleProperty;
 import io.javalin.openapi.OpenApiRequestBody;
 import io.javalin.openapi.OpenApiResponse;
-import convex.core.util.JSON;
 
 /**
  * Minimal MCP JSON-RPC endpoint that follows the core patterns from the Covia Venue
@@ -103,6 +103,14 @@ public class McpAPI extends ABaseAPI {
 		registerTools();
 	}
 
+	public AMap<AString, ACell> getServerInfo() {
+		return serverInfo;
+	}
+
+	public AVector<AMap<AString, ACell>> getToolMetadata() {
+		return listToolsVector();
+	}
+
 	@Override
 	public void addRoutes(Javalin app) {
 		app.post("/mcp", this::handleMcpRequest);
@@ -150,14 +158,18 @@ public class McpAPI extends ABaseAPI {
 				AMap<AString, ACell> response = createResponse(map);
 				setContent(ctx, response);
 			} else if (body instanceof AVector<?> vector) {
-				AVector<AMap<AString, ACell>> responses = Vectors.empty();
 				long n = vector.count();
+				if (n == 0) {
+					setContent(ctx, protocolError(-32600, "Invalid batch request (empty)"));
+					return;
+				}
+				AVector<AMap<AString, ACell>> responses = Vectors.empty();
 				for (long i = 0; i < n; i++) {
 					ACell entry = vector.get(i);
 					if (entry instanceof AMap<?, ?> batchMap) {
 						responses = responses.conj(createResponse(batchMap));
 					} else {
-						responses = responses.conj(protocolError(-32600, "Batch entries must be JSON objects"));
+						responses = responses.conj(protocolError(-32600, "Invalid Request"));
 					}
 				}
 				setContent(ctx, responses);
@@ -169,6 +181,11 @@ public class McpAPI extends ABaseAPI {
 		}
 	}
 
+	/**
+	 * Create a response for a single MCP request
+	 * @param request
+	 * @return
+	 */
 	private AMap<AString, ACell> createResponse(AMap<?, ?> request) {
 		ACell idCell = request.get(FIELD_ID);
 		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
@@ -255,13 +272,7 @@ public class McpAPI extends ABaseAPI {
 			return protocolError(-32601, "Unknown tool: " + toolName);
 		}
 
-		AMap<?, ?> arguments = null;
-		ACell argumentsCell = params.get(FIELD_ARGUMENTS);
-		if (argumentsCell instanceof AMap<?, ?> argsMap) {
-			arguments = argsMap;
-		}
-
-		return tool.handle(arguments);
+		return tool.handle(RT.ensureMap(params.get(FIELD_ARGUMENTS)));
 	}
 
 	private AMap<AString, ACell> toolResult(Result result) {
@@ -281,8 +292,8 @@ public class McpAPI extends ABaseAPI {
 		return protocolResult(buildMcpResult(structured, result.isError()));
 	}
 
-	private AMap<AString, ACell> toolSuccess(ACell structured) {
-		AMap<AString, ACell> payload = RT.ensureMap(structured);
+	private AMap<AString, ACell> toolSuccess(ACell structuredResult) {
+		AMap<AString, ACell> payload = RT.ensureMap(structuredResult);
 		if (payload == null) payload = EMPTY_MAP;
 		return protocolResult(buildMcpResult(payload, false));
 	}
@@ -308,11 +319,6 @@ public class McpAPI extends ABaseAPI {
 		);
 	}
 
-	private Address parseAddress(ACell cell) {
-		if (cell == null) return null;
-		return Address.parse((Object) cell);
-	}
-
 	private void registerTools() {
 		registerTool(new QueryTool());
 		registerTool(new TransactTool());
@@ -331,7 +337,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<?, ?> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
 			if (arguments == null) {
 				return protocolError(-32602, "Query requires arguments");
 			}
@@ -347,7 +353,7 @@ public class McpAPI extends ABaseAPI {
 				} catch (Exception e) {
 					return toolError("Failed to parse query source: " + e.getMessage());
 				}
-				Address address = parseAddress(arguments.get(ARG_ADDRESS));
+				Address address = Address.parse(arguments.get(ARG_ADDRESS));
 				Convex convex = restServer.getConvex();
 				Result result = convex.querySync(form, address);
 				return toolResult(result);
@@ -365,7 +371,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<?, ?> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
 			if (arguments == null) {
 				return protocolError(-32602, "Transact requires arguments");
 			}
@@ -373,12 +379,32 @@ public class McpAPI extends ABaseAPI {
 			if (sourceCell == null) {
 				return protocolError(-32602, "Transact requires 'source' string");
 			}
+			AString seedCell = RT.ensureString(arguments.get(ARG_SEED));
+			if (seedCell == null) {
+				return protocolError(-32602, "Transact requires 'seed' string");
+			}
+			AString addressCell = RT.ensureString(arguments.get(ARG_ADDRESS));
+			if (addressCell == null) {
+				return protocolError(-32602, "Transact requires 'address' string");
+			}
 			String source = sourceCell.toString();
+			String seedHex = seedCell.toString();
+			Blob seedBlob = Blob.parse(seedHex);
+			if ((seedBlob == null) || (seedBlob.count() != AKeyPair.SEED_LENGTH)) {
+				return toolError("Seed must be 32-byte hex string");
+			}
+			Address address= Address.parse(addressCell.toString());
+			if (address == null) {
+				return toolError("Invalid address format");
+			}
 			try {
-				Result result = restServer.getConvex().transactSync(source);
-				return toolResult(result);
-			} catch (InterruptedException e) {
-				throw e;
+				AKeyPair keyPair = AKeyPair.create(seedBlob);
+				try (Convex client = Convex.connect(server)) {
+					client.setAddress(address);
+					client.setKeyPair(keyPair);
+					Result result = client.transactSync(source);
+					return toolResult(result);
+				}
 			} catch (Exception e) {
 				return toolError("Transaction failed: " + e.getMessage());
 			}
@@ -391,7 +417,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<?, ?> arguments) {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			if (arguments == null) {
 				return protocolError(-32602, "Hash tool requires arguments");
 			}
@@ -412,11 +438,11 @@ public class McpAPI extends ABaseAPI {
 				return toolError("Unsupported hash algorithm: " + algorithm);
 			}
 			String hashHex = hash.toHexString();
-			AMap<AString, ACell> structured = Maps.of(
+			AMap<AString, ACell> result = Maps.of(
 				Strings.create("algorithm"), Strings.create(algorithm),
 				Strings.create("hash"), Strings.create(hashHex)
 			);
-			return toolSuccess(structured);
+			return toolSuccess(result);
 		}
 	}
 
@@ -426,7 +452,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<?, ?> arguments) {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			if (arguments == null) {
 				return protocolError(-32602, "Sign tool requires arguments");
 			}
@@ -451,12 +477,12 @@ public class McpAPI extends ABaseAPI {
 				AKeyPair keyPair = AKeyPair.create(seedBlob);
 				SignedData<Blob> signed = keyPair.signData(valueBlob);
 				AccountKey accountKey = keyPair.getAccountKey();
-				AMap<AString, ACell> structured = Maps.of(
+				AMap<AString, ACell> result = Maps.of(
 					Strings.create("value"), valueCell,
 					Strings.create("signature"), Strings.create(signed.getSignature().toHexString()),
 					Strings.create("accountKey"), Strings.create(accountKey.toHexString())
 				);
-				return toolSuccess(structured);
+				return toolSuccess(result);
 			} catch (Exception e) {
 				return toolError("Signing failed: " + e.getMessage());
 			}
@@ -469,7 +495,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<?, ?> arguments) {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			try {
 				AMap<?, ?> status = server.getStatusMap();
 				AMap<AString, ACell> payload = Maps.of(Strings.create("status"), (ACell) status);
@@ -501,4 +527,5 @@ public class McpAPI extends ABaseAPI {
 		result=result.assoc(SERVER_URL_FIELD,mcpURL);
 		setContent(ctx,result);
 	}
+
 }

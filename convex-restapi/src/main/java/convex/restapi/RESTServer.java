@@ -14,6 +14,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.ConfigException;
@@ -52,7 +53,13 @@ public class RESTServer implements Closeable {
 
 	private RESTServer(Server server) {
 		this.server = server;
-		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
+		this.convex = ConvexLocal.create(server);
+		
+		if (RT.bool(getConfig().get(ChainAPI.K_FAUCET))) {
+			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
+		} else {
+			this.convexFaucet=null;
+		}
 	}
 	
 	protected ChainAPI chainAPI;
@@ -62,6 +69,10 @@ public class RESTServer implements Closeable {
 	protected PeerAdminAPI peerAPI;
 	protected ExplorerAPI explorerAPI;
 	protected McpAPI mcpAPI;
+
+	public McpAPI getMcpAPI() {
+		return mcpAPI;
+	}
 
 	private void addAPIRoutes(Javalin app) {
 		chainAPI = new ChainAPI(this);
@@ -250,9 +261,23 @@ public class RESTServer implements Closeable {
 		// we don't own the Convex server, so do nothing to it
 	}
 
+	/**
+	 * Shared local Convex client instance. Use for fast reads. Don't transact with this!!
+	 * @return Local convex client instance
+	 */
 	public Convex getConvex() {
 		return convex;
 	}
+	
+	private final Convex convexFaucet;
+	/**
+	 * Shared local Convex faucet instance. SECURITY: has access to faucet funds. Don't allow external usage!
+	 * @return Local convex faucet instance
+	 */
+	public Convex getFaucet() {
+		return convexFaucet;
+	}
+
 
 	/**
 	 * Gets the local Convex Server instance, or null if not using a local connection.

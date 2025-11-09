@@ -1,16 +1,24 @@
 {
   "name": "transact",
   "title": "Convex Transaction",
-  "description": "Submit a Convex transaction using the server's configured keypair",
+  "description": "Submit a Convex transaction. Transactions require an origin account with a CVM balance and a valid Ed25519 signature. Transactions are atomic operations on the CVM that can update global state and take economic actions (e.g. interact with digital assets and smart contracts)",
   "inputSchema": {
     "type": "object",
     "properties": {
       "source": {
         "type": "string",
-        "description": "CVM source code to submit as a transaction '(transfer #13 10000000000)'"
+        "description": "CVM source code to execute e.g. '(transfer #13 10000000000)'"
+      },
+      "seed": {
+         "type": "string",
+         "description": "Ed25519 seed (64 hex chars) used to sign the transaction. Only submit this if you trust the host!"
+      },
+      "address": {
+        "type": "string",
+        "description": "Origin account address (e.g. '#13'). This is the account in which the transaction will execute."
       }
     },
-    "required": ["source"]
+    "required": ["source", "seed", "address"]
   },
   "outputSchema": {
     "type": "object",

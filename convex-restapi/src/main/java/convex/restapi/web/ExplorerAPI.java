@@ -58,6 +58,7 @@ import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -67,6 +68,7 @@ import convex.peer.ConnectionManager;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
+import convex.restapi.api.McpAPI;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -74,6 +76,8 @@ import io.javalin.http.NotFoundResponse;
 import j2html.tags.DomContent;
 import j2html.tags.specialized.TableTag;
 import j2html.tags.specialized.TbodyTag;
+import convex.core.data.AString;
+import convex.core.util.JSON;
 
 /**
  * On-chain explorer API 
@@ -85,8 +89,13 @@ public class ExplorerAPI extends AWebSite {
 	}
 	
 	static final String ROUTE = "/explorer/";
-	
 
+	private static final AString KEY_NAME = Strings.create("name");
+	private static final AString KEY_TITLE = Strings.create("title");
+	private static final AString KEY_DESCRIPTION = Strings.create("description");
+	private static final AString KEY_INPUT_SCHEMA = Strings.create("inputSchema");
+	private static final AString KEY_OUTPUT_SCHEMA = Strings.create("outputSchema");
+	
 
 	@Override
 	public void addRoutes(Javalin app) {
@@ -102,6 +111,8 @@ public class ExplorerAPI extends AWebSite {
 		app.get(prefix+"peers", this::showPeers);
 		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
 		app.get(prefix+"connections", this::showConnections);
+		app.get(prefix+"mcp", this::showMcp);
+		app.get(prefix+"mcp/tools/{toolName}", this::showMcpTool);
 		app.get(prefix+"repl", this::showRepl);
 		app.post(prefix+"search", this::handleSearch);
 	}
@@ -132,6 +143,10 @@ public class ExplorerAPI extends AWebSite {
 				article(
 					p(a("Connections").withHref(ROUTE+"connections").withStyle("font-weight:600;font-size:1.1em;")),
 					p("Inspect outbound peer connections maintained by this server.")
+				),
+				article(
+					p(a("MCP").withHref(ROUTE+"mcp").withStyle("font-weight:600;font-size:1.1em;")),
+					p("View Model Context Protocol endpoint details and available tools.")
 				),
 				article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
@@ -285,6 +300,156 @@ public class ExplorerAPI extends AWebSite {
 				tableContent
 			)
 		);
+	}
+
+	public void showMcp(Context ctx) {
+		McpAPI mcp = restServer.getMcpAPI();
+		if (mcp == null) {
+			returnPage(ctx, "MCP", new String[][] {{"Explorer", ROUTE},{"MCP", null}},
+				p("MCP API is not configured on this server."));
+			return;
+		}
+
+		String endpointUrl = ABaseAPI.getExternalBaseUrl(ctx, "/mcp");
+
+		AMap<AString, ACell> serverInfo = mcp.getServerInfo();
+		ArrayList<DomContent> infoRows = new ArrayList<>();
+		if (serverInfo != null) {
+			long count = serverInfo.count();
+			for (int i = 0; i < count; i++) {
+				MapEntry<AString, ACell> entry = serverInfo.entryAt(i);
+				infoRows.add(row(entry.getKey().toString(), showCVX(entry.getValue()), ""));
+			}
+		}
+
+		DomContent infoTable = table(
+			thead(tr(th("Field"), th("Value"), th("Notes"))),
+			tbody(infoRows.isEmpty() ? tr(td("-"), td(code("nil")), td("")) : each(infoRows, r -> r))
+		);
+
+		AVector<AMap<AString, ACell>> toolMetadata = mcp.getToolMetadata();
+		ArrayList<DomContent[]> toolRows = new ArrayList<>();
+		if (toolMetadata != null) {
+			long toolCount = toolMetadata.count();
+			for (int i = 0; i < toolCount; i++) {
+				AMap<AString, ACell> metadata = toolMetadata.get(i);
+				AString nameCell = RT.ensureString(metadata.get(KEY_NAME));
+				AString titleCell = RT.ensureString(metadata.get(KEY_TITLE));
+				AString descriptionCell = RT.ensureString(metadata.get(KEY_DESCRIPTION));
+				String toolName = (nameCell != null) ? nameCell.toString() : "unknown";
+				String toolTitle = (titleCell != null) ? titleCell.toString() : toolName;
+				String description = (descriptionCell != null) ? descriptionCell.toString() : "";
+
+				String toolLink = ROUTE + "mcp/tools/" + toolName;
+				toolRows.add(new DomContent[] {
+					td(a(toolTitle).withHref(toolLink)),
+					td(code(toolName)),
+					td(description == null || description.isBlank() ? em("No description") : text(description))
+				});
+			}
+		}
+
+		DomContent toolsTable = table(
+			thead(tr(th("Title"), th("Name"), th("Description"))),
+			tbody(
+				toolRows.isEmpty()
+					? tr(td(em("No tools registered")).attr("colspan", "3"))
+					: each(toolRows, row -> tr(row))
+			)
+		);
+
+		returnPage(ctx, "Model Context Protocol", new String[][] {{"Explorer", ROUTE},{"MCP", null}},
+			article(
+				h6("MCP Endpoint"),
+				p(text("POST requests to "), code(endpointUrl)),
+				p(text("This peer provides MCP JSON-RPC access for LLMs and AI tools"))
+			),
+			article(
+				h6("MCP Server Info"),
+				infoTable
+			),
+			article(
+				h6("Registered Tools"),
+				toolsTable
+			)
+		);
+	}
+
+	public void showMcpTool(Context ctx) {
+		McpAPI mcp = restServer.getMcpAPI();
+		if (mcp == null) {
+			returnPage(ctx, "MCP Tool", new String[][] {{"Explorer", ROUTE},{"MCP", ROUTE + "mcp"},{"Tool", null}},
+				p("MCP API is not configured on this server."));
+			return;
+		}
+
+		String toolNameParam = ctx.pathParam("toolName");
+		AVector<AMap<AString, ACell>> toolMetadata = mcp.getToolMetadata();
+		if (toolMetadata == null) {
+			throw new NotFoundResponse("No tools available");
+		}
+
+		AMap<AString, ACell> metadata = null;
+		long toolCount = toolMetadata.count();
+		for (int i = 0; i < toolCount; i++) {
+			AMap<AString, ACell> entry = toolMetadata.get(i);
+			AString nameCell = RT.ensureString(entry.get(KEY_NAME));
+			if (nameCell != null && toolNameParam.equals(nameCell.toString())) {
+				metadata = entry;
+				break;
+			}
+		}
+
+		if (metadata == null) {
+			throw new NotFoundResponse("Unknown MCP tool: " + toolNameParam);
+		}
+
+		AString titleCell = RT.ensureString(metadata.get(KEY_TITLE));
+		AString descriptionCell = RT.ensureString(metadata.get(KEY_DESCRIPTION));
+		String toolTitle = (titleCell != null) ? titleCell.toString() : toolNameParam;
+		String description = (descriptionCell != null) ? descriptionCell.toString() : null;
+		ACell inputSchema = metadata.get(KEY_INPUT_SCHEMA);
+		ACell outputSchema = metadata.get(KEY_OUTPUT_SCHEMA);
+
+		String[][] breadcrumbs = {
+			{"Explorer", ROUTE},
+			{"MCP", ROUTE + "mcp"},
+			{toolNameParam, null}
+		};
+
+		DomContent toolMetadataTable = table(
+			thead(tr(th("Field"), th("Value"))),
+			tbody(
+				tr(td("Name"), td(code(toolNameParam))),
+				tr(td("Title"), td(toolTitle)),
+				tr(td("Description"), td(description == null || description.isBlank() ? em("No description provided") : text(description)))
+			)
+		);
+
+		DomContent schemaSection = div(
+			inputSchema != null
+				? details(
+					summary("Input Schema"),
+					preCode(JSON.toStringPretty(inputSchema)))
+				: p(em("No input schema defined")),
+			outputSchema != null
+				? details(
+					summary("Output Schema"),
+					preCode(JSON.toStringPretty(outputSchema)))
+				: p(em("No output schema defined"))
+		);
+
+		ACell examples = metadata.get(Strings.create("examples"));
+		DomContent examplesSection = (examples != null)
+			? details(
+				summary("Examples"),
+				preCode(JSON.toStringPretty(examples)))
+			: div();
+
+		returnPage(ctx, toolTitle, breadcrumbs,
+			article(toolMetadataTable),
+			article(schemaSection),
+			article(examplesSection));
 	}
 	
 	/**

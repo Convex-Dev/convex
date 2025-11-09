@@ -408,7 +408,8 @@ public class ChainAPI extends ABaseAPI {
 						description = "Bad request, probably a missing or invalid accountKey")
 				})
 	public void createAccount(Context ctx) throws InterruptedException {
-		checkFaucetAllowed();
+		Convex faucetClient=restServer.getFaucet();
+		if (faucetClient==null) throw new ForbiddenResponse("Faucet use not authorised on this server");
 
 		Map<String, Object> req = getJSONBody(ctx);
 		Object key = req.get("accountKey");
@@ -424,9 +425,9 @@ public class ChainAPI extends ABaseAPI {
 		
 		Address a;
 		try {
-			a = convex.createAccountSync(pk);
+			a = faucetClient.createAccountSync(pk);
 			if (amt != null) {
-				convex.transferSync(a, amt.longValue());
+				faucetClient.transferSync(a, amt.longValue());
 			}
 		} catch (ResultException e) {
 			setContent(ctx,e.getResult());
@@ -521,7 +522,7 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toString(as));
 	}
 
-	private static Keyword K_FAUCET=Keyword.create("faucet");
+	public static final Keyword K_FAUCET=Keyword.intern("faucet");
 	
 	@OpenApi(path = ROUTE + "faucet", 
 			versions="peer-v1",
@@ -561,8 +562,9 @@ public class ChainAPI extends ABaseAPI {
 						description = "Faucet request forbidden, probably Server is not accepting faucet requests")
 				})
 	public void faucetRequest(Context ctx) throws InterruptedException {
-		checkFaucetAllowed();
-		
+		Convex faucetClient=restServer.getFaucet();
+		if (faucetClient==null) throw new ForbiddenResponse("Faucet use not authorised on this server");
+
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null) failBadRequest("Expected JSON body containing valid 'address' field");
@@ -578,7 +580,7 @@ public class ChainAPI extends ABaseAPI {
 
 		// SECURITY: Make sure this is not subject to injection attack
 		// Optional: pre-compile to Op
-		Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
+		Result r = faucetClient.transactSync("(transfer " + addr + " " + amt + ")");
 		if (r.isError()) {
 			HashMap<String, Object> hm = r.toJSON();
 			ctx.result(JSON.toString(hm));
@@ -605,14 +607,9 @@ public class ChainAPI extends ABaseAPI {
 		throw new BadRequestResponse(JSON.toString(result));
 	}
 
-	private void checkFaucetAllowed() {
-		boolean faucet=isFaucetEnabled();
-		if (!faucet) throw new ForbiddenResponse("Faucet use not authorised on this server");
-	}
 
-	private boolean isFaucetEnabled() {
-		return RT.bool(restServer.getConfig().get(K_FAUCET));
-	}
+
+
 
 	@OpenApi(path = ROUTE+"transaction/prepare",
 			versions="peer-v1",

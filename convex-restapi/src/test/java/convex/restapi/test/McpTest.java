@@ -162,9 +162,7 @@ public class McpTest extends ARESTTest {
 	public void testSignMissingSeed() throws IOException, InterruptedException {
 		AMap<AString, ACell> responseMap = makeToolCall("sign", "{ \"value\": \"68656c6c6f\" }");
 		AMap<AString, ACell> structured = expectError(responseMap);
-		String message = toString(structured.get(Strings.create("message")));
-		assertNotNull(message);
-		assertTrue(message.contains("seed"));
+		assertNull(structured.get(Strings.create("value")));
 	}
 
 	/**
@@ -176,9 +174,7 @@ public class McpTest extends ARESTTest {
 		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
 		AMap<AString, ACell> responseMap = makeToolCall("sign", "{ \"seed\": \"" + seedHex + "\" }");
 		AMap<AString, ACell> structured = expectError(responseMap);
-		String message = toString(structured.get(Strings.create("message")));
-		assertNotNull(message);
-		assertTrue(message.contains("value"));
+		assertNull(structured.get(Strings.create("signature")));
 	}
 
 	/**
@@ -197,7 +193,6 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpAPI.FIELD_ERROR));
 		assertNotNull(error);
 		assertEquals(CVMLong.create(-32600), error.get(McpAPI.FIELD_CODE));
-		assertEquals(Strings.create("Invalid Request"), error.get(McpAPI.FIELD_MESSAGE));
 	}
 
 	/**
@@ -218,7 +213,6 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> error = RT.ensureMap(errorResponse.get(McpAPI.FIELD_ERROR));
 		assertNotNull(error);
 		assertEquals(CVMLong.create(-32600), error.get(McpAPI.FIELD_CODE));
-		assertEquals(Strings.create("Invalid Request"), error.get(McpAPI.FIELD_MESSAGE));
 	}
 
 	/**

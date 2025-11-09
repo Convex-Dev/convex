@@ -1,13 +1,13 @@
 {
   "name": "query",
   "title": "Convex Query",
-  "description": "Execute a Convex Lisp query using the configured account",
+  "description": "Execute a Convex Lisp query. Queries are fast and cheap, and do not affect the global state.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "source": {
         "type": "string",
-        "description": "CVM source code to execute, e.g. '*balance*'"
+        "description": "CVM source code to execute, e.g. '(balance #13)'"
       },
       "address": {
         "type": "string",

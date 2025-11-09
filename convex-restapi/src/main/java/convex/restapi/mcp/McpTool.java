@@ -39,7 +39,7 @@ public abstract class McpTool {
 	/**
 	 * Execute the tool using the supplied arguments.
 	 */
-	public abstract AMap<AString, ACell> handle(AMap<?, ?> arguments) throws InterruptedException;
+	public abstract AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException;
 
 	/**
 	 * Utility to load tool metadata from a JSON resource.
