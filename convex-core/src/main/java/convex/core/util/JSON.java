@@ -39,11 +39,6 @@ import convex.core.text.Text;
  */
 public class JSON {
 
-	
-
-
-
-
 	/**
 	 * Convert any object to a String containing valid JSON
 	 * 

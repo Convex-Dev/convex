@@ -50,6 +50,10 @@ import convex.core.util.JSON;
 /**
  * Minimal MCP JSON-RPC endpoint that follows the core patterns from the Covia Venue
  * implementation, adapted for the Convex REST server.
+ * 
+ * See: 
+ * https://www.jsonrpc.org/specification
+ * https://modelcontextprotocol.io/specification/2025-06-18
  */
 public class McpAPI extends ABaseAPI {
 

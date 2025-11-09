@@ -182,6 +182,46 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
+	 * Empty batch should return an Invalid Request error response.
+	 */
+	@Test
+	public void testEmptyBatchInvalidRequest() throws IOException, InterruptedException {
+		HttpResponse<String> response = post(MCP_PATH, "[]");
+		assertEquals(200, response.statusCode());
+
+		ACell parsed = JSON.parse(response.body());
+		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
+		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+
+		assertNull(responseMap.get(McpAPI.FIELD_ID));
+		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpAPI.FIELD_ERROR));
+		assertNotNull(error);
+		assertEquals(CVMLong.create(-32600), error.get(McpAPI.FIELD_CODE));
+		assertEquals(Strings.create("Invalid Request"), error.get(McpAPI.FIELD_MESSAGE));
+	}
+
+	/**
+	 * Non-empty but invalid batch should return a vector of Invalid Request errors.
+	 */
+	@Test
+	public void testInvalidBatchElement() throws IOException, InterruptedException {
+		HttpResponse<String> response = post(MCP_PATH, "[1]");
+		assertEquals(200, response.statusCode());
+
+		ACell parsed = JSON.parse(response.body());
+		assertTrue(parsed instanceof AVector, "Expected vector response but got " + RT.getType(parsed));
+		AVector<ACell> results = RT.ensureVector(parsed);
+		assertEquals(1, results.count());
+
+		AMap<AString, ACell> errorResponse = RT.ensureMap(results.get(0));
+		assertNull(errorResponse.get(McpAPI.FIELD_ID));
+		AMap<AString, ACell> error = RT.ensureMap(errorResponse.get(McpAPI.FIELD_ERROR));
+		assertNotNull(error);
+		assertEquals(CVMLong.create(-32600), error.get(McpAPI.FIELD_CODE));
+		assertEquals(Strings.create("Invalid Request"), error.get(McpAPI.FIELD_MESSAGE));
+	}
+
+	/**
 	 * Utility to issue an MCP tools/call request and get the parsed response as a
 	 * Convex map.
 	 */
