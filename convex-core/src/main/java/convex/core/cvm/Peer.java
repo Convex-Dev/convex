@@ -603,13 +603,20 @@ public class Peer {
 	/**
 	 * Gets the BlockResult of a specific block index
 	 * @param i Index of Block
-	 * @return BlockResult, or null if the BlockResult is not stired
+	 * @return BlockResult, or null if the BlockResult is not ready
 	 */
 	public BlockResult getBlockResult(long i) {
 		if (i<historyPosition) return null; // Ancient history
 		long brix=i-historyPosition;
 		if (brix>=blockResults.count()) return null;
 		return blockResults.get(brix);
+	}
+	
+
+	private BlockResult getBlockResult(ACell index) {
+		CVMLong pos=RT.ensureLong(index);		
+		if (pos==null) return null;
+		return getBlockResult(pos.longValue());
 	}
 
 	/**
@@ -788,6 +795,17 @@ public class Peer {
 	public CVMLong getBlockIndex(Hash blockHash) {
 		return getPeerIndex().getBlockIndex(blockHash);
 	}
+
+	public Result getTransactionResult(AVector<CVMLong> pos) {
+		if (pos.count()!=2) throw new IllegalArgumentException("Position vector must have 2 integer values");
+		BlockResult br= getBlockResult(pos.get(0));
+		if (br==null) return null;
+		CVMLong txIndex=RT.ensureLong(pos.get(1));
+		if (txIndex==null) throw new IllegalArgumentException("Transaction index must be a long value");
+		Result r=br.getResult(txIndex.longValue());
+		return r;
+	}
+
 
 
 }

@@ -24,6 +24,7 @@ import convex.core.crypto.IdenticonBuilder;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
@@ -32,6 +33,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -41,6 +43,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
@@ -158,7 +161,7 @@ public class ChainAPI extends ABaseAPI {
 			queryParams = {
 					@OpenApiParam(
 							name = "hash", 
-							description = "Transaction hash as a hex string. Leading '0x' is optional but discouraged.", 
+							description = "Transaction hash as a hex string. Leading '0x' is optional.", 
 							required = true, 
 							type = String.class, 
 							example = "0x1234567812345678123456781234567812345678123456781234567812345678") },
@@ -187,12 +190,24 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid hash: " + hashParam);
 		}
 
-		SignedData<ATransaction> transaction = server.getPeer().getTransaction(h);
+		Peer peer=server.getPeer();
+		
+		SignedData<ATransaction> transaction = peer.getTransaction(h);
 		if (transaction == null) {
 			throw new NotFoundResponse("Transaction not found: " + hashParam);
 		}
+		
+		AVector<CVMLong> pos=peer.getTransactionLocation(h);
 
-		setContent(ctx,transaction);
+		Result txResult=peer.getTransactionResult(pos);
+		
+		AMap<AString,ACell> result=Maps.of(
+			Keywords.TX, transaction,
+			Keywords.POSITION, pos,
+			Keywords.RESULT, txResult
+		);
+		
+		setContent(ctx,result);
 	}
 
 	@OpenApi(path = ROUTE + "blocks", 
@@ -340,8 +355,10 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid block number format: must be a number");
 		}
 		
+		Peer peer=server.getPeer();
+		
 		// Get blocks from peer order
-		Order peerOrder = server.getPeer().getPeerOrder();
+		Order peerOrder = peer.getPeerOrder();
 		AVector<SignedData<Block>> blocks = peerOrder.getBlocks();
 		long totalBlocks = blocks.count();
 		
@@ -351,7 +368,7 @@ public class ChainAPI extends ABaseAPI {
 		}
 		
 		// Get finality point for determining if block is finalised
-		long finalityPoint = server.getPeer().getFinalityPoint();
+		long finalityPoint = peer.getFinalityPoint();
 		
 		// Get the specific block
 		SignedData<Block> signedBlock = blocks.get(blockNum);

@@ -654,10 +654,10 @@ public class ExplorerAPI extends AWebSite {
 	private TbodyTag makeBlockTable(SignedData<Block> sblock) {
 		AccountKey peerKey=sblock.getAccountKey(); // Public key of signing peer
 		return tbody(
-				tr(
-						td("Block Hash"),
-						td(showID(sblock.getHash(),64)),
-						td("Hash of block as signed by peer")),
+			tr(
+				td("Block Hash"),
+				td(showID(sblock.getHash(),64)),
+				td("Hash of block as signed by peer")),
 			tr(
 				td("Peer"),
 				td(a(showID(peerKey,64)).withHref(ROUTE+"peers/"+peerKey)),
@@ -687,7 +687,7 @@ public class ExplorerAPI extends AWebSite {
 			rows.add(new DomContent[] {
 				td(a(Long.toString(i)).withHref(txLink)),
 				td(identicon(strans.getAccountKey()),showAddress(strans.getValue().getOrigin())),
-				td(showID(strans.getHash()))
+				td(showCVX(strans.getHash()))
 			});
 		}
 		
