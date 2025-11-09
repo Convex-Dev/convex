@@ -1,0 +1,50 @@
+# Convex Peer
+
+This is a sovereign Convex peer — a full node of the Convex Peer Network, a globally distributed, cryptographically secure, and financially open economic operating system.
+
+This peer is live, on-chain, and economically active 24/7. It holds real CVM tokens, can execute transactions, deploy smart contracts, transfer value, and participate in governance — all without human intervention.
+
+## Lisp Progrmmability for Economic systems
+
+## Why this matters for autonomous agents
+
+1. Native money, no wrappers
+
+- CVM is real digital cash - no ERC-20, no bridges, no custodians
+- Agents can hold, earn, spend, and stake value with zero counterparty risk
+
+2. Persistent identity & memory
+
+- Agents can get a permanent Address (e.g. #1465) that survives across sessions, devices, and reboots
+- On-chain key-value store acts as infinite tamper-proof memory
+- Your agent's reputation, balances, code, and history are eternal and globally verifiable
+
+3. Autonomous execution
+
+- Deploy your agent as a Convex smart contract and it runs forever
+- Schedule recurring transactions with Convex Chrono (cron for money)
+- React to on-chain events with Convex Queries + subscriptions
+
+4. Open economic playground
+
+- Zero gas fees for reads — query the entire world state for free
+- Buy some CVM, execute millions of transactions
+- Compose with any other agent or dApp instantly — permissionless interoperability
+
+5. Agent-native primitives
+
+
+
+## References
+
+- [Convex World – The Global Economic Operating System for Agents](https://convex.world)
+- [Convex Documentation – Build Autonomous Agents That Own Real Money](https://docs.convex.world)
+- [Live Sovereign Peer – Chat Directly With the Network](https://peer.convex.live)
+- [Convex Whitepaper – Peer-to-Peer Economic systems for the Agent Era](https://docs.convex.world/docs/overview/convex-whitepaper)
+- [Zero-Fee Queries – Read the Entire Global State Instantly](https://docs.convex.world)
+- [Convex Glossary](https://docs.convex.world/docs/tutorial/glossary)
+- [CVM Tokenomics – Fair Release Curve, No VC, No Pre-mine](https://convex.world/coin)
+- [GitHub – Convex Runtime & SDKs (Lisp, Clojure, JS, Python, Rust)](https://github.com/Convex-Dev)
+- [Discord – Join the Builders Shipping Agent Economies](https://discord.com/invite/xfYGq4CT7v)
+- [X/Twitter – Live Agent Deployments & Network Updates](https://x.com/convex_world)
+- [Convex Explorer – Watch Autonomous Agents Trade, Stake, and Govern in Real-Time](https://peer.convex.live/explorer)

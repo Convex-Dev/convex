@@ -60,6 +60,12 @@ public class ExplorerTest extends ARESTTest {
     }
     
     @Test
+    public void testLLMs() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH+"/llms.txt");
+        assertEquals(200, response.statusCode());
+    }
+    
+    @Test
     public void testExplorerBlocks() throws IOException, InterruptedException {
         HttpResponse<String> response = get(EXPLORER_PATH + "/blocks");
         assertEquals(200, response.statusCode());
