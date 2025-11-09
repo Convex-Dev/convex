@@ -61,7 +61,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort FIELD_NAME = Strings.intern("name");
 	public static final StringShort FIELD_ARGUMENTS = Strings.intern("arguments");
 	public static final StringShort FIELD_RESULT = Strings.intern("result");
-	public static final AString FIELD_ERROR = Strings.create("error");
+	public static final StringShort FIELD_ERROR = Strings.intern("error");
 	public static final StringShort FIELD_CODE = Strings.intern("code");
 	public static final StringShort FIELD_MESSAGE = Strings.intern("message");
 	public static final StringShort FIELD_CONTENT = Strings.intern("content");
@@ -69,6 +69,8 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort FIELD_TYPE = Strings.intern("type");
 	public static final StringShort FIELD_TEXT = Strings.intern("text");
 	public static final StringShort FIELD_IS_ERROR = Strings.intern("isError");
+	public static final StringShort SERVER_URL_FIELD=Strings.intern("server_url");
+
 
 	public static final StringShort ARG_SOURCE = Strings.intern("source");
 	public static final StringShort ARG_ADDRESS = Strings.intern("address");
@@ -100,6 +102,7 @@ public class McpAPI extends ABaseAPI {
 	@Override
 	public void addRoutes(Javalin app) {
 		app.post("/mcp", this::handleMcpRequest);
+		app.get("/.well-known/mcp", this::getMCPWellKnown);
 	}
 
 	@OpenApi(path = "/mcp", 
@@ -471,5 +474,27 @@ public class McpAPI extends ABaseAPI {
 				return toolError("Failed to load peer status: " + e.getMessage());
 			}
 		}
+	}
+	
+	private AMap<AString,ACell> WELL_KNOWN=JSON.parse("""
+		{	
+			"mcp_version": "1.0",
+			"server_url": "http://localhost:8080/mcp",
+			"description": "Convex network MCP for decentralised economic systems",
+			"tools_endpoint": "/mcp",
+			"endpoint": {"path":"/mcp","transport":"streamable-http"}
+		}
+""");
+	
+	@OpenApi(path = "/.well-known/mcp", 
+			methods = HttpMethod.GET, 
+			tags = { "MCP"},
+			summary = "Get MCP server capabilities", 
+			operationId = "mcpWellKnown")	
+	protected void getMCPWellKnown(Context ctx) { 
+		AMap<AString,ACell> result=WELL_KNOWN;
+		AString mcpURL=Strings.create(getExternalBaseUrl(ctx, "mcp"));
+		result=result.assoc(SERVER_URL_FIELD,mcpURL);
+		setContent(ctx,result);
 	}
 }
