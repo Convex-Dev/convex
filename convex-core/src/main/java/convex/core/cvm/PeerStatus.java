@@ -29,7 +29,13 @@ public class PeerStatus extends ARecordGeneric {
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
 	private static final Index<Address, CVMLong> EMPTY_STAKES = Index.none();
 
-	private final int IX_TIMESTAMP=5;
+	private static final int IX_CONTROLLER=0;
+	private static final int IX_STAKE=1;
+	private static final int IX_STAKES=2;
+	private static final int IX_DEL_STAKE=3;
+	private static final int IX_METADATA=4;
+	private static final int IX_TIMESTAMP=5;
+	private static final int IX_BALANCE=6;
 	
 	/**
 	 * Per controller address
@@ -37,7 +43,7 @@ public class PeerStatus extends ARecordGeneric {
     private final Address controller;
     
     /**
-     * Peer state share
+     * Peer stake share
      */
 	private final long peerStake;
 
@@ -84,13 +90,16 @@ public class PeerStatus extends ARecordGeneric {
 		this.balance=balance;
 	}
 
+	@SuppressWarnings("unchecked")
 	public PeerStatus(AVector<ACell> values) {
 		super(CVMTag.PEER_STATUS,FORMAT,values);
-		this.controller = RT.ensureAddress(values.get(0));
-		this.peerStake = RT.ensureLong(values.get(1)).longValue();
-		this.delegatedStake = RT.ensureLong(values.get(3)).longValue();
+		this.controller = RT.ensureAddress(values.get(IX_CONTROLLER));
+		this.peerStake = RT.ensureLong(values.get(IX_STAKE)).longValue();
+		this.stakes = RT.ensureIndex(values.get(IX_STAKES));
+		this.delegatedStake = RT.ensureLong(values.get(IX_DEL_STAKE)).longValue();
+		this.metadata = (AHashMap<ACell,ACell>)(values.get(IX_METADATA));
 		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
-		this.balance = RT.ensureLong(values.get(6)).longValue();
+		this.balance = RT.ensureLong(values.get(IX_BALANCE)).longValue();
 	}
 
 	public static PeerStatus create(Address controller, long stake) {
@@ -131,7 +140,7 @@ public class PeerStatus extends ARecordGeneric {
 	}
 	
 	public Index<Address,CVMLong> getStakes() {
-		if (stakes==null) stakes=RT.ensureIndex(values.get(2));
+		if (stakes==null) stakes=RT.ensureIndex(values.get(IX_STAKES));
 		return stakes;
 	}
 
@@ -200,10 +209,9 @@ public class PeerStatus extends ARecordGeneric {
 	 *
 	 * @return Host String
 	 */
-	@SuppressWarnings("unchecked")
 	public AHashMap<ACell, ACell> getMetadata() {
 		if (metadata==null) {
-			metadata=(AHashMap<ACell, ACell>)(values.get(4));
+			metadata=RT.ensureMap(values.get(IX_METADATA));
 		}
 		return metadata;
 	}
@@ -262,7 +270,7 @@ public class PeerStatus extends ARecordGeneric {
 	
 	private PeerStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
-		return new PeerStatus(values.assoc(6,CVMLong.create(newBalance)));
+		return new PeerStatus(values.assoc(IX_BALANCE,CVMLong.create(newBalance)));
 	}
 	
 	private PeerStatus withTimestamp(long newTimestamp) {
@@ -303,13 +311,15 @@ public class PeerStatus extends ARecordGeneric {
 
 	@Override
 	public ACell get(Keyword key) {
+		// If we have a local field value cached, use this directly rather than going through the values vector
+		
 		if (Keywords.CONTROLLER.equals(key)) return controller;
-		if (Keywords.STAKE.equals(key)) return values.get(1);
-		if (Keywords.STAKES.equals(key)) return getStakes();
-		if (Keywords.DELEGATED_STAKE.equals(key)) return values.get(3);
-		if (Keywords.METADATA.equals(key)) return getMetadata();
-		if (Keywords.TIMESTAMP.equals(key)) return values.get(5);
-		if (Keywords.BALANCE.equals(key)) return values.get(6);
+		if (Keywords.STAKE.equals(key)) return values.get(IX_STAKE); // already a CVMLong
+		if (Keywords.STAKES.equals(key)) return stakes;
+		if (Keywords.DELEGATED_STAKE.equals(key)) return values.get(IX_DEL_STAKE); // already a CVMLong
+		if (Keywords.METADATA.equals(key)) return metadata;
+		if (Keywords.TIMESTAMP.equals(key)) return values.get(IX_TIMESTAMP); // already a CVMLong
+		if (Keywords.BALANCE.equals(key)) return values.get(IX_BALANCE); // already a CVMLong
 
 		return null;
 	}
