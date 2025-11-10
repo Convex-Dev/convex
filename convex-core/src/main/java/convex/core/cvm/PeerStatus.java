@@ -38,7 +38,7 @@ public class PeerStatus extends ARecordGeneric {
 	private static final int IX_BALANCE=6;
 	
 	/**
-	 * Per controller address
+	 * Peer controller address
 	 */
     private final Address controller;
     
