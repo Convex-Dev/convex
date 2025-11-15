@@ -10,11 +10,13 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.init.Init;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
@@ -108,6 +110,49 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("query", "{ \"source\": \"*balance*\" }");
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		assertNotNull(structured.get(Strings.create("value")));
+	}
+
+	/**
+	 * Prepare tool should mirror the REST transaction preparation response and
+	 * return encoded data plus metadata for signing.
+	 */
+	@Test
+	public void testPrepareTool() throws IOException, InterruptedException {
+		String args = "{ \"source\": \"(* 2 3)\", \"address\": \"#11\" }";
+		AMap<AString, ACell> responseMap = makeToolCall("prepare", args);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertNotNull(RT.ensureString(structured.get(Strings.create("hash"))));
+		assertNotNull(RT.ensureString(structured.get(Strings.create("data"))));
+		assertNotNull(structured.get(Strings.create("sequence")));
+	}
+
+	/**
+	 * Prepare tool hash should match the output of the REST transaction/prepare API.
+	 */
+	@Test
+	public void testPrepareToolMatchesChainAPI() throws IOException, InterruptedException {
+		String source = "(* 2 3)";
+		String addressString = "#11";
+		String mcpArgs = "{ \"source\": \"" + source + "\", \"address\": \"" + addressString + "\" }";
+
+		AMap<AString, ACell> responseMap = makeToolCall("prepare", mcpArgs);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		AString mcpHash = RT.ensureString(structured.get(Strings.create("hash")));
+		assertNotNull(mcpHash);
+
+		AMap<AString, ACell> requestMap = Maps.of(
+			Strings.create("address"), addressString,
+			Strings.create("source"), Strings.create(source)
+		);
+		HttpResponse<String> restResponse = post(API_PATH + "/transaction/prepare", JSON.toString(requestMap));
+		assertEquals(200, restResponse.statusCode());
+		ACell restParsed = JSON.parse(restResponse.body());
+		AMap<AString, ACell> restMap = RT.ensureMap(restParsed);
+		assertNotNull(restMap);
+		AString restHash = RT.ensureString(restMap.get(Strings.create("hash")));
+		assertNotNull(restHash);
+
+		assertEquals(restHash, mcpHash);
 	}
 
 	/**

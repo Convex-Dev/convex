@@ -1,0 +1,49 @@
+{
+  "name": "prepare",
+  "title": "Prepare Transaction",
+  "description": "Prepare (but do not send) a Convex transaction. This mirrors the /api/v1/transaction/prepare endpoint and returns the encoded transaction along with the sequence that should be signed.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "CVM source code for the transaction (e.g. \"(* 2 3)\")"
+      },
+      "address": {
+        "type": "string",
+        "description": "Origin account address for the transaction (e.g. \"#11\")"
+      },
+      "sequence": {
+        "type": "integer",
+        "description": "Optional explicit sequence number; defaults to current account sequence + 1"
+      }
+    },
+    "required": ["source", "address"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "Original source expression that was prepared"
+      },
+      "address": {
+        "type": "string",
+        "description": "Address that will execute the transaction"
+      },
+      "hash": {
+        "type": "string",
+        "description": "Hash of the prepared transaction payload"
+      },
+      "data": {
+        "type": "string",
+        "description": "Hex-encoded transaction bytes suitable for signing"
+      },
+      "sequence": {
+        "type": "integer",
+        "description": "Sequence number used when preparing the transaction"
+      }
+    }
+  }
+}
+

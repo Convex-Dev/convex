@@ -14,6 +14,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Hashing;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
@@ -21,8 +23,11 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
@@ -30,6 +35,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.ResultException;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -76,12 +82,12 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort FIELD_IS_ERROR = Strings.intern("isError");
 	public static final StringShort SERVER_URL_FIELD=Strings.intern("server_url");
 
-
 	public static final StringShort ARG_SOURCE = Strings.intern("source");
 	public static final StringShort ARG_ADDRESS = Strings.intern("address");
 	public static final StringShort ARG_VALUE = Strings.intern("value");
 	public static final StringShort ARG_ALGORITHM = Strings.intern("algorithm");
-	public static final AString ARG_SEED = Strings.create("seed");
+	public static final StringShort ARG_SEED = Strings.intern("seed");
+	public static final StringShort ARG_SEQUENCE = Strings.intern("sequence");
 
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
@@ -322,6 +328,7 @@ public class McpAPI extends ABaseAPI {
 
 	private void registerTools() {
 		registerTool(new QueryTool());
+		registerTool(new PrepareTool());
 		registerTool(new TransactTool());
 		registerTool(new HashTool());
 		registerTool(new SignTool());
@@ -406,6 +413,69 @@ public class McpAPI extends ABaseAPI {
 				}
 			} catch (Exception e) {
 				return toolError("Transaction failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class PrepareTool extends McpTool {
+		PrepareTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/prepare.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
+			if (sourceCell == null) {
+				return protocolError(-32602, "Prepare requires 'source' string");
+			}
+			AString addressCell = RT.ensureString(arguments.get(ARG_ADDRESS));
+			if (addressCell == null) {
+				return protocolError(-32602, "Prepare requires 'address' string");
+			}
+			Address address = Address.parse(addressCell.toString());
+			if (address == null) {
+				return toolError("Invalid address format");
+			}
+
+			ACell code;
+			try {
+				code = Reader.read(sourceCell.toString());
+			} catch (Exception e) {
+				return toolError("Failed to parse source: " + e.getMessage());
+			}
+
+			long sequence;
+			ACell sequenceArg = arguments.get(ARG_SEQUENCE);
+			if (sequenceArg != null) {
+				CVMLong seqLong = CVMLong.parse(sequenceArg);
+				if (seqLong == null) {
+					return toolError("sequence must be an integer");
+				}
+				sequence = seqLong.longValue();
+			} else {
+				try {
+					sequence = restServer.getConvex().getSequence(address) + 1;
+				} catch (ResultException e) {
+					return toolResult(e.getResult());
+				}
+			}
+
+			try {
+				ATransaction transaction = Invoke.create(address, sequence, code);
+				transaction = Cells.persist(transaction);
+				Ref<ATransaction> ref = transaction.getRef();
+				String hashHex = SignedData.getMessageForRef(ref).toHexString();
+				String dataHex = Format.encodeMultiCell(transaction, true).toHexString();
+				AMap<AString, ACell> structured = Maps.of(
+					Strings.create("source"), sourceCell,
+					Strings.create("address"), Strings.create(address.toString()),
+					Strings.create("hash"), Strings.create(hashHex),
+					Strings.create("data"), Strings.create(dataHex),
+					Strings.create("sequence"), CVMLong.create(sequence)
+				);
+				return toolSuccess(structured);
+			} catch (Exception e) {
+				return toolError("Prepare failed: " + e.getMessage());
 			}
 		}
 	}
