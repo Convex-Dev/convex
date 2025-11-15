@@ -39,12 +39,7 @@
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
 		</dependency>
-		<dependency>
- 			<groupId>io.netty</groupId>
- 			<artifactId>netty-all</artifactId>
- 			<version>4.2.7.Final</version>
-  		 	<scope>compile</scope>
- 		</dependency>
+		
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -71,5 +66,48 @@
 			<scope>test</scope>
 		</dependency>
 		-->	
+		
+		<!-- Core buffer and common utils -->
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-buffer</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-common</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		
+		  <!-- Transport layer (NIO-based, no natives) -->
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-transport</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		
+		  <!-- Handlers and codecs for framing/protocols -->
+		  <dependency> 
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-handler</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-codec</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		
+		  <!-- DNS resolution (for peer discovery) -->
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-resolver</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
+		  <dependency>
+		    <groupId>io.netty</groupId>
+		    <artifactId>netty-resolver-dns</artifactId>
+		    <version>${netty.version}</version>
+		  </dependency>
 	</dependencies>
 </project>

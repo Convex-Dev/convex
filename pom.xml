@@ -33,6 +33,7 @@
 		<junit.version>6.0.1</junit.version>
 		<slf4j.version>2.0.16</slf4j.version>
 		<hc.version>5.5</hc.version>
+		<netty.version>4.2.7.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2025-04-11T08:36:37Z</project.build.outputTimestamp>
