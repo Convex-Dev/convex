@@ -131,6 +131,30 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(200, txResponse.statusCode());
 		}
 	}
+
+	@Test public void testDataEncodeDecode() throws IOException, InterruptedException {
+		assertCad3RoundTrip("12", "110c");
+		assertCad3RoundTrip("nil", "00");
+		assertCad3RoundTrip("[]", "8000");
+	}
+
+	private void assertCad3RoundTrip(String cvxLiteral, String expectedHex) throws IOException, InterruptedException {
+		String encodePayload = "{ \"data\": \"" + cvxLiteral.replace("\"", "\\\"") + "\" }";
+		HttpResponse<String> encodeResponse = post(API_PATH + "/data/encode", encodePayload);
+		assertEquals(200, encodeResponse.statusCode());
+		AMap<AString, ACell> encodeMap = JSON.parse(encodeResponse.body());
+		AString cad3 = RT.ensureString(encodeMap.get(Strings.create("cad3")));
+		assertNotNull(cad3);
+		assertEquals(expectedHex, cad3.toString().toLowerCase());
+
+		String decodePayload = "{ \"cad3\": \"" + cad3.toString() + "\" }";
+		HttpResponse<String> decodeResponse = post(API_PATH + "/data/decode", decodePayload);
+		assertEquals(200, decodeResponse.statusCode());
+		AMap<AString, ACell> decodeMap = JSON.parse(decodeResponse.body());
+		AString cvx = RT.ensureString(decodeMap.get(Strings.create("cvx")));
+		assertNotNull(cvx);
+		assertEquals(cvxLiteral, cvx.toString());
+	}
 	
 	@Test public void testQuery() throws IOException, InterruptedException {
 		{ // should be a bad request with bad JSON

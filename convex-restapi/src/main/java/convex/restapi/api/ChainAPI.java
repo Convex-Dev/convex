@@ -109,6 +109,10 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "peers/{addr}", this::queryPeer);
 
 		app.get(prefix + "data/<hash>", this::getData);
+		app.post(prefix + "data/encode", this::encodeData);
+		app.post(prefix + "data/decode", this::decodeData);
+		
+		
 		app.get(prefix + "tx", this::getTransaction);
 		
 		app.get(prefix + "blocks", this::getBlocks);
@@ -124,7 +128,7 @@ public class ChainAPI extends ABaseAPI {
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
 			versions="peer-v1",
-			methods = HttpMethod.POST, 
+			methods = HttpMethod.GET, 
 			tags = { "Data Lattice"},
 			summary = "Get data from the server with the specified hash", 
 			operationId = "data", 
@@ -151,6 +155,113 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse(jsonError("Error: " + e.getMessage()));
 		}
 		setContent(ctx,d);
+	}
+	
+	@OpenApi(path = ROUTE + "data/encode", 
+			versions="peer-v1",
+			methods = HttpMethod.POST, 
+			tags = { "Data Lattice"},
+			summary = "Encode data in CAD3 multi-cell format", 
+			operationId = "encode",
+			requestBody = @OpenApiRequestBody(
+					description = "Encode request",
+					content= {@OpenApiContent(
+							from=QueryRequest.class,
+							type = "application/json", 
+							exampleObjects = {
+								@OpenApiExampleProperty(name = "data", value = "12")
+							}),
+							@OpenApiContent(
+								mimeType = "application/cvx",
+								from=String.class,
+								example="[1 2 3]"
+							)
+					}))
+	public void encodeData(Context ctx) {
+		String type=ctx.req().getContentType();
+		ACell value;
+		
+		if (ContentTypes.JSON.equals(type)) {
+			ACell body=this.readJSONBody(ctx);
+			AString field=RT.ensureString(RT.getIn(body, Strings.DATA));
+			if (field==null) throw new BadRequestResponse("Encode requires 'data' field");
+			value=Reader.read(field.toString());
+		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
+			try {
+				value=Reader.read(ctx.bodyInputStream());
+			} catch (Exception e) {
+				throw new BadRequestResponse("Could not parse CVX content: "+e.getMessage());
+			}
+		} else {
+			throw new BadRequestResponse("Expected JSON request or plain CVX data to encode");
+		}
+		
+		Blob b=Format.encodeMultiCell(value, true);
+
+		ctx.status(200);
+		String rtype=this.calcResponseContentType(ctx);
+		if (ContentTypes.CVX_RAW.equals(rtype)||ContentTypes.BYTES.equals(type)) {
+			ctx.result(b.getInputStream());
+		} else {
+			AMap<AString, ACell> result = Maps.of(
+				Strings.create("cad3"), Strings.create(b.toCVMHexString()),
+				Strings.create("hash"), Strings.create(Ref.get(value).getEncoding().toCVMHexString())
+			);
+			this.setContent(ctx, result);
+		}
+		
+	}
+	
+	@OpenApi(path = ROUTE + "data/decode", 
+			versions="peer-v1",
+			methods = HttpMethod.POST, 
+			tags = { "Data Lattice"},
+			summary = "Decode CAD3 data", 
+			operationId = "decode",
+			requestBody = @OpenApiRequestBody(
+					description = "Decode request",
+					content= {@OpenApiContent(
+							from=QueryRequest.class,
+							type = "application/json", 
+							exampleObjects = {
+								@OpenApiExampleProperty(name = "cad3", value = "0x110c")
+							})
+					}))
+	public void decodeData(Context ctx) {
+		String type=ctx.req().getContentType();
+		ABlob value;
+		
+		if (ContentTypes.JSON.equals(type)) {
+			ACell body=this.readJSONBody(ctx);
+			AString field=RT.ensureString(RT.getIn(body, Strings.create("cad3")));
+			if (field==null) throw new BadRequestResponse("Decode requires 'cad3' field");
+			value=Blob.parse(field);
+		} else if (ContentTypes.CVX.equals(type)||ContentTypes.BYTES.equals(type)) {
+			try {
+				value=Blobs.fromStream(ctx.bodyInputStream());
+			} catch (Exception e) {
+				throw new BadRequestResponse("Could not read CAD3 content: "+e.getMessage());
+			}
+		} else {
+			throw new BadRequestResponse("Expected CAD3 data to decode");
+		}
+		
+		ACell r;
+		try {
+			r = Format.decodeMultiCell(value.toFlatBlob());
+		} catch (BadFormatException e) {
+			this.failBadRequest("Error decoding CAD3 data - bad format");
+			return;
+		}
+
+		ctx.status(200);
+		String rtype=this.calcResponseContentType(ctx);
+		if (ContentTypes.CVX_RAW.equals(rtype)) {
+			ctx.result(RT.print(r).getInputStream());
+		} else if (ContentTypes.JSON.equals(rtype)) {
+			this.setContent(ctx, Maps.of("cvx",RT.print(r)));
+		}
+		
 	}
 
 	@OpenApi(path = ROUTE + "tx", 

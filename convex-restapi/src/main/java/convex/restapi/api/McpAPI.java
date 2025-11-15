@@ -602,7 +602,7 @@ public class McpAPI extends ABaseAPI {
 				}
 				AString signatureCell = RT.ensureString(arguments.get(Strings.create("signature")));
 				if (signatureCell == null) {
-					return protocolError(-32602, "Submit requires 'signature' string");
+					return protocolError(-32602, "Submit requires 'sig' string with Ed25519 signature");
 				}
 				Blob signatureBlob = Blob.parse(signatureCell.toString());
 				if ((signatureBlob == null) || (signatureBlob.count() != Ed25519Signature.SIGNATURE_LENGTH)) {

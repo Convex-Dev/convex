@@ -13,9 +13,9 @@
         "type": "string",
         "description": "Hex-encoded public key corresponding to the signer"
       },
-      "signature": {
+      "sig": {
         "type": "string",
-        "description": "Hex-encoded Ed25519 signature (64 bytes)"
+        "description": "Ed25519 signature in hex (64 bytes = 128 hex digits)"
       }
     },
     "required": ["hash", "accountKey", "signature"]
@@ -24,17 +24,16 @@
     "type": "object",
     "properties": {
       "value": {
+		"type": "any",
         "description": "Resulting CVM value converted to JSON"
       },
       "errorCode": {
+		"type": "string",
         "description": "CVM error code (if the transaction failed)"
       },
       "info": {
+		"type": "object",
         "description": "Additional execution metadata"
-      },
-      "message": {
-        "type": "string",
-        "description": "Optional human-readable message"
       }
     }
   }

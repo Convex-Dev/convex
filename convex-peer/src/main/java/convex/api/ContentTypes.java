@@ -30,4 +30,10 @@ public class ContentTypes {
 	 * Content type for CVX raw encoding (multi cell supported)
 	 */
 	public static final String CVX_RAW="application/cvx-raw";
+	
+	/**
+	 * Content type for plain bytes 
+	 */
+	public static final String BYTES="application/octet-stream";
+
 }

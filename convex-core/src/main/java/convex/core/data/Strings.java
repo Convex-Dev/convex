@@ -88,9 +88,12 @@ public class Strings {
 
 	public static final StringShort AMOUNT = StringShort.intern("amount");
 	
+	public static final StringShort CAD3 = StringShort.intern("cad3");
+
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());
 	};
+
 
 
 

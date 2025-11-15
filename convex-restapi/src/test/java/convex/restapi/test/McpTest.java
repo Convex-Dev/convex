@@ -186,7 +186,6 @@ public class McpTest extends ARESTTest {
 
 		String submitArgs = "{ \"hash\": \"" + hashHex + "\", \"signature\": \"" + signatureHex + "\", \"accountKey\": \"" + accountKeyHex + "\" }";
 		AMap<AString, ACell> submitResponse = makeToolCall("submit", submitArgs);
-		System.out.println("Submit response: " + submitResponse);
 		AMap<AString, ACell> submitResult = expectResult(submitResponse);
 		assertEquals(CVMLong.create(6), submitResult.get(Strings.create("value")));
 	}
