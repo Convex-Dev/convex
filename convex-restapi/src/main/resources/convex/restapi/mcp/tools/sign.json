@@ -7,7 +7,7 @@
     "properties": {
       "value": {
         "type": "string",
-        "description": "Hex encoded data to sign"
+        "description": "Hex encoded bytes to sign. For Convex transactions, this is the 'hash' field returned by prepare"
       },
       "seed": {
         "type": "string",

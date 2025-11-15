@@ -38,6 +38,7 @@ import convex.core.util.Utils;
 import convex.restapi.RESTServer;
 import convex.restapi.mcp.McpTool;
 import convex.restapi.model.JsonRPCRequest;
+import convex.restapi.model.JsonRPCResponse;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.openapi.HttpMethod;
@@ -142,7 +143,7 @@ public class McpAPI extends ABaseAPI {
 							content = {
 								@OpenApiContent(
 										type = "application/json", 
-										from = Object.class,
+										from = JsonRPCResponse.class,
 										exampleObjects = {
 											@OpenApiExampleProperty(name = "jsonrpc", value = "2.0"),
 											@OpenApiExampleProperty(name = "result", value="{}"),
@@ -387,9 +388,7 @@ public class McpAPI extends ABaseAPI {
 			if (addressCell == null) {
 				return protocolError(-32602, "Transact requires 'address' string");
 			}
-			String source = sourceCell.toString();
-			String seedHex = seedCell.toString();
-			Blob seedBlob = Blob.parse(seedHex);
+			Blob seedBlob = Blob.parse(seedCell);
 			if ((seedBlob == null) || (seedBlob.count() != AKeyPair.SEED_LENGTH)) {
 				return toolError("Seed must be 32-byte hex string");
 			}
@@ -402,7 +401,7 @@ public class McpAPI extends ABaseAPI {
 				try (Convex client = Convex.connect(server)) {
 					client.setAddress(address);
 					client.setKeyPair(keyPair);
-					Result result = client.transactSync(source);
+					Result result = client.transactSync(Reader.read(sourceCell));
 					return toolResult(result);
 				}
 			} catch (Exception e) {
