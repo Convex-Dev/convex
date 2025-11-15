@@ -11,7 +11,9 @@ import convex.api.ContentTypes;
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
 import convex.core.crypto.Hashing;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.cvm.transactions.ATransaction;
@@ -34,6 +36,8 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.json.JSONReader;
@@ -330,6 +334,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new QueryTool());
 		registerTool(new PrepareTool());
 		registerTool(new TransactTool());
+		registerTool(new SubmitTool());
 		registerTool(new HashTool());
 		registerTool(new SignTool());
 		registerTool(new PeerStatusTool());
@@ -337,6 +342,15 @@ public class McpAPI extends ABaseAPI {
 
 	private void registerTool(McpTool tool) {
 		tools.put(tool.getName(), tool);
+	}
+
+	private ATransaction decodeTransaction(Blob hashBlob) throws BadFormatException, MissingDataException {
+		Ref<?> ref = Format.readRef(hashBlob, 0);
+		ACell value = ref.getValue();
+		if (!(value instanceof ATransaction transaction)) {
+			throw new BadFormatException("Value with hash " + hashBlob.toHexString() + " is not a transaction");
+		}
+		return transaction;
 	}
 
 	private class QueryTool extends McpTool {
@@ -544,16 +558,62 @@ public class McpAPI extends ABaseAPI {
 			}
 			try {
 				AKeyPair keyPair = AKeyPair.create(seedBlob);
-				SignedData<Blob> signed = keyPair.signData(valueBlob);
+				ASignature signature = keyPair.sign(valueBlob);
 				AccountKey accountKey = keyPair.getAccountKey();
 				AMap<AString, ACell> result = Maps.of(
 					Strings.create("value"), valueCell,
-					Strings.create("signature"), Strings.create(signed.getSignature().toHexString()),
+						Strings.create("signature"), Strings.create(signature.toHexString()),
 					Strings.create("accountKey"), Strings.create(accountKey.toHexString())
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
 				return toolError("Signing failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class SubmitTool extends McpTool {
+		SubmitTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/submit.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+			if (arguments == null) {
+				return protocolError(-32602, "Submit requires arguments");
+			}
+			AString hashCell = RT.ensureString(arguments.get(Strings.create("hash")));
+			if (hashCell == null) {
+				return protocolError(-32602, "Submit requires 'hash' string");
+			}
+			Blob hashBlob = Blob.parse(hashCell);
+			if (hashBlob == null) {
+				return toolError("hash must be valid hex");
+			}
+			try {
+				ATransaction transaction = decodeTransaction(hashBlob);
+				AString accountKeyCell = RT.ensureString(arguments.get(Strings.create("accountKey")));
+				if (accountKeyCell == null) {
+					return protocolError(-32602, "Submit requires 'accountKey' string");
+				}
+				AccountKey accountKey = AccountKey.parse(accountKeyCell.toString());
+				if (accountKey == null) {
+					return toolError("Invalid account key");
+				}
+				AString signatureCell = RT.ensureString(arguments.get(Strings.create("signature")));
+				if (signatureCell == null) {
+					return protocolError(-32602, "Submit requires 'signature' string");
+				}
+				Blob signatureBlob = Blob.parse(signatureCell.toString());
+				if ((signatureBlob == null) || (signatureBlob.count() != Ed25519Signature.SIGNATURE_LENGTH)) {
+					return toolError("signature must be a 64-byte hex string");
+				}
+				ASignature signature = Ed25519Signature.fromBlob(signatureBlob);
+				SignedData<ATransaction> signed = SignedData.create(accountKey, signature, transaction.getRef());
+				Result result = restServer.getConvex().transactSync(signed);
+				return toolResult(result);
+			} catch (Exception e) {
+				return toolError("Submit failed: " + e.getMessage());
 			}
 		}
 	}

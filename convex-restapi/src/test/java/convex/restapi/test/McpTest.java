@@ -21,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
@@ -132,7 +133,7 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testPrepareToolMatchesChainAPI() throws IOException, InterruptedException {
 		String source = "(* 2 3)";
-		String addressString = "#11";
+		String addressString = Init.GENESIS_ADDRESS.toString();
 		String mcpArgs = "{ \"source\": \"" + source + "\", \"address\": \"" + addressString + "\" }";
 
 		AMap<AString, ACell> responseMap = makeToolCall("prepare", mcpArgs);
@@ -153,6 +154,41 @@ public class McpTest extends ARESTTest {
 		assertNotNull(restHash);
 
 		assertEquals(restHash, mcpHash);
+	}
+
+	/**
+	 * Full e2e flow: prepare -> sign -> submit should execute the transaction successfully.
+	 */
+	@Test
+	public void testPrepareSignSubmit() throws IOException, InterruptedException {
+		String source = "(* 2 3)";
+		String addressString = Init.GENESIS_ADDRESS.toString();
+		String prepareArgs = "{ \"source\": \"" + source + "\", \"address\": \"" + addressString + "\" }";
+
+		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
+		AMap<AString, ACell> prepared = expectResult(prepareResponse);
+		AString hashCell = RT.ensureString(prepared.get(Strings.create("hash")));
+		assertNotNull(hashCell);
+		String hashHex = hashCell.toString();
+
+		String seedHex = KP.getSeed().toHexString();
+		String signArgs = "{ \"value\": \"" + hashHex + "\", \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
+		AMap<AString, ACell> signed = expectResult(signResponse);
+		String signatureHex = toString(signed.get(Strings.create("signature")));
+		String accountKeyHex = toString(signed.get(Strings.create("accountKey")));
+		assertNotNull(signatureHex);
+		assertNotNull(accountKeyHex);
+		assertEquals(KP.getAccountKey().toHexString(), accountKeyHex);
+		Blob hashBlob = Blob.parse(hashHex);
+		assertNotNull(hashBlob);
+		assertEquals(KP.sign(hashBlob).toHexString(), signatureHex);
+
+		String submitArgs = "{ \"hash\": \"" + hashHex + "\", \"signature\": \"" + signatureHex + "\", \"accountKey\": \"" + accountKeyHex + "\" }";
+		AMap<AString, ACell> submitResponse = makeToolCall("submit", submitArgs);
+		System.out.println("Submit response: " + submitResponse);
+		AMap<AString, ACell> submitResult = expectResult(submitResponse);
+		assertEquals(CVMLong.create(6), submitResult.get(Strings.create("value")));
 	}
 
 	/**
@@ -188,13 +224,13 @@ public class McpTest extends ARESTTest {
 		Blob seedBlob = Blob.fromHex(seedHex);
 		AKeyPair keyPair = AKeyPair.create(seedBlob);
 		Blob payload = Blob.fromHex(valueHex);
-		SignedData<Blob> expected = keyPair.signData(payload);
+		ASignature expectedSignature = keyPair.sign(payload);
 
 		String signature = toString(structured.get(Strings.create("signature")));
 		String accountKey = toString(structured.get(Strings.create("accountKey")));
 		String signedValue = toString(structured.get(Strings.create("value")));
 
-		assertEquals(expected.getSignature().toHexString(), signature);
+		assertEquals(expectedSignature.toHexString(), signature);
 		assertEquals(keyPair.getAccountKey().toHexString(), accountKey);
 		assertEquals(valueHex, signedValue);
 	}
