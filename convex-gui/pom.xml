@@ -15,7 +15,7 @@
 	<url>https://convex.world</url>
 	
 	<properties>
-		<zxing.version>3.5.3</zxing.version>
+		<zxing.version>3.5.4</zxing.version>
 		<flatlaf.version>3.6.2</flatlaf.version>
 	</properties>
 

@@ -7,7 +7,6 @@ import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.util.Utils;
 
 /**

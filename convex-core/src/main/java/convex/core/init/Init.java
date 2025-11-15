@@ -12,7 +12,6 @@ import convex.core.cvm.Context;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;

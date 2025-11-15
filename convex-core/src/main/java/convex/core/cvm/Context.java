@@ -19,7 +19,6 @@ import convex.core.cvm.exception.RollbackValue;
 import convex.core.cvm.exception.TailcallValue;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AArrayBlob;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;

@@ -18,7 +18,7 @@
 	<artifactId>convex-core</artifactId>
 
 	<name>Convex Core</name>
-	<description>Convex core libraries and common utilities</description>
+	<description>Convex core libraries and common utilities, incliding high performance lattice data structures</description>
 	<url>https://convex.world</url>
 
 	<build>

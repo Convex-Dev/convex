@@ -5,7 +5,6 @@ import java.security.Security;
 import convex.core.crypto.bc.BCProvider;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 
 
 /**
