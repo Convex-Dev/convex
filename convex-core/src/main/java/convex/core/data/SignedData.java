@@ -83,6 +83,12 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 		return sd;
 	}
 
+	/**
+	 * Gets the message bytes (as signed in this SignedData)
+	 * @param <T> Type of value to sign
+	 * @param ref Ref to the data for signing
+	 * @return Message bytes
+	 */
 	public static <T extends ACell> Blob getMessageForRef(Ref<T> ref) {
 		return ref.getEncoding();
 	}
