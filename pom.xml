@@ -20,7 +20,6 @@
 		<module>convex-observer</module>
 		<module>convex-java</module>
 		<module>convex-restapi</module>
-		<module>convex-sodium</module>
 		<module>convex-integration</module>
 	</modules>
 

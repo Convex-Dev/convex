@@ -42,11 +42,6 @@
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
-			<artifactId>convex-sodium</artifactId>
-			<version>${convex.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>world.convex</groupId>
 			<artifactId>convex-gui</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
