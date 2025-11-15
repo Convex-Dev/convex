@@ -656,7 +656,8 @@ public class ChainAPI extends ABaseAPI {
 											@OpenApiExampleProperty(name = "sequence", value = "14"),
 											@OpenApiExampleProperty(name = "address", value = "12"),
 											@OpenApiExampleProperty(name = "source", value = "(* 2 3)"),
-											@OpenApiExampleProperty(name = "hash", value = "d00c0e81031103110232012a")
+											@OpenApiExampleProperty(name = "hash", value = "d00c0e81031103110232012a"),
+											@OpenApiExampleProperty(name = "data", value = "d00c0e81031103110232012a")
 										}
 										)}),
 					@OpenApiResponse(status = "503", 
@@ -688,11 +689,13 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
+		trans=Cells.persist(trans); // persist data so we have a full copy if needed
 		Ref<ATransaction> ref = Cells.persist(trans).getRef();
 		HashMap<String, Object> rmap = new HashMap<>();
 		rmap.put("source", srcValue);
 		rmap.put("address", JSON.json(addr));
 		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
+		rmap.put("data", Format.encodeMultiCell(trans, true).toHexString());
 		rmap.put("sequence", sequence);
 		ctx.status(200);
 		ctx.result(JSON.toString(rmap));

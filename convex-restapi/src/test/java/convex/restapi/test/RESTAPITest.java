@@ -12,12 +12,21 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.crypto.ASignature;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.init.Init;
@@ -50,6 +59,52 @@ public class RESTAPITest extends ARESTTest {
 		assertNotNull(JSON.parse(s));
 	}
 	
+	@Test public void testTxPrepareSubmit() throws IOException, InterruptedException, BadFormatException {
+		{ // should be a bad request with non-parseable/missing fields
+			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", "");
+			assertEquals(400, res.statusCode());
+		}
+		
+		{ // prepare should work
+			AMap<AString,ACell> req=Maps.of(
+					"address",Init.GENESIS_ADDRESS,
+					"source","(* 2 3)");
+			
+			String tx=JSON.toStringPretty(req);
+			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", tx);
+			assertEquals(200, res.statusCode());
+			
+			// Parse response as JSON to verify it's valid JSON
+			String responseBody = res.body();
+			AMap<AString,ACell> responseMap = JSON.parse(responseBody);
+			assertNotNull(responseMap);
+			
+			Blob data=Blob.parse(responseMap.getIn(Strings.DATA));
+			assertNotNull(data);
+			ACell txValue=Format.decodeMultiCell(data);
+			assertTrue(txValue instanceof ATransaction);
+			
+			// Get the hash value required for signing
+			Blob hash=Blob.parse(responseMap.getIn(Strings.HASH));
+			assertNotNull(hash);
+			
+			ASignature sig=KP.sign(hash);
+
+			AMap<AString,ACell> sub=Maps.of(
+					"accountKey", KP.getAccountKey(),
+					"hash",hash.toCVMHexString(), 
+					"sig",sig.toCVMHexString());
+
+			HttpResponse<String> res2 = post(API_PATH+"/transaction/submit", JSON.toStringPretty(sub));
+			assertEquals(200, res2.statusCode());
+			
+			AMap<AString, ACell> result =  JSON.parse(res2.body());
+			assertEquals(CVMLong.create(6),result.getIn("value"));
+
+		}
+	}
+	
+	
 	@Test public void testTransact() throws IOException, InterruptedException {
 		{ // should be a bad request with non-parseable/missing fields
 			HttpResponse<String> res = post(API_PATH+"/transact", "");
@@ -63,18 +118,13 @@ public class RESTAPITest extends ARESTTest {
 			
 			// Parse response as JSON to verify it's valid JSON
 			String responseBody = res.body();
-			Object parsedResponse = JSON.parse(responseBody);
-			assertNotNull(parsedResponse);
 			
 			// Extract transaction hash from the response using Convex data structures
-			@SuppressWarnings("unchecked")
-			convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell> responseMap = (convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell>) parsedResponse;
-			convex.core.data.ACell infoCell = responseMap.get(convex.core.data.Strings.create("info"));
-			assertNotNull(infoCell, "Response should contain info field");
-			
-			@SuppressWarnings("unchecked")
-			convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell> info = (convex.core.data.AMap<convex.core.data.ACell, convex.core.data.ACell>) infoCell;
-			convex.core.data.ACell txCell = info.get(convex.core.data.Strings.create("tx"));
+			AMap<AString, ACell> responseMap =  JSON.parse(responseBody);
+
+			AMap<ACell, ACell> info = responseMap.getIn("info");
+			assertNotNull(info, "Response should contain info field");
+			ACell txCell = info.getIn("tx");
 			assertNotNull(txCell, "Info should contain tx field with transaction hash");
 			String txHash = txCell.toString();
 			

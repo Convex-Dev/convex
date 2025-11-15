@@ -117,7 +117,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param keys Keys to look up in data structures
 	 * @return Value from collection, or null if not found
 	 */
-	public ACell getIn(Object... keys) {
+	public <T extends ACell> T getIn(Object... keys) {
 		return RT.getIn(this, keys);
 	}
 	
@@ -127,7 +127,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param keys Keys to look up in data structures
 	 * @return Value from collection, or null if not found
 	 */
-	public ACell getIn(ACell... keys) {
+	public <T extends ACell> T getIn(ACell... keys) {
 		return RT.getIn(this, keys);
 	}
 	
@@ -137,8 +137,9 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param key Key to look up in data structures. 
 	 * @return Value from collection, or null if not found
 	 */
-	public ACell getIn(Object key) {
-		return get(RT.cvm(key));
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getIn(Object key) {
+		return (T) get(RT.cvm(key));
 	}
 	
 	/**
@@ -147,8 +148,9 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param key Key to look up in data structures
 	 * @return Value from collection, or null if not found
 	 */
-	public ACell getIn(ACell key) {
-		return get(key);
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getIn(ACell key) {
+		return (T) get(key);
 	}
 	
 	/**

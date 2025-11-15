@@ -78,6 +78,11 @@ public class Strings {
 
 	public static final StringShort NULL = StringShort.intern("null");
 
+	public static final StringShort TX = StringShort.intern("tx");
+	
+	public static final StringShort DATA = StringShort.intern("data");
+
+	public static final StringShort HASH = StringShort.intern("hash");
 	
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());

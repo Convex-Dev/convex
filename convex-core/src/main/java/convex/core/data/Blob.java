@@ -68,13 +68,25 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Parses String input as a Blob. Converts from hex.
 	 * 
-	 * @param data Byte array
+	 * @param data String containing hex
 	 * @return Blob with the same byte contents as the given array
 	 */
 	public static Blob parse(String data) {
 		ABlob b = Blobs.parse(data);
 		if (b == null)
 			return null;
+		return b.toFlatBlob();
+	}
+	
+	/**
+	 * Parses input as a Blob. Converts strings from hex.
+	 * 
+	 * @param data Byte array
+	 * @return Blob with the same byte contents as the given array
+	 */
+	public static Blob parse(Object data) {
+		ABlob b = Blobs.parse(data);
+		if (b == null) return null;
 		return b.toFlatBlob();
 	}
 

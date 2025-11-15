@@ -1,5 +1,6 @@
 package convex.restapi.api;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Map;
@@ -9,6 +10,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -17,6 +19,7 @@ import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
 import convex.core.text.StringUtils;
 import convex.core.exceptions.ParseException;
+import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
@@ -72,6 +75,21 @@ public abstract class AGenericAPI {
 			return req;
 		} catch (IllegalArgumentException | ParseException e) {
 			throw new BadRequestResponse(jsonError("Invalid JSON body"));
+		}
+	}
+	
+	/**
+	 * Gets JSON body from a Context as a CVM Value
+	 * @param ctx Request context
+	 * @return JSON Object
+	 * @throws BadRequestResponse if the JSON body is invalid
+	 */
+	protected AMap<AString, ACell> readJSONBody(Context ctx) {
+		try {
+			AMap<AString, ACell> req= JSONReader.readObject(ctx.bodyInputStream());
+			return req;
+		} catch (IllegalArgumentException | ParseException | IOException e) {
+			throw new BadRequestResponse(jsonError("Invalid JSON body: "+e.getMessage()));
 		}
 	}
 	

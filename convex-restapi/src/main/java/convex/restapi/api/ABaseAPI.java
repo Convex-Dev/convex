@@ -6,7 +6,7 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
 /**
- * BAse class for API based services
+ * Base class for API based services
  */
 public abstract class ABaseAPI extends AGenericAPI {
 	
