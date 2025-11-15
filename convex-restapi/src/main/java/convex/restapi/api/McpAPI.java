@@ -92,6 +92,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_ALGORITHM = Strings.intern("algorithm");
 	public static final StringShort ARG_SEED = Strings.intern("seed");
 	public static final StringShort ARG_SEQUENCE = Strings.intern("sequence");
+	public static final StringShort ARG_CVX = Strings.intern("cvx");
 
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
@@ -334,6 +335,8 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new QueryTool());
 		registerTool(new PrepareTool());
 		registerTool(new TransactTool());
+		registerTool(new EncodeTool());
+		registerTool(new DecodeTool());
 		registerTool(new SubmitTool());
 		registerTool(new HashTool());
 		registerTool(new SignTool());
@@ -631,6 +634,65 @@ public class McpAPI extends ABaseAPI {
 				return toolSuccess(payload);
 			} catch (Exception e) {
 				return toolError("Failed to load peer status: " + e.getMessage());
+			}
+		}
+	}
+
+	private class EncodeTool extends McpTool {
+		EncodeTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/encode.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			if (arguments == null) {
+				return protocolError(-32602, "Encode requires arguments");
+			}
+			AString cvxCell = RT.ensureString(arguments.get(Strings.create("cvx")));
+			if (cvxCell == null) {
+				return protocolError(-32602, "Encode requires 'cvx' string");
+			}
+			try {
+				ACell value = Reader.read(cvxCell.toString());
+				Blob encoded = Format.encodeMultiCell(value, true);
+				AMap<AString, ACell> result = Maps.of(
+					Strings.create("cad3"), Strings.create(encoded.toCVMHexString()),
+					Strings.create("hash"), Strings.create(Ref.get(value).getEncoding().toCVMHexString())
+				);
+				return toolSuccess(result);
+			} catch (Exception e) {
+				return toolError("Encode failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class DecodeTool extends McpTool {
+		DecodeTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/decode.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			if (arguments == null) {
+				return protocolError(-32602, "Decode requires arguments");
+			}
+			AString cad3Cell = RT.ensureString(arguments.get(Strings.create("cad3")));
+			if (cad3Cell == null) {
+				return protocolError(-32602, "Decode requires 'cad3' string");
+			}
+			Blob cad3Blob = Blob.parse(cad3Cell);
+			if (cad3Blob == null) {
+				return toolError("cad3 must be valid hex data");
+			}
+			try {
+				ACell decoded = Format.decodeMultiCell(cad3Blob);
+				AString cvx = RT.print(decoded);
+				AMap<AString, ACell> result = Maps.of(
+					Strings.create("cvx"), cvx == null ? Strings.create("") : cvx
+				);
+				return toolSuccess(result);
+			} catch (Exception e) {
+				return toolError("Decode failed: " + e.getMessage());
 			}
 		}
 	}

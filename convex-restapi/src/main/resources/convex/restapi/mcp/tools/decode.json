@@ -1,0 +1,25 @@
+{
+  "name": "decode",
+  "title": "Decode CAD3",
+  "description": "Decode CAD3 multi-cell bytes back into a CVX literal, mirroring /api/v1/data/decode.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "cad3": {
+        "type": "string",
+        "description": "Hex string of the CAD3 bytes"
+      }
+    },
+    "required": ["cad3"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "cvx": {
+        "type": "string",
+        "description": "CVM literal reconstructed from the CAD3 data"
+      }
+    }
+  }
+}
+

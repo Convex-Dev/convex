@@ -156,6 +156,31 @@ public class McpTest extends ARESTTest {
 		assertEquals(restHash, mcpHash);
 	}
 
+	@Test
+	public void testEncodeDecodeTools() throws IOException, InterruptedException {
+		assertEncodeDecodeRoundTrip("12", "110c");
+		assertEncodeDecodeRoundTrip("nil", "00");
+		assertEncodeDecodeRoundTrip("[]", "8000");
+	}
+
+	private void assertEncodeDecodeRoundTrip(String cvxLiteral, String expectedHex) throws IOException, InterruptedException {
+		String encodeArgs = "{ \"cvx\": \"" + cvxLiteral.replace("\"", "\\\"") + "\" }";
+		AMap<AString, ACell> encodeResponse = makeToolCall("encode", encodeArgs);
+		AMap<AString, ACell> encodeResult = expectResult(encodeResponse);
+		AString cad3 = RT.ensureString(encodeResult.get(Strings.create("cad3")));
+		assertNotNull(cad3);
+		assertEquals(expectedHex, cad3.toString().toLowerCase());
+		AString hash = RT.ensureString(encodeResult.get(Strings.create("hash")));
+		assertNotNull(hash);
+
+		String decodeArgs = "{ \"cad3\": \"" + cad3.toString() + "\" }";
+		AMap<AString, ACell> decodeResponse = makeToolCall("decode", decodeArgs);
+		AMap<AString, ACell> decodeResult = expectResult(decodeResponse);
+		AString cvx = RT.ensureString(decodeResult.get(Strings.create("cvx")));
+		assertNotNull(cvx);
+		assertEquals(cvxLiteral, cvx.toString());
+	}
+
 	/**
 	 * Full e2e flow: prepare -> sign -> submit should execute the transaction successfully.
 	 */
