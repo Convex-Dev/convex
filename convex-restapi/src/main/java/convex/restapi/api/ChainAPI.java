@@ -46,6 +46,7 @@ import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -428,8 +429,8 @@ public class ChainAPI extends ABaseAPI {
 		Convex faucetClient=restServer.getFaucet();
 		if (faucetClient==null) throw new ForbiddenResponse("Faucet use not authorised on this server");
 
-		Map<String, Object> req = getJSONBody(ctx);
-		Object key = req.get("accountKey");
+		AMap<AString, ACell> req = readJSONBody(ctx);
+		AString key = req.getIn("accountKey");
 		if (key == null)
 			throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
 
@@ -437,7 +438,7 @@ public class ChainAPI extends ABaseAPI {
 		if (pk == null)
 			throw new BadRequestResponse(jsonError("Unable to parse accountKey: " + key));
 
-		Object faucet = req.get("faucet");
+		ACell faucet = req.getIn("faucet");
 		AInteger amt = AInteger.parse(faucet);
 		
 		Address a;
@@ -582,11 +583,11 @@ public class ChainAPI extends ABaseAPI {
 		Convex faucetClient=restServer.getFaucet();
 		if (faucetClient==null) throw new ForbiddenResponse("Faucet use not authorised on this server");
 
-		Map<String, Object> req = getJSONBody(ctx);
-		Address addr = Address.parse(req.get("address"));
+		AMap<AString, ACell> req = readJSONBody(ctx);
+		Address addr = Address.parse(req.getIn("address"));
 		if (addr == null) failBadRequest("Expected JSON body containing valid 'address' field");
 
-		Object o = req.get("amount");
+		ACell o = req.getIn("amount");
 		CVMLong l = CVMLong.parse(o);
 		if (l == null) {failBadRequest("Faucet requires an 'amount' field containing a long value."); return;}
 
@@ -599,13 +600,12 @@ public class ChainAPI extends ABaseAPI {
 		// Optional: pre-compile to Op
 		Result r = faucetClient.transactSync("(transfer " + addr + " " + amt + ")");
 		if (r.isError()) {
-			HashMap<String, Object> hm = r.toJSON();
-			ctx.result(JSON.toString(hm));
+			setContent(ctx,r);
 			ctx.status(422);
 		} else {
-			req.put("address", RT.castLong(addr).longValue());
-			req.put("amount", r.getValue());
-			ctx.result(JSON.toString(req));
+			req=req.assoc(Strings.ADDRESS, RT.castLong(addr));
+			req=req.assoc(Strings.AMOUNT, r.getValue());
+			setContent(ctx,req);
 		}
 	}
 

@@ -84,9 +84,14 @@ public class Strings {
 
 	public static final StringShort HASH = StringShort.intern("hash");
 	
+	public static final StringShort ADDRESS = StringShort.intern("address");
+
+	public static final StringShort AMOUNT = StringShort.intern("amount");
+	
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());
 	};
+
 
 
 

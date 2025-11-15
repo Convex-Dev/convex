@@ -81,7 +81,7 @@ public abstract class AGenericAPI {
 	/**
 	 * Gets JSON body from a Context as a CVM Value
 	 * @param ctx Request context
-	 * @return JSON Object
+	 * @return JSON AMap
 	 * @throws BadRequestResponse if the JSON body is invalid
 	 */
 	protected AMap<AString, ACell> readJSONBody(Context ctx) {
