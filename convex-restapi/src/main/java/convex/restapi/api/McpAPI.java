@@ -232,10 +232,9 @@ public class McpAPI extends ABaseAPI {
 	private AMap<AString, ACell> buildInitializeResult() {
 		AMap<AString, ACell> capabilities = Maps.of(Strings.create("tools"), EMPTY_MAP);
 		AMap<AString, ACell> result = Maps.of(
-			Strings.create("protocolVersion"), Strings.create("1.0"),
+			Strings.create("protocolVersion"), Strings.create("2025-03-26"),
 			Strings.create("serverInfo"), serverInfo,
-			Strings.create("capabilities"), capabilities,
-			Strings.create("tools"), listToolsVector()
+			Strings.create("capabilities"), capabilities
 		);
 		return result;
 	}

@@ -136,6 +136,7 @@ public class RESTAPITest extends ARESTTest {
 		assertCad3RoundTrip("12", "110c");
 		assertCad3RoundTrip("nil", "00");
 		assertCad3RoundTrip("[]", "8000");
+		assertCad3RoundTrip("()", "8100");
 	}
 
 	private void assertCad3RoundTrip(String cvxLiteral, String expectedHex) throws IOException, InterruptedException {
