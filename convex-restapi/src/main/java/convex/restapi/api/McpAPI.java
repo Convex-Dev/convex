@@ -424,7 +424,7 @@ public class McpAPI extends ABaseAPI {
 				try (Convex client = Convex.connect(server)) {
 					client.setAddress(address);
 					client.setKeyPair(keyPair);
-					Result result = client.transactSync(Reader.read(sourceCell));
+					Result result = client.transactSync((ACell)Reader.read(sourceCell));
 					return toolResult(result);
 				}
 			} catch (Exception e) {

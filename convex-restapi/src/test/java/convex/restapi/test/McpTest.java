@@ -22,7 +22,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.restapi.api.McpAPI;
@@ -212,6 +211,24 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> submitResponse = makeToolCall("submit", submitArgs);
 		AMap<AString, ACell> submitResult = expectResult(submitResponse);
 		assertEquals(CVMLong.create(6), submitResult.get(Strings.create("value")));
+	}
+
+	/**
+	 * Transact tool should execute a transaction directly with source, seed, and address,
+	 * returning the result value.
+	 */
+	@Test
+	public void testTransactTool() throws IOException, InterruptedException {
+		String source = "(* 2 3)";
+		String addressString = Init.GENESIS_ADDRESS.toString();
+		String seedHex = KP.getSeed().toHexString();
+		String transactArgs = "{ \"source\": \"" + source + "\", \"address\": \"" + addressString + "\", \"seed\": \"" + seedHex + "\" }";
+
+		AMap<AString, ACell> transactResponse = makeToolCall("transact", transactArgs);
+		AMap<AString, ACell> transactResult = expectResult(transactResponse);
+		ACell value = transactResult.get(Strings.create("value"));
+		assertNotNull(value, "Transact should return a value");
+		assertEquals(CVMLong.create(6), value, "Transact result should be 6 for (* 2 3)");
 	}
 
 	/**
