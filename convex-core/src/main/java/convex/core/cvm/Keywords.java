@@ -156,6 +156,10 @@ public class Keywords {
 	public static final Keyword DATA = Keyword.intern("data");
 	public static final Keyword FS = Keyword.intern("fs");
 	
+	
+	// General API keywords
+	public static final Keyword FAUCET = Keyword.intern("faucet");
+	
 
 
 

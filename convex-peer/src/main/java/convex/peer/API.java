@@ -104,6 +104,7 @@ public class API {
 		HashMap<Keyword, Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, kp);
 		config.put(Keywords.STATE, genesis);
+		config.put(Keywords.FAUCET, true);
 		return launchPeer(config);
 	}
 

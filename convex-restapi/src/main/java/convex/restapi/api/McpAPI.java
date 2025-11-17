@@ -15,6 +15,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Hashing;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.Coin;
 import convex.core.crypto.Providers;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
@@ -98,6 +99,8 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_PUBLIC_KEY = Strings.intern("publicKey");
 	public static final StringShort ARG_SIGNATURE = Strings.intern("signature");
 	public static final StringShort ARG_BYTES = Strings.intern("bytes");
+	public static final StringShort ARG_ACCOUNT_KEY = Strings.intern("accountKey");
+	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
 
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
@@ -347,6 +350,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new PeerStatusTool());
 		registerTool(new KeyGenTool());
 		registerTool(new ValidateTool());
+		registerTool(new CreateAccountTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -793,6 +797,83 @@ public class McpAPI extends ABaseAPI {
 				return toolSuccess(result);
 			} catch (Exception e) {
 				return toolError("Validation failed: " + e.getMessage());
+			}
+		}
+	}
+
+	/**
+	 * Common method to perform faucet payout. Used by both createAccount and potentially other tools.
+	 * @param faucetClient The Convex client with faucet permissions
+	 * @param address The address to transfer coins to
+	 * @param faucetAmount The amount in copper to transfer (may be null)
+	 * @return Result of the transfer, or null if no transfer was requested
+	 */
+	private Result performFaucetPayout(Convex faucetClient, Address address, Long faucetAmount) throws InterruptedException {
+		if (faucetAmount == null) {
+			return null;
+		}
+		long amt = faucetAmount;
+		// Apply same limit as ChainAPI.faucetRequest
+		if (amt > Coin.GOLD) {
+			amt = Coin.GOLD;
+		}
+		return faucetClient.transferSync(address, amt);
+	}
+
+	private class CreateAccountTool extends McpTool {
+		CreateAccountTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/createAccount.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+			if (arguments == null) {
+				return protocolError(-32602, "CreateAccount requires arguments");
+			}
+			AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
+			if (accountKeyCell == null) {
+				return protocolError(-32602, "CreateAccount requires 'accountKey' string");
+			}
+			
+			Convex faucetClient = restServer.getFaucet();
+			if (faucetClient == null) {
+				return toolError("Faucet use not authorised on this server");
+			}
+			
+			try {
+				AccountKey accountKey = AccountKey.parse(accountKeyCell.toString());
+				if (accountKey == null) {
+					return toolError("Unable to parse accountKey: " + accountKeyCell);
+				}
+				
+				ACell faucetCell = arguments.get(ARG_FAUCET);
+				Long faucetAmount = null;
+				if (faucetCell != null) {
+					CVMLong faucetLong = CVMLong.parse(faucetCell);
+					if (faucetLong == null) {
+						return toolError("Faucet amount must be a valid number");
+					}
+					faucetAmount = faucetLong.longValue();
+				}
+				
+				Address address = faucetClient.createAccountSync(accountKey);
+				
+				// Perform faucet payout if requested
+				if (faucetAmount != null) {
+					Result transferResult = performFaucetPayout(faucetClient, address, faucetAmount);
+					if (transferResult != null && transferResult.isError()) {
+						return toolResult(transferResult);
+					}
+				}
+				
+				AMap<AString, ACell> result = Maps.of(
+					Strings.create("address"), CVMLong.create(address.longValue())
+				);
+				return toolSuccess(result);
+			} catch (ResultException e) {
+				return toolResult(e.getResult());
+			} catch (Exception e) {
+				return toolError("Account creation failed: " + e.getMessage());
 			}
 		}
 	}
