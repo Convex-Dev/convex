@@ -25,6 +25,8 @@ import convex.core.crypto.ASignature;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.restapi.api.McpAPI;
+import convex.core.data.AccountKey;
+import convex.core.crypto.Ed25519Signature;
 
 /**
  * Integration tests for the MCP HTTP endpoint.
@@ -126,8 +128,8 @@ public class McpTest extends ARESTTest {
 		String args = "{ \"source\": \"(* 2 3)\", \"address\": \"#11\" }";
 		AMap<AString, ACell> responseMap = makeToolCall("prepare", args);
 		AMap<AString, ACell> structured = expectResult(responseMap);
-		assertNotNull(RT.ensureString(RT.getIn(structured, "hash")));
-		assertNotNull(RT.ensureString(RT.getIn(structured, "data")));
+		assertNotNull(RT.getIn(structured, "hash"));
+		assertNotNull(RT.getIn(structured, "data"));
 		assertNotNull(RT.getIn(structured, "sequence"));
 	}
 
@@ -145,7 +147,7 @@ public class McpTest extends ARESTTest {
 
 		AMap<AString, ACell> responseMap = makeToolCall("prepare", JSON.toString(mcpArgs));
 		AMap<AString, ACell> structured = expectResult(responseMap);
-		AString mcpHash = RT.ensureString(RT.getIn(structured, "hash"));
+		AString mcpHash = RT.getIn(structured, "hash");
 		assertNotNull(mcpHash);
 
 		AMap<AString, ACell> requestMap = Maps.of(
@@ -157,7 +159,7 @@ public class McpTest extends ARESTTest {
 		ACell restParsed = JSON.parse(restResponse.body());
 		AMap<AString, ACell> restMap = RT.ensureMap(restParsed);
 		assertNotNull(restMap);
-		AString restHash = RT.ensureString(RT.getIn(restMap, "hash"));
+		AString restHash = RT.getIn(restMap, "hash");
 		assertNotNull(restHash);
 
 		assertEquals(restHash, mcpHash);
@@ -174,16 +176,16 @@ public class McpTest extends ARESTTest {
 		String encodeArgs = "{ \"cvx\": \"" + cvxLiteral.replace("\"", "\\\"") + "\" }";
 		AMap<AString, ACell> encodeResponse = makeToolCall("encode", encodeArgs);
 		AMap<AString, ACell> encodeResult = expectResult(encodeResponse);
-		AString cad3 = RT.ensureString(RT.getIn(encodeResult, "cad3"));
+		AString cad3 = RT.getIn(encodeResult, "cad3");
 		assertNotNull(cad3);
 		assertEquals(expectedHex, cad3.toString().toLowerCase());
-		AString hash = RT.ensureString(RT.getIn(encodeResult, "hash"));
+		AString hash = RT.getIn(encodeResult, "hash");
 		assertNotNull(hash);
 
 		String decodeArgs = "{ \"cad3\": \"" + cad3.toString() + "\" }";
 		AMap<AString, ACell> decodeResponse = makeToolCall("decode", decodeArgs);
 		AMap<AString, ACell> decodeResult = expectResult(decodeResponse);
-		AString cvx = RT.ensureString(RT.getIn(decodeResult, "cvx"));
+		AString cvx = RT.getIn(decodeResult, "cvx");
 		assertNotNull(cvx);
 		assertEquals(cvxLiteral, cvx.toString());
 	}
@@ -202,7 +204,7 @@ public class McpTest extends ARESTTest {
 
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", JSON.toString(prepareArgs));
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
-		AString hashCell = RT.ensureString(RT.getIn(prepared, "hash"));
+		AString hashCell = RT.getIn(prepared, "hash");
 		assertNotNull(hashCell);
 		Blob hashBlob = Blob.parse(hashCell.toString());
 
@@ -213,12 +215,12 @@ public class McpTest extends ARESTTest {
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", JSON.toString(signArgs));
 		AMap<AString, ACell> signed = expectResult(signResponse);
-		AString signatureHex = RT.ensureString(RT.getIn(signed, "signature"));
-		AString accountKeyHex = RT.ensureString(RT.getIn(signed, "accountKey"));
+		AString signatureHex = RT.getIn(signed, "signature");
+		AString accountKeyHex = RT.getIn(signed, "accountKey");
 		assertNotNull(signatureHex);
 		assertNotNull(accountKeyHex);
-		assertEquals(Strings.create(KP.getAccountKey().toHexString()), accountKeyHex);
-		assertEquals(Strings.create(KP.sign(hashBlob).toHexString()), signatureHex);
+		assertEquals(KP.getAccountKey(), AccountKey.parse(accountKeyHex));
+		assertEquals(KP.sign(hashBlob), Blob.parse(signatureHex));
 
 		AMap<AString, ACell> submitArgs = Maps.of(
 			Strings.create("hash"), hashCell,
@@ -260,8 +262,8 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("keyGen", "{}");
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		
-		AString seed = RT.ensureString(RT.getIn(structured, "seed"));
-		AString publicKey = RT.ensureString(RT.getIn(structured, "publicKey"));
+		AString seed = RT.getIn(structured, "seed");
+		AString publicKey = RT.getIn(structured, "publicKey");
 		
 		assertNotNull(seed, "KeyGen should return a seed");
 		assertNotNull(publicKey, "KeyGen should return a publicKey");
@@ -279,8 +281,8 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("keyGen", JSON.toString(keyGenArgs));
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		
-		AString seed = RT.ensureString(RT.getIn(structured, "seed"));
-		AString publicKey = RT.ensureString(RT.getIn(structured, "publicKey"));
+		AString seed = RT.getIn(structured, "seed");
+		AString publicKey = RT.getIn(structured, "publicKey");
 		
 		assertNotNull(seed, "KeyGen should return the seed");
 		assertNotNull(publicKey, "KeyGen should return a publicKey");
@@ -290,7 +292,7 @@ public class McpTest extends ARESTTest {
 		// Verify the public key is deterministic for the same seed
 		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", JSON.toString(keyGenArgs));
 		AMap<AString, ACell> structured2 = expectResult(responseMap2);
-		AString publicKey2 = RT.ensureString(RT.getIn(structured2, "publicKey"));
+		AString publicKey2 = RT.getIn(structured2, "publicKey");
 		assertEquals(publicKey, publicKey2, "Same seed should produce same public key");
 	}
 
@@ -305,8 +307,8 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("keyGen", JSON.toString(keyGenArgs));
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		
-		AString seed = RT.ensureString(RT.getIn(structured, "seed"));
-		AString publicKey = RT.ensureString(RT.getIn(structured, "publicKey"));
+		AString seed = RT.getIn(structured, "seed");
+		AString publicKey = RT.getIn(structured, "publicKey");
 		
 		assertNotNull(seed, "KeyGen should return the seed");
 		assertNotNull(publicKey, "KeyGen should return a publicKey");
@@ -317,7 +319,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> keyGenArgsNoPrefix = Maps.of(Strings.create("seed"), SEED_TEST);
 		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", JSON.toString(keyGenArgsNoPrefix));
 		AMap<AString, ACell> structured2 = expectResult(responseMap2);
-		AString publicKey2 = RT.ensureString(RT.getIn(structured2, "publicKey"));
+		AString publicKey2 = RT.getIn(structured2, "publicKey");
 		assertEquals(publicKey, publicKey2, "Same seed with or without 0x prefix should produce same public key");
 	}
 
@@ -328,7 +330,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> keyGenArgs = Maps.of(Strings.create("seed"), seed);
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", JSON.toString(keyGenArgs));
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
-		return RT.ensureString(RT.getIn(keyGenResult, "publicKey"));
+		return RT.getIn(keyGenResult, "publicKey");
 	}
 
 	/**
@@ -341,7 +343,7 @@ public class McpTest extends ARESTTest {
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", JSON.toString(signArgs));
 		AMap<AString, ACell> signResult = expectResult(signResponse);
-		return RT.ensureString(RT.getIn(signResult, "signature"));
+		return RT.getIn(signResult, "signature");
 	}
 
 	/**
@@ -416,8 +418,8 @@ public class McpTest extends ARESTTest {
 		// Step 1: Generate a random key pair using keyGen
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", "{}");
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
-		AString seedHex = RT.ensureString(RT.getIn(keyGenResult, "seed"));
-		AString publicKeyHex = RT.ensureString(RT.getIn(keyGenResult, "publicKey"));
+		AString seedHex = RT.getIn(keyGenResult, "seed");
+		AString publicKeyHex = RT.getIn(keyGenResult, "publicKey");
 		
 		assertNotNull(seedHex, "keyGen should return a seed");
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
@@ -432,8 +434,8 @@ public class McpTest extends ARESTTest {
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", JSON.toString(signArgs));
 		AMap<AString, ACell> signResult = expectResult(signResponse);
-		AString signatureHex = RT.ensureString(RT.getIn(signResult, "signature"));
-		AString accountKeyFromSign = RT.ensureString(RT.getIn(signResult, "accountKey"));
+		AString signatureHex = RT.getIn(signResult, "signature");
+		AString accountKeyFromSign = RT.getIn(signResult, "accountKey");
 		
 		assertNotNull(signatureHex, "sign should return a signature");
 		assertNotNull(accountKeyFromSign, "sign should return an accountKey");
@@ -490,7 +492,7 @@ public class McpTest extends ARESTTest {
 	public void testCreateAccountTool() throws IOException, InterruptedException {
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", "{}");
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
-		AString publicKeyHex = RT.ensureString(RT.getIn(keyGenResult, "publicKey"));
+		AString publicKeyHex = RT.getIn(keyGenResult, "publicKey");
 		
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
 		
@@ -512,7 +514,7 @@ public class McpTest extends ARESTTest {
 	public void testCreateAccountToolWithFaucet() throws IOException, InterruptedException {
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", "{}");
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
-		AString publicKeyHex = RT.ensureString(RT.getIn(keyGenResult, "publicKey"));
+		AString publicKeyHex = RT.getIn(keyGenResult, "publicKey");
 		
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
 		
@@ -565,9 +567,9 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("sign", JSON.toString(arguments));
 		AMap<AString, ACell> structured = expectResult(responseMap);
 
-		AString signature = RT.ensureString(RT.getIn(structured, "signature"));
-		AString accountKey = RT.ensureString(RT.getIn(structured, "accountKey"));
-		AString signedValue = RT.ensureString(RT.getIn(structured, "value"));
+		AString signature = RT.getIn(structured, "signature");
+		AString accountKey = RT.getIn(structured, "accountKey");
+		AString signedValue = RT.getIn(structured, "value");
 
 		assertEquals(Strings.create(expectedSignature.toHexString()), signature);
 		assertEquals(Strings.create(keyPair.getAccountKey().toHexString()), accountKey);
