@@ -150,6 +150,9 @@ public class API {
 		// Peer should get a new allocated port
 		config.put(Keywords.PORT, null);
 
+		// Peer should have an enabled faucet for local use
+		config.put(Keywords.FAUCET, true);
+
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
 		

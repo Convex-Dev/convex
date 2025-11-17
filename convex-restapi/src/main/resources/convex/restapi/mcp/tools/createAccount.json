@@ -7,11 +7,11 @@
     "properties": {
       "accountKey": {
         "type": "string",
-        "description": "Hex encoded public key (account key) for the new account, with or without 0x prefix"
+        "description": "Hex encoded public key (account key) for the new account (0x prefix optional)"
       },
       "faucet": {
         "type": "string",
-        "description": "Optional amount of convex coins to request from faucet (in copper). If not provided, no faucet request is made."
+        "description": "Optional amount of convex coins to request from faucet (in copper). If not provided, no faucet request is made. MAx of 1 CVM is default."
       }
     },
     "required": ["accountKey"]

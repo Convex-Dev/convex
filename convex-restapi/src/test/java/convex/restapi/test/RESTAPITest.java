@@ -12,7 +12,9 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
@@ -301,5 +303,65 @@ public class RESTAPITest extends ARESTTest {
 		assertNotNull(RT.getIn(statusMap, "genesis"), "Status should contain genesis field");
 		assertNotNull(RT.getIn(statusMap, "state"), "Status should contain state field");
 		assertNotNull(RT.getIn(statusMap, "consensus-point"), "Status should contain consensus-point field");
+	}
+	
+	@Test public void testCreateAccount() throws IOException, InterruptedException {
+		{ // should be a bad request with missing accountKey
+			HttpResponse<String> res = post(API_PATH + "/createAccount", "{}");
+			assertEquals(400, res.statusCode());
+		}
+		
+		{ // should be a bad request with invalid accountKey
+			AMap<AString, ACell> req = Maps.of("accountKey", "invalid-key");
+			HttpResponse<String> res = post(API_PATH + "/createAccount", JSON.toString(req));
+			assertEquals(400, res.statusCode());
+		}
+		
+		{ // should create account successfully
+			AKeyPair newKeyPair = AKeyPair.generate();
+			String accountKeyHex = newKeyPair.getAccountKey().toHexString();
+			
+			AMap<AString, ACell> req = Maps.of("accountKey", accountKeyHex);
+			HttpResponse<String> res = post(API_PATH + "/createAccount", JSON.toString(req));
+			assertEquals(200, res.statusCode());
+			
+			// Parse response as JSON
+			String responseBody = res.body();
+			AMap<AString, ACell> responseMap = JSON.parse(responseBody);
+			assertNotNull(responseMap);
+			
+			// Verify response contains address
+			ACell addressCell = RT.getIn(responseMap, "address");
+			assertNotNull(addressCell, "Response should contain address field");
+			
+			// Verify address is a valid number
+			Address address = Address.parse(addressCell);
+			assertNotNull(address, "Address should be valid");
+		}
+		
+		{ // should create account with faucet request
+			AKeyPair newKeyPair = AKeyPair.generate();
+			String accountKeyHex = newKeyPair.getAccountKey().toHexString();
+			
+			AMap<AString, ACell> req = Maps.of(
+				"accountKey", accountKeyHex,
+				"faucet", CVMLong.create(1000)
+			);
+			HttpResponse<String> res = post(API_PATH + "/createAccount", JSON.toString(req));
+			assertEquals(200, res.statusCode());
+			
+			// Parse response as JSON
+			String responseBody = res.body();
+			AMap<AString, ACell> responseMap = JSON.parse(responseBody);
+			assertNotNull(responseMap);
+			
+			// Verify response contains address
+			ACell addressCell = RT.getIn(responseMap, "address");
+			assertNotNull(addressCell, "Response should contain address field");
+			
+			// Verify address is a valid number
+			Address address = Address.parse(addressCell);
+			assertNotNull(address, "Address should be valid");
+		}
 	}
 }
