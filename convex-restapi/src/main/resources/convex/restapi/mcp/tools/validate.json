@@ -1,0 +1,33 @@
+{
+  "name": "validate",
+  "title": "Signature Validator",
+  "description": "Validate an Ed25519 signature. Takes a public key, signature, and message bytes, and returns true if the signature is valid, false otherwise.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Hex encoded public key (account key) as hex string, with or without 0x prefix"
+      },
+      "signature": {
+        "type": "string",
+        "description": "Hex encoded Ed25519 signature (64 bytes, 128 hex characters), with or without 0x prefix"
+      },
+      "bytes": {
+        "type": "string",
+        "description": "Hex encoded message bytes that were signed, with or without 0x prefix"
+      }
+    },
+    "required": ["publicKey", "signature", "bytes"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "boolean",
+        "description": "true if the signature is valid, false otherwise"
+      }
+    }
+  }
+}
+

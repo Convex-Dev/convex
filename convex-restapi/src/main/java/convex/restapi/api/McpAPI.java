@@ -1,6 +1,7 @@
 package convex.restapi.api;
 
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -14,6 +15,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Hashing;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.crypto.Providers;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.cvm.transactions.ATransaction;
@@ -93,6 +95,9 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_SEED = Strings.intern("seed");
 	public static final StringShort ARG_SEQUENCE = Strings.intern("sequence");
 	public static final StringShort ARG_CVX = Strings.intern("cvx");
+	public static final StringShort ARG_PUBLIC_KEY = Strings.intern("publicKey");
+	public static final StringShort ARG_SIGNATURE = Strings.intern("signature");
+	public static final StringShort ARG_BYTES = Strings.intern("bytes");
 
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
@@ -340,6 +345,8 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new HashTool());
 		registerTool(new SignTool());
 		registerTool(new PeerStatusTool());
+		registerTool(new KeyGenTool());
+		registerTool(new ValidateTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -692,6 +699,100 @@ public class McpAPI extends ABaseAPI {
 				return toolSuccess(result);
 			} catch (Exception e) {
 				return toolError("Decode failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class KeyGenTool extends McpTool {
+		KeyGenTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/keyGen.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			Blob seedBlob;
+			try {
+				AString seedCell = RT.ensureString(arguments != null ? arguments.get(ARG_SEED) : null);
+				if (seedCell != null) {
+					// Use provided seed
+					String seedHex = seedCell.toString();
+					seedBlob = Blob.parse(seedHex);
+					if (seedBlob == null) {
+						return toolError("Seed must be valid hex data");
+					}
+					if (seedBlob.count() != AKeyPair.SEED_LENGTH) {
+						return toolError("Seed must be 32-byte hex string (64 hex characters)");
+					}
+				} else {
+					// Generate secure random seed
+					seedBlob = Blob.createRandom(new SecureRandom(), AKeyPair.SEED_LENGTH);
+				}
+				
+				AKeyPair keyPair = AKeyPair.create(seedBlob);
+				AccountKey publicKey = keyPair.getAccountKey();
+				
+				AMap<AString, ACell> result = Maps.of(
+					Strings.create("seed"), Strings.create(seedBlob.toString()),
+					Strings.create("publicKey"), Strings.create(publicKey.toString())
+				);
+				return toolSuccess(result);
+			} catch (Exception e) {
+				return toolError("Key generation failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class ValidateTool extends McpTool {
+		ValidateTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/validate.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			if (arguments == null) {
+				return protocolError(-32602, "Validate requires arguments");
+			}
+			AString publicKeyCell = RT.ensureString(arguments.get(ARG_PUBLIC_KEY));
+			if (publicKeyCell == null) {
+				return protocolError(-32602, "Validate requires 'publicKey' string");
+			}
+			AString signatureCell = RT.ensureString(arguments.get(ARG_SIGNATURE));
+			if (signatureCell == null) {
+				return protocolError(-32602, "Validate requires 'signature' string");
+			}
+			AString bytesCell = RT.ensureString(arguments.get(ARG_BYTES));
+			if (bytesCell == null) {
+				return protocolError(-32602, "Validate requires 'bytes' string");
+			}
+			
+			try {
+				AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
+				if (publicKey == null) {
+					return toolError("Invalid public key format");
+				}
+				
+				Blob signatureBlob = Blob.parse(signatureCell.toString());
+				if (signatureBlob == null) {
+					return toolError("Signature must be valid hex data");
+				}
+				if (signatureBlob.count() != Ed25519Signature.SIGNATURE_LENGTH) {
+					return toolError("Signature must be 64-byte hex string (128 hex characters)");
+				}
+				ASignature signature = Ed25519Signature.fromBlob(signatureBlob);
+				
+				Blob messageBlob = Blob.parse(bytesCell.toString());
+				if (messageBlob == null) {
+					return toolError("Bytes must be valid hex data");
+				}
+				
+				boolean isValid = Providers.verify(signature, messageBlob, publicKey);
+				
+				AMap<AString, ACell> result = Maps.of(
+					Strings.create("value"), isValid ? CVMBool.TRUE : CVMBool.FALSE
+				);
+				return toolSuccess(result);
+			} catch (Exception e) {
+				return toolError("Validation failed: " + e.getMessage());
 			}
 		}
 	}

@@ -232,6 +232,241 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
+	 * KeyGen tool should generate a key pair with a secure random seed when no seed is provided.
+	 */
+	@Test
+	public void testKeyGenToolRandom() throws IOException, InterruptedException {
+		AMap<AString, ACell> responseMap = makeToolCall("keyGen", "{}");
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		
+		AString seed = RT.ensureString(structured.get(Strings.create("seed")));
+		AString publicKey = RT.ensureString(structured.get(Strings.create("publicKey")));
+		
+		assertNotNull(seed, "KeyGen should return a seed");
+		assertNotNull(publicKey, "KeyGen should return a publicKey");
+		String seedStr = seed.toString();
+		assertTrue(seedStr.startsWith("0x"), "Seed should start with 0x prefix");
+		assertEquals(66, seedStr.length(), "Seed should be 66 characters (0x + 64 hex chars for 32 bytes)");
+		assertTrue(publicKey.toString().startsWith("0x"), "PublicKey should start with 0x prefix");
+	}
+
+	/**
+	 * KeyGen tool should generate a key pair from a provided seed (without 0x prefix).
+	 */
+	@Test
+	public void testKeyGenToolWithSeed() throws IOException, InterruptedException {
+		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String keyGenArgs = "{ \"seed\": \"" + seedHex + "\" }";
+		
+		AMap<AString, ACell> responseMap = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		
+		AString seed = RT.ensureString(structured.get(Strings.create("seed")));
+		AString publicKey = RT.ensureString(structured.get(Strings.create("publicKey")));
+		
+		assertNotNull(seed, "KeyGen should return the seed");
+		assertNotNull(publicKey, "KeyGen should return a publicKey");
+		String expectedSeed = "0x" + seedHex;
+		assertEquals(expectedSeed, seed.toString(), "Seed should match the provided seed with 0x prefix");
+		
+		// Verify the public key is deterministic for the same seed
+		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> structured2 = expectResult(responseMap2);
+		AString publicKey2 = RT.ensureString(structured2.get(Strings.create("publicKey")));
+		assertEquals(publicKey.toString(), publicKey2.toString(), "Same seed should produce same public key");
+	}
+
+	/**
+	 * KeyGen tool should accept seed input with 0x prefix.
+	 */
+	@Test
+	public void testKeyGenToolWithSeedWithPrefix() throws IOException, InterruptedException {
+		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String seedHexWithPrefix = "0x" + seedHex;
+		String keyGenArgs = "{ \"seed\": \"" + seedHexWithPrefix + "\" }";
+		
+		AMap<AString, ACell> responseMap = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		
+		AString seed = RT.ensureString(structured.get(Strings.create("seed")));
+		AString publicKey = RT.ensureString(structured.get(Strings.create("publicKey")));
+		
+		assertNotNull(seed, "KeyGen should return the seed");
+		assertNotNull(publicKey, "KeyGen should return a publicKey");
+		String expectedSeed = "0x" + seedHex;
+		assertEquals(expectedSeed, seed.toString(), "Seed should match the provided seed with 0x prefix");
+		
+		// Verify the public key is the same whether input has 0x prefix or not
+		String keyGenArgsNoPrefix = "{ \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", keyGenArgsNoPrefix);
+		AMap<AString, ACell> structured2 = expectResult(responseMap2);
+		AString publicKey2 = RT.ensureString(structured2.get(Strings.create("publicKey")));
+		assertEquals(publicKey.toString(), publicKey2.toString(), "Same seed with or without 0x prefix should produce same public key");
+	}
+
+	/**
+	 * Validate tool should return true for a valid Ed25519 signature.
+	 */
+	@Test
+	public void testValidateToolSuccess() throws IOException, InterruptedException {
+		// First, generate a key pair and sign some data
+		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String keyGenArgs = "{ \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
+		String publicKeyHex = toString(keyGenResult.get(Strings.create("publicKey")));
+		
+		// Sign some data
+		String valueHex = "68656c6c6f"; // "hello" in hex
+		String signArgs = "{ \"value\": \"" + valueHex + "\", \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
+		AMap<AString, ACell> signResult = expectResult(signResponse);
+		String signatureHex = toString(signResult.get(Strings.create("signature")));
+		
+		// Now validate the signature
+		String validateArgs = "{ \"publicKey\": \"" + publicKeyHex + "\", \"signature\": \"" + signatureHex + "\", \"bytes\": \"" + valueHex + "\" }";
+		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
+		AMap<AString, ACell> validateResult = expectResult(validateResponse);
+		ACell value = validateResult.get(Strings.create("value"));
+		
+		assertNotNull(value, "Validate should return a value");
+		assertEquals(CVMBool.TRUE, value, "Valid signature should return true");
+	}
+
+	/**
+	 * Validate tool should return false for an invalid signature (wrong signature).
+	 */
+	@Test
+	public void testValidateToolFailureWrongSignature() throws IOException, InterruptedException {
+		// Generate a key pair
+		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String keyGenArgs = "{ \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
+		String publicKeyHex = toString(keyGenResult.get(Strings.create("publicKey")));
+		
+		// Use a wrong signature (all zeros)
+		String wrongSignatureHex = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+		String valueHex = "68656c6c6f"; // "hello" in hex
+		
+		// Validate with wrong signature
+		String validateArgs = "{ \"publicKey\": \"" + publicKeyHex + "\", \"signature\": \"" + wrongSignatureHex + "\", \"bytes\": \"" + valueHex + "\" }";
+		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
+		AMap<AString, ACell> validateResult = expectResult(validateResponse);
+		ACell value = validateResult.get(Strings.create("value"));
+		
+		assertNotNull(value, "Validate should return a value");
+		assertEquals(CVMBool.FALSE, value, "Invalid signature should return false");
+	}
+
+	/**
+	 * Validate tool should return false for an invalid signature (wrong message bytes).
+	 */
+	@Test
+	public void testValidateToolFailureWrongBytes() throws IOException, InterruptedException {
+		// Generate a key pair and sign some data
+		String seedHex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String keyGenArgs = "{ \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", keyGenArgs);
+		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
+		String publicKeyHex = toString(keyGenResult.get(Strings.create("publicKey")));
+		
+		// Sign "hello"
+		String valueHex = "68656c6c6f"; // "hello" in hex
+		String signArgs = "{ \"value\": \"" + valueHex + "\", \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
+		AMap<AString, ACell> signResult = expectResult(signResponse);
+		String signatureHex = toString(signResult.get(Strings.create("signature")));
+		
+		// Try to validate with wrong message bytes
+		String wrongValueHex = "776f726c64"; // "world" in hex
+		String validateArgs = "{ \"publicKey\": \"" + publicKeyHex + "\", \"signature\": \"" + signatureHex + "\", \"bytes\": \"" + wrongValueHex + "\" }";
+		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
+		AMap<AString, ACell> validateResult = expectResult(validateResponse);
+		ACell value = validateResult.get(Strings.create("value"));
+		
+		assertNotNull(value, "Validate should return a value");
+		assertEquals(CVMBool.FALSE, value, "Signature for wrong message should return false");
+	}
+
+	/**
+	 * End-to-end test: Generate a key pair, sign data, and validate the signature.
+	 * This test demonstrates the complete workflow using keyGen, sign, and validate tools.
+	 */
+	@Test
+	public void testSignatureE2E() throws IOException, InterruptedException {
+		// Step 1: Generate a random key pair using keyGen
+		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", "{}");
+		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
+		String seedHex = toString(keyGenResult.get(Strings.create("seed")));
+		String publicKeyHex = toString(keyGenResult.get(Strings.create("publicKey")));
+		
+		assertNotNull(seedHex, "keyGen should return a seed");
+		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
+		assertTrue(seedHex.startsWith("0x"), "Seed should start with 0x prefix");
+		assertTrue(publicKeyHex.startsWith("0x"), "PublicKey should start with 0x prefix");
+		
+		// Step 2: Sign some data using the generated seed
+		String valueHex = "48656c6c6f20576f726c64"; // "Hello World" in hex
+		String signArgs = "{ \"value\": \"" + valueHex + "\", \"seed\": \"" + seedHex + "\" }";
+		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
+		AMap<AString, ACell> signResult = expectResult(signResponse);
+		String signatureHex = toString(signResult.get(Strings.create("signature")));
+		String accountKeyFromSign = toString(signResult.get(Strings.create("accountKey")));
+		
+		assertNotNull(signatureHex, "sign should return a signature");
+		assertNotNull(accountKeyFromSign, "sign should return an accountKey");
+		assertTrue(signatureHex.length() > 0, "Signature should be non-empty");
+		
+		// Verify the account key from sign matches the public key from keyGen
+		// Normalize by removing 0x prefix if present for comparison
+		String normalizedPublicKey = publicKeyHex.startsWith("0x") ? publicKeyHex.substring(2) : publicKeyHex;
+		String normalizedAccountKey = accountKeyFromSign.startsWith("0x") ? accountKeyFromSign.substring(2) : accountKeyFromSign;
+		assertEquals(normalizedPublicKey.toLowerCase(), normalizedAccountKey.toLowerCase(), "Public key from keyGen should match accountKey from sign");
+		
+		// Step 3: Validate the signature using the validate tool
+		String validateArgs = "{ \"publicKey\": \"" + publicKeyHex + "\", \"signature\": \"" + signatureHex + "\", \"bytes\": \"" + valueHex + "\" }";
+		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
+		AMap<AString, ACell> validateResult = expectResult(validateResponse);
+		ACell isValid = validateResult.get(Strings.create("value"));
+		
+		assertNotNull(isValid, "validate should return a value");
+		assertEquals(CVMBool.TRUE, isValid, "The signature should be valid after the complete E2E workflow");
+	}
+
+	/**
+	 * Validate tool should return false for an invalid signature (wrong public key).
+	 */
+	@Test
+	public void testValidateToolFailureWrongPublicKey() throws IOException, InterruptedException {
+		// Generate two different key pairs
+		String seed1Hex = "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20";
+		String seed2Hex = "2102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f21";
+		
+		// Get public key from second key pair (we'll use this as the wrong key)
+		String keyGenArgs2 = "{ \"seed\": \"" + seed2Hex + "\" }";
+		AMap<AString, ACell> keyGenResponse2 = makeToolCall("keyGen", keyGenArgs2);
+		AMap<AString, ACell> keyGenResult2 = expectResult(keyGenResponse2);
+		String publicKey2Hex = toString(keyGenResult2.get(Strings.create("publicKey")));
+		
+		// Sign with first key pair
+		String valueHex = "68656c6c6f"; // "hello" in hex
+		String signArgs = "{ \"value\": \"" + valueHex + "\", \"seed\": \"" + seed1Hex + "\" }";
+		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
+		AMap<AString, ACell> signResult = expectResult(signResponse);
+		String signatureHex = toString(signResult.get(Strings.create("signature")));
+		
+		// Try to validate with wrong public key (from second key pair)
+		String validateArgs = "{ \"publicKey\": \"" + publicKey2Hex + "\", \"signature\": \"" + signatureHex + "\", \"bytes\": \"" + valueHex + "\" }";
+		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
+		AMap<AString, ACell> validateResult = expectResult(validateResponse);
+		ACell value = validateResult.get(Strings.create("value"));
+		
+		assertNotNull(value, "Validate should return a value");
+		assertEquals(CVMBool.FALSE, value, "Signature with wrong public key should return false");
+	}
+
+	/**
 	 * Attempting to call an unregistered tool should surface a protocol error
 	 * (same as unknown method) rather than a tool-level error payload.
 	 */
