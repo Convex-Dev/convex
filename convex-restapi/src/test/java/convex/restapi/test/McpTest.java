@@ -67,9 +67,8 @@ public class McpTest extends ARESTTest {
 		assertTrue(resultCell instanceof AMap);
 
 		AMap<AString, ACell> result = RT.ensureMap(resultCell);
-		AVector<ACell> tools = RT.ensureVector(result.get(Strings.create("tools")));
-		assertNotNull(tools, "initialize should include tools");
-		assertTrue(tools.count() >= 5);
+		ACell protocol = RT.getIn(result,"protocolVersion");
+		assertNotNull(protocol, "initialize should include protocol version");
 	}
 
 	/**
