@@ -80,7 +80,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort FIELD_CODE = Strings.intern("code");
 	public static final StringShort FIELD_MESSAGE = Strings.intern("message");
 	public static final StringShort FIELD_CONTENT = Strings.intern("content");
-	public static final StringShort FIELD_STRUCTURED_CONTENT = Strings.intern("structured_content");
+	public static final StringShort FIELD_STRUCTURED_CONTENT = Strings.intern("structuredContent");
 	public static final StringShort FIELD_TYPE = Strings.intern("type");
 	public static final StringShort FIELD_TEXT = Strings.intern("text");
 	public static final StringShort FIELD_IS_ERROR = Strings.intern("isError");
