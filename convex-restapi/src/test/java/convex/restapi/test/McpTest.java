@@ -12,21 +12,25 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.init.Init;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.api.McpAPI;
 import convex.core.data.AccountKey;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.cvm.Address;
 
 /**
  * Integration tests for the MCP HTTP endpoint.
@@ -316,7 +320,7 @@ public class McpTest extends ARESTTest {
 		assertEquals(expectedSeed, seed, "Seed should match the provided seed with 0x prefix");
 		
 		// Verify the public key is the same whether input has 0x prefix or not
-		AMap<AString, ACell> keyGenArgsNoPrefix = Maps.of(Strings.create("seed"), SEED_TEST);
+		AMap<AString, ACell> keyGenArgsNoPrefix = Maps.of("seed", SEED_TEST);
 		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", JSON.toString(keyGenArgsNoPrefix));
 		AMap<AString, ACell> structured2 = expectResult(responseMap2);
 		AString publicKey2 = RT.getIn(structured2, "publicKey");
@@ -327,7 +331,7 @@ public class McpTest extends ARESTTest {
 	 * Helper method to generate a key pair and return the public key.
 	 */
 	private AString generateKeyPair(AString seed) throws IOException, InterruptedException {
-		AMap<AString, ACell> keyGenArgs = Maps.of(Strings.create("seed"), seed);
+		AMap<AString, ACell> keyGenArgs = Maps.of("seed", seed);
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", JSON.toString(keyGenArgs));
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
 		return RT.getIn(keyGenResult, "publicKey");
@@ -533,6 +537,43 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
+	 * CreateAccount and DescribeAccount integration test.
+	 * Creates a new account and verifies that describeAccount returns an empty metadata map.
+	 */
+	@Test
+	public void testCreateAccountAndDescribeAccount() throws IOException, InterruptedException {
+		// Step 1: Generate a key pair
+		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", "{}");
+		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
+		AString publicKeyHex = RT.getIn(keyGenResult, "publicKey");
+		
+		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
+		
+		// Step 2: Create an account
+		AMap<AString, ACell> createAccountArgs = Maps.of(Strings.create("accountKey"), publicKeyHex);
+		AMap<AString, ACell> createAccountResponse = makeToolCall("createAccount", JSON.toString(createAccountArgs));
+		AMap<AString, ACell> createAccountResult = expectResult(createAccountResponse);
+		ACell addressCell = RT.getIn(createAccountResult, "address");
+		
+		assertNotNull(addressCell, "createAccount should return an address");
+		Address addressLong = Address.parse(addressCell);
+		assertNotNull(addressLong, "Address should be valid");
+		
+		// Step 3: Describe the account
+		AString addressString = Strings.create("#" + addressLong.longValue());
+		AMap<AString, ACell> describeAccountArgs = Maps.of("address", addressString);
+		AMap<AString, ACell> describeAccountResponse = makeToolCall("describeAccount", JSON.toString(describeAccountArgs));
+		AMap<AString, ACell> describeAccountResult = expectResult(describeAccountResponse);
+		
+		// Step 4: Verify metadata is an empty map
+		AString metadataCell = RT.getIn(describeAccountResult, "metadata");
+		assertNotNull(metadataCell, "describeAccount should return CVX format metadata map");
+		AMap<Symbol,AHashMap<ACell,ACell>> meta=Reader.read(metadataCell);
+		assertTrue(meta instanceof AMap, "Metadata should be a map");
+		assertEquals(0, meta.count(), "New account should have empty metadata");
+	}
+
+	/**
 	 * Attempting to call an unregistered tool should surface a protocol error
 	 * (same as unknown method) rather than a tool-level error payload.
 	 */
@@ -677,8 +718,8 @@ public class McpTest extends ARESTTest {
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
 		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
-		assertNotNull(result, "RPC result missing");
-		assertEquals(CVMBool.FALSE, result.get(McpAPI.FIELD_IS_ERROR));
+		assertNotNull(result, ()->"RPC result missing in:" + responseMap);
+		assertEquals(CVMBool.FALSE, result.get(McpAPI.FIELD_IS_ERROR), ()->"Unexpcted failure in:" + responseMap);
 
 		AVector<ACell> content = RT.ensureVector(result.get(McpAPI.FIELD_CONTENT));
 		assertNotNull(content);

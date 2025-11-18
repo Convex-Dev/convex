@@ -7,7 +7,7 @@
     "properties": {
       "value": {
         "type": "string",
-        "description": "Hex encoded bytes to sign. For Convex transactions, this is the 'hash' field returned by prepare"
+        "description": "Hex encoded bytes to sign. For Convex transactions, this is the 'hash' field returned by prepare i.e. the ref-encoding of the transaction."
       },
       "seed": {
         "type": "string",
@@ -21,8 +21,7 @@
     "properties": {
       "value": {"type": "string", "description": "Hex encoded payload that was signed"},
       "signature": {"type": "string", "description": "Hex encoded Ed25519 signature"},
-      "accountKey": {"type": "string", "description": "Hex encoded public key"},
-      "message": {"type": "string", "description": "Optional human-readable message"}
+      "accountKey": {"type": "string", "description": "Hex encoded public key"}
     }
   }
 }

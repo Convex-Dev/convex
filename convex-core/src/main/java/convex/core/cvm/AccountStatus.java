@@ -368,14 +368,16 @@ public class AccountStatus extends ARecordGeneric {
 	
 	/**
 	 * Gets the Environment for this account.
-	 * @return Environment map for this Account
+	 * @return Environment map for this Account. Might be null?
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Symbol, ACell> getEnvironment() {
-		if (environment==null) {
-			environment=(AHashMap<Symbol, ACell>)values.get(IX_ENVIRONMENT);
+		AHashMap<Symbol, ACell> result= environment;
+		if (result==null) {
+			result=(AHashMap<Symbol, ACell>)values.get(IX_ENVIRONMENT);
+			environment=result;
 		}
-		return environment;
+		return result;
 	}
 
 	/**
@@ -384,10 +386,12 @@ public class AccountStatus extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
-		if (metadata==null) {
-			metadata=(AHashMap<Symbol,AHashMap<ACell,ACell>>)(values.get(IX_METADATA));
+		AHashMap<Symbol, AHashMap<ACell,ACell>> result= metadata;
+		if (result==null) {
+			result=(AHashMap<Symbol,AHashMap<ACell,ACell>>)(values.get(IX_METADATA));
+			metadata=result;
 		}
-		return metadata;
+		return result;
 	}
 
 	/**

@@ -17,16 +17,20 @@ import convex.core.crypto.Hashing;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.Coin;
 import convex.core.crypto.Providers;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
+import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.MapEntry;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Symbol;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
@@ -351,6 +355,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new KeyGenTool());
 		registerTool(new ValidateTool());
 		registerTool(new CreateAccountTool());
+		registerTool(new DescribeAccountTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -874,6 +879,55 @@ public class McpAPI extends ABaseAPI {
 				return toolResult(e.getResult());
 			} catch (Exception e) {
 				return toolError("Account creation failed: " + e.getMessage());
+			}
+		}
+	}
+	
+	private class DescribeAccountTool extends McpTool {
+		DescribeAccountTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/describeAccount.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+			try {
+				Address address = Address.parse(RT.getIn(arguments,ARG_ADDRESS));
+				if (address == null) {
+					return toolError("No valid address provided");
+				}
+				
+				AccountStatus accountStatus = server.getPeer().getConsensusState().getAccount(address);
+				if (accountStatus == null) {
+					return toolError("Account not found: " + address);
+				}
+				
+				// Get metadata: AHashMap<Symbol, AHashMap<ACell,ACell>>
+				AHashMap<Symbol, AHashMap<ACell, ACell>> meta = accountStatus.getMetadata();
+				if (meta==null) meta=Maps.empty();
+				
+				// Complete metadata with any Symbols that have no metadata but are present in environment
+				AHashMap<Symbol, ACell> env = accountStatus.getEnvironment();
+				if (env!=null) {
+					long esize=env.count();
+					for (long i=0; i<esize; i++) {
+						MapEntry<Symbol, ACell> entry = env.entryAt(i);
+						Symbol sym = entry.getKey();
+						if (!meta.containsKey(sym)) {
+							meta=meta.assoc(sym, null);
+						}
+					}
+				}
+				
+				Object metadataString = RT.print(meta);
+				if (metadataString == null) {
+					metadataString="Metadata too large to print";
+				}
+				AMap<AString, ACell> resultMap = Maps.of(
+					"metadata", metadataString
+				);
+				return toolSuccess(resultMap);
+			} catch (Exception e) {
+				return toolError("Account lookup failed: " + e.getMessage());
 			}
 		}
 	}

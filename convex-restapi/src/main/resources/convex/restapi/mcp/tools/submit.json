@@ -7,7 +7,7 @@
     "properties": {
       "hash": {
         "type": "string",
-        "description": "Transaction reference hash returned by the prepare tool"
+        "description": "Transaction reference hash returned by the prepare tool (hex string). This is the ref-encoding of the transaction."
       },
       "accountKey": {
         "type": "string",
@@ -15,27 +15,30 @@
       },
       "sig": {
         "type": "string",
-        "description": "Ed25519 signature in hex (64 bytes = 128 hex digits)"
+        "description": "Ed25519 signature of hash bytes in hex (64 bytes = 128 hex digits)"
       }
     },
-    "required": ["hash", "accountKey", "signature"]
+    "required": [
+      "hash",
+      "accountKey",
+      "signature"
+    ]
   },
   "outputSchema": {
     "type": "object",
     "properties": {
       "value": {
-		"type": "any",
+        "type": "any",
         "description": "Resulting CVM value converted to JSON"
       },
       "errorCode": {
-		"type": "string",
+        "type": "string",
         "description": "CVM error code (if the transaction failed)"
       },
       "info": {
-		"type": "object",
+        "type": "object",
         "description": "Additional execution metadata"
       }
     }
   }
 }
-

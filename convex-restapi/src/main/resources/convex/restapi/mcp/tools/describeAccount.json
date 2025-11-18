@@ -1,0 +1,25 @@
+{
+  "name": "describeAccount",
+  "title": "Describe Account",
+  "description": "Get symbol metadata for an account. Returns a map of Symbol -> Symbol metadata (possibly nil).",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Address of the account to describe (e.g. '#11' or '11')"
+      }
+    },
+    "required": ["address"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "metadata": {
+        "type": "object",
+        "description": "Map of Symbol -> Symbol metadata (possibly nil)"
+      }
+    }
+  }
+}
+
