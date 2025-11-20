@@ -866,13 +866,14 @@ public class State extends ARecordGeneric {
 	}
 
 	/**
-	 * Look up an Address from CNS
+	 * Look up an value from CNS
 	 * @param name CNS name String
-	 * @return Address from CNS, or null if not found
+	 * @return Value from CNS, or null if not found
 	 */
-	public Address lookupCNS(String name) {
+	public ACell lookupCNS(String name) {
 		Context ctx=Context.create(this);
-		return (Address) ctx.lookupCNS(name).getResult();
+		Symbol sym=Symbol.create(name);
+		return ctx.lookupCNS(sym).getResult();
 	}
 
 	/**

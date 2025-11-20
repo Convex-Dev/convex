@@ -40,6 +40,17 @@ public final class Symbol extends ASymbolic {
 	 * @param name Symbol name
 	 * @return Symbol instance, or null if the Symbol is invalid
 	 */
+	public static Symbol of(Object name) {
+		if (name instanceof AString s) return create(s);
+		if (name instanceof String s) return create(s);
+		return null;
+	}
+	
+	/**
+	 * Creates a Symbol with the given name
+	 * @param name Symbol name
+	 * @return Symbol instance, or null if the Symbol is invalid
+	 */
 	public static Symbol create(String name) {
 		if (name==null) return null;
 		StringStore.Entry e=StringStore.get(name);
@@ -55,6 +66,8 @@ public final class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(AString name) {
 		if (!validateName(name)) return null;
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getSymbol();
 		Symbol sym= new Symbol((StringShort)name);
 		return sym;
 	}

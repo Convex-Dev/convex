@@ -20,6 +20,7 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.cvm.Address;
+import convex.core.cvm.State;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -44,10 +45,11 @@ public class OraclePanel extends JPanel {
 		this.manager=manager;
 		this.setLayout(new BorderLayout());
 		
-		Address oracleAddress = manager.getState().lookupCNS("convex.trusted-oracle");
-		Address oracleActorAddress = manager.getState().lookupCNS("convex.trusted-oracle.actor");
+		State state=manager.getState();
+		Address oracleAddress = RT.ensureAddress(state.lookupCNS("convex.trusted-oracle"));
+		Address oracleActorAddress = RT.ensureAddress(state.lookupCNS("convex.trusted-oracle.actor"));
 
-		OracleTableModel tableModel = new OracleTableModel(manager.getState(), oracleActorAddress);
+		OracleTableModel tableModel = new OracleTableModel(state, oracleActorAddress);
 		JTable table = new JTable(tableModel);
 		scrollPane = new JScrollPane(table);;
 

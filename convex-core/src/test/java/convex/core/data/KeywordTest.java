@@ -2,12 +2,15 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.Keywords;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.text.Text;
@@ -87,5 +90,21 @@ public class KeywordTest {
 		
 		// fallback to generic bloblike tests
 		BlobsTest.doBlobLikeTests(k);
+	}
+
+	@Test
+	public void testIntern() {
+		// Test that interning a Symbol results in the same symbol for subsequent creates
+		Keyword s1 = Keyword.intern("shouldBeInterned");
+		Keyword s2 = Keyword.create("shouldBeInterned");
+		assertSame(s1, s2);
+
+		// Test that creating a Symbol with the same name does not intern the same symbol
+		Keyword s3 = Keyword.create("shouldNotBeInterned");
+		Keyword s4 = Keyword.create("shouldNotBeInterned");
+		assertNotSame(s3, s4);
+
+		// Test that the Symbols class is interning the correct symbols
+		assertSame(Keywords.FOO,Keyword.create("foo"));
 	}
 }

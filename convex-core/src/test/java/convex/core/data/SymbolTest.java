@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;	
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import java.util.HashSet;
 
@@ -99,6 +101,22 @@ public class SymbolTest {
 		assertTrue(Symbol.validateName(s.getName()));
 		
 		BlobsTest.doBlobLikeTests(s);
+	}
+
+	@Test
+	public void testIntern() {
+		// Test that interning a Symbol results in the same symbol for subsequent creates
+		Symbol s1 = Symbol.intern("shouldBeInterned");
+		Symbol s2 = Symbol.create("shouldBeInterned");
+		assertSame(s1, s2);
+
+		// Test that creating a Symbol with the same name does not intern the same symbol
+		Symbol s3 = Symbol.create("shouldNotBeInterned");
+		Symbol s4 = Symbol.create("shouldNotBeInterned");
+		assertNotSame(s3, s4);
+
+		// Test that the Symbols class is interning the correct symbols
+		assertSame(Symbols.ABS,Symbol.of("abs"));
 	}
 
 }

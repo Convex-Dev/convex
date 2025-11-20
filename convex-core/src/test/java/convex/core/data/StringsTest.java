@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import java.io.IOException;
 
@@ -216,18 +217,7 @@ public class StringsTest {
 		assertEquals(0xffffffff, s.intAt(-6)); // 0xff before start of string
 	}
 	
-	@Test public void testIntern() {
-		AString s1=Strings.intern("interned");
-		AString s2=Strings.intern("interned");
-		assertSame(s1,s2);
-		AString s3=Strings.intern(s1);
-		assertSame(s1,s3);
-		assertSame(s1.toFlatBlob(),s3.toFlatBlob());
-		
-		assertTrue(s1.getRef().isInternal());
-		
-		assertSame(ErrorCodes.TIMEOUT,Keyword.create("TIMEOUT"));
-	}
+
 
 	@Test
 	public void testCharAt() {
@@ -251,6 +241,34 @@ public class StringsTest {
 		if (c != null) {
 			assertEquals(CVMChar.create(c), cg);
 		}
+	}
+
+	@Test
+	public void testIntern() {
+		// Test that interning a Symbol results in the same symbol for subsequent creates
+		AString s1 = Strings.intern("shouldBeInterned");
+		AString s2 = Strings.create("shouldBeInterned");
+		assertSame(s1, s2);
+
+		// Test that creating a Symbol with the same name does not intern the same symbol
+		AString s3 = Strings.create("shouldNotBeInterned");
+		AString s4 = Strings.create("shouldNotBeInterned");
+		assertNotSame(s3, s4);
+
+		// Test that the Symbols class is interning the correct symbols
+		assertSame(Strings.ADDRESS,Strings.create("address"));
+	}
+
+	@Test public void testInternRefs() {
+		AString s1=Strings.intern("interned");
+		AString s2=Strings.intern("interned");
+		assertSame(s1,s2);
+		AString s3=Strings.intern(s1);
+		assertSame(s1,s3);
+		assertSame(s1.toFlatBlob(),s3.toFlatBlob());
+		
+		assertTrue(s1.getRef().isInternal());
+		assertSame(ErrorCodes.TIMEOUT,Keyword.create("TIMEOUT"));
 	}
 
 	public void doStringTest(AString a) {

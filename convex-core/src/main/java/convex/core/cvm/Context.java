@@ -2281,10 +2281,9 @@ public class Context {
 		return log;
 	}
 
-	public Context lookupCNS(String name) {
+	public Context lookupCNS(Symbol name) {
 		Context ctx=this.fork();
-		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.CNS_RESOLVE, Symbol.create(name));
-
+		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.CNS_RESOLVE, name);
 		return ctx;
 	}
 
