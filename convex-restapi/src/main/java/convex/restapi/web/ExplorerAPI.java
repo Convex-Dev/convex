@@ -522,7 +522,7 @@ public class ExplorerAPI extends AWebSite {
 		Server s=restServer.getServer();
 		
 		// Get current state from server
-		State state = s.getPeer().getConsensusState();
+		State state = s.getState();
 		AVector<AccountStatus> accounts = state.getAccounts();
 		long naccounts = accounts.count();
 		
@@ -1010,7 +1010,7 @@ public class ExplorerAPI extends AWebSite {
 		long accountNum=Long.parseLong(ctx.pathParam("accountNum"));
 		
 		// Get current state from server
-		State state = s.getPeer().getConsensusState();
+		State state = s.getState();
 		Address address = Address.create(accountNum);
 		AccountStatus account = state.getAccount(address);
 		
@@ -1169,7 +1169,7 @@ public class ExplorerAPI extends AWebSite {
 		Server s=restServer.getServer();
 		
 		// Get current state from server
-		State state = s.getPeer().getConsensusState();
+		State state = s.getState();
 		Index<AArrayBlob, PeerStatus> peers = state.getPeers();
 		long npeers = peers.count();
 		
@@ -1243,7 +1243,7 @@ public class ExplorerAPI extends AWebSite {
 		}
 		
 		// Get current state from server
-		State state = server.getPeer().getConsensusState();
+		State state = server.getState();
 		PeerStatus peerStatus = state.getPeer(peerKey);
 		
 		if (peerStatus == null) {

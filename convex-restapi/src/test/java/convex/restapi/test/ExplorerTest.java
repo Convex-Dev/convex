@@ -175,7 +175,7 @@ public class ExplorerTest extends ARESTTest {
         // Extract a peer key from the response (this is a simplified approach)
         // In a real test, you might want to parse the HTML to extract actual peer keys
         // For now, we'll test with a known format that should exist
-        var peers = server.getServer().getPeer().getConsensusState().getPeers();
+        var peers = server.getServer().getState().getPeers();
         if (peers.count() > 0) {
             String peerKey = peers.entryAt(0).getKey().toHexString();
             HttpResponse<String> response = get(EXPLORER_PATH + "/peers/" + peerKey);

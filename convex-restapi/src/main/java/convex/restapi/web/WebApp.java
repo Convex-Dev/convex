@@ -33,7 +33,7 @@ public class WebApp extends AWebSite {
 		String peerKeyHex = server.getPeer().getPeerKey().toHexString();
 		String peerLink = ABaseAPI.getExternalBaseUrl(ctx, "/explorer/peers/"+peerKeyHex);
 		
-		State state=server.getPeer().getConsensusState();
+		State state=server.getState();
 		long accountCount=state.getAccounts().count();
 		long issuedSupply=state.computeSupply();
 		
