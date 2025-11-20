@@ -119,7 +119,7 @@ public class McpTest extends ARESTTest {
 	 */
 	@Test
 	public void testToolCallQuery() throws IOException, InterruptedException {
-		AMap<AString, ACell> args = Maps.of(Strings.create("source"), Strings.create("*balance*"));
+		AMap<AString, ACell> args = Maps.of("source", "*balance*");
 		AMap<AString, ACell> responseMap = makeToolCall("query", args);
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		assertNotNull(RT.getIn(structured, "value"));
@@ -132,8 +132,8 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testPrepareTool() throws IOException, InterruptedException {
 		AMap<AString, ACell> args = Maps.of(
-			Strings.create("source"), Strings.create("(* 2 3)"),
-			Strings.create("address"), Strings.create("#11")
+			"source", "(* 2 3)",
+			"address", "#11"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("prepare", args);
 		AMap<AString, ACell> structured = expectResult(responseMap);
@@ -150,8 +150,8 @@ public class McpTest extends ARESTTest {
 		AString source = Strings.create("(* 2 3)");
 		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
 		AMap<AString, ACell> mcpArgs = Maps.of(
-			Strings.create("source"), source,
-			Strings.create("address"), addressString
+			"source", source,
+			"address", addressString
 		);
 
 		AMap<AString, ACell> responseMap = makeToolCall("prepare", mcpArgs);
@@ -160,8 +160,8 @@ public class McpTest extends ARESTTest {
 		assertNotNull(mcpHash);
 
 		AMap<AString, ACell> requestMap = Maps.of(
-			Strings.create("address"), addressString,
-			Strings.create("source"), source
+			"address", addressString,
+			"source", source
 		);
 		HttpResponse<String> restResponse = post(API_PATH + "/transaction/prepare", JSON.toString(requestMap));
 		assertEquals(200, restResponse.statusCode());
@@ -182,7 +182,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	private void assertEncodeDecodeRoundTrip(String cvxLiteral, String expectedHex) throws IOException, InterruptedException {
-		AMap<AString, ACell> encodeArgs = Maps.of(Strings.create("cvx"), Strings.create(cvxLiteral));
+		AMap<AString, ACell> encodeArgs = Maps.of("cvx", cvxLiteral);
 		AMap<AString, ACell> encodeResponse = makeToolCall("encode", encodeArgs);
 		AMap<AString, ACell> encodeResult = expectResult(encodeResponse);
 		AString cad3 = RT.getIn(encodeResult, "cad3");
@@ -191,7 +191,7 @@ public class McpTest extends ARESTTest {
 		AString hash = RT.getIn(encodeResult, "hash");
 		assertNotNull(hash);
 
-		AMap<AString, ACell> decodeArgs = Maps.of(Strings.create("cad3"), cad3);
+		AMap<AString, ACell> decodeArgs = Maps.of("cad3", cad3);
 		AMap<AString, ACell> decodeResponse = makeToolCall("decode", decodeArgs);
 		AMap<AString, ACell> decodeResult = expectResult(decodeResponse);
 		AString cvx = RT.getIn(decodeResult, "cvx");
@@ -207,8 +207,8 @@ public class McpTest extends ARESTTest {
 		AString source = Strings.create("(* 2 3)");
 		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
 		AMap<AString, ACell> prepareArgs = Maps.of(
-			Strings.create("source"), source,
-			Strings.create("address"), addressString
+			"source", source,
+			"address", addressString
 		);
 
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
@@ -219,8 +219,8 @@ public class McpTest extends ARESTTest {
 
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
 		AMap<AString, ACell> signArgs = Maps.of(
-			Strings.create("value"), hashCell,
-			Strings.create("seed"), seedHex
+			"value", hashCell,
+			"seed", seedHex
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
 		AMap<AString, ACell> signed = expectResult(signResponse);
@@ -232,9 +232,9 @@ public class McpTest extends ARESTTest {
 		assertEquals(KP.sign(hashBlob), Blob.parse(signatureHex));
 
 		AMap<AString, ACell> submitArgs = Maps.of(
-			Strings.create("hash"), hashCell,
-			Strings.create("signature"), signatureHex,
-			Strings.create("accountKey"), accountKeyHex
+			"hash", hashCell,
+			"signature", signatureHex,
+			"accountKey", accountKeyHex
 		);
 		AMap<AString, ACell> submitResponse = makeToolCall("submit", submitArgs);
 		AMap<AString, ACell> submitResult = expectResult(submitResponse);
@@ -251,9 +251,9 @@ public class McpTest extends ARESTTest {
 		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
 		AMap<AString, ACell> transactArgs = Maps.of(
-			Strings.create("source"), source,
-			Strings.create("address"), addressString,
-			Strings.create("seed"), seedHex
+			"source", source,
+			"address", addressString,
+			"seed", seedHex
 		);
 
 		AMap<AString, ACell> transactResponse = makeToolCall("transact", transactArgs);
@@ -286,7 +286,7 @@ public class McpTest extends ARESTTest {
 	 */
 	@Test
 	public void testKeyGenToolWithSeed() throws IOException, InterruptedException {
-		AMap<AString, ACell> keyGenArgs = Maps.of(Strings.create("seed"), SEED_TEST);
+		AMap<AString, ACell> keyGenArgs = Maps.of("seed", SEED_TEST);
 		AMap<AString, ACell> responseMap = makeToolCall("keyGen", keyGenArgs);
 		AMap<AString, ACell> structured = expectResult(responseMap);
 		
@@ -311,7 +311,7 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testKeyGenToolWithSeedWithPrefix() throws IOException, InterruptedException {
 		AString seedHexWithPrefix = Strings.create("0x" + SEED_TEST.toString());
-		AMap<AString, ACell> keyGenArgs = Maps.of(Strings.create("seed"), seedHexWithPrefix);
+		AMap<AString, ACell> keyGenArgs = Maps.of("seed", seedHexWithPrefix);
 		
 		AMap<AString, ACell> responseMap = makeToolCall("keyGen", keyGenArgs);
 		AMap<AString, ACell> structured = expectResult(responseMap);
@@ -325,7 +325,7 @@ public class McpTest extends ARESTTest {
 		assertEquals(expectedSeed, seed, "Seed should match the provided seed with 0x prefix");
 		
 		// Verify the public key is the same whether input has 0x prefix or not
-		AMap<AString, ACell> keyGenArgsNoPrefix = Maps.of(Strings.create("seed"), SEED_TEST);
+		AMap<AString, ACell> keyGenArgsNoPrefix = Maps.of("seed", SEED_TEST);
 		AMap<AString, ACell> responseMap2 = makeToolCall("keyGen", keyGenArgsNoPrefix);
 		AMap<AString, ACell> structured2 = expectResult(responseMap2);
 		AString publicKey2 = RT.getIn(structured2, "publicKey");
@@ -336,7 +336,7 @@ public class McpTest extends ARESTTest {
 	 * Helper method to generate a key pair and return the public key.
 	 */
 	private AString generateKeyPair(AString seed) throws IOException, InterruptedException {
-		AMap<AString, ACell> keyGenArgs = Maps.of(Strings.create("seed"), seed);
+		AMap<AString, ACell> keyGenArgs = Maps.of("seed", seed);
 		AMap<AString, ACell> keyGenResponse = makeToolCall("keyGen", keyGenArgs);
 		AMap<AString, ACell> keyGenResult = expectResult(keyGenResponse);
 		return RT.getIn(keyGenResult, "publicKey");
@@ -347,8 +347,8 @@ public class McpTest extends ARESTTest {
 	 */
 	private AString signData(AString valueHex, AString seedHex) throws IOException, InterruptedException {
 		AMap<AString, ACell> signArgs = Maps.of(
-			Strings.create("value"), valueHex,
-			Strings.create("seed"), seedHex
+			"value", valueHex,
+			"seed", seedHex
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
 		AMap<AString, ACell> signResult = expectResult(signResponse);
@@ -364,9 +364,9 @@ public class McpTest extends ARESTTest {
 		AString signatureHex = signData(VALUE_HELLO, SEED_TEST);
 		
 		AMap<AString, ACell> validateArgs = Maps.of(
-			Strings.create("publicKey"), publicKeyHex,
-			Strings.create("signature"), signatureHex,
-			Strings.create("bytes"), VALUE_HELLO
+			"publicKey", publicKeyHex,
+			"signature", signatureHex,
+			"bytes", VALUE_HELLO
 		);
 		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
 		AMap<AString, ACell> validateResult = expectResult(validateResponse);
@@ -385,9 +385,9 @@ public class McpTest extends ARESTTest {
 		AString wrongSignatureHex = Strings.create("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
 		
 		AMap<AString, ACell> validateArgs = Maps.of(
-			Strings.create("publicKey"), publicKeyHex,
-			Strings.create("signature"), wrongSignatureHex,
-			Strings.create("bytes"), VALUE_HELLO
+			"publicKey", publicKeyHex,
+			"signature", wrongSignatureHex,
+			"bytes", VALUE_HELLO
 		);
 		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
 		AMap<AString, ACell> validateResult = expectResult(validateResponse);
@@ -406,9 +406,9 @@ public class McpTest extends ARESTTest {
 		AString signatureHex = signData(VALUE_HELLO, SEED_TEST);
 		
 		AMap<AString, ACell> validateArgs = Maps.of(
-			Strings.create("publicKey"), publicKeyHex,
-			Strings.create("signature"), signatureHex,
-			Strings.create("bytes"), VALUE_WORLD
+			"publicKey", publicKeyHex,
+			"signature", signatureHex,
+			"bytes", VALUE_WORLD
 		);
 		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
 		AMap<AString, ACell> validateResult = expectResult(validateResponse);
@@ -438,8 +438,8 @@ public class McpTest extends ARESTTest {
 		// Step 2: Sign some data using the generated seed
 		AString valueHex = Strings.create("48656c6c6f20576f726c64");
 		AMap<AString, ACell> signArgs = Maps.of(
-			Strings.create("value"), valueHex,
-			Strings.create("seed"), seedHex
+			"value", valueHex,
+			"seed", seedHex
 		);
 		AMap<AString, ACell> signResponse = makeToolCall("sign", signArgs);
 		AMap<AString, ACell> signResult = expectResult(signResponse);
@@ -482,9 +482,9 @@ public class McpTest extends ARESTTest {
 		AString signatureHex = signData(VALUE_HELLO, seed1Hex);
 		
 		AMap<AString, ACell> validateArgs = Maps.of(
-			Strings.create("publicKey"), publicKey2Hex,
-			Strings.create("signature"), signatureHex,
-			Strings.create("bytes"), VALUE_HELLO
+			"publicKey", publicKey2Hex,
+			"signature", signatureHex,
+			"bytes", VALUE_HELLO
 		);
 		AMap<AString, ACell> validateResponse = makeToolCall("validate", validateArgs);
 		AMap<AString, ACell> validateResult = expectResult(validateResponse);
@@ -505,7 +505,7 @@ public class McpTest extends ARESTTest {
 		
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
 		
-		AMap<AString, ACell> createAccountArgs = Maps.of(Strings.create("accountKey"), publicKeyHex);
+		AMap<AString, ACell> createAccountArgs = Maps.of("accountKey", publicKeyHex);
 		AMap<AString, ACell> createAccountResponse = makeToolCall("createAccount", createAccountArgs);
 		AMap<AString, ACell> createAccountResult = expectResult(createAccountResponse);
 		ACell addressCell = RT.getIn(createAccountResult, "address");
@@ -528,8 +528,8 @@ public class McpTest extends ARESTTest {
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
 		
 		AMap<AString, ACell> createAccountArgs = Maps.of(
-			Strings.create("accountKey"), publicKeyHex,
-			Strings.create("faucet"), CVMLong.create(1000)
+			"accountKey", publicKeyHex,
+			"faucet", CVMLong.create(1000)
 		);
 		AMap<AString, ACell> createAccountResponse = makeToolCall("createAccount", createAccountArgs);
 		AMap<AString, ACell> createAccountResult = expectResult(createAccountResponse);
@@ -555,7 +555,7 @@ public class McpTest extends ARESTTest {
 		assertNotNull(publicKeyHex, "keyGen should return a publicKey");
 		
 		// Step 2: Create an account
-		AMap<AString, ACell> createAccountArgs = Maps.of(Strings.create("accountKey"), publicKeyHex);
+		AMap<AString, ACell> createAccountArgs = Maps.of("accountKey", publicKeyHex);
 		AMap<AString, ACell> createAccountResponse = makeToolCall("createAccount", createAccountArgs);
 		AMap<AString, ACell> createAccountResult = expectResult(createAccountResponse);
 		ACell addressCell = RT.getIn(createAccountResult, "address");
@@ -566,7 +566,7 @@ public class McpTest extends ARESTTest {
 		
 		// Step 3: Describe the account
 		AString addressString = Strings.create("#" + addressLong.longValue());
-		AMap<AString, ACell> describeAccountArgs = Maps.of(Strings.create("address"), addressString);
+		AMap<AString, ACell> describeAccountArgs = Maps.of("address", addressString);
 		AMap<AString, ACell> describeAccountResponse = makeToolCall("describeAccount", describeAccountArgs);
 		AMap<AString, ACell> describeAccountResult = expectResult(describeAccountResponse);
 		
@@ -607,8 +607,8 @@ public class McpTest extends ARESTTest {
 		ASignature expectedSignature = keyPair.sign(payload);
 
 		AMap<AString, ACell> arguments = Maps.of(
-			Strings.create("value"), VALUE_HELLO,
-			Strings.create("seed"), SEED_TEST
+			"value", VALUE_HELLO,
+			"seed", SEED_TEST
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("sign", arguments);
 		AMap<AString, ACell> structured = expectResult(responseMap);
@@ -628,7 +628,7 @@ public class McpTest extends ARESTTest {
 	 */
 	@Test
 	public void testSignMissingSeed() throws IOException, InterruptedException {
-		AMap<AString, ACell> args = Maps.of(Strings.create("value"), Strings.create("68656c6c6f"));
+		AMap<AString, ACell> args = Maps.of("value", "68656c6c6f");
 		AMap<AString, ACell> responseMap = makeToolCall("sign", args);
 		AMap<AString, ACell> structured = expectError(responseMap);
 		assertNull(RT.getIn(structured, "value"));
@@ -640,7 +640,7 @@ public class McpTest extends ARESTTest {
 	 */
 	@Test
 	public void testSignMissingValue() throws IOException, InterruptedException {
-		AMap<AString, ACell> signArgs = Maps.of(Strings.create("seed"), SEED_TEST);
+		AMap<AString, ACell> signArgs = Maps.of("seed", SEED_TEST);
 		AMap<AString, ACell> responseMap = makeToolCall("sign", signArgs);
 		AMap<AString, ACell> structured = expectError(responseMap);
 		assertNull(RT.getIn(structured, "signature"));
@@ -694,14 +694,14 @@ public class McpTest extends ARESTTest {
 		}
 		String id = "test-" + toolName;
 		AMap<AString, ACell> params = Maps.of(
-			Strings.create("name"), Strings.create(toolName),
-			Strings.create("arguments"), arguments
+			"name", toolName,
+			"arguments", arguments
 		);
 		AMap<AString, ACell> request = Maps.of(
-			Strings.create("jsonrpc"), Strings.create("2.0"),
-			Strings.create("method"), Strings.create("tools/call"),
-			Strings.create("params"), params,
-			Strings.create("id"), Strings.create(id)
+			"jsonrpc", "2.0",
+			"method", "tools/call",
+			"params", params,
+			"id", id
 		);
 
 		HttpResponse<String> response = post(MCP_PATH, JSON.toString(request));
@@ -755,8 +755,8 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testLookupCountInCore() throws IOException, InterruptedException {
 		AMap<AString, ACell> lookupArgs = Maps.of(
-			Strings.create("address"), Strings.create("#8"),
-			Strings.create("symbol"), Strings.create("count")
+			"address", "#8",
+			"symbol", "count"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("lookup", lookupArgs);
 		AMap<AString, ACell> structured = expectResult(responseMap);
@@ -778,8 +778,8 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testLookupNonExistentSymbol() throws IOException, InterruptedException {
 		AMap<AString, ACell> lookupArgs = Maps.of(
-			Strings.create("address"), Strings.create("#0"),
-			Strings.create("symbol"), Strings.create("foo")
+			"address", "#0",
+			"symbol", "foo"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("lookup", lookupArgs);
 		AMap<AString, ACell> structured = expectResult(responseMap);
@@ -800,8 +800,8 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testLookupInvalidAddress() throws IOException, InterruptedException {
 		AMap<AString, ACell> lookupArgs = Maps.of(
-			Strings.create("address"), Strings.create("#-100"),
-			Strings.create("symbol"), Strings.create("count")
+			"address", "#-100",
+			"symbol", "count"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("lookup", lookupArgs);
 		AMap<AString, ACell> structured = expectError(responseMap);
@@ -819,8 +819,8 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testLookupInvalidSymbol() throws IOException, InterruptedException {
 		AMap<AString, ACell> lookupArgs = Maps.of(
-			Strings.create("address"), Strings.create("#8"),
-			Strings.create("symbol"), Strings.create("[]")
+			"address", "#8",
+			"symbol", "[]"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("lookup", lookupArgs);
 		AMap<AString, ACell> structured = expectResult(responseMap);
