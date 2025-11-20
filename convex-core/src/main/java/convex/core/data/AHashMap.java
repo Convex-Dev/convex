@@ -149,20 +149,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	public abstract int encode(byte[] bs, int pos);
 	
 	/**
-	 * Gets the keys in this Map as a Vector
-	 * 
-	 * @return Vector of keys in map defined order
-	 */
-	public AVector<K> getKeys() {
-		int n=Utils.checkedInt(count);
-		ACell[] keys=new ACell[n];
-		for (int i=0; i<n; i++) {
-			keys[i]=entryAt(i).getKey();
-		}
-		return Vectors.wrap(keys);
-	}
-	
-	/**
 	 * Gets the Hash for the first entry. Useful for prefix comparisons etc.
 	 * @return
 	 */
