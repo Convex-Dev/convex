@@ -147,6 +147,18 @@ public class Server implements Closeable {
 		}
 		
 	}
+	
+	/**
+	 * Creates a new (unlaunched) Server with a given config.
+	 *
+	 * @param config Server configuration map. Will be defensively copied.
+	 *
+	 * @return New Server instance
+	 * @throws ConfigException If Peer configuration failed, possible multiple causes
+	 */
+	public static Server create(HashMap<Keyword, Object> config) throws ConfigException {
+		return new Server(new HashMap<>(config));
+	}
 
 	// This doesn't actually do anything useful? Do we need this?
 //	/**
@@ -294,17 +306,7 @@ public class Server implements Closeable {
 		return Utils.toInt(maybeTimeout);
 	}
 
-	/**
-	 * Creates a new (unlaunched) Server with a given config.
-	 *
-	 * @param config Server configuration map. Will be defensively copied.
-	 *
-	 * @return New Server instance
-	 * @throws ConfigException If Peer configuration failed, possible multiple causes
-	 */
-	public static Server create(HashMap<Keyword, Object> config) throws ConfigException {
-		return new Server(new HashMap<>(config));
-	}
+
 
 	private void observeMessageReceived(Message m) {
 		Consumer<Message> obs=messageReceiveObserver;

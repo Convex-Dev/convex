@@ -21,6 +21,7 @@
 		<module>convex-java</module>
 		<module>convex-restapi</module>
 		<module>convex-integration</module>
+		<module>convex-sql</module>
 	</modules>
 
 	<properties>
