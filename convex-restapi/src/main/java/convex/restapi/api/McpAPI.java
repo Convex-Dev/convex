@@ -20,7 +20,6 @@ import convex.core.crypto.Providers;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
-import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
@@ -105,6 +104,15 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_BYTES = Strings.intern("bytes");
 	public static final StringShort ARG_ACCOUNT_KEY = Strings.intern("accountKey");
 	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
+	public static final StringShort ARG_HASH = Strings.intern("hash");
+	public static final StringShort ARG_CAD3 = Strings.intern("cad3");
+	public static final StringShort ARG_GET_PATH = Strings.intern("getPath");
+	
+	public static final StringShort KEY_NETWORK_ID = Strings.intern("networkId");
+	public static final StringShort KEY_PEER_KEY = Strings.intern("peerKey");
+	public static final StringShort KEY_VALUE = Strings.intern("value");
+	public static final StringShort KEY_ERROR_CODE = Strings.intern("errorCode");
+	public static final StringShort KEY_INFO = Strings.intern("info");
 
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
@@ -114,14 +122,14 @@ public class McpAPI extends ABaseAPI {
 	public McpAPI(RESTServer restServer) {
 		super(restServer);
 		AMap<AString, ACell> info = Maps.of(
-			Strings.create("name"), Strings.create("convex-mcp"),
-			Strings.create("title"), Strings.create("Convex MCP"),
-			Strings.create("version"), Strings.create(Utils.getVersion())
+			"name", "convex-mcp",
+			"title", "Convex MCP",
+			"version", Utils.getVersion()
 		);
 		Peer peer = server.getPeer();
 		if (peer != null) {
-			info = info.assoc(Strings.create("networkId"), Strings.create(peer.getNetworkID().toHexString()));
-			info = info.assoc(Strings.create("peerKey"), Strings.create(peer.getPeerKey().toHexString()));
+			info = info.assoc(KEY_NETWORK_ID, Strings.create(peer.getNetworkID().toHexString()));
+			info = info.assoc(KEY_PEER_KEY, Strings.create(peer.getPeerKey().toHexString()));
 		}
 		serverInfo = info;
 		registerTools();
@@ -239,11 +247,11 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	private AMap<AString, ACell> buildInitializeResult() {
-		AMap<AString, ACell> capabilities = Maps.of(Strings.create("tools"), EMPTY_MAP);
+		AMap<AString, ACell> capabilities = Maps.of("tools", EMPTY_MAP);
 		AMap<AString, ACell> result = Maps.of(
-			Strings.create("protocolVersion"), Strings.create("2025-03-26"),
-			Strings.create("serverInfo"), serverInfo,
-			Strings.create("capabilities"), capabilities
+			"protocolVersion", "2025-03-26",
+			"serverInfo", serverInfo,
+			"capabilities", capabilities
 		);
 		return result;
 	}
@@ -257,7 +265,7 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	private AMap<AString, ACell> listTools() {
-		return Maps.of(Strings.create("tools"), listToolsVector());
+		return Maps.of("tools", listToolsVector());
 	}
 
 	/* JSON-RPC protocol result */
@@ -269,7 +277,7 @@ public class McpAPI extends ABaseAPI {
 	private AMap<AString, ACell> protocolError(int code, String message) {
 		AMap<AString, ACell> error = Maps.of(
 			FIELD_CODE, CVMLong.create(code),
-			FIELD_MESSAGE, Strings.create(message)
+			FIELD_MESSAGE, message
 		);
 		return BASE_RESPONSE.assoc(FIELD_ERROR, error);
 	}
@@ -308,15 +316,15 @@ public class McpAPI extends ABaseAPI {
 		AMap<AString, ACell> structured = EMPTY_MAP;
 		ACell value = result.getValue();
 		if (value != null) {
-			structured = structured.assoc(Strings.create("value"), value);
+			structured = structured.assoc(KEY_VALUE, value);
 		}
 		ACell errorCode = result.getErrorCode();
 		if (errorCode != null) {
-			structured = structured.assoc(Strings.create("errorCode"), errorCode);
+			structured = structured.assoc(KEY_ERROR_CODE, errorCode);
 		}
 		ACell info = result.getInfo();
 		if (info != null) {
-			structured = structured.assoc(Strings.create("info"), info);
+			structured = structured.assoc(KEY_INFO, info);
 		}
 		return protocolResult(buildMcpResult(structured, result.isError()));
 	}
@@ -330,7 +338,7 @@ public class McpAPI extends ABaseAPI {
 	/* Create an error result for a tool call (but protocol valid) */
 	private AMap<AString, ACell> toolError(String message) {
 		AMap<AString, ACell> payload = Maps.of(
-			Strings.create("message"), Strings.create(message)
+			"message", message
 		);
 		return protocolResult(buildMcpResult(payload, true));
 	}
@@ -338,7 +346,7 @@ public class McpAPI extends ABaseAPI {
 	private AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
 		AString jsonText = JSON.print(structured);
 		AMap<AString, ACell> textContent = Maps.of(
-			FIELD_TYPE, Strings.create("text"),
+			FIELD_TYPE, "text",
 			FIELD_TEXT, jsonText
 		);
 		AVector<AMap<AString, ACell>> content = Vectors.of(textContent);
@@ -496,14 +504,10 @@ public class McpAPI extends ABaseAPI {
 				}
 				sequence = seqLong.longValue();
 			} else try {
-				
-				sequence = restServer.getConvex().getSequence(address) + 1;
-			} catch (ResultException e) {
-				return toolError("Failed to get sequence number "+e.getMessage());
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return toolError("Tool call interrupted");
-			}
+				sequence = server.getPeer().getConsensusState().getAccount(address).getSequence() + 1;
+			} catch (NullPointerException e) {
+				return toolError("Failed to get sequence number, account does not exist: "+address);
+			} 
 
 			try {
 				ATransaction transaction = Invoke.create(address, sequence, code);
@@ -512,11 +516,11 @@ public class McpAPI extends ABaseAPI {
 				String hashHex = SignedData.getMessageForRef(ref).toHexString();
 				String dataHex = Format.encodeMultiCell(transaction, true).toHexString();
 				AMap<AString, ACell> structured = Maps.of(
-					Strings.create("source"), sourceCell,
-					Strings.create("address"), Strings.create(address.toString()),
-					Strings.create("hash"), Strings.create(hashHex),
-					Strings.create("data"), Strings.create(dataHex),
-					Strings.create("sequence"), CVMLong.create(sequence)
+				"source", sourceCell,
+					"address", address,
+					"hash", hashHex,
+					"data", dataHex,
+					"sequence", CVMLong.create(sequence)
 				);
 				return toolSuccess(structured);
 			} catch (Exception e) {
@@ -550,8 +554,8 @@ public class McpAPI extends ABaseAPI {
 			}
 			String hashHex = hash.toHexString();
 			AMap<AString, ACell> result = Maps.of(
-				Strings.create("algorithm"), Strings.create(algorithm),
-				Strings.create("hash"), Strings.create(hashHex)
+				"algorithm", algorithm,
+				"hash", hashHex
 			);
 			return toolSuccess(result);
 		}
@@ -586,9 +590,9 @@ public class McpAPI extends ABaseAPI {
 				ASignature signature = keyPair.sign(valueBlob);
 				AccountKey accountKey = keyPair.getAccountKey();
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("value"), valueCell,
-						Strings.create("signature"), Strings.create(signature.toHexString()),
-					Strings.create("accountKey"), Strings.create(accountKey.toHexString())
+					"value", valueCell,
+					"signature", signature.toHexString(),
+					"accountKey", accountKey.toHexString()
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
@@ -604,7 +608,7 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments)  {
-			AString hashCell = RT.ensureString(arguments.get(Strings.create("hash")));
+			AString hashCell = RT.ensureString(arguments.get(ARG_HASH));
 			if (hashCell == null) {
 				return protocolError(-32602, "Submit requires 'hash' string");
 			}
@@ -614,7 +618,7 @@ public class McpAPI extends ABaseAPI {
 			}
 			try {
 				ATransaction transaction = decodeTransaction(hashBlob);
-				AString accountKeyCell = RT.ensureString(arguments.get(Strings.create("accountKey")));
+				AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
 				if (accountKeyCell == null) {
 					return protocolError(-32602, "Submit requires 'accountKey' string");
 				}
@@ -622,7 +626,7 @@ public class McpAPI extends ABaseAPI {
 				if (accountKey == null) {
 					return toolError("Invalid account key");
 				}
-				AString signatureCell = RT.ensureString(arguments.get(Strings.create("signature")));
+				AString signatureCell = RT.ensureString(arguments.get(ARG_SIGNATURE));
 				if (signatureCell == null) {
 					return protocolError(-32602, "Submit requires 'sig' string with Ed25519 signature");
 				}
@@ -649,7 +653,7 @@ public class McpAPI extends ABaseAPI {
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			try {
 				AMap<?, ?> status = server.getStatusMap();
-				AMap<AString, ACell> payload = Maps.of(Strings.create("status"), (ACell) status);
+				AMap<AString, ACell> payload = Maps.of("status", (ACell) status);
 				return toolSuccess(payload);
 			} catch (Exception e) {
 				return toolError("Failed to load peer status: " + e.getMessage());
@@ -664,7 +668,7 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString cvxCell = RT.ensureString(arguments.get(Strings.create("cvx")));
+			AString cvxCell = RT.ensureString(arguments.get(ARG_CVX));
 			if (cvxCell == null) {
 				return protocolError(-32602, "Encode requires 'cvx' string");
 			}
@@ -672,8 +676,8 @@ public class McpAPI extends ABaseAPI {
 				ACell value = Reader.read(cvxCell.toString());
 				Blob encoded = Format.encodeMultiCell(value, true);
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("cad3"), Strings.create(encoded.toCVMHexString()),
-					Strings.create("hash"), Strings.create(Ref.get(value).getEncoding().toCVMHexString())
+					"cad3", encoded.toCVMHexString(),
+					"hash", Ref.get(value).getEncoding().toCVMHexString()
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
@@ -689,7 +693,7 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString cad3Cell = RT.ensureString(arguments.get(Strings.create("cad3")));
+			AString cad3Cell = RT.ensureString(arguments.get(ARG_CAD3));
 			if (cad3Cell == null) {
 				return protocolError(-32602, "Decode requires 'cad3' string");
 			}
@@ -701,7 +705,7 @@ public class McpAPI extends ABaseAPI {
 				ACell decoded = Format.decodeMultiCell(cad3Blob);
 				AString cvx = RT.print(decoded);
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("cvx"), cvx == null ? Strings.create("") : cvx
+					"cvx", cvx == null ? "" : cvx
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
@@ -739,8 +743,8 @@ public class McpAPI extends ABaseAPI {
 				AccountKey publicKey = keyPair.getAccountKey();
 				
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("seed"), Strings.create(seedBlob.toString()),
-					Strings.create("publicKey"), Strings.create(publicKey.toString())
+					"seed", seedBlob.toString(),
+					"publicKey", publicKey.toString()
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
@@ -792,7 +796,7 @@ public class McpAPI extends ABaseAPI {
 				boolean isValid = Providers.verify(signature, messageBlob, publicKey);
 				
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("value"), isValid ? CVMBool.TRUE : CVMBool.FALSE
+					"value", isValid ? CVMBool.TRUE : CVMBool.FALSE
 				);
 				return toolSuccess(result);
 			} catch (Exception e) {
@@ -864,7 +868,7 @@ public class McpAPI extends ABaseAPI {
 				}
 				
 				AMap<AString, ACell> result = Maps.of(
-					Strings.create("address"), CVMLong.create(address.longValue())
+					"address", CVMLong.create(address.longValue())
 				);
 				return toolSuccess(result);
 			} catch (ResultException e) {
@@ -975,7 +979,7 @@ public class McpAPI extends ABaseAPI {
 					value = env.get(symbol);
 					
 					// Apply path if provided
-					AString pathCell = RT.ensureString(arguments.get(Strings.create("getPath")));
+					AString pathCell = RT.ensureString(arguments.get(ARG_GET_PATH));
 					if (pathCell != null && value != null) {
 						String pathStr = pathCell.toString();
 						try {
@@ -1012,9 +1016,9 @@ public class McpAPI extends ABaseAPI {
 				
 				// Build result
 				AMap<AString, ACell> resultMap = Maps.of(
-					Strings.create("exists"), exists ? CVMBool.TRUE : CVMBool.FALSE,
-					Strings.create("value"), value != null ? value : RT.cvm(null),
-					Strings.create("meta"), meta != null ? meta : RT.cvm(null)
+					"exists", exists ? CVMBool.TRUE : CVMBool.FALSE,
+					"value", value != null ? value : RT.cvm(null),
+					"meta", meta != null ? meta : RT.cvm(null)
 				);
 				return toolSuccess(resultMap);
 			} catch (Exception e) {
