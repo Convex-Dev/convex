@@ -263,10 +263,12 @@ public class McpAPI extends ABaseAPI {
 		return Maps.of(Strings.create("tools"), listToolsVector());
 	}
 
+	/* JSON-RPC protocol result */
 	private AMap<AString, ACell> protocolResult(AMap<AString, ACell> result) {
 		return BASE_RESPONSE.assoc(FIELD_RESULT, result);
 	}
 
+	/* JSON-RPC protocol error */
 	private AMap<AString, ACell> protocolError(int code, String message) {
 		AMap<AString, ACell> error = Maps.of(
 			FIELD_CODE, CVMLong.create(code),
@@ -295,9 +297,16 @@ public class McpAPI extends ABaseAPI {
 			return protocolError(-32601, "Unknown tool: " + toolName);
 		}
 
-		return tool.handle(RT.ensureMap(params.get(FIELD_ARGUMENTS)));
+		AMap<AString,ACell> arguments=RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		
+		if (arguments == null) {
+			return protocolError(-32602, toolName +" requires arguments");
+		}
+
+		return tool.handle(arguments);
 	}
 
+	/* Create a Result from a CVM Result */
 	private AMap<AString, ACell> toolResult(Result result) {
 		AMap<AString, ACell> structured = EMPTY_MAP;
 		ACell value = result.getValue();
@@ -321,6 +330,7 @@ public class McpAPI extends ABaseAPI {
 		return protocolResult(buildMcpResult(payload, false));
 	}
 
+	/* Create an error result for a tool call (but protocol valid) */
 	private AMap<AString, ACell> toolError(String message) {
 		AMap<AString, ACell> payload = Maps.of(
 			Strings.create("message"), Strings.create(message)
@@ -356,6 +366,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new ValidateTool());
 		registerTool(new CreateAccountTool());
 		registerTool(new DescribeAccountTool());
+		registerTool(new LookupTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -378,9 +389,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
-			if (arguments == null) {
-				return protocolError(-32602, "Query requires arguments");
-			}
 			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
 			if (sourceCell == null) {
 				return protocolError(-32602, "Query requires 'source' string");
@@ -412,9 +420,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
-			if (arguments == null) {
-				return protocolError(-32602, "Transact requires arguments");
-			}
 			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
 			if (sourceCell == null) {
 				return protocolError(-32602, "Transact requires 'source' string");
@@ -519,9 +524,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			if (arguments == null) {
-				return protocolError(-32602, "Hash tool requires arguments");
-			}
 			AString valueCell = RT.ensureString(arguments.get(ARG_VALUE));
 			if (valueCell == null) {
 				return protocolError(-32602, "Hash tool requires 'value' string");
@@ -554,9 +556,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			if (arguments == null) {
-				return protocolError(-32602, "Sign tool requires arguments");
-			}
 			AString valueCell = RT.ensureString(arguments.get(ARG_VALUE));
 			if (valueCell == null) {
 				return toolError("Sign tool requires a 'value' hex string");
@@ -597,9 +596,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
-			if (arguments == null) {
-				return protocolError(-32602, "Submit requires arguments");
-			}
 			AString hashCell = RT.ensureString(arguments.get(Strings.create("hash")));
 			if (hashCell == null) {
 				return protocolError(-32602, "Submit requires 'hash' string");
@@ -660,9 +656,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			if (arguments == null) {
-				return protocolError(-32602, "Encode requires arguments");
-			}
 			AString cvxCell = RT.ensureString(arguments.get(Strings.create("cvx")));
 			if (cvxCell == null) {
 				return protocolError(-32602, "Encode requires 'cvx' string");
@@ -688,9 +681,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			if (arguments == null) {
-				return protocolError(-32602, "Decode requires arguments");
-			}
 			AString cad3Cell = RT.ensureString(arguments.get(Strings.create("cad3")));
 			if (cad3Cell == null) {
 				return protocolError(-32602, "Decode requires 'cad3' string");
@@ -758,9 +748,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			if (arguments == null) {
-				return protocolError(-32602, "Validate requires arguments");
-			}
 			AString publicKeyCell = RT.ensureString(arguments.get(ARG_PUBLIC_KEY));
 			if (publicKeyCell == null) {
 				return protocolError(-32602, "Validate requires 'publicKey' string");
@@ -832,9 +819,6 @@ public class McpAPI extends ABaseAPI {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
-			if (arguments == null) {
-				return protocolError(-32602, "CreateAccount requires arguments");
-			}
 			AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
 			if (accountKeyCell == null) {
 				return protocolError(-32602, "CreateAccount requires 'accountKey' string");
@@ -928,6 +912,95 @@ public class McpAPI extends ABaseAPI {
 				return toolSuccess(resultMap);
 			} catch (Exception e) {
 				return toolError("Account lookup failed: " + e.getMessage());
+			}
+		}
+	}
+	
+	private class LookupTool extends McpTool {
+		LookupTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/lookup.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+			try {
+				// Parse address
+				ACell addressCell = arguments.get(ARG_ADDRESS);
+				if (addressCell == null) {
+					return toolError("Lookup requires 'address' parameter, e.g. '#5675' or '@convex.core'");
+				}
+				Address address = Address.parse(addressCell);
+				if (address == null) {
+					return toolError("Invalid address format");
+				}
+				
+				// Parse symbol
+				AString symbolCell = RT.ensureString(arguments.get(Strings.SYMBOL));
+				if (symbolCell == null) {
+					return toolError("Lookup requires 'symbol' parameter");
+				}
+				Symbol symbol = RT.ensureSymbol(Reader.read(symbolCell));
+				
+				// Get account status
+				AccountStatus accountStatus = server.getPeer().getConsensusState().getAccount(address);
+				if (accountStatus == null) {
+					return toolError("Account not found: " + address);
+				}
+				
+				// Check if symbol exists in environment
+				AHashMap<Symbol, ACell> env = accountStatus.getEnvironment();
+				boolean exists = (env != null) && env.containsKey(symbol);
+				
+				// Get the value
+				ACell value = null;
+				if (exists && env != null) {
+					value = env.get(symbol);
+					
+					// Apply path if provided
+					AString pathCell = RT.ensureString(arguments.get(Strings.create("getPath")));
+					if (pathCell != null && value != null) {
+						String pathStr = pathCell.toString();
+						try {
+							// Parse the path as a sequence
+							ACell pathForm = Reader.read(pathStr);
+							AVector<ACell> pathSeq = RT.ensureVector(pathForm);
+							if (pathSeq != null) {
+								// Convert sequence to array for RT.getIn
+								long pathLen = pathSeq.count();
+								ACell[] pathKeys = new ACell[(int)pathLen];
+								for (long i = 0; i < pathLen; i++) {
+									pathKeys[(int)i] = pathSeq.get(i);
+								}
+								value = RT.getIn(value, pathKeys);
+							} else {
+								// If not a vector, try as a single key
+								value = RT.getIn(value, pathForm);
+							}
+						} catch (Exception e) {
+							return toolError("Failed to parse getPath: " + e.getMessage());
+						}
+					}
+				}
+				
+				// Get metadata for the symbol (only if it exists)
+				AHashMap<ACell, ACell> meta = null;
+				if (exists) {
+					AHashMap<ACell, ACell> symbolMeta = accountStatus.getMetadata(symbol);
+					// Return metadata only if it's not empty
+					if (symbolMeta != null && !symbolMeta.isEmpty()) {
+						meta = symbolMeta;
+					}
+				}
+				
+				// Build result
+				AMap<AString, ACell> resultMap = Maps.of(
+					Strings.create("exists"), exists ? CVMBool.TRUE : CVMBool.FALSE,
+					Strings.create("value"), value != null ? value : RT.cvm(null),
+					Strings.create("meta"), meta != null ? meta : RT.cvm(null)
+				);
+				return toolSuccess(resultMap);
+			} catch (Exception e) {
+				return toolError("Lookup failed: " + e.getMessage());
 			}
 		}
 	}

@@ -55,10 +55,7 @@ public final class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(AString name) {
 		if (!validateName(name)) return null;
-		
 		Symbol sym= new Symbol((StringShort)name);
-	
-
 		return sym;
 	}
 	

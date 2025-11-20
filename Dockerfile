@@ -5,17 +5,18 @@
 FROM maven:3.9.9-eclipse-temurin-22-jammy AS build
 WORKDIR /build
 COPY . .
-RUN mvn clean install -DskipTests
+RUN mvn clean install
 
 #######################################
 # Run stage
 FROM eclipse-temurin:22-jre-alpine AS run
 
 # Add labels
-LABEL org.opencontainers.image.title="Convex"
-LABEL org.opencontainers.image.description="Convex Peer Node"
-LABEL org.opencontainers.image.source="https://github.com/Convex-Dev/convex"
-LABEL org.opencontainers.image.source="https://convex.world"
+LABEL
+org.opencontainers.image.title="Convex" \
+org.opencontainers.image.description="Convex Peer Node" \
+org.opencontainers.image.source="https://github.com/Convex-Dev/convex" \
+org.opencontainers.image.source="https://convex.world" 
 
 # Create non-root user
 RUN addgroup -S convex && adduser -S convex -G convex

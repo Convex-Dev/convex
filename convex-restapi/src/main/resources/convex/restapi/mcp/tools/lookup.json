@@ -1,0 +1,46 @@
+{
+  "name": "lookup",
+  "title": "Symbol Lookup",
+  "description": "Look up a symbolic value in an account. Returns whether the symbol exists, its value (optionally using a path), and its metadata.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Address of the account (e.g. '#5675' or '@convex.core')"
+      },
+      "symbol": {
+        "type": "string",
+        "description": "Symbol name to look up at specified address (e.g. 'user-database')"
+      },
+      "getPath": {
+        "type": "string",
+        "description": "Optional path to navigate into the value (e.g. '[:users 7 :name]') in CVX format"
+      }
+    },
+    "required": ["address", "symbol"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Resolved address of the account (e.g. '#5675')"
+      },
+ 
+      "exists": {
+        "type": "boolean",
+        "description": "Whether the symbol exists in the account environment"
+      },
+      "value": {
+        "type": "string",
+        "description": "The value at the symbol (using getIn with the path if provided) in CVX format"
+      },
+      "meta": {
+        "type": "string",
+        "description": "The metadata on the symbol (can be null) in CVX format"
+      }
+    }
+  }
+}
+
