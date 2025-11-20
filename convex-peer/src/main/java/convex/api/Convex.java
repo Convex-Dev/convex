@@ -230,7 +230,7 @@ public abstract class Convex implements AutoCloseable {
 	 * Look up the sequence number for an account
 	 * @param origin Account for which to check sequence
 	 * @return Sequence number of account
-	 * @throws ResultException If sequence number could not be obtained
+	 * @throws ResultException If sequence number could not be obtained (invalid account or bad server response)
 	 */
 	public long lookupSequence(Address origin) throws InterruptedException, ResultException {
 		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);

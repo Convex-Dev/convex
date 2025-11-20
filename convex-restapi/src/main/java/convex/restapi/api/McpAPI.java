@@ -230,9 +230,6 @@ public class McpAPI extends ABaseAPI {
 				case "tools/call" -> result = toolCall(request.get(FIELD_PARAMS));
 				default -> result = protocolError(-32601, "Method not found: " + method);
 			}
-		} catch (InterruptedException ie) {
-			Thread.currentThread().interrupt();
-			result = protocolError(-32603, "Interrupted");
 		} catch (Exception ex) {
 			log.warn("Error handling MCP request for method {}", method, ex);
 			result = protocolError(-32603, "Internal error");
@@ -282,7 +279,7 @@ public class McpAPI extends ABaseAPI {
 		return response.assoc(FIELD_ID, idCell);
 	}
 
-	private AMap<AString, ACell> toolCall(ACell paramsCell) throws InterruptedException {
+	private AMap<AString, ACell> toolCall(ACell paramsCell) {
 		if (!(paramsCell instanceof AMap<?, ?> params)) {
 			return protocolError(-32602, "params must be an object");
 		}
@@ -388,7 +385,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
 			if (sourceCell == null) {
 				return protocolError(-32602, "Query requires 'source' string");
@@ -406,10 +403,9 @@ public class McpAPI extends ABaseAPI {
 				Result result = convex.querySync(form, address);
 				return toolResult(result);
 			} catch (InterruptedException e) {
-				throw e;
-			} catch (Exception e) {
-				return toolError("Query execution failed: " + e.getMessage());
-			}
+				Thread.currentThread().interrupt();
+				return toolError("Tool call interrupted");
+			} 
 		}
 	}
 
@@ -419,7 +415,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments)  {
 			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
 			if (sourceCell == null) {
 				return protocolError(-32602, "Transact requires 'source' string");
@@ -465,7 +461,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			AString sourceCell = RT.ensureString(arguments.get(ARG_SOURCE));
 			if (sourceCell == null) {
 				return protocolError(-32602, "Prepare requires 'source' string");
@@ -499,12 +495,14 @@ public class McpAPI extends ABaseAPI {
 					return toolError("sequence must be an integer");
 				}
 				sequence = seqLong.longValue();
-			} else {
-				try {
-					sequence = restServer.getConvex().getSequence(address) + 1;
-				} catch (ResultException e) {
-					return toolResult(e.getResult());
-				}
+			} else try {
+				
+				sequence = restServer.getConvex().getSequence(address) + 1;
+			} catch (ResultException e) {
+				return toolError("Failed to get sequence number "+e.getMessage());
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return toolError("Tool call interrupted");
 			}
 
 			try {
@@ -605,7 +603,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments)  {
 			AString hashCell = RT.ensureString(arguments.get(Strings.create("hash")));
 			if (hashCell == null) {
 				return protocolError(-32602, "Submit requires 'hash' string");
@@ -828,7 +826,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments)  {
 			AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
 			if (accountKeyCell == null) {
 				return protocolError(-32602, "CreateAccount requires 'accountKey' string");
@@ -883,7 +881,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			try {
 				Address address;
 				try {
@@ -937,7 +935,7 @@ public class McpAPI extends ABaseAPI {
 		}
 
 		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
 			try {
 				// Parse address
 				ACell addressCell = arguments.get(ARG_ADDRESS);
