@@ -504,7 +504,7 @@ public class McpAPI extends ABaseAPI {
 				}
 				sequence = seqLong.longValue();
 			} else try {
-				sequence = server.getPeer().getConsensusState().getAccount(address).getSequence() + 1;
+				sequence = server.getState().getAccount(address).getSequence() + 1;
 			} catch (NullPointerException e) {
 				return toolError("Failed to get sequence number, account does not exist: "+address);
 			} 
@@ -897,7 +897,7 @@ public class McpAPI extends ABaseAPI {
 					return toolError("No valid address provided");
 				}
 				
-				AccountStatus accountStatus = server.getPeer().getConsensusState().getAccount(address);
+				AccountStatus accountStatus = server.getState().getAccount(address);
 				if (accountStatus == null) {
 					return toolError("Account not found: " + address);
 				}
