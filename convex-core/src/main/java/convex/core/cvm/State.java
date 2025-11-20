@@ -885,8 +885,21 @@ public class State extends ARecordGeneric {
 		if (ctx.isExceptional()) {
 			return null;
 		}
-		
 		return ctx.getResult();
+	}
+
+	/**
+	 * Look up (resolve) a full record from CNS
+	 * @param name CNS name Symbol
+	 * @return Record from CNS, or null if not found / invalid
+	 */
+	public AVector<ACell> lookupCNSRecord(Symbol name) {
+		Context ctx=Context.create(this);
+		ctx= ctx.lookupCNSRecord(name);
+		if (ctx.isExceptional()) {
+			return null;
+		}
+		return RT.ensureVector(ctx.getResult());
 	}
 
 	/**

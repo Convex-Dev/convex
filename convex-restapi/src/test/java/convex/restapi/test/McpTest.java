@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
 import java.net.http.HttpResponse;
@@ -30,7 +31,6 @@ import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.api.McpAPI;
 import convex.core.data.AccountKey;
-import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
 
 /**
@@ -767,8 +767,8 @@ public class McpTest extends ARESTTest {
 		ACell value = RT.getIn(structured, "value");
 		assertNotNull(value, "count symbol should have a value");
 		
-		ACell meta = RT.getIn(structured, "meta");
-		assertNotNull(meta, "count symbol should have non-null metadata");
+		AString metaString = RT.getIn(structured, "meta");
+		AMap<Symbol,AHashMap<ACell,ACell>> meta=Reader.read(metaString);
 		assertTrue(meta instanceof AHashMap, "Metadata should be a map");
 	}
 
@@ -787,11 +787,8 @@ public class McpTest extends ARESTTest {
 		ACell exists = RT.getIn(structured, "exists");
 		assertEquals(CVMBool.FALSE, exists, "foo symbol should not exist in #0");
 		
-		ACell value = RT.getIn(structured, "value");
-		assertNull(value, "Non-existent symbol should have null value");
-		
-		ACell meta = RT.getIn(structured, "meta");
-		assertNull(meta, "Non-existent symbol should have null metadata");
+		assertFalse(structured.containsKey(Strings.create("value")), ()->"Non-existent symbol should not have a value");
+
 	}
 
 	/**
@@ -827,5 +824,59 @@ public class McpTest extends ARESTTest {
 		
 		ACell exists = RT.getIn(structured, "exists");
 		assertSame(CVMBool.FALSE,exists);
+	}
+
+	/**
+	 * ResolveCNS tool should return the same record for "@convex.trust" and "convex.trust".
+	 */
+	@Test
+	public void testResolveCNSWithAndWithoutAt() throws IOException, InterruptedException {
+		// Test with @ prefix
+		AMap<AString, ACell> argsWithAt = Maps.of("name", "@convex.trust");
+		AMap<AString, ACell> responseWithAt = makeToolCall("resolveCNS", argsWithAt);
+		AMap<AString, ACell> structuredWithAt = expectResult(responseWithAt);
+		ACell existsWithAt = RT.getIn(structuredWithAt, "exists");
+		assertEquals(CVMBool.TRUE, existsWithAt, "@convex.trust should exist");
+		
+		// Test without @ prefix
+		AMap<AString, ACell> argsWithoutAt = Maps.of("name", "convex.trust");
+		AMap<AString, ACell> responseWithoutAt = makeToolCall("resolveCNS", argsWithoutAt);
+		AMap<AString, ACell> structuredWithoutAt = expectResult(responseWithoutAt);
+		
+		// Both should be equal
+		assertEquals(structuredWithAt, structuredWithoutAt);
+
+	}
+
+	/**
+	 * ResolveCNS tool should return controller #2 for convex.trust.
+	 */
+	@Test
+	public void testResolveCNSTrustController() throws IOException, InterruptedException {
+		AMap<AString, ACell> args = Maps.of("name", "convex.trust");
+		AMap<AString, ACell> responseMap = makeToolCall("resolveCNS", args);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		
+		ACell exists = RT.getIn(structured, "exists");
+		assertEquals(CVMBool.TRUE, exists, "convex.trust should exist");
+		
+		ACell controller = RT.getIn(structured, "controller");
+		assertNotNull(controller, "Controller should not be null");
+		
+		Address controllerAddr = Address.parse(controller);
+		assertNotNull(controllerAddr, "Controller should be an Address");
+	}
+
+	/**
+	 * ResolveCNS tool should return exists=false for a non-existent CNS name.
+	 */
+	@Test
+	public void testResolveCNSNonExistent() throws IOException, InterruptedException {
+		AMap<AString, ACell> args = Maps.of("name", "fictitious.cns.name");
+		AMap<AString, ACell> responseMap = makeToolCall("resolveCNS", args);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		
+		ACell exists = RT.getIn(structured, "exists");
+		assertEquals(CVMBool.FALSE, exists, "fictitious.cns.name should not exist");
 	}
 }

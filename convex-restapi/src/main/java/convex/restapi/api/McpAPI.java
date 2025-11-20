@@ -107,6 +107,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_HASH = Strings.intern("hash");
 	public static final StringShort ARG_CAD3 = Strings.intern("cad3");
 	public static final StringShort ARG_GET_PATH = Strings.intern("getPath");
+	public static final StringShort ARG_NAME = Strings.intern("name");
 	
 	public static final StringShort KEY_NETWORK_ID = Strings.intern("networkId");
 	public static final StringShort KEY_PEER_KEY = Strings.intern("peerKey");
@@ -372,6 +373,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new CreateAccountTool());
 		registerTool(new DescribeAccountTool());
 		registerTool(new LookupTool());
+		registerTool(new ResolveCNSTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -973,6 +975,10 @@ public class McpAPI extends ABaseAPI {
 				AHashMap<Symbol, ACell> env = accountStatus.getEnvironment();
 				boolean exists = (env != null) && env.containsKey(symbol);
 				
+				if (!exists) {
+					return toolSuccess(Maps.of("exists", CVMBool.FALSE));
+				}
+
 				// Get the value
 				ACell value = null;
 				if (exists && env != null) {
@@ -1017,12 +1023,68 @@ public class McpAPI extends ABaseAPI {
 				// Build result
 				AMap<AString, ACell> resultMap = Maps.of(
 					"exists", exists ? CVMBool.TRUE : CVMBool.FALSE,
-					"value", value != null ? value : RT.cvm(null),
-					"meta", meta != null ? meta : RT.cvm(null)
+					"value", RT.print(value),
+					"meta", RT.print(meta)
 				);
 				return toolSuccess(resultMap);
 			} catch (Exception e) {
 				return toolError("Lookup failed: " + e.getMessage());
+			}
+		}
+	}
+	
+	private class ResolveCNSTool extends McpTool {
+		ResolveCNSTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/resolveCNS.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			try {
+				// Parse name argument
+				AString nameCell = RT.ensureString(arguments.get(ARG_NAME));
+				if (nameCell == null) {
+					return toolError("ResolveCNS requires 'name' parameter, e.g. 'convex.core'");
+				}
+
+				// Remove leading @ if present
+				if (nameCell.startsWith("@")) {
+					nameCell = nameCell.slice(1);
+				}
+				
+				// Treat as Symbol
+				Symbol symbol=Symbol.create(nameCell);
+				if (symbol == null) {
+					return toolError("Invalid CNS name: "+nameCell);
+				}
+				
+				// Look up CNS record
+				AVector<ACell> record = server.getState().lookupCNSRecord(symbol);
+				if (record == null) {
+					return toolSuccess(Maps.of("exists", CVMBool.FALSE));
+				}
+
+				if (record.count() != 4) {
+					return toolError("CNS record has unexpected length, got "+record);
+				}
+				
+				// Extract elements from vector: [value controller meta child]
+				ACell value = record.get(0);
+				ACell controller = record.get(1);
+				ACell meta = record.get(2);
+				ACell child = record.get(3);
+				
+				// Build result map
+				AMap<AString, ACell> resultMap = Maps.of(
+					"value", RT.print(value),
+					"controller", RT.print(controller),
+					"meta", RT.print(meta),
+					"child", RT.print(child),
+					"exists", CVMBool.TRUE
+				);
+				return toolSuccess(resultMap);
+			} catch (Exception e) {
+				return toolError("CNS resolution failed: " + e.getMessage());
 			}
 		}
 	}

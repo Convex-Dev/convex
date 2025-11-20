@@ -2287,6 +2287,12 @@ public class Context {
 		return ctx;
 	}
 
+	public Context lookupCNSRecord(Symbol name) {
+		Context ctx=this.fork();
+		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.READ, name);
+		return ctx;
+	}
+
 	/**
 	 * Expands a form with the default *initial-expander*
 	 * @param form Form to expand
