@@ -10,6 +10,8 @@ import convex.core.lang.RT;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import convex.core.data.AVector;
+import convex.core.cvm.State;
+import convex.core.data.Symbol;
 
 /**
  * Base class for API based services
@@ -143,9 +145,17 @@ public abstract class ABaseAPI extends AGenericAPI {
 	 * @param o Object to resolve an address from.
 	 * @return Address instance, or null if not a valid address.
 	 */
-	protected static Address resolveAddress(ACell o) {
+	protected Address resolveAddress(ACell o) {
+		if (o==null) return null;
+
 		if (o instanceof Address a) {
 			return a;
+		}
+
+		if (o instanceof Symbol sym) {
+			State state=server.getState();
+			ACell cnsValue=state.lookupCNS(sym);
+			return resolveAddress(cnsValue);
 		}
 
 		if (o instanceof AVector v) {
@@ -157,8 +167,12 @@ public abstract class ABaseAPI extends AGenericAPI {
 			// If it's a String, try to parse it as an address
 			AString s = RT.ensureString(o);
 			if (s != null) {
+				// remove the @ prefix if it exists
+				if (s.startsWith("@")) s=s.slice(1);
 				return resolveAddress(Reader.read(s));
 			}
+
+			// If it's a Keyword, try to parse it as an address
 			return null;
 		} catch (Exception e) {
 			throw new IllegalArgumentException("Unable to resolve address from object: "+o+" cause: "+e.getMessage(), e);

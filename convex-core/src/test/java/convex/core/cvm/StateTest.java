@@ -2,6 +2,7 @@ package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -126,5 +127,16 @@ public class StateTest {
 		// TODO: figure out why not see #453
 		//assertEquals(rs1.stored,rs1.persisted);
 		//assertEquals(rs1.total,rs1.persisted);
+	}
+	
+	@Test 
+	public void testState() {
+		State s=INIT_STATE;
+		
+		assertNotNull(s.lookupCNS("convex.core"));
+		assertNull(s.lookupCNS("random.non.existent.namespace.56785"));
+		
+		assertNull(s.lookupCNS(""));
+	
 	}
 }

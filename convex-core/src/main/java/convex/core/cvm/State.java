@@ -866,14 +866,27 @@ public class State extends ARecordGeneric {
 	}
 
 	/**
-	 * Look up an value from CNS
+	 * Look up an value from CNS. Prefer the Symbol overload for performance.
 	 * @param name CNS name String
 	 * @return Value from CNS, or null if not found
 	 */
 	public ACell lookupCNS(String name) {
+		return lookupCNS(Symbol.create(name));
+	}
+
+	/**
+	 * Look up (resolve) an value from CNS
+	 * @param name CNS name Symbol
+	 * @return Value from CNS, or null if not found / invalid
+	 */
+	public ACell lookupCNS(Symbol name) {
 		Context ctx=Context.create(this);
-		Symbol sym=Symbol.create(name);
-		return ctx.lookupCNS(sym).getResult();
+		ctx= ctx.lookupCNS(name);
+		if (ctx.isExceptional()) {
+			return null;
+		}
+		
+		return ctx.getResult();
 	}
 
 	/**

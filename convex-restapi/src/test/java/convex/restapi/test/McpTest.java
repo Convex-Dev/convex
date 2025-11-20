@@ -88,11 +88,11 @@ public class McpTest extends ARESTTest {
 	 */
 	@Test
 	public void testUnknownMethod() throws IOException, InterruptedException {
-		String request = "{\n"
-			+ "  \"jsonrpc\": \"2.0\",\n"
-			+ "  \"method\": \"does/not/exist\",\n"
-			+ "  \"params\": {},\n"
-			+ "  \"id\": \"bad-1\"\n"
+		String request = "{"
+			+ "  \"jsonrpc\": \"2.0\","
+			+ "  \"method\": \"does/not/exist\","
+			+ "  \"params\": {},"
+			+ "  \"id\": \"bad-1\""
 			+ "}";
 
 		HttpResponse<String> response = post(MCP_PATH, request);
@@ -755,7 +755,7 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testLookupCountInCore() throws IOException, InterruptedException {
 		AMap<AString, ACell> lookupArgs = Maps.of(
-			"address", "#8",
+			"address", "convex.core",
 			"symbol", "count"
 		);
 		AMap<AString, ACell> responseMap = makeToolCall("lookup", lookupArgs);
