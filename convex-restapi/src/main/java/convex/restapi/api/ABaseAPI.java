@@ -1,9 +1,15 @@
 package convex.restapi.api;
 
 import convex.peer.Server;
+import convex.core.cvm.Address;
+import convex.core.data.AString;
+import convex.core.data.ACell;
+import convex.core.lang.Reader;
 import convex.restapi.RESTServer;
+import convex.core.lang.RT;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
+import convex.core.data.AVector;
 
 /**
  * Base class for API based services
@@ -132,5 +138,30 @@ public abstract class ABaseAPI extends AGenericAPI {
 		return range;
 	}
 
+	/**
+	 * Attempt to resolve an address from an arbitrary object, including possible CNS lookups.
+	 * @param o Object to resolve an address from.
+	 * @return Address instance, or null if not a valid address.
+	 */
+	protected static Address resolveAddress(ACell o) {
+		if (o instanceof Address a) {
+			return a;
+		}
 
+		if (o instanceof AVector v) {
+			if (v.count() !=2) return null; // must be a scoped address
+			return resolveAddress(v.get(0)); // resolve the base address
+		}
+
+		try {
+			// If it's a String, try to parse it as an address
+			AString s = RT.ensureString(o);
+			if (s != null) {
+				return resolveAddress(Reader.read(s));
+			}
+			return null;
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Unable to resolve address from object: "+o+" cause: "+e.getMessage(), e);
+		}
+	}
 }

@@ -401,7 +401,7 @@ public class McpAPI extends ABaseAPI {
 				} catch (Exception e) {
 					return toolError("Failed to parse query source: " + e.getMessage());
 				}
-				Address address = Address.parse(arguments.get(ARG_ADDRESS));
+				Address address = resolveAddress(arguments.get(ARG_ADDRESS)); // OK if null
 				Convex convex = restServer.getConvex();
 				Result result = convex.querySync(form, address);
 				return toolResult(result);
@@ -436,7 +436,12 @@ public class McpAPI extends ABaseAPI {
 			if ((seedBlob == null) || (seedBlob.count() != AKeyPair.SEED_LENGTH)) {
 				return toolError("Seed must be 32-byte hex string");
 			}
-			Address address= Address.parse(addressCell.toString());
+			Address address;
+			try {
+				address = resolveAddress(addressCell);
+			} catch (IllegalArgumentException e) {
+				return toolError("Invalid address format: " + e.getMessage());
+			}
 			if (address == null) {
 				return toolError("Invalid address format");
 			}
@@ -469,7 +474,12 @@ public class McpAPI extends ABaseAPI {
 			if (addressCell == null) {
 				return protocolError(-32602, "Prepare requires 'address' string");
 			}
-			Address address = Address.parse(addressCell.toString());
+			Address address;
+			try {
+				address = resolveAddress(addressCell);
+			} catch (IllegalArgumentException e) {
+				return toolError("Invalid address format: " + e.getMessage());
+			}
 			if (address == null) {
 				return toolError("Invalid address format");
 			}
@@ -875,7 +885,12 @@ public class McpAPI extends ABaseAPI {
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) throws InterruptedException {
 			try {
-				Address address = Address.parse(RT.getIn(arguments,ARG_ADDRESS));
+				Address address;
+				try {
+					address = resolveAddress(RT.getIn(arguments,ARG_ADDRESS));
+				} catch (IllegalArgumentException e) {
+					return toolError("Invalid address format: " + e.getMessage());
+				}
 				if (address == null) {
 					return toolError("No valid address provided");
 				}
@@ -929,7 +944,12 @@ public class McpAPI extends ABaseAPI {
 				if (addressCell == null) {
 					return toolError("Lookup requires 'address' parameter, e.g. '#5675' or '@convex.core'");
 				}
-				Address address = Address.parse(addressCell);
+				Address address;
+				try {
+					address = resolveAddress(addressCell);
+				} catch (IllegalArgumentException e) {
+					return toolError("Invalid address format: " + e.getMessage());
+				}
 				if (address == null) {
 					return toolError("Invalid address format");
 				}
