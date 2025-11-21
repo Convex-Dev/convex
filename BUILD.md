@@ -5,57 +5,53 @@
 Convex main repository is structured as a multi-module Maven project.
 
 
-## Build and test
-
-### Merge 
-
-- Merge from `master` branch, ensure in sync
-- Merge any other branches for release
+## Release preparation
 
 ### Ensure clean build
 
 ```
-mvn clean package
+mvn -B clean verify
 ```
 
 Remember to test headless (i.e. no GUI) e.g. with CI server.
 
-## Release preparation
-
-### Set version information
-
-First set the version number for the new version to be released
-
-```
-mvn versions:set -DnewVersion='0.8.0' -DartifactId=*  -DgroupId=*
-```
-
 ### Update CHANGELOG
 
-Need to make sure `CHANGELOG.md` is fully up to date before deploy
+Make sure `CHANGELOG.md` is fully up to date before deploy
 
 - Finalise CHANGELOG for current version
 - Annotate with date
 - Commit to release branch
 
+### Merge to master
 
-### Build and deploy
+Switch to `master` branch.
+
+Merge `develop` as a merge commit (“If a fast-forward, create a merge commit” in Eclipse)
+
+### Set version information
+
+Set the version number for the new version to be released
 
 ```
-mvn clean deploy -DperformRelease
+mvn versions:set -DnewVersion='0.8.2' -DartifactId=* -DgroupId=*
 ```
 
 ### Tag release
 
-- Merge to `master` branch
-- Tag Release Commit on merge
-- Push to GitHub!
+- Tag Release Commit e.g. `0.8.2`
+
+### Build and deploy
+
+```
+mvn clean deploy 
+```
 
 ### Prepare for next develop version
 
-- Merge `master` back into `develop`
+- Merge `master` back into `develop` (again no FF)
 - Create new CHANGELOG "Unreleased" section for next version
-- Run `mvn versions:set -DnewVersion='0.7.4-SNAPSHOT'` for next snapshot version as required 
+- Run `mvn versions:set -DnewVersion='0.8.3-SNAPSHOT'` for next snapshot version as required 
 
 ## Docker build
 
