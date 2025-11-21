@@ -311,7 +311,7 @@ public final class CVMLong extends AInteger {
 		
 		BigInteger bi=BigInteger.valueOf(av);
 		bi=bi.add(BigInteger.valueOf(bv));
-		return CVMBigInteger.wrap(bi).toCanonical();
+		return AInteger.create(bi);
 	}
 	
 	@Override
@@ -319,7 +319,7 @@ public final class CVMLong extends AInteger {
 		if (a instanceof CVMLong)  return sub((CVMLong)a);
 		BigInteger bi=big();
 		bi=bi.subtract(a.big());
-		return CVMBigInteger.wrap(bi).toCanonical();
+		return AInteger.create(bi);
 	}
 	
 	public AInteger sub(CVMLong b) {
@@ -335,7 +335,7 @@ public final class CVMLong extends AInteger {
 		
 		BigInteger bi=BigInteger.valueOf(av);
 		bi=bi.subtract(BigInteger.valueOf(bv));
-		return CVMBigInteger.wrap(bi).toCanonical();
+		return AInteger.create(bi);
 	}
 
 	@Override
@@ -373,6 +373,7 @@ public final class CVMLong extends AInteger {
 	@Override
 	public AInteger mod(AInteger base) {
 		if (base instanceof CVMLong) return mod((CVMLong)base);
+		if (base.isNegative()) base=base.negate();
 		return AInteger.create(big().mod(base.big()));
 	}
 	
@@ -451,6 +452,16 @@ public final class CVMLong extends AInteger {
 	@Override
 	public boolean isLong() {
 		return true;
+	}
+
+	@Override
+	public boolean isNegative() {
+		return value<0;
+	}
+
+	@Override
+	public boolean isPositive() {
+		return value>0;
 	}
 
 

@@ -1,7 +1,6 @@
 package convex.core.data;
 
-import java.util.WeakHashMap;
-
+import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -35,9 +34,18 @@ public final class Symbol extends ASymbolic {
 	public AType getType() {
 		return Types.SYMBOL;
 	}
-	
-	protected static final WeakHashMap<AString,Symbol> cache=new WeakHashMap<>(100);
 
+	/**
+	 * Creates a Symbol with the given name
+	 * @param name Symbol name
+	 * @return Symbol instance, or null if the Symbol is invalid
+	 */
+	public static Symbol of(Object name) {
+		if (name instanceof AString s) return create(s);
+		if (name instanceof String s) return create(s);
+		return null;
+	}
+	
 	/**
 	 * Creates a Symbol with the given name
 	 * @param name Symbol name
@@ -45,6 +53,8 @@ public final class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(String name) {
 		if (name==null) return null;
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getSymbol();
 		return create(Strings.create(name));
 	}
 
@@ -56,21 +66,19 @@ public final class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(AString name) {
 		if (!validateName(name)) return null;
-		
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getSymbol();
 		Symbol sym= new Symbol((StringShort)name);
-		
-		synchronized (cache) {
-			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(name);
-			if (cached!=null) return cached;
-			cache.put(name,sym);
-		}
-
 		return sym;
 	}
 	
 	public static Symbol intern(AString name) {
-		Symbol sym=create(name);
+		Symbol sym=create(Strings.intern(name));
+		return Cells.intern(sym);
+	}
+	
+	public static Symbol intern(String name) {
+		Symbol sym=create(Strings.intern(name));
 		return Cells.intern(sym);
 	}
 	
@@ -150,8 +158,9 @@ public final class Symbol extends ASymbolic {
 		// Note we sometimes call this with a fake tag, and there is a cache
 		// we only want to attach encoding if not already done, and if tag is correct
 		if (sym.cachedEncoding()==null) {
-			if (blob.byteAt(offset)==Tag.SYMBOL);
-			sym.attachEncoding(blob.slice(offset, offset+2+len));
+			if (blob.byteAt(offset)==Tag.SYMBOL) {
+				sym.attachEncoding(blob.slice(offset, offset+2+len));
+			}
 		}
 		return sym;
 	}

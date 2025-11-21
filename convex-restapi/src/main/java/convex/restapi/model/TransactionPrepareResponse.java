@@ -8,4 +8,5 @@ public class TransactionPrepareResponse {
 	public String source;
 	public long sequence;
 	public String hash;
+	public String data;
 }

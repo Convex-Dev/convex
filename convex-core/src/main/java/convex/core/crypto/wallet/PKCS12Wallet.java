@@ -9,16 +9,12 @@ import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.HashMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.cvm.Address;
 import convex.core.data.AccountKey;
 
 public class PKCS12Wallet extends AWallet {
 	public static final String KEYSTORE_TYPE="pkcs12";
 	
-	private static final Logger log = LoggerFactory.getLogger(PKCS12Wallet.class.getName());
 
 	private HashMap<Address, HotWalletEntry> data;
 
@@ -61,7 +57,6 @@ public class PKCS12Wallet extends AWallet {
 			while (aliases.hasMoreElements()) {
 				String alias=aliases.nextElement();
 				ks.getKey(alias, pwdArray);
-				log.info("Loading private key with alias: "+alias);
 			}
 			return wallet;
 		} catch (IOException | GeneralSecurityException t) {

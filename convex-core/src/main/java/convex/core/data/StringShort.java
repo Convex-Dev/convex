@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.charset.StandardCharsets;
 
+import convex.core.data.impl.StringStore;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -31,11 +32,16 @@ public final class StringShort extends AString {
 	public static final int MAX_ENCODING_LENGTH = 1 + Format.getVLQLongLength(MAX_LENGTH) + MAX_LENGTH; // Max 4096 bytes
 
 	private final Blob data;
+	
+	/**
+	 * Cached internal String instance
+	 */
+	private String _string=null;
 
 	/**
 	 * The canonical empty String
 	 */
-	public static final StringShort EMPTY = Cells.intern(new StringShort(Blob.EMPTY));
+	public static final StringShort EMPTY = StringStore.intern("");
 
 	protected StringShort(Blob data) {
 		super(data.count);
@@ -51,29 +57,60 @@ public final class StringShort extends AString {
 		super(length);
 		this.data = Blob.wrap(data, offset, length);
 	}
+	
+	/**
+	 * Creates a StringShort, wrapping a Blob. Warning: might not be valid UTF=8
+	 * @throws IllegalArgumentException if the wrapped Blob is too large for a StringShort
+	 */
+	public static StringShort wrap(Blob b) {
+		if (b.count()>MAX_LENGTH) throw new IllegalArgumentException("Invalid Blob length for StringShort");
+		return new StringShort(b);
+	}
 
 	/**
-	 * Creates a StringShort instance from a regular Java String
+	 * Creates a StringShort instance from a regular Java String. Looks up interned Strings if possible
 	 * 
 	 * @param string String to wrap as StringShort
 	 * @return StringShort instance, or null if String is of invalid size
 	 */
 	public static StringShort create(String string) {
 		if (string.length()==0) return EMPTY;
+		
+		StringStore.Entry e=StringStore.get(string);
+		if (e!=null) return e.getStringShort();
+		
 		byte[] bs = string.getBytes(StandardCharsets.UTF_8);
-		return new StringShort(bs);
+		StringShort result= new StringShort(bs);
+		result._string=string;
+		return result;
+	}
+	
+	/**
+	 * Interns a StringShort instance from a regular Java String. Reuses interned Strings if possible
+	 * 
+	 * @param string String to wrap as StringShort
+	 * @return StringShort instance, or null if String is of invalid size
+	 */
+	public static StringShort intern(String string) {
+		if (string.length()==0) return EMPTY;
+		return StringStore.intern(string);
 	}
 
 	/**
 	 * Creates a StringShort instance from a Blob of UTF-8 data. Shares underlying
-	 * array.
+	 * array if possible
 	 * 
 	 * @param b Array Blob to convert to StringShort
 	 * @return StringShort instance
 	 */
 	public static StringShort create(AArrayBlob b) {
-		if (b.count() == 0)
-			return StringShort.EMPTY;
+		long len=b.count();
+		if (len == 0) return StringShort.EMPTY;
+		
+		// Check for interned Strings
+		StringStore.Entry e=StringStore.get(b);
+		if (e!=null) return e.getStringShort();
+
 		return new StringShort(b.toFlatBlob());
 	}
 
@@ -172,7 +209,7 @@ public final class StringShort extends AString {
 		int headerLen=1+Format.getVLQCountLength(length);
 		int dataOffset=pos+headerLen;
 		Blob data=blob.slice(dataOffset,dataOffset+length);
-		StringShort result= new StringShort(data);
+		StringShort result= create(data);
 		
 		result.attachEncoding(blob.slice(pos,dataOffset+len));
 		return result;
@@ -182,19 +219,22 @@ public final class StringShort extends AString {
 	public Blob toBlob() {
 		return data;
 	}
+	
+	public Blob toFlatBlob() {
+		return data;
+	}
 
 	@Override
 	public boolean equals(AString b) {
-		if (b instanceof StringShort) {
-			return equals((StringShort) b);
-		}
-		AString c=b.toCanonical();
-		if (b==c) return false;
+		if (b==null) return false;
+		if (this.length!=b.length) return false;
+		StringShort c=(StringShort)b.toCanonical();
 		return equals(c);
 	}
 
 	public final boolean equals(StringShort a) {
 		if (a==this) return true;
+		if (a==null) return false;
 		return data.equals(a.data);
 	}
 
@@ -207,7 +247,7 @@ public final class StringShort extends AString {
 	public AString toCanonical() {
 		if (length <= MAX_LENGTH)
 			return this;
-		return Strings.create(data.toCanonical());
+		return Strings.create((ABlob)data.getCanonical());
 	}
 
 	@Override
@@ -257,9 +297,14 @@ public final class StringShort extends AString {
 	
 	@Override
 	public String toString() {
+		String result=_string;
+		if (result!=null) return result; // return cached Java string if available
+		
 		byte [] bytes=data.getInternalArray();
 		if (bytes.length!=data.count()) bytes=data.getBytes(); // need a copy if not fully packed
-		return new String(bytes,StandardCharsets.UTF_8);
+		result= new String(bytes,StandardCharsets.UTF_8);
+		_string=result;
+		return result;
 	}
 
 }

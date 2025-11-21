@@ -45,6 +45,8 @@ Governance key: `0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB
 Genesis Peer key: `0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d`
 mikera key: `0x89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac`
 
+Original Genesis state hash: `0xb0e44f2a645abfa539f5b96b7a0eabb0f902866feaff0f7c12d1213e02333f13`
+
 
 ### Managing with screen
 

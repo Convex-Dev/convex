@@ -72,10 +72,10 @@ public class Toast extends JWindow {
 			try {
 				long time=start;
 				while (time<(start+millis)) {
-					Thread.sleep(100);
+					Thread.sleep(50);
 					time=System.currentTimeMillis();
 					// drop opacity after 50% of time has elapsed
-					double opac=Math.min(1.0,Math.max(0.0,(2*(1.0-(time-start)/(double)millis))));
+					double opac=Math.min(1.0,Math.max(0.0,((millis-(time-start))/1000.0)));
 					setOpacity((float)opac) ;
 				}
 			} catch (InterruptedException e) {
@@ -100,6 +100,8 @@ public class Toast extends JWindow {
 	public static void display(JComponent parent, String message, Color colour) {
 		JTextArea ta=new JTextArea(message);
 		ta.setBackground(null);
+		ta.setForeground(Color.BLACK);
+		ta.setFont(convex.gui.utils.Toolkit.BIG_FONT);
 		ta.setEditable(false);
 		display(parent,ta,colour);
 	}

@@ -8,7 +8,7 @@ import org.antlr.v4.runtime.Token;
 
 import convex.core.exceptions.ParseException;
 
-class ConvexErrorListener extends BaseErrorListener {
+public class ConvexErrorListener extends BaseErrorListener {
 
 	@Override
 	public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine,

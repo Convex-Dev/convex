@@ -14,7 +14,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.0</version>
+		<version>0.8.2-SNAPSHOT</version>
 	</parent>
 
 	<build>
@@ -60,11 +60,6 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>${convex.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>world.convex</groupId>
-			<artifactId>convex-sodium</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>

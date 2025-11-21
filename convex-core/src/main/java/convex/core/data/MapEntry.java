@@ -102,7 +102,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super ACell, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<ACell, R> mapper) {
 		return Vectors.of(mapper.apply(getKey()), mapper.apply(getValue()));
 	}
 
@@ -173,9 +173,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
 		return result;
 	}
-
+	
 	@Override
-	public boolean equals(AVector<? super ACell> o) {
+	public boolean equals(AVector<?> o) {
 		if (o==null) return false;
 		if (o==this) return true;
 		AVector<?> v=(AVector<?>) o;

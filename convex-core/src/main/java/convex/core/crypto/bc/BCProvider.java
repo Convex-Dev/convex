@@ -7,7 +7,6 @@ import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.util.Utils;
 
 /**
@@ -33,7 +32,7 @@ public class BCProvider extends AProvider {
 	}
 	
 	@Override
-	public BCKeyPair create(Blob seed) {
+	public BCKeyPair create(AArrayBlob seed) {
 		return BCKeyPair.create(seed);
 	}
 

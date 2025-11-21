@@ -1,0 +1,22 @@
+{
+  "name": "peerStatus",
+  "title": "Peer Status",
+  "description": "Return current peer status information",
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "description": "Peer status map keyed by keyword"
+      },
+      "message": {
+        "type": "string",
+        "description": "Optional human-readable message"
+      }
+    }
+  }
+}
+

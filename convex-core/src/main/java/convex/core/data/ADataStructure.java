@@ -1,5 +1,9 @@
 package convex.core.data;
 
+import java.util.function.Function;
+
+import convex.core.lang.RT;
+
 /**
  * Abstract base class for Persistent data structures. Each can be regarded as a
  * countable, immutable collection of elements.
@@ -107,6 +111,47 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 */
 	public abstract ACell get(ACell key, ACell notFound);
 
+	/**
+	 * Get the value associated with a path of keys. Converts JVM keys to CVM equivalent if required.
+	 * 
+	 * @param keys Keys to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	public <T extends ACell> T getIn(Object... keys) {
+		return RT.getIn(this, keys);
+	}
+	
+	/**
+	 * Get the value associated with a path of keys. 
+	 * 
+	 * @param keys Keys to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	public <T extends ACell> T getIn(ACell... keys) {
+		return RT.getIn(this, keys);
+	}
+	
+	/**
+	 * Get the value associated with a key. Converts JVM keys to CVM equivalent if required.
+	 * 
+	 * @param key Key to look up in data structures. 
+	 * @return Value from collection, or null if not found
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getIn(Object key) {
+		return (T) get(RT.cvm(key));
+	}
+	
+	/**
+	 * Get the value associated with a key.
+	 * 
+	 * @param key Key to look up in data structures
+	 * @return Value from collection, or null if not found
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getIn(ACell key) {
+		return (T) get(key);
+	}
 	
 	/**
 	 * Checks if the data structure contains the specified key
@@ -133,5 +178,14 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 		if ((ix>=0)&&(ix<count)) return;
 		throw new IndexOutOfBoundsException((int)ix);
 	}
+	
+	/**
+	 * Maps a function over a collection, applying it to each element in turn.
+	 * 
+	 * @param <R> Type of element in resulting collection
+	 * @param mapper Function to map over collection
+	 * @return Collection after function applied to each element
+	 */
+	public abstract <R extends ACell> ADataStructure<R> map(Function<E, R> mapper);
 
 }

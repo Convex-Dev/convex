@@ -80,14 +80,14 @@ public class PeerTest {
 		PeerStatus ps = STATE.getPeer(pa);
 		
 		long initialStake = ps.getPeerStake();
-		assertEquals(initialStake, ps.getTotalStake());
+		assertEquals(initialStake, ps.getTotalStakeShares());
 
 		assertEquals(0, ps.getDelegatedStake(InitTest.HERO));
 
 		// add a delegated stake
 		PeerStatus ps2 = ps.withDelegatedStake(InitTest.HERO, 1234);
 		assertEquals(1234L, ps2.getDelegatedStake(InitTest.HERO));
-		assertEquals(initialStake + 1234, ps2.getTotalStake());
+		assertEquals(initialStake + 1234, ps2.getTotalStakeShares());
 		assertEquals(initialStake, ps2.getPeerStake());
 		
 		RecordTest.doRecordTests(ps);

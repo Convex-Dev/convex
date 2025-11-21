@@ -14,9 +14,9 @@ import javax.swing.DefaultListModel;
 import javax.swing.JList;
 import javax.swing.JPopupMenu;
 
-import convex.dlfs.DLPath;
 import convex.gui.components.Toast;
 import convex.gui.utils.Toolkit;
+import convex.lattice.fs.DLPath;
 
 @SuppressWarnings("serial")
 public class FileList extends JList<Path> {

@@ -153,7 +153,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<T, R> mapper) {
 		return toVector().map(mapper);
 	}
 
@@ -280,7 +280,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public boolean equals(AVector<? super T> a) {
+	public boolean equals(AVector<?> a) {
 		if (a==this) return true;
 		if (a==null) return false;
 		if (this.count!=a.count) return false;
@@ -288,7 +288,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	protected ACell toCanonical() {
+	protected AVector<T> toCanonical() {
 		return 	Vectors.create(data, Utils.checkedInt(start), Utils.checkedInt(count));
 	}
 

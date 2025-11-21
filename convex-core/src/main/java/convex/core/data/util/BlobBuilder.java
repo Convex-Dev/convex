@@ -1,6 +1,7 @@
 package convex.core.data.util;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
@@ -174,7 +175,7 @@ public class BlobBuilder {
 	 * Appends a long value as a UTF-8 string. This is common enough that we want an optimised implementation
 	 * to avoid extra String allocations
 	 * 
-	 * @param value
+	 * @param value Long value to append as UTF-8 numeric bytes
 	 */
 	public void appendLongString(long value) {
 		if (value==Long.MIN_VALUE) {
@@ -206,9 +207,27 @@ public class BlobBuilder {
 		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
 		ensureArray(arrayPos()+1);
 		tail[Blob.CHUNK_LENGTH-spare]=b;
-		count+=1;
+		this.count+=1;
 		if (spare==1) {
 			completeChunk();
+		}
+		return this;
+	}
+	
+	public BlobBuilder appendRepeatedByte(byte b, long repeatCount) {
+		int spare=spare();
+		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
+		while (repeatCount>0) {
+			int batchSize=(int)Math.min(spare, repeatCount);
+			int start=arrayPos();
+			int end=start+batchSize;
+			ensureArray(end);
+			Arrays.fill(tail, start, end, b);
+			this.count+=batchSize;
+			if (spare()==0) {
+				completeChunk();
+			}
+			repeatCount-=batchSize;
 		}
 		return this;
 	}
@@ -245,6 +264,10 @@ public class BlobBuilder {
 		}
 	}
 	
+	/**
+	 * Append a byte as two hex characters
+	 * @param b Byte to append as hex
+	 */
 	public void appendHexByte(byte b) {
 		append(Utils.toHexChar((b & 0xF0) >>> 4));
 		append(Utils.toHexChar((b & 0xF)));

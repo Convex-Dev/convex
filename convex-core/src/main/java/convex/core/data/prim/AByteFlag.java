@@ -54,7 +54,7 @@ public abstract class AByteFlag extends APrimitive {
 
 	/**
 	 * Create a Byte Flag for the given value (0..15 where 0=false, 1=true .... )
-	 * @param value
+	 * @param value Value for byte flag (0-15)
 	 * @return ByteFlag instance, or null if value out of range
 	 */
 	public static AByteFlag create(long value) {

@@ -2,7 +2,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.0</version>
+		<version>0.8.2-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -13,7 +13,7 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<picocli.version>4.7.6</picocli.version>
+		<picocli.version>4.7.7</picocli.version>
 		<maven.compiler.release>21</maven.compiler.release>
 	</properties>
 
@@ -101,11 +101,6 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-peer</artifactId>
-			<version>${convex.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>world.convex</groupId>
-			<artifactId>convex-sodium</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>

@@ -506,7 +506,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<T, R> mapper) {
 		int blength = children.length;
 		Ref<AVector<R>>[] newBlocks = (Ref<AVector<R>>[]) new Ref<?>[blength];
 		for (int i = 0; i < blength; i++) {
@@ -711,7 +711,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean equals(AVector<? super T>  o) {
+	public boolean equals(AVector<?>  o) {
 		if (this==o) return true;
 		if (!(o instanceof VectorTree)) {
 			if (o==null) return false;

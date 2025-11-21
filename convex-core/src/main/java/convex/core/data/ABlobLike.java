@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.InputStream;
+
 import convex.core.data.util.BlobBuilder;
 import convex.core.util.Utils;
 
@@ -135,6 +137,17 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	public String toHexString() {
 		return toHexString(Utils.checkedInt(hexLength()));
 	}
+	
+	/**
+	 * Converts this data object to a lowercase hex string representation
+	 * @return Hex String representation
+	 */
+	public AString toCVMHexString() {
+		BlobBuilder bb=new BlobBuilder();
+		long hl=hexLength();
+		appendHex(bb,hl);
+		return bb.getCVMString();
+	}
 
 	/**
 	 * Append hex string up to the given length in hex digits (a multiple of two)
@@ -188,5 +201,8 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
-
+	/**
+	 * Get an InputStream for the data of this BlobLike object
+	 */
+	public abstract InputStream getInputStream();
 }

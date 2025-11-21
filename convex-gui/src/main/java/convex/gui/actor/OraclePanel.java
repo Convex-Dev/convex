@@ -20,13 +20,13 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.cvm.Address;
+import convex.core.cvm.State;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
-import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.models.OracleTableModel;
 import convex.gui.utils.Toolkit;
@@ -45,10 +45,11 @@ public class OraclePanel extends JPanel {
 		this.manager=manager;
 		this.setLayout(new BorderLayout());
 		
-		Address oracleAddress = manager.getState().lookupCNS("convex.trusted-oracle");
-		Address oracleActorAddress = manager.getState().lookupCNS("convex.trusted-oracle.actor");
+		State state=manager.getState();
+		Address oracleAddress = RT.ensureAddress(state.lookupCNS("convex.trusted-oracle"));
+		Address oracleActorAddress = RT.ensureAddress(state.lookupCNS("convex.trusted-oracle.actor"));
 
-		OracleTableModel tableModel = new OracleTableModel(manager.getState(), oracleActorAddress);
+		OracleTableModel tableModel = new OracleTableModel(state, oracleActorAddress);
 		JTable table = new JTable(tableModel);
 		scrollPane = new JScrollPane(table);;
 
@@ -145,7 +146,8 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(ACell code) {
-		manager.transact(code).thenAcceptAsync(receiveAction);
+		manager.transact(code);
+		// TODO: show results?
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {
@@ -173,15 +175,13 @@ public class OraclePanel extends JPanel {
 		@Override
 		public void accept(Result t) {
 			if (t.isError()) {
-				handleError(RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
+				handleError((long) RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
 			} else {
 				handleResult(t.getValue());
 			}
 		}
 
 	};
-
-	private final DefaultReceiveAction receiveAction = new DefaultReceiveAction(scrollPane);
 
 	private void showError(Object code, Object msg) {
 		String resultString = "Error executing transaction: " + code + " "+msg;

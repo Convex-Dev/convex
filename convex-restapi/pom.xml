@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.0</version>
+		<version>0.8.2-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -16,7 +16,7 @@
 
 	<properties>
 		<json.simple.version>1.1.1</json.simple.version>
-		<javalin.version>6.3.0</javalin.version>
+		<javalin.version>6.7.0</javalin.version>
 	</properties>
 
 	<build>
@@ -33,6 +33,7 @@
 						</annotationProcessorPath>
 					</annotationProcessorPaths>
 				</configuration>
+				<!-- 
 				<executions>
 					<execution>
 						<id>default-compile</id>
@@ -41,6 +42,7 @@
 						</goals>
 					</execution>
 				</executions>
+				-->
 			</plugin>
 		</plugins>
 	</build>
@@ -103,16 +105,6 @@
 			<artifactId>javalin-redoc-plugin</artifactId>
 			<version>${javalin.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>io.javalin.community.ssl</groupId>
-			<artifactId>ssl-plugin</artifactId>
-			<version>${javalin.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-core</artifactId>
-			<version>2.17.2</version>
-		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -125,16 +117,6 @@
 			<artifactId>junit-jupiter-api</artifactId>
 			<version>${junit.version}</version>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-			<artifactId>httpclient5</artifactId>
-			<version>${hc.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-			<artifactId>httpclient5-fluent</artifactId>
-			<version>${hc.version}</version>
 		</dependency>
 	</dependencies>
 </project>

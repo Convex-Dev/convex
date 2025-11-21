@@ -1,25 +1,22 @@
 package convex.restapi.api;
 
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Map;
-
-import convex.api.ContentTypes;
-import convex.core.data.ACell;
-import convex.core.data.Blob;
-import convex.core.data.Format;
-import convex.core.lang.Reader;
-import convex.java.JSON;
 import convex.peer.Server;
+import convex.core.cvm.Address;
+import convex.core.data.AString;
+import convex.core.data.ACell;
+import convex.core.lang.Reader;
 import convex.restapi.RESTServer;
-import io.javalin.Javalin;
+import convex.core.lang.RT;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
+import convex.core.data.AVector;
+import convex.core.cvm.State;
+import convex.core.data.Symbol;
 
 /**
- * BAse class for API based services
+ * Base class for API based services
  */
-public abstract class ABaseAPI {
+public abstract class ABaseAPI extends AGenericAPI {
 	
 	protected final RESTServer restServer;
 	protected final Server server;
@@ -29,85 +26,156 @@ public abstract class ABaseAPI {
 		this.server=restServer.getServer();
 	}
 	
+
+	public static String getHostname(Context ctx) {
+		String host =ctx.header("X-Forwarded-Host");
+	    if (host == null) {
+	        host = ctx.host(); // e.g., "localhost:8080" or "my-server.org"
+	    }
+	    int colon=host.indexOf(':');
+	    if (colon>=0) {
+	    	host=host.substring(0,colon);
+	    }
+	    return host;
+	}
+
+	
 	/**
-	 * Gets JSON body from a Context as a Java Object
-	 * @param ctx Request context
-	 * @return JSON Object
-	 * @throws BadRequestResponse if the JSON body is invalid
+	 * Utility method to construct the external base URL
+	 * @param ctx Javalin context
+	 * @param basePath Path for base URL e.g. "mcp"
+	 * @return Base URL for external use (possible localhost if external URL not available from Context)
 	 */
-	protected Map<String, Object> getJSONBody(Context ctx) {
-		try {
-			Map<String, Object> req= JSON.toMap(ctx.body());
-			return req;
-		} catch (IllegalArgumentException e) {
-			throw new BadRequestResponse(jsonError("Invalid JSON body"));
-		}
+	public static String getExternalBaseUrl(Context ctx, String basePath) {
+	    // Identify protocol being used
+	    String proto = ctx.header("X-Forwarded-Proto");
+	    if (proto == null) {
+	        proto = ctx.scheme(); // e.g., "http" or "https"
+	    }
+	    
+	    String port = ctx.header("X-Forwarded-Port");
+	    if (port==null) {
+	    	port=Integer.toString(ctx.port());
+	    }
+	    
+	    String host = getHostname(ctx);
+	    
+	    
+	    String prefix = ctx.header("X-Forwarded-Prefix");
+	
+	    
+	    // get the Port
+	
+	    // Build the base URL
+	    StringBuilder baseUrl = new StringBuilder();
+	
+	    // Append protocol
+	    baseUrl.append(proto).append("://");
+	
+	    // Append host
+	    baseUrl.append(host);
+	    
+	    // Append port if non-standard and not already included in host
+	    if (!host.contains(":")) {
+	        if (("https".equalsIgnoreCase(proto) && "443".equals(port)) ||
+	            ("http".equalsIgnoreCase(proto) && "80".equals(port))) {
+	            // Standard hostname is fine since we are using correct protocol for peer
+	        } else {
+	        	baseUrl.append(':').append(port);
+	        }
+	    }
+	
+	    // Append base path (e.g., "/api/v1")
+	    if (basePath != null && !basePath.isEmpty()) {
+	        // Ensure basePath starts with a slash and doesn't end with one
+	        String cleanedBasePath = basePath.startsWith("/") ? basePath : "/" + basePath;
+	        cleanedBasePath = cleanedBasePath.endsWith("/") ? 
+	                          cleanedBasePath.substring(0, cleanedBasePath.length() - 1) : 
+	                          cleanedBasePath;
+	        baseUrl.append(cleanedBasePath);
+	    }
+	
+	    // Append prefix if provided by proxy
+	    if (prefix != null && !prefix.isEmpty()) {
+	        // Ensure prefix starts with a slash and doesn't end with one
+	        prefix = prefix.startsWith("/") ? prefix : "/" + prefix;
+	        prefix = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+	        // Only append prefix if it's not already part of the basePath
+	        if (!baseUrl.toString().endsWith(prefix)) {
+	            baseUrl.append(prefix);
+	        }
+	    }
+	
+	    return baseUrl.toString();
 	}
 	
+	private static final long DEFAULT_LIMIT = 10;
+
 	/**
-	 * Gets CVX body from a Context as a cell
-	 * @param ctx Request context
-	 * @return CVM Value
-	 * @throws BadRequestResponse if the body is invalid
-	 */
-	protected <T extends ACell> T getCVXBody(Context ctx) {
-		try {
-			@SuppressWarnings("unchecked")
-			T req= (T) Reader.read(ctx.body());
-			return req;
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Invalid CVX body"));
-		}
-	}
-	
-	/**
-	 * Gets body from a Context as a cell
-	 * @param ctx Request context
-	 * @return CVM Value
-	 * @throws BadRequestResponse if the body is invalid
-	 */
-	protected <T extends ACell> T getRawBody(Context ctx) {
-		try {
-			byte[] bs=ctx.bodyAsBytes();
-			T result=Format.decodeMultiCell(Blob.wrap(bs));
-			return result;
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Invalid Raw body"));
-		}
-	}
-	
-	protected String calcResponseContentType(Context ctx) {
-		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
-		String type=ContentTypes.JSON;
-		// TODO: look at quality weights perhaps
-		if (accepts!=null) {
-			for (String a:Collections.list(accepts)) {
-				if (a.contains(ContentTypes.CVX_RAW)) {
-					type=ContentTypes.CVX_RAW;
-					break;
-				}
-				if (a.contains(ContentTypes.CVX)) {
-					type=ContentTypes.CVX;
-				}
-			}
-		}
-		return type;
-	}
-	
-	/**
-	 * Gets a generic JSON response for an error message
-	 * @param string
+	 * Get a pagination range from query params as an [start,end, fullLimit] array
+	 * @param ctx Javalin content
+	 * @param maxIndex Maximum element index (exclusive), typically the number of elements
 	 * @return
 	 */
-	protected static String jsonError(String string) {
-		return "{\"error\":\"" + string + "\"}";
+	protected long[] getPaginationRange(Context ctx, long maxIndex) {
+		long[] range=new long[3];
+		try {
+			String offsetParam=ctx.queryParam("offset");
+			long offset=(offsetParam==null)?0:Integer.parseInt(offsetParam);
+			if (offset<0) throw new BadRequestResponse("Negative offset parameter: "+offset);
+			if (offset>maxIndex) throw new BadRequestResponse("Offset out of range: "+offset);
+			
+			String limitParam=ctx.queryParam("limit");
+			long limit=(offsetParam==null)?DEFAULT_LIMIT:Integer.parseInt(limitParam);
+			if (limit<0) throw new BadRequestResponse("Negative limit parameter: "+limit);
+
+			range[0]=offset;
+			range[1]=Math.min(maxIndex, offset+limit);
+			range[2]=limit;
+		} catch (BadRequestResponse e) {
+			throw e;
+		} catch (NumberFormatException e) {
+			throw new BadRequestResponse("Unable to parse offset/limit");
+		}
+		return range;
 	}
 
 	/**
-	 * Add routes to the service
-	 * @param app Javalin instance to add routes to
-	 * @param baseURL Base URL for routes e.g. "/service-name/api"
+	 * Attempt to resolve an address from an arbitrary object, including possible CNS lookups.
+	 * @param o Object to resolve an address from.
+	 * @return Address instance, or null if not a valid address.
 	 */
-	abstract void addRoutes(Javalin app);
+	protected Address resolveAddress(ACell o) {
+		if (o==null) return null;
 
+		if (o instanceof Address a) {
+			return a;
+		}
+
+		if (o instanceof Symbol sym) {
+			State state=server.getState();
+			ACell cnsValue=state.lookupCNS(sym);
+			return resolveAddress(cnsValue);
+		}
+
+		if (o instanceof AVector v) {
+			if (v.count() !=2) return null; // must be a scoped address
+			return resolveAddress(v.get(0)); // resolve the base address
+		}
+
+		try {
+			// If it's a String, try to parse it as an address
+			AString s = RT.ensureString(o);
+			if (s != null) {
+				// remove the @ prefix if it exists
+				if (s.startsWith("@")) s=s.slice(1);
+				return resolveAddress(Reader.read(s));
+			}
+
+			// If it's a Keyword, try to parse it as an address
+			return null;
+		} catch (Exception e) {
+			throw new IllegalArgumentException("Unable to resolve address from object: "+o+" cause: "+e.getMessage(), e);
+		}
+	}
 }

@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
@@ -59,6 +61,7 @@ import convex.core.util.Utils;
  * In general, focused on unit testing special op capabilities. General on-chain
  * behaviour should be covered elsewhere.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class OpsTest extends ACVMTest {
 
 	protected OpsTest() {

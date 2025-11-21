@@ -1,5 +1,10 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertNotError;
+
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
@@ -13,13 +18,12 @@ import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
-import static convex.test.Assertions.*;
-
 /**
  * Base class for CVM tests that work from a given initial State and Context.
  *
  * Provides utility functions for CVM code execution.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public abstract class ACVMTest {
 
 	protected final State INITIAL;
@@ -59,7 +63,11 @@ public abstract class ACVMTest {
 		INITIAL_JUICE = c.getJuiceAvailable();
 		HERO_BALANCE = c.getAccountStatus(HERO).getBalance();
 		VILLAIN_BALANCE = c.getAccountStatus(VILLAIN).getBalance();
-		c=buildContext(c);
+		try {
+			c=buildContext(c);
+		} catch (Exception e) {
+			throw new Error("Error building CVM context for "+this.getClass().getName(),e);
+		}
 		if (c.isError()) throw new Error("Error initialising context: "+c.getExceptional());
 		c=c.withJuice(0); // reset juice used
 		this.INITIAL=c.getState();
@@ -82,8 +90,9 @@ public abstract class ACVMTest {
 	 * to generate a separate context
 	 * @param ctx Context to modify
 	 * @return
+	 * @throws Exception 
 	 */
-	protected Context buildContext(Context ctx) {
+	protected Context buildContext(Context ctx) throws Exception {
 		return ctx;
 	}
 

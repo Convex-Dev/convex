@@ -22,8 +22,14 @@ public class CVMExecutor extends AThreadedComponent {
 	
 	private Peer peer;
 	
+	/**
+	 * Hook for observing peer updates
+	 */
 	private Consumer<Peer> updateHook=null;
 	
+	/**
+	 * Queue for latest incoming Beliefs
+	 */
 	private LatestUpdateQueue<Belief> update=new LatestUpdateQueue<>();
 
 	public CVMExecutor(Server server) {

@@ -398,7 +398,7 @@ public class BIP39 {
 	
 	/**
 	 * Gets bytes containing the entropy and checksum used to create the given words
-	 * @param mnemonic
+	 * @param mnemonic BIP39 Mnemonic string
 	 * @return byte array of sufficient size, or null if not valid BIP39 words
 	 */
 	public static byte[] mnemonicToBytes(String mnemonic) {
@@ -509,14 +509,20 @@ public class BIP39 {
 
 	/**
 	 * Extends an abbreviated form of a BIP39 word to a full word e.g. 'SHAL' => 'shallow'
-	 * @param abbr
-	 * @return Full lowercase PIB39 word
+	 * @param abbr abbreviated BIP39 word
+	 * @return Full lowercase BIP39 word
 	 */
 	public static String extendWord(String abbr) {
 		return ABBR.get(abbr.trim().toLowerCase());
 	}
 
+	/**
+	 * Parse a string for a BNIP39 math like m/44/864/0/0/0
+	 * @param path String containing a path
+	 * @return Path as an int[] array, or null if did not parse 
+	 */
 	public static int[] parsePath(String path) {
+		if (path==null) return null;
 		try {
 			String[] es=path.split("/");
 			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");

@@ -11,6 +11,7 @@ import java.util.function.Function;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -40,7 +41,7 @@ public class BeliefMerge {
 	private final State state;
 	private final AKeyPair keyPair;
 	private final long timestamp;
-	private final Index<AccountKey, PeerStatus> peers;
+	private final Index<AArrayBlob, PeerStatus> peers;
 
 	private BeliefMerge(Belief belief, AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
 		this.initialBelief=belief;

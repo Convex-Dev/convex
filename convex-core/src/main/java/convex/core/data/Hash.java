@@ -74,21 +74,23 @@ public class Hash extends AArrayBlob {
     /**
      * Wraps the specified blob data as a Hash, sharing the underlying byte array.
      * @param data Blob data of correct size for a Hash. Must have at least enough bytes for a Hash
-     * @return Wrapped data as a Hash
+     * @return Wrapped data as a Hash, or null if data is of wrong length
      */
 	public static Hash wrap(AArrayBlob data) {
 		if (data instanceof Hash) return (Hash)data;
+		if (LENGTH!=data.count()) return null;
+	
 		return wrap(data.getInternalArray(),data.getInternalOffset());
 	}
 	
 	/**
      * Wraps the specified blob data as a Hash, sharing the underlying byte array.
      * @param data Blob data of correct size for a Hash. Must have at least enough bytes for a Hash
-	 * @param pos Position ib Blob to read from
-     * @return Wrapped data as a Hash, or null if insufficent bytes in source Blob
+	 * @param pos Position in Blob to start from
+     * @return Wrapped data as a Hash, or null if insufficient bytes in source Blob
      */
 	public static Hash wrap(AArrayBlob data, int pos) {
-		if ((pos==0) &&(data instanceof Hash)) return (Hash)data;
+		if ((pos==0) && (data instanceof Hash)) return (Hash)data;
 		if (pos+LENGTH>data.count()) return null;
 		return wrap(data.getInternalArray(),Utils.checkedInt(data.getInternalOffset()+pos));
 	}
@@ -149,7 +151,12 @@ public class Hash extends AArrayBlob {
 	 * @return Hash value, or null if not parseable
 	 */
 	public static Hash parse(String s) {
-		return wrap(Blobs.parse(s));
+		ABlob b=Blobs.parse(s);
+		if (b!=null) {
+			return wrap(b);
+		}
+		
+		return null;
 	}
 	
 	/**

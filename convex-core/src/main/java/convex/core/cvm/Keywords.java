@@ -43,6 +43,7 @@ public class Keywords {
 	public static final Keyword NAME = Keyword.intern("name");
 
 	// source info
+	public static final Keyword DOC = Keyword.intern("doc");
 	public static final Keyword START = Keyword.intern("start");
 	public static final Keyword END = Keyword.intern("end");
 	public static final Keyword SOURCE = Keyword.intern("source");
@@ -149,6 +150,15 @@ public class Keywords {
 	
 	// Commond trust keys
 	public static final Keyword CONTROL = Keyword.intern("control");
+	
+	// Lattice structure keys
+	public static final Keyword APP = Keyword.intern("app");
+	public static final Keyword DATA = Keyword.intern("data");
+	public static final Keyword FS = Keyword.intern("fs");
+	
+	
+	// General API keywords
+	public static final Keyword FAUCET = Keyword.intern("faucet");
 	
 
 

@@ -51,7 +51,7 @@ public class DocsTest extends ACVMTest {
 	}
 
 	private void doExampleTest(Symbol sym, AHashMap<ACell, ACell> ex) {
-		String code=RT.jvm( ex.get(Keywords.CODE));
+		String code=(String) RT.jvm( ex.get(Keywords.CODE));
 		
 		Context ctx=step(code);
 		if (ctx.isError()) {

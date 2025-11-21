@@ -58,11 +58,17 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 		return Lists.empty();
 	}
 	
+	/**
+	 * Reverses this List, producing a Vector
+	 */
+	@Override
+	public abstract AVector<T> reversed();
+	
 	@Override
 	public abstract AList<T> next();
 
 	@Override
-	public abstract <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> AList<R> map(Function<T, R> mapper);
 
 	@Override
 	public abstract AList<T> concat(ASequence<? extends T> vals);

@@ -193,8 +193,10 @@ public final class CVMDouble extends ANumeric {
 	@Override
 	public boolean equals(ACell a) {
 		if (a==this) return true;
-		if (!(a instanceof CVMDouble)) return false;
-		return equals((CVMDouble)a);
+		if (a instanceof CVMDouble d) {;
+			return equals(d);
+		}
+		return false;
 	}
 	
 	public boolean equals(CVMDouble a) {
@@ -269,7 +271,19 @@ public final class CVMDouble extends ANumeric {
 		return value==0.0;
 	}
 
+	@Override
+	public boolean isNegative() {
+		return value<0;
+	}
 
+	@Override
+	public boolean isPositive() {
+		return value>0;
+	}
 
+	@Override
+	public boolean isNatural() {
+		return false;
+	}
 
 }

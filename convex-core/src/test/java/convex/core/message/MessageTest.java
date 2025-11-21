@@ -185,7 +185,7 @@ public class MessageTest {
 	
 	/**
 	 * Generic tests for any valid message
-	 * @param m
+	 * @param m Message to test
 	 */
 	public void doMessageTest(Message m) {
 		MessageType type=m.getType();

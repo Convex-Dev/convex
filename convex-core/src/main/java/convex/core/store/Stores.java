@@ -13,7 +13,7 @@ public class Stores {
 	private static AStore defaultStore=null;
 	
 	// Configured global store
-	private static AStore globalStore=null;
+	private static volatile AStore globalStore=null;
 	
 	// Thread local current store, in case servers want different stores
 	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {

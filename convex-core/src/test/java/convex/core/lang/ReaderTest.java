@@ -8,6 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
@@ -425,6 +430,15 @@ public class ReaderTest {
 		doReadPrintTest("[:foo bar]");
 		doReadPrintTest("#Index {}");
 		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");
+	}
+	
+	/**
+	 * Test cases that should read and print identically
+	 * @throws IOException 
+	 */
+	@Test public void testReadFromStream() throws IOException {
+		InputStream stream = new ByteArrayInputStream("[1 2 3]".getBytes(StandardCharsets.UTF_8));
+		assertEquals(Vectors.of(1,2,3),Reader.read(stream));
 	}
 	
 	/**

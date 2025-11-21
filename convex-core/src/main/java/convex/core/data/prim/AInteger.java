@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import java.math.BigInteger;
 
 import convex.core.data.ABlob;
+import convex.core.data.Blob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
@@ -89,6 +90,7 @@ public abstract class AInteger extends ANumeric {
 	 * @return Number of bytes
 	 */
 	public abstract int byteLength();
+	
 
 	@Override
 	public ANumeric add(ANumeric b) {
@@ -126,6 +128,12 @@ public abstract class AInteger extends ANumeric {
 	public AInteger toInteger() {
 		return this;
 	}
+	
+	@Override
+	public boolean isNatural() {
+		// Integers are natural if positive or zero
+		return isPositive()||isZero();
+	}
 
 	/**
 	 * Create a canonical CVM integer representation of the given Java BigInteger
@@ -158,6 +166,12 @@ public abstract class AInteger extends ANumeric {
 		if (value instanceof BigInteger) return create((BigInteger)value);
 		return CVMLong.create(value.longValue());
 	}
+	
+	/**
+	 * Negates this integer
+	 * @return Negated value
+	 */
+	public abstract AInteger negate();
 
 	/**
 	 * Returns the modulus of this integer with a given integer base
@@ -207,6 +221,21 @@ public abstract class AInteger extends ANumeric {
 	 */
 	public AInteger toPower(AInteger power) {
 		throw new TODOException();
+	}
+
+	/**
+	 * Parses hex value as a number
+	 * @param hexstring String of hex characters
+	 * @return hex characters parses as a natural number
+	 */
+	public static AInteger parseHex(String hexstring) {
+		int n=hexstring.length();
+		if ((n&1)!=0) {
+			hexstring="0"+hexstring;
+		}
+		Blob b=Blob.fromHex(hexstring);
+		if (b==null) throw new IllegalArgumentException("invalid hex:"+hexstring);
+		return create(b);
 	}
 
 }

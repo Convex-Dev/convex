@@ -42,7 +42,7 @@ public class AccountStatus extends ARecordGeneric {
 	private final Address parent;
 	
 	// Sequence of fields in account. 
-	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
+	public static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
 			Keywords.BALANCE,Keywords.ALLOWANCE,
 			Keywords.HOLDINGS, Keywords.CONTROLLER,
 			Keywords.ENVIRONMENT,Keywords.METADATA,
@@ -225,7 +225,7 @@ public class AccountStatus extends ARecordGeneric {
 	
 	@Override 
 	public boolean equals(ACell o) {
-		if (o instanceof AccountStatus) return equals((AccountStatus)o);
+		if (o instanceof AccountStatus as) return equals(as);
 		return Cells.equalsGeneric(this, o);
 	}
 	
@@ -367,15 +367,17 @@ public class AccountStatus extends ARecordGeneric {
 	}
 	
 	/**
-	 * Gets the Environment for this account. Defaults to the an empty map if no Environment has been created.
-	 * @return Environment map for this Account
+	 * Gets the Environment for this account.
+	 * @return Environment map for this Account. Might be null?
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Symbol, ACell> getEnvironment() {
-		if (environment==null) {
-			environment=(AHashMap<Symbol, ACell>)values.get(IX_ENVIRONMENT);
+		AHashMap<Symbol, ACell> result= environment;
+		if (result==null) {
+			result=(AHashMap<Symbol, ACell>)values.get(IX_ENVIRONMENT);
+			environment=result;
 		}
-		return environment;
+		return result;
 	}
 
 	/**
@@ -384,10 +386,12 @@ public class AccountStatus extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
-		if (metadata==null) {
-			metadata=(AHashMap<Symbol,AHashMap<ACell,ACell>>)(values.get(IX_METADATA));
+		AHashMap<Symbol, AHashMap<ACell,ACell>> result= metadata;
+		if (result==null) {
+			result=(AHashMap<Symbol,AHashMap<ACell,ACell>>)(values.get(IX_METADATA));
+			metadata=result;
 		}
-		return metadata;
+		return result;
 	}
 
 	/**
@@ -445,7 +449,7 @@ public class AccountStatus extends ARecordGeneric {
 
 	/**
 	 * Gets environment entry for a given symbol
-	 * @param sym
+	 * @param sym Symbol to loop up
 	 * @return Environment entry, or null if not defined in this account
 	 */
 	public MapEntry<Symbol, ACell> getEnvironmentEntry(Symbol sym) {

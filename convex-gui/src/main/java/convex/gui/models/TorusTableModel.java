@@ -27,7 +27,7 @@ public class TorusTableModel extends BaseTableModel {
 		this.asset=eval("(import convex.asset)");
 	}
 	
-	private static final String[] FIXED_COLS = new String[] { "Token", "Market", "Pool AMT", "Pool CVX","Price" };
+	private static final String[] FIXED_COLS = new String[] { "Token", "Market", "Pool AMT", "Pool CVM","Price" };
 	private static final Symbol SYM_MARKETS = Symbol.create("markets");
 
 	NumberFormat formatter = new DecimalFormat("#0.000000");     

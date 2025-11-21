@@ -459,13 +459,28 @@ public class NumericsTest extends ACVMTest {
 	}
 	
 	public static void doIntegerTests(AInteger a) {
-		assertEquals(a.abs(),RT.multiply(a.signum(),a));
+		CVMLong signum=a.signum();
+		assertEquals(a.abs(),RT.multiply(signum,a));
+		if (signum.equals(CVMLong.ONE)) {
+			assertTrue(a.isPositive());
+			assertTrue(a.isNatural());
+		} else if (signum.equals(CVMLong.MINUS_ONE)) {
+			assertTrue(a.isNegative());
+			assertFalse(a.isNatural());
+		} else {
+			assertTrue(a.isZero());
+			assertTrue(a.isNatural());
+		}
 		
 		doGenericNumberTests(a);
 	}
 	
 	public static void doDoubleTests(CVMDouble a) {
-		assertEquals(a.abs(),RT.multiply(a.signum(),a));
+		CVMDouble signum = a.signum();
+		assertFalse(a.isNatural());
+		assertEquals(a.abs(),RT.multiply(signum,a));
+		
+		assertEquals(Math.signum(a.doubleValue()),signum.doubleValue());
 		
 		doGenericNumberTests(a);
 	}

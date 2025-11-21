@@ -11,7 +11,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
-import convex.core.data.ABlob;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
@@ -63,15 +63,11 @@ public class Init {
 	// First user of Protonet, i.e. @mikera
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
 	public static final AccountKey FIRST_USER_KEY = AccountKey.fromHex("89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac");
-
-	// Constants
-	private static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
-	private static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
 	
 	/**
 	 * Number of coins issued at genesis (one million)
 	 */
-	private static final long GENESIS_COINS=1000000*Coin.GOLD;
+	public static final long GENESIS_COINS=1000000*Coin.GOLD;
 
 	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d");
 	public static final AccountKey DEFAULT_GENESIS_KEY = AccountKey.fromHex("c1d3b0104d55ddf7680181a46e93422e49e2ea9298e37794860f1ef1128427f7");
@@ -90,7 +86,7 @@ public class Init {
 	public static State createBaseState(AccountKey governanceKey, AccountKey genesisKey, List<AccountKey> peerKeys) {
 		
 		// accumulators for initial state maps
-		Index<AccountKey, PeerStatus> peers = EMPTY_PEERS;
+		Index<AArrayBlob, PeerStatus> peers = State.EMPTY_PEERS;
 		AVector<AccountStatus> accts = Vectors.empty();
 
 		long supply = Constants.MAX_SUPPLY;
@@ -178,7 +174,7 @@ public class Init {
 
 		// Create the initial state with static libraries and memory allowances. 
 		// We now have a functional CVM State!
-		State s = State.create(accts, peers, globals, EMPTY_SCHEDULE);
+		State s = State.create(accts, peers, globals, State.EMPTY_SCHEDULE);
 		{
 			supply-=s.getGlobalMemoryValue().longValue();
 			
@@ -230,20 +226,20 @@ public class Init {
 
 		// BASE_PEER_ADDRESS = accts.size();
 		{
-			long peerFunds = supply;
-			supply -= peerFunds;
+			long peerFundsLeft = supply;
+			supply = 0; // all supply used up
 			for (int i = 0; i < keyCount; i++) {
 				AccountKey peerKey = peerKeys.get(i);
 				Address peerController = getGenesisPeerAddress(i);
 	
 				// Divide funds among peers
-				long peerStake = peerFunds / (keyCount-i);
+				long peerStake = peerFundsLeft / (keyCount-i);
 	
 	            // Add peer with specified stake
 				peers = addPeer(peers, peerKey, peerController, peerStake);
-				peerFunds -= peerStake;
+				peerFundsLeft -= peerStake;
 			}
-			assert(peerFunds == 0L);
+			assert(peerFundsLeft == supply);
 		}
 		
 
@@ -387,7 +383,7 @@ public class Init {
 	
 	/**
 	 * Add extra libraries for testing purposes, not part of official genesis
-	 * @param peerKeys
+	 * @param peerKeys KEeys for peers in test state
 	 * @return Test State instance
 	 */
 	public static State createTestState(List<AccountKey> peerKeys) {
@@ -488,8 +484,8 @@ public class Init {
 		String symName = row.get(0).toString();
 		String name = row.get(1).toString();
 		String desc = row.get(2).toString();
-		double usdPrice = RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
-		long decimals = RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
+		double usdPrice = (Double) RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
+		long decimals = (Long) RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
 		long usdValue=(Long) RT.jvm(row.get(4)); // USD value of liquidity in currency
 		
 		// number of sub-units in currency
@@ -541,7 +537,7 @@ public class Init {
 		return GENESIS_ADDRESS.offset(index+1);
 	}
 
-	private static Index<AccountKey, PeerStatus> addPeer(Index<AccountKey, PeerStatus> peers, AccountKey peerKey,
+	private static Index<AArrayBlob, PeerStatus> addPeer(Index<AArrayBlob, PeerStatus> peers, AccountKey peerKey,
 			Address owner, long initialStake) {
 		PeerStatus ps = PeerStatus.create(owner, initialStake, null);
 		if (peers.containsKey(peerKey)) throw new IllegalArgumentException("Duplicate peer key");

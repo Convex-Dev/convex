@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.0</version>
+		<version>0.8.2-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -15,8 +15,8 @@
 	<url>https://convex.world</url>
 	
 	<properties>
-		<zxing.version>3.5.3</zxing.version>
-		<flatlaf.version>3.5.2</flatlaf.version>
+		<zxing.version>3.5.4</zxing.version>
+		<flatlaf.version>3.6.2</flatlaf.version>
 	</properties>
 
 	<build>
@@ -53,12 +53,6 @@
 			<groupId>com.miglayout</groupId>
 			<artifactId>miglayout-swing</artifactId>
 			<version>11.4.2</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-text</artifactId>
-			<version>1.12.0</version>
 		</dependency>
 
 		<dependency>

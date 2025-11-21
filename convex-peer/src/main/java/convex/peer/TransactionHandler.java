@@ -284,37 +284,43 @@ public class TransactionHandler extends AThreadedComponent {
 			
 		// possibly have own transactions to publish as a Peer
 		maybeGetOwnTransactions(peer);
-			
+		
 		// possibly have client transactions to publish
 		transactionQueue.drainTo(newTransactions);
-
-		if (newTransactions.isEmpty()) return null;
 		
+		// Count the new transactions. If there aren't any, we can safely exit
 		int ntrans=newTransactions.size();
-		int bsize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
-		int nblocks=((ntrans-1)/bsize)+1;
-		
-		@SuppressWarnings("unchecked")
-		SignedData<Block>[] signedBlocks=new SignedData[nblocks];
-		
-		for (int i=0; i<nblocks; i++) {
-		
-			int start=i*bsize;
-			int end=Math.min(ntrans, (i+1)*bsize);
-			Block block = Block.create(timestamp, newTransactions.subList(start, end));
-			SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
+		if (ntrans==0) return null;
+
+		try {
 			
-			try {
+			int maxBlockSize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
+			int nblocks=((ntrans-1)/maxBlockSize)+1;
+			
+			@SuppressWarnings("unchecked")
+			SignedData<Block>[] signedBlocks=new SignedData[nblocks];
+		
+			for (int i=0; i<nblocks; i++) {
+				int start=i*maxBlockSize;
+				int end=Math.min(ntrans, (i+1)*maxBlockSize);
+				Block block = Block.create(timestamp, newTransactions.subList(start, end));
+				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 				signedBlock=Cells.persist(signedBlock);
-			} catch (Exception e) {
-				log.warn("Exception preparing new block",e);
-				return null;
+				signedBlocks[i]=signedBlock;		
 			}
-			signedBlocks[i]=signedBlock;		
+			newTransactions.clear();
+			lastBlockPublishedTime=timestamp;
+			return signedBlocks;
+		} catch (Exception e) {
+			log.warn("Exception preparing new block",e);
+			return null;
+		} finally {
+			// clear in case of faulty transactions. 
+			if (!newTransactions.isEmpty()) {
+				log.warn("Discarded "+newTransactions.size()+ "potentially faulty / malicious transactions");
+				newTransactions.clear();
+			}
 		}
-		newTransactions.clear();
-		lastBlockPublishedTime=timestamp;
-		return signedBlocks;
 	}
 
 	Long minBlockTime=null;
@@ -353,7 +359,6 @@ public class TransactionHandler extends AThreadedComponent {
 	
 	/**
 	 * Check if the Peer want to send any of its own transactions
-	 * @param transactionList List of transactions to add to.
 	 */
 	void maybeGetOwnTransactions(Peer p) {
 		long ts=Utils.getCurrentTimestamp();

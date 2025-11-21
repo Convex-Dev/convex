@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.InputStream;
+
 import convex.core.Constants;
 import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.InvalidDataException;
@@ -49,7 +51,7 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		return name;
 	}
 
-	protected static boolean validateName(AString name) {
+	public static boolean validateName(AString name) {
 		if (name == null) return false;
 		long n = name.count();
 		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
@@ -115,6 +117,15 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	@Override
 	public ABlob toBlob() {
 		return name.toBlob();
+	}
+	
+	public Blob toFlatBlob() {
+		return name.toFlatBlob();
+	}
+	
+	@Override
+	public InputStream getInputStream() {
+		return name.getInputStream();
 	}
 
 	@Override

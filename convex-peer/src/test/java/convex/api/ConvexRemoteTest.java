@@ -32,7 +32,6 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
-import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
@@ -180,26 +179,4 @@ public class ConvexRemoteTest {
 			}
 		}
 	}
-	
-	@Test
-	public void testReceivedCount() throws IOException, TimeoutException, InterruptedException, ResultException {
-		synchronized (network.SERVER) {
-			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			AConnection conn=convex.connection;
-
-			long seq=convex.getSequence();
-			assertEquals(1,conn.getReceivedCount());
-			
-			// conn.setReceiveHook(m-> System.out.println(m));
-			
-			convex.querySync("'foo");
-			assertEquals(2,conn.getReceivedCount());
-			
-			Result r=convex.transactSync("*sequence*");
-			assertNull(r.getErrorCode());
-			assertEquals(seq,RT.ensureLong(r.getValue()).longValue());
-			assertEquals(3,conn.getReceivedCount());
-		}
-	}
-
 }

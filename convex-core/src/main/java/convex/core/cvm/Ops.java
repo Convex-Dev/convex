@@ -25,7 +25,7 @@ public class Ops {
 
 	/**
 	 * Reads an Op from the given Blob. Assumes tag specifying an Op already read.
-	 * @param tag 
+	 * @param tag Tag of CAD3 encoding being read
 	 * 
 	 * @param <T> The return type of the Op
 	 * @param b Blob to read from

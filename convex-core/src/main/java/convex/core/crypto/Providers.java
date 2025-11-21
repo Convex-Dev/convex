@@ -5,7 +5,6 @@ import java.security.Security;
 import convex.core.crypto.bc.BCProvider;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 
 
 /**
@@ -40,7 +39,7 @@ public class Providers {
 		currentProvider=provider;
 	}
 	
-	public static AKeyPair generate(Blob seed) {
+	public static AKeyPair generate(AArrayBlob seed) {
 		return currentProvider.create(seed);
 	}
 }

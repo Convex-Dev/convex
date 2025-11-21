@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.0</version>
+		<version>0.8.2-SNAPSHOT</version>
 	</parent>
 
 	<name>Convex Observer</name>
@@ -18,11 +18,6 @@
 	<dependencies>
 		<!--
 		https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient -->
-		<dependency>
-			<groupId>org.apache.httpcomponents.client5</groupId>
-			<artifactId>httpclient5</artifactId>
-			<version>${hc.version}</version>
-		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
@@ -49,7 +44,7 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-java</artifactId>
-			<version>0.8.0</version>
+			<version>0.8.2-SNAPSHOT</version>
 		</dependency>
 	</dependencies>
 </project>

@@ -8,6 +8,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -21,18 +23,18 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
-import convex.core.data.Blob;
+import convex.core.data.AString;
 import convex.core.data.Hash;
-import convex.core.data.impl.ALongBlob;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 
@@ -617,7 +619,7 @@ public class Utils {
 	
 	/**
 	 * Returns the minimal number of bytes to represent the signed twos complement
-	 * long value. Return value will be at 1-8
+	 * long value. Return value will be 1-8
 	 *
 	 * @param x Long value
 	 * @return Number of bytes required for representation, in the range 1-8
@@ -684,7 +686,7 @@ public class Utils {
 	 *                                  int
 	 */
 	public static long toLong(Object v) {
-		if (v instanceof Long) return (Integer) v;
+		if (v instanceof Long l) return l.longValue();
 		if (v instanceof String) {
 			try {
 				return Long.parseLong((String) v);
@@ -722,7 +724,17 @@ public class Utils {
 		}
 	}
 	
-
+	public static AString readResourceAsAString(String path) throws IOException {
+		return Strings.fromStream(getResourceAsStream(path));
+	}
+	
+	/**
+	 * Gets a resource as a Stream.
+	 *
+	 * @param path Path to resource, e.g "/actors/token.cvx"
+	 * @return String content of resource file
+	 * @throws IOException If an IO error occurs
+	 */
 	public static InputStream getResourceAsStream(String path) throws IOException {
 		InputStream inputStream = Utils.class.getResourceAsStream(path);
 		if (inputStream == null) throw new IOException("Resource not found: " + path);
@@ -734,19 +746,11 @@ public class Utils {
 	 *
 	 * @param inputStream Stream of data to read as UTF-8 string
 	 * @return String content of stream, or null on failure
+	 * @throws IOException 
 	 */
-	public static String readString(InputStream inputStream) {
-		try {
-			ByteArrayOutputStream result = new ByteArrayOutputStream();
-			byte[] buffer = new byte[1024];
-			for (int length; (length = inputStream.read(buffer)) != -1; ) {
-				result.write(buffer, 0, length);
-			}
-			// StandardCharsets.UTF_8.name() > JDK 7
-			return result.toString("UTF-8");
-		} catch (IOException t) {
-			return null;
-		}
+	public static String readString(InputStream inputStream) throws IOException {
+		byte[] bytes = inputStream.readAllBytes();
+	    return new String(bytes, StandardCharsets.UTF_8);
 	}
 
 	/**
@@ -835,19 +839,6 @@ public class Utils {
 		if (ix > 0) {
 			bs[ix - 1] = (byte) ((val >> 8) & 0xFF);
 		}
-	}
-
-	/**
-	 * Reads data from the Byte Buffer buffer, up to the limit.
-	 * @param bb ByteBuffer to read from
-	 * @return Blob containing bytes read from buffer
-	 */
-	public static AArrayBlob readBufferData(ByteBuffer bb) {
-		bb.position(0);
-		int len = bb.remaining();
-		byte[] bytes = new byte[len];
-		bb.get(bytes);
-		return Blob.wrap(bytes);
 	}
 
 	/**
@@ -1304,6 +1295,14 @@ public class Utils {
 			}
 		}
 	}
+	
+	public static <A,B> List<B> map(List<A> values, Function<A,B> mapper) {
+		ArrayList<B> result=new ArrayList<B>(values.size());
+		for (A value: values) {
+			result.add(mapper.apply(value));
+		}
+		return result;
+	}
 
 	public static String joinStrings(List<String> strings, String separator) {
 		StringBuilder sb=new StringBuilder(); 
@@ -1323,7 +1322,7 @@ public class Utils {
 	 * @param c Divisor
 	 * @return Result of (a*b)/c
 	 */
-	static long slowMulDiv(long a, long b, long c) {
+	public static long slowMulDiv(long a, long b, long c) {
 		// TODO: we want a faster version of this
 
 		BigInteger result=BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c));
@@ -1400,13 +1399,28 @@ public class Utils {
 	}
 
 	public static long longByteAt(long value,long i) {
-		return 0xFF&(value >> ((ALongBlob.LENGTH - i - 1) * 8));
+		return 0xFF&(value >> ((8 - i - 1) * 8));
 	}
 
+	static String version=null;
 	public static String getVersion() {
-		String v= Utils.class.getPackage().getImplementationVersion();
-		if (v==null) v="Unlabelled SNAPSHOT";
-		return v;
+		version = Utils.class.getPackage().getImplementationVersion();
+		
+		if (version==null) try {
+			Properties properties = new Properties();
+			InputStream stream = getResourceAsStream("/convex/core/build.properties");
+			if (stream!=null) {
+				properties.load(stream);
+				version=properties.getProperty("convex.core.version");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		if (version==null) {
+			return "SNAPSHOT";
+		}
+		return version;
 	}
 
 	public static String timeString() {
@@ -1416,6 +1430,23 @@ public class Utils {
 	private static String timeString(Instant timeStamp) {
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneId.from(ZoneOffset.UTC));
 		return formatter.format(timeStamp);
+	}
+
+	/**
+	 * Checks if a Unicode code point or char
+	 * @param c Unicode code point
+	 * @return True if ASCII char, false otherwise
+	 */
+	public static boolean isASCIIChar(long c) {
+		return (c&(~0x7fl))==0;
+	}
+
+	public static String urlDecode(String value) {
+	    return URLDecoder.decode(value, StandardCharsets.UTF_8);
+	}
+	
+	public static String urlEncode(String value) {
+	    return URLEncoder.encode(value, StandardCharsets.UTF_8);
 	}
 
 

@@ -9,7 +9,7 @@ import convex.core.util.ErrorMessages;
 
 /**
  * Abstract base class for ops encoded as dense records of ops
- * @param <T>
+ * @param <T> Type of op return value
  */
 public abstract class AFlatMultiOp<T extends ACell> extends AMultiOp<T> {
 

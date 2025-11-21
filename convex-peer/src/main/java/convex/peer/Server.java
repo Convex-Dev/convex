@@ -473,7 +473,13 @@ public class Server implements Closeable {
 		}
 	}
 
-
+	/**
+	 * Gets the current consensus state for this Peer Server
+	 * @return Current consensus state
+	 */
+	public State getState() {
+		return getPeer().getConsensusState();
+	}
 
 	protected void processTransact(Message m) {
 		boolean queued=transactionHandler.offerTransaction(m);

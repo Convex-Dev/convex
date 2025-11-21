@@ -1,5 +1,8 @@
 package convex.core.data.prim;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 /**
  * BAse class for CVM numeric types
  */
@@ -32,6 +35,24 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Signum of the numeric value
 	 */
 	public abstract APrimitive signum();
+	
+	/**
+	 * Returns true if this numeric value is negative. Note zero and NaN are not negative
+	 * @return true if negative
+	 */
+	public abstract boolean isNegative();
+
+	/**
+	 * Returns true if this numeric value is positive. Note zero and NaN are not positive
+	 * @return true if negative
+	 */
+	public abstract boolean isPositive();
+	
+	/**
+	 * Returns true if this numeric value is a natural integer
+	 * @return true if a natural integer, false otherwise
+	 */
+	public abstract boolean isNatural();
 
 
 	/**
@@ -84,4 +105,36 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return True if this value is numerically equal to zero
 	 */
 	public abstract boolean isZero();
+	
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ANumeric> T fromNumber(Number number) {
+        if (number == null) {
+            return null;
+        }
+
+        // Fast paths for common types
+        if (number instanceof Long || number instanceof Integer || number instanceof Short || number instanceof Byte) {
+            return (T) CVMLong.create(number.longValue());
+        }
+        if (number instanceof Double || number instanceof Float) {
+            return (T) CVMDouble.create(number.doubleValue());
+        }
+
+        if (number instanceof BigInteger bi) {
+            return (T) AInteger.create(bi);
+        }
+
+        // Slow path for other Number subclasses (e.g., AtomicInteger, AtomicLong)
+        try {
+            BigDecimal bd = new BigDecimal(number.toString());
+            BigInteger bi = bd.toBigIntegerExact();
+            if (bi.bitLength() <= 63) {
+                return (T) CVMLong.create(bi.longValue());
+            }
+            return (T) CVMBigInteger.create(bi);
+        } catch (ArithmeticException | NumberFormatException e) {
+            return (T) CVMDouble.create(number.doubleValue());
+        }
+    }
 }

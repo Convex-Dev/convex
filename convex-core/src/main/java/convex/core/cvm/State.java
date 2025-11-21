@@ -4,9 +4,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -17,6 +14,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -55,8 +53,8 @@ import convex.core.util.Utils;
  *
  */
 public class State extends ARecordGeneric {
-	public static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
-	public static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
+	public static final Index<AArrayBlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
+	public static final Index<AArrayBlob, PeerStatus> EMPTY_PEERS = Index.none();
 
 	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS,
 			Keywords.GLOBALS, Keywords.SCHEDULE };
@@ -91,10 +89,8 @@ public class State extends ARecordGeneric {
 	 */
 	public static final State EMPTY = create(Vectors.empty(), EMPTY_PEERS, Constants.INITIAL_GLOBALS, EMPTY_SCHEDULE);
 
-	private static final Logger log = LoggerFactory.getLogger(State.class.getName());
-
-	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
+	private State(AVector<AccountStatus> accounts, Index<AArrayBlob, PeerStatus> peers,
+			AVector<ACell> globals, Index<AArrayBlob, AVector<ACell>> schedule) {
 		super(CVMTag.STATE,FORMAT,Vectors.of(accounts,peers,globals,schedule).toVector());
 	}
 	
@@ -124,8 +120,8 @@ public class State extends ARecordGeneric {
 	 * @param schedule Schedule (may be null)
 	 * @return New State instance
 	 */
-	public static State create(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
+	public static State create(AVector<AccountStatus> accounts, Index<AArrayBlob, PeerStatus> peers,
+			AVector<ACell> globals, Index<AArrayBlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, globals, schedule);
 	}
 
@@ -172,8 +168,8 @@ public class State extends ARecordGeneric {
 	 * @return A map of addresses to PeerStatus records
 	 */
 	@SuppressWarnings("unchecked")
-	public Index<AccountKey, PeerStatus> getPeers() {
-		return(Index<AccountKey, PeerStatus>) values.get(1);
+	public Index<AArrayBlob, PeerStatus> getPeers() {
+		return(Index<AArrayBlob, PeerStatus>) values.get(1);
 	}
 
 	/**
@@ -359,7 +355,6 @@ public class State extends ARecordGeneric {
 
 		// now apply the transactions!
 		int n = al.size();
-		log.debug("Applying {} scheduled transactions",n);
 		for (int i = 0; i < n; i++) {
 			AVector<ACell> st = (AVector<ACell>) al.get(i);
 			Address origin = (Address) st.get(0);
@@ -372,10 +367,8 @@ public class State extends ARecordGeneric {
 			if (ctx.isExceptional()) {
 				// TODO: what to do here? probably ignore
 				// we maybe need to think about reporting scheduled results?
-				log.trace("Scheduled transaction error: {}", ctx.getExceptional());
 			} else {
 				state = ctx.getState();
-				log.trace("Scheduled transaction succeeded");
 			}
 		}
 
@@ -460,15 +453,16 @@ public class State extends ARecordGeneric {
 	 * Applies a signed transaction to the State.
 	 *
 	 * SECURITY: Checks digital signature and correctness of account key
-	 * @param tctx 
+	 * @param signedTx Signed transaction
+	 * @param tctx Transaction context
 	 *
 	 * @return ResultContext containing the result of the transaction
-	 * @throws InvalidBlockException 
+	 * @throws InvalidBlockException If block is invalid (bad transaction)
 	 */
-	public ResultContext applyTransaction(SignedData<ATransaction> t2, TransactionContext tctx) throws InvalidBlockException {
+	public ResultContext applyTransaction(SignedData<ATransaction> signedTx, TransactionContext tctx) throws InvalidBlockException {
 		// Extract transaction
-		ATransaction t=RT.ensureTransaction(t2.getValue());
-		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+t2.getHash());
+		ATransaction t=RT.ensureTransaction(signedTx.getValue());
+		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+signedTx.getHash());
 
 		Address addr=t.getOrigin();
 		tctx.origin=addr;
@@ -493,7 +487,7 @@ public class State extends ARecordGeneric {
 			}
 			
 			// Perform Signature check
-			boolean sigValid=t2.checkSignature(key);
+			boolean sigValid=signedTx.checkSignature(key);
 			if (!sigValid) {
 				ResultContext rc= ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 				return rc.withSource(SourceCodes.CVM);
@@ -619,7 +613,7 @@ public class State extends ARecordGeneric {
 		long timeStamp=this.getTimestamp().longValue();
 		Double totalStake = getPeers().reduceEntries((acc, e) -> {
 			PeerStatus ps=e.getValue();
-			double stake = (double) (ps.getTotalStake());
+			double stake = (double) (ps.getTotalStakeShares());
 			
 			long peerTimestamp=ps.getTimestamp();
 			double decay=Economics.stakeDecay(timeStamp,peerTimestamp);
@@ -703,7 +697,7 @@ public class State extends ARecordGeneric {
 	 * @param newPeers New Peer Map
 	 * @return Updated State
 	 */
-	public State withPeers(Index<AccountKey, PeerStatus> newPeers) {
+	public State withPeers(Index<AArrayBlob, PeerStatus> newPeers) {
 		if (getPeers() == newPeers) return this;
 		return create(values.assoc(1,newPeers));
 	}
@@ -872,13 +866,40 @@ public class State extends ARecordGeneric {
 	}
 
 	/**
-	 * Look up an Address from CNS
+	 * Look up an value from CNS. Prefer the Symbol overload for performance.
 	 * @param name CNS name String
-	 * @return Address from CNS, or null if not found
+	 * @return Value from CNS, or null if not found
 	 */
-	public Address lookupCNS(String name) {
+	public ACell lookupCNS(String name) {
+		return lookupCNS(Symbol.create(name));
+	}
+
+	/**
+	 * Look up (resolve) an value from CNS
+	 * @param name CNS name Symbol
+	 * @return Value from CNS, or null if not found / invalid
+	 */
+	public ACell lookupCNS(Symbol name) {
 		Context ctx=Context.create(this);
-		return (Address) ctx.lookupCNS(name).getResult();
+		ctx= ctx.lookupCNS(name);
+		if (ctx.isExceptional()) {
+			return null;
+		}
+		return ctx.getResult();
+	}
+
+	/**
+	 * Look up (resolve) a full record from CNS
+	 * @param name CNS name Symbol
+	 * @return Record from CNS, or null if not found / invalid
+	 */
+	public AVector<ACell> lookupCNSRecord(Symbol name) {
+		Context ctx=Context.create(this);
+		ctx= ctx.lookupCNSRecord(name);
+		if (ctx.isExceptional()) {
+			return null;
+		}
+		return RT.ensureVector(ctx.getResult());
 	}
 
 	/**

@@ -47,10 +47,7 @@ import convex.test.Samples;
  */
 public class TransactionTest extends ACVMTest {
 	
-	Address HERO=InitTest.HERO;
 	AKeyPair HERO_KP=InitTest.HERO_KEYPAIR;
-	
-	Address VILLAIN=InitTest.VILLAIN;
 	AKeyPair VILLAIN_KP=InitTest.VILLAIN_KEYPAIR;
 	long JP=Constants.INITIAL_JUICE_PRICE;
 	
@@ -255,8 +252,7 @@ public class TransactionTest extends ACVMTest {
 	}
 	
 	/**
-	 * TEsts for transactions that don't get as far as code execution
-	 * @throws InvalidBlockException 
+	 * Tests for transactions that don't get as far as code execution
 	 */
 	@SuppressWarnings("unchecked")
 	@Test public void testBadSignedTransactions() throws InvalidBlockException {

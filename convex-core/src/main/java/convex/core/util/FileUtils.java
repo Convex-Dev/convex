@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -19,7 +18,7 @@ import convex.core.message.Message;
 public class FileUtils {
 
 	/**
-	 * Loads a file as a String. Handles `-` for STDIN
+	 * Loads a UTF-8 file as a String. Handles `-` for STDIN, and leading `~` for user home directory
 	 * @param fileName File to load
 	 * @return String contents of file
 	 * @throws IOException in case of IO failure
@@ -31,8 +30,8 @@ public class FileUtils {
 			byte[] bs = System.in.readAllBytes();
 			result = new String(bs);
 		} else {
-			Path path = Paths.get(fileName);
-			if (!path.toFile().exists()) {
+			Path path = getPath(fileName);
+			if (!Files.exists(path)) {
 				throw new FileNotFoundException("File does not exist: " + path);
 			}
 			result = Files.readString(path, StandardCharsets.UTF_8);
@@ -42,10 +41,6 @@ public class FileUtils {
 	
 	public static Blob loadFileAsBlob(Path file) throws IOException {
 		return Blob.wrap(Files.readAllBytes(file));
-	}
-
-	public static byte[] loadFileAsBytes(Path file) throws IOException {
-		return Files.readAllBytes(file);
 	}
 	
 	public static <T extends ACell> T loadCAD3(Path file) throws IOException, BadFormatException {
@@ -88,20 +83,51 @@ public class FileUtils {
 		Files.createDirectories(Path.of(dirPath));
 		return target;
 	}
+	
+	/**
+	 * Create a path of directories as necessary to hold a file object. Interprets leading "~" as user home directory.
+	 *
+	 * @param file File object to see if the directory of the filename exists, if not then create it.
+	 * @return An absolute Path to the file, with parent directories created recursively as needed
+	 * @throws IOException In case of IO Error
+	 */
+	public static Path ensureFilePath(Path file) throws IOException {
+		// Get path of parent directory, using absolute path (may be current working directory user.dir)
+		Path parent=file.getParent();
+		Files.createDirectories(parent);
+		return file;
+	}
 
 	/**
 	 * Gets the absolute path File for a given file name. Interprets leading "~" as user home directory.
 	 * @param path Path as a string
-	 * @return File representing the given path
+	 * @return File representing the given absolute path
 	 */
 	public static File getFile(String path) {
-		if (path!=null && path.startsWith("~")) {
+		if (path.startsWith("~")) {
 			path=System.getProperty("user.home")+path.substring(1);
 			return new File(path);
 		} else {
 			path=new File(path).getAbsolutePath();
 			return new File(path);
 		}
+	}
+	
+	/**
+	 * Gets the absolute Pile for a given file name. Interprets leading "~" as user home directory.
+	 * @param pathName Path as a string
+	 * @return Path instance representing the given absolute path
+	 */
+	public static Path getPath(String pathName) {
+		if (pathName.startsWith("~")) {
+			pathName=System.getProperty("user.home")+pathName.substring(1);
+		} else {
+			// ensure an absolute path
+			if (!pathName.startsWith(File.separator)) {
+				pathName=File.separator+pathName;
+			}
+		}
+		return new File(pathName).toPath();
 	}
 
 

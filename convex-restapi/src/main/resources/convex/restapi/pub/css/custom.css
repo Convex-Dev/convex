@@ -1,0 +1,84 @@
+/* custom.css */
+
+/* Default styles for dark mode */
+.cvm-balance {
+    color: #ff0; /* Bright yellow for dark mode, high contrast */
+}
+
+/* Light mode styles using prefers-color-scheme */
+@media (prefers-color-scheme: light) {
+    .cvm-balance {
+        color: #840; /* Gold-like color for light mode, professional and warm */
+    }
+}
+
+[data-theme="light"] {
+	.cvm-balance {
+	    color: #840; /* Gold-like color for light mode, professional and warm */
+	}
+}
+
+/* Light mode styles using class-based theme toggle (optional) */
+.light-mode .cvm-balance {
+    color: #840;
+}
+
+/* REPL Styles */
+.repl-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 80vh;
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    overflow: hidden;
+}
+
+.repl-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1em;
+    background: var(--pico-code-background-color);
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.repl-input-area {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--pico-muted-border-color);
+    background: var(--pico-background-color);
+}
+
+.repl-controls {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+}
+
+.repl-input {
+    flex: 1;
+    font-family: monospace;
+    min-height: 80px;
+    resize: vertical;
+}
+
+.repl-entry {
+    margin-bottom: 1em;
+}
+
+.repl-prompt {
+    
+}
+
+.repl-result {
+    color: var(--pico-primary);
+    margin-bottom: 0.25em;
+	font-weight: bold;
+}
+
+.repl-error {
+    color: var(--pico-del-color);
+    margin-top: 0.25em;
+}

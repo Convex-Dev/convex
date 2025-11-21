@@ -1,0 +1,44 @@
+{
+  "name": "submit",
+  "title": "Submit Prepared Transaction",
+  "description": "Submit a previously prepared transaction. Requires the transaction hash reference, the account public key, and the Ed25519 signature over the provided hash.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "hash": {
+        "type": "string",
+        "description": "Transaction reference hash returned by the prepare tool (hex string). This is the ref-encoding of the transaction."
+      },
+      "accountKey": {
+        "type": "string",
+        "description": "Hex-encoded public key corresponding to the signer"
+      },
+      "sig": {
+        "type": "string",
+        "description": "Ed25519 signature of hash bytes in hex (64 bytes = 128 hex digits)"
+      }
+    },
+    "required": [
+      "hash",
+      "accountKey",
+      "signature"
+    ]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "any",
+        "description": "Resulting CVM value converted to JSON"
+      },
+      "errorCode": {
+        "type": "string",
+        "description": "CVM error code (if the transaction failed)"
+      },
+      "info": {
+        "type": "object",
+        "description": "Additional execution metadata"
+      }
+    }
+  }
+}

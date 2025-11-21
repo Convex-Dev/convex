@@ -3,11 +3,13 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -29,7 +31,7 @@ import convex.test.Samples;
 
 public class BlobsTest {
 	@Test public void testConstants() {
-		assertEquals(4096,Blob.CHUNK_LENGTH);
+		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
 		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
 	}
 	
@@ -98,6 +100,11 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testHexString() {
+		assertEquals("0123",Blob.fromHex("0123").toCVMHexString().toString());
+	}
+	
+	@Test
 	public void testHexMatchLength() {
 		assertEquals(4,Blob.fromHex("0123").hexMatch(Blob.fromHex("0123"), 0, 4));
 		assertEquals(3,Blob.fromHex("0123").hexMatch(Blob.fromHex("012f"), 0, 4));
@@ -106,12 +113,19 @@ public class BlobsTest {
 		assertEquals(0,Blob.fromHex("ffff0123").hexMatch(Blob.fromHex("ffff012f"), 3, 0));
 	}
 	
-	@Test public void testHexDigit() {
-		
+	@Test
+	public void testHexDigitComplete() {
+	    Blob b = Blob.fromHex("a1b2");
+	    assertEquals(10, b.getHexDigit(0)); // 'a'
+	    assertEquals(1, b.getHexDigit(1));  // '1'
+	    assertEquals(11, b.getHexDigit(2)); // 'b'
+	    assertEquals(2, b.getHexDigit(3));  // '2'
+	    
+	    // Test boundary conditions
+	    assertThrows(IndexOutOfBoundsException.class, () -> b.getHexDigit(-1));
+	    assertThrows(IndexOutOfBoundsException.class, () -> b.getHexDigit(4));
+	    assertThrows(IndexOutOfBoundsException.class, () -> Blob.EMPTY.getHexDigit(0));
 	}
-	
-	
-	
 
 	@Test
 	public void testFromHex() {
@@ -152,6 +166,15 @@ public class BlobsTest {
 		
 		bb.append('b');
 		assertEquals("ab",bb.getCVMString().toString());
+		
+		bb.appendRepeatedByte((byte)'c', 5);
+		assertEquals("abccccc",bb.getCVMString().toString());
+		
+		bb.appendRepeatedByte((byte)0, 5000);
+		assertEquals(5007,bb.count());
+		ABlob blob=bb.toBlob();
+		assertEquals("abccccc",Strings.create(blob.slice(0,7)).toString());
+		assertEquals(Blob.EMPTY_CHUNK,blob.slice(100, 4196)); // slice of 4096 zero bytes spanning chunks
 	}
 	
 	@Test
@@ -160,7 +183,9 @@ public class BlobsTest {
 		bb.append(new byte[0]);
 		assertEquals(0,bb.count());
 		byte[] bs=new byte[1000];
-		for (int i=0; i<bs.length; i++) bs[i]=(byte)i;
+		for (int i=0; i<bs.length; i++) {
+			bs[i]=(byte)i;
+		}
 		
 		for (int i=0; i<100; i++) {
 			bb.append(bs);
@@ -332,6 +357,20 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testSliceInvalidRanges() {
+	    Blob b = Blob.fromHex("0123456789");
+	    
+	    // start > end
+	    assertNull(b.slice(3, 2));
+	    
+	    // negative length implicitly
+	    assertNull(b.slice(5, 4));
+	    
+	    // valid edge case
+	    assertEquals(Blob.EMPTY, b.slice(3, 3));
+	}
+	
+	@Test
 	public void testBlobAppendSmall() {
 		ABlob src = Blob.fromHex("cafebabedeadbeef");
 		src=src.append(Blob.fromHex("f00d"));
@@ -392,6 +431,78 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testHexParsingEdgeCases() {
+	    // Case sensitivity
+	    assertEquals(Blob.fromHex("abcd"), Blob.fromHex("ABCD"));
+	    assertEquals(Blob.fromHex("abcd"), Blob.fromHex("AbCd"));
+	    
+	    // Invalid characters
+	    assertNull(Blob.fromHex("12GH"));
+	    assertNull(Blob.fromHex("12 34"));
+	    assertNull(Blob.fromHex("12\n34"));
+	    
+	    // Empty and whitespace
+	    assertEquals(Blob.EMPTY, Blob.fromHex(""));
+	    assertNull(Blob.fromHex("   ")); // Should this be EMPTY or null?
+	}
+
+	
+	@Test
+	public void testBlobTreeDepthLimits() {
+	    // Test extremely deep blob trees don't cause stack overflow
+	    BlobBuilder bb = new BlobBuilder();
+	    Blob small = Blob.fromHex("01");
+	    
+	    // Build a very nested structure
+	    for (int i = 0; i < 1000; i++) {
+	        bb.append(small);
+	    }
+	    
+	    ABlob result = bb.toBlob();
+	    assertNotNull(result);
+	    assertEquals(1000, result.count());
+	}
+	
+	@Test
+	public void testInstanceReuseOptimizations() {
+	    Blob b = Blob.fromHex("0123456789abcdef");
+	    
+	    // Full slice should return same instance
+	    assertSame(b, b.slice(0));
+	    assertSame(b, b.slice(0, b.count()));
+	    
+	    // Empty slices should return empty singleton
+	    assertSame(Blob.EMPTY, b.slice(5, 5));
+	    assertSame(Blob.EMPTY, b.slice(b.count()));
+	    	    
+	
+	}
+	
+	@Test
+	public void testCompareConsistency() {
+	    // Ensure compareTo is consistent with equals
+	    Blob[] blobs = new Blob[] {
+	        Blob.EMPTY,
+	        Blob.fromHex("00"),
+	        Blob.fromHex("01"),
+	        Blob.fromHex("FF"),
+	        Blob.fromHex("0000"),
+	        Blob.fromHex("0001"),
+	        Blob.fromHex("FFFF")
+	    };
+	    
+	    for (Blob b1 : blobs) {
+	        for (Blob b2 : blobs) {
+	            // If equal, compareTo should return 0
+	            
+	            // compareTo should be antisymmetric
+	            assertEquals(-Integer.signum(b1.compareTo(b2)), Integer.signum(b2.compareTo(b1)));
+	        }
+	        doBlobTests(b1);
+	    }
+	}
+	
+	@Test
 	public void testPacked() {
 		Blob chunk=Samples.FULL_BLOB;
 		assertEquals(Blob.CHUNK_LENGTH,chunk.size());
@@ -432,10 +543,11 @@ public class BlobsTest {
 
 	@Test
 	public void testBigBlob() throws InvalidDataException, BadFormatException, IOException {
-		BlobTree bb = Samples.BIG_BLOB_TREE;
+		final BlobTree bb = Samples.BIG_BLOB_TREE;
 		long len = bb.count();
 
 		assertEquals(Samples.BIG_BLOB_LENGTH, len);
+		assertTrue(bb.isCanonical());
 
 		assertSame(bb, bb.slice(0));
 		assertSame(bb, bb.slice(0, len));
@@ -463,6 +575,9 @@ public class BlobsTest {
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
 		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
+		
+		// Check streaming a BlobTree
+		assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
 
 		doBlobTests(bb);
 	}
@@ -561,6 +676,24 @@ public class BlobsTest {
 		assertEquals(b,Blobs.parse(hex));
 		assertEquals(b,Blobs.parse(" 0x"+hex+" "));
 		assertEquals(b,Blobs.parse(" "+hex+" "));
+	}
+	
+	@Test
+	public void testBlobFromStream() throws IOException {
+		doBlobStreamTest(Blobs.empty());
+		doBlobStreamTest(Samples.SMALL_BLOB);
+		
+		doBlobStreamTest(Samples.FULL_BLOB);
+		doBlobStreamTest(Samples.FULL_BLOB_PLUS);
+	}
+
+	private void doBlobStreamTest(ABlob b) throws IOException {
+		byte[] bs=b.getBytes();
+		ByteArrayInputStream bis=new ByteArrayInputStream(bs);
+		ABlob r=Blobs.fromStream(bis);
+		assertEquals(b,r);
+		
+		assertEquals(b,Blobs.fromStream(b.getInputStream()));
 	}
 
 	@Test

@@ -40,7 +40,7 @@ public class ListsTest {
 		assertSame(e,Format.read(expectedEncoding));
 		
 		// Reverse gets back to empty vector
-		assertSame(Vectors.empty(),e.reverse());
+		assertSame(Vectors.empty(),e.reversed());
 		
 		doListTests(e);
 	}
@@ -124,7 +124,7 @@ public class ListsTest {
 			assertSame(Lists.empty(), a);
 			
 			 // empty list shouldn't contain anything (including itself)
-			assertEquals(-1,a.indexOf(a));
+			assertEquals(-1,a.indexOf(List.EMPTY));
 			assertEquals(-1,a.lastIndexOf(null));
 		} else {
 			T first = a.get(0);

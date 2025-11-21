@@ -8,9 +8,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 
 import convex.core.util.ThreadUtils;
-import convex.dlfs.DLFileSystem;
-import convex.dlfs.DLPath;
 import convex.gui.components.CodeLabel;
+import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
 import net.miginfocom.swing.MigLayout;
 
 /**

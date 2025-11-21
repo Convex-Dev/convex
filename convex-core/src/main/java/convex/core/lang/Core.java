@@ -221,7 +221,7 @@ public class Core {
 
 			long juice = Juice.BUILD_DATA;
 
-			ASequence<ACell> result = seq.reverse();
+			ASequence<ACell> result = seq.reversed();
 			return context.withResult(juice, result);
 		}
 	});

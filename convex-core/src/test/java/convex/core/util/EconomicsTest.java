@@ -41,7 +41,7 @@ public class EconomicsTest {
 		// selling into pool at zero price
 		checkSwap(0, -1, 1, 1);
 
-		// Overflow casess
+		// Overflow cases
 		assertEquals(Long.MAX_VALUE, Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
 		assertEquals(Long.MAX_VALUE, Economics.swapPrice(1, 10, Long.MAX_VALUE));
 		

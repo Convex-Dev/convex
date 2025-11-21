@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
@@ -15,6 +16,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -64,6 +66,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return getKeyRefEntry(ref) != null;
 	}
 	
+	/**
+	 * Checks if this map contains and entry for the given key
+	 * 
+	 * @param key Key to check
+	 */
 	@SuppressWarnings("unchecked")
 	public boolean containsKey(ACell key) {
 		return getEntry((K)key)!=null;
@@ -71,21 +78,17 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	@Override
 	public final boolean containsKey(Object key) {
-		if ((key==null)||(key instanceof ACell)) {
-			return containsKey((ACell)key);
-		}
-		// If not a valid CVM value, cannot contain key
-		return false;
+		return containsKey(RT.cvm(key));
 	}
 	
 	@Override
 	public final boolean containsValue(Object value) {
-		if (value instanceof ACell) return containsValue((ACell)value);
+		if (value instanceof ACell cell) return containsValue(cell);
 		return false;
 	}
 
 	/**
-	 * CHecks if this map contains the given value. WARNING: probably O(n)
+	 * Checks if this map contains the given value. WARNING: probably O(n)
 	 * @param value Value to check
 	 * @return true if map contains value, false otherwise
 	 */
@@ -191,7 +194,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param i Index of entry to get
 	 * @return map entry
 	 */
-	@Override
 	public final MapEntry<K, V> get(long i) {
 		checkIndex(i);
 		return entryAt(i);
@@ -205,9 +207,16 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 */
 	public abstract MapEntry<K, V> getEntry(ACell k);
 	
+	/**
+	 * Gets the Value in this map for the given key
+	 * 
+	 * @param key Key to lookup in the map. Regular Java values will be converted to equivalent CVM type if necessary
+	 * @return The Value in the map for this key, or null if the key is not found
+	 */
 	@Override
 	public final V get(Object key) {
 		if ((key==null)||(key instanceof ACell)) return (V) get((ACell)key);
+		// Note we don't want to do RT.cvm(...) here, because it breaks Map contract
 		return null;
 	}
 	
@@ -347,7 +356,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	/**
 	 * Gets a vector of keys for this Map. 
-	 * O(n) in general.
+	 * O(n) in general, but may admit faster implementations
 	 * 
 	 * @return Vector of Keys
 	 */
@@ -370,6 +379,26 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		accumulateValues(al);
 		return Vectors.create(al);
 	}
+
+	/**
+	 * Merge this map with another map, using the given function for each key that
+	 * is present in either map and has a different value
+	 * 
+	 * The function is passed null for missing values in either map, and must return
+	 * type V.
+	 * 
+	 * If the function returns null, the entry is removed.
+	 * 
+	 * Returns the same map if no changes occurred.
+	 * 
+	 * @param b    Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	public abstract AMap<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func);
 	
+	// TODO: should be: public abstract <K2, V2> AMap<K2, V2> map(Function<MapEntry<K, V>, MapEntry<K2, V2>> mapper);
+	@Override
+	public abstract <R extends ACell> ADataStructure<R> map(Function<MapEntry<K,V>, R> mapper);
 
 }

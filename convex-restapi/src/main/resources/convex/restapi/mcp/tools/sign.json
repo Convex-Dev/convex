@@ -1,0 +1,28 @@
+{
+  "name": "sign",
+  "title": "Value Signer",
+  "description": "Sign raw data (provided as a hex string) using a provided Ed25519 seed",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "string",
+        "description": "Hex encoded bytes to sign. For Convex transactions, this is the 'hash' field returned by prepare i.e. the ref-encoding of the transaction."
+      },
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed as 64 hex characters"
+      }
+    },
+    "required": ["value", "seed"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {"type": "string", "description": "Hex encoded payload that was signed"},
+      "signature": {"type": "string", "description": "Hex encoded Ed25519 signature"},
+      "accountKey": {"type": "string", "description": "Hex encoded public key"}
+    }
+  }
+}
+

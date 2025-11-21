@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,6 +21,7 @@ public class AccountStatusTest {
 
 	@Test public void testEmpty() throws InvalidDataException {
 		AccountStatus as=AccountStatus.create();
+		assertNull(as.getEnvironment());
 		doAccountStatusTest(as);
 	}
 	

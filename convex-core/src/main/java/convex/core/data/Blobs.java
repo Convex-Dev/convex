@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
@@ -70,6 +72,23 @@ public class Blobs {
 	}
 	
 	/**
+	 * Reads an InputStream as a canonical Blob.
+	 *
+	 * @param inputStream Stream of data to read as UTF-8 string
+	 * @return Blob content of stream
+	 * @throws IOException 
+	 */
+	public static ABlob fromStream(InputStream inputStream) throws IOException {
+		ABlob result=Blob.EMPTY;
+		while (true) {
+			byte[] bs=inputStream.readNBytes(Blob.CHUNK_LENGTH);
+			if (bs.length==0) break;
+			result=result.append(Blob.wrap(bs));
+		}
+		return result;
+	}
+	
+	/**
 	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length
 	 * @param o Object expected to contain a Blob value
 	 * @return ABlob value, or null if not parseable
@@ -124,7 +143,8 @@ public class Blobs {
 	}
 
 	/**
-	 * Create a Blob entirely filled with a given value
+	 * Create a Blob entirely filled with a given value. Optimised to re-use child chunks for very large blobs
+	 * 
 	 * @param value Byte value to fill with (low 8 bits used)
 	 * @param length Length of Blob to create
 	 * @return Blob filled with given value
@@ -179,7 +199,7 @@ public class Blobs {
 	}
 
 	/**
-	 * Create a 8-byte Blob representing a long value
+	 * Create a 8-byte Blob representing a long value as 64 bits
 	  */
 	public static Blob forLong(long c) {
 		byte[] bs=new byte[8];

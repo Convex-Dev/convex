@@ -358,7 +358,7 @@ public class Cells {
 
 	/**
 	 * Marks a cell as being validated
-	 * @param cell
+	 * @param cell CEll to mark as validated
 	 */
 	public static void markValidated(ACell cell) {
 		

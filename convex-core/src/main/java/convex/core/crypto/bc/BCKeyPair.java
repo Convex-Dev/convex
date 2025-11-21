@@ -28,13 +28,13 @@ public class BCKeyPair extends AKeyPair {
 	protected final Ed25519PrivateKeyParameters priv;
 	public static long signatureCount;
 
-	private BCKeyPair(AccountKey pk, Blob seed, Ed25519PrivateKeyParameters priv) {
+	private BCKeyPair(AccountKey pk, AArrayBlob seed, Ed25519PrivateKeyParameters priv) {
 		this.publicKey=pk;
-		this.seed=seed;
+		this.seed=seed.toFlatBlob();
 		this.priv=priv;
 	}
 	
-	public static BCKeyPair create(Blob seed) {
+	public static BCKeyPair create(AArrayBlob seed) {
 		long n=seed.count();
 		if (seed.count() != SEED_LENGTH) throw new IllegalArgumentException("32 bytes private key material expected as seed but got: "+n);
 

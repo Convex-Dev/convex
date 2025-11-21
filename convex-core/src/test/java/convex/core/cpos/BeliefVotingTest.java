@@ -86,7 +86,7 @@ public class BeliefVotingTest {
 		SignedData<Block> A=bl(1);
 		
 		
-		assertTrue(initialState.getPeers().get(keys[0]).getTotalStake()>0);
+		assertTrue(initialState.getPeers().get(keys[0]).getTotalStakeShares()>0);
 		
 		Order o0=Order.create().withTimestamp(TS);
 		Belief b0=Belief.create(kps[0], o0);

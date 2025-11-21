@@ -25,7 +25,7 @@ public class ByteFlag extends AByteFlag {
 	
 	/**
 	 * Private constructor, to enforce singleton instances
-	 * @param tag
+	 * @param tag tag for byte flag instance
 	 */
 	public ByteFlag(byte tag) {
 		this.tag=tag;
@@ -34,7 +34,7 @@ public class ByteFlag extends AByteFlag {
 	/**
 	 * Creates an extended byte flag for the given value 0-15
 	 * @param value Value to include in byte flag (0-15), only low bits used
-	 * @return Byteflag with given value
+	 * @return Byteflag with given value, or null if not in valid range
 	 */
 	public static ByteFlag create(long value) {
 		int m=(int)(value&0xf);
@@ -43,7 +43,7 @@ public class ByteFlag extends AByteFlag {
 	}
 	
 	public static ByteFlag forTag(byte tag) {
-		if ((tag & 0xF0)!=Tag.BYTE_FLAG_BASE) return null;
+		if ((byte)(tag & 0xF0)!=Tag.BYTE_FLAG_BASE) return null;
 		return new ByteFlag(tag);
 	}
 	

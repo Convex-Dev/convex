@@ -334,7 +334,7 @@ public class TorusTest extends ACVMTest {
 		// FIRST TEST: Initial deposit of $100k USD liquidity
 		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
 		ctx= exec(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
-		final long INITIAL_SHARES=RT.jvm(ctx.getResult());
+		final long INITIAL_SHARES=(Long)RT.jvm(ctx.getResult());
 
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)"));
@@ -350,7 +350,7 @@ public class TorusTest extends ACVMTest {
 		// SECOND TEST: Initial deposit of $100k USD liquidity
 		// Deposit more liquidity $100,000 for 1000 Gold - previous token offer should cover this
 		ctx= exec(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
-		final long NEW_SHARES=RT.jvm(ctx.getResult());
+		final long NEW_SHARES=(Long) RT.jvm(ctx.getResult());
 		assertEquals(20000000L,evalL(ctx,"(asset/balance USD USDM)"));
 
 		// Check new pool shares, accessible as a fungible asset balance
@@ -380,7 +380,7 @@ public class TorusTest extends ACVMTest {
 		// ============================================================
 		// FORTH TEST - buy half of all tokens ($50k)
 		ctx= step(ctx,"(call USDM *balance* (buy-tokens 5000000))");
-		long paidConvex=RT.jvm(ctx.getResult());
+		long paidConvex=(Long) RT.jvm(ctx.getResult());
 		assertTrue(paidConvex>1000000000000L); // should cost more than pool Convex balance after fee
 		assertTrue(paidConvex<1100000000000L,"Paid:" +paidConvex); // but less than 10% fee
 		assertEquals(5000000L,evalL(ctx,"(asset/balance USD USDM)"));
@@ -391,7 +391,7 @@ public class TorusTest extends ACVMTest {
 		// FIFTH TEST - sell back tokens ($50k)
 		ctx= step(ctx,"(asset/offer USDM [USD 5000000])");
 		ctx= step(ctx,"(call USDM (sell-tokens 5000000))");
-		long gainedConvex=RT.jvm(ctx.getResult());
+		long gainedConvex=(Long)RT.jvm(ctx.getResult());
 		assertTrue(gainedConvex>900000000000L); // should gain most of money back
 		assertTrue(gainedConvex<paidConvex,"Gain:" +gainedConvex); // but less than cost, since we have fees
 		assertEquals( 10000000L,evalL(ctx,"(asset/balance USD USDM)"));

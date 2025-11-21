@@ -1,6 +1,7 @@
 package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.security.InvalidKeyException;
@@ -97,6 +98,21 @@ public class SLIP10Test {
 		AKeyPair kp2=SLIP10.deriveKeyPair(seed);
 		assertEquals(kp1,kp2);
 		
+	}
+	
+	@Test 
+	public void testDerivePaths () throws InvalidKeyException, NoSuchAlgorithmException {
+		Blob seed=Blob.fromHex("DEADBEEF1234");
+		Blob m=SLIP10.getMaster(seed);
+		
+		AKeyPair kpm=SLIP10.deriveKeyPair(m, new int[0]);
+		assertEquals(kpm,SLIP10.deriveKeyPair(m, (int[])null));
+		
+		AKeyPair kpd=SLIP10.deriveKeyPair(m, "m/44/864/0/0/0");
+		assertEquals(kpd,SLIP10.deriveKeyPair(m, new int[] {44,864,0,0,0}));
+		assertNotEquals(kpd,SLIP10.deriveKeyPair(m, new int[] {45,864,0,0,0}));
+		assertNotEquals(kpd,SLIP10.deriveKeyPair(m, new int[] {44,864,0,0,1}));
+
 	}
 	
 	@Test 

@@ -66,7 +66,7 @@ public class MarketComponent extends BaseListComponent {
 		setLayout(new BorderLayout());
 
 		// Top label
-		String oName = RT.jvm( oracleData.get(Keyword.create("desc")));
+		String oName = (String) RT.jvm( oracleData.get(Keyword.create("desc")));
 		if (oName == null) oName = "Nameless Oracle";
 		title = new CodeLabel(oName);
 		title.setFont(Toolkit.MONO_FONT);
@@ -174,12 +174,12 @@ public class MarketComponent extends BaseListComponent {
 			for (int i = 0; i < numOutcomes; i++) {
 				ACell outcome = outcomes.get(i);
 
-				double p = RT.jvm(ctx.actorCall(address, 0, "price", outcome).getResult());
+				double p = (double) RT.jvm(ctx.actorCall(address, 0, "price", outcome).getResult());
 				if (Double.isNaN(p)) p = 1.0 / numOutcomes;
 				String prob = probFormatter.format(p * 100.0) + "%";
 				probLabels.get(outcome).setText(prob);
 
-				Long ts = RT.jvm( ctx.actorCall(address, 0, "totals", outcome).getResult());
+				Long ts = (Long) RT.jvm( ctx.actorCall(address, 0, "totals", outcome).getResult());
 				String totalStake = ts.toString();
 				tsLabels.get(outcome).setText(totalStake);
 

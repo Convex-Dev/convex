@@ -130,9 +130,6 @@ public class LocalStart extends ALocalCommand {
 		int n=servers.size();
 		
 
-		if (apiPort > 0) {
-			log.debug("Requesting REST API on port "+apiPort);
-		}
 		launchRestAPI(servers.get(0));
 		
 		// informWarning("Failed to start REST server: "+t);
@@ -156,7 +153,10 @@ public class LocalStart extends ALocalCommand {
 	
 	public RESTServer launchRestAPI(Server server) {
 		RESTServer restServer=RESTServer.create(server);
-		restServer.start();
+		if (apiPort > 0) {
+			log.debug("Requesting REST API on port "+apiPort);
+		}
+		restServer.start(apiPort);
 		return restServer;
 	}
 }

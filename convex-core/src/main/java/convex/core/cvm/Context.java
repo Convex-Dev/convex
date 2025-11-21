@@ -18,6 +18,7 @@ import convex.core.cvm.exception.ReturnValue;
 import convex.core.cvm.exception.RollbackValue;
 import convex.core.cvm.exception.TailcallValue;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -2100,7 +2101,7 @@ public class Context {
 	
 	public Context evictPeer(AccountKey peerKey) {
 		Context ctx=this;
-		Index<AccountKey, PeerStatus> peers = ctx.getState().getPeers();
+		Index<AArrayBlob, PeerStatus> peers = ctx.getState().getPeers();
 		PeerStatus ps=peers.get(peerKey);
 		if (ps==null) {
 			// no peer to evict
@@ -2280,10 +2281,15 @@ public class Context {
 		return log;
 	}
 
-	public Context lookupCNS(String name) {
+	public Context lookupCNS(Symbol name) {
 		Context ctx=this.fork();
-		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.CNS_RESOLVE, Symbol.create(name));
+		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.RESOLVE, name);
+		return ctx;
+	}
 
+	public Context lookupCNSRecord(Symbol name) {
+		Context ctx=this.fork();
+		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.READ, name);
 		return ctx;
 	}
 

@@ -93,8 +93,8 @@ public final class Address extends AExtensionValue {
 	@Override
 	public boolean equals(ACell o) {
 		if (o==this) return true;
-		if (o instanceof Address) {
-			return value==((Address) o).value;
+		if (o instanceof Address addr) {
+			return value==addr.value;
 		} else {
 			return Cells.equalsGeneric(this, o);
 		}
@@ -158,14 +158,13 @@ public final class Address extends AExtensionValue {
 	 */
 	public static Address parse(Object o) {
 		if (o==null) return null;
-		if (o instanceof ACell) {
-			Address add=RT.castAddress((ACell)o);
+		if (o instanceof ACell cell) {
+			Address add=RT.castAddress(cell);
 			if (add!=null) return add;
-			o=RT.jvm((ACell)o); // convert to JVM type
+			o=RT.jvm((ACell)o); // convert to JVM type, last try (e.g. BigInteger)
 		}
-		if (o instanceof String) return parse((String)o);
-		if (o instanceof Number) {
-			Number n=(Number)o;
+		if (o instanceof String s) return parse(s);
+		if (o instanceof Number n) {
 			long l=n.longValue();
 			if (l==n.doubleValue()) return Address.create(l);
 		}

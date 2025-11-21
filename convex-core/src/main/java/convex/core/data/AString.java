@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharsetDecoder;
@@ -125,6 +126,11 @@ public abstract class AString extends ABlobLike<CVMChar> {
 		return toBlob().getBytes(dest, destOffset);
 	}
 	
+	/**
+	 * Returns the Java String representing the UTF-8 content of this AString
+	 * 
+	 * NOTE: this is not round-trippable through the CVX Reader, intended for output purposes only.
+	 */
 	@Override 
 	public String toString() {
 		int n=Utils.checkedInt(count());
@@ -180,6 +186,15 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	 * @return Specified substring
 	 */
 	public abstract AString slice(long start, long end);
+	
+	/**
+	 * Gets a slice of this string from the start position to the end
+	 * @param start Start index (inclusive)
+	 * @return Specified substring
+	 */
+	public AString slice(long start) {
+		return slice(start,count());
+	}
 
 	/**
 	 * Splits this string by the given character
@@ -261,6 +276,27 @@ public abstract class AString extends ABlobLike<CVMChar> {
 		return append(Strings.create(string));
 	}
 	
+	/**
+	 * Checks if this string starts with another string. May be O(n) in length of prefix
+	 */
+	public boolean startsWith(AString prefix) {
+		final long pc=prefix.count();
+		if (pc==0) return true; // empty string always matches
+		if (pc>length) return false; // too big to match
+		
+		for (int i=0; i<pc; i++) {
+			if (!(this.byteAt(i)==prefix.byteAt(i))) return false;
+		}
+		return true;
+ 	}
+	
+	/**
+	 * Checks if this string starts with a specific Java string. May be O(n) in length of prefix
+	 */
+	public boolean startsWith(String prefix) {
+		return startsWith(Strings.create(prefix));
+ 	}
+	
 	@Override
 	public final boolean equals(ACell o) {
 		if (!(o instanceof AString)) return false;
@@ -276,4 +312,9 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	
 	@Override
 	public abstract AString toCanonical();
+	
+	@Override
+	public InputStream getInputStream() {
+		return toBlob().getInputStream();
+	}
 }

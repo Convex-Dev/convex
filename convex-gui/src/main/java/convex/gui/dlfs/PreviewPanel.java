@@ -14,9 +14,9 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.util.Utils;
-import convex.dlfs.DLFSNode;
-import convex.dlfs.DLPath;
 import convex.gui.components.CodePane;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLPath;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

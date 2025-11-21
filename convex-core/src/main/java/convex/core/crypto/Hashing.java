@@ -4,8 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import org.bouncycastle.jcajce.provider.digest.Blake2b.Blake2b160;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
+import convex.core.data.ABlobLike;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.exceptions.Panic;
 
@@ -102,6 +105,18 @@ public class Hashing {
 		byte[] hash = md.digest(data);
 		return Hash.wrap(hash);
 	}
+	
+	/**
+	 * Computes the Blake2b-160 hash of byte data
+	 * 
+	 * @param data Byte array to hash
+	 * @return Hash value
+	 */
+	public static Blob blake2b160(byte[] data) {
+		Blake2b160 md = new Blake2b160();
+		byte[] hash = md.digest(data);
+		return Blob.wrap(hash);
+	}
 
 	/**
 	 * Computes the SHA-256 hash of a string
@@ -152,5 +167,13 @@ public class Hashing {
 			return new Keccak.Digest256();
 		}
 	};
+	
+	public static Hash sha256(ABlobLike<?> data) {
+		return data.toBlob().computeHash(getSHA256Digest());
+	}
+	
+	public static Hash sha3(ABlobLike<?> data) {
+		return data.toBlob().getContentHash();
+	}
 
 }

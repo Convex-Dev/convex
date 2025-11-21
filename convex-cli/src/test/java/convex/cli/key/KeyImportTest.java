@@ -106,12 +106,11 @@ public class KeyImportTest {
 			"--storepass", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--keypass",KEY_PASSWORD,
+			"--path","m", // test with the BIP 39 root seed
 			"--text", "elder mail trick garage hour enjoy attack fringe problem motion poem security caught false penalty", 
 			"--passphrase", new String("")
 		);
 		tester.assertExitCode(ExitCodes.SUCCESS);
-		
-		// Should give Ed25519 Seed: 616421a4ea27c65919faa5555e923f6005d76695c7d9ba0fe2a484b90e23de89
 
 		CLTester t2=CLTester.run(
 				"key" , 
@@ -121,7 +120,7 @@ public class KeyImportTest {
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
 		String output=t2.getOutput();
-		// System.out.println(output);
+		// For private seed 0fe73e40845f24ecba903a1403c0374214c150c721e13b218359ae852d110098
 		assertTrue(output.contains("359562fef6063132699e5e51aa741943c712712be1c2783b61aa2d6f3b42aa44".toLowerCase()));
 	}
 }

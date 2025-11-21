@@ -1,0 +1,41 @@
+{
+  "name": "resolveCNS",
+  "title": "Resolve CNS Name",
+  "description": "Resolves a Convex Name Service (CNS) name to its full record, including value, controller, metadata, and child node.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "CNS name to resolve (e.g., 'convex.core')"
+      }
+    },
+    "required": ["name"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "type": "string",
+        "description": "Value for CNS record in CVX format, usually an address or scoped address"
+      },
+      "controller": {
+        "type": "string",
+        "description": "Controller (trust-monitor) for this CNS record in CVX format"
+      },
+      "meta": {
+        "type": "string",
+        "description": "Metadata field for the CNS record in CVX format"
+      },
+      "child": {
+        "type": "string",
+        "description": "Child CNS node actor (often nil) in CVX format"
+      },
+      "exists": {
+        "type": "boolean",
+        "description": "Whether the CNS record exists"
+      }
+    }
+  }
+}
+

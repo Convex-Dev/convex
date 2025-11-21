@@ -467,6 +467,7 @@ public class CoreTest extends ACVMTest {
 		// Blob casts treat blob as extended long bits (sign extended if needed)
 		assertEquals(4096L, evalL("(int 0x1000)"));
 		assertEquals(-1L, evalL("(int 0xff)"));
+		assertEquals(0L, evalL("(int 0x)"));
 		assertEquals(-1L, evalL("(int 0xffffffff)"));
 		assertEquals(0x0cff00000050l, evalL("(int 0x0cff00000050)")); 
 		
@@ -3416,7 +3417,7 @@ public class CoreTest extends ACVMTest {
 			// simple case of staking 1000000 on first peer of the realm
 			Context rc=step(ctx,"(set-stake my-peer 1000000)");
 			assertNotError(rc);
-			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
+			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStakeShares());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
 			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalBalance());
 		}
@@ -3494,7 +3495,7 @@ public class CoreTest extends ACVMTest {
 		PeerStatus ps=ctx.getState().getPeer(KEY);
 		assertEquals(ps, eval(ctx,"(get-in *state* [:peers "+KEY+"])"));
 		assertEquals(STK,ps.getPeerStake());
-		assertEquals(STK,ps.getTotalStake());
+		assertEquals(STK,ps.getTotalStakeShares());
 		assertEquals(STK,ps.getBalance());
 		assertEquals(CPoSConstants.INITIAL_PEER_TIMESTAMP,ps.getTimestamp());
 		
@@ -3507,7 +3508,7 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals(STK*2,ctx.getResult());
 		ps=ctx.getState().getPeer(KEY);
 		assertEquals(STK*3,ps.getPeerStake());
-		assertEquals(STK*3,ps.getTotalStake());
+		assertEquals(STK*3,ps.getTotalStakeShares());
 		assertEquals(STK*3,ps.getBalance());
 		
 		// Check we can't set nonsensical stakes
@@ -3521,7 +3522,7 @@ public class CoreTest extends ACVMTest {
 		ctx=exec(ctx,"(set-peer-stake "+KEY+" 0)");
 		ps=ctx.getState().getPeer(KEY);
 		assertEquals(0,ps.getPeerStake());
-		assertEquals(0,ps.getTotalStake());
+		assertEquals(0,ps.getTotalStakeShares());
 		assertEquals(0,ps.getBalance());
 
 		assertArityError(step(ctx,"(set-peer-stake)"));
@@ -3640,7 +3641,7 @@ public class CoreTest extends ACVMTest {
 			ctx=exec(ctx,"(eval-as USER '(set-stake "+PK+" "+USERSTAKE+"))");
 			assertCVMEquals(USERSTAKE,ctx.getResult());
 			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
-			assertEquals(PEERSTAKE+USERSTAKE,ctx.getState().getPeer(PK).getTotalStake());
+			assertEquals(PEERSTAKE+USERSTAKE,ctx.getState().getPeer(PK).getTotalStakeShares());
 			assertEquals(USERFUND-USERSTAKE,ctx.getBalance(USER));
 			
 			// USER should't be able to evict
@@ -3836,6 +3837,9 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(mod :a 7)"));
 		assertCastError(step("(mod 7 nil)"));
+		
+		assertCVMEquals(Long.MAX_VALUE,eval("(mod 9223372036854775807 (* -2 9223372036854775807))"));
+		assertCVMEquals(Long.MAX_VALUE-1,eval("(mod 9223372036854775806 (* -2 9223372036854775807))"));
 
 		assertArityError(step("(mod)"));
 		assertArityError(step("(mod 1)"));
@@ -4933,12 +4937,18 @@ public class CoreTest extends ACVMTest {
 		// set-parent
 		assertEquals(VILLAIN, eval("(set-parent "+VILLAIN+")"));
 		assertEquals(VILLAIN, eval("(do (set-parent "+VILLAIN+") *parent*)"));
+		
+		// Behaviour for a deployed actor with *caller* as parent
+		assertEquals(CVMLong.ONE, eval("(do (def a 1) (def actor (deploy '(set-parent *caller*))) actor/a)"));
+		assertUndeclaredError(step("(do (def a 1) (def actor (deploy '(set-parent *caller*))) actor/b)")); 
+
 			
 		// non-existent parent accounts
 		assertNobodyError(step("(set-parent #99999)")); 
 		
 		// protection against account being it's own parent
 		assertArgumentError(step("(set-parent *address*)")); 
+		
 
 		assertCastError(step("(set-parent :foo)"));
 		assertCastError(step("(set-parent [#8 :foo])"));

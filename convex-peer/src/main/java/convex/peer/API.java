@@ -104,6 +104,7 @@ public class API {
 		HashMap<Keyword, Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, kp);
 		config.put(Keywords.STATE, genesis);
+		config.put(Keywords.FAUCET, true);
 		return launchPeer(config);
 	}
 
@@ -148,6 +149,9 @@ public class API {
 
 		// Peer should get a new allocated port
 		config.put(Keywords.PORT, null);
+
+		// Peer should have an enabled faucet for local use
+		config.put(Keywords.FAUCET, true);
 
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);

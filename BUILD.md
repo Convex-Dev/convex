@@ -72,6 +72,14 @@ docker login -u "convexlive" docker.io
 docker push convexlive/convex
 ```
 
+## JPackage Build
+
+For a deployable application build
+
+```bash
+jpackage -n convex --main-class convex.main.Main --main-jar convex.jar
+```
+
 ## Repeatable Builds
 
 It is the intention that builds should be repeatable. Any issues, please report!

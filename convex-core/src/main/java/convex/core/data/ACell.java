@@ -106,12 +106,32 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return getEncoding().hashCode();
 	}
 	
+	/**
+	 * Test if this Cell is equal to another Java object, in the manner of Object.equals(...) 
+	 * 
+	 * A Cell is defined to be equal to another Object if and only if the other object is a Cell with the same encoding.
+	 */
 	@Override
 	public final boolean equals(Object a) {
 		if (a==this) return true; // Fast path, avoids cast
-		if (!(a instanceof ACell)) return false; // Handles null
-		return equals((ACell)a);
+		if (a instanceof ACell cell) {
+			return equals(cell);
+		}
+		return false; // not a cell, so can't be equal
 	}
+	
+	/**
+	 * Checks for equality with another Cell. In general, Cells are considered equal
+	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
+	 * 
+	 * Subclasses SHOULD override this if they have a more efficient equals implementation. 
+	 * 
+	 * MUST NOT require reads from Store.
+	 * 
+	 * @param a Cell to compare with. May be null.
+	 * @return True if this cell is equal to the other object
+	 */
+	public abstract boolean equals(ACell a);
 	
 	/**
 	 * Gets the canonical encoded byte representation of this cell.
@@ -140,18 +160,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return c;
 	}
 	
-	/**
-	 * Checks for equality with another Cell. In general, Cells are considered equal
-	 * if they have the same canonical representation, i.e. an identical encoding with the same hash value.
-	 * 
-	 * Subclasses SHOULD override this if they have a more efficient equals implementation. 
-	 * 
-	 * MUST NOT require reads from Store.
-	 * 
-	 * @param a Cell to compare with. May be null.
-	 * @return True if this cell is equal to the other object
-	 */
-	public abstract boolean equals(ACell a);
+
 	
 	/**
 	 * Writes this Cell's CAD3 encoding to a byte array, including the tag byte which will be written first.

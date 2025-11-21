@@ -1,0 +1,29 @@
+{
+  "name": "keyGen",
+  "title": "Key Pair Generator",
+  "description": "Generate a new Ed25519 key pair. Optionally provide a seed (32-byte hex string), otherwise a secure random seed will be generated.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Optional Ed25519 seed as 64 hex characters (32 bytes). If not provided, a secure random seed will be generated."
+      }
+    },
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Hex encoded Ed25519 seed (32 bytes, 64 hex characters)"
+      },
+      "publicKey": {
+        "type": "string",
+        "description": "Hex encoded public key (account key)"
+      }
+    }
+  }
+}
+

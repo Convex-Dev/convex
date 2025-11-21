@@ -49,9 +49,10 @@ public class SLIP10 {
 	/**
 	 * Derives an Ed25519 private key from a BIP32 master key
 	 * @param master Master key as defined in SLIP10
-	 * @param ixs key derivation path indexes
+	 * @param ixs key derivation path indexes. If null, assumes an empty path and just returns the master key
 	 */
 	public static Blob derive(Blob master, int... ixs)  {
+		if (ixs==null) return master;
 		if (ixs.length==0) return master;
 		if (ixs.length>255) throw new IllegalArgumentException("Maximum BIP32 path length exceeded (must be 255 or less)");
 		byte[] bs=master.getBytes();

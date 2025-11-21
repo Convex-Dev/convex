@@ -71,7 +71,7 @@ public class RegistryTest extends ACVMTest {
 			assertEquals(realAddr, eval(c, "(#9/resolve 'convex.test.foo)"));
 		}
 
-		{ // Check Transfer of control to VILLAIN
+		{  // Check Transfer of control to VILLAIN
 			Context c = exec(ctx, "(reg/control 'convex.test.foo " + VILLAIN + ")");
 
 			// This address shouldn't be able to use update or control any more

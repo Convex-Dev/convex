@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.util.JSON;
 
 public class RemoteRESTClientTest {
 	
@@ -22,11 +23,11 @@ public class RemoteRESTClientTest {
 	
 	static final String TEST_PEER="https://convex.world";
 	
-	public Convex getNewConvex() {
+	public ConvexJSON getNewConvex() {
 		if (skip) return null;
 		AKeyPair kp=AKeyPair.generate();
 		try {
-			Convex convex=Convex.connect(TEST_PEER);
+			ConvexJSON convex=ConvexJSON.connect(TEST_PEER);
 			Address addr=convex.createAccount(kp);
 			convex.setAddress(addr);
 			convex.setKeyPair(kp);
@@ -39,7 +40,7 @@ public class RemoteRESTClientTest {
 	}
 	
 	@Test public void testQuery() {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		Map<String,Object> result=convex.query ("*address*");
 		assertNotNull(result);
@@ -47,7 +48,7 @@ public class RemoteRESTClientTest {
 	}
 	
 	@Test public void testQueryAccount() {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		Map<String,Object> result=convex.queryAccount(convex.getAddress());
 		assertNotNull(result);
@@ -57,7 +58,7 @@ public class RemoteRESTClientTest {
 	
 	
 	@Test public void testQueryAsync() throws InterruptedException, ExecutionException {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		Future<Map<String,Object>> f=convex.queryAsync ("(+ 1 2)");
 		Map<String,Object> result=f.get();
@@ -66,18 +67,18 @@ public class RemoteRESTClientTest {
 	}
 	
 	@Test public void testTransact() {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		convex.faucet(convex.getAddress(), 1000000);
 		checkValid(convex);
 		Map<String,Object> result=convex.transact ("(* 3 4)");
 		assertNotNull(result);
-		assertEquals(12L,result.get("value"),"Unexpected:"+JSON.toPrettyString(result));
+		assertEquals(12L,result.get("value"),"Unexpected:"+JSON.toString(result));
 	}
 	
 	@SuppressWarnings("null")
 	@Test public void testNewAccount() throws InterruptedException, ExecutionException {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		Address addr=convex.useNewAccount(1000666);
 		assertNotNull(addr);
@@ -97,7 +98,7 @@ public class RemoteRESTClientTest {
 	}
 	
 	@Test public void testFaucet() {
-		Convex convex=getNewConvex();
+		ConvexJSON convex=getNewConvex();
 		checkValid(convex);
 		Address addr=convex.useNewAccount();
 		Map<String,Object> acc1=convex.queryAccount();
@@ -111,11 +112,11 @@ public class RemoteRESTClientTest {
 	}
 	
 	@Test public void testCreateInstance() {
-		Convex convex=Convex.connect(TEST_PEER);
+		ConvexJSON convex=ConvexJSON.connect(TEST_PEER);
 		assertNotNull(convex);
 	}
 
-	protected void checkValid(Convex convex) {
+	protected void checkValid(ConvexJSON convex) {
 		if (convex==null) {
 			skip=true;
 			Assume.assumeTrue(false);

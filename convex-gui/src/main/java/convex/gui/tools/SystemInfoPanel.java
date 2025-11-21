@@ -12,7 +12,6 @@ import javax.swing.JPanel;
 
 import convex.core.crypto.Hashing;
 import convex.core.text.Text;
-import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.utils.Toolkit;
@@ -42,7 +41,7 @@ public class SystemInfoPanel extends JPanel {
 				hashPanel.add(new ActionButton("Compute...,",0xe8b6, e->{
 					try {
 						String hash;
-						hash = Hashing.sha256(FileUtils.loadFileAsBytes(jarFile)).toHexString();
+						hash = Hashing.sha256(Files.readAllBytes(jarFile)).toHexString();
 						hashPanel.removeAll();
 						hashPanel.add(new JLabel(hash.toUpperCase()));
 					} catch (IOException e1) {

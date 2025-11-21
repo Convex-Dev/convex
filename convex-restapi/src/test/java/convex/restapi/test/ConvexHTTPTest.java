@@ -13,9 +13,12 @@ import org.junit.jupiter.api.Test;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
+import convex.core.cvm.Keywords;
+import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
@@ -60,6 +63,10 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertFalse(r.isError());
 		assertEquals(CVMLong.create(5),r.getValue());
 		
+		// Should be a transaction hash
+		Hash tx=RT.ensureHash(RT.getIn(r,Keywords.INFO,Keywords.TX));
+		assertNotNull(tx);
+		
 		r=convex.transactSync("(+ :foo 3)");
 		assertEquals(ErrorCodes.CAST,r.getErrorCode());
 		assertEquals(SourceCodes.CODE,r.getSource()); // should fail in user code
@@ -75,5 +82,24 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertTrue(r.isError());
 		assertEquals(ErrorCodes.IO,r.getErrorCode());
 		assertEquals(SourceCodes.NET,r.getSource());
+	}
+	
+	@Test public void testRequestStatus() throws ResultException, InterruptedException {
+		ConvexHTTP convex=connect();
+		
+		Result r=convex.requestStatusSync();
+		assertFalse(r.isError(), ()->"Error in status request: " + r);
+		assertNotNull(r.getValue(), "Status result should have a value");
+		assertTrue(r.getValue() instanceof convex.core.data.AMap, 
+			"Status result should be a map but got: " + Utils.getClassName(r.getValue()));
+		
+		// Check that the status map contains expected keys
+		@SuppressWarnings("unchecked")
+		convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell> statusMap = 
+			(convex.core.data.AMap<convex.core.data.Keyword, convex.core.data.ACell>) r.getValue();
+		
+		// Verify common status fields exist
+		assertNotNull(statusMap.get(Keywords.BELIEF), "Status should contain belief hash");
+		assertNotNull(statusMap.get(Keywords.PEER), "Status should contain peer key");
 	}
 }

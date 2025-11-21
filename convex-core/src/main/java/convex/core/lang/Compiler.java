@@ -101,7 +101,7 @@ public class Compiler {
 	 * Updates context with result, juice consumed
 	 * 
 	 * @param form A fully expanded form expressed as a Syntax Object
-	 * @param context
+	 * @param context CVM context in which to compile
 	 * @return Context with compiled Op as result
 	 */
 	@SuppressWarnings("unchecked")
@@ -153,8 +153,8 @@ public class Compiler {
 	 * Compiles a sequence of forms, returning a vector of ops in the updated
 	 * context. Equivalent to calling compile sequentially on each form.
 	 * 
-	 * @param forms
-	 * @param context
+	 * @param forms Forms to compile in turn
+	 * @param context CVM context in which to compile
 	 * @return Context with Vector of compiled ops as result
 	 */
 	public static Context compileAll(ASequence<ACell> forms, Context context) {

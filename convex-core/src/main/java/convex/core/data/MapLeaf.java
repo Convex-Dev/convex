@@ -240,7 +240,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		for (int i = 0; i < len; i++) {
 			MapEntry<K, V> me = entries[i];
 			if (Cells.equals(me.getKey(), key)) {
-				if (Cells.equals(me.getValue(), value)) return this;
+				if (Cells.equals(me.getValue(), value)) return this; // check for same value. We can skip if same. Saves new map creation.
 				MapEntry<K, V> newEntry = me.withValue(value);
 				if (me == newEntry) return this;
 
@@ -544,11 +544,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (results == null) return this; // no change detected
 		return Maps.createWithShift(shift, results);
 	}
-
-	@Override
-	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		return mergeDifferences(b,func,0);
-	}
 	
 	@Override
 	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
@@ -755,5 +750,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (count==0) return null;
 		return entries[0].getKeyHash();
 	}
+
+
 
 }

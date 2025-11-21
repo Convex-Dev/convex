@@ -15,12 +15,15 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.reader.ReaderUtils;
 import convex.core.util.Bits;
+import convex.core.util.Utils;
 
 /**
  * Class for CVM Character values.
  * 
  * Characters are Unicode code points, and can be used to construct Strings on the CVM.
  * Limited to range 0 .. 0x10ffff as per Unicode standard
+ * 
+ * Encoded with a byte tag that includes the length of the codepoint value, and a VLC-encoded count
  */
 public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public static int MAX_CODEPOINT=0x10ffff; // 21 bits max Unicode value
@@ -73,6 +76,21 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		if (value<CACHE_SIZE) return cache[(int)value];
 		if (value>MAX_CODEPOINT) return null;
 		return new CVMChar((int)value);
+	}
+	
+	/**
+	 * Gets a {@link CVMChar} for the given Unicode code point, or null if not valid
+	 * @param value Unicode code point for the character
+	 * @return CVMChar instance, or null if not valid
+	 */
+	public static CVMChar create(char value) {
+		if (value<128) return cache[value];
+		boolean isWholeCodePoint = !Character.isHighSurrogate(value) && !Character.isLowSurrogate(value);
+		if (isWholeCodePoint) {
+			return create((long)value);
+		} else {
+			throw new IllegalArgumentException("Can't create a valid CVMChar from a UTF-16 surrogate");
+		}
 	}
 	
 	/**
@@ -247,8 +265,8 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 			case '\t': bb.append("\\tab"); break;
 			default:  {
 				bb.append('\\');
-				if (Character.isBmpCodePoint(value)) {
-					bb.append((char)value);
+				if (Utils.isASCIIChar(value)) {
+					bb.append((byte)value);
 				} else {
 					bb.append(toUTFBytes());
 				}
@@ -371,7 +389,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public int compareTo(CVMChar o) {
 		return Integer.compare(value, o.value);
 	}
-
+	
 	@Override public boolean equals(ACell a) {
 		if (!(a instanceof CVMChar)) return false;
 		return value==((CVMChar)a).value;

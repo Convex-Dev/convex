@@ -13,8 +13,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
-import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
@@ -176,30 +174,6 @@ public class Belief extends ARecordGeneric {
 		if (orders==null) orders=(Index<AccountKey, SignedData<Order>>) values.get(0);
 		return orders;
 	}
-	
-	@Override 
-	public boolean equals(ACell a) {
-		if (a instanceof Belief) return equals((Belief)a);
-		return super.equals(a);
-	}
-	
-	/**
-	 * Tests if this Belief is equal to another
-	 * @param a Belief to compare with
-	 * @return true if equal, false otherwise
-	 */
-	public boolean equals(Belief a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return Cells.equals(h, ha);
-		}
-
-		if (!getOrders().equals(a.getOrders())) return false;
-		return true;
-	}
 
 	/**
 	 * Gets a new HashMap containing all Orders
@@ -217,13 +191,11 @@ public class Belief extends ARecordGeneric {
 	@SuppressWarnings("unchecked")
 	public static Collection<SignedData<Order>> extractOrders(ACell payload) {
 		ArrayList<SignedData<Order>> result=new ArrayList<>();
-		if (payload instanceof SignedData) {
-			SignedData<?> sd=(SignedData<?>)payload;
+		if (payload instanceof SignedData sd) {
 			if (sd.getValue() instanceof Order) {
 				result.add((SignedData<Order>) sd);
 			}
-		} else if (payload instanceof Belief) {
-			Belief b=(Belief)payload;
+		} else if (payload instanceof Belief b) {
 			Index<AccountKey, SignedData<Order>> porders = b.getOrders();
 			int n=porders.size();
 			for (int i=0; i<n; i++) {

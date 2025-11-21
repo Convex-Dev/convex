@@ -49,6 +49,8 @@ public class CollectionsTest {
 			assertSame(last,cells[(int) (n-1)]);
 			
 			assertEquals(Ref.get(last),a.getElementRef(n-1));
+			
+			assertEquals(a,a.reversed().reversed());
 		}
 		
 		ASequence<T> empty=a.empty();
@@ -164,6 +166,7 @@ public class CollectionsTest {
 			V value = me.getValue();
 
 			assertEquals(a.get(key), value);
+			assertEquals(a.getIn(key), value);
 
 			// remove and add back entry
 			AMap<K, V> da = a.dissoc(key);

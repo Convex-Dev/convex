@@ -3,13 +3,13 @@ package convex.java;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
-import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
-import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
-import org.apache.hc.core5.http.ContentType;
 
 import convex.api.ContentTypes;
 import convex.core.ErrorCodes;
@@ -34,15 +34,23 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
+import convex.core.util.JSON;
 import convex.core.util.Utils;
 
+/**
+ * Convex client instance that uses HTTP
+ */
 public class ConvexHTTP extends convex.api.Convex {
 	
 	private final URI uri;
+	private final HttpClient httpClient;
 
 	protected ConvexHTTP(Address address, AKeyPair keyPair, URI uri) {
 		super(address, keyPair);
-		this.uri=uri;
+		this.uri = uri;
+		this.httpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(30))
+				.build();
 	}
 	
 	public static ConvexHTTP connect(URI uri,Address address, AKeyPair keyPair) {
@@ -64,30 +72,33 @@ public class ConvexHTTP extends convex.api.Convex {
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signedTransaction) {
 		String transactPath=getAPIPath()+"/transact";
-		SimpleHttpRequest request=SimpleRequestBuilder.post(transactPath)
-				.addHeader("Accept", ContentTypes.CVX_RAW)
-				.setBody(Format.encodeMultiCell(signedTransaction, true).getBytes(), ContentType.create(ContentTypes.CVX_RAW))
+		
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(transactPath))
+				.header("Accept", ContentTypes.CVX_RAW)
+				.header("Content-Type", ContentTypes.CVX_RAW)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(Format.encodeMultiCell(signedTransaction, true).getBytes()))
 				.build();
-		CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
-		CompletableFuture<Result> result=future.thenApply(response->{
+		
+		CompletableFuture<HttpResponse<byte[]>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
+		CompletableFuture<Result> result = future.thenApply(response->{
 			return extractResult(response);
 		});
 		return result;
 	}
 
-	private Result extractResult(SimpleHttpResponse response) {
-		String type=response.getContentType().getMimeType();
+	private Result extractResult(HttpResponse<byte[]> response) {
+		String type = response.headers().firstValue("Content-Type").orElse("application/octet-stream");
 		try {
 			if (ContentTypes.CVX.equals(type)) {
-				String body=response.getBodyText();
-				// System.out.println(body);
+				String body = new String(response.body());
 				// We expect a map containing the result fields
-				ACell data=Reader.read(body);
+				ACell data = Reader.read(body);
 				return Result.fromData(data);
 			} else if (ContentTypes.CVX_RAW.equals(type)) {
-				byte[] body=response.getBodyBytes();
+				byte[] body = response.body();
 				try {
-					ACell v=Format.decodeMultiCell(Blob.wrap(body));
+					ACell v = Format.decodeMultiCell(Blob.wrap(body));
 					if (v instanceof Result) return (Result)v;
 					return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
 				} catch (MissingDataException e) {
@@ -95,7 +106,8 @@ public class ConvexHTTP extends convex.api.Convex {
 				}
 			} else {
 				// assume JSON?
-				Object m = JSON.parse(response.getBodyText());
+				String body = new String(response.body());
+				ACell m = JSON.parse(body);
 				return Result.fromJSON(m);
 			}
 		} catch (ParseException e) {
@@ -113,8 +125,42 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		// TODO Auto-generated method stub
-		return null;
+		String statusPath = getAPIPath() + "/status";
+		
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(statusPath))
+				.header("Accept", ContentTypes.CVX)
+				.GET()
+				.build();
+		
+		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+		CompletableFuture<Result> result = future.handle((response, ex) -> {
+			// In case of exception, convert to result
+			if (ex != null) return Result.fromException(ex).withSource(SourceCodes.NET);
+			
+			// Check HTTP status code
+			int statusCode = response.statusCode();
+			if (statusCode != 200) {
+				return Result.error(ErrorCodes.IO, "HTTP status " + statusCode + ": " + response.body())
+						.withSource(SourceCodes.NET);
+			}
+			
+			String body = response.body();
+			try {
+				// Parse the response as CVX data (should be a map)
+				ACell data = Reader.read(body);
+				if (!(data instanceof AMap)) {
+					return Result.error(ErrorCodes.FORMAT, "Expected status map but got: " + Utils.getClassName(data));
+				}
+				// Return the status map wrapped in a successful Result
+				return Result.value(data);
+			} catch (ParseException e) {
+				return Result.error(ErrorCodes.FORMAT, "Can't read CVX response: " + body);
+			} catch (Exception e) {
+				return Result.fromException(e).withSource(SourceCodes.NET);
+			}
+		});
+		return result;
 	}
 
 	@Override
@@ -127,20 +173,23 @@ public class ConvexHTTP extends convex.api.Convex {
 		String queryPath=getAPIPath()+"/query";
 		AMap<Keyword,ACell> query=Maps.of(Keywords.SOURCE,form,Keywords.ADDRESS,address);
 		// System.out.println("Query to "+queryPath);
-		SimpleHttpRequest request=SimpleRequestBuilder.post(queryPath)
-				.addHeader("Accept", ContentTypes.CVX)
-				.setBody(RT.toString(query), ContentType.create(ContentTypes.CVX))
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(queryPath))
+				.header("Accept", ContentTypes.CVX)
+				.header("Content-Type", ContentTypes.CVX)
+				.POST(HttpRequest.BodyPublishers.ofString(RT.toString(query)))
 				.build();
-		CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
-		CompletableFuture<Result> result=future.handle((response,ex)->{
+		
+		CompletableFuture<HttpResponse<String>> future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+		CompletableFuture<Result> result = future.handle((response,ex)->{
 			// In case of exception, convert to result
 			if (ex!=null) return Result.fromException(ex).withSource(SourceCodes.NET);
 			
-			String body=response.getBodyText();
+			String body = response.body();
 			try {
 				// System.out.println(body);
 				// We expect a map containing the result fields
-				ACell data=Reader.read(body);
+				ACell data = Reader.read(body);
 				return Result.fromData(data);
 			} catch (ParseException e) {
 				return Result.error(ErrorCodes.FORMAT, "Can't read CVX response: "+body);

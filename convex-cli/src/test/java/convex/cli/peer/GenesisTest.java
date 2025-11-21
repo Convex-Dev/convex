@@ -15,8 +15,10 @@ import convex.cli.Helpers;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
-import convex.core.data.Keyword;
+import convex.core.crypto.SLIP10;
 import convex.core.cvm.Keywords;
+import convex.core.data.AccountKey;
+import convex.core.data.Keyword;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.ConfigException;
@@ -34,7 +36,7 @@ public class GenesisTest {
 	
 	private static final String bip39="miracle source lizard gun neutral year dust recycle drama nephew infant enforce";
 	private static final String bipPassphrase="thisIsNotSecure";
-	private static final String expectedKey="09a5528c53579e1ee76a327ab8bc9db7b2853dd17391a6e3fe7f3052c6e8686a";
+	private static final AccountKey expectedKey=AccountKey.parse("7e965F07c3A2051e01399D545749102CcF30c731CF8C40e73a0B03b5C37bE34F");
 	
 	
 	static {
@@ -60,27 +62,28 @@ public class GenesisTest {
 				"--passphrase", bipPassphrase
 			);
 		importTester.assertExitCode(ExitCodes.SUCCESS);
-		assertEquals(expectedKey,importTester.getOutput().trim());
+		String pubKey=expectedKey.toString();
+		assertEquals(expectedKey.toHexString(),importTester.getOutput().trim());
 		
 		CLTester tester =  CLTester.run(
 				"peer", "genesis", "-n", "-v1",
-				"--peer-key", expectedKey,
+				"--peer-key", pubKey,
 				"--peer-keypass", new String(KEY_PASSWORD),
 				"--etch", TEMP_ETCH.getCanonicalPath(), 
-				"--key", expectedKey,
+				"--key", pubKey,
 				"--keypass", new String(KEY_PASSWORD),
 				"--keystore", KEYSTORE_FILENAME
 		);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		
-		AKeyPair kp=BIP39.seedToKeyPair(BIP39.getSeed(bip39, bipPassphrase));
-		assertEquals(expectedKey,kp.getAccountKey().toHexString());
+		AKeyPair kp=SLIP10.deriveKeyPair(BIP39.getSeed(bip39, bipPassphrase),new int[] {44,864,0,0,0});
+		assertEquals(expectedKey,kp.getAccountKey());
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, TEMP_ETCH);
 		config.put(Keywords.KEYPAIR, kp);
 		Server s=API.launchPeer(config); 
-		assertEquals(expectedKey,s.getPeerKey() .toHexString());
+		assertEquals(expectedKey,s.getPeerKey());
 		s.shutdown();
 		
 //		tester =  CLTester.run(

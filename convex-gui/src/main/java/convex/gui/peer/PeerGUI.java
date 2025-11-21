@@ -92,8 +92,8 @@ public class PeerGUI extends AbstractGUI {
 	 * @param sa Socket address of source peer to sync with
 	 * @param kp Key pair for new peer
 	 * @return PeerGUI instance
-	 * @throws InterruptedException
-	 * @throws PeerException
+	 * @throws InterruptedException In case of interrupt
+	 * @throws PeerException In case of peer launch error
 	 */
 	public static PeerGUI launchPeerGUI(InetSocketAddress sa, AKeyPair kp) throws InterruptedException, PeerException {
 		DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
@@ -178,6 +178,11 @@ public class PeerGUI extends AbstractGUI {
 	JPanel accountsPanel;
 	JTabbedPane tabs;
 	RESTServer restServer;
+
+	/**
+	 * Port of the most recently launched REST Server
+	 */
+	public static Integer REST_PORT=null;
 	
 
 	/**
@@ -211,6 +216,7 @@ public class PeerGUI extends AbstractGUI {
 		try {
 			restServer=RESTServer.create(first);
 			restServer.start();
+			REST_PORT=restServer.getPort();
 		} catch (Exception t) {
 			log.warn("Unable to start REST Server: ",t);
 		}
@@ -320,7 +326,7 @@ public class PeerGUI extends AbstractGUI {
 	 * @return Convex connection instance
 	 * @throws IOException If IO error occurs during connection attempt
 	 * @throws TimeoutException If attempt to connect times out
-	 * @throws InterruptedException 
+	 * @throws InterruptedException In case of interrupt
 	 */
 	public Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException, InterruptedException {
 		InetSocketAddress host = getDefaultConvex().getHostAddress();

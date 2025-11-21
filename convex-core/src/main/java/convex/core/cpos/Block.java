@@ -188,7 +188,7 @@ public final class Block extends ARecordGeneric {
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (a instanceof Block) return equals((Block)a);
+		if (a instanceof Block block) return equals(block);
 		return Cells.equalsGeneric(this, a);
 	}
 	
@@ -205,7 +205,7 @@ public final class Block extends ARecordGeneric {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Cells.equals(h, ha);
+			if (ha!=null) return h.equals(ha);
 		}
 		
 		if (!(Cells.equals(values, a.values))) return false;

@@ -7,6 +7,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -92,9 +93,13 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		return Vectors.wrap(elements);
 	}
 	
+	@Override public AVector<T> reversed() {
+		throw new TODOException();
+	}
+	
 	
 	@Override
-	public <R extends ACell> ASet<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> ASet<R> map(Function<T, R> mapper) {
 		ASet<R> result=Sets.empty();
 		for (long i=0; i<count; i++) {
 			result=result.conj(mapper.apply(get(i)));
@@ -226,4 +231,6 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	public ASet<T> slice(long start) {
 		return slice(start, count());
 	}
+	
+
 }

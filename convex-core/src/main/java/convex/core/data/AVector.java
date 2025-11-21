@@ -64,7 +64,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	
 	/**
 	 * Remove an element at the specified position in a vector. WARNING: likely to be O(n)
-	 * @param i
+	 * @param i Index position to remove
 	 * @return Shortened Vector, or null if position was invalid
 	 */
 	public abstract AVector<T> dissocAt(long i);
@@ -133,11 +133,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract boolean allMatch(Predicate<? super T> pred);
 
 	@Override
-	public abstract <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> AVector<R> map(Function<T, R> mapper);
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> AVector<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
+	public <R extends ACell> AVector<R> flatMap(Function<T, ASequence<R>> mapper) {
 		ASequence<ASequence<R>> vals = this.map(mapper);
 		AVector<R> result = (AVector<R>) this.empty();
 		for (ASequence<R> seq : vals) {
@@ -244,6 +244,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract AVector<T> next();
 
 	@Override
+	public AVector<T> slice(long start) {
+		return slice(start,count);
+	}
+	
+	@Override
 	public abstract AVector<T> slice(long start, long end);
 	
 	@Override
@@ -260,8 +265,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 	
+	/**
+	 * Reverses this Vector, producing a List
+	 */
 	@Override
-	public AList<T> reverse() {
+	public AList<T> reversed() {
 		return convex.core.data.List.reverse(this);
 	}
 
@@ -284,15 +292,18 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		throw new UnsupportedOperationException();
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
 	public final boolean equals(ACell a) {
-		if (!(a instanceof AVector)) return false;
-		
-		return equals((AVector<? super T>)a); 
+		if (a instanceof AVector v) return equals(v);
+		return false; 
 	}
 	
-	public abstract boolean equals(AVector<? super T> a);
+	/**
+	 * Tests if this vector is equals to another Vector
+	 * @param a Any vector
+	 * @return true if vectors are equal, false otherwise
+	 */
+	public abstract boolean equals(AVector<?> a);
 	
 	@Override
 	public final byte getTag() {

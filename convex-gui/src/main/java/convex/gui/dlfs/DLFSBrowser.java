@@ -11,12 +11,12 @@ import javax.swing.JMenuBar;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.dlfs.DLFS;
-import convex.dlfs.DLFileSystem;
-import convex.dlfs.DLPath;
 import convex.gui.components.AbstractGUI;
 import convex.gui.state.StateExplorer;
 import convex.gui.utils.Toolkit;
+import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

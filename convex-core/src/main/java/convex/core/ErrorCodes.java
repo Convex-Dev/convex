@@ -1,5 +1,10 @@
 package convex.core;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Keyword;
 
 /**
@@ -248,5 +253,95 @@ public class ErrorCodes {
 	 */
 	public static final Keyword CONNECT = Keyword.intern("CONNECT");
 
+	/**
+	 * Map of error codes to their descriptions
+	 */
+	private static final Map<Keyword, String> DESCRIPTIONS = new HashMap<>();
+	
+	static {
+		DESCRIPTIONS.put(SEQUENCE, "Bad sequence number - must be one greater than the current sequence");
+		DESCRIPTIONS.put(FUNDS, "Insufficient funds to perform the operation");
+		DESCRIPTIONS.put(JUICE, "Transaction ran out of available juice (computational resources)");
+		DESCRIPTIONS.put(DEPTH, "Execution depth limit exceeded - typically indicates infinite recursion");
+		DESCRIPTIONS.put(MEMORY, "Insufficient memory allowance to complete transaction");
+		DESCRIPTIONS.put(NOBODY, "Attempting to access a non-existent account");
+		DESCRIPTIONS.put(ARITY, "Function or expander has inappropriate number of arguments");
+		DESCRIPTIONS.put(UNDECLARED, "Accessed an undeclared symbol");
+		DESCRIPTIONS.put(CAST, "Argument cannot be cast to the required type");
+		DESCRIPTIONS.put(BOUNDS, "Index out of bounds for sequential object");
+		DESCRIPTIONS.put(ARGUMENT, "Argument is of correct type but not an allowable value");
+		DESCRIPTIONS.put(STATE, "Operation failed due to invalid state - check pre-conditions");
+		DESCRIPTIONS.put(COMPILE, "Compilation failure with invalid AST");
+		DESCRIPTIONS.put(EXPAND, "AST expansion failure");
+		DESCRIPTIONS.put(ASSERT, "Asserted condition was not met");
+		DESCRIPTIONS.put(TRUST, "Trust condition violated - unauthorised operation");
+		DESCRIPTIONS.put(UNEXPECTED, "Unexpected error occurred");
+		DESCRIPTIONS.put(EXCEPTION, "Unhandled exception");
+		DESCRIPTIONS.put(HALT, "Halt operation executed");
+		DESCRIPTIONS.put(RECUR, "Recur operation executed");
+		DESCRIPTIONS.put(TAILCALL, "Tailcall operation executed");
+		DESCRIPTIONS.put(RETURN, "Return operation executed");
+		DESCRIPTIONS.put(REDUCED, "Reduced result");
+		DESCRIPTIONS.put(ROLLBACK, "Rollback operation executed - state changes reverted");
+		DESCRIPTIONS.put(SIGNATURE, "Invalid signature on transaction");
+		DESCRIPTIONS.put(TODO, "Not yet implemented");
+		DESCRIPTIONS.put(FATAL, "Fatal error - STOP everything now!");
+		DESCRIPTIONS.put(FORMAT, "Message format error");
+		DESCRIPTIONS.put(LOAD, "Rejected due to load limits");
+		DESCRIPTIONS.put(CHILD, "Child transaction failed");
+		DESCRIPTIONS.put(TIMEOUT, "Operation timed out");
+		DESCRIPTIONS.put(PEER, "Peer-specific error");
+		DESCRIPTIONS.put(SYNTAX, "Syntax problem in code");
+		DESCRIPTIONS.put(LIQUIDITY, "Insufficient liquidity for trade");
+		DESCRIPTIONS.put(INTERRUPTED, "Operation was interrupted");
+		DESCRIPTIONS.put(CLOSED, "IO channel or resource is closed");
+		DESCRIPTIONS.put(IO, "General IO exception");
+		DESCRIPTIONS.put(MISSING, "Missing data");
+		DESCRIPTIONS.put(LIMIT, "Resource limit exceeded");
+		DESCRIPTIONS.put(CONNECT, "Connection failure");
+	}
+	
+	/**
+	 * Get a description for an error code
+	 * @param errorCode The error code keyword
+	 * @return Description of the error code, or null if not defined
+	 */
+	public static String getDescription(Keyword errorCode) {
+		if (errorCode == null) return null;
+		return DESCRIPTIONS.get(errorCode);
+	}
+	
+	/**
+	 * Get a description for an error code
+	 * @param errorCode The error code as a String
+	 * @return Description of the error code, or null if not defined
+	 */
+	public static String getDescription(String errorCode) {
+		if (errorCode == null) return null;
+		return getDescription(Keyword.create(errorCode));
+	}
+	
+	/**
+	 * Get a description for an error code
+	 * @param errorCode The error code as an AString
+	 * @return Description of the error code, or null if not defined
+	 */
+	public static String getDescription(AString errorCode) {
+		if (errorCode == null) return null;
+		return getDescription(errorCode.toString());
+	}
+	
+	/**
+	 * Get a description for an error code (generic ACell)
+	 * @param errorCode The error code as an ACell (should be Keyword, String, or AString)
+	 * @return Description of the error code, or null if not defined or wrong type
+	 */
+	public static String getDescription(ACell errorCode) {
+		if (errorCode == null) return null;
+		if (errorCode instanceof Keyword k) return getDescription(k);
+		if (errorCode instanceof AString s) return getDescription(s);
+		// Try converting to string as fallback
+		return getDescription(errorCode.toString());
+	}
 
 }

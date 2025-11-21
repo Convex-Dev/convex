@@ -1,0 +1,29 @@
+{
+  "name": "encode",
+  "title": "Encode CAD3",
+  "description": "Encode a CVX literal into CAD3 multi-cell bytes, mirroring /api/v1/data/encode.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "cvx": {
+        "type": "string",
+        "description": "CVM literal to encode e.g. \"(* 2 3)\" or \"12\""
+      }
+    },
+    "required": ["cvx"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "cad3": {
+        "type": "string",
+        "description": "Hex string representing the CAD3 bytes"
+      },
+      "hash": {
+        "type": "string",
+        "description": "Hash of the encoded value"
+      }
+    }
+  }
+}
+

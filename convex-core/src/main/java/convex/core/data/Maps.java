@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Collection;
 import java.util.HashMap;
 
 import convex.core.exceptions.BadFormatException;
@@ -163,6 +164,14 @@ public class Maps {
 		long n=Math.min(keys.count(),  values.count());
 		for (long i=0; i<n; i++) {
 			result=result.assoc(keys.get(i), values.get(i));
+		}
+		return result;
+	}
+
+	public static <K extends ACell, V extends ACell> AMap<K, V> fromEntries(Collection<MapEntry<K, V>> entries) {
+		AMap<K, V> result=Maps.empty();
+		for (MapEntry<K,V> me:entries) {
+			result=result.assocEntry(me);
 		}
 		return result;
 	}

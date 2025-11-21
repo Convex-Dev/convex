@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -406,10 +408,14 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public int toByteBuffer(long offset, long count, ByteBuffer dest) {
 		if (count<0) throw new IllegalArgumentException("Negative count");
-		if ((offset<0)||(offset+count>this.count)) throw new IllegalArgumentException();
+		if ((offset<0)||(offset+count>this.count)) throw new IllegalArgumentException("Out of range in toByteBuffer");
 		int n=(int)count;
 		dest.put(store, (int) (this.offset+offset), n);
 		return n;
 	}
 
+	@Override
+	public InputStream getInputStream() {
+		return new ByteArrayInputStream(store, offset, size());
+	}
 }

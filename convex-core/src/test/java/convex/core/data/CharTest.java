@@ -2,10 +2,14 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMChar;
+import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 
@@ -79,6 +83,13 @@ public class CharTest {
 		CVMChar c=CVMChar.create(i);
 		doCharTests(c);
 	}
+	
+	@Test public void testSurrogates() {
+		char highSurrogate=0xd800;
+		char lowSurrogate=0xdc00;
+		assertThrows(IllegalArgumentException.class,()->CVMChar.create(lowSurrogate));
+		assertThrows(IllegalArgumentException.class,()->CVMChar.create(highSurrogate));
+	}
 
 
 	/**
@@ -102,6 +113,25 @@ public class CharTest {
 		// Should round trip via UTF blob
 		assertEquals(s,Strings.create(c.toUTFBlob()));
 		
+		doCharEncodingTest(c);
+		
 		ObjectsTest.doAnyValueTests(c);
+	}
+
+	private void doCharEncodingTest(CVMChar c) {
+		Blob b=c.getEncoding();
+		try {
+			assertEquals(c,Format.read(b));
+			
+			// should be encoded as unsigned bytes after tag
+			byte[] bs=b.slice(1).getBytes();
+			long val=new BigInteger(1,bs).longValue();
+			assertEquals(c.getCodePoint(),val);
+			assertEquals(CVMChar.byteCountFromTag(c.getTag()),bs.length);
+			
+		} catch (BadFormatException e) {
+			throw new Error(e);
+		}
+		
 	}
 }

@@ -325,7 +325,7 @@ public class List<T extends ACell> extends AList<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AList<R> map(Function<T, R> mapper) {
 		AVector<R> newData=data.map(mapper);
 		if (data==newData) return (AList<R>) this;
 		return new List<>(newData);
@@ -395,7 +395,7 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public AVector<T> reverse() {
+	public AVector<T> reversed() {
 		return data;
 	}
 

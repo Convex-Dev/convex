@@ -190,7 +190,7 @@ public class Samples {
 	 * @param size
 	 * @return
 	 */
-	static Blob createTestBlob(long size) {
+	public static Blob createTestBlob(long size) {
 		Blob b=Blob.createRandom(new Random(), size);
 		return b;
 	}
@@ -201,7 +201,7 @@ public class Samples {
 	 * @return
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	static Index<ABlob,CVMLong> createTestIndex(long size) {
+	public static Index<ABlob,CVMLong> createTestIndex(long size) {
 		Index bm=Index.EMPTY;
 		for (long i=0; i<size; i++) {
 			CVMLong val=CVMLong.create(i);

@@ -4,13 +4,16 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import convex.core.cpos.Block;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
+import convex.core.util.MergeFunction;
 
 /**
  * Base class for CVM Record data types. 
@@ -256,6 +259,14 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	 */
 	public abstract RecordFormat getFormat();
 	
+	@Override
+	public ARecord<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func) {
+		throw new UnsupportedOperationException("Difference based merge not supported for record");
+	}
 
+	@Override
+	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
+		throw new TODOException();
+	}
 
 }
