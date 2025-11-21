@@ -37,6 +37,8 @@ Set the version number for the new version to be released
 mvn versions:set -DnewVersion='0.8.2' -DartifactId=* -DgroupId=*
 ```
 
+Commit as "Prepare for Release 0.8.2"
+
 ### Tag release
 
 - Tag Release Commit e.g. `0.8.2`
