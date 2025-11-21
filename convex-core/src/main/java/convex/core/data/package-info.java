@@ -3,8 +3,8 @@
  * required to implement immutable, decentralised data objects.
  * 
  * * <p>This package defines the immutable persistent data types that represent
- * all values in the CVM, including {@link CVMLong}, {@link Address}, {@link Blob},
- * {@link AVector}, {@link AMap}, etc. All classes implement the {@link ADataType}
+ * all values in the CVM, including CVMLong, Address,  Blob,
+ * AVector, AMap, etc. All classes extend the ACell
  * hierarchy and are designed for structural sharing and cryptographic hashing via CAD3 encodings.</p>
  * 
  * <p>

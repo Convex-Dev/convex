@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.2-SNAPSHOT</version>
+	<version>0.8.2</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -36,7 +36,7 @@
 		<netty.version>4.2.7.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2025-04-11T08:36:37Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2025-11-21T20:46:12Z</project.build.outputTimestamp>
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
 		</argLine>
@@ -127,17 +127,29 @@
 					</execution>
 				</executions>
 			</plugin>
+			
+			<!-- Actually activate the spurce / javadoc plugins for every module -->
+		    <plugin>
+		      <artifactId>maven-source-plugin</artifactId>
+		      <executions><execution><id>attach-sources</id></execution></executions>
+		    </plugin>
+		    <plugin>
+		      <artifactId>maven-javadoc-plugin</artifactId>
+		      <executions><execution><id>attach-javadocs</id></execution></executions>
+		    </plugin>
 
-			<plugin>
-				<groupId>org.sonatype.plugins</groupId>
-				<artifactId>nexus-staging-maven-plugin</artifactId>
-				<version>1.7.0</version>
-				<extensions>true</extensions>
+		    <plugin>
+  		        <groupId>org.sonatype.central</groupId>
+				<artifactId>central-publishing-maven-plugin</artifactId>
+				<version>0.9.0</version>
+ 				<extensions>true</extensions>
 				<configuration>
-					<serverId>ossrh</serverId>
-					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-					<!-- Set to true for auto release -->
-					<autoReleaseAfterClose>true</autoReleaseAfterClose>
+					<publishingServerId>central</publishingServerId>
+					<!-- 
+						<autoPublish>true</autoPublish> 
+						<waitUntil>published</waitUntil>
+					-->
+					<checksums>all</checksums>
 				</configuration>
 			</plugin>
 

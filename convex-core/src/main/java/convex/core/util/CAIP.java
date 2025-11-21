@@ -71,7 +71,7 @@ public class CAIP {
 	 * Gets the asset ID for a CAD29 token from a CAPI-19 string
 	 * @param caip19 CAIP19 Format asset ID, e.g. "cad29:72"
 	 * @return CAD29 asset ID, or CONVEX_ASSET_ID constant if the String refers to CVM
-	 * @throw IllegalArgumentException if String is not a valid token ID
+	 * @throws IllegalArgumentException if String is not a valid token ID
 	 */
 	public static ACell parseTokenID(String caip19) {
 		if (isCVM(caip19)) return CONVEX_ASSET_ID;
