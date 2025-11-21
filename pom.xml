@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.2</version>
+	<version>0.8.3-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -36,7 +36,7 @@
 		<netty.version>4.2.7.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2025-11-21T20:46:12Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2025-11-21T21:46:04Z</project.build.outputTimestamp>
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
 		</argLine>
@@ -66,8 +66,8 @@
 
 	<distributionManagement>
 		<snapshotRepository>
-			<id>ossrh</id>
-			<url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+			<id>central</id>
+			<url>https://central.sonatype.org/repository/maven-snapshots/</url>
 		</snapshotRepository>
 	</distributionManagement>
 
