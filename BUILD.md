@@ -46,7 +46,8 @@ Commit as "Prepare for Release 0.8.2"
 ### Build and deploy
 
 ```
-mvn clean deploy 
+mvn -B clean verify
+mvn deploy -Prelease
 ```
 
 ### Prepare for next develop version

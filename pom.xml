@@ -127,17 +127,29 @@
 					</execution>
 				</executions>
 			</plugin>
+			
+			<!-- Actually activate the spurce / javadoc plugins for every module -->
+		    <plugin>
+		      <artifactId>maven-source-plugin</artifactId>
+		      <executions><execution><id>attach-sources</id></execution></executions>
+		    </plugin>
+		    <plugin>
+		      <artifactId>maven-javadoc-plugin</artifactId>
+		      <executions><execution><id>attach-javadocs</id></execution></executions>
+		    </plugin>
 
-			<plugin>
-				<groupId>org.sonatype.plugins</groupId>
-				<artifactId>nexus-staging-maven-plugin</artifactId>
-				<version>1.7.0</version>
-				<extensions>true</extensions>
+		    <plugin>
+  		        <groupId>org.sonatype.central</groupId>
+				<artifactId>central-publishing-maven-plugin</artifactId>
+				<version>0.9.0</version>
+ 				<extensions>true</extensions>
 				<configuration>
-					<serverId>ossrh</serverId>
-					<nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-					<!-- Set to true for auto release -->
-					<autoReleaseAfterClose>true</autoReleaseAfterClose>
+					<publishingServerId>central</publishingServerId>
+					<!-- 
+						<autoPublish>true</autoPublish> 
+						<waitUntil>published</waitUntil>
+					-->
+					<checksums>all</checksums>
 				</configuration>
 			</plugin>
 
