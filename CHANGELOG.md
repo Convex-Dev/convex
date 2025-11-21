@@ -1,10 +1,11 @@
 # Changelog
+
 Notable changes to Convex core modules will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.2] - 2024-11-10
+## [0.8.2] - 2025-11-21
 
 ### Added
 
@@ -26,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Potential synchronisation issue with ConvexLocal
 - BIP39 paths for CLI key import
 
-## [0.8.1] - 2024-03-14
+## [0.8.1] - 2025-03-14
 
 ### Added
 
