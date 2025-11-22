@@ -55,7 +55,7 @@ module convex.core {
 	exports convex.etch;
 	exports convex.lattice.fs;
 
-	requires transitive org.antlr.antlr4.runtime;
+	requires org.antlr.antlr4.runtime;
 	requires org.bouncycastle.pkix;
 	requires transitive org.bouncycastle.provider;
 	requires org.bouncycastle.util;

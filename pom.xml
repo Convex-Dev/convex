@@ -102,6 +102,31 @@
 				</plugins>
 			</build>
 		</profile>
+		
+		<profile>
+			<id>m2e</id>
+			<activation>
+				<property>
+					<name>m2e.version</name>
+				</property>
+			</activation>
+			<build>
+				<pluginManagement>
+					<plugins>
+						<plugin>
+						    <groupId>org.eclipse.m2e</groupId>
+						    <artifactId>lifecycle-mapping</artifactId>
+						    <version>1.0.0</version>
+						    <configuration>
+						        <action>
+						            <ignore>jar</ignore> <!-- Ignore jar mojo injection in IDE -->
+						        </action>
+						    </configuration>
+						</plugin>
+					</plugins>
+				</pluginManagement>
+			</build>
+		</profile>
 	</profiles>
 
 	<build>
@@ -145,11 +170,13 @@
  				<extensions>true</extensions>
 				<configuration>
 					<publishingServerId>central</publishingServerId>
+					<checksums>all</checksums>
 					<!-- 
-						<autoPublish>true</autoPublish> 
 						<waitUntil>published</waitUntil>
 					-->
-					<checksums>all</checksums>
+					
+					<autoPublish>true</autoPublish> 
+					
 				</configuration>
 			</plugin>
 
@@ -188,7 +215,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.5.0</version>
+					<version>3.4.2</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -220,6 +247,8 @@
 						</execution>
 					</executions>
 				</plugin>
+				
+			
 
 				<!-- This generates JavaDocs -->
 				<plugin>
