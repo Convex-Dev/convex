@@ -16,27 +16,21 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.util.JSON;
 
-public class RemoteRESTClientTest {
+public class RemoteRESTClientIT {
 	
 	// Use to skip remote tests
-	static boolean skip=true;
+	static boolean skip=false;
 	
-	static final String TEST_PEER="https://convex.world";
+	static final String TEST_PEER="https://mikera1337-convex-testnet.hf.space";
 	
 	public ConvexJSON getNewConvex() {
 		if (skip) return null;
 		AKeyPair kp=AKeyPair.generate();
-		try {
-			ConvexJSON convex=ConvexJSON.connect(TEST_PEER);
-			Address addr=convex.createAccount(kp);
-			convex.setAddress(addr);
-			convex.setKeyPair(kp);
-			return convex;
-		} catch (Exception e) {
-			skip=true;
-			return null;
-		}
-			
+		ConvexJSON convex=ConvexJSON.connect(TEST_PEER);
+		Address addr=convex.createAccount(kp);
+		convex.setAddress(addr);
+		convex.setKeyPair(kp);
+		return convex;	
 	}
 	
 	@Test public void testQuery() {
@@ -55,7 +49,6 @@ public class RemoteRESTClientTest {
 		assertTrue(result.containsKey("sequence"));
 		assertTrue(result.containsKey("memorySize"));
 	}
-	
 	
 	@Test public void testQueryAsync() throws InterruptedException, ExecutionException {
 		ConvexJSON convex=getNewConvex();

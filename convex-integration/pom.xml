@@ -19,6 +19,17 @@
 
 	<build>
 		<plugins>
+		    <plugin>
+	            <groupId>org.apache.maven.plugins</groupId>
+	            <artifactId>maven-surefire-plugin</artifactId>
+	            <configuration>
+	                <!-- Run only unit tests, exclude slow / environment dependentintegration tests -->
+	                <excludes>
+	                    <exclude>**/*IT.java</exclude>
+	                </excludes>
+	            </configuration>
+	        </plugin>
+		
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.7.1</version>
@@ -55,6 +66,53 @@
 			</plugin>
 		</plugins>
 	</build>
+	
+	<profiles>
+    <profile>
+        <id>integration-tests</id>
+
+        <build>
+            <plugins>
+                <!-- Failsafe runs the heavy live integration tests -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <version>3.5.4</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>integration-test</goal>
+                                <goal>verify</goal>
+                            </goals>
+                            <configuration>
+
+                                <!-- Live environment -->
+                                <systemPropertyVariables>
+                                    <convex.peer.url>https://peer.convex.live</convex.peer.url>
+                                    <spring.profiles.active>live</spring.profiles.active>
+                                </systemPropertyVariables>
+
+                                <!-- Optional: run in parallel, fail fast, etc. -->
+                                <parallel>classes</parallel>
+                                <threadCount>4</threadCount>
+                                <failIfNoTests>true</failIfNoTests>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <!-- Optional: completely skip surefire when running integration tests -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <skip>true</skip>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+</profiles>
 
 	<dependencies>
 		<dependency>
