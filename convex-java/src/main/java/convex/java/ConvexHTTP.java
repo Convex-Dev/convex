@@ -38,7 +38,7 @@ import convex.core.util.JSON;
 import convex.core.util.Utils;
 
 /**
- * Convex client instance that uses HTTP
+ * Convex client instance that uses HTTP with native CVX content
  */
 public class ConvexHTTP extends convex.api.Convex {
 	
