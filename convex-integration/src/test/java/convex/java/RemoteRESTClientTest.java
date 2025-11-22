@@ -76,7 +76,6 @@ public class RemoteRESTClientTest {
 		assertEquals(12L,result.get("value"),"Unexpected:"+JSON.toString(result));
 	}
 	
-	@SuppressWarnings("null")
 	@Test public void testNewAccount() throws InterruptedException, ExecutionException {
 		ConvexJSON convex=getNewConvex();
 		checkValid(convex);

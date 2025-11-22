@@ -188,7 +188,7 @@ public class Samples {
 	/**
 	 * Create a random test Blob of the given size
 	 * @param size
-	 * @return
+	 * @return A random Blob of the correct count
 	 */
 	public static Blob createTestBlob(long size) {
 		Blob b=Blob.createRandom(new Random(), size);
@@ -198,7 +198,7 @@ public class Samples {
 	/**
 	 * Create a test Index of the given size
 	 * @param size
-	 * @return
+	 * @return An Index with the correct number of entries
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static Index<ABlob,CVMLong> createTestIndex(long size) {

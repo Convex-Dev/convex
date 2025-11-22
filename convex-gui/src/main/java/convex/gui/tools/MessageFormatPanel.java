@@ -159,7 +159,7 @@ public class MessageFormatPanel extends JPanel {
 		messageArea.setText(msg);
 	}
 	
-	@SuppressWarnings("null")
+
 	private void updateHashLabel(ACell v, Blob b) {
 		StringBuilder sb=new StringBuilder();
 		boolean empty=(b==null);

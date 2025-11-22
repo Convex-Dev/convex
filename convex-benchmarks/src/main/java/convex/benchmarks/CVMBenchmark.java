@@ -118,7 +118,6 @@ public class CVMBenchmark {
 	public void queryAccountHoldings() {
 		State s=STATE;
 		Address addr=HERO;
-		@SuppressWarnings("unused")
 		ACell result=s.getAccount(addr).getHoldings();
 	}
 
