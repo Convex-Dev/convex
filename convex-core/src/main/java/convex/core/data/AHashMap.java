@@ -5,7 +5,6 @@ import java.util.function.Predicate;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.MergeFunction;
-import convex.core.util.Utils;
 
 public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K, V> {
 
