@@ -1,5 +1,7 @@
 # Convex Core
 
+[![javadoc](https://javadoc.io/badge2/world.convex/convex-core/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-core)
+
 ## Overview
 
 Convex Core is the fundamental code base for Convex
