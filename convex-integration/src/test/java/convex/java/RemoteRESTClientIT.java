@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.junit.Assume;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -111,7 +111,7 @@ public class RemoteRESTClientIT {
 	protected void checkValid(ConvexJSON convex) {
 		if (convex==null) {
 			skip=true;
-			Assume.assumeTrue(false);
+			Assumptions.assumeTrue(false);
 		} else {
 			// OK?
 		}

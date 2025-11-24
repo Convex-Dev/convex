@@ -253,7 +253,6 @@ public abstract class AWebSite extends ABaseAPI {
 	 * Build Prev/Next navigation for detail pages with compact info label.
 	 * Example: "Block 3 / 678" next to buttons.
 	 *
-	 * @param ctx      Request context
 	 * @param basePath Base path without trailing index (e.g. "/explorer/blocks")
 	 * @param index    Current zero-based index
 	 * @param total    Total count
@@ -298,7 +297,7 @@ public abstract class AWebSite extends ABaseAPI {
 
 	/**
 	 * Format a UNIX timestamp (ms) as UTC like "2025-03-15 18:23:56.345"
-	 * @param tsa Timestamp
+	 * @param ts Timestamp
 	 */
 	protected DomContent timestamp(long ts) {
 		String s=TS_FMT.format(Instant.ofEpochMilli(ts));

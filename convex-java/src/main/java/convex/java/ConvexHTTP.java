@@ -57,6 +57,10 @@ public class ConvexHTTP extends convex.api.Convex {
 		return new ConvexHTTP(address,keyPair,uri);
 	}
 	
+	public static ConvexHTTP connect(URI uri) {
+		return new ConvexHTTP(null,null,uri);
+	}
+	
 
 	private String getAPIPath() {
 		int port=uri.getPort();
