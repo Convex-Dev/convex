@@ -29,7 +29,7 @@ import convex.core.crypto.ASignature;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.restapi.api.McpAPI;
+import convex.restapi.mcp.McpAPI;
 import convex.core.data.AccountKey;
 import convex.core.cvm.Address;
 

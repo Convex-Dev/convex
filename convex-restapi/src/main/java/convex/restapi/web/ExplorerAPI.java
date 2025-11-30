@@ -68,7 +68,7 @@ import convex.peer.ConnectionManager;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
-import convex.restapi.api.McpAPI;
+import convex.restapi.mcp.McpAPI;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;

@@ -1,4 +1,4 @@
-package convex.restapi.api;
+package convex.restapi.mcp;
 
 import java.io.IOException;
 import java.security.SecureRandom;
@@ -52,7 +52,8 @@ import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.restapi.RESTServer;
-import convex.restapi.mcp.McpTool;
+import convex.restapi.api.ABaseAPI;
+import convex.restapi.api.ChainAPI;
 import convex.restapi.model.JsonRPCRequest;
 import convex.restapi.model.JsonRPCResponse;
 import io.javalin.Javalin;
@@ -926,7 +927,8 @@ public class McpAPI extends ABaseAPI {
 					metadataString="Metadata too large to print";
 				}
 				AMap<AString, ACell> resultMap = Maps.of(
-					"metadata", metadataString
+					"metadata", metadataString,
+					"accountInfo",ChainAPI.getAccountInfo(address, accountStatus)
 				);
 				return toolSuccess(resultMap);
 			} catch (Exception e) {

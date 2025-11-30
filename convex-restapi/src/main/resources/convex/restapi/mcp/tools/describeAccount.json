@@ -1,13 +1,13 @@
 {
   "name": "describeAccount",
   "title": "Describe Account",
-  "description": "Get symbol metadata for an account. Returns a map of Symbol -> Symbol metadata (possibly nil).",
+  "description": "Get key information for an account including defined symbols with metadata and summary of account status.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "address": {
         "type": "string",
-        "description": "Address of the account to describe (e.g. '#11' or '11')"
+        "description": "Address of the account (e.g. '#11')"
       }
     },
     "required": ["address"]
@@ -17,8 +17,12 @@
     "properties": {
       "metadata": {
         "type": "object",
-        "description": "Map of Symbol -> Symbol metadata (possibly nil)"
-      }
+        "description": "Map of Symbol -> Symbol metadata (possibly nil), use for identifying callable functions and on-chain data"
+      },
+	  "accountInfo": {
+	    "type": "object",
+	    "description": "General account info including balance and sequence number etc."
+	  }
     }
   }
 }

@@ -612,6 +612,12 @@ public class ChainAPI extends ABaseAPI {
 			return;
 		}
 
+		String jsonAccountInfo = JSON.toString(getAccountInfo(addr, as));
+		
+		ctx.result(jsonAccountInfo);
+	}
+
+	public static HashMap<String, Object> getAccountInfo(Address addr, AccountStatus as) {
 		boolean isUser = !as.isActor();
 		AccountKey publicKey=as.getAccountKey();
 
@@ -623,10 +629,10 @@ public class ChainAPI extends ABaseAPI {
 		hm.put("memorySize", as.getMemorySize());
 		hm.put("sequence", as.getSequence());
 		hm.put("type", isUser ? "user" : "actor");
-
-		ctx.result(JSON.toString(hm));
+		return hm;
 	}
 
+	
 	public void queryPeer(Context ctx) throws InterruptedException {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
