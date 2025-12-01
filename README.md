@@ -1,23 +1,33 @@
-# Convex
+# Convex - Lattice technology for Open Economic Systems
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-<!-- ![Workflow](https://github.com/convex-dev/convex/actions/workflows/tests.yml/badge.svg) -->
+**Convex** is a decentralised network and execution platform that powers the Internet of Value. It realises the vision of a true **Stateful Internet**, where the network itself securely hosts, executes, and persists both code and data.
 
+Convex provides a full-stack platform for decentralised applications and programmable economic systems that manage digital assets. Ownership of accounts and assets is cryptographically enforced and can be governed (optionally) through smart contracts.
 
-Convex is a decentralised network and execution engine for the Internet of Value. It can be seen as an implementation of a "Stateful Internet" where the network itself securely hosts and executes code and data.
+## Core Technology: Lattice-Based Architecture
 
-It is designed as a full stack solution for decentralised applications and programmable economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. 
+Unlike traditional blockchains, Convex is built on **Lattice Technology**, which leverages the mathematical properties of lattices to deliver superior consensus and verifiability. This foundation yields significant advantages over conventional blockchain designs:
 
-Convex is based on Lattice Technology, exploiting the mathematical properties of lattices to achieve efficient consensus and verifiability. Lattice technology can be used to solve problems in a similar manner to blockchains, but offers some significant advantages:
+| Feature                                      | Convex Advantage                                                                 |
+|----------------------------------------------|-----------------------------------------------------------------------------------|
+| **Global State Model**                       | Single, consistent global state with immutable data structures and atomic transactions |
+| **Virtual Machine**                          | Lambda-calculus-based VM supporting fully Turing-complete smart contracts         |
+| **Throughput**                               | Tens of thousands of write TPS today; designed to scale to millions in the future |
+| **Networking**                               | Simple, robust random-gossip protocol                                             |
+| **Confirmation Latency**                     | Millisecond-range global consensus (network-speed dependent)                      |
+| **Energy Efficiency**                        | **100% Green** – powered by Convergent Proof-of-Stake (no energy-intensive mining) |
+| **Programming Language**                     | Integrated on-chain compiler for **Convex Lisp** (a modern, secure Lisp dialect)   |
 
-- Global State model with immutable data structures and atomic transactions
-- Lambda Calculus based VM supporting Turing complete Smart Contracts
-- High transaction throughput (tens of thousands of write transactions per second, potentially scaling to millions in the future)
-- Simple networking protocol based on random gossip
-- Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
-- 100% Green - energy efficiency using the Convergent Proof of Stake consensus algorithm
-- Integrated on-chain compiler (Convex Lisp)
+## Why Convex?
+
+- **Developer-friendly**: Write smart contracts in a powerful, functional Lisp that compiles and executes directly on-chain.
+- **Instant finality**: Transactions confirm in milliseconds with cryptographic guarantees.
+- **Truly scalable**: Lattice agreement eliminates the bottlenecks of linear blockchains.
+- **Sustainable by design**: Minimal energy footprint while maintaining full decentralization and security.
+
+Convex is the high-performance, eco-friendly backbone for the next generation of decentralised finance, agentic economies, self-sovereign ownership, and beyond.
 
 ## About this repository
 
