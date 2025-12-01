@@ -1421,6 +1421,10 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Vectors.of(1,2,3),eval("(update [1 2 3] 1 identity)"));
 
+		assertEquals(Vectors.of(0,2,0),eval("(update [0 1 0] 1 + 1)"));
+		assertEquals(Vectors.of(0,4,0),eval("(update [0 1 0] 1 + 1 2)"));
+		assertEquals(Vectors.of(0,46,0),eval("(apply update [0 1 0] 1 + [1 2 3 4 5 6 7 8 9])"));
+
 		// nil works as empty map 
 		assertEquals(Maps.of(2,Sets.of(2,3)),eval("(update nil 2 union #{2,3})"));
 		
@@ -1444,6 +1448,10 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Vectors.of(1,2,3),eval("(update-in [1 2 3] [1] identity)"));
 
+		assertEquals(Vectors.of(0,2,0),eval("(update-in [0 1 0] [1] + 1)"));
+		assertEquals(Vectors.of(0,4,0),eval("(update-in [0 1 0] [1] + 1 2)"));
+		assertEquals(Vectors.of(0,46,0),eval("(apply update-in [0 1 0] [1] + [1 2 3 4 5 6 7 8 9])"));
+		
 		// nil works as empty map 
 		assertEquals(Maps.of(2,Sets.of(2,3)),eval("(update-in nil [2] union #{2,3})"));
 		
