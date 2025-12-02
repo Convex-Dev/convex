@@ -12,13 +12,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Index;
@@ -167,6 +168,25 @@ public class JSONTest {
 
 	}
 	
+	@Test 
+	public void testStrings() {
+		assertEquals("\\",JSON.parse("\"\\\\\"").toString()); // i.e. '\'
+		
+		doStringTest("");
+		doStringTest("foo bar");
+		doStringTest("\\\\"); // i.e. '\'
+		doStringTest("\\\""); // i.e. '"'
+		doStringTest("\\u1111"); // i.e. 'x'
+		doStringTest("\\/"); // i.e. '/'
+
+	}
+	
+	private void doStringTest(String s) {
+		String quoted="\""+s+"\"";
+		AString js=JSON.parse(quoted);
+		assertEquals(js,JSON.parse(JSON.toString(js)));
+	}
+
 	@Test
 	public void testJSON5Comments() {
 		assertEquals(Vectors.of(true,null),JSON.parseJSON5("[true, /* \n */ null]"));

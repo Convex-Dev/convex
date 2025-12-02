@@ -14,6 +14,7 @@ import convex.lattice.ALattice;
  */
 public class DataLattice extends ALattice<Index<Hash,ACell>> {
 
+	public static DataLattice INSTANCE=new DataLattice();
 
 	@Override
 	public Index<Hash, ACell> merge(Index<Hash, ACell> ownValue, Index<Hash, ACell> otherValue) {
