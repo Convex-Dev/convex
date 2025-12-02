@@ -1,4 +1,4 @@
-package convex.lattice.cursor;
+package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -21,47 +21,17 @@ import convex.lattice.generic.SetLattice;
 import convex.lattice.generic.SignedLattice;
 
 public class LatticeTest {
-	AKeyPair KP1 = AKeyPair.createSeeded(56756785);
-	AKeyPair KP2 = AKeyPair.createSeeded(756778);
-	
 
-	@Test public void testLatticeAPI() {
-		
-		ALattice<AHashMap<ACell,AInteger>> l=MapLattice.create(MaxLattice.create());
-		
-		assertEquals(Maps.empty(), l.merge(Maps.empty(), null));
-		
-		assertEquals(Maps.of(1,2,3,4), l.merge(Maps.of(1,2), Maps.of(3,4)));
-
-		assertEquals(Maps.of(1,6,2,10), l.merge(Maps.of(1,3,2,10), Maps.of(1,6,2,5)));
-	}
-	
-	
-	/**
-	 * Tests for example lattices
-	 */
-	@Test public void testLatticeExamples() {
-		doLatticeTest(MaxLattice.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
-		
-		doLatticeTest(MapLattice.create(MaxLattice.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7));
-
-		doLatticeTest(SignedLattice.create(MaxLattice.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
-
-		doLatticeTest(SetLattice.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
-		
-		doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
-
-		doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
-	}
 
 
 
 	/**
 	 * Generic property tests for any lattice
-	 * @param maxNode
-	 * @param one
+	 * @param value1 First valid lattice value
+	 * @param value2 Second valid lattice value
+	 * @param lattice Lattice consistent with values
 	 */
-	private <V extends ACell> void doLatticeTest(ALattice<V> lattice, V value, V value2) {
+	public static <V extends ACell> void doLatticeTest(ALattice<V> lattice, V value, V value2) {
 		V zero=lattice.zero();
 		
 		// Merges with zero
