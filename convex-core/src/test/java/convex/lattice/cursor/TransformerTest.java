@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -10,6 +10,9 @@ import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
+import convex.lattice.cursor.Transformer;
 import convex.core.data.prim.AInteger;
 
 /**

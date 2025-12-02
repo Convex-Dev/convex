@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.cursor;
 
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BinaryOperator;

@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -12,6 +12,7 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALattice;
 import convex.lattice.generic.CompareLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;

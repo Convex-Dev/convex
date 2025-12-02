@@ -1,4 +1,4 @@
 /**
  * Base package for lattice processing operations
  */
-package convex.lattice;
+package convex.lattice.cursor;

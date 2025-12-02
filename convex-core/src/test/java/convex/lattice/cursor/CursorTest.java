@@ -1,4 +1,4 @@
-package convex.lattice;
+package convex.lattice.cursor;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,6 +22,11 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.ABranchedCursor;
+import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.PathCursor;
+import convex.lattice.cursor.Root;
 
 public class CursorTest {
 
