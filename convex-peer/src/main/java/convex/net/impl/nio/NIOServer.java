@@ -21,8 +21,6 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.peer.Config;
@@ -55,17 +53,11 @@ public class NIOServer extends AServer {
 
 	private final Consumer<Message> receiveAction;
 
-	private final AStore store;
 	
-	protected NIOServer(AStore store, Consumer<Message> receiveAction) {
-		this.store=store;
+	protected NIOServer(Consumer<Message> receiveAction) {
 		this.receiveAction=receiveAction;
 	}
 	
-	
-	private AStore getStore() {
-		return store;
-	}
 
 	/**
 	 * Creates a new unlaunched NIO server component
@@ -74,7 +66,7 @@ public class NIOServer extends AServer {
 	 * @return New NIOServer instance
 	 */
 	public static NIOServer create(Server server) {
-		return new NIOServer(server.getStore(),server.getReceiveAction());
+		return new NIOServer(server.getReceiveAction());
 	}
 
 	/**
@@ -143,8 +135,6 @@ public class NIOServer extends AServer {
 	private Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-			// Use the store configured for the owning server.
-			Stores.setCurrent(getStore());
 			try {
 				// loop unless we are interrupted
 				while (running && !Thread.currentThread().isInterrupted()) {
@@ -274,7 +264,8 @@ public class NIOServer extends AServer {
 		return Connection.create(sc, getReceiveAction(), null);
 	}
 
-	protected Consumer<Message> getReceiveAction() {
+	@Override
+	public Consumer<Message> getReceiveAction() {
 		return receiveAction;
 	}
 

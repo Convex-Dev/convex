@@ -19,7 +19,6 @@ import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cvm.Keywords;
 import convex.core.message.Message;
-import convex.core.store.Stores;
 
 public class NIOServerTest {
 
@@ -29,7 +28,7 @@ public class NIOServerTest {
 			recd.add(m);
 		};
 		
-		try (NIOServer s = new NIOServer(Stores.current(),rec)) {
+		try (NIOServer s = new NIOServer(rec)) {
 			s.launch();
 			InetSocketAddress sa=s.getHostAddress();
 			

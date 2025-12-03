@@ -119,7 +119,8 @@ public class NettyServer extends AServer {
    		this.channel=f.channel();
     }
 	
-	protected Consumer<Message> getReceiveAction() {
+	@Override
+	public Consumer<Message> getReceiveAction() {
 		return receiveAction;
 	}
 	
