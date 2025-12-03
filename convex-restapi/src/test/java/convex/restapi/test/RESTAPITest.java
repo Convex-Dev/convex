@@ -160,6 +160,21 @@ public class RESTAPITest extends ARESTTest {
 	}
 	
 	@Test public void testQuery() throws IOException, InterruptedException {
+//		{ // Edge case with \/ in JSON
+//			String query=JSON.toStringPretty(Maps.of("address",11,"source","#8\\/count"));
+//			System.out.println("testQuery:"+query);
+//			HttpResponse<String> res = post(API_PATH+"/query", query);
+//			String r=res.body();
+//			System.out.println(r);
+//			AMap<AString,ACell> json=JSON.parse(r);
+//			ACell value=json.getIn("value");
+//			
+//			assertEquals(200, res.statusCode());
+//			assertTrue(value instanceof AString);
+//			assertNull(json.getIn("errorCode"));
+//		}
+		
+		
 		{ // should be a bad request with bad JSON
 			HttpResponse<String> res = post(API_PATH+"/query", "fddfgb");
 			assertEquals(400, res.statusCode());

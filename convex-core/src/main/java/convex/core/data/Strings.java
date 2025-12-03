@@ -92,9 +92,13 @@ public class Strings {
 
 	public static final StringShort SYMBOL = StringShort.intern("symbol");
 
+	public static final StringShort SOURCE = StringShort.intern("source");
+
+	
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());
 	};
+
 
 
 

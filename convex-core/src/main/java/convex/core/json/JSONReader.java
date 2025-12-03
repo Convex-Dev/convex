@@ -160,7 +160,8 @@ public class JSONReader {
 	}
 	
 	public static AMap<AString,ACell> readObject(InputStream is) throws IOException {
-		return readObject(CharStreams.fromStream(is));
+		CharStream cs=CharStreams.fromStream(is);
+		return readObject(cs);
 	}
 
 	@SuppressWarnings("unchecked")

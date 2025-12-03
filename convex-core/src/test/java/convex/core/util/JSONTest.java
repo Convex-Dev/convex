@@ -126,6 +126,11 @@ public class JSONTest {
 	@Test
 	public void testPrettyJSON() {
 		assertEquals("{\n  \"foo\": \"bar\"\n}",JSON.printPretty(Maps.of("foo","bar")).toString());
+		
+		// special case regression test
+		assertEquals("\"\\\\/\"",JSON.toStringPretty(Strings.create("\\/")));
+		assertEquals(Strings.create("\"\\\\/\""),JSON.printPretty(Strings.create("\\/")));
+
 	}
 	
 	@Test
@@ -170,6 +175,11 @@ public class JSONTest {
 	
 	@Test 
 	public void testStrings() {
+		assertEquals(Strings.intern("\n"),JSONReader.read("\"\\n\"")); 
+
+		// '\/' is valid JSON, you can unnecessarily escape a slash. WTF JSON?
+		assertEquals(Strings.intern("/"),JSONReader.read("\"\\/\"")); 
+		
 		assertEquals("\\",JSON.parse("\"\\\\\"").toString()); // i.e. '\'
 		
 		doStringTest("");

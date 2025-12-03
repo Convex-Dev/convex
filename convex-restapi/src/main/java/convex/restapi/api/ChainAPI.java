@@ -1082,12 +1082,12 @@ public class ChainAPI extends ABaseAPI {
 				addr=Address.parse(RT.get(req, Keywords.ADDRESS));
 				form=RT.get(req, Keywords.SOURCE);
 			} else {
-				Map<String, Object> req = getJSONBody(ctx);
+				AMap<AString, ACell> req = readJSONBody(ctx);
 				// System.out.println("query data: "+req+ " of type "+Utils.getClassName(req));
-				addr = Address.parse(req.get("address"));
-				Object srcValue = req.get("source");
+				addr = Address.parse(req.get(Strings.ADDRESS));
+				AString srcValue = RT.ensureString(req.get(Strings.SOURCE));
 				// System.out.println("query source: "+srcValue);
-				form = readCode(srcValue);
+				form = Reader.read(srcValue);
 			}
 	
 			Result r = convex.querySync(form, addr);
