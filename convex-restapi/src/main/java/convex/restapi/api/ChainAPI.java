@@ -57,6 +57,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.RESTServer;
+import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
@@ -91,23 +92,28 @@ public class ChainAPI extends ABaseAPI {
 
 	private static final String ROUTE = "/api/v1/";
 
+	private ConcurrentLimit faucetLimit=new ConcurrentLimit(10);
+	private ConcurrentLimit identiconLimit=new ConcurrentLimit(10);
+	private ConcurrentLimit transactLimit=new ConcurrentLimit(2);
+	
 	@Override
 	public void addRoutes(Javalin app) {
 		String prefix = ROUTE;
 
-		app.post(prefix + "createAccount", this::createAccount);
 		app.post(prefix + "query", this::query);
-
-		app.post(prefix + "faucet", this::faucetRequest);
 
 		app.post(prefix + "transaction/prepare", this::transactionPrepare);
 		app.post(prefix + "transaction/submit", this::transactionSubmit);
+		app.post(prefix + "transact", transactLimit.handler(this::transact));
 
-		app.post(prefix + "transact", this::transact);
+		app.post(prefix + "createAccount", faucetLimit.handler(this::createAccount));
+		app.post(prefix + "faucet",  faucetLimit.handler(this::faucetRequest));
+
 
 		app.get(prefix + "accounts/{addr}", this::queryAccount);
 		app.get(prefix + "peers/{addr}", this::queryPeer);
 
+	
 		app.get(prefix + "data/<hash>", this::getData);
 		app.post(prefix + "data/encode", this::encodeData);
 		app.post(prefix + "data/decode", this::decodeData);
@@ -120,7 +126,7 @@ public class ChainAPI extends ABaseAPI {
 		
 		app.get(prefix + "status", this::getStatus);
 		
-		app.get("/identicon/{hex}", this::getIdenticon);
+		app.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 		
 		convex = restServer.getConvex();
 

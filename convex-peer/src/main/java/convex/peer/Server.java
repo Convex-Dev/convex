@@ -100,7 +100,7 @@ public class Server implements Closeable {
 	protected final ConnectionManager manager = new ConnectionManager(this);
 	
 	/**
-	 * Connection manager instance.
+	 * Belief propagator instance.
 	 */
 	protected final BeliefPropagator propagator=new BeliefPropagator(this);
 	
@@ -110,7 +110,7 @@ public class Server implements Closeable {
 	protected final TransactionHandler transactionHandler=new TransactionHandler(this);
 	
 	/**
-	 * Transaction handler instance.
+	 * CVM Executor instance.
 	 */
 	protected final CVMExecutor executor=new CVMExecutor(this);
 
@@ -385,7 +385,7 @@ public class Server implements Closeable {
 			isRunning = true;
 			
 			// Close server on shutdown, should be before Etch stores in priority
-			Shutdown.addHook(Shutdown.SERVER, ()->close());
+			Shutdown.addHook(Shutdown.SERVER, this::close);
 			
 			
 			

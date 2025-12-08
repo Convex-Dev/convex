@@ -41,7 +41,9 @@ public abstract class AServer implements Closeable {
 	public abstract void launch() throws IOException, InterruptedException;
 
 	/**
-	 * Get the receiver action for the Server, which handles an incoming Message
+	 * Get the receiver action for the server, which handles an incoming Message
+	 * Receive action is responsible for all message handling
+	 * 
 	 * @return Receive action
 	 */
 	public abstract Consumer<Message> getReceiveAction();

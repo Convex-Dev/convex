@@ -17,10 +17,25 @@ public class CacheTest {
 		c.put(s, w);
 		assertEquals(w,c.get(s));
 		
+		assertNull(c.get(w));
+
+		// Overwrite with null
 		c.put(s, null);
 		assertNull(c.get(s));
 		
-		assertNull(c.get(w));
+	}
+	
+	@Test
+	public void testClear() {
+		SoftCache<String,Object> c=new SoftCache<>();
+		
+		String s="Hello";
+		String w="World";
+		c.put(s, w);
+		assertEquals(w,c.get(s));
+		
+		c.clear();
+		assertNull(c.get(s));
 	}
 
 	// test that we don't blow up with OOM....
