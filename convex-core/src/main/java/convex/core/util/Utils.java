@@ -43,6 +43,8 @@ import convex.core.lang.RT;
  */
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];
+	public static final byte[] ZERO_BYTES_32 = new byte[32];
+	public static final byte[] ZERO_BYTES_64 = new byte[64];
 
 	/**
 	 * Converts an int to a hex string e.g. "80cafe80"

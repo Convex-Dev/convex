@@ -73,13 +73,14 @@ public class Samples {
 	 */
 	public static final Address BAD_ADDRESS = Address.create(7777777777L);
 	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("bbbb");
-	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.dummy("0");
+	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.ZERO;
 	
 	public static final AKeyPair KEY_PAIR=AKeyPair.createSeeded(13371337L);
 	public static final AKeyPair[] KEY_PAIRS=new AKeyPair[100];
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
+	public static final ASignature ZERO_SIGNATURE = Ed25519Signature.ZERO;
 
 	public static final VectorLeaf<CVMLong> INT_VECTOR_10 = createTestIntVector(10);
 	public static final VectorLeaf<CVMLong> INT_VECTOR_16 = createTestIntVector(16);

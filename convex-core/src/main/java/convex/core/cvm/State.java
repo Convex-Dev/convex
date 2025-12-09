@@ -389,7 +389,7 @@ public class State extends ARecordGeneric {
 				SignedData<ATransaction> signed = transactions.get(i);
 				
 				// Update transaction context
-				tctx.tx=signed;
+				tctx.signedTx=signed;
 				tctx.txNumber=i;
 				
 				// execute the transaction using the *latest* state (not necessarily "this")

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
@@ -15,7 +14,9 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -316,10 +317,9 @@ public class Peer {
 			return  ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existant account");
 		}
 
-		// Run query in a fake context
-		Context ctx=Context.create(state, address, Constants.MAX_TRANSACTION_JUICE);
-		ctx=ctx.run(form);
-		ResultContext rctx=ResultContext.fromContext(ctx);
+		// Run query in a fake transaction for given address
+		ATransaction tx=Invoke.create(address, state.getAccount(address).getSequence()+1, form);
+		ResultContext rctx=state.applyTransaction(tx);
 		return rctx;
 	}
 
@@ -332,7 +332,11 @@ public class Peer {
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
 		State s=getConsensusState();
-		ResultContext ctx=getConsensusState().applyTransaction(transaction,TransactionContext.create(s));
+		TransactionContext tctx=TransactionContext.create(s);
+		
+		// This is a fake transaction
+		tctx.signedTx=SignedData.create(AccountKey.ZERO, Ed25519Signature.ZERO, transaction.getRef());
+		ResultContext ctx=s.applyTransaction(transaction,tctx);
 		return ctx;
 	}
 

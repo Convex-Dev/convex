@@ -45,6 +45,7 @@ public class Hash extends AArrayBlob {
 	public static final Hash TRUE_HASH = Hashing.sha3(new byte[] { CVMTag.TRUE });
 	public static final Hash FALSE_HASH = Hashing.sha3(new byte[] { CVMTag.FALSE });
 	public static final Hash EMPTY_HASH = Hashing.sha3(new byte[0]);
+	public static final Hash ZERO = Hashing.sha3(Utils.ZERO_BYTES_32);
 
 
 	/**
