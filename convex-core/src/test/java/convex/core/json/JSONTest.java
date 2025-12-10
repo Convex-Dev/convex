@@ -1,4 +1,4 @@
-package convex.core.util;
+package convex.core.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,8 +35,9 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.json.JSONReader;
 import convex.core.lang.RT;
+import convex.core.util.JSON;
+import convex.core.util.Utils;
 
 public class JSONTest {
 

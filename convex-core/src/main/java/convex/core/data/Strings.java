@@ -100,7 +100,13 @@ public class Strings {
 	};
 
 
-
+	public static AString wrap(byte[] utfBytes) {
+		if (utfBytes.length<=StringShort.MAX_LENGTH) {
+			return StringShort.wrap(utfBytes);
+		} else {
+			return StringTree.create(Blob.wrap(utfBytes));
+		}
+	}
 
 
 
@@ -330,6 +336,8 @@ public class Strings {
 	public static AString fromStream(InputStream inputStream) throws IOException {
 		return create(Blobs.fromStream(inputStream));
 	}
+
+
 
 
 
