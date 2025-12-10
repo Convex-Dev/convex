@@ -625,8 +625,12 @@ public class RT {
 		}
 
 		if (a instanceof APrimitive) {
-			if (a instanceof CVMBool)
-				return null; // disallow boolean -> long cast
+			// disallow boolean -> long cast since (long false) would still be truthy
+			if (a instanceof CVMBool) {
+				return null; 
+			}
+			
+			// Other primitives are OK as a long
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
 
