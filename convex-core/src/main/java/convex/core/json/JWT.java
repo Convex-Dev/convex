@@ -7,11 +7,16 @@ import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
+import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
 import convex.core.util.JSON;
@@ -24,6 +29,9 @@ public class JWT {
 	static Base64.Encoder encoder=Base64.getUrlEncoder().withoutPadding();
 	
 	static AString HEADER_HS256 = encode(Strings.intern("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"));
+	static final AMap<AString,ACell> HEADER_EDDSA_BASE = Maps.of(
+		Strings.create("alg"), Strings.create("EdDSA"),
+		Strings.create("typ"), Strings.create("JWT"));
 	
 	/**
 	 * Get the claims string for a JWT before encoding
@@ -85,5 +93,43 @@ public class JWT {
 		return sig.equals(jwt.slice(lastdot+1));
 	}
 
+	/**
+	 * Build and sign a symmetric (HS256) JSON Web Token from claim data.
+	 * 
+	 * @param claimData Claims to embed in the JWT payload as an {@link AMap} of
+	 *                  {@link AString} keys to {@link ACell} values.
+	 * @param secret    Shared secret key material used for HMAC signing.
+	 * @return The encoded JWT string containing header, payload, and signature.
+	 */
+	public static AString signSymmetric(AMap<AString,ACell> claimData, ABlobLike<?> secret) {
+		AString claimString = claims(claimData);
+		AString base64Claims = encode(claimString);
+		AString toSign = HEADER_HS256.append(".").append(base64Claims);
+		AString signature = signHS256(toSign, secret);
+		return toSign.append(".").append(signature);
+	}
 
+	/**
+	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token from claim data.
+	 * 
+	 * @param claimData Claims to embed in the JWT payload as an {@link AMap} of
+	 *                  {@link AString} keys to {@link ACell} values.
+	 * @param keyPair   Key pair used to produce the Ed25519 signature. The
+	 *                  multikey-encoded public key is placed in the {@code kid}
+	 *                  header parameter.
+	 * @return The encoded JWT string containing header, payload, and signature.
+	 */
+	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair) {
+		AString kid = Multikey.encodePublicKey(keyPair.getAccountKey());
+		AMap<AString,ACell> headerMap = HEADER_EDDSA_BASE.assoc(Strings.create("kid"), kid);
+		AString headerString = claims(headerMap);
+		AString base64Header = encode(headerString);
+
+		AString claimString = claims(claimData);
+		AString base64Claims = encode(claimString);
+		AString toSign = base64Header.append(".").append(base64Claims);
+		ASignature signature = keyPair.sign(Blob.wrap(toSign.getBytes()));
+		AString encodedSig = encode(signature.getBytes());
+		return toSign.append(".").append(encodedSig);
+	}
 }
