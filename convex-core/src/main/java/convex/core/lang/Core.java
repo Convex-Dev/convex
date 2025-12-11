@@ -2518,8 +2518,8 @@ public class Core {
 			
 			// Pre-consume juice based on number of extra args copied
 			long argJuice=Juice.BUILD_PER_ELEMENT*vlen;
-			if (!context.checkJuice(argJuice)) return (context.withJuiceError());
 			context=context.consumeJuice(Juice.APPLY+argJuice);
+			if (context.isExceptional()) return context;
 
 			// Build an array of arguments for the function
 			// TODO: bounds on number of arguments?
