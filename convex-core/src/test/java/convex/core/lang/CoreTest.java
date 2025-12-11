@@ -2852,6 +2852,7 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(10L,evalL("(apply + 1 2 [3 4])"));
 		assertEquals(3L,evalL("(apply + 1 2 nil)"));
+		assertEquals(3L,evalL("(apply + 1 2 {})"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
@@ -2876,9 +2877,8 @@ public class CoreTest extends ACVMTest {
 		// Cast error if not applied to collection
 		assertCastError(step("(apply inc 1)"));
 		assertCastError(step("(apply inc :foo)"));
-
-		// not a sequential collection
-		assertCastError(step("(apply + 1 2 {})"));
+		
+		assertEquals(Vectors.empty(), eval("(apply concat {} {})"));
 	}
 
 

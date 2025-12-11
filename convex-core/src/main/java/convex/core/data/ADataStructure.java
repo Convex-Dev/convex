@@ -3,6 +3,7 @@ package convex.core.data;
 import java.util.function.Function;
 
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for Persistent data structures. Each can be regarded as a
@@ -187,5 +188,22 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @return Collection after function applied to each element
 	 */
 	public abstract <R extends ACell> ADataStructure<R> map(Function<E, R> mapper);
+
+	@Override
+	public abstract E get(long index);
+
+	
+	/**
+	 * Converts this data structure to a new Cell array
+	 * @return A new cell array containing the elements of this data structure
+	 */
+	public ACell[] toCellArray() {
+		int n=Utils.checkedInt(count());
+		ACell[] cells=new ACell[n];
+		for (int i=0; i<n; i++) {
+			cells[i]=get(i);
+		}
+		return cells;
+	}
 
 }
