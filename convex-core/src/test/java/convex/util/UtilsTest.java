@@ -8,13 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.function.Function;
 
-import org.junit.Test;
 
 import convex.core.cpos.Block;
 import convex.core.cvm.Peer;
@@ -42,14 +43,13 @@ public class UtilsTest {
 		assertEquals('0', Utils.toHexChar(0));
 	}
 
-	@Test(expected = IllegalArgumentException.class)
-	public void testBadHexCharNegative() {
-		Utils.toHexChar(-1);
-	}
-
-	@Test(expected = IllegalArgumentException.class)
-	public void testBadHexChar1() {
-		Utils.toHexChar(16);
+	@Test
+	public void testBadHexChar() {
+		assertThrows(IllegalArgumentException.class,()->
+			Utils.toHexChar(-1));
+	
+		assertThrows(IllegalArgumentException.class,()->
+			Utils.toHexChar(16));
 	}
 	
 
@@ -170,6 +170,12 @@ public class UtilsTest {
 		assertEquals(32, bs.length);
 		assertEquals(0, b.remaining());
 		assertEquals("0000000000000000000000000000000000000000000000000000000000000007", Utils.toHexString(bs));
+	}
+	
+	@Test public void testTimeStamp() {
+		long t1=Instant.now().toEpochMilli();
+		long t2=System.currentTimeMillis();
+		assertEquals(t1,t2);
 	}
 	
 	@Test 
