@@ -6,7 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Symbols;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
+import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 
@@ -57,5 +61,49 @@ public class JWTTest {
 		
 		AString jwt=message.append(".").append(sig);
 		assertTrue(JWT.verifyHS256(jwt, key));
+	}
+
+	@Test public void testSignSymmetricRoundTrip() {
+		AString secret = Strings.create("a-secret-key-used-for-testing");
+		AMap<AString, convex.core.data.ACell> claims = Maps.of(
+			"foo", "bar",
+			"answer", 42);
+
+		AString jwt = JWT.signSymmetric(claims, secret);
+
+		assertTrue(JWT.verifyHS256(jwt, secret.getBytes()));
+
+		String[] parts = jwt.toString().split("\\.");
+		assertEquals(3, parts.length);
+
+		// decode the claims part to ensure it matches what we signed
+		AString claimsBase64 = Strings.create(parts[1]);
+		String decodedClaims = new String(JWT.decodeRaw(claimsBase64));
+		assertEquals(JWT.claims(claims).toString(), decodedClaims);
+	}
+
+	@Test public void testSignPublic() {
+		AKeyPair kp = AKeyPair.createSeeded(12345L);
+		AMap<AString, convex.core.data.ACell> claims = Maps.of(
+			"sub", "alice@example.org",
+			"scope", "read");
+
+		AString jwt = JWT.signPublic(claims, kp);
+
+		String[] parts = jwt.toString().split("\\.");
+		assertEquals(3, parts.length);
+
+		AString headerB64 = Strings.create(parts[0]);
+		String headerJson = new String(JWT.decodeRaw(headerB64));
+		assertTrue(headerJson.contains("\"alg\":\"EdDSA\""));
+		assertTrue(headerJson.contains("\"kid\":\"z"));
+
+		AString payloadB64 = Strings.create(parts[1]);
+		AString message = Strings.create(parts[0]).append(".").append(payloadB64);
+		ASignature sig = ASignature.fromBlob(Blob.wrap(JWT.decodeRaw(Strings.create(parts[2]))));
+		assertTrue(sig.verify(Blob.wrap(message.getBytes()), kp.getAccountKey()));
+
+		String decodedClaims = new String(JWT.decodeRaw(payloadB64));
+		assertEquals(JWT.claims(claims).toString(), decodedClaims);
 	}
 }
