@@ -59,9 +59,8 @@ public class LocalStart extends ALocalCommand {
 	private String[] ports;
 
 	@Option(names={"--api-port"},
-		defaultValue = "8080",
-		description="REST API port, enables REST API to the first peer in the local cluster. Default: ${DEFAULT-VALUE}")
-	private int apiPort;
+		description="REST API port, enables REST API to the first peer in the local cluster. If unspecified, takes 8080 if available.")
+	private Integer apiPort;
 
     /**
      * Gets n public keys for local test cluster
@@ -153,7 +152,7 @@ public class LocalStart extends ALocalCommand {
 	
 	public RESTServer launchRestAPI(Server server) {
 		RESTServer restServer=RESTServer.create(server);
-		if (apiPort > 0) {
+		if (apiPort!=null) {
 			log.debug("Requesting REST API on port "+apiPort);
 		}
 		restServer.start(apiPort);
