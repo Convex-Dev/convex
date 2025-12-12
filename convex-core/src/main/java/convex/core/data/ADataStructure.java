@@ -189,10 +189,15 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 */
 	public abstract <R extends ACell> ADataStructure<R> map(Function<E, R> mapper);
 
+	/**
+	 * Gets the element at the specified element index in this data structure
+	 * 
+	 * @param index Index of element to get
+	 * @return Element at the specified index
+	 */
 	@Override
 	public abstract E get(long index);
 
-	
 	/**
 	 * Converts this data structure to a new Cell array
 	 * @return A new cell array containing the elements of this data structure

@@ -17,7 +17,8 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	public abstract long count();
 
 	/**
-	 * Gets the element at the specified element index in this value
+	 * Gets the element at the specified position in this countable object. Element type
+	 * returned will vary based on the type of countable object
 	 * 
 	 * @param index Index of element to get
 	 * @return Element at the specified index
@@ -62,7 +63,9 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	}
 
 	/**
-	 * Gets a slice of this data structure
+	 * Gets a slice of this data structure. Generally O(n) though slices starting at 
+	 * beginning of vectors or finishing at ends of lists are O(depth)
+	 * 
 	 * @param start Start index (inclusive)
 	 * @param end end index (exclusive)
 	 * @return Slice of data structure, or null if invalid slice
