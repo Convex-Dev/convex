@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.*;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -28,6 +29,7 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 
+@Execution(ExecutionMode.CONCURRENT)
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {
 
