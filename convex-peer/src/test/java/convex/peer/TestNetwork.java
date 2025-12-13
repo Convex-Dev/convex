@@ -104,6 +104,34 @@ public class TestNetwork {
 			return null;
 		}
 	}
+	
+	/**
+	 * Gets a fresh local client account on the test network with 1 Gold
+	 * @return ConvexLocal Client instance
+	 */
+	public synchronized ConvexLocal getLocalClient() {
+		return getLocalClient(AKeyPair.generate());
+	}
+	
+	/**
+	 * Gets a fresh local client account on the test network with 1 Gold
+	 * @param kp Key pair to use for client
+	 * @return ConvexLocal Client instance
+	 */
+	public synchronized ConvexLocal getLocalClient(AKeyPair kp) {
+		try {
+			TestNetwork network=this;
+			Address addr=network.CONVEX.createAccountSync(kp.getAccountKey());
+			network.CONVEX.transferSync(addr, Coin.GOLD);
+			ConvexLocal client=Convex.connect(network.SERVER, addr, kp);
+			return client;
+		} catch (ResultException t) {
+			throw Utils.sneakyThrow(t);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return null;
+		}
+	}
 
 	public static synchronized TestNetwork getInstance() {
 		if (instance == null) {

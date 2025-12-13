@@ -247,7 +247,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief.
-	 * @param newBelief 
+	 * @param newBeliefs New beliefs to merge 
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
 	 */

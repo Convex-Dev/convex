@@ -244,7 +244,7 @@ public abstract class Convex implements AutoCloseable {
 	
 	/**
 	 * Called after a transaction is submitted to update sequence (if possible)
-	 * @param value
+	 * @param signed Signed transaction
 	 */
 	protected void maybeUpdateSequence(SignedData<ATransaction> signed) {
 		try {
