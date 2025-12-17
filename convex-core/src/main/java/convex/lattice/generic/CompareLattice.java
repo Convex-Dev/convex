@@ -47,4 +47,16 @@ public class CompareLattice<V extends ACell> extends ALattice<V> {
 		return true;
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell[] path,int pos) {
+		if (path.length==pos) return (ALattice<T>)this;
+		return null;
+	}
+
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		return null;
+	}
+
 }

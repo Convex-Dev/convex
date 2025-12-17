@@ -1,9 +1,16 @@
 package convex.lattice;
 
 import convex.core.data.ACell;
+import convex.core.data.Cells;
+import convex.core.lang.RT;
 
 /**
  * Abstract base class for lattice functions
+ * 
+ * Lattices represent merge functions for lattice values and support:
+ * - a `zero` initial value
+ * - ability to validate foreign values (pre-merge checks)
+ * - ability to obtain child lattices
  * 
  * @param <V> Type of values in this lattice
  */
@@ -31,4 +38,62 @@ public abstract class ALattice<V extends ACell> {
 	 * @return true if foreign value is an acceptable lattice value
 	 */
 	public abstract boolean checkForeign(V value);
+	
+	/**
+	 * Get the sub-lattice at the specified path
+	 * @param <T>
+	 * @param path Path of ACell keys
+	 * @return Sub-lattice instance, or null if invalid path
+	 */
+	public final  <T extends ACell> ALattice<T> path(ACell... path) {
+		return path(path,0);
+	}
+	
+	/**
+	 * Get this lattice (with an empty path)
+	 * @return This lattice cast to specified type
+	 */
+	public ALattice<V> path() {
+		return this;
+	}
+	
+	/**
+	 * Get this lattice (with an empty path)
+	 * @return This lattice cast to specified type
+	 */
+	public abstract <T extends ACell> ALattice<T> path(ACell childKey);
+	
+	@SuppressWarnings("unchecked")
+	protected <T extends ACell> ALattice<T> path(ACell[] path, int pos) {
+		if (path.length<=pos) return (ALattice<T>) this;
+		ALattice<?> child=path(path[pos]);
+		if (child==null) return null;
+		return child.path(path,pos+1);
+	}
+	
+	/**
+	 * Get this lattice (with an empty path)
+	 * @return This lattice cast to specified type
+	 */
+	public <T extends ACell> ALattice<T> path(Object childKey) {
+		return path(RT.cvm(childKey));
+	}
+
+	
+	/**
+	 * Get the sub-lattice at the specified path
+	 * @param <T>
+	 * @param path Path of keys
+	 * @return Sub-lattice instance, or null if invalid path
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> ALattice<T> path(Object... path) {
+		int d=path.length;
+		if (d==0) return (ALattice<T>) path();
+		if (d==1) return (ALattice<T>) path((ACell)RT.cvm(path[0]));
+		
+		ACell[] cellPath=Cells.toCellArray(path);
+		return path(cellPath,0);
+	}
+
 }

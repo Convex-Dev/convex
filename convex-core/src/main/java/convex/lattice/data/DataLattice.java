@@ -47,4 +47,19 @@ public class DataLattice extends ALattice<Index<Hash,ACell>> {
 		return (Index<Hash, ACell>) Index.EMPTY;
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <T extends ACell> ALattice<T> path(ACell[] path,int pos) {
+		int d=path.length;
+		if (d==pos) return (ALattice<T>) this;
+		// no child lattices
+		return null;
+	}
+
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		// No child lattices
+		return null;
+	}
+
 }

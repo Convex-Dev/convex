@@ -1,5 +1,6 @@
 package convex.lattice.generic;
 
+import convex.core.data.ACell;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -14,7 +15,7 @@ public class MaxLattice extends ALattice<AInteger> {
 		// private to enforce Singleton
 	}
 	
-	private static final MaxLattice INSTANCE = new MaxLattice();
+	public static final MaxLattice INSTANCE = new MaxLattice();
 
 	@Override
 	public AInteger merge(AInteger ownValue, AInteger otherValue) {
@@ -35,6 +36,11 @@ public class MaxLattice extends ALattice<AInteger> {
 	@Override
 	public boolean checkForeign(AInteger value) {
 		return (value instanceof AInteger);
+	}
+
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		return null;
 	}
 
 }

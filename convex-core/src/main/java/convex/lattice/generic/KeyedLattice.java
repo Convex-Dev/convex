@@ -86,4 +86,11 @@ public class KeyedLattice extends ALattice<AMap<Keyword,?>> {
 		return (value instanceof AMap);
 	}
 
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell child) {
+		int pos=keys.indexOf(child);
+		if (pos<0) return null;
+		return (ALattice<T>) lattices.get(pos);
+	}
 }

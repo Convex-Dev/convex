@@ -6,6 +6,11 @@ import convex.core.data.Maps;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
 
+/**
+ * A lattice representing a hash map that merges values
+ * @param <K> Key type
+ * @param <V> Value type
+ */
 public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
 
 	protected final ALattice<V> valueNode;
@@ -39,6 +44,13 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 	@Override
 	public boolean checkForeign(AHashMap<K, V> value) {
 		return (value instanceof AHashMap);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		// Any value should use child lattice
+		return (ALattice<T>) valueNode;
 	}
 	
 

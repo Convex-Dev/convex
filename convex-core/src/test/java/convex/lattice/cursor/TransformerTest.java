@@ -9,11 +9,8 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.Root;
-import convex.lattice.cursor.Transformer;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Tests for Transformer functionality.

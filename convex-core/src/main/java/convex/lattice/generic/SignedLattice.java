@@ -1,6 +1,7 @@
 package convex.lattice.generic;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
@@ -79,6 +80,15 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 	@Override
 	public SignedData<V> zero() {
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		if (Keywords.VALUE.equals(childKey)) {
+			return (ALattice<T>) valueNode;
+		}
 		return null;
 	}
 

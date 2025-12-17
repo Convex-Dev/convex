@@ -106,6 +106,22 @@ public class Cells {
 	}
 	
 	/**
+	 * Converts an Object[] array to an ACell[] array.
+	 *
+	 * @param any Object an array to convert
+	 * @return ACell[] array
+	 */
+	public static ACell[] toCellArray(Object... any) {
+		int n = any.length;
+		if (n==0) return EMPTY_ARRAY;
+		ACell[] result = new ACell[n];
+		for (int i = 0; i < n; i++) {
+			result[i] = RT.cvm(any[i]);
+		}
+		return result;
+	}
+	
+	/**
 	 * Converts any array to an ACell[] array. Elements must be Cells.
 	 *
 	 * @param coll Array to convert

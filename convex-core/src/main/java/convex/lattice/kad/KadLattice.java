@@ -1,5 +1,6 @@
 package convex.lattice.kad;
 
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.lattice.ALattice;
 
@@ -33,6 +34,12 @@ public class KadLattice extends ALattice<AVector<?>> {
 	public boolean checkForeign(AVector<?> value) {
 		// TODO Auto-generated method stub
 		return false;
+	}
+
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }
