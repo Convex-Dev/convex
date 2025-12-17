@@ -954,4 +954,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		throw new TODOException();
 	}
 
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new TODOException();
+	}
+
 }

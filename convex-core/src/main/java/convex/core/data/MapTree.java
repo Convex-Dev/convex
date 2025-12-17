@@ -1019,5 +1019,8 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return firstHash;
 	}
 
-
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new TODOException();
+	}
 }

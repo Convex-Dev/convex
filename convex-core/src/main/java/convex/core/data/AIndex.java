@@ -25,15 +25,20 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 	@SuppressWarnings("unchecked")
 	@Override
 	public final V get(ACell key) {
-		if (!(key instanceof ABlobLike)) return null;
-		return get((K) key);
+		if (key instanceof ABlobLike k) {
+			return get((K)k);
+		}
+		return null;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsKey(ACell key) {
-		if (!(key instanceof ABlobLike)) return false;
-		return (getEntry((K) key) != null);
+		if (key instanceof ABlobLike k) {
+			return (getEntry((K)k) != null);
+			
+		}
+		return false;
 	}
 
 	/**

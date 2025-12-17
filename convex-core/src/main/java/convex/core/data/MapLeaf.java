@@ -12,6 +12,7 @@ import java.util.function.Function;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
+import convex.core.exceptions.TODOException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
@@ -751,6 +752,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return entries[0].getKeyHash();
 	}
 
-
-
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new TODOException();
+	}
 }

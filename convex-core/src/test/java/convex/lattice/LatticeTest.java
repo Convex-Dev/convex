@@ -31,10 +31,10 @@ public class LatticeTest {
 		
 		// Merges with zero
 		assertEquals(v1,lattice.merge(zero,v1));
-		assertEquals(v1,lattice.merge(v1,zero));
+		assertSame(v1,lattice.merge(v1,zero));
 
 		// Null merge
-		assertEquals(v1,lattice.merge(v1,null));
+		assertSame(v1,lattice.merge(v1,null));
 		assertEquals(v1,lattice.merge(null,v1));
 
 		
@@ -49,7 +49,11 @@ public class LatticeTest {
 		assertEquals(merged,lattice.merge(v2,merged));
 		assertEquals(merged,lattice.merge(merged,v1));
 		assertEquals(merged,lattice.merge(merged,v2));
-		assertEquals(merged,lattice.merge(merged,merged));
+		
+		// Identity merges
+		assertSame(merged,lattice.merge(merged,merged));
+		assertSame(v1,lattice.merge(v1,v1));
+		assertSame(v2,lattice.merge(v2,v2));
 		
 		assertSame(lattice,lattice.path());
 		
