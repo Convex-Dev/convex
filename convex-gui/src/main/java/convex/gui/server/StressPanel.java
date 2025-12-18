@@ -247,7 +247,7 @@ public class StressPanel extends JPanel {
 		
 			// Generate client accounts
 			StringBuilder cmdsb=new StringBuilder();
-			cmdsb.append("(let [f (fn [k] (let [a (deploy `(do (set-key ~k) (set-controller #13))] (transfer a 1000000000) a))] ");
+			cmdsb.append("(let [f (fn [k] (let [a (deploy `(do (set-key ~k) (set-controller #13)))] (transfer a 1000000000) a))] ");
 			cmdsb.append("  (mapv f [");
 			for (int i=0; i<clientCount; i++) {
 				AKeyPair kp=AKeyPair.generate();
@@ -410,7 +410,7 @@ public class StressPanel extends JPanel {
 					default: throw new Error("Bad TX type: "+type);
 				}
 			}
-			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)) ) )");
+			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)))");
 			String source = tsb.toString();
 			ATransaction t = Invoke.create(origin,ATransaction.UNKNOWN_SEQUENCE, Reader.read(source));
 			return t;
