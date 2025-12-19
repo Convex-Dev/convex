@@ -56,6 +56,8 @@ public class HackerTools extends AbstractGUI {
 
 	private MessageFormatPanel messagePanel;
 	
+	private SignerPanel signerPanel;
+	
 	private DLFSPanel dataPanel=new DLFSPanel(DLFS.createLocal());
 
 	/**
@@ -69,11 +71,13 @@ public class HackerTools extends AbstractGUI {
 		
 		keyGenPanel = new KeyGenPanel(null);
 		messagePanel = new MessageFormatPanel();
+		signerPanel = new SignerPanel();
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("KeyRing", new KeyRingPanel());
 		tabs.add("Encoding", messagePanel);
+		tabs.add("Signer", signerPanel);
 		tabs.add("Data Lattice", dataPanel);
 		tabs.add("System Info", new SystemInfoPanel());
 		
