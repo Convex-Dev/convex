@@ -74,10 +74,10 @@ public class HackerTools extends AbstractGUI {
 		signerPanel = new SignerPanel();
 		this.add(tabs, BorderLayout.CENTER);
 
+		tabs.add("Signer", signerPanel);
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("KeyRing", new KeyRingPanel());
 		tabs.add("Encoding", messagePanel);
-		tabs.add("Signer", signerPanel);
 		tabs.add("Data Lattice", dataPanel);
 		tabs.add("System Info", new SystemInfoPanel());
 		

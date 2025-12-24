@@ -205,8 +205,8 @@ public class ChainAPI extends ABaseAPI {
 		Blob b=Format.encodeMultiCell(value, true);
 
 		ctx.status(200);
-		String rtype=this.calcResponseContentType(ctx);
-		if (ContentTypes.CVX_RAW.equals(rtype)||ContentTypes.BYTES.equals(type)) {
+		String responseType=this.calcResponseContentType(ctx);
+		if (ContentTypes.CVX_RAW.equals(responseType)||ContentTypes.BYTES.equals(type)) {
 			ctx.result(b.getInputStream());
 		} else {
 			AMap<AString, ACell> result = Maps.of(
@@ -582,7 +582,7 @@ public class ChainAPI extends ABaseAPI {
 			},
 			responses = {
 				@OpenApiResponse(status = "200", 
-						description = "Account queried sucecssfully", 
+						description = "Account queried successfully", 
 						content = {
 							@OpenApiContent(
 									from=QueryAccountResponse.class,
@@ -814,14 +814,14 @@ public class ChainAPI extends ABaseAPI {
 		ATransaction trans = Invoke.create(addr, sequence, code);
 		trans=Cells.persist(trans); // persist data so we have a full copy if needed
 		Ref<ATransaction> ref = Cells.persist(trans).getRef();
-		HashMap<String, Object> rmap = new HashMap<>();
-		rmap.put("source", srcValue);
-		rmap.put("address", JSON.json(addr));
-		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
-		rmap.put("data", Format.encodeMultiCell(trans, true).toHexString());
-		rmap.put("sequence", sequence);
+		HashMap<String, Object> result = new HashMap<>();
+		result.put("source", srcValue);
+		result.put("address", JSON.json(addr));
+		result.put("hash", SignedData.getMessageForRef(ref).toHexString());
+		result.put("data", Format.encodeMultiCell(trans, true).toHexString());
+		result.put("sequence", sequence);
 		ctx.status(200);
-		ctx.result(JSON.toString(rmap));
+		ctx.result(JSON.toString(result));
 	}
 
 
@@ -1079,12 +1079,12 @@ public class ChainAPI extends ABaseAPI {
 			String type=ctx.req().getContentType();
 			
 			if (ContentTypes.CVX.equals(type)) {
-				ACell rbody=getCVXBody(ctx);
-				if (!(rbody instanceof AMap)) {
+				ACell body=getCVXBody(ctx);
+				if (!(body instanceof AMap)) {
 					throw new BadRequestResponse("query body is not a map.");
 				}
 				@SuppressWarnings("unchecked")
-				AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) rbody;
+				AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) body;
 				addr=Address.parse(RT.get(req, Keywords.ADDRESS));
 				form=RT.get(req, Keywords.SOURCE);
 			} else {
@@ -1145,9 +1145,9 @@ public class ChainAPI extends ABaseAPI {
 			image.setRGB(0, 0, IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, identiconData, 0, IdenticonBuilder.SIZE);
 			
 			// Convert to PNG bytes
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			ImageIO.write(image, "PNG", baos);
-			byte[] pngBytes = baos.toByteArray();
+			ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+			ImageIO.write(image, "PNG", byteStream);
+			byte[] pngBytes = byteStream.toByteArray();
 			
 			// Set response headers for caching and content type
 			ctx.header("Content-Type", "image/png");

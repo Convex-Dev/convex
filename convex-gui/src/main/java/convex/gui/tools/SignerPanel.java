@@ -28,6 +28,7 @@ import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.SignedData;
 import convex.core.data.Symbol;
@@ -88,52 +89,47 @@ public class SignerPanel extends JPanel {
 
 		// Top panel - Input fields
 		JPanel inputPanel = new JPanel();
-		inputPanel.setLayout(new MigLayout("fillx, insets 10", "[][grow][]", "[]10[]10[]10[]10[]"));
+		inputPanel.setLayout(new MigLayout("fillx, insets 10", "[][grow][]", "[]10[]10[]10[]10[]10[]10[]"));
 		
 		// Common fields: Address and Sequence (outside tabs)
 		JLabel addressLabel = new JLabel("Address:");
 		inputPanel.add(addressLabel);
 		addressField = new AddressCombo();
 		inputPanel.add(addressField, "growx");
-		inputPanel.add(new JLabel("Origin address for transaction"), "wrap");
 		
 		JLabel sequenceLabel = new JLabel("Sequence:");
 		inputPanel.add(sequenceLabel);
 		sequenceSpinner = new JSpinner(new SpinnerNumberModel(1L, 1L, Long.MAX_VALUE, 1L));
-		inputPanel.add(sequenceSpinner, "growx");
-		inputPanel.add(new JLabel("Sequence number (first transaction is 1)"), "wrap");
-		
-		// Transaction type tabs
-		JLabel typeLabel = new JLabel("Transaction Type:");
-		inputPanel.add(typeLabel, "top");
-		transactionTypeTabs = new JTabbedPane();
-		transactionTypeTabs.addTab("Invoke", createInvokePanel());
-		transactionTypeTabs.addTab("Transfer", createTransferPanel());
-		transactionTypeTabs.addTab("Call", createCallPanel());
-		inputPanel.add(transactionTypeTabs, "grow, wrap");
+		inputPanel.add(sequenceSpinner);
 		
 		// Key selector
 		JLabel keyLabel = new JLabel("Key:");
 		inputPanel.add(keyLabel);
 		keyCombo = KeyPairCombo.create();
-		inputPanel.add(keyCombo, "growx, wrap");
+		inputPanel.add(keyCombo, "growx, wrap, span");
+		
+		// Transaction type tabs
+		transactionTypeTabs = new JTabbedPane();
+		transactionTypeTabs.addTab("Invoke", createInvokePanel());
+		transactionTypeTabs.addTab("Transfer", createTransferPanel());
+		transactionTypeTabs.addTab("Call", createCallPanel());
+		inputPanel.add(transactionTypeTabs, "grow, wrap, span");
+		
 		
 		// Preview section
-		JLabel previewLabel = new JLabel("Preview (transaction before signing):");
-		inputPanel.add(previewLabel, "span 3, wrap");
-		previewArea = new JTextArea();
+		previewArea = new JTextArea("Enter transaction details to preview");
 		previewArea.setEditable(false);
 		previewArea.setFont(Toolkit.MONO_FONT);
 		previewArea.setRows(4);
-		JScrollPane previewScroll = new JScrollPane(previewArea);
-		inputPanel.add(previewScroll, "span 3, grow, wrap");
+		inputPanel.add(previewArea, "span 3, grow, wrap");
 		
 		// Sign button
 		signButton = new ActionButton("Sign", 0xe5ca, new SignActionListener());
 		signButton.setToolTipText("Create, sign, and encode the transaction");
+		signButton.setEnabled(false);
 		inputPanel.add(signButton, "span 2, center");
 		
-		splitPane.setLeftComponent(new JScrollPane(inputPanel));
+		splitPane.setLeftComponent(inputPanel);
 
 		// Bottom panel - Output
 		JPanel outputPanel = new JPanel();
@@ -189,7 +185,7 @@ public class SignerPanel extends JPanel {
 		sequenceSpinner.addChangeListener(e -> updatePreview());
 		transactionTypeTabs.addChangeListener(e -> updatePreview());
 		
-		signButton.setEnabled(false);
+
 		updatePreview();
 	}
 	
@@ -445,12 +441,10 @@ public class SignerPanel extends JPanel {
 		StringBuilder error = new StringBuilder();
 		ATransaction tx = buildTransaction(error);
 		if (tx != null) {
-			previewArea.setForeground(Color.BLACK);
 			previewArea.setText(RT.print(tx).toString());
 			signButton.setEnabled(true);
 		} else {
-			previewArea.setForeground(Color.RED);
-			String msg = error.length() == 0 ? "No transaction" : "Error: " + error.toString();
+			String msg = error.length() == 0 ? "No transaction" : error.toString();
 			previewArea.setText(msg);
 			signButton.setEnabled(false);
 		}
@@ -461,11 +455,9 @@ public class SignerPanel extends JPanel {
 		if (transaction == null || signedTransaction == null) {
 			sb.append("No transaction");
 		} else {
-			sb.append("Address:     ").append(transaction.getOrigin()).append("\n");
-			sb.append("Sequence:    ").append(transaction.getSequence()).append("\n");
-			sb.append("Signed:      ").append(signedTransaction.getAccountKey().toChecksumHex()).append("\n");
-			Blob encoded = Format.encodeMultiCell(signedTransaction, true);
-			sb.append("Size:        ").append(encoded.count()).append(" bytes");
+			sb.append("TX Hash:     ").append(signedTransaction.getHash());
+			sb.append("Signed By:   ").append(signedTransaction.getAccountKey().toChecksumHex()).append("\n");
+			sb.append("Size:        ").append(Cells.storageSize(signedTransaction));
 		}
 		infoLabel.setText(sb.toString());
 	}
