@@ -36,6 +36,7 @@ import convex.peer.Server;
  * receive queue is full (thereby applying back-pressure to clients)
  *
  */
+@Deprecated()
 public class NIOServer extends AServer {
 	public static final int DEFAULT_PORT = 18888;
 

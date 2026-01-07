@@ -17,6 +17,7 @@ import convex.lattice.ALattice;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.Root;
 import convex.net.AServer;
+import convex.net.impl.netty.NettyServer;
 
 /**
  * A networked node server for Lattice networks.
@@ -42,7 +43,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Cursor for the current local lattice value
 	 */
-	private final ACursor<V> valueCursor;
+	private final ACursor<V> cursor;
 	
 	/**
 	 * Network server instance for handling connections
@@ -88,16 +89,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 		
 		// Initialize value cursor with lattice zero value
 		V initialValue = lattice.zero();
-		this.valueCursor = Root.create(initialValue);
+		this.cursor = Root.create(initialValue);
 		
 		this.peerNodes = new java.util.HashSet<>();
 		
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;
 		
-		// Create network server (using same pattern as Peer Server)
-		// TODO: Implement server creation once AServer integration is complete
-		this.networkServer = null; // Stub
+		// Network server will be created in launch() method
+		this.networkServer = null;
 	}
 	
 	/**
@@ -114,14 +114,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 		
 		log.info("Launching NodeServer on port {}", port);
 		
-		// Configure and launch network server
-		if (networkServer != null) {
-			if (port != null) {
-				networkServer.setPort(port);
-			}
-			networkServer.launch();
-			port = networkServer.getPort();
+		// Create Netty server if not already created
+		if (networkServer == null) {
+			networkServer = new NettyServer(port);
+			// Set the receive action for handling incoming messages
+			((NettyServer) networkServer).setReceiveAction(receiveAction);
 		}
+		
+		// Configure and launch network server
+		if (port != null) {
+			networkServer.setPort(port);
+		}
+		networkServer.launch();
+		port = networkServer.getPort();
 		
 		running = true;
 		log.info("NodeServer started successfully on port {}", port);
@@ -175,37 +180,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// 6. Return merged value
 		
 		log.debug("Syncing with peer: {}", peerAddress);
-		return CompletableFuture.completedFuture(valueCursor.get()); // Stub
+		return CompletableFuture.completedFuture(cursor.get()); // Stub
 	}
 	
 	/**
 	 * Updates the local lattice value by merging with a received value.
 	 * 
+	 * This method performs an atomic merge operation using the cursor's
+	 * updateAndGet method, ensuring thread-safe updates.
+	 * 
 	 * @param receivedValue The value received from a peer
-	 * @return The merged value, or null if merge was not performed
+	 * @return The merged value, or null if merge was not performed (e.g., invalid foreign value)
 	 */
-	private V mergeValue(V receivedValue) {
-		// TODO: Implement value merge
-		// 1. Validate foreign value using lattice.checkForeign()
-		// 2. Get current value from cursor
-		// 3. Merge using lattice.merge()
-		// 4. Update cursor atomically
-		// 5. Store new value in store if it's a new hash
-		// 6. Return merged value
-		
+	public V mergeValue(V receivedValue) {
 		if (receivedValue == null) {
 			return null;
 		}
 		
-		V currentValue = valueCursor.get();
-		if (lattice.checkForeign(receivedValue)) {
-			V merged = lattice.merge(currentValue, receivedValue);
-			valueCursor.set(merged);
-			log.debug("Merged lattice value");
-			return merged;
+		// Validate foreign value before attempting merge
+		if (!lattice.checkForeign(receivedValue)) {
+			log.debug("Rejected invalid foreign lattice value");
+			return null;
 		}
 		
-		return null;
+		// Atomically update the cursor by merging the current value with the received value
+		// This ensures thread-safe updates even if multiple threads are merging concurrently
+		V merged = cursor.updateAndGet(currentValue -> {
+			return lattice.merge(currentValue, receivedValue);
+		});
+		
+		log.debug("Merged lattice value atomically");
+		
+		// TODO: Store new value in store if it's a new hash
+		// This would involve checking if the merged value's hash is already in the store
+		
+		return merged;
 	}
 	
 	/**
@@ -247,7 +256,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return Current local lattice value
 	 */
 	public V getLocalValue() {
-		return valueCursor.get();
+		return cursor.get();
 	}
 	
 	/**
@@ -256,7 +265,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return The value cursor
 	 */
 	public ACursor<V> getValueCursor() {
-		return valueCursor;
+		return cursor;
 	}
 	
 	/**
@@ -266,6 +275,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public Integer getPort() {
 		return port;
+	}
+	
+	/**
+	 * Gets the host address this server is bound to.
+	 * 
+	 * @return The host address, or null if server is not launched
+	 */
+	public InetSocketAddress getHostAddress() {
+		if (networkServer != null && running) {
+			return networkServer.getHostAddress();
+		}
+		return null;
 	}
 	
 	/**

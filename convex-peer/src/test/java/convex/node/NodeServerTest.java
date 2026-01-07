@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.api.ConvexRemote;
 import convex.core.data.ASet;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
@@ -137,40 +138,28 @@ public class NodeServerTest {
 		// Start with zero
 		assertEquals(CVMLong.ZERO, maxNodeServer.getLocalValue());
 
-		// Merge with a value (using reflection to access private method)
-		// Since mergeValue is private, we'll test through the cursor and lattice directly
-		ACursor<AInteger> cursor = maxNodeServer.getValueCursor();
-		
-		// Simulate merge: get current, merge, set
-		AInteger current = cursor.get();
-		AInteger received = CVMLong.ONE;
-		if (lattice.checkForeign(received)) {
-			AInteger merged = lattice.merge(current, received);
-			cursor.set(merged);
-		}
-
+		// Merge with a value using the public mergeValue method
+		AInteger merged = maxNodeServer.mergeValue(CVMLong.ONE);
+		assertNotNull(merged);
+		assertEquals(CVMLong.ONE, merged);
 		assertEquals(CVMLong.ONE, maxNodeServer.getLocalValue());
 
 		// Merge with larger value
-		current = cursor.get();
-		AInteger larger = CVMLong.create(5);
-		if (lattice.checkForeign(larger)) {
-			AInteger merged = lattice.merge(current, larger);
-			cursor.set(merged);
-		}
-
+		merged = maxNodeServer.mergeValue(CVMLong.create(5));
+		assertNotNull(merged);
+		assertEquals(CVMLong.create(5), merged);
 		assertEquals(CVMLong.create(5), maxNodeServer.getLocalValue());
 
 		// Merge with smaller value (should keep larger)
-		current = cursor.get();
-		AInteger smaller = CVMLong.create(3);
-		if (lattice.checkForeign(smaller)) {
-			AInteger merged = lattice.merge(current, smaller);
-			cursor.set(merged);
-		}
-
+		merged = maxNodeServer.mergeValue(CVMLong.create(3));
+		assertNotNull(merged);
 		// Max lattice should keep the maximum value
+		assertEquals(CVMLong.create(5), merged);
 		assertEquals(CVMLong.create(5), maxNodeServer.getLocalValue());
+		
+		// Test merging null value (should return null)
+		AInteger nullResult = maxNodeServer.mergeValue(null);
+		assertEquals(null, nullResult);
 	}
 
 	/**
@@ -181,18 +170,15 @@ public class NodeServerTest {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
 		setNodeServer = new NodeServer<>(lattice, store, null);
 
-		ACursor<ASet<ACell>> cursor = setNodeServer.getValueCursor();
-
 		// Start with empty set
-		assertTrue(cursor.get().isEmpty());
+		assertTrue(setNodeServer.getLocalValue().isEmpty());
 
-		// Merge with a set containing values
-		ASet<ACell> current = cursor.get();
-		ASet<ACell> received = Sets.of(CVMLong.ONE, CVMLong.TWO);
-		if (lattice.checkForeign(received)) {
-			ASet<ACell> merged = lattice.merge(current, received);
-			cursor.set(merged);
-		}
+		// Merge with a set containing values using the public mergeValue method
+		ASet<ACell> merged = setNodeServer.mergeValue(Sets.of(CVMLong.ONE, CVMLong.TWO));
+		assertNotNull(merged);
+		assertTrue(merged.contains(CVMLong.ONE));
+		assertTrue(merged.contains(CVMLong.TWO));
+		assertEquals(2, merged.count());
 
 		ASet<ACell> result = setNodeServer.getLocalValue();
 		assertTrue(result.contains(CVMLong.ONE));
@@ -200,12 +186,12 @@ public class NodeServerTest {
 		assertEquals(2, result.count());
 
 		// Merge with overlapping set
-		current = cursor.get();
-		ASet<ACell> received2 = Sets.of(CVMLong.TWO, CVMLong.create(3));
-		if (lattice.checkForeign(received2)) {
-			ASet<ACell> merged = lattice.merge(current, received2);
-			cursor.set(merged);
-		}
+		merged = setNodeServer.mergeValue(Sets.of(CVMLong.TWO, CVMLong.create(3)));
+		assertNotNull(merged);
+		assertTrue(merged.contains(CVMLong.ONE));
+		assertTrue(merged.contains(CVMLong.TWO));
+		assertTrue(merged.contains(CVMLong.create(3)));
+		assertEquals(3, merged.count());
 
 		result = setNodeServer.getLocalValue();
 		assertTrue(result.contains(CVMLong.ONE));
@@ -341,6 +327,32 @@ public class NodeServerTest {
 		// getLocalValue should reflect the change
 		AInteger value2 = maxNodeServer.getLocalValue();
 		assertEquals(CVMLong.create(42), value2);
+	}
+
+	/**
+	 * Test connecting to NodeServer with ConvexRemote
+	 */
+	@Test
+	public void testConvexRemoteConnection() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+		
+		// Launch the server
+		maxNodeServer.launch();
+		assertTrue(maxNodeServer.isRunning());
+		
+		// Get the server address
+		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		assertNotNull(serverAddress, "Server should have a host address after launch");
+		
+		// Connect with ConvexRemote
+		ConvexRemote convex = ConvexRemote.connect(serverAddress);
+		assertNotNull(convex, "ConvexRemote connection should be created");
+		assertTrue(convex.isConnected(), "ConvexRemote should be connected");
+		
+		// Clean up
+		convex.close();
+		assertFalse(convex.isConnected(), "ConvexRemote should be disconnected after close");
 	}
 }
 
