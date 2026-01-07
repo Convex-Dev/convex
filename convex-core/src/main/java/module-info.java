@@ -53,6 +53,9 @@ module convex.core {
 	exports convex.core.lang;
 	exports convex.core.json;
 	exports convex.etch;
+	exports convex.lattice;
+	exports convex.lattice.generic;
+	exports convex.lattice.cursor;
 	exports convex.lattice.fs;
 
 	requires transitive org.antlr.antlr4.runtime;

@@ -1,0 +1,346 @@
+package convex.node;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import convex.core.data.ACell;
+import convex.core.data.ASet;
+import convex.core.data.Sets;
+import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMLong;
+import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
+import convex.lattice.ALattice;
+import convex.lattice.cursor.ACursor;
+import convex.lattice.generic.MaxLattice;
+import convex.lattice.generic.SetLattice;
+
+/**
+ * Tests for NodeServer class.
+ * 
+ * Basic smoke tests for creating and operating a local NodeServer instance.
+ */
+public class NodeServerTest {
+
+	private NodeServer<AInteger> maxNodeServer;
+	private NodeServer<ASet<ACell>> setNodeServer;
+	private AStore store;
+
+	@BeforeEach
+	public void setUp() {
+		store = new MemoryStore();
+	}
+
+	@AfterEach
+	public void tearDown() throws IOException {
+		if (maxNodeServer != null) {
+			maxNodeServer.close();
+		}
+		if (setNodeServer != null) {
+			setNodeServer.close();
+		}
+		if (store != null) {
+			store.close();
+		}
+	}
+
+	/**
+	 * Test creating a NodeServer with MaxLattice
+	 */
+	@Test
+	public void testCreateMaxLatticeServer() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		assertNotNull(maxNodeServer);
+		assertNotNull(maxNodeServer.getLattice());
+		assertNotNull(maxNodeServer.getStore());
+		assertNotNull(maxNodeServer.getValueCursor());
+		assertFalse(maxNodeServer.isRunning());
+	}
+
+	/**
+	 * Test creating a NodeServer with SetLattice
+	 */
+	@Test
+	public void testCreateSetLatticeServer() {
+		ALattice<ASet<ACell>> lattice = SetLattice.create();
+		setNodeServer = new NodeServer<>(lattice, store, null);
+
+		assertNotNull(setNodeServer);
+		assertNotNull(setNodeServer.getLattice());
+		assertNotNull(setNodeServer.getStore());
+		assertNotNull(setNodeServer.getValueCursor());
+		assertFalse(setNodeServer.isRunning());
+	}
+
+	/**
+	 * Test initial value is lattice zero
+	 */
+	@Test
+	public void testInitialValue() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		AInteger initialValue = maxNodeServer.getLocalValue();
+		assertNotNull(initialValue);
+		assertEquals(CVMLong.ZERO, initialValue);
+		assertEquals(lattice.zero(), initialValue);
+	}
+
+	/**
+	 * Test value cursor operations
+	 */
+	@Test
+	public void testValueCursor() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		ACursor<AInteger> cursor = maxNodeServer.getValueCursor();
+		assertNotNull(cursor);
+
+		// Initial value should be zero
+		assertEquals(CVMLong.ZERO, cursor.get());
+
+		// Set a new value
+		cursor.set(CVMLong.ONE);
+		assertEquals(CVMLong.ONE, cursor.get());
+		assertEquals(CVMLong.ONE, maxNodeServer.getLocalValue());
+
+		// Update using getAndSet
+		AInteger oldValue = cursor.getAndSet(CVMLong.TWO);
+		assertEquals(CVMLong.ONE, oldValue);
+		assertEquals(CVMLong.TWO, cursor.get());
+	}
+
+	/**
+	 * Test mergeValue method with MaxLattice
+	 */
+	@Test
+	public void testMergeValue() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		// Start with zero
+		assertEquals(CVMLong.ZERO, maxNodeServer.getLocalValue());
+
+		// Merge with a value (using reflection to access private method)
+		// Since mergeValue is private, we'll test through the cursor and lattice directly
+		ACursor<AInteger> cursor = maxNodeServer.getValueCursor();
+		
+		// Simulate merge: get current, merge, set
+		AInteger current = cursor.get();
+		AInteger received = CVMLong.ONE;
+		if (lattice.checkForeign(received)) {
+			AInteger merged = lattice.merge(current, received);
+			cursor.set(merged);
+		}
+
+		assertEquals(CVMLong.ONE, maxNodeServer.getLocalValue());
+
+		// Merge with larger value
+		current = cursor.get();
+		AInteger larger = CVMLong.create(5);
+		if (lattice.checkForeign(larger)) {
+			AInteger merged = lattice.merge(current, larger);
+			cursor.set(merged);
+		}
+
+		assertEquals(CVMLong.create(5), maxNodeServer.getLocalValue());
+
+		// Merge with smaller value (should keep larger)
+		current = cursor.get();
+		AInteger smaller = CVMLong.create(3);
+		if (lattice.checkForeign(smaller)) {
+			AInteger merged = lattice.merge(current, smaller);
+			cursor.set(merged);
+		}
+
+		// Max lattice should keep the maximum value
+		assertEquals(CVMLong.create(5), maxNodeServer.getLocalValue());
+	}
+
+	/**
+	 * Test mergeValue with SetLattice
+	 */
+	@Test
+	public void testMergeSetValue() {
+		ALattice<ASet<ACell>> lattice = SetLattice.create();
+		setNodeServer = new NodeServer<>(lattice, store, null);
+
+		ACursor<ASet<ACell>> cursor = setNodeServer.getValueCursor();
+
+		// Start with empty set
+		assertTrue(cursor.get().isEmpty());
+
+		// Merge with a set containing values
+		ASet<ACell> current = cursor.get();
+		ASet<ACell> received = Sets.of(CVMLong.ONE, CVMLong.TWO);
+		if (lattice.checkForeign(received)) {
+			ASet<ACell> merged = lattice.merge(current, received);
+			cursor.set(merged);
+		}
+
+		ASet<ACell> result = setNodeServer.getLocalValue();
+		assertTrue(result.contains(CVMLong.ONE));
+		assertTrue(result.contains(CVMLong.TWO));
+		assertEquals(2, result.count());
+
+		// Merge with overlapping set
+		current = cursor.get();
+		ASet<ACell> received2 = Sets.of(CVMLong.TWO, CVMLong.create(3));
+		if (lattice.checkForeign(received2)) {
+			ASet<ACell> merged = lattice.merge(current, received2);
+			cursor.set(merged);
+		}
+
+		result = setNodeServer.getLocalValue();
+		assertTrue(result.contains(CVMLong.ONE));
+		assertTrue(result.contains(CVMLong.TWO));
+		assertTrue(result.contains(CVMLong.create(3)));
+		assertEquals(3, result.count());
+	}
+
+	/**
+	 * Test peer management
+	 */
+	@Test
+	public void testPeerManagement() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		InetSocketAddress peer1 = new InetSocketAddress("127.0.0.1", 18888);
+		InetSocketAddress peer2 = new InetSocketAddress("127.0.0.1", 18889);
+
+		// Initially no peers
+		Set<InetSocketAddress> peers = maxNodeServer.getPeerNodes();
+		assertTrue(peers.isEmpty());
+
+		// Add peers
+		maxNodeServer.addPeer(peer1);
+		maxNodeServer.addPeer(peer2);
+
+		peers = maxNodeServer.getPeerNodes();
+		assertEquals(2, peers.size());
+		assertTrue(peers.contains(peer1));
+		assertTrue(peers.contains(peer2));
+
+		// Remove a peer
+		maxNodeServer.removePeer(peer1);
+		peers = maxNodeServer.getPeerNodes();
+		assertEquals(1, peers.size());
+		assertTrue(peers.contains(peer2));
+		assertFalse(peers.contains(peer1));
+	}
+
+	/**
+	 * Test syncWithPeer (stub implementation)
+	 */
+	@Test
+	public void testSyncWithPeer() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		InetSocketAddress peerAddress = new InetSocketAddress("127.0.0.1", 18888);
+		
+		// Stub implementation should return current value
+		CompletableFuture<AInteger> future = maxNodeServer.syncWithPeer(peerAddress);
+		AInteger result = future.get(1, TimeUnit.SECONDS);
+		
+		assertNotNull(result);
+		assertEquals(CVMLong.ZERO, result); // Should return initial zero value
+	}
+
+	/**
+	 * Test that server cannot be launched twice
+	 */
+	@Test
+	public void testLaunchTwice() throws IOException, InterruptedException {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		// First launch should work (even though network server is stubbed)
+		maxNodeServer.launch();
+		assertTrue(maxNodeServer.isRunning());
+
+		// Second launch should throw exception
+		assertThrows(IllegalStateException.class, () -> {
+			maxNodeServer.launch();
+		});
+	}
+
+	/**
+	 * Test close operation
+	 */
+	@Test
+	public void testClose() throws IOException, InterruptedException {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		maxNodeServer.launch();
+		assertTrue(maxNodeServer.isRunning());
+
+		maxNodeServer.close();
+		assertFalse(maxNodeServer.isRunning());
+
+		// Closing again should be safe
+		maxNodeServer.close();
+		assertFalse(maxNodeServer.isRunning());
+	}
+
+	/**
+	 * Test port configuration
+	 */
+	@Test
+	public void testPortConfiguration() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		
+		// Test with null port
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+		assertEquals(null, maxNodeServer.getPort());
+
+		// Test with specific port
+		NodeServer<AInteger> server2 = new NodeServer<>(lattice, store, 19999);
+		assertEquals(Integer.valueOf(19999), server2.getPort());
+		
+		try {
+			server2.close();
+		} catch (IOException e) {
+			// Ignore
+		}
+	}
+
+	/**
+	 * Test that getLocalValue returns current cursor value
+	 */
+	@Test
+	public void testGetLocalValue() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+
+		// Initial value
+		AInteger value1 = maxNodeServer.getLocalValue();
+		assertEquals(CVMLong.ZERO, value1);
+
+		// Update cursor directly
+		maxNodeServer.getValueCursor().set(CVMLong.create(42));
+
+		// getLocalValue should reflect the change
+		AInteger value2 = maxNodeServer.getLocalValue();
+		assertEquals(CVMLong.create(42), value2);
+	}
+}
+
