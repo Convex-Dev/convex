@@ -10,11 +10,19 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.ErrorCodes;
+import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Strings;
+import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.PathCursor;
 import convex.lattice.cursor.Root;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
@@ -134,33 +142,187 @@ public class NodeServer<V extends ACell> implements Closeable {
 	
 	/**
 	 * Handles an incoming message from a peer node.
-	 * Messages are expected to contain lattice values encoded in binary format.
+	 * Supports PING, LATTICE_QUERY, and LATTICE_VALUE message types.
 	 * 
 	 * @param message The incoming message
 	 */
 	private void handleIncomingMessage(Message message) {
-		// TODO: Implement message handling
-		// 1. Decode binary message to extract lattice value
-		// 2. Validate foreign value using lattice.checkForeign()
-		// 3. Merge with local value using lattice.merge()
-		// 4. Update local value and persist if needed
-		// 5. Optionally propagate merged value to other peers
-		
 		log.debug("Received message from peer: {}", message);
 		
 		try {
-			// TODO: Decode lattice value from binary data
-			// Blob messageData = message.getMessageData();
-			// V receivedValue = decodeLatticeValue(messageData);
-			
-			// TODO: Validate and merge using lattice instance
-			// V currentValue = valueCursor.get();
-			// if (lattice.checkForeign(receivedValue)) {
-			//     V merged = lattice.merge(currentValue, receivedValue);
-			//     valueCursor.set(merged);
-			// }
+			MessageType type = message.getType();
+			switch (type) {
+			case PING:
+				processPing(message);
+				break;
+			case LATTICE_QUERY:
+				processLatticeQuery(message);
+				break;
+			case LATTICE_VALUE:
+				processLatticeValue(message);
+				break;
+			default:
+				log.debug("Unhandled message type: {}", type);
+				break;
+			}
+		} catch (BadFormatException e) {
+			log.warn("Bad format in message: {}", message, e);
 		} catch (Exception e) {
 			log.warn("Error handling incoming message", e);
+		}
+	}
+	
+	/**
+	 * Processes a PING message by responding with a RESULT containing the same ID.
+	 * 
+	 * @param message The PING message
+	 */
+	private void processPing(Message message) {
+		ACell id = message.getID();
+		if (id == null) {
+			log.warn("PING message missing ID");
+			return;
+		}
+		
+		Result result = Result.create(id, Strings.create("PONG"));
+		message.returnResult(result);
+		log.debug("Responded to PING with ID: {}", id);
+	}
+	
+	/**
+	 * Processes a LATTICE_QUERY message by returning the value at the specified path.
+	 * 
+	 * Payload format: [:LQ id [*path*]]
+	 * 
+	 * @param message The LATTICE_QUERY message
+	 * @throws BadFormatException If message format is invalid
+	 */
+	private void processLatticeQuery(Message message) throws BadFormatException {
+		AVector<?> payload = RT.ensureVector(message.getPayload());
+		if (payload == null || payload.count() < 2) {
+			log.warn("Invalid LATTICE_QUERY message format");
+			Result error = Result.create(message.getID(), Strings.create("Invalid LATTICE_QUERY format"), ErrorCodes.ARGUMENT);
+			message.returnResult(error);
+			return;
+		}
+		
+		ACell id = payload.get(1);
+		ACell pathCell = payload.count() > 2 ? payload.get(2) : null;
+		
+		// Convert path to array if it's a vector
+		ACell[] path = null;
+		if (pathCell != null) {
+			AVector<?> pathVector = RT.ensureVector(pathCell);
+			if (pathVector != null) {
+				long pathLen = pathVector.count();
+				path = new ACell[(int)pathLen];
+				for (long i = 0; i < pathLen; i++) {
+					path[(int)i] = pathVector.get(i);
+				}
+			} else {
+				// Single key path
+				path = new ACell[] { pathCell };
+			}
+		} else {
+			// Empty path means root
+			path = new ACell[0];
+		}
+		
+		// Get the value at the path
+		V currentValue = cursor.get();
+		ACell valueAtPath = path.length == 0 ? currentValue : RT.getIn(currentValue, path);
+		
+		// Get sub-lattice at path for validation
+		ALattice<?> subLattice = lattice.path(path);
+		if (subLattice == null && path.length > 0) {
+			log.warn("Invalid path for LATTICE_QUERY: path length {}", path.length);
+			Result error = Result.create(id, Strings.create("Invalid path"), ErrorCodes.ARGUMENT);
+			message.returnResult(error);
+			return;
+		}
+		
+		Result result = Result.create(id, valueAtPath);
+		message.returnResult(result);
+		log.debug("Responded to LATTICE_QUERY at path with length: {}", path.length);
+	}
+	
+	/**
+	 * Processes a LATTICE_VALUE message by merging the received value at the specified path.
+	 * 
+	 * Payload format: [:LV [*path*] value]
+	 * 
+	 * @param message The LATTICE_VALUE message
+	 * @throws BadFormatException If message format is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	private void processLatticeValue(Message message) throws BadFormatException {
+		AVector<?> payload = RT.ensureVector(message.getPayload());
+		if (payload == null || payload.count() < 2) {
+			log.warn("Invalid LATTICE_VALUE message format");
+			return;
+		}
+		
+		ACell pathCell = payload.get(1);
+		ACell value = payload.count() > 2 ? payload.get(2) : null;
+		
+		if (value == null) {
+			log.warn("LATTICE_VALUE message missing value");
+			return;
+		}
+		
+		// Convert path to array if it's a vector
+		ACell[] path = null;
+		if (pathCell != null) {
+			AVector<?> pathVector = RT.ensureVector(pathCell);
+			if (pathVector != null) {
+				long pathLen = pathVector.count();
+				path = new ACell[(int)pathLen];
+				for (long i = 0; i < pathLen; i++) {
+					path[(int)i] = pathVector.get(i);
+				}
+			} else {
+				// Single key path
+				path = new ACell[] { pathCell };
+			}
+		} else {
+			// Empty path means root
+			path = new ACell[0];
+		}
+		
+		// Get sub-lattice at path
+		ALattice<?> subLattice = lattice.path(path);
+		if (subLattice == null && path.length > 0) {
+			log.warn("Invalid path for LATTICE_VALUE: path length {}", path.length);
+			return;
+		}
+		
+		// Merge the value at the path
+		if (path.length == 0) {
+			// Root path: merge directly with root lattice
+			V receivedValue = (V) value;
+			mergeValue(receivedValue);
+		} else {
+			// Path-specific merge: use PathCursor
+			PathCursor<ACell> pathCursor = PathCursor.create(cursor, path);
+			ACell currentValueAtPath = pathCursor.get();
+			
+			// Check foreign value using sub-lattice
+			if (subLattice != null) {
+				ALattice<ACell> typedSubLattice = (ALattice<ACell>) subLattice;
+				if (!typedSubLattice.checkForeign(value)) {
+					log.debug("Rejected invalid foreign lattice value at path");
+					return;
+				}
+				
+				// Merge using sub-lattice
+				ACell merged = typedSubLattice.merge(currentValueAtPath, value);
+				pathCursor.set(merged);
+				log.debug("Merged lattice value at path with length: {}", path.length);
+			} else {
+				// No sub-lattice, just set the value
+				pathCursor.set(value);
+				log.debug("Set lattice value at path with length: {}", path.length);
+			}
 		}
 	}
 	

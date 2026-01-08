@@ -122,6 +122,29 @@ public enum MessageType {
 	STATUS(12),
 	
 	/**
+	 * Lattice value message, announcement of a changed lattice value
+	 * 
+	 * Payload is: [:LV [*path*] value]
+	 */
+	LATTICE_VALUE(14),
+	
+	/**
+	 * Lattice query message = request for a lattice value
+	 * 
+	 * Payload is: [:LQ id [*path*]]
+	 */
+	LATTICE_QUERY(15),
+	
+	/**
+	 * Ping message for connectivity testing.
+	 * 
+	 * Payload is: [:PING id]
+	 * 
+	 * Typically responded to with a RESULT message containing the same ID.
+	 */
+	PING(16),
+	
+	/**
 	 * Unknown message type
 	 * 
 	 * Payload could be anything
@@ -162,6 +185,12 @@ public enum MessageType {
 			return STATUS;
 		case 13:
 			return UNKNOWN;
+		case 14:
+			return LATTICE_VALUE;
+		case 15:
+			return LATTICE_QUERY;
+		case 16:
+			return PING;
 		}
 		throw new BadFormatException("Invalid message code: " + i);
 	}

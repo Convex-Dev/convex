@@ -182,6 +182,9 @@ public class Message {
 				if (MessageTag.BYE.equals(mt)) return MessageType.GOODBYE;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
 				if (MessageTag.DATA_REQUEST.equals(mt)) return MessageType.DATA_REQUEST;
+				if (MessageTag.LATTICE_VALUE.equals(mt)) return MessageType.LATTICE_VALUE;
+				if (MessageTag.LATTICE_QUERY.equals(mt)) return MessageType.LATTICE_QUERY;
+				if (MessageTag.PING.equals(mt)) return MessageType.PING;
 			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
@@ -251,7 +254,9 @@ public class Message {
 				case STATUS:
 				case TRANSACT: 
 				case QUERY:
-				case DATA_REQUEST:{
+				case DATA_REQUEST:
+				case LATTICE_QUERY:
+				case PING:{
 					AVector<?> v=RT.ensureVector(getPayload());
 					if (v.count()<2) return null;
 					return RT.ensureLong(v.get(1));
@@ -311,7 +316,9 @@ public class Message {
 				case STATUS: 
 				case TRANSACT: 
 				case QUERY:
-				case DATA_REQUEST: {
+				case DATA_REQUEST:
+				case LATTICE_QUERY:
+				case PING: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 
