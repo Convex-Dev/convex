@@ -22,6 +22,7 @@ import convex.core.message.Message;
 
 public class NIOServerTest {
 
+	@SuppressWarnings("deprecation")
 	@Test public void testNIOServer() throws IOException, TimeoutException, InterruptedException {
 		ArrayList<Message> recd=new ArrayList<Message>();
 		Consumer<Message> rec=m->{

@@ -2,10 +2,7 @@ package convex.node;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,13 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
-import convex.core.data.prim.AInteger;
-import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
-import convex.lattice.generic.MaxLattice;
 
 /**
  * Tests for a network of NodeServer instances.

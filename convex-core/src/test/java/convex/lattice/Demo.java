@@ -75,7 +75,7 @@ public class Demo {
 				KEY_USERS
 		);
 
-		Index<LongBlob, ACell> snapshot=null;
+		Index<LongBlob, ACell> snapshot=Index.none();
 		ArrayList<Index<LongBlob, ACell>> snapshots=new ArrayList<>();
 
 		

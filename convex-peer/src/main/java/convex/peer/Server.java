@@ -134,6 +134,7 @@ public class Server implements Closeable {
 	 */
 	private AServer nio;
 
+	@SuppressWarnings("deprecation")
 	private Server(HashMap<Keyword, Object> config) throws ConfigException {
 		this.config = config;
 		
