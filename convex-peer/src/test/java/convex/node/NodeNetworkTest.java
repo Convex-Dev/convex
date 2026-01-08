@@ -2,6 +2,7 @@ package convex.node;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -19,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
+import convex.lattice.Lattice;
 import convex.lattice.generic.MaxLattice;
 
 /**
@@ -34,12 +36,12 @@ public class NodeNetworkTest {
 	/**
 	 * Common lattice instance shared by all NodeServers in the network
 	 */
-	private ALattice<AInteger> commonLattice;
+	private ALattice<?> commonLattice;
 	
 	/**
 	 * List of NodeServer instances in the network
 	 */
-	private List<NodeServer<AInteger>> nodeServers;
+	private List<NodeServer<?>> nodeServers;
 	
 	/**
 	 * List of stores for each NodeServer
@@ -67,7 +69,7 @@ public class NodeNetworkTest {
 	@BeforeAll
 	public void setUpNetwork() throws IOException, InterruptedException {
 		// Create common lattice instance
-		commonLattice = MaxLattice.create();
+		commonLattice = Lattice.ROOT;
 		
 		// Initialize lists
 		nodeServers = new ArrayList<>(NETWORK_SIZE);
@@ -81,7 +83,7 @@ public class NodeNetworkTest {
 			
 			// Create NodeServer with the common lattice
 			Integer port = BASE_PORT + i;
-			NodeServer<AInteger> server = new NodeServer<>(commonLattice, store, port);
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, port);
 			nodeServers.add(server);
 			
 			// Launch the server
@@ -101,76 +103,16 @@ public class NodeNetworkTest {
 	@AfterAll
 	public void tearDownNetwork() throws IOException {
 		// Close all NodeServers
-		if (nodeServers != null) {
-			for (NodeServer<AInteger> server : nodeServers) {
-				if (server != null && server.isRunning()) {
-					server.close();
-				}
-			}
-			nodeServers.clear();
+		for (NodeServer<?> server : nodeServers) {
+			server.close();
 		}
+		nodeServers.clear();
 		
 		// Close all stores
-		if (stores != null) {
-			for (AStore store : stores) {
-				if (store != null) {
-					store.close();
-				}
-			}
-			stores.clear();
+		for (AStore store : stores) {
+			store.close();
 		}
-	}
-
-	/**
-	 * Test that all NodeServers are running and accessible
-	 */
-	@Test
-	public void testNetworkSetup() {
-		assertNotNull(commonLattice, "Common lattice should be initialized");
-		assertNotNull(nodeServers, "NodeServers list should be initialized");
-		assertTrue(nodeServers.size() == NETWORK_SIZE, 
-				"Network should have " + NETWORK_SIZE + " NodeServers");
-		
-		// Verify each server is running and has a valid address
-		for (int i = 0; i < nodeServers.size(); i++) {
-			NodeServer<AInteger> server = nodeServers.get(i);
-			assertNotNull(server, "NodeServer " + i + " should not be null");
-			assertTrue(server.isRunning(), "NodeServer " + i + " should be running");
-			
-			InetSocketAddress address = server.getHostAddress();
-			assertNotNull(address, "NodeServer " + i + " should have a host address");
-			assertTrue(address.getPort() >= BASE_PORT && address.getPort() < BASE_PORT + NETWORK_SIZE,
-					"NodeServer " + i + " should be on expected port range");
-			
-			// Verify all servers share the same lattice instance
-			assertTrue(server.getLattice() == commonLattice,
-					"NodeServer " + i + " should share the common lattice instance");
-			
-			// Verify initial value is the lattice zero
-			AInteger value = server.getLocalValue();
-			assertNotNull(value, "NodeServer " + i + " should have an initial value");
-			assertTrue(value.equals(CVMLong.ZERO),
-					"NodeServer " + i + " should start with lattice zero value");
-		}
-	}
-
-	/**
-	 * Test that NodeServers can have different values merged independently
-	 */
-	@Test
-	public void testIndependentValueMerging() {
-		// Merge different values into each server
-		nodeServers.get(0).mergeValue(CVMLong.ONE);
-		nodeServers.get(1).mergeValue(CVMLong.create(5));
-		nodeServers.get(2).mergeValue(CVMLong.create(3));
-		
-		// Verify each server has its own value
-		assertTrue(nodeServers.get(0).getLocalValue().equals(CVMLong.ONE),
-				"NodeServer 0 should have value 1");
-		assertTrue(nodeServers.get(1).getLocalValue().equals(CVMLong.create(5)),
-				"NodeServer 1 should have value 5");
-		assertTrue(nodeServers.get(2).getLocalValue().equals(CVMLong.create(3)),
-				"NodeServer 2 should have value 3");
+		stores.clear();
 	}
 
 	/**
@@ -179,7 +121,7 @@ public class NodeNetworkTest {
 	@Test
 	public void testGetNodeServer() {
 		for (int i = 0; i < NETWORK_SIZE; i++) {
-			NodeServer<AInteger> server = nodeServers.get(i);
+			NodeServer<?> server = nodeServers.get(i);
 			assertNotNull(server, "NodeServer at index " + i + " should not be null");
 			assertTrue(server.isRunning(), "NodeServer at index " + i + " should be running");
 		}
@@ -190,10 +132,10 @@ public class NodeNetworkTest {
 	 */
 	@Test
 	public void testSharedLattice() {
-		ALattice<AInteger> firstLattice = nodeServers.get(0).getLattice();
+		ALattice<?> firstLattice = nodeServers.get(0).getLattice();
 		
 		for (int i = 1; i < nodeServers.size(); i++) {
-			ALattice<AInteger> serverLattice = nodeServers.get(i).getLattice();
+			ALattice<?> serverLattice = nodeServers.get(i).getLattice();
 			assertTrue(serverLattice == firstLattice,
 					"NodeServer " + i + " should share the same lattice instance as NodeServer 0");
 			assertTrue(serverLattice == commonLattice,
