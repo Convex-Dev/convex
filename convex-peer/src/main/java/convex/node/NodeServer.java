@@ -3,21 +3,30 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.lattice.ALattice;
@@ -207,41 +216,22 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		
 		ACell id = payload.get(1);
-		ACell pathCell = payload.count() > 2 ? payload.get(2) : null;
+		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
 		
 		// Convert path to array if it's a vector
-		ACell[] path = null;
-		if (pathCell != null) {
-			AVector<?> pathVector = RT.ensureVector(pathCell);
-			if (pathVector != null) {
-				long pathLen = pathVector.count();
-				path = new ACell[(int)pathLen];
-				for (long i = 0; i < pathLen; i++) {
-					path[(int)i] = pathVector.get(i);
-				}
-			} else {
-				// Single key path
-				path = new ACell[] { pathCell };
-			}
+		ACell[] path;
+		if (pathVector != null) {
+			path=pathVector.toCellArray();
 		} else {
-			// Empty path means root
-			path = new ACell[0];
+			// Empty path means root with empty cell array
+			path = Cells.EMPTY_ARRAY;
 		}
 		
 		// Get the value at the path
-		V currentValue = cursor.get();
-		ACell valueAtPath = path.length == 0 ? currentValue : RT.getIn(currentValue, path);
-		
-		// Get sub-lattice at path for validation
-		ALattice<?> subLattice = lattice.path(path);
-		if (subLattice == null && path.length > 0) {
-			log.warn("Invalid path for LATTICE_QUERY: path length {}", path.length);
-			Result error = Result.create(id, Strings.create("Invalid path"), ErrorCodes.ARGUMENT);
-			message.returnResult(error);
-			return;
-		}
+		V valueAtPath = cursor.get(path);
 		
 		Result result = Result.create(id, valueAtPath);
+		System.out.println("Lattice query: "+result);
 		message.returnResult(result);
 		log.debug("Responded to LATTICE_QUERY at path with length: {}", path.length);
 	}
@@ -346,6 +336,111 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 	
 	/**
+	 * Syncs with a target node by requesting its root lattice value and merging it.
+	 * 
+	 * Connects to the target node, sends a LATTICE_QUERY with an empty path (root),
+	 * receives the result, merges it with the local value, and returns the merged value.
+	 * 
+	 * @param targetNode Address of the target node to sync with
+	 * @return CompletableFuture that completes with the merged value after sync, or fails if sync fails
+	 */
+	public CompletableFuture<V> sync(InetSocketAddress targetNode) {
+		log.debug("Syncing with target node: {}", targetNode);
+		
+		return CompletableFuture.supplyAsync(() -> {
+			ConvexRemote convex = null;
+			try {
+				// Connect to target node
+				convex = ConvexRemote.connect(targetNode);
+				log.debug("Connected to target node: {}", targetNode);
+				
+				// Create LATTICE_QUERY message with empty path (root)
+				// Payload format: [:LQ id []]
+				CVMLong queryId = CVMLong.create(System.currentTimeMillis());
+				AVector<ACell> emptyPath = Vectors.empty();
+				AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, emptyPath);
+				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+				
+				// Send query and wait for result with timeout
+				CompletableFuture<Result> resultFuture = convex.message(queryMessage);
+				Result result = resultFuture.get(10, TimeUnit.SECONDS);
+				
+				// Check if result is an error
+				if (result.isError()) {
+					String errorMsg = result.getValue() != null ? result.getValue().toString() : "Unknown error";
+					log.warn("Sync failed with error: {}", errorMsg);
+					throw new RuntimeException("Sync failed: " + errorMsg);
+				}
+				
+				// Get the received value and merge it
+				ACell receivedValue = result.getValue();
+				
+				// Cast and merge the value
+				@SuppressWarnings("unchecked")
+				V typedValue = (V) receivedValue;
+				V merged = mergeValue(typedValue);
+				
+				log.debug("Sync completed successfully with target node: {}", targetNode);
+				return merged;
+				
+			} catch (TimeoutException e) {
+				log.warn("Sync timeout with target node: {}", targetNode, e);
+				throw new RuntimeException("Sync timeout: " + e.getMessage(), e);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				log.warn("Sync interrupted with target node: {}", targetNode, e);
+				throw new RuntimeException("Sync interrupted", e);
+			} catch (Exception e) {
+				log.warn("Sync failed with target node: {}", targetNode, e);
+				throw new RuntimeException("Sync failed: " + e.getMessage(), e);
+			} finally {
+				// Always close the connection
+				if (convex != null) {
+					convex.close();
+				}
+			}
+		});
+	}
+	
+	/**
+	 * Syncs with all connected peer nodes.
+	 * 
+	 * Calls sync(targetNode) for each connected peer node and waits for all to complete.
+	 * 
+	 * @return CompletableFuture that completes when all sync operations are done
+	 */
+	public boolean sync() {
+		Set<InetSocketAddress> peers = getPeerNodes();
+		
+		if (peers.isEmpty()) {
+			log.debug("No peer nodes to sync with");
+			return true;
+		}
+		
+		log.debug("Syncing with {} peer nodes", peers.size());
+		
+		// Create sync futures for all peers
+		List<CompletableFuture<V>> syncFutures = new ArrayList<>();
+		for (InetSocketAddress peer : peers) {
+			syncFutures.add(sync(peer));
+		}
+		
+		// Wait for all syncs to complete (or fail)
+		CompletableFuture<Void> allSyncs = CompletableFuture.allOf(
+			syncFutures.toArray(new CompletableFuture[0])
+		);
+		
+		// Log completion status
+		try {	
+			allSyncs.join();
+			return true;
+		} catch (Exception e) {
+			log.warn("Sync failed with error: {}", e.getMessage());
+			return false;
+		}
+	}
+	
+	/**
 	 * Updates the local lattice value by merging with a received value.
 	 * 
 	 * This method performs an atomic merge operation using the cursor's
@@ -368,7 +463,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Atomically update the cursor by merging the current value with the received value
 		// This ensures thread-safe updates even if multiple threads are merging concurrently
 		V merged = cursor.updateAndGet(currentValue -> {
-			return lattice.merge(currentValue, receivedValue);
+			V newValue= lattice.merge(currentValue, receivedValue);
+			if (currentValue!=newValue) {
+				System.out.println("NodeServer Merge:\n"+currentValue+" => "+newValue);
+			}
+			return newValue;
 		});
 		
 		log.debug("Merged lattice value atomically");
@@ -426,7 +525,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * 
 	 * @return The value cursor
 	 */
-	public ACursor<V> getValueCursor() {
+	public ACursor<V> getCursor() {
 		return cursor;
 	}
 	

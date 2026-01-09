@@ -20,9 +20,10 @@ public class DataLattice extends ALattice<Index<Hash,ACell>> {
 	public Index<Hash, ACell> merge(Index<Hash, ACell> ownValue, Index<Hash, ACell> otherValue) {
 		Index<Hash,ACell> result=ownValue;
 		if (result==null) result=zero();
+		if (otherValue==null) return result;
 		
 		ArrayList<ACell> newValues=new ArrayList<>();
-		result.mergeDifferences(result, (a,b)->{
+		result.mergeDifferences(otherValue, (a,b)->{
 			if (a!=null) return a; // keep own value
 			newValues.add(b);
 			return a;

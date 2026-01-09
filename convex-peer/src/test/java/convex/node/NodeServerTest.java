@@ -16,12 +16,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.api.ConvexRemote;
 import convex.core.data.ASet;
 import convex.core.data.Sets;
+import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.message.Message;
+import convex.core.message.MessageTag;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
@@ -69,7 +75,7 @@ public class NodeServerTest {
 		assertNotNull(maxNodeServer);
 		assertNotNull(maxNodeServer.getLattice());
 		assertNotNull(maxNodeServer.getStore());
-		assertNotNull(maxNodeServer.getValueCursor());
+		assertNotNull(maxNodeServer.getCursor());
 		assertFalse(maxNodeServer.isRunning());
 	}
 
@@ -84,7 +90,7 @@ public class NodeServerTest {
 		assertNotNull(setNodeServer);
 		assertNotNull(setNodeServer.getLattice());
 		assertNotNull(setNodeServer.getStore());
-		assertNotNull(setNodeServer.getValueCursor());
+		assertNotNull(setNodeServer.getCursor());
 		assertFalse(setNodeServer.isRunning());
 	}
 
@@ -110,7 +116,7 @@ public class NodeServerTest {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store, null);
 
-		ACursor<AInteger> cursor = maxNodeServer.getValueCursor();
+		ACursor<AInteger> cursor = maxNodeServer.getCursor();
 		assertNotNull(cursor);
 
 		// Initial value should be zero
@@ -322,7 +328,7 @@ public class NodeServerTest {
 		assertEquals(CVMLong.ZERO, value1);
 
 		// Update cursor directly
-		maxNodeServer.getValueCursor().set(CVMLong.create(42));
+		maxNodeServer.getCursor().set(CVMLong.create(42));
 
 		// getLocalValue should reflect the change
 		AInteger value2 = maxNodeServer.getLocalValue();
@@ -353,6 +359,96 @@ public class NodeServerTest {
 		// Clean up
 		convex.close();
 		assertFalse(convex.isConnected(), "ConvexRemote should be disconnected after close");
+	}
+	
+	/**
+	 * Test that a PING request returns a result
+	 */
+	@Test
+	public void testPingRequest() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+		
+		// Launch the server
+		maxNodeServer.launch();
+		assertTrue(maxNodeServer.isRunning());
+		
+		// Get the server address
+		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		assertNotNull(serverAddress, "Server should have a host address after launch");
+		
+		// Connect with ConvexRemote
+		ConvexRemote convex = ConvexRemote.connect(serverAddress);
+		assertNotNull(convex, "ConvexRemote connection should be created");
+		
+		try {
+			// Create a PING message with ID 1
+			// Payload format: [:PING id]
+			CVMLong pingId = CVMLong.create(1);
+			AVector<?> pingPayload = Vectors.create(MessageTag.PING, pingId);
+			Message pingMessage = Message.create(MessageType.PING, pingPayload);
+			
+			// Send PING message and wait for result
+			CompletableFuture<Result> resultFuture = convex.message(pingMessage);
+			Result result = resultFuture.get(5, TimeUnit.SECONDS);
+			
+			// Verify result
+			assertNotNull(result, "PING should return a result");
+			assertEquals(pingId, result.getID(), "Result ID should match PING ID");
+			assertFalse(result.isError(), "PING should succeed");
+			assertNotNull(result.getValue(), "PING result should have a value");
+		} finally {
+			convex.close();
+		}
+	}
+	
+	/**
+	 * Test that a LATTICE_QUERY request with an empty path returns a valid lattice value
+	 */
+	@Test
+	public void testLatticeQueryEmptyPath() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, null);
+		
+		// Set an initial value
+		maxNodeServer.getCursor().set(CVMLong.create(42));
+		
+		// Launch the server
+		maxNodeServer.launch();
+		assertTrue(maxNodeServer.isRunning());
+		
+		// Get the server address
+		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		assertNotNull(serverAddress, "Server should have a host address after launch");
+		
+		// Connect with ConvexRemote
+		ConvexRemote convex = ConvexRemote.connect(serverAddress);
+		assertNotNull(convex, "ConvexRemote connection should be created");
+		
+		try {
+			// Create a LATTICE_QUERY message with empty path
+			// Payload format: [:LQ id []]
+			CVMLong queryId = CVMLong.create(2);
+			AVector<ACell> emptyPath = Vectors.empty();
+			AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, emptyPath);
+			Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+			
+			// Send LATTICE_QUERY message and wait for result
+			CompletableFuture<Result> resultFuture = convex.message(queryMessage);
+			Result result = resultFuture.get(5, TimeUnit.SECONDS);
+			
+			// Verify result
+			assertNotNull(result, "LATTICE_QUERY should return a result");
+			assertEquals(queryId, result.getID(), "Result ID should match query ID");
+			assertFalse(result.isError(), "LATTICE_QUERY should succeed");
+			
+			// Verify the returned value is a valid lattice value (should be 42)
+			ACell value = result.getValue();
+			assertNotNull(value, "LATTICE_QUERY result should have a value");
+			assertEquals(CVMLong.create(42), value, "LATTICE_QUERY should return the current lattice value");
+		} finally {
+			convex.close();
+		}
 	}
 }
 
