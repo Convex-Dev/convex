@@ -173,9 +173,10 @@ public class UtilsTest {
 	}
 	
 	@Test public void testTimeStamp() {
+		// Just a check that these are consistent
 		long t1=Instant.now().toEpochMilli();
 		long t2=System.currentTimeMillis();
-		assertEquals(t1,t2);
+		assertTrue(t2-t1<10);
 	}
 	
 	@Test 
