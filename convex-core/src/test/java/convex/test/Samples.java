@@ -1,11 +1,11 @@
 package convex.test;
 
-import static org.junit.Assert.assertTrue;
-
 import java.util.Random;
 import java.util.stream.Stream;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
