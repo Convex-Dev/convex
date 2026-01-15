@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.data.ASet;
 import convex.core.data.Cells;
@@ -209,18 +210,21 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test peer management
+	 * Test peer management with Convex connections
 	 */
 	@Test
-	public void testPeerManagement() {
+	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer.launch();
 
-		InetSocketAddress peer1 = new InetSocketAddress("127.0.0.1", 18888);
-		InetSocketAddress peer2 = new InetSocketAddress("127.0.0.1", 18889);
+		// Create Convex connections to the server (using loopback addresses for testing)
+		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		ConvexRemote peer1 = ConvexRemote.connect(serverAddress);
+		ConvexRemote peer2 = ConvexRemote.connect(serverAddress);
 
 		// Initially no peers
-		Set<InetSocketAddress> peers = maxNodeServer.getPeerNodes();
+		Set<Convex> peers = maxNodeServer.getPeerNodes();
 		assertTrue(peers.isEmpty());
 
 		// Add peers
@@ -238,24 +242,35 @@ public class NodeServerTest {
 		assertEquals(1, peers.size());
 		assertTrue(peers.contains(peer2));
 		assertFalse(peers.contains(peer1));
+
+		// Clean up
+		peer1.close();
+		peer2.close();
 	}
 
 	/**
-	 * Test syncWithPeer (stub implementation)
+	 * Test syncWithPeer using Convex connection
 	 */
 	@Test
 	public void testSyncWithPeer() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer.launch();
 
-		InetSocketAddress peerAddress = new InetSocketAddress("127.0.0.1", 18888);
+		// Create a Convex connection to the server
+		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		ConvexRemote peer = ConvexRemote.connect(serverAddress);
 		
-		// Stub implementation should return current value
-		CompletableFuture<AInteger> future = maxNodeServer.syncWithPeer(peerAddress);
-		AInteger result = future.get(1, TimeUnit.SECONDS);
-		
-		assertNotNull(result);
-		assertEquals(CVMLong.ZERO, result); // Should return initial zero value
+		try {
+			// Sync with peer - should get the current value (zero initially)
+			CompletableFuture<AInteger> future = maxNodeServer.syncWithPeer(peer);
+			AInteger result = future.get(5, TimeUnit.SECONDS);
+			
+			assertNotNull(result);
+			assertEquals(CVMLong.ZERO, result); // Should return initial zero value
+		} finally {
+			peer.close();
+		}
 	}
 
 	/**

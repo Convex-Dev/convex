@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.api.ConvexRemote;
+import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -78,9 +78,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private Consumer<Message> receiveAction;
 	
 	/**
-	 * Set of connected peer node addresses
+	 * Set of connected peer Convex instances (maintains persistent connections)
 	 */
-	private Set<InetSocketAddress> peerNodes;
+	private Set<Convex> peerNodes;
 	
 	/**
 	 * Port this server is listening on
@@ -350,42 +350,38 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 	
 	/**
-	 * Syncs lattice value with a remote peer node.
+	 * Syncs lattice value with a remote peer node using the provided Convex connection.
 	 * 
-	 * @param peerAddress Address of the peer node
+	 * @param convex Convex connection to the peer node
 	 * @return Future that completes when sync is done, returning the merged value
 	 */
-	public CompletableFuture<V> syncWithPeer(InetSocketAddress peerAddress) {
-		// TODO: Implement peer synchronization
-		// 1. Establish connection to peer
-		// 2. Send current local value via binary protocol
-		// 3. Receive peer's lattice value
-		// 4. Merge values using lattice.merge()
-		// 5. Update valueCursor with merged value
-		// 6. Return merged value
-		
-		log.debug("Syncing with peer: {}", peerAddress);
-		return CompletableFuture.completedFuture(cursor.get()); // Stub
+	public CompletableFuture<V> syncWithPeer(Convex convex) {
+		// Use the sync method which handles the LATTICE_QUERY
+		return sync(convex);
 	}
 	
 	/**
 	 * Syncs with a target node by requesting its root lattice value and merging it.
 	 * 
-	 * Connects to the target node, sends a LATTICE_QUERY with an empty path (root),
+	 * Uses the provided Convex connection to send a LATTICE_QUERY with an empty path (root),
 	 * receives the result, merges it with the local value, and returns the merged value.
 	 * 
-	 * @param targetNode Address of the target node to sync with
+	 * @param convex Convex connection to the target node
 	 * @return CompletableFuture that completes with the merged value after sync, or fails if sync fails
 	 */
-	public CompletableFuture<V> sync(InetSocketAddress targetNode) {
-		log.debug("Syncing with target node: {}", targetNode);
+	public CompletableFuture<V> sync(Convex convex) {
+		if (convex == null) {
+			return CompletableFuture.failedFuture(new IllegalArgumentException("Convex connection cannot be null"));
+		}
+		
+		log.debug("Syncing with target node: {}", convex.getHostAddress());
 		
 		return CompletableFuture.supplyAsync(() -> {
-			ConvexRemote convex = null;
 			try {
-				// Connect to target node
-				convex = ConvexRemote.connect(targetNode);
-				log.debug("Connected to target node: {}", targetNode);
+				// Check if connection is still valid
+				if (!convex.isConnected()) {
+					throw new RuntimeException("Convex connection is not connected");
+				}
 				
 				// Create LATTICE_QUERY message with empty path (root)
 				// Payload format: [:LQ id []]
@@ -413,24 +409,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 				V typedValue = (V) receivedValue;
 				V merged = mergeValue(typedValue);
 				
-				log.debug("Sync completed successfully with target node: {}", targetNode);
+				log.debug("Sync completed successfully with target node: {}", convex.getHostAddress());
 				return merged;
 				
 			} catch (TimeoutException e) {
-				log.warn("Sync timeout with target node: {}", targetNode, e);
+				log.warn("Sync timeout with target node: {}", convex.getHostAddress(), e);
 				throw new RuntimeException("Sync timeout: " + e.getMessage(), e);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				log.warn("Sync interrupted with target node: {}", targetNode, e);
+				log.warn("Sync interrupted with target node: {}", convex.getHostAddress(), e);
 				throw new RuntimeException("Sync interrupted", e);
 			} catch (Exception e) {
-				log.warn("Sync failed with target node: {}", targetNode, e);
+				log.warn("Sync failed with target node: {}", convex.getHostAddress(), e);
 				throw new RuntimeException("Sync failed: " + e.getMessage(), e);
-			} finally {
-				// Always close the connection
-				if (convex != null) {
-					convex.close();
-				}
 			}
 		});
 	}
@@ -438,12 +429,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Syncs with all connected peer nodes.
 	 * 
-	 * Calls sync(targetNode) for each connected peer node and waits for all to complete.
+	 * Calls sync(convex) for each connected peer Convex instance and waits for all to complete.
 	 * 
-	 * @return CompletableFuture that completes when all sync operations are done
+	 * @return true if all syncs completed successfully, false otherwise
 	 */
 	public boolean sync() {
-		Set<InetSocketAddress> peers = getPeerNodes();
+		Set<Convex> peers = getPeerNodes();
 		
 		if (peers.isEmpty()) {
 			log.debug("No peer nodes to sync with");
@@ -454,8 +445,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 		
 		// Create sync futures for all peers
 		List<CompletableFuture<V>> syncFutures = new ArrayList<>();
-		for (InetSocketAddress peer : peers) {
-			syncFutures.add(sync(peer));
+		for (Convex peer : peers) {
+			// Only sync with connected peers
+			if (peer != null && peer.isConnected()) {
+				syncFutures.add(sync(peer));
+			} else {
+				log.debug("Skipping disconnected peer: {}", peer);
+			}
+		}
+		
+		if (syncFutures.isEmpty()) {
+			log.debug("No connected peers to sync with");
+			return true;
 		}
 		
 		// Wait for all syncs to complete (or fail)
@@ -513,33 +514,61 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Broadcasts the current lattice value to all connected peer nodes.
 	 */
 	public void broadcastValue() {
-		// TODO: Implement value broadcasting
-		// 1. Get current value from cursor
-		// 2. Encode value to binary format
-		// 3. Send to all connected peers via binary protocol
+		V currentValue = cursor.get();
+		if (currentValue == null) {
+			log.debug("No value to broadcast");
+			return;
+		}
 		
-		// V currentValue = valueCursor.get();
 		log.debug("Broadcasting lattice value to {} peers", peerNodes.size());
+		
+		// Send LATTICE_VALUE message to all connected peers
+		for (Convex peer : peerNodes) {
+			if (peer != null && peer.isConnected()) {
+				try {
+					// Create LATTICE_VALUE message with empty path (root) and current value
+					// Payload format: [:LV [] value]
+					AVector<ACell> emptyPath = Vectors.empty();
+					AVector<?> valuePayload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, currentValue);
+					Message valueMessage = Message.create(MessageType.LATTICE_VALUE, valuePayload);
+					
+					// Send message asynchronously (fire and forget)
+					peer.message(valueMessage);
+					log.debug("Broadcasted lattice value to peer: {}", peer.getHostAddress());
+				} catch (Exception e) {
+					log.debug("Failed to broadcast to peer: {}", peer.getHostAddress(), e);
+				}
+			}
+		}
 	}
 	
 	/**
-	 * Adds a peer node address for connection.
+	 * Adds a peer Convex connection.
 	 * 
-	 * @param peerAddress Address of the peer node
+	 * @param convex Convex connection to the peer node
 	 */
-	public void addPeer(InetSocketAddress peerAddress) {
-		peerNodes.add(peerAddress);
-		log.debug("Added peer: {}", peerAddress);
+	public void addPeer(Convex convex) {
+		if (convex == null) {
+			log.warn("Attempted to add null peer connection");
+			return;
+		}
+		peerNodes.add(convex);
+		log.debug("Added peer: {}", convex.getHostAddress());
 	}
 	
 	/**
-	 * Removes a peer node address.
+	 * Removes a peer Convex connection.
 	 * 
-	 * @param peerAddress Address of the peer node to remove
+	 * @param convex Convex connection to remove
 	 */
-	public void removePeer(InetSocketAddress peerAddress) {
-		peerNodes.remove(peerAddress);
-		log.debug("Removed peer: {}", peerAddress);
+	public void removePeer(Convex convex) {
+		if (convex == null) {
+			return;
+		}
+		boolean removed = peerNodes.remove(convex);
+		if (removed) {
+			log.debug("Removed peer: {}", convex.getHostAddress());
+		}
 	}
 	
 	/**
@@ -609,11 +638,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 	
 	/**
-	 * Gets the set of connected peer node addresses.
+	 * Gets the set of connected peer Convex instances.
 	 * 
-	 * @return Set of peer addresses
+	 * @return Set of peer Convex connections
 	 */
-	public Set<InetSocketAddress> getPeerNodes() {
+	public Set<Convex> getPeerNodes() {
 		return new java.util.HashSet<>(peerNodes);
 	}
 	
@@ -631,6 +660,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 			networkServer.close();
 		}
 		
+		// Close all peer connections
+		for (Convex peer : peerNodes) {
+			if (peer != null) {
+				try {
+					peer.close();
+					log.debug("Closed peer connection: {}", peer.getHostAddress());
+				} catch (Exception e) {
+					log.warn("Error closing peer connection: {}", peer.getHostAddress(), e);
+				}
+			}
+		}
 		peerNodes.clear();
 		log.debug("NodeServer closed");
 	}

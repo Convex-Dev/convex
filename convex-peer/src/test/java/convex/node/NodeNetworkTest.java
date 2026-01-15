@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
+import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -107,15 +108,21 @@ public class NodeNetworkTest {
 		}
 		
 		// Set up peer connections: make all servers peers of each other
+		// Create Convex connections between all servers
 		for (int i = 0; i < NETWORK_SIZE; i++) {
 			NodeServer<?> server = nodeServers.get(i);
 			
-			// Add all other servers as peers
+			// Add all other servers as peers using Convex connections
 			for (int j = 0; j < NETWORK_SIZE; j++) {
 				if (i != j) {
 					NodeServer<?> otherServer = nodeServers.get(j);
 					InetSocketAddress otherAddress = otherServer.getHostAddress();
-					server.addPeer(otherAddress);
+					try {
+						Convex peerConnection = ConvexRemote.connect(otherAddress);
+						server.addPeer(peerConnection);
+					} catch (Exception e) {
+						throw new RuntimeException("Failed to create peer connection from server " + i + " to server " + j, e);
+					}
 				}
 			}
 		}
