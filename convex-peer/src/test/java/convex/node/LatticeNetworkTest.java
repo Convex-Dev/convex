@@ -1,5 +1,6 @@
 package convex.node;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +26,7 @@ import convex.api.ConvexRemote;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
+import convex.core.data.ACell;
 import convex.lattice.Lattice;
 
 /**
@@ -188,6 +190,33 @@ public class LatticeNetworkTest {
 			assertNotNull(server, "NodeServer at index " + i + " should not be null");
 			assertTrue(server.isRunning(), "NodeServer at index " + i + " should be running");
 			assertSame(commonLattice, server.getLattice(), "All NodeServers should share the same Lattice.ROOT instance");
+		}
+	}
+
+	/**
+	 * Tests that after syncing the network, all servers have the same lattice value.
+	 * 
+	 * @throws InterruptedException If the operation is interrupted
+	 * @throws ExecutionException If a sync operation fails
+	 * @throws TimeoutException If a sync operation times out
+	 */
+	@Test
+	public void testSyncNetwork() throws InterruptedException, ExecutionException, TimeoutException {
+		// Sync the entire network
+		syncNetwork();
+		
+		// Get the lattice value from the first server as the reference
+		NodeServer<?> firstServer = nodeServers.get(0);
+		ACell referenceValue = firstServer.getLocalValue();
+		assertNotNull(referenceValue, "First server should have a lattice value");
+		
+		// Verify all other servers have the same lattice value
+		for (int i = 1; i < NETWORK_SIZE; i++) {
+			NodeServer<?> server = nodeServers.get(i);
+			ACell serverValue = server.getLocalValue();
+			assertNotNull(serverValue, "Server " + i + " should have a lattice value");
+			assertEquals(referenceValue, serverValue, 
+				"Server " + i + " should have the same lattice value as server 0 after sync");
 		}
 	}
 }
