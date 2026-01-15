@@ -194,7 +194,7 @@ public class NodeNetworkTest {
 		
 		// Update the :data path with the updated Index
 		server0.getCursor().set(updatedDataIndex, dataKeyword);
-		System.out.println("Server0 value: "+server0.getCursor().get());
+		// System.out.println("Server0 value: "+server0.getCursor().get());
 		
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);

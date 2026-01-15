@@ -211,6 +211,7 @@ public class NodeServerTest {
 
 	/**
 	 * Test peer management with Convex connections
+	 * TODO: should be using full connection manager
 	 */
 	@Test
 	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
