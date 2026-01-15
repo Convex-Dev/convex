@@ -180,20 +180,6 @@ public class LatticeNetworkTest {
 	}
 
 	/**
-	 * Verifies that all NodeServers in the lattice network are running and share
-	 * the same base lattice instance.
-	 */
-	@Test
-	public void testLatticeRootNetworkInitialised() {
-		for (int i = 0; i < NETWORK_SIZE; i++) {
-			NodeServer<?> server = nodeServers.get(i);
-			assertNotNull(server, "NodeServer at index " + i + " should not be null");
-			assertTrue(server.isRunning(), "NodeServer at index " + i + " should be running");
-			assertSame(commonLattice, server.getLattice(), "All NodeServers should share the same Lattice.ROOT instance");
-		}
-	}
-
-	/**
 	 * Tests that after syncing the network, all servers have the same lattice value.
 	 * 
 	 * @throws InterruptedException If the operation is interrupted

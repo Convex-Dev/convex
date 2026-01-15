@@ -35,6 +35,7 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALattice;
 
 public class DLFSTest {
 	
@@ -379,5 +380,117 @@ public class DLFSTest {
 		}
 	}
 
+	/**
+	 * Test that DLFSLattice works as expected with rsync-like merge semantics.
+	 * 
+	 * Verifies:
+	 * - Zero value is an empty directory
+	 * - Merge of two filesystem trees combines entries
+	 * - Timestamp-based conflict resolution (newer wins)
+	 * - Merge with zero/null behaves correctly
+	 * - Foreign value validation
+	 * - Path support for directory entries
+	 */
+	@Test
+	public void testDLFSLattice() throws IOException {
+		DLFSLattice lattice = DLFSLattice.INSTANCE;
+		
+		// Test zero value
+		AVector<ACell> zero = lattice.zero();
+		assertNotNull(zero, "Zero value should not be null");
+		assertTrue(DLFSNode.isDirectory(zero), "Zero value should be an empty directory");
+		assertTrue(DLFSNode.getDirectoryEntries(zero).isEmpty(), "Zero directory should be empty");
+		
+		// Test merge with zero
+		DLFileSystem fs1 = DLFS.createLocal();
+		fs1.setTimestamp(CVMLong.create(1000));
+		Path file1 = Files.createFile(fs1.getPath("file1"));
+		try (OutputStream os = Files.newOutputStream(file1)) {
+			os.write(new byte[] {1, 2, 3});
+		}
+		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
+		
+		// Merge with zero should return the same value
+		AVector<ACell> mergedWithZero = lattice.merge(node1, zero);
+		assertEquals(node1, mergedWithZero, "Merge with zero should return own value");
+		
+		AVector<ACell> mergedFromZero = lattice.merge(zero, node1);
+		assertEquals(node1, mergedFromZero, "Merge from zero should return other value");
+		
+		// Test merge with null
+		assertEquals(node1, lattice.merge(node1, null), "Merge with null should return own value");
+		assertEquals(node1, lattice.merge(null, node1), "Merge from null should return other value");
+		
+		// Test merge of two different filesystem trees (rsync-like behavior)
+		DLFileSystem fs2 = DLFS.createLocal();
+		fs2.setTimestamp(CVMLong.create(2000));
+		
+		// Create different files in fs2
+		Path file2 = Files.createFile(fs2.getPath("file2"));
+		try (OutputStream os = Files.newOutputStream(file2)) {
+			os.write(new byte[] {4, 5, 6});
+		}
+		Path dir2 = Files.createDirectory(fs2.getPath("dir2"));
+		Path file3 = Files.createFile(dir2.resolve("file3"));
+		try (OutputStream os = Files.newOutputStream(file3)) {
+			os.write(new byte[] {7, 8, 9});
+		}
+		
+		AVector<ACell> node2 = fs2.getNode(fs2.getRoot());
+		
+		// Merge the two filesystems - should combine all entries
+		AVector<ACell> merged = lattice.merge(node1, node2);
+		assertNotNull(merged, "Merged value should not be null");
+		
+		// Verify merged filesystem contains entries from both
+		DLPath mergedPath1 = fs1.getPath("file1");
+		DLPath mergedPath2 = fs1.getPath("file2");
+		DLPath mergedPath3 = fs1.getPath("dir2/file3");
+		
+		AVector<ACell> mergedNode1 = DLFSNode.navigate(merged, mergedPath1);
+		AVector<ACell> mergedNode2 = DLFSNode.navigate(merged, mergedPath2);
+		AVector<ACell> mergedNode3 = DLFSNode.navigate(merged, mergedPath3);
+		
+		assertNotNull(mergedNode1, "Merged filesystem should contain file1 from fs1");
+		assertNotNull(mergedNode2, "Merged filesystem should contain file2 from fs2");
+		assertNotNull(mergedNode3, "Merged filesystem should contain file3 from fs2");
+		assertTrue(DLFSNode.isRegularFile(mergedNode1), "file1 should be a regular file");
+		assertTrue(DLFSNode.isRegularFile(mergedNode2), "file2 should be a regular file");
+		assertTrue(DLFSNode.isRegularFile(mergedNode3), "file3 should be a regular file");
+		
+		// Test timestamp-based conflict resolution (newer wins)
+		DLFileSystem fs3 = DLFS.createLocal();
+		fs3.setTimestamp(CVMLong.create(3000));
+		Path conflictFile = Files.createFile(fs3.getPath("file1")); // Same name as file1
+		try (OutputStream os = Files.newOutputStream(conflictFile)) {
+			os.write(new byte[] {10, 11, 12}); // Different content
+		}
+		AVector<ACell> node3 = fs3.getNode(fs3.getRoot());
+		
+		// Merge should prefer newer timestamp (fs3's file1)
+		AVector<ACell> mergedWithConflict = lattice.merge(node1, node3);
+		AVector<ACell> conflictNode = DLFSNode.navigate(mergedWithConflict, fs1.getPath("file1"));
+		assertNotNull(conflictNode, "Merged should contain file1");
+		ABlob conflictData = DLFSNode.getData(conflictNode);
+		assertNotNull(conflictData, "file1 should have data");
+		// Should have newer file's data (from fs3, timestamp 3000 > 1000)
+		assertEquals(Blob.wrap(new byte[] {10, 11, 12}), conflictData, "Newer timestamp should win in conflict");
+		
+		// Test idempotency - merging same value should return same
+		assertSame(node1, lattice.merge(node1, node1), "Merge of same value should return same instance");
+		
+		// Test checkForeign
+		assertTrue(lattice.checkForeign(node1), "Valid DLFS node should pass checkForeign");
+		assertTrue(lattice.checkForeign(node2), "Valid DLFS node should pass checkForeign");
+		assertTrue(lattice.checkForeign(merged), "Merged DLFS node should pass checkForeign");
+		assertFalse(lattice.checkForeign(null), "Null should fail checkForeign");
+		
+		// Test path support - directory entries should return the same lattice
+		AVector<ACell> rootDir = merged;
+		convex.core.data.AString dirName = convex.core.data.Strings.create("dir2");
+		ALattice<?> childLattice = lattice.path(dirName);
+		assertNotNull(childLattice, "Path to directory entry should return a lattice");
+		assertSame(lattice, childLattice, "Directory entry should use same DLFSLattice");
+	}
 
 }
