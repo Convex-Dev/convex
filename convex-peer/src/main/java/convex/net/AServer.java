@@ -7,6 +7,9 @@ import java.util.function.Consumer;
 
 import convex.core.message.Message;
 
+/**
+ * Base class for servers that Listen for lattice protocol messages and call a receive action
+ */
 public abstract class AServer implements Closeable {
 
 	/**

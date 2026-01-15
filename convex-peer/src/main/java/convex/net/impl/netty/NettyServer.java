@@ -31,6 +31,9 @@ public class NettyServer extends AServer {
 
 	static EventLoopGroup bossGroup=null;
 	
+	private Channel channel;
+
+
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
 		bossGroup=new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
@@ -42,6 +45,7 @@ public class NettyServer extends AServer {
 		return bossGroup;
 	}
 	
+	// Receive action. Default is just an echo. Users should set a receive action
 	private Consumer<Message> receiveAction=m->{
 		try {
 			ACell payload=m.getPayload();
@@ -50,8 +54,6 @@ public class NettyServer extends AServer {
 			log.warn("Unexpected exception handling message receipt",e);
 		}
 	};
-
-	private Channel channel;
 
 	public NettyServer(Integer port) {
 		setPort(port);
