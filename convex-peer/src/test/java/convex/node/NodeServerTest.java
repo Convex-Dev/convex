@@ -465,8 +465,11 @@ public class NodeServerTest {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
 		setNodeServer = new NodeServer<>(lattice, store, null);
 		
-		// Create a lattice value to be acquired from the NodeServer
-		ASet<ACell> latticeValue = Sets.of(CVMLong.ONE, CVMLong.TWO, CVMLong.create(3));
+		// Create a large lattice value (10,000 distinct elements) so that it spans multiple branches
+		ASet<ACell> latticeValue = Sets.empty();
+		for (int i = 0; i < 10_000; i++) {
+			latticeValue = latticeValue.conj(CVMLong.create(i));
+		}
 		
 		// Persist the lattice value into the NodeServer's store so it can be served via DATA_REQUEST
 		latticeValue = Cells.store(latticeValue, store);
@@ -480,25 +483,24 @@ public class NodeServerTest {
 		InetSocketAddress serverAddress = setNodeServer.getHostAddress();
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
-		AStore clientStore = new MemoryStore();
 		ConvexRemote convex = ConvexRemote.connect(serverAddress);
 		
 		try {
 			// Acquire the lattice structure into the client store. This will issue
 			// one or more DATA_REQUEST messages that NodeServer must handle correctly.
-			CompletableFuture<ACell> future = convex.acquire(valueHash, clientStore);
+			CompletableFuture<ACell> future = convex.acquire(valueHash);
 			ACell acquired = future.get(10, TimeUnit.SECONDS);
 			
 			assertNotNull(acquired, "Acquired lattice value should not be null");
 			
-			// Ensure the acquired value is fully present in the client store (no missing data)
-			Cells.persist(acquired, clientStore);
-			
-			// Top-level hash should now be present in the client store
-			assertNotNull(clientStore.refForHash(valueHash), "Client store should contain the acquired lattice value");
+			// Verify that we acquired a large lattice structure (10,000 elements)
+			assertTrue(acquired instanceof ASet, "Acquired value should be a set");
+			ASet<?> acquiredSet = (ASet<?>) acquired;
+			assertEquals(10_000L, acquiredSet.count(), "Acquired set should contain 10,000 elements");
+			assertTrue(acquiredSet.contains(CVMLong.create(0)));
+			assertTrue(acquiredSet.contains(CVMLong.create(9_999)));
 		} finally {
 			convex.close();
-			clientStore.close();
 		}
 	}
 }

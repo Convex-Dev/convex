@@ -497,9 +497,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// This ensures thread-safe updates even if multiple threads are merging concurrently
 		V merged = cursor.updateAndGet(currentValue -> {
 			V newValue= lattice.merge(currentValue, receivedValue);
-			if (currentValue!=newValue) {
-				System.out.println("NodeServer Merge:\n"+currentValue+" => "+newValue);
-			}
+			// if (currentValue!=newValue) System.out.println("NodeServer Merge:\n"+currentValue+" => "+newValue);
 			return newValue;
 		});
 		
