@@ -58,8 +58,8 @@ public abstract class ALattice<V extends ACell> {
 	}
 	
 	/**
-	 * Get this lattice (with an empty path)
-	 * @return This lattice cast to specified type
+	 * Get a child lattice
+	 * @return The child lattice (may be null)
 	 */
 	public abstract <T extends ACell> ALattice<T> path(ACell childKey);
 	

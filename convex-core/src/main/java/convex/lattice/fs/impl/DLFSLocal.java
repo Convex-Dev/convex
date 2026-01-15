@@ -19,6 +19,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFSProvider;
@@ -26,15 +27,15 @@ import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
 
 /**
- * Local DLFS Drive implementation
+ * Local DLFS Drive implementation, wrapping a lattice Cursor
  */
 public class DLFSLocal extends DLFileSystem {
 	
-	AVector<ACell> rootNode;
+	Root<AVector<ACell>> rootCursor;
 	
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
 		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
-		this.rootNode=rootNode;
+		this.rootCursor=Root.create(rootNode);
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {
@@ -43,12 +44,14 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public AVector<ACell> getNode(DLPath path) {
+		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> result=DLFSNode.navigate(rootNode,path);
 		return result;
 	}
 
 	@Override
 	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
+		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> result=DLFSNode.navigate(rootNode,dir);
 		return DLDirectoryStream.create(dir,result);
 	}
@@ -65,6 +68,7 @@ public class DLFSLocal extends DLFileSystem {
 		if (name==null) throw new FileAlreadyExistsException(DLFS.ROOT_STRING);
 		DLPath parent=dir.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(dir.toString());
+		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
 		if (parentNode==null) {
 			throw new FileNotFoundException(parent.toString());
@@ -82,6 +86,7 @@ public class DLFSLocal extends DLFileSystem {
 		path=path.toAbsolutePath();
 		DLPath parent=path.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(path.toString()); // trying to create root
+		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
 		if (parentNode==null) {
 			throw new FileNotFoundException("Parent directory does not exist: "+parent.toString());
@@ -118,12 +123,13 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
-		rootNode=DLFSNode.updateNode(rootNode,dir,newNode,getTimestamp());
+		rootCursor.updateAndGet(rootNode->DLFSNode.updateNode(rootNode,dir,newNode,getTimestamp()));
 		return newNode;
 	}
 
 	@Override
 	protected void checkAccess(DLPath path) throws IOException {
+		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
 		if ((node==null)||(DLFSNode.isTombstone(node))) {
 			throw new NoSuchFileException(path.toString());
@@ -132,19 +138,18 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public Hash getRootHash() {
-		return Cells.getHash(rootNode);
+		return Cells.getHash(rootCursor.get());
 	}
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		AVector<ACell> merged=DLFSNode.merge(rootNode,other,getTimestamp());
-		rootNode=merged;
+		rootCursor.updateAndGet(rootNode->DLFSNode.merge(rootNode,other,getTimestamp()));
 	}
 
 
 	@Override 
 	public DLFSLocal clone() {
-		DLFSLocal result=new DLFSLocal(provider(),uriPath,rootNode);
+		DLFSLocal result=new DLFSLocal(provider(),uriPath,rootCursor.get());
 		return result;
 	}
 }

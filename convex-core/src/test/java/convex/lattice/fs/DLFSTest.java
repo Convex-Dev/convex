@@ -31,11 +31,14 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeTest;
 
 public class DLFSTest {
 	
@@ -491,6 +494,57 @@ public class DLFSTest {
 		ALattice<?> childLattice = lattice.path(dirName);
 		assertNotNull(childLattice, "Path to directory entry should return a lattice");
 		assertSame(lattice, childLattice, "Directory entry should use same DLFSLattice");
+	}
+
+	/**
+	 * Test that DLFSLattice passes the generic lattice property tests from LatticeTest.
+	 * This verifies that DLFSLattice correctly implements all required lattice semantics.
+	 * 
+	 * Tests path functionality with [0, "sharedDir"] where:
+	 * - 0 is the directory entries index (POS_DIR)
+	 * - "sharedDir" is a directory entry name
+	 */
+	@Test
+	public void testDLFSLatticeGenericProperties() throws IOException {
+		DLFSLattice lattice = DLFSLattice.INSTANCE;
+		
+		// Create two different filesystem nodes for testing
+		// Both nodes will have a shared "sharedDir" directory entry for path testing
+		DLFileSystem fs1 = DLFS.createLocal();
+		fs1.setTimestamp(CVMLong.create(1000));
+		Path file1 = Files.createFile(fs1.getPath("file1"));
+		try (OutputStream os = Files.newOutputStream(file1)) {
+			os.write(new byte[] {1, 2, 3});
+		}
+		Path sharedDir1 = Files.createDirectory(fs1.getPath("sharedDir"));
+		Path fileInDir1 = Files.createFile(sharedDir1.resolve("fileA"));
+		try (OutputStream os = Files.newOutputStream(fileInDir1)) {
+			os.write(new byte[] {10, 20});
+		}
+		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
+		
+		DLFileSystem fs2 = DLFS.createLocal();
+		fs2.setTimestamp(CVMLong.create(2000));
+		Path file2 = Files.createFile(fs2.getPath("file2"));
+		try (OutputStream os = Files.newOutputStream(file2)) {
+			os.write(new byte[] {4, 5, 6});
+		}
+		Path sharedDir2 = Files.createDirectory(fs2.getPath("sharedDir"));
+		Path fileInDir2 = Files.createFile(sharedDir2.resolve("fileB"));
+		try (OutputStream os = Files.newOutputStream(fileInDir2)) {
+			os.write(new byte[] {30, 40});
+		}
+		AVector<ACell> node2 = fs2.getNode(fs2.getRoot());
+		
+		// Run generic lattice property tests (without path parameter)
+		// This tests: merge with zero, null handling, idempotency, etc.
+		LatticeTest.doLatticeTest(lattice, node1, node2);
+		
+		// Test with a path to a directory entry: [0, "sharedDir"]
+		// Path [0, "sharedDir"] means: get directory entries (index 0), then get "sharedDir" entry
+		// Both node1 and node2 have "sharedDir", so RT.getIn will work for both
+		AString dirName = Strings.create("sharedDir");
+		LatticeTest.doLatticeTest(lattice, node1, node2, 0L, dirName);
 	}
 
 }
