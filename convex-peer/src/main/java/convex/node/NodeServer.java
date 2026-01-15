@@ -151,7 +151,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	
 	/**
 	 * Handles an incoming message from a peer node.
-	 * Supports PING, LATTICE_QUERY, and LATTICE_VALUE message types.
+	 * Supports PING, LATTICE_QUERY, LATTICE_VALUE, and DATA_REQUEST message types.
 	 * 
 	 * @param message The incoming message
 	 */
@@ -169,6 +169,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				break;
 			case LATTICE_VALUE:
 				processLatticeValue(message);
+				break;
+			case DATA_REQUEST:
+				processDataRequest(message);
 				break;
 			default:
 				log.debug("Unhandled message type: {}", type);
@@ -231,9 +234,39 @@ public class NodeServer<V extends ACell> implements Closeable {
 		V valueAtPath = cursor.get(path);
 		
 		Result result = Result.create(id, valueAtPath);
-		System.out.println("Lattice query: "+result);
+		// System.out.println("Lattice query: "+result);
 		message.returnResult(result);
 		log.debug("Responded to LATTICE_QUERY at path with length: {}", path.length);
+	}
+	
+	/**
+	 * Processes a DATA_REQUEST message by responding with available data from the store.
+	 * Missing data is signaled by null values in the response, which encode to NULL_ENCODING.
+	 * 
+	 * This method is compatible with convex.peer.Server's handling of missing data requests.
+	 * 
+	 * Payload format: [:DR id hash1 hash2 ...]
+	 * 
+	 * @param message The DATA_REQUEST message
+	 * @throws BadFormatException If message format is invalid
+	 */
+	private void processDataRequest(Message message) throws BadFormatException {
+		try {
+			// Use the same pattern as QueryHandler.handleDataRequest
+			// This creates a response with available data from the store,
+			// and null values for missing data (which encode to NULL_ENCODING)
+			Message response = message.makeDataResponse(store);
+			boolean sent = message.returnMessage(response);
+			if (!sent) {
+				log.info("Can't send data request response due to full buffer");
+			} else {
+				log.debug("Missing data request handled");
+			}
+		} catch (BadFormatException e) {
+			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", message);
+		} catch (Exception e) {
+			log.warn("Unable to deliver missing data due to exception:", e);
+		}
 	}
 	
 	/**

@@ -21,6 +21,8 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.api.ConvexRemote;
 import convex.core.data.ASet;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
@@ -448,6 +450,55 @@ public class NodeServerTest {
 			assertEquals(CVMLong.create(42), value, "LATTICE_QUERY should return the current lattice value");
 		} finally {
 			convex.close();
+		}
+	}
+	
+	/**
+	 * Test that Convex.acquire can retrieve a lattice structure via repeated DATA_REQUESTs.
+	 *
+	 * This verifies that NodeServer's DATA_REQUEST handling is compatible with the peer
+	 * protocol and can serve a complete lattice value to a remote client store.
+	 */
+	@Test
+	public void testAcquireLatticeStructureViaDataRequests() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
+		// Use a SetLattice-backed NodeServer with the shared test store
+		ALattice<ASet<ACell>> lattice = SetLattice.create();
+		setNodeServer = new NodeServer<>(lattice, store, null);
+		
+		// Create a lattice value to be acquired from the NodeServer
+		ASet<ACell> latticeValue = Sets.of(CVMLong.ONE, CVMLong.TWO, CVMLong.create(3));
+		
+		// Persist the lattice value into the NodeServer's store so it can be served via DATA_REQUEST
+		latticeValue = Cells.store(latticeValue, store);
+		Hash valueHash = Cells.getHash(latticeValue);
+		
+		// Launch the NodeServer
+		setNodeServer.launch();
+		assertTrue(setNodeServer.isRunning());
+		
+		// Connect a remote Convex client to the NodeServer
+		InetSocketAddress serverAddress = setNodeServer.getHostAddress();
+		assertNotNull(serverAddress, "Server should have a host address after launch");
+		
+		AStore clientStore = new MemoryStore();
+		ConvexRemote convex = ConvexRemote.connect(serverAddress);
+		
+		try {
+			// Acquire the lattice structure into the client store. This will issue
+			// one or more DATA_REQUEST messages that NodeServer must handle correctly.
+			CompletableFuture<ACell> future = convex.acquire(valueHash, clientStore);
+			ACell acquired = future.get(10, TimeUnit.SECONDS);
+			
+			assertNotNull(acquired, "Acquired lattice value should not be null");
+			
+			// Ensure the acquired value is fully present in the client store (no missing data)
+			Cells.persist(acquired, clientStore);
+			
+			// Top-level hash should now be present in the client store
+			assertNotNull(clientStore.refForHash(valueHash), "Client store should contain the acquired lattice value");
+		} finally {
+			convex.close();
+			clientStore.close();
 		}
 	}
 }
