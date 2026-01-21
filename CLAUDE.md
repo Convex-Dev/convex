@@ -58,10 +58,14 @@ Tests follow JUnit 6 conventions with `src/test/java` mirroring `src/main/java` 
 
 See README.md for download links and detailed running instructions.
 
-Quick reference:
+Execution is typically using CLI commands on convex.jar uberjar (all dependencies included):
 ```bash
 java -jar convex.jar desktop   # Launch GUI
-./convex local gui             # Local test network with GUI
+```
+
+Typically should set up small convenience wrapper script to run `java -jar ...` and allow comamnds like:
+```bash
+convex key generate
 ```
 
 ## Development Workflow
@@ -84,12 +88,10 @@ See README.md for contribution guidelines and license terms.
 
 ## Key Principles
 
-- **Lattice technology** not linear blockchain
-- **Lambda calculus VM** for functional smart contracts
-- **Zero-energy consensus** (Convergent Proof of Stake)
-- **Global state model** with atomic transactions
-- **Millisecond consensus** latency
-- **100% eco-friendly** by design
+- **Immutable Data** - Use immutable lattice data structures (ACell hierarchy)
+- **Lambda calculus VM** for functional smart contracts, pure functions that update state
+- **Lattice technology** - data merges like CRDTs, not linear blockchain
+- **Global state model** with atomic transactions on Convex with self-sovereign accounts like #1337
 
 ## Resources
 
