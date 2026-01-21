@@ -79,9 +79,14 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 
 ### Download
 
-Recent development snapshot builds of `convex.jar` are made available here:
+**Stable Releases:**
+- [Latest Release](https://github.com/Convex-Dev/convex/releases/latest) - Production-ready builds with full changelog
 
-- [Snapshots](https://drive.google.com/drive/folders/1AZdyuZOmC70i_TtuEW3uEKvjYLOqIMiv?usp=drive_link)
+**Development Snapshots:**
+- [Snapshot Build](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop) - Latest `develop` branch build (⚠️ may be unstable)
+- [Google Drive Snapshots](https://drive.google.com/drive/folders/1AZdyuZOmC70i_TtuEW3uEKvjYLOqIMiv?usp=drive_link) - Archive of development builds
+
+The snapshot build is automatically updated with each push to the `develop` branch.
 
 ### Building locally
 

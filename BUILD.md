@@ -4,6 +4,29 @@
 
 Convex main repository is structured as a multi-module Maven project.
 
+## Automated Builds
+
+### Snapshot Builds (develop branch)
+
+Every push to the `develop` branch triggers an automated snapshot build:
+- Builds and tests the project
+- Creates/updates a `snapshot-develop` pre-release on GitHub
+- Uploads `convex.jar` with current version and commit info
+- ⚠️ Marked as pre-release (unstable, for development/testing only)
+
+Access: [Snapshot Release](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop)
+
+### Release Builds (tagged versions)
+
+Pushing a tag matching `*.*.*` (e.g., `0.8.3`) triggers an automated release build:
+- Builds and tests the project
+- Extracts changelog from CHANGELOG.md
+- Creates a stable GitHub Release
+- Uploads `convex.jar` as a release asset
+- Marked as stable production release
+
+See "Release preparation" section below for the full release process.
+
 
 ## Release preparation
 
