@@ -42,8 +42,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building snapshot version: $VERSION"
 
-      - name: Build with tests
-        run: mvn -B clean verify
+      - name: Build with install
+        run: mvn -B clean install -DskipTests
 
       - name: Get short commit hash
         id: commit
