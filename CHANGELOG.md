@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- LatticeContext for context-aware lattice merge operations
+- Context-aware merge methods in ALattice and SignedLattice
+- Support for passing timestamps and signing keys via context during merges
+
 ### Changed
 
+- SignedLattice now supports getting keypair from merge context with fallback to instance variable
+- Enhanced lattice merge infrastructure to support contextual information
+
 ### Fixed
+
+- GitHub Actions release workflow (updated to modern actions, fixed missing step IDs)
 
 ## [0.8.2] - 2025-11-21
 

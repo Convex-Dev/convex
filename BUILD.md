@@ -39,13 +39,26 @@ mvn versions:set -DnewVersion='0.8.2' -DartifactId=* -DgroupId=*
 
 Commit as "Prepare for Release 0.8.2"
 
-### Tag release
+### Tag and push release
 
-- Tag Release Commit e.g. `0.8.2`
+Tag the release commit and push to trigger automated build:
 
-### Build and deploy
-
+```bash
+git tag 0.8.3
+git push origin 0.8.3
 ```
+
+This will trigger the GitHub Actions release workflow which:
+- Builds and tests the project (`mvn -B clean verify`)
+- Extracts changelog for this version from CHANGELOG.md
+- Creates a GitHub Release with the changelog
+- Uploads `convex.jar` as a release asset
+
+The JAR will be available as a GitHub Release asset named `convex-{version}.jar`
+
+### Manual deploy to Maven Central (if needed)
+
+```bash
 mvn -B clean verify
 mvn deploy -Prelease
 ```
