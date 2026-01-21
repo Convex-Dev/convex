@@ -12,7 +12,9 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.SignedData;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
 
 public class GenericLatticeTest {
@@ -48,6 +50,45 @@ public class GenericLatticeTest {
 		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
 
 		LatticeTest.doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
+	}
+
+	@Test
+	public void testSignedLatticeWithContext() {
+		AKeyPair kp = AKeyPair.generate();
+		CVMLong ts = CVMLong.create(System.currentTimeMillis());
+		LatticeContext ctx = LatticeContext.create(ts, kp);
+
+		// Create signed lattice (without setting keypair on instance)
+		SignedLattice<AInteger> sl = SignedLattice.<AInteger>create(MaxLattice.create());
+
+		// Create signed values
+		SignedData<AInteger> sd1 = kp.signData(CVMLong.create(10));
+		SignedData<AInteger> sd2 = kp.signData(CVMLong.create(20));
+
+		// Merge using context - should get max value (20) with valid signature
+		SignedData<AInteger> result = sl.merge(ctx, sd1, sd2);
+
+		assertEquals(CVMLong.create(20), result.getValue());
+		assertEquals(true, result.checkSignature());
+	}
+
+	@Test
+	public void testSignedLatticeContextFallback() {
+		AKeyPair kp = AKeyPair.generate();
+
+		// Create signed lattice with keypair set on instance (old style)
+		SignedLattice<AInteger> sl = SignedLattice.<AInteger>create(MaxLattice.create());
+		sl.setKeyPair(kp);
+
+		// Create signed values
+		SignedData<AInteger> sd1 = kp.signData(CVMLong.create(10));
+		SignedData<AInteger> sd2 = kp.signData(CVMLong.create(20));
+
+		// Merge with empty context - should fall back to instance keypair
+		SignedData<AInteger> result = sl.merge(LatticeContext.EMPTY, sd1, sd2);
+
+		assertEquals(CVMLong.create(20), result.getValue());
+		assertEquals(true, result.checkSignature());
 	}
 
 }
