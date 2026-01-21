@@ -23,6 +23,19 @@ public abstract class ALattice<V extends ACell> {
 	 * @return Merged lattice root cell
 	 */
 	public abstract V merge(V ownValue, V otherValue);
+
+	/**
+	 * Context-aware merge function. Default implementation delegates to simple merge.
+	 * Override this method if merge logic requires contextual information (timestamp, signing key, etc.)
+	 *
+	 * @param context Context for merge operation
+	 * @param ownValue Own lattice value
+	 * @param otherValue Externally received lattice value
+	 * @return Merged lattice root cell
+	 */
+	public V merge(LatticeContext context, V ownValue, V otherValue) {
+		return merge(ownValue, otherValue);
+	}
 	
 	/**
 	 * Obtains the "zero" value for the lattice. This may be null, but a non-null zero value is preferred.
