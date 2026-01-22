@@ -1,0 +1,20 @@
+<configuration>
+  <!-- Test logging configuration: suppress INFO noise, show WARN and above -->
+
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>[%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Suppress noisy libraries -->
+  <logger name="io.javalin" level="WARN"/>
+  <logger name="org.eclipse.jetty" level="WARN"/>
+  <logger name="convex.peer.Server" level="WARN"/>
+  <logger name="convex.peer.ConnectionManager" level="WARN"/>
+
+  <!-- Default to WARN for all loggers during tests -->
+  <root level="WARN">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
