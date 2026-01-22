@@ -50,8 +50,8 @@ public class LatticeDemo {
 
 	// Configuration: How many nodes and operations to run
 	private static final int NUM_NODES = 3;      // Number of independent nodes in the network
-	private static final int MERGES = 100;       // Number of merge batches to perform
-	private static final int MODS = 100;         // Number of modifications per merge batch
+	private static final int MERGES = 1000;       // Number of merge batches to perform
+	private static final int MODS = 1000;         // Number of modifications per merge batch
 	private static final int BASE_PORT = 19700;  // Starting port number for nodes
 
 	public static void main(String[] args) throws Exception {
