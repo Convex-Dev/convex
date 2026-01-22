@@ -19,6 +19,7 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
@@ -103,6 +104,7 @@ public class LatticePropagatorTest {
 	 * 1. The propagator detects value changes
 	 * 2. The propagator broadcasts to connected peers
 	 * 3. Broadcasts are sent automatically without manual intervention
+	 * 4. broadcast value is successfully obtained
 	 */
 	@Test
 	public void testAutomaticPropagation() throws Exception {
@@ -128,7 +130,7 @@ public class LatticePropagatorTest {
 		server2.updateLocalPath(updatedDataIndex, dataKeyword);
 
 		// Wait for propagator to detect change and broadcast (up to 1 second)
-		TimeUnit.MILLISECONDS.sleep(500);
+		server1.sync();
 
 		// Verify propagator detected the change and broadcasted
 		long finalBroadcastCount = server2.getPropagator().getBroadcastCount();
@@ -138,6 +140,8 @@ public class LatticePropagatorTest {
 		// Verify the broadcast count increased by at least 1
 		assertTrue((finalBroadcastCount - initialBroadcastCount) >= 1,
 			"At least one broadcast should have been sent after value change");
+		
+		assertEquals(testValue,RT.getIn(server1.getLocalValue(),dataKeyword,valueHash));
 	}
 
 	/**
