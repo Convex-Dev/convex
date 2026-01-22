@@ -21,7 +21,7 @@
     "required": [
       "hash",
       "accountKey",
-      "signature"
+      "sig"
     ]
   },
   "outputSchema": {

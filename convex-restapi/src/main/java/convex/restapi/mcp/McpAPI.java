@@ -102,6 +102,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_CVX = Strings.intern("cvx");
 	public static final StringShort ARG_PUBLIC_KEY = Strings.intern("publicKey");
 	public static final StringShort ARG_SIGNATURE = Strings.intern("signature");
+	public static final StringShort ARG_SIG = Strings.intern("sig");
 	public static final StringShort ARG_BYTES = Strings.intern("bytes");
 	public static final StringShort ARG_ACCOUNT_KEY = Strings.intern("accountKey");
 	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
@@ -629,7 +630,11 @@ public class McpAPI extends ABaseAPI {
 				if (accountKey == null) {
 					return toolError("Invalid account key");
 				}
-				AString signatureCell = RT.ensureString(arguments.get(ARG_SIGNATURE));
+				// Accept both 'sig' and 'signature' for backwards compatibility
+				AString signatureCell = RT.ensureString(arguments.get(ARG_SIG));
+				if (signatureCell == null) {
+					signatureCell = RT.ensureString(arguments.get(ARG_SIGNATURE));
+				}
 				if (signatureCell == null) {
 					return protocolError(-32602, "Submit requires 'sig' string with Ed25519 signature");
 				}
