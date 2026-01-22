@@ -157,7 +157,7 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		rootCursor.updateAndGet(rootNode->DLFSNode.merge(rootNode,other,getTimestamp()));
+		rootCursor.updateAndGet(rootNode->DLFSNode.merge(rootNode,other));
 	}
 
 

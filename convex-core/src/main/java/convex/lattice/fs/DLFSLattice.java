@@ -53,16 +53,9 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 			return ownValue;
 		}
 
-		// Get timestamps from both nodes
-		CVMLong timeA = DLFSNode.getUTime(ownValue);
-		CVMLong timeB = DLFSNode.getUTime(otherValue);
-
-		// Use the maximum timestamp for the merge operation
-		// This ensures merged nodes have a timestamp that reflects the most recent change
-		CVMLong mergeTime = timeA.longValue() >= timeB.longValue() ? timeA : timeB;
-
 		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
-		return DLFSNode.merge(ownValue, otherValue, mergeTime);
+		// The merge is deterministic: timestamp is derived from the input nodes
+		return DLFSNode.merge(ownValue, otherValue);
 	}
 
 	@Override
@@ -83,17 +76,11 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 			return ownValue;
 		}
 
-		// Get merge timestamp from context, fallback to node timestamps
-		CVMLong mergeTime = context.getTimestamp();
-		if (mergeTime == null) {
-			// Fallback: use max of node timestamps
-			CVMLong timeA = DLFSNode.getUTime(ownValue);
-			CVMLong timeB = DLFSNode.getUTime(otherValue);
-			mergeTime = timeA.longValue() >= timeB.longValue() ? timeA : timeB;
-		}
-
 		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
-		return DLFSNode.merge(ownValue, otherValue, mergeTime);
+		// The merge is deterministic: timestamp is derived from the input nodes
+		// Note: Context timestamp is currently not used for DLFS merge.
+		// If timestamp override is needed, it should be handled at a higher level.
+		return DLFSNode.merge(ownValue, otherValue);
 	}
 
 	@Override
