@@ -79,6 +79,29 @@ public class AccountCreate extends AAccountCommand {
 
 	@Override
 	public void execute() throws InterruptedException {
+		// Validate requirements BEFORE generating keys
+		if (!useFaucet) {
+			// Transaction mode: validate funding account params early with clear messages
+			String keySpec = keyMixin.getPublicKey();
+			boolean hasKey = keySpec != null && !keySpec.isBlank();
+
+			// Check what's missing and provide helpful error message
+			try {
+				addressMixin.getAddress("Enter funding account address: ");
+			} catch (CLIError e) {
+				// Enhance error message for transaction mode
+				throw new CLIError(ExitCodes.USAGE,
+					"Transaction mode requires -a/--address and --key for the funding account.\n" +
+					"Use --faucet to create account via faucet instead (if available).");
+			}
+
+			if (!hasKey) {
+				throw new CLIError(ExitCodes.USAGE,
+					"Transaction mode requires --key for the funding account.\n" +
+					"Use --faucet to create account via faucet instead (if available).");
+			}
+		}
+
 		AKeyPair newKeyPair = null;
 		AccountKey newAccountKey = null;
 		boolean newKeyGenerated = false;
@@ -126,19 +149,13 @@ public class AccountCreate extends AAccountCommand {
 	}
 
 	/**
-	 * Create account using transaction from existing funded account
+	 * Create account using transaction from existing funded account.
+	 * Note: Assumes address and key have been validated in execute().
 	 */
 	private Address createViaTransaction(AccountKey newAccountKey) throws InterruptedException {
-		// Need address and key for the funding account
-		Address fundingAddress = addressMixin.getAddress("Enter funding account address: ");
-		if (fundingAddress == null) {
-			throw new CLIError(ExitCodes.USAGE, "Transaction mode requires --address for the funding account.");
-		}
-
+		// Get validated params (already checked in execute())
+		Address fundingAddress = addressMixin.getAddress(null);
 		String keySpec = keyMixin.getPublicKey();
-		if (keySpec == null || keySpec.isBlank()) {
-			throw new CLIError(ExitCodes.USAGE, "Transaction mode requires --key for the funding account.");
-		}
 
 		// Load the funding account's key pair
 		AKeyPair fundingKeyPair = storeMixin.loadKeyFromStore(keySpec, () -> keyMixin.getKeyPassword());

@@ -124,7 +124,7 @@ public class Main extends ACommand {
 			} catch (ParameterException t) {
 				informError("ERROR: Unable to parse arguments: " + t.getMessage());
 				informWarning("For more information on options and commands try 'convex help'.");
-				return ExitCodes.ERROR;
+				return ExitCodes.USAGE;
 			}
 
 			if (commandLine.isUsageHelpRequested()) {
