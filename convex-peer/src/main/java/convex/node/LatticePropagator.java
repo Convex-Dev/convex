@@ -93,11 +93,6 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 	private volatile boolean running = false;
 
 	/**
-	 * Flag indicating if a broadcast is currently in progress
-	 */
-	private final AtomicBoolean broadcasting = new AtomicBoolean(false);
-
-	/**
 	 * Queue for receiving broadcast trigger notifications.
 	 * Uses LatestUpdateQueue which only stores the most recent trigger,
 	 * avoiding redundant broadcasts when multiple merges occur rapidly.
@@ -167,7 +162,7 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 		propagationThread.setDaemon(true);
 		propagationThread.start();
 
-		log.info("LatticePropagator started for NodeServer on port {}", nodeServer.getPort());
+		log.debug("LatticePropagator started for NodeServer on port {}", nodeServer.getPort());
 	}
 
 	/**
@@ -213,7 +208,7 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 			}
 		} finally {
 			Stores.setCurrent(savedStore);
-			log.info("LatticePropagator stopped");
+			log.debug("LatticePropagator stopped");
 		}
 	}
 
@@ -251,47 +246,35 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 			return;
 		}
 
-		// Set broadcasting flag
-		if (!broadcasting.compareAndSet(false, true)) {
-			// Already broadcasting, skip
-			log.trace("Already broadcasting, skipping");
-			return;
-		}
+		// Send delta broadcasts in a loop until no more changes
+		do {
+			try {
+				broadcast(value);
+				lastAnnouncedValue = value;
+				lastBroadcastTime = currentTime;
+				broadcastCount++;
+				log.debug("Delta broadcast sent (count: {})", broadcastCount);
 
-		try {
-			// Send delta broadcasts in a loop until no more changes
-			do {
-				try {
-					broadcast(value);
-					lastAnnouncedValue = value;
-					lastBroadcastTime = currentTime;
-					broadcastCount++;
-					log.debug("Delta broadcast sent (count: {})", broadcastCount);
+				// After broadcast, check if value changed again
+				value = nodeServer.getLocalValue();
+				currentTime = Utils.getCurrentTimestamp();
 
-					// After broadcast, check if value changed again
-					value = nodeServer.getLocalValue();
-					currentTime = Utils.getCurrentTimestamp();
+				// Poll queue to consume any trigger (LatestUpdateQueue only stores 1 item)
+				triggerQueue.poll();
 
-					// Poll queue to consume any trigger (LatestUpdateQueue only stores 1 item)
-					triggerQueue.poll();
-
-					// If value changed, continue broadcasting
-					if (!hasValueChanged(value)) {
-						break; // No more changes, exit loop
-					}
-
-					log.debug("Value changed during broadcast, sending another delta");
-
-				} catch (IOException e) {
-					log.warn("Error during lattice broadcast", e);
-					break;
+				// If value changed, continue broadcasting
+				if (!hasValueChanged(value)) {
+					break; // No more changes, exit loop
 				}
-			} while (running && !Thread.currentThread().isInterrupted());
 
-		} finally {
-			// Clear broadcasting flag
-			broadcasting.set(false);
-		}
+				log.debug("Value changed during broadcast, sending another delta");
+
+			} catch (IOException e) {
+				log.warn("Error during lattice broadcast", e);
+				break;
+			}
+		} while (running && !Thread.currentThread().isInterrupted());
+
 	}
 
 	/**
@@ -492,15 +475,6 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Checks if a broadcast is currently in progress.
-	 *
-	 * @return true if broadcasting, false otherwise
-	 */
-	public boolean isBroadcasting() {
-		return broadcasting.get();
-	}
-
-	/**
 	 * Gets the number of broadcasts sent by this propagator.
 	 *
 	 * @return Broadcast count
@@ -575,7 +549,7 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 			}
 		}
 
-		log.info("LatticePropagator stopped (sent {} delta broadcasts, {} root syncs)",
+		log.debug("LatticePropagator stopped (sent {} delta broadcasts, {} root syncs)",
 			broadcastCount, rootSyncCount);
 	}
 }

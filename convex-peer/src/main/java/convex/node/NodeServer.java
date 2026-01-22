@@ -142,7 +142,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException("NodeServer is already running");
 		}
 
-		log.info("Launching NodeServer on port {}", port);
+		log.debug("Launching NodeServer on port {}", port);
 
 		// Create Netty server if not already created
 		if (networkServer == null) {
@@ -164,7 +164,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		propagator = new LatticePropagator<>(this, store);
 		propagator.start();
 
-		log.info("NodeServer started successfully on port {}", port);
+		log.debug("NodeServer started successfully on port {}", port);
 	}
 	
 	/**
@@ -907,7 +907,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return;
 		}
 
-		log.info("Closing NodeServer");
+		log.trace("Closing NodeServer");
 
 		running = false;
 
@@ -925,7 +925,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (peer != null) {
 				try {
 					peer.close();
-					log.debug("Closed peer connection: {}", peer.getHostAddress());
+					log.trace("Closed peer connection: {}", peer.getHostAddress());
 				} catch (Exception e) {
 					log.warn("Error closing peer connection: {}", peer.getHostAddress(), e);
 				}
