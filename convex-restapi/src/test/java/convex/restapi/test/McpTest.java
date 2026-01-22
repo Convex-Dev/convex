@@ -242,6 +242,102 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
+	 * Two-step flow: prepare -> signAndSubmit should execute the transaction successfully.
+	 * This is the recommended pattern for agents.
+	 */
+	@Test
+	public void testPrepareSignAndSubmit() throws IOException, InterruptedException {
+		AString source = Strings.create("(+ 10 20)");
+		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
+		AMap<AString, ACell> prepareArgs = Maps.of(
+			"source", source,
+			"address", addressString
+		);
+
+		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
+		AMap<AString, ACell> prepared = expectResult(prepareResponse);
+		AString hashCell = RT.getIn(prepared, "hash");
+		assertNotNull(hashCell, "Prepare should return a hash");
+
+		AString seedHex = Strings.create(KP.getSeed().toHexString());
+		AMap<AString, ACell> signAndSubmitArgs = Maps.of(
+			"hash", hashCell,
+			"seed", seedHex
+		);
+		AMap<AString, ACell> signAndSubmitResponse = makeToolCall("signAndSubmit", signAndSubmitArgs);
+		AMap<AString, ACell> result = expectResult(signAndSubmitResponse);
+		assertEquals(CVMLong.create(30), RT.getIn(result, "value"), "Result should be 30 for (+ 10 20)");
+	}
+
+	/**
+	 * signAndSubmit should fail gracefully with invalid hash.
+	 */
+	@Test
+	public void testSignAndSubmitInvalidHash() throws IOException, InterruptedException {
+		AString seedHex = Strings.create(KP.getSeed().toHexString());
+		AMap<AString, ACell> args = Maps.of(
+			"hash", "0xDEADBEEF",
+			"seed", seedHex
+		);
+		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
+		AMap<AString, ACell> structured = expectError(response);
+		assertNotNull(structured, "Invalid hash should return a structured error");
+	}
+
+	/**
+	 * signAndSubmit should fail gracefully with invalid seed.
+	 */
+	@Test
+	public void testSignAndSubmitInvalidSeed() throws IOException, InterruptedException {
+		// First prepare a valid transaction
+		AString source = Strings.create("(* 2 3)");
+		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
+		AMap<AString, ACell> prepareArgs = Maps.of(
+			"source", source,
+			"address", addressString
+		);
+		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
+		AMap<AString, ACell> prepared = expectResult(prepareResponse);
+		AString hashCell = RT.getIn(prepared, "hash");
+
+		// Try with invalid seed (too short)
+		AMap<AString, ACell> args = Maps.of(
+			"hash", hashCell,
+			"seed", "0x1234"
+		);
+		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
+		AMap<AString, ACell> structured = expectError(response);
+		assertNotNull(structured, "Invalid seed should return a structured error");
+	}
+
+	/**
+	 * signAndSubmit should fail with missing hash parameter.
+	 */
+	@Test
+	public void testSignAndSubmitMissingHash() throws IOException, InterruptedException {
+		AString seedHex = Strings.create(KP.getSeed().toHexString());
+		AMap<AString, ACell> args = Maps.of("seed", seedHex);
+		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
+
+		// Should return a protocol error for missing required parameter
+		ACell errorCell = response.get(McpAPI.FIELD_ERROR);
+		assertNotNull(errorCell, "Missing hash should return a protocol error");
+	}
+
+	/**
+	 * signAndSubmit should fail with missing seed parameter.
+	 */
+	@Test
+	public void testSignAndSubmitMissingSeed() throws IOException, InterruptedException {
+		AMap<AString, ACell> args = Maps.of("hash", "0x1234567890abcdef");
+		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
+
+		// Should return a protocol error for missing required parameter
+		ACell errorCell = response.get(McpAPI.FIELD_ERROR);
+		assertNotNull(errorCell, "Missing seed should return a protocol error");
+	}
+
+	/**
 	 * Transact tool should execute a transaction directly with source, seed, and address,
 	 * returning the result value.
 	 */
