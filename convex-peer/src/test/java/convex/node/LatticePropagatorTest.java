@@ -104,13 +104,10 @@ public class LatticePropagatorTest {
 	 * 1. The propagator detects value changes
 	 * 2. The propagator broadcasts to connected peers
 	 * 3. Broadcasts are sent automatically without manual intervention
-	 * 4. broadcast value is successfully obtained
+	 * 4. Broadcast value is successfully obtained by remote peer
 	 */
 	@Test
 	public void testAutomaticPropagation() throws Exception {
-		// Get initial broadcast count
-		long initialBroadcastCount = server2.getPropagator().getBroadcastCount();
-
 		// Get the :data keyword
 		Keyword dataKeyword = Keyword.intern("data");
 
@@ -129,31 +126,22 @@ public class LatticePropagatorTest {
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.updateLocalPath(updatedDataIndex, dataKeyword);
 
-		// Wait for propagator to detect change and broadcast (up to 1 second)
-		server1.sync();
+		// Sync server1 to ensure it has received the broadcast from server2
+		assertTrue(server1.sync(), "Sync should complete successfully");
 
-		// Verify propagator detected the change and broadcasted
-		long finalBroadcastCount = server2.getPropagator().getBroadcastCount();
-		assertTrue(finalBroadcastCount > initialBroadcastCount,
-			"Propagator should have detected value change and broadcasted to peers");
-
-		// Verify the broadcast count increased by at least 1
-		assertTrue((finalBroadcastCount - initialBroadcastCount) >= 1,
-			"At least one broadcast should have been sent after value change");
-		
-		assertEquals(testValue,RT.getIn(server1.getLocalValue(),dataKeyword,valueHash));
+		// Verify server1 received the value from server2
+		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
+			"Server1 should have received the value broadcast from server2");
 	}
 
 	/**
-	 * Tests that propagator broadcast count increases with local updates.
+	 * Tests that multiple updates are successfully propagated to remote peers.
 	 */
 	@Test
-	public void testPropagatorBroadcastCount() throws Exception {
-		// Get initial broadcast count
-		long initialCount = server1.getPropagator().getBroadcastCount();
-
-		// Perform multiple local updates to trigger broadcasts
+	public void testMultipleUpdates() throws Exception {
+		// Perform multiple local updates on server1
 		Keyword dataKeyword = Keyword.intern("data");
+
 		for (int i = 0; i < 3; i++) {
 			ACell testValue = CVMLong.create(1000 + i);
 			Hash valueHash = Hash.get(testValue);
@@ -168,18 +156,12 @@ public class LatticePropagatorTest {
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.updateLocalPath(updatedDataIndex, dataKeyword);
 
-			// Small delay between updates to allow broadcasts to complete
-			TimeUnit.MILLISECONDS.sleep(100);
+			// Sync server2 to ensure it received the update from server1
+			assertTrue(server2.sync(), "Sync should complete successfully for update " + (i + 1));
+
+			// Verify server2 received this specific value
+			assertEquals(testValue, RT.getIn(server2.getLocalValue(), dataKeyword, valueHash),
+				"Server2 should have received update " + (i + 1) + " from server1");
 		}
-
-		// Wait a bit for final broadcast to complete
-		TimeUnit.MILLISECONDS.sleep(200);
-
-		// Verify count increased
-		long finalCount = server1.getPropagator().getBroadcastCount();
-		assertTrue(finalCount > initialCount,
-			"Propagator broadcast count should increase with local updates");
-		assertTrue((finalCount - initialCount) >= 3,
-			"Should have at least 3 broadcasts from 3 local updates");
 	}
 }
