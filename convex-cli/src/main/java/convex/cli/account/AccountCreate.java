@@ -44,7 +44,7 @@ public class AccountCreate extends AAccountCommand {
 	private boolean generateNewKey;
 
 	@Option(names={"-f", "--fund"},
-		description="Fund the account with the default fund amount via faucet.")
+		description="Create and fund account via faucet.")
 	private boolean isFund;
 
 	@Option(names={"--fund-amount"},
@@ -84,7 +84,7 @@ public class AccountCreate extends AAccountCommand {
 			keyPair = AKeyPair.generate();
 			accountKey = keyPair.getAccountKey();
 			newKeyGenerated = true;
-			inform("No key specified, generated new key pair with public key: 0x" + accountKey.toChecksumHex());
+			inform("No new key specified, generated new key pair with public key: 0x" + accountKey.toChecksumHex());
 		}
 
 		// Connect to peer
