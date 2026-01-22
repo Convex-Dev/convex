@@ -38,6 +38,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
 
 public class DLFSTest {
@@ -545,6 +546,97 @@ public class DLFSTest {
 		// Both node1 and node2 have "sharedDir", so RT.getIn will work for both
 		AString dirName = Strings.create("sharedDir");
 		LatticeTest.doLatticeTest(lattice, node1, node2, 0L, dirName);
+	}
+
+	/**
+	 * Test that DLFSLattice context-aware merge uses timestamp from context.
+	 *
+	 * Verifies:
+	 * - Context timestamp is used for merge operations when provided
+	 * - Fallback to node timestamps when context timestamp is null
+	 * - Context timestamp overrides node timestamps for conflict resolution
+	 */
+	@Test
+	public void testDLFSLatticeContextAwareMerge() throws IOException {
+		DLFSLattice lattice = DLFSLattice.INSTANCE;
+
+		// Create two filesystems with conflicting files at different timestamps
+		DLFileSystem fs1 = DLFS.createLocal();
+		fs1.setTimestamp(CVMLong.create(1000));
+		Path file1 = Files.createFile(fs1.getPath("conflict.txt"));
+		try (OutputStream os = Files.newOutputStream(file1)) {
+			os.write(new byte[] {1, 2, 3});
+		}
+		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
+
+		DLFileSystem fs2 = DLFS.createLocal();
+		fs2.setTimestamp(CVMLong.create(2000));
+		Path file2 = Files.createFile(fs2.getPath("conflict.txt"));
+		try (OutputStream os = Files.newOutputStream(file2)) {
+			os.write(new byte[] {4, 5, 6});
+		}
+		AVector<ACell> node2 = fs2.getNode(fs2.getRoot());
+
+		// Test 1: Context with timestamp = 3000
+		// Should use context timestamp for merge
+		CVMLong contextTime = CVMLong.create(3000);
+		LatticeContext context = LatticeContext.create(contextTime, null);
+
+		AVector<ACell> merged = lattice.merge(context, node1, node2);
+		assertNotNull(merged, "Merged value should not be null");
+
+		// Merged root should have timestamp from context (3000), not from nodes
+		CVMLong mergedTime = DLFSNode.getUTime(merged);
+		assertEquals(3000L, mergedTime.longValue(), "Merged root should use context timestamp");
+
+		// Test 2: Context with null timestamp
+		// Should fall back to max of node timestamps (2000)
+		LatticeContext emptyContext = LatticeContext.EMPTY;
+
+		AVector<ACell> merged2 = lattice.merge(emptyContext, node1, node2);
+		assertNotNull(merged2, "Merged value should not be null");
+
+		CVMLong mergedTime2 = DLFSNode.getUTime(merged2);
+		assertEquals(2000L, mergedTime2.longValue(), "Merged root should use max node timestamp when context timestamp is null");
+
+		// Test 3: Basic merge (no context) should behave as before
+		AVector<ACell> merged3 = lattice.merge(node1, node2);
+		assertNotNull(merged3, "Merged value should not be null");
+
+		CVMLong mergedTime3 = DLFSNode.getUTime(merged3);
+		assertEquals(2000L, mergedTime3.longValue(), "Basic merge should use max node timestamp");
+
+		// Test 4: Verify DirectoryEntriesLattice passes context through
+		// Create two filesystems with subdirectories
+		DLFileSystem fs3 = DLFS.createLocal();
+		fs3.setTimestamp(CVMLong.create(1000));
+		Path dir1 = Files.createDirectory(fs3.getPath("subdir"));
+		Path file3 = Files.createFile(dir1.resolve("file.txt"));
+		try (OutputStream os = Files.newOutputStream(file3)) {
+			os.write(new byte[] {7, 8, 9});
+		}
+		AVector<ACell> node3 = fs3.getNode(fs3.getRoot());
+
+		DLFileSystem fs4 = DLFS.createLocal();
+		fs4.setTimestamp(CVMLong.create(2000));
+		Path dir2 = Files.createDirectory(fs4.getPath("subdir"));
+		Path file4 = Files.createFile(dir2.resolve("other.txt"));
+		try (OutputStream os = Files.newOutputStream(file4)) {
+			os.write(new byte[] {10, 11, 12});
+		}
+		AVector<ACell> node4 = fs4.getNode(fs4.getRoot());
+
+		// Merge with context timestamp = 4000
+		LatticeContext context2 = LatticeContext.create(CVMLong.create(4000), null);
+		AVector<ACell> merged4 = lattice.merge(context2, node3, node4);
+
+		// Verify merged root uses context timestamp
+		assertEquals(4000L, DLFSNode.getUTime(merged4).longValue(), "Merged root with subdirs should use context timestamp");
+
+		// Verify subdirectory also gets context timestamp during merge
+		AVector<ACell> mergedSubdir = DLFSNode.navigate(merged4, fs3.getPath("subdir"));
+		assertNotNull(mergedSubdir, "Merged subdirectory should exist");
+		assertEquals(4000L, DLFSNode.getUTime(mergedSubdir).longValue(), "Merged subdirectory should use context timestamp");
 	}
 
 }

@@ -91,4 +91,73 @@ public class GenericLatticeTest {
 		assertEquals(true, result.checkSignature());
 	}
 
+	@Test
+	public void testOwnerLatticeWithContext() {
+		// Create two key pairs for two different owners
+		AKeyPair kp1 = AKeyPair.generate();
+		AKeyPair kp2 = AKeyPair.generate();
+		CVMLong ts = CVMLong.create(System.currentTimeMillis());
+
+		// Create OwnerLattice for signed max values
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Create first owner's signed values
+		ACell owner1 = kp1.getAccountKey();
+		SignedData<AInteger> owner1Val1 = kp1.signData(CVMLong.create(10));
+		AHashMap<ACell, SignedData<AInteger>> map1 = Maps.of(owner1, owner1Val1);
+
+		// Create second owner's signed values
+		ACell owner2 = kp2.getAccountKey();
+		SignedData<AInteger> owner2Val1 = kp2.signData(CVMLong.create(20));
+		AHashMap<ACell, SignedData<AInteger>> map2 = Maps.of(owner2, owner2Val1);
+
+		// Merge two different owners - should combine both entries
+		LatticeContext ctx1 = LatticeContext.create(ts, kp1);
+		AHashMap<ACell, SignedData<AInteger>> merged = ownerLattice.merge(ctx1, map1, map2);
+
+		assertEquals(2, merged.size(), "Merged map should have both owners");
+		assertEquals(CVMLong.create(10), merged.get(owner1).getValue(), "Owner1's value should be preserved");
+		assertEquals(CVMLong.create(20), merged.get(owner2).getValue(), "Owner2's value should be preserved");
+
+		// Update owner1's value and merge again
+		SignedData<AInteger> owner1Val2 = kp1.signData(CVMLong.create(30));
+		AHashMap<ACell, SignedData<AInteger>> map3 = Maps.of(owner1, owner1Val2);
+
+		LatticeContext ctx2 = LatticeContext.create(ts, kp1);
+		AHashMap<ACell, SignedData<AInteger>> merged2 = ownerLattice.merge(ctx2, merged, map3);
+
+		assertEquals(2, merged2.size(), "Merged map should still have both owners");
+		assertEquals(CVMLong.create(30), merged2.get(owner1).getValue(), "Owner1's value should be updated to max (30)");
+		assertEquals(CVMLong.create(20), merged2.get(owner2).getValue(), "Owner2's value should remain unchanged");
+
+		// Verify signatures are valid
+		assertEquals(true, merged2.get(owner1).checkSignature(), "Owner1's signature should be valid");
+		assertEquals(true, merged2.get(owner2).checkSignature(), "Owner2's signature should be valid");
+	}
+
+	@Test
+	public void testOwnerLatticeContextFallback() {
+		// Test that OwnerLattice works without context (backwards compatibility)
+		AKeyPair kp1 = AKeyPair.generate();
+		AKeyPair kp2 = AKeyPair.generate();
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Create owner values
+		ACell owner1 = kp1.getAccountKey();
+		SignedData<AInteger> owner1Val = kp1.signData(CVMLong.create(10));
+		AHashMap<ACell, SignedData<AInteger>> map1 = Maps.of(owner1, owner1Val);
+
+		ACell owner2 = kp2.getAccountKey();
+		SignedData<AInteger> owner2Val = kp2.signData(CVMLong.create(20));
+		AHashMap<ACell, SignedData<AInteger>> map2 = Maps.of(owner2, owner2Val);
+
+		// Merge without context (basic merge)
+		AHashMap<ACell, SignedData<AInteger>> merged = ownerLattice.merge(map1, map2);
+
+		assertEquals(2, merged.size(), "Merged map should have both owners");
+		assertEquals(CVMLong.create(10), merged.get(owner1).getValue());
+		assertEquals(CVMLong.create(20), merged.get(owner2).getValue());
+	}
+
 }
