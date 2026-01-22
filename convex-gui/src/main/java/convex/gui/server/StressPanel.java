@@ -87,7 +87,7 @@ public class StressPanel extends JPanel {
 		actionPanel.add(btnRun);
 		btnRun.addActionListener(e -> {
 			Hash network=peerView.getLocalServer().getPeer().getGenesisHash();
-			if (network.equals(Networks.PRONONET_GENESIS)) {
+			if (network.equals(Networks.PROTONET_GENESIS)) {
 				int confirm=JOptionPane.showConfirmDialog(this, "This is the live network. Running a stress test is likley to be expensive! Are you really sure you want to do this?", "Run test on Live network?", JOptionPane.WARNING_MESSAGE);
 				if (confirm!=JOptionPane.OK_OPTION) return;
 			}
