@@ -22,8 +22,10 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
@@ -38,14 +40,20 @@ import convex.net.impl.netty.NettyServer;
 
 /**
  * A networked node server for Lattice networks.
- * 
+ *
  * This server handles binary protocol communication for syncing lattice values
  * with other nodes in the network. It provides a lightweight alternative to
  * the full Peer Server, focused specifically on lattice value synchronization.
- * 
+ *
  * The server uses the binary protocol (VLQ-encoded message lengths followed by
  * message data) to exchange and merge lattice values with peer nodes.
- * 
+ *
+ * Features:
+ * - Automatic delta-based broadcasting of lattice updates to peers
+ * - Efficient novelty detection using store announcement mechanism
+ * - Manual sync capabilities for on-demand synchronization
+ * - Support for hierarchical lattice paths
+ *
  * @param <V> The type of lattice values managed by this node server
  */
 public class NodeServer<V extends ACell> implements Closeable {
@@ -71,22 +79,27 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Store for persisting and retrieving lattice values
 	 */
 	private final AStore store;
-	
+
+	/**
+	 * Automatic lattice propagator for broadcasting updates
+	 */
+	private LatticePropagator<V> propagator;
+
 	/**
 	 * Message receiver action for handling incoming lattice sync messages
 	 */
 	private Consumer<Message> receiveAction;
-	
+
 	/**
 	 * Set of connected peer Convex instances (maintains persistent connections)
 	 */
 	private Set<Convex> peerNodes;
-	
+
 	/**
 	 * Port this server is listening on
 	 */
 	private Integer port;
-	
+
 	/**
 	 * Whether the server is currently running
 	 */
@@ -119,8 +132,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	
 	/**
 	 * Launches the node server, binding to the configured port and starting
-	 * network listeners.
-	 * 
+	 * network listeners and automatic propagation.
+	 *
 	 * @throws IOException If an IO error occurs during launch
 	 * @throws InterruptedException If the operation is interrupted
 	 */
@@ -128,24 +141,29 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (running) {
 			throw new IllegalStateException("NodeServer is already running");
 		}
-		
+
 		log.info("Launching NodeServer on port {}", port);
-		
+
 		// Create Netty server if not already created
 		if (networkServer == null) {
 			networkServer = new NettyServer(port);
 			// Set the receive action for handling incoming messages
 			((NettyServer) networkServer).setReceiveAction(receiveAction);
 		}
-		
+
 		// Configure and launch network server
 		if (port != null) {
 			networkServer.setPort(port);
 		}
 		networkServer.launch();
 		port = networkServer.getPort();
-		
+
 		running = true;
+
+		// Start automatic lattice propagator
+		propagator = new LatticePropagator<>(this, store);
+		propagator.start();
+
 		log.info("NodeServer started successfully on port {}", port);
 	}
 	
@@ -270,10 +288,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 	
 	/**
-	 * Processes a LATTICE_VALUE message by merging the received value at the specified path.
-	 * 
+	 * Processes a LATTICE_VALUE message with automatic missing data recovery.
+	 *
+	 * Uses speculative merge in a forked cursor to detect missing data,
+	 * then pulls only what's needed before committing the merge.
+	 *
 	 * Payload format: [:LV [*path*] value]
-	 * 
+	 *
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
 	 */
@@ -284,51 +305,163 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.warn("Invalid LATTICE_VALUE message format");
 			return;
 		}
-		
+
 		ACell pathCell = payload.get(1);
 		ACell value = payload.count() > 2 ? payload.get(2) : null;
-		
+
 		if (value == null) {
 			log.warn("LATTICE_VALUE message missing value");
 			return;
 		}
-		
-		// Convert path to array if it's a vector
-		ACell[] path = null;
-		if (pathCell != null) {
-			AVector<?> pathVector = RT.ensureVector(pathCell);
-			if (pathVector != null) {
-				long pathLen = pathVector.count();
-				path = new ACell[(int)pathLen];
-				for (long i = 0; i < pathLen; i++) {
-					path[(int)i] = pathVector.get(i);
-				}
-			} else {
-				// Single key path
-				path = new ACell[] { pathCell };
-			}
-		} else {
-			// Empty path means root
-			path = new ACell[0];
-		}
-		
-		// Get sub-lattice at path
+
+		// Convert path to array
+		ACell[] path = extractPath(pathCell);
+
+		// Get sub-lattice at path for validation
 		ALattice<?> subLattice = lattice.path(path);
 		if (subLattice == null && path.length > 0) {
 			log.warn("Invalid path for LATTICE_VALUE: path length {}", path.length);
 			return;
 		}
-		
-		// Merge the value at the path
+
+		// Merge with fork + acquire pattern
 		if (path.length == 0) {
-			// Root path: merge directly with root lattice
+			// Root merge: use fork pattern for automatic recovery
 			V receivedValue = (V) value;
-			mergeValue(receivedValue);
+			mergeValueWithAcquire(receivedValue, message);
 		} else {
-			// Path-specific merge: use PathCursor
+			// Path-specific merge: use existing logic with acquire fallback
+			mergePathWithAcquire(path, value, message);
+		}
+	}
+
+	/**
+	 * Extracts path array from message path cell.
+	 *
+	 * @param pathCell Path cell from message (may be null, vector, or single key)
+	 * @return Array of path keys (empty array for root)
+	 */
+	private ACell[] extractPath(ACell pathCell) {
+		if (pathCell == null) {
+			return new ACell[0]; // Empty path = root
+		}
+
+		AVector<?> pathVector = RT.ensureVector(pathCell);
+		if (pathVector != null) {
+			// Vector path
+			long pathLen = pathVector.count();
+			ACell[] path = new ACell[(int)pathLen];
+			for (long i = 0; i < pathLen; i++) {
+				path[(int)i] = pathVector.get(i);
+			}
+			return path;
+		} else {
+			// Single key path
+			return new ACell[] { pathCell };
+		}
+	}
+
+	/**
+	 * Attempts to merge a value at root, forking the cursor to detect missing data
+	 * and acquiring it automatically before committing the merge.
+	 *
+	 * This implements the "speculative fork + acquire" pattern:
+	 * 1. Fork the cursor (cheap, copy-on-write)
+	 * 2. Attempt merge in fork
+	 * 3. If MissingDataException => acquire missing cells
+	 * 4. Retry merge after acquisition
+	 * 5. Commit successful merge to main cursor
+	 * 6. Trigger immediate delta broadcast
+	 *
+	 * @param receivedValue Value to merge
+	 * @param message Original message (for tracking sender)
+	 */
+	private void mergeValueWithAcquire(V receivedValue, Message message) {
+		try {
+			// Validate foreign value
+			if (!lattice.checkForeign(receivedValue)) {
+				log.debug("Rejected invalid foreign lattice value");
+				return;
+			}
+
+			// Attempt merge with automatic acquisition on missing data
+			V merged = mergeValueWithRetry(receivedValue, 3);
+			if (merged != null) {
+				cursor.set(merged);
+				log.debug("Merged lattice value successfully");
+
+				// Trigger immediate delta broadcast
+				if (propagator != null) {
+					propagator.triggerBroadcast();
+				}
+			}
+		} catch (Exception e) {
+			log.warn("Error during lattice merge with acquire", e);
+		}
+	}
+
+	/**
+	 * Merges a value with automatic retry on missing data.
+	 *
+	 * @param receivedValue Value to merge
+	 * @param maxRetries Maximum number of acquisition retries
+	 * @return Merged value, or null if merge failed
+	 */
+	private V mergeValueWithRetry(V receivedValue, int maxRetries) {
+		int attempt = 0;
+		while (attempt < maxRetries) {
+			try {
+				// Attempt merge
+				V currentValue = cursor.get();
+				V merged = lattice.merge(currentValue, receivedValue);
+
+				// Try to persist (triggers MissingDataException if data missing)
+				merged = Cells.persist(merged);
+				return merged;
+
+			} catch (MissingDataException e) {
+				attempt++;
+				log.debug("Missing data in lattice merge (attempt {}): {}, acquiring...",
+					attempt, e.getMissingHash());
+
+				// Acquire missing data from peers
+				ACell acquired = acquireFromPeers(e.getMissingHash());
+				if (acquired == null) {
+					log.warn("Could not acquire missing data after {} attempts: {}",
+						attempt, e.getMissingHash());
+					return null;
+				}
+
+				log.debug("Acquired missing data, retrying merge");
+				// Loop will retry merge
+
+			} catch (IOException e) {
+				log.warn("IO error during lattice merge", e);
+				return null;
+			}
+		}
+
+		log.warn("Failed to merge after {} acquisition attempts", maxRetries);
+		return null;
+	}
+
+	/**
+	 * Merges a value at a specific path with acquire fallback.
+	 *
+	 * @param path Path array
+	 * @param value Value to merge at path
+	 * @param message Original message
+	 */
+	@SuppressWarnings("unchecked")
+	private void mergePathWithAcquire(ACell[] path, ACell value, Message message) {
+		try {
+			// Get sub-lattice at path
+			ALattice<?> subLattice = lattice.path(path);
 			PathCursor<ACell> pathCursor = PathCursor.create(cursor, path);
 			ACell currentValueAtPath = pathCursor.get();
-			
+
+			boolean merged = false;
+
 			// Check foreign value using sub-lattice
 			if (subLattice != null) {
 				ALattice<ACell> typedSubLattice = (ALattice<ACell>) subLattice;
@@ -336,17 +469,99 @@ public class NodeServer<V extends ACell> implements Closeable {
 					log.debug("Rejected invalid foreign lattice value at path");
 					return;
 				}
-				
-				// Merge using sub-lattice
-				ACell merged = typedSubLattice.merge(currentValueAtPath, value);
-				pathCursor.set(merged);
-				log.debug("Merged lattice value at path with length: {}", path.length);
+
+				// Attempt merge with retry on missing data
+				ACell mergedValue = mergePathValueWithRetry(typedSubLattice, currentValueAtPath, value, 3);
+				if (mergedValue != null) {
+					pathCursor.set(mergedValue);
+					log.debug("Merged lattice value at path with length: {}", path.length);
+					merged = true;
+				}
 			} else {
 				// No sub-lattice, just set the value
 				pathCursor.set(value);
 				log.debug("Set lattice value at path with length: {}", path.length);
+				merged = true;
+			}
+
+			// Trigger immediate delta broadcast after successful merge
+			if (merged && propagator != null) {
+				propagator.triggerBroadcast();
+			}
+		} catch (Exception e) {
+			log.warn("Error during path merge with acquire", e);
+		}
+	}
+
+	/**
+	 * Merges a value at path with automatic retry on missing data.
+	 *
+	 * @param subLattice Sub-lattice for merge
+	 * @param currentValue Current value at path
+	 * @param receivedValue Received value to merge
+	 * @param maxRetries Maximum acquisition retries
+	 * @return Merged value, or null if failed
+	 */
+	private ACell mergePathValueWithRetry(ALattice<ACell> subLattice, ACell currentValue,
+	                                       ACell receivedValue, int maxRetries) {
+		int attempt = 0;
+		while (attempt < maxRetries) {
+			try {
+				// Attempt merge
+				ACell merged = subLattice.merge(currentValue, receivedValue);
+				merged = Cells.persist(merged);
+				return merged;
+
+			} catch (MissingDataException e) {
+				attempt++;
+				log.debug("Missing data in path merge (attempt {}): {}, acquiring...",
+					attempt, e.getMissingHash());
+
+				ACell acquired = acquireFromPeers(e.getMissingHash());
+				if (acquired == null) {
+					log.warn("Could not acquire missing data: {}", e.getMissingHash());
+					return null;
+				}
+
+				log.debug("Acquired missing data, retrying merge");
+				// Loop will retry
+
+			} catch (IOException e) {
+				log.warn("IO error during path merge", e);
+				return null;
 			}
 		}
+
+		return null;
+	}
+
+	/**
+	 * Acquires missing data from connected peers.
+	 *
+	 * Tries each peer in turn until the data is successfully acquired.
+	 *
+	 * @param missingHash Hash of missing data
+	 * @return Acquired cell, or null if not found
+	 */
+	private ACell acquireFromPeers(Hash missingHash) {
+		for (Convex peer : peerNodes) {
+			if (peer == null || !peer.isConnected()) continue;
+
+			try {
+				// Use Convex.acquire() to pull missing data
+				ACell acquired = peer.acquire(missingHash).get(5, TimeUnit.SECONDS);
+				log.debug("Acquired missing data from peer {}: {}",
+					peer.getHostAddress(), missingHash);
+				return acquired;
+			} catch (Exception e) {
+				// Try next peer
+				log.trace("Could not acquire from peer {}: {}",
+					peer.getHostAddress(), e.getMessage());
+			}
+		}
+
+		log.warn("Could not acquire missing data from any peer: {}", missingHash);
+		return null;
 	}
 	
 	/**
@@ -588,10 +803,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public ACursor<V> getCursor() {
 		return cursor;
 	}
-	
+
+	/**
+	 * Updates the local lattice value and triggers an immediate delta broadcast.
+	 *
+	 * This is the recommended way to update the root lattice value from local code,
+	 * as it ensures the change is immediately propagated to all connected peers.
+	 *
+	 * @param newValue The new lattice value to set
+	 */
+	public void updateLocal(V newValue) {
+		cursor.set(newValue);
+		if (propagator != null) {
+			propagator.triggerBroadcast();
+		}
+	}
+
+	/**
+	 * Updates the local lattice value at a specific path and triggers an immediate delta broadcast.
+	 *
+	 * This is the recommended way to update path-specific values from local code,
+	 * as it ensures the change is immediately propagated to all connected peers.
+	 *
+	 * @param value The value to set at the path
+	 * @param path Path keys (varargs)
+	 */
+	public void updateLocalPath(ACell value, ACell... path) {
+		cursor.set(value, path);
+		if (propagator != null) {
+			propagator.triggerBroadcast();
+		}
+	}
+
 	/**
 	 * Gets the port this server is listening on.
-	 * 
+	 *
 	 * @return Port number, or null if not bound
 	 */
 	public Integer getPort() {
@@ -639,27 +885,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 	
 	/**
 	 * Gets the set of connected peer Convex instances.
-	 * 
+	 *
 	 * @return Set of peer Convex connections
 	 */
 	public Set<Convex> getPeerNodes() {
 		return new java.util.HashSet<>(peerNodes);
 	}
-	
+
+	/**
+	 * Gets the automatic lattice propagator instance.
+	 *
+	 * @return LatticePropagator instance, or null if server is not launched
+	 */
+	public LatticePropagator<V> getPropagator() {
+		return propagator;
+	}
+
 	@Override
 	public void close() throws IOException {
 		if (!running) {
 			return;
 		}
-		
+
 		log.info("Closing NodeServer");
-		
+
 		running = false;
-		
+
+		// Stop automatic propagator first
+		if (propagator != null) {
+			propagator.close();
+		}
+
 		if (networkServer != null) {
 			networkServer.close();
 		}
-		
+
 		// Close all peer connections
 		for (Convex peer : peerNodes) {
 			if (peer != null) {
