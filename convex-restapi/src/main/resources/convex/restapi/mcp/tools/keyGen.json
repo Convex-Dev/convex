@@ -1,7 +1,7 @@
 {
   "name": "keyGen",
   "title": "Key Pair Generator",
-  "description": "Generate a new Ed25519 key pair. Optionally provide a seed (32-byte hex string), otherwise a secure random seed will be generated.",
+  "description": "Generate a new Ed25519 key pair suitable for signing on Convex. Optionally provide a seed (32-byte hex string), otherwise a secure random seed will be generated.",
   "inputSchema": {
     "type": "object",
     "properties": {

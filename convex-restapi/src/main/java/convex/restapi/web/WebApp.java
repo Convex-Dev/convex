@@ -45,7 +45,7 @@ public class WebApp extends AWebSite {
 
 		// Network detection
 		Hash genesisHash = server.getPeer().getGenesisState().getHash();
-		boolean isLive = Networks.PRONONET_GENESIS.equals(genesisHash);
+		boolean isLive = Networks.PROTONET_GENESIS.equals(genesisHash);
 		String networkName = isLive ? "Protonet (Live)" : "Test Network";
 		String networkDesc = isLive
 			? "Connected to Protonet, the live Convex network with real Convex Coins."
@@ -138,7 +138,7 @@ public class WebApp extends AWebSite {
 
 		// Network detection
 		Hash genesisHash = server.getPeer().getGenesisState().getHash();
-		boolean isLive = Networks.PRONONET_GENESIS.equals(genesisHash);
+		boolean isLive = Networks.PROTONET_GENESIS.equals(genesisHash);
 
 		StringBuilder sb = new StringBuilder();
 		sb.append("# Convex Peer Server\n\n");
@@ -190,7 +190,7 @@ public class WebApp extends AWebSite {
 		// Capabilities
 		sb.append("## Agent Capabilities\n\n");
 		if (isLive) {
-			sb.append("1. **Native money, no wrappers**: Convex Coins are real digital cash — no ERC-20, no bridges.\n");
+			sb.append("1. **Native money, no wrappers**: Convex Coins (CVM) are real digital cash — no ERC-20, no bridges.\n");
 			sb.append("   Agents can hold, earn, spend, and stake value with zero counterparty risk.\n\n");
 		} else {
 			sb.append("1. **Free test coins**: Use the faucet to get free test coins for experimentation.\n");
@@ -201,7 +201,7 @@ public class WebApp extends AWebSite {
 		sb.append("3. **Autonomous execution**: Deploy agents as Convex actors that run forever.\n");
 		sb.append("   React to on-chain events and compose with any other agent permissionlessly.\n\n");
 		sb.append("4. **Zero-fee reads**: Query the entire world state for free." +
-				(isLive ? " Buy some Convex Coins,\n   execute millions of transactions.\n\n"
+				(isLive ? " Buy some Convex Coins (CVM),\n   execute millions of transactions.\n\n"
 				        : " Use the faucet for test coins.\n\n"));
 
 		// Quick start for agents
@@ -219,9 +219,10 @@ public class WebApp extends AWebSite {
 
 		// References
 		sb.append("## References\n\n");
-		sb.append("- [Convex World](https://convex.world) — The Global Economic Operating System\n");
+		sb.append("- [Convex World](https://convex.world) — Engine for the agentic economy\n");
 		sb.append("- [Documentation](https://docs.convex.world) — Build Autonomous Agents\n");
 		sb.append("- [Explorer](" + host + "/explorer/) — Watch Agents Trade and Govern\n");
+		sb.append("- [Protonet](https://peer.convex.live) — Official live Protonet peer hosted by Convex Foundation\n");
 		sb.append("- [GitHub](https://github.com/Convex-Dev) — Open Source Runtime & SDKs\n");
 		sb.append("- [Discord](https://discord.com/invite/xfYGq4CT7v) — Join the Builder Community\n");
 
