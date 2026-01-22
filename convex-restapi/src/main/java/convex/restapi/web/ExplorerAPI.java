@@ -14,6 +14,7 @@ import static j2html.TagCreator.h5;
 import static j2html.TagCreator.h6;
 import static j2html.TagCreator.input;
 import static j2html.TagCreator.label;
+import static j2html.TagCreator.li;
 import static j2html.TagCreator.option;
 import static j2html.TagCreator.p;
 import static j2html.TagCreator.rawHtml;
@@ -22,6 +23,7 @@ import static j2html.TagCreator.small;
 import static j2html.TagCreator.span;
 import static j2html.TagCreator.summary;
 import static j2html.TagCreator.table;
+import static j2html.TagCreator.tag;
 import static j2html.TagCreator.tbody;
 import static j2html.TagCreator.td;
 import static j2html.TagCreator.text;
@@ -1340,11 +1342,12 @@ public class ExplorerAPI extends AWebSite {
 			ctx.redirect(ROUTE);
 			return;
 		}
-		
+
 		Peer peer=server.getPeer(); // get the current peer snapshot
-		
+		State state = peer.getConsensusState();
+
 		query = query.trim();
-		
+
 		// Try to parse as account number (e.g., "#123" or "123")
 		try {
 			String numStr = query.startsWith("#") ? query.substring(1) : query;
@@ -1356,17 +1359,17 @@ public class ExplorerAPI extends AWebSite {
 		} catch (NumberFormatException e) {
 			// not a number, continue
 		}
-		
+
 		// Try to parse as hex (peer key, hash, etc.)
 		Blob blob = Blob.parse(query);
 		if (blob!=null) {
-			// OK, it's paresable as hex
+			// OK, it's parseable as hex
 			if (blob.count()==32) {
 				// it might be a key or hash
-				
+
 				// Try as peer AccountKey (peer)
 				AccountKey peerKey = AccountKey.create(blob);
-				if (peer.getConsensusState().getPeer(peerKey)!=null) {
+				if (state.getPeer(peerKey)!=null) {
 					ctx.redirect(ROUTE+"peers/"+peerKey.toHexString());
 					return;
 				}
@@ -1391,12 +1394,44 @@ public class ExplorerAPI extends AWebSite {
 					}
 
 			}
-			
+
 		}
-		
+
+		// Try to resolve as CNS name (e.g., "convex.core", "torus.exchange")
+		if (query.contains(".") || query.matches("^[a-zA-Z][a-zA-Z0-9-]*$")) {
+			try {
+				Symbol cnsName = Symbol.create(query);
+				ACell resolved = state.lookupCNS(cnsName);
+				if (resolved != null) {
+					// CNS resolved to something - check what it is
+					Address addr = RT.castAddress(resolved);
+					if (addr != null) {
+						ctx.redirect(ROUTE+"accounts/"+addr.longValue());
+						return;
+					}
+					// If it resolved but not to an Address, show result page
+					returnPage(ctx, "CNS: " + query,
+						h6("CNS Lookup: " + query),
+						p(text("Resolved to: "), showCVX(resolved)),
+						searchBox()
+					);
+					return;
+				}
+			} catch (Exception e) {
+				// Not a valid CNS name, continue
+			}
+		}
+
 		// If nothing matched, show error
 		returnPage(ctx,"Couldn't find what you were looking for",
 				h6("Couldn't find search term: "+query),
+				p("Try searching for:"),
+				tag("ul").with(
+					li("Account number: #123 or 123"),
+					li("Peer key: 0x... (32 bytes hex)"),
+					li("Block or transaction hash: 0x... (32 bytes hex)"),
+					li("CNS name: convex.core, torus.exchange")
+				),
 				searchBox()
 		);
 	}
