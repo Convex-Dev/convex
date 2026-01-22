@@ -78,6 +78,18 @@ public class ExplorerTest extends ARESTTest {
         assertTrue(isValidHtmlResponse(response, "Convex Peer Server"));
     }
 
+    @Test
+    public void testHomepageNetworkInfo() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/");
+        assertEquals(200, response.statusCode());
+        String body = response.body();
+        // Test peer should show as test network (not Protonet genesis)
+        assertTrue(body.contains("Network"));
+        assertTrue(body.contains("Genesis Hash"));
+        // Should show either "Test Network" or "Protonet" depending on genesis
+        assertTrue(body.contains("Test Network") || body.contains("Protonet"));
+    }
+
     // ====== llms.txt Tests ======
 
     @Test
@@ -92,6 +104,9 @@ public class ExplorerTest extends ARESTTest {
         assertTrue(body.contains("Peer Key:"));
         assertTrue(body.contains("## Agent Capabilities"));
         assertTrue(body.contains("## Quick Start"));
+        // Verify network info
+        assertTrue(body.contains("Network:"));
+        assertTrue(body.contains("Genesis Hash:"));
     }
 
     @Test

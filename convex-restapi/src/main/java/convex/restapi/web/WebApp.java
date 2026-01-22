@@ -2,10 +2,12 @@ package convex.restapi.web;
 
 import static j2html.TagCreator.*;
 
+import convex.core.Networks;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
@@ -41,6 +43,14 @@ public class WebApp extends AWebSite {
 		long accountCount=state.getAccounts().count();
 		long issuedSupply=state.computeSupply();
 
+		// Network detection
+		Hash genesisHash = server.getPeer().getGenesisState().getHash();
+		boolean isLive = Networks.PRONONET_GENESIS.equals(genesisHash);
+		String networkName = isLive ? "Protonet (Live)" : "Test Network";
+		String networkDesc = isLive
+			? "Connected to Protonet, the live Convex network with real Convex Coins."
+			: "Connected to a test network. Coins have no real value. Faucet may be available.";
+
 		AMap<Keyword,ACell> statusMap=server.getStatusMap();
 
 		// MCP section content
@@ -73,9 +83,10 @@ public class WebApp extends AWebSite {
 				details(
 					summary("Network Info"),
 					table(
-						tr(td("Genesis Hash"),td(code(server.getPeer().getGenesisState().getHash().toString()))),
-						tr(td("Accounts"),td(code(Long.toString(accountCount)))),
-						tr(td("Issued CVM"),td(showBalance(issuedSupply)))
+						tr(td("Network"),td(isLive ? strong(networkName) : em(networkName)),td(networkDesc)),
+						tr(td("Genesis Hash"),td(code(genesisHash.toString())),td(isLive ? "Protonet genesis" : "Test genesis")),
+						tr(td("Accounts"),td(code(Long.toString(accountCount))),td("")),
+						tr(td("Issued CVM"),td(showBalance(issuedSupply)),td(isLive ? "Real value" : "Test coins"))
 					)
 				).attr("open", true)
 			),
@@ -125,20 +136,32 @@ public class WebApp extends AWebSite {
 		String host = ABaseAPI.getExternalBaseUrl(ctx, null);
 		String peerKey = server.getPeer().getPeerKey().toHexString();
 
+		// Network detection
+		Hash genesisHash = server.getPeer().getGenesisState().getHash();
+		boolean isLive = Networks.PRONONET_GENESIS.equals(genesisHash);
+
 		StringBuilder sb = new StringBuilder();
 		sb.append("# Convex Peer Server\n\n");
 		sb.append("> The Engine of the Agentic Economy\n\n");
 
-		sb.append("This is a sovereign Convex peer at " + host + " — a full node of the Convex network,\n");
-		sb.append("a globally distributed, cryptographically secure, and financially open economic operating system.\n\n");
-
-		sb.append("This peer is live, on-chain, and economically active 24/7. It holds real Convex Coins,\n");
-		sb.append("can execute transactions, deploy smart contracts, transfer value, and participate in\n");
-		sb.append("governance — all without human intervention.\n\n");
+		if (isLive) {
+			sb.append("This is a **LIVE** Convex peer at " + host + " connected to Protonet,\n");
+			sb.append("the production Convex network with real Convex Coins.\n\n");
+			sb.append("This peer is economically active 24/7. It holds real value,\n");
+			sb.append("can execute transactions, deploy smart contracts, transfer value, and participate in\n");
+			sb.append("governance — all without human intervention.\n\n");
+		} else {
+			sb.append("This is a **TEST** Convex peer at " + host + " connected to a test network.\n\n");
+			sb.append("Coins on this network have no real value. This peer may have a faucet available\n");
+			sb.append("for free test coins via the `createAccount` MCP tool with a `faucet` parameter.\n\n");
+			sb.append("For the live network with real Convex Coins, use: https://peer.convex.live\n\n");
+		}
 
 		// Peer info
 		sb.append("## Peer Info\n\n");
+		sb.append("- Network: " + (isLive ? "Protonet (Live)" : "Test Network") + "\n");
 		sb.append("- Peer Key: " + peerKey + "\n");
+		sb.append("- Genesis Hash: " + genesisHash.toString() + "\n");
 		sb.append("- API Base: " + host + "\n");
 		sb.append("- MCP Endpoint: " + host + "/mcp (POST JSON-RPC)\n");
 		sb.append("- REST API: " + host + "/api/v1/\n");
@@ -166,14 +189,20 @@ public class WebApp extends AWebSite {
 
 		// Capabilities
 		sb.append("## Agent Capabilities\n\n");
-		sb.append("1. **Native money, no wrappers**: Convex Coins are real digital cash — no ERC-20, no bridges.\n");
-		sb.append("   Agents can hold, earn, spend, and stake value with zero counterparty risk.\n\n");
+		if (isLive) {
+			sb.append("1. **Native money, no wrappers**: Convex Coins are real digital cash — no ERC-20, no bridges.\n");
+			sb.append("   Agents can hold, earn, spend, and stake value with zero counterparty risk.\n\n");
+		} else {
+			sb.append("1. **Free test coins**: Use the faucet to get free test coins for experimentation.\n");
+			sb.append("   Perfect for development and testing agent workflows.\n\n");
+		}
 		sb.append("2. **Persistent identity & memory**: Agents get permanent Addresses (e.g. #1465) that survive\n");
 		sb.append("   across sessions. On-chain key-value storage acts as infinite tamper-proof memory.\n\n");
 		sb.append("3. **Autonomous execution**: Deploy agents as Convex actors that run forever.\n");
 		sb.append("   React to on-chain events and compose with any other agent permissionlessly.\n\n");
-		sb.append("4. **Zero-fee reads**: Query the entire world state for free. Buy some Convex Coins,\n");
-		sb.append("   execute millions of transactions.\n\n");
+		sb.append("4. **Zero-fee reads**: Query the entire world state for free." +
+				(isLive ? " Buy some Convex Coins,\n   execute millions of transactions.\n\n"
+				        : " Use the faucet for test coins.\n\n"));
 
 		// Quick start for agents
 		sb.append("## Quick Start for Agents\n\n");
