@@ -32,7 +32,8 @@ import convex.lattice.fs.DLPath;
  */
 public class DLFSLocal extends DLFileSystem {
 
-	Root<AVector<ACell>> rootCursor;
+	// Cursor for filesystem root node. This may be a path into a bigger lattice
+	ACursor<AVector<ACell>> rootCursor;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
 		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
@@ -48,12 +49,7 @@ public class DLFSLocal extends DLFileSystem {
 	 */
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ACursor<AVector<ACell>> cursor) {
 		super(dlfsProvider, uriPath, DLFSNode.getUTime(cursor.get()));
-		if (cursor instanceof Root) {
-			this.rootCursor = (Root<AVector<ACell>>) cursor;
-		} else {
-			// Wrap in Root to ensure we have a Root cursor
-			this.rootCursor = Root.create(cursor.get());
-		}
+		this.rootCursor =  cursor;
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {

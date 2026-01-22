@@ -19,7 +19,7 @@ import convex.lattice.ALattice;
  * - Missing entries from one side are added from the other
  * - Tombstones (deleted files) are preserved appropriately
  * 
- * The merge behavior is equivalent to Unix rsync between two drives, where:
+ * The merge behaviour is equivalent to Unix rsync between two drives, where:
  * - Files/directories that exist in both are merged
  * - Files/directories that exist only in one are copied to the result
  * - Conflicts are resolved by timestamp (newer wins)
