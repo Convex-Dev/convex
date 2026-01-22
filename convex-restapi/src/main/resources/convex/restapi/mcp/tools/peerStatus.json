@@ -1,7 +1,7 @@
 {
   "name": "peerStatus",
   "title": "Peer Status",
-  "description": "Return current peer status information",
+  "description": "Return current Convex peer status information",
   "inputSchema": {
     "type": "object",
     "properties": {}

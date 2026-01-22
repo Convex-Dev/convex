@@ -1,7 +1,7 @@
 {
   "name": "query",
   "title": "Convex Query",
-  "description": "Execute a Convex Lisp query. Queries are fast and cheap, and do not affect the global state.",
+  "description": "Execute a Convex Lisp query. Queries are fast, free of fees, and do not affect the global state.",
   "inputSchema": {
     "type": "object",
     "properties": {

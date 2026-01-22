@@ -33,7 +33,7 @@
       },
       "hash": {
         "type": "string",
-        "description": "Transaction hash - pass this to signAndSubmit or submit"
+        "description": "Transaction encoding to sign - pass this to signAndSubmit or submit"
       },
       "data": {
         "type": "string",
