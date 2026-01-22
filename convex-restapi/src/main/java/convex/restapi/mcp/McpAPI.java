@@ -377,6 +377,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new DescribeAccountTool());
 		registerTool(new LookupTool());
 		registerTool(new ResolveCNSTool());
+		registerTool(new GetTransactionTool());
 	}
 
 	private void registerTool(McpTool tool) {
@@ -1094,13 +1095,13 @@ public class McpAPI extends ABaseAPI {
 				if (nameCell.startsWith("@")) {
 					nameCell = nameCell.slice(1);
 				}
-				
+
 				// Treat as Symbol
 				Symbol symbol=Symbol.create(nameCell);
 				if (symbol == null) {
 					return toolError("Invalid CNS name: "+nameCell);
 				}
-				
+
 				// Look up CNS record
 				AVector<ACell> record = server.getState().lookupCNSRecord(symbol);
 				if (record == null) {
@@ -1110,13 +1111,13 @@ public class McpAPI extends ABaseAPI {
 				if (record.count() != 4) {
 					return toolError("CNS record has unexpected length, got "+record);
 				}
-				
+
 				// Extract elements from vector: [value controller meta child]
 				ACell value = record.get(0);
 				ACell controller = record.get(1);
 				ACell meta = record.get(2);
 				ACell child = record.get(3);
-				
+
 				// Build result map
 				AMap<AString, ACell> resultMap = Maps.of(
 					"value", RT.print(value),
@@ -1131,7 +1132,48 @@ public class McpAPI extends ABaseAPI {
 			}
 		}
 	}
-	
+
+	private class GetTransactionTool extends McpTool {
+		GetTransactionTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/getTransaction.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString hashCell = RT.ensureString(arguments.get(ARG_HASH));
+			if (hashCell == null) {
+				return protocolError(-32602, "getTransaction requires 'hash' string");
+			}
+
+			Hash h = Hash.parse(hashCell.toString());
+			if (h == null) {
+				return toolError("Invalid hash format: " + hashCell);
+			}
+
+			try {
+				Peer peer = server.getPeer();
+
+				SignedData<ATransaction> transaction = peer.getTransaction(h);
+				if (transaction == null) {
+					return toolSuccess(Maps.of("found", CVMBool.FALSE));
+				}
+
+				AVector<CVMLong> pos = peer.getTransactionLocation(h);
+				Result txResult = peer.getTransactionResult(pos);
+
+				AMap<AString, ACell> resultMap = Maps.of(
+					"found", CVMBool.TRUE,
+					"tx", RT.print(transaction),
+					"position", pos,
+					"result", RT.print(txResult)
+				);
+				return toolSuccess(resultMap);
+			} catch (Exception e) {
+				return toolError("getTransaction failed: " + e.getMessage());
+			}
+		}
+	}
+
 	private AMap<AString,ACell> WELL_KNOWN=JSON.parse("""
 		{	
 			"mcp_version": "1.0",

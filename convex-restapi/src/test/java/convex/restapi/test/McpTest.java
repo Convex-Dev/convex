@@ -19,6 +19,7 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -26,12 +27,13 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.data.AccountKey;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.mcp.McpAPI;
-import convex.core.data.AccountKey;
-import convex.core.cvm.Address;
 
 /**
  * Integration tests for the MCP HTTP endpoint.
@@ -335,6 +337,86 @@ public class McpTest extends ARESTTest {
 		// Should return a protocol error for missing required parameter
 		ACell errorCell = response.get(McpAPI.FIELD_ERROR);
 		assertNotNull(errorCell, "Missing seed should return a protocol error");
+	}
+
+	/**
+	 * GetTransaction tool should retrieve a transaction after it's been submitted.
+	 * This is an e2e test that runs a transaction then verifies it can be looked up by hash.
+	 */
+	@Test
+	public void testGetTransaction() throws IOException, InterruptedException {
+		// First, run a transaction using signAndSubmit
+		AString source = Strings.create("(def test-var-for-get-tx 42)");
+		AString addressString = Strings.create(Init.GENESIS_ADDRESS.toString());
+		AMap<AString, ACell> prepareArgs = Maps.of(
+			"source", source,
+			"address", addressString
+		);
+
+		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
+		AMap<AString, ACell> prepared = expectResult(prepareResponse);
+		AString hashCell = RT.getIn(prepared, "hash");
+		assertNotNull(hashCell, "Prepare should return a hash");
+
+		AString seedHex = Strings.create(KP.getSeed().toHexString());
+		AMap<AString, ACell> signAndSubmitArgs = Maps.of(
+			"hash", hashCell,
+			"seed", seedHex
+		);
+		AMap<AString, ACell> signAndSubmitResponse = makeToolCall("signAndSubmit", signAndSubmitArgs);
+		AMap<AString, ACell> txResult = expectResult(signAndSubmitResponse);
+		assertEquals(CVMLong.create(42), RT.getIn(txResult, "value"), "Transaction result should be 42");
+
+		// Get the transaction hash from info.tx (info has string keys with hex string values)
+		ACell infoCell = RT.getIn(txResult, "info");
+		assertNotNull(infoCell, "Transaction result should have info, got result: " + txResult);
+		AString txHashString = RT.ensureString(RT.getIn(infoCell, "tx"));
+		assertNotNull(txHashString, "Transaction info should contain tx hash");
+
+		// Now use getTransaction to look up the transaction by hash
+		AMap<AString, ACell> getTransactionArgs = Maps.of("hash", txHashString);
+		AMap<AString, ACell> getTransactionResponse = makeToolCall("getTransaction", getTransactionArgs);
+		AMap<AString, ACell> getTxResult = expectResult(getTransactionResponse);
+
+		// Verify it was found
+		assertEquals(CVMBool.TRUE, RT.getIn(getTxResult, "found"), "Transaction should be found");
+		assertNotNull(RT.getIn(getTxResult, "tx"), "Transaction data should be returned");
+		assertNotNull(RT.getIn(getTxResult, "position"), "Transaction position should be returned");
+		assertNotNull(RT.getIn(getTxResult, "result"), "Transaction result should be returned");
+	}
+
+	/**
+	 * GetTransaction tool should return found=false for a non-existent hash.
+	 */
+	@Test
+	public void testGetTransactionNotFound() throws IOException, InterruptedException {
+		// Use a valid but non-existent hash
+		AMap<AString, ACell> args = Maps.of("hash", "0x0000000000000000000000000000000000000000000000000000000000000000");
+		AMap<AString, ACell> response = makeToolCall("getTransaction", args);
+		AMap<AString, ACell> result = expectResult(response);
+
+		assertEquals(CVMBool.FALSE, RT.getIn(result, "found"), "Non-existent transaction should have found=false");
+	}
+
+	/**
+	 * GetTransaction tool should return error for invalid hash format.
+	 */
+	@Test
+	public void testGetTransactionInvalidHash() throws IOException, InterruptedException {
+		AMap<AString, ACell> args = Maps.of("hash", "not-a-valid-hash");
+		AMap<AString, ACell> response = makeToolCall("getTransaction", args);
+		AMap<AString, ACell> error = expectError(response);
+		assertNotNull(error, "Invalid hash should return an error");
+	}
+
+	/**
+	 * GetTransaction tool should return protocol error for missing hash parameter.
+	 */
+	@Test
+	public void testGetTransactionMissingHash() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = makeToolCall("getTransaction", Maps.empty());
+		ACell errorCell = response.get(McpAPI.FIELD_ERROR);
+		assertNotNull(errorCell, "Missing hash should return a protocol error");
 	}
 
 	/**

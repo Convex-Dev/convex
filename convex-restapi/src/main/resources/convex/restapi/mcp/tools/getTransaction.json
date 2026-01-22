@@ -1,0 +1,33 @@
+{
+  "name": "getTransaction",
+  "title": "Get Transaction",
+  "description": "Look up a transaction by its hash. Returns the signed transaction data, its position in the ordering, and the execution result. Use this to verify that a transaction was successfully included in consensus and to check its outcome.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "hash": {
+        "type": "string",
+        "description": "Transaction hash as a hex string (64 hex chars). This is the hash returned from transact, signAndSubmit, or submit tools."
+      }
+    },
+    "required": ["hash"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "tx": {
+        "description": "The signed transaction data including origin address, sequence number, and code"
+      },
+      "position": {
+        "description": "Position of the transaction in the consensus ordering [block-index, tx-index]"
+      },
+      "result": {
+        "description": "Execution result of the transaction including value, error code (if failed), and metadata"
+      },
+      "found": {
+        "type": "boolean",
+        "description": "True if the transaction was found, false otherwise"
+      }
+    }
+  }
+}
