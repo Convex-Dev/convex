@@ -147,6 +147,8 @@ public class Main extends ACommand {
 	}
 
 	private void setupVerbosity() {
+		// Verbosity levels 0-5 map to SLF4J levels. Levels 4 and 5 both map to TRACE
+		// since SLF4J has no finer level than TRACE.
 		Level[] verboseLevels = { Level.ERROR, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.TRACE };
 
 		if (verbose == null)

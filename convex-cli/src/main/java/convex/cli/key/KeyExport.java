@@ -15,7 +15,6 @@ import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 
 /**
@@ -33,10 +32,6 @@ public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);
 
-	@ParentCommand
-	protected Key keyParent;
-	
-	
 	@Mixin
 	protected KeyMixin keyMixin;
 
@@ -86,10 +81,10 @@ public class KeyExport extends AKeyCommand {
 		}
 
 		String publicKey = keystorePublicKey;
-		AKeyPair keyPair = storeMixin.loadKeyFromStore(publicKey,()->keyMixin.getKeyPassword());
-		if (keyPair==null) {
-			// TODO: maybe prompt?
-			throw new CLIError("Key pair not found for key: "+keystorePublicKey);
+		AKeyPair keyPair = storeMixin.loadKeyFromStore(publicKey, () -> keyMixin.getKeyPassword());
+		if (keyPair == null) {
+			throw new CLIError("Key pair not found in keystore for: " + keystorePublicKey +
+				". Use 'convex key list' to see available keys.");
 		}
 		
 		// Default to "seed" type unless security is strict
