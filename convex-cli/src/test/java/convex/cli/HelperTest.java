@@ -21,8 +21,10 @@ public class HelperTest {
 	public static void assertExecuteCommandLineResult(int exitCode, String patternText, String ... args) {
 		CLTester tester =  CLTester.run(args);
 		tester.assertExitCode(exitCode);;
-		
+
 		String output=tester.getOutput();
+		// Strip ANSI escape codes for reliable pattern matching
+		output = output.replaceAll("\u001B\\[[;\\d]*m", "");
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);
 		Matcher matcher = regex.matcher(output);
 
@@ -36,6 +38,8 @@ public class HelperTest {
 
 	public static void assertCommandLineResult(int returnCode, String patternText, CLTester tester) {
 		String output=tester.getOutput();
+		// Strip ANSI escape codes for reliable pattern matching
+		output = output.replaceAll("\u001B\\[[;\\d]*m", "");
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);
 		Matcher matcher = regex.matcher(output);
 
