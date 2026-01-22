@@ -367,6 +367,7 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new EncodeTool());
 		registerTool(new DecodeTool());
 		registerTool(new SubmitTool());
+		registerTool(new SignAndSubmitTool());
 		registerTool(new HashTool());
 		registerTool(new SignTool());
 		registerTool(new PeerStatusTool());
@@ -648,6 +649,41 @@ public class McpAPI extends ABaseAPI {
 				return toolResult(result);
 			} catch (Exception e) {
 				return toolError("Submit failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class SignAndSubmitTool extends McpTool {
+		SignAndSubmitTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signAndSubmit.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString hashCell = RT.ensureString(arguments.get(ARG_HASH));
+			if (hashCell == null) {
+				return protocolError(-32602, "signAndSubmit requires 'hash' string");
+			}
+			Blob hashBlob = Blob.parse(hashCell);
+			if (hashBlob == null) {
+				return toolError("hash must be valid hex");
+			}
+			AString seedCell = RT.ensureString(arguments.get(ARG_SEED));
+			if (seedCell == null) {
+				return protocolError(-32602, "signAndSubmit requires 'seed' string");
+			}
+			Blob seedBlob = Blob.parse(seedCell);
+			if (seedBlob == null || seedBlob.count() != AKeyPair.SEED_LENGTH) {
+				return toolError("seed must be a 32-byte hex string (64 hex characters)");
+			}
+			try {
+				ATransaction transaction = decodeTransaction(hashBlob);
+				AKeyPair keyPair = AKeyPair.create(seedBlob);
+				SignedData<ATransaction> signed = keyPair.signData(transaction);
+				Result result = restServer.getConvex().transactSync(signed);
+				return toolResult(result);
+			} catch (Exception e) {
+				return toolError("signAndSubmit failed: " + e.getMessage());
 			}
 		}
 	}

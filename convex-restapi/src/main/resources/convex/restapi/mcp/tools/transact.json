@@ -1,21 +1,21 @@
 {
   "name": "transact",
-  "title": "Convex Transaction",
-  "description": "Submit a Convex transaction. Transactions require an origin account with a CVM balance and a valid Ed25519 signature. Transactions are atomic operations on the CVM that can update global state and take economic actions (e.g. interact with digital assets and smart contracts)",
+  "title": "Convex Transaction (Quick)",
+  "description": "Execute a Convex transaction in one step. Convenient but sends seed over network.\n\n⚠️ SECURITY WARNING: This tool sends your Ed25519 seed to the peer for signing. Only use this:\n- Over HTTPS connections\n- With peers you fully trust\n- For testing/development\n\nFor production or sensitive operations, use the safer two-step flow: prepare -> signAndSubmit (seed stays local until submit).\n\nTransactions are atomic operations on the CVM that update global state and can interact with digital assets and smart contracts.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "source": {
         "type": "string",
-        "description": "CVM source code to execute e.g. '(transfer #13 10000000000)'"
+        "description": "Convex Lisp source code to execute, e.g. '(transfer #13 1000000000)'"
       },
       "seed": {
          "type": "string",
-         "description": "Ed25519 seed (64 hex chars) used to sign the transaction. Only submit this if you trust the host!"
+         "description": "Ed25519 seed (64 hex chars). ⚠️ SECURITY: Sent over network to peer for signing. Use HTTPS and trusted peers only!"
       },
       "address": {
         "type": "string",
-        "description": "Origin account address (e.g. '#13'). This is the account in which the transaction will execute."
+        "description": "Origin account address (e.g. '#13'). Transaction executes from this account."
       }
     },
     "required": ["source", "seed", "address"]
@@ -23,11 +23,10 @@
   "outputSchema": {
     "type": "object",
     "properties": {
-      "value": {"description": "Resulting CVM value"},
+      "value": {"description": "Resulting CVM value from execution"},
       "errorCode": {"description": "CVM error code if the transaction failed"},
-      "info": {"description": "Additional execution metadata"},
+      "info": {"description": "Execution metadata including juice used, fees, and transaction hash"},
       "message": {"type": "string", "description": "Optional human-readable message"}
     }
   }
 }
-

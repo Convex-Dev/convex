@@ -1,0 +1,33 @@
+{
+  "name": "signAndSubmit",
+  "title": "Sign and Submit Transaction",
+  "description": "Sign a prepared transaction with an Ed25519 seed and submit it for execution. This combines the 'sign' and 'submit' tools into a single convenient step. Use after calling 'prepare' to get the transaction hash. SECURITY WARNING: This sends your Ed25519 seed over the network. Only use with HTTPS connections to peers you trust.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "hash": {
+        "type": "string",
+        "description": "Transaction hash returned by the 'prepare' tool (hex string)"
+      },
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed (64 hex chars) used to sign the transaction. SECURITY: Only submit this over HTTPS to a trusted peer!"
+      }
+    },
+    "required": ["hash", "seed"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "description": "Resulting CVM value from transaction execution"
+      },
+      "errorCode": {
+        "description": "CVM error code if the transaction failed"
+      },
+      "info": {
+        "description": "Additional execution metadata including juice used, fees, and transaction hash"
+      }
+    }
+  }
+}
