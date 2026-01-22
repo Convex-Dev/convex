@@ -19,6 +19,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
@@ -30,12 +31,29 @@ import convex.lattice.fs.DLPath;
  * Local DLFS Drive implementation, wrapping a lattice Cursor
  */
 public class DLFSLocal extends DLFileSystem {
-	
+
 	Root<AVector<ACell>> rootCursor;
-	
+
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
 		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
 		this.rootCursor=Root.create(rootNode);
+	}
+
+	/**
+	 * Creates a DLFSLocal backed by a cursor (which may be a path into a larger lattice).
+	 *
+	 * @param dlfsProvider Provider for this filesystem
+	 * @param uriPath URI path (may be null)
+	 * @param cursor Cursor pointing to the DLFS tree
+	 */
+	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ACursor<AVector<ACell>> cursor) {
+		super(dlfsProvider, uriPath, DLFSNode.getUTime(cursor.get()));
+		if (cursor instanceof Root) {
+			this.rootCursor = (Root<AVector<ACell>>) cursor;
+		} else {
+			// Wrap in Root to ensure we have a Root cursor
+			this.rootCursor = Root.create(cursor.get());
+		}
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {

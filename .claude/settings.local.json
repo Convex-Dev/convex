@@ -6,7 +6,11 @@
       "Bash(mvn clean test:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(mvn test-compile exec:java:*)"
+      "Bash(mvn test-compile exec:java:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(mvn test-compile:*)"
     ]
   }
 }
