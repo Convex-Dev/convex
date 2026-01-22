@@ -1,26 +1,20 @@
 package convex.cli.account;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.core.cvm.Address;
 import convex.core.exceptions.ResultException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
+ * Convex account fund command
  *
- *  Convex account fund command
- *
- *  convex.account.fund
- *
+ * convex account fund
  */
-
 @Command(name="fund",
     aliases={"fu"},
 	mixinStandardHelpOptions=true,
@@ -29,40 +23,33 @@ import picocli.CommandLine.ParentCommand;
 		+ "If the keystore is not at the default location also the keystore filename.")
 public class AccountFund extends AAccountCommand {
 
-	private static final Logger log = LoggerFactory.getLogger(AccountFund.class);
-
-	@ParentCommand
-	private Account accountParent;
-
 	@Option(names={"-a", "--address"},
-		description="Account address to use to request funds.")
-	private long addressNumber;
-
+		required=true,
+		description="Account address to fund (e.g. #1234 or 1234).")
+	private String addressSpec;
 
 	@Parameters(paramLabel="amount",
 		defaultValue=""+Constants.ACCOUNT_FUND_AMOUNT,
-		description="Amount to fund the account")
+		description="Amount to fund the account (default: ${DEFAULT-VALUE}).")
 	private long amount;
 
 	@Override
 	public void execute() throws InterruptedException {
-		if (addressNumber == 0) {
-			log.warn("--address. You need to provide a valid address number");
-			return;
+		// Parse address using standard utility
+		Address address = Address.parse(addressSpec);
+		if (address == null) {
+			throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + addressSpec +
+				". Use format #1234 or plain number.");
 		}
 
-		Convex convex = null;
-		Address address = Address.create(addressNumber);
-
-		convex = connect();
-		convex.transferSync(address, amount);
-		Long balance;
+		Convex convex = connect();
 		try {
-			balance = convex.getBalance(address);
+			convex.transferSync(address, amount);
+			Long balance = convex.getBalance(address);
+			inform("Funded " + address + " with " + amount + " coins.");
 			println(balance);
 		} catch (ResultException e) {
-			throw new CLIError("Error getting balance: "+e.getResult().getValue(),e);
+			throw new CLIError(ExitCodes.TEMPFAIL, "Error funding account: " + e.getResult().getValue(), e);
 		}
-		
 	}
 }
