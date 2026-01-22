@@ -645,7 +645,7 @@ public class ChainAPI extends ABaseAPI {
 		if (addr == null) {
 			throw new BadRequestResponse(jsonError("Invalid peer key: " + addrParam));
 		}
-
+ 
 		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
