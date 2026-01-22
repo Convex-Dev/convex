@@ -88,6 +88,7 @@ public class ChainAPI extends ABaseAPI {
 
 	public ChainAPI(RESTServer restServer) {
 		super(restServer);
+		this.convex = restServer.getConvex();
 	}
 
 	private static final String ROUTE = "/api/v1/";
@@ -114,7 +115,7 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "peers/{addr}", this::queryPeer);
 
 	
-		app.get(prefix + "data/<hash>", this::getData);
+		app.get(prefix + "data/{hash}", this::getData);
 		app.post(prefix + "data/encode", this::encodeData);
 		app.post(prefix + "data/decode", this::decodeData);
 		
@@ -127,9 +128,6 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "status", this::getStatus);
 		
 		app.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
-		
-		convex = restServer.getConvex();
-
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
@@ -670,7 +668,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST, 
 			operationId = "faucetRequest", 
 			tags = { "Account"},
-			summary = "Request coins from a Faucet provider. Requires a peer winning to accept faucet requests.", 
+			summary = "Request coins from a Faucet provider. Requires a peer willing to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
 				description = "Faucet request, must provide an address for coins to be deposited in", 
 				content = {@OpenApiContent(
@@ -739,7 +737,7 @@ public class ChainAPI extends ABaseAPI {
 	protected void failBadRequest(String message) {
 		HashMap<String, Object> hm = new HashMap<>();
 		hm.put("errorCode","FAILED");
-		hm.put("value","message");
+		hm.put("value", message);
 		failBadRequest(hm);
 	}
 	
@@ -813,7 +811,7 @@ public class ChainAPI extends ABaseAPI {
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
 		trans=Cells.persist(trans); // persist data so we have a full copy if needed
-		Ref<ATransaction> ref = Cells.persist(trans).getRef();
+		Ref<ATransaction> ref = trans.getRef();
 		HashMap<String, Object> result = new HashMap<>();
 		result.put("source", srcValue);
 		result.put("address", JSON.json(addr));
@@ -932,10 +930,14 @@ public class ChainAPI extends ABaseAPI {
 
 	/**
 	 * Read code on best efforts basis, expecting a String
-	 * @param srcValue
+	 * @param srcValue Source value to read
 	 * @return Object to interpret as code
+	 * @throws BadRequestResponse if srcValue is not a valid String
 	 */
 	private static ACell readCode(Object srcValue) {
+		if (!(srcValue instanceof String)) {
+			throw new BadRequestResponse("Source code must be a string");
+		}
 		return Reader.read((String) srcValue);
 	}
 
