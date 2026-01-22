@@ -66,25 +66,28 @@ public class ClientTest {
 			CLTester tester;
 			
 			tester =  CLTester.run(
-					"status", 
+					"status",
+					"--host", "localhost",
 					"--port",port
 				);
 			tester.assertExitCode(ExitCodes.SUCCESS);
 			assertTrue(tester.getOutput().contains(Keywords.GENESIS.toString()));
-			
+
 			tester=  CLTester.run(
 					"query", "-a", "#11",
+					"--host", "localhost",
 					"--port",port,
-					"--keystore", KEYSTORE_FILENAME, 
+					"--keystore", KEYSTORE_FILENAME,
 					"--keypass",new String(KEY_PASSWORD),
 					"*balance*"
 				);
 			tester.assertExitCode(ExitCodes.SUCCESS);
-			
+
 			tester =  CLTester.run(
 					"transact", "-a", "11",
+					"--host", "localhost",
 					"--port",port,
-					"--keystore", KEYSTORE_FILENAME, 
+					"--keystore", KEYSTORE_FILENAME,
 					"--keypass",new String(KEY_PASSWORD),
 					"*balance*"
 				);

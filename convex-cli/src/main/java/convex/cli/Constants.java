@@ -8,9 +8,6 @@ package convex.cli;
 */
 public class Constants {
 
-	public static final String HOSTNAME_REMOTE = "convex.world";
-
-
 	public static final String KEYSTORE_FILENAME = convex.core.Constants.DEFAULT_KEYSTORE_FILENAME;
 
 	public static final String CONFIG_FILENAME = "~/.convex/convex.properties";
@@ -27,7 +24,9 @@ public class Constants {
 
 	public static final int DEFAULT_PEER_PORT = convex.core.Constants.DEFAULT_PEER_PORT;
 
-	public static final String DEFAULT_PEER_HOSTNAME = "localhost";
+	// Default to public network peer for better out-of-box experience
+	// Use --host localhost or CONVEX_HOST=localhost for local development
+	public static final String DEFAULT_PEER_HOSTNAME = "peer.convex.live";
 
 	public static final int DEFAULT_VERBOSE_LEVEL = 2;
 

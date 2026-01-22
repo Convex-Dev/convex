@@ -43,27 +43,30 @@ public class AccountTest {
 		
 		convex.core.cvm.AccountStatus as=SERVER.getPeer().getConsensusState().getAccount(Address.create(11));
 		tester =  CLTester.run(
-				"account", 
+				"account",
 				"balance",
+				"--host", "localhost",
 				"--port",PORT,
 				"11"
 			);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals(""+as.getBalance(),tester.getOutput().trim());
-		
+
 		tester =  CLTester.run(
-				"account", 
+				"account",
 				"balance",
+				"--host", "localhost",
 				"--port",PORT,
 				"-a11"
 			);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals(""+as.getBalance(),tester.getOutput().trim());
-		
+
 		// No account specified
 		tester =  CLTester.run(
-				"account", 
+				"account",
 				"balance",
+				"--host", "localhost",
 				"--port",PORT
 			);
 		tester.assertExitCode(ExitCodes.USAGE);
