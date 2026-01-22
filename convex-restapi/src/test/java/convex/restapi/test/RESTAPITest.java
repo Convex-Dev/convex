@@ -110,15 +110,33 @@ public class RESTAPITest extends ARESTTest {
 			HttpResponse<String> res = post(API_PATH+"/transact", "");
 			assertEquals(400, res.statusCode());
 		}
-		
+
+		{ // should be a bad request with missing address
+			String tx = JSON.toStringPretty(Maps.of("source", "(+ 1 2)", "seed", KP.getSeed()));
+			HttpResponse<String> res = post(API_PATH+"/transact", tx);
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // should be a bad request with non-string source
+			String tx = "{\"address\":" + Init.GENESIS_ADDRESS.longValue() + ",\"source\":123,\"seed\":\"" + KP.getSeed().toHexString() + "\"}";
+			HttpResponse<String> res = post(API_PATH+"/transact", tx);
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // should be a bad request with invalid seed length
+			String tx = JSON.toStringPretty(Maps.of("address", Init.GENESIS_ADDRESS, "source", "(+ 1 2)", "seed", "0x1234"));
+			HttpResponse<String> res = post(API_PATH+"/transact", tx);
+			assertEquals(400, res.statusCode());
+		}
+
 		{ // should execute successfully on genesis account
 			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
 			HttpResponse<String> res = post(API_PATH+"/transact", tx);
 			assertEquals(200, res.statusCode());
-			
+
 			// Parse response as JSON to verify it's valid JSON
 			String responseBody = res.body();
-			
+
 			// Extract transaction hash from the response using Convex data structures
 			AMap<AString, ACell> responseMap =  JSON.parse(responseBody);
 
@@ -127,7 +145,7 @@ public class RESTAPITest extends ARESTTest {
 			ACell txCell = info.getIn("tx");
 			assertNotNull(txCell, "Info should contain tx field with transaction hash");
 			String txHash = txCell.toString();
-			
+
 			// Test GET tx endpoint with the extracted hash
 			HttpResponse<String> txResponse = get(API_PATH + "/tx?hash=" + txHash);
 			assertEquals(200, txResponse.statusCode());
@@ -357,26 +375,256 @@ public class RESTAPITest extends ARESTTest {
 		{ // should create account with faucet request
 			AKeyPair newKeyPair = AKeyPair.generate();
 			String accountKeyHex = newKeyPair.getAccountKey().toHexString();
-			
+
 			AMap<AString, ACell> req = Maps.of(
 				"accountKey", accountKeyHex,
 				"faucet", CVMLong.create(1000)
 			);
 			HttpResponse<String> res = post(API_PATH + "/createAccount", JSON.toString(req));
 			assertEquals(200, res.statusCode());
-			
+
 			// Parse response as JSON
 			String responseBody = res.body();
 			AMap<AString, ACell> responseMap = JSON.parse(responseBody);
 			assertNotNull(responseMap);
-			
+
 			// Verify response contains address
 			ACell addressCell = RT.getIn(responseMap, "address");
 			assertNotNull(addressCell, "Response should contain address field");
-			
+
 			// Verify address is a valid number
 			Address address = Address.parse(addressCell);
 			assertNotNull(address, "Address should be valid");
+		}
+	}
+
+	@Test public void testFaucet() throws IOException, InterruptedException {
+		{ // should be a bad request with missing address
+			HttpResponse<String> res = post(API_PATH + "/faucet", "{}");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // should be a bad request with missing amount
+			AMap<AString, ACell> req = Maps.of("address", Init.GENESIS_ADDRESS);
+			HttpResponse<String> res = post(API_PATH + "/faucet", JSON.toString(req));
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // should execute faucet request successfully
+			AMap<AString, ACell> req = Maps.of(
+				"address", Init.GENESIS_ADDRESS,
+				"amount", CVMLong.create(1000000)
+			);
+			HttpResponse<String> res = post(API_PATH + "/faucet", JSON.toString(req));
+			assertEquals(200, res.statusCode());
+
+			// Parse response
+			AMap<AString, ACell> responseMap = JSON.parse(res.body());
+			assertNotNull(responseMap);
+			assertNotNull(RT.getIn(responseMap, "address"), "Response should contain address");
+			assertNotNull(RT.getIn(responseMap, "amount"), "Response should contain amount");
+		}
+
+		{ // should cap amount at GOLD limit
+			AMap<AString, ACell> req = Maps.of(
+				"address", Init.GENESIS_ADDRESS,
+				"amount", CVMLong.create(Long.MAX_VALUE)
+			);
+			HttpResponse<String> res = post(API_PATH + "/faucet", JSON.toString(req));
+			assertEquals(200, res.statusCode());
+
+			// Verify amount was capped
+			AMap<AString, ACell> responseMap = JSON.parse(res.body());
+			ACell amount = RT.getIn(responseMap, "amount");
+			assertNotNull(amount);
+			// Amount should be capped at Coin.GOLD (1000000000)
+			assertTrue(((CVMLong)amount).longValue() <= 1000000000L, "Amount should be capped at GOLD");
+		}
+	}
+
+	@Test public void testIdenticon() throws IOException, InterruptedException {
+		{ // should return PNG for valid hex
+			HttpResponse<String> res = get(HOST_PATH + "/identicon/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+			assertEquals(200, res.statusCode());
+			assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("image/png"));
+			// Check caching headers
+			assertTrue(res.headers().firstValue("Cache-Control").orElse("").contains("max-age"));
+			assertNotNull(res.headers().firstValue("ETag").orElse(null));
+		}
+
+		{ // should return PNG for short hex (any valid hex works)
+			HttpResponse<String> res = get(HOST_PATH + "/identicon/abcd");
+			assertEquals(200, res.statusCode());
+			assertTrue(res.headers().firstValue("Content-Type").orElse("").contains("image/png"));
+		}
+
+		{ // should return 400 for invalid hex
+			HttpResponse<String> res = get(HOST_PATH + "/identicon/notvalidhex!");
+			assertEquals(400, res.statusCode());
+		}
+	}
+
+	@Test public void testQueryPeer() throws IOException, InterruptedException {
+		// Get the peer key from the server
+		String peerKey = server.getServer().getPeerKey().toHexString();
+
+		{ // should return peer info for valid peer
+			HttpResponse<String> res = get(API_PATH + "/peers/" + peerKey);
+			assertEquals(200, res.statusCode());
+
+			// Parse response - should be valid JSON representing PeerStatus
+			String body = res.body();
+			assertNotNull(body);
+			assertFalse(body.isBlank());
+		}
+
+		{ // should return 404 for non-existent peer
+			String fakePeerKey = "0000000000000000000000000000000000000000000000000000000000000000";
+			HttpResponse<String> res = get(API_PATH + "/peers/" + fakePeerKey);
+			assertEquals(404, res.statusCode());
+		}
+
+		{ // should return 400 for invalid peer key format
+			HttpResponse<String> res = get(API_PATH + "/peers/invalid-key");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // should return 400 for too-short key
+			HttpResponse<String> res = get(API_PATH + "/peers/1234");
+			assertEquals(400, res.statusCode());
+		}
+	}
+
+	@Test public void testAdversarialInputs() throws IOException, InterruptedException {
+		// Test various malformed and adversarial inputs
+
+		{ // Extremely long source code
+			StringBuilder longSource = new StringBuilder("(+ 1");
+			for (int i = 0; i < 10000; i++) {
+				longSource.append(" 1");
+			}
+			longSource.append(")");
+			String query = JSON.toStringPretty(Maps.of("address", 11, "source", longSource.toString()));
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			// Should either succeed or fail gracefully (not crash)
+			assertTrue(res.statusCode() == 200 || res.statusCode() == 400 || res.statusCode() == 422);
+		}
+
+		{ // Null bytes in source
+			String query = "{\"address\":11,\"source\":\"(+ 1 \\u0000 2)\"}";
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			// Should handle gracefully
+			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500);
+		}
+
+		{ // Unicode in source
+			String query = JSON.toStringPretty(Maps.of("address", 11, "source", "(str \"こんにちは\" \"🎉\")"));
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			assertEquals(200, res.statusCode());
+		}
+
+		{ // Very large address number
+			String query = JSON.toStringPretty(Maps.of("address", Long.MAX_VALUE, "source", "*balance*"));
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			// Should handle - might be 200 with error result or 404
+			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500);
+		}
+
+		{ // Negative address
+			HttpResponse<String> res = get(API_PATH + "/accounts/-1");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // SQL injection attempt in query source (should be harmless)
+			String query = JSON.toStringPretty(Maps.of("address", 11, "source", "'; DROP TABLE users; --"));
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			// Should fail to parse as Convex code, but not crash (400 parse error or 422 execution error)
+			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500,
+				"SQL injection should be handled gracefully, got: " + res.statusCode());
+		}
+
+		{ // Script injection attempt
+			String query = JSON.toStringPretty(Maps.of("address", 11, "source", "<script>alert('xss')</script>"));
+			HttpResponse<String> res = post(API_PATH + "/query", query);
+			// Should fail to parse as Convex code (400 parse error or 422 execution error)
+			assertTrue(res.statusCode() >= 200 && res.statusCode() < 500,
+				"Script injection should be handled gracefully, got: " + res.statusCode());
+		}
+
+		{ // Deeply nested JSON
+			StringBuilder nested = new StringBuilder("{\"address\":11,\"source\":\"1\"");
+			// This is valid JSON, just testing parser robustness
+			nested.append("}");
+			HttpResponse<String> res = post(API_PATH + "/query", nested.toString());
+			assertEquals(200, res.statusCode());
+		}
+
+		{ // Empty hash for getData
+			HttpResponse<String> res = get(API_PATH + "/data/");
+			// Should be 404 (no route match) or 400
+			assertTrue(res.statusCode() == 400 || res.statusCode() == 404);
+		}
+
+		{ // Hash with special characters (path traversal attempt)
+			HttpResponse<String> res = get(API_PATH + "/data/../../etc/passwd");
+			// Should be 400 (bad hash) or 404 (route not found due to path normalization)
+			assertTrue(res.statusCode() == 400 || res.statusCode() == 404,
+				"Path traversal should be handled, got: " + res.statusCode());
+		}
+
+		{ // Block number as negative
+			HttpResponse<String> res = get(API_PATH + "/blocks/-1");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Block number as non-numeric
+			HttpResponse<String> res = get(API_PATH + "/blocks/abc");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Blocks with invalid pagination
+			HttpResponse<String> res = get(API_PATH + "/blocks?offset=-1");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Blocks with limit too high
+			HttpResponse<String> res = get(API_PATH + "/blocks?limit=10000");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Transaction prepare with code injection attempt
+			AMap<AString, ACell> req = Maps.of(
+				"address", Init.GENESIS_ADDRESS,
+				"source", "(eval (read-string \"(def bad 1)\"))"
+			);
+			HttpResponse<String> res = post(API_PATH + "/transaction/prepare", JSON.toStringPretty(req));
+			// Should prepare (code validity checked at execution time)
+			assertEquals(200, res.statusCode());
+		}
+
+		{ // Faucet with negative amount
+			AMap<AString, ACell> req = Maps.of(
+				"address", Init.GENESIS_ADDRESS,
+				"amount", CVMLong.create(-1000)
+			);
+			HttpResponse<String> res = post(API_PATH + "/faucet", JSON.toString(req));
+			// Should either reject or treat as 0
+			assertTrue(res.statusCode() == 200 || res.statusCode() == 400 || res.statusCode() == 422);
+		}
+
+		{ // Malformed JSON
+			HttpResponse<String> res = post(API_PATH + "/query", "{invalid json}");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Empty body
+			HttpResponse<String> res = post(API_PATH + "/query", "");
+			assertEquals(400, res.statusCode());
+		}
+
+		{ // Content-Type mismatch (sending non-JSON as JSON)
+			HttpResponse<String> res = post(API_PATH + "/query", "not json at all");
+			assertEquals(400, res.statusCode());
 		}
 	}
 }

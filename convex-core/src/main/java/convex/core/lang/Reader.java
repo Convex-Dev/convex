@@ -7,6 +7,7 @@ import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.reader.AntlrReader;
 import convex.core.util.Utils;
 
@@ -86,8 +87,10 @@ public class Reader {
 	public static <R extends ACell> R read(AString source) {
 		try {
 			return (R) read(source.getInputStream());
-		} catch (IOException e) {
-			throw new IllegalArgumentException("Could not read string input: "+e.getMessage());
+		} catch (ParseException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ParseException("Could not read string input: "+e.getMessage(), e);
 		}
 	}
 
