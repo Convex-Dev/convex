@@ -68,9 +68,32 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 			}
 			return zero();
 		}
-		
+
 		// Merge the maps using the SignedLattice merge function for each owner
 		return ownValue.mergeDifferences(otherValue, mergeFunction);
+	}
+
+	@Override
+	public AHashMap<ACell, SignedData<V>> merge(
+			convex.lattice.LatticeContext context,
+			AHashMap<ACell, SignedData<V>> ownValue,
+			AHashMap<ACell, SignedData<V>> otherValue) {
+		if (otherValue == null) {
+			return ownValue;
+		}
+		if (ownValue == null) {
+			if (checkForeign(otherValue)) {
+				return otherValue;
+			}
+			return zero();
+		}
+
+		// Merge the maps using context-aware SignedLattice merge for each owner
+		MergeFunction<SignedData<V>> contextMergeFunction = (a, b) -> {
+			return signedLattice.merge(context, a, b);
+		};
+
+		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}
 
 	@Override

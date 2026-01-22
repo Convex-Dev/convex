@@ -56,10 +56,41 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		// Get timestamps from both nodes
 		CVMLong timeA = DLFSNode.getUTime(ownValue);
 		CVMLong timeB = DLFSNode.getUTime(otherValue);
-		
+
 		// Use the maximum timestamp for the merge operation
 		// This ensures merged nodes have a timestamp that reflects the most recent change
 		CVMLong mergeTime = timeA.longValue() >= timeB.longValue() ? timeA : timeB;
+
+		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
+		return DLFSNode.merge(ownValue, otherValue, mergeTime);
+	}
+
+	@Override
+	public AVector<ACell> merge(convex.lattice.LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
+		// Handle null cases
+		if (ownValue == null) {
+			if (checkForeign(otherValue)) {
+				return otherValue;
+			}
+			return zero();
+		}
+		if (otherValue == null) {
+			return ownValue;
+		}
+
+		// Fast path: if values are equal, return own value
+		if (Utils.equals(ownValue, otherValue)) {
+			return ownValue;
+		}
+
+		// Get merge timestamp from context, fallback to node timestamps
+		CVMLong mergeTime = context.getTimestamp();
+		if (mergeTime == null) {
+			// Fallback: use max of node timestamps
+			CVMLong timeA = DLFSNode.getUTime(ownValue);
+			CVMLong timeB = DLFSNode.getUTime(otherValue);
+			mergeTime = timeA.longValue() >= timeB.longValue() ? timeA : timeB;
+		}
 
 		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
 		return DLFSNode.merge(ownValue, otherValue, mergeTime);
@@ -145,12 +176,30 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 			if (otherValue == null) {
 				return ownValue;
 			}
-			
+
 			// Merge directory entries using DLFSLattice for values
 			MergeFunction<AVector<ACell>> mergeFunction = (a, b) -> {
 				return DLFSLattice.INSTANCE.merge(a, b);
 			};
-			
+
+			return ownValue.mergeDifferences(otherValue, mergeFunction);
+		}
+
+		@Override
+		public Index<AString, AVector<ACell>> merge(convex.lattice.LatticeContext context, Index<AString, AVector<ACell>> ownValue, Index<AString, AVector<ACell>> otherValue) {
+			if (ownValue == null) {
+				if (otherValue == null) return zero();
+				return otherValue;
+			}
+			if (otherValue == null) {
+				return ownValue;
+			}
+
+			// Merge directory entries using context-aware DLFSLattice for values
+			MergeFunction<AVector<ACell>> mergeFunction = (a, b) -> {
+				return DLFSLattice.INSTANCE.merge(context, a, b);
+			};
+
 			return ownValue.mergeDifferences(otherValue, mergeFunction);
 		}
 		
