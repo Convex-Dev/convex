@@ -58,11 +58,110 @@ public class ExplorerTest extends ARESTTest {
         assertEquals(200, response.statusCode());
         assertTrue(isValidHtmlResponse(response, "Peer Explorer"));
     }
-    
+
+    // ====== Homepage Tests ======
+
     @Test
-    public void testLLMs() throws IOException, InterruptedException {
-        HttpResponse<String> response = get(HOST_PATH+"/llms.txt");
+    public void testHomepage() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/");
         assertEquals(200, response.statusCode());
+        assertTrue(isValidHtmlResponse(response, "Convex Peer Server"));
+        // Verify MCP section is present
+        assertTrue(response.body().contains("Agent Integration"));
+        assertTrue(response.body().contains("Agentic Economy"));
+    }
+
+    @Test
+    public void testHomepageIndex() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/index.html");
+        assertEquals(200, response.statusCode());
+        assertTrue(isValidHtmlResponse(response, "Convex Peer Server"));
+    }
+
+    // ====== llms.txt Tests ======
+
+    @Test
+    public void testLLMsTxt() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/llms.txt");
+        assertEquals(200, response.statusCode());
+        String body = response.body();
+        // Verify dynamic content is present
+        assertTrue(body.contains("Convex Peer Server"));
+        assertTrue(body.contains("Agentic Economy"));
+        assertTrue(body.contains("MCP Endpoint"));
+        assertTrue(body.contains("Peer Key:"));
+        assertTrue(body.contains("## Agent Capabilities"));
+        assertTrue(body.contains("## Quick Start"));
+    }
+
+    @Test
+    public void testLLMsTxtContentType() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/llms.txt");
+        assertEquals(200, response.statusCode());
+        assertTrue(response.headers().firstValue("Content-Type")
+                .map(ct -> ct.contains("text/plain"))
+                .orElse(false));
+    }
+
+    // ====== 404 Tests ======
+
+    @Test
+    public void testNotFoundPage() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(HOST_PATH + "/nonexistent-page-12345");
+        assertEquals(404, response.statusCode());
+    }
+
+    // ====== MCP Explorer Tests ======
+
+    @Test
+    public void testExplorerMcp() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(EXPLORER_PATH + "/mcp");
+        assertEquals(200, response.statusCode());
+        assertTrue(isValidHtmlResponse(response, "Model Context Protocol"));
+        assertTrue(response.body().contains("/mcp"));
+    }
+
+    @Test
+    public void testExplorerMcpToolValid() throws IOException, InterruptedException {
+        // Test accessing a known tool (query should always exist)
+        HttpResponse<String> response = get(EXPLORER_PATH + "/mcp/tools/query");
+        assertEquals(200, response.statusCode());
+        assertTrue(response.body().contains("query"));
+    }
+
+    @Test
+    public void testExplorerMcpToolNotFound() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(EXPLORER_PATH + "/mcp/tools/nonexistent-tool-xyz");
+        assertEquals(404, response.statusCode());
+    }
+
+    // ====== Connections Tests ======
+
+    @Test
+    public void testExplorerConnections() throws IOException, InterruptedException {
+        HttpResponse<String> response = get(EXPLORER_PATH + "/connections");
+        assertEquals(200, response.statusCode());
+        assertTrue(isValidHtmlResponse(response, "Connections"));
+    }
+
+    // ====== CNS Search Tests ======
+
+    @Test
+    public void testExplorerSearchCNS() throws IOException, InterruptedException {
+        // Test search with a known CNS name
+        HttpResponse<String> response = post(EXPLORER_PATH + "/search", "q=convex.core");
+        // Should either redirect to the account or show the resolved value
+        assertTrue(response.statusCode() == 200 || response.statusCode() == 302);
+    }
+
+    @Test
+    public void testExplorerSearchCNSInvalid() throws IOException, InterruptedException {
+        // Test search with an invalid CNS name that doesn't exist
+        HttpResponse<String> response = post(EXPLORER_PATH + "/search", "q=nonexistent.cns.name.xyz");
+        assertEquals(200, response.statusCode());
+        // Should show error message or search hints
+        String body = response.body();
+        assertTrue(body.contains("Couldn't find") || body.contains("Try searching") || body.contains("nonexistent"));
     }
     
     @Test
