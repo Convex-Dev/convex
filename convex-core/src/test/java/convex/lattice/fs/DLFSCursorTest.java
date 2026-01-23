@@ -15,7 +15,7 @@ import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ABranchedCursor;
+import convex.lattice.cursor.AForkableCursor;
 import convex.lattice.cursor.Root;
 import convex.lattice.fs.impl.DLFSLocal;
 
@@ -37,7 +37,7 @@ public class DLFSCursorTest {
 
 		// Get branched cursor for "test" drive
 		AString driveName = Strings.create("test");
-		ABranchedCursor<AVector<ACell>> driveCursor = root.path(driveName);
+		AForkableCursor<AVector<ACell>> driveCursor = root.path(driveName);
 
 		// Initialize with empty DLFS tree if needed
 		if (driveCursor.get() == null) {
@@ -45,7 +45,7 @@ public class DLFSCursorTest {
 		}
 
 		// Detach cursor for isolated DLFS operations
-		ABranchedCursor<AVector<ACell>> detached = driveCursor.detach();
+		AForkableCursor<AVector<ACell>> detached = driveCursor.detach();
 		DLFSLocal dlfs = new DLFSLocal(DLFS.provider(), null, detached);
 
 		// Create directory
@@ -56,9 +56,9 @@ public class DLFSCursorTest {
 		Path file = dlfs.getPath("/docs/readme.txt");
 		Files.writeString(file, "Hello from DLFS!");
 
-		// Sync the DLFS drive back to root lattice
-		boolean synced = driveCursor.sync(detached);
-		assertTrue(synced, "Sync should succeed");
+		// Merge the DLFS drive back to root lattice (CAS-based)
+		boolean merged = driveCursor.merge(detached);
+		assertTrue(merged, "Merge should succeed");
 
 		// Verify: Create new DLFS from synced root
 		AVector<ACell> syncedTree = root.get().get(driveName);

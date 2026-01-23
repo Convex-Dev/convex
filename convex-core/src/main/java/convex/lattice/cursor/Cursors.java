@@ -4,7 +4,12 @@ import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
+import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
+/**
+ * Factory methods for creating cursors.
+ */
 public class Cursors {
 
 	/**
@@ -25,6 +30,44 @@ public class Cursors {
 	 */
 	public static <V extends ACell> Root<V> create(V value) {
 		return Root.create(value);
+	}
+
+	// ===== Lattice Cursor Factory Methods =====
+
+	/**
+	 * Creates a root lattice cursor with the given lattice and initial value.
+	 *
+	 * @param <V> Type of cursor value
+	 * @param lattice The lattice defining merge semantics
+	 * @param initialValue Initial value for the cursor
+	 * @return New lattice cursor instance
+	 */
+	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue) {
+		return new RootLatticeCursor<>(lattice, initialValue);
+	}
+
+	/**
+	 * Creates a root lattice cursor with the given lattice, initial value, and context.
+	 *
+	 * @param <V> Type of cursor value
+	 * @param lattice The lattice defining merge semantics
+	 * @param initialValue Initial value for the cursor
+	 * @param context Merge context for lattice operations
+	 * @return New lattice cursor instance
+	 */
+	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice, V initialValue, LatticeContext context) {
+		return new RootLatticeCursor<>(lattice, initialValue, context);
+	}
+
+	/**
+	 * Creates a root lattice cursor using the lattice's zero value as initial value.
+	 *
+	 * @param <V> Type of cursor value
+	 * @param lattice The lattice defining merge semantics
+	 * @return New lattice cursor instance with zero initial value
+	 */
+	public static <V extends ACell> RootLatticeCursor<V> createLattice(ALattice<V> lattice) {
+		return new RootLatticeCursor<>(lattice, lattice.zero());
 	}
 
 	/**

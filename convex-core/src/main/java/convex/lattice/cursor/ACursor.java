@@ -118,9 +118,19 @@ public abstract class ACursor<V extends ACell> {
 	
 	public abstract <T extends ACell> ACursor<T> path(ACell... path);
 	
+	/**
+	 * Detaches a copy of this cursor for independent modification.
+	 *
+	 * <p>The detached cursor starts with the current value and can be modified
+	 * independently. Use {@link AForkableCursor#merge(AForkableCursor)} to merge
+	 * changes back to the parent.</p>
+	 *
+	 * @param <T> Type of the detached cursor value
+	 * @return A new independent cursor with the current value
+	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> ABranchedCursor<T> detach() {
-		return (ABranchedCursor<T>) Root.create(get());
+	public <T extends ACell> AForkableCursor<T> detach() {
+		return (AForkableCursor<T>) Root.create(get());
 	}
  	
 

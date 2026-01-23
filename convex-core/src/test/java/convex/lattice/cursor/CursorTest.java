@@ -111,29 +111,29 @@ public class CursorTest {
 	@Test public void testDetachedPath() {
 		AMap<Symbol,AInteger> INITIAL=Maps.of(Symbols.FOO,1);
 		Root<AInteger> root=Cursors.of(INITIAL);
-		ABranchedCursor<AInteger> path=root.path(Symbols.FOO);
-		ABranchedCursor<AInteger> det=path.detach();
-		
+		AForkableCursor<AInteger> path=root.path(Symbols.FOO);
+		AForkableCursor<AInteger> det=path.detach();
+
 		// modify detached path
 		assertCVMEquals(1,det.get());
 		det.set(2);
 		assertCVMEquals(1,path.get());
-		
+
 		// Run tests on detached cursor
 		det.set(null);
 		doIntCursorTest(det);
 		assertEquals(INITIAL,root.get());
-		
-		// Check and sync
+
+		// Check and merge (CAS-based)
 		AInteger NOW=det.get();
 		assertNotEquals(NOW,CVMLong.ONE); // should have changed
-		boolean synced=path.sync(det);
-		assertTrue(synced);
-		
+		boolean merged=path.merge(det);
+		assertTrue(merged);
+
 		// Check update propagated to root
 		AMap<Symbol,AInteger> NEWMAP=Maps.of(Symbols.FOO,NOW);
 		assertEquals(root.get(),NEWMAP);
-		
+
 	}
 
 }

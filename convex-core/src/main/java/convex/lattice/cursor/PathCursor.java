@@ -7,7 +7,15 @@ import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
-public class PathCursor<V extends ACell> extends ABranchedCursor<V> {
+/**
+ * A cursor that navigates to a path within a base cursor's value.
+ *
+ * <p>PathCursor provides a view into a nested location within a data structure.
+ * Updates to the PathCursor are reflected in the base cursor atomically.</p>
+ *
+ * @param <V> Type of cursor values at the path location
+ */
+public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 
 	ACursor<ACell> base;
 	ACell[] path;
