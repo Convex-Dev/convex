@@ -1,16 +1,25 @@
 package convex.lattice.cursor;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.AHashMap;
 import convex.core.data.ASet;
+import convex.core.cvm.Keywords;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
+import convex.lattice.generic.MapLattice;
+import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 
 /**
@@ -19,6 +28,56 @@ import convex.lattice.generic.SetLattice;
  * These tests serve as usage examples for the lattice cursor API.
  */
 public class LatticeCursorTest {
+
+	// ===== Standard cursor operation tests =====
+
+	@Test
+	public void testRootCursorOperations() {
+		MaxLattice lattice = MaxLattice.INSTANCE;
+		RootLatticeCursor<AInteger> root = Cursors.createLattice(lattice, null);
+		doIntCursorTest(root);
+	}
+
+	@Test
+	public void testForkedCursorOperations() {
+		MaxLattice lattice = MaxLattice.INSTANCE;
+		RootLatticeCursor<AInteger> root = Cursors.createLattice(lattice, null);
+		ALatticeCursor<AInteger> fork = root.fork();
+		doIntCursorTest(fork);
+	}
+
+	/**
+	 * Tests all standard ACursor operations on an integer cursor.
+	 * Adapted from CursorTest.doIntCursorTest for lattice cursors.
+	 */
+	private void doIntCursorTest(ACursor<? extends AInteger> cursor) {
+		@SuppressWarnings("unchecked")
+		ACursor<AInteger> root = (ACursor<AInteger>) cursor;
+
+		assertEquals("nil", root.toString());
+
+		CVMLong TWO = CVMLong.create(2);
+
+		root.set(1);
+		assertCVMEquals(1, root.get());
+
+		assertFalse(root.compareAndSet(CVMLong.ZERO, CVMLong.ZERO));
+		assertTrue(root.compareAndSet(CVMLong.ONE, CVMLong.ZERO));
+		assertCVMEquals(0, root.get());
+
+		assertCVMEquals(0, root.getAndSet(TWO));
+		assertSame(TWO, root.get());
+
+		assertEquals(TWO, root.getAndUpdate(a -> a.inc()));
+		assertCVMEquals(4, root.updateAndGet(a -> a.inc()));
+
+		assertCVMEquals(4, root.getAndAccumulate(CVMLong.ONE, (a, b) -> a.add(b)));
+		assertCVMEquals(7, root.accumulateAndGet(TWO, (a, b) -> a.add(b)));
+
+		assertEquals("7", root.toString());
+	}
+
+	// ===== Fork/Sync pattern tests =====
 
 	@Test
 	public void testBasicForkSync() {
@@ -240,5 +299,238 @@ public class LatticeCursorTest {
 		ASet<CVMLong> updated = root.updateAndGet(set -> set.include(CVMLong.create(4)));
 		assertTrue(updated.contains(CVMLong.create(3)));
 		assertTrue(updated.contains(CVMLong.create(4)));
+	}
+
+	// ===== Complex concurrent modification tests =====
+
+	/**
+	 * Tests concurrent modifications from multiple sources:
+	 * - Direct root modifications
+	 * - PathCursor modifications
+	 * - Forked cursor modifications with sync
+	 *
+	 * Uses a MapLattice<Keyword, SetLattice<CVMLong>> to test that modifications
+	 * to one key don't overwrite modifications to other keys.
+	 */
+	@Test
+	public void testConcurrentPathAndForkModifications() {
+		// Create a map lattice where values are sets (grow-only)
+		SetLattice<CVMLong> valueLattice = SetLattice.create();
+		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(valueLattice);
+
+		// Initial state: {:a #{1}, :b #{10}}
+		AHashMap<Keyword, ASet<CVMLong>> initial = Maps.of(
+			Keywords.FOO, Sets.of(CVMLong.ONE),
+			Keywords.BAR, Sets.of(CVMLong.create(10))
+		);
+		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.createLattice(mapLattice, initial);
+
+		// Create a PathCursor to modify :a directly on root
+		PathCursor<ASet<CVMLong>> pathA = new PathCursor<>(root, Keywords.FOO);
+
+		// Fork the root for isolated modifications
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork = root.fork();
+
+		// Create a PathCursor on the fork to modify :b
+		PathCursor<ASet<CVMLong>> forkPathB = new PathCursor<>(fork, Keywords.BAR);
+
+		// === Concurrent modifications ===
+
+		// 1. Modify :a via pathA on root - add 2
+		pathA.updateAndGet(set -> set.include(CVMLong.create(2)));
+
+		// 2. Modify :b via forkPathB on fork - add 20
+		forkPathB.updateAndGet(set -> set.include(CVMLong.create(20)));
+
+		// 3. Also modify :a on fork directly - add 3
+		fork.updateAndGet(map -> map.assoc(Keywords.FOO,
+			((ASet<CVMLong>) map.get(Keywords.FOO)).include(CVMLong.create(3))));
+
+		// Check intermediate states
+		// Root :a should have {1, 2}
+		ASet<CVMLong> rootA = (ASet<CVMLong>) root.get().get(Keywords.FOO);
+		assertTrue(rootA.contains(CVMLong.ONE), "Root :a should have 1");
+		assertTrue(rootA.contains(CVMLong.create(2)), "Root :a should have 2");
+		assertFalse(rootA.contains(CVMLong.create(3)), "Root :a should NOT have 3 yet (fork hasn't synced)");
+
+		// Root :b should still be {10} (fork hasn't synced)
+		ASet<CVMLong> rootB = (ASet<CVMLong>) root.get().get(Keywords.BAR);
+		assertTrue(rootB.contains(CVMLong.create(10)), "Root :b should have 10");
+		assertFalse(rootB.contains(CVMLong.create(20)), "Root :b should NOT have 20 yet");
+
+		// Fork :a should have {1, 3} (doesn't see root's 2)
+		ASet<CVMLong> forkA = (ASet<CVMLong>) fork.get().get(Keywords.FOO);
+		assertTrue(forkA.contains(CVMLong.ONE), "Fork :a should have 1");
+		assertTrue(forkA.contains(CVMLong.create(3)), "Fork :a should have 3");
+		assertFalse(forkA.contains(CVMLong.create(2)), "Fork :a should NOT have 2 yet");
+
+		// Fork :b should have {10, 20}
+		ASet<CVMLong> forkB = (ASet<CVMLong>) fork.get().get(Keywords.BAR);
+		assertTrue(forkB.contains(CVMLong.create(10)), "Fork :b should have 10");
+		assertTrue(forkB.contains(CVMLong.create(20)), "Fork :b should have 20");
+
+		// === Sync fork back to root ===
+		fork.sync();
+
+		// After sync, root should have merged values:
+		// :a = {1, 2, 3} (1 from initial, 2 from pathA, 3 from fork)
+		// :b = {10, 20} (10 from initial, 20 from fork)
+		AHashMap<Keyword, ASet<CVMLong>> finalRoot = root.get();
+
+		ASet<CVMLong> finalA = (ASet<CVMLong>) finalRoot.get(Keywords.FOO);
+		assertTrue(finalA.contains(CVMLong.ONE), "Final :a should have 1");
+		assertTrue(finalA.contains(CVMLong.create(2)), "Final :a should have 2 (from pathA)");
+		assertTrue(finalA.contains(CVMLong.create(3)), "Final :a should have 3 (from fork)");
+
+		ASet<CVMLong> finalB = (ASet<CVMLong>) finalRoot.get(Keywords.BAR);
+		assertTrue(finalB.contains(CVMLong.create(10)), "Final :b should have 10");
+		assertTrue(finalB.contains(CVMLong.create(20)), "Final :b should have 20 (from fork)");
+	}
+
+	/**
+	 * Tests that forking a fork and syncing in sequence preserves all modifications
+	 * through the chain, including modifications at different paths.
+	 */
+	@Test
+	public void testNestedForksWithPaths() {
+		SetLattice<CVMLong> valueLattice = SetLattice.create();
+		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(valueLattice);
+
+		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.createLattice(mapLattice, Maps.empty());
+
+		// Level 1 fork - add :a => #{1}
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = root.fork();
+		fork1.updateAndGet(map -> map.assoc(Keywords.FOO, Sets.of(CVMLong.ONE)));
+
+		// Level 2 fork (from fork1) - add :b => #{2}
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = fork1.fork();
+		fork2.updateAndGet(map -> map.assoc(Keywords.BAR, Sets.of(CVMLong.create(2))));
+
+		// Level 3 fork (from fork2) - modify :a to add 3
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3 = fork2.fork();
+		PathCursor<ASet<CVMLong>> fork3PathA = new PathCursor<>(fork3, Keywords.FOO);
+		fork3PathA.updateAndGet(set -> (set == null) ? Sets.of(CVMLong.create(3)) : set.include(CVMLong.create(3)));
+
+		// Meanwhile, modify fork1 directly - add :c => #{100}
+		fork1.updateAndGet(map -> map.assoc(Keywords.BAZ, Sets.of(CVMLong.create(100))));
+
+		// Root should still be empty
+		assertEquals(Maps.empty(), root.get());
+
+		// Sync chain: fork3 -> fork2 -> fork1 -> root
+		fork3.sync();
+		fork2.sync();
+		fork1.sync();
+
+		// Verify all modifications made it to root
+		AHashMap<Keyword, ASet<CVMLong>> finalRoot = root.get();
+
+		// :a should have {1, 3}
+		ASet<CVMLong> finalA = (ASet<CVMLong>) finalRoot.get(Keywords.FOO);
+		assertNotNull(finalA, ":a should exist");
+		assertTrue(finalA.contains(CVMLong.ONE), ":a should have 1 (from fork1)");
+		assertTrue(finalA.contains(CVMLong.create(3)), ":a should have 3 (from fork3)");
+
+		// :b should have {2}
+		ASet<CVMLong> finalB = (ASet<CVMLong>) finalRoot.get(Keywords.BAR);
+		assertNotNull(finalB, ":b should exist");
+		assertTrue(finalB.contains(CVMLong.create(2)), ":b should have 2 (from fork2)");
+
+		// :c should have {100}
+		ASet<CVMLong> finalC = (ASet<CVMLong>) finalRoot.get(Keywords.BAZ);
+		assertNotNull(finalC, ":c should exist");
+		assertTrue(finalC.contains(CVMLong.create(100)), ":c should have 100 (from fork1)");
+	}
+
+	/**
+	 * Tests multiple forks modifying the same path and ensures lattice merge
+	 * combines all values correctly.
+	 */
+	@Test
+	public void testConcurrentForksModifyingSamePath() {
+		SetLattice<CVMLong> valueLattice = SetLattice.create();
+		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(valueLattice);
+
+		AHashMap<Keyword, ASet<CVMLong>> initial = Maps.of(Keywords.FOO, Sets.empty());
+		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.createLattice(mapLattice, initial);
+
+		// Create 3 concurrent forks, each modifying :a via path
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = root.fork();
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = root.fork();
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork3 = root.fork();
+
+		PathCursor<ASet<CVMLong>> path1 = new PathCursor<>(fork1, Keywords.FOO);
+		PathCursor<ASet<CVMLong>> path2 = new PathCursor<>(fork2, Keywords.FOO);
+		PathCursor<ASet<CVMLong>> path3 = new PathCursor<>(fork3, Keywords.FOO);
+
+		// Each fork adds different values to :a
+		path1.updateAndGet(set -> set.include(CVMLong.create(1)).include(CVMLong.create(2)));
+		path2.updateAndGet(set -> set.include(CVMLong.create(2)).include(CVMLong.create(3)));
+		path3.updateAndGet(set -> set.include(CVMLong.create(3)).include(CVMLong.create(4)));
+
+		// Sync all forks in arbitrary order
+		fork2.sync();
+		fork1.sync();
+		fork3.sync();
+
+		// All values should be merged: {1, 2, 3, 4}
+		ASet<CVMLong> result = (ASet<CVMLong>) root.get().get(Keywords.FOO);
+		assertTrue(result.contains(CVMLong.create(1)), "Should have 1");
+		assertTrue(result.contains(CVMLong.create(2)), "Should have 2");
+		assertTrue(result.contains(CVMLong.create(3)), "Should have 3");
+		assertTrue(result.contains(CVMLong.create(4)), "Should have 4");
+		assertEquals(4L, result.count(), "Should have exactly 4 elements");
+	}
+
+	/**
+	 * Tests that direct path modifications on root interleaved with fork syncs
+	 * correctly merge without losing data.
+	 */
+	@Test
+	public void testInterleavedPathModificationsAndSyncs() {
+		SetLattice<CVMLong> valueLattice = SetLattice.create();
+		MapLattice<Keyword, ASet<CVMLong>> mapLattice = MapLattice.create(valueLattice);
+
+		AHashMap<Keyword, ASet<CVMLong>> initial = Maps.of(
+			Keywords.FOO, Sets.empty(),
+			Keywords.BAR, Sets.empty()
+		);
+		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root = Cursors.createLattice(mapLattice, initial);
+
+		// Fork and modify :a
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork1 = root.fork();
+		PathCursor<ASet<CVMLong>> fork1PathA = new PathCursor<>(fork1, Keywords.FOO);
+		fork1PathA.updateAndGet(set -> set.include(CVMLong.create(1)));
+
+		// Direct path modification on root - modify :b
+		PathCursor<ASet<CVMLong>> rootPathB = new PathCursor<>(root, Keywords.BAR);
+		rootPathB.updateAndGet(set -> set.include(CVMLong.create(10)));
+
+		// Sync fork1
+		fork1.sync();
+
+		// Create another fork and modify :a again
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> fork2 = root.fork();
+		PathCursor<ASet<CVMLong>> fork2PathA = new PathCursor<>(fork2, Keywords.FOO);
+		fork2PathA.updateAndGet(set -> set.include(CVMLong.create(2)));
+
+		// Meanwhile, modify :b on root again
+		rootPathB.updateAndGet(set -> set.include(CVMLong.create(20)));
+
+		// Sync fork2
+		fork2.sync();
+
+		// Final state should have:
+		// :a = {1, 2}
+		// :b = {10, 20}
+		AHashMap<Keyword, ASet<CVMLong>> finalRoot = root.get();
+
+		ASet<CVMLong> finalA = (ASet<CVMLong>) finalRoot.get(Keywords.FOO);
+		assertTrue(finalA.contains(CVMLong.create(1)), ":a should have 1");
+		assertTrue(finalA.contains(CVMLong.create(2)), ":a should have 2");
+
+		ASet<CVMLong> finalB = (ASet<CVMLong>) finalRoot.get(Keywords.BAR);
+		assertTrue(finalB.contains(CVMLong.create(10)), ":b should have 10");
+		assertTrue(finalB.contains(CVMLong.create(20)), ":b should have 20");
 	}
 }
