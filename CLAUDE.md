@@ -46,12 +46,15 @@ Examples:
 ### Test Structure
 Tests follow JUnit 6 conventions with `src/test/java` mirroring `src/main/java` structure.
 
+### Language
+Concise language, British English spelling
+
 ## Key Technologies
 
 - **Netty** - Async networking
 - **JUnit 6** - Testing
 - **SLF4J** - Logging
-- **Ed25519** - Cryptographic signatures
+- **Ed25519** - Cryptographic signatures (Bouncy Castle Library)
 - **ANTLR4** - Parser generation (requires IDE source path configuration)
 
 ## Running Convex
@@ -63,7 +66,7 @@ Execution is typically using CLI commands on convex.jar uberjar (all dependencie
 java -jar convex.jar desktop   # Launch GUI
 ```
 
-Typically should set up small convenience wrapper script to run `java -jar ...` and allow comamnds like:
+Typically should set up small convenience wrapper script to run `java -jar ...` and allow commands like:
 ```bash
 convex key generate
 ```
@@ -81,10 +84,6 @@ See BUILD.md for complete release workflow.
 ### Known Issues
 - ANTLR4 generated sources may need manual IDE source path configuration
 - Add `target/generated-sources/antlr4` as source directory if needed
-
-## Contributing
-
-See README.md for contribution guidelines and license terms.
 
 ## Key Principles
 

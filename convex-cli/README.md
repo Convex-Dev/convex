@@ -1,6 +1,8 @@
 # Convex CLI
 
-Command-line interface for the Convex decentralized network. Query state, execute transactions, manage keys, run local test networks, and operate production peers.
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
+
+Command-line interface for the [Convex](https://convex.world) decentralised network. Query state, execute transactions, manage keys, run local test networks, and operate production peers.
 
 ## Quick Start
 

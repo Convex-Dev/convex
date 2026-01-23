@@ -1,58 +1,57 @@
-# Convex Desktop GUI
+# Convex Desktop
 
-Convex Desktop is a full featured desktop application for working with Convex. It is intended for developers who wish to build solutions on Convex as well as power users who wish to work directly with assets and smart contracts on the Convex Network.
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-Key features:
-- Execute transactions on Convex networks
-- Secure key generation and wallet management
-- Run a local network of Convex Peers
-- Visualisation of CPoS consensus and network messaging
-- Simulations and stress test code
+A full-featured desktop application for developers and power users working with the [Convex](https://convex.world) decentralized network.
 
 ![Screenshot](docs/images/convex-desktop.png)
 
-```
-Unleash the power of the Convex decentralized network directly from your desktop. The Convex GUI 
-application puts the control center for Web3 innovation at your fingertips. Designed for power users 
-and developers, this intuitive interface empowers you to seamlessly interact with Convex, build 
-next-generation dApps, and navigate the future of a democratized internet – all within a familiar
-and efficient desktop environment. Take command of your decentralized experience. 
- 
-Download the Convex GUI today.
+## Features
 
-- Google Gemini
-```
+- **Transaction Execution** - Submit transactions and queries to Convex networks
+- **Wallet Management** - Secure key generation and account management
+- **Local Network** - Run a local Convex peer cluster for development
+- **Network Visualization** - Real-time view of CPoS consensus and messaging
+- **Testing Tools** - Simulations and stress testing capabilities
 
-## Usage
+## Quick Start
 
-### Building
+### Download
 
-You will need a recent version of Java (21+) and Maven (3.7+) installed
+Download `convex.jar` from the [releases page](https://github.com/Convex-Dev/convex/releases).
 
-You can then build the latest version of Convex Desktop as follows:
-
-- Download the convex repository via git `https://github.com/Convex-Dev/convex.git` or using the zip download `https://github.com/Convex-Dev/convex/archive/refs/heads/develop.zip`
-- Run `mvn install` in the root directory (this will build all Convex modules)
-- The Convex `.jar` file should be created at `convex-integration/target/convex.jar` 
-
-### Running Convex Desktop
-
-If Java is properly installed on your machine, you should be able to run the `convex.jar` file directly as a Java application (double click on Windows).
-
-Alternatively, from the command line you can run the desktop with a Java command such as:
+### Run
 
 ```bash
 java -jar convex.jar desktop
 ```
 
-This launches the Convex Desktop application main screen.
+On Windows, you can also double-click `convex.jar` if Java is properly configured.
+
+## Building from Source
+
+**Requirements:** Java 21+, Maven 3.7+
+
+```bash
+git clone https://github.com/Convex-Dev/convex.git
+cd convex
+mvn install
+java -jar convex-integration/target/convex.jar desktop
+```
+
+## Documentation
+
+- [Convex Documentation](https://docs.convex.world)
+- [CLI Reference](../convex-cli/README.md)
+- [GitHub Repository](https://github.com/Convex-Dev/convex)
 
 ## License
 
-Copyright 2019-2024 The Convex Foundation and Contributors
+Copyright 2019-2025 The Convex Foundation and Contributors
 
-Code in convex-gui is provided under the [Convex Public License](../LICENSE.md). Alternate licenses can be granted for developers in the Convex ecosystem who have specific requirements - contact @mikera to discuss
+Code in convex-gui is provided under the [Convex Public License](../LICENSE.md).
 
-Feather Icons (https://github.com/feathericons/feather) used under MIT license 
+### Third-Party Licenses
 
-Material UI Swing (https://github.com/vincenzopalazzo/material-ui-swing) used under MIT license.
+- [Feather Icons](https://github.com/feathericons/feather) - MIT License
+- [Material UI Swing](https://github.com/vincenzopalazzo/material-ui-swing) - MIT License
