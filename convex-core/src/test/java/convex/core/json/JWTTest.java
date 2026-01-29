@@ -1,15 +1,25 @@
 package convex.core.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.Signature;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Symbols;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
@@ -163,9 +173,214 @@ public class JWTTest {
 		assertNull(JWT.verifyPublic(Strings.create(forgedJwt)), "JWT with wrong key should fail");
 	}
 
+	@Test public void testVerifyWithTrustedKey() {
+		AKeyPair venueKP = AKeyPair.createSeeded(999L);
+		AMap<AString, convex.core.data.ACell> claims = Maps.of(
+			"sub", "did:web:venue.example.com:u:alice",
+			"iss", "did:key:" + convex.core.crypto.util.Multikey.encodePublicKey(venueKP.getAccountKey()));
+
+		AString jwt = JWT.signPublic(claims, venueKP);
+
+		// Verify with correct trusted key succeeds
+		AMap<AString, convex.core.data.ACell> verified = JWT.verifyPublic(jwt, venueKP.getAccountKey());
+		assertNotNull(verified);
+		assertEquals("did:web:venue.example.com:u:alice", verified.get(Strings.create("sub")).toString());
+
+		// Verify with wrong trusted key fails
+		AKeyPair otherKP = AKeyPair.createSeeded(888L);
+		assertNull(JWT.verifyPublic(jwt, otherKP.getAccountKey()));
+	}
+
 	@Test public void testVerifyPublicRejectsGarbage() {
 		assertNull(JWT.verifyPublic(Strings.create("not-a-jwt")));
 		assertNull(JWT.verifyPublic(Strings.create("a.b.c")));
 		assertNull(JWT.verifyPublic(Strings.create("")));
+	}
+
+	// ========== Instance-based parse tests ==========
+
+	@Test public void testParseAndCache() {
+		AKeyPair kp = AKeyPair.createSeeded(42L);
+		AMap<AString, ACell> claims = Maps.of("sub", "alice", "scope", "read");
+		AString jwtString = JWT.signPublic(claims, kp);
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+
+		// Repeated access returns same cached objects
+		assertSame(parsed.getHeader(), parsed.getHeader());
+		assertSame(parsed.getClaims(), parsed.getClaims());
+		assertSame(parsed.getRaw(), parsed.getRaw());
+
+		assertEquals("EdDSA", parsed.getAlgorithm());
+		assertNotNull(parsed.getKeyID());
+		assertEquals("alice", parsed.getClaims().get(Strings.create("sub")).toString());
+	}
+
+	@Test public void testParseRejectsGarbage() {
+		assertNull(JWT.parse(Strings.create("not-a-jwt")));
+		assertNull(JWT.parse(Strings.create("a.b.c")));
+		assertNull(JWT.parse(Strings.create("")));
+	}
+
+	@Test public void testInstanceVerifyEdDSA() {
+		AKeyPair kp = AKeyPair.generate();
+		AMap<AString, ACell> claims = Maps.of("sub", "test");
+		AString jwtString = JWT.signPublic(claims, kp);
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertTrue(parsed.verifyEdDSA());
+		assertTrue(parsed.verifyEdDSA(kp.getAccountKey()));
+
+		// Wrong key should fail
+		AKeyPair other = AKeyPair.generate();
+		assertFalse(parsed.verifyEdDSA(other.getAccountKey()));
+	}
+
+	@Test public void testInstanceVerifyHS256() {
+		byte[] secret = "test-secret-key-long-enough".getBytes();
+		AMap<AString, ACell> claims = Maps.of("sub", "bob");
+		AString jwtString = JWT.signSymmetric(claims, Blob.wrap(secret));
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertEquals("HS256", parsed.getAlgorithm());
+		assertTrue(parsed.verifyHS256(secret));
+
+		// Wrong secret should fail
+		assertFalse(parsed.verifyHS256("wrong-secret-key-long-enough".getBytes()));
+	}
+
+	// ========== RS256 tests ==========
+
+	private KeyPair generateRSAKeyPair() throws Exception {
+		KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
+		gen.initialize(2048);
+		return gen.generateKeyPair();
+	}
+
+	private AString buildRS256JWT(AMap<AString, ACell> claims, java.security.PrivateKey privateKey) throws Exception {
+		Base64.Encoder enc = Base64.getUrlEncoder().withoutPadding();
+		String header = "{\"alg\":\"RS256\",\"typ\":\"JWT\",\"kid\":\"test-key-1\"}";
+		String headerB64 = enc.encodeToString(header.getBytes());
+		String claimsJson = convex.core.util.JSON.toString(claims);
+		String claimsB64 = enc.encodeToString(claimsJson.getBytes());
+		String signingInput = headerB64 + "." + claimsB64;
+
+		Signature sig = Signature.getInstance("SHA256withRSA");
+		sig.initSign(privateKey);
+		sig.update(signingInput.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+		byte[] sigBytes = sig.sign();
+		String sigB64 = enc.encodeToString(sigBytes);
+
+		return Strings.create(signingInput + "." + sigB64);
+	}
+
+	@Test public void testVerifyRS256() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		RSAPublicKey pubKey = (RSAPublicKey) kp.getPublic();
+
+		AMap<AString, ACell> claims = Maps.of("sub", "alice", "iss", "test-issuer");
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		// Static method
+		AMap<AString, ACell> verified = JWT.verifyRS256(jwtString, pubKey);
+		assertNotNull(verified);
+		assertEquals("alice", verified.get(Strings.create("sub")).toString());
+
+		// Instance method
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertEquals("RS256", parsed.getAlgorithm());
+		assertEquals("test-key-1", parsed.getKeyID());
+		assertTrue(parsed.verifyRS256(pubKey));
+	}
+
+	@Test public void testVerifyRS256RejectsTampered() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		RSAPublicKey pubKey = (RSAPublicKey) kp.getPublic();
+
+		AMap<AString, ACell> claims = Maps.of("sub", "alice");
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		// Tamper with the payload
+		String s = jwtString.toString();
+		int dot1 = s.indexOf('.');
+		String tampered = s.substring(0, dot1 + 2) + "X" + s.substring(dot1 + 3);
+
+		assertNull(JWT.verifyRS256(Strings.create(tampered), pubKey));
+	}
+
+	@Test public void testVerifyRS256RejectsWrongKey() throws Exception {
+		KeyPair kp1 = generateRSAKeyPair();
+		KeyPair kp2 = generateRSAKeyPair();
+
+		AMap<AString, ACell> claims = Maps.of("sub", "alice");
+		AString jwtString = buildRS256JWT(claims, kp1.getPrivate());
+
+		// Verify with wrong key should fail
+		assertNull(JWT.verifyRS256(jwtString, (RSAPublicKey) kp2.getPublic()));
+
+		// Verify with correct key should succeed
+		assertNotNull(JWT.verifyRS256(jwtString, (RSAPublicKey) kp1.getPublic()));
+	}
+
+	// ========== Claims validation tests ==========
+
+	@Test public void testValidateClaimsExpired() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		long pastExp = System.currentTimeMillis() / 1000 - 3600; // 1 hour ago
+		AMap<AString, ACell> claims = Maps.of("sub", "alice", "exp", pastExp);
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
+		assertFalse(parsed.validateClaims(null, null), "Expired token should fail validation");
+	}
+
+	@Test public void testValidateClaimsWrongIssuer() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		long futureExp = System.currentTimeMillis() / 1000 + 3600;
+		AMap<AString, ACell> claims = Maps.of("sub", "alice", "iss", "wrong-issuer", "exp", futureExp);
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertFalse(parsed.validateClaims("expected-issuer", null));
+		assertTrue(parsed.validateClaims("wrong-issuer", null));
+	}
+
+	@Test public void testValidateClaimsWrongAudience() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		long futureExp = System.currentTimeMillis() / 1000 + 3600;
+		AMap<AString, ACell> claims = Maps.of("sub", "alice", "aud", "client-123", "exp", futureExp);
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertFalse(parsed.validateClaims(null, "wrong-client"));
+		assertTrue(parsed.validateClaims(null, "client-123"));
+	}
+
+	@Test public void testValidateClaimsPass() throws Exception {
+		KeyPair kp = generateRSAKeyPair();
+		long futureExp = System.currentTimeMillis() / 1000 + 3600;
+		AMap<AString, ACell> claims = Maps.of(
+			"sub", "alice",
+			"iss", "https://accounts.google.com",
+			"aud", "my-client-id",
+			"exp", futureExp);
+		AString jwtString = buildRS256JWT(claims, kp.getPrivate());
+
+		JWT parsed = JWT.parse(jwtString);
+		assertNotNull(parsed);
+		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
+		assertTrue(parsed.validateClaims("https://accounts.google.com", "my-client-id"));
+		// Null params skip checks
+		assertTrue(parsed.validateClaims(null, null));
+		assertTrue(parsed.validateClaims("https://accounts.google.com", null));
+		assertTrue(parsed.validateClaims(null, "my-client-id"));
 	}
 }
