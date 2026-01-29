@@ -1,6 +1,8 @@
 package convex.core.json;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -105,5 +107,65 @@ public class JWTTest {
 
 		String decodedClaims = new String(JWT.decodeRaw(payloadB64));
 		assertEquals(JWT.claims(claims).toString(), decodedClaims);
+	}
+
+	@Test public void testVerifyPublicRoundTrip() {
+		AKeyPair kp = AKeyPair.generate();
+		AMap<AString, convex.core.data.ACell> claims = Maps.of(
+			"sub", "did:key:z6MkTest",
+			"iss", "did:key:z6MkTest",
+			"aud", "https://venue.example.com");
+
+		AString jwt = JWT.signPublic(claims, kp);
+		AMap<AString, convex.core.data.ACell> verified = JWT.verifyPublic(jwt);
+
+		assertNotNull(verified, "Valid JWT should verify successfully");
+		assertEquals("did:key:z6MkTest", verified.get(Strings.create("sub")).toString());
+		assertEquals("did:key:z6MkTest", verified.get(Strings.create("iss")).toString());
+		assertEquals("https://venue.example.com", verified.get(Strings.create("aud")).toString());
+	}
+
+	@Test public void testVerifyPublicRejectsTampered() {
+		AKeyPair kp = AKeyPair.generate();
+		AMap<AString, convex.core.data.ACell> claims = Maps.of("sub", "alice");
+
+		AString jwt = JWT.signPublic(claims, kp);
+
+		// Tamper with the claims (change a character in the middle)
+		String s = jwt.toString();
+		int dot1 = s.indexOf('.');
+		int dot2 = s.indexOf('.', dot1 + 1);
+		String tampered = s.substring(0, dot1 + 2) + "X" + s.substring(dot1 + 3);
+		assertNull(JWT.verifyPublic(Strings.create(tampered)), "Tampered JWT should fail verification");
+	}
+
+	@Test public void testVerifyPublicRejectsWrongKey() {
+		AKeyPair kp1 = AKeyPair.createSeeded(1L);
+		AKeyPair kp2 = AKeyPair.createSeeded(2L);
+		AMap<AString, convex.core.data.ACell> claims = Maps.of("sub", "alice");
+
+		// Sign with kp1
+		AString jwt = JWT.signPublic(claims, kp1);
+
+		// Verify should succeed with correct key embedded in kid
+		assertNotNull(JWT.verifyPublic(jwt));
+
+		// Manually swap the header to use kp2's kid but keep kp1's signature
+		// This should fail because signature won't match the new kid's public key
+		String s = jwt.toString();
+		int dot1 = s.indexOf('.');
+		// Replace header with one containing kp2's kid
+		AString kid2 = convex.core.crypto.util.Multikey.encodePublicKey(kp2.getAccountKey());
+		AMap<AString, convex.core.data.ACell> fakeHeader = Maps.of(
+			"alg", "EdDSA", "typ", "JWT", "kid", kid2);
+		String fakeHeaderB64 = JWT.encode(Strings.create(convex.core.util.JSON.toString(fakeHeader))).toString();
+		String forgedJwt = fakeHeaderB64 + s.substring(dot1);
+		assertNull(JWT.verifyPublic(Strings.create(forgedJwt)), "JWT with wrong key should fail");
+	}
+
+	@Test public void testVerifyPublicRejectsGarbage() {
+		assertNull(JWT.verifyPublic(Strings.create("not-a-jwt")));
+		assertNull(JWT.verifyPublic(Strings.create("a.b.c")));
+		assertNull(JWT.verifyPublic(Strings.create("")));
 	}
 }

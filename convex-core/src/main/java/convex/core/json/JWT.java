@@ -12,6 +12,7 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
+import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -19,6 +20,7 @@ import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
+import convex.core.lang.RT;
 import convex.core.util.JSON;
 
 public class JWT {
@@ -119,6 +121,54 @@ public class JWT {
 	 *                  header parameter.
 	 * @return The encoded JWT string containing header, payload, and signature.
 	 */
+	/**
+	 * Verify an EdDSA (Ed25519) JWT and return the claims if valid.
+	 *
+	 * Extracts the public key from the {@code kid} header parameter (multikey format),
+	 * verifies the Ed25519 signature, and returns the parsed claims map.
+	 *
+	 * @param jwt The encoded JWT string
+	 * @return Claims map if signature is valid, or null if verification fails
+	 */
+	@SuppressWarnings("unchecked")
+	public static AMap<AString,ACell> verifyPublic(AString jwt) {
+		try {
+			String s = jwt.toString();
+			int dot1 = s.indexOf('.');
+			if (dot1 < 0) return null;
+			int dot2 = s.indexOf('.', dot1 + 1);
+			if (dot2 < 0) return null;
+
+			// Decode header
+			String headerB64 = s.substring(0, dot1);
+			AMap<AString,ACell> header = RT.ensureMap(JSON.parse(Strings.wrap(decoder.decode(headerB64))));
+			if (header == null) return null;
+
+			// Check algorithm
+			AString alg = RT.ensureString(header.get(Strings.create("alg")));
+			if (alg == null || !"EdDSA".equals(alg.toString())) return null;
+
+			// Extract kid and decode public key
+			AString kid = RT.ensureString(header.get(Strings.create("kid")));
+			if (kid == null) return null;
+			AccountKey publicKey = Multikey.decodePublicKey(kid.toString());
+			if (publicKey == null) return null;
+
+			// Verify signature
+			String sigB64 = s.substring(dot2 + 1);
+			byte[] sigBytes = decoder.decode(sigB64);
+			ASignature sig = ASignature.fromBlob(Blob.wrap(sigBytes));
+			String signingInput = s.substring(0, dot2);
+			if (!sig.verify(Blob.wrap(signingInput.getBytes()), publicKey)) return null;
+
+			// Decode and return claims
+			String claimsB64 = s.substring(dot1 + 1, dot2);
+			return RT.ensureMap(JSON.parse(Strings.wrap(decoder.decode(claimsB64))));
+		} catch (Exception e) {
+			return null; // any parsing/decoding error means invalid token
+		}
+	}
+
 	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair) {
 		AString kid = Multikey.encodePublicKey(keyPair.getAccountKey());
 		AMap<AString,ACell> headerMap = HEADER_EDDSA_BASE.assoc(Strings.create("kid"), kid);
