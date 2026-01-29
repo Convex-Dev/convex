@@ -12,6 +12,8 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.ANumeric;
+
 import convex.core.init.Init;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -34,6 +36,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.mcp.McpAPI;
+import convex.restapi.mcp.McpTool;
 
 /**
  * Integration tests for the MCP HTTP endpoint.
@@ -50,6 +53,9 @@ public class McpTest extends ARESTTest {
 	private static final AString SEED_TEST = Strings.create("0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20");
 	private static final AString VALUE_HELLO = Strings.create("68656c6c6f");
 	private static final AString VALUE_WORLD = Strings.create("776f726c64");
+
+	/** Tracks the last tool name called by makeToolCall, used for schema validation in expectResult */
+	private String lastToolName;
 
 	/**
 	 * Happy-path sanity check that the MCP server exposes the required tool list.
@@ -870,6 +876,7 @@ public class McpTest extends ARESTTest {
 		if (arguments == null) {
 			arguments = Maps.empty();
 		}
+		this.lastToolName = toolName;
 		String id = "test-" + toolName;
 		AMap<AString, ACell> params = Maps.of(
 			"name", toolName,
@@ -892,10 +899,71 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
+	 * Validates that the structured content of a tool response matches the
+	 * declared outputSchema in the tool's JSON definition. Checks that each
+	 * property's actual type matches the schema type (string, object, boolean,
+	 * integer, number, array).
+	 */
+	private void validateOutputSchema(String toolName, AMap<AString, ACell> structured) {
+		String resourcePath = "convex/restapi/mcp/tools/" + toolName + ".json";
+		AMap<AString, ACell> metadata = McpTool.loadMetadata(resourcePath);
+
+		AMap<AString, ACell> outputSchema = RT.ensureMap(metadata.get(Strings.create("outputSchema")));
+		if (outputSchema == null) return; // no schema to validate
+
+		AMap<AString, ACell> properties = RT.ensureMap(outputSchema.get(Strings.create("properties")));
+		if (properties == null) return; // no properties declared
+
+		long n = properties.count();
+		for (long i = 0; i < n; i++) {
+			var entry = properties.entryAt(i);
+			String fieldName = entry.getKey().toString();
+			AMap<AString, ACell> fieldSchema = RT.ensureMap(entry.getValue());
+			if (fieldSchema == null) continue;
+
+			AString typeCell = RT.ensureString(fieldSchema.get(Strings.create("type")));
+			if (typeCell == null) continue; // no type constraint
+
+			String expectedType = typeCell.toString();
+			ACell actualValue = structured.get(Strings.create(fieldName));
+
+			// Field may be absent (not required) - only validate if present
+			if (actualValue == null) continue;
+
+			switch (expectedType) {
+				case "string":
+					assertTrue(actualValue instanceof AString,
+						() -> "Tool '" + toolName + "' field '" + fieldName + "': expected string but got " + RT.getType(actualValue) + " = " + actualValue);
+					break;
+				case "object":
+					assertTrue(actualValue instanceof AMap,
+						() -> "Tool '" + toolName + "' field '" + fieldName + "': expected object but got " + RT.getType(actualValue) + " = " + actualValue);
+					break;
+				case "boolean":
+					assertTrue(actualValue instanceof CVMBool,
+						() -> "Tool '" + toolName + "' field '" + fieldName + "': expected boolean but got " + RT.getType(actualValue) + " = " + actualValue);
+					break;
+				case "integer":
+				case "number":
+					assertTrue(actualValue instanceof ANumeric,
+						() -> "Tool '" + toolName + "' field '" + fieldName + "': expected " + expectedType + " but got " + RT.getType(actualValue) + " = " + actualValue);
+					break;
+				case "array":
+					assertTrue(actualValue instanceof AVector,
+						() -> "Tool '" + toolName + "' field '" + fieldName + "': expected array but got " + RT.getType(actualValue) + " = " + actualValue);
+					break;
+				default:
+					// Unknown type in schema, skip validation
+					break;
+			}
+		}
+	}
+
+	/**
 	 * Common assertion path for successful tool calls. Ensures the result wrapper
 	 * is present, marks {@code isError == false}, checks that a text payload was
 	 * produced for backward compatibility, and returns the structured content map
-	 * for further inspection.
+	 * for further inspection. Also validates the output against the declared schema.
 	 */
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpAPI.FIELD_ERROR));
@@ -910,6 +978,12 @@ public class McpTest extends ARESTTest {
 		assertNotNull(textEntry.get(McpAPI.FIELD_TEXT));
 		AMap<AString, ACell> structured =RT.ensureMap(result.get(McpAPI.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
+
+		// Validate structured content against the tool's declared outputSchema
+		if (lastToolName != null) {
+			validateOutputSchema(lastToolName, structured);
+		}
+
 		return structured;
 	}
 

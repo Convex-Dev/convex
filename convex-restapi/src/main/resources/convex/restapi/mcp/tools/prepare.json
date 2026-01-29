@@ -28,7 +28,7 @@
         "description": "Original source expression that was prepared"
       },
       "address": {
-        "type": "string",
+        "type": "integer",
         "description": "Address that will execute the transaction"
       },
       "hash": {
