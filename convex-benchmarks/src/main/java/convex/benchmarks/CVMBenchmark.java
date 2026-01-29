@@ -114,6 +114,7 @@ public class CVMBenchmark {
 		ctx.context.getResult();
 	}
 	
+	@SuppressWarnings("unused")
 	@Benchmark
 	public void queryAccountHoldings() {
 		State s=STATE;
