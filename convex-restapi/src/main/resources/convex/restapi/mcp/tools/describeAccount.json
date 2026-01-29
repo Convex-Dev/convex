@@ -16,8 +16,8 @@
     "type": "object",
     "properties": {
       "metadata": {
-        "type": "object",
-        "description": "Map of Symbol -> Symbol metadata (possibly nil), use for identifying callable functions and on-chain data"
+        "type": "string",
+        "description": "Map of Symbol -> Symbol metadata (possibly nil) in CVX format, use for identifying callable functions and on-chain data"
       },
 	  "accountInfo": {
 	    "type": "object",
