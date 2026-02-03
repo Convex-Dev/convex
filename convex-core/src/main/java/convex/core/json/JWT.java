@@ -83,7 +83,6 @@ public class JWT {
 	 * @param jwt The encoded JWT string
 	 * @return Parsed JWT instance, or null if malformed
 	 */
-	@SuppressWarnings("unchecked")
 	public static JWT parse(AString jwt) {
 		try {
 			String s = jwt.toString();

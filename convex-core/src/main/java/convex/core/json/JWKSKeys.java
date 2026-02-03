@@ -36,7 +36,6 @@ public class JWKSKeys {
 	 * @param jwksJson Raw JSON from a JWKS endpoint
 	 * @return Map of kid to RSAPublicKey, never null (empty if no valid keys)
 	 */
-	@SuppressWarnings("unchecked")
 	public static Map<String, RSAPublicKey> parseKeys(String jwksJson) {
 		Map<String, RSAPublicKey> result = new HashMap<>();
 		try {
