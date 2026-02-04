@@ -1,7 +1,10 @@
 package convex.lattice;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
+import convex.core.data.Keyword;
+import convex.core.data.Strings;
 import convex.core.lang.RT;
 
 /**
@@ -52,6 +55,38 @@ public abstract class ALattice<V extends ACell> {
 	 */
 	public abstract boolean checkForeign(V value);
 	
+	/**
+	 * Resolves an external key (e.g. JSON string) to the canonical CVM key
+	 * used by this lattice level. Returns null if the key cannot be resolved
+	 * to a valid child key.
+	 *
+	 * <p>Used by JSON-based APIs to translate path elements before calling
+	 * standard lattice operations like {@code descend()}. Normal CVM code
+	 * that already uses canonical key types does not need this.
+	 *
+	 * <p>Default implementation returns the key unchanged.
+	 *
+	 * @param key External key to resolve
+	 * @return Canonical CVM key, or null if the key is not valid
+	 */
+	public ACell resolveKey(ACell key) {
+		return key;
+	}
+
+	/**
+	 * Converts a canonical CVM key to its JSON-compatible representation.
+	 * Keywords become their name strings; blobs become hex strings;
+	 * other types (AString, AInteger) pass through unchanged.
+	 *
+	 * @param key CVM key to convert
+	 * @return JSON-compatible key
+	 */
+	public static ACell toJSONKey(ACell key) {
+		if (key instanceof Keyword k) return k.getName();
+		if (key instanceof ABlob b) return Strings.create(b.toHexString());
+		return key;
+	}
+
 	/**
 	 * Get the sub-lattice at the specified path
 	 * @param <T>

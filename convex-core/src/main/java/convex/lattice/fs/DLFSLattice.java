@@ -116,6 +116,18 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		return true;
 	}
 
+	@Override
+	public ACell resolveKey(ACell key) {
+		if (key instanceof AInteger) return key;
+		if (key instanceof AString) {
+			// Try parsing as integer for vector position access
+			AInteger n = AInteger.parse(key);
+			if (n != null) return n;
+			return key; // String filename
+		}
+		return key;
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {

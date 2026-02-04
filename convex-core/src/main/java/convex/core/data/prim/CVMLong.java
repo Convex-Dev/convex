@@ -167,6 +167,19 @@ public final class CVMLong extends AInteger {
 	}
 	
 	/**
+	 * Parse an ACell as a CVM Long.
+	 * @param cell ACell to parse
+	 * @return CVM Long value, or null if not convertible to long
+	 */
+	public static CVMLong parse(ACell cell) {
+		if (cell == null) return null;
+		CVMLong v = RT.ensureLong(cell);
+		if (v != null) return v;
+		if (cell instanceof AString) return parse(cell.toString());
+		return null;
+	}
+
+	/**
 	 * Parse an Object as a CVM Long, on a best efforts basis
 	 * @param o Object to parse
 	 * @return CVM Long value, or null if parse failed

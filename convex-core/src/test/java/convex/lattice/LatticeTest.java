@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.Keyword;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -60,11 +63,28 @@ public class LatticeTest {
 		if (path.length>0) {
 			ALattice<ACell> child=lattice.path(path);
 			assertNotNull(child);
-			
+
 			ACell c1=RT.getIn(v1,path);
 			ACell c2=RT.getIn(v2,path);
-			
+
 			assertEquals(child.merge(c1,c2),RT.getIn(merged, path));
+
+			// Test resolveKey: canonical CVM key round-trips through resolveKey
+			Object firstKey=path[0];
+			ACell cvmKey=RT.cvm(firstKey);
+			ACell resolved=lattice.resolveKey(cvmKey);
+			assertNotNull(resolved,"resolveKey should resolve canonical CVM key: "+cvmKey);
+
+			// path() should work with the resolved key
+			assertNotNull(lattice.path(resolved),"path() should accept resolved key");
+
+			// toJSONKey round-trip: CVM key → JSON key → resolveKey → same CVM key
+			ACell jsonKey=ALattice.toJSONKey(resolved);
+			assertNotNull(jsonKey,"toJSONKey should produce a non-null JSON key");
+			ACell roundTripped=lattice.resolveKey(jsonKey);
+			assertNotNull(roundTripped,"resolveKey should resolve JSON representation back");
+			// The round-tripped key should resolve to the same child lattice
+			assertNotNull(lattice.path(roundTripped),"path() should accept round-tripped key");
 		}
 	}
 	
@@ -72,8 +92,39 @@ public class LatticeTest {
 		ACell genesis=Lattice.ROOT.zero();
 		var root=Root.create(genesis);
 		assertSame(genesis,root.get());
-		
-		// ACursor dl=Lattice.path(root,genesis);
+	}
+
+	@Test public void testResolveKey() {
+		// ROOT resolveKey: string → keyword
+		assertSame(Keywords.KV, Lattice.ROOT.resolveKey(Strings.create("kv")));
+		assertSame(Keywords.DATA, Lattice.ROOT.resolveKey(Strings.create("data")));
+		assertSame(Keywords.FS, Lattice.ROOT.resolveKey(Strings.create("fs")));
+
+		// ROOT resolveKey: keyword → keyword (identity)
+		assertSame(Keywords.KV, Lattice.ROOT.resolveKey(Keywords.KV));
+
+		// ROOT resolveKey: unknown key → null
+		assertNull(Lattice.ROOT.resolveKey(Strings.create("nonexistent")));
+
+		// toJSONKey: keyword → string
+		assertEquals(Strings.create("kv"), ALattice.toJSONKey(Keywords.KV));
+		assertEquals(Strings.create("data"), ALattice.toJSONKey(Keywords.DATA));
+
+		// toJSONKey: string passes through
+		{
+			ACell s = Strings.create("hello");
+			assertSame(s, ALattice.toJSONKey(s));
+		}
+
+		// toJSONKey: integer passes through
+		assertSame(CVMLong.ONE, ALattice.toJSONKey(CVMLong.ONE));
+
+		// Round-trip: keyword → JSON string → resolveKey → same keyword
+		for (Keyword kw : new Keyword[]{Keywords.KV, Keywords.DATA, Keywords.FS}) {
+			ACell json = ALattice.toJSONKey(kw);
+			ACell resolved = Lattice.ROOT.resolveKey(json);
+			assertSame(kw, resolved, "Round-trip should preserve keyword: " + kw);
+		}
 	}
 	
 	@Test public void testMaxLattice() {

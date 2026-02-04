@@ -1,7 +1,10 @@
 package convex.lattice.generic;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.util.MergeFunction;
@@ -111,6 +114,15 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 		// TODO: Signature validation for specific owners will be looked up later,
 		// so we only check the structure here
 		return (value instanceof AHashMap);
+	}
+
+	@Override
+	public ACell resolveKey(ACell key) {
+		if (key instanceof ABlob) return key;
+		if (key instanceof AString s) {
+			return Blob.parse(s.toString());
+		}
+		return key;
 	}
 
 	@SuppressWarnings("unchecked")

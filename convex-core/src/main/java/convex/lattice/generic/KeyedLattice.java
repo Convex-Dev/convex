@@ -99,6 +99,26 @@ public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
 	}
 
 	/**
+	 * Resolves an external key to the canonical Keyword for this lattice.
+	 * Both Keywords and AStrings with the same text resolve to the same
+	 * canonical Keyword (e.g. {@code "data"} resolves to {@code :data}).
+	 *
+	 * @return Canonical Keyword, or null if the key doesn't match any child
+	 */
+	@Override
+	public ACell resolveKey(ACell key) {
+		if (key instanceof ABlobLike<?> blobLike) {
+			ABlob childBlob=blobLike.toBlob();
+			for (int i=0; i<keyBlobs.size(); i++) {
+				if (keyBlobs.get(i).equals(childBlob)) {
+					return keys.get(i);
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Resolves a child lattice by key. Uses blob-based comparison so that
 	 * both Keywords and AStrings with the same text resolve to the same
 	 * child lattice (e.g. {@code :data} and {@code "data"} are equivalent).

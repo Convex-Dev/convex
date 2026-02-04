@@ -2,6 +2,8 @@ package convex.lattice.generic;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
@@ -100,6 +102,18 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 	@Override
 	public SignedData<V> zero() {
+		return null;
+	}
+
+	private static final ABlob VALUE_BLOB = Keywords.VALUE.toBlob();
+
+	@Override
+	public ACell resolveKey(ACell key) {
+		if (key instanceof ABlobLike<?> blobLike) {
+			if (VALUE_BLOB.equals(blobLike.toBlob())) {
+				return Keywords.VALUE;
+			}
+		}
 		return null;
 	}
 

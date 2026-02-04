@@ -14,6 +14,7 @@ import java.util.HashSet;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
@@ -43,8 +44,18 @@ public class LongTest {
 		
 		assertNull(CVMLong.parse("1.3"));
 		assertNull(CVMLong.parse(":foo"));
-		assertNull(CVMLong.parse(null));
+		assertNull(CVMLong.parse((String)null));
 		assertNull(CVMLong.parse(CVMBigInteger.MIN_POSITIVE));
+
+		// ACell overloads: doubles must not silently parse as integers
+		assertNull(AInteger.parse(Strings.create("1.3")));
+		assertNull(CVMLong.parse(Strings.create("1.3")));
+		assertNull(AInteger.parse((ACell)null));
+
+		// ACell overloads: valid integers
+		assertCVMEquals(42L, AInteger.parse(Strings.create("42")));
+		assertCVMEquals(42L, AInteger.parse(CVMLong.create(42)));
+		assertCVMEquals(-7L, CVMLong.parse(Strings.create("-7")));
 	}
 
 	@Test 

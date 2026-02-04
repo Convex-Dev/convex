@@ -41,14 +41,14 @@ public class GenericLatticeTest {
 	 */
 	@Test public void testLatticeExamples() {
 		LatticeTest.doLatticeTest(MaxLattice.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
-		
-		LatticeTest.doLatticeTest(MapLattice.create(MaxLattice.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7));
 
-		LatticeTest.doLatticeTest(SignedLattice.create(MaxLattice.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
+		LatticeTest.doLatticeTest(MapLattice.create(MaxLattice.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7), 1);
+
+		LatticeTest.doLatticeTest(SignedLattice.create(MaxLattice.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE), Keywords.VALUE);
 
 		LatticeTest.doLatticeTest(SetLattice.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
-		
-		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Index.of(Keywords.FOO,CVMLong.ONE), Index.of(Keywords.BAR,Sets.of(1,2)));
+
+		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Index.of(Keywords.FOO,CVMLong.ONE), Index.of(Keywords.BAR,Sets.of(1,2)), Keywords.FOO);
 
 		LatticeTest.doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
 	}
