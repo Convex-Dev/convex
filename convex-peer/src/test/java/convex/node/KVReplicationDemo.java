@@ -141,7 +141,7 @@ public class KVReplicationDemo {
 				if (kvValue instanceof AHashMap<?,?> kvMap) {
 					ACell dbValue = kvMap.get(dbName);
 					if (dbValue instanceof AHashMap<?,?>) {
-						@SuppressWarnings({"unchecked", "rawtypes"})
+						@SuppressWarnings({"rawtypes"})
 						AHashMap ownerMap = (AHashMap) dbValue;
 						long merged = databases.get(i).mergeReplicas(ownerMap);
 						System.out.println("Node " + i + ": merged " + merged + " remote replica(s)");
