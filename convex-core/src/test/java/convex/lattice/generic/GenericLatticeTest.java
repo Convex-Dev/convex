@@ -8,6 +8,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
@@ -47,7 +48,7 @@ public class GenericLatticeTest {
 
 		LatticeTest.doLatticeTest(SetLattice.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
 		
-		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
+		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Index.of(Keywords.FOO,CVMLong.ONE), Index.of(Keywords.BAR,Sets.of(1,2)));
 
 		LatticeTest.doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
 	}

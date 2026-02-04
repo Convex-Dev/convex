@@ -3,6 +3,7 @@ package convex.lattice.kv;
 import java.util.function.Predicate;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -163,15 +164,16 @@ public class KVDatabase {
 			ACell ownerKey = entry.getKey();
 			SignedData<Index<AString, AVector<ACell>>> signedState = entry.getValue();
 
+			// Resolve owner key (may be ABlob after deserialization)
+			AccountKey ak = (ownerKey instanceof ABlob blob)
+				? AccountKey.create(blob) : null;
+			if (ak == null) continue;
+
 			// Skip our own replica
-			if (accountKey.equals(ownerKey)) continue;
+			if (accountKey.equals(ak)) continue;
 
 			// Apply filter
-			if (ownerKey instanceof AccountKey ak) {
-				if (!replicaFilter.test(ak)) continue;
-			} else {
-				continue; // Skip non-AccountKey owners
-			}
+			if (!replicaFilter.test(ak)) continue;
 
 			// Validate signature
 			if (!signedState.checkSignature()) continue;
