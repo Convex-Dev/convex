@@ -401,9 +401,9 @@ public class LatticeKVTest {
 	public void testConcurrentCounterMerge() {
 		LatticeKV root = LatticeKV.create("root");
 
-		// Create forks with different actor IDs for PN-counter
-		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), "actor1");
-		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), "actor2");
+		// Create forks with different replica IDs for PN-counter
+		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), "replica-1");
+		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), "replica-2");
 
 		// Both increment independently
 		fork1.incrby("counter", 5);
@@ -413,7 +413,7 @@ public class LatticeKVTest {
 		fork1.sync();
 		fork2.sync();
 
-		// PN-Counter merge: both actor contributions preserved
+		// PN-Counter merge: both replica contributions preserved
 		assertEquals(8, root.incrby("counter", 0));
 	}
 

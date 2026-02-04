@@ -155,6 +155,7 @@ public class Keywords {
 	public static final Keyword APP = Keyword.intern("app");
 	public static final Keyword DATA = Keyword.intern("data");
 	public static final Keyword FS = Keyword.intern("fs");
+	public static final Keyword KV = Keyword.intern("kv");
 	
 	
 	// General API keywords

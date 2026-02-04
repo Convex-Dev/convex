@@ -25,11 +25,11 @@ import convex.lattice.cursor.Cursors;
 public class LatticeKV {
 
 	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
-	private final String actorId;
+	private final String replicaID;
 
-	LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, String actorId) {
+	LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, String replicaID) {
 		this.cursor = cursor;
-		this.actorId = actorId;
+		this.replicaID = replicaID;
 	}
 
 	/**
@@ -40,12 +40,12 @@ public class LatticeKV {
 	}
 
 	/**
-	 * Creates a new empty KV store with a specific actor ID for PN-counter operations
+	 * Creates a new empty KV store with a specific replica ID for PN-counter operations
 	 */
-	public static LatticeKV create(String actorId) {
+	public static LatticeKV create(String replicaID) {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.createLattice(KVStoreLattice.INSTANCE);
-		return new LatticeKV(cursor, actorId);
+		return new LatticeKV(cursor, replicaID);
 	}
 
 	/**
@@ -59,7 +59,7 @@ public class LatticeKV {
 	 * Creates a forked copy of this store for independent operation
 	 */
 	public LatticeKV fork() {
-		return new LatticeKV(cursor.fork(), actorId);
+		return new LatticeKV(cursor.fork(), replicaID);
 	}
 
 	/**
@@ -443,7 +443,7 @@ public class LatticeKV {
 		AVector<ACell> entry = getLiveEntry(key);
 		checkType(entry, KVEntry.TYPE_COUNTER, "INCRBY");
 		ACell counterValue = (entry != null) ? KVEntry.getValue(entry) : null;
-		counterValue = KVCounter.increment(counterValue, actorId, amount);
+		counterValue = KVCounter.increment(counterValue, replicaID, amount);
 		putEntry(key, KVEntry.create(counterValue, KVEntry.TYPE_COUNTER, now()));
 		return KVCounter.getValue(counterValue);
 	}
