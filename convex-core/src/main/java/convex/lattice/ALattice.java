@@ -2,6 +2,7 @@ package convex.lattice;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.ASequence;
 import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
@@ -85,6 +86,54 @@ public abstract class ALattice<V extends ACell> {
 		if (key instanceof Keyword k) return k.getName();
 		if (key instanceof ABlob b) return Strings.create(b.toHexString());
 		return key;
+	}
+
+	/**
+	 * Resolves a JSON path (array of external keys) to canonical CVM keys by
+	 * walking the lattice hierarchy. Each key is resolved via {@link #resolveKey}
+	 * at the appropriate lattice level.
+	 *
+	 * @param jsonPath External keys to resolve
+	 * @return Array of canonical CVM keys, or null if resolution fails at any level
+	 */
+	public ACell[] resolvePath(ACell... jsonPath) {
+		int n=jsonPath.length;
+		ACell[] result=new ACell[n];
+		ALattice<?> current=this;
+		for (int i=0; i<n; i++) {
+			ACell resolved=current.resolveKey(jsonPath[i]);
+			if (resolved==null) return null;
+			result[i]=resolved;
+			if (i<n-1) {
+				current=current.path(resolved);
+				if (current==null) return null;
+			}
+		}
+		return result;
+	}
+
+	/**
+	 * Resolves a JSON path (sequence of external keys) to canonical CVM keys by
+	 * walking the lattice hierarchy. Each key is resolved via {@link #resolveKey}
+	 * at the appropriate lattice level.
+	 *
+	 * @param jsonPath Sequence of external keys to resolve
+	 * @return Array of canonical CVM keys, or null if resolution fails at any level
+	 */
+	public ACell[] resolvePath(ASequence<ACell> jsonPath) {
+		int n=(int)jsonPath.count();
+		ACell[] result=new ACell[n];
+		ALattice<?> current=this;
+		for (int i=0; i<n; i++) {
+			ACell resolved=current.resolveKey(jsonPath.get(i));
+			if (resolved==null) return null;
+			result[i]=resolved;
+			if (i<n-1) {
+				current=current.path(resolved);
+				if (current==null) return null;
+			}
+		}
+		return result;
 	}
 
 	/**

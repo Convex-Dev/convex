@@ -28,8 +28,8 @@ public class Lattice {
 		Keywords.FS, OwnerLattice.create(
 			MapLattice.create(DLFSLattice.INSTANCE)
 		),
-		Keywords.KV, MapLattice.create(
-			OwnerLattice.create(KVStoreLattice.INSTANCE)
+		Keywords.KV, OwnerLattice.create(
+			MapLattice.create(KVStoreLattice.INSTANCE)
 		)
 	);
 }

@@ -15,19 +15,19 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 
 /**
- * A named KV database within the global lattice, with per-node signed replicas.
+ * A named KV database within the global lattice, with per-owner signed replicas.
  *
- * <p>Sits at the lattice path {@code :kv / <db-name> / <node-key>} and handles:
+ * <p>Sits at the lattice path {@code :kv / <owner-key> / <db-name>} and handles:
  * <ul>
- *   <li>Signing this node's KV store with its key pair</li>
+ *   <li>Signing this node's database map with its key pair</li>
  *   <li>Merging selected remote replicas into the local store (merge-on-write)</li>
  *   <li>Rejecting replicas with invalid signatures</li>
  * </ul>
  *
  * <p>Lattice path structure:
  * <pre>
- * :kv → MapLattice&lt;AString, OwnerLattice&lt;KVStoreLattice&gt;&gt;
- *         db-name →  node-key → signed(Index&lt;AString, KVEntry&gt;)
+ * :kv → OwnerLattice&lt;MapLattice&lt;KVStoreLattice&gt;&gt;
+ *         owner-key → signed(db-name → Index&lt;AString, KVEntry&gt;)
  * </pre>
  *
  * <p>Usage:
@@ -112,22 +112,27 @@ public class KVDatabase {
 	}
 
 	/**
-	 * Returns this node's KV store as signed data.
+	 * Returns this owner's signed database map containing this database.
+	 * The signed value is a map of database names to KV store state.
 	 *
-	 * @return SignedData wrapping the current KV store state
+	 * @return SignedData wrapping a map of {dbName → KV store state}
 	 */
-	public SignedData<Index<AString, AVector<ACell>>> getSignedState() {
-		return keyPair.signData(kv.cursor().get());
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
+		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
+			(AHashMap) Maps.of(dbName, kv.cursor().get());
+		return keyPair.signData(dbMap);
 	}
 
 	/**
-	 * Exports this node's replica as an owner map entry suitable for lattice merge.
-	 * Returns a map with a single entry: this node's account key → signed KV state.
+	 * Exports this node's replica as an owner map entry suitable for lattice merge
+	 * at the :kv level. Returns a map with a single entry:
+	 * this node's account key → signed({dbName → KV store state}).
 	 *
 	 * @return Owner map with this node's signed contribution
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> exportReplica() {
+	public AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportReplica() {
 		return (AHashMap) Maps.of(accountKey, getSignedState());
 	}
 
@@ -138,10 +143,10 @@ public class KVDatabase {
 	 * <p>This is the merge-on-write model: remote values are absorbed into the
 	 * local KV store via KVStoreLattice merge, and the result is owned by this node.
 	 *
-	 * @param remoteOwnerMap Map of node-key → signed KV state from remote nodes
+	 * @param remoteOwnerMap Map of owner-key → signed({dbName → KV state}) from remote nodes
 	 * @return Number of replicas successfully merged
 	 */
-	public long mergeReplicas(AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> remoteOwnerMap) {
+	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap) {
 		return mergeReplicas(remoteOwnerMap, key -> true);
 	}
 
@@ -150,19 +155,19 @@ public class KVDatabase {
 	 * Only merges replicas whose account key passes the filter predicate.
 	 * Rejects replicas with invalid signatures regardless of filter.
 	 *
-	 * @param remoteOwnerMap Map of node-key → signed KV state from remote nodes
+	 * @param remoteOwnerMap Map of owner-key → signed({dbName → KV state}) from remote nodes
 	 * @param replicaFilter Predicate to select which replicas to merge (by account key)
 	 * @return Number of replicas successfully merged
 	 */
 	public long mergeReplicas(
-			AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> remoteOwnerMap,
+			AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap,
 			Predicate<AccountKey> replicaFilter) {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
 
 		long merged = 0;
 		for (var entry : remoteOwnerMap.entrySet()) {
 			ACell ownerKey = entry.getKey();
-			SignedData<Index<AString, AVector<ACell>>> signedState = entry.getValue();
+			SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> signedDbMap = entry.getValue();
 
 			// Resolve owner key (may be ABlob after deserialization)
 			AccountKey ak = (ownerKey instanceof ABlob blob)
@@ -176,10 +181,14 @@ public class KVDatabase {
 			if (!replicaFilter.test(ak)) continue;
 
 			// Validate signature
-			if (!signedState.checkSignature()) continue;
+			if (!signedDbMap.checkSignature()) continue;
 
-			// Merge remote KV state into our local store
-			Index<AString, AVector<ACell>> remoteState = signedState.getValue();
+			// Extract this database from the remote owner's database map
+			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = signedDbMap.getValue();
+			if (dbMap == null) continue;
+
+			@SuppressWarnings("unchecked")
+			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {
 				kv.cursor().merge(remoteState);
 				merged++;

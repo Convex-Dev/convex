@@ -7,18 +7,26 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
+import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.lattice.cursor.Root;
+import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
+import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.SetLattice;
 
 public class LatticeTest {
@@ -127,6 +135,113 @@ public class LatticeTest {
 		}
 	}
 	
+	@Test public void testResolvePath() {
+		// Empty path
+		ACell[] empty=Lattice.ROOT.resolvePath();
+		assertNotNull(empty);
+		assertEquals(0,empty.length);
+
+		// Invalid key at root → null
+		assertNull(Lattice.ROOT.resolvePath(Strings.create("nonexistent")));
+
+		// ASequence overload: invalid key → null
+		@SuppressWarnings("unchecked")
+		AVector<ACell> badSeq=(AVector<ACell>)Vectors.of(Strings.create("nonexistent"));
+		assertNull(Lattice.ROOT.resolvePath(badSeq));
+	}
+
+	@Test public void testResolvePathRoundTrip() {
+		// Build a test lattice: KeyedLattice with :alpha → OwnerLattice(MaxLattice)
+		Keyword ALPHA=Keyword.create("alpha");
+		Keyword BETA=Keyword.create("beta");
+		KeyedLattice lattice=KeyedLattice.create(
+			ALPHA, OwnerLattice.create(MaxLattice.create()),
+			BETA, MapLattice.create(SetLattice.create())
+		);
+
+		// --- Single-level round-trip: JSON "alpha" → :alpha → "alpha" ---
+		{
+			ACell[] jsonPath={Strings.create("alpha")};
+			ACell[] cvmPath=lattice.resolvePath(jsonPath);
+			assertNotNull(cvmPath);
+			assertSame(ALPHA,cvmPath[0]);
+
+			// Convert back to JSON
+			ACell[] jsonBack=toJSONPath(cvmPath);
+			assertEquals(Strings.create("alpha"),jsonBack[0]);
+
+			// Round-trip: resolve the JSON-back path again
+			ACell[] cvmPath2=lattice.resolvePath(jsonBack);
+			assertNotNull(cvmPath2);
+			assertArrayEquals(cvmPath,cvmPath2);
+		}
+
+		// --- Two-level round-trip through OwnerLattice: ["alpha", "0xabcd"] ---
+		{
+			Blob ownerKey=Blob.fromHex("abcd");
+			ACell[] jsonPath={Strings.create("alpha"),Strings.create("abcd")};
+			ACell[] cvmPath=lattice.resolvePath(jsonPath);
+			assertNotNull(cvmPath);
+			assertSame(ALPHA,cvmPath[0]);
+			assertEquals(ownerKey,cvmPath[1]);
+
+			ACell[] jsonBack=toJSONPath(cvmPath);
+			assertEquals(Strings.create("alpha"),jsonBack[0]);
+			assertEquals(Strings.create("abcd"),jsonBack[1]);
+
+			ACell[] cvmPath2=lattice.resolvePath(jsonBack);
+			assertNotNull(cvmPath2);
+			assertArrayEquals(cvmPath,cvmPath2);
+		}
+
+		// --- Two-level through MapLattice: ["beta", "mykey"] ---
+		{
+			ACell[] jsonPath={Strings.create("beta"),Strings.create("mykey")};
+			ACell[] cvmPath=lattice.resolvePath(jsonPath);
+			assertNotNull(cvmPath);
+			assertSame(BETA,cvmPath[0]);
+			assertEquals(Strings.create("mykey"),cvmPath[1]);
+
+			ACell[] jsonBack=toJSONPath(cvmPath);
+			assertArrayEquals(jsonPath,jsonBack);
+
+			ACell[] cvmPath2=lattice.resolvePath(jsonBack);
+			assertNotNull(cvmPath2);
+			assertArrayEquals(cvmPath,cvmPath2);
+		}
+
+		// --- ASequence overload matches varargs ---
+		{
+			@SuppressWarnings("unchecked")
+			AVector<ACell> seqPath=(AVector<ACell>)Vectors.of(Strings.create("alpha"),Strings.create("abcd"));
+			ACell[] fromSeq=lattice.resolvePath(seqPath);
+			ACell[] fromArgs=lattice.resolvePath(Strings.create("alpha"),Strings.create("abcd"));
+			assertNotNull(fromSeq);
+			assertArrayEquals(fromArgs,fromSeq);
+		}
+
+		// --- CVM keys also work through resolvePath ---
+		{
+			ACell[] cvmDirect=lattice.resolvePath(ALPHA);
+			assertNotNull(cvmDirect);
+			assertSame(ALPHA,cvmDirect[0]);
+		}
+
+		// --- Invalid deep path → null ---
+		assertNull(lattice.resolvePath(Strings.create("nonexistent"),Strings.create("x")));
+	}
+
+	/**
+	 * Helper: convert each element of a CVM path back to its JSON representation
+	 */
+	private static ACell[] toJSONPath(ACell[] cvmPath) {
+		ACell[] result=new ACell[cvmPath.length];
+		for (int i=0; i<cvmPath.length; i++) {
+			result[i]=ALattice.toJSONKey(cvmPath[i]);
+		}
+		return result;
+	}
+
 	@Test public void testMaxLattice() {
 		MaxLattice lattice=MaxLattice.INSTANCE;
 		assertSame(CVMLong.TWO,lattice.merge(RT.cvm(1), RT.cvm(2)));

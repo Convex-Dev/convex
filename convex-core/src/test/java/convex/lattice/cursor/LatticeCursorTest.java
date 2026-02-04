@@ -9,18 +9,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.Index;
+import convex.core.data.SignedData;
 import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
+import convex.lattice.ALattice;
+import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
+import convex.lattice.kv.KVDatabase;
 
 /**
  * Tests for lattice cursor functionality.
@@ -532,5 +543,104 @@ public class LatticeCursorTest {
 		ASet<CVMLong> finalB = (ASet<CVMLong>) finalRoot.get(Keywords.BAR);
 		assertTrue(finalB.contains(CVMLong.create(10)), ":b should have 10");
 		assertTrue(finalB.contains(CVMLong.create(20)), ":b should have 20");
+	}
+
+	// ===== KV Database with lattice path resolution =====
+
+	/**
+	 * Demonstrates the full lifecycle of a KV database accessed through
+	 * JSON path resolution and lattice cursors:
+	 *
+	 * 1. Resolve a JSON path to canonical CVM keys
+	 * 2. Descend a root cursor to the :kv level (OwnerLattice)
+	 * 3. Populate a KVDatabase using its high-level API
+	 * 4. Merge the database's owner-map replica into the cursor
+	 * 5. A second node reads the data back from the root cursor
+	 *
+	 * Lattice path: :kv → OwnerLattice(MapLattice(KVStoreLattice))
+	 *   owner-key → signed(db-name → KV store)
+	 */
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testKVDatabaseWithLatticePath() {
+		// Create root lattice cursor for the full lattice state
+		RootLatticeCursor<Index<Keyword, ACell>> root = Cursors.createLattice(Lattice.ROOT);
+
+		// === Step 1: Resolve JSON path to :kv level ===
+		// :kv is OwnerLattice(MapLattice(KVStoreLattice))
+		// Database names are per-owner (inside the signed value), not global keys
+		ACell[] kvPath = Lattice.ROOT.resolvePath(Strings.create("kv"));
+		assertNotNull(kvPath, "Path ['kv'] should resolve");
+		assertEquals(Keywords.KV, kvPath[0]);
+
+		// Round-trip: CVM key back to JSON
+		assertEquals(Strings.create("kv"), ALattice.toJSONKey(kvPath[0]));
+
+		// === Step 2: Descend root cursor to the :kv level (OwnerLattice) ===
+		ALatticeCursor<ACell> kvCursor = root.descend(kvPath);
+		assertNotNull(kvCursor);
+
+		// === Step 3: Create and populate a KV database via the high-level API ===
+		AKeyPair nodeA = AKeyPair.generate();
+		KVDatabase dbA = KVDatabase.create("mydb", nodeA);
+		dbA.kv().set("greeting", Strings.create("hello"));
+		dbA.kv().set("count", CVMLong.create(42));
+		dbA.kv().hset("user", "name", Strings.create("Alice"));
+
+		// Verify data via the database API
+		assertEquals(Strings.create("hello"), dbA.kv().get("greeting"));
+		assertEquals(CVMLong.create(42), dbA.kv().get("count"));
+		assertEquals(Strings.create("Alice"), dbA.kv().hget("user", "name"));
+
+		// === Step 4: Merge database owner-map replica into cursor at :kv ===
+		// exportReplica returns {accountKey → signed({dbName → kvStore})}
+		// This is the OwnerLattice value shape
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> replicaA =
+			dbA.exportReplica();
+		kvCursor.merge(replicaA);
+
+		// === Step 5: Verify changes reflected in the root cursor ===
+		Index<Keyword, ACell> rootState = root.get();
+		assertNotNull(rootState.get(Keywords.KV), "Root should have :kv section");
+
+		// The :kv value is the owner map: {accountKey → signed({dbName → kvStore})}
+		ACell kvValue = rootState.get(Keywords.KV);
+		assertNotNull(kvValue, "Owner map should exist at :kv");
+
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> ownerMap =
+			(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>>) kvValue;
+		SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> signedA =
+			ownerMap.get(nodeA.getAccountKey());
+		assertNotNull(signedA, "Owner map should contain node A's signed state");
+		assertTrue(signedA.checkSignature(), "Signed state should have valid signature");
+
+		// The signed value contains {dbName → kvStore}
+		AHashMap<AString, Index<AString, AVector<ACell>>> dbMapA = signedA.getValue();
+		assertNotNull(dbMapA.get(Strings.create("mydb")), "Signed value should contain 'mydb' database");
+
+		// === Step 6: A second node reads data from the root cursor ===
+		AKeyPair nodeB = AKeyPair.generate();
+		KVDatabase dbB = KVDatabase.create("mydb", nodeB);
+
+		// Node B merges replicas from the owner map
+		long merged = dbB.mergeReplicas(ownerMap);
+		assertEquals(1, merged, "Should merge one replica from node A");
+
+		// Node B now sees all of node A's data
+		assertEquals(Strings.create("hello"), dbB.kv().get("greeting"));
+		assertEquals(CVMLong.create(42), dbB.kv().get("count"));
+		assertEquals(Strings.create("Alice"), dbB.kv().hget("user", "name"));
+
+		// === Step 7: Node B adds data and merges back into root ===
+		dbB.kv().set("source", Strings.create("nodeB"));
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> replicaB =
+			dbB.exportReplica();
+		kvCursor.merge(replicaB);
+
+		// Root cursor now has both nodes' signed replicas
+		ACell updatedKvValue = root.get().get(Keywords.KV);
+		AHashMap<ACell, ?> finalOwners = (AHashMap<ACell, ?>) updatedKvValue;
+		assertNotNull(finalOwners.get(nodeA.getAccountKey()), "Should have node A's replica");
+		assertNotNull(finalOwners.get(nodeB.getAccountKey()), "Should have node B's replica");
 	}
 }

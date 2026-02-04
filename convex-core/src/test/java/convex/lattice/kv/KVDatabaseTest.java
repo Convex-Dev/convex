@@ -40,13 +40,13 @@ public class KVDatabaseTest {
 
 		db.kv().set("foo", Strings.create("bar"));
 
-		SignedData<Index<AString, AVector<ACell>>> signed = db.getSignedState();
+		var signed = db.getSignedState();
 		assertTrue(signed.checkSignature());
 		assertEquals(kp.getAccountKey(), signed.getAccountKey());
 
-		// The signed value contains our data
-		Index<AString, AVector<ACell>> state = signed.getValue();
-		assertNotNull(state.get(Strings.create("foo")));
+		// The signed value is a db-name map containing our database
+		AHashMap<AString, ?> dbMap = signed.getValue();
+		assertNotNull(dbMap.get(Strings.create("signed-db")));
 	}
 
 	@Test
@@ -56,11 +56,11 @@ public class KVDatabaseTest {
 
 		db.kv().set("x", Strings.create("y"));
 
-		AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> exported = db.exportReplica();
+		var exported = db.exportReplica();
 		assertEquals(1, exported.count());
 
 		// Entry is keyed by our account key
-		SignedData<Index<AString, AVector<ACell>>> entry = exported.get(kp.getAccountKey());
+		var entry = exported.get(kp.getAccountKey());
 		assertNotNull(entry);
 		assertTrue(entry.checkSignature());
 	}
@@ -101,8 +101,8 @@ public class KVDatabaseTest {
 		dbB.kv().set("key-b", Strings.create("b"));
 
 		// Both merge each other
-		AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> exportA = dbA.exportReplica();
-		AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> exportB = dbB.exportReplica();
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportA = dbA.exportReplica();
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportB = dbB.exportReplica();
 
 		dbA.mergeReplicas(exportB);
 		dbB.mergeReplicas(exportA);
@@ -128,7 +128,7 @@ public class KVDatabaseTest {
 		dbC.kv().set("from-c", Strings.create("c"));
 
 		// Combine B and C exports
-		AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> combined =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> combined =
 			dbB.exportReplica().merge(dbC.exportReplica());
 
 		// Node A only accepts from node B, ignores C
@@ -151,13 +151,16 @@ public class KVDatabaseTest {
 
 		dbB.kv().set("legit", Strings.create("data"));
 
-		// Export B's data but tamper: sign B's data with a different key
+		// Export B's data but tamper: wrap in db-name map and sign with a different key
 		Index<AString, AVector<ACell>> bState = dbB.kv().cursor().get();
-		SignedData<Index<AString, AVector<ACell>>> forged = keyFake.signData(bState);
+		@SuppressWarnings({"unchecked", "rawtypes"})
+		AHashMap<AString, Index<AString, AVector<ACell>>> bDbMap =
+			(AHashMap) convex.core.data.Maps.of(Strings.create("secure"), bState);
+		SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> forged = keyFake.signData(bDbMap);
 
 		// Forge an owner map claiming to be from keyB but signed by keyFake
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		AHashMap<ACell, SignedData<Index<AString, AVector<ACell>>>> forgedMap =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> forgedMap =
 			(AHashMap) convex.core.data.Maps.of(keyB.getAccountKey(), forged);
 
 		// Should reject — signature doesn't match the claimed owner key
