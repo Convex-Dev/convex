@@ -10,9 +10,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AString;
 import convex.core.data.Hash;
-import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
@@ -24,8 +22,9 @@ import convex.lattice.kv.KVDatabase;
  * Demo showing KV store replication across a network of NodeServers.
  *
  * <p>Each node creates a signed KV database and publishes it into the global
- * lattice at {@code :kv / "shared" / <owner-key>}. The LatticePropagator
- * automatically broadcasts changes to peers, and lattice merge (OwnerLattice +
+ * lattice at {@code :kv / <owner-key>}. The signed value contains a map of
+ * database names to KV stores. The LatticePropagator automatically broadcasts
+ * changes to peers, and lattice merge (OwnerLattice + MapLattice +
  * KVStoreLattice) combines signed replicas from all nodes.
  *
  * <p>After sync, each node reads back the merged owner map and absorbs remote
@@ -105,13 +104,13 @@ public class KVReplicationDemo {
 
 			// --- Publish signed replicas into the lattice ---
 			System.out.println("\nPublishing signed replicas to lattice...");
-			AString dbName = Strings.create(DB_NAME);
 			for (int i = 0; i < NUM_NODES; i++) {
+				// exportReplica returns {ownerKey → signed({dbName → kvStore})}
+				// which is the OwnerLattice value shape at :kv
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
-				AHashMap<ACell, ACell> kvMap = Maps.of(dbName, replica);
-				servers.get(i).updateLocalPath(kvMap, Keywords.KV);
+				servers.get(i).updateLocalPath(replica, Keywords.KV);
 			}
 
 			// --- Sync network ---
@@ -137,16 +136,14 @@ public class KVReplicationDemo {
 			// --- Read back merged replicas into each KVDatabase ---
 			System.out.println("\n=== KV Merge ===");
 			for (int i = 0; i < NUM_NODES; i++) {
+				// :kv value is OwnerLattice: {ownerKey → signed({dbName → kvStore})}
 				ACell kvValue = servers.get(i).getCursor().get(Keywords.KV);
-				if (kvValue instanceof AHashMap<?,?> kvMap) {
-					ACell dbValue = kvMap.get(dbName);
-					if (dbValue instanceof AHashMap<?,?>) {
-						@SuppressWarnings({"rawtypes"})
-						AHashMap ownerMap = (AHashMap) dbValue;
-						@SuppressWarnings("unchecked")
-						long merged = databases.get(i).mergeReplicas(ownerMap);
-						System.out.println("Node " + i + ": merged " + merged + " remote replica(s)");
-					}
+				if (kvValue instanceof AHashMap<?,?>) {
+					@SuppressWarnings({"rawtypes"})
+					AHashMap ownerMap = (AHashMap) kvValue;
+					@SuppressWarnings("unchecked")
+					long merged = databases.get(i).mergeReplicas(ownerMap);
+					System.out.println("Node " + i + ": merged " + merged + " remote replica(s)");
 				}
 			}
 

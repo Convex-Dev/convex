@@ -661,7 +661,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			V value = func.merge(e.getKey(), null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
@@ -743,7 +743,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			V value = func.merge(e.getKey(), null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.

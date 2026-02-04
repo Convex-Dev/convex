@@ -916,7 +916,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			MapEntry<K,V> mea=this.getEntry(k);
 			if (mea!=null) continue; // skip, will merge in second loop
 			if (!Utils.equals(null,v)) {
-				V nv=func.merge(null,v);
+				V nv=func.merge(k,null,v);
 				if (nv==null) {
 					// key already doewn't exist in this
 				} else {
@@ -934,7 +934,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			MapEntry<K,V> meb=b.getEntry(k);
 			V ov=(meb==null)?null:meb.getValue(); // value at same key in other index
 			if (!Utils.equals(v,ov)) {
-				V nv=func.merge(v,ov);
+				V nv=func.merge(k,v,ov);
 				if (nv==null) {
 					// remove value
 					result=result.dissoc(k);

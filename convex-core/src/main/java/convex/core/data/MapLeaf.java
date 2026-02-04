@@ -521,14 +521,14 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			// new entry
 			MapEntry<K, V> newE = null;
 			if (c < 0) {
-				V r = func.merge(ae.getValue(), null);
+				V r = func.merge(ae.getKey(), ae.getValue(), null);
 				if (r != null) newE = ae.withValue(r);
 			} else if (c > 0) {
-				V r = func.merge(null, be.getValue());
+				V r = func.merge(be.getKey(), null, be.getValue());
 				if (r != null) newE = be.withValue(r);
 			} else {
 				// we have matched keys
-				V r = func.merge(ae.getValue(), be.getValue());
+				V r = func.merge(ae.getKey(), ae.getValue(), be.getValue());
 				if (r != null) newE = ae.withValue(r);
 			}
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
@@ -568,17 +568,17 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			MapEntry<K, V> newE = null;
 			if (c < 0) {
 				// lowest key in this map only
-				V r = func.merge(ae.getValue(), null);
+				V r = func.merge(ae.getKey(), ae.getValue(), null);
 				if (r != null) newE = ae.withValue(r);
 			} else if (c > 0) {
 				// lowest key in other map b only
-				V r = func.merge(null, be.getValue());
+				V r = func.merge(be.getKey(), null, be.getValue());
 				if (r != null) newE = be.withValue(r);
 			} else {
 				// keys are equal (i.e. value in both maps)
 				V av = ae.getValue();
 				V bv = be.getValue();
-				V r = (Cells.equals(av, bv)) ? av : func.merge(ae.getValue(), be.getValue());
+				V r = (Cells.equals(av, bv)) ? av : func.merge(ae.getKey(), ae.getValue(), be.getValue());
 				if (r != null) newE = ae.withValue(r);
 			}
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {

@@ -9,6 +9,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * Lattice implementation for owner-based signed data.
@@ -18,8 +19,9 @@ import convex.lattice.ALattice;
  * and for each owner key, merges the SignedData values using SignedLattice
  * semantics.
  * 
- * Signature validation for owners will be looked up later, so checkForeign
- * is lenient and only checks the structure.
+ * Owner verification (checking that the signer key is authorised for the
+ * owner) is performed during context-aware merge via LatticeContext.verifyOwner().
+ * The checkForeign method only validates structure.
  * 
  * @param <V> Type of the underlying signed value
  */
@@ -78,7 +80,7 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 
 	@Override
 	public AHashMap<ACell, SignedData<V>> merge(
-			convex.lattice.LatticeContext context,
+			LatticeContext context,
 			AHashMap<ACell, SignedData<V>> ownValue,
 			AHashMap<ACell, SignedData<V>> otherValue) {
 		if (otherValue == null) {
@@ -91,9 +93,21 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 			return zero();
 		}
 
-		// Merge the maps using context-aware SignedLattice merge for each owner
-		MergeFunction<SignedData<V>> contextMergeFunction = (a, b) -> {
-			return signedLattice.merge(context, a, b);
+		// Merge the maps using context-aware SignedLattice merge for each owner,
+		// with owner key verification via keyed merge
+		MergeFunction<SignedData<V>> contextMergeFunction = new MergeFunction<>() {
+			public SignedData<V> merge(SignedData<V> a, SignedData<V> b) {
+				return signedLattice.merge(context, a, b);
+			}
+			public SignedData<V> merge(Object key, SignedData<V> a, SignedData<V> b) {
+				// Verify signer key is valid for this owner
+				if (b != null && key instanceof ACell ownerKey) {
+					if (!context.verifyOwner(ownerKey, b.getAccountKey())) {
+						return a; // reject: signer not authorised for this owner
+					}
+				}
+				return signedLattice.merge(context, a, b);
+			}
 		};
 
 		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
@@ -110,9 +124,7 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 			return false;
 		}
 		
-		// Check that it's a valid HashMap
-		// TODO: Signature validation for specific owners will be looked up later,
-		// so we only check the structure here
+		// Check that it's a valid HashMap (owner verification is done during merge)
 		return (value instanceof AHashMap);
 	}
 

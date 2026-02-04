@@ -1,6 +1,11 @@
 package convex.lattice.generic;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.util.Set;
+import java.util.function.BiPredicate;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,9 +13,11 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.SignedData;
@@ -159,6 +166,147 @@ public class GenericLatticeTest {
 		assertEquals(2, merged.size(), "Merged map should have both owners");
 		assertEquals(CVMLong.create(10), merged.get(owner1).getValue());
 		assertEquals(CVMLong.create(20), merged.get(owner2).getValue());
+	}
+
+	// ===== Owner verification tests =====
+
+	@Test
+	public void testOwnerVerificationBlobKeyMatch() {
+		// Blob/AccountKey owner matching the signer → accepted
+		AKeyPair kpOwner = AKeyPair.generate();
+		AKeyPair kpOther = AKeyPair.generate();
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Owner map with correct signer
+		ACell ownerKey = kpOwner.getAccountKey();
+		SignedData<AInteger> signed = kpOwner.signData(CVMLong.create(42));
+		AHashMap<ACell, SignedData<AInteger>> incoming = Maps.of(ownerKey, signed);
+
+		// Merge with context (any context triggers verification for blob keys)
+		LatticeContext ctx = LatticeContext.create(null, kpOther);
+		AHashMap<ACell, SignedData<AInteger>> result = ownerLattice.merge(ctx, Maps.empty(), incoming);
+
+		assertNotNull(result.get(ownerKey), "Correctly signed entry should be accepted");
+		assertEquals(CVMLong.create(42), result.get(ownerKey).getValue());
+	}
+
+	@Test
+	public void testOwnerVerificationBlobKeyMismatch() {
+		// Blob/AccountKey owner NOT matching the signer → rejected
+		AKeyPair kpOwner = AKeyPair.generate();
+		AKeyPair kpFake = AKeyPair.generate();
+		AKeyPair kpMerger = AKeyPair.generate();
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Sign with kpFake but claim to be kpOwner
+		ACell ownerKey = kpOwner.getAccountKey();
+		SignedData<AInteger> forged = kpFake.signData(CVMLong.create(42));
+		AHashMap<ACell, SignedData<AInteger>> incoming = Maps.of(ownerKey, forged);
+
+		// Merge with context — should reject because signer doesn't match owner
+		LatticeContext ctx = LatticeContext.create(null, kpMerger);
+		AHashMap<ACell, SignedData<AInteger>> result = ownerLattice.merge(ctx, Maps.empty(), incoming);
+
+		assertNull(result.get(ownerKey), "Mismatched signer should be rejected");
+	}
+
+	@Test
+	public void testOwnerVerificationWithCustomVerifier() {
+		// String owner with custom verifier
+		AKeyPair kpAuthorised = AKeyPair.generate();
+		AKeyPair kpUnauthorised = AKeyPair.generate();
+		AKeyPair kpMerger = AKeyPair.generate();
+
+		AccountKey authorisedKey = kpAuthorised.getAccountKey();
+
+		// Verifier that accepts a specific key for the string owner "org:acme"
+		BiPredicate<ACell, AccountKey> verifier = (owner, signerKey) -> {
+			if (owner instanceof convex.core.data.AString s && "org:acme".equals(s.toString())) {
+				return authorisedKey.equals(signerKey);
+			}
+			return false;
+		};
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+		LatticeContext ctx = LatticeContext.create(null, kpMerger, verifier);
+
+		ACell ownerKey = Strings.create("org:acme");
+
+		// Authorised signer → accepted
+		SignedData<AInteger> goodSigned = kpAuthorised.signData(CVMLong.create(10));
+		AHashMap<ACell, SignedData<AInteger>> goodIncoming = Maps.of(ownerKey, goodSigned);
+		AHashMap<ACell, SignedData<AInteger>> result1 = ownerLattice.merge(ctx, Maps.empty(), goodIncoming);
+
+		assertNotNull(result1.get(ownerKey), "Authorised signer should be accepted");
+		assertEquals(CVMLong.create(10), result1.get(ownerKey).getValue());
+
+		// Unauthorised signer → rejected
+		SignedData<AInteger> badSigned = kpUnauthorised.signData(CVMLong.create(20));
+		AHashMap<ACell, SignedData<AInteger>> badIncoming = Maps.of(ownerKey, badSigned);
+		AHashMap<ACell, SignedData<AInteger>> result2 = ownerLattice.merge(ctx, Maps.empty(), badIncoming);
+
+		assertNull(result2.get(ownerKey), "Unauthorised signer should be rejected");
+	}
+
+	@Test
+	public void testOwnerVerificationMultipleKeys() {
+		// Organisation with multiple authorised keys
+		AKeyPair kpA = AKeyPair.generate();
+		AKeyPair kpB = AKeyPair.generate();
+		AKeyPair kpRogue = AKeyPair.generate();
+		AKeyPair kpMerger = AKeyPair.generate();
+
+		Set<AccountKey> authorisedKeys = Set.of(kpA.getAccountKey(), kpB.getAccountKey());
+
+		BiPredicate<ACell, AccountKey> verifier = (owner, signerKey) -> {
+			if (owner instanceof convex.core.data.AString s && "org:multi".equals(s.toString())) {
+				return authorisedKeys.contains(signerKey);
+			}
+			return false;
+		};
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+		LatticeContext ctx = LatticeContext.create(null, kpMerger, verifier);
+		ACell ownerKey = Strings.create("org:multi");
+
+		// Key A → accepted
+		SignedData<AInteger> signedA = kpA.signData(CVMLong.create(10));
+		AHashMap<ACell, SignedData<AInteger>> incomingA = Maps.of(ownerKey, signedA);
+		AHashMap<ACell, SignedData<AInteger>> resultA = ownerLattice.merge(ctx, Maps.empty(), incomingA);
+		assertNotNull(resultA.get(ownerKey), "Key A should be accepted");
+
+		// Key B → accepted
+		SignedData<AInteger> signedB = kpB.signData(CVMLong.create(20));
+		AHashMap<ACell, SignedData<AInteger>> incomingB = Maps.of(ownerKey, signedB);
+		AHashMap<ACell, SignedData<AInteger>> resultB = ownerLattice.merge(ctx, Maps.empty(), incomingB);
+		assertNotNull(resultB.get(ownerKey), "Key B should be accepted");
+
+		// Rogue key → rejected
+		SignedData<AInteger> signedRogue = kpRogue.signData(CVMLong.create(30));
+		AHashMap<ACell, SignedData<AInteger>> incomingRogue = Maps.of(ownerKey, signedRogue);
+		AHashMap<ACell, SignedData<AInteger>> resultRogue = ownerLattice.merge(ctx, Maps.empty(), incomingRogue);
+		assertNull(resultRogue.get(ownerKey), "Rogue key should be rejected");
+	}
+
+	@Test
+	public void testOwnerVerificationNoVerifierLenient() {
+		// No verifier set → lenient mode, string owners accepted
+		AKeyPair kp = AKeyPair.generate();
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Use string owner with no verifier (lenient)
+		ACell ownerKey = Strings.create("anyone");
+		SignedData<AInteger> signed = kp.signData(CVMLong.create(99));
+		AHashMap<ACell, SignedData<AInteger>> incoming = Maps.of(ownerKey, signed);
+
+		// Context without verifier
+		LatticeContext ctx = LatticeContext.create(null, kp);
+		AHashMap<ACell, SignedData<AInteger>> result = ownerLattice.merge(ctx, Maps.empty(), incoming);
+
+		assertNotNull(result.get(ownerKey), "Lenient mode should accept any string owner");
 	}
 
 }
