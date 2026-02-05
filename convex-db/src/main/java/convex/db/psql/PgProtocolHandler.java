@@ -182,9 +182,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			try {
 				executeQuery(ctx, sql);
 			} catch (SQLException e) {
-				log.warn("Query error: {}", e.getMessage());
+				log.warn("Query error: {}", e.getMessage(), e);
 				write(ctx, ErrorResponse.fromException(e));
 				// Stop processing on error
+				break;
+			} catch (RuntimeException e) {
+				// Runtime exceptions from Calcite (type coercion, etc.) are query errors
+				log.warn("Query execution error: {}", e.getMessage(), e);
+				write(ctx, ErrorResponse.fromException(e));
 				break;
 			} catch (Exception e) {
 				log.error("Unexpected error", e);
@@ -237,6 +242,10 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	/**
 	 * Rewrites PostgreSQL-specific SQL to Calcite-compatible syntax.
 	 * Returns null if the query should return an empty result set.
+	 *
+	 * <p>WARNING: This method contains numerous hacks to work around Calcite's
+	 * lack of native PostgreSQL syntax support. Each hack is marked with a TODO
+	 * indicating the proper solution.
 	 */
 	private String rewriteQuery(String sql) {
 		if (sql == null) return sql;
@@ -244,48 +253,82 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		sql = sql.trim();
 		String lowerSql = sql.toLowerCase();
 
-		// System catalog queries - return null to signal empty result
-		if (lowerSql.contains("pg_catalog.") ||
-			lowerSql.contains("pg_type") ||
-			lowerSql.contains("pg_class") ||
-			lowerSql.contains("pg_namespace") ||
-			lowerSql.contains("pg_attribute") ||
-			lowerSql.contains("pg_constraint") ||
+		// TODO: Remove hack needed to handle PostgreSQL regex operators (!~, ~, ~*, !~*)
+		// Proper fix: Register custom Calcite operators for POSIX regex matching,
+		// or use Calcite Babel parser which has built-in PostgreSQL dialect support
+		if (sql.contains("!~") || sql.contains("~*") ||
+			(sql.contains("~") && !sql.contains("~=") && !sql.contains("~~"))) {
+			return null; // Return empty result for regex queries
+		}
+
+		// TODO: Remove hack needed to handle queries for unimplemented pg_catalog tables
+		// Proper fix: Implement virtual tables for pg_constraint, pg_index, pg_proc,
+		// pg_views, pg_settings, pg_am, pg_roles, pg_stat*, and information_schema
+		if (lowerSql.contains("pg_constraint") ||
 			lowerSql.contains("pg_index") ||
 			lowerSql.contains("pg_proc") ||
-			lowerSql.contains("pg_database") ||
-			lowerSql.contains("pg_tables") ||
 			lowerSql.contains("pg_views") ||
+			lowerSql.contains("pg_settings") ||
+			lowerSql.contains("pg_am") ||
+			lowerSql.contains("pg_roles") ||
+			lowerSql.contains("pg_stat") ||
 			lowerSql.contains("information_schema.")) {
 			return null; // Signal to return empty result
 		}
 
-		// CURRENT_SCHEMA() or CURRENT_SCHEMA -> 'public'
+		// TODO: Remove hack needed to emulate PostgreSQL search_path behavior
+		// Proper fix: Implement Calcite's SchemaPlus.setPath() to configure search path,
+		// or use a custom SqlValidator that resolves unqualified table names
+		sql = addPgCatalogPrefix(sql, "pg_database");
+		sql = addPgCatalogPrefix(sql, "pg_type");
+		sql = addPgCatalogPrefix(sql, "pg_class");
+		sql = addPgCatalogPrefix(sql, "pg_namespace");
+		sql = addPgCatalogPrefix(sql, "pg_attribute");
+		sql = addPgCatalogPrefix(sql, "pg_tables");
+
+		// TODO: Remove hack needed to handle CURRENT_SCHEMA function
+		// Proper fix: Register CURRENT_SCHEMA as a Calcite ScalarFunction that
+		// returns the current schema from session context
 		sql = sql.replaceAll("(?i)CURRENT_SCHEMA\\s*\\(\\s*\\)", "'public'");
 		sql = sql.replaceAll("(?i)\\bCURRENT_SCHEMA\\b", "'public'");
 
-		// CURRENT_DATABASE() -> 'database_name'
+		// TODO: Remove hack needed to handle CURRENT_DATABASE function
+		// Proper fix: Register CURRENT_DATABASE as a Calcite ScalarFunction that
+		// returns the database name from session context
 		sql = sql.replaceAll("(?i)CURRENT_DATABASE\\s*\\(\\s*\\)", "'" + database + "'");
 
-		// CURRENT_USER -> 'user'
+		// TODO: Remove hack needed to handle CURRENT_USER keyword
+		// Proper fix: Register CURRENT_USER as a Calcite ScalarFunction that
+		// returns the authenticated username from session context
 		sql = sql.replaceAll("(?i)\\bCURRENT_USER\\b", "'convex'");
 
-		// SESSION_USER -> 'user'
+		// TODO: Remove hack needed to handle SESSION_USER keyword
+		// Proper fix: Register SESSION_USER as a Calcite ScalarFunction that
+		// returns the session username from session context
 		sql = sql.replaceAll("(?i)\\bSESSION_USER\\b", "'convex'");
 
-		// version() -> '15.0 (Convex)'
+		// TODO: Remove hack needed to handle version() function
+		// Proper fix: Register version() as a Calcite ScalarFunction that
+		// returns appropriate version string
 		sql = sql.replaceAll("(?i)\\bversion\\s*\\(\\s*\\)", "'PostgreSQL 15.0 (Convex SQL)'");
 
-		// pg_backend_pid() -> process ID
+		// TODO: Remove hack needed to handle pg_backend_pid() function
+		// Proper fix: Register pg_backend_pid() as a Calcite ScalarFunction that
+		// returns the connection's process ID from session context
 		sql = sql.replaceAll("(?i)pg_backend_pid\\s*\\(\\s*\\)", String.valueOf(processId));
 
-		// PostgreSQL cast syntax ::type -> CAST(... AS type)
-		// This is complex to do with regex, so just handle common cases
+		// TODO: Remove hack needed to handle PostgreSQL cast syntax (::type)
+		// Proper fix: Use Calcite Babel parser with PostgreSQL conformance,
+		// which natively supports :: cast syntax
 		sql = sql.replaceAll("::integer", "");
 		sql = sql.replaceAll("::int", "");
+		sql = sql.replaceAll("::int4", "");
+		sql = sql.replaceAll("::int8", "");
+		sql = sql.replaceAll("::bigint", "");
 		sql = sql.replaceAll("::text", "");
 		sql = sql.replaceAll("::varchar", "");
 		sql = sql.replaceAll("::regclass", "");
+		sql = sql.replaceAll("::oid", "");
 
 		return sql;
 	}
@@ -310,10 +353,20 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 	// ========== Extended Query Protocol ==========
 
-	private final Map<String, PreparedStatement> preparedStatements = new java.util.HashMap<>();
-	private final Map<String, String> preparedQueries = new java.util.HashMap<>();
-	private ResultSet currentResultSet;
-	private ResultSetMetaData currentMetaData;
+	/**
+	 * Prepared statement info - stores the query and parameter types.
+	 */
+	private record PreparedStmt(String query, int[] paramTypes) {}
+
+	/**
+	 * Portal info - a bound prepared statement ready for execution.
+	 */
+	private record Portal(PreparedStmt stmt, byte[][] paramValues, short[] paramFormats, short[] resultFormats) {}
+
+	// Statements are named prepared statements (Parse creates these)
+	private final Map<String, PreparedStmt> statements = new java.util.HashMap<>();
+	// Portals are bound statements ready to execute (Bind creates these)
+	private final Map<String, Portal> portals = new java.util.HashMap<>();
 
 	private void handleParse(ChannelHandlerContext ctx, PgMessageDecoder.Parse parse) {
 		if (!authenticated) {
@@ -326,13 +379,15 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			String query = parse.query();
 			log.debug("Parse: name='{}', query='{}'", name, query);
 
-			// Store the query for later execution
-			preparedQueries.put(name, query);
+			// Close existing statement with same name (PostgreSQL behavior)
+			statements.remove(name);
 
-			// Send ParseComplete
+			// Store the prepared statement
+			statements.put(name, new PreparedStmt(query, parse.paramTypes()));
+
 			write(ctx, ParseComplete.INSTANCE);
 		} catch (Exception e) {
-			log.warn("Parse error: {}", e.getMessage());
+			log.warn("Parse error: {}", e.getMessage(), e);
 			write(ctx, ErrorResponse.fromException(e));
 		}
 	}
@@ -343,10 +398,33 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			return;
 		}
 
-		log.debug("Bind: portal='{}', statement='{}'", bind.portal(), bind.statement());
+		try {
+			String portalName = bind.portal();
+			String stmtName = bind.statement();
+			log.debug("Bind: portal='{}', statement='{}', params={}", portalName, stmtName, bind.paramValues().length);
 
-		// For now, just acknowledge - we'll execute on Execute
-		write(ctx, BindComplete.INSTANCE);
+			// Find the prepared statement
+			PreparedStmt stmt = statements.get(stmtName);
+			if (stmt == null) {
+				write(ctx, ErrorResponse.builder()
+					.severity("ERROR")
+					.code("26000") // invalid_sql_statement_name
+					.message("prepared statement \"" + stmtName + "\" does not exist")
+					.build());
+				return;
+			}
+
+			// Close existing portal with same name (PostgreSQL behavior)
+			portals.remove(portalName);
+
+			// Create the portal with bound parameters
+			portals.put(portalName, new Portal(stmt, bind.paramValues(), bind.paramFormats(), bind.resultFormats()));
+
+			write(ctx, BindComplete.INSTANCE);
+		} catch (Exception e) {
+			log.warn("Bind error: {}", e.getMessage(), e);
+			write(ctx, ErrorResponse.fromException(e));
+		}
 	}
 
 	private void handleDescribe(ChannelHandlerContext ctx, PgMessageDecoder.Describe describe) {
@@ -360,29 +438,60 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		try {
 			if (describe.type() == 'S') {
 				// Describe prepared statement
-				String query = preparedQueries.get(describe.name());
-				if (query == null) {
-					query = preparedQueries.get(""); // unnamed statement
+				PreparedStmt stmt = statements.get(describe.name());
+				if (stmt == null) {
+					write(ctx, ErrorResponse.builder()
+						.severity("ERROR")
+						.code("26000")
+						.message("prepared statement \"" + describe.name() + "\" does not exist")
+						.build());
+					return;
 				}
 
-				// For now, send empty ParameterDescription and NoData or RowDescription
-				write(ctx, ParameterDescription.EMPTY);
+				// Send parameter description
+				write(ctx, new ParameterDescription(stmt.paramTypes()));
 
+				String query = rewriteQuery(stmt.query());
 				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
-					// Execute to get metadata
-					try (Statement stmt = connection.createStatement();
-						 ResultSet rs = stmt.executeQuery(query)) {
+					// Execute to get metadata (substitute $N with NULL for metadata query)
+					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
+					try (Statement s = connection.createStatement();
+						 ResultSet rs = s.executeQuery(metaQuery)) {
 						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
+					} catch (SQLException e) {
+						// If metadata query fails, return NoData
+						write(ctx, NoData.INSTANCE);
 					}
 				} else {
 					write(ctx, NoData.INSTANCE);
 				}
 			} else {
-				// Describe portal - send NoData for now
-				write(ctx, NoData.INSTANCE);
+				// Describe portal
+				Portal portal = portals.get(describe.name());
+				if (portal == null) {
+					write(ctx, ErrorResponse.builder()
+						.severity("ERROR")
+						.code("34000") // invalid_cursor_name
+						.message("portal \"" + describe.name() + "\" does not exist")
+						.build());
+					return;
+				}
+
+				String query = rewriteQuery(portal.stmt().query());
+				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
+					String metaQuery = query.replaceAll("\\$\\d+", "NULL");
+					try (Statement s = connection.createStatement();
+						 ResultSet rs = s.executeQuery(metaQuery)) {
+						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
+					} catch (SQLException e) {
+						write(ctx, NoData.INSTANCE);
+					}
+				} else {
+					write(ctx, NoData.INSTANCE);
+				}
 			}
 		} catch (Exception e) {
-			log.warn("Describe error: {}", e.getMessage());
+			log.warn("Describe error: {}", e.getMessage(), e);
 			write(ctx, ErrorResponse.fromException(e));
 		}
 	}
@@ -393,23 +502,33 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			return;
 		}
 
-		log.debug("Execute: portal='{}', maxRows={}", execute.portal(), execute.maxRows());
+		String portalName = execute.portal();
+		log.debug("Execute: portal='{}', maxRows={}", portalName, execute.maxRows());
 
 		try {
-			// Get the query from the unnamed statement/portal
-			String query = preparedQueries.get("");
-			if (query == null) {
-				query = preparedQueries.get(execute.portal());
+			Portal portal = portals.get(portalName);
+			if (portal == null) {
+				write(ctx, ErrorResponse.builder()
+					.severity("ERROR")
+					.code("34000")
+					.message("portal \"" + portalName + "\" does not exist")
+					.build());
+				return;
 			}
 
+			String query = portal.stmt().query();
 			if (query == null || query.trim().isEmpty()) {
 				write(ctx, new EmptyQueryResponse());
 				return;
 			}
 
-			executeQuery(ctx, query);
+			executeWithParameters(ctx, query, portal.paramValues(), portal.paramFormats());
 		} catch (SQLException e) {
-			log.warn("Execute error: {}", e.getMessage());
+			log.warn("Execute error: {}", e.getMessage(), e);
+			write(ctx, ErrorResponse.fromException(e));
+		} catch (RuntimeException e) {
+			// Runtime exceptions from Calcite (type coercion, etc.) are query errors
+			log.warn("Query execution error: {}", e.getMessage(), e);
 			write(ctx, ErrorResponse.fromException(e));
 		} catch (Exception e) {
 			log.error("Unexpected error during execute", e);
@@ -417,12 +536,147 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
+	/**
+	 * Execute a query with bound parameters.
+	 */
+	private void executeWithParameters(ChannelHandlerContext ctx, String sql, byte[][] paramValues, short[] paramFormats) throws SQLException {
+		sql = rewriteQuery(sql);
+
+		if (sql == null) {
+			write(ctx, CommandComplete.select(0));
+			return;
+		}
+
+		// If no parameters, execute directly
+		if (paramValues == null || paramValues.length == 0) {
+			executeQuery(ctx, sql);
+			return;
+		}
+
+		// For pg_catalog queries, substitute parameters directly
+		// (Calcite's virtual tables don't support prepared statements well)
+		String lowerSql = sql.toLowerCase();
+		if (lowerSql.contains("pg_catalog") || lowerSql.contains("pg_database") ||
+			lowerSql.contains("pg_type") || lowerSql.contains("pg_class") ||
+			lowerSql.contains("pg_namespace") || lowerSql.contains("pg_attribute") ||
+			lowerSql.contains("pg_tables")) {
+			String substituted = substituteParameters(sql, paramValues, paramFormats);
+			executeQuery(ctx, substituted);
+			return;
+		}
+
+		// Convert $1, $2 to ? for JDBC
+		String jdbcSql = sql.replaceAll("\\$\\d+", "?");
+
+		try (PreparedStatement pstmt = connection.prepareStatement(jdbcSql)) {
+			// Bind parameters
+			for (int i = 0; i < paramValues.length; i++) {
+				byte[] value = paramValues[i];
+				if (value == null) {
+					pstmt.setNull(i + 1, java.sql.Types.NULL);
+				} else {
+					// Determine format: 0 = text, 1 = binary
+					short format = (paramFormats != null && paramFormats.length > 0)
+						? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
+						: 0;
+
+					if (format == 0) {
+						// Text format - convert bytes to string
+						String strValue = new String(value, java.nio.charset.StandardCharsets.UTF_8);
+						pstmt.setString(i + 1, strValue);
+					} else {
+						// Binary format - set as bytes
+						pstmt.setBytes(i + 1, value);
+					}
+				}
+			}
+
+			boolean hasResultSet = pstmt.execute();
+			if (hasResultSet) {
+				try (ResultSet rs = pstmt.getResultSet()) {
+					sendResultSet(ctx, rs);
+				}
+			} else {
+				int updateCount = pstmt.getUpdateCount();
+				String upperSql = sql.toUpperCase().trim();
+				if (upperSql.startsWith("INSERT")) {
+					write(ctx, CommandComplete.insert(updateCount));
+				} else if (upperSql.startsWith("UPDATE")) {
+					write(ctx, CommandComplete.update(updateCount));
+				} else if (upperSql.startsWith("DELETE")) {
+					write(ctx, CommandComplete.delete(updateCount));
+				} else {
+					write(ctx, new CommandComplete("OK"));
+				}
+			}
+		}
+	}
+
+	/**
+	 * Adds pg_catalog. prefix to a table name if not already qualified.
+	 * PostgreSQL's search path includes pg_catalog, but Calcite requires explicit schema.
+	 */
+	private String addPgCatalogPrefix(String sql, String tableName) {
+		// Match table name that's not already prefixed with pg_catalog.
+		// Use word boundaries and negative lookbehind for the dot
+		String pattern = "(?i)(?<!pg_catalog\\.)\\b" + tableName + "\\b";
+		return sql.replaceAll(pattern, "pg_catalog." + tableName);
+	}
+
+	/**
+	 * Substitutes $1, $2, etc. with actual parameter values.
+	 * Used for pg_catalog queries where PreparedStatement doesn't work well.
+	 */
+	private String substituteParameters(String sql, byte[][] paramValues, short[] paramFormats) {
+		String result = sql;
+		for (int i = 0; i < paramValues.length; i++) {
+			String placeholder = "\\$" + (i + 1);
+			String replacement;
+
+			if (paramValues[i] == null) {
+				replacement = "NULL";
+			} else {
+				short format = (paramFormats != null && paramFormats.length > 0)
+					? (paramFormats.length == 1 ? paramFormats[0] : paramFormats[i])
+					: 0;
+
+				if (format == 0) {
+					// Text format
+					String strValue = new String(paramValues[i], java.nio.charset.StandardCharsets.UTF_8);
+					// Check if it looks like a boolean or number
+					if (strValue.equalsIgnoreCase("t") || strValue.equalsIgnoreCase("true")) {
+						replacement = "TRUE";
+					} else if (strValue.equalsIgnoreCase("f") || strValue.equalsIgnoreCase("false")) {
+						replacement = "FALSE";
+					} else if (strValue.matches("-?\\d+(\\.\\d+)?")) {
+						replacement = strValue; // Number, no quotes
+					} else {
+						// String - escape single quotes and wrap
+						replacement = "'" + strValue.replace("'", "''") + "'";
+					}
+				} else {
+					// Binary format - represent as hex
+					StringBuilder hex = new StringBuilder("'\\x");
+					for (byte b : paramValues[i]) {
+						hex.append(String.format("%02x", b & 0xff));
+					}
+					hex.append("'");
+					replacement = hex.toString();
+				}
+			}
+
+			result = result.replaceFirst(placeholder, replacement);
+		}
+		return result;
+	}
+
 	private void handleClose(ChannelHandlerContext ctx, PgMessageDecoder.Close close) {
 		log.debug("Close: type={}, name='{}'", (char) close.type(), close.name());
 
 		if (close.type() == 'S') {
-			preparedStatements.remove(close.name());
-			preparedQueries.remove(close.name());
+			statements.remove(close.name());
+		} else {
+			portals.remove(close.name());
 		}
 
 		write(ctx, CloseComplete.INSTANCE);

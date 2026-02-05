@@ -119,10 +119,29 @@ public class ErrorResponse extends PgMessage {
 	 * Creates an error response from an exception.
 	 */
 	public static ErrorResponse fromException(Throwable t) {
+		// Find the root cause for better error messages
+		Throwable root = t;
+		while (root.getCause() != null && root.getCause() != root) {
+			root = root.getCause();
+		}
+
+		// Build the primary message - prefer root cause if it has more detail
+		String message = t.getMessage();
+		String rootMessage = root.getMessage();
+		if (message == null || message.isBlank()) {
+			message = t.getClass().getSimpleName();
+		}
+
 		Builder builder = builder()
 			.severity("ERROR")
-			.message(t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
+			.message(message);
 
+		// Add root cause as detail if different from main message
+		if (root != t && rootMessage != null && !rootMessage.equals(message)) {
+			builder.detail("Caused by: " + root.getClass().getSimpleName() + ": " + rootMessage);
+		}
+
+		// Set SQL state code
 		if (t instanceof SQLException sqlEx) {
 			String sqlState = sqlEx.getSQLState();
 			builder.code(sqlState != null ? sqlState : "42000");

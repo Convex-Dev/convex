@@ -3,9 +3,11 @@ package convex.db.calcite;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 
+import convex.db.calcite.pgcatalog.PgCatalogSchema;
 import convex.db.lattice.LatticeTables;
 
 /**
@@ -47,6 +49,13 @@ public class ConvexSchema extends AbstractSchema {
 			tableMap.put(tableName, new ConvexTable(this, tableName));
 		}
 		return tableMap;
+	}
+
+	@Override
+	protected Map<String, Schema> getSubSchemaMap() {
+		Map<String, Schema> subSchemas = new HashMap<>();
+		subSchemas.put("pg_catalog", new PgCatalogSchema(this));
+		return subSchemas;
 	}
 
 	/**

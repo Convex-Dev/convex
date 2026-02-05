@@ -110,10 +110,35 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 			case PgMessage.BIND -> {
 				String portal = readCString(in);
 				String statement = readCString(in);
-				// Skip format codes and parameters for now
-				int remaining = length - 4 - portal.length() - 1 - statement.length() - 1;
-				in.skipBytes(remaining);
-				out.add(new Bind(portal, statement));
+
+				// Parameter format codes
+				short numParamFormats = in.readShort();
+				short[] paramFormats = new short[numParamFormats];
+				for (int i = 0; i < numParamFormats; i++) {
+					paramFormats[i] = in.readShort();
+				}
+
+				// Parameter values
+				short numParams = in.readShort();
+				byte[][] paramValues = new byte[numParams][];
+				for (int i = 0; i < numParams; i++) {
+					int paramLen = in.readInt();
+					if (paramLen == -1) {
+						paramValues[i] = null; // NULL
+					} else {
+						paramValues[i] = new byte[paramLen];
+						in.readBytes(paramValues[i]);
+					}
+				}
+
+				// Result format codes
+				short numResultFormats = in.readShort();
+				short[] resultFormats = new short[numResultFormats];
+				for (int i = 0; i < numResultFormats; i++) {
+					resultFormats[i] = in.readShort();
+				}
+
+				out.add(new Bind(portal, statement, paramFormats, paramValues, resultFormats));
 			}
 			case PgMessage.DESCRIBE -> {
 				byte descType = in.readByte();
@@ -163,7 +188,7 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 	public record CancelRequest(int processId, int secretKey) {}
 	public record Query(String sql) {}
 	public record Parse(String name, String query, int[] paramTypes) {}
-	public record Bind(String portal, String statement) {}
+	public record Bind(String portal, String statement, short[] paramFormats, byte[][] paramValues, short[] resultFormats) {}
 	public record Describe(byte type, String name) {}
 	public record Execute(String portal, int maxRows) {}
 	public enum Sync { INSTANCE }
