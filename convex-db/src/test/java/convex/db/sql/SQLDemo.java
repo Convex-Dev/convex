@@ -16,26 +16,30 @@ public class SQLDemo {
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== Convex SQL Demo ===\n");
 
-		// 1. Create database
+		// 1. Create database and table
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("demo", kp);
+		db.tables().createTable("employees", new String[]{"id", "name", "dept", "salary"});
 		System.out.println("Database: " + db.getName());
 
-		// 2. Create table
-		db.tables().createTable("employees", new String[]{"id", "name", "dept", "salary"});
+		// 2. Insert via JDBC
+		try (SQLEngine writer = SQLEngine.create(db)) {
+			Connection conn = writer.getConnection();
+			Statement stmt = conn.createStatement();
 
-		// 3. Insert rows (Java types auto-convert)
-		db.tables().insert("employees", 1, 1, "Alice", "Engineering", 95000);
-		db.tables().insert("employees", 2, 2, "Bob", "Sales", 75000);
-		db.tables().insert("employees", 3, 3, "Charlie", "Engineering", 105000);
-		db.tables().insert("employees", 4, 4, "Diana", "Marketing", 80000);
-		db.tables().insert("employees", 5, 5, "Eve", "Engineering", 90000);
+			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000001', 1, 'Alice', 'Engineering', 95000)");
+			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000002', 2, 'Bob', 'Sales', 75000)");
+			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000003', 3, 'Charlie', 'Engineering', 105000)");
+			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000004', 4, 'Diana', 'Marketing', 80000)");
+			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000005', 5, 'Eve', 'Engineering', 90000)");
+			System.out.println("Inserted 5 rows via JDBC\n");
+		}
 
-		// 4. Query via JDBC
-		try (SQLEngine engine = SQLEngine.create(db)) {
-			Connection conn = engine.getConnection();
+		// 3. Query via separate JDBC connection
+		try (SQLEngine reader = SQLEngine.create(db)) {
+			Connection conn = reader.getConnection();
 
-			System.out.println("\n--- SELECT * FROM employees ---");
+			System.out.println("--- SELECT * FROM employees ---");
 			query(conn, "SELECT * FROM employees");
 
 			System.out.println("\n--- WHERE dept = 'Engineering' ---");
@@ -55,11 +59,9 @@ public class SQLDemo {
 			ResultSetMetaData meta = rs.getMetaData();
 			int cols = meta.getColumnCount();
 
-			// Header
 			for (int i = 1; i <= cols; i++) System.out.print(pad(meta.getColumnLabel(i)));
 			System.out.println();
 
-			// Rows
 			while (rs.next()) {
 				for (int i = 1; i <= cols; i++) {
 					Object v = rs.getObject(i);
@@ -71,9 +73,9 @@ public class SQLDemo {
 		}
 	}
 
-	private static String pad(Object v) { return String.format("%-15s", v); }
+	private static String pad(Object v) { return String.format("%-20s", v); }
 	private static String hex(byte[] b) {
-		if (b.length <= 4) {
+		if (b.length <= 8) {
 			StringBuilder sb = new StringBuilder();
 			for (byte x : b) sb.append(String.format("%02x", x));
 			return sb.toString();
