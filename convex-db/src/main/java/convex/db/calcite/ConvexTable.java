@@ -156,8 +156,21 @@ public class ConvexTable extends AbstractQueryableTable
 
 	/**
 	 * Execute UPDATE - called from ConvexTableModify generated code.
+	 *
+	 * <p>Follows PostgreSQL semantics: PK updates are allowed but uniqueness
+	 * is enforced. If the new PK already exists (and is different from the
+	 * current row's PK), throws a unique constraint violation.
 	 */
 	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
+		// Check if PK column (index 0) is being updated
+		boolean pkBeingUpdated = false;
+		for (int idx : updateIndices) {
+			if (idx == 0) {
+				pkBeingUpdated = true;
+				break;
+			}
+		}
+
 		long count = 0;
 		for (Object[] row : input) {
 			if (row == null) continue;
@@ -175,9 +188,20 @@ public class ConvexTable extends AbstractQueryableTable
 				}
 			}
 
-			// Delete old row by PK, insert updated row
-			ACell pk = toCell(updatedRow[0]);
-			schema.getTables().deleteByKey(tableName, pk);
+			ACell oldPk = toCell(row[0]);
+			ACell newPk = toCell(updatedRow[0]);
+
+			// If PK is being changed, check for uniqueness violation
+			if (pkBeingUpdated && !oldPk.equals(newPk)) {
+				// Check if new PK already exists
+				if (schema.getTables().selectByKey(tableName, newPk) != null) {
+					throw new RuntimeException("Unique constraint violation: primary key '" +
+						newPk + "' already exists in table '" + tableName + "'");
+				}
+			}
+
+			// Delete old row by ORIGINAL PK, then insert with new values
+			schema.getTables().deleteByKey(tableName, oldPk);
 			if (insertRow(updatedRow)) {
 				count++;
 			}
