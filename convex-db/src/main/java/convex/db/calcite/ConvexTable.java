@@ -31,6 +31,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.db.lattice.LatticeTables;
 
 /**
  * Calcite Table backed by Convex lattice storage.
@@ -63,15 +64,26 @@ public class ConvexTable extends AbstractQueryableTable
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
 
-		String[] columnNames = schema.getTables().getColumnNames(tableName);
-		if (columnNames != null) {
-			for (String colName : columnNames) {
-				// Use ANY type since lattice values are dynamically typed
-				builder.add(colName, SqlTypeName.ANY).nullable(true);
+		LatticeTables tables = schema.getTables();
+		String[] columnNames = tables.getColumnNames(tableName);
+		ConvexType[] columnTypes = tables.getColumnTypes(tableName);
+
+		if (columnNames != null && columnTypes != null) {
+			for (int i = 0; i < columnNames.length; i++) {
+				builder.add(columnNames[i], columnTypes[i].getSqlType()).nullable(true);
 			}
 		}
 
 		return builder.build();
+	}
+
+	/**
+	 * Gets the column types for this table.
+	 *
+	 * @return Array of ConvexType for each column
+	 */
+	public ConvexType[] getColumnTypes() {
+		return schema.getTables().getColumnTypes(tableName);
 	}
 
 	@Override
@@ -160,6 +172,8 @@ public class ConvexTable extends AbstractQueryableTable
 	 * <p>Follows PostgreSQL semantics: PK updates are allowed but uniqueness
 	 * is enforced. If the new PK already exists (and is different from the
 	 * current row's PK), throws a unique constraint violation.
+	 *
+	 * <p>Type validation is performed on updated columns.
 	 */
 	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
 		// Check if PK column (index 0) is being updated
@@ -170,6 +184,8 @@ public class ConvexTable extends AbstractQueryableTable
 				break;
 			}
 		}
+
+		ConvexType[] types = getColumnTypes();
 
 		long count = 0;
 		for (Object[] row : input) {
@@ -184,12 +200,16 @@ public class ConvexTable extends AbstractQueryableTable
 			for (int i = 0; i < updateIndices.length; i++) {
 				int targetIdx = updateIndices[i];
 				if (targetIdx >= 0 && targetIdx < columnCount) {
-					updatedRow[targetIdx] = row[columnCount + i];
+					// Validate type before assignment
+					Object newValue = row[columnCount + i];
+					ConvexType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexType.ANY;
+					type.toCell(newValue); // Validates type, throws if invalid
+					updatedRow[targetIdx] = newValue;
 				}
 			}
 
-			ACell oldPk = toCell(row[0]);
-			ACell newPk = toCell(updatedRow[0]);
+			ACell oldPk = toCell(row[0], 0);
+			ACell newPk = toCell(updatedRow[0], 0);
 
 			// If PK is being changed, check for uniqueness violation
 			if (pkBeingUpdated && !oldPk.equals(newPk)) {
@@ -216,7 +236,7 @@ public class ConvexTable extends AbstractQueryableTable
 		long count = 0;
 		for (Object[] row : input) {
 			if (row != null && row.length > 0) {
-				ACell pk = toCell(row[0]);
+				ACell pk = toCell(row[0], 0);
 				if (schema.getTables().deleteByKey(tableName, pk)) {
 					count++;
 				}
@@ -227,23 +247,33 @@ public class ConvexTable extends AbstractQueryableTable
 
 	private boolean insertRow(Object[] row) {
 		if (row == null || row.length < 1) return false;
+		ConvexType[] types = getColumnTypes();
 		ACell[] cells = new ACell[row.length];
 		for (int i = 0; i < row.length; i++) {
-			cells[i] = toCell(row[i]);
+			ConvexType type = (types != null && i < types.length) ? types[i] : ConvexType.ANY;
+			cells[i] = type.toCell(row[i]);
 		}
 		return schema.getTables().insert(tableName, Vectors.of(cells));
 	}
 
+	/**
+	 * Converts a value to a CVM cell using the specified column type.
+	 *
+	 * @param v Value to convert
+	 * @param columnIndex Column index for type lookup
+	 * @return CVM cell
+	 */
+	private ACell toCell(Object v, int columnIndex) {
+		ConvexType[] types = getColumnTypes();
+		ConvexType type = (types != null && columnIndex < types.length) ? types[columnIndex] : ConvexType.ANY;
+		return type.toCell(v);
+	}
+
+	/**
+	 * Converts a value to a CVM cell (untyped - uses ANY).
+	 * Use toCell(v, columnIndex) for type-validated conversion.
+	 */
 	private ACell toCell(Object v) {
-		if (v == null) return null;
-		if (v instanceof ACell c) return c;
-		if (v instanceof byte[] b) return Blob.wrap(b);
-		if (v instanceof Long l) return CVMLong.create(l);
-		if (v instanceof Integer i) return CVMLong.create(i);
-		if (v instanceof Double d) return CVMDouble.create(d);
-		if (v instanceof Float f) return CVMDouble.create(f);
-		if (v instanceof Number n) return CVMLong.create(n.longValue()); // Handle BigDecimal, etc.
-		if (v instanceof String s) return Strings.create(s);
-		return Strings.create(v.toString());
+		return ConvexType.ANY.toCell(v);
 	}
 }

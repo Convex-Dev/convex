@@ -4,23 +4,21 @@ import java.util.Iterator;
 
 import org.apache.calcite.linq4j.Enumerator;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
 import convex.db.lattice.LatticeTables;
 
 /**
  * Enumerator for iterating over rows in a Convex lattice table.
  *
- * <p>Converts CVM cell values to Java objects for Calcite consumption.
+ * <p>Converts CVM cell values to Java objects for Calcite consumption,
+ * using the declared column types for proper type conversion.
  */
 public class ConvexEnumerator implements Enumerator<Object[]> {
 
 	private final Iterator<AVector<ACell>> rowIterator;
 	private final int columnCount;
+	private final ConvexType[] columnTypes;
 	private AVector<ACell> currentRow;
 
 	/**
@@ -44,6 +42,7 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 
 		String[] columns = tables.getColumnNames(tableName);
 		this.columnCount = (columns != null) ? columns.length : 0;
+		this.columnTypes = tables.getColumnTypes(tableName);
 	}
 
 	@Override
@@ -54,7 +53,8 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 
 		Object[] result = new Object[columnCount];
 		for (int i = 0; i < columnCount && i < currentRow.count(); i++) {
-			result[i] = toJava(currentRow.get(i));
+			ConvexType type = (columnTypes != null && i < columnTypes.length) ? columnTypes[i] : ConvexType.ANY;
+			result[i] = type.toJava(currentRow.get(i));
 		}
 		return result;
 	}
@@ -77,37 +77,5 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 	@Override
 	public void close() {
 		// Nothing to close
-	}
-
-	/**
-	 * Converts a CVM cell to a Java object.
-	 *
-	 * @param cell CVM cell value
-	 * @return Java object suitable for Calcite
-	 */
-	private Object toJava(ACell cell) {
-		if (cell == null) return null;
-
-		if (cell instanceof CVMLong l) {
-			long value = l.longValue();
-			// Return Integer for values that fit, to match SQL literal types
-			// (SQL literals like "1" are treated as Integer by Calcite)
-			if (value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) {
-				return (int) value;
-			}
-			return value;
-		}
-		if (cell instanceof CVMDouble d) {
-			return d.doubleValue();
-		}
-		if (cell instanceof AString s) {
-			return s.toString();
-		}
-		if (cell instanceof ABlob b) {
-			return b.getBytes();
-		}
-
-		// Default: convert to string representation
-		return cell.toString();
 	}
 }

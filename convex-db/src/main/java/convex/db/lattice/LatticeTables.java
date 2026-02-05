@@ -10,6 +10,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.db.calcite.ConvexType;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -147,21 +148,43 @@ public class LatticeTables {
 
 	/**
 	 * Creates a new table with the given column names.
-	 * All columns are untyped (any ACell value).
+	 * All columns use ANY type (dynamic typing).
 	 *
 	 * @param name Table name
 	 * @param columns Column names
 	 * @return true if table created, false if already exists
 	 */
-	@SuppressWarnings({"unchecked", "rawtypes"})
 	public boolean createTable(String name, String[] columns) {
+		ConvexType[] types = new ConvexType[columns.length];
+		for (int i = 0; i < types.length; i++) {
+			types[i] = ConvexType.ANY;
+		}
+		return createTable(name, columns, types);
+	}
+
+	/**
+	 * Creates a new table with explicitly typed columns.
+	 *
+	 * @param name Table name
+	 * @param columns Column names
+	 * @param types Column types (must match columns length)
+	 * @return true if table created, false if already exists
+	 * @throws IllegalArgumentException if columns and types have different lengths
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	public boolean createTable(String name, String[] columns, ConvexType[] types) {
+		if (columns.length != types.length) {
+			throw new IllegalArgumentException("Columns and types must have same length");
+		}
+
 		AVector<ACell> existing = getLiveTable(name);
 		if (existing != null) return false;
 
-		// Build schema: [[name, null], ...] (null type = any)
+		// Build schema: [[name, typeName], ...]
 		AVector schema = Vectors.empty();
-		for (String col : columns) {
-			schema = schema.append(Vectors.of(Strings.create(col), null));
+		for (int i = 0; i < columns.length; i++) {
+			AString typeName = (types[i] == ConvexType.ANY) ? null : Strings.create(types[i].name());
+			schema = schema.append(Vectors.of(Strings.create(columns[i]), typeName));
 		}
 
 		putTable(name, SQLTable.create((AVector<AVector<ACell>>) schema, now()));
@@ -215,6 +238,27 @@ public class LatticeTables {
 		String[] result = new String[(int) schema.count()];
 		for (int i = 0; i < result.length; i++) {
 			result[i] = schema.get(i).get(0).toString();
+		}
+		return result;
+	}
+
+	/**
+	 * Gets the column types for a table.
+	 *
+	 * @param name Table name
+	 * @return Array of column types, or null if table not found
+	 */
+	public ConvexType[] getColumnTypes(String name) {
+		AVector<AVector<ACell>> schema = getSchema(name);
+		if (schema == null) return null;
+		ConvexType[] result = new ConvexType[(int) schema.count()];
+		for (int i = 0; i < result.length; i++) {
+			ACell typeCell = schema.get(i).get(1);
+			if (typeCell == null) {
+				result[i] = ConvexType.ANY;
+			} else {
+				result[i] = ConvexType.fromName(typeCell.toString());
+			}
 		}
 		return result;
 	}

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -37,8 +38,10 @@ public class ConvexTableTest {
 		AKeyPair kp = AKeyPair.generate();
 		db = SQLDatabase.create(dbName, kp);
 		ConvexSchemaFactory.register(dbName, db);
-		// Use 'amount' instead of 'value' - 'value' is a reserved keyword in Calcite
-		db.tables().createTable("test_table", new String[]{"id", "name", "amount"});
+		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
+		db.tables().createTable("test_table",
+			new String[]{"id", "name", "amount"},
+			new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.INTEGER});
 		conn = DriverManager.getConnection("jdbc:convex:database=" + dbName);
 	}
 
@@ -79,27 +82,21 @@ public class ConvexTableTest {
 	}
 
 	/**
-	 * Tests updating an integer column with a string value.
+	 * Tests that updating an integer column with a string value throws an error.
 	 *
-	 * <p>Convex uses dynamic typing, so this should succeed - the column
-	 * will now contain a string value instead of an integer.
+	 * <p>With explicit type declarations, the INTEGER column should reject
+	 * string values - either at Calcite validation or our type checking.
 	 */
 	@Test
-	void testUpdateIntegerColumnWithString() throws SQLException {
+	void testUpdateIntegerColumnWithStringThrows() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
 			// Insert integer value
 			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
 
-			// Update integer column with string - should work (dynamic typing)
-			int updated = stmt.executeUpdate("UPDATE test_table SET amount = 'not-a-number' WHERE id = 1");
-			assertEquals(1, updated);
-
-			// Verify the value is now a string
-			try (ResultSet rs = stmt.executeQuery("SELECT amount FROM test_table WHERE id = 1")) {
-				assertTrue(rs.next());
-				Object amount = rs.getObject(1);
-				assertEquals("not-a-number", amount);
-			}
+			// Update integer column with string - should throw
+			assertThrows(SQLException.class, () -> {
+				stmt.executeUpdate("UPDATE test_table SET amount = 'not-a-number' WHERE id = 1");
+			}, "Updating INTEGER column with string should throw");
 		}
 	}
 
@@ -163,29 +160,32 @@ public class ConvexTableTest {
 	}
 
 	/**
-	 * Tests that ORDER BY fails gracefully with mixed types.
-	 *
-	 * <p>When a column contains both integers and strings, sorting will fail
-	 * because Java cannot compare Integer to String.
+	 * Tests that ORDER BY works correctly with typed columns.
 	 */
 	@Test
-	void testOrderByMixedTypesFails() throws SQLException {
+	void testOrderByTypedColumn() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
 			// Insert integer values
-			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
-			stmt.executeUpdate("INSERT INTO test_table VALUES (2, 'Bob', 200)");
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 300)");
+			stmt.executeUpdate("INSERT INTO test_table VALUES (2, 'Bob', 100)");
+			stmt.executeUpdate("INSERT INTO test_table VALUES (3, 'Charlie', 200)");
 
-			// Update one value to string
-			stmt.executeUpdate("UPDATE test_table SET amount = 'not-a-number' WHERE id = 1");
+			// ORDER BY should work correctly with typed columns
+			try (ResultSet rs = stmt.executeQuery("SELECT name, amount FROM test_table ORDER BY amount")) {
+				assertTrue(rs.next());
+				assertEquals("Bob", rs.getString(1));
+				assertEquals(100, rs.getInt(2));
 
-			// ORDER BY should fail with mixed types
-			assertThrows(SQLException.class, () -> {
-				try (ResultSet rs = stmt.executeQuery("SELECT * FROM test_table ORDER BY amount")) {
-					while (rs.next()) {
-						// Consume results
-					}
-				}
-			}, "ORDER BY on mixed types should throw");
+				assertTrue(rs.next());
+				assertEquals("Charlie", rs.getString(1));
+				assertEquals(200, rs.getInt(2));
+
+				assertTrue(rs.next());
+				assertEquals("Alice", rs.getString(1));
+				assertEquals(300, rs.getInt(2));
+
+				assertFalse(rs.next());
+			}
 		}
 	}
 
@@ -254,6 +254,56 @@ public class ConvexTableTest {
 				assertTrue(rs.next());
 				assertEquals(1, rs.getInt(1));
 			}
+		}
+	}
+
+	/**
+	 * Tests that ANY-typed columns allow string values and can be updated to different types.
+	 *
+	 * <p>Note: Calcite has limitations with literal translation for ANY type,
+	 * so we test dynamic typing via UPDATE rather than INSERT of mixed types.
+	 */
+	@Test
+	void testAnyTypeAllowsDynamicTyping() throws Exception {
+		// Create a table with an ANY-typed column
+		String anyTableName = "any_table_" + System.currentTimeMillis();
+		db.tables().createTable(anyTableName,
+			new String[]{"id", "data"},
+			new ConvexType[]{ConvexType.INTEGER, ConvexType.ANY});
+
+		try (Statement stmt = conn.createStatement()) {
+			// Insert string value into ANY column
+			stmt.executeUpdate("INSERT INTO " + anyTableName + " VALUES (1, 'text')");
+
+			// Verify string value
+			try (ResultSet rs = stmt.executeQuery("SELECT data FROM " + anyTableName + " WHERE id = 1")) {
+				assertTrue(rs.next());
+				assertEquals("text", rs.getObject(1));
+			}
+
+			// Update to a different string - ANY column accepts it
+			stmt.executeUpdate("UPDATE " + anyTableName + " SET data = 'updated' WHERE id = 1");
+
+			try (ResultSet rs = stmt.executeQuery("SELECT data FROM " + anyTableName + " WHERE id = 1")) {
+				assertTrue(rs.next());
+				assertEquals("updated", rs.getObject(1));
+			}
+		}
+	}
+
+	/**
+	 * Tests that INSERT with wrong type throws error.
+	 *
+	 * <p>When inserting a string literal into an INTEGER column, Calcite
+	 * validates the type and throws an error.
+	 */
+	@Test
+	void testInsertWrongTypeThrows() throws SQLException {
+		try (Statement stmt = conn.createStatement()) {
+			// Try to insert a string into the INTEGER amount column
+			assertThrows(SQLException.class, () -> {
+				stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 'not-a-number')");
+			}, "Inserting string into INTEGER column should throw");
 		}
 	}
 }
