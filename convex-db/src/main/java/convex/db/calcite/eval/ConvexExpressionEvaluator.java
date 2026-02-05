@@ -286,31 +286,38 @@ public class ConvexExpressionEvaluator {
 	}
 
 	// ========== String Functions ==========
-	// Note: These use Java String methods since CVM doesn't have upper/lower/trim.
-	// Candidates for new core functions if performance matters.
+	// Now using native AString methods for upper/lower/trim.
 
 	private static ACell cellUpper(ACell a) {
 		if (a == null) return null;
-		return Strings.create(a.toString().toUpperCase());
+		AString s = RT.ensureString(a);
+		if (s == null) return Strings.create(a.toString().toUpperCase());
+		return s.toUpperCase();
 	}
 
 	private static ACell cellLower(ACell a) {
 		if (a == null) return null;
-		return Strings.create(a.toString().toLowerCase());
+		AString s = RT.ensureString(a);
+		if (s == null) return Strings.create(a.toString().toLowerCase());
+		return s.toLowerCase();
 	}
 
 	private static ACell cellTrim(ACell a) {
 		if (a == null) return null;
-		return Strings.create(a.toString().trim());
+		AString s = RT.ensureString(a);
+		if (s == null) return Strings.create(a.toString().trim());
+		return s.trim();
 	}
 
 	private static ACell cellLTrim(ACell a) {
 		if (a == null) return null;
+		// AString doesn't have ltrim, use Java String
 		return Strings.create(a.toString().stripLeading());
 	}
 
 	private static ACell cellRTrim(ACell a) {
 		if (a == null) return null;
+		// AString doesn't have rtrim, use Java String
 		return Strings.create(a.toString().stripTrailing());
 	}
 
