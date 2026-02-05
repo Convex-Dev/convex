@@ -11,11 +11,11 @@ import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.calcite.ConvexSchema;
-import org.apache.calcite.adapter.enumerable.EnumerableRules;
-
-import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexSchemaFactory;
-import convex.db.calcite.ConvexTableModifyRule;
+import convex.db.calcite.ConvexLogicalTableModifyRule;
+import convex.db.calcite.rules.ConvexRules;
+
+import org.apache.calcite.adapter.enumerable.EnumerableRules;
 
 /**
  * JDBC Driver for Convex SQL databases.
@@ -51,11 +51,18 @@ public class ConvexDriver extends Driver {
 
 		// Register hook to add Convex rules to the planner
 		Hook.PLANNER.add((RelOptPlanner planner) -> {
-			// Remove Calcite's default EnumerableTableModifyRule which doesn't support UPDATE/DELETE
+			// Remove Calcite's default EnumerableTableModifyRule
 			planner.removeRule(EnumerableRules.ENUMERABLE_TABLE_MODIFICATION_RULE);
-			// Add our custom rules
-			planner.addRule(ConvexTableModifyRule.INSTANCE);
+
+			// Add Enumerable DML rule (works with Calcite's update count handling)
+			planner.addRule(convex.db.calcite.ConvexTableModifyRule.INSTANCE);
 			planner.addRule(ConvexLogicalTableModifyRule.INSTANCE);
+
+			// Add ConvexConvention rules for native CVM query execution
+			// (SELECT operations use pure CVM types throughout)
+			for (var rule : ConvexRules.queryRules()) {
+				planner.addRule(rule);
+			}
 		});
 	}
 
