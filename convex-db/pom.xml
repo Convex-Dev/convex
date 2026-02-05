@@ -82,5 +82,13 @@
 			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- PostgreSQL JDBC driver for testing PG wire protocol -->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.7.5</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>
