@@ -16,6 +16,7 @@
 		<module>convex-cli</module>
 		<module>convex-gui</module>
 		<module>convex-peer</module>
+		<module>convex-db</module>
 		<module>convex-benchmarks</module>
 		<module>convex-observer</module>
 		<module>convex-java</module>

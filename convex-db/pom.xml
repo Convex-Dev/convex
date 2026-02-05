@@ -1,0 +1,81 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<parent>
+		<groupId>world.convex</groupId>
+		<artifactId>convex</artifactId>
+		<version>0.8.3-SNAPSHOT</version>
+	</parent>
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<artifactId>convex-db</artifactId>
+
+	<name>Convex DB</name>
+	<description>SQL database layer for Convex lattice data</description>
+	<url>https://convex.world</url>
+
+	<properties>
+		<calcite.version>1.41.0</calcite.version>
+	</properties>
+
+	<build>
+		<plugins>
+		</plugins>
+	</build>
+
+	<dependencies>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-core</artifactId>
+			<version>${convex.version}</version>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-peer</artifactId>
+			<version>${convex.version}</version>
+			<scope>compile</scope>
+		</dependency>
+
+		<!-- Apache Calcite for SQL -->
+		<dependency>
+			<groupId>org.apache.calcite</groupId>
+			<artifactId>calcite-core</artifactId>
+			<version>${calcite.version}</version>
+		</dependency>
+
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>${slf4j.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Testing -->
+		<dependency>
+			<groupId>org.junit.platform</groupId>
+			<artifactId>junit-platform-commons</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>
