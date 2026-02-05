@@ -8,17 +8,23 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
+import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.TableScan;
+import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.convention.ConvexConvention;
+import convex.db.calcite.rel.ConvexAggregate;
 import convex.db.calcite.rel.ConvexFilter;
 import convex.db.calcite.rel.ConvexProject;
+import convex.db.calcite.rel.ConvexSort;
 import convex.db.calcite.rel.ConvexTableScan;
 
 /**
@@ -37,13 +43,19 @@ public class ConvexRules {
 	/** Rule to convert LogicalProject to ConvexProject. */
 	public static final ConvexProjectRule PROJECT = ConvexProjectRule.INSTANCE;
 
+	/** Rule to convert LogicalSort to ConvexSort. */
+	public static final ConvexSortRule SORT = ConvexSortRule.INSTANCE;
+
+	/** Rule to convert LogicalAggregate to ConvexAggregate. */
+	public static final ConvexAggregateRule AGGREGATE = ConvexAggregateRule.INSTANCE;
+
 	/** Rule to convert ConvexConvention to EnumerableConvention. */
 	public static final ConvexToEnumerableConverterRule TO_ENUMERABLE =
 		ConvexToEnumerableConverterRule.INSTANCE;
 
 	/** Returns all Convex query rules for SELECT operations. */
 	public static List<RelOptRule> rules() {
-		return List.of(TABLE_SCAN, FILTER, PROJECT, TO_ENUMERABLE);
+		return List.of(TABLE_SCAN, FILTER, PROJECT, SORT, AGGREGATE, TO_ENUMERABLE);
 	}
 
 	/** Alias for rules() - returns query rules. */
@@ -132,6 +144,60 @@ public class ConvexRules {
 				project.getInput().getTraitSet().replace(ConvexConvention.INSTANCE));
 			return new ConvexProject(project.getCluster(), traitSet, input,
 				project.getProjects(), project.getRowType());
+		}
+	}
+
+	// ========== Sort Rule ==========
+
+	public static class ConvexSortRule extends ConverterRule {
+		public static final ConvexSortRule INSTANCE = new ConvexSortRule();
+
+		private ConvexSortRule() {
+			super(Config.INSTANCE
+				.withConversion(LogicalSort.class, Convention.NONE,
+					ConvexConvention.INSTANCE, "ConvexSortRule")
+				.withRuleFactory(ConvexSortRule::new));
+		}
+
+		private ConvexSortRule(Config config) {
+			super(config);
+		}
+
+		@Override
+		public RelNode convert(RelNode rel) {
+			LogicalSort sort = (LogicalSort) rel;
+			RelTraitSet traitSet = sort.getTraitSet().replace(ConvexConvention.INSTANCE);
+			RelNode input = convert(sort.getInput(),
+				sort.getInput().getTraitSet().replace(ConvexConvention.INSTANCE));
+			return new ConvexSort(sort.getCluster(), traitSet, input,
+				sort.getCollation(), sort.offset, sort.fetch);
+		}
+	}
+
+	// ========== Aggregate Rule ==========
+
+	public static class ConvexAggregateRule extends ConverterRule {
+		public static final ConvexAggregateRule INSTANCE = new ConvexAggregateRule();
+
+		private ConvexAggregateRule() {
+			super(Config.INSTANCE
+				.withConversion(LogicalAggregate.class, Convention.NONE,
+					ConvexConvention.INSTANCE, "ConvexAggregateRule")
+				.withRuleFactory(ConvexAggregateRule::new));
+		}
+
+		private ConvexAggregateRule(Config config) {
+			super(config);
+		}
+
+		@Override
+		public RelNode convert(RelNode rel) {
+			LogicalAggregate agg = (LogicalAggregate) rel;
+			RelTraitSet traitSet = agg.getTraitSet().replace(ConvexConvention.INSTANCE);
+			RelNode input = convert(agg.getInput(),
+				agg.getInput().getTraitSet().replace(ConvexConvention.INSTANCE));
+			return new ConvexAggregate(agg.getCluster(), traitSet, input,
+				agg.getGroupSet(), agg.getGroupSets(), agg.getAggCallList());
 		}
 	}
 }
