@@ -6,10 +6,16 @@ import java.util.Properties;
 
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.Driver;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.calcite.ConvexSchema;
+import org.apache.calcite.adapter.enumerable.EnumerableRules;
+
+import convex.db.calcite.ConvexLogicalTableModifyRule;
 import convex.db.calcite.ConvexSchemaFactory;
+import convex.db.calcite.ConvexTableModifyRule;
 
 /**
  * JDBC Driver for Convex SQL databases.
@@ -42,6 +48,15 @@ public class ConvexDriver extends Driver {
 
 	static {
 		new ConvexDriver().register();
+
+		// Register hook to add Convex rules to the planner
+		Hook.PLANNER.add((RelOptPlanner planner) -> {
+			// Remove Calcite's default EnumerableTableModifyRule which doesn't support UPDATE/DELETE
+			planner.removeRule(EnumerableRules.ENUMERABLE_TABLE_MODIFICATION_RULE);
+			// Add our custom rules
+			planner.addRule(ConvexTableModifyRule.INSTANCE);
+			planner.addRule(ConvexLogicalTableModifyRule.INSTANCE);
+		});
 	}
 
 	public ConvexDriver() {

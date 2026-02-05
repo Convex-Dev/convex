@@ -88,6 +88,30 @@ public class ConvexSchemaFactory implements SchemaFactory {
 		return new ConvexSchema(db.tables(), name);
 	}
 
+	// ========== Table lookup for code generation ==========
+
+	/** Cache of schemas for table lookup */
+	private static final Map<String, ConvexSchema> SCHEMA_CACHE = new ConcurrentHashMap<>();
+
+	/**
+	 * Gets a ConvexTable by schema and table name.
+	 * Called from generated code in ConvexTableModify.
+	 *
+	 * @param schemaName Schema name
+	 * @param tableName Table name
+	 * @return The ConvexTable
+	 */
+	public static ConvexTable getTable(String schemaName, String tableName) {
+		ConvexSchema schema = SCHEMA_CACHE.computeIfAbsent(schemaName, k -> {
+			SQLDatabase db = REGISTRY.get(k);
+			if (db == null) {
+				throw new IllegalStateException("Database '" + k + "' not registered");
+			}
+			return new ConvexSchema(db.tables(), k);
+		});
+		return schema.getConvexTable(tableName);
+	}
+
 	@Override
 	public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
 		// Get database name from operand

@@ -99,4 +99,14 @@ public class ConvexSchema extends AbstractSchema {
 	public boolean tableExists(String tableName) {
 		return tables.tableExists(tableName);
 	}
+
+	/**
+	 * Gets a ConvexTable by name.
+	 *
+	 * @param tableName Table name
+	 * @return The ConvexTable
+	 */
+	public ConvexTable getConvexTable(String tableName) {
+		return new ConvexTable(this, tableName);
+	}
 }

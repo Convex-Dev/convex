@@ -1,6 +1,5 @@
 package convex.db.calcite;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -17,7 +16,6 @@ import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableModify;
-import org.apache.calcite.rel.logical.LogicalTableModify;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexNode;
@@ -27,14 +25,12 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.sql.type.SqlTypeName;
 
 import convex.core.data.ACell;
-import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.db.lattice.LatticeTables;
 
 /**
  * Calcite Table backed by Convex lattice storage.
@@ -90,7 +86,8 @@ public class ConvexTable extends AbstractQueryableTable
 
 	@Override
 	public Collection<Object[]> getModifiableCollection() {
-		return new ModifiableCollection();
+		// Not used - we use direct methods instead
+		throw new UnsupportedOperationException("Use executeInsert/Update/Delete instead");
 	}
 
 	@Override
@@ -103,9 +100,16 @@ public class ConvexTable extends AbstractQueryableTable
 			List<String> updateColumnList,
 			List<RexNode> sourceExpressionList,
 			boolean flattened) {
-		return LogicalTableModify.create(
-			table, catalogReader, child, operation,
-			updateColumnList, sourceExpressionList, flattened);
+		// Return a logical modify node - ConvexTableModifyRule will convert
+		// it to the physical ConvexTableModify in ENUMERABLE convention
+		return ConvexLogicalTableModify.create(
+			table,
+			catalogReader,
+			child,
+			operation,
+			updateColumnList,
+			sourceExpressionList,
+			flattened);
 	}
 
 	@Override
@@ -135,52 +139,87 @@ public class ConvexTable extends AbstractQueryableTable
 		return schema;
 	}
 
+	// ========== DML Operations (called from generated code) ==========
+
 	/**
-	 * Collection that routes modifications to the lattice storage.
+	 * Execute INSERT - called from ConvexTableModify generated code.
 	 */
-	private class ModifiableCollection extends ArrayList<Object[]> {
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		public boolean add(Object[] row) {
-			if (row == null || row.length < 1) return false;
-
-			ACell[] cells = new ACell[row.length];
-			for (int i = 0; i < row.length; i++) {
-				cells[i] = toCell(row[i]);
+	public long executeInsert(Enumerable<Object[]> input) {
+		long count = 0;
+		for (Object[] row : input) {
+			if (row != null && insertRow(row)) {
+				count++;
 			}
-
-			return schema.getTables().insert(tableName, Vectors.of(cells));
 		}
+		return count;
+	}
 
-		@Override
-		public boolean addAll(Collection<? extends Object[]> rows) {
-			boolean modified = false;
-			for (Object[] row : rows) {
-				modified |= add(row);
+	/**
+	 * Execute UPDATE - called from ConvexTableModify generated code.
+	 */
+	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
+		long count = 0;
+		for (Object[] row : input) {
+			if (row == null) continue;
+
+			// Reconstruct updated row from Calcite's format:
+			// [original columns..., new values for updated columns...]
+			Object[] updatedRow = new Object[columnCount];
+			for (int i = 0; i < columnCount; i++) {
+				updatedRow[i] = row[i];
 			}
-			return modified;
-		}
-
-		private ACell toCell(Object v) {
-			if (v == null) return null;
-			if (v instanceof ACell c) return c;
-			if (v instanceof byte[] b) return Blob.wrap(b);
-			if (v instanceof Long l) return CVMLong.create(l);
-			if (v instanceof Integer i) return CVMLong.create(i);
-			if (v instanceof Double d) return CVMDouble.create(d);
-			if (v instanceof String s) return Strings.create(s);
-			// Handle Calcite's ByteString type
-			if (v.getClass().getName().equals("org.apache.calcite.avatica.util.ByteString")) {
-				try {
-					java.lang.reflect.Method m = v.getClass().getMethod("getBytes");
-					byte[] bytes = (byte[]) m.invoke(v);
-					return Blob.wrap(bytes);
-				} catch (Exception e) {
-					return Strings.create(v.toString());
+			for (int i = 0; i < updateIndices.length; i++) {
+				int targetIdx = updateIndices[i];
+				if (targetIdx >= 0 && targetIdx < columnCount) {
+					updatedRow[targetIdx] = row[columnCount + i];
 				}
 			}
-			return Strings.create(v.toString());
+
+			// Delete old row by PK, insert updated row
+			ACell pk = toCell(updatedRow[0]);
+			schema.getTables().deleteByKey(tableName, pk);
+			if (insertRow(updatedRow)) {
+				count++;
+			}
 		}
+		return count;
+	}
+
+	/**
+	 * Execute DELETE - called from ConvexTableModify generated code.
+	 */
+	public long executeDelete(Enumerable<Object[]> input) {
+		long count = 0;
+		for (Object[] row : input) {
+			if (row != null && row.length > 0) {
+				ACell pk = toCell(row[0]);
+				if (schema.getTables().deleteByKey(tableName, pk)) {
+					count++;
+				}
+			}
+		}
+		return count;
+	}
+
+	private boolean insertRow(Object[] row) {
+		if (row == null || row.length < 1) return false;
+		ACell[] cells = new ACell[row.length];
+		for (int i = 0; i < row.length; i++) {
+			cells[i] = toCell(row[i]);
+		}
+		return schema.getTables().insert(tableName, Vectors.of(cells));
+	}
+
+	private ACell toCell(Object v) {
+		if (v == null) return null;
+		if (v instanceof ACell c) return c;
+		if (v instanceof byte[] b) return Blob.wrap(b);
+		if (v instanceof Long l) return CVMLong.create(l);
+		if (v instanceof Integer i) return CVMLong.create(i);
+		if (v instanceof Double d) return CVMDouble.create(d);
+		if (v instanceof Float f) return CVMDouble.create(f);
+		if (v instanceof Number n) return CVMLong.create(n.longValue()); // Handle BigDecimal, etc.
+		if (v instanceof String s) return Strings.create(s);
+		return Strings.create(v.toString());
 	}
 }

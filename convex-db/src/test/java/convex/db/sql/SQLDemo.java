@@ -54,6 +54,22 @@ public class SQLDemo {
 
 			System.out.println("\n--- COUNT(*) ---");
 			query(conn, "SELECT COUNT(*) as total FROM employees");
+
+			// Test UPDATE
+			System.out.println("\n--- UPDATE test ---");
+			try (Statement stmt = conn.createStatement()) {
+				int updated = stmt.executeUpdate("UPDATE employees SET salary = 100000 WHERE id = 1");
+				System.out.println("Updated " + updated + " rows");
+			}
+			query(conn, "SELECT * FROM employees WHERE id = 1");
+
+			// Test DELETE
+			System.out.println("\n--- DELETE test ---");
+			try (Statement stmt = conn.createStatement()) {
+				int deleted = stmt.executeUpdate("DELETE FROM employees WHERE id = 5");
+				System.out.println("Deleted " + deleted + " rows");
+			}
+			query(conn, "SELECT COUNT(*) as remaining FROM employees");
 		}
 	}
 

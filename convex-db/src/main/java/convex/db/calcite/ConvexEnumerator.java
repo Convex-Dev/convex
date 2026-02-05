@@ -89,7 +89,13 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 		if (cell == null) return null;
 
 		if (cell instanceof CVMLong l) {
-			return l.longValue();
+			long value = l.longValue();
+			// Return Integer for values that fit, to match SQL literal types
+			// (SQL literals like "1" are treated as Integer by Calcite)
+			if (value >= Integer.MIN_VALUE && value <= Integer.MAX_VALUE) {
+				return (int) value;
+			}
+			return value;
 		}
 		if (cell instanceof CVMDouble d) {
 			return d.doubleValue();
