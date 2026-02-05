@@ -234,16 +234,13 @@ public class LatticeTables {
 	// ========== Row Operations ==========
 
 	/**
-	 * Inserts a row with the given primary key.
-	 * If a row with this key exists, it is updated.
-	 * Primary key is converted to ABlob (supports CVMLong, AString, ABlob).
+	 * Inserts a row into a table. First column is used as primary key.
 	 *
 	 * @param tableName Table name
-	 * @param primaryKey Primary key value
-	 * @param values Column values
+	 * @param row Complete row (first column is primary key)
 	 * @return true if inserted, false if table not found
 	 */
-	public boolean insert(String tableName, ACell primaryKey, AVector<ACell> values) {
+	public boolean insert(String tableName, AVector<ACell> row) {
 		AVector<ACell> table = getLiveTable(tableName);
 		if (table == null) return false;
 
@@ -251,22 +248,21 @@ public class LatticeTables {
 		if (rows == null) rows = TableLattice.INSTANCE.zero();
 
 		CVMLong timestamp = now();
-		ABlob key = toKey(primaryKey);
-		rows = rows.assoc(key, SQLRow.create(values, timestamp));
+		ABlob key = toKey(row.get(0));
+		rows = rows.assoc(key, SQLRow.create(row, timestamp));
 		putTable(tableName, SQLTable.withRows(table, rows, timestamp));
 		return true;
 	}
 
 	/**
-	 * Inserts a row with auto-conversion from Java types.
+	 * Inserts a row with auto-conversion from Java types. First value is primary key.
 	 *
 	 * @param tableName Table name
-	 * @param primaryKey Primary key (Long, String, etc.)
-	 * @param values Column values (auto-converted via RT.cvm)
+	 * @param values Column values (first is primary key)
 	 * @return true if inserted, false if table not found
 	 */
-	public boolean insert(String tableName, Object primaryKey, Object... values) {
-		return insert(tableName, RT.cvm(primaryKey), Vectors.of(values));
+	public boolean insert(String tableName, Object... values) {
+		return insert(tableName, Vectors.of(values));
 	}
 
 	/**

@@ -16,23 +16,24 @@ public class SQLDemo {
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== Convex SQL Demo ===\n");
 
-		// 1. Create database and table
+		// 1. Create database
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("demo", kp);
-		db.tables().createTable("employees", new String[]{"id", "name", "dept", "salary"});
 		System.out.println("Database: " + db.getName());
 
-		// 2. Insert via JDBC
-		try (SQLEngine writer = SQLEngine.create(db)) {
-			Connection conn = writer.getConnection();
-			Statement stmt = conn.createStatement();
+		// 2. Create table via schema API, insert via SQL
+		try (SQLEngine engine = SQLEngine.create(db)) {
+			// Create table via schema API
+			engine.getSchema().createTable("employees", "id", "name", "dept", "salary");
+			System.out.println("Created table via schema API");
 
-			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000001', 1, 'Alice', 'Engineering', 95000)");
-			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000002', 2, 'Bob', 'Sales', 75000)");
-			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000003', 3, 'Charlie', 'Engineering', 105000)");
-			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000004', 4, 'Diana', 'Marketing', 80000)");
-			stmt.executeUpdate("INSERT INTO employees VALUES (x'0000000000000005', 5, 'Eve', 'Engineering', 90000)");
-			System.out.println("Inserted 5 rows via JDBC\n");
+			// Insert rows via SQL (Calcite handles parsing)
+			engine.execute("INSERT INTO employees VALUES (1, 'Alice', 'Engineering', 95000)");
+			engine.execute("INSERT INTO employees VALUES (2, 'Bob', 'Sales', 75000)");
+			engine.execute("INSERT INTO employees VALUES (3, 'Charlie', 'Engineering', 105000)");
+			engine.execute("INSERT INTO employees VALUES (4, 'Diana', 'Marketing', 80000)");
+			engine.execute("INSERT INTO employees VALUES (5, 'Eve', 'Engineering', 90000)");
+			System.out.println("Inserted 5 rows via SQL\n");
 		}
 
 		// 3. Query via separate JDBC connection

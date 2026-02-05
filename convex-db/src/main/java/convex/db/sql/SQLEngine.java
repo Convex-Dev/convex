@@ -13,22 +13,30 @@ import java.util.Properties;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.schema.SchemaPlus;
 
+import convex.db.calcite.ConvexSchema;
 import convex.db.lattice.LatticeTables;
 import convex.db.lattice.SQLDatabase;
 
 /**
  * SQL query execution engine backed by Apache Calcite.
  *
- * <p>Provides a simple API for executing SQL queries against Convex lattice tables.
+ * <p>Provides SQL query and DML support for Convex lattice tables.
+ * All SQL parsing is handled by Calcite.
  *
  * <p>Usage:
  * <pre>
  * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * db.tables().createTable("users", new String[]{"id", "name"});
- * db.tables().insert("users", CVMLong.create(1), Vectors.of(...));
  *
- * SQLEngine engine = SQLEngine.create(db);
- * List&lt;Object[]&gt; results = engine.query("SELECT * FROM users");
+ * try (SQLEngine engine = SQLEngine.create(db)) {
+ *     // Create table via schema API
+ *     engine.getSchema().createTable("users", "id", "name", "email");
+ *
+ *     // DML via SQL
+ *     engine.execute("INSERT INTO users VALUES (1, 'Alice', 'alice@example.com')");
+ *
+ *     // Query via SQL
+ *     List&lt;Object[]&gt; results = engine.query("SELECT * FROM users");
+ * }
  * </pre>
  */
 public class SQLEngine implements AutoCloseable {
@@ -70,7 +78,7 @@ public class SQLEngine implements AutoCloseable {
 		CalciteConnection calciteConnection = connection.unwrap(CalciteConnection.class);
 
 		SchemaPlus rootSchema = calciteConnection.getRootSchema();
-		ConvexSchema convexSchema = new ConvexSchema(tables);
+		ConvexSchema convexSchema = new ConvexSchema(tables, schemaName);
 		rootSchema.add(schemaName, convexSchema);
 
 		// Set as default schema
@@ -108,10 +116,9 @@ public class SQLEngine implements AutoCloseable {
 	}
 
 	/**
-	 * Executes a SQL update statement (INSERT, UPDATE, DELETE, CREATE, DROP).
+	 * Executes a SQL statement (INSERT, UPDATE, DELETE).
 	 *
-	 * <p>Note: For lattice tables, DDL and DML should be done through
-	 * LatticeTables methods. This method is for compatibility.
+	 * <p>All SQL parsing is handled by Calcite.
 	 *
 	 * @param sql SQL statement
 	 * @return Number of rows affected

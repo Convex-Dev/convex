@@ -79,20 +79,15 @@ public class SQLDatabaseTest {
 
 		tables.createTable("users", new String[]{"id", "name", "email"});
 
-		// Insert row
-		ACell key = CVMLong.create(1);
-		AVector<ACell> values = Vectors.of(
-			CVMLong.create(1),
-			Strings.create("Alice"),
-			Strings.create("alice@example.com")
-		);
-		boolean inserted = tables.insert("users", key, values);
+		// Insert row (first column is primary key)
+		boolean inserted = tables.insert("users", 1, "Alice", "alice@example.com");
 		assertTrue(inserted);
 		assertEquals(1, tables.getRowCount("users"));
 
 		// Select row
-		AVector<ACell> row = tables.selectByKey("users", key);
+		AVector<ACell> row = tables.selectByKey("users", CVMLong.create(1));
 		assertNotNull(row);
+		assertEquals(CVMLong.create(1), row.get(0));
 		assertEquals(Strings.create("Alice"), row.get(1));
 		assertEquals(Strings.create("alice@example.com"), row.get(2));
 
@@ -108,18 +103,16 @@ public class SQLDatabaseTest {
 		LatticeTables tables = db.tables();
 
 		tables.createTable("items", new String[]{"id", "name"});
-
-		ACell key = CVMLong.create(1);
-		tables.insert("items", key, Vectors.of(CVMLong.create(1), Strings.create("Item")));
+		tables.insert("items", 1, "Item");
 		assertEquals(1, tables.getRowCount("items"));
 
-		boolean deleted = tables.deleteByKey("items", key);
+		boolean deleted = tables.deleteByKey("items", CVMLong.create(1));
 		assertTrue(deleted);
 		assertEquals(0, tables.getRowCount("items"));
-		assertNull(tables.selectByKey("items", key));
+		assertNull(tables.selectByKey("items", CVMLong.create(1)));
 
 		// Can't delete non-existent
-		boolean notFound = tables.deleteByKey("items", key);
+		boolean notFound = tables.deleteByKey("items", CVMLong.create(1));
 		assertFalse(notFound);
 	}
 
@@ -130,10 +123,9 @@ public class SQLDatabaseTest {
 		LatticeTables tables = db.tables();
 
 		tables.createTable("products", new String[]{"id", "name"});
-
-		tables.insert("products", CVMLong.create(1), Vectors.of(CVMLong.create(1), Strings.create("Apple")));
-		tables.insert("products", CVMLong.create(2), Vectors.of(CVMLong.create(2), Strings.create("Banana")));
-		tables.insert("products", CVMLong.create(3), Vectors.of(CVMLong.create(3), Strings.create("Cherry")));
+		tables.insert("products", 1, "Apple");
+		tables.insert("products", 2, "Banana");
+		tables.insert("products", 3, "Cherry");
 
 		var all = tables.selectAll("products");
 		assertEquals(3, all.count());
@@ -160,11 +152,11 @@ public class SQLDatabaseTest {
 		LatticeTables tables = db.tables();
 
 		tables.createTable("data", new String[]{"id", "value"});
-		tables.insert("data", CVMLong.create(1), Vectors.of(CVMLong.create(1), Strings.create("original")));
+		tables.insert("data", 1, "original");
 
 		// Fork
 		LatticeTables forked = tables.fork();
-		forked.insert("data", CVMLong.create(2), Vectors.of(CVMLong.create(2), Strings.create("forked")));
+		forked.insert("data", 2, "forked");
 
 		// Original unchanged
 		assertEquals(1, tables.getRowCount("data"));
@@ -187,9 +179,9 @@ public class SQLDatabaseTest {
 		db1.tables().createTable("counter", new String[]{"id", "count"});
 		db2.tables().createTable("counter", new String[]{"id", "count"});
 
-		db1.tables().insert("counter", CVMLong.create(1), Vectors.of(CVMLong.create(1), CVMLong.create(100)));
+		db1.tables().insert("counter", 1, 100);
 		Thread.sleep(10); // Ensure different timestamps
-		db2.tables().insert("counter", CVMLong.create(2), Vectors.of(CVMLong.create(2), CVMLong.create(200)));
+		db2.tables().insert("counter", 2, 200);
 
 		// Merge db2's replica into db1
 		long merged = db1.mergeReplicas(db2.exportReplica());
@@ -212,7 +204,7 @@ public class SQLDatabaseTest {
 
 		db1.tables().createTable("secure", new String[]{"id"});
 		db2.tables().createTable("secure", new String[]{"id"});
-		db2.tables().insert("secure", CVMLong.create(1), Vectors.of(CVMLong.create(1)));
+		db2.tables().insert("secure", 1);
 
 		// Get db2's export and tamper with it by re-signing with wrong key
 		var export = db2.exportReplica();
