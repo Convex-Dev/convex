@@ -7,12 +7,14 @@ import java.util.Properties;
 import org.apache.calcite.jdbc.CalciteConnection;
 import org.apache.calcite.jdbc.Driver;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.runtime.Hook;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.calcite.ConvexLogicalTableModifyRule;
+import convex.db.calcite.ConvexTableModifyRule;
 import convex.db.calcite.rules.ConvexRules;
 
 import org.apache.calcite.adapter.enumerable.EnumerableRules;
@@ -41,6 +43,13 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  * Statement stmt = conn.createStatement();
  * ResultSet rs = stmt.executeQuery("SELECT * FROM users");
  * </pre>
+ *
+ * <p><b>Note:</b> This driver registers Convex-specific planner rules globally via
+ * a {@link Hook#PLANNER} hook. The query rules (SELECT) only match ConvexTable
+ * and won't affect other Calcite adapters. However, the DML rule replacement
+ * (removing ENUMERABLE_TABLE_MODIFICATION_RULE) is global - if you need to use
+ * other Calcite adapters with DML in the same JVM, consider using separate
+ * class loaders.
  */
 public class ConvexDriver extends Driver {
 
@@ -49,18 +58,19 @@ public class ConvexDriver extends Driver {
 	static {
 		new ConvexDriver().register();
 
-		// Register hook to add Convex rules to the planner
+		// Register Convex rules with the planner.
 		Hook.PLANNER.add((RelOptPlanner planner) -> {
-			// Remove Calcite's default EnumerableTableModifyRule
+			// Remove default DML rule to ensure ConvexLogicalTableModifyRule is used
+			// for ConvexTable. This is global but necessary because both rules match
+			// the same input pattern and Calcite may choose the default.
 			planner.removeRule(EnumerableRules.ENUMERABLE_TABLE_MODIFICATION_RULE);
 
-			// Add Enumerable DML rule (works with Calcite's update count handling)
-			planner.addRule(convex.db.calcite.ConvexTableModifyRule.INSTANCE);
+			// Add Convex DML rules (have matches() that check for ConvexTable)
+			planner.addRule(ConvexTableModifyRule.INSTANCE);
 			planner.addRule(ConvexLogicalTableModifyRule.INSTANCE);
 
-			// Add ConvexConvention rules for native CVM query execution
-			// (SELECT operations use pure CVM types throughout)
-			for (var rule : ConvexRules.queryRules()) {
+			// Add query rules (have matches() that check for ConvexTable)
+			for (RelOptRule rule : ConvexRules.queryRules()) {
 				planner.addRule(rule);
 			}
 		});

@@ -2,6 +2,7 @@ package convex.db.calcite.convention;
 
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.ConventionTraitDef;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitDef;
 
@@ -10,6 +11,9 @@ import org.apache.calcite.plan.RelTraitDef;
  *
  * <p>This convention keeps CVM types throughout the execution pipeline,
  * only converting to Java types at the JDBC ResultSet boundary.
+ *
+ * <p>Rules for this convention are registered via {@link convex.db.jdbc.ConvexDriver}
+ * when the driver is loaded.
  */
 public enum ConvexConvention implements Convention {
 	INSTANCE;
@@ -35,8 +39,8 @@ public enum ConvexConvention implements Convention {
 	}
 
 	@Override
-	public void register(org.apache.calcite.plan.RelOptPlanner planner) {
-		// Rules will be registered separately
+	public void register(RelOptPlanner planner) {
+		// Rules are registered via ConvexDriver's PLANNER hook
 	}
 
 	@Override
