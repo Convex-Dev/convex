@@ -4,6 +4,7 @@ import java.util.function.Predicate;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -204,6 +205,12 @@ public class KVDatabase {
 
 			// Validate signature
 			if (!signedDbMap.checkSignature()) continue;
+
+			// Verify signer matches owner key (for AccountKey owners)
+			// For other owner types, this simple merge model doesn't do advanced verification
+			if (remoteOwnerKey instanceof AccountKey ownerAK) {
+				if (!ownerAK.equals(signedDbMap.getAccountKey())) continue;
+			}
 
 			// Extract this database from the remote owner's database map
 			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = signedDbMap.getValue();
