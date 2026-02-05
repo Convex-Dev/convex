@@ -158,13 +158,17 @@ public class ConvexTable extends AbstractQueryableTable
 	 * Execute INSERT - called from ConvexTableModify generated code.
 	 */
 	public long executeInsert(Enumerable<Object[]> input) {
-		long count = 0;
-		for (Object[] row : input) {
-			if (row != null && insertRow(row)) {
-				count++;
+		try {
+			long count = 0;
+			for (Object[] row : input) {
+				if (row != null && insertRow(row)) {
+					count++;
+				}
 			}
+			return count;
+		} catch (ExceptionInInitializerError e) {
+			throw wrapTypeError(e, "INSERT");
 		}
-		return count;
 	}
 
 	/**
@@ -177,73 +181,96 @@ public class ConvexTable extends AbstractQueryableTable
 	 * <p>Type validation is performed on updated columns.
 	 */
 	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
-		// Check if PK column (index 0) is being updated
-		boolean pkBeingUpdated = false;
-		for (int idx : updateIndices) {
-			if (idx == 0) {
-				pkBeingUpdated = true;
-				break;
-			}
-		}
-
-		ConvexColumnType[] types = getColumnTypes();
-
-		long count = 0;
-		for (Object[] row : input) {
-			if (row == null) continue;
-
-			// Reconstruct updated row from Calcite's format:
-			// [original columns..., new values for updated columns...]
-			Object[] updatedRow = new Object[columnCount];
-			for (int i = 0; i < columnCount; i++) {
-				updatedRow[i] = row[i];
-			}
-			for (int i = 0; i < updateIndices.length; i++) {
-				int targetIdx = updateIndices[i];
-				if (targetIdx >= 0 && targetIdx < columnCount) {
-					// Validate type before assignment
-					Object newValue = row[columnCount + i];
-					ConvexColumnType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexColumnType.of(ConvexType.ANY);
-					type.toCell(newValue); // Validates type, throws if invalid
-					updatedRow[targetIdx] = newValue;
+		try {
+			// Check if PK column (index 0) is being updated
+			boolean pkBeingUpdated = false;
+			for (int idx : updateIndices) {
+				if (idx == 0) {
+					pkBeingUpdated = true;
+					break;
 				}
 			}
 
-			ACell oldPk = toCell(row[0], 0);
-			ACell newPk = toCell(updatedRow[0], 0);
+			ConvexColumnType[] types = getColumnTypes();
 
-			// If PK is being changed, check for uniqueness violation
-			if (pkBeingUpdated && !oldPk.equals(newPk)) {
-				// Check if new PK already exists
-				if (schema.getTables().selectByKey(tableName, newPk) != null) {
-					throw new RuntimeException("Unique constraint violation: primary key '" +
-						newPk + "' already exists in table '" + tableName + "'");
+			long count = 0;
+			for (Object[] row : input) {
+				if (row == null) continue;
+
+				// Reconstruct updated row from Calcite's format:
+				// [original columns..., new values for updated columns...]
+				Object[] updatedRow = new Object[columnCount];
+				for (int i = 0; i < columnCount; i++) {
+					updatedRow[i] = row[i];
+				}
+				for (int i = 0; i < updateIndices.length; i++) {
+					int targetIdx = updateIndices[i];
+					if (targetIdx >= 0 && targetIdx < columnCount) {
+						// Validate type before assignment
+						Object newValue = row[columnCount + i];
+						ConvexColumnType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexColumnType.of(ConvexType.ANY);
+						type.toCell(newValue); // Validates type, throws if invalid
+						updatedRow[targetIdx] = newValue;
+					}
+				}
+
+				ACell oldPk = toCell(row[0], 0);
+				ACell newPk = toCell(updatedRow[0], 0);
+
+				// If PK is being changed, check for uniqueness violation
+				if (pkBeingUpdated && !oldPk.equals(newPk)) {
+					// Check if new PK already exists
+					if (schema.getTables().selectByKey(tableName, newPk) != null) {
+						throw new RuntimeException("Unique constraint violation: primary key '" +
+							newPk + "' already exists in table '" + tableName + "'");
+					}
+				}
+
+				// Delete old row by ORIGINAL PK, then insert with new values
+				schema.getTables().deleteByKey(tableName, oldPk);
+				if (insertRow(updatedRow)) {
+					count++;
 				}
 			}
-
-			// Delete old row by ORIGINAL PK, then insert with new values
-			schema.getTables().deleteByKey(tableName, oldPk);
-			if (insertRow(updatedRow)) {
-				count++;
-			}
+			return count;
+		} catch (ExceptionInInitializerError e) {
+			throw wrapTypeError(e, "UPDATE");
 		}
-		return count;
 	}
 
 	/**
 	 * Execute DELETE - called from ConvexTableModify generated code.
 	 */
 	public long executeDelete(Enumerable<Object[]> input) {
-		long count = 0;
-		for (Object[] row : input) {
-			if (row != null && row.length > 0) {
-				ACell pk = toCell(row[0], 0);
-				if (schema.getTables().deleteByKey(tableName, pk)) {
-					count++;
+		try {
+			long count = 0;
+			for (Object[] row : input) {
+				if (row != null && row.length > 0) {
+					ACell pk = toCell(row[0], 0);
+					if (schema.getTables().deleteByKey(tableName, pk)) {
+						count++;
+					}
 				}
 			}
+			return count;
+		} catch (ExceptionInInitializerError e) {
+			throw wrapTypeError(e, "DELETE");
 		}
-		return count;
+	}
+
+	/**
+	 * Wraps type conversion errors from Calcite's generated code into a RuntimeException
+	 * with a clear SQL error message. Avatica will convert this to SQLException.
+	 */
+	private RuntimeException wrapTypeError(ExceptionInInitializerError e, String operation) {
+		Throwable cause = e.getCause();
+		String message = "Type conversion error in " + operation + " on table '" + tableName + "'";
+		if (cause instanceof NumberFormatException nfe) {
+			message += ": invalid number format - " + nfe.getMessage();
+		} else if (cause != null) {
+			message += ": " + cause.getMessage();
+		}
+		return new RuntimeException(message, e);
 	}
 
 	private boolean insertRow(Object[] row) {

@@ -29,8 +29,8 @@ public enum ConvexType {
 	/** Arbitrary precision integer. SQL: BIGINT, Convex: AInteger */
 	BIGINT(SqlTypeName.BIGINT, AInteger.class),
 
-	/** 64-bit signed integer. SQL: INTEGER, Convex: CVMLong */
-	INTEGER(SqlTypeName.INTEGER, CVMLong.class),
+	/** 64-bit signed integer. SQL: BIGINT, Convex: CVMLong */
+	INTEGER(SqlTypeName.BIGINT, CVMLong.class),
 
 	/** Exact decimal number. SQL: DECIMAL, Convex: CVMDouble (approximation) */
 	DECIMAL(SqlTypeName.DECIMAL, CVMDouble.class),
@@ -148,7 +148,7 @@ public enum ConvexType {
 
 		return switch (this) {
 			case BIGINT -> cell instanceof AInteger i ? i.big() : null;
-			case INTEGER -> cell instanceof CVMLong l ? (int) l.longValue() : null;
+			case INTEGER -> cell instanceof CVMLong l ? l.longValue() : null;
 			case DECIMAL -> cell instanceof CVMDouble d ? java.math.BigDecimal.valueOf(d.doubleValue()) : null;
 			case DOUBLE -> cell instanceof CVMDouble d ? d.doubleValue() : null;
 			case CHAR, VARCHAR -> cell instanceof AString s ? s.toString() : null;

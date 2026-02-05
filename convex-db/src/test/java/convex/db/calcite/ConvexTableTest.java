@@ -94,10 +94,14 @@ public class ConvexTableTest {
 			// Insert integer value
 			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
 
-			// Update integer column with string - should throw
-			assertThrows(SQLException.class, () -> {
+			// Update integer column with string - should throw SQLException
+			SQLException ex = assertThrows(SQLException.class, () -> {
 				stmt.executeUpdate("UPDATE test_table SET amount = 'not-a-number' WHERE id = 1");
-			}, "Updating INTEGER column with string should throw");
+			}, "Updating INTEGER column with string should throw SQLException");
+
+			// Verify the cause chain contains the type conversion error
+			assertTrue(ex.getMessage().contains("Type conversion error")
+				|| ex.getCause() != null, "SQLException should have type error message or cause");
 		}
 	}
 
@@ -301,10 +305,14 @@ public class ConvexTableTest {
 	@Test
 	void testInsertWrongTypeThrows() throws SQLException {
 		try (Statement stmt = conn.createStatement()) {
-			// Try to insert a string into the INTEGER amount column
-			assertThrows(SQLException.class, () -> {
+			// Try to insert a string into the INTEGER amount column - should throw SQLException
+			SQLException ex = assertThrows(SQLException.class, () -> {
 				stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 'not-a-number')");
-			}, "Inserting string into INTEGER column should throw");
+			}, "Inserting string into INTEGER column should throw SQLException");
+
+			// Verify the cause chain contains the type conversion error
+			assertTrue(ex.getMessage().contains("Type conversion error")
+				|| ex.getCause() != null, "SQLException should have type error message or cause");
 		}
 	}
 

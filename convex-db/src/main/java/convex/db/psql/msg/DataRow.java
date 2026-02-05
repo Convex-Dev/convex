@@ -24,8 +24,9 @@ public class DataRow extends PgMessage {
 	public static DataRow fromResultSet(ResultSet rs, int columnCount) throws SQLException {
 		byte[][] values = new byte[columnCount][];
 		for (int i = 0; i < columnCount; i++) {
-			Object obj = rs.getObject(i + 1);
-			if (obj == null) {
+			int col = i + 1;
+			Object obj = rs.getObject(col);
+			if (obj == null || rs.wasNull()) {
 				values[i] = null;
 			} else {
 				values[i] = formatValue(obj);

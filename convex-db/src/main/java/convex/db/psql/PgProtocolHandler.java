@@ -58,8 +58,20 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			handleTerminate(ctx);
 		} else if (msg instanceof PgMessageDecoder.Sync) {
 			handleSync(ctx);
+		} else if (msg instanceof PgMessageDecoder.Parse parse) {
+			handleParse(ctx, parse);
+		} else if (msg instanceof PgMessageDecoder.Bind bind) {
+			handleBind(ctx, bind);
+		} else if (msg instanceof PgMessageDecoder.Describe describe) {
+			handleDescribe(ctx, describe);
+		} else if (msg instanceof PgMessageDecoder.Execute execute) {
+			handleExecute(ctx, execute);
+		} else if (msg instanceof PgMessageDecoder.Close close) {
+			handleClose(ctx, close);
+		} else if (msg instanceof PgMessageDecoder.Flush) {
+			ctx.flush();
 		} else {
-			log.debug("Unhandled message: {}", msg.getClass().getSimpleName());
+			log.warn("Unhandled message: {}", msg.getClass().getSimpleName());
 		}
 	}
 
@@ -140,33 +152,45 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 			return;
 		}
 
-		String sql = query.sql().trim();
-		log.debug("Query: {}", sql);
+		String fullSql = query.sql().trim();
+		log.debug("Query: {}", fullSql);
 
-		if (sql.isEmpty()) {
+		if (fullSql.isEmpty()) {
 			write(ctx, new EmptyQueryResponse());
 			write(ctx, ReadyForQuery.IDLE_INSTANCE);
 			ctx.flush();
 			return;
 		}
 
-		// Handle special commands
-		if (sql.toUpperCase().startsWith("SET ")) {
-			// Ignore SET commands for now
-			write(ctx, CommandComplete.set());
-			write(ctx, ReadyForQuery.IDLE_INSTANCE);
-			ctx.flush();
-			return;
-		}
+		// Split on semicolons and execute each statement
+		// Note: This is a simple split - doesn't handle semicolons in strings
+		String[] statements = fullSql.split(";");
 
-		try {
-			executeQuery(ctx, sql);
-		} catch (SQLException e) {
-			log.warn("Query error: {}", e.getMessage());
-			write(ctx, ErrorResponse.fromException(e));
-		} catch (Exception e) {
-			log.error("Unexpected error", e);
-			write(ctx, ErrorResponse.fromException(e));
+		for (String sql : statements) {
+			sql = sql.trim();
+			if (sql.isEmpty()) {
+				continue;
+			}
+
+			// Handle special commands
+			if (sql.toUpperCase().startsWith("SET ")) {
+				// Ignore SET commands for now
+				write(ctx, CommandComplete.set());
+				continue;
+			}
+
+			try {
+				executeQuery(ctx, sql);
+			} catch (SQLException e) {
+				log.warn("Query error: {}", e.getMessage());
+				write(ctx, ErrorResponse.fromException(e));
+				// Stop processing on error
+				break;
+			} catch (Exception e) {
+				log.error("Unexpected error", e);
+				write(ctx, ErrorResponse.fromException(e));
+				break;
+			}
 		}
 
 		write(ctx, ReadyForQuery.IDLE_INSTANCE);
@@ -174,6 +198,14 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 	}
 
 	private void executeQuery(ChannelHandlerContext ctx, String sql) throws SQLException {
+		sql = rewriteQuery(sql);
+
+		// Null means return empty result (e.g., for system catalog queries)
+		if (sql == null) {
+			write(ctx, CommandComplete.select(0));
+			return;
+		}
+
 		try (Statement stmt = connection.createStatement()) {
 			boolean hasResultSet = stmt.execute(sql);
 
@@ -202,6 +234,62 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 		}
 	}
 
+	/**
+	 * Rewrites PostgreSQL-specific SQL to Calcite-compatible syntax.
+	 * Returns null if the query should return an empty result set.
+	 */
+	private String rewriteQuery(String sql) {
+		if (sql == null) return sql;
+
+		sql = sql.trim();
+		String lowerSql = sql.toLowerCase();
+
+		// System catalog queries - return null to signal empty result
+		if (lowerSql.contains("pg_catalog.") ||
+			lowerSql.contains("pg_type") ||
+			lowerSql.contains("pg_class") ||
+			lowerSql.contains("pg_namespace") ||
+			lowerSql.contains("pg_attribute") ||
+			lowerSql.contains("pg_constraint") ||
+			lowerSql.contains("pg_index") ||
+			lowerSql.contains("pg_proc") ||
+			lowerSql.contains("pg_database") ||
+			lowerSql.contains("pg_tables") ||
+			lowerSql.contains("pg_views") ||
+			lowerSql.contains("information_schema.")) {
+			return null; // Signal to return empty result
+		}
+
+		// CURRENT_SCHEMA() or CURRENT_SCHEMA -> 'public'
+		sql = sql.replaceAll("(?i)CURRENT_SCHEMA\\s*\\(\\s*\\)", "'public'");
+		sql = sql.replaceAll("(?i)\\bCURRENT_SCHEMA\\b", "'public'");
+
+		// CURRENT_DATABASE() -> 'database_name'
+		sql = sql.replaceAll("(?i)CURRENT_DATABASE\\s*\\(\\s*\\)", "'" + database + "'");
+
+		// CURRENT_USER -> 'user'
+		sql = sql.replaceAll("(?i)\\bCURRENT_USER\\b", "'convex'");
+
+		// SESSION_USER -> 'user'
+		sql = sql.replaceAll("(?i)\\bSESSION_USER\\b", "'convex'");
+
+		// version() -> '15.0 (Convex)'
+		sql = sql.replaceAll("(?i)\\bversion\\s*\\(\\s*\\)", "'PostgreSQL 15.0 (Convex SQL)'");
+
+		// pg_backend_pid() -> process ID
+		sql = sql.replaceAll("(?i)pg_backend_pid\\s*\\(\\s*\\)", String.valueOf(processId));
+
+		// PostgreSQL cast syntax ::type -> CAST(... AS type)
+		// This is complex to do with regex, so just handle common cases
+		sql = sql.replaceAll("::integer", "");
+		sql = sql.replaceAll("::int", "");
+		sql = sql.replaceAll("::text", "");
+		sql = sql.replaceAll("::varchar", "");
+		sql = sql.replaceAll("::regclass", "");
+
+		return sql;
+	}
+
 	private void sendResultSet(ChannelHandlerContext ctx, ResultSet rs) throws SQLException {
 		ResultSetMetaData meta = rs.getMetaData();
 		int columnCount = meta.getColumnCount();
@@ -218,6 +306,136 @@ public class PgProtocolHandler extends ChannelInboundHandlerAdapter {
 
 		// Send command complete
 		write(ctx, CommandComplete.select(rowCount));
+	}
+
+	// ========== Extended Query Protocol ==========
+
+	private final Map<String, PreparedStatement> preparedStatements = new java.util.HashMap<>();
+	private final Map<String, String> preparedQueries = new java.util.HashMap<>();
+	private ResultSet currentResultSet;
+	private ResultSetMetaData currentMetaData;
+
+	private void handleParse(ChannelHandlerContext ctx, PgMessageDecoder.Parse parse) {
+		if (!authenticated) {
+			sendErrorAndClose(ctx, "28000", "not authenticated");
+			return;
+		}
+
+		try {
+			String name = parse.name();
+			String query = parse.query();
+			log.debug("Parse: name='{}', query='{}'", name, query);
+
+			// Store the query for later execution
+			preparedQueries.put(name, query);
+
+			// Send ParseComplete
+			write(ctx, ParseComplete.INSTANCE);
+		} catch (Exception e) {
+			log.warn("Parse error: {}", e.getMessage());
+			write(ctx, ErrorResponse.fromException(e));
+		}
+	}
+
+	private void handleBind(ChannelHandlerContext ctx, PgMessageDecoder.Bind bind) {
+		if (!authenticated) {
+			sendErrorAndClose(ctx, "28000", "not authenticated");
+			return;
+		}
+
+		log.debug("Bind: portal='{}', statement='{}'", bind.portal(), bind.statement());
+
+		// For now, just acknowledge - we'll execute on Execute
+		write(ctx, BindComplete.INSTANCE);
+	}
+
+	private void handleDescribe(ChannelHandlerContext ctx, PgMessageDecoder.Describe describe) {
+		if (!authenticated) {
+			sendErrorAndClose(ctx, "28000", "not authenticated");
+			return;
+		}
+
+		log.debug("Describe: type={}, name='{}'", (char) describe.type(), describe.name());
+
+		try {
+			if (describe.type() == 'S') {
+				// Describe prepared statement
+				String query = preparedQueries.get(describe.name());
+				if (query == null) {
+					query = preparedQueries.get(""); // unnamed statement
+				}
+
+				// For now, send empty ParameterDescription and NoData or RowDescription
+				write(ctx, ParameterDescription.EMPTY);
+
+				if (query != null && query.toUpperCase().trim().startsWith("SELECT")) {
+					// Execute to get metadata
+					try (Statement stmt = connection.createStatement();
+						 ResultSet rs = stmt.executeQuery(query)) {
+						write(ctx, RowDescription.fromMetaData(rs.getMetaData()));
+					}
+				} else {
+					write(ctx, NoData.INSTANCE);
+				}
+			} else {
+				// Describe portal - send NoData for now
+				write(ctx, NoData.INSTANCE);
+			}
+		} catch (Exception e) {
+			log.warn("Describe error: {}", e.getMessage());
+			write(ctx, ErrorResponse.fromException(e));
+		}
+	}
+
+	private void handleExecute(ChannelHandlerContext ctx, PgMessageDecoder.Execute execute) {
+		if (!authenticated) {
+			sendErrorAndClose(ctx, "28000", "not authenticated");
+			return;
+		}
+
+		log.debug("Execute: portal='{}', maxRows={}", execute.portal(), execute.maxRows());
+
+		try {
+			// Get the query from the unnamed statement/portal
+			String query = preparedQueries.get("");
+			if (query == null) {
+				query = preparedQueries.get(execute.portal());
+			}
+
+			if (query == null || query.trim().isEmpty()) {
+				write(ctx, new EmptyQueryResponse());
+				return;
+			}
+
+			executeQuery(ctx, query);
+		} catch (SQLException e) {
+			log.warn("Execute error: {}", e.getMessage());
+			write(ctx, ErrorResponse.fromException(e));
+		} catch (Exception e) {
+			log.error("Unexpected error during execute", e);
+			write(ctx, ErrorResponse.fromException(e));
+		}
+	}
+
+	private void handleClose(ChannelHandlerContext ctx, PgMessageDecoder.Close close) {
+		log.debug("Close: type={}, name='{}'", (char) close.type(), close.name());
+
+		if (close.type() == 'S') {
+			preparedStatements.remove(close.name());
+			preparedQueries.remove(close.name());
+		}
+
+		write(ctx, CloseComplete.INSTANCE);
+	}
+
+	private void sendErrorAndClose(ChannelHandlerContext ctx, String code, String message) {
+		write(ctx, ErrorResponse.builder()
+			.severity("FATAL")
+			.code(code)
+			.message(message)
+			.build());
+		ctx.flush();
+		ctx.close();
 	}
 
 	private void handleSync(ChannelHandlerContext ctx) {
