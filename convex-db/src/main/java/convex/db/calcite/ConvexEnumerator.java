@@ -18,7 +18,7 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 
 	private final Iterator<AVector<ACell>> rowIterator;
 	private final int columnCount;
-	private final ConvexType[] columnTypes;
+	private final ConvexColumnType[] columnTypes;
 	private AVector<ACell> currentRow;
 
 	/**
@@ -53,7 +53,7 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 
 		Object[] result = new Object[columnCount];
 		for (int i = 0; i < columnCount && i < currentRow.count(); i++) {
-			ConvexType type = (columnTypes != null && i < columnTypes.length) ? columnTypes[i] : ConvexType.ANY;
+			ConvexColumnType type = (columnTypes != null && i < columnTypes.length) ? columnTypes[i] : ConvexColumnType.of(ConvexType.ANY);
 			result[i] = type.toJava(currentRow.get(i));
 		}
 		return result;

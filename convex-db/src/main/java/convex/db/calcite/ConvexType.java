@@ -12,6 +12,8 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -24,14 +26,20 @@ import convex.core.data.prim.CVMLong;
  */
 public enum ConvexType {
 
-	/** 64-bit signed integer. SQL: BIGINT, Convex: CVMLong */
-	BIGINT(SqlTypeName.BIGINT, CVMLong.class),
+	/** Arbitrary precision integer. SQL: BIGINT, Convex: AInteger */
+	BIGINT(SqlTypeName.BIGINT, AInteger.class),
 
-	/** 32-bit signed integer. SQL: INTEGER, Convex: CVMLong */
+	/** 64-bit signed integer. SQL: INTEGER, Convex: CVMLong */
 	INTEGER(SqlTypeName.INTEGER, CVMLong.class),
+
+	/** Exact decimal number. SQL: DECIMAL, Convex: CVMDouble (approximation) */
+	DECIMAL(SqlTypeName.DECIMAL, CVMDouble.class),
 
 	/** Double-precision floating point. SQL: DOUBLE, Convex: CVMDouble */
 	DOUBLE(SqlTypeName.DOUBLE, CVMDouble.class),
+
+	/** Fixed-length string. SQL: CHAR, Convex: AString */
+	CHAR(SqlTypeName.CHAR, AString.class),
 
 	/** Variable-length string. SQL: VARCHAR, Convex: AString */
 	VARCHAR(SqlTypeName.VARCHAR, AString.class),
@@ -89,15 +97,20 @@ public enum ConvexType {
 		}
 
 		return switch (this) {
-			case BIGINT, INTEGER -> {
+			case BIGINT -> {
+				if (value instanceof java.math.BigInteger bi) yield CVMBigInteger.wrap(bi);
+				if (value instanceof Number n) yield CVMBigInteger.wrap(java.math.BigInteger.valueOf(n.longValue()));
+				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
+			}
+			case INTEGER -> {
 				if (value instanceof Number n) yield CVMLong.create(n.longValue());
 				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
 			}
-			case DOUBLE -> {
+			case DECIMAL, DOUBLE -> {
 				if (value instanceof Number n) yield CVMDouble.create(n.doubleValue());
 				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
 			}
-			case VARCHAR -> {
+			case CHAR, VARCHAR -> {
 				if (value instanceof String s) yield Strings.create(s);
 				throw new IllegalArgumentException("Cannot convert " + value.getClass().getSimpleName() + " to " + this);
 			}
@@ -134,10 +147,11 @@ public enum ConvexType {
 		if (cell == null) return null;
 
 		return switch (this) {
-			case BIGINT -> cell instanceof CVMLong l ? l.longValue() : null;
+			case BIGINT -> cell instanceof AInteger i ? i.big() : null;
 			case INTEGER -> cell instanceof CVMLong l ? (int) l.longValue() : null;
+			case DECIMAL -> cell instanceof CVMDouble d ? java.math.BigDecimal.valueOf(d.doubleValue()) : null;
 			case DOUBLE -> cell instanceof CVMDouble d ? d.doubleValue() : null;
-			case VARCHAR -> cell instanceof AString s ? s.toString() : null;
+			case CHAR, VARCHAR -> cell instanceof AString s ? s.toString() : null;
 			case BOOLEAN -> cell instanceof CVMBool b ? b.booleanValue() : null;
 			case VARBINARY, BLOB -> cell instanceof ABlob b ? b.getBytes() : null;
 			case TIMESTAMP -> cell instanceof CVMLong l ? new Timestamp(l.longValue()) : null;
@@ -210,9 +224,11 @@ public enum ConvexType {
 	public static ConvexType fromName(String name) {
 		return switch (name.toUpperCase()) {
 			case "BIGINT", "LONG" -> BIGINT;
-			case "INTEGER", "INT" -> INTEGER;
+			case "INTEGER", "INT", "SMALLINT", "TINYINT" -> INTEGER;
+			case "DECIMAL", "NUMERIC", "DEC" -> DECIMAL;
 			case "DOUBLE", "FLOAT", "REAL" -> DOUBLE;
-			case "VARCHAR", "STRING", "TEXT", "CHAR" -> VARCHAR;
+			case "CHAR", "CHARACTER" -> CHAR;
+			case "VARCHAR", "STRING", "TEXT" -> VARCHAR;
 			case "BOOLEAN", "BOOL" -> BOOLEAN;
 			case "VARBINARY", "BYTES" -> VARBINARY;
 			case "BINARY", "BLOB" -> BLOB;

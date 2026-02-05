@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -305,5 +306,62 @@ public class ConvexTableTest {
 				stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 'not-a-number')");
 			}, "Inserting string into INTEGER column should throw");
 		}
+	}
+
+	/**
+	 * Tests parameterized types like VARCHAR(n) and DECIMAL(p,s).
+	 */
+	@Test
+	void testParameterizedTypes() throws Exception {
+		// Create a table with parameterized types
+		String tableName = "typed_table_" + System.currentTimeMillis();
+		db.tables().createTable(tableName,
+			new String[]{"id", "code", "price", "description"},
+			new ConvexColumnType[]{
+				ConvexColumnType.of(ConvexType.INTEGER),
+				ConvexColumnType.character(3),        // CHAR(3)
+				ConvexColumnType.decimal(10, 2),      // DECIMAL(10,2)
+				ConvexColumnType.varchar(100)         // VARCHAR(100)
+			});
+
+		try (Statement stmt = conn.createStatement()) {
+			// Insert valid data
+			stmt.executeUpdate("INSERT INTO " + tableName + " VALUES (1, 'ABC', 99.99, 'Test item')");
+
+			// Verify data
+			try (ResultSet rs = stmt.executeQuery("SELECT * FROM " + tableName + " WHERE id = 1")) {
+				assertTrue(rs.next());
+				assertEquals(1, rs.getInt("id"));
+				assertEquals("ABC", rs.getString("code"));
+				// DECIMAL returns BigDecimal
+				assertEquals(99.99, rs.getDouble("price"), 0.001);
+				assertEquals("Test item", rs.getString("description"));
+			}
+		}
+	}
+
+	/**
+	 * Tests ConvexColumnType.parse() for SQL type strings.
+	 */
+	@Test
+	void testColumnTypeParsing() {
+		// Simple types
+		assertEquals(ConvexType.INTEGER, ConvexColumnType.parse("INTEGER").getBaseType());
+		assertEquals(ConvexType.VARCHAR, ConvexColumnType.parse("VARCHAR").getBaseType());
+
+		// Parameterized types
+		ConvexColumnType varchar100 = ConvexColumnType.parse("VARCHAR(100)");
+		assertEquals(ConvexType.VARCHAR, varchar100.getBaseType());
+		assertEquals(100, varchar100.getPrecision());
+		assertFalse(varchar100.hasScale());
+
+		ConvexColumnType decimal = ConvexColumnType.parse("DECIMAL(10,2)");
+		assertEquals(ConvexType.DECIMAL, decimal.getBaseType());
+		assertEquals(10, decimal.getPrecision());
+		assertEquals(2, decimal.getScale());
+
+		ConvexColumnType char3 = ConvexColumnType.parse("CHAR(3)");
+		assertEquals(ConvexType.CHAR, char3.getBaseType());
+		assertEquals(3, char3.getPrecision());
 	}
 }

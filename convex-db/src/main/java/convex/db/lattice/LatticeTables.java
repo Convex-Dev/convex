@@ -10,6 +10,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -155,24 +156,41 @@ public class LatticeTables {
 	 * @return true if table created, false if already exists
 	 */
 	public boolean createTable(String name, String[] columns) {
-		ConvexType[] types = new ConvexType[columns.length];
+		ConvexColumnType[] types = new ConvexColumnType[columns.length];
 		for (int i = 0; i < types.length; i++) {
-			types[i] = ConvexType.ANY;
+			types[i] = ConvexColumnType.of(ConvexType.ANY);
 		}
 		return createTable(name, columns, types);
 	}
 
 	/**
-	 * Creates a new table with explicitly typed columns.
+	 * Creates a new table with explicitly typed columns (no precision/scale).
 	 *
 	 * @param name Table name
 	 * @param columns Column names
-	 * @param types Column types (must match columns length)
+	 * @param types Column base types (must match columns length)
+	 * @return true if table created, false if already exists
+	 * @throws IllegalArgumentException if columns and types have different lengths
+	 */
+	public boolean createTable(String name, String[] columns, ConvexType[] types) {
+		ConvexColumnType[] columnTypes = new ConvexColumnType[types.length];
+		for (int i = 0; i < types.length; i++) {
+			columnTypes[i] = ConvexColumnType.of(types[i]);
+		}
+		return createTable(name, columns, columnTypes);
+	}
+
+	/**
+	 * Creates a new table with fully typed columns (including precision/scale).
+	 *
+	 * @param name Table name
+	 * @param columns Column names
+	 * @param types Column types with precision/scale (must match columns length)
 	 * @return true if table created, false if already exists
 	 * @throws IllegalArgumentException if columns and types have different lengths
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public boolean createTable(String name, String[] columns, ConvexType[] types) {
+	public boolean createTable(String name, String[] columns, ConvexColumnType[] types) {
 		if (columns.length != types.length) {
 			throw new IllegalArgumentException("Columns and types must have same length");
 		}
@@ -180,11 +198,14 @@ public class LatticeTables {
 		AVector<ACell> existing = getLiveTable(name);
 		if (existing != null) return false;
 
-		// Build schema: [[name, typeName], ...]
+		// Build schema: [[name, typeName, precision, scale], ...]
 		AVector schema = Vectors.empty();
 		for (int i = 0; i < columns.length; i++) {
-			AString typeName = (types[i] == ConvexType.ANY) ? null : Strings.create(types[i].name());
-			schema = schema.append(Vectors.of(Strings.create(columns[i]), typeName));
+			ConvexColumnType ct = types[i];
+			AString typeName = (ct.getBaseType() == ConvexType.ANY) ? null : Strings.create(ct.getBaseType().name());
+			CVMLong precision = ct.hasPrecision() ? CVMLong.create(ct.getPrecision()) : null;
+			CVMLong scale = ct.hasScale() ? CVMLong.create(ct.getScale()) : null;
+			schema = schema.append(Vectors.of(Strings.create(columns[i]), typeName, precision, scale));
 		}
 
 		putTable(name, SQLTable.create((AVector<AVector<ACell>>) schema, now()));
@@ -243,21 +264,42 @@ public class LatticeTables {
 	}
 
 	/**
-	 * Gets the column types for a table.
+	 * Gets the column types for a table (with precision/scale).
 	 *
 	 * @param name Table name
 	 * @return Array of column types, or null if table not found
 	 */
-	public ConvexType[] getColumnTypes(String name) {
+	public ConvexColumnType[] getColumnTypes(String name) {
 		AVector<AVector<ACell>> schema = getSchema(name);
 		if (schema == null) return null;
-		ConvexType[] result = new ConvexType[(int) schema.count()];
+		ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
 		for (int i = 0; i < result.length; i++) {
-			ACell typeCell = schema.get(i).get(1);
+			AVector<ACell> colDef = schema.get(i);
+			ACell typeCell = colDef.get(1);
+
+			ConvexType baseType;
 			if (typeCell == null) {
-				result[i] = ConvexType.ANY;
+				baseType = ConvexType.ANY;
 			} else {
-				result[i] = ConvexType.fromName(typeCell.toString());
+				baseType = ConvexType.fromName(typeCell.toString());
+			}
+
+			// Read precision and scale (may be null or missing for old schemas)
+			int precision = -1;
+			int scale = -1;
+			if (colDef.count() > 2 && colDef.get(2) instanceof CVMLong p) {
+				precision = (int) p.longValue();
+			}
+			if (colDef.count() > 3 && colDef.get(3) instanceof CVMLong s) {
+				scale = (int) s.longValue();
+			}
+
+			if (scale >= 0) {
+				result[i] = ConvexColumnType.withScale(baseType, precision, scale);
+			} else if (precision >= 0) {
+				result[i] = ConvexColumnType.withPrecision(baseType, precision);
+			} else {
+				result[i] = ConvexColumnType.of(baseType);
 			}
 		}
 		return result;

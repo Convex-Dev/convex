@@ -66,11 +66,12 @@ public class ConvexTable extends AbstractQueryableTable
 
 		LatticeTables tables = schema.getTables();
 		String[] columnNames = tables.getColumnNames(tableName);
-		ConvexType[] columnTypes = tables.getColumnTypes(tableName);
+		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
 
 		if (columnNames != null && columnTypes != null) {
 			for (int i = 0; i < columnNames.length; i++) {
-				builder.add(columnNames[i], columnTypes[i].getSqlType()).nullable(true);
+				RelDataType type = columnTypes[i].toRelDataType(typeFactory);
+				builder.add(columnNames[i], typeFactory.createTypeWithNullability(type, true));
 			}
 		}
 
@@ -80,9 +81,9 @@ public class ConvexTable extends AbstractQueryableTable
 	/**
 	 * Gets the column types for this table.
 	 *
-	 * @return Array of ConvexType for each column
+	 * @return Array of ConvexColumnType for each column
 	 */
-	public ConvexType[] getColumnTypes() {
+	public ConvexColumnType[] getColumnTypes() {
 		return schema.getTables().getColumnTypes(tableName);
 	}
 
@@ -185,7 +186,7 @@ public class ConvexTable extends AbstractQueryableTable
 			}
 		}
 
-		ConvexType[] types = getColumnTypes();
+		ConvexColumnType[] types = getColumnTypes();
 
 		long count = 0;
 		for (Object[] row : input) {
@@ -202,7 +203,7 @@ public class ConvexTable extends AbstractQueryableTable
 				if (targetIdx >= 0 && targetIdx < columnCount) {
 					// Validate type before assignment
 					Object newValue = row[columnCount + i];
-					ConvexType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexType.ANY;
+					ConvexColumnType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexColumnType.of(ConvexType.ANY);
 					type.toCell(newValue); // Validates type, throws if invalid
 					updatedRow[targetIdx] = newValue;
 				}
@@ -247,10 +248,10 @@ public class ConvexTable extends AbstractQueryableTable
 
 	private boolean insertRow(Object[] row) {
 		if (row == null || row.length < 1) return false;
-		ConvexType[] types = getColumnTypes();
+		ConvexColumnType[] types = getColumnTypes();
 		ACell[] cells = new ACell[row.length];
 		for (int i = 0; i < row.length; i++) {
-			ConvexType type = (types != null && i < types.length) ? types[i] : ConvexType.ANY;
+			ConvexColumnType type = (types != null && i < types.length) ? types[i] : ConvexColumnType.of(ConvexType.ANY);
 			cells[i] = type.toCell(row[i]);
 		}
 		return schema.getTables().insert(tableName, Vectors.of(cells));
@@ -264,8 +265,8 @@ public class ConvexTable extends AbstractQueryableTable
 	 * @return CVM cell
 	 */
 	private ACell toCell(Object v, int columnIndex) {
-		ConvexType[] types = getColumnTypes();
-		ConvexType type = (types != null && columnIndex < types.length) ? types[columnIndex] : ConvexType.ANY;
+		ConvexColumnType[] types = getColumnTypes();
+		ConvexColumnType type = (types != null && columnIndex < types.length) ? types[columnIndex] : ConvexColumnType.of(ConvexType.ANY);
 		return type.toCell(v);
 	}
 
