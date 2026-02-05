@@ -85,11 +85,16 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 				return timeA >= timeB ? a : b;
 		}
 
-		// Take max timestamp, max expiry
+		// Take max timestamp, merge expiry (nil = no expiry wins over any timestamp)
 		CVMLong mergedTime = timeA >= timeB ? KVEntry.getUTime(a) : KVEntry.getUTime(b);
 		CVMLong expA = KVEntry.getExpire(a);
 		CVMLong expB = KVEntry.getExpire(b);
-		CVMLong mergedExpire = (expA.longValue() >= expB.longValue()) ? expA : expB;
+		CVMLong mergedExpire;
+		if (expA == null || expB == null) {
+			mergedExpire = null; // no expiry wins
+		} else {
+			mergedExpire = (expA.longValue() >= expB.longValue()) ? expA : expB;
+		}
 
 		return KVEntry.create(mergedValue, type, mergedTime).assoc(KVEntry.POS_EXPIRE, mergedExpire);
 	}

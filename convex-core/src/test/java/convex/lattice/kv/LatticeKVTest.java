@@ -24,14 +24,14 @@ public class LatticeKVTest {
 	@Test
 	public void testEntryCreation() {
 		CVMLong ts = CVMLong.create(1000);
-		AVector<ACell> entry = KVEntry.createString(Strings.create("hello"), ts);
+		AVector<ACell> entry = KVEntry.createValue(Strings.create("hello"), ts);
 		assertEquals(Strings.create("hello"), KVEntry.getValue(entry));
-		assertEquals(KVEntry.TYPE_STRING, KVEntry.getType(entry));
+		assertEquals(KVEntry.TYPE_VALUE, KVEntry.getType(entry));
 		assertEquals(ts, KVEntry.getUTime(entry));
-		assertEquals(CVMLong.ZERO, KVEntry.getExpire(entry));
+		assertNull(KVEntry.getExpire(entry));
 		assertTrue(KVEntry.isValid(entry));
 		assertFalse(KVEntry.isTombstone(entry));
-		assertEquals("string", KVEntry.typeName(entry));
+		assertEquals("value", KVEntry.typeName(entry));
 	}
 
 	@Test
@@ -50,7 +50,7 @@ public class LatticeKVTest {
 	public void testExpiry() {
 		CVMLong ts = CVMLong.create(1000);
 		CVMLong expire = CVMLong.create(5000);
-		AVector<ACell> entry = KVEntry.createString(Strings.create("val"), ts, expire);
+		AVector<ACell> entry = KVEntry.createValue(Strings.create("val"), ts, expire);
 		assertFalse(KVEntry.isExpired(entry, 4999));
 		assertTrue(KVEntry.isExpired(entry, 5000));
 		assertTrue(KVEntry.isExpired(entry, 6000));
@@ -60,7 +60,7 @@ public class LatticeKVTest {
 
 	@Test
 	public void testNoExpiry() {
-		AVector<ACell> entry = KVEntry.createString(Strings.create("val"), CVMLong.create(1000));
+		AVector<ACell> entry = KVEntry.createValue(Strings.create("val"), CVMLong.create(1000));
 		assertFalse(KVEntry.isExpired(entry, Long.MAX_VALUE));
 		assertTrue(KVEntry.isLive(entry, Long.MAX_VALUE));
 	}
@@ -69,15 +69,15 @@ public class LatticeKVTest {
 
 	@Test
 	public void testMergeIdempotence() {
-		AVector<ACell> entry = KVEntry.createString(Strings.create("a"), CVMLong.create(1000));
+		AVector<ACell> entry = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
 		AVector<ACell> merged = KVEntryLattice.INSTANCE.merge(entry, entry);
 		assertEquals(entry, merged);
 	}
 
 	@Test
 	public void testMergeCommutativity() {
-		AVector<ACell> a = KVEntry.createString(Strings.create("a"), CVMLong.create(1000));
-		AVector<ACell> b = KVEntry.createString(Strings.create("b"), CVMLong.create(2000));
+		AVector<ACell> a = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
+		AVector<ACell> b = KVEntry.createValue(Strings.create("b"), CVMLong.create(2000));
 		AVector<ACell> ab = KVEntryLattice.INSTANCE.merge(a, b);
 		AVector<ACell> ba = KVEntryLattice.INSTANCE.merge(b, a);
 		assertEquals(ab, ba);
@@ -85,15 +85,15 @@ public class LatticeKVTest {
 
 	@Test
 	public void testMergeLWW() {
-		AVector<ACell> older = KVEntry.createString(Strings.create("old"), CVMLong.create(1000));
-		AVector<ACell> newer = KVEntry.createString(Strings.create("new"), CVMLong.create(2000));
+		AVector<ACell> older = KVEntry.createValue(Strings.create("old"), CVMLong.create(1000));
+		AVector<ACell> newer = KVEntry.createValue(Strings.create("new"), CVMLong.create(2000));
 		AVector<ACell> merged = KVEntryLattice.INSTANCE.merge(older, newer);
 		assertEquals(Strings.create("new"), KVEntry.getValue(merged));
 	}
 
 	@Test
 	public void testMergeTombstoneWins() {
-		AVector<ACell> live = KVEntry.createString(Strings.create("val"), CVMLong.create(1000));
+		AVector<ACell> live = KVEntry.createValue(Strings.create("val"), CVMLong.create(1000));
 		AVector<ACell> tomb = KVEntry.createTombstone(CVMLong.create(2000));
 		AVector<ACell> merged = KVEntryLattice.INSTANCE.merge(live, tomb);
 		assertTrue(KVEntry.isTombstone(merged));
@@ -102,7 +102,7 @@ public class LatticeKVTest {
 	@Test
 	public void testMergeWriteResurrects() {
 		AVector<ACell> tomb = KVEntry.createTombstone(CVMLong.create(1000));
-		AVector<ACell> live = KVEntry.createString(Strings.create("back"), CVMLong.create(2000));
+		AVector<ACell> live = KVEntry.createValue(Strings.create("back"), CVMLong.create(2000));
 		AVector<ACell> merged = KVEntryLattice.INSTANCE.merge(tomb, live);
 		assertFalse(KVEntry.isTombstone(merged));
 		assertEquals(Strings.create("back"), KVEntry.getValue(merged));
@@ -110,7 +110,7 @@ public class LatticeKVTest {
 
 	@Test
 	public void testMergeNull() {
-		AVector<ACell> entry = KVEntry.createString(Strings.create("a"), CVMLong.create(1000));
+		AVector<ACell> entry = KVEntry.createValue(Strings.create("a"), CVMLong.create(1000));
 		assertEquals(entry, KVEntryLattice.INSTANCE.merge(entry, null));
 		assertEquals(entry, KVEntryLattice.INSTANCE.merge(null, entry));
 	}
@@ -161,7 +161,7 @@ public class LatticeKVTest {
 	public void testType() {
 		LatticeKV kv = LatticeKV.create();
 		kv.set("str", Strings.create("val"));
-		assertEquals("string", kv.type("str"));
+		assertEquals("value", kv.type("str"));
 		assertNull(kv.type("nonexistent"));
 	}
 

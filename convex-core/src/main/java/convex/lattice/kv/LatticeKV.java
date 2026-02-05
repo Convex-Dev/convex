@@ -124,7 +124,7 @@ public class LatticeKV {
 	 * Sets a string value for a key
 	 */
 	public void set(String key, ACell value) {
-		putEntry(key, KVEntry.createString(value, now()));
+		putEntry(key, KVEntry.createValue(value, now()));
 	}
 
 	/**
@@ -134,7 +134,7 @@ public class LatticeKV {
 		long nowMs = System.currentTimeMillis();
 		CVMLong timestamp = CVMLong.create(nowMs);
 		CVMLong expire = CVMLong.create(nowMs + ttlMillis);
-		putEntry(key, KVEntry.createString(value, timestamp, expire));
+		putEntry(key, KVEntry.createValue(value, timestamp, expire));
 	}
 
 	/**
@@ -189,7 +189,7 @@ public class LatticeKV {
 		AVector<ACell> entry = getLiveEntry(key);
 		if (entry == null) return -2;
 		CVMLong expire = KVEntry.getExpire(entry);
-		if (expire == null || expire.longValue() == 0) return -1;
+		if (expire == null) return -1;
 		long remaining = expire.longValue() - System.currentTimeMillis();
 		return Math.max(0, remaining);
 	}

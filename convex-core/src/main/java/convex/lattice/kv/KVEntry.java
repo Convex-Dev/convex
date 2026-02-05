@@ -13,10 +13,12 @@ import convex.core.data.prim.CVMLong;
  *   <li>POS_VALUE (0) - The stored value</li>
  *   <li>POS_TYPE (1) - CVMLong type tag</li>
  *   <li>POS_UTIME (2) - Last modification timestamp (epoch millis)</li>
- *   <li>POS_EXPIRE (3) - Expiry timestamp (0 = no expiry)</li>
+ *   <li>POS_EXPIRE (3) - Expiry timestamp (nil = no expiry)</li>
  * </ul>
  *
- * A tombstone is an entry with null value and null type, preserving the timestamp.
+ * A tombstone is an entry with nil value and nil type, preserving the timestamp.
+ *
+ * @see <a href="https://docs.convex.world/cad/037_kv_database">CAD037: KV Database</a>
  */
 public class KVEntry {
 
@@ -28,34 +30,34 @@ public class KVEntry {
 	public static final int POS_EXPIRE = 3;
 
 	// Type tags
-	public static final long TYPE_STRING = 0;
+	public static final long TYPE_VALUE = 0;
 	public static final long TYPE_HASH = 1;
 	public static final long TYPE_SET = 2;
 	public static final long TYPE_SORTED_SET = 3;
 	public static final long TYPE_LIST = 4;
 	public static final long TYPE_COUNTER = 5;
 
-	private static final AVector<ACell> TOMBSTONE = Vectors.of(null, null, CVMLong.ZERO, CVMLong.ZERO);
+	private static final AVector<ACell> TOMBSTONE = Vectors.of(null, null, CVMLong.ZERO, null);
 
 	/**
-	 * Creates a string-type entry
+	 * Creates a value-type entry
 	 */
-	public static AVector<ACell> createString(ACell value, CVMLong timestamp) {
-		return Vectors.of(value, CVMLong.create(TYPE_STRING), timestamp, CVMLong.ZERO);
+	public static AVector<ACell> createValue(ACell value, CVMLong timestamp) {
+		return Vectors.of(value, CVMLong.create(TYPE_VALUE), timestamp, null);
 	}
 
 	/**
-	 * Creates a string-type entry with TTL
+	 * Creates a value-type entry with expiry
 	 */
-	public static AVector<ACell> createString(ACell value, CVMLong timestamp, CVMLong expire) {
-		return Vectors.of(value, CVMLong.create(TYPE_STRING), timestamp, expire);
+	public static AVector<ACell> createValue(ACell value, CVMLong timestamp, CVMLong expire) {
+		return Vectors.of(value, CVMLong.create(TYPE_VALUE), timestamp, expire);
 	}
 
 	/**
 	 * Creates an entry with a specific type tag
 	 */
 	public static AVector<ACell> create(ACell value, long type, CVMLong timestamp) {
-		return Vectors.of(value, CVMLong.create(type), timestamp, CVMLong.ZERO);
+		return Vectors.of(value, CVMLong.create(type), timestamp, null);
 	}
 
 	/**
@@ -100,7 +102,7 @@ public class KVEntry {
 	}
 
 	/**
-	 * Gets the expiry timestamp from an entry (0 = no expiry)
+	 * Gets the expiry timestamp from an entry (nil = no expiry)
 	 */
 	public static CVMLong getExpire(AVector<ACell> entry) {
 		if (entry == null) return null;
@@ -122,8 +124,7 @@ public class KVEntry {
 		if (entry == null) return false;
 		CVMLong expire = getExpire(entry);
 		if (expire == null) return false;
-		long exp = expire.longValue();
-		return exp > 0 && currentTimeMillis >= exp;
+		return currentTimeMillis >= expire.longValue();
 	}
 
 	/**
@@ -141,7 +142,7 @@ public class KVEntry {
 	public static String typeName(AVector<ACell> entry) {
 		long type = getType(entry);
 		switch ((int) type) {
-			case (int) TYPE_STRING: return "string";
+			case (int) TYPE_VALUE: return "value";
 			case (int) TYPE_HASH: return "hash";
 			case (int) TYPE_SET: return "set";
 			case (int) TYPE_SORTED_SET: return "zset";

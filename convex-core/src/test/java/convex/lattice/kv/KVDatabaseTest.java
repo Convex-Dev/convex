@@ -27,7 +27,7 @@ public class KVDatabaseTest {
 		KVDatabase db = KVDatabase.create("test-db", kp);
 
 		assertEquals(Strings.create("test-db"), db.getName());
-		assertEquals(kp.getAccountKey(), db.getAccountKey());
+		assertEquals(kp.getAccountKey(), db.getOwnerKey());
 
 		db.kv().set("key1", Strings.create("value1"));
 		assertEquals(Strings.create("value1"), db.kv().get("key1"));
@@ -132,7 +132,7 @@ public class KVDatabaseTest {
 			dbB.exportReplica().merge(dbC.exportReplica());
 
 		// Node A only accepts from node B, ignores C
-		Set<AccountKey> trusted = Set.of(keyB.getAccountKey());
+		Set<ACell> trusted = Set.of(keyB.getAccountKey());
 		long merged = dbA.mergeReplicas(combined, trusted::contains);
 
 		assertEquals(1, merged);
