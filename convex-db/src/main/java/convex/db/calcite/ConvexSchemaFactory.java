@@ -1,6 +1,7 @@
 package convex.db.calcite;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
@@ -10,7 +11,7 @@ import convex.db.lattice.LatticeTables;
 import convex.db.lattice.SQLDatabase;
 
 /**
- * Factory for creating Convex schemas from Calcite model configuration.
+ * Factory for creating Convex schemas.
  *
  * <p>Can be used in a Calcite model JSON file:
  * <pre>
@@ -27,57 +28,81 @@ import convex.db.lattice.SQLDatabase;
  * }
  * </pre>
  *
- * <p>Or used programmatically by providing a LatticeTables instance directly.
+ * <p>Or via JDBC URL:
+ * <pre>
+ * jdbc:convex:database=mydb
+ * </pre>
+ *
+ * <p>Databases must be registered before connecting:
+ * <pre>
+ * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+ * ConvexSchemaFactory.register("mydb", db);
+ *
+ * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
+ * </pre>
  */
 public class ConvexSchemaFactory implements SchemaFactory {
 
-	// Thread-local storage for programmatic schema creation
-	private static final ThreadLocal<LatticeTables> TABLES_CONTEXT = new ThreadLocal<>();
+	/** Registry of databases by name */
+	private static final Map<String, SQLDatabase> REGISTRY = new ConcurrentHashMap<>();
 
 	/**
-	 * Creates a schema from model configuration.
+	 * Registers a database for JDBC access.
 	 *
-	 * <p>If a LatticeTables instance was set via {@link #withTables}, uses that.
-	 * Otherwise, creates a new SQLDatabase based on the operand configuration.
-	 *
-	 * @param parentSchema Parent schema
-	 * @param name Schema name
-	 * @param operand Configuration from model file
-	 * @return New ConvexSchema instance
+	 * @param name Database name (used in connection URL)
+	 * @param database The SQLDatabase instance
 	 */
+	public static void register(String name, SQLDatabase database) {
+		REGISTRY.put(name, database);
+	}
+
+	/**
+	 * Unregisters a database.
+	 *
+	 * @param name Database name
+	 * @return The removed database, or null if not found
+	 */
+	public static SQLDatabase unregister(String name) {
+		return REGISTRY.remove(name);
+	}
+
+	/**
+	 * Gets a registered database.
+	 *
+	 * @param name Database name
+	 * @return The database, or null if not registered
+	 */
+	public static SQLDatabase get(String name) {
+		return REGISTRY.get(name);
+	}
+
+	/**
+	 * Creates a ConvexSchema from a registered database.
+	 *
+	 * @param name Database name
+	 * @return ConvexSchema, or null if database not registered
+	 */
+	public static ConvexSchema createFromRegistry(String name) {
+		SQLDatabase db = REGISTRY.get(name);
+		if (db == null) return null;
+		return new ConvexSchema(db.tables(), name);
+	}
+
 	@Override
 	public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
-		// Check for programmatically provided tables
-		LatticeTables tables = TABLES_CONTEXT.get();
-		if (tables != null) {
-			return new ConvexSchema(tables, name);
+		// Get database name from operand
+		String dbName = (String) operand.get("database");
+		if (dbName == null) {
+			dbName = name;
 		}
 
-		// Create from operand configuration
-		String dbName = (String) operand.getOrDefault("database", name);
-		// For model-based creation, we'd need to resolve the database
-		// This is a placeholder - real implementation would look up or create the database
-		throw new UnsupportedOperationException(
-			"Model-based schema creation not yet implemented. Use SQLEngine.create() for programmatic access.");
-	}
+		// Look up in registry
+		SQLDatabase db = REGISTRY.get(dbName);
+		if (db != null) {
+			return new ConvexSchema(db.tables(), name);
+		}
 
-	/**
-	 * Sets the LatticeTables to use for the next schema creation.
-	 *
-	 * <p>This enables programmatic schema creation without a model file.
-	 * The tables are stored in thread-local storage and consumed by the
-	 * next call to {@link #create}.
-	 *
-	 * @param tables LatticeTables to use
-	 */
-	public static void withTables(LatticeTables tables) {
-		TABLES_CONTEXT.set(tables);
-	}
-
-	/**
-	 * Clears the thread-local tables context.
-	 */
-	public static void clearContext() {
-		TABLES_CONTEXT.remove();
+		throw new IllegalArgumentException(
+			"Database '" + dbName + "' not registered. Call ConvexSchemaFactory.register() first.");
 	}
 }

@@ -1,45 +1,48 @@
 package convex.db.sql;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 
 import convex.core.crypto.AKeyPair;
+import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.lattice.SQLDatabase;
 
 /**
- * Demo showing Convex SQL database usage via JDBC.
+ * Demo showing Convex SQL database usage via standard JDBC.
  */
 public class SQLDemo {
 
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== Convex SQL Demo ===\n");
 
-		// 1. Create database
+		// 1. Create and register database
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("demo", kp);
+		ConvexSchemaFactory.register("demo", db);
 		System.out.println("Database: " + db.getName());
 
-		// 2. Create table via schema API, insert via SQL
-		try (SQLEngine engine = SQLEngine.create(db)) {
-			// Create table via schema API
-			engine.getSchema().createTable("employees", "id", "name", "dept", "salary");
-			System.out.println("Created table via schema API");
+		// 2. Create table via database API
+		db.tables().createTable("employees", new String[]{"id", "name", "dept", "salary"});
+		System.out.println("Created table: employees");
 
-			// Insert rows via SQL (Calcite handles parsing)
-			engine.execute("INSERT INTO employees VALUES (1, 'Alice', 'Engineering', 95000)");
-			engine.execute("INSERT INTO employees VALUES (2, 'Bob', 'Sales', 75000)");
-			engine.execute("INSERT INTO employees VALUES (3, 'Charlie', 'Engineering', 105000)");
-			engine.execute("INSERT INTO employees VALUES (4, 'Diana', 'Marketing', 80000)");
-			engine.execute("INSERT INTO employees VALUES (5, 'Eve', 'Engineering', 90000)");
-			System.out.println("Inserted 5 rows via SQL\n");
-		}
+		// 3. Connect via JDBC and use standard SQL
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=demo")) {
+			System.out.println("Connected via jdbc:convex:\n");
 
-		// 3. Query via separate JDBC connection
-		try (SQLEngine reader = SQLEngine.create(db)) {
-			Connection conn = reader.getConnection();
+			// Insert rows via JDBC
+			try (Statement stmt = conn.createStatement()) {
+				stmt.executeUpdate("INSERT INTO employees VALUES (1, 'Alice', 'Engineering', 95000)");
+				stmt.executeUpdate("INSERT INTO employees VALUES (2, 'Bob', 'Sales', 75000)");
+				stmt.executeUpdate("INSERT INTO employees VALUES (3, 'Charlie', 'Engineering', 105000)");
+				stmt.executeUpdate("INSERT INTO employees VALUES (4, 'Diana', 'Marketing', 80000)");
+				stmt.executeUpdate("INSERT INTO employees VALUES (5, 'Eve', 'Engineering', 90000)");
+			}
+			System.out.println("Inserted 5 rows via JDBC\n");
 
+			// Query via JDBC
 			System.out.println("--- SELECT * FROM employees ---");
 			query(conn, "SELECT * FROM employees");
 
