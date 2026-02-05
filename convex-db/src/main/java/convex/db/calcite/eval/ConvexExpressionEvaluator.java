@@ -159,6 +159,8 @@ public class ConvexExpressionEvaluator {
 			// Comparison operators - use RT functions
 			case EQUALS -> cellEquals(args[0], args[1]);
 			case NOT_EQUALS -> cellNotEquals(args[0], args[1]);
+			case IS_NOT_DISTINCT_FROM -> cellIsNotDistinctFrom(args[0], args[1]);
+			case IS_DISTINCT_FROM -> cellIsDistinctFrom(args[0], args[1]);
 			case LESS_THAN -> RT.lt(args);
 			case LESS_THAN_OR_EQUAL -> RT.le(args);
 			case GREATER_THAN -> RT.gt(args);
@@ -394,6 +396,26 @@ public class ConvexExpressionEvaluator {
 		}
 
 		return CVMBool.create(!Cells.equals(a, b));
+	}
+
+	/**
+	 * IS NOT DISTINCT FROM: treats NULLs as equal.
+	 * NULL IS NOT DISTINCT FROM NULL = TRUE
+	 * x IS NOT DISTINCT FROM NULL = FALSE (when x is not null)
+	 */
+	private static CVMBool cellIsNotDistinctFrom(ACell a, ACell b) {
+		if (a == null && b == null) return CVMBool.TRUE;
+		if (a == null || b == null) return CVMBool.FALSE;
+		return cellEquals(a, b);
+	}
+
+	/**
+	 * IS DISTINCT FROM: treats NULLs as equal (opposite of IS NOT DISTINCT FROM).
+	 */
+	private static CVMBool cellIsDistinctFrom(ACell a, ACell b) {
+		if (a == null && b == null) return CVMBool.FALSE;
+		if (a == null || b == null) return CVMBool.TRUE;
+		return cellNotEquals(a, b);
 	}
 
 	/**
