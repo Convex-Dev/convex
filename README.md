@@ -37,6 +37,7 @@ This repository contains the core Convex distribution including:
 - The standard Convex Peer server implementation (NIO based) implementing Convergent Proof of Stake (CPoS) for consensus
 - CLI Tools for operating Peers, scripting transactions and more
 - The Etch database for persistent data storage
+- SQL database layer with JDBC driver and PostgreSQL wire protocol server
 - A Swing GUI for managing local peers / exploring the network
 - A simple REST API server
 - JMH Benchmarking suite
@@ -59,6 +60,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 | [convex-peer](https://github.com/Convex-Dev/convex/tree/develop/convex-peer/) | Peer implementation and networking | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-peer.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-peer/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-peer) |
 | [convex-cli](https://github.com/Convex-Dev/convex/tree/develop/convex-cli/) | Command Line Tools | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-cli/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-cli) |
 | [convex-gui](https://github.com/Convex-Dev/convex/tree/develop/convex-gui/) | Convex Desktop GUI Interface | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-gui/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-gui) |
+| [convex-db](https://github.com/Convex-Dev/convex/tree/develop/convex-db/) | SQL database with JDBC and PostgreSQL protocol | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-db.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-db/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-db) |
 
 For local use of Convex data structures and CVM execution, `convex-core` is typically sufficient. To run a peer or communicate with one over the network, include `convex-peer` as a dependency. Other modules are designed primarily as standalone applications or client libraries.
 
