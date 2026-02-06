@@ -39,7 +39,7 @@ public class QueueDemo {
 	private static RootLatticeCursor<Index<Keyword, ACell>> root;
 	private static EtchStore store;
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, InterruptedException {
 		System.out.println("=== Lattice Queue Demo ===\n");
 
 		// -------------------------------------------------------
@@ -273,6 +273,41 @@ public class QueueDemo {
 
 		System.out.printf("%nFinal bench queue: %,d records%n", benchQ.size());
 		System.out.println("Final Etch root hash: " + store.getRootHash());
+
+		// -------------------------------------------------------
+		// 12. Concurrent Topic Benchmark
+		// -------------------------------------------------------
+		System.out.println("\n--- Concurrent Topic Benchmark ---");
+
+		int CONCURRENT_N = 100_000;
+		int NUM_CONCURRENT_PARTITIONS = 4;
+
+		LatticeMQ concurrentMQ = LatticeMQ.create();
+		LatticeTopic concurrentTopic = concurrentMQ.topic("concurrent-bench");
+
+		try (ConcurrentTopic ct = ConcurrentTopic.create(
+				concurrentTopic, NUM_CONCURRENT_PARTITIONS, 4096, 256)) {
+			ct.start();
+
+			t0 = System.nanoTime();
+			for (int i = 0; i < CONCURRENT_N; i++) {
+				ct.offer(Strings.create("key-" + (i % 1000)), Strings.create("msg-" + i));
+			}
+			ct.flush();
+			long ctNs = System.nanoTime() - t0;
+
+			System.out.printf("CONCURRENT OFFER+FLUSH x%,d (%d partitions) : %,d ms  (%,.0f ops/sec)%n",
+				CONCURRENT_N, NUM_CONCURRENT_PARTITIONS, ctNs / 1_000_000, CONCURRENT_N * 1e9 / ctNs);
+
+			long totalSize = 0;
+			for (int i = 0; i < NUM_CONCURRENT_PARTITIONS; i++) {
+				long pSize = concurrentTopic.partition(i).size();
+				System.out.printf("  partition %d size = %,d%n", i, pSize);
+				totalSize += pSize;
+			}
+			System.out.printf("  total records   = %,d%n", totalSize);
+			System.out.printf("  totalSyncs()    = %,d%n", ct.totalSyncs());
+		}
 
 		store.close();
 		System.out.println("\n=== Demo Complete ===");
