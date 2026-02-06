@@ -720,9 +720,7 @@ public class Utils {
 	 */
 	public static String readResourceAsString(String path) throws IOException {
 		try (InputStream inputStream = getResourceAsStream(path)) {
-			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-				return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-			}
+			return new String(inputStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
 		}
 	}
 	
