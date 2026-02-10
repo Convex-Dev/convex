@@ -37,10 +37,10 @@ implementation 'world.convex:convex-java:0.8.2'
 ### Connect to the Network
 
 ```java
-import convex.java.Convex;
+import convex.api.Convex;
 
-// Connect to the public test network
-Convex convex = Convex.connect("https://convex.world");
+// Connect to a public testnet (or run a local peer for development)
+Convex convex = Convex.connect("https://mikera1337-convex-testnet.hf.space");
 ```
 
 ### Create an Account
@@ -100,11 +100,11 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.lang.Reader;
 
-// Connect to the network
-Convex convex = Convex.connect("https://peer.convex.live");
+// Connect to a public testnet
+Convex convex = Convex.connect("https://mikera1337-convex-testnet.hf.space");
 
 // Execute a query
-Result result = convex.query(Reader.read("(balance #9)")).get();
+Result result = convex.query(Reader.read("(balance #13)")).get();
 System.out.println("Balance: " + result.getValue());
 
 // Use your account
