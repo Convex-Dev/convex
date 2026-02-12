@@ -157,7 +157,7 @@ public class Keywords {
 	public static final Keyword FS = Keyword.intern("fs");
 	public static final Keyword KV = Keyword.intern("kv");
 	public static final Keyword QUEUE = Keyword.intern("queue");
-
+	public static final Keyword LOCAL = Keyword.intern("local");
 
 	// General API keywords
 	public static final Keyword FAUCET = Keyword.intern("faucet");

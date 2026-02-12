@@ -1,11 +1,9 @@
 package convex.core.util;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -27,7 +25,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import convex.core.data.ACell;
 import convex.core.data.AObject;

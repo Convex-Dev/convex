@@ -1,8 +1,6 @@
 package convex.lattice;
 
 import convex.core.cvm.Keywords;
-import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.lattice.data.DataLattice;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.generic.KeyedLattice;
@@ -25,6 +23,8 @@ public class Lattice {
 	 *   Each database has per-node signed replicas merged via KVStoreLattice
 	 * - :queue - Kafka-style message queues (owner -> topic -> :partitions -> partition id -> queue)
 	 *   Each topic has metadata + partitions; each partition is an append-only log
+	 * - :local - Peer-local storage (owner -> keyword-keyed map of peer-local data)
+	 *   Each peer owns a signed slot; safe to replicate via OwnerLattice merge
 	 */
 	public static KeyedLattice ROOT = KeyedLattice.create(
 		Keywords.DATA, DataLattice.INSTANCE,
@@ -36,6 +36,7 @@ public class Lattice {
 		),
 		Keywords.QUEUE, OwnerLattice.create(
 			MapLattice.create(TopicLattice.INSTANCE)
-		)
+		),
+		LocalLattice.KEY_LOCAL, LocalLattice.LATTICE
 	);
 }
