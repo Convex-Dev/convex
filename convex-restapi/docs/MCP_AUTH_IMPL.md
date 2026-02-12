@@ -93,24 +93,26 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 4: Signing Service — Sign and JWT
+## Stage 4: Signing Service — Sign and JWT ✓
 
-**Module:** `convex-peer`
+**Module:** `convex-peer` — **DONE** (25 tests pass, 9 new)
 
-**Extend:** `SigningService.java`, `SigningServiceTest.java`
+**Extended:** `SigningService.java`, `SigningServiceTest.java`
 
 **New methods:**
-- `ABlob sign(String identity, AccountKey publicKey, String passphrase, ABlob bytesToSign)` — decrypt key, sign, zero, return signature
-- `String getSelfSignedJWT(String identity, AccountKey publicKey, String passphrase, String audience, Map<String,Object> claims, long lifetime)` — decrypt key, build JWT with `sub=did:key:...`, sign with `JWT.signPublic()`, zero, return
+- `ASignature sign(String identity, AccountKey publicKey, String passphrase, ABlob message)` — decrypt key, sign with Ed25519, zero seed, return signature (or null if key not found)
+- `AString getSelfSignedJWT(String identity, AccountKey publicKey, String passphrase, String audience, AMap<AString,ACell> extraClaims, long lifetimeSeconds)` — decrypt key, build JWT with `sub`/`iss` = `did:key:<multikey>`, `iat`, `exp`, optional `aud`, merge extra claims, sign with `JWT.signPublic()`, zero seed, return encoded JWT (or null if key not found)
 
 **Tests:**
-- Sign bytes, verify signature with public key
-- Wrong passphrase → fails
-- Wrong identity → fails (different lookup hash)
-- getSelfSignedJWT: verify result with `JWT.verifyPublic()`
-- getSelfSignedJWT: verify `sub` and `iss` are correct `did:key`
-- getSelfSignedJWT: verify `aud` claim when audience provided
-- getSelfSignedJWT: verify custom claims merged into payload
+- Sign bytes, verify signature with public key ✓
+- Wrong passphrase → null ✓
+- Wrong identity → null (different lookup hash) ✓
+- getSelfSignedJWT: verify result with `JWT.verifyPublic()` ✓
+- getSelfSignedJWT: verify `sub` and `iss` are correct `did:key` ✓
+- getSelfSignedJWT: verify `aud` claim when audience provided ✓
+- getSelfSignedJWT: verify custom claims merged into payload ✓
+- getSelfSignedJWT: wrong passphrase → null ✓
+- getSelfSignedJWT: verify `exp` is in the future within lifetime ✓
 
 **Verify:** `mvn test -pl convex-peer -Dtest=SigningServiceTest`
 

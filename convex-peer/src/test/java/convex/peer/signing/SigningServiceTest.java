@@ -1,0 +1,389 @@
+package convex.peer.signing;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
+import convex.core.crypto.util.Multikey;
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.data.AccountKey;
+import convex.core.data.Blob;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
+import convex.core.json.JWT;
+import convex.core.lang.RT;
+import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.Root;
+
+/**
+ * Tests for SigningService — encrypted key store operating on a cursor.
+ */
+public class SigningServiceTest {
+
+	/**
+	 * Creates a fresh SigningService backed by an in-memory Root cursor.
+	 */
+	private static SigningService createService() {
+		AKeyPair peerKP = AKeyPair.generate();
+		ACursor<ACell> cursor = new Root<>((ACell) null);
+		SigningService svc = new SigningService(peerKP, cursor);
+		svc.init();
+		return svc;
+	}
+
+	/**
+	 * Creates a SigningService with a specific peer key pair and cursor.
+	 */
+	private static SigningService createService(AKeyPair peerKP, ACursor<ACell> cursor) {
+		SigningService svc = new SigningService(peerKP, cursor);
+		svc.init();
+		return svc;
+	}
+
+	// ===== Initialisation =====
+
+	@Test
+	public void testInitCreatesStructure() {
+		AKeyPair peerKP = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		SigningService svc = new SigningService(peerKP, cursor);
+		assertNull(cursor.get(), "Cursor should be null before init");
+
+		svc.init();
+		assertNotNull(cursor.get(), "Cursor should have data after init");
+	}
+
+	@Test
+	public void testInitIdempotent() {
+		AKeyPair peerKP = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		SigningService svc = new SigningService(peerKP, cursor);
+		svc.init();
+		ACell first = cursor.get();
+
+		// Second init should load existing, not overwrite
+		SigningService svc2 = new SigningService(peerKP, cursor);
+		svc2.init();
+		ACell second = cursor.get();
+
+		assertEquals(first, second, "Re-init should preserve existing data");
+	}
+
+	@Test
+	public void testUninitialised() {
+		AKeyPair peerKP = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+		SigningService svc = new SigningService(peerKP, cursor);
+
+		// Operations before init should fail
+		assertThrows(IllegalStateException.class, () -> svc.createKey("did:key:test", "pass"));
+		assertThrows(IllegalStateException.class, () -> svc.listKeys("did:key:test"));
+	}
+
+	// ===== createKey =====
+
+	@Test
+	public void testCreateKeyReturnsPublicKey() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "secret");
+		assertNotNull(pk);
+		assertEquals(32, pk.getBytes().length);
+	}
+
+	@Test
+	public void testCreateKeyAppearsInListKeys() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "mypass");
+
+		List<AccountKey> keys = svc.listKeys("did:key:alice");
+		assertEquals(1, keys.size());
+		assertEquals(pk, keys.get(0));
+	}
+
+	@Test
+	public void testCreateMultipleKeysForSameIdentity() {
+		SigningService svc = createService();
+		AccountKey pk1 = svc.createKey("did:key:alice", "pass1");
+		AccountKey pk2 = svc.createKey("did:key:alice", "pass2");
+
+		assertNotEquals(pk1, pk2, "Different keys should have different public keys");
+
+		List<AccountKey> keys = svc.listKeys("did:key:alice");
+		assertEquals(2, keys.size());
+		assertTrue(keys.contains(pk1));
+		assertTrue(keys.contains(pk2));
+	}
+
+	@Test
+	public void testCreateKeysForDifferentIdentities() {
+		SigningService svc = createService();
+		AccountKey pkA = svc.createKey("did:key:alice", "pass");
+		AccountKey pkB = svc.createKey("did:key:bob", "pass");
+
+		// Each identity sees only its own keys
+		List<AccountKey> aliceKeys = svc.listKeys("did:key:alice");
+		assertEquals(1, aliceKeys.size());
+		assertEquals(pkA, aliceKeys.get(0));
+
+		List<AccountKey> bobKeys = svc.listKeys("did:key:bob");
+		assertEquals(1, bobKeys.size());
+		assertEquals(pkB, bobKeys.get(0));
+	}
+
+	@Test
+	public void testListKeysUnknownIdentity() {
+		SigningService svc = createService();
+		List<AccountKey> keys = svc.listKeys("did:key:unknown");
+		assertTrue(keys.isEmpty());
+	}
+
+	// ===== Encrypted Key Store =====
+
+	@Test
+	public void testStoredKeyCanBeLoaded() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "mypass");
+
+		byte[] seed = svc.loadKey("did:key:alice", pk, "mypass");
+		assertNotNull(seed, "Seed should be loadable with correct credentials");
+		assertEquals(32, seed.length);
+	}
+
+	@Test
+	public void testWrongPassphraseCannotLoadKey() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "correct");
+
+		// Wrong passphrase → different lookup hash → key not found
+		assertNull(svc.loadKey("did:key:alice", pk, "wrong"),
+				"Wrong passphrase should produce different lookup hash");
+	}
+
+	@Test
+	public void testWrongIdentityCannotLoadKey() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		// Wrong identity → different lookup hash → key not found
+		assertNull(svc.loadKey("did:key:bob", pk, "pass"),
+				"Wrong identity should produce different lookup hash");
+	}
+
+	@Test
+	public void testLoadedSeedMatchesOriginalKey() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		byte[] seed = svc.loadKey("did:key:alice", pk, "pass");
+		AKeyPair recovered = AKeyPair.create(seed);
+		assertEquals(pk, recovered.getAccountKey(),
+				"Recovered key pair should have same public key");
+	}
+
+	// ===== Persistence via Cursor =====
+
+	@Test
+	public void testPersistAndReloadViaCursor() {
+		AKeyPair peerKP = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		// Create service, add keys
+		SigningService svc1 = createService(peerKP, cursor);
+		AccountKey pk1 = svc1.createKey("did:key:alice", "pass1");
+		AccountKey pk2 = svc1.createKey("did:key:alice", "pass2");
+
+		// Simulate restart: new service instance, same cursor state
+		// In production, cursor state would be persisted/loaded by the server layer
+		ACell savedState = cursor.get();
+		Root<ACell> cursor2 = Root.create(savedState);
+
+		SigningService svc2 = createService(peerKP, cursor2);
+
+		// Keys should survive
+		List<AccountKey> keys = svc2.listKeys("did:key:alice");
+		assertEquals(2, keys.size());
+		assertTrue(keys.contains(pk1));
+		assertTrue(keys.contains(pk2));
+
+		// Should be able to load seeds
+		byte[] seed1 = svc2.loadKey("did:key:alice", pk1, "pass1");
+		assertNotNull(seed1);
+		assertEquals(pk1, AKeyPair.create(seed1).getAccountKey());
+	}
+
+	@Test
+	public void testDifferentPeerKeyCannotDecryptSecret() {
+		AKeyPair peerKP1 = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		// Peer 1 creates service and keys
+		SigningService svc1 = createService(peerKP1, cursor);
+		svc1.createKey("did:key:alice", "pass");
+
+		// Peer 2 tries to load with same cursor data but different peer key
+		AKeyPair peerKP2 = AKeyPair.generate();
+		ACell savedState = cursor.get();
+		Root<ACell> cursor2 = Root.create(savedState);
+
+		SigningService svc2 = new SigningService(peerKP2, cursor2);
+		assertThrows(RuntimeException.class, svc2::init,
+				"Different peer key should fail to decrypt encryptionSecret");
+	}
+
+	// ===== encryptionSecret Round-Trip =====
+
+	@Test
+	public void testEncryptionSecretRoundTrip() {
+		SigningService svc = createService();
+		byte[] secret = new byte[32];
+		new java.security.SecureRandom().nextBytes(secret);
+
+		ACell encrypted = svc.encryptSecret(secret);
+		assertNotNull(encrypted);
+
+		byte[] decrypted = svc.decryptSecret((convex.core.data.ABlob) encrypted);
+		assertArrayEquals(secret, decrypted);
+	}
+
+	// ===== sign() =====
+
+	@Test
+	public void testSignAndVerify() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		Blob message = Blob.wrap("hello world".getBytes());
+		ASignature sig = svc.sign("did:key:alice", pk, "pass", message);
+		assertNotNull(sig);
+
+		assertTrue(sig.verify(message, pk), "Signature should verify with correct public key");
+	}
+
+	@Test
+	public void testSignWrongPassphrase() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "correct");
+
+		Blob message = Blob.wrap("test".getBytes());
+		assertNull(svc.sign("did:key:alice", pk, "wrong", message),
+				"Wrong passphrase should return null");
+	}
+
+	@Test
+	public void testSignWrongIdentity() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		Blob message = Blob.wrap("test".getBytes());
+		assertNull(svc.sign("did:key:bob", pk, "pass", message),
+				"Wrong identity should return null");
+	}
+
+	// ===== getSelfSignedJWT() =====
+
+	@Test
+	public void testGetSelfSignedJWT() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		AString jwt = svc.getSelfSignedJWT("did:key:alice", pk, "pass", null, null, 3600);
+		assertNotNull(jwt);
+
+		// Verify the JWT signature
+		AMap<AString, ACell> claims = JWT.verifyPublic(jwt);
+		assertNotNull(claims, "JWT should verify successfully");
+	}
+
+	@Test
+	public void testGetSelfSignedJWTSubAndIss() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		AString jwt = svc.getSelfSignedJWT("did:key:alice", pk, "pass", null, null, 3600);
+		AMap<AString, ACell> claims = JWT.verifyPublic(jwt);
+		assertNotNull(claims);
+
+		// sub and iss should be did:key:<multikey>
+		String expectedDID = "did:key:" + Multikey.encodePublicKey(pk);
+		assertEquals(expectedDID, RT.ensureString(claims.get(Strings.create("sub"))).toString());
+		assertEquals(expectedDID, RT.ensureString(claims.get(Strings.create("iss"))).toString());
+	}
+
+	@Test
+	public void testGetSelfSignedJWTAudience() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		AString jwt = svc.getSelfSignedJWT("did:key:alice", pk, "pass",
+				"https://api.example.com", null, 3600);
+		AMap<AString, ACell> claims = JWT.verifyPublic(jwt);
+		assertNotNull(claims);
+
+		assertEquals("https://api.example.com",
+				RT.ensureString(claims.get(Strings.create("aud"))).toString());
+	}
+
+	@Test
+	public void testGetSelfSignedJWTExtraClaims() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		AMap<AString, ACell> extra = Maps.of(
+			Strings.create("scope"), Strings.create("read write"),
+			Strings.create("nonce"), Strings.create("abc123")
+		);
+
+		AString jwt = svc.getSelfSignedJWT("did:key:alice", pk, "pass", null, extra, 3600);
+		AMap<AString, ACell> claims = JWT.verifyPublic(jwt);
+		assertNotNull(claims);
+
+		assertEquals("read write",
+				RT.ensureString(claims.get(Strings.create("scope"))).toString());
+		assertEquals("abc123",
+				RT.ensureString(claims.get(Strings.create("nonce"))).toString());
+	}
+
+	@Test
+	public void testGetSelfSignedJWTWrongPassphrase() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "correct");
+
+		assertNull(svc.getSelfSignedJWT("did:key:alice", pk, "wrong", null, null, 3600),
+				"Wrong passphrase should return null");
+	}
+
+	@Test
+	public void testGetSelfSignedJWTExpiry() {
+		SigningService svc = createService();
+		AccountKey pk = svc.createKey("did:key:alice", "pass");
+
+		AString jwt = svc.getSelfSignedJWT("did:key:alice", pk, "pass", null, null, 3600);
+		AMap<AString, ACell> claims = JWT.verifyPublic(jwt);
+		assertNotNull(claims);
+
+		// exp should be in the future
+		long exp = Long.parseLong(claims.get(Strings.create("exp")).toString());
+		long now = System.currentTimeMillis() / 1000;
+		assertTrue(exp > now, "Expiry should be in the future");
+		assertTrue(exp <= now + 3600, "Expiry should not exceed lifetime");
+	}
+
+	// ===== Edge Cases =====
+
+	@Test
+	public void testNullConstructorArgs() {
+		AKeyPair kp = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		assertThrows(IllegalArgumentException.class, () -> new SigningService(null, cursor));
+		assertThrows(IllegalArgumentException.class, () -> new SigningService(kp, null));
+	}
+}
