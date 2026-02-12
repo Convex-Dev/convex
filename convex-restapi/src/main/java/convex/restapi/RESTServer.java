@@ -21,6 +21,7 @@ import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
+import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
 import convex.restapi.api.X402;
@@ -71,6 +72,7 @@ public class RESTServer implements Closeable {
 	protected ExplorerAPI explorerAPI;
 	protected McpAPI mcpAPI;
 	protected X402 x402API;
+	protected DIDAPI didAPI;
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;
@@ -100,6 +102,9 @@ public class RESTServer implements Closeable {
 
 		x402API = new X402(this);
 		x402API.addRoutes(app);
+
+		didAPI = new DIDAPI(this);
+		didAPI.addRoutes(app);
 	}
 	
 	private Javalin buildApp(boolean useSSL) {
