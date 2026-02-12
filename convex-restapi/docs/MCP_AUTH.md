@@ -348,15 +348,17 @@ Unauthenticated access remains available for public endpoints (queries, network 
 │    Self-issued JWT verification                          │
 │    encryptionSecret management (generate, wrap, unwrap)        │
 │                                                          │
-│  Lattice Persistence:                                    │
-│    :local → OwnerLattice<PeerKey, ...>                   │
-│      <peerKey> :signing → encrypted key store            │
+│  Cursor-based state (ACursor<ACell>):                    │
+│    Server layer provides cursor to :signing subtree      │
+│    SigningService reads/writes through cursor             │
+│    Persistence/replication is server layer's choice       │
 ├──────────────────────────────────────────────────────────┤
 │  convex-core                         (primitives layer)  │
 │                                                          │
-│  Lattice types: OwnerLattice, SignedLattice, Index       │
-│  :local convention for per-peer owned data               │
-│  Crypto: Ed25519, JWT, Multikey, HKDF                    │
+│  Lattice: OwnerLattice, SignedLattice, LocalLattice      │
+│  Cursor: ACursor, Root, PathCursor (atomic get/set)      │
+│  :local registered in Lattice.ROOT                       │
+│  Crypto: Ed25519, JWT, Multikey, HKDF, AESGCM           │
 │  Data: Hash, ABlob, Keyword, AVector, AccountKey         │
 │  Storage: EtchStore, Stores, setRootData/getRootData     │
 └──────────────────────────────────────────────────────────┘
@@ -366,11 +368,11 @@ Unauthenticated access remains available for public endpoints (queries, network 
 
 | Layer | Module | Owns | Does NOT own |
 |---|---|---|---|
-| **Primitives** | `convex-core` | OwnerLattice, `:local` convention, JWT, Multikey, HKDF, Etch storage | Key management logic, auth flows, API |
-| **Service** | `convex-peer` | SigningService, key encryption/decryption, `:signing` lattice structure, encryptionSecret management, auth token issuance | MCP tool definitions, HTTP routing, endpoint handlers |
-| **API** | `convex-restapi` | MCP tool handlers, auth endpoints, confirm UI, Convex convenience tools | Encryption, key storage, lattice structure |
+| **Primitives** | `convex-core` | OwnerLattice, LocalLattice, `:local` in `Lattice.ROOT`, ACursor abstraction, JWT, Multikey, HKDF, AESGCM, Etch storage | Key management logic, auth flows, API |
+| **Service** | `convex-peer` | SigningService (cursor-based), key encryption/decryption, `:signing` data structure, encryptionSecret management, auth token issuance | Persistence decisions, cursor construction, MCP tools, HTTP routing |
+| **API** | `convex-restapi` | MCP tool handlers, auth endpoints, confirm UI, Convex convenience tools, cursor construction and persistence | Encryption, key storage internals |
 
-The API layer calls the service layer; the service layer uses core primitives. No layer reaches down more than one level.
+The API layer constructs the cursor (choosing persistence strategy) and passes it to the service layer. The service layer uses core primitives. No layer reaches down more than one level.
 
 ## Threat Model and Security
 
@@ -838,60 +840,42 @@ Enables `listKeys` — the peer decrypts the user's key list using only their id
 
 `CVMLong` for future schema migrations. Currently `1`.
 
-### Persistence Pattern
+### Cursor-Based Access Pattern
 
-Follows the same pattern as Covia's `Engine.persistState()` / `loadStateFromStore()`. Each peer navigates to its own OwnerLattice slot via its peer key:
+The `SigningService` operates on an `ACursor<ACell>` pointing at the `:signing` subtree. This decouples key management from persistence — the server layer controls how the cursor is backed (EtchStore, in-memory `Root`, OwnerLattice path, etc.). Follows the same pattern as `convex.lattice.kv.LatticeKV` / `KVDatabase`.
 
 ```java
-// Path: :local → <peerKey> → :signing
-static final Keyword LOCAL = Keyword.intern("local");
-static final Keyword SIGNING = Keyword.intern("signing");
+// Server layer constructs the cursor (choice of persistence belongs here)
+// Option A: in-memory (testing, ephemeral)
+ACursor<ACell> cursor = new Root<>((ACell) null);
 
-// Initialisation — navigate to this peer's signing subtree
-ACell root = store.getRootData();
-// OwnerLattice.get(peerKey) → this peer's signed slot
-Index<Keyword, ACell> myLocal = ownerLattice.getOwned(peerKey);
-Index<Keyword, ACell> signing = (Index<Keyword, ACell>) myLocal.get(SIGNING);
-if (signing == null) {
-    signing = Index.of(
-        Keys.VERSION, CVMLong.ONE,
-        Keys.KEYS,    Index.none(),
-        Keys.USERS,   Index.none(),
-        Keys.AUDIT,   Index.none()
-    );
-}
+// Option B: path into EtchStore-backed lattice root
+// Root<ACell> latticeRoot = ...;  // backed by EtchStore
+// ACursor<ACell> cursor = latticeRoot.path(LOCAL, peerKey, SIGNING);
 
-// Write — update signing subtree, sign with peer key, persist
-Index<Hash, ABlob> keys = (Index<Hash, ABlob>) signing.get(Keys.KEYS);
-keys = keys.assoc(lookupHash, encryptedSeed);
-signing = signing.assoc(Keys.KEYS, keys);
-myLocal = myLocal.assoc(SIGNING, signing);
-// OwnerLattice signs the updated slot with the peer's keypair
-root = ownerLattice.setOwned(peerKeyPair, myLocal);
-store.setRootData(root);  // atomic
+// SigningService operates through the cursor — doesn't know or care about backing
+SigningService svc = new SigningService(peerKeyPair, cursor);
+svc.init();  // generates or loads encryptionSecret via cursor
 
-// Read — immutable snapshot, no locking needed
-Index<Hash, ABlob> keys = (Index<Hash, ABlob>) signing.get(Keys.KEYS);
-ABlob encrypted = keys.get(lookupHash);  // null if not found
+// Key operations read/write through the cursor atomically
+AccountKey pk = svc.createKey("did:key:alice", "passphrase");
+List<AccountKey> keys = svc.listKeys("did:key:alice");
+byte[] seed = svc.loadKey("did:key:alice", pk, "passphrase");
 ```
+
+The cursor provides `get()`, `set()`, and `updateAndGet()` with `AtomicReference` semantics. The `SigningService` uses `updateAndGet()` for mutations, ensuring thread-safe read-modify-write.
 
 ### Write-Through Persistence
 
-Every mutating operation (`createKey`, `deleteKey`, `sign` audit entry, etc.) persists immediately via `setRootData()`. This mirrors Covia's `persistJobRecord()` pattern — no batching, no delayed flush. The store is always consistent.
+Persistence is the server layer's responsibility. The server can flush the cursor's backing store after each operation, batch writes, or rely on the cursor's own persistence semantics. The `SigningService` itself is persistence-agnostic — it writes through the cursor and trusts the cursor to be durable.
 
 ### Concurrency
 
-Single-writer model. All write operations (key creation, deletion, passphrase change) are serialised through a lock or single-threaded executor. Read operations (sign, listKeys) load an immutable root snapshot and proceed concurrently — Convex data structures are persistent/immutable, so readers never see partial writes.
-
-For signing requests under load:
-1. Each request loads the current root (immutable snapshot)
-2. Key lookup and decryption proceed concurrently
-3. Audit log writes serialise through the write lock
-4. Root swap is atomic — concurrent reads are unaffected
+The cursor abstraction provides atomic updates via `updateAndGet()`. All mutations go through this, so concurrent access is safe without external locking. Read operations (`get()`) return immutable snapshots — Convex data structures are persistent/immutable, so readers never see partial writes.
 
 ### Backup, Recovery, and Replication
 
-The Etch store is self-consistent at all times — the root hash in the file header points to a complete, content-addressed tree. The `:local` subtree travels with the store.
+Persistence and replication are the server layer's responsibility. When backed by an Etch store, the store is self-consistent at all times — the root hash in the file header points to a complete, content-addressed tree. The `:local` subtree travels with the store.
 
 | Operation | Method |
 |---|---|
@@ -957,26 +941,27 @@ Crypto and lattice primitives used by the service layer. These exist (or will be
 | Ed25519 signing | Ed25519 | `convex.core.crypto` |
 | JWT signing/verification | EdDSA | `convex.core.json.JWT` — `signPublic()`, `verifyPublic()` |
 | Multikey encoding | Ed25519 → multibase | `convex.core.crypto.util.Multikey` — `encodePublicKey()`, `decodePublicKey()` |
-| HKDF key derivation | [HKDF](https://datatracker.ietf.org/doc/html/rfc5869)-SHA256 | BouncyCastle `HKDFBytesGenerator` (new utility in `convex.core.crypto`). Used for wrapping keys and encryptionSecret wrapping. |
-| AES-256-GCM | Symmetric encryption | BouncyCastle (new utility in `convex.core.crypto`) |
+| HKDF key derivation | [HKDF](https://datatracker.ietf.org/doc/html/rfc5869)-SHA256 | `convex.core.crypto.HKDF` — `derive(ikm, salt, info, length)`, `derive256()` |
+| AES-256-GCM | Symmetric authenticated encryption | `convex.core.crypto.AESGCM` — `encrypt(key, plaintext)`, `decrypt(key, data)` |
 | OwnerLattice | Per-owner signed data | `convex.lattice.generic.OwnerLattice` |
-| `:local` convention | Per-peer lattice subtree | Convention: OwnerLattice keyed by peer AccountKey, never replicated by default |
+| LocalLattice | `:local` OwnerLattice convention | `convex.lattice.LocalLattice` — registered in `Lattice.ROOT`, helpers for per-peer slot access |
+| ACursor | Atomic mutable reference | `convex.lattice.cursor.ACursor` — `get()`, `set()`, `updateAndGet()`, `path()` |
 | Etch storage | Content-addressed persistence | `convex.etch.EtchStore`, `convex.core.store.Stores` |
 
 ### Service Layer (convex-peer)
 
-The signing service backend. Owns key lifecycle, encryption, lattice persistence, and auth token issuance. Exposed as a service object on the peer `Server`, consumed by the API layer.
+The signing service backend. Owns key lifecycle and encryption. Operates on an `ACursor<ACell>` — decoupled from persistence/replication, which is the server layer's responsibility. Follows the `LatticeKV` / `KVDatabase` cursor pattern.
 
-**SigningService responsibilities:**
-- Key lifecycle: create, import, export, delete, change passphrase
-- Sign bytes, build self-issued JWTs
-- `encryptionSecret` management: generate random 256-bit key on first start, store encrypted with peer key in `:signing :secret`
+**SigningService** — `convex.peer.signing.SigningService`:
+- Constructor: `SigningService(AKeyPair peerKeyPair, ACursor<ACell> cursor)`
+- `init()` — generates or loads `encryptionSecret` via cursor
+- Key lifecycle: `createKey`, `listKeys`, `loadKey` (import, export, delete, changePassphrase in Stage 5)
+- Sign bytes, build self-issued JWTs (Stage 4)
+- `encryptionSecret` management: generate random 256-bit key on first start, store encrypted with peer key in cursor
 - Wrapping key derivation: `HKDF-SHA256(ikm: encryptionSecret, salt: identity ‖ publicKey ‖ passphrase, info: "convex-signing-service-v1")`
 - Lookup hash: `SHA-256(identity ‖ publicKey ‖ passphrase)`
 - User index encryption: `HKDF(encryptionSecret, salt: identity, info: "convex-user-index-v1")`
-- Lattice persistence of `:local → <peerKey> → :signing` subtree
-- Audit log append
-- Confirmation token management (in-memory)
+- Audit log append (Stage 5)
 - Memory safety: zero seed material and wrapping keys after each operation
 
 **Peer Authentication responsibilities:**

@@ -17,93 +17,77 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 | MCP server + 16 tools | Exists | `convex.restapi.mcp.McpAPI` (JSON-RPC 2.0, full tool framework) |
 | `McpTool` base class | Exists | `convex.restapi.mcp.McpTool` (tool metadata from JSON) |
 | `DIDAPI` | Exists | `convex.restapi.api.DIDAPI` (did:web endpoints) |
-| HKDF | **Missing** | Need new utility in `convex.core.crypto` |
-| AES-256-GCM | **Missing** | Need new utility in `convex.core.crypto` |
+| HKDF | **Done (Stage 1)** | `convex.core.crypto.HKDF` — RFC 5869 SHA-256, wraps BouncyCastle `HKDFBytesGenerator` |
+| AES-256-GCM | **Done (Stage 1)** | `convex.core.crypto.AESGCM` — 12-byte nonce prepended, JDK `AES/GCM/NoPadding` |
+| `LocalLattice` | **Done (Stage 2)** | `convex.lattice.LocalLattice` — `:local` OwnerLattice convention, registered in `Lattice.ROOT` |
+| `ACursor` abstraction | Exists | `convex.lattice.cursor.ACursor` — atomic get/set/updateAndGet, path navigation |
+| SigningService | **Done (Stage 3)** | `convex.peer.signing.SigningService` — takes `ACursor<ACell>`, decoupled from persistence |
 | Auth middleware | **Missing** | No bearer token / JWT verification in restapi |
-| SigningService | **Missing** | Core service to be built in `convex-peer` |
 
 ---
 
-## Stage 1: Core Crypto — HKDF and AES-256-GCM
+## Stage 1: Core Crypto — HKDF and AES-256-GCM ✓
 
-**Module:** `convex-core`
+**Module:** `convex-core` — **DONE** (20 tests pass)
 
-**Files to create:**
-- `convex-core/src/main/java/convex/core/crypto/HKDF.java`
-- `convex-core/src/main/java/convex/core/crypto/AESGCM.java`
-- `convex-core/src/test/java/convex/core/crypto/HKDFTest.java`
-- `convex-core/src/test/java/convex/core/crypto/AESGCMTest.java`
-
-**HKDF.java:**
-- Static utility wrapping BouncyCastle `HKDFBytesGenerator`
-- `byte[] derive(byte[] ikm, byte[] salt, byte[] info, int length)`
-- Uses SHA-256 as the underlying hash
-
-**AESGCM.java:**
-- Static utility for AES-256-GCM authenticated encryption
-- `byte[] encrypt(byte[] key, byte[] plaintext)` — generates random 12-byte nonce, prepends to ciphertext
-- `byte[] decrypt(byte[] key, byte[] ciphertext)` — extracts nonce from prefix, decrypts
-- Uses BouncyCastle or JDK `javax.crypto.Cipher` with `AES/GCM/NoPadding`
-
-**Tests:**
-- HKDF: known test vectors from RFC 5869, different inputs produce different outputs
-- AESGCM: round-trip encrypt/decrypt, wrong key fails, tampered ciphertext fails (authentication tag check)
+**Files created:**
+- `convex-core/src/main/java/convex/core/crypto/HKDF.java` — `derive(ikm, salt, info, length)`, `derive256()` convenience
+- `convex-core/src/main/java/convex/core/crypto/AESGCM.java` — `encrypt(key, plaintext)`, `decrypt(key, data)` using JDK `AES/GCM/NoPadding`
+- `convex-core/src/test/java/convex/core/crypto/HKDFTest.java` — 8 tests (3 RFC 5869 vectors, variance, edge cases)
+- `convex-core/src/test/java/convex/core/crypto/AESGCMTest.java` — 12 tests (round-trips, wrong key, tamper, nonce variance, input validation)
 
 **Verify:** `mvn test -pl convex-core -Dtest=HKDFTest,AESGCMTest`
 
 ---
 
-## Stage 2: Local Lattice — OwnerLattice Convention
+## Stage 2: Local Lattice — OwnerLattice Convention ✓
 
-**Module:** `convex-core`
+**Module:** `convex-core` — **DONE** (16 tests pass)
 
-**Files to create:**
-- `convex-core/src/main/java/convex/lattice/LocalLattice.java` (or similar — thin wrapper/helper for the `:local` convention)
-- `convex-core/src/test/java/convex/lattice/LocalLatticeTest.java`
+**Files created:**
+- `convex-core/src/main/java/convex/lattice/LocalLattice.java` — `KEY_LOCAL`, `LATTICE`, `createSlot()`, `setSlot()`, `getSlot()`, `getSignedSlot()`, `get()` helpers
+- `convex-core/src/test/java/convex/lattice/LocalLatticeTest.java` — 16 tests
 
-**Purpose:** Establish the `:local` OwnerLattice convention as a tested core primitive. The signing service and any future peer-local services build on top of this.
+**Also modified:**
+- `convex-core/.../cvm/Keywords.java` — added `LOCAL` keyword constant
+- `convex-core/.../lattice/Lattice.java` — registered `:local` in `Lattice.ROOT`
 
-**LocalLattice (helper/convention):**
-- `:local` keyword constant
-- Helper to get/set a peer's owned slot: navigate root → `:local` → OwnerLattice → signed slot for a given peer key
-- Helper to initialise `:local` in a root if absent
-- Wraps `OwnerLattice<AHashMap<ACell, SignedData<V>>>` with convenience for the per-peer-key pattern
-
-**Tests:**
-- Create a root with `:local`, write a value under peer key A, read it back
-- Two peer keys writing to the same root — independent slots, no conflict
-- Merge two roots with different peer keys — both slots preserved
-- Merge two roots where same peer key has different values — latest signed value wins
-- Peer A cannot write to peer B's slot (signature verification)
-- Round-trip through EtchStore: `setRootData()` → `getRootData()` → `:local` data intact
-- Nested structure: peer slot contains `Index<Keyword, ACell>` with sub-keys — verify path navigation works
+**Design notes:**
+- Per-peer value is `AHashMap<Keyword, ACell>` with atomic replace semantics (not per-keyword merge)
+- OwnerLattice handles inter-peer isolation; intra-peer updates are whole-slot replacement
+- Follows the same pattern as `:fs`, `:kv`, `:queue` in `Lattice.ROOT`
 
 **Verify:** `mvn test -pl convex-core -Dtest=LocalLatticeTest`
 
 ---
 
-## Stage 3: Signing Service — Encrypted Key Store
+## Stage 3: Signing Service — Encrypted Key Store ✓
 
-**Module:** `convex-peer`
+**Module:** `convex-peer` — **DONE** (16 tests pass)
 
-**Files to create:**
+**Files created:**
 - `convex-peer/src/main/java/convex/peer/signing/SigningService.java`
 - `convex-peer/src/test/java/convex/peer/signing/SigningServiceTest.java`
 
-**SigningService.java — first slice:**
-- Constructor takes `AKeyPair peerKeyPair, AStore store`
-- `encryptionSecret` management: generate on first start, store encrypted in lattice at `:local → <peerKey> → :signing → :secret`, load on subsequent starts
-- `AccountKey createKey(String identity, String passphrase)` — generate keypair, encrypt seed, store in `:keys`, update `:users`
-- `List<AccountKey> listKeys(String identity)` — decrypt user index, return public keys
-- Internal: `wrapKey()`, `unwrapKey()`, `lookupHash()`, `userIndexKey()`
-- Lattice persistence via `store.setRootData()`
+**Also modified:**
+- `convex-peer/module-info.java` — exports `convex.peer.signing`
+
+**SigningService API:**
+- Constructor takes `AKeyPair peerKeyPair, ACursor<ACell> cursor` — decoupled from persistence. The server layer controls how the cursor is backed (EtchStore, in-memory, OwnerLattice path, etc.)
+- `init()` — generates encryptionSecret on first start or loads from existing cursor state
+- `createKey(identity, passphrase)` → `AccountKey`
+- `listKeys(identity)` → `List<AccountKey>`
+- `loadKey(identity, publicKey, passphrase)` → `byte[]` seed (or null if wrong lookup hash)
+- Internal: `storeKey()`, `addToUserIndex()`, `computeLookupHash()`, `deriveKeyWrappingKey()`, `deriveUserIndexKey()`, `encryptSecret()`, `decryptSecret()`
+- Follows `convex.lattice.kv.LatticeKV` / `KVDatabase` cursor pattern
 
 **Tests:**
-- Create a key, verify it appears in listKeys
-- Create multiple keys for same identity
-- Create keys for different identities — compartmentalised
-- Persist to store, reload from store, keys survive
-- encryptionSecret round-trip: generate, store encrypted, reload, decrypt, still works
+- Init creates structure; init is idempotent; uninitialised throws
+- createKey returns key; appears in listKeys; multiple keys per identity; compartmentalised identities
+- Stored key loadable with correct credentials; wrong passphrase/identity → null (different lookup hash)
+- Loaded seed matches original key pair
+- Persist and reload via cursor snapshot; different peer key cannot decrypt secret
+- encryptionSecret round-trip; null constructor args rejected
 
 **Verify:** `mvn test -pl convex-peer -Dtest=SigningServiceTest`
 
@@ -382,9 +366,9 @@ Each tool handler: extract identity from context attribute, extract params, dele
 
 | Stage | Module | Focus | New Files |
 |---|---|---|---|
-| 1 | convex-core | HKDF + AES-256-GCM utilities | 4 |
-| 2 | convex-core | Local Lattice — OwnerLattice convention | 2 |
-| 3 | convex-peer | SigningService — key store basics | 2 |
+| 1 ✓ | convex-core | HKDF + AES-256-GCM utilities | 4 (20 tests) |
+| 2 ✓ | convex-core | Local Lattice — OwnerLattice convention | 2 + modify (16 tests) |
+| 3 ✓ | convex-peer | SigningService — cursor-based key store | 2 + modify (16 tests) |
 | 4 | convex-peer | SigningService — sign + JWT | 0 (extend) |
 | 5 | convex-peer | SigningService — elevated ops + tombstones | 0 (extend) |
 | 6 | convex-peer | OwnerLattice multi-peer + key rotation | 0 (extend) |
