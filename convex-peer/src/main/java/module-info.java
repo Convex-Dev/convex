@@ -1,6 +1,7 @@
 module convex.peer {
 	exports convex.net;
 	exports convex.peer;
+	exports convex.peer.auth;
 	exports convex.peer.signing;
 	exports convex.net.store;
 	exports convex.api;

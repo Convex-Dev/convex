@@ -20,11 +20,13 @@ import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
+import convex.peer.auth.PeerAuth;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
 import convex.restapi.api.X402;
+import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
@@ -73,12 +75,25 @@ public class RESTServer implements Closeable {
 	protected McpAPI mcpAPI;
 	protected X402 x402API;
 	protected DIDAPI didAPI;
+	protected AuthMiddleware authMiddleware;
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;
 	}
 
+	public AuthMiddleware getAuthMiddleware() {
+		return authMiddleware;
+	}
+
 	private void addAPIRoutes(Javalin app) {
+		// Auth middleware — extracts identity from bearer token if present
+		AKeyPair peerKP = server.getKeyPair();
+		if (peerKP != null) {
+			PeerAuth peerAuth = new PeerAuth(peerKP);
+			authMiddleware = new AuthMiddleware(peerAuth);
+			app.before(authMiddleware.handler());
+		}
+
 		chainAPI = new ChainAPI(this);
 		chainAPI.addRoutes(app);
 

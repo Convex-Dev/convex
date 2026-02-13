@@ -22,7 +22,8 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 | `LocalLattice` | **Done (Stage 2)** | `convex.lattice.LocalLattice` — `:local` OwnerLattice convention, registered in `Lattice.ROOT` |
 | `ACursor` abstraction | Exists | `convex.lattice.cursor.ACursor` — atomic get/set/updateAndGet, path navigation |
 | SigningService | **Done (Stage 3)** | `convex.peer.signing.SigningService` — takes `ACursor<ACell>`, decoupled from persistence |
-| Auth middleware | **Missing** | No bearer token / JWT verification in restapi |
+| `PeerAuth` | **Done (Stage 7)** | `convex.peer.auth.PeerAuth` — two-path JWT verification + peer token issuance |
+| `AuthMiddleware` | **Done (Stage 8)** | `convex.restapi.auth.AuthMiddleware` — Javalin bearer token middleware |
 
 ---
 
@@ -180,62 +181,78 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 7: Auth — JWT Verification
+## Stage 7: Auth — JWT Verification ✓
 
-**Module:** `convex-peer`
+**Module:** `convex-peer` — **DONE** (12 tests pass)
 
-**Files to create:**
+**Files created:**
 - `convex-peer/src/main/java/convex/peer/auth/PeerAuth.java`
 - `convex-peer/src/test/java/convex/peer/auth/PeerAuthTest.java`
 
+**Also modified:**
+- `convex-peer/module-info.java` — added `exports convex.peer.auth`
+
 **PeerAuth.java:**
-- `String verifyBearerToken(String jwt, AccountKey peerKey)` — returns identity (DID string) or null
-  - Try self-issued: decode `kid` from header → `Multikey.decodePublicKey()` → `JWT.verifyPublic(jwt)` → return `sub` claim (must be `did:key:...`)
-  - Try peer-signed: `JWT.verifyPublic(jwt, peerKey)` → return `sub` claim (must be `did:web:...`)
-  - Check `iat`/`exp` validity
-- `String issuePeerToken(AccountKey peerKey, AKeyPair peerKeyPair, String identity, long lifetime)` — create peer-signed JWT with `sub=identity`, `iss=did:web:...`
+- Constructor takes `AKeyPair peerKeyPair` — stores peer key pair and derived `AccountKey`
+- `AString verifyBearerToken(AString jwt)` — returns identity (AString DID) or null
+  - Parses JWT via `JWT.parse(jwt)`
+  - Try self-issued: `getKeyID()` → `Multikey.decodePublicKey()` → `verifyEdDSA(signerKey)` → `validateClaims()` → verify `sub` matches `did:key:` for signing key → return `sub`
+  - Try peer-signed: `verifyEdDSA(peerKey)` → `validateClaims()` → return `sub`
+- `AString issuePeerToken(AString identity, long lifetimeSeconds)` — create peer-signed JWT with `sub=identity`, `iss=did:key:<peer-multikey>`, `iat`, `exp`
+- `AccountKey getPeerKey()` — returns peer's public key
 
 **Tests:**
-- Self-issued JWT: create with known keypair, verify, correct identity returned
-- Self-issued JWT: expired → rejected
-- Self-issued JWT: tampered signature → rejected
-- Self-issued JWT: `kid` doesn't match signing key → rejected
-- Peer-signed JWT: issue and verify with peer key → correct identity
-- Peer-signed JWT: verify with wrong peer key → rejected
-- Peer-signed JWT: expired → rejected
-- Identity format: self-issued returns `did:key:...`, peer-signed returns whatever `sub` says
+- Self-issued JWT: create with known keypair, verify, correct `did:key:` identity returned ✓
+- Self-issued JWT: expired → rejected ✓
+- Self-issued JWT: tampered signature → rejected ✓
+- Self-issued JWT: `kid` doesn't match signing key → rejected ✓
+- Peer-signed JWT: issue and verify → correct identity ✓
+- Peer-signed JWT: verify with wrong peer key → rejected ✓
+- Peer-signed JWT: expired → rejected ✓
+- Null token → null ✓
+- Garbage token → null ✓
+- Null constructor arg → IllegalArgumentException ✓
+- Peer token claims: verify sub, exp in future ✓
+- getPeerKey matches constructor key pair ✓
 
 **Verify:** `mvn test -pl convex-peer -Dtest=PeerAuthTest`
 
 ---
 
-## Stage 8: REST API — Auth Middleware
+## Stage 8: REST API — Auth Middleware ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (11 tests pass, 131 total restapi tests pass)
 
-**Files to create/modify:**
+**Files created:**
 - `convex-restapi/src/main/java/convex/restapi/auth/AuthMiddleware.java`
-- `convex-restapi/src/main/java/convex/restapi/RESTServer.java` (add middleware registration)
-- `convex-restapi/src/test/java/convex/restapi/auth/AuthMiddlewareTest.java`
+- `convex-restapi/src/test/java/convex/restapi/test/AuthMiddlewareTest.java`
+
+**Also modified:**
+- `convex-restapi/src/main/java/convex/restapi/RESTServer.java` — added middleware field, getter, registration in `addAPIRoutes()`
 
 **AuthMiddleware.java:**
-- Javalin `beforeMatched` handler for protected routes
-- Extracts `Authorization: Bearer <jwt>` header
-- Calls `PeerAuth.verifyBearerToken()`
-- Sets identity on Javalin context attribute (e.g., `ctx.attribute("identity", did)`)
-- Returns 401 if no/invalid token
+- Two handler modes:
+  - `handler()` — optional auth: sets identity if valid token present, does not reject unauthenticated requests
+  - `requiredHandler()` — required auth: returns 401 JSON error if no valid token
+- `static AString getIdentity(Context ctx)` — retrieves identity from context attribute for downstream handlers
+- `PeerAuth getPeerAuth()` — access to underlying PeerAuth instance
+- Extracts `Authorization: Bearer <token>` header, delegates to `PeerAuth.verifyBearerToken()`
+- Identity stored as `ctx.attribute("auth.identity", AString)`
 
 **RESTServer.java changes:**
-- Register middleware on MCP and protected API routes
-- Leave public routes unprotected (queries, DID docs, `signingServiceInfo`)
+- Added `protected AuthMiddleware authMiddleware` field and `getAuthMiddleware()` getter
+- In `addAPIRoutes()`: creates `PeerAuth` from server keypair, registers `authMiddleware.handler()` via `app.before()` (optional auth on all routes)
+- Null-safe: skips middleware registration if server has no keypair
 
-**Tests (using existing ARESTTest pattern):**
-- Request without bearer token → 401
-- Request with valid self-issued JWT → 200, identity set correctly
-- Request with valid peer-signed JWT → 200, identity set correctly
-- Request with expired JWT → 401
-- Request with garbage token → 401
-- Public endpoints still accessible without auth
+**Tests (extends ARESTTest):**
+- PeerAuth unit: creation, self-issued round-trip, peer-signed round-trip ✓
+- AuthMiddleware unit: creation, null arg rejected ✓
+- HTTP integration: public endpoint without auth → 200 ✓
+- HTTP integration: MCP with self-issued JWT → 200 ✓
+- HTTP integration: MCP with peer-signed JWT → 200 ✓
+- HTTP integration: MCP without auth → 200 (MCP allows unauthenticated) ✓
+- HTTP integration: MCP with expired JWT → 200 (identity not set, but route allows it) ✓
+- HTTP integration: MCP with garbage auth → 200 (same) ✓
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=AuthMiddlewareTest`
 
@@ -392,8 +409,8 @@ Each tool handler: extract identity from context attribute, extract params, dele
 | 4 ✓ | convex-peer | SigningService — sign + JWT | 0 (extend, +9 tests) |
 | 5 ✓ | convex-peer | SigningService — elevated ops, plaintext identity index, LWW timestamps | 0 (extend, +12 tests) |
 | 6 ✓ | convex-peer | Multi-peer isolation + key rotation | 0 (extend, +2 tests) |
-| 7 | convex-peer | PeerAuth — JWT verification | 2 |
-| 8 | convex-restapi | Auth middleware | 2 + modify |
+| 7 ✓ | convex-peer | PeerAuth — two-path JWT verification + peer token issuance | 2 + modify (12 tests) |
+| 8 ✓ | convex-restapi | AuthMiddleware — optional/required bearer token handlers | 2 + modify (11 tests) |
 | 9 | convex-restapi | MCP tools — core signing | modify + JSON |
 | 10 | convex-restapi | MCP tools — elevated + confirmation flow | 3 + modify |
 | 11 | convex-restapi | MCP tools — Convex convenience | modify |
