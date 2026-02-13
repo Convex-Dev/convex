@@ -131,6 +131,7 @@ public class McpAPI extends ABaseAPI {
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
 	private final AMap<AString, ACell> serverInfo;
 	private final Map<String, McpTool> tools = new LinkedHashMap<>();
+	private final Map<String, McpPrompt> prompts = new LinkedHashMap<>();
 
 	public McpAPI(RESTServer restServer) {
 		super(restServer);
@@ -146,6 +147,7 @@ public class McpAPI extends ABaseAPI {
 		}
 		serverInfo = info;
 		registerTools();
+		new McpPrompts(this).registerAll();
 	}
 
 	public AMap<AString, ACell> getServerInfo() {
@@ -300,6 +302,8 @@ public class McpAPI extends ABaseAPI {
 				case "notifications/initialized" -> result = protocolResult(EMPTY_MAP);
 				case "tools/list" -> result = protocolResult(listTools());
 				case "tools/call" -> result = toolCall(request.get(FIELD_PARAMS));
+				case "prompts/list" -> result = protocolResult(listPrompts());
+				case "prompts/get" -> result = promptGet(request.get(FIELD_PARAMS));
 				default -> result = protocolError(-32601, "Method not found: " + method);
 			}
 		} catch (Exception ex) {
@@ -311,7 +315,10 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	private AMap<AString, ACell> buildInitializeResult() {
-		AMap<AString, ACell> capabilities = Maps.of("tools", EMPTY_MAP);
+		AMap<AString, ACell> capabilities = Maps.of(
+			"tools", EMPTY_MAP,
+			"prompts", EMPTY_MAP
+		);
 		AMap<AString, ACell> result = Maps.of(
 			"protocolVersion", "2025-03-26",
 			"serverInfo", serverInfo,
@@ -447,6 +454,39 @@ public class McpAPI extends ABaseAPI {
 
 	void registerTool(McpTool tool) {
 		tools.put(tool.getName(), tool);
+	}
+
+	void registerPrompt(McpPrompt prompt) {
+		prompts.put(prompt.getName(), prompt);
+	}
+
+	private AMap<AString, ACell> listPrompts() {
+		AVector<AMap<AString, ACell>> vec = Vectors.empty();
+		for (McpPrompt prompt : prompts.values()) {
+			vec = vec.conj(prompt.getMetadata());
+		}
+		return Maps.of("prompts", vec);
+	}
+
+	private AMap<AString, ACell> promptGet(ACell paramsCell) {
+		if (!(paramsCell instanceof AMap<?, ?> params)) {
+			return protocolError(-32602, "params must be an object");
+		}
+
+		AString nameCell = RT.ensureString(params.get(FIELD_NAME));
+		if (nameCell == null) return protocolError(-32602, "Prompt name required");
+
+		McpPrompt prompt = prompts.get(nameCell.toString());
+		if (prompt == null) return protocolError(-32601, "Unknown prompt: " + nameCell);
+
+		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		if (arguments == null) arguments = Maps.empty();
+
+		AVector<AMap<AString, ACell>> messages = prompt.render(arguments);
+		return protocolResult(Maps.of(
+			"description", prompt.getMetadata().get(Strings.create("description")),
+			"messages", messages
+		));
 	}
 
 	private ATransaction decodeTransaction(Blob hashBlob) throws BadFormatException, MissingDataException {

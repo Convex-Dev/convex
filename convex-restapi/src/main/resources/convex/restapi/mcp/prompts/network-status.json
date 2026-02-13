@@ -1,0 +1,5 @@
+{
+  "name": "network-status",
+  "description": "Get an overview of the Convex network — peer status, consensus state, key system accounts, and recent activity.",
+  "arguments": []
+}

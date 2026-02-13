@@ -1,0 +1,11 @@
+{
+  "name": "convex-guide",
+  "description": "Interactive guide for Convex Lisp concepts — data types, actors, assets, accounts, and more. Demonstrates examples using live queries.",
+  "arguments": [
+    {
+      "name": "topic",
+      "description": "Topic to learn about (e.g. 'data types', 'actors', 'assets', 'accounts', 'error handling')",
+      "required": true
+    }
+  ]
+}

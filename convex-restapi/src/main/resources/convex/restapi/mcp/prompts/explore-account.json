@@ -1,0 +1,11 @@
+{
+  "name": "explore-account",
+  "description": "Explore a Convex account — view balance, public key, defined symbols, and metadata. Use this to understand what an account contains and what functions it exposes.",
+  "arguments": [
+    {
+      "name": "address",
+      "description": "Account address (e.g. '#11' or '@convex.fungible')",
+      "required": true
+    }
+  ]
+}

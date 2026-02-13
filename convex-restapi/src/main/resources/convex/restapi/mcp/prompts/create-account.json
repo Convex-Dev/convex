@@ -1,0 +1,16 @@
+{
+  "name": "create-account",
+  "description": "Create a new Convex account with a signing key stored in the peer's signing service. Optionally fund it via faucet. Requires authentication.",
+  "arguments": [
+    {
+      "name": "passphrase",
+      "description": "Passphrase to encrypt the new signing key",
+      "required": true
+    },
+    {
+      "name": "faucetAmount",
+      "description": "Optional amount of Convex coins to request from faucet (in copper, max 1 CVX = 1000000000)",
+      "required": false
+    }
+  ]
+}

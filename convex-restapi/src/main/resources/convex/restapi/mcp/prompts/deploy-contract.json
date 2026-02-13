@@ -1,0 +1,21 @@
+{
+  "name": "deploy-contract",
+  "description": "Deploy a smart contract to the Convex network using the signing service. Requires authentication and an existing account.",
+  "arguments": [
+    {
+      "name": "source",
+      "description": "Convex Lisp source code for the contract to deploy",
+      "required": true
+    },
+    {
+      "name": "address",
+      "description": "Account address to deploy from (e.g. '#42')",
+      "required": true
+    },
+    {
+      "name": "passphrase",
+      "description": "Passphrase for the signing key associated with the account",
+      "required": true
+    }
+  ]
+}

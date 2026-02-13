@@ -1,0 +1,26 @@
+{
+  "name": "transfer-funds",
+  "description": "Transfer Convex coins between accounts using the signing service. Requires authentication.",
+  "arguments": [
+    {
+      "name": "from",
+      "description": "Sender account address (e.g. '#42')",
+      "required": true
+    },
+    {
+      "name": "to",
+      "description": "Recipient account address (e.g. '#13')",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "description": "Amount of Convex coins to transfer (in copper)",
+      "required": true
+    },
+    {
+      "name": "passphrase",
+      "description": "Passphrase for the signing key associated with the sender account",
+      "required": true
+    }
+  ]
+}
