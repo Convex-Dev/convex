@@ -52,7 +52,6 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
-import convex.peer.signing.SigningService;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
@@ -116,9 +115,11 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_PASSPHRASE = Strings.intern("passphrase");
 	public static final StringShort ARG_AUDIENCE = Strings.intern("audience");
 	public static final StringShort ARG_LIFETIME = Strings.intern("lifetime");
+	public static final StringShort ARG_CONFIRM_TOKEN = Strings.intern("confirmToken");
+	public static final StringShort ARG_NEW_PASSPHRASE = Strings.intern("newPassphrase");
 
 	/** ThreadLocal to make the current Javalin Context available to tool handlers */
-	private static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
+	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
 
 	public static final StringShort KEY_NETWORK_ID = Strings.intern("networkId");
 	public static final StringShort KEY_PEER_KEY = Strings.intern("peerKey");
@@ -284,12 +285,12 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/* JSON-RPC protocol result */
-	private AMap<AString, ACell> protocolResult(AMap<AString, ACell> result) {
+	AMap<AString, ACell> protocolResult(AMap<AString, ACell> result) {
 		return BASE_RESPONSE.assoc(FIELD_RESULT, result);
 	}
 
 	/* JSON-RPC protocol error */
-	private AMap<AString, ACell> protocolError(int code, String message) {
+	AMap<AString, ACell> protocolError(int code, String message) {
 		AMap<AString, ACell> error = Maps.of(
 			FIELD_CODE, CVMLong.create(code),
 			FIELD_MESSAGE, message
@@ -327,7 +328,8 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/* Create a Result from a CVM Result */
-	private AMap<AString, ACell> toolResult(Result result) {
+	/* Create a Result from a CVM Result - package-private for use by tool extensions */
+	AMap<AString, ACell> toolResult(Result result) {
 		AMap<AString, ACell> structured = EMPTY_MAP;
 		ACell value = result.getValue();
 		if (value != null) {
@@ -344,21 +346,21 @@ public class McpAPI extends ABaseAPI {
 		return protocolResult(buildMcpResult(structured, result.isError()));
 	}
 
-	private AMap<AString, ACell> toolSuccess(ACell structuredResult) {
+	AMap<AString, ACell> toolSuccess(ACell structuredResult) {
 		AMap<AString, ACell> payload = RT.ensureMap(structuredResult);
 		if (payload == null) payload = EMPTY_MAP;
 		return protocolResult(buildMcpResult(payload, false));
 	}
 
 	/* Create an error result for a tool call (but protocol valid) */
-	private AMap<AString, ACell> toolError(String message) {
+	AMap<AString, ACell> toolError(String message) {
 		AMap<AString, ACell> payload = Maps.of(
 			"message", message
 		);
 		return protocolResult(buildMcpResult(payload, true));
 	}
 
-	private AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
+	AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
 		AString jsonText = JSON.print(structured);
 		AMap<AString, ACell> textContent = Maps.of(
 			FIELD_TYPE, "text",
@@ -391,15 +393,11 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new ResolveCNSTool());
 		registerTool(new GetTransactionTool());
 
-		// Signing service tools (require auth)
-		registerTool(new SigningServiceInfoTool());
-		registerTool(new SigningCreateKeyTool());
-		registerTool(new SigningListKeysTool());
-		registerTool(new SigningSignTool());
-		registerTool(new SigningGetJWTTool());
+		// Signing service tools (standard + elevated)
+		new SigningMcpTools(this).registerAll();
 	}
 
-	private void registerTool(McpTool tool) {
+	void registerTool(McpTool tool) {
 		tools.put(tool.getName(), tool);
 	}
 
@@ -1194,173 +1192,19 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/**
+	 * Gets the RESTServer instance. Package-private accessor for tool extensions.
+	 */
+	RESTServer getRESTServer() {
+		return restServer;
+	}
+
+	/**
 	 * Gets the authenticated identity from the current request context, or null if unauthenticated.
 	 */
-	private AString getRequestIdentity() {
+	AString getRequestIdentity() {
 		Context ctx = currentContext.get();
 		if (ctx == null) return null;
 		return AuthMiddleware.getIdentity(ctx);
-	}
-
-	// ==================== Signing Service Tools ====================
-
-	private class SigningServiceInfoTool extends McpTool {
-		SigningServiceInfoTool() {
-			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingServiceInfo.json"));
-		}
-
-		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			SigningService svc = restServer.getSigningService();
-			AMap<AString, ACell> result = Maps.of(
-				"available", (svc != null) ? CVMBool.TRUE : CVMBool.FALSE
-			);
-			return toolSuccess(result);
-		}
-	}
-
-	private class SigningCreateKeyTool extends McpTool {
-		SigningCreateKeyTool() {
-			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingCreateKey.json"));
-		}
-
-		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString identity = getRequestIdentity();
-			if (identity == null) return toolError("Authentication required");
-
-			SigningService svc = restServer.getSigningService();
-			if (svc == null) return toolError("Signing service not available");
-
-			AString passphrase = RT.ensureString(arguments.get(ARG_PASSPHRASE));
-			if (passphrase == null) return protocolError(-32602, "signingCreateKey requires 'passphrase' string");
-
-			try {
-				AccountKey publicKey = svc.createKey(identity, passphrase);
-				AMap<AString, ACell> result = Maps.of(
-					"publicKey", publicKey.toString()
-				);
-				return toolSuccess(result);
-			} catch (Exception e) {
-				return toolError("Key creation failed: " + e.getMessage());
-			}
-		}
-	}
-
-	private class SigningListKeysTool extends McpTool {
-		SigningListKeysTool() {
-			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingListKeys.json"));
-		}
-
-		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString identity = getRequestIdentity();
-			if (identity == null) return toolError("Authentication required");
-
-			SigningService svc = restServer.getSigningService();
-			if (svc == null) return toolError("Signing service not available");
-
-			try {
-				List<AccountKey> keys = svc.listKeys(identity);
-				AVector<ACell> keyStrings = Vectors.empty();
-				for (AccountKey ak : keys) {
-					keyStrings = keyStrings.conj(Strings.create(ak.toString()));
-				}
-				AMap<AString, ACell> result = Maps.of("keys", keyStrings);
-				return toolSuccess(result);
-			} catch (Exception e) {
-				return toolError("List keys failed: " + e.getMessage());
-			}
-		}
-	}
-
-	private class SigningSignTool extends McpTool {
-		SigningSignTool() {
-			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingSign.json"));
-		}
-
-		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString identity = getRequestIdentity();
-			if (identity == null) return toolError("Authentication required");
-
-			SigningService svc = restServer.getSigningService();
-			if (svc == null) return toolError("Signing service not available");
-
-			AString publicKeyCell = RT.ensureString(arguments.get(ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return protocolError(-32602, "signingSign requires 'publicKey' string");
-
-			AString passphrase = RT.ensureString(arguments.get(ARG_PASSPHRASE));
-			if (passphrase == null) return protocolError(-32602, "signingSign requires 'passphrase' string");
-
-			AString valueCell = RT.ensureString(arguments.get(ARG_VALUE));
-			if (valueCell == null) return protocolError(-32602, "signingSign requires 'value' hex string");
-
-			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
-			if (publicKey == null) return toolError("Invalid public key format");
-
-			Blob valueBlob = Blob.parse(valueCell.toString());
-			if (valueBlob == null) return toolError("Value must be valid hex data");
-
-			try {
-				ASignature signature = svc.sign(identity, publicKey, passphrase, valueBlob);
-				if (signature == null) return toolError("Key not found or wrong passphrase");
-
-				AMap<AString, ACell> result = Maps.of(
-					"signature", signature.toHexString(),
-					"publicKey", publicKeyCell
-				);
-				return toolSuccess(result);
-			} catch (Exception e) {
-				return toolError("Signing failed: " + e.getMessage());
-			}
-		}
-	}
-
-	private class SigningGetJWTTool extends McpTool {
-		SigningGetJWTTool() {
-			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingGetJWT.json"));
-		}
-
-		@Override
-		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
-			AString identity = getRequestIdentity();
-			if (identity == null) return toolError("Authentication required");
-
-			SigningService svc = restServer.getSigningService();
-			if (svc == null) return toolError("Signing service not available");
-
-			AString publicKeyCell = RT.ensureString(arguments.get(ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return protocolError(-32602, "signingGetJWT requires 'publicKey' string");
-
-			AString passphrase = RT.ensureString(arguments.get(ARG_PASSPHRASE));
-			if (passphrase == null) return protocolError(-32602, "signingGetJWT requires 'passphrase' string");
-
-			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
-			if (publicKey == null) return toolError("Invalid public key format");
-
-			String audience = null;
-			AString audienceCell = RT.ensureString(arguments.get(ARG_AUDIENCE));
-			if (audienceCell != null) audience = audienceCell.toString();
-
-			long lifetime = 3600;
-			ACell lifetimeCell = arguments.get(ARG_LIFETIME);
-			if (lifetimeCell != null) {
-				CVMLong lifetimeLong = CVMLong.parse(lifetimeCell);
-				if (lifetimeLong == null) return toolError("lifetime must be an integer");
-				lifetime = lifetimeLong.longValue();
-			}
-
-			try {
-				AString jwt = svc.getSelfSignedJWT(identity, publicKey, passphrase, audience, null, lifetime);
-				if (jwt == null) return toolError("Key not found or wrong passphrase");
-
-				AMap<AString, ACell> result = Maps.of("jwt", jwt);
-				return toolSuccess(result);
-			} catch (Exception e) {
-				return toolError("JWT creation failed: " + e.getMessage());
-			}
-		}
 	}
 
 	private AMap<AString,ACell> WELL_KNOWN=JSON.parse("""

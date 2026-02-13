@@ -303,40 +303,71 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 10: MCP Tools — Elevated Operations and Confirmation Flow
+## Stage 10: MCP Tools — Elevated Operations and Confirmation Flow ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (11 tests pass, 163 total restapi tests pass)
 
-**Files to create/modify:**
+**Files created:**
 - `convex-restapi/src/main/java/convex/restapi/auth/ConfirmationService.java`
-- Add elevated tools to `McpAPI.java`
-- `convex-restapi/src/main/java/convex/restapi/web/ConfirmPage.java` (or similar)
+- `convex-restapi/src/main/java/convex/restapi/mcp/SigningMcpTools.java`
+- `convex-restapi/src/main/java/convex/restapi/api/ConfirmAPI.java`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingImportKey.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingExportKey.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingDeleteKey.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingChangePassphrase.json`
 - `convex-restapi/src/test/java/convex/restapi/test/ElevatedMcpTest.java`
+- `convex-restapi/src/test/java/convex/restapi/test/SigningMcpClientTest.java` (MCP SDK client tests)
+
+**Also modified:**
+- `convex-restapi/pom.xml` — added MCP SDK test dependency (`io.modelcontextprotocol.sdk:mcp:0.12.1`)
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` — extracted signing tools into `SigningMcpTools`, made helpers package-private, added `getRESTServer()` accessor
+- `convex-restapi/src/main/java/convex/restapi/RESTServer.java` — added `ConfirmationService` field/getter, registered `ConfirmAPI`
 
 **ConfirmationService.java:**
-- In-memory store: `confirmToken → {identity, tool, params, expiresAt, approved}`
-- `createConfirmation(identity, tool, params)` → returns confirmToken + confirmUrl
-- `approveConfirmation(confirmToken)` → marks as approved
-- `validateConfirmation(confirmToken, identity, tool, params)` → returns true if approved, matches, not expired
+- In-memory store: `Map<String, Confirmation>` where `Confirmation` record holds `(identity, toolName, paramsHash, description, expiresAt, approved)`
+- Token format: `ct_` + 32 hex chars (16 random bytes), 5-minute lifetime
+- `createConfirmation(identity, toolName, params, description)` → creates token, auto-cleans expired entries
+- `approveConfirmation(token)` → marks as approved (returns boolean)
+- `validateAndConsume(token, identity, toolName, params)` → checks approved, not expired, scope-bound (identity + tool + params hash match), then removes (single-use)
+- `computeParamsHash(toolName, params)` — SHA-256 of `toolName + params.toString()` for scope binding
+
+**SigningMcpTools.java:**
+- Package-private class in `convex.restapi.mcp`, extracted from McpAPI to control class size
+- Contains all 9 signing tool inner classes (5 standard + 4 elevated) and `handleElevated` helper
+- `registerAll()` registers all tools with McpAPI via package-private `registerTool()`
+- `handleElevated()` — two-step flow: without `confirmToken` → return `confirmation_required` with URL; with valid `confirmToken` → validate+consume → proceed
+
+**ConfirmAPI.java:**
+- Extends `ABaseAPI`, registers `GET /confirm` and `POST /confirm`
+- GET renders HTML confirmation page with tool name, identity, description, and Confirm button
+- POST approves the confirmation and renders success page
+- Proper HTML escaping via `esc()` method
 
 **Elevated MCP tools:**
-- `importKey`, `exportKey`, `deleteKey`, `changePassphrase`
-- Without confirmToken → return `confirmation_required` response
-- With valid confirmToken → execute via SigningService
+- `signingImportKey` — import Ed25519 seed, requires confirmation
+- `signingExportKey` — reveal private seed, requires confirmation
+- `signingDeleteKey` — permanently destroy key, requires confirmation
+- `signingChangePassphrase` — re-encrypt with new passphrase, requires confirmation
+- All tool JSON descriptions reference the signing service and list related tools
 
-**Confirm endpoint:**
-- `GET /confirm?token=ct_...` — renders confirmation page showing action details
-- `POST /confirm?token=ct_...` — approves the confirmation
+**Tests (ElevatedMcpTest, extends ARESTTest):**
+- Export key full confirmation round-trip (create → export without token → confirm → export with token → verify seed) ✓
+- Import key full confirmation round-trip (import → confirm → verify key appears in list) ✓
+- Delete key confirmation flow ✓
+- Change passphrase confirmation flow (sign works with new, fails with old) ✓
+- All 4 elevated tools without auth → tool error ✓
+- Reused confirmToken → rejected (single-use) ✓
+- confirmToken for wrong tool → rejected (scope-bound) ✓
+- Unapproved confirmToken → rejected ✓
+- Confirm endpoint GET missing token → 400 ✓
+- Confirm endpoint GET invalid token → 404 ✓
+- Confirm endpoint POST invalid token → 404 ✓
 
-**Tests:**
-- Call exportKey without confirmToken → `confirmation_required` response with URL
-- Approve confirmation via POST → retry exportKey with confirmToken → succeeds
-- Expired confirmToken → rejected
-- Reused confirmToken → rejected (single-use)
-- confirmToken for different tool/params → rejected (scope-bound)
-- Full round-trip: createKey → exportKey (confirm) → importKey (confirm) on different identity
+**Additional tests (SigningMcpClientTest, extends ARESTTest):**
+- 10 tests exercising signing tools via official MCP SDK (`McpSyncClient` with `HttpClientStreamableHttpTransport`)
+- Verifies full MCP protocol stack: ping, listTools, tool schemas, serviceInfo, createKey+listKeys, sign+verify, getJWT, auth enforcement
 
-**Verify:** `mvn test -pl convex-restapi -Dtest=ElevatedMcpTest`
+**Verify:** `mvn test -pl convex-restapi -Dtest=ElevatedMcpTest,SigningMcpClientTest`
 
 ---
 
@@ -427,7 +458,7 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 | 7 ✓ | convex-peer | PeerAuth — two-path JWT verification + peer token issuance | 2 + modify (12 tests) |
 | 8 ✓ | convex-restapi | AuthMiddleware — optional/required bearer token handlers | 2 + modify (11 tests) |
 | 9 ✓ | convex-restapi | MCP signing tools — signingServiceInfo/CreateKey/ListKeys/Sign/GetJWT | 6 + modify (11 tests) |
-| 10 | convex-restapi | MCP tools — elevated + confirmation flow | 3 + modify |
+| 10 ✓ | convex-restapi | MCP tools — elevated + confirmation flow, SigningMcpTools extraction, MCP SDK client tests | 9 + modify (21 tests) |
 | 11 | convex-restapi | MCP tools — Convex convenience | modify |
 | 12 | convex-restapi | Social login OAuth flow | 3 |
 | 13 | convex-restapi | End-to-end integration | 1 |

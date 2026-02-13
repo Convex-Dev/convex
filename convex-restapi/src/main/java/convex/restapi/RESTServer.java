@@ -25,11 +25,13 @@ import convex.peer.Server;
 import convex.peer.auth.PeerAuth;
 import convex.peer.signing.SigningService;
 import convex.restapi.api.ChainAPI;
+import convex.restapi.api.ConfirmAPI;
 import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
 import convex.restapi.api.X402;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.auth.ConfirmationService;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
@@ -76,6 +78,7 @@ public class RESTServer implements Closeable {
 		} else {
 			this.signingService = null;
 		}
+		this.confirmationService = new ConfirmationService();
 	}
 	
 	protected ChainAPI chainAPI;
@@ -89,6 +92,8 @@ public class RESTServer implements Closeable {
 	protected DIDAPI didAPI;
 	protected AuthMiddleware authMiddleware;
 	protected SigningService signingService;
+	protected ConfirmationService confirmationService;
+	protected ConfirmAPI confirmAPI;
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;
@@ -100,6 +105,10 @@ public class RESTServer implements Closeable {
 
 	public SigningService getSigningService() {
 		return signingService;
+	}
+
+	public ConfirmationService getConfirmationService() {
+		return confirmationService;
 	}
 
 	private void addAPIRoutes(Javalin app) {
@@ -137,6 +146,9 @@ public class RESTServer implements Closeable {
 
 		didAPI = new DIDAPI(this);
 		didAPI.addRoutes(app);
+
+		confirmAPI = new ConfirmAPI(this);
+		confirmAPI.addRoutes(app);
 	}
 	
 	private Javalin buildApp(boolean useSSL) {

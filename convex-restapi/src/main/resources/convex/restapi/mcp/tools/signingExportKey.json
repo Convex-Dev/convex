@@ -1,0 +1,48 @@
+{
+  "name": "signingExportKey",
+  "title": "Export Key (Signing Service)",
+  "description": "Exports (reveals) the private Ed25519 seed for a key stored in the peer's signing service. Requires authentication. This is an elevated operation — on first call (without confirmToken), returns a confirmation URL that the user must visit in a browser to approve. After approval, retry with the confirmToken to receive the seed. WARNING: the returned seed grants full control over the key. Part of the signing service: see also signingServiceInfo, signingCreateKey, signingListKeys, signingSign, signingGetJWT, signingImportKey, signingDeleteKey, signingChangePassphrase.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key identifying which key to export (hex string)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase used when the key was created or imported"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["publicKey", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Decrypted Ed25519 seed (hex string, returned after confirmation)"
+      },
+      "publicKey": {
+        "type": "string",
+        "description": "The exported key's public key"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}

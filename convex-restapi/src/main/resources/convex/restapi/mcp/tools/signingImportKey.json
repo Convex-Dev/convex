@@ -1,0 +1,44 @@
+{
+  "name": "signingImportKey",
+  "title": "Import Key (Signing Service)",
+  "description": "Imports an existing Ed25519 seed into the peer's signing service key store. Requires authentication. This is an elevated operation — on first call (without confirmToken), returns a confirmation URL that the user must visit in a browser to approve. After approval, retry with the confirmToken to complete the import. Part of the signing service: see also signingServiceInfo, signingCreateKey, signingListKeys, signingSign, signingGetJWT, signingExportKey, signingDeleteKey, signingChangePassphrase.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed to import (64-character hex string, e.g. 0x...)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase for at-rest encryption of the imported key"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["seed", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key derived from the imported seed (returned after confirmation)"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}
