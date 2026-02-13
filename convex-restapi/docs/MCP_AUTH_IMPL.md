@@ -371,69 +371,77 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 11: MCP Tools — Signing Convenience Layer
+## Stage 11: MCP Tools — Signing Convenience Layer ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (8 tests pass, 178 total)
 
-**Motivation:** The existing `transact` and `createAccount` tools require the agent to manage raw Ed25519 seeds. These new `signing*` variants use the signing service instead, so the agent only needs a passphrase. The signing service is not always enabled (disabled by default, requires config `mcp.signing: true`), so these tools are registered only when the signing service is available. The existing raw tools remain unchanged.
-
-**Files to create/modify:**
-- Add tools to `SigningMcpTools.java` (extends existing extraction)
+**Files created/modified:**
+- `SigningMcpTools.java` — added `SigningTransactTool`, `SigningCreateAccountTool`, `SigningListAccountsTool` inner classes + `parseAddress` helper
 - `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingTransact.json`
 - `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingCreateAccount.json`
 - `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingListAccounts.json`
 - `convex-restapi/src/test/java/convex/restapi/test/SigningConvenienceTest.java`
 
 **New MCP tools (separate from existing raw tools):**
-- `signingTransact` — takes `source`, `address`, `passphrase`; resolves signing key for address, prepares tx, signs via signing service, submits
-- `signingCreateAccount` — takes `passphrase`, optional `faucet` amount; creates signing key, creates on-chain account with that key, optional faucet payout
-- `signingListAccounts` — takes no args (uses identity); lists signing keys, queries network for addresses registered with each key
+- `signingTransact` — takes `source`, `address`, `passphrase`; looks up account's on-chain key, signs via signing service, submits transaction
+- `signingCreateAccount` — takes `passphrase`, optional `faucet` amount; creates signing key + on-chain account in one step
+- `signingListAccounts` — lists signing keys for the authenticated identity (TODO: resolve on-chain addresses when peer has a key→account index)
 
 **Design notes:**
-- Tools only registered when `getSigningService() != null`
-- Signing service enablement should be a config option (Stage 14: `mcp.signing`)
-- `signingTransact` looks up the account's public key on-chain, finds matching signing key for the authenticated identity, signs with that key
-- `signingCreateAccount` combines `signingCreateKey` + raw `createAccount` in a single tool call
-
-**Tests:**
-- `signingCreateAccount` with faucet → returns address + public key, account exists on network with correct key ✓
-- `signingListAccounts` → shows the created account ✓
-- `signingTransact` with created account → executes CVX code, returns result ✓
-- `signingTransact` with wrong passphrase → error ✓
-- `signingTransact` with address not managed by this identity → error ✓
-- All tools without auth → error ✓
-- Tools not registered when signing service unavailable ✓
+- All tools registered unconditionally; each checks signing service availability at call time and returns error if unavailable
+- `signingTransact` builds and persists the transaction, computes the signing message via `SignedData.getMessageForRef()`, signs via `SigningService.sign()`, and submits the `SignedData` — the private key never leaves the signing service
+- `signingCreateAccount` combines `signingCreateKey` + faucet-based account creation in a single tool call
+- `signingListAccounts` returns keys only for now; on-chain address resolution deferred until peers have a proper key→account index
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=SigningConvenienceTest`
 
 ---
 
-## Stage 12: Social Login — OAuth Flow
+## Stage 12: Social Login — OAuth Flow ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (19 tests pass, 197 total restapi tests pass)
 
-**Files to create:**
+**Files created:**
 - `convex-restapi/src/main/java/convex/restapi/auth/OAuthService.java`
 - `convex-restapi/src/main/java/convex/restapi/web/AuthPage.java`
 - `convex-restapi/src/test/java/convex/restapi/test/OAuthTest.java`
 
+**Also modified:**
+- `convex-restapi/src/main/java/convex/restapi/RESTServer.java` — added `OAuthService` field/getter, `AuthPage` field/registration
+- `convex-restapi/src/main/java/convex/restapi/api/ConfirmAPI.java` — migrated from raw HTML to j2html, now extends `AWebSite` for consistent Pico CSS styling
+- `convex-peer/src/main/java/convex/peer/PeerConfig.java` — added OAuth config accessors (`getOAuthProvider()`, `getOAuthClientId()`, `getOAuthClientSecret()`)
+
 **OAuthService.java:**
-- OAuth 2.1 + PKCE flow management
-- Provider configuration (Google, Apple, GitHub, Discord)
-- JWKS fetching and caching (Google, Apple)
-- ID token validation → extract stable user ID
+- OAuth 2.1 + PKCE flow management with `Provider` enum (Google OIDC, GitHub OAuth2)
+- PKCE helpers: `generateCodeVerifier()`, `computeCodeChallenge()`, `generateState()`
+- In-memory `PendingAuth` state store with 10-minute expiry and auto-cleanup
+- JWKS fetching and caching (24-hour TTL) via `JWKSKeys.parseKeys()`
+- Token exchange via `java.net.http.HttpClient` (JDK 21, no extra dependency)
+- OIDC path: validates RS256 ID token signature via JWKS, extracts `sub` claim
+- OAuth2 path: calls user API with access token, extracts `id` field
 - Identity construction: `did:web:<hostname>:oauth:<provider>:<sub>`
-- Peer-signed JWT issuance via `PeerAuth.issuePeerToken()`
+- Provider config from peer config: `auth.oauth.<provider>.clientId` / `clientSecret`
 
-**Auth endpoint:**
-- `GET /auth` — renders login page with provider buttons
-- `GET /auth/callback` — OAuth redirect handler
+**AuthPage.java (extends AWebSite):**
+- `GET /auth` — renders login page with j2html + Pico CSS, provider buttons for each configured provider
+- `GET /auth/callback` — OAuth redirect handler: validates state, exchanges code, resolves identity, issues peer-signed JWT via `PeerAuth.issuePeerToken()`, displays token on success page
+- Consistent styling with Explorer, WebApp via `AWebSite.returnPage()`
 
-**Tests:**
-- Mock provider JWKS endpoint, validate ID token
-- Verify correct `did:web` identity format per provider
-- Verify peer-signed JWT issued after successful auth
-- Verify peer-signed JWT accepted by AuthMiddleware
+**ConfirmAPI.java (migrated):**
+- Changed from `extends ABaseAPI` to `extends AWebSite`
+- Replaced raw HTML string builder with j2html `TagCreator` elements
+- Uses `returnPage()` for consistent header, footer, Pico CSS styling
+- Removed `page()` and `esc()` helper methods
+
+**Tests (OAuthTest, extends ARESTTest):**
+- Login page renders with "no providers" message (no OAuth config in test env) ✓
+- Callback error handling: error param, missing state, invalid state, missing code ✓
+- PKCE helpers: verifier length/uniqueness, challenge determinism/length, state format ✓
+- Identity format: Google, GitHub, localhost hostname ✓
+- Provider enum: byId lookup, display names, OIDC flags ✓
+- State management: store/consume round-trip, single-use, invalid/null ✓
+- ConfirmAPI regression: missing token → 400, invalid token → 404 ✓
+- No providers configured assertion ✓
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=OAuthTest`
 
@@ -590,8 +598,8 @@ Each prompt renders a sequence of messages that instruct the AI which tools to c
 | 8 ✓ | convex-restapi | AuthMiddleware — optional/required bearer token handlers | 2 + modify (11 tests) |
 | 9 ✓ | convex-restapi | MCP signing tools — signingServiceInfo/CreateKey/ListKeys/Sign/GetJWT | 6 + modify (11 tests) |
 | 10 ✓ | convex-restapi | MCP tools — elevated + confirmation flow, SigningMcpTools extraction, MCP SDK client tests | 9 + modify (21 tests) |
-| 11 | convex-restapi | MCP tools — Convex convenience | modify |
-| 12 | convex-restapi | Social login OAuth flow | 3 |
+| 11 ✓ | convex-restapi | MCP tools — Convex convenience | modify |
+| 12 ✓ | convex-restapi | Social login OAuth flow — OAuthService, AuthPage (j2html), ConfirmAPI migration | 3 + modify (19 tests) |
 | 13 | convex-restapi | End-to-end integration | 1 |
 | 14 ✓ | convex-peer, convex-restapi | Config refactor — JSON5-based PeerConfig, backward compat, example config | 4 (48 tests) |
 | 15 | convex-restapi | MCP Skills — prompts and guided workflows | 3 + modify |

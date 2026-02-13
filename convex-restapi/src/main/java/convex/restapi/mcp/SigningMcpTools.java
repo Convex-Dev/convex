@@ -2,8 +2,15 @@ package convex.restapi.mcp;
 
 import java.util.List;
 
+import convex.api.Convex;
+import convex.core.Coin;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -11,12 +18,18 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
+import convex.peer.Server;
 import convex.peer.signing.SigningService;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.auth.ConfirmationService;
@@ -67,6 +80,11 @@ class SigningMcpTools {
 		api.registerTool(new SigningListKeysTool());
 		api.registerTool(new SigningSignTool());
 		api.registerTool(new SigningGetJWTTool());
+
+		// Convenience tools
+		api.registerTool(new SigningTransactTool());
+		api.registerTool(new SigningCreateAccountTool());
+		api.registerTool(new SigningListAccountsTool());
 
 		// Elevated tools
 		api.registerTool(new SigningImportKeyTool());
@@ -267,6 +285,167 @@ class SigningMcpTools {
 				return api.toolSuccess(Maps.of("jwt", jwt));
 			} catch (Exception e) {
 				return api.toolError("JWT creation failed: " + e.getMessage());
+			}
+		}
+	}
+
+	// ==================== Convenience Tools ====================
+
+	/**
+	 * Parses an address from a string, supporting "#13" and "13" formats.
+	 */
+	private static Address parseAddress(AString addressCell) {
+		if (addressCell == null) return null;
+		try {
+			ACell parsed = Reader.read(addressCell.toString());
+			if (parsed instanceof Address a) return a;
+			CVMLong num = RT.ensureLong(parsed);
+			if (num != null) return Address.create(num.longValue());
+			return null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	private class SigningTransactTool extends McpTool {
+		SigningTransactTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingTransact.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString identity = api.getRequestIdentity();
+			if (identity == null) return api.toolError("Authentication required");
+
+			SigningService svc = getSigningService();
+			if (svc == null) return api.toolError("Signing service not available");
+
+			AString sourceCell = RT.ensureString(arguments.get(McpAPI.ARG_SOURCE));
+			if (sourceCell == null) return api.protocolError(-32602, "signingTransact requires 'source' string");
+
+			AString addressCell = RT.ensureString(arguments.get(McpAPI.ARG_ADDRESS));
+			if (addressCell == null) return api.protocolError(-32602, "signingTransact requires 'address' string");
+
+			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
+			if (passphrase == null) return api.protocolError(-32602, "signingTransact requires 'passphrase' string");
+
+			Address address = parseAddress(addressCell);
+			if (address == null) return api.toolError("Invalid address format");
+
+			// Get account's on-chain key
+			Server srv = api.getRESTServer().getServer();
+			AccountStatus as = srv.getState().getAccount(address);
+			if (as == null) return api.toolError("Account not found: " + address);
+
+			AccountKey accountKey = as.getAccountKey();
+			if (accountKey == null) return api.toolError("Account has no public key (actor account)");
+
+			// Parse source
+			ACell code;
+			try {
+				code = Reader.read(sourceCell.toString());
+			} catch (Exception e) {
+				return api.toolError("Failed to parse source: " + e.getMessage());
+			}
+
+			try {
+				// Build transaction
+				long sequence = as.getSequence() + 1;
+				ATransaction transaction = Invoke.create(address, sequence, code);
+				transaction = Cells.persist(transaction);
+				Ref<ATransaction> ref = transaction.getRef();
+				Blob message = SignedData.getMessageForRef(ref);
+
+				// Sign via signing service
+				ASignature signature = svc.sign(identity, accountKey, passphrase, message);
+				if (signature == null) return api.toolError("Key not found or wrong passphrase for account key " + accountKey);
+
+				// Submit
+				SignedData<ATransaction> signed = SignedData.create(accountKey, signature, ref);
+				Result result = api.getRESTServer().getConvex().transactSync(signed);
+				return api.toolResult(result);
+			} catch (Exception e) {
+				return api.toolError("Transaction failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class SigningCreateAccountTool extends McpTool {
+		SigningCreateAccountTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingCreateAccount.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString identity = api.getRequestIdentity();
+			if (identity == null) return api.toolError("Authentication required");
+
+			SigningService svc = getSigningService();
+			if (svc == null) return api.toolError("Signing service not available");
+
+			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
+			if (passphrase == null) return api.protocolError(-32602, "signingCreateAccount requires 'passphrase' string");
+
+			Convex faucetClient = api.getRESTServer().getFaucet();
+			if (faucetClient == null) return api.toolError("Faucet not available on this server");
+
+			try {
+				// Create key in signing service
+				AccountKey publicKey = svc.createKey(identity, passphrase);
+
+				// Create on-chain account
+				Address address = faucetClient.createAccountSync(publicKey);
+
+				// Optional faucet payout
+				ACell faucetCell = arguments.get(McpAPI.ARG_FAUCET);
+				if (faucetCell != null) {
+					CVMLong faucetLong = CVMLong.parse(faucetCell);
+					if (faucetLong == null) return api.toolError("Faucet amount must be a valid number");
+					long amt = faucetLong.longValue();
+					if (amt > Coin.GOLD) amt = Coin.GOLD;
+					Result transferResult = faucetClient.transferSync(address, amt);
+					if (transferResult.isError()) return api.toolResult(transferResult);
+				}
+
+				AMap<AString, ACell> result = Maps.of(
+					"address", CVMLong.create(address.longValue()),
+					"publicKey", publicKey.toString()
+				);
+				return api.toolSuccess(result);
+			} catch (ResultException e) {
+				return api.toolResult(e.getResult());
+			} catch (Exception e) {
+				return api.toolError("Account creation failed: " + e.getMessage());
+			}
+		}
+	}
+
+	// TODO: signingListAccounts should resolve on-chain addresses per key
+	// when the peer has a proper key→account index. For now, returns keys only.
+	private class SigningListAccountsTool extends McpTool {
+		SigningListAccountsTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingListAccounts.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString identity = api.getRequestIdentity();
+			if (identity == null) return api.toolError("Authentication required");
+
+			SigningService svc = getSigningService();
+			if (svc == null) return api.toolError("Signing service not available");
+
+			try {
+				List<AccountKey> keys = svc.listKeys(identity);
+				AVector<ACell> entries = Vectors.empty();
+				for (AccountKey key : keys) {
+					entries = entries.conj(Maps.of(
+						"publicKey", key.toString()
+					));
+				}
+				return api.toolSuccess(Maps.of("accounts", entries));
+			} catch (Exception e) {
+				return api.toolError("List accounts failed: " + e.getMessage());
 			}
 		}
 	}

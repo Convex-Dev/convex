@@ -1,7 +1,14 @@
 package convex.restapi.api;
 
+import static j2html.TagCreator.button;
+import static j2html.TagCreator.form;
+import static j2html.TagCreator.p;
+import static j2html.TagCreator.strong;
+import static j2html.TagCreator.text;
+
 import convex.restapi.RESTServer;
 import convex.restapi.auth.ConfirmationService;
+import convex.restapi.web.AWebSite;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 
@@ -17,7 +24,7 @@ import io.javalin.http.Context;
  *
  * @see ConfirmationService
  */
-public class ConfirmAPI extends ABaseAPI {
+public class ConfirmAPI extends AWebSite {
 
 	public ConfirmAPI(RESTServer restServer) {
 		super(restServer);
@@ -35,32 +42,34 @@ public class ConfirmAPI extends ABaseAPI {
 	private void handleConfirmGet(Context ctx) {
 		String token = ctx.queryParam("token");
 		if (token == null || token.isEmpty()) {
-			ctx.status(400).contentType("text/html").result(
-				page("Missing Token", "<p>No confirmation token provided.</p>"));
+			ctx.status(400);
+			returnPage(ctx, "Missing Token",
+				p("No confirmation token provided."));
 			return;
 		}
 
 		ConfirmationService confirmSvc = restServer.getConfirmationService();
 		ConfirmationService.Confirmation c = confirmSvc.getConfirmation(token);
 		if (c == null) {
-			ctx.status(404).contentType("text/html").result(
-				page("Invalid or Expired", "<p>This confirmation link is invalid or has expired.</p>"));
+			ctx.status(404);
+			returnPage(ctx, "Invalid or Expired",
+				p("This confirmation link is invalid or has expired."));
 			return;
 		}
 
 		if (c.approved()) {
-			ctx.contentType("text/html").result(
-				page("Already Approved", "<p>This operation has already been approved.</p>"));
+			returnPage(ctx, "Already Approved",
+				p("This operation has already been approved."));
 			return;
 		}
 
-		ctx.contentType("text/html").result(page("Confirm Operation",
-			"<p><strong>Tool:</strong> " + esc(c.toolName()) + "</p>"
-			+ "<p><strong>Identity:</strong> " + esc(c.identity().toString()) + "</p>"
-			+ "<p>" + esc(c.description()) + "</p>"
-			+ "<form method='POST' action='/confirm?token=" + esc(token) + "'>"
-			+ "<button type='submit'>Confirm</button>"
-			+ "</form>"));
+		returnPage(ctx, "Confirm Operation",
+			p(strong("Tool: "), text(c.toolName())),
+			p(strong("Identity: "), text(c.identity().toString())),
+			p(c.description()),
+			form(
+				button("Confirm").withType("submit")
+			).withMethod("POST").withAction("/confirm?token=" + token));
 	}
 
 	/**
@@ -69,30 +78,21 @@ public class ConfirmAPI extends ABaseAPI {
 	private void handleConfirmPost(Context ctx) {
 		String token = ctx.queryParam("token");
 		if (token == null || token.isEmpty()) {
-			ctx.status(400).contentType("text/html").result(
-				page("Missing Token", "<p>No confirmation token provided.</p>"));
+			ctx.status(400);
+			returnPage(ctx, "Missing Token",
+				p("No confirmation token provided."));
 			return;
 		}
 
 		ConfirmationService confirmSvc = restServer.getConfirmationService();
 		boolean approved = confirmSvc.approveConfirmation(token);
 		if (approved) {
-			ctx.contentType("text/html").result(
-				page("Approved", "<p>You may close this window. The agent will complete the operation.</p>"));
+			returnPage(ctx, "Approved",
+				p("You may close this window. The agent will complete the operation."));
 		} else {
-			ctx.status(404).contentType("text/html").result(
-				page("Invalid or Expired", "<p>This confirmation link is invalid or has expired.</p>"));
+			ctx.status(404);
+			returnPage(ctx, "Invalid or Expired",
+				p("This confirmation link is invalid or has expired."));
 		}
-	}
-
-	private static String page(String title, String body) {
-		return "<html><head><title>" + esc(title) + "</title></head><body>"
-			+ "<h2>" + esc(title) + "</h2>" + body + "</body></html>";
-	}
-
-	private static String esc(String s) {
-		if (s == null) return "";
-		return s.replace("&", "&amp;").replace("<", "&lt;")
-				.replace(">", "&gt;").replace("\"", "&quot;");
 	}
 }
