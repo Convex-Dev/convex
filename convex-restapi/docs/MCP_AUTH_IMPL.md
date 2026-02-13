@@ -160,21 +160,21 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 6: Signing Service — Multi-Peer and Key Rotation
+## Stage 6: Signing Service — Multi-Peer and Key Rotation ✓
 
-**Module:** `convex-peer`
+**Module:** `convex-peer` — **DONE** (39 tests pass, 2 new in this stage)
 
-**Extend:** `SigningServiceTest.java`
+**Extended:** `SigningServiceTest.java`
 
-**Focus:** Verify the OwnerLattice isolation and merge properties work correctly with SigningService.
+**Focus:** Verify cursor isolation and peer key rotation at the SigningService level. OwnerLattice merge is already tested in `LocalLatticeTest`.
 
-**Tests:**
-- Two SigningService instances with different peer keys sharing the same store
-- Each creates keys independently — no conflicts
-- Each can only see its own keys via listKeys
-- Merge the two lattice roots → both peers' data preserved
-- One peer cannot decrypt the other's encryptionSecret (wrong peer key)
-- Peer key rotation: create service with key A, create signing keys, simulate rotation to key B (re-wrap encryptionSecret), verify all signing keys still accessible
+**New tests:**
+- `testIndependentServicesIndependentCursors` — two services with separate cursors, same identity string → independent key stores, cross-service load fails (different encryptionSecret) ✓
+- `testPeerKeyRotation` — create keys with peer key A, re-wrap encryptionSecret to peer key B (decrypt with old, encrypt with new), verify all signing keys accessible with new peer key, loaded seeds match original keys ✓
+
+**Already covered by existing tests:**
+- Different peer key cannot decrypt encryptionSecret → `testDifferentPeerKeyCannotDecryptSecret`
+- Persist and reload via cursor snapshot → `testPersistAndReloadViaCursor`
 
 **Verify:** `mvn test -pl convex-peer -Dtest=SigningServiceTest`
 
@@ -391,7 +391,7 @@ Each tool handler: extract identity from context attribute, extract params, dele
 | 3 ✓ | convex-peer | SigningService — cursor-based key store (AString params) | 2 + modify (16 tests) |
 | 4 ✓ | convex-peer | SigningService — sign + JWT | 0 (extend, +9 tests) |
 | 5 ✓ | convex-peer | SigningService — elevated ops, plaintext identity index, LWW timestamps | 0 (extend, +12 tests) |
-| 6 | convex-peer | OwnerLattice multi-peer + key rotation | 0 (extend) |
+| 6 ✓ | convex-peer | Multi-peer isolation + key rotation | 0 (extend, +2 tests) |
 | 7 | convex-peer | PeerAuth — JWT verification | 2 |
 | 8 | convex-restapi | Auth middleware | 2 + modify |
 | 9 | convex-restapi | MCP tools — core signing | modify + JSON |

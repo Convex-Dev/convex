@@ -11,10 +11,12 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.json.JWT;
@@ -546,6 +548,72 @@ public class SigningServiceTest {
 		List<AccountKey> keys = svc.listKeys(s("did:key:alice"));
 		assertEquals(1, keys.size());
 		assertEquals(pk, keys.get(0));
+	}
+
+	// ===== Multi-Peer Isolation =====
+
+	@Test
+	public void testIndependentServicesIndependentCursors() {
+		SigningService svcA = createService();
+		SigningService svcB = createService();
+
+		AccountKey pkA = svcA.createKey(s("did:key:alice"), s("pass"));
+		AccountKey pkB = svcB.createKey(s("did:key:alice"), s("pass"));
+
+		// Same identity, different services → different keys, each only sees its own
+		assertNotEquals(pkA, pkB);
+		assertEquals(1, svcA.listKeys(s("did:key:alice")).size());
+		assertEquals(pkA, svcA.listKeys(s("did:key:alice")).get(0));
+		assertEquals(1, svcB.listKeys(s("did:key:alice")).size());
+		assertEquals(pkB, svcB.listKeys(s("did:key:alice")).get(0));
+
+		// Cross-service access fails (different encryptionSecret)
+		assertNull(svcA.loadKey(s("did:key:alice"), pkB, s("pass")));
+		assertNull(svcB.loadKey(s("did:key:alice"), pkA, s("pass")));
+	}
+
+	// ===== Key Rotation (re-wrap encryptionSecret) =====
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testPeerKeyRotation() {
+		AKeyPair oldKP = AKeyPair.generate();
+		AKeyPair newKP = AKeyPair.generate();
+		Root<ACell> cursor = new Root<>((ACell) null);
+
+		// Create service with old peer key, add signing keys
+		SigningService oldSvc = createService(oldKP, cursor);
+		AccountKey pk1 = oldSvc.createKey(s("did:key:alice"), s("pass1"));
+		AccountKey pk2 = oldSvc.createKey(s("did:key:alice"), s("pass2"));
+
+		// Re-wrap: decrypt encryptionSecret with old key, re-encrypt with new key
+		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
+		ABlob oldEncryptedSecret = (ABlob) data.get(SigningService.KEY_SECRET);
+		byte[] rawSecret = oldSvc.decryptSecret(oldEncryptedSecret);
+
+		SigningService tempSvc = new SigningService(newKP, new Root<>((ACell) null));
+		ABlob newEncryptedSecret = tempSvc.encryptSecret(rawSecret);
+		java.util.Arrays.fill(rawSecret, (byte) 0);
+
+		// Update cursor with re-wrapped secret
+		data = data.assoc(SigningService.KEY_SECRET, newEncryptedSecret);
+		Root<ACell> newCursor = Root.create(data);
+
+		// New service with new peer key should load successfully
+		SigningService newSvc = createService(newKP, newCursor);
+
+		// All signing keys still accessible
+		List<AccountKey> keys = newSvc.listKeys(s("did:key:alice"));
+		assertEquals(2, keys.size());
+		assertTrue(keys.contains(pk1));
+		assertTrue(keys.contains(pk2));
+
+		assertNotNull(newSvc.loadKey(s("did:key:alice"), pk1, s("pass1")));
+		assertNotNull(newSvc.loadKey(s("did:key:alice"), pk2, s("pass2")));
+
+		// Verify loaded seed matches original key
+		byte[] seed1 = newSvc.loadKey(s("did:key:alice"), pk1, s("pass1"));
+		assertEquals(pk1, AKeyPair.create(seed1).getAccountKey());
 	}
 
 	// ===== Edge Cases =====
