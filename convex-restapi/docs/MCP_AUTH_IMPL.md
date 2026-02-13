@@ -371,27 +371,40 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 11: MCP Tools — Convex Convenience Layer
+## Stage 11: MCP Tools — Signing Convenience Layer
 
 **Module:** `convex-restapi`
 
-**Files to modify:**
-- Add tools to `McpAPI.java`
-- `convex-restapi/src/test/java/convex/restapi/test/ConvexMcpTest.java`
+**Motivation:** The existing `transact` and `createAccount` tools require the agent to manage raw Ed25519 seeds. These new `signing*` variants use the signing service instead, so the agent only needs a passphrase. The signing service is not always enabled (disabled by default, requires config `mcp.signing: true`), so these tools are registered only when the signing service is available. The existing raw tools remain unchanged.
 
-**New MCP tools:**
-- `transact` — resolve key for address, prepare tx, sign, submit
-- `createAccount` — createKey + create Convex account (+ optional faucet)
-- `listAccounts` — listKeys + query network for addresses per key
+**Files to create/modify:**
+- Add tools to `SigningMcpTools.java` (extends existing extraction)
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingTransact.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingCreateAccount.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingListAccounts.json`
+- `convex-restapi/src/test/java/convex/restapi/test/SigningConvenienceTest.java`
+
+**New MCP tools (separate from existing raw tools):**
+- `signingTransact` — takes `source`, `address`, `passphrase`; resolves signing key for address, prepares tx, signs via signing service, submits
+- `signingCreateAccount` — takes `passphrase`, optional `faucet` amount; creates signing key, creates on-chain account with that key, optional faucet payout
+- `signingListAccounts` — takes no args (uses identity); lists signing keys, queries network for addresses registered with each key
+
+**Design notes:**
+- Tools only registered when `getSigningService() != null`
+- Signing service enablement should be a config option (Stage 14: `mcp.signing`)
+- `signingTransact` looks up the account's public key on-chain, finds matching signing key for the authenticated identity, signs with that key
+- `signingCreateAccount` combines `signingCreateKey` + raw `createAccount` in a single tool call
 
 **Tests:**
-- `createAccount` with faucet → returns address + public key, account exists on network
-- `listAccounts` → shows the created account
-- `transact` with created account → executes CVX code, returns result
-- `transact` with wrong passphrase → error
-- `transact` with address not managed by this identity → error
+- `signingCreateAccount` with faucet → returns address + public key, account exists on network with correct key ✓
+- `signingListAccounts` → shows the created account ✓
+- `signingTransact` with created account → executes CVX code, returns result ✓
+- `signingTransact` with wrong passphrase → error ✓
+- `signingTransact` with address not managed by this identity → error ✓
+- All tools without auth → error ✓
+- Tools not registered when signing service unavailable ✓
 
-**Verify:** `mvn test -pl convex-restapi -Dtest=ConvexMcpTest`
+**Verify:** `mvn test -pl convex-restapi -Dtest=SigningConvenienceTest`
 
 ---
 
@@ -445,6 +458,124 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
+## Stage 14: Refactor Config — JSON5-Based Peer and API Configuration ✓
+
+**Modules:** `convex-peer`, `convex-restapi` — **DONE** (48 tests pass: 41 PeerConfigTest + 7 PeerConfigFileTest)
+
+**Motivation:** Peer configuration currently uses `HashMap<Keyword, Object>` — untyped, no schema, no file loading. REST and MCP configuration is either hardcoded or piggybacks on the peer config map. This stage adds JSON5-based config loading following the Covia pattern: `AMap<AString, ACell>` wrapped in a typed `PeerConfig` class with accessor methods and sensible defaults. The existing `HashMap<Keyword, Object>` format is preserved via `toLegacy()` for backward compatibility — no existing code is modified.
+
+**Files created:**
+- `convex-peer/src/main/java/convex/peer/PeerConfig.java` — typed config wrapper with all sections
+- `convex-peer/src/test/java/convex/peer/PeerConfigTest.java` — 41 tests
+- `convex-restapi/src/test/resources/config-example.json5` — full example config with comments
+- `convex-restapi/src/test/java/convex/restapi/test/PeerConfigFileTest.java` — 7 tests
+
+**No files modified** — fully additive, backward compatible.
+
+**PeerConfig.java:**
+- Wraps `AMap<AString, ACell>` loaded via `JSON.parseJSON5()`
+- Four sections: `peer`, `rest`, `mcp`, `auth` — each accessed via `getSection(key)`
+- `static PeerConfig parse(String json5)` — parse from JSON5 string
+- `static PeerConfig load(String path)` — load from file
+- `static PeerConfig create(AMap<AString, ACell>)` — wrap existing map
+- `HashMap<Keyword, Object> toLegacy()` — convert to existing config format
+
+**Typed accessors (all with sensible defaults):**
+- **Peer:** `getPeerPort()`, `getKeypairSeed()`, `getStorePath()`, `getPeerUrl()`, `isRestore()` (true), `isPersist()` (true), `isAutoManage()` (true), `getOutgoingConnections()`, `getSource()`, `getTimeout()`
+- **REST:** `getRestPort()`, `getBaseUrl()`, `isFaucetEnabled()` (false)
+- **MCP:** `isMcpEnabled()` (true), `isSigningEnabled()` (false), `isElevatedEnabled()` (follows signing), `getToolsConfig()`
+- **Auth:** `getTokenExpiry()` (86400), `isPublicAccess()` (true)
+
+**Legacy bridge (`toLegacy()`):**
+- Maps peer section keys to `Keywords` constants (PORT, URL, STORE, etc.)
+- Converts keypair seed hex string to `AKeyPair` instance
+- Maps REST keys to flat config (BASE_URL, FAUCET)
+- Only sets explicitly configured keys; omitted keys retain legacy defaults
+
+**Example config file** (`config-example.json5`):
+- Full JSON5 with comments documenting every option
+- All sections present with defaults; optional fields commented out
+- Covers peer (port, keypair, store, url, booleans), rest (port, baseUrl, faucet), mcp (enabled, signing, elevated, tools), auth (tokenExpiry, publicAccess, oauth placeholder)
+
+**Tests:**
+- PeerConfigTest (41): parse minimal/null, all typed accessors with defaults, all typed accessors with overrides, boolean defaults and overrides, section access, tools config, JSON5 comments and trailing commas, full config round-trip, legacy bridge for all key types (port, keypair→AKeyPair, booleans, strings)
+- PeerConfigFileTest (7): example config parses, peer/rest/mcp/auth defaults correct, toLegacy produces expected values, all sections accessible
+
+**Verify:** `mvn test -pl convex-peer -Dtest=PeerConfigTest && mvn test -pl convex-restapi -Dtest=PeerConfigFileTest`
+
+---
+
+## Stage 15: MCP Skills — Prompts and Guided Workflows
+
+**Module:** `convex-restapi`
+
+**Motivation:** MCP tools are low-level primitives. Agents often need multi-step workflows that combine several tools. The MCP spec defines "prompts" — reusable templates that guide AI through common tasks. This stage adds MCP prompts support, exposing high-level skills like "create and fund an account" or "deploy a smart contract" as guided workflows.
+
+**Files to create:**
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompt.java` — base class for prompts
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompts.java` — prompt registry and handlers
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/*.json` — prompt metadata
+- `convex-restapi/src/test/java/convex/restapi/test/McpPromptsTest.java`
+
+**Files to modify:**
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` — add `prompts/list` and `prompts/get` method handlers, advertise `prompts` capability
+
+**MCP prompts protocol (per spec):**
+- `prompts/list` → returns array of prompt metadata (name, description, arguments)
+- `prompts/get` → returns rendered prompt messages for a given prompt + arguments
+
+**McpPrompt.java:**
+- Abstract base class, mirrors `McpTool` pattern
+- `getName()`, `getDescription()`, `getArguments()` — metadata from JSON
+- `AVector<AMap<AString, ACell>> render(AMap<AString, ACell> arguments)` — returns message list (role + content)
+- Metadata loaded from JSON resources (same pattern as tool JSON files)
+
+**Initial prompts:**
+
+| Prompt | Arguments | Description |
+|--------|-----------|-------------|
+| `create-account` | `passphrase`, `faucetAmount?` | Guide: create signing key → create on-chain account → request faucet funds |
+| `deploy-contract` | `source`, `address`, `passphrase` | Guide: prepare transaction → sign with signing service → submit |
+| `transfer-funds` | `from`, `to`, `amount`, `passphrase` | Guide: prepare transfer tx → sign → submit → verify balance |
+| `setup-identity` | `passphrase` | Guide: create signing key → generate self-issued JWT → explain usage |
+| `explore-account` | `address` | Guide: describe account → lookup key definitions → resolve CNS if applicable |
+| `network-status` | _(none)_ | Guide: peer status → describe key accounts → summarise network state |
+
+**Prompt message format (per MCP spec):**
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": {
+        "type": "text",
+        "text": "Create a new Convex account with signing key..."
+      }
+    }
+  ]
+}
+```
+
+Each prompt renders a sequence of messages that instruct the AI which tools to call and in what order, with the specific arguments filled in from the prompt parameters. The AI then executes the workflow by calling the referenced tools.
+
+**McpAPI changes:**
+- Add `"prompts"` to capabilities in `buildInitializeResult()`
+- Handle `prompts/list` → return prompt metadata
+- Handle `prompts/get` → validate prompt name and arguments, call `render()`, return messages
+- Prompt registration follows tool registration pattern
+
+**Tests:**
+- `prompts/list` returns all registered prompts with metadata
+- `prompts/get` with valid prompt + arguments → returns messages
+- `prompts/get` with unknown prompt → error
+- `prompts/get` with missing required argument → error
+- Each prompt renders correct tool references and argument values
+- Prompts configurable via RestConfig (`mcp.prompts.enabled`)
+
+**Verify:** `mvn test -pl convex-restapi -Dtest=McpPromptsTest`
+
+---
+
 ## Summary
 
 | Stage | Module | Focus | New Files |
@@ -462,3 +593,5 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 | 11 | convex-restapi | MCP tools — Convex convenience | modify |
 | 12 | convex-restapi | Social login OAuth flow | 3 |
 | 13 | convex-restapi | End-to-end integration | 1 |
+| 14 ✓ | convex-peer, convex-restapi | Config refactor — JSON5-based PeerConfig, backward compat, example config | 4 (48 tests) |
+| 15 | convex-restapi | MCP Skills — prompts and guided workflows | 3 + modify |
