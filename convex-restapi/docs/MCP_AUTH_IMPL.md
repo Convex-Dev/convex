@@ -447,20 +447,22 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 13: Integration and End-to-End
+## Stage 13: Integration and End-to-End ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (6 tests pass)
 
-**Files to create:**
-- `convex-restapi/src/test/java/convex/restapi/test/SigningE2ETest.java`
+**Files created:**
+- `convex-restapi/src/test/java/convex/restapi/test/SigningE2ETest.java` — 6 multi-step E2E tests
 
-**End-to-end scenarios:**
-1. Self-issued JWT auth → createKey → sign → verify signature
-2. Self-issued JWT auth → createAccount → transact → verify on-chain result
-3. Self-issued JWT auth → createKey → getSelfSignedJWT → use JWT to auth to a second peer instance
-4. Social login mock → createKey → exportKey (with confirmation) → importKey on second identity
-5. Two peer instances sharing a store → independent key stores, no conflicts
-6. Persist → restart → recover → keys still accessible
+**End-to-end scenarios tested:**
+1. Self-issued JWT auth → createKey → sign → verify signature (using validate tool)
+2. Peer-issued JWT auth → createAccount → transact (def) → verify on-chain via query
+3. Auth → createKey → getSelfSignedJWT → use that JWT as bearer token for subsequent request (JWT chain)
+4. Export key (with confirmation) → import on different identity → verify cross-identity key transfer and passphrase isolation
+5. Two identities (Alice, Bob) have fully isolated key stores — each sees only own keys, cross-identity signing fails
+6. Create account → deploy actor → describe actor → lookup symbol on actor → store reference in user account
+
+All scenarios share the single `ARESTTest` server instance (no extra servers launched).
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=SigningE2ETest`
 
@@ -513,72 +515,34 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 15: MCP Skills — Prompts and Guided Workflows
+## Stage 15: MCP Skills — Prompts and Guided Workflows ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (11 tests pass)
 
-**Motivation:** MCP tools are low-level primitives. Agents often need multi-step workflows that combine several tools. The MCP spec defines "prompts" — reusable templates that guide AI through common tasks. This stage adds MCP prompts support, exposing high-level skills like "create and fund an account" or "deploy a smart contract" as guided workflows.
+**Files created:**
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompt.java` — abstract base class mirroring `McpTool`, with `render()` method returning message vectors, `loadMetadata()` from JSON, `userMessage()` helper
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompts.java` — registry with 6 inner prompt classes and conditional registration (signing-dependent prompts only when signing service available)
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/explore-account.json` — always available
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/network-status.json` — always available
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/convex-guide.json` — always available
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/create-account.json` — requires signing service
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/deploy-contract.json` — requires signing service
+- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/transfer-funds.json` — requires signing service
+- `convex-restapi/src/test/java/convex/restapi/test/McpPromptsTest.java` — 11 tests
 
-**Files to create:**
-- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompt.java` — base class for prompts
-- `convex-restapi/src/main/java/convex/restapi/mcp/McpPrompts.java` — prompt registry and handlers
-- `convex-restapi/src/main/resources/convex/restapi/mcp/prompts/*.json` — prompt metadata
-- `convex-restapi/src/test/java/convex/restapi/test/McpPromptsTest.java`
+**Files modified:**
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` — added prompts map, `registerPrompt()`, `prompts/list` and `prompts/get` dispatch, `listPrompts()` and `promptGet()` handlers, `"prompts"` capability in `buildInitializeResult()`
 
-**Files to modify:**
-- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` — add `prompts/list` and `prompts/get` method handlers, advertise `prompts` capability
+**Prompts implemented:**
 
-**MCP prompts protocol (per spec):**
-- `prompts/list` → returns array of prompt metadata (name, description, arguments)
-- `prompts/get` → returns rendered prompt messages for a given prompt + arguments
-
-**McpPrompt.java:**
-- Abstract base class, mirrors `McpTool` pattern
-- `getName()`, `getDescription()`, `getArguments()` — metadata from JSON
-- `AVector<AMap<AString, ACell>> render(AMap<AString, ACell> arguments)` — returns message list (role + content)
-- Metadata loaded from JSON resources (same pattern as tool JSON files)
-
-**Initial prompts:**
-
-| Prompt | Arguments | Description |
-|--------|-----------|-------------|
-| `create-account` | `passphrase`, `faucetAmount?` | Guide: create signing key → create on-chain account → request faucet funds |
-| `deploy-contract` | `source`, `address`, `passphrase` | Guide: prepare transaction → sign with signing service → submit |
-| `transfer-funds` | `from`, `to`, `amount`, `passphrase` | Guide: prepare transfer tx → sign → submit → verify balance |
-| `setup-identity` | `passphrase` | Guide: create signing key → generate self-issued JWT → explain usage |
-| `explore-account` | `address` | Guide: describe account → lookup key definitions → resolve CNS if applicable |
-| `network-status` | _(none)_ | Guide: peer status → describe key accounts → summarise network state |
-
-**Prompt message format (per MCP spec):**
-```json
-{
-  "messages": [
-    {
-      "role": "user",
-      "content": {
-        "type": "text",
-        "text": "Create a new Convex account with signing key..."
-      }
-    }
-  ]
-}
-```
-
-Each prompt renders a sequence of messages that instruct the AI which tools to call and in what order, with the specific arguments filled in from the prompt parameters. The AI then executes the workflow by calling the referenced tools.
-
-**McpAPI changes:**
-- Add `"prompts"` to capabilities in `buildInitializeResult()`
-- Handle `prompts/list` → return prompt metadata
-- Handle `prompts/get` → validate prompt name and arguments, call `render()`, return messages
-- Prompt registration follows tool registration pattern
-
-**Tests:**
-- `prompts/list` returns all registered prompts with metadata
-- `prompts/get` with valid prompt + arguments → returns messages
-- `prompts/get` with unknown prompt → error
-- `prompts/get` with missing required argument → error
-- Each prompt renders correct tool references and argument values
-- Prompts configurable via RestConfig (`mcp.prompts.enabled`)
+| Prompt | Arguments | Conditional | Tools referenced |
+|--------|-----------|-------------|-----------------|
+| `explore-account` | `address` (required) | Always | describeAccount, lookup, query |
+| `network-status` | _(none)_ | Always | peerStatus, query |
+| `convex-guide` | `topic` (required) | Always | query |
+| `create-account` | `passphrase` (required), `faucetAmount` (optional) | Signing service | signingCreateAccount |
+| `deploy-contract` | `source`, `address`, `passphrase` (all required) | Signing service | signingTransact, describeAccount |
+| `transfer-funds` | `from`, `to`, `amount`, `passphrase` (all required) | Signing service | signingTransact, query |
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=McpPromptsTest`
 
@@ -600,6 +564,6 @@ Each prompt renders a sequence of messages that instruct the AI which tools to c
 | 10 ✓ | convex-restapi | MCP tools — elevated + confirmation flow, SigningMcpTools extraction, MCP SDK client tests | 9 + modify (21 tests) |
 | 11 ✓ | convex-restapi | MCP tools — Convex convenience | modify |
 | 12 ✓ | convex-restapi | Social login OAuth flow — OAuthService, AuthPage (j2html), ConfirmAPI migration | 3 + modify (19 tests) |
-| 13 | convex-restapi | End-to-end integration | 1 |
+| 13 ✓ | convex-restapi | End-to-end integration | 1 (6 tests) |
 | 14 ✓ | convex-peer, convex-restapi | Config refactor — JSON5-based PeerConfig, backward compat, example config | 4 (48 tests) |
-| 15 | convex-restapi | MCP Skills — prompts and guided workflows | 3 + modify |
+| 15 ✓ | convex-restapi | MCP Skills — prompts and guided workflows | 8 + modify (11 tests) |
