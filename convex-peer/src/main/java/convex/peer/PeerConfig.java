@@ -82,6 +82,9 @@ public class PeerConfig {
 
 	public static final AString TOKEN_EXPIRY = Strings.intern("tokenExpiry");
 	public static final AString PUBLIC_ACCESS = Strings.intern("publicAccess");
+	public static final AString OAUTH = Strings.intern("oauth");
+	private static final AString CLIENT_ID = Strings.intern("clientId");
+	private static final AString CLIENT_SECRET = Strings.intern("clientSecret");
 
 	// ========== Instance ==========
 
@@ -309,6 +312,44 @@ public class PeerConfig {
 	 */
 	public boolean isPublicAccess() {
 		return getBool(getSection(AUTH), PUBLIC_ACCESS, true);
+	}
+
+	// ========== OAuth typed accessors ==========
+
+	/**
+	 * Get OAuth provider configuration for a specific provider.
+	 * @param provider Provider name (e.g. "google", "github")
+	 * @return Provider config map with clientId/clientSecret, or null if not configured
+	 */
+	public AMap<AString, ACell> getOAuthProvider(String provider) {
+		AMap<AString, ACell> authSection = getSection(AUTH);
+		AMap<AString, ACell> oauth = RT.ensureMap(authSection.get(OAUTH));
+		if (oauth == null) return null;
+		return RT.ensureMap(oauth.get(Strings.create(provider)));
+	}
+
+	/**
+	 * Get OAuth client ID for a provider.
+	 * @param provider Provider name (e.g. "google", "github")
+	 * @return Client ID string, or null if not configured
+	 */
+	public String getOAuthClientId(String provider) {
+		AMap<AString, ACell> pc = getOAuthProvider(provider);
+		if (pc == null) return null;
+		AString v = RT.ensureString(pc.get(CLIENT_ID));
+		return (v != null) ? v.toString() : null;
+	}
+
+	/**
+	 * Get OAuth client secret for a provider.
+	 * @param provider Provider name (e.g. "google", "github")
+	 * @return Client secret string, or null if not configured
+	 */
+	public String getOAuthClientSecret(String provider) {
+		AMap<AString, ACell> pc = getOAuthProvider(provider);
+		if (pc == null) return null;
+		AString v = RT.ensureString(pc.get(CLIENT_SECRET));
+		return (v != null) ? v.toString() : null;
 	}
 
 	// ========== Legacy bridge ==========
