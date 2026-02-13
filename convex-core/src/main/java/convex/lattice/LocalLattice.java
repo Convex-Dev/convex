@@ -7,6 +7,8 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.lattice.generic.LWWLattice;
+import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 
 /**
@@ -39,21 +41,15 @@ public class LocalLattice {
 	public static final Keyword KEY_LOCAL = Keyword.intern("local");
 
 	/**
-	 * Value lattice for per-peer data. Each peer's slot is replaced atomically
-	 * (other wins), since the entire slot is signed as one unit.
+	 * Value lattice for per-peer data. Uses a MapLattice that merges each
+	 * keyword's value independently via LWW (timestamp-based last-write-wins).
+	 *
+	 * Each service (e.g. :signing) stores its own timestamped map. Concurrent
+	 * updates to different services merge cleanly; updates to the same service
+	 * resolve by picking the higher timestamp.
 	 */
-	private static final ALattice<AHashMap<Keyword, ACell>> VALUE_LATTICE =
-			new ALattice<AHashMap<Keyword, ACell>>() {
-				@Override public AHashMap<Keyword, ACell> merge(
-						AHashMap<Keyword, ACell> own, AHashMap<Keyword, ACell> other) {
-					return (other != null) ? other : own;
-				}
-				@Override public AHashMap<Keyword, ACell> zero() { return Maps.empty(); }
-				@Override public boolean checkForeign(AHashMap<Keyword, ACell> value) {
-					return value instanceof AHashMap;
-				}
-				@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
-			};
+	private static final MapLattice<Keyword, ACell> VALUE_LATTICE =
+			MapLattice.create(LWWLattice.INSTANCE);
 
 	/**
 	 * The OwnerLattice type for `:local` — each peer owns a signed slot

@@ -46,18 +46,22 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 **Files created:**
 - `convex-core/src/main/java/convex/lattice/LocalLattice.java` — `KEY_LOCAL`, `LATTICE`, `createSlot()`, `setSlot()`, `getSlot()`, `getSignedSlot()`, `get()` helpers
-- `convex-core/src/test/java/convex/lattice/LocalLatticeTest.java` — 16 tests
+- `convex-core/src/main/java/convex/lattice/generic/LWWLattice.java` — timestamp-based last-write-wins register with hash tiebreaker for commutativity
+- `convex-core/src/test/java/convex/lattice/LocalLatticeTest.java` — 18 tests
+- `convex-core/src/test/java/convex/lattice/generic/LWWLatticeTest.java` — 14 tests (lattice laws: commutativity, associativity, idempotency)
 
 **Also modified:**
 - `convex-core/.../cvm/Keywords.java` — added `LOCAL` keyword constant
 - `convex-core/.../lattice/Lattice.java` — registered `:local` in `Lattice.ROOT`
 
 **Design notes:**
-- Per-peer value is `AHashMap<Keyword, ACell>` with atomic replace semantics (not per-keyword merge)
-- OwnerLattice handles inter-peer isolation; intra-peer updates are whole-slot replacement
-- Follows the same pattern as `:fs`, `:kv`, `:queue` in `Lattice.ROOT`
+- Per-peer value is `AHashMap<Keyword, ACell>` with per-keyword merge via `MapLattice(LWWLattice.INSTANCE)`
+- OwnerLattice handles inter-peer isolation; intra-peer merge is per-service keyword via LWW (timestamp-based, hash tiebreaker for commutativity)
+- Each service (`:signing`, etc.) bumps a `:timestamp` key on every mutation; merge picks the higher timestamp
+- Different services merge independently — updating `:signing` does not clobber a sibling service
+- Since LWW replaces each service's map as a unit, internal deletions (e.g., key removal) use `dissoc` — no tombstones needed
 
-**Verify:** `mvn test -pl convex-core -Dtest=LocalLatticeTest`
+**Verify:** `mvn test -pl convex-core -Dtest=LWWLatticeTest,LocalLatticeTest`
 
 ---
 
@@ -75,10 +79,10 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 **SigningService API:**
 - Constructor takes `AKeyPair peerKeyPair, ACursor<ACell> cursor` — decoupled from persistence. The server layer controls how the cursor is backed (EtchStore, in-memory, OwnerLattice path, etc.)
 - `init()` — generates encryptionSecret on first start or loads from existing cursor state
-- `createKey(identity, passphrase)` → `AccountKey`
-- `listKeys(identity)` → `List<AccountKey>`
-- `loadKey(identity, publicKey, passphrase)` → `byte[]` seed (or null if wrong lookup hash)
-- Internal: `storeKey()`, `addToUserIndex()`, `computeLookupHash()`, `deriveKeyWrappingKey()`, `deriveUserIndexKey()`, `encryptSecret()`, `decryptSecret()`
+- `createKey(AString identity, AString passphrase)` → `AccountKey`
+- `listKeys(AString identity)` → `List<AccountKey>`
+- `loadKey(AString identity, AccountKey publicKey, AString passphrase)` → `byte[]` seed (or null if wrong lookup hash)
+- Internal: `storeKey()`, `addToKeyIndex()`, `computeLookupHash()`, `computeIdentityHash()`, `deriveKeyWrappingKey()`, `encryptSecret()`, `decryptSecret()`
 - Follows `convex.lattice.kv.LatticeKV` / `KVDatabase` cursor pattern
 
 **Tests:**
@@ -95,13 +99,13 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ## Stage 4: Signing Service — Sign and JWT ✓
 
-**Module:** `convex-peer` — **DONE** (25 tests pass, 9 new)
+**Module:** `convex-peer` — **DONE** (37 tests total, 9 new in this stage)
 
 **Extended:** `SigningService.java`, `SigningServiceTest.java`
 
 **New methods:**
-- `ASignature sign(String identity, AccountKey publicKey, String passphrase, ABlob message)` — decrypt key, sign with Ed25519, zero seed, return signature (or null if key not found)
-- `AString getSelfSignedJWT(String identity, AccountKey publicKey, String passphrase, String audience, AMap<AString,ACell> extraClaims, long lifetimeSeconds)` — decrypt key, build JWT with `sub`/`iss` = `did:key:<multikey>`, `iat`, `exp`, optional `aud`, merge extra claims, sign with `JWT.signPublic()`, zero seed, return encoded JWT (or null if key not found)
+- `ASignature sign(AString identity, AccountKey publicKey, AString passphrase, ABlob message)` — decrypt key, sign with Ed25519, zero seed, return signature (or null if key not found)
+- `AString getSelfSignedJWT(AString identity, AccountKey publicKey, AString passphrase, String audience, AMap<AString,ACell> extraClaims, long lifetimeSeconds)` — decrypt key, build JWT with `sub`/`iss` = `did:key:<multikey>`, `iat`, `exp`, optional `aud`, merge extra claims, sign with `JWT.signPublic()`, zero seed, return encoded JWT (or null if key not found)
 
 **Tests:**
 - Sign bytes, verify signature with public key ✓
@@ -118,25 +122,39 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 5: Signing Service — Elevated Operations
+## Stage 5: Signing Service — Elevated Operations ✓
 
-**Module:** `convex-peer`
+**Module:** `convex-peer` — **DONE** (37 tests pass, 12 new in this stage)
 
-**Extend:** `SigningService.java`, `SigningServiceTest.java`
+**Extended:** `SigningService.java`, `SigningServiceTest.java`
 
 **New methods:**
-- `AccountKey importKey(String identity, ABlob seed, String passphrase)` — store existing seed
-- `ABlob exportKey(String identity, AccountKey publicKey, String passphrase)` — return decrypted seed
-- `void deleteKey(String identity, AccountKey publicKey, String passphrase)` — remove from `:keys`, tombstone in `:users`
-- `void changePassphrase(String identity, AccountKey publicKey, String oldPass, String newPass)` — decrypt with old, re-encrypt with new, update both `:keys` entries
+- `AccountKey importKey(AString identity, ABlob seed, AString passphrase)` — store existing seed, deduplicate identity index
+- `ABlob exportKey(AString identity, AccountKey publicKey, AString passphrase)` — return decrypted seed as Blob (or null)
+- `void deleteKey(AString identity, AccountKey publicKey, AString passphrase)` — remove from `:keys` via `dissoc`, remove from identity index
+- `void changePassphrase(AString identity, AccountKey publicKey, AString oldPass, AString newPass)` — decrypt with old, remove old `:keys` entry, re-encrypt with new passphrase
+
+**Internal helpers added:**
+- `removeFromKeys()` — dissoc lookup hash from `:keys` Index, bump `:timestamp`
+- `removeFromKeyIndex()` — rebuild identity's `AVector<AccountKey>` without the deleted key, bump `:timestamp`
+
+**Identity index format:** Plaintext `Index<Hash, AVector<AccountKey>>` (`:identities` key). Identity hash → vector of public keys. No encryption — public keys are public information, identity hashes are one-way. Deletion rebuilds the vector without the deleted key. No tombstones needed because the entire `:signing` map is merged as a unit via LWW (higher `:timestamp` wins), so deleted keys cannot be resurrected by stale replicas.
+
+**Timestamp bumping:** Every mutation to the `:signing` map (`storeKey`, `removeFromKeys`, `addToKeyIndex`, `removeFromKeyIndex`) bumps the `:timestamp` key for LWW merge correctness.
 
 **Tests:**
-- Import a known seed, verify public key matches
-- Export a key, verify seed matches what was imported
-- Delete a key, verify gone from listKeys, verify tombstone in user index
-- Delete + merge with pre-delete state → tombstone wins, key stays deleted
-- Change passphrase, verify old passphrase fails, new passphrase works
-- Import duplicate public key (same identity, same passphrase) → idempotent or error
+- Import known seed → correct public key, appears in listKeys ✓
+- Import duplicate (same identity, same seed, same passphrase) → idempotent, no duplicate in listKeys ✓
+- Export key matches imported seed ✓
+- Export with wrong passphrase → null ✓
+- Delete key removed from listKeys ✓
+- Delete key cannot be loaded ✓
+- Delete key preserves other keys for same identity ✓
+- Delete key persists across cursor restart ✓
+- Change passphrase: new passphrase works ✓
+- Change passphrase: old passphrase fails ✓
+- Change passphrase: wrong old passphrase throws IllegalArgumentException ✓
+- Change passphrase preserves identity index (key still in listKeys) ✓
 
 **Verify:** `mvn test -pl convex-peer -Dtest=SigningServiceTest`
 
@@ -369,10 +387,10 @@ Each tool handler: extract identity from context attribute, extract params, dele
 | Stage | Module | Focus | New Files |
 |---|---|---|---|
 | 1 ✓ | convex-core | HKDF + AES-256-GCM utilities | 4 (20 tests) |
-| 2 ✓ | convex-core | Local Lattice — OwnerLattice convention | 2 + modify (16 tests) |
-| 3 ✓ | convex-peer | SigningService — cursor-based key store | 2 + modify (16 tests) |
-| 4 | convex-peer | SigningService — sign + JWT | 0 (extend) |
-| 5 | convex-peer | SigningService — elevated ops + tombstones | 0 (extend) |
+| 2 ✓ | convex-core | Local Lattice + LWWLattice — OwnerLattice + MapLattice(LWW) | 4 + modify (32 tests) |
+| 3 ✓ | convex-peer | SigningService — cursor-based key store (AString params) | 2 + modify (16 tests) |
+| 4 ✓ | convex-peer | SigningService — sign + JWT | 0 (extend, +9 tests) |
+| 5 ✓ | convex-peer | SigningService — elevated ops, plaintext identity index, LWW timestamps | 0 (extend, +12 tests) |
 | 6 | convex-peer | OwnerLattice multi-peer + key rotation | 0 (extend) |
 | 7 | convex-peer | PeerAuth — JWT verification | 2 |
 | 8 | convex-restapi | Auth middleware | 2 + modify |

@@ -17,6 +17,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
+import convex.lattice.generic.LWWLattice;
 
 /**
  * Tests for the LocalLattice convention (:local OwnerLattice).
@@ -166,24 +167,93 @@ public class LocalLatticeTest {
 	}
 
 	@Test
-	public void testMergeSamePeerContextAware() {
+	public void testMergeSamePeerLWW() {
 		AKeyPair kp = AKeyPair.generate();
 		AccountKey pk = kp.getAccountKey();
 
-		// Peer writes version 1
-		AHashMap<Keyword, ACell> data1 = Maps.of(KEY_VERSION, CVMLong.create(1));
+		// Peer writes :signing with timestamp 100
+		AHashMap<Keyword, ACell> signing1 = Maps.of(
+				KEY_VERSION, CVMLong.create(1),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(100));
+		AHashMap<Keyword, ACell> data1 = Maps.of(KEY_SIGNING, signing1);
 		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> local1 = LocalLattice.createSlot(kp, data1);
 
-		// Same peer writes version 2
-		AHashMap<Keyword, ACell> data2 = Maps.of(KEY_VERSION, CVMLong.create(2));
+		// Same peer writes :signing with timestamp 200
+		AHashMap<Keyword, ACell> signing2 = Maps.of(
+				KEY_VERSION, CVMLong.create(2),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(200));
+		AHashMap<Keyword, ACell> data2 = Maps.of(KEY_SIGNING, signing2);
 		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> local2 = LocalLattice.createSlot(kp, data2);
 
-		// Context-aware merge with signing key
+		// Context-aware merge — higher timestamp should win
 		LatticeContext ctx = LatticeContext.create(null, kp);
 		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> merged = LocalLattice.LATTICE.merge(ctx, local1, local2);
 
-		// SignedLattice merge semantics should apply
-		assertNotNull(LocalLattice.getSlot(merged, pk));
+		AHashMap<Keyword, ACell> slot = LocalLattice.getSlot(merged, pk);
+		assertNotNull(slot);
+		@SuppressWarnings("unchecked")
+		AHashMap<Keyword, ACell> mergedSigning = (AHashMap<Keyword, ACell>) slot.get(KEY_SIGNING);
+		assertEquals(CVMLong.create(2), mergedSigning.get(KEY_VERSION),
+				"Higher timestamp (200) should win");
+	}
+
+	@Test
+	public void testMergeSamePeerLWWReversed() {
+		AKeyPair kp = AKeyPair.generate();
+		AccountKey pk = kp.getAccountKey();
+
+		// Same as above but merge in reverse order — result must be identical
+		AHashMap<Keyword, ACell> signing1 = Maps.of(
+				KEY_VERSION, CVMLong.create(1),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(100));
+		AHashMap<Keyword, ACell> data1 = Maps.of(KEY_SIGNING, signing1);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> local1 = LocalLattice.createSlot(kp, data1);
+
+		AHashMap<Keyword, ACell> signing2 = Maps.of(
+				KEY_VERSION, CVMLong.create(2),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(200));
+		AHashMap<Keyword, ACell> data2 = Maps.of(KEY_SIGNING, signing2);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> local2 = LocalLattice.createSlot(kp, data2);
+
+		LatticeContext ctx = LatticeContext.create(null, kp);
+
+		// Merge both orders — must be commutative
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> mergedAB = LocalLattice.LATTICE.merge(ctx, local1, local2);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> mergedBA = LocalLattice.LATTICE.merge(ctx, local2, local1);
+
+		assertEquals(LocalLattice.getSlot(mergedAB, pk), LocalLattice.getSlot(mergedBA, pk),
+				"Merge must be commutative");
+	}
+
+	@Test
+	public void testMergeIndependentServices() {
+		AKeyPair kp = AKeyPair.generate();
+		AccountKey pk = kp.getAccountKey();
+
+		Keyword KEY_OTHER = Keyword.intern("other");
+
+		// State A: only :signing
+		AHashMap<Keyword, ACell> signingData = Maps.of(
+				KEY_VERSION, CVMLong.create(1),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(100));
+		AHashMap<Keyword, ACell> dataA = Maps.of(KEY_SIGNING, signingData);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> localA = LocalLattice.createSlot(kp, dataA);
+
+		// State B: only :other
+		AHashMap<Keyword, ACell> otherData = Maps.of(
+				KEY_VERSION, CVMLong.create(42),
+				LWWLattice.KEY_TIMESTAMP, CVMLong.create(150));
+		AHashMap<Keyword, ACell> dataB = Maps.of(KEY_OTHER, otherData);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> localB = LocalLattice.createSlot(kp, dataB);
+
+		// Merge — both services should survive
+		LatticeContext ctx = LatticeContext.create(null, kp);
+		AHashMap<ACell, SignedData<AHashMap<Keyword, ACell>>> merged = LocalLattice.LATTICE.merge(ctx, localA, localB);
+
+		AHashMap<Keyword, ACell> slot = LocalLattice.getSlot(merged, pk);
+		assertNotNull(slot);
+		assertNotNull(slot.get(KEY_SIGNING), ":signing should survive merge");
+		assertNotNull(slot.get(KEY_OTHER), ":other should survive merge");
 	}
 
 	@Test

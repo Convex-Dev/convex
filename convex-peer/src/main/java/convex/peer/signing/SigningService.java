@@ -15,6 +15,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
@@ -22,6 +23,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.json.JWT;
 import convex.lattice.cursor.ACursor;
@@ -37,11 +39,17 @@ import convex.lattice.cursor.ACursor;
  * <h2>Data Layout</h2>
  * The cursor should point at an {@code AHashMap<Keyword, ACell>} with:
  * <pre>
- *   :secret  → ABlob (encryptionSecret, encrypted with peer key)
- *   :keys    → Index&lt;Hash, ABlob&gt; (lookup-hash → encrypted seed)
- *   :users   → Index&lt;Hash, ABlob&gt; (identity-hash → encrypted key list)
- *   :version → CVMLong (schema version)
+ *   :secret     → ABlob (encryptionSecret, encrypted with peer key)
+ *   :keys       → Index&lt;Hash, ABlob&gt; (lookup-hash → encrypted seed)
+ *   :identities → Index&lt;Hash, AVector&gt; (identity-hash → vector of public keys)
+ *   :version    → CVMLong (schema version)
+ *   :timestamp  → CVMLong (epoch millis, bumped on every mutation for LWW merge)
  * </pre>
+ *
+ * The {@code :identities} index is a plaintext mapping from identity hash to
+ * a vector of {@link AccountKey}s. It enables {@link #listKeys(AString)} to
+ * enumerate keys for a given identity. This is separate from the peer-level
+ * {@code :users} registry which tracks user lifecycle and ownership.
  *
  * <h2>Security Model</h2>
  * <ul>
@@ -49,8 +57,8 @@ import convex.lattice.cursor.ACursor;
  *       encrypted with the peer key. All key material derives from this secret.</li>
  *   <li>Individual keys are encrypted with HKDF-derived wrapping keys bound to
  *       (identity, publicKey, passphrase). You must know all three to decrypt.</li>
- *   <li>The user index reveals key ownership (public keys per identity) but not
- *       key material — encrypted with a key derived from identity alone.</li>
+ *   <li>The identity index is unencrypted — it maps identity hashes to public
+ *       keys, both of which are public information.</li>
  * </ul>
  *
  * @see convex.core.crypto.HKDF
@@ -59,15 +67,15 @@ import convex.lattice.cursor.ACursor;
 public class SigningService {
 
 	// Keyword constants for the :signing subtree
-	static final Keyword KEY_SECRET  = Keyword.intern("secret");
-	static final Keyword KEY_KEYS    = Keyword.intern("keys");
-	static final Keyword KEY_USERS   = Keyword.intern("users");
-	static final Keyword KEY_VERSION = Keyword.intern("version");
+	static final Keyword KEY_SECRET     = Keyword.intern("secret");
+	static final Keyword KEY_KEYS       = Keyword.intern("keys");
+	static final Keyword KEY_IDENTITIES = Keyword.intern("identities");
+	static final Keyword KEY_VERSION    = Keyword.intern("version");
+	static final Keyword KEY_TIMESTAMP  = Keyword.intern("timestamp");
 
 	// HKDF info strings
 	private static final byte[] INFO_SECRET = "convex-signing-secret-v1".getBytes();
 	private static final byte[] INFO_KEY    = "convex-signing-service-v1".getBytes();
-	private static final byte[] INFO_USER   = "convex-user-index-v1".getBytes();
 
 	private final AKeyPair peerKeyPair;
 	private final ACursor<ACell> cursor;
@@ -104,11 +112,12 @@ public class SigningService {
 
 			ABlob encryptedSecret = encryptSecret(encryptionSecret);
 			AHashMap<Keyword, ACell> initial = Maps.of(
-				KEY_SECRET,  encryptedSecret,
-				KEY_KEYS,    Index.none(),
-				KEY_USERS,   Index.none(),
-				KEY_VERSION, CVMLong.ONE
+				KEY_SECRET,     encryptedSecret,
+				KEY_KEYS,       Index.none(),
+				KEY_IDENTITIES, Index.none(),
+				KEY_VERSION,    CVMLong.ONE
 			);
+			initial = initial.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
 			cursor.set(initial);
 		} else {
 			// Load existing secret
@@ -128,14 +137,14 @@ public class SigningService {
 	 * @param passphrase Passphrase for key encryption
 	 * @return Public key of the created key pair
 	 */
-	public AccountKey createKey(String identity, String passphrase) {
+	public AccountKey createKey(AString identity, AString passphrase) {
 		checkInitialised();
 		AKeyPair newKP = AKeyPair.generate();
 		AccountKey publicKey = newKP.getAccountKey();
 		byte[] seed = newKP.getSeed().getBytes();
 
 		storeKey(identity, publicKey, passphrase, seed);
-		addToUserIndex(identity, publicKey);
+		addToKeyIndex(identity, publicKey);
 
 		// Zero the seed bytes
 		Arrays.fill(seed, (byte) 0);
@@ -147,31 +156,28 @@ public class SigningService {
 	 * Lists the public keys associated with the given identity.
 	 *
 	 * @param identity Caller identity (DID string)
-	 * @return List of public keys (excluding tombstoned keys), may be empty
+	 * @return List of public keys, may be empty
 	 */
-	public List<AccountKey> listKeys(String identity) {
+	public List<AccountKey> listKeys(AString identity) {
 		checkInitialised();
 		List<AccountKey> result = new ArrayList<>();
+		Hash idHash = computeIdentityHash(identity);
 
-		ABlob encryptedIndex = getUserIndexEntry(identity);
-		if (encryptedIndex == null) return result;
+		@SuppressWarnings("unchecked")
+		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
+		if (data == null) return result;
 
-		byte[] userKey = deriveUserIndexKey(identity);
-		byte[] decrypted;
-		try {
-			decrypted = AESGCM.decrypt(userKey, encryptedIndex.getBytes());
-		} finally {
-			Arrays.fill(userKey, (byte) 0);
-		}
+		@SuppressWarnings("unchecked")
+		Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
+		if (identities == null) return result;
 
-		// Decode the key list — stored as concatenated 32-byte public keys
-		// with tombstones represented as 32 zero bytes
-		for (int i = 0; i + AccountKey.LENGTH <= decrypted.length; i += AccountKey.LENGTH) {
-			byte[] keyBytes = Arrays.copyOfRange(decrypted, i, i + AccountKey.LENGTH);
-			AccountKey ak = AccountKey.create(Blob.wrap(keyBytes));
-			if (!isZero(keyBytes)) {
-				result.add(ak);
-			}
+		@SuppressWarnings("unchecked")
+		AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
+		if (keys == null) return result;
+
+		for (long i = 0; i < keys.count(); i++) {
+			AccountKey ak = (AccountKey) keys.get(i);
+			if (ak != null) result.add(ak);
 		}
 
 		return result;
@@ -193,7 +199,7 @@ public class SigningService {
 	 * @param message Bytes to sign
 	 * @return Ed25519 signature, or null if key not found
 	 */
-	public ASignature sign(String identity, AccountKey publicKey, String passphrase, ABlob message) {
+	public ASignature sign(AString identity, AccountKey publicKey, AString passphrase, ABlob message) {
 		checkInitialised();
 		byte[] seed = loadKey(identity, publicKey, passphrase);
 		if (seed == null) return null;
@@ -221,7 +227,7 @@ public class SigningService {
 	 * @param lifetimeSeconds Token lifetime in seconds from now
 	 * @return Encoded JWT string, or null if key not found
 	 */
-	public AString getSelfSignedJWT(String identity, AccountKey publicKey, String passphrase,
+	public AString getSelfSignedJWT(AString identity, AccountKey publicKey, AString passphrase,
 			String audience, AMap<AString, ACell> extraClaims, long lifetimeSeconds) {
 		checkInitialised();
 		byte[] seed = loadKey(identity, publicKey, passphrase);
@@ -259,6 +265,87 @@ public class SigningService {
 		}
 	}
 
+	/**
+	 * Imports an existing Ed25519 seed, encrypts it, and stores it under the
+	 * given identity and passphrase.
+	 *
+	 * If the key already exists in the key index for this identity, the
+	 * encrypted seed is overwritten but no duplicate entry is created.
+	 *
+	 * @param identity Caller identity (DID string)
+	 * @param seed Raw 32-byte Ed25519 seed
+	 * @param passphrase Passphrase for key encryption
+	 * @return Public key derived from the seed
+	 */
+	public AccountKey importKey(AString identity, ABlob seed, AString passphrase) {
+		checkInitialised();
+		AKeyPair kp = AKeyPair.create(seed.getBytes());
+		AccountKey publicKey = kp.getAccountKey();
+
+		storeKey(identity, publicKey, passphrase, seed.getBytes());
+
+		// Only add to key index if not already present
+		if (!listKeys(identity).contains(publicKey)) {
+			addToKeyIndex(identity, publicKey);
+		}
+
+		return publicKey;
+	}
+
+	/**
+	 * Exports (decrypts) the seed for a stored key.
+	 *
+	 * @param identity Caller identity (DID string)
+	 * @param publicKey Public key identifying which key to export
+	 * @param passphrase Passphrase for key decryption
+	 * @return Decrypted seed as a Blob, or null if key not found
+	 */
+	public ABlob exportKey(AString identity, AccountKey publicKey, AString passphrase) {
+		checkInitialised();
+		byte[] seed = loadKey(identity, publicKey, passphrase);
+		if (seed == null) return null;
+		return Blob.wrap(seed);
+	}
+
+	/**
+	 * Deletes a key from the store. Removes the encrypted seed from the
+	 * {@code :keys} index and removes the public key from the identity's
+	 * key index.
+	 *
+	 * @param identity Caller identity (DID string)
+	 * @param publicKey Public key identifying which key to delete
+	 * @param passphrase Passphrase (required to compute the lookup hash)
+	 */
+	public void deleteKey(AString identity, AccountKey publicKey, AString passphrase) {
+		checkInitialised();
+		removeFromKeys(identity, publicKey, passphrase);
+		removeFromKeyIndex(identity, publicKey);
+	}
+
+	/**
+	 * Changes the passphrase for a stored key. Decrypts the seed with the old
+	 * passphrase, removes the old encrypted entry, and re-encrypts with the
+	 * new passphrase. The key index is unchanged (public key identity is the same).
+	 *
+	 * @param identity Caller identity (DID string)
+	 * @param publicKey Public key identifying which key to re-wrap
+	 * @param oldPass Current passphrase
+	 * @param newPass New passphrase
+	 * @throws IllegalArgumentException if the old passphrase is wrong
+	 */
+	public void changePassphrase(AString identity, AccountKey publicKey, AString oldPass, AString newPass) {
+		checkInitialised();
+		byte[] seed = loadKey(identity, publicKey, oldPass);
+		if (seed == null) throw new IllegalArgumentException("Cannot decrypt key with provided credentials");
+
+		try {
+			removeFromKeys(identity, publicKey, oldPass);
+			storeKey(identity, publicKey, newPass, seed);
+		} finally {
+			Arrays.fill(seed, (byte) 0);
+		}
+	}
+
 	// ==================== Internal Methods ====================
 
 	private void checkInitialised() {
@@ -266,9 +353,9 @@ public class SigningService {
 	}
 
 	/**
-	 * Stores an encrypted seed in the :keys index and returns the lookup hash.
+	 * Stores an encrypted seed in the :keys index.
 	 */
-	void storeKey(String identity, AccountKey publicKey, String passphrase, byte[] seed) {
+	void storeKey(AString identity, AccountKey publicKey, AString passphrase, byte[] seed) {
 		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
 		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
 		byte[] encrypted = AESGCM.encrypt(wrappingKey, seed);
@@ -283,7 +370,9 @@ public class SigningService {
 			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
 			if (keys == null) keys = Index.none();
 			keys = keys.assoc(lookupHash, encryptedBlob);
-			return data.assoc(KEY_KEYS, keys);
+			data = data.assoc(KEY_KEYS, keys);
+			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
+			return data;
 		});
 	}
 
@@ -292,7 +381,7 @@ public class SigningService {
 	 *
 	 * @return Decrypted seed bytes, or null if not found
 	 */
-	byte[] loadKey(String identity, AccountKey publicKey, String passphrase) {
+	byte[] loadKey(AString identity, AccountKey publicKey, AString passphrase) {
 		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
 
 		@SuppressWarnings("unchecked")
@@ -315,62 +404,77 @@ public class SigningService {
 	}
 
 	/**
-	 * Adds a public key to the user index for the given identity.
+	 * Removes an encrypted seed from the :keys index.
 	 */
-	void addToUserIndex(String identity, AccountKey publicKey) {
-		Hash userHash = computeUserHash(identity);
-		byte[] userKey = deriveUserIndexKey(identity);
-
-		// Read existing key list (or empty)
-		ABlob existing = getUserIndexEntry(identity);
-		byte[] keyList;
-		if (existing != null) {
-			try {
-				keyList = AESGCM.decrypt(userKey, existing.getBytes());
-			} catch (Exception e) {
-				// Corrupted entry — start fresh
-				keyList = new byte[0];
-			}
-		} else {
-			keyList = new byte[0];
-		}
-
-		// Append the new public key (32 bytes)
-		byte[] newKeyList = new byte[keyList.length + AccountKey.LENGTH];
-		System.arraycopy(keyList, 0, newKeyList, 0, keyList.length);
-		publicKey.getBytes(newKeyList, keyList.length);
-
-		// Encrypt and store
-		byte[] encrypted = AESGCM.encrypt(userKey, newKeyList);
-		Arrays.fill(userKey, (byte) 0);
-		ABlob encryptedBlob = Blob.wrap(encrypted);
-
+	void removeFromKeys(AString identity, AccountKey publicKey, AString passphrase) {
+		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
 		cursor.updateAndGet(v -> {
 			@SuppressWarnings("unchecked")
 			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
 			@SuppressWarnings("unchecked")
-			Index<Hash, ABlob> users = (Index<Hash, ABlob>) data.get(KEY_USERS);
-			if (users == null) users = Index.none();
-			users = users.assoc(userHash, encryptedBlob);
-			return data.assoc(KEY_USERS, users);
+			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
+			if (keys == null) return v;
+			keys = keys.dissoc(lookupHash);
+			data = data.assoc(KEY_KEYS, keys);
+			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
+			return data;
 		});
 	}
 
 	/**
-	 * Gets the encrypted user index entry for the given identity.
+	 * Adds a public key to the identity's key index.
 	 */
-	private ABlob getUserIndexEntry(String identity) {
-		Hash userHash = computeUserHash(identity);
+	void addToKeyIndex(AString identity, AccountKey publicKey) {
+		Hash idHash = computeIdentityHash(identity);
+		cursor.updateAndGet(v -> {
+			@SuppressWarnings("unchecked")
+			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
+			@SuppressWarnings("unchecked")
+			Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
+			if (identities == null) identities = Index.none();
 
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
-		if (data == null) return null;
+			@SuppressWarnings("unchecked")
+			AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
+			if (keys == null) keys = Vectors.empty();
+			keys = keys.conj(publicKey);
 
-		@SuppressWarnings("unchecked")
-		Index<Hash, ABlob> users = (Index<Hash, ABlob>) data.get(KEY_USERS);
-		if (users == null) return null;
+			identities = identities.assoc(idHash, keys);
+			data = data.assoc(KEY_IDENTITIES, identities);
+			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
+			return data;
+		});
+	}
 
-		return users.get(userHash);
+	/**
+	 * Removes a public key from the identity's key index.
+	 */
+	void removeFromKeyIndex(AString identity, AccountKey publicKey) {
+		Hash idHash = computeIdentityHash(identity);
+		cursor.updateAndGet(v -> {
+			@SuppressWarnings("unchecked")
+			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
+			@SuppressWarnings("unchecked")
+			Index<Hash, ACell> identities = (Index<Hash, ACell>) data.get(KEY_IDENTITIES);
+			if (identities == null) return v;
+
+			@SuppressWarnings("unchecked")
+			AVector<ACell> keys = (AVector<ACell>) identities.get(idHash);
+			if (keys == null) return v;
+
+			// Rebuild vector without the deleted key
+			AVector<ACell> newKeys = Vectors.empty();
+			for (long i = 0; i < keys.count(); i++) {
+				ACell k = keys.get(i);
+				if (!publicKey.equals(k)) {
+					newKeys = newKeys.conj(k);
+				}
+			}
+
+			identities = identities.assoc(idHash, newKeys);
+			data = data.assoc(KEY_IDENTITIES, identities);
+			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
+			return data;
+		});
 	}
 
 	// ==================== Crypto Helpers ====================
@@ -401,53 +505,26 @@ public class SigningService {
 	}
 
 	/**
-	 * Computes the lookup hash for a key: SHA-256(identity ‖ publicKey ‖ passphrase)
+	 * Computes the lookup hash for a key: SHA-256(identity || publicKey || passphrase)
 	 */
-	static Hash computeLookupHash(String identity, AccountKey publicKey, String passphrase) {
-		byte[] idBytes = identity.getBytes();
-		byte[] pkBytes = publicKey.getBytes();
-		byte[] ppBytes = passphrase.getBytes();
-		byte[] combined = new byte[idBytes.length + pkBytes.length + ppBytes.length];
-		System.arraycopy(idBytes, 0, combined, 0, idBytes.length);
-		System.arraycopy(pkBytes, 0, combined, idBytes.length, pkBytes.length);
-		System.arraycopy(ppBytes, 0, combined, idBytes.length + pkBytes.length, ppBytes.length);
+	static Hash computeLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
+		ABlob combined = identity.toBlob().append(publicKey).append(passphrase.toBlob());
 		return Hashing.sha256(combined);
 	}
 
 	/**
-	 * Computes the user index hash: SHA-256(identity)
+	 * Computes the identity hash: SHA-256(identity)
 	 */
-	static Hash computeUserHash(String identity) {
-		return Hashing.sha256(identity.getBytes());
+	static Hash computeIdentityHash(AString identity) {
+		return Hashing.sha256(identity);
 	}
 
 	/**
 	 * Derives the wrapping key for an individual signing key.
-	 * HKDF(encryptionSecret, salt: identity ‖ publicKey ‖ passphrase, info: "convex-signing-service-v1")
+	 * HKDF(encryptionSecret, salt: identity || publicKey || passphrase, info: "convex-signing-service-v1")
 	 */
-	byte[] deriveKeyWrappingKey(String identity, AccountKey publicKey, String passphrase) {
-		byte[] idBytes = identity.getBytes();
-		byte[] pkBytes = publicKey.getBytes();
-		byte[] ppBytes = passphrase.getBytes();
-		byte[] salt = new byte[idBytes.length + pkBytes.length + ppBytes.length];
-		System.arraycopy(idBytes, 0, salt, 0, idBytes.length);
-		System.arraycopy(pkBytes, 0, salt, idBytes.length, pkBytes.length);
-		System.arraycopy(ppBytes, 0, salt, idBytes.length + pkBytes.length, ppBytes.length);
-		return HKDF.derive256(encryptionSecret, salt, INFO_KEY);
-	}
-
-	/**
-	 * Derives the wrapping key for a user index entry.
-	 * HKDF(encryptionSecret, salt: identity, info: "convex-user-index-v1")
-	 */
-	byte[] deriveUserIndexKey(String identity) {
-		return HKDF.derive256(encryptionSecret, identity.getBytes(), INFO_USER);
-	}
-
-	private static boolean isZero(byte[] bytes) {
-		for (byte b : bytes) {
-			if (b != 0) return false;
-		}
-		return true;
+	byte[] deriveKeyWrappingKey(AString identity, AccountKey publicKey, AString passphrase) {
+		ABlob salt = identity.toBlob().append(publicKey).append(passphrase.toBlob());
+		return HKDF.derive256(encryptionSecret, salt.getBytes(), INFO_KEY);
 	}
 }

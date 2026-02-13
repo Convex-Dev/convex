@@ -339,7 +339,7 @@ Unauthenticated access remains available for public endpoints (queries, network 
 │    Key lifecycle (create, import, export, delete)         │
 │    Sign bytes, build self-issued JWTs                    │
 │    Passphrase-based encryption/decryption                │
-│    User index management                                 │
+│    Identity index management                             │
 │    Audit log                                             │
 │    Confirmation token management                         │
 │                                                          │
@@ -503,7 +503,7 @@ Generates a new Ed25519 keypair and stores the encrypted seed.
 2. Generate Ed25519 keypair
 3. Compute wrapping key and lookup hash from identity + publicKey + passphrase
 4. Encrypt seed, store in key store
-5. Update user index
+5. Update identity index
 6. Zero seed material from memory
 7. Return public key
 
@@ -773,11 +773,9 @@ The `:local` subtree may live in the peer's main Etch store or in a separate sto
 │   │   │     key:   lookupHash — SHA-256(identity ‖ publicKey ‖ passphrase)
 │   │   │     value: encryptedSeed — AES-256-GCM ciphertext (includes nonce)
 │   │   │
-│   │   ├── :users → Index<Hash, ABlob>
+│   │   ├── :identities → Index<Hash, AVector<AccountKey>>
 │   │   │     key:   identityHash — SHA-256(canonical DID string)
-│   │   │     value: encrypted payload — AES-256-GCM
-│   │   │            plaintext: AVector<AccountKey> (list of public keys)
-│   │   │            wrapping key: HKDF(encryptionSecret, identity)
+│   │   │     value: AVector of AccountKey (plaintext, public keys only)
 │   │   │
 │   │   ├── :audit → Index<ABlob, AVector<ACell>>
 │   │   │     key:   12-byte Blob (8-byte epoch millis BE + 4-byte counter BE)
@@ -793,7 +791,7 @@ The `:local` subtree may live in the peer's main Etch store or in a separate sto
 └── ...
 ```
 
-**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Merge takes the latest signed value per owner. This enables:
+**`:local`** uses `OwnerLattice` — each peer writes only to its own slot, signed with its peer key. Within each peer's slot, a `MapLattice` merges per-keyword using `LWWLattice` (timestamp-based last-write-wins with hash tiebreaker for commutativity). Each service (`:signing`, etc.) bumps a `:timestamp` key on every mutation; during merge, the higher-timestamp version wins. Different services merge independently — updating `:signing` does not clobber a sibling service. This enables:
 
 - **Shared store** — multiple peers coexist in the same Etch store without conflict
 - **Safe replication** — `:local` can be replicated between peers for fault tolerance; each peer's data is signed and can't be tampered with by others
@@ -815,17 +813,16 @@ All `Index` keys are `ABlobLike` types (`Hash`, `ABlob`, `Keyword`) — compatib
 
 No metadata stored alongside the ciphertext. The lookup hash is the only way to find a key — you must know identity, public key, and passphrase to compute it.
 
-**`:users` — User Index**
+**`:identities` — Identity Index**
 
-`Index<Hash, ABlob>` mapping identity hashes to encrypted key lists.
+`Index<Hash, AVector<AccountKey>>` mapping identity hashes to public key vectors. Plaintext — no encryption, since public keys are public information and identity hashes are one-way.
 
-- Key: `Hash.of(canonicalDID)` — 32-byte SHA-256 of the DID string
-- Value: `Blob.wrap(ciphertext)` — AES-256-GCM encrypted `AVector<AccountKey>`
-- Wrapping key: `HKDF(encryptionSecret, salt: identity, info: "convex-user-index-v1")`
+- Key: `SHA-256(canonicalDID)` — 32-byte identity hash
+- Value: `AVector<AccountKey>` — ordered list of public keys registered under this identity
 
-Enables `listKeys` — the peer decrypts the user's key list using only their identity (no passphrase needed, since this reveals public keys, not secrets). On data-at-rest compromise, reveals key ownership but not key material.
+Enables `listKeys` — the peer reads the identity's key vector directly. No passphrase or decryption needed.
 
-**Tombstones:** When a key is deleted, the user index retains the public key marked with a tombstone (e.g., a `nil` or sentinel value in the `AVector`). This ensures that deletion survives lattice merge — without a tombstone, merging with a replica that still has the key would resurrect it. The `:keys` Index entry is removed (`dissoc`), but the tombstone in `:users` prevents the key from reappearing in `listKeys` after a merge.
+**Deletion:** Key deletion uses `dissoc` on the `:keys` Index (removes the encrypted seed) and rebuilds the identity's `AVector` without the deleted public key. No tombstones are needed because the entire `:signing` map is merged as a unit via LWW — a stale replica with the old key cannot resurrect deleted entries, since the newer map (with the deletion and higher `:timestamp`) always wins.
 
 **`:audit` — Audit Log (Optional)**
 
@@ -858,9 +855,9 @@ SigningService svc = new SigningService(peerKeyPair, cursor);
 svc.init();  // generates or loads encryptionSecret via cursor
 
 // Key operations read/write through the cursor atomically
-AccountKey pk = svc.createKey("did:key:alice", "passphrase");
-List<AccountKey> keys = svc.listKeys("did:key:alice");
-byte[] seed = svc.loadKey("did:key:alice", pk, "passphrase");
+AccountKey pk = svc.createKey(Strings.create("did:key:alice"), Strings.create("passphrase"));
+List<AccountKey> keys = svc.listKeys(Strings.create("did:key:alice"));
+byte[] seed = svc.loadKey(Strings.create("did:key:alice"), pk, Strings.create("passphrase"));
 ```
 
 The cursor provides `get()`, `set()`, and `updateAndGet()` with `AtomicReference` semantics. The `SigningService` uses `updateAndGet()` for mutations, ensuring thread-safe read-modify-write.
@@ -881,13 +878,13 @@ Persistence and replication are the server layer's responsibility. When backed b
 |---|---|
 | Backup | Copy the Etch file (file-level lock during copy) |
 | Restore | Replace the Etch file, restart peer |
-| Merge | Lattice merge on `:local` — OwnerLattice takes latest signed value per peer key, no conflicts |
+| Merge | Lattice merge on `:local` — OwnerLattice isolates per peer key; within each peer's slot, MapLattice merges per keyword via LWW (timestamp-based); no conflicts |
 | Verify | Walk the tree — content-addressed nodes are self-verifying; OwnerLattice entries are signature-verified |
 
 Because `:local` uses `OwnerLattice`, replication is safe:
 
 - **Fault tolerance** — replicate `:local` between peers sharing a signing service. If one peer goes down, its encrypted signing data is still available in the shared store. Only that peer's `encryptionSecret` (which requires the peer key to unwrap) can decrypt it, so a replacement peer with the same keypair can resume service.
-- **No conflicts** — each peer writes only to its own signed slot. Merge is per-owner, latest-signed-value wins.
+- **No conflicts** — each peer writes only to its own signed slot. Inter-peer merge is per-owner (OwnerLattice); intra-peer merge is per-service keyword via LWW (MapLattice + LWWLattice).
 - **No leakage** — encrypted data is opaque to other peers. OwnerLattice provides structural separation; AES-256-GCM provides confidentiality.
 - **Selective sync** — peers can choose whether to replicate `:local` or keep it store-local. The lattice structure works either way.
 
@@ -944,7 +941,8 @@ Crypto and lattice primitives used by the service layer. These exist (or will be
 | HKDF key derivation | [HKDF](https://datatracker.ietf.org/doc/html/rfc5869)-SHA256 | `convex.core.crypto.HKDF` — `derive(ikm, salt, info, length)`, `derive256()` |
 | AES-256-GCM | Symmetric authenticated encryption | `convex.core.crypto.AESGCM` — `encrypt(key, plaintext)`, `decrypt(key, data)` |
 | OwnerLattice | Per-owner signed data | `convex.lattice.generic.OwnerLattice` |
-| LocalLattice | `:local` OwnerLattice convention | `convex.lattice.LocalLattice` — registered in `Lattice.ROOT`, helpers for per-peer slot access |
+| LocalLattice | `:local` OwnerLattice convention | `convex.lattice.LocalLattice` — registered in `Lattice.ROOT`, helpers for per-peer slot access, MapLattice(LWWLattice) value merge |
+| LWWLattice | Timestamp-based last-write-wins register | `convex.lattice.generic.LWWLattice` — hash tiebreaker for commutativity |
 | ACursor | Atomic mutable reference | `convex.lattice.cursor.ACursor` — `get()`, `set()`, `updateAndGet()`, `path()` |
 | Etch storage | Content-addressed persistence | `convex.etch.EtchStore`, `convex.core.store.Stores` |
 
@@ -955,13 +953,13 @@ The signing service backend. Owns key lifecycle and encryption. Operates on an `
 **SigningService** — `convex.peer.signing.SigningService`:
 - Constructor: `SigningService(AKeyPair peerKeyPair, ACursor<ACell> cursor)`
 - `init()` — generates or loads `encryptionSecret` via cursor
-- Key lifecycle: `createKey`, `listKeys`, `loadKey` (import, export, delete, changePassphrase in Stage 5)
-- Sign bytes, build self-issued JWTs (Stage 4)
+- Key lifecycle: `createKey`, `listKeys`, `loadKey`, `importKey`, `exportKey`, `deleteKey`, `changePassphrase`
+- Sign bytes, build self-issued JWTs
 - `encryptionSecret` management: generate random 256-bit key on first start, store encrypted with peer key in cursor
 - Wrapping key derivation: `HKDF-SHA256(ikm: encryptionSecret, salt: identity ‖ publicKey ‖ passphrase, info: "convex-signing-service-v1")`
 - Lookup hash: `SHA-256(identity ‖ publicKey ‖ passphrase)`
-- User index encryption: `HKDF(encryptionSecret, salt: identity, info: "convex-user-index-v1")`
-- Audit log append (Stage 5)
+- Identity index: plaintext `Index<Hash, AVector<AccountKey>>` (`:identities` key)
+- All parameters use `AString` (CVM string type) for identity and passphrase
 - Memory safety: zero seed material and wrapping keys after each operation
 
 **Peer Authentication responsibilities:**
