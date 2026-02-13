@@ -1,0 +1,19 @@
+{
+  "name": "signingListKeys",
+  "title": "List Signing Keys",
+  "description": "Lists all public keys stored in the signing service for the authenticated identity. Requires authentication via bearer token.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "keys": {
+        "type": "array",
+        "description": "Array of hex-encoded Ed25519 public keys for this identity"
+      }
+    }
+  }
+}

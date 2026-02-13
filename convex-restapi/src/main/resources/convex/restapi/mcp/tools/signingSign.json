@@ -1,0 +1,36 @@
+{
+  "name": "signingSign",
+  "title": "Sign with Stored Key",
+  "description": "Signs arbitrary hex-encoded bytes using a key stored in the signing service. The key is identified by public key and decrypted using the passphrase. Requires authentication via bearer token.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded Ed25519 public key identifying the signing key"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to decrypt the signing key"
+      },
+      "value": {
+        "type": "string",
+        "description": "Hex-encoded bytes to sign"
+      }
+    },
+    "required": ["publicKey", "passphrase", "value"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "signature": {
+        "type": "string",
+        "description": "Hex-encoded Ed25519 signature"
+      },
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded public key that produced the signature"
+      }
+    }
+  }
+}

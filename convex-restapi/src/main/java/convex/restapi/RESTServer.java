@@ -13,14 +13,17 @@ import convex.api.ConvexLocal;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
 import convex.core.data.Keyword;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
+import convex.lattice.cursor.Root;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.peer.auth.PeerAuth;
+import convex.peer.signing.SigningService;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
@@ -58,11 +61,20 @@ public class RESTServer implements Closeable {
 	private RESTServer(Server server) {
 		this.server = server;
 		this.convex = ConvexLocal.create(server);
-		
+
 		if (RT.bool(getConfig().get(ChainAPI.K_FAUCET))) {
 			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
 		} else {
 			this.convexFaucet=null;
+		}
+
+		AKeyPair kp = server.getKeyPair();
+		if (kp != null) {
+			Root<ACell> cursor = new Root<>();
+			this.signingService = new SigningService(kp, cursor);
+			this.signingService.init();
+		} else {
+			this.signingService = null;
 		}
 	}
 	
@@ -76,6 +88,7 @@ public class RESTServer implements Closeable {
 	protected X402 x402API;
 	protected DIDAPI didAPI;
 	protected AuthMiddleware authMiddleware;
+	protected SigningService signingService;
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;
@@ -83,6 +96,10 @@ public class RESTServer implements Closeable {
 
 	public AuthMiddleware getAuthMiddleware() {
 		return authMiddleware;
+	}
+
+	public SigningService getSigningService() {
+		return signingService;
 	}
 
 	private void addAPIRoutes(Javalin app) {

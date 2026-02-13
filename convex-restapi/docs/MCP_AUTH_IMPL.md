@@ -258,31 +258,46 @@ Staged implementation of the design in `MCP_AUTH.md`. Each stage is independentl
 
 ---
 
-## Stage 9: MCP Tools — Core Signing
+## Stage 9: MCP Tools — Core Signing ✓
 
-**Module:** `convex-restapi`
+**Module:** `convex-restapi` — **DONE** (11 tests pass, 142 total restapi tests pass)
 
-**Files to create/modify:**
-- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` (add new tools)
-- Tool JSON definitions in `convex-restapi/src/main/resources/convex/restapi/mcp/tools/`
+**Files created:**
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingServiceInfo.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingCreateKey.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingListKeys.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingSign.json`
+- `convex-restapi/src/main/resources/convex/restapi/mcp/tools/signingGetJWT.json`
 - `convex-restapi/src/test/java/convex/restapi/test/SigningMcpTest.java`
 
-**New MCP tools (standard tier):**
-- `signingServiceInfo` — no auth required, returns capabilities
-- `createKey` — calls `SigningService.createKey()`
-- `listKeys` — calls `SigningService.listKeys()`
-- `sign` — calls `SigningService.sign()`
-- `getSelfSignedJWT` — calls `SigningService.getSelfSignedJWT()`
+**Also modified:**
+- `convex-restapi/src/main/java/convex/restapi/RESTServer.java` — added `SigningService` field, `Root<ACell>` cursor, `init()` in constructor, `getSigningService()` getter
+- `convex-restapi/src/main/java/convex/restapi/mcp/McpAPI.java` — added `ThreadLocal<Context>` for passing request context to tools, `getRequestIdentity()` helper, 5 new inner tool classes, registered in `registerTools()`
 
-Each tool handler: extract identity from context attribute, extract params, delegate to SigningService, format response.
+**New MCP tools:**
+- `signingServiceInfo` — no auth required, returns `{available: true/false}`
+- `signingCreateKey` — auth required, takes `passphrase`, returns `{publicKey: "0x..."}`
+- `signingListKeys` — auth required, returns `{keys: ["0x...", ...]}`
+- `signingSign` — auth required, takes `publicKey`, `passphrase`, `value` (hex), returns `{signature: "0x...", publicKey: "0x..."}`
+- `signingGetJWT` — auth required, takes `publicKey`, `passphrase`, optional `audience`/`lifetime`, returns `{jwt: "ey..."}`
 
-**Tests:**
-- `signingServiceInfo` returns expected structure
-- Authenticate → `createKey` → `listKeys` → verify key appears
-- Authenticate → `createKey` → `sign` → verify signature externally
-- Authenticate → `createKey` → `getSelfSignedJWT` → verify JWT externally
-- Tool call without auth → error
-- Wrong passphrase → MCP error response with `isError: true`
+**Design notes:**
+- `ThreadLocal<Context>` set in `handleMcpRequest`, cleared in `finally` block — enables tool inner classes to access Javalin context for `AuthMiddleware.getIdentity()` without changing the `McpTool.handle()` signature
+- `RESTServer` creates a `SigningService` with `Root<ACell>` in-memory cursor — the cursor can be swapped for lattice-backed persistence later
+- Tools return `toolError("Authentication required")` (isError: true) when no identity is present, not 401 — tools are protocol-valid responses with error payloads
+
+**Tests (extends ARESTTest):**
+- `signingServiceInfo` returns `available=true` without auth ✓
+- Auth → `signingCreateKey` → `signingListKeys` → key appears in list ✓
+- Auth → multiple `signingCreateKey` → different keys generated ✓
+- Auth → `signingCreateKey` → `signingSign` → verify signature externally with `Providers.verify()` ✓
+- Auth → `signingSign` with wrong passphrase → tool error ✓
+- Auth → `signingCreateKey` → `signingGetJWT` → verify JWT with `JWT.verifyPublic()`, check `sub` is `did:key:` ✓
+- Auth → `signingGetJWT` with audience → verify `aud` claim in JWT ✓
+- `signingCreateKey` without auth → tool error ✓
+- `signingListKeys` without auth → tool error ✓
+- `signingSign` without auth → tool error ✓
+- Identity compartmentalisation: Alice's keys invisible to Bob, Bob cannot sign with Alice's key ✓
 
 **Verify:** `mvn test -pl convex-restapi -Dtest=SigningMcpTest`
 
@@ -411,7 +426,7 @@ Each tool handler: extract identity from context attribute, extract params, dele
 | 6 ✓ | convex-peer | Multi-peer isolation + key rotation | 0 (extend, +2 tests) |
 | 7 ✓ | convex-peer | PeerAuth — two-path JWT verification + peer token issuance | 2 + modify (12 tests) |
 | 8 ✓ | convex-restapi | AuthMiddleware — optional/required bearer token handlers | 2 + modify (11 tests) |
-| 9 | convex-restapi | MCP tools — core signing | modify + JSON |
+| 9 ✓ | convex-restapi | MCP signing tools — signingServiceInfo/CreateKey/ListKeys/Sign/GetJWT | 6 + modify (11 tests) |
 | 10 | convex-restapi | MCP tools — elevated + confirmation flow | 3 + modify |
 | 11 | convex-restapi | MCP tools — Convex convenience | modify |
 | 12 | convex-restapi | Social login OAuth flow | 3 |

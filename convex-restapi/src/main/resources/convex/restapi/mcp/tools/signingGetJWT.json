@@ -1,0 +1,36 @@
+{
+  "name": "signingGetJWT",
+  "title": "Get Self-Signed JWT",
+  "description": "Creates a self-signed EdDSA JWT using a key stored in the signing service. The JWT has sub and iss set to did:key:<multikey> for the signing key. Requires authentication via bearer token.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded Ed25519 public key identifying the signing key"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to decrypt the signing key"
+      },
+      "audience": {
+        "type": "string",
+        "description": "Optional audience claim (aud) for the JWT"
+      },
+      "lifetime": {
+        "type": "integer",
+        "description": "Token lifetime in seconds. Default: 3600 (1 hour)"
+      }
+    },
+    "required": ["publicKey", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "jwt": {
+        "type": "string",
+        "description": "Encoded JWT string"
+      }
+    }
+  }
+}
