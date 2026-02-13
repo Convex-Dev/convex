@@ -159,7 +159,16 @@ public class McpAPI extends ABaseAPI {
 	@Override
 	public void addRoutes(Javalin app) {
 		app.post("/mcp", this::handleMcpRequest);
+		app.get("/mcp", this::handleMcpGet);
 		app.get("/.well-known/mcp", this::getMCPWellKnown);
+	}
+
+	/**
+	 * GET /mcp — SSE streaming not supported. Return 405 Method Not Allowed
+	 * per MCP Streamable HTTP spec.
+	 */
+	private void handleMcpGet(Context ctx) {
+		ctx.status(405);
 	}
 
 	@OpenApi(path = "/mcp", 
@@ -201,8 +210,14 @@ public class McpAPI extends ABaseAPI {
 		try {
 			ACell body = JSONReader.read(ctx.bodyInputStream());
 			if (body instanceof AMap<?, ?> map) {
-				AMap<AString, ACell> response = createResponse(map);
-				setContent(ctx, response);
+				if (isNotification(map)) {
+					// Notification (no id) — process but return 202 with no body
+					processNotification(map);
+					ctx.status(202).result("");
+				} else {
+					AMap<AString, ACell> response = createResponse(map);
+					setContent(ctx, response);
+				}
 			} else if (body instanceof AVector<?> vector) {
 				long n = vector.count();
 				if (n == 0) {
@@ -213,19 +228,52 @@ public class McpAPI extends ABaseAPI {
 				for (long i = 0; i < n; i++) {
 					ACell entry = vector.get(i);
 					if (entry instanceof AMap<?, ?> batchMap) {
-						responses = responses.conj(createResponse(batchMap));
+						if (isNotification(batchMap)) {
+							processNotification(batchMap);
+						} else {
+							responses = responses.conj(createResponse(batchMap));
+						}
 					} else {
 						responses = responses.conj(protocolError(-32600, "Invalid Request"));
 					}
 				}
-				setContent(ctx, responses);
+				if (responses.isEmpty()) {
+					// All entries were notifications
+					ctx.status(202).result("");
+				} else {
+					setContent(ctx, responses);
+				}
 			} else {
 				setContent(ctx, protocolError(-32600, "Request must be a JSON object or array"));
 			}
 		} catch (ParseException | IOException e) {
 			setContent(ctx, protocolError(-32700, "Parse error"));
+		} catch (Exception e) {
+			log.warn("Unexpected error handling MCP request", e);
+			setContent(ctx, protocolError(-32603, "Internal error"));
 		} finally {
 			currentContext.remove();
+		}
+	}
+
+	/**
+	 * Check if a JSON-RPC message is a notification (no "id" field).
+	 */
+	private boolean isNotification(AMap<?, ?> request) {
+		return !request.containsKey(FIELD_ID);
+	}
+
+	/**
+	 * Process a notification message (no response expected).
+	 */
+	private void processNotification(AMap<?, ?> request) {
+		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
+		if (methodCell == null) return;
+		String method = methodCell.toString().trim();
+		// Handle known notifications silently
+		switch (method) {
+			case "notifications/initialized", "notifications/cancelled" -> { /* acknowledged */ }
+			default -> log.debug("Unrecognised MCP notification: {}", method);
 		}
 	}
 
