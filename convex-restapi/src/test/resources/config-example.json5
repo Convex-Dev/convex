@@ -5,7 +5,7 @@
 	 * This JSON5 config file configures a Convex peer server, REST API,
 	 * MCP endpoint, and authentication. Load with:
 	 *
-	 *   PeerConfig config = PeerConfig.load("config.json5");
+	 *   RESTConfig config = RESTConfig.load("config.json5");
 	 *   HashMap<Keyword, Object> legacy = config.toLegacy();
 	 *   Server server = API.launchPeer(legacy);
 	 *

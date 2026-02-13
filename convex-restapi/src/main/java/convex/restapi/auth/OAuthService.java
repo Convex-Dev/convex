@@ -27,7 +27,6 @@ import convex.core.json.JWT;
 import convex.core.json.JWKSKeys;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
-import convex.peer.PeerConfig;
 import convex.restapi.RESTServer;
 
 /**

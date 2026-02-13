@@ -19,23 +19,24 @@ import convex.core.lang.RT;
 import convex.core.util.JSON;
 
 /**
- * Typed configuration wrapper for Convex peer and REST/MCP settings.
+ * Typed configuration wrapper for Convex peer settings.
  *
  * <p>Loads configuration from a JSON5 file into an immutable {@link AMap},
  * following the same pattern as Covia's {@code Config} class. Provides typed
- * accessor methods with sensible defaults.
+ * accessor methods with sensible defaults for peer-layer concerns.
  *
  * <p>For backward compatibility, {@link #toLegacy()} converts the config into
  * the existing {@code HashMap<Keyword, Object>} format used by
  * {@link Server} and {@link API#launchPeer(java.util.Map)}.
  *
+ * <p>REST/MCP/OAuth configuration is handled by the
+ * {@code convex.restapi.RESTConfig} subclass in the convex-restapi module.
+ *
  * <h2>Config File Format (JSON5)</h2>
  * <pre>{@code
  * {
  *   "peer": { "port": 18888, "keypair": "abcdef...", ... },
- *   "rest": { "port": 8080, "faucet": true, ... },
- *   "mcp":  { "enabled": true, "signing": true, ... },
- *   "auth": { "tokenExpiry": 86400, ... }
+ *   "auth": { "tokenExpiry": 86400, "publicAccess": true, ... }
  * }
  * }</pre>
  *
@@ -47,8 +48,6 @@ public class PeerConfig {
 	// ========== Top-level section keys ==========
 
 	public static final AString PEER = Strings.intern("peer");
-	public static final AString REST = Strings.intern("rest");
-	public static final AString MCP = Strings.intern("mcp");
 	public static final AString AUTH = Strings.intern("auth");
 
 	// ========== Peer config keys ==========
@@ -65,32 +64,16 @@ public class PeerConfig {
 	public static final AString TIMEOUT = Strings.intern("timeout");
 	public static final AString POLL_DELAY = Strings.intern("pollDelay");
 
-	// ========== REST config keys ==========
-
-	public static final AString BASE_URL = Strings.intern("baseUrl");
-	public static final AString FAUCET = Strings.intern("faucet");
-	public static final AString CORS = Strings.intern("cors");
-
-	// ========== MCP config keys ==========
-
-	public static final AString ENABLED = Strings.intern("enabled");
-	public static final AString SIGNING = Strings.intern("signing");
-	public static final AString ELEVATED = Strings.intern("elevated");
-	public static final AString TOOLS = Strings.intern("tools");
-
 	// ========== Auth config keys ==========
 
 	public static final AString TOKEN_EXPIRY = Strings.intern("tokenExpiry");
 	public static final AString PUBLIC_ACCESS = Strings.intern("publicAccess");
-	public static final AString OAUTH = Strings.intern("oauth");
-	private static final AString CLIENT_ID = Strings.intern("clientId");
-	private static final AString CLIENT_SECRET = Strings.intern("clientSecret");
 
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
 
-	private PeerConfig(AMap<AString, ACell> config) {
+	protected PeerConfig(AMap<AString, ACell> config) {
 		this.config = (config == null) ? Maps.empty() : config;
 	}
 
@@ -134,7 +117,7 @@ public class PeerConfig {
 
 	/**
 	 * Get a config section as a map.
-	 * @param key Section key (e.g. "peer", "rest", "mcp", "auth")
+	 * @param key Section key (e.g. "peer", "auth")
 	 * @return Section map, or empty map if not present
 	 */
 	public AMap<AString, ACell> getSection(AString key) {
@@ -231,70 +214,6 @@ public class PeerConfig {
 		return (v != null) ? v.longValue() : null;
 	}
 
-	// ========== REST typed accessors ==========
-
-	/**
-	 * Get the REST API port.
-	 * @return Port number, or null for default (8080)
-	 */
-	public Integer getRestPort() {
-		CVMLong v = RT.ensureLong(getSection(REST).get(PORT));
-		return (v != null) ? (int) v.longValue() : null;
-	}
-
-	/**
-	 * Get the external base URL.
-	 * @return Base URL string, or null if not configured
-	 */
-	public String getBaseUrl() {
-		AString v = RT.ensureString(getSection(REST).get(BASE_URL));
-		return (v != null) ? v.toString() : null;
-	}
-
-	/**
-	 * Whether the faucet endpoint is enabled.
-	 * @return true if faucet enabled (default: false)
-	 */
-	public boolean isFaucetEnabled() {
-		return getBool(getSection(REST), FAUCET, false);
-	}
-
-	// ========== MCP typed accessors ==========
-
-	/**
-	 * Whether MCP is enabled.
-	 * @return true if MCP enabled (default: true)
-	 */
-	public boolean isMcpEnabled() {
-		return getBool(getSection(MCP), ENABLED, true);
-	}
-
-	/**
-	 * Whether the signing service is enabled via MCP.
-	 * @return true if signing enabled (default: false)
-	 */
-	public boolean isSigningEnabled() {
-		return getBool(getSection(MCP), SIGNING, false);
-	}
-
-	/**
-	 * Whether elevated signing operations (import/export/delete) are enabled.
-	 * @return true if elevated ops enabled (default: true when signing is enabled)
-	 */
-	public boolean isElevatedEnabled() {
-		return getBool(getSection(MCP), ELEVATED, isSigningEnabled());
-	}
-
-	/**
-	 * Get the MCP tools configuration section.
-	 * @return Tools config map, or empty map if not configured
-	 */
-	public AMap<AString, ACell> getToolsConfig() {
-		AMap<AString, ACell> mcpSection = getSection(MCP);
-		AMap<AString, ACell> tools = RT.ensureMap(mcpSection.get(TOOLS));
-		return (tools != null) ? tools : Maps.empty();
-	}
-
 	// ========== Auth typed accessors ==========
 
 	/**
@@ -314,53 +233,17 @@ public class PeerConfig {
 		return getBool(getSection(AUTH), PUBLIC_ACCESS, true);
 	}
 
-	// ========== OAuth typed accessors ==========
-
-	/**
-	 * Get OAuth provider configuration for a specific provider.
-	 * @param provider Provider name (e.g. "google", "github")
-	 * @return Provider config map with clientId/clientSecret, or null if not configured
-	 */
-	public AMap<AString, ACell> getOAuthProvider(String provider) {
-		AMap<AString, ACell> authSection = getSection(AUTH);
-		AMap<AString, ACell> oauth = RT.ensureMap(authSection.get(OAUTH));
-		if (oauth == null) return null;
-		return RT.ensureMap(oauth.get(Strings.create(provider)));
-	}
-
-	/**
-	 * Get OAuth client ID for a provider.
-	 * @param provider Provider name (e.g. "google", "github")
-	 * @return Client ID string, or null if not configured
-	 */
-	public String getOAuthClientId(String provider) {
-		AMap<AString, ACell> pc = getOAuthProvider(provider);
-		if (pc == null) return null;
-		AString v = RT.ensureString(pc.get(CLIENT_ID));
-		return (v != null) ? v.toString() : null;
-	}
-
-	/**
-	 * Get OAuth client secret for a provider.
-	 * @param provider Provider name (e.g. "google", "github")
-	 * @return Client secret string, or null if not configured
-	 */
-	public String getOAuthClientSecret(String provider) {
-		AMap<AString, ACell> pc = getOAuthProvider(provider);
-		if (pc == null) return null;
-		AString v = RT.ensureString(pc.get(CLIENT_SECRET));
-		return (v != null) ? v.toString() : null;
-	}
-
 	// ========== Legacy bridge ==========
 
 	/**
 	 * Convert this config to the legacy {@code HashMap<Keyword, Object>} format
 	 * used by {@link API#launchPeer(java.util.Map)} and {@link Server}.
 	 *
-	 * <p>Maps JSON5 config keys to their corresponding {@link Keywords} constants.
-	 * Only sets keys that are explicitly configured; omitted keys retain their
-	 * existing defaults in the legacy system.
+	 * <p>Maps peer-section JSON5 config keys to their corresponding
+	 * {@link Keywords} constants. Only sets keys that are explicitly configured;
+	 * omitted keys retain their existing defaults in the legacy system.
+	 *
+	 * <p>Subclasses may override to add additional section mappings.
 	 *
 	 * @return Legacy config map suitable for {@code API.launchPeer()}
 	 */
@@ -389,38 +272,30 @@ public class PeerConfig {
 			}
 		}
 
-		// REST section → flat keys in legacy config
-		String baseUrl = getBaseUrl();
-		if (baseUrl != null) legacy.put(Keywords.BASE_URL, baseUrl);
-
-		if (getSection(REST).containsKey(FAUCET)) {
-			legacy.put(Keywords.FAUCET, isFaucetEnabled());
-		}
-
 		return legacy;
 	}
 
 	// ========== Helpers ==========
 
-	private static boolean getBool(AMap<AString, ACell> section, AString key, boolean defaultValue) {
+	protected static boolean getBool(AMap<AString, ACell> section, AString key, boolean defaultValue) {
 		ACell v = section.get(key);
 		if (v == null) return defaultValue;
 		return RT.bool(v);
 	}
 
-	private static void mapLong(AMap<AString, ACell> source, AString sourceKey,
+	protected static void mapLong(AMap<AString, ACell> source, AString sourceKey,
 			HashMap<Keyword, Object> target, Keyword targetKey) {
 		CVMLong v = RT.ensureLong(source.get(sourceKey));
 		if (v != null) target.put(targetKey, (int) v.longValue());
 	}
 
-	private static void mapString(AMap<AString, ACell> source, AString sourceKey,
+	protected static void mapString(AMap<AString, ACell> source, AString sourceKey,
 			HashMap<Keyword, Object> target, Keyword targetKey) {
 		AString v = RT.ensureString(source.get(sourceKey));
 		if (v != null) target.put(targetKey, v.toString());
 	}
 
-	private static void mapBool(AMap<AString, ACell> source, AString sourceKey,
+	protected static void mapBool(AMap<AString, ACell> source, AString sourceKey,
 			HashMap<Keyword, Object> target, Keyword targetKey) {
 		ACell v = source.get(sourceKey);
 		if (v != null) target.put(targetKey, RT.bool(v));

@@ -97,76 +97,6 @@ public class PeerConfigTest {
 	}
 
 	@Test
-	public void testRestPortDefault() {
-		PeerConfig config = PeerConfig.parse("{}");
-		assertNull(config.getRestPort());
-	}
-
-	@Test
-	public void testRestPort() {
-		PeerConfig config = PeerConfig.parse("{\"rest\": {\"port\": 9090}}");
-		assertEquals(9090, config.getRestPort());
-	}
-
-	@Test
-	public void testBaseUrl() {
-		PeerConfig config = PeerConfig.parse("{\"rest\": {\"baseUrl\": \"https://peer.example.com\"}}");
-		assertEquals("https://peer.example.com", config.getBaseUrl());
-	}
-
-	@Test
-	public void testFaucetDefault() {
-		PeerConfig config = PeerConfig.parse("{}");
-		assertFalse(config.isFaucetEnabled());
-	}
-
-	@Test
-	public void testFaucetEnabled() {
-		PeerConfig config = PeerConfig.parse("{\"rest\": {\"faucet\": true}}");
-		assertTrue(config.isFaucetEnabled());
-	}
-
-	@Test
-	public void testMcpEnabledDefault() {
-		PeerConfig config = PeerConfig.parse("{}");
-		assertTrue(config.isMcpEnabled());
-	}
-
-	@Test
-	public void testMcpDisabled() {
-		PeerConfig config = PeerConfig.parse("{\"mcp\": {\"enabled\": false}}");
-		assertFalse(config.isMcpEnabled());
-	}
-
-	@Test
-	public void testSigningDefault() {
-		PeerConfig config = PeerConfig.parse("{}");
-		assertFalse(config.isSigningEnabled());
-	}
-
-	@Test
-	public void testSigningEnabled() {
-		PeerConfig config = PeerConfig.parse("{\"mcp\": {\"signing\": true}}");
-		assertTrue(config.isSigningEnabled());
-	}
-
-	@Test
-	public void testElevatedDefaultFollowsSigning() {
-		PeerConfig off = PeerConfig.parse("{\"mcp\": {\"signing\": false}}");
-		assertFalse(off.isElevatedEnabled());
-
-		PeerConfig on = PeerConfig.parse("{\"mcp\": {\"signing\": true}}");
-		assertTrue(on.isElevatedEnabled());
-	}
-
-	@Test
-	public void testElevatedExplicit() {
-		PeerConfig config = PeerConfig.parse("{\"mcp\": {\"signing\": true, \"elevated\": false}}");
-		assertTrue(config.isSigningEnabled());
-		assertFalse(config.isElevatedEnabled());
-	}
-
-	@Test
 	public void testTokenExpiryDefault() {
 		PeerConfig config = PeerConfig.parse("{}");
 		assertEquals(86400L, config.getTokenExpiry());
@@ -201,20 +131,6 @@ public class PeerConfigTest {
 		AMap<AString, ACell> auth = config.getSection(PeerConfig.AUTH);
 		assertNotNull(auth);
 		assertTrue(auth.isEmpty());
-	}
-
-	@Test
-	public void testToolsConfig() {
-		PeerConfig config = PeerConfig.parse(
-			"{\"mcp\": {\"tools\": {\"transact\": {\"enabled\": true}}}}");
-		AMap<AString, ACell> tools = config.getToolsConfig();
-		assertFalse(tools.isEmpty());
-	}
-
-	@Test
-	public void testToolsConfigDefault() {
-		PeerConfig config = PeerConfig.parse("{}");
-		assertTrue(config.getToolsConfig().isEmpty());
 	}
 
 	// ========== Legacy bridge tests ==========
@@ -255,15 +171,6 @@ public class PeerConfigTest {
 	}
 
 	@Test
-	public void testToLegacyRestKeys() {
-		PeerConfig config = PeerConfig.parse(
-			"{\"rest\": {\"baseUrl\": \"https://example.com\", \"faucet\": true}}");
-		HashMap<Keyword, Object> legacy = config.toLegacy();
-		assertEquals("https://example.com", legacy.get(Keywords.BASE_URL));
-		assertEquals(true, legacy.get(Keywords.FAUCET));
-	}
-
-	@Test
 	public void testToLegacyUrl() {
 		PeerConfig config = PeerConfig.parse("{\"peer\": {\"url\": \"peer.convex.live\"}}");
 		HashMap<Keyword, Object> legacy = config.toLegacy();
@@ -285,8 +192,17 @@ public class PeerConfigTest {
 	}
 
 	@Test
+	public void testToLegacyNoRestKeys() {
+		// PeerConfig.toLegacy() should NOT include REST keys
+		PeerConfig config = PeerConfig.parse(
+			"{\"rest\": {\"baseUrl\": \"https://example.com\", \"faucet\": true}}");
+		HashMap<Keyword, Object> legacy = config.toLegacy();
+		assertNull(legacy.get(Keywords.BASE_URL));
+		assertNull(legacy.get(Keywords.FAUCET));
+	}
+
+	@Test
 	public void testJson5Comments() {
-		// JSON5 supports comments — verify they parse correctly
 		PeerConfig config = PeerConfig.parse("""
 			{
 				// Line comment
@@ -307,13 +223,10 @@ public class PeerConfigTest {
 					"port": 18888,
 					"restore": true,
 				},
-				"rest": {
-					"faucet": true,
-				},
 			}
 			""");
 		assertEquals(18888, config.getPeerPort());
-		assertTrue(config.isFaucetEnabled());
+		assertTrue(config.isRestore());
 	}
 
 	@Test
@@ -327,16 +240,6 @@ public class PeerConfigTest {
 					"url": "peer.example.com",
 					"restore": true,
 					"persist": true,
-				},
-				"rest": {
-					"port": 8080,
-					"baseUrl": "https://peer.example.com",
-					"faucet": true,
-				},
-				"mcp": {
-					"enabled": true,
-					"signing": true,
-					"elevated": true,
 				},
 				"auth": {
 					"tokenExpiry": 7200,
@@ -352,16 +255,6 @@ public class PeerConfigTest {
 		assertTrue(config.isRestore());
 		assertTrue(config.isPersist());
 
-		// REST
-		assertEquals(8080, config.getRestPort());
-		assertEquals("https://peer.example.com", config.getBaseUrl());
-		assertTrue(config.isFaucetEnabled());
-
-		// MCP
-		assertTrue(config.isMcpEnabled());
-		assertTrue(config.isSigningEnabled());
-		assertTrue(config.isElevatedEnabled());
-
 		// Auth
 		assertEquals(7200L, config.getTokenExpiry());
 		assertFalse(config.isPublicAccess());
@@ -371,7 +264,5 @@ public class PeerConfigTest {
 		assertEquals(18888, legacy.get(Keywords.PORT));
 		assertInstanceOf(AKeyPair.class, legacy.get(Keywords.KEYPAIR));
 		assertEquals("peer.example.com", legacy.get(Keywords.URL));
-		assertEquals("https://peer.example.com", legacy.get(Keywords.BASE_URL));
-		assertEquals(true, legacy.get(Keywords.FAUCET));
 	}
 }
