@@ -27,8 +27,9 @@
 		// "keypair": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 
 		// Etch store path for persistent storage.
-		// Omit for temporary in-memory store (data lost on restart).
-		// Use "temp" for a temporary file-backed store.
+		// Use "memory" for a pure in-memory store (fastest, RAM-limited, data lost on restart).
+		// Use "temp" for a temporary file-backed store (data lost on restart).
+		// Omit or set null for default temporary file-backed store.
 		// "store": "/path/to/peer.etch",
 
 		// Public URL for this peer (used for peer discovery and DID documents).

@@ -63,7 +63,7 @@ public class JoinNetworkTest {
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
-			config.put(Keywords.STORE,EtchStore.createTemp());
+			config.put(Keywords.STORE,EtchStore.createTemp()); // Etch store as per real peer startup
 			config.put(Keywords.CONTROLLER,controller);
 			config.put(Keywords.SOURCE,network.SERVER.getHostAddress());
 

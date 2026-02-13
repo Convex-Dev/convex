@@ -12,6 +12,7 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 
 /**
  * Class implementing direct in-memory caching and storage of hashed node data. 
@@ -80,15 +81,20 @@ public class MemoryStore extends AStore {
 	
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> persistRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus, boolean topLevel) {
-		// Convert to direct Ref. Don't want to store a soft ref!
-		ref = ref.toDirect();
+		// Convert to direct Ref if possible
+		try {
+			ref = ref.toDirect();
+		} catch (MissingDataException e) {
+			// Data not yet available (e.g. during remote acquisition), return unchanged
+			return ref;
+		}
 
 		final T o=ref.getValue();
 		if (o==null) return (Ref<T>) Ref.NULL_VALUE;
-		
+
 		ACell cell = (ACell) o;
 		boolean embedded=cell.isEmbedded();
-		
+
 		Hash hash=null;
 		if (!embedded) {
 			// check store for existing ref first. Return this is we have it
@@ -99,26 +105,36 @@ public class MemoryStore extends AStore {
 				ref=existing;
 			}
 		}
-		
-		// need to do recursive persistence
+
+		// Recursively persist children, tracking if all were fully resolved
+		final int[] minChildStatus = {requiredStatus};
 		cell  = cell.updateRefs(r -> {
-			return persistRef(r,noveltyHandler,requiredStatus,false);
+			Ref<ACell> result = persistRef(r,noveltyHandler,requiredStatus,false);
+			if (result.getStatus()<requiredStatus) {
+				minChildStatus[0]=Math.min(minChildStatus[0], result.getStatus());
+			}
+			return result;
 		});
-		
+
 		ref=ref.withValue((T)cell);
 
+		// Only claim full status if all children achieved it;
+		// otherwise cap at STORED (this cell is stored but descendants may be incomplete)
+		int achievedStatus = (minChildStatus[0]>=requiredStatus) ? requiredStatus : Math.max(Ref.STORED, minChildStatus[0]);
+		ref=ref.withMinimumStatus(achievedStatus);
 		if (topLevel||!embedded) {
 			// Persist at top level
 			final Hash fHash = (hash!=null)?hash:ref.getHash();
-			
+
 			hashRefs.put(fHash, (Ref<ACell>) ref);
 			if (noveltyHandler != null) noveltyHandler.accept((Ref<ACell>) ref);
 		}
-		return ref.withMinimumStatus(requiredStatus);
+		return ref;
 	}
 
 	@Override
 	public Hash getRootHash() throws IOException {
+		if (rootData==null) return null;
 		return rootData.getHash();
 	}
 	

@@ -117,6 +117,7 @@ public class ThreadUtils {
 		runVirtual(()-> {
 			AStore saved=Stores.current();
 			try {
+				Stores.setCurrent(store);
 				func.run();
 			} finally {
 				Stores.setCurrent(saved);

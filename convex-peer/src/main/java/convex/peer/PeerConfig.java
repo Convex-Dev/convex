@@ -147,7 +147,8 @@ public class PeerConfig {
 
 	/**
 	 * Get the Etch store path.
-	 * @return Store path string, or null if not configured (uses temp store)
+	 * @return Store path string ("memory" for in-memory (RAM-limited),
+	 *         "temp" for temp file, a file path, or null for default temp store)
 	 */
 	public String getStorePath() {
 		AString v = RT.ensureString(getSection(PEER).get(STORE));

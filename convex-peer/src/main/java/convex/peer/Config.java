@@ -13,6 +13,7 @@ import convex.core.cvm.Keywords;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
@@ -113,6 +114,9 @@ public class Config {
 		
 		if ((o instanceof String)||(o instanceof AString)) {
 			String fname=o.toString();
+			if ("memory".equals(fname)) {
+				return (T) new MemoryStore();
+			}
 			if ("temp".equals(fname)) {
 				return (T) EtchStore.createTemp();
 			}

@@ -2,6 +2,7 @@ package convex.peer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,8 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 
 public class PeerConfigTest {
 
@@ -133,6 +136,23 @@ public class PeerConfigTest {
 		assertTrue(auth.isEmpty());
 	}
 
+	// ========== Config.checkStore tests ==========
+
+	@Test
+	public void testCheckStoreMemory() throws IOException {
+		HashMap<Keyword, Object> config = new HashMap<>();
+		config.put(Keywords.STORE, "memory");
+		AStore store = Config.checkStore(config);
+		assertInstanceOf(MemoryStore.class, store);
+	}
+
+	@Test
+	public void testCheckStoreNull() throws IOException {
+		HashMap<Keyword, Object> config = new HashMap<>();
+		AStore store = Config.checkStore(config);
+		assertNull(store);
+	}
+
 	// ========== Legacy bridge tests ==========
 
 	@Test
@@ -182,6 +202,14 @@ public class PeerConfigTest {
 		PeerConfig config = PeerConfig.parse("{\"peer\": {\"store\": \"temp\"}}");
 		HashMap<Keyword, Object> legacy = config.toLegacy();
 		assertEquals("temp", legacy.get(Keywords.STORE));
+	}
+
+	@Test
+	public void testToLegacyStoreMemory() {
+		PeerConfig config = PeerConfig.parse("{\"peer\": {\"store\": \"memory\"}}");
+		assertEquals("memory", config.getStorePath());
+		HashMap<Keyword, Object> legacy = config.toLegacy();
+		assertEquals("memory", legacy.get(Keywords.STORE));
 	}
 
 	@Test
