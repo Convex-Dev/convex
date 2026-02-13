@@ -165,6 +165,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 */
 	@Override
 	public ACell decodeMultiCell(Blob enc) throws BadFormatException  {
+		// Uses Stores.current() as decode context (set by AStore.decode())
 		return Format.decodeMultiCell(enc);
 	}
 }

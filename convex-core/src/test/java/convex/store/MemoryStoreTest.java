@@ -55,7 +55,7 @@ public class MemoryStoreTest {
 			Hash goodHash = goodRef.getHash();
 			assertNull(ms.refForHash(goodHash));
 
-			goodRef.persist();
+			goodRef.persist(ms);
 
 			if (!(data.isEmbedded())) {
 				Ref<AMap<ACell, ACell>> recRef = ms.refForHash(goodHash);
@@ -79,7 +79,7 @@ public class MemoryStoreTest {
 		Ref<Blob> initialRef = value.getRef();
 		assertEquals(Ref.UNKNOWN, initialRef.getStatus());
 		assertNull(Stores.current().refForHash(hash));
-		Ref<Blob> ref = initialRef.persist();
+		Ref<Blob> ref = initialRef.persist(Stores.current());
 		assertEquals(Ref.PERSISTED, ref.getStatus());
 		assertTrue(ref.isPersisted());
 
@@ -105,12 +105,12 @@ public class MemoryStoreTest {
 			Hash dataHash = dataRef.getHash();
 			assertNull(ms.refForHash(dataHash));
 
-			dataRef.persist(handler);
+			dataRef.persist(handler, ms);
 			int num=al.size();
 			assertTrue(num>0);
 			assertEquals(data, al.get(num-1).getValue());
 
-			data.getRef().persist();
+			data.getRef().persist(ms);
 			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);

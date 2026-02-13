@@ -76,7 +76,7 @@ public class GenTestAnyValue {
 	@Property
 	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
 		if (Cells.isEmbedded(o)) {
-			Cells.persist(o); // NOTE: may have child refs to persist
+			Cells.persist(o, Stores.current()); // NOTE: may have child refs to persist
 			
 			Blob data=Cells.encode(o);
 			ACell o2=Format.read(data);
@@ -107,7 +107,7 @@ public class GenTestAnyValue {
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toFlatBlob();
 		
 		// check persistence
-		o=Cells.persist(o);
+		o=Cells.persist(o, Stores.current());
 		Ref<ACell> dataRef=Ref.get(o); // ensure in store
 		Hash hash=Hash.get(o);
 		assertEquals(dataRef.getHash(),hash);

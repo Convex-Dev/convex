@@ -19,6 +19,7 @@ import convex.core.data.FuzzTestFormat;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.Stores;
 import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
 
@@ -40,7 +41,7 @@ public class GenTestFormat {
 		Blob b = Cells.encode(prim);
 		if (!Cells.isEmbedded(prim)) {
 			// persist in case large
-			Cells.persist(prim);
+			Cells.persist(prim, Stores.current());
 		}
 		ACell o = Format.read(b);
 		assertEquals(prim, o);
@@ -51,7 +52,7 @@ public class GenTestFormat {
 
 	@Property
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException, IOException {
-		Ref<ACell> pref = Ref.get(Cells.persist(value)); // ensure persisted
+		Ref<ACell> pref = Ref.get(Cells.persist(value, Stores.current())); // ensure persisted
 		Blob b = Cells.encode(value);
 		try {
 			ACell o = Format.read(b);

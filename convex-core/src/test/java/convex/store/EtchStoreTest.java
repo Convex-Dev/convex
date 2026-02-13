@@ -77,7 +77,7 @@ public class EtchStoreTest {
 			Hash goodHash = goodRef.getHash();
 			assertNull(store.refForHash(goodHash));
 
-			goodRef.persist();
+			goodRef.persist(store);
 
 			if (!data.isEmbedded()) {
 				Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
@@ -157,10 +157,10 @@ public class EtchStoreTest {
 			assertNull(Stores.current().refForHash(hash));
 
 			// shallow persistence first
-			Ref<Blob> refShallow=initialRef.persistShallow();
+			Ref<Blob> refShallow=initialRef.persistShallow(store);
 			assertEquals(Ref.STORED, refShallow.getStatus());
 
-			Ref<Blob> ref = initialRef.persist();
+			Ref<Blob> ref = initialRef.persist(store);
 			assertEquals(Ref.PERSISTED, ref.getStatus());
 			assertTrue(ref.isPersisted());
 
@@ -205,40 +205,40 @@ public class EtchStoreTest {
 
 			// First try shallow persistence
 			counter.set(0L);
-			Ref<Belief> srb=rb.persistShallow(noveltyHandler);
+			Ref<Belief> srb=rb.persistShallow(noveltyHandler, store);
 			assertEquals(Ref.STORED,srb.getStatus());
 			// One cell persisted, should only be novelty if embedded
-			assertEquals(belief.isEmbedded()?0L:1L,counter.get()); 
+			assertEquals(belief.isEmbedded()?0L:1L,counter.get());
 
 			// assertEquals(srb,store.refForHash(rb.getHash()));
 			assertNull(store.refForHash(t1.getRef().getHash()));
 
 			// Persist belief
 			counter.set(0L);
-			Ref<Belief> prb=srb.persist(noveltyHandler);
+			Ref<Belief> prb=srb.persist(noveltyHandler, store);
 			assertEquals(3L,counter.get());
 
 			// Persist again. Should be no new novelty
 			counter.set(0L);
-			Ref<Belief> prb2=srb.persist(noveltyHandler);
+			Ref<Belief> prb2=srb.persist(noveltyHandler, store);
 			assertEquals(prb2,prb);
 			assertEquals(0L,counter.get()); // Nothing new persisted
 
 			// Announce belief
 			counter.set(0L);
-			Ref<Belief> arb=Cells.announce(belief,noveltyHandler).getRef();
+			Ref<Belief> arb=Cells.announce(belief,noveltyHandler,store).getRef();
 			assertEquals(srb,arb);
 			assertEquals(3L,counter.get());
 
 			// Announce again. Should be no new novelty
 			counter.set(0L);
-			Ref<Belief> arb2=Cells.announce(belief,noveltyHandler).getRef();
+			Ref<Belief> arb2=Cells.announce(belief,noveltyHandler,store).getRef();
 			assertEquals(srb,arb2);
 			assertEquals(0L,counter.get()); // Nothing new announced
 
 			// Check re-stored ref has correct status
 			counter.set(0L);
-			Ref<Belief> arb3=srb.persistShallow(noveltyHandler);
+			Ref<Belief> arb3=srb.persistShallow(noveltyHandler, store);
 			assertEquals(0L,counter.get()); // Nothing new persisted
 			assertTrue(Ref.STORED<=arb3.getStatus());
 
@@ -266,12 +266,12 @@ public class EtchStoreTest {
 			Hash dataHash = dataRef.getHash();
 			assertNull(store.refForHash(dataHash));
 
-			Cells.announce(data,handler);
+			Cells.announce(data,handler,store);
 			int num=al.size(); // number of novel cells persisted
 			assertTrue(num>0); // got new novelty
 			assertEquals(data, al.get(num-1).getValue());
 
-			data.getRef().persist();
+			data.getRef().persist(store);
 			assertEquals(num, al.size()); // no new novelty transmitted
 		} finally {
 			Stores.setCurrent(oldStore);
@@ -291,7 +291,7 @@ public class EtchStoreTest {
 			assertNotSame(cell,a1);
 			assertEquals(cell,a1);
 			
-			Ref<?> r=Cells.persist(cell).getRef();
+			Ref<?> r=Cells.persist(cell, store).getRef();
 			assertTrue(r.isPersisted());
 			cell=r.getValue();
 			

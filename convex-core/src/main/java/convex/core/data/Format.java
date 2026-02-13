@@ -798,16 +798,15 @@ public class Format {
 	 * @return Array of decoded cells
 	 * @throws BadFormatException In event of any encoding error detected
 	 */
-	public static ACell[] decodeCells(Blob data) throws BadFormatException {
+	public static ACell[] decodeCells(Blob data, AStore store) throws BadFormatException {
 		long ml=data.count();
 		if (ml>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml==0) return Cells.EMPTY_ARRAY;
-		
+
 		ArrayList<ACell> cells=new ArrayList<>();
 		ACell first=Format.read(data, 0);
 		cells.add(first);
 		int pos=first.getEncodingLength();
-		AStore store=Stores.current();
 		while (pos<ml) {
 			long encLength=Format.readVLQCount(data.getInternalArray(), data.getInternalOffset()+pos);
 			pos+=Format.getVLQCountLength(encLength);
@@ -826,24 +825,32 @@ public class Format {
 	 * @return Cell instance
 	 * @throws BadFormatException If encoding format is invalid
 	 */
-	@SuppressWarnings("unchecked")
+	/**
+	 * Reads a cell from a Blob of data using the current thread-local store for decode context.
+	 * Prefer the 2-arg version with explicit store where possible.
+	 */
 	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
+		return decodeMultiCell(data, Stores.current());
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T decodeMultiCell(Blob data, AStore store) throws BadFormatException {
 		long ml=data.count();
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		
+
 		// read first cell
 		T result= Format.read(data,0);
 		if (result==null) {
 			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
 			return null; // null value OK at top level
 		}
-		
+
 		int rl=Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Fast path if already complete
-		
+
 		// read remaining cells
 		HashMap<Hash,ACell> hm=new HashMap<>();
-		decodeCells(hm,data.slice(rl,ml));
+		decodeCells(hm,data.slice(rl,ml),store);
 
 		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();		
 		ArrayList<ACell> stack=new ArrayList<>();
@@ -914,11 +921,10 @@ public class Format {
 	 * @param data Encoding to read
 	 * @throws BadFormatException In case of bad format, including any embedded values
 	 */
-	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data) throws BadFormatException {
+	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data, AStore store) throws BadFormatException {
 		long dataLength=data.count();
 		try {
 			int ix=0;
-			AStore store=Stores.current();
 			while( ix<dataLength) {
 				long encLength=Format.readVLQCount(data,ix);
 				ix+=Format.getVLQCountLength(encLength);

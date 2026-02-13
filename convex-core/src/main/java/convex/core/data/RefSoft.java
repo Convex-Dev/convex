@@ -87,6 +87,18 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		return new RefSoft<T>(Stores.current(),hash);
 	}
 
+	/**
+	 * Create a RefSoft with a Hash reference and explicit store.
+	 *
+	 * @param <T>   Type of value
+	 * @param hash  Hash ID of value
+	 * @param store Store to look up the value in
+	 * @return New RefSoft instance
+	 */
+	public static <T extends ACell> Ref<T> createForHash(Hash hash, AStore store) {
+		return new RefSoft<T>(store,hash);
+	}
+
 	@Override
 	public T getValue() {
 		T result = softRef.get();

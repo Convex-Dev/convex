@@ -7,6 +7,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.store.Stores;
 import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.bc.BCProvider;
@@ -26,7 +27,7 @@ public class SignatureBenchmark {
 	private static SignedData<ABlob> makeSigned() {
 		SignedData<ABlob> signed= KEYPAIR.signData(Blobs.fromHex("cafebabe"));
 		try {
-			Cells.persist(signed);
+			Cells.persist(signed, Stores.current());
 		} catch (IOException e) {
 			throw new Error(e);
 		}

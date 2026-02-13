@@ -20,6 +20,7 @@ import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 public class AddressTest {
@@ -65,7 +66,7 @@ public class AddressTest {
 		Hash h=Hash.get(a);
 		
 		try {
-			a=Cells.persist(a);
+			a=Cells.persist(a, Stores.current());
 		} catch (IOException e) {
 			fail(e);
 		}

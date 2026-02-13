@@ -84,15 +84,15 @@ public class RefTest {
 		
 		// Shallow persist vv
 		Ref<AVector<ACell>> vvr=vv.getRef();
-		vvr=vvr.persistShallow();
+		vvr=vvr.persistShallow(Stores.current());
 		assertEquals(Ref.STORED, vvr.getStatus());
 
 		// non-embedded child v shouldn't yet be in store
 		assertThrows(MissingDataException.class, () -> Ref.forHash(vh).getValue());
-		
+
 		// Shallow persist v
 		Ref<AVector<ACell>> vr=v.getRef();
-		vr = vr.persistShallow();
+		vr = vr.persistShallow(Stores.current());
 		assertEquals(Ref.STORED, vr.getStatus());
 
 		
@@ -100,7 +100,7 @@ public class RefTest {
 		assertEquals(v, Ref.forHash(vh).getValue());
 		
 		// Now do full persistence of vv
-		vvr=Cells.persist(vv).getRef();
+		vvr=Cells.persist(vv, Stores.current()).getRef();
 		assertEquals(Ref.PERSISTED, vvr.getStatus());
 		
 		// Persistence should extend to child v
@@ -109,7 +109,7 @@ public class RefTest {
 		assertEquals(Ref.PERSISTED, vr.getStatus());	
 		
 		// Now try announcing vv
-		vv=Cells.announce(vv,null);
+		vv=Cells.announce(vv,null,Stores.current());
 		vvr=vv.getRef();
 		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
 		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
@@ -156,7 +156,7 @@ public class RefTest {
 	public void testPersistEmbeddedNull() throws InvalidDataException, IOException {
 		Ref<ACell> nr = Ref.get(null);
 		assertSame(Ref.NULL_VALUE, nr);
-		assertSame(nr, nr.persist());
+		assertSame(nr, nr.persist(Stores.current()));
 		nr.validate();
 		assertTrue(nr.isEmbedded());
 	}
@@ -165,7 +165,7 @@ public class RefTest {
 	public void testPersistEmbeddedLong() throws IOException {
 		ACell val=RT.cvm(10001L);
 		Ref<ACell> nr = Ref.get(val);
-		Ref<ACell> nrp = nr.persist();
+		Ref<ACell> nrp = nr.persist(Stores.current());
 		
 		assertSame(nr.getValue(), nrp.getValue());
 		assertTrue(nr.isEmbedded());
@@ -185,7 +185,7 @@ public class RefTest {
 		assertEquals(0,rs.persisted);
 		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
 		
-		Ref<ABlob> rb=Cells.persist(bigBlob).getRef();
+		Ref<ABlob> rb=Cells.persist(bigBlob, Stores.current()).getRef();
 		
 		// TODO: Check Soft Refs
 		
@@ -203,7 +203,7 @@ public class RefTest {
 		Ref<?> orig = value.getRef();
 		assertEquals(Ref.UNKNOWN, orig.getStatus());
 		assertFalse(orig.isPersisted());
-		orig = orig.persist();
+		orig = orig.persist(Stores.current());
 		assertTrue(orig.isPersisted());
 
 		// a ref using the same hash
@@ -216,7 +216,7 @@ public class RefTest {
 
 	@Test
 	public void testCompare() throws IOException {
-		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L)).getRef()));
+		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L), Stores.current()).getRef()));
 		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
 		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(
@@ -378,7 +378,7 @@ public class RefTest {
 		assertTrue(ref.isInternal(),()->"Not internal ref: "+a+" of type "+Utils.getClass(a));
 		assertSame(a,ref.getValue());
 		
-		Stores.runWithMemoryStore(()->assertSame(a,Cells.persist(a)));
+		Stores.runWithMemoryStore(()->assertSame(a,Cells.persist(a, Stores.current())));
 		
 	}
 

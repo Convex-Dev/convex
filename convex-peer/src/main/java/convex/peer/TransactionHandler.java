@@ -305,7 +305,7 @@ public class TransactionHandler extends AThreadedComponent {
 				int end=Math.min(ntrans, (i+1)*maxBlockSize);
 				Block block = Block.create(timestamp, newTransactions.subList(start, end));
 				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
-				signedBlock=Cells.persist(signedBlock);
+				signedBlock=Cells.persist(signedBlock, server.getStore());
 				signedBlocks[i]=signedBlock;		
 			}
 			newTransactions.clear();

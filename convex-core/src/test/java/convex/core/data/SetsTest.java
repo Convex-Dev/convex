@@ -17,6 +17,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.store.Stores;
 import convex.test.Samples;
 
 /**
@@ -57,7 +58,7 @@ public class SetsTest {
 	@Test public void testSetEncodeRegression() throws BadFormatException, IOException {
 		// This failed once in generative tests, checking just in case
 		ASet<ACell> s = Sets.of(Address.ZERO,Samples.IPSUM);
-		Ref<ACell> pref = Ref.get(Cells.persist(s)); // ensure persisted
+		Ref<ACell> pref = Ref.get(Cells.persist(s, Stores.current())); // ensure persisted
 		
 		Blob enc=s.getEncoding();
 		assertEquals(s,Format.read(enc));

@@ -57,7 +57,7 @@ public class MessageTest {
 		AVector<ACell> v=mr.toResult().getValue();
 		
 		assertEquals(b,v.get(0));
-		Cells.persist(b);
+		Cells.persist(b, Stores.current());
 		
 		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
 		doMessageTest(md);
@@ -153,7 +153,7 @@ public class MessageTest {
 	@Test 
 	public void testDataMessages() throws BadFormatException, IOException {
 		Blob b=Blob.createRandom(new Random(1256785), 1000);
-		Cells.persist(b);
+		Cells.persist(b, Stores.current());
 		
 		Message m=Message.createDataRequest(CVMLong.ONE, b.getHash());
 		Message r=Message.createDataResponse(CVMLong.ONE, b);

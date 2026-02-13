@@ -40,7 +40,7 @@ public class ObjectsTest {
 		Hash h=Hash.get(a);
 				
 		try {
-			a=Cells.persist(a);
+			a=Cells.persist(a, Stores.current());
 		} catch (IOException e) {
 			fail(e);
 		}
@@ -427,7 +427,7 @@ public class ObjectsTest {
 			assertNull(ms.refForHash(hash));
 			
 			// persist the cell
-			Cells.persist(a);
+			Cells.persist(a, ms);
 			
 			// retrieve from store
 			Ref<ACell> rr=ms.refForHash(hash);

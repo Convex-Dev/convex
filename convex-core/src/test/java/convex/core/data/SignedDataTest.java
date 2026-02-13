@@ -19,6 +19,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class SignedDataTest {
@@ -43,8 +44,8 @@ public class SignedDataTest {
 		assertNotNull(sd.toString());
 
 		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
-		
-		Cells.persist(sd);
+
+		Cells.persist(sd, Stores.current());
 		
 		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
 		// should have cached checked signature
@@ -89,8 +90,8 @@ public class SignedDataTest {
 		CVMLong cl=RT.cvm(1585856457);
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
-		Cells.persist(sd);
-		
+		Cells.persist(sd, Stores.current());
+
 		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
 		// should have cached checked signature
 		assertTrue(sd1.isSignatureChecked());

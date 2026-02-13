@@ -50,7 +50,7 @@ public class ParamTestRefs {
 				CVMLong n=CVMLong.create(1567565765677L);
 				Ref<CVMLong> r=Ref.get(n);
 				assertTrue(r.isEmbedded());
-				Ref<CVMLong> r2=r.persist();
+				Ref<CVMLong> r2=r.persist(store);
 				assertTrue(r.isEmbedded());
 				assertSame(n,r2.getValue());
 			}
@@ -60,7 +60,7 @@ public class ParamTestRefs {
 				AVector<CVMLong> v=Vectors.of(6759578996496L);
 				Ref<AVector<CVMLong>> r=v.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
-				Ref<AVector<CVMLong>> r2=r.persist();
+				Ref<AVector<CVMLong>> r2=r.persist(store);
 				assertEquals(Ref.PERSISTED,r2.getStatus());
 				assertEquals(v.getRef(0),r2.getValue().getRef(0));
 			}
@@ -70,7 +70,7 @@ public class ParamTestRefs {
 				Ref<AMap<CVMLong,AVector<CVMLong>>> r=m.getRef();
 				assertEquals(Ref.UNKNOWN,r.getStatus());
 				
-				Ref<AMap<CVMLong,AVector<CVMLong>>> r2=r.persist();
+				Ref<AMap<CVMLong,AVector<CVMLong>>> r2=r.persist(store);
 				
 				assertEquals(Ref.PERSISTED,r2.getStatus());
 				MapEntry<CVMLong, AVector<CVMLong>> me2=r2.getValue().entryAt(0);

@@ -622,7 +622,7 @@ public class McpAPI extends ABaseAPI {
 
 			try {
 				ATransaction transaction = Invoke.create(address, sequence, code);
-				transaction = Cells.persist(transaction);
+				transaction = Cells.persist(transaction, server.getStore());
 				Ref<ATransaction> ref = transaction.getRef();
 				String hashHex = SignedData.getMessageForRef(ref).toHexString();
 				String dataHex = Format.encodeMultiCell(transaction, true).toHexString();

@@ -13,7 +13,6 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 /**
@@ -192,17 +191,6 @@ public class Cells {
 	}
 	
 	/**
-	 * Persist a cell in the current store
-	 * @param a Cell to persist
-	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException in case of IO error during persistence
-	 */
-	public static <T extends ACell> T persist(T a) throws IOException {
-		AStore store=Stores.current();
-		return persist(a,store);
-	}
-
-	/**
 	 * Persist a cell in the given store
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
@@ -232,14 +220,15 @@ public class Cells {
 	 * Announces a Cell, reporting as novelty any cells that have not been previously announced
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
+	 * @param store Store to announce in
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
 	 * @throws IOException in case of IO error during persistence
 	 */
-	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) throws IOException {
+	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		if (a==null) {
 			return null; // null is never "novelty"
 		};
-		Ref<T> ref=Stores.current().storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
+		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
 		return ref.getValue();
 	}
 

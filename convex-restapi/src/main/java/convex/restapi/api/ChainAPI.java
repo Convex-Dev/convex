@@ -810,7 +810,7 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
-		trans=Cells.persist(trans); // persist data so we have a full copy if needed
+		trans=Cells.persist(trans, server.getStore()); // persist data so we have a full copy if needed
 		Ref<ATransaction> ref = trans.getRef();
 		HashMap<String, Object> result = new HashMap<>();
 		result.put("source", srcValue);

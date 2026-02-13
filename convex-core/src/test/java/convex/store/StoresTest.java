@@ -53,7 +53,7 @@ public class StoresTest {
 
 			// Use fresh State
 			State s=InitTest.createState();
-			Ref<State> sr=Cells.persist(s).getRef();
+			Ref<State> sr=Cells.persist(s, testStore).getRef();
 
 			Hash hash=sr.getHash();
 
@@ -98,7 +98,7 @@ public class StoresTest {
 		AStore temp=Stores.current();
 		try {
 			Stores.setCurrent(e1);
-			assertSame(ev,Cells.persist(ev));
+			assertSame(ev,Cells.persist(ev, e1));
 			
 			// vector shouldn't be in other stores
 			Hash hv=v.getHash();
@@ -174,6 +174,88 @@ public class StoresTest {
 
 		// Calling thread's store should be unaffected
 		assertSame(before, Stores.current(), "Calling thread store should not change");
+	}
+
+	// ========== Cross-store lattice merge tests ==========
+
+	@Test
+	public void testLatticeMergeEtchToMemory() throws IOException {
+		// Simulate lattice merge: read deep structure from Etch, persist to MemoryStore
+		EtchStore source = EtchStore.createTemp();
+		MemoryStore target = new MemoryStore();
+
+		// Build and persist a nested structure in source
+		AVector<ACell> inner = Vectors.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+		ASet<ACell> set = Sets.of(inner, CVMLong.create(42), Samples.NON_EMBEDDED_STRING);
+		set = Cells.persist(set, source);
+		Hash rootHash = Cells.getHash(set);
+
+		// Persist to target store (lattice merge)
+		ASet<ACell> merged = Cells.persist(set, target);
+
+		// Verify in target
+		Ref<?> tgtRef = target.refForHash(rootHash);
+		assertNotNull(tgtRef, "Root should be retrievable from target after merge");
+		assertTrue(tgtRef.getStatus() >= Ref.PERSISTED);
+		assertEquals(set, merged);
+
+		// Verify nested children are individually retrievable in target
+		if (!Samples.NON_EMBEDDED_STRING.isEmbedded()) {
+			Hash childHash = Cells.getHash(Samples.NON_EMBEDDED_STRING);
+			assertNotNull(target.refForHash(childHash), "Non-embedded child should be in target");
+		}
+	}
+
+	@Test
+	public void testLatticeMergeMemoryToEtch() throws IOException {
+		// Reverse direction: MemoryStore → EtchStore
+		MemoryStore source = new MemoryStore();
+		EtchStore target = EtchStore.createTemp();
+
+		ASet<ACell> set = Sets.empty();
+		for (int i = 0; i < 200; i++) {
+			set = set.conj(CVMLong.create(i));
+		}
+		set = Cells.persist(set, source);
+		Hash rootHash = Cells.getHash(set);
+
+		// Merge to Etch
+		Cells.persist(set, target);
+
+		Ref<?> tgtRef = target.refForHash(rootHash);
+		assertNotNull(tgtRef);
+		assertTrue(tgtRef.getStatus() >= Ref.PERSISTED);
+		assertEquals(200L, ((ASet<?>) tgtRef.getValue()).count());
+	}
+
+	@Test
+	public void testBidirectionalLatticeMerge() throws IOException {
+		// Two stores each have different data, merge both ways
+		MemoryStore store1 = new MemoryStore();
+		MemoryStore store2 = new MemoryStore();
+
+		AVector<CVMLong> data1 = Vectors.of(1L, 2L, 3L);
+		AVector<CVMLong> data2 = Vectors.of(4L, 5L, 6L);
+
+		data1 = Cells.persist(data1, store1);
+		data2 = Cells.persist(data2, store2);
+
+		Hash h1 = Cells.getHash(data1);
+		Hash h2 = Cells.getHash(data2);
+
+		// store2 doesn't have data1, store1 doesn't have data2
+		assertNull(store2.refForHash(h1));
+		assertNull(store1.refForHash(h2));
+
+		// Merge: each gets the other's data
+		Cells.persist(data1, store2);
+		Cells.persist(data2, store1);
+
+		// Now both stores have both values
+		assertNotNull(store1.refForHash(h2));
+		assertNotNull(store2.refForHash(h1));
+		assertEquals(data1, store2.refForHash(h1).getValue());
+		assertEquals(data2, store1.refForHash(h2).getValue());
 	}
 
 	// ========== Cross-store acquisition round-trip ==========

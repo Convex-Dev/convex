@@ -34,6 +34,7 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
 import convex.core.lang.NumericsTest;
 import convex.core.lang.RT;
+import convex.core.store.Stores;
 import convex.test.Samples;
 
 /**
@@ -121,7 +122,7 @@ public class ParamTestValues extends ACVMTest {
 
 	@Test
 	public void testHexRoundTrip() throws InvalidDataException, ValidationException, IOException {
-		Cells.persist(data);
+		Cells.persist(data, Stores.current());
 		String hex = Cells.encode(data).toHexString();
 		Blob d2 = Blob.fromHex(hex);
 		ACell rec = Format.read(d2);

@@ -40,6 +40,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.store.Stores;
 import convex.test.Samples;
 import convex.test.Testing;
  
@@ -325,7 +326,7 @@ public class EncodingTest {
 		AVector<?> v=Vectors.of(1,randBlob,randBlob);
 		
 		ArrayList<ACell> novelty=new ArrayList<>();
-		Cells.announce(v,r->novelty.add(r.getValue()));
+		Cells.announce(v,r->novelty.add(r.getValue()),Stores.current());
 		if (v.isEmbedded()) novelty.add(v);
 		
 		assertEquals(2,novelty.size());
@@ -344,7 +345,7 @@ public class EncodingTest {
 		
 		Blob enc=Format.encodeCells(al);
 		
-		ACell[] cs=Format.decodeCells(enc);
+		ACell[] cs=Format.decodeCells(enc, Stores.current());
 		assertEquals(CVMLong.ONE,cs[0]);
 		assertEquals(CVMDouble.ZERO,cs[2]);
 		assertEquals(3,cs.length);
@@ -391,7 +392,7 @@ public class EncodingTest {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Stores.current());
 		novelty.add(b);
 		
 		Blob enc=Format.encodeDelta(novelty);
@@ -400,7 +401,7 @@ public class EncodingTest {
 		assertEquals(Refs.totalRefCount(b),Refs.totalRefCount(b2));
 		
 		novelty.clear();
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Stores.current());
 		assertTrue(novelty.isEmpty());
 		
 	}
@@ -495,7 +496,7 @@ public class EncodingTest {
 		
 		Belief b=Belief.create(kp, o);
 		
-		b=Cells.persist(b);
+		b=Cells.persist(b, Stores.current());
 		assertTrue(b.getRef().getStatus()==Ref.PERSISTED);
 		
 		ArrayList<ACell> novelty=new ArrayList<>();
@@ -509,7 +510,7 @@ public class EncodingTest {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Stores.current());
 		novelty.add(b);
 		Blob enc=Format.encodeDelta(novelty);
 		
@@ -519,7 +520,7 @@ public class EncodingTest {
 		
 		// Check no new novelty if announce again
 		novelty.clear();
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Stores.current());
 		assertEquals(0,novelty.size());
 		
 		// Extend Belief with new Peer Order
@@ -529,7 +530,7 @@ public class EncodingTest {
 		Belief b3=b.withOrders(b.getOrders().assoc(kp2.getAccountKey(), kp2.signData(o2)));
 		
 		novelty.clear();
-		b3=Cells.announce(b3, noveltyHandler);
+		b3=Cells.announce(b3, noveltyHandler, Stores.current());
 		assertFalse(novelty.isEmpty());
 		novelty.add(b3);
 		Blob enc2=Format.encodeDelta(novelty);

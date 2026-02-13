@@ -28,7 +28,7 @@ public class EtchStressTest {
 			ABlob b=Blobs.createRandom(r,10000);
 			Hash h=b.getHash();
 			
-			b=Cells.persist(b);
+			b=Cells.persist(b, store);
 			
 			Ref<ABlob> rb=store.refForHash(h);
 			if (rb==null) {

@@ -27,6 +27,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
+import convex.core.store.Stores;
 
 /**
  * Tests for the State data structure
@@ -66,7 +67,7 @@ public class StateTest {
 
 		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = Cells.persist(s).getRef();
+		Ref<State> rs = Cells.persist(s, Stores.current()).getRef();
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 
 		// TODO: consider if cached ref in state should now have persisted status?
@@ -109,7 +110,7 @@ public class StateTest {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));
 		
-		Ref<State> r1=Cells.persist(s).getRef();
+		Ref<State> r1=Cells.persist(s, Stores.current()).getRef();
 		RefTreeStats rs1=Refs.getRefTreeStats(r1);
 		
 		assertTrue(r1.isPersisted());

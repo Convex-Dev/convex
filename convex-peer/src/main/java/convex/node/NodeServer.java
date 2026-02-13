@@ -416,7 +416,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				V merged = lattice.merge(currentValue, receivedValue);
 
 				// Try to persist (triggers MissingDataException if data missing)
-				merged = Cells.persist(merged);
+				merged = Cells.persist(merged, store);
 				return merged;
 
 			} catch (MissingDataException e) {
@@ -509,7 +509,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			try {
 				// Attempt merge
 				ACell merged = subLattice.merge(currentValue, receivedValue);
-				merged = Cells.persist(merged);
+				merged = Cells.persist(merged, store);
 				return merged;
 
 			} catch (MissingDataException e) {

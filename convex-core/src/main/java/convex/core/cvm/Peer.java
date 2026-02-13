@@ -34,7 +34,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 /**
@@ -247,7 +246,6 @@ public class Peer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static AMap<Keyword, ACell> getPeerData(AStore store, ACell rootKey) throws IOException {
-		Stores.setCurrent(store);
 		Hash root = store.getRootHash();
 		Ref<ACell> ref=store.refForHash(root);
 		if (ref==null) return null; // not found case

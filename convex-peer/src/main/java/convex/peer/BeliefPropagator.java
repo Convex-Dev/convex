@@ -142,7 +142,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			// Persist Belief in all cases, even if we didn't announce
 			// This is mainly in case we get missing data / sync requests for the Belief
 			// This is super cheap if already persisted, so no problem in general for each loop
-			belief=Cells.persist(belief);
+			belief=Cells.persist(belief, server.getStore());
 		} catch (IOException e) {
 			// We might get an error while shutting down, can ignore this
 			if (!server.isLive()) return;
@@ -370,7 +370,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						
 						
 						// Ensure we can persist newly received Order
-						so=Cells.persist(so);
+						so=Cells.persist(so, server.getStore());
 						observeOrderUpdate(so);
 						orders.put(key, so);
 						changed=true;
@@ -417,7 +417,7 @@ public class BeliefPropagator extends AThreadedComponent {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		belief=Cells.announce(belief, noveltyHandler);
+		belief=Cells.announce(belief, noveltyHandler, server.getStore());
 		lastFullBroadcastBelief=belief;
 
 		Message msg = createPartialBelief(belief, novelty);
@@ -446,7 +446,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		SignedData<Order> order=belief.getOrders().get(key);
 		if (order==null) return null;
 		
-		order=Cells.announce(order, noveltyHandler);
+		order=Cells.announce(order, noveltyHandler, server.getStore());
 		
 		// Update belief orders with persisted version
 		orders=orders.assoc(key, order);

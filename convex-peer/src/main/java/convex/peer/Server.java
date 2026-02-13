@@ -47,7 +47,6 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
@@ -172,7 +171,7 @@ public class Server implements Closeable {
 //	}
 
 	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
-		log.debug("Establishing Peer with store: {}",Stores.current());
+		log.debug("Establishing Peer with store: {}",store);
 		AKeyPair keyPair = Config.ensurePeerKey(config);
 		if (keyPair==null) {
 			log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
@@ -351,10 +350,7 @@ public class Server implements Closeable {
 	public synchronized void launch() throws LaunchException, InterruptedException {
 		if (isRunning) return; // in case of double launch
 		isRunning=true;
-		AStore savedStore=Stores.current();
 		try {
-			Stores.setCurrent(store);
-			
 			// Establish Peer state
 			Peer peer = establishPeer();
 
@@ -363,8 +359,8 @@ public class Server implements Closeable {
 			executor.persistPeerData();
 
 			HashMap<Keyword, Object> config = getConfig();
-			
-			
+
+
 			if (config.containsKey(Keywords.RECALC)) try {
 				Object o=config.get(Keywords.RECALC);
 				if (o!=null) {
@@ -384,12 +380,12 @@ public class Server implements Closeable {
 
 			// set running status now, so that loops don't immediately terminate
 			isRunning = true;
-			
+
 			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, this::close);
-			
-			
-			
+
+
+
 			// Start threaded components
 			manager.start();
 			queryHandler.start();
@@ -397,15 +393,13 @@ public class Server implements Closeable {
 			transactionHandler.start();
 			executor.start();
 
-	
+
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
 		} catch (ConfigException e) {
 			throw new LaunchException("Launch failed due to config problem: "+e,e);
 		} catch (IOException e) {
 			throw new LaunchException("Launch failed due to IO Error: "+e,e);
-		} finally {
-			Stores.setCurrent(savedStore);
 		}
 	}
 
@@ -425,9 +419,7 @@ public class Server implements Closeable {
 	 */
 	protected void processMessage(Message m) {
 		// log.info("Message received: "+m.getMessageData());
-		AStore tempStore=Stores.current();
 		try {
-			Stores.setCurrent(this.store);
 			MessageType type = m.getType();
 			switch (type) {
 			case BELIEF:
@@ -469,8 +461,6 @@ public class Server implements Closeable {
 			log.info("Missing data: {} in message", missingHash);
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
-		} finally {
-			Stores.setCurrent(tempStore);
 		}
 	}
 
@@ -636,33 +626,27 @@ public class Server implements Closeable {
 	 */
 	@SuppressWarnings("unchecked")
 	public Peer persistPeerData() throws IOException {
-		AStore tempStore = Stores.current();
-		try {
-			Peer peer=getPeer();
-			Stores.setCurrent(store);
-			AMap<Keyword,ACell> peerData = peer.toData();
+		Peer peer=getPeer();
+		AMap<Keyword,ACell> peerData = peer.toData();
 
-			// Set up root key for Peer persistence. Default is Peer Account Key
-			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
-			if (rk==null) rk=peer.getPeerKey();
-			ACell rootKey=rk;
+		// Set up root key for Peer persistence. Default is Peer Account Key
+		ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+		if (rk==null) rk=peer.getPeerKey();
+		ACell rootKey=rk;
 
-			Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
-			AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
-			AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
+		Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
+		AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
+		AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 
-			newRootData=store.setRootData(newRootData).getValue();
-			
-			// ensure specific values are persisted, might be needed for lookup
-			store.storeTopRef(peer.getGenesisState().getRef(), Ref.PERSISTED, null);
-			store.storeTopRef(peer.getBelief().getRef(), Ref.PERSISTED, null);
-			
-			peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
-			log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
-			return Peer.fromData(getKeyPair(), peerData);
-		}  finally {
-			Stores.setCurrent(tempStore);
-		}
+		newRootData=store.setRootData(newRootData).getValue();
+
+		// ensure specific values are persisted, might be needed for lookup
+		store.storeTopRef(peer.getGenesisState().getRef(), Ref.PERSISTED, null);
+		store.storeTopRef(peer.getBelief().getRef(), Ref.PERSISTED, null);
+
+		peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
+		log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
+		return Peer.fromData(getKeyPair(), peerData);
 	}
 
 	/**

@@ -13,6 +13,7 @@ import convex.core.data.EncodingTest;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class BeliefTest {
@@ -45,7 +46,7 @@ public class BeliefTest {
 		
 		RecordTest.doRecordTests(b);
 		
-		b=Cells.persist(b);
+		b=Cells.persist(b, Stores.current());
 		
 		RecordTest.doRecordTests(b);
 		

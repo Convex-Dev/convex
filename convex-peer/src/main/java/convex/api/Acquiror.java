@@ -136,7 +136,7 @@ public class Acquiror {
 						// maybe if other stuff arrived since complete, but not sure
 						try {
 							T a=ref.getValue();
-							a=Cells.persist(a);
+							a=Cells.persist(a, store);
 						} catch (MissingDataException e) {
 							// We will loop
 						}

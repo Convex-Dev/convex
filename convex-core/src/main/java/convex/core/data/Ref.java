@@ -12,7 +12,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Trees;
 
 /**
@@ -336,6 +335,17 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static <T extends ACell> Ref<T> forHash(Hash hash) {
 		return RefSoft.createForHash(hash);
 	}
+
+	/**
+	 * Gets a Ref for a given Hash, targeting a specific store.
+	 *
+	 * @param hash The hash value for this Ref to refer to
+	 * @param store Store to look up the value in
+	 * @return Ref for the specific hash in the given store
+	 */
+	public static <T extends ACell> Ref<T> forHash(Hash hash, AStore store) {
+		return RefSoft.createForHash(hash, store);
+	}
 	
 	public Ref<T> markEmbedded(boolean isEmbedded) {
 		int newFlags=mergeFlags(flags,(isEmbedded?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK));
@@ -432,25 +442,25 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 *         garbage collected before being persisted 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) throws IOException {
+	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		int status = getStatus();
 		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
-		AStore store=Stores.current();
 		return (Ref<R>) store.storeRef(this, Ref.PERSISTED,noveltyHandler);
 	}
-	
+
 	/**
-	 * Persists this Ref in the current store if not embedded and not already
+	 * Persists this Ref in the given store if not embedded and not already
 	 * persisted. Resulting status will be PERSISTED or higher.
-	 * 
+	 *
 	 * This may convert the Ref from a direct reference to a soft reference.
-	 * 
+	 *
+	 * @param store Store to persist in
 	 * @throws MissingDataException if the Ref cannot be fully persisted.
 	 * @return the persisted Ref
 	 * @throws IOException in case of IO error during persistence
 	 */
-	public <R extends ACell> Ref<R> persist() throws IOException {
-		return persist(null);
+	public <R extends ACell> Ref<R> persist(AStore store) throws IOException {
+		return persist(null, store);
 	}
 
 	/**
@@ -551,30 +561,31 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public abstract RefSoft<T> toSoft(AStore store);
 
 	/**
-	 * Persists a Ref shallowly in the current store.
-	 * 
+	 * Persists a Ref shallowly in the given store.
+	 *
 	 * Status will be updated to STORED or higher.
-	 * 
+	 *
+	 * @param store Store to persist in
 	 * @return Ref with status of STORED or above
 	 * @throws IOException in case of IO error during persistence
 	 */
-	public <R extends ACell> Ref<R> persistShallow() throws IOException {
-		return persistShallow(null);
+	public <R extends ACell> Ref<R> persistShallow(AStore store) throws IOException {
+		return persistShallow(null, store);
 	}
-	
+
 	/**
-	 * Persists a Ref shallowly in the current store.
-	 * 
+	 * Persists a Ref shallowly in the given store.
+	 *
 	 * Status will be updated STORED or higher. Novelty handler will be called exactly once if and only if
 	 * the ref was not previously stored
-	 * 
+	 *
 	 * @param noveltyHandler Novelty handler to call (may be null)
+	 * @param store Store to persist in
 	 * @return Ref with status of STORED or above
 	 * @throws IOException in case of IO error during persistence
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) throws IOException {
-		AStore store=Stores.current();
+	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler, AStore store) throws IOException {
 		return (Ref<R>) store.storeTopRef((Ref<ACell>)this, Ref.STORED, noveltyHandler);
 	}
 

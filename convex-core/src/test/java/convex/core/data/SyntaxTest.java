@@ -19,6 +19,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.store.Stores;
 
 public class SyntaxTest {
 
@@ -85,7 +86,7 @@ public class SyntaxTest {
 		
 		assertEquals(s,s2);
 		
-		Ref<Syntax> pref=Cells.persist(s).getRef();
+		Ref<Syntax> pref=Cells.persist(s, Stores.current()).getRef();
 		assertEquals(s,pref.getValue());
 
 	}

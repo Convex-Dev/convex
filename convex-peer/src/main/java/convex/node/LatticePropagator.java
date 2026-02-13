@@ -23,7 +23,6 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
 
@@ -175,40 +174,33 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 	 * 5. Periodically check for root sync
 	 */
 	private void propagationLoop() {
-		AStore savedStore = Stores.current();
-		try {
-			Stores.setCurrent(store);
+		while (running && !Thread.currentThread().isInterrupted()) {
+			try {
+				// Wait for broadcast trigger (with timeout for root sync checks)
+				Object trigger = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
 
-			while (running && !Thread.currentThread().isInterrupted()) {
-				try {
-					// Wait for broadcast trigger (with timeout for root sync checks)
-					Object trigger = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
+				// Get current lattice value
+				V currentValue = nodeServer.getLocalValue();
+				long currentTime = Utils.getCurrentTimestamp();
 
-					// Get current lattice value
-					V currentValue = nodeServer.getLocalValue();
-					long currentTime = Utils.getCurrentTimestamp();
-
-					// If triggered or value changed, send delta
-					if (trigger != null || hasValueChanged(currentValue)) {
-						sendDeltaIfReady(currentValue, currentTime);
-					}
-
-					// Periodic root-only sync for divergence detection
-					maybePerformRootSync(currentValue, currentTime);
-
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					log.debug("LatticePropagator interrupted");
-					break;
-				} catch (Exception e) {
-					log.warn("Unexpected error in propagation loop", e);
-					// Continue running despite error
+				// If triggered or value changed, send delta
+				if (trigger != null || hasValueChanged(currentValue)) {
+					sendDeltaIfReady(currentValue, currentTime);
 				}
+
+				// Periodic root-only sync for divergence detection
+				maybePerformRootSync(currentValue, currentTime);
+
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				log.debug("LatticePropagator interrupted");
+				break;
+			} catch (Exception e) {
+				log.warn("Unexpected error in propagation loop", e);
+				// Continue running despite error
 			}
-		} finally {
-			Stores.setCurrent(savedStore);
-			log.debug("LatticePropagator stopped");
 		}
+		log.debug("LatticePropagator stopped");
 	}
 
 	/**
@@ -340,7 +332,7 @@ public class LatticePropagator<V extends ACell> implements Closeable {
 		};
 
 		// Announce to store, marking as announced and collecting novelty
-		value = Cells.announce(value, noveltyHandler);
+		value = Cells.announce(value, noveltyHandler, store);
 
 		// Ensure value is in the novelty list
 		if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {

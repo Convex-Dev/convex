@@ -27,6 +27,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
+import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class BlobsTest {
@@ -569,7 +570,7 @@ public class BlobsTest {
 
 		bb.validate();
 
-		Ref<BlobTree> rb = Cells.persist(bb).getRef();
+		Ref<BlobTree> rb = Cells.persist(bb, Stores.current()).getRef();
 		BlobTree bbb = Format.read(bb.getEncoding());
 		bbb.validate();
 		assertEquals(bb, bbb);
@@ -719,7 +720,7 @@ public class BlobsTest {
 	   ABlob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
 	   
-	   Ref<ACell> pref = Cells.persist(value).getRef(); // ensure persisted
+	   Ref<ACell> pref = Cells.persist(value, Stores.current()).getRef(); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
 	   Blob b = value.getEncoding();
 	   ACell o = Format.read(b);

@@ -24,7 +24,6 @@ import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 
 
 /**
@@ -74,21 +73,15 @@ public class API {
 		Config.ensureFlags(config);
 		Config.checkKeyStore(config);
 		
-		AStore tempStore=Stores.current();
-		try {
-			// Configure the store and use on this thread during launch
-			AStore store=Config.ensureStore(config);
-			Stores.setCurrent(store);
+		// Configure the store
+		Config.ensureStore(config);
 
-			Config.ensurePeerKey(config);	
-			Config.ensureGenesisState(config);
-			
-			Server server = Server.create(config);
-			server.launch();
-			return server;
-		} finally {
-			Stores.setCurrent(tempStore);
-		}
+		Config.ensurePeerKey(config);
+		Config.ensureGenesisState(config);
+
+		Server server = Server.create(config);
+		server.launch();
+		return server;
 	}
 	
 	/**

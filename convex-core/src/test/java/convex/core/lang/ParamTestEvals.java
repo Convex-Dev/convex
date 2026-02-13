@@ -22,6 +22,7 @@ import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitTest;
+import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 @RunWith(Parameterized.class)
@@ -107,7 +108,7 @@ public class ParamTestEvals {
 	public void testOpRoundTrip() throws BadFormatException, IOException {
 		AOp<?> op = compile(source);
 		Blob b = Cells.encode(op);
-		Cells.persist(op); // persist to allow re-creation
+		Cells.persist(op, Stores.current()); // persist to allow re-creation
 
 		AOp<?> op2 = Format.read(b);
 		Blob b2 = Cells.encode(op2);
