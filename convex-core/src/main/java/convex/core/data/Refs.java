@@ -191,6 +191,37 @@ public class Refs {
 	}
 
 	/**
+	 * Checks that all non-embedded refs in a cell tree are direct (RefDirect).
+	 * Safe for incomplete trees: does not call getValue() on non-direct refs,
+	 * so will not trigger MissingDataException.
+	 *
+	 * @param cell Cell to check (may be null)
+	 * @return true if all non-embedded refs are direct, false if any RefSoft found
+	 */
+	public static boolean allRefsDirect(ACell cell) {
+		if (cell == null) return true;
+		ArrayList<ACell> stack = new ArrayList<>();
+		stack.add(cell);
+		while (!stack.isEmpty()) {
+			ACell c = stack.remove(stack.size() - 1);
+			int rc = c.getRefCount();
+			for (int i = 0; i < rc; i++) {
+				Ref<?> r = c.getRef(i);
+				if (r.isEmbedded()) {
+					ACell child = r.getValue();
+					if (child != null) stack.add(child);
+				} else if (r.isDirect()) {
+					ACell child = r.getValue();
+					if (child != null) stack.add(child);
+				} else {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
 	 * Filters an array of Refs, returning an array containing only the elements where the
 	 * mask bit is set. May return the same array if all elements areincluded.
 	 *

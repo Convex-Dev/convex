@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -301,5 +302,73 @@ public class EncoderTest {
 		} finally {
 			Stores.setCurrent(null);
 		}
+	}
+
+	// ==================== No-store multi-cell decode validation ====================
+
+	@Test public void testMultiCellNoStoreComplete() throws BadFormatException {
+		// Complete multi-cell message decoded with no store should succeed
+		// and produce 100% RefDirect for all non-embedded refs
+		ACell big = Samples.INT_VECTOR_300;
+		Blob enc = Format.encodeMultiCell(big, true);
+
+		// Verify it's actually multi-cell (has children)
+		assertTrue(enc.count() > Cells.encode(big).count(), "Should be multi-cell encoding");
+
+		// Decode with no store
+		assertNull(Stores.current());
+		ACell decoded = CVM.decodeMultiCell(enc);
+		assertEquals(big, decoded);
+
+		// All refs must be direct (no RefSoft surviving)
+		assertTrue(Refs.allRefsDirect(decoded), "All refs should be direct after complete message decode");
+
+		// Double-check with visitAllRefs
+		Refs.visitAllRefs(decoded.getRef(), r -> {
+			if (!r.isEmbedded()) {
+				assertTrue(r.isDirect(), "Non-embedded ref should be direct: " + r);
+			}
+		});
+
+		// Also verify via CAD3Encoder
+		ACell fromCAD3 = CAD3.decodeMultiCell(enc);
+		assertEquals(big, fromCAD3);
+		assertTrue(Refs.allRefsDirect(fromCAD3));
+	}
+
+	@Test public void testMultiCellNoStorePartialTopOnly() throws BadFormatException {
+		// Encoding just the top cell of a multi-cell value (children not included).
+		// With no store set, unresolved refs remain as RefSoft pointing to dead MessageStore.
+		ACell big = Samples.INT_VECTOR_300;
+		Blob topOnly = Cells.encode(big);
+
+		// Confirm the original value has non-embedded child refs
+		assertTrue(big.getRefCount() > 0, "Test value should have child refs");
+
+		assertNull(Stores.current());
+
+		// Decode succeeds but the result has non-direct refs (RefSoft to dead MessageStore)
+		ACell decoded = CVM.decodeMultiCell(topOnly);
+		assertNotNull(decoded);
+		assertFalse(Refs.allRefsDirect(decoded),
+			"Partial message decode should leave non-direct refs");
+
+		// Same for CAD3Encoder
+		ACell fromCAD3 = CAD3.decodeMultiCell(topOnly);
+		assertNotNull(fromCAD3);
+		assertFalse(Refs.allRefsDirect(fromCAD3),
+			"Partial message decode should leave non-direct refs");
+	}
+
+	@Test public void testMultiCellNoStoreSingleEmbedded() throws BadFormatException {
+		// Single embedded cell (no children needed) should decode fine with no store
+		ACell small = Vectors.of(1, 2, 3);
+		assertTrue(small.isEmbedded(), "Test value should be embedded");
+		Blob enc = Cells.encode(small);
+
+		assertNull(Stores.current());
+		ACell decoded = CVM.decodeMultiCell(enc);
+		assertEquals(small, decoded);
+		assertTrue(Refs.allRefsDirect(decoded));
 	}
 }

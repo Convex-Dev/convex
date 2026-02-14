@@ -197,93 +197,118 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		int ml=Utils.checkedInt(data.count());
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
-		// Set up temporary MessageStore before reading, so that RefSoft.createForHash
-		// can capture it during top cell decode (non-embedded refs need a store)
-		HashMap<Hash,ACell> hm=new HashMap<>();
-		boolean replacedStore=false;
-		if (Stores.current()==null) {
-			Stores.setCurrent(new MessageStore(hm, null));
-			replacedStore=true;
-		}
-
-		try {
-			// Read first cell. Non-embedded child refs will create RefSoft
-			// pointing to the MessageStore (children added below)
+		// Fast path: if a store is already set, read the top cell directly.
+		// Any non-embedded refs will create RefSoft pointing to the existing store.
+		if (Stores.current()!=null) {
+			// Fast path: always try loading a single cell first (common case)
 			ACell result= this.read(data,0);
 			if (result==null) {
 				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
 				return null;
 			}
-
 			int rl=Utils.checkedInt(result.getEncodingLength());
-			if (rl==ml) return result; // Single-cell fast path
-
-			// Multi-cell: decode children into HashMap
-			readChildCells(hm, data, rl, ml);
-
-			// Replacement scan: resolve all refs from decoded children
-			final HashMap<Hash,ACell> childMap=hm;
-			HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();
-			ArrayList<ACell> stack=new ArrayList<>();
-
-			IRefFunction func=new IRefFunction() {
-				@SuppressWarnings("rawtypes")
-				@Override
-				public Ref apply(Ref r) {
-					if (r.isEmbedded()) {
-						ACell cc=r.getValue();
-						if (cc==null) return r;
-						ACell nc=cc.updateRefs(this);
-						if (cc==nc) return r;
-						return nc.getRef();
-					} else {
-						Hash h=r.getHash();
-
-						// if done, just replace with done version
-						ACell doneVal=done.get(h);
-						if (doneVal!=null) return doneVal.getRef();
-
-						// if in map, push cell to stack
-						ACell part=childMap.get(h);
-						if (part!=null) {
-							stack.add(part);
-							return part.getRef();
-						}
-
-						// not in message, must be partial
-						return r;
-					}
-				}
-			};
-
-			stack.add(result);
-			Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
-				@Override
-				public boolean test(ACell c) {
-					Hash h=c.getHash();
-					if (done.containsKey(h)) return true;
-
-					int pos=stack.size();
-					// Update Refs, adding new non-embedded cells to stack
-					ACell nc=c.updateRefs(func);
-
-					if (stack.size()==pos) {
-						// we must be done since nothing new added to stack
-						done.put(h,nc);
-						return true;
-					} else {
-						// something extra on the stack to handle first
-						stack.set(pos-1,nc);
-						return false;
-					}
-				}
-			});
-
-			result=done.get(result.getHash());
-			return result;
-		} finally {
-			if (replacedStore) Stores.setCurrent(null);
+			if (rl==ml) return result; // single cell, done
+			return resolveChildren(result, data, rl, ml);
 		}
+
+		// No store set: install a temporary MessageStore so that
+		// RefSoft.createForHash can capture it during top cell decode
+		HashMap<Hash,ACell> hm=new HashMap<>();
+		Stores.setCurrent(new MessageStore(hm, null));
+		try {
+			ACell result= this.read(data,0);
+			if (result==null) {
+				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+				return null;
+			}
+			int rl=Utils.checkedInt(result.getEncodingLength());
+			if (rl==ml) return result; // single cell, done
+			return resolveChildren(result, hm, data, rl, ml);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	/**
+	 * Resolves child cells from multi-cell encoded data when a store is set.
+	 * Decodes children and uses a replacement scan to wire up refs.
+	 */
+	private ACell resolveChildren(ACell result, Blob data, int rl, int ml) throws BadFormatException {
+		HashMap<Hash,ACell> hm=new HashMap<>();
+		readChildCells(hm, data, rl, ml);
+		return resolveRefs(result, hm);
+	}
+
+	/**
+	 * Resolves child cells from multi-cell encoded data when using a MessageStore.
+	 * Children are decoded into the same HashMap backing the MessageStore.
+	 */
+	private ACell resolveChildren(ACell result, HashMap<Hash,ACell> hm, Blob data, int rl, int ml) throws BadFormatException {
+		readChildCells(hm, data, rl, ml);
+		return resolveRefs(result, hm);
+	}
+
+	/**
+	 * Replacement scan: resolve all non-embedded refs using decoded child cells.
+	 */
+	private ACell resolveRefs(ACell result, final HashMap<Hash,ACell> childMap) {
+		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();
+		ArrayList<ACell> stack=new ArrayList<>();
+
+		IRefFunction func=new IRefFunction() {
+			@SuppressWarnings("rawtypes")
+			@Override
+			public Ref apply(Ref r) {
+				if (r.isEmbedded()) {
+					ACell cc=r.getValue();
+					if (cc==null) return r;
+					ACell nc=cc.updateRefs(this);
+					if (cc==nc) return r;
+					return nc.getRef();
+				} else {
+					Hash h=r.getHash();
+
+					// if done, just replace with done version
+					ACell doneVal=done.get(h);
+					if (doneVal!=null) return doneVal.getRef();
+
+					// if in map, push cell to stack
+					ACell part=childMap.get(h);
+					if (part!=null) {
+						stack.add(part);
+						return part.getRef();
+					}
+
+					// not in message, must be partial
+					return r;
+				}
+			}
+		};
+
+		stack.add(result);
+		Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
+			@Override
+			public boolean test(ACell c) {
+				Hash h=c.getHash();
+				if (done.containsKey(h)) return true;
+
+				int pos=stack.size();
+				// Update Refs, adding new non-embedded cells to stack
+				ACell nc=c.updateRefs(func);
+
+				if (stack.size()==pos) {
+					// we must be done since nothing new added to stack
+					done.put(h,nc);
+					return true;
+				} else {
+					// something extra on the stack to handle first
+					stack.set(pos-1,nc);
+					return false;
+				}
+			}
+		});
+
+		return done.get(result.getHash());
 	}
 
 	/**
