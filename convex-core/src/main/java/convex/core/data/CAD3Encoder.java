@@ -197,17 +197,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		int ml=Utils.checkedInt(data.count());
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
-		// Read first cell unconditionally. Caller must set a store if needed.
-		ACell result= this.read(data,0);
-		if (result==null) {
-			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-			return null;
-		}
-
-		int rl=Utils.checkedInt(result.getEncodingLength());
-		if (rl==ml) return result; // Single-cell fast path: no HashMap needed
-
-		// Multi-cell: decode children into HashMap
+		// Set up temporary MessageStore before reading, so that RefSoft.createForHash
+		// can capture it during top cell decode (non-embedded refs need a store)
 		HashMap<Hash,ACell> hm=new HashMap<>();
 		boolean replacedStore=false;
 		if (Stores.current()==null) {
@@ -216,6 +207,18 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		}
 
 		try {
+			// Read first cell. Non-embedded child refs will create RefSoft
+			// pointing to the MessageStore (children added below)
+			ACell result= this.read(data,0);
+			if (result==null) {
+				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+				return null;
+			}
+
+			int rl=Utils.checkedInt(result.getEncodingLength());
+			if (rl==ml) return result; // Single-cell fast path
+
+			// Multi-cell: decode children into HashMap
 			readChildCells(hm, data, rl, ml);
 
 			// Replacement scan: resolve all refs from decoded children

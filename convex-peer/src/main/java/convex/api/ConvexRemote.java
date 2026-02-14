@@ -206,14 +206,16 @@ public class ConvexRemote extends Convex {
 	@Override
 	public CompletableFuture<State> acquireState() {
 		AStore store=Stores.current();
+		if (store==null) store=new convex.core.store.MemoryStore();
+		final AStore acquireStore=store;
 		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 
 			if (stateHash == null) {
 				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
 			}
-			return acquire(stateHash,store);
-		});	
+			return acquire(stateHash,acquireStore);
+		});
 	}
 	
 	@Override

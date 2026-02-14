@@ -53,6 +53,11 @@ public class ConvexLocal extends Convex {
 		return server.isLive();
 	}
 
+	@Override
+	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
+		return acquire(hash, server.getStore());
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {

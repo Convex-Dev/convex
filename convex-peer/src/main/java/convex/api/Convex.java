@@ -700,15 +700,18 @@ public abstract class Convex implements AutoCloseable {
 
 	/**
 	 * Attempts to asynchronously acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the current store configured for the calling
-	 * thread.
+	 * from the connected peer. Uses the current thread's store if set, otherwise
+	 * creates a temporary MemoryStore. Subclasses may override for better defaults
+	 * (e.g. ConvexLocal uses the server's store).
 	 *
 	 * @param hash Hash of value to acquire.
 	 *
 	 * @return Future for the cell being acquired
 	 */
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
-		return acquire(hash, Stores.current());
+		AStore store=Stores.current();
+		if (store==null) store=new convex.core.store.MemoryStore();
+		return acquire(hash, store);
 	}
 
 	/**
@@ -966,14 +969,16 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public CompletableFuture<State> acquireState()  {
 		AStore store=Stores.current();
+		if (store==null) store=new convex.core.store.MemoryStore();
+		final AStore acquireStore=store;
 		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 
 			if (stateHash == null) {
 				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
 			}
-			return acquire(stateHash,store);
-		});	
+			return acquire(stateHash,acquireStore);
+		});
 	}
 	
 	/**

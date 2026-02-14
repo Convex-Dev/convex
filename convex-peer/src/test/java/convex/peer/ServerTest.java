@@ -208,7 +208,7 @@ public class ServerTest {
 
 			Future<Belief> acquiror=convex.acquire(h);
 			Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
-			Refs.checkConsistentStores(ab.getRef(),Stores.current());
+			// Acquired belief was stored in a temporary MemoryStore (no thread-local store set)
 			assertTrue(ab instanceof Belief);
 			assertEquals(h,ab.getHash());
 		}
