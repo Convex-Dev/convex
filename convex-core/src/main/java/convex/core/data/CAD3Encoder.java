@@ -184,6 +184,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * followed by VLQ-prefixed child cells. All reads dispatch through this
 	 * encoder's virtual {@link #read} methods, so CAD3Encoder produces generic
 	 * types and CVMEncoder produces CVM-specific types.
+	 * 
+	 * PERFORMANCE: This is a hot path for all incoming messages on network. Must be optimal, minimal GC
+	 * SECURITY: Input may come from untrusted sources, so must be robust to adversarial input (reject in at most O(n) time)
 	 *
 	 * Uses the current thread-local store for Ref resolution. If no store is
 	 * set, installs a temporary MessageStore for the duration of child decoding.
@@ -328,7 +331,10 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				long encLength=Format.readVLQCount(data,ix);
 				ix+=Format.getVLQCountLength(encLength);
 
-				Blob enc=data.slice(ix, ix+(int)encLength);
+				int childEnd=ix+(int)encLength;
+				if (childEnd>end) throw new BadFormatException("Child encoding exceeds message bounds");
+				Blob enc=data.slice(ix, childEnd);
+				if (enc==null) throw new BadFormatException("Invalid child encoding slice");
 				Hash h=enc.getContentHash();
 				ACell c=this.read(enc, 0);
 

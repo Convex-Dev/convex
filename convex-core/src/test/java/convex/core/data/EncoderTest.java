@@ -371,4 +371,192 @@ public class EncoderTest {
 		assertEquals(small, decoded);
 		assertTrue(Refs.allRefsDirect(decoded));
 	}
+
+	// ==================== Adversarial decodeMultiCell tests ====================
+
+	/**
+	 * Helper: builds a multi-cell message from a top cell and explicit children.
+	 * Each child is preceded by its VLQ-encoded length.
+	 */
+	private static Blob buildMultiCell(ACell topCell, ACell... children) {
+		Blob topEnc = Cells.encode(topCell);
+		int totalLen = topEnc.size();
+		Blob[] childEncs = new Blob[children.length];
+		for (int i = 0; i < children.length; i++) {
+			childEncs[i] = Cells.encode(children[i]);
+			totalLen += Format.getVLQCountLength(childEncs[i].size()) + childEncs[i].size();
+		}
+		byte[] msg = new byte[totalLen];
+		int ix = topEnc.getBytes(msg, 0);
+		for (Blob childEnc : childEncs) {
+			ix = Format.writeVLQCount(msg, ix, childEnc.size());
+			ix = childEnc.getBytes(msg, ix);
+		}
+		return Blob.wrap(msg);
+	}
+
+	@Test public void testAdversarialEmptyBlob() {
+		// Empty input must be rejected
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(Blob.EMPTY));
+		assertThrows(BadFormatException.class, () -> CAD3.decodeMultiCell(Blob.EMPTY));
+	}
+
+	@Test public void testAdversarialExtraTrailingGarbage() {
+		// Valid single-cell encoding with garbage bytes appended.
+		// Decoder sees rl < ml, tries to parse children from garbage, must reject.
+		ACell small = Vectors.of(1, 2, 3);
+		Blob enc = Cells.encode(small);
+		Blob bad = enc.append(Blob.wrap(new byte[]{(byte)0xFF, 0x01, 0x02})).toFlatBlob();
+
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Trailing garbage after single cell should be rejected");
+	}
+
+	@Test public void testAdversarialExtraBytesAfterNil() {
+		// Nil encoding (0x00) followed by extra bytes
+		Blob bad = Blob.wrap(new byte[]{0x00, 0x01});
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Extra bytes after nil should be rejected");
+	}
+
+	@Test public void testAdversarialExtraUnreferencedChildren() throws BadFormatException {
+		// Valid multi-cell message with additional children that are NOT referenced
+		// by the top cell. These are extra payload the sender injected.
+		ACell big = Samples.INT_VECTOR_300;
+		Blob validEnc = Format.encodeMultiCell(big, true);
+
+		// Use a large blob as unreferenced child — must be non-embedded
+		ACell unreferenced = Blob.createRandom(new java.util.Random(1234), 200);
+		assertFalse(unreferenced.isEmbedded(), "unreferenced cell must be non-embedded");
+
+		Blob unreferencedEnc = Cells.encode(unreferenced);
+		byte[] vlq = new byte[Format.getVLQCountLength(unreferencedEnc.size())];
+		Format.writeVLQCount(vlq, 0, unreferencedEnc.size());
+
+		Blob extraMessage = validEnc.append(Blob.wrap(vlq)).append(unreferencedEnc).toFlatBlob();
+
+		// Decode should succeed — extra children are silently ignored by resolveRefs
+		// (they go into the HashMap but are never looked up)
+		assertNull(Stores.current());
+		ACell decoded = CVM.decodeMultiCell(extraMessage);
+		assertEquals(big, decoded);
+	}
+
+	@Test public void testAdversarialTruncatedChild() {
+		// Multi-cell message where VLQ length claims N bytes but fewer are available
+		ACell big = Samples.INT_VECTOR_300;
+		Blob validEnc = Format.encodeMultiCell(big, true);
+
+		// Chop off last 10 bytes — truncates the final child encoding
+		Blob truncated = validEnc.slice(0, validEnc.count() - 10);
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(truncated),
+			"Truncated child should be rejected");
+	}
+
+	@Test public void testAdversarialBadVLQLength() {
+		// Multi-cell message with a VLQ child length that exceeds remaining data
+		ACell small = Vectors.of(1, 2, 3);
+		Blob topEnc = Cells.encode(small);
+
+		// Append VLQ claiming 9999 bytes followed by only 2 bytes
+		byte[] vlq = new byte[Format.getVLQCountLength(9999)];
+		Format.writeVLQCount(vlq, 0, 9999);
+		Blob bad = topEnc.append(Blob.wrap(vlq)).append(Blob.wrap(new byte[]{0x10, 0x01})).toFlatBlob();
+
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"VLQ length exceeding remaining data should be rejected");
+	}
+
+	@Test public void testAdversarialZeroLengthChild() {
+		// Multi-cell message with a zero-length child encoding (VLQ = 0)
+		ACell small = Vectors.of(1, 2, 3);
+		Blob topEnc = Cells.encode(small);
+
+		// VLQ(0) followed by nothing — the child encoding is empty
+		Blob bad = topEnc.append(Blob.wrap(new byte[]{0x00})).toFlatBlob();
+
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Zero-length child encoding should be rejected");
+	}
+
+	@Test public void testAdversarialEmbeddedCellAsChild() {
+		// A child that is embedded (small value) — readChildCells must reject this
+		ACell big = Samples.INT_VECTOR_300;
+		Blob topEnc = Cells.encode(big);
+
+		// Use CVMLong.ONE as "child" — it's embedded (1 byte encoding)
+		ACell embedded = Vectors.of(1); // small vector, should be embedded
+		assertTrue(embedded.isEmbedded(), "Test child must be embedded");
+
+		Blob msg = buildMultiCell(big, embedded);
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(msg),
+			"Embedded cell as child should be rejected");
+	}
+
+	@Test public void testAdversarialNullChildEncoding() {
+		// A child that decodes to null (0x00 tag)
+		ACell big = Samples.INT_VECTOR_300;
+		Blob topEnc = Cells.encode(big);
+
+		// Manually append VLQ(1) + 0x00 (null encoding)
+		Blob bad = topEnc.append(Blob.wrap(new byte[]{0x01, 0x00})).toFlatBlob();
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Null child encoding should be rejected");
+	}
+
+	@Test public void testAdversarialCorruptedChildEncoding() {
+		// Valid VLQ length but garbage bytes for the child encoding
+		ACell big = Samples.INT_VECTOR_300;
+		Blob topEnc = Cells.encode(big);
+
+		// VLQ(5) + 5 bytes of 0xFF garbage — invalid tag
+		Blob bad = topEnc.append(Blob.wrap(new byte[]{
+			0x05, (byte)0xFF, (byte)0xFF, (byte)0xFF, (byte)0xFF, (byte)0xFF
+		})).toFlatBlob();
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Corrupted child encoding should be rejected");
+	}
+
+	@Test public void testAdversarialDuplicateChildren() throws BadFormatException {
+		// Complete message with the same child included twice.
+		// HashMap.put overwrites, so this should be harmless.
+		ACell big = Samples.INT_VECTOR_300;
+		Blob validEnc = Format.encodeMultiCell(big, true);
+		Blob topEnc = Cells.encode(big);
+
+		// Get the children portion from the valid encoding
+		Blob childrenPortion = validEnc.slice(topEnc.size(), validEnc.count());
+
+		// Append children twice
+		Blob doubled = topEnc.append(childrenPortion).append(childrenPortion).toFlatBlob();
+
+		assertNull(Stores.current());
+		ACell decoded = CVM.decodeMultiCell(doubled);
+		assertEquals(big, decoded);
+	}
+
+	@Test public void testAdversarialHugeVLQCount() {
+		// VLQ encoding a massive count (Integer.MAX_VALUE) — should fail gracefully
+		ACell small = Vectors.of(1, 2, 3);
+		Blob topEnc = Cells.encode(small);
+
+		// Encode Integer.MAX_VALUE as VLQ
+		long hugeCount = Integer.MAX_VALUE;
+		byte[] vlq = new byte[Format.getVLQCountLength(hugeCount)];
+		Format.writeVLQCount(vlq, 0, hugeCount);
+
+		Blob bad = topEnc.append(Blob.wrap(vlq)).toFlatBlob();
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Huge VLQ count should be rejected when data is insufficient");
+	}
+
+	@Test public void testAdversarialSingleTrailingByte() {
+		// One extra byte after valid encoding — not enough for VLQ + child
+		ACell small = Vectors.of(1, 2, 3);
+		Blob enc = Cells.encode(small);
+		Blob bad = enc.append(Blob.wrap(new byte[]{0x42})).toFlatBlob();
+
+		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
+			"Single trailing byte should be rejected");
+	}
 }
