@@ -79,8 +79,8 @@ public class ObjectsTest {
 	}
 	
 	
-	private static final CAD3Encoder CAD3_ENCODER=new CAD3Encoder();
-	private static final CVMEncoder CVM_ENCODER=new CVMEncoder();
+	private static final CAD3Encoder CAD3_ENCODER=CAD3Encoder.INSTANCE;
+	private static final CVMEncoder CVM_ENCODER=CVMEncoder.INSTANCE;
 	
 	public static void doCAD3Tests(ACell a) {
 		// Decode round-trips need store for non-embedded Ref resolution

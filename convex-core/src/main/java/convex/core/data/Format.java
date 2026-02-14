@@ -9,42 +9,11 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import convex.core.Result;
-import convex.core.cpos.Belief;
-import convex.core.cpos.Block;
-import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
-import convex.core.cpos.Order;
-import convex.core.cvm.ACVMRecord;
-import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Address;
-import convex.core.cvm.CVMTag;
-import convex.core.cvm.Ops;
-import convex.core.cvm.PeerStatus;
-import convex.core.cvm.State;
-import convex.core.cvm.Syntax;
-import convex.core.cvm.ops.Cond;
-import convex.core.cvm.ops.Def;
-import convex.core.cvm.ops.Do;
-import convex.core.cvm.ops.Let;
-import convex.core.cvm.ops.Local;
-import convex.core.cvm.ops.Lookup;
-import convex.core.cvm.ops.Special;
-import convex.core.cvm.transactions.Call;
-import convex.core.cvm.transactions.Invoke;
-import convex.core.cvm.transactions.Multi;
-import convex.core.cvm.transactions.Transfer;
-import convex.core.data.prim.AByteFlag;
-import convex.core.data.prim.ANumeric;
-import convex.core.data.prim.CVMBigInteger;
-import convex.core.data.prim.CVMChar;
-import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
+import convex.core.cvm.CVMEncoder;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.Panic;
-import convex.core.lang.Core;
 import convex.core.lang.RT;
-import convex.core.lang.impl.Fn;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Bits;
@@ -480,71 +449,6 @@ public class Format {
 		return cell.getRef();
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.VECTOR) return (T) Vectors.read(b,pos);
-
-		if (tag == Tag.MAP) return (T) Maps.read(b,pos);
-
-		if (tag == CVMTag.SYNTAX) return (T) Syntax.read(b,pos);
-		
-		if (tag == Tag.SET) return (T) Sets.read(b,pos);
-
-		if (tag == Tag.LIST) return (T) List.read(b,pos);
-
-		if (tag == Tag.INDEX) return (T) Index.read(b,pos);
-
-		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
-	}
-
-	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
-		try {
-			if (tag == CVMTag.OP_CODED) return Ops.readCodedOp(tag,b, pos); 
-			
-			if (tag == CVMTag.OP_LOOKUP) return Lookup.read(b,pos);
-			
-			if (tag == CVMTag.OP_DEF) {
-				return Def.read(b, pos);
-			}
-			
-			if (tag == CVMTag.OP_LET) {
-				return Let.read(b,pos,false);
-			}
-		    
-			if (tag == CVMTag.OP_LOOP) {
-				return Let.read(b,pos,true);
-			}
-		} catch (Exception e) {
-			// something went wrong, fall through to reading a generic coded value
-		}
-		
-		return CodedValue.read(tag,b,pos);
-	}
-	
-	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
-		// We expect a VLQ Count following the tag
-		long code=readVLQCount(blob,offset+1);
-		
-		if (tag == CVMTag.CORE_DEF) {
-			ACell cc=Core.fromCode(code);
-			if (cc!=null) return cc;
-		}
-
-		if ((tag == CVMTag.OP_SPECIAL)&&(code<Special.NUM_SPECIALS)) {
-			Special<?> spec= Special.create((int)code);
-			if (spec!=null) {
-				return spec;
-			}
-		}
-		
-		if (tag == CVMTag.OP_LOCAL) {
-			Local<?> loc=Local.create(code);
-			return loc;
-		}
-
-
-		return ExtensionValue.create(tag, code);
-	}
 
 	/**
 	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
@@ -596,7 +500,7 @@ public class Format {
 	}
 	
 	/**
-	 * Read from a Blob with the specified tag, assumed to be at position 0
+	 * Read from a Blob with the specified tag. Delegates to CVMEncoder for dispatch.
 	 * @param <T> Type of value to read
 	 * @param tag Tag to use for reading
 	 * @param blob Blob to read from
@@ -606,154 +510,9 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
-
-		// Fast paths for common one-byte instances. TODO: might switch have better performance if compiled correctly into a table?
-		if (tag==Tag.NULL) return null;
-		if (tag==Tag.INTEGER) return (T) CVMLong.ZERO; 
-
-		try {
-			int high=(tag & 0xF0);
-			if (high == 0x10) return (T) readNumeric(tag,blob,offset);
-			
-			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-			
-			if (tag == CVMTag.ADDRESS) return (T) Address.read(blob,offset);
-			
-			if (high == 0xB0) return (T) AByteFlag.read(tag);
-			
-			if (high == 0xC0) return (T) readCode(tag,blob,offset);
-
-			if (high == 0x80) return readDataStructure(tag,blob,offset);
-			
-			if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
-
-			if (high == 0xD0) return (T) readDenseRecord(tag, blob, offset);
-
-			if (high == 0xE0) return (T) readExtension(tag, blob, offset);
-			
- 			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
-		} catch (BadFormatException e) {
-			throw e;
-		} catch (IndexOutOfBoundsException e) {
-			throw new BadFormatException("Read out of bounds when decoding with tag 0x"+Utils.toHexString(tag),e);
-		} catch (MissingDataException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
-		}
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag,blob,offset));
+		return (T) CVMEncoder.INSTANCE.read(tag, blob, offset);
 	}
 
-
-	private static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
-		if (tag==Tag.SIGNED_DATA) return SignedData.read(blob,offset,true);	
-		if (tag==Tag.SIGNED_DATA_SHORT) return SignedData.read(blob,offset,false);	
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (tag<0x19) return CVMLong.read(tag,blob,offset);
-		if (tag == 0x19) return CVMBigInteger.read(blob,offset);
-		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
-		
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
-		switch (tag) {
-			case Tag.SYMBOL: return Symbol.read(blob,offset);
-			case Tag.KEYWORD: return Keyword.read(blob,offset);
-			case Tag.BLOB: return Blobs.read(blob,offset);
-			case Tag.STRING: return Strings.read(blob,offset);
-		} 
-		
-		if ((tag&Tag.CHAR_MASK)==Tag.CHAR_BASE) {
-			int len=CVMChar.byteCountFromTag(tag);
-			if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
-			return CVMChar.read(len, blob,offset); // skip tag byte
-		}
-
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	
-	/**
-	 * Reads a Record with the given tag
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	private static <T extends ACVMRecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readDenseRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		try {
-			if (tag == CVMTag.INVOKE) {
-				return (T) Invoke.read(b,pos);
-			} else if (tag == CVMTag.TRANSFER) {
-				return (T) Transfer.read(b,pos);
-			} else if (tag == CVMTag.CALL) {
-				return (T) Call.read(b,pos);
-			} else if (tag == CVMTag.MULTI) {
-				return (T) Multi.read(b,pos);
-			}
-			
-			if (tag == CVMTag.FN) {
-				return (T) Fn.read(b,pos);
-			}
-			
-			if (tag == CVMTag.STATE) {
-				return (T) State.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BELIEF) {
-				return (T) Belief.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BLOCK) {
-				return (T) Block.read(b,pos);
-			}
-			
-			if (tag == CVMTag.RESULT) {
-				return (T) Result.read(b,pos);
-			}
-			
-			if (tag == CVMTag.ORDER) {
-				return (T) Order.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BLOCK_RESULT) {
-				return (T) BlockResult.read(b,pos);
-			}
-			
-			if (tag == CVMTag.OP_DO) {
-				return (T) Do.read(b,pos);
-			}
-			
-			if (tag == CVMTag.OP_COND) {
-				return (T) Cond.read(b,pos);
-			}
-
-			if (tag == CVMTag.OP_INVOKE) {
-				 // Note name clash with transaction type
-				return (T) convex.core.cvm.ops.Invoke.read(b,pos);
-			}
-			
-			if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
-			if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
-		} catch (Exception e) {
-			// something failed, might be generic DenseRecord
-		}
-		
-		// Might be a generic Dense Record
-		DenseRecord dr=DenseRecord.read(tag,b,pos);
-		if (dr==null) throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-		return (T) dr;
-	}
 
 	/**
 	 * Writes hex digits from digit position start, total length.

@@ -181,7 +181,12 @@ public class Samples {
 	public static final CVMBigInteger MIN_BIGINT;
 
 	public static final ACell NIL = null;
-	
+
+	// CVM type samples for cross-encoder testing
+	public static final Invoke INVOKE_TRANSACTION = Invoke.create(Address.create(1), 0, Lists.of(Symbols.PLUS, 1L, 2L));
+	public static final convex.core.cvm.transactions.Transfer TRANSFER_TRANSACTION = convex.core.cvm.transactions.Transfer.create(Address.create(1), 0, Address.create(2), 1000);
+	public static final convex.core.cpos.Order EMPTY_ORDER = convex.core.cpos.Order.create();
+
 	static {
 		// we should be able to actually build these, thanks to structural sharing.
 		DIABOLICAL_VECTOR_30_30 = createNastyNestedVector(30, 30);

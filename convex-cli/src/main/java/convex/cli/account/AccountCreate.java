@@ -5,6 +5,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
@@ -172,7 +173,7 @@ public class AccountCreate extends AAccountCommand {
 			return convex.createAccountSync(newAccountKey);
 		} catch (ResultException e) {
 			throw new CLIError(ExitCodes.TEMPFAIL, "Failed to create account: " + e.getResult().getValue(), e);
-		}
+		} 
 	}
 
 	/**
