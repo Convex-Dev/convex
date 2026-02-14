@@ -455,11 +455,12 @@ public class Format {
 	 * @return Value read from the blob of encoded data
 	 * @throws BadFormatException In case of encoding error
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		long n=blob.count();
 		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
 		byte tag = blob.byteAtUnchecked(0);
-		T result= read(tag,blob,0);
+		T result= (T) CVMEncoder.INSTANCE.read(tag, blob, 0);
 		if (result==null) {
 			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);
 		} else {
@@ -477,10 +478,10 @@ public class Format {
 	 * @return Value read from the blob of encoded data
 	 * @throws BadFormatException In case of encoding error
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(Blob blob, int offset) throws BadFormatException {
 		byte tag = blob.byteAt(offset);
-		T result= read(tag,blob,offset);
-		return result;
+		return (T) CVMEncoder.INSTANCE.read(tag, blob, offset);
 	}
 	
 	/**

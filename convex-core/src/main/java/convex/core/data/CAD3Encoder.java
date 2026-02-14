@@ -57,6 +57,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				break;
 
 			case 1: // 0x10-0x1F : Numeric values
+				if (tag==0x10) return CVMLong.ZERO; // fast path
 				return readNumeric(tag,encoding,offset);
 
 			case 2: // 0x20-0x2F : Addresses and references
@@ -191,7 +192,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * @return Decoded top-level cell
 	 * @throws BadFormatException If encoding format is invalid
 	 */
-	@SuppressWarnings("unchecked")
 	@Override
 	public ACell decodeMultiCell(Blob data) throws BadFormatException {
 		int ml=Utils.checkedInt(data.count());
