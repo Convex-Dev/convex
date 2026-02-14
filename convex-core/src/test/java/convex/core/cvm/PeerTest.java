@@ -25,11 +25,13 @@ import convex.core.data.ObjectsTest;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
+import convex.core.store.Stores;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
+import convex.test.Samples;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class PeerTest {
@@ -62,7 +64,9 @@ public class PeerTest {
 		temp.toFile().deleteOnExit();
 		
 		FileUtils.writeCAD3(temp,data);
-		AMap<Keyword, ACell> data2=FileUtils.loadCAD3(temp);
+		Stores.setCurrent(Samples.TEST_STORE);
+		AMap<Keyword, ACell> data2;
+		try { data2=FileUtils.loadCAD3(temp); } finally { Stores.setCurrent(null); }
 		
 		Peer p4=Peer.fromData(KP, data2);
 		assertEquals(p.getBelief(),p4.getBelief());

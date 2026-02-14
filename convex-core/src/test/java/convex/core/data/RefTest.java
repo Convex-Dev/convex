@@ -26,18 +26,20 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class RefTest {
+
 	@Test
 	public void testMissingData() {
 		// create a Ref using just a bad hash
-		Ref<?> ref = Ref.forHash(Samples.BAD_HASH);
+		Ref<?> ref = Ref.forHash(Samples.BAD_HASH, Samples.TEST_STORE);
 
 		// equals comparison should work
-		assertEquals(ref, Ref.forHash(Samples.BAD_HASH));
+		assertEquals(ref, Ref.forHash(Samples.BAD_HASH, Samples.TEST_STORE));
 
 		// generic properties of missing Ref
 		assertEquals(Samples.BAD_HASH, ref.getHash());
@@ -66,61 +68,67 @@ public class RefTest {
 	public void testShallowPersist() throws IOException {
 		Blob bb = Blob.createRandom(new Random(), 100); // unique blob but embedded
 		assertTrue(bb.isEmbedded());
-		
+
 		AVector<ACell> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
 		assertFalse(v.isEmbedded());
 		assertEquals(5,Refs.totalRefCount(v));
 		assertEquals(2,Refs.uniqueRefCount(v));
-		
+
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
-		
+
 		// Big vector vv containing two non-embedded copies of v
 		AVector<ACell> vv=Vectors.of(v,v);
 		assertEquals(11,Refs.totalRefCount(vv));
 		assertEquals(3,Refs.uniqueRefCount(vv));
 		assertTrue(vv.isEmbedded()); // true because just 2 child Refs
 		assertFalse(vv.isCompletelyEncoded()); // false because has non-embedded children
-		
-		// Shallow persist vv
-		Ref<AVector<ACell>> vvr=vv.getRef();
-		vvr=vvr.persistShallow(Stores.current());
-		assertEquals(Ref.STORED, vvr.getStatus());
 
-		// non-embedded child v shouldn't yet be in store
-		assertThrows(MissingDataException.class, () -> Ref.forHash(vh).getValue());
+		// Ref.forHash requires a current store for RefSoft creation
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			// Shallow persist vv
+			Ref<AVector<ACell>> vvr=vv.getRef();
+			vvr=vvr.persistShallow(Samples.TEST_STORE);
+			assertEquals(Ref.STORED, vvr.getStatus());
 
-		// Shallow persist v
-		Ref<AVector<ACell>> vr=v.getRef();
-		vr = vr.persistShallow(Stores.current());
-		assertEquals(Ref.STORED, vr.getStatus());
+			// non-embedded child v shouldn't yet be in store
+			assertThrows(MissingDataException.class, () -> Ref.forHash(vh).getValue());
 
-		
-		// should be able to get v back from store now
-		assertEquals(v, Ref.forHash(vh).getValue());
-		
-		// Now do full persistence of vv
-		vvr=Cells.persist(vv, Stores.current()).getRef();
-		assertEquals(Ref.PERSISTED, vvr.getStatus());
-		
-		// Persistence should extend to child v
-		vr=Ref.forHash(vh);
-		assertEquals(v,vr.getValue());
-		assertEquals(Ref.PERSISTED, vr.getStatus());	
-		
-		// Now try announcing vv
-		vv=Cells.announce(vv,null,Stores.current());
-		vvr=vv.getRef();
-		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
-		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
-		
-		// Announce should extend to child v
-		vr=Ref.forHash(vh);
-		assertEquals(v,vr.getValue());
-		assertEquals(Ref.ANNOUNCED, vr.getStatus());	
-		
-		// child blob still shouldn't be in store after everything else
-		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
+			// Shallow persist v
+			Ref<AVector<ACell>> vr=v.getRef();
+			vr = vr.persistShallow(Samples.TEST_STORE);
+			assertEquals(Ref.STORED, vr.getStatus());
+
+			// should be able to get v back from store now
+			assertEquals(v, Ref.forHash(vh).getValue());
+
+			// Now do full persistence of vv
+			vvr=Cells.persist(vv, Samples.TEST_STORE).getRef();
+			assertEquals(Ref.PERSISTED, vvr.getStatus());
+
+			// Persistence should extend to child v
+			vr=Ref.forHash(vh);
+			assertEquals(v,vr.getValue());
+			assertEquals(Ref.PERSISTED, vr.getStatus());
+
+			// Now try announcing vv
+			vv=Cells.announce(vv,null,Samples.TEST_STORE);
+			vvr=vv.getRef();
+			assertEquals(Ref.ANNOUNCED, vvr.getStatus());
+			assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
+
+			// Announce should extend to child v
+			vr=Ref.forHash(vh);
+			assertEquals(v,vr.getValue());
+			assertEquals(Ref.ANNOUNCED, vr.getStatus());
+
+			// child blob still shouldn't be in store after everything else
+			assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	}
 	
 	@Test 
@@ -131,7 +139,9 @@ public class RefTest {
 		Blob enc=r.getEncoding();
 		
 		// Should be able to read incomplete encoding
-		ABlob b=Format.read(enc);
+		Stores.setCurrent(Samples.TEST_STORE);
+		ABlob b;
+		try { b=Format.read(enc); } finally { Stores.setCurrent(null); }
 		
 		assertEquals(enc,b.getEncoding());
 		assertEquals(b,r); // Shouldn't hit store!
@@ -156,7 +166,7 @@ public class RefTest {
 	public void testPersistEmbeddedNull() throws InvalidDataException, IOException {
 		Ref<ACell> nr = Ref.get(null);
 		assertSame(Ref.NULL_VALUE, nr);
-		assertSame(nr, nr.persist(Stores.current()));
+		assertSame(nr, nr.persist(Samples.TEST_STORE));
 		nr.validate();
 		assertTrue(nr.isEmbedded());
 	}
@@ -165,7 +175,7 @@ public class RefTest {
 	public void testPersistEmbeddedLong() throws IOException {
 		ACell val=RT.cvm(10001L);
 		Ref<ACell> nr = Ref.get(val);
-		Ref<ACell> nrp = nr.persist(Stores.current());
+		Ref<ACell> nrp = nr.persist(Samples.TEST_STORE);
 		
 		assertSame(nr.getValue(), nrp.getValue());
 		assertTrue(nr.isEmbedded());
@@ -185,7 +195,7 @@ public class RefTest {
 		assertEquals(0,rs.persisted);
 		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
 		
-		Ref<ABlob> rb=Cells.persist(bigBlob, Stores.current()).getRef();
+		Ref<ABlob> rb=Cells.persist(bigBlob, Samples.TEST_STORE).getRef();
 		
 		// TODO: Check Soft Refs
 		
@@ -203,7 +213,7 @@ public class RefTest {
 		Ref<?> orig = value.getRef();
 		assertEquals(Ref.UNKNOWN, orig.getStatus());
 		assertFalse(orig.isPersisted());
-		orig = orig.persist(Stores.current());
+		orig = orig.persist(Samples.TEST_STORE);
 		assertTrue(orig.isPersisted());
 
 		// a ref using the same hash
@@ -216,11 +226,11 @@ public class RefTest {
 
 	@Test
 	public void testCompare() throws IOException {
-		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L), Stores.current()).getRef()));
+		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L), Samples.TEST_STORE).getRef()));
 		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
-				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
+				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"), Samples.TEST_STORE)));
 		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(
-				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"))));
+				Ref.forHash(Hash.fromHex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), Samples.TEST_STORE)));
 	}
 	
 	@Test
@@ -255,10 +265,10 @@ public class RefTest {
 		assertNotNull(ref.toString());
 	}
 	
-	@Test 
+	@Test
 	public void testMissing() {
 		Hash bad=Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000");
-		Ref<?> ref=Ref.forHash(bad);
+		Ref<?> ref=Ref.forHash(bad, Samples.TEST_STORE);
 		assertTrue(ref.isMissing());
 	}
 
@@ -395,11 +405,12 @@ public class RefTest {
 	@Test 
 	public void testReadRefSoft() throws BadFormatException {
 		Hash h=Hash.wrap(Blobs.createRandom(32));
-		Ref<?> ref=RefSoft.createForHash(h);
+		Ref<?> ref=RefSoft.createForHash(h, Samples.TEST_STORE);
 		ref.markEmbedded(false); // needed to ensure indirect encoding is assumed
 		Blob b=ref.getEncoding();
 		assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.count());
-		assertEquals(ref,Format.readRef(b, 0));
+		Stores.setCurrent(Samples.TEST_STORE);
+		try { assertEquals(ref,Format.readRef(b, 0)); } finally { Stores.setCurrent(null); }
 	}
 	
 	@Test 

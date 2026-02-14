@@ -31,6 +31,7 @@ import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class BlobsTest {
+
 	@Test public void testConstants() {
 		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
 		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
@@ -570,17 +571,20 @@ public class BlobsTest {
 
 		bb.validate();
 
-		Ref<BlobTree> rb = Cells.persist(bb, Stores.current()).getRef();
-		BlobTree bbb = Format.read(bb.getEncoding());
-		bbb.validate();
-		assertEquals(bb, bbb);
-		assertEquals(bb, rb.getValue());
-		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
-		
-		// Check streaming a BlobTree
-		assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
+		Ref<BlobTree> rb = Cells.persist(bb, Samples.TEST_STORE).getRef();
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			BlobTree bbb = Format.read(bb.getEncoding());
+			bbb.validate();
+			assertEquals(bb, bbb);
+			assertEquals(bb, rb.getValue());
+			assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
 
-		doBlobTests(bb);
+			// Check streaming a BlobTree
+			assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
+
+			doBlobTests(bb);
+		} finally { Stores.setCurrent(null); }
 	}
 	
 	@Test
@@ -720,10 +724,12 @@ public class BlobsTest {
 	   ABlob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
 	   
-	   Ref<ACell> pref = Cells.persist(value, Stores.current()).getRef(); // ensure persisted
+	   Ref<ACell> pref = Cells.persist(value, Samples.TEST_STORE).getRef(); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
 	   Blob b = value.getEncoding();
-	   ACell o = Format.read(b);
+	   Stores.setCurrent(Samples.TEST_STORE);
+	   ACell o;
+	   try { o = Format.read(b); } finally { Stores.setCurrent(null); }
 
 	   assertEquals(RT.getType(value), RT.getType(o));
 	   assertEquals(value, o);

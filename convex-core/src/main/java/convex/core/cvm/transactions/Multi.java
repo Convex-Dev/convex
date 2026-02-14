@@ -198,7 +198,7 @@ public class Multi extends ATransaction {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Multi(values);
+		return new Multi(newValues);
 	}
 
 

@@ -28,6 +28,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.store.Stores;
+import convex.test.Samples;
 
 /**
  * Tests for the State data structure
@@ -67,21 +68,24 @@ public class StateTest {
 
 		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = Cells.persist(s, Stores.current()).getRef();
+		Ref<State> rs = Cells.persist(s, Samples.TEST_STORE).getRef();
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 
 		// TODO: consider if cached ref in state should now have persisted status?
 		// assertTrue(s.getRef().isPersisted());
 
 		Blob b = Cells.encode(s);
-		State s2 = Format.read(b);
-		assertEquals(s, s2);
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			State s2 = Format.read(b);
+			assertEquals(s, s2);
 
-		AccountStatus as=s2.getAccount(InitTest.HERO);
-		assertNotNull(as);
-		
-		RecordTest.doRecordTests(s2);
-		RecordTest.doRecordTests(as);
+			AccountStatus as=s2.getAccount(InitTest.HERO);
+			assertNotNull(as);
+
+			RecordTest.doRecordTests(s2);
+			RecordTest.doRecordTests(as);
+		} finally { Stores.setCurrent(null); }
 	}
 	
 	@Test
@@ -97,7 +101,9 @@ public class StateTest {
 		
 		Blob b=Format.encodeMultiCell(s,true);
 		
-		State s2=Format.decodeMultiCell(b);
+		Stores.setCurrent(Samples.TEST_STORE);
+		State s2;
+		try { s2=Format.decodeMultiCell(b); } finally { Stores.setCurrent(null); }
 		// System.err.println(Refs.printMissingTree(s2));
 		assertEquals(s,s2);
 		
@@ -110,7 +116,7 @@ public class StateTest {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));
 		
-		Ref<State> r1=Cells.persist(s, Stores.current()).getRef();
+		Ref<State> r1=Cells.persist(s, Samples.TEST_STORE).getRef();
 		RefTreeStats rs1=Refs.getRefTreeStats(r1);
 		
 		assertTrue(r1.isPersisted());

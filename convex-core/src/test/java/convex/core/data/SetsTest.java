@@ -58,10 +58,11 @@ public class SetsTest {
 	@Test public void testSetEncodeRegression() throws BadFormatException, IOException {
 		// This failed once in generative tests, checking just in case
 		ASet<ACell> s = Sets.of(Address.ZERO,Samples.IPSUM);
-		Ref<ACell> pref = Ref.get(Cells.persist(s, Stores.current())); // ensure persisted
-		
+		Ref<ACell> pref = Ref.get(Cells.persist(s, Samples.TEST_STORE)); // ensure persisted
+
 		Blob enc=s.getEncoding();
-		assertEquals(s,Format.read(enc));
+		Stores.setCurrent(Samples.TEST_STORE);
+		try { assertEquals(s,Format.read(enc)); } finally { Stores.setCurrent(null); }
 		
 		assertEquals(s,pref.getValue());
 	}

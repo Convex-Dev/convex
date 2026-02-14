@@ -133,7 +133,7 @@ public class Call extends ATransaction {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Call(values);
+		return new Call(newValues);
 	}
 
 

@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.Blob;
+import convex.core.Result;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import io.netty.buffer.ByteBuf;
@@ -44,69 +45,83 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	@Override
 	protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-   		ByteBuf buf=(ByteBuf)in;
-   		buf.markReaderIndex(); // mark reader position, may revert to this if no complete message 
-   		
-   		int mlen=0;
-		int newBytes=buf.readableBytes();
-		if (newBytes==0) return;
-		
-		for (int i=0; ; i++) {
-			if (i>=newBytes) {
-				// insufficient bytes for message length, need to wait for more
+		try {
+	   		ByteBuf buf=(ByteBuf)in;
+	   		buf.markReaderIndex(); // mark reader position, may revert to this if no complete message 
+	   		
+	   		int mlen=0;
+			int newBytes=buf.readableBytes();
+			if (newBytes==0) return;
+			
+			for (int i=0; ; i++) {
+				if (i>=newBytes) {
+					// insufficient bytes for message length, need to wait for more
+					buf.resetReaderIndex();
+					return;
+				}
+	
+				byte b=buf.readByte();
+	
+				if ((i==0)&&(b==0x80)) {
+					byte[] bytes=new byte[newBytes];
+					bytes[0]=b;
+					buf.readBytes(bytes, 1, newBytes-1);
+					Blob tmp=Blob.wrap(bytes);
+					throw new BadFormatException("Zero leading bits in message length, content: "+tmp);
+				}
+				
+	   			int bm=(b&0x7f); // new bits for length
+	   		    mlen=(mlen<<7)+bm;
+				if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+mlen);
+				if ((b&0x80)==0) {
+					// we have a complete message length
+					break;
+				};
+			}
+	   	    
+			if (buf.readableBytes()<mlen) {
+				// insufficient bytes for message, need to wait for more
 				buf.resetReaderIndex();
 				return;
 			}
-
-			byte b=buf.readByte();
-
-			if ((i==0)&&(b==0x80)) {
-				byte[] bytes=new byte[newBytes];
-				bytes[0]=b;
-				buf.readBytes(bytes, 1, newBytes-1);
-				Blob tmp=Blob.wrap(bytes);
-				throw new BadFormatException("Zero leading bits in message length, content: "+tmp);
-			}
 			
-   			int bm=(b&0x7f); // new bits for length
-   		    mlen=(mlen<<7)+bm;
-			if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+mlen);
-			if ((b&0x80)==0) {
-				// we have a complete message length
-				break;
-			};
-		}
-   	    
-		if (buf.readableBytes()<mlen) {
-			// insufficient bytes for message, need to wait for more
-			buf.resetReaderIndex();
-			return;
-		}
+			byte[] messageData=new byte[mlen];
+			
+			// We now have a complete message!
+			buf.readBytes(messageData);
+			
+			// Create message with return action, unspecified (null) type and Blob data
+			Message m=Message.create(returnAction,null,Blob.wrap(messageData));
+			out.add(m);
 		
-		byte[] messageData=new byte[mlen];
-		
-		// We now have a complete message!
-		buf.readBytes(messageData);
-		
-		// Create message with return action, unspecified (null) type and Blob data
-		Message m=Message.create(returnAction,null,Blob.wrap(messageData));
-		out.add(m);
-	
-		if (receiveAction!=null) {
-			// Call the message receiver handler
-			try {
-				receiveAction.accept(m);
-			} catch (Exception e) {
-				if (e instanceof BadFormatException) {
-					// PRobably a malformed request, we can safely ignore
-				} else {
-					log.warn("Unexpected error in NettyInboundHandler",e);
+			if (receiveAction!=null) {
+				// Call the message receiver handler
+				try {
+					receiveAction.accept(m);
+				} catch (Exception e) {
+					if (e instanceof BadFormatException) {
+						// Probably a malformed request, we can safely ignore
+					} else {
+						log.warn("Unexpected error in NettyInboundHandler",e);
+						System.err.println("Inbound enexpected error: "+e);
+					}
+					// Return error result to client so futures don't hang
+					try {
+						m.returnResult(Result.fromException(e).withID(m.getID()));
+					} catch (Exception e2) {
+						// best effort, ignore if we can't return an error
+						System.err.println("Inbound failure to return result: "+e2);
+					}
+				} finally {
+					receivedCount++;
 				}
-			} finally {
-				receivedCount++;
+			} else {
+				log.warn("Message ignored, no receiveAction");
+				System.err.println("Inbound message ignored, no receiveAction");
 			}
-		} else {
-			log.warn("Message ignored, no receiveAction");
+		} catch (Throwable e) {
+			System.err.println("Inbound message handling error: "+e);
+			throw e;
 		}
 	}
 }

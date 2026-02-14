@@ -47,6 +47,7 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
@@ -89,8 +90,15 @@ public class Server implements Closeable {
 	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> receiveAction = m->{
-		observeMessageReceived(m);
-		processMessage(m);
+		// Ensure server store is available on Netty IO threads for message decoding
+		AStore saved=Stores.current();
+		Stores.setCurrent(getStore());
+		try {
+			observeMessageReceived(m);
+			processMessage(m);
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	};
 
 	/**
@@ -461,6 +469,11 @@ public class Server implements Closeable {
 			log.info("Missing data: {} in message", missingHash);
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
+			try {
+				m.returnResult(Result.fromException(e).withID(m.getID()));
+			} catch (Exception e2) {
+				// best effort
+			}
 		}
 	}
 

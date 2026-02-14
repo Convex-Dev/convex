@@ -16,12 +16,7 @@ public class Stores {
 	private static volatile AStore globalStore=null;
 	
 	// Thread local current store, in case servers want different stores
-	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {
-		@Override
-		protected AStore initialValue() {
-			return getGlobalStore();
-		}
-	};
+	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>();
 	
 	/**
 	 * Gets the current (thread-local) Store instance. This is initialised to be the

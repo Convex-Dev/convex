@@ -78,13 +78,13 @@ public class MemoryStoreTest {
 
 		Ref<Blob> initialRef = value.getRef();
 		assertEquals(Ref.UNKNOWN, initialRef.getStatus());
-		assertNull(Stores.current().refForHash(hash));
-		Ref<Blob> ref = initialRef.persist(Stores.current());
+		assertNull(Samples.TEST_STORE.refForHash(hash));
+		Ref<Blob> ref = initialRef.persist(Samples.TEST_STORE);
 		assertEquals(Ref.PERSISTED, ref.getStatus());
 		assertTrue(ref.isPersisted());
 
 		if (!(value.isEmbedded())) {
-			Ref<Blob> newRef = Stores.current().refForHash(hash);
+			Ref<Blob> newRef = Samples.TEST_STORE.refForHash(hash);
 			assertEquals(initialRef, newRef);
 			assertEquals(value, newRef.getValue());
 		}

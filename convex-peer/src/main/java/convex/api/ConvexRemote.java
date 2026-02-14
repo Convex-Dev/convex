@@ -146,7 +146,7 @@ public class ConvexRemote extends Convex {
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		ACell id=m.getResultID();
-		
+
 		if (id!=null) {
 			// Check if we are waiting for a Result with this ID for this connection
 			synchronized (awaiting) {
@@ -161,13 +161,13 @@ public class ConvexRemote extends Convex {
 							log.warn("Message return future already completed with value: "+cf.join());
 						}
 						awaiting.remove(id);
-					} 
+					}
 				} catch (Exception e) {
 					log.warn("Unexpected error completing result",e);
 				} finally {
 					Stores.setCurrent(savedStore);
 				}
-				
+
 			}
 		} else {
 			// Ignore the message, we are a client side connection so not interested.

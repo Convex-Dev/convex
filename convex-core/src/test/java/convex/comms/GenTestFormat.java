@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 
+import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -19,12 +20,13 @@ import convex.core.data.FuzzTestFormat;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.Stores;
+import convex.test.Samples;
 import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestFormat {
+
 	@Property
 	public void messageRoundTrip(String str) throws BadFormatException {
 		AString s=Strings.create(str);
@@ -41,7 +43,7 @@ public class GenTestFormat {
 		Blob b = Cells.encode(prim);
 		if (!Cells.isEmbedded(prim)) {
 			// persist in case large
-			Cells.persist(prim, Stores.current());
+			Cells.persist(prim, Samples.TEST_STORE);
 		}
 		ACell o = Format.read(b);
 		assertEquals(prim, o);
@@ -52,7 +54,7 @@ public class GenTestFormat {
 
 	@Property
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException, IOException {
-		Ref<ACell> pref = Ref.get(Cells.persist(value, Stores.current())); // ensure persisted
+		Ref<ACell> pref = Ref.get(Cells.persist(value, Samples.TEST_STORE)); // ensure persisted
 		Blob b = Cells.encode(value);
 		try {
 			ACell o = Format.read(b);

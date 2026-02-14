@@ -13,10 +13,10 @@ import convex.core.data.EncodingTest;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class BeliefTest {
+
 	static final int PEERS=4;
 	static final AKeyPair[] kps=new AKeyPair[PEERS];
 	static final AccountKey[] keys=new AccountKey[PEERS];
@@ -46,7 +46,7 @@ public class BeliefTest {
 		
 		RecordTest.doRecordTests(b);
 		
-		b=Cells.persist(b, Stores.current());
+		b=Cells.persist(b, Samples.TEST_STORE);
 		
 		RecordTest.doRecordTests(b);
 		

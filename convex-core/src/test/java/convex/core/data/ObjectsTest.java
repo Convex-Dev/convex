@@ -40,7 +40,7 @@ public class ObjectsTest {
 		Hash h=Hash.get(a);
 				
 		try {
-			a=Cells.persist(a, Stores.current());
+			a=Cells.persist(a, Samples.TEST_STORE);
 		} catch (IOException e) {
 			fail(e);
 		}
@@ -83,35 +83,37 @@ public class ObjectsTest {
 	private static final CVMEncoder CVM_ENCODER=new CVMEncoder();
 	
 	public static void doCAD3Tests(ACell a) {
+		// Decode round-trips need store for non-embedded Ref resolution
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
 		try {
 			Blob enc=Format.encodeMultiCell(a, true);
 			ACell cad=CAD3_ENCODER.decodeMultiCell(enc);
-			assertEquals(a,cad);	
-			assertEquals(cad,a);	
-			
+			assertEquals(a,cad);
+			assertEquals(cad,a);
+
 			// First byte should be tag of top level cell
 			assertEquals(a.getTag(),enc.byteAt(0));
-			
+
 			ACell cvm=CVM_ENCODER.decodeMultiCell(enc);
 			assertEquals(a,cvm);
 			assertEquals(cvm,a);
-			
+
 			// re-ecoding should be same result
 			assertEquals(enc,Format.encodeMultiCell(cvm, true));
-		} catch (BadFormatException e) {
-			fail(e);
-		}
-		
-		try {
+
+			// Single-cell decode round-trip
 			Blob encoding=a.getEncoding();
 			ACell b=Format.read(encoding);
 			assertEquals(b.getHash(),Hashing.sha3(encoding.getBytes()));
 			assertEquals(a,b);
-			
+
 			b.attachEncoding(null);
 			assertEquals(encoding,b.getEncoding());
 		} catch (BadFormatException e) {
 			fail(e);
+		} finally {
+			Stores.setCurrent(saved);
 		}
 	}
 
@@ -241,25 +243,31 @@ public class ObjectsTest {
 		Blob enc=a.getEncoding();
 		EncodingTest.checkCodingSize(a);
 		long n=enc.count();
-		
-		// Re=read on encoding
-		ACell b;
+
+		// Decode round-trip needs store for non-embedded Ref resolution
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
 		try {
-			b = Format.read(enc);
-		} catch (BadFormatException e) {
-			fail("Reload from complete encoding failed for: " + a + " with encoding "+enc);
-			return;
+			ACell b;
+			try {
+				b = Format.read(enc);
+			} catch (BadFormatException e) {
+				fail("Reload from complete encoding failed for: " + a + " with encoding "+enc);
+				return;
+			}
+			assertEquals(a,b);
+			assertEquals(b,a);
+			assertEquals(enc,b.getEncoding()); // Encoding should be the same
+
+			// Truncated encoding is never valid
+			assertThrows(BadFormatException.class,()->Format.read(enc.slice(0,n-1)));
+		} finally {
+			Stores.setCurrent(saved);
 		}
-		assertEquals(a,b);
-		assertEquals(b,a);
-		assertEquals(enc,b.getEncoding()); // Encoding should be the same
-		
-		// Truncated encoding is never valid
-		assertThrows(BadFormatException.class,()->Format.read(enc.slice(0,n-1)));
-		
+
 		// Tag must equal first byte of encoding
 		assertEquals(a.getTag(),enc.byteAt(0));
-		
+
 		// convert to canonical for following
 		a=a.getCanonical();
 		if (a.isCompletelyEncoded()) {
@@ -276,43 +284,49 @@ public class ObjectsTest {
 		if (a==null) {
 			assertSame(Blob.NULL_ENCODING,encoding);
 			return;
-		} 
-		
+		}
+
 		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
 		assertSame(encoding,a.getEncoding()); // should be same cached encoding
 		assertEquals(encoding.count,a.getEncodingLength());
-			
+
 		if (a.isCVMValue()) {
 			assertNotNull(a.getType());
 		}
 
 		// Any encoding should be less than or equal to the limit
 		assertTrue(encoding.count <= Format.LIMIT_ENCODING_LENGTH);
-		
+
 		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
 		if (encoding.count > Format.MAX_EMBEDDED_LENGTH) {
 			assertFalse(Cells.isEmbedded(a),()->"Should not be embedded: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 
+		// Decode round-trip needs store for non-embedded Ref resolution
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
 		try {
-			// Test that we can re-read the encoding accurately
-			ACell a2 = Format.read(encoding);
-			assertEquals(a, a2);
-			
-			// Encoding should be cached, probably but not necessarily identical
-			assertEquals(a2.cachedEncoding(),encoding);
-			
-			// Test that we can re-read from a sliced Blob
-			ABlob t=Samples.SMALL_BLOB.append(encoding);
-			Blob offsetEncoding=t.slice(Samples.SMALL_BLOB.count()).toFlatBlob();
-			ACell a3= Format.read(offsetEncoding);
-			assertEquals(a, a3);
-		} catch (BadFormatException e) {
-			fail("Can't read encoding: 0x" + encoding.toHexString(), e);
-			return;
+			try {
+				ACell a2 = Format.read(encoding);
+				assertEquals(a, a2);
+
+				// Encoding should be cached, probably but not necessarily identical
+				assertEquals(a2.cachedEncoding(),encoding);
+
+				// Test that we can re-read from a sliced Blob
+				ABlob t=Samples.SMALL_BLOB.append(encoding);
+				Blob offsetEncoding=t.slice(Samples.SMALL_BLOB.count()).toFlatBlob();
+				ACell a3= Format.read(offsetEncoding);
+				assertEquals(a, a3);
+			} catch (BadFormatException e) {
+				fail("Can't read encoding: 0x" + encoding.toHexString(), e);
+				return;
+			}
+
+			assertThrows(BadFormatException.class,()->Format.read(encoding.append(Samples.SMALL_BLOB).toFlatBlob()));
+		} finally {
+			Stores.setCurrent(saved);
 		}
-		
-		assertThrows(BadFormatException.class,()->Format.read(encoding.append(Samples.SMALL_BLOB).toFlatBlob()));
 	}
 	
 
@@ -476,10 +490,14 @@ public class ObjectsTest {
 		
 		Blob enc=a.getEncoding();
 		assertEquals(enc, b.getEncoding());
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
 		try {
 			assertEquals(a, Format.read(enc));
 		} catch (BadFormatException e) {
 			throw Utils.sneakyThrow(e);
+		} finally {
+			Stores.setCurrent(saved);
 		}
 	}
 

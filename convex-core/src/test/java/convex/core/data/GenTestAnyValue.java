@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 
+import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -15,14 +16,13 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestAnyValue {
-	
+
 	@Property
 	public void printFormats(@From(ValueGen.class) ACell o) {
 		String s=Utils.print(o);
@@ -76,7 +76,7 @@ public class GenTestAnyValue {
 	@Property
 	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
 		if (Cells.isEmbedded(o)) {
-			Cells.persist(o, Stores.current()); // NOTE: may have child refs to persist
+			Cells.persist(o, Samples.TEST_STORE); // NOTE: may have child refs to persist
 			
 			Blob data=Cells.encode(o);
 			ACell o2=Format.read(data);
@@ -107,7 +107,7 @@ public class GenTestAnyValue {
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toFlatBlob();
 		
 		// check persistence
-		o=Cells.persist(o, Stores.current());
+		o=Cells.persist(o, Samples.TEST_STORE);
 		Ref<ACell> dataRef=Ref.get(o); // ensure in store
 		Hash hash=Hash.get(o);
 		assertEquals(dataRef.getHash(),hash);
@@ -126,7 +126,7 @@ public class GenTestAnyValue {
 		assertEquals(data,data2);
 		
 		// simulate retrieval via hash
-		Ref<ACell> dataRef2=Stores.current().refForHash(hash);
+		Ref<ACell> dataRef2=Samples.TEST_STORE.refForHash(hash);
 		if (dataRef2!=null) {
 			// Have in store
 			assertEquals(dataRef,dataRef2);

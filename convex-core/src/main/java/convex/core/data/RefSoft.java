@@ -84,7 +84,9 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	 * @return New RefSoft instance, or cached Refsoft from current store
 	 */
 	public static <T extends ACell> Ref<T> createForHash(Hash hash) {
-		return new RefSoft<T>(Stores.current(),hash);
+		AStore store=Stores.current();
+		if (store==null) throw new IllegalStateException("No current store set for decoding non-embedded Ref: "+hash);
+		return new RefSoft<T>(store,hash);
 	}
 
 	/**

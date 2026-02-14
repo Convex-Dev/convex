@@ -278,10 +278,10 @@ public abstract class Convex implements AutoCloseable {
 	 * @return Address of account created
 	 * @throws ResultException  If account creation failed
 	 */
-	public Address createAccountSync(AccountKey publicKey) throws InterruptedException, ResultException {
+	public Address createAccountSync(AccountKey publicKey) throws InterruptedException, ResultException, TimeoutException {
 		Address address;
 		try {
-			address = createAccount(publicKey).get();
+			address = createAccount(publicKey).get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 		} catch (ExecutionException e) {
 			throw new ResultException(Result.fromException(e));
 		}

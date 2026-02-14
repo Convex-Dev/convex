@@ -161,6 +161,7 @@ public class MessageFormatPanel extends JPanel {
 	
 
 	private void updateHashLabel(ACell v, Blob b) {
+		// TODO: change to if (b!=null)
 		StringBuilder sb=new StringBuilder();
 		boolean empty=(b==null);
 		sb.append("Type:          "+(empty?"<none>":RT.getType(v).toString()));

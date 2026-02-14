@@ -358,6 +358,7 @@ public class Order extends ARecordGeneric {
 
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
-		return new Order(values);
+		if (values==newValues) return this;
+		return new Order(newValues);
 	}
 }

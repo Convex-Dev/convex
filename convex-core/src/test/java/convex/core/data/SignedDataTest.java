@@ -19,10 +19,10 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class SignedDataTest {
+
 	@SuppressWarnings("unchecked")
 	@Test
 	public void testBadSignature() throws IOException {
@@ -45,13 +45,13 @@ public class SignedDataTest {
 
 		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
 
-		Cells.persist(sd, Stores.current());
-		
-		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		Cells.persist(sd, Samples.TEST_STORE);
+
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash(), Samples.TEST_STORE).getValue();
 		// should have cached checked signature
 		assertTrue(sd1.isSignatureChecked());
 		assertFalse(sd1.checkSignature());
-		
+
 		doSignedDataTest(sd);
 		doSignedDataTest(sd1);
 	}
@@ -70,7 +70,7 @@ public class SignedDataTest {
 
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
-		
+
 		// should be checked by default
 		assertTrue(sd.isSignatureChecked());
 
@@ -80,19 +80,19 @@ public class SignedDataTest {
 		assertEquals(cl, sd.getValue());
 
 		assertTrue(sd.getValueRef().isEmbedded());
-		
+
 		doSignedDataTest(sd);
 	}
-	
+
 	@SuppressWarnings("unchecked")
-	@Test 
+	@Test
 	public void testSignatureCache() throws IOException {
 		CVMLong cl=RT.cvm(1585856457);
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
-		Cells.persist(sd, Stores.current());
+		Cells.persist(sd, Samples.TEST_STORE);
 
-		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
+		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash(), Samples.TEST_STORE).getValue();
 		// should have cached checked signature
 		assertTrue(sd1.isSignatureChecked());
 		assertTrue(sd1.checkSignature());

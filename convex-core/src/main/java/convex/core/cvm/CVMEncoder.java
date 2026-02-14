@@ -15,6 +15,8 @@ public class CVMEncoder extends CAD3Encoder {
 
 	public static final CVMEncoder INSTANCE = new CVMEncoder();
 
+	public CVMEncoder() {}
+
 	@Override
 	public ACell read(Blob encoding,int offset) throws BadFormatException {
 		return super.read(encoding,offset);

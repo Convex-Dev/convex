@@ -37,34 +37,44 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.test.Samples;
 
 public class MessageTest {
+
 	static Hash BAD_HASH=Hash.EMPTY_HASH;
 	static AKeyPair KP=AKeyPair.createSeeded(1567856);
 
 	@Test public void testMissingResponse() throws BadFormatException, IOException {
 		// non-embedded Blob which might be a missing branch
 		Blob b=Blobs.createRandom(400);
-		
+
 		Message mq=Message.createDataResponse(CVMLong.ONE, b);
 		assertEquals(MessageType.RESULT,mq.getType());
 		doMessageTest(mq);
-		
+
 		Blob enc=mq.getMessageData();
-		
-		Message mr=Message.create(enc);
-		AVector<ACell> v=mr.toResult().getValue();
-		
-		assertEquals(b,v.get(0));
-		Cells.persist(b, Stores.current());
-		
-		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
-		doMessageTest(md);
-		
-		Message mdr=md.makeDataResponse(Stores.current());
-		assertEquals(mq,mdr);
-		doMessageTest(mdr);
+
+		// Decoding messages with non-embedded content requires a store
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			Message mr=Message.create(enc);
+			AVector<ACell> v=mr.toResult().getValue();
+
+			assertEquals(b,v.get(0));
+			Cells.persist(b, Samples.TEST_STORE);
+
+			Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
+			doMessageTest(md);
+
+			Message mdr=md.makeDataResponse(Samples.TEST_STORE);
+			assertEquals(mq,mdr);
+			doMessageTest(mdr);
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -81,16 +91,21 @@ public class MessageTest {
 		
 		Blob enc=m.getMessageData();
 		
-		ACell b2=Format.decodeMultiCell(enc);
+		Stores.setCurrent(Samples.TEST_STORE);
+		ACell b2;
+		try { b2=Format.decodeMultiCell(enc); } finally { Stores.setCurrent(null); }
 		assertEquals(belief.getHash(),b2.getHash());
 		
 		Message m2=Message.create(enc);
 		assertNull(m.getResultID());
 
-		assertEquals(MessageType.BELIEF,m2.getType());
-		assertEquals(belief,m2.getPayload());
-		
-		
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			assertEquals(MessageType.BELIEF,m2.getType());
+			assertEquals(belief,m2.getPayload());
+		} finally { Stores.setCurrent(null); }
+
+
 	}
 	
 	@Test public void testBigMissingResponse() throws BadFormatException, IOException {
@@ -98,19 +113,26 @@ public class MessageTest {
 		Blob b=Blobs.createRandom(400);
 		Hash[] hashes=new Hash[CPoSConstants.MISSING_LIMIT];
 		Arrays.fill(hashes,b.getHash());
-		
+
 		Message mr=Message.createDataRequest(b,hashes);
 		assertEquals(MessageType.DATA_REQUEST,mr.getType());
 		doMessageTest(mr);
-		
+
 		Blob enc=mr.getMessageData();
-		
-		Message mrs=Message.create(enc);
-		AVector<ACell> v=mrs.getPayload();
-		assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
-		assertEquals(MessageType.DATA_REQUEST,mrs.getType());
-		assertEquals(MessageTag.DATA_REQUEST,v.get(0));
-		doMessageTest(mrs);
+
+		// Decoding messages with non-embedded content requires a store
+		AStore saved=Stores.current();
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			Message mrs=Message.create(enc);
+			AVector<ACell> v=mrs.getPayload();
+			assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
+			assertEquals(MessageType.DATA_REQUEST,mrs.getType());
+			assertEquals(MessageTag.DATA_REQUEST,v.get(0));
+			doMessageTest(mrs);
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	}
 	
 	
@@ -119,7 +141,7 @@ public class MessageTest {
 		Message md=Message.createDataRequest(CVMLong.ONE, BAD_HASH);
 		assertEquals(Vectors.of(MessageTag.DATA_REQUEST,1,BAD_HASH),md.getPayload());
 		
-		Message mdr=md.makeDataResponse(Stores.current());
+		Message mdr=md.makeDataResponse(Samples.TEST_STORE);
 		assertEquals(Result.create(CVMLong.ONE, Vectors.of(Cells.NIL)),mdr.getPayload());
 	}
 	
@@ -153,12 +175,12 @@ public class MessageTest {
 	@Test 
 	public void testDataMessages() throws BadFormatException, IOException {
 		Blob b=Blob.createRandom(new Random(1256785), 1000);
-		Cells.persist(b, Stores.current());
-		
+		Cells.persist(b, Samples.TEST_STORE);
+
 		Message m=Message.createDataRequest(CVMLong.ONE, b.getHash());
 		Message r=Message.createDataResponse(CVMLong.ONE, b);
-		
-		assertEquals(r,m.makeDataResponse(Stores.current()));
+
+		assertEquals(r,m.makeDataResponse(Samples.TEST_STORE));
 		
 		// Check Result
 		Result res=r.toResult();
@@ -211,7 +233,9 @@ public class MessageTest {
 			Blob data=m.getMessageData();
 			assertTrue(data.count()>0);
 		
-			ACell dp=Format.decodeMultiCell(data);
+			Stores.setCurrent(Samples.TEST_STORE);
+			ACell dp;
+			try { dp=Format.decodeMultiCell(data); } finally { Stores.setCurrent(null); }
 			Message m2=Message.create(null, dp);
 			
 			assertEquals(type,m2.getType());

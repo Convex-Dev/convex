@@ -22,8 +22,10 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -550,9 +552,18 @@ public final class Result extends ARecordGeneric {
 		return Result.create(id, value, errorCode);
 	}
 
-	public static ACell peekResultID(Blob messageData, int i) throws BadFormatException {
-		Result r=Result.read(messageData, i);
-		return r.getID();
+	public static ACell peekResultID(Blob messageData, int pos) throws BadFormatException {
+		// Read the ID directly from encoding without decoding the full Result.
+		// Result is encoded as: tag + VLQ count + element refs...
+		byte tag=messageData.byteAt(pos);
+		if (tag!=CVMTag.RESULT) throw new BadFormatException("Expected Result tag but got: "+tag);
+		int rpos=pos+1;
+		long count=Format.readVLQCount(messageData, rpos);
+		if (count<1) throw new BadFormatException("Result with no elements");
+		rpos+=Format.getVLQCountLength(count);
+		// First element is the ID — always embedded, so no store needed
+		Ref<ACell> idRef=Format.readRef(messageData, rpos);
+		return idRef.getValue();
 	}
 
 

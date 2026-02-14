@@ -125,7 +125,7 @@ public class TestNetwork {
 			network.CONVEX.transferSync(addr, Coin.GOLD);
 			ConvexLocal client=Convex.connect(network.SERVER, addr, kp);
 			return client;
-		} catch (ResultException t) {
+		} catch (ResultException | java.util.concurrent.TimeoutException t) {
 			throw Utils.sneakyThrow(t);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

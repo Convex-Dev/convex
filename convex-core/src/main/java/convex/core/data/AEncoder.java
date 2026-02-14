@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.AStore;
 
 /**
  * Abstract base class for encoders, which convert data to / from Blob instances
@@ -9,8 +8,6 @@ import convex.core.store.AStore;
 public abstract class AEncoder<T> {
 
 	public static final int FORMAT_V1=1;
-	
-	protected AStore store;
 	
 	/**
 	 * Encodes a value as Blob

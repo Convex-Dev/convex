@@ -131,7 +131,7 @@ public class Invoke extends ATransaction {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Invoke(values);
+		return new Invoke(newValues);
 	}
 
 }

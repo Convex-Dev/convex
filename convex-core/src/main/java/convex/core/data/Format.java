@@ -820,133 +820,198 @@ public class Format {
 	}
 	
 	/**
-	 * Reads a cell from a Blob of data, allowing for non-embedded branches following the first cell
-	 * @param data Data to decode
+	 * Temporary store used during multi-cell message decoding. Resolves refs
+	 * from the message's child cell HashMap first, then delegates to the
+	 * backing store for any refs not in the message (partial messages).
+	 */
+	private static class MessageStore extends AStore {
+		private final HashMap<Hash, ACell> cells;
+		private final AStore delegate;
+
+		MessageStore(HashMap<Hash, ACell> cells, AStore delegate) {
+			this.cells = cells;
+			this.delegate = delegate;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends ACell> Ref<T> refForHash(Hash hash) {
+			ACell cell = cells.get(hash);
+			if (cell != null) return (Ref<T>) cell.getRef();
+			if (delegate != null) return delegate.refForHash(hash);
+			return null;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
+			if (delegate != null) try { return delegate.storeRef(ref, status, handler); } catch (Exception e) {}
+			return ref;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
+			if (delegate != null) try { return delegate.storeTopRef(ref, status, handler); } catch (Exception e) {}
+			return ref;
+		}
+
+		@Override public Hash getRootHash() { return null; }
+		@Override public <T extends ACell> Ref<T> setRootData(T data) { return Ref.get(data); }
+		@Override public void close() {}
+
+		@Override
+		public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
+			if (delegate != null) return delegate.decode(encoding);
+			return Format.read(encoding);
+		}
+
+		@Override
+		public AEncoder<ACell> getEncoder() {
+			return (delegate != null) ? delegate.getEncoder() : null;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends ACell> Ref<T> checkCache(Hash h) {
+			ACell cell = cells.get(h);
+			if (cell != null) return (Ref<T>) cell.getRef();
+			if (delegate != null) return delegate.checkCache(h);
+			return null;
+		}
+
+		@Override
+		public String shortName() { return "message"; }
+	}
+
+	/**
+	 * Reads a cell from a Blob of multi-cell encoded data.
+	 *
+	 * Uses the current thread-local store for decode context. If no store is set,
+	 * uses a temporary MessageStore so that RefSofts can be created during
+	 * child cell decode. The replacement scan resolves all refs from decoded
+	 * children.
+	 *
+	 * @param data Data to decode (top cell encoding followed by VLQ-prefixed children)
 	 * @return Cell instance
 	 * @throws BadFormatException If encoding format is invalid
 	 */
-	/**
-	 * Reads a cell from a Blob of data using the current thread-local store for decode context.
-	 * Prefer the 2-arg version with explicit store where possible.
-	 */
-	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
-		return decodeMultiCell(data, Stores.current());
-	}
-
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T decodeMultiCell(Blob data, AStore store) throws BadFormatException {
-		long ml=data.count();
+	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
+		int ml=Utils.checkedInt(data.count());
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
-		// read first cell
+		// Read first cell unconditionally. Caller must set a store if needed.
 		T result= Format.read(data,0);
 		if (result==null) {
 			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-			return null; // null value OK at top level
+			return null;
 		}
 
 		int rl=Utils.checkedInt(result.getEncodingLength());
-		if (rl==ml) return result; // Fast path if already complete
+		if (rl==ml) return result; // Single-cell fast path: no HashMap needed
 
-		// read remaining cells
+		// Multi-cell: decode children into HashMap
 		HashMap<Hash,ACell> hm=new HashMap<>();
-		decodeCells(hm,data.slice(rl,ml),store);
+		boolean replacedStore=false;
+		if (Stores.current()==null) {
+			Stores.setCurrent(new MessageStore(hm, null));
+			replacedStore=true;
+		}
 
-		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();		
-		ArrayList<ACell> stack=new ArrayList<>();
+		try {
+			decodeCells(hm, data, rl, ml);
 
-		IRefFunction func=new IRefFunction() {
-			@SuppressWarnings("rawtypes")
-			@Override
-			public Ref apply(Ref r) {
-				if (r.isEmbedded()) {
-					ACell cc=r.getValue();
-					if (cc==null) return r;
-					ACell nc=cc.updateRefs(this);
-					if (cc==nc) return r;
-					return nc.getRef();
-				} else {
-					Hash h=r.getHash();
-					
-					// if done, just replace with done version
-					ACell doneVal=done.get(h);
-					if (doneVal!=null) return doneVal.getRef();
-					
-					// if in map, push cell to stack
-					ACell part=hm.get(h);
-					if (part!=null) {
-						stack.add(part);
-						return part.getRef();
+			// Replacement scan: resolve all refs from decoded children
+			final HashMap<Hash,ACell> childMap=hm;
+			HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();
+			ArrayList<ACell> stack=new ArrayList<>();
+
+			IRefFunction func=new IRefFunction() {
+				@SuppressWarnings("rawtypes")
+				@Override
+				public Ref apply(Ref r) {
+					if (r.isEmbedded()) {
+						ACell cc=r.getValue();
+						if (cc==null) return r;
+						ACell nc=cc.updateRefs(this);
+						if (cc==nc) return r;
+						return nc.getRef();
+					} else {
+						Hash h=r.getHash();
+
+						// if done, just replace with done version
+						ACell doneVal=done.get(h);
+						if (doneVal!=null) return doneVal.getRef();
+
+						// if in map, push cell to stack
+						ACell part=childMap.get(h);
+						if (part!=null) {
+							stack.add(part);
+							return part.getRef();
+						}
+
+						// not in message, must be partial
+						return r;
 					}
-					
-					// not in message, must be partial
-					return r;
 				}
-			} 
-		};
-		
-		stack.add(result); 
-		Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
-			@Override
-			public boolean test(ACell c) {
-				Hash h=c.getHash();
-				if (done.containsKey(h)) return true;
-				
-				int pos=stack.size();
-				// Update Refs, adding new non-embedded cells to stack
-				ACell nc=c.updateRefs(func);
-				
-				if (stack.size()==pos) {
-					// we must be done since nothing new added to stack
-					done.put(h,nc);
-					return true;
-				} else {
-					// something extra on the stack to handle first
-					stack.set(pos-1,nc);
-					return false;
+			};
+
+			stack.add(result);
+			Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
+				@Override
+				public boolean test(ACell c) {
+					Hash h=c.getHash();
+					if (done.containsKey(h)) return true;
+
+					int pos=stack.size();
+					// Update Refs, adding new non-embedded cells to stack
+					ACell nc=c.updateRefs(func);
+
+					if (stack.size()==pos) {
+						// we must be done since nothing new added to stack
+						done.put(h,nc);
+						return true;
+					} else {
+						// something extra on the stack to handle first
+						stack.set(pos-1,nc);
+						return false;
+					}
 				}
-			}
-		});
-		
-		// ACell cc=done.get(check);
-		
-		result=(T) done.get(result.getHash());
-		
-		return result;
+			});
+
+			result=(T) done.get(result.getHash());
+			return result;
+		} finally {
+			if (replacedStore) Stores.setCurrent(null);
+		}
 	}
-	
+
 	/**
-	 * Decode encoded non-embedded Cells into an accumulator HashMap
-	 * @param acc Accumulator for Cells, keyed by Hash
-	 * @param data Encoding to read
+	 * Decode VLQ-prefixed non-embedded Cells into an accumulator HashMap.
+	 * Uses offsets into the original Blob to avoid slicing.
+	 * @param acc Accumulator for Cells, keyed by content Hash
+	 * @param data Blob containing the encoded cells
+	 * @param offset Start offset in data
+	 * @param end End offset in data
 	 * @throws BadFormatException In case of bad format, including any embedded values
 	 */
-	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data, AStore store) throws BadFormatException {
-		long dataLength=data.count();
+	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data, int offset, int end) throws BadFormatException {
 		try {
-			int ix=0;
-			while( ix<dataLength) {
+			int ix=offset;
+			while(ix<end) {
 				long encLength=Format.readVLQCount(data,ix);
 				ix+=Format.getVLQCountLength(encLength);
-				
-				Blob enc=data.slice(ix, ix+encLength);
-				if (enc==null) {
-					throw new BadFormatException("Incomplete encoding");
-				}
+
+				Blob enc=data.slice(ix, ix+(int)encLength);
 				Hash h=enc.getContentHash();
-				
-				// Check store for Ref - avoids duplicate objects in many cases
-				ACell c=store.decode(enc);
-				
-				if (c==null) {
-					throw new BadFormatException("Null child encoding");
-				}
+				ACell c=Format.read(enc);
+
+				if (c==null) throw new BadFormatException("Null child encoding");
 				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
-				
+
 				acc.put(h, c);
-				ix+=encLength;
+				ix+=(int)encLength;
 			}
-			if (ix!=dataLength) throw new BadFormatException("Bad message length when decoding");
+			if (ix!=end) throw new BadFormatException("Bad message length when decoding");
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Insufficient bytes to decode Cells");
 		}

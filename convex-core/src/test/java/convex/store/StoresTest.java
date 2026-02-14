@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -15,6 +16,7 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.State;
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AString;
@@ -23,12 +25,17 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.init.InitTest;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.core.store.NullStore;
 import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
@@ -256,6 +263,86 @@ public class StoresTest {
 		assertNotNull(store2.refForHash(h1));
 		assertEquals(data1, store2.refForHash(h1).getValue());
 		assertEquals(data2, store1.refForHash(h2).getValue());
+	}
+
+	// ========== NullStore tests ==========
+
+	@Test
+	public void testNullStoreBasics() {
+		NullStore ns = NullStore.INSTANCE;
+		assertEquals("null", ns.shortName());
+
+		// refForHash always returns null
+		assertNull(ns.refForHash(Hash.EMPTY_HASH));
+		assertNull(ns.refForHash(Samples.NON_EMBEDDED_STRING.getHash()));
+
+		// checkCache always returns null
+		assertNull(ns.checkCache(Hash.EMPTY_HASH));
+
+		// getRootHash returns null
+		assertNull(ns.getRootHash());
+	}
+
+	@Test
+	public void testNullStoreStoreOps() throws IOException {
+		NullStore ns = NullStore.INSTANCE;
+		CVMLong val = CVMLong.create(42);
+		Ref<CVMLong> ref = val.getRef();
+
+		// storeRef returns the ref unchanged
+		assertSame(ref, ns.storeRef(ref, Ref.STORED, null));
+		assertSame(ref, ns.storeTopRef(ref, Ref.STORED, null));
+	}
+
+	@Test
+	public void testNullStoreDecodeEmbedded() throws Exception {
+		NullStore ns = NullStore.INSTANCE;
+
+		// Decoding embedded values should work
+		CVMLong val = CVMLong.create(42);
+		Blob enc = val.getEncoding();
+		ACell decoded = ns.decode(enc);
+		assertEquals(val, decoded);
+	}
+
+	@Test
+	public void testNullStoreRefMissing() {
+		// RefSoft created with NullStore should throw MissingDataException on getValue
+		AStore saved = Stores.current();
+		Stores.setCurrent(NullStore.INSTANCE);
+		try {
+			Hash h = Samples.NON_EMBEDDED_STRING.getHash();
+			Ref<ACell> ref = Ref.forHash(h);
+			assertNotNull(ref);
+			assertThrows(MissingDataException.class, () -> ref.getValue());
+		} finally {
+			Stores.setCurrent(saved);
+		}
+	}
+
+	/**
+	 * Test that peekResultID works even with no branches stored. We need to see the Result ID
+	 * without assuming the message encoding is complete and with no store present.
+	 * @throws Exception
+	 */
+	@Test
+	public void testNullStorePeekResultID() throws Exception {
+		// Create a Result with non-embedded content, encode as multi-cell
+		Blob bigBlob = Blobs.createRandom(400);
+		assertFalse(bigBlob.isEmbedded());
+		Result result = Result.create(CVMLong.create(7), Vectors.of(bigBlob));
+
+		Blob enc = Format.encodeMultiCell(result, true);
+
+		// peekResultID should work without any store set (uses NullStore internally)
+		AStore saved = Stores.current();
+		Stores.setCurrent(null);
+		try {
+			ACell id = Result.peekResultID(enc, 0);
+			assertEquals(CVMLong.create(7), id);
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	}
 
 	// ========== Cross-store acquisition round-trip ==========

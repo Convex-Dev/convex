@@ -215,6 +215,6 @@ public final class Block extends ARecordGeneric {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Block(values);
+		return new Block(newValues);
 	}	
 }

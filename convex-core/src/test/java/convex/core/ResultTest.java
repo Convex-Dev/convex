@@ -22,6 +22,8 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.store.Stores;
+import convex.test.Samples;
 
 public class ResultTest {
 
@@ -77,7 +79,9 @@ public class ResultTest {
 		Result r=Result.fromData(Reader.read(bad));
 		Blob b=Format.encodeMultiCell(r, true);
 		// assertEquals("0xad051104304743616e277420636f6e7665727420617267756d656e7420617420706f736974696f6e20312028776974682074797065204b6579776f72642920746f2074797065204e756d626572330443415354800020d71ec156f7a11f1ba988b92a800eb57169e25a04289fd24bc0c892c3d1d5787d811582073305747261636580023013496e20636f72652066756e6374696f6e3a202b3019496e2065787072657373696f6e3a20282b203a666f6f20332933056561646472210b330466656573120a823302747831207f61e6e8abc68199638a8502336f4f5e98334e2ec5391e9693c099270f8f17f13306736f757263653304434f444533056a7569636512022133036c6f638002110110",b.toString());
-		Result r2=Format.decodeMultiCell(b);
+		Stores.setCurrent(Samples.TEST_STORE);
+		Result r2;
+		try { r2=Format.decodeMultiCell(b); } finally { Stores.setCurrent(null); }
 		assertEquals(r,r2);
 		
 	}

@@ -19,6 +19,8 @@ import convex.core.util.ErrorMessages;
  */
 public class CAD3Encoder extends AEncoder<ACell> {
 
+	public CAD3Encoder() {}
+
 	public Blob encode(ACell a) {
 		return Cells.encode(a);
 	}
@@ -165,7 +167,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 */
 	@Override
 	public ACell decodeMultiCell(Blob enc) throws BadFormatException  {
-		// Uses Stores.current() as decode context (set by AStore.decode())
 		return Format.decodeMultiCell(enc);
 	}
 }
