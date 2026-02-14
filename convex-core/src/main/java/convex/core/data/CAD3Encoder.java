@@ -1,5 +1,10 @@
 package convex.core.data;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Syntax;
@@ -11,7 +16,10 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.util.ErrorMessages;
+import convex.core.util.Trees;
 import convex.core.util.Utils;
 
 /**
@@ -166,5 +174,209 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	protected ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
 		long code=Format.readVLQCount(blob,offset+1);
 		return ExtensionValue.create(tag, code);
+	}
+
+	// ==================== Multi-cell decode ====================
+
+	/**
+	 * Decodes a cell from multi-cell encoded data. The top-level cell is
+	 * followed by VLQ-prefixed child cells. All reads dispatch through this
+	 * encoder's virtual {@link #read} methods, so CAD3Encoder produces generic
+	 * types and CVMEncoder produces CVM-specific types.
+	 *
+	 * Uses the current thread-local store for Ref resolution. If no store is
+	 * set, installs a temporary MessageStore for the duration of child decoding.
+	 *
+	 * @param data Multi-cell encoded data
+	 * @return Decoded top-level cell
+	 * @throws BadFormatException If encoding format is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	public ACell decodeMultiCell(Blob data) throws BadFormatException {
+		int ml=Utils.checkedInt(data.count());
+		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
+
+		// Read first cell unconditionally. Caller must set a store if needed.
+		ACell result= this.read(data,0);
+		if (result==null) {
+			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+			return null;
+		}
+
+		int rl=Utils.checkedInt(result.getEncodingLength());
+		if (rl==ml) return result; // Single-cell fast path: no HashMap needed
+
+		// Multi-cell: decode children into HashMap
+		HashMap<Hash,ACell> hm=new HashMap<>();
+		boolean replacedStore=false;
+		if (Stores.current()==null) {
+			Stores.setCurrent(new MessageStore(hm, null));
+			replacedStore=true;
+		}
+
+		try {
+			readChildCells(hm, data, rl, ml);
+
+			// Replacement scan: resolve all refs from decoded children
+			final HashMap<Hash,ACell> childMap=hm;
+			HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();
+			ArrayList<ACell> stack=new ArrayList<>();
+
+			IRefFunction func=new IRefFunction() {
+				@SuppressWarnings("rawtypes")
+				@Override
+				public Ref apply(Ref r) {
+					if (r.isEmbedded()) {
+						ACell cc=r.getValue();
+						if (cc==null) return r;
+						ACell nc=cc.updateRefs(this);
+						if (cc==nc) return r;
+						return nc.getRef();
+					} else {
+						Hash h=r.getHash();
+
+						// if done, just replace with done version
+						ACell doneVal=done.get(h);
+						if (doneVal!=null) return doneVal.getRef();
+
+						// if in map, push cell to stack
+						ACell part=childMap.get(h);
+						if (part!=null) {
+							stack.add(part);
+							return part.getRef();
+						}
+
+						// not in message, must be partial
+						return r;
+					}
+				}
+			};
+
+			stack.add(result);
+			Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
+				@Override
+				public boolean test(ACell c) {
+					Hash h=c.getHash();
+					if (done.containsKey(h)) return true;
+
+					int pos=stack.size();
+					// Update Refs, adding new non-embedded cells to stack
+					ACell nc=c.updateRefs(func);
+
+					if (stack.size()==pos) {
+						// we must be done since nothing new added to stack
+						done.put(h,nc);
+						return true;
+					} else {
+						// something extra on the stack to handle first
+						stack.set(pos-1,nc);
+						return false;
+					}
+				}
+			});
+
+			result=done.get(result.getHash());
+			return result;
+		} finally {
+			if (replacedStore) Stores.setCurrent(null);
+		}
+	}
+
+	/**
+	 * Decodes VLQ-prefixed non-embedded child cells into an accumulator HashMap.
+	 * Dispatches through this encoder's virtual {@link #read} methods.
+	 *
+	 * @param acc Accumulator for cells, keyed by content hash
+	 * @param data Blob containing the encoded cells
+	 * @param offset Start offset in data
+	 * @param end End offset in data
+	 * @throws BadFormatException If encoding is invalid or contains embedded cells
+	 */
+	private void readChildCells(HashMap<Hash,ACell> acc, Blob data, int offset, int end) throws BadFormatException {
+		try {
+			int ix=offset;
+			while(ix<end) {
+				long encLength=Format.readVLQCount(data,ix);
+				ix+=Format.getVLQCountLength(encLength);
+
+				Blob enc=data.slice(ix, ix+(int)encLength);
+				Hash h=enc.getContentHash();
+				ACell c=this.read(enc, 0);
+
+				if (c==null) throw new BadFormatException("Null child encoding");
+				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
+
+				acc.put(h, c);
+				ix+=(int)encLength;
+			}
+			if (ix!=end) throw new BadFormatException("Bad message length when decoding");
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Insufficient bytes to decode Cells");
+		}
+	}
+
+	/**
+	 * Temporary store used during multi-cell message decoding when no store
+	 * is set on the current thread. Resolves Refs from the message's decoded
+	 * child cells first, then delegates to any backing store for refs not
+	 * in the message (partial messages).
+	 */
+	private static class MessageStore extends AStore {
+		private final HashMap<Hash, ACell> cells;
+		private final AStore delegate;
+
+		MessageStore(HashMap<Hash, ACell> cells, AStore delegate) {
+			this.cells = cells;
+			this.delegate = delegate;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends ACell> Ref<T> refForHash(Hash hash) {
+			ACell cell = cells.get(hash);
+			if (cell != null) return (Ref<T>) cell.getRef();
+			if (delegate != null) return delegate.refForHash(hash);
+			return null;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
+			if (delegate != null) try { return delegate.storeRef(ref, status, handler); } catch (Exception e) {}
+			return ref;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
+			if (delegate != null) try { return delegate.storeTopRef(ref, status, handler); } catch (Exception e) {}
+			return ref;
+		}
+
+		@Override public Hash getRootHash() { return null; }
+		@Override public <T extends ACell> Ref<T> setRootData(T data) { return Ref.get(data); }
+		@Override public void close() {}
+
+		@Override
+		public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
+			if (delegate != null) return delegate.decode(encoding);
+			return Format.read(encoding);
+		}
+
+		@Override
+		public AEncoder<ACell> getEncoder() {
+			return (delegate != null) ? delegate.getEncoder() : null;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends ACell> Ref<T> checkCache(Hash h) {
+			ACell cell = cells.get(h);
+			if (cell != null) return (Ref<T>) cell.getRef();
+			if (delegate != null) return delegate.checkCache(h);
+			return null;
+		}
+
+		@Override
+		public String shortName() { return "message"; }
 	}
 }

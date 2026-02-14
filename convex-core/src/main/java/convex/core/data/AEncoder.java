@@ -54,13 +54,13 @@ public abstract class AEncoder<T> {
 	public abstract T read(byte tag, Blob encoding, int offset) throws BadFormatException;
 
 	/**
-	 * Reads a value from a Blob of multi-cell encoded data
-	 * @param enc Data to decode (top cell followed by children)
+	 * Decodes a value from multi-cell encoded data (top cell followed by
+	 * VLQ-prefixed children). Dispatches through this encoder's virtual
+	 * {@link #read} methods for type-appropriate decoding.
+	 *
+	 * @param encoding Data to decode (top cell followed by children)
 	 * @return Decoded value
 	 * @throws BadFormatException If encoding format is invalid
 	 */
-	@SuppressWarnings("unchecked")
-	public T decodeMultiCell(Blob enc) throws BadFormatException {
-		return (T) Format.decodeMultiCell(enc);
-	}
+	public abstract T decodeMultiCell(Blob encoding) throws BadFormatException;
 }

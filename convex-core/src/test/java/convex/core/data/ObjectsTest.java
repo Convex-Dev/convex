@@ -99,7 +99,8 @@ public class ObjectsTest {
 			assertEquals(a,cvm);
 			assertEquals(cvm,a);
 
-			// re-ecoding should be same result
+			// Re-encoding through both encoder types should reproduce identical bytes
+			assertEquals(enc,Format.encodeMultiCell(cad, true));
 			assertEquals(enc,Format.encodeMultiCell(cvm, true));
 
 			// Single-cell decode round-trip
@@ -110,6 +111,28 @@ public class ObjectsTest {
 
 			b.attachEncoding(null);
 			assertEquals(encoding,b.getEncoding());
+
+			// For completely encoded cells (no branches), single-cell decode
+			// must produce an identical result to multi-cell decode
+			if (a.isCompletelyEncoded()) {
+				assertEquals(encoding, enc, "Completely encoded cell should have identical single and multi-cell encodings");
+				ACell cadSingle=CAD3_ENCODER.decode(encoding);
+				ACell cvmSingle=CVM_ENCODER.decode(encoding);
+				assertEquals(cad, cadSingle);
+				assertEquals(cvm, cvmSingle);
+			}
+
+			// Multi-cell decode with children resolved from store: encode only
+			// the top cell, set store with persisted children, decode should
+			// reconstruct the full value including all children
+			if (a.getBranchCount()>0) {
+				// top cell encoding alone (no children appended)
+				Blob topOnly=a.getEncoding();
+				ACell fromStore=CVM_ENCODER.decodeMultiCell(topOnly);
+				// Re-encode as multi-cell to verify deep equality (all children present)
+				assertEquals(enc, Format.encodeMultiCell(fromStore, true),
+					"Store-resolved cell should produce identical multi-cell encoding");
+			}
 		} catch (BadFormatException e) {
 			fail(e);
 		} finally {
