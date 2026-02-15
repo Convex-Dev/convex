@@ -175,15 +175,6 @@ public final class CVMDouble extends ANumeric {
 		return Tag.DOUBLE;
 	}
 	
-	public static CVMDouble read(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");
-		long bits=Utils.readLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1,8);
-		double d=Double.longBitsToDouble(bits);
-		CVMDouble result= unsafeCreate(d);
-		result.attachEncoding(blob.slice(offset,offset+1+8));
-		return result;
-	}
-
 	@Override
 	public AString toCVMString(long limit) {
 		if (limit<1) return null;

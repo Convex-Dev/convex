@@ -206,24 +206,6 @@ public final class StringShort extends AString {
 		return 0;
 	}
 	
-	/**
-	 * Read a StringShort from an encoding. Assumes tag and length already validated. 
-	 * @param length Length of string in UTF-8 bytes
-	 * @param blob Source of encoding
-	 * @param pos Position of encoding start (i.e. tag)
-	 * @return String instance
-	 */
-	public static StringShort read(long length, Blob blob, int pos) {
-		int len=Utils.checkedInt(length);
-		int headerLen=1+Format.getVLQCountLength(length);
-		int dataOffset=pos+headerLen;
-		Blob data=blob.slice(dataOffset,dataOffset+length);
-		StringShort result= create(data);
-		
-		result.attachEncoding(blob.slice(pos,dataOffset+len));
-		return result;
-	}
-
 	@Override
 	public Blob toBlob() {
 		return data;

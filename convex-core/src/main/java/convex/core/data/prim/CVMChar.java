@@ -196,20 +196,6 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	}
 	
 	/**
-	 * Reads char data from Blob
-	 * @param len Length in UTF-8 bytes
-	 * @param blob Blob to read from
-	 * @param pos Position of tag
-	 * @return CVMChar instance
-	 * @throws BadFormatException if any format error
-	 */
-	public static CVMChar read(int len, Blob blob, int pos) throws BadFormatException {
-		CVMChar result=readRaw(len,blob,pos+1); // read 
-		result.attachEncoding(blob.slice(pos, pos+1+len));
-		return result;
-	}
-	
-	/**
 	 * Reads raw char data from Blob
 	 * @param len Length in UTF=8 bytes
 	 * @param blob Blob to read from

@@ -180,34 +180,6 @@ public final class Syntax extends ACell {
 		return true;
 	}
 
-	/**
-	 * Decodes a Syntax object from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Syntax read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // read position after tag
-		Ref<ACell> datum = Format.readRef(b,epos);
-		
-		epos+=datum.getEncodingLength();
-		AHashMap<ACell, ACell> props = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(props);
-		
-		if (props == null) {
-			props = Maps.empty(); // we encode empty props as null for efficiency
-		} else {
-			if (props.isEmpty()) {
-				throw new BadFormatException("Empty Syntax metadata should be encoded as nil");
-			}
-		}
-		Syntax result=new Syntax(datum,props);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 
 	@Override
 	public int encode(byte[] bs, int pos) {

@@ -290,27 +290,6 @@ public final class Result extends ARecordGeneric {
 		return null;
 	}
 	
-	/**
-	 * Reads a Result from a Blob encoding. Assumes tag byte already checked.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Result read(Blob b, int pos) throws BadFormatException {
-		int epos=pos; 
-		// include tag location since we are reading raw Vector (will ignore tag)
-		AVector<ACell> v=Vectors.read(b,epos);
-		epos+=Cells.getEncodingLength(v);
-		
-		// we can't check values yet because might be missing data
-		
-		Result r=buildFromVector(v);
-		r.attachEncoding(b.slice(pos, epos));
-		return r;
-	}
-
 
 	/**
 	 * Tests is the Result represents an Error
@@ -561,9 +540,8 @@ public final class Result extends ARecordGeneric {
 		long count=Format.readVLQCount(messageData, rpos);
 		if (count<1) throw new BadFormatException("Result with no elements");
 		rpos+=Format.getVLQCountLength(count);
-		// First element is the ID — always embedded, so no store needed
-		Ref<ACell> idRef=Format.readRef(messageData, rpos);
-		return idRef.getValue();
+		// First element is the ID — always embedded, so decode directly
+		return Format.read(messageData, rpos);
 	}
 
 

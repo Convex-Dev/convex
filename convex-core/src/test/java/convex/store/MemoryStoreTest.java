@@ -164,7 +164,7 @@ public class MemoryStoreTest {
 			assertNotNull(ms.refForHash(realChildHash));
 
 			// Create a RefSoft pointing to missing data in ms
-			Ref<ACell> missingRef = RefSoft.createForHash(missingHash);
+			Ref<ACell> missingRef = RefSoft.createForHash(missingHash, ms);
 			assertTrue(missingRef.isMissing());
 
 			// storeTopRef at STORED level should not throw even with a missing ref

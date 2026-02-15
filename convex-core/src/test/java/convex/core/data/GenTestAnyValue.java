@@ -67,7 +67,7 @@ public class GenTestAnyValue {
 				byte[] badBytes=r.getHash().getBytes();
 				Utils.writeInt(badBytes, 28,12255);
 				Hash badHash=Hash.wrap(badBytes);
-				return Ref.forHash(badHash);
+				return Ref.forHash(badHash, Samples.TEST_STORE);
 			});
 			c.validateCell();
 		}
@@ -130,7 +130,7 @@ public class GenTestAnyValue {
 		if (dataRef2!=null) {
 			// Have in store
 			assertEquals(dataRef,dataRef2);
-			Ref<ACell> r2=Ref.forHash(hash);
+			Ref<ACell> r2=Ref.forHash(hash, Samples.TEST_STORE);
 			ACell o3=r2.getValue();
 			assertEquals(o,o3);
 		}

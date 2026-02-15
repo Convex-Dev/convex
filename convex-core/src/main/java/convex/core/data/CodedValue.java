@@ -106,21 +106,5 @@ public class CodedValue extends ACell {
 		return sb.check(limit);
 	}
 
-	public static CodedValue read(byte tag, Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		Ref<ACell> cref=Format.readRef(b, epos);
-		epos+=cref.getEncodingLength();
-		
-		Ref<ACell> vref=Format.readRef(b, epos);
-		epos+=vref.getEncodingLength();
-		
-		CodedValue result=new  CodedValue(tag,cref,vref);
-		if (tag==b.byteAtUnchecked(pos)) {
-			result.attachEncoding(b.slice(pos,epos));
-		}
-		return result;
-	}
-
 
 }

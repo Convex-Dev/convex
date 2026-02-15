@@ -278,27 +278,6 @@ public final class CVMBigInteger extends AInteger {
 		return CVMLong.create(v);
 	}
 	
-	public static CVMBigInteger read(Blob blob, int offset) throws BadFormatException {
-		// Read "as if" this was a Blob, although we ignore the tag
-		ABlob b=Blobs.read(blob, offset);
-
-		if (b==null) throw new BadFormatException("Bad big integer format in read from blob");
-		long bc=b.count();
-		if (bc<=LONG_BYTELENGTH) {
-			throw new BadFormatException("Non-canonical big integer length");
-		}
-		if (bc>MAX_BYTELENGTH) {
-			throw new BadFormatException("Encoding exceeds max big integer length");
-		}
-		CVMBigInteger result= create(b);
-		if (result==null) throw new BadFormatException("Illegal creation of BigInteger from blob");
-		if (result.byteLength()!=bc) throw new BadFormatException("Excess leading bytes in BigInteger representation");
-
-		// Attach the encoding, will be same length as Blob encoding
-		result.attachEncoding(blob.slice(offset,offset+b.getEncodingLength()));
-		return result;
-	}
-
 	@Override
 	public ANumeric abs() {
 		BigInteger bi=big();

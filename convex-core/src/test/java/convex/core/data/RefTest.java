@@ -84,51 +84,46 @@ public class RefTest {
 		assertTrue(vv.isEmbedded()); // true because just 2 child Refs
 		assertFalse(vv.isCompletelyEncoded()); // false because has non-embedded children
 
-		// Ref.forHash requires a current store for RefSoft creation
-		AStore saved=Stores.current();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			// Shallow persist vv
-			Ref<AVector<ACell>> vvr=vv.getRef();
-			vvr=vvr.persistShallow(Samples.TEST_STORE);
-			assertEquals(Ref.STORED, vvr.getStatus());
+		AStore store = Samples.TEST_STORE;
 
-			// non-embedded child v shouldn't yet be in store
-			assertThrows(MissingDataException.class, () -> Ref.forHash(vh).getValue());
+		// Shallow persist vv
+		Ref<AVector<ACell>> vvr=vv.getRef();
+		vvr=vvr.persistShallow(store);
+		assertEquals(Ref.STORED, vvr.getStatus());
 
-			// Shallow persist v
-			Ref<AVector<ACell>> vr=v.getRef();
-			vr = vr.persistShallow(Samples.TEST_STORE);
-			assertEquals(Ref.STORED, vr.getStatus());
+		// non-embedded child v shouldn't yet be in store
+		assertThrows(MissingDataException.class, () -> Ref.forHash(vh, store).getValue());
 
-			// should be able to get v back from store now
-			assertEquals(v, Ref.forHash(vh).getValue());
+		// Shallow persist v
+		Ref<AVector<ACell>> vr=v.getRef();
+		vr = vr.persistShallow(store);
+		assertEquals(Ref.STORED, vr.getStatus());
 
-			// Now do full persistence of vv
-			vvr=Cells.persist(vv, Samples.TEST_STORE).getRef();
-			assertEquals(Ref.PERSISTED, vvr.getStatus());
+		// should be able to get v back from store now
+		assertEquals(v, Ref.forHash(vh, store).getValue());
 
-			// Persistence should extend to child v
-			vr=Ref.forHash(vh);
-			assertEquals(v,vr.getValue());
-			assertEquals(Ref.PERSISTED, vr.getStatus());
+		// Now do full persistence of vv
+		vvr=Cells.persist(vv, store).getRef();
+		assertEquals(Ref.PERSISTED, vvr.getStatus());
 
-			// Now try announcing vv
-			vv=Cells.announce(vv,null,Samples.TEST_STORE);
-			vvr=vv.getRef();
-			assertEquals(Ref.ANNOUNCED, vvr.getStatus());
-			assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
+		// Persistence should extend to child v
+		vr=Ref.forHash(vh, store);
+		assertEquals(v,vr.getValue());
+		assertEquals(Ref.PERSISTED, vr.getStatus());
 
-			// Announce should extend to child v
-			vr=Ref.forHash(vh);
-			assertEquals(v,vr.getValue());
-			assertEquals(Ref.ANNOUNCED, vr.getStatus());
+		// Now try announcing vv
+		vv=Cells.announce(vv,null,store);
+		vvr=vv.getRef();
+		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
+		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
 
-			// child blob still shouldn't be in store after everything else
-			assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		// Announce should extend to child v
+		vr=Ref.forHash(vh, store);
+		assertEquals(v,vr.getValue());
+		assertEquals(Ref.ANNOUNCED, vr.getStatus());
+
+		// child blob still shouldn't be in store after everything else
+		assertThrows(MissingDataException.class, () -> Ref.forHash(bh, store).getValue());
 	}
 	
 	@Test 
@@ -218,7 +213,7 @@ public class RefTest {
 
 		// a ref using the same hash
 		if (!(value.isEmbedded())) {
-			Ref<?> ref = Ref.forHash(orig.getHash());
+			Ref<?> ref = Ref.forHash(orig.getHash(), Samples.TEST_STORE);
 			assertEquals(orig, ref);
 			assertEquals(value, ref.getValue());
 		}
@@ -413,8 +408,9 @@ public class RefTest {
 		ref.markEmbedded(false); // needed to ensure indirect encoding is assumed
 		Blob b=ref.getEncoding();
 		assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.count());
-		Stores.setCurrent(Samples.TEST_STORE);
-		try { assertEquals(ref,Format.readRef(b, 0)); } finally { Stores.setCurrent(null); }
+		// Decode ref from encoding: tag 0x20 + 32-byte hash
+		Ref<?> decoded = Ref.forHash(h, Samples.TEST_STORE).markEmbedded(false);
+		assertEquals(ref, decoded);
 	}
 	
 	@Test 
@@ -424,6 +420,8 @@ public class RefTest {
 		assertTrue(a.isEmbedded());
 		Blob b=ref.getEncoding();
 		assertSame(a.getEncoding(),b); // ref encoding should just be the embedded value encoding
-		assertEquals(ref,Format.readRef(b, 0));
+		// Embedded value: decode from encoding and compare Ref
+		ACell decoded = Format.read(b);
+		assertEquals(ref, decoded.getRef());
 	}
 }

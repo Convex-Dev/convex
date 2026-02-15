@@ -93,28 +93,6 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 		return symbol.print(bb,limit);
 	}
 
-	/**
-	 * Reads a Lookup op from a Blob encoding
-	 * @param <T> Type of Lookup value
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Lookup<T> read(Blob b,int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag to get to data
-		
-		Ref<AOp<Address>> addr=Format.readRef(b, epos);
-		epos+=addr.getEncodingLength();
-		
-		Ref<Symbol> sym=Format.readRef(b, epos);
-		epos+=sym.getEncodingLength();
-		
-		Lookup<T> result= new Lookup<T>(addr,sym);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 
 
 	@Override

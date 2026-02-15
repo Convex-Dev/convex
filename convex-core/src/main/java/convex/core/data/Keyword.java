@@ -136,23 +136,6 @@ public final class Keyword extends ASymbolic {
 		return true;
 	}
 
-	/**
-	 * Reads a Keyword from its encoding in the given Blob
-	 * 
-	 * @param blob Data source
-	 * @return The Keyword read
-	 * @throws BadFormatException If a Keyword could not be read correctly
-	 */
-	public static Keyword read(Blob blob, int offset) throws BadFormatException {
-		int len=0xff&blob.byteAt(offset+1); // skip tag to read length
-		if (len>MAX_CHARS) throw new BadFormatException("Keyword too long");
-		AString name=Format.readUTF8String(blob,offset+2,len);
-		Keyword kw = Keyword.create(name);
-		if (kw == null) throw new BadFormatException("Can't read keyword");
-		kw.attachEncoding(blob.slice(offset, offset+2+len));
-		return kw;
-	}
-	
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.KEYWORD;

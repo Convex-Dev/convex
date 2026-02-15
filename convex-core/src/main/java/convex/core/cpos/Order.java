@@ -114,24 +114,6 @@ public class Order extends ARecordGeneric {
 	}
 
 	/**
-	 * Decode an Order from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Order read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values = Vectors.read(b, pos);
-		if (values.count()!=NUM_FIELDS) throw new BadFormatException("Wrong number of Order fields");
-		long epos=pos+values.getEncodingLength();
-		
-		Order result=new Order(values);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
-	/**
 	 * Checks if another Order is consistent with this Order.
 	 * 
 	 * Order is defined as consistent iff: 

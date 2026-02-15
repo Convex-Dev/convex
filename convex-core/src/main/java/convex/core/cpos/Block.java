@@ -151,21 +151,6 @@ public final class Block extends ARecordGeneric {
 	}
 	
 	/**
-	 * Read a Block from a Blob encoding
-	 * @throws BadFormatException In event of encoding error
-	 */
-	public static Block read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=BLOCK_KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Block result=new Block(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
-	/**
 	 * Get the vector of transactions in this Block
 	 * @return Vector of transactions
 	 */

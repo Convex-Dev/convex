@@ -146,32 +146,6 @@ public class Vectors {
 	}
 
 	/**
-	 * Reads a Vector for the specified Blob. 
-	 * 
-	 * Assumes Tag byte already checked, attaches encoding iff tag is Tag.VECTOR.
-	 * 
-	 * Distinguishes between child types according to count.
-	 * 
-	 * @param <T> Type of elements
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQCount(b,pos+1);
-		if (count < 0) throw new BadFormatException("Negative length");
-
-		AVector<T> result;
-		if (VectorLeaf.isValidCount(count)) {
-			result= VectorLeaf.read(count,b,pos);
-		} else {
-			result= VectorTree.read(count,b,pos);
-		}
-		return result;
-	}
-
-	/**
 	 * Create a Vector which represents a range of integers from start to end
 	 * @param start Start index (inclusive)
 	 * @param end End index (exclusive)

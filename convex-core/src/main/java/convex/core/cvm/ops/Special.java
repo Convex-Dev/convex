@@ -215,15 +215,5 @@ public class Special<T extends ACell> extends AOp<T> {
 	}
 
 
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
-
-		byte scode=b.byteAt(epos);
-		Special<T> special=(Special<T>) Special.create(scode);
-		if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString(scode));
-		return special;
-	}
-
 
 }

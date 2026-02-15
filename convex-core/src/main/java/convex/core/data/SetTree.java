@@ -422,41 +422,6 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
-	/**
-	 * Reads a SetTree from the provided Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @param count Number of elements	 
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <V extends ACell> SetTree<V> read(Blob b, int pos, long count) throws BadFormatException {
-		int headerLen=1+Format.getVLQCountLength(count);
-		int epos=pos+headerLen;
-		
-		int shift=b.byteAt(epos++);
-		short mask=b.shortAt(epos);
-		epos+=2;
-		
-		int ilength = Integer.bitCount(mask & 0xFFFF);
-		
-		@SuppressWarnings("unchecked")
-		Ref<AHashSet<V>>[] blocks = (Ref<AHashSet<V>>[]) new Ref<?>[ilength];
-		for (int i = 0; i < ilength; i++) {
-			// need to read as a Ref
-			Ref<AHashSet<V>> ref = Format.readRef(b,epos);
-			epos+=ref.getEncodingLength();
-			blocks[i] = ref;
-		}
-		
-		SetTree<V> result = new SetTree<V>(blocks, shift, mask, count);
-		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
-		Blob enc=b.slice(pos,epos);
-		result.attachEncoding(enc);
-		return result;
-	}
-
 	@Override public final boolean isCVMValue() {
 		return true;
 	}

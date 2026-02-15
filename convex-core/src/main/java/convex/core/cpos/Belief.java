@@ -151,17 +151,6 @@ public class Belief extends ARecordGeneric {
 		return Belief.create(newOrders);
 	}
 	
-	public static Belief read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=1) throw new BadFormatException("Wrong number of values for Belief");
-
-		Belief result=new Belief(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-	
 	/**
 	 * Gets the current Order for a given Address within this Belief.
 	 * 

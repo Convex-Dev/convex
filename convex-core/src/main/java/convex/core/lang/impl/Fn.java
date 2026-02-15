@@ -123,33 +123,6 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	}
 
 
-	/**
-	 * Decodes a function instance from a Blob encoding.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> AClosure<T> read(Blob b, int pos) throws BadFormatException {
-		
-		AVector<ACell> data = Vectors.read(b,pos);
-		long n=data.count();
-		if (n==0) throw new BadFormatException("Empty record in Fn");
-		
-		byte type=b.byteAtUnchecked(pos+1+Format.getVLQCountLength(n)); // byte after tag can indicate normal function type
-		
-		AClosure<T> result;
-		switch (type) {
-			case CVMTag.FN_NORMAL: result= Fn.create(data); break;
-			default: result= MultiFn.create(data); break;
-		}
-		
-		int epos=pos+data.getEncodingLength();
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("(fn ");

@@ -102,16 +102,6 @@ public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
 		return 1+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T extends ACell> Constant<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
-
-		Ref<T> ref = Format.readRef(b,epos);
-		epos+=ref.getEncodingLength();
-		Constant<T> result= createFromRef(ref);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	public T getValue() {
 		return value.getValue();
 	}

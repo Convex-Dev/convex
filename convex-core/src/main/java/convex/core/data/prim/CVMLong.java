@@ -136,20 +136,6 @@ public final class CVMLong extends AInteger {
 		return pos+numBytes;
 	}
 	
-	public static CVMLong read(byte tag, Blob blob, int offset) throws BadFormatException {
-		int numBytes=tag-Tag.INTEGER;
-		if (numBytes==0) return ZERO;
-		long v=Format.readLong(blob,offset+1,numBytes);
-
-		long end=offset+1+numBytes;
-		CVMLong result= create(v);
-		if (result.encoding==null) {
-			// we likely already have a valid encoding if cached!
-			result.attachEncoding(blob.slice(offset,end));
-		}
-		return result;
-	}
-
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.appendLongString(value);

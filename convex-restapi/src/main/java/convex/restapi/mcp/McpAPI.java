@@ -489,11 +489,10 @@ public class McpAPI extends ABaseAPI {
 		));
 	}
 
-	private ATransaction decodeTransaction(Blob hashBlob) throws BadFormatException, MissingDataException {
-		Ref<?> ref = Format.readRef(hashBlob, 0);
-		ACell value = ref.getValue();
+	private ATransaction decodeTransaction(Blob encodedBlob) throws BadFormatException, MissingDataException {
+		ACell value = server.getStore().decodeRef(encodedBlob).getValue();
 		if (!(value instanceof ATransaction transaction)) {
-			throw new BadFormatException("Value with hash " + hashBlob.toHexString() + " is not a transaction");
+			throw new BadFormatException("Value with data " + encodedBlob.toHexString() + " is not a transaction");
 		}
 		return transaction;
 	}

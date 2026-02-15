@@ -230,48 +230,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 	}
 
-	/**
-	 * Reads a {@link VectorLeaf} from the provided Blob 
-	 * 
-	 * Assumes the header byte and count is already read.
-	 * 
-	 * @param b Blob to read from
-	 * @param count Number of elements, assumed to be valid
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> read(long count, Blob b, int pos) throws BadFormatException {
-		if (count == 0) return (VectorLeaf<T>)EMPTY;
-
-		int n = ((int) count) & 0xF;
-		if (n == 0) {
-			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
-			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
-		}
-
-		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
-		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
-		for (int i = 0; i < n; i++) {
-			Ref<T> ref = Format.readRef(b,rpos);
-			items[i] = ref;
-			rpos+=ref.getEncodingLength();
-		}
-
-		Ref<AVector<T>> pfx = null;
-		boolean prefixPresent = count > MAX_SIZE;
-		if (prefixPresent) {
-			pfx=Format.readRef(b,rpos);
-			rpos+=pfx.getEncodingLength();
-		}
-
-		VectorLeaf<T> result=new VectorLeaf<T>(items, pfx, count);
-		// Attach encoding only if "real"
-		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
-		return result;
-	}
-
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;

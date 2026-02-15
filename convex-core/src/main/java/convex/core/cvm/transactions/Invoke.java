@@ -80,25 +80,6 @@ public class Invoke extends ATransaction {
 		return command;
 	}
 
-	/**
-	 * Read a Transfer transaction from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Invoke read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=FORMAT_COUNT) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Invoke result=new Invoke(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 	@Override
 	public Context apply(final Context context) {
 		Context ctx=context;

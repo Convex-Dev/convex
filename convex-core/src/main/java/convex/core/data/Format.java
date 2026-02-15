@@ -422,31 +422,6 @@ public class Format {
 	}
 	
 	/**
-	 * Reads a Ref or embedded Cell value from a Blob
-	 * 
-	 * Converts Embedded Cells to Direct Refs automatically.
-	 * 
-	 * @param <T> Type of referenced value
-	 * @param b Blob containing a ref to read
-	 * @param pos Position to read Ref from (should point to tag)
-	 * @return Ref as read from Blob at the specified position
-	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
-	 *                            value is found where it should be a Ref.
-	 */
-	public static <T extends ACell> Ref<T> readRef(Blob b,int pos) throws BadFormatException {
-		byte tag=b.byteAt(pos);
-		if (tag==Tag.REF) return Ref.readRaw(b,pos+1);
-		
-		if (tag==Tag.NULL) return Ref.nil();
-		
-		// We now expect a non-null embedded cell
-		T cell= Format.read(tag,b,pos);
-		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref: type = " +RT.getType(cell));
-		return cell.getRef();
-	}
-	
-
-	/**
 	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
 	 * throws an exception if the Blob contents are not fully consumed
 	 * 
@@ -458,20 +433,21 @@ public class Format {
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		long n=blob.count();
 		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		byte tag = blob.byteAtUnchecked(0);
-		T result= (T) CVMEncoder.INSTANCE.read(tag, blob, 0);
+		AEncoder.DecodeState ds = new AEncoder.DecodeState(blob);
+		T result= (T) CVMEncoder.INSTANCE.read(ds);
 		if (result==null) {
 			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);
 		} else {
-			if (result.getEncoding().count()!=n) throw new BadFormatException("Excess bytes in read from Blob");
+			long consumed = ds.pos - blob.getInternalOffset();
+			if (consumed!=n) throw new BadFormatException("Excess bytes in read from Blob");
+			result.attachEncoding(blob);
 		}
 		return result;
 	}
-	
+
 	/**
-	 * Decodes a single Value from a Blob, starting at a given offset Assumes the presence of a tag.
-	 * throws an exception if the Blob contents are not fully consumed
-	 * 
+	 * Decodes a single Value from a Blob, starting at a given offset. Assumes the presence of a tag.
+	 *
 	 * @param blob Blob representing the Encoding of the Value
 	 * @param offset Offset of tag byte in blob
 	 * @return Value read from the blob of encoded data
@@ -479,10 +455,16 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T read(Blob blob, int offset) throws BadFormatException {
-		byte tag = blob.byteAt(offset);
-		return (T) CVMEncoder.INSTANCE.read(tag, blob, offset);
+		AEncoder.DecodeState ds = new AEncoder.DecodeState(blob);
+		ds.pos += offset;
+		int startPos = ds.pos;
+		T result = (T) CVMEncoder.INSTANCE.read(ds);
+		if (result != null) {
+			result.attachEncoding(Blob.wrap(ds.data, startPos, ds.pos - startPos));
+		}
+		return result;
 	}
-	
+
 	/**
 	 * Helper method to read a CVM value encoded as a hex string
 	 * @param <T> Type of value to read
@@ -494,20 +476,6 @@ public class Format {
 		Blob enc=Blob.fromHex(hexString);
 		if (enc==null) throw new BadFormatException("Invalid hex string");
 		return read(Blob.fromHex(hexString));
-	}
-	
-	/**
-	 * Read from a Blob with the specified tag. Delegates to CVMEncoder for dispatch.
-	 * @param <T> Type of value to read
-	 * @param tag Tag to use for reading
-	 * @param blob Blob to read from
-	 * @param offset Offset of tag byte in blob
-	 * @return Value decoded
-	 * @throws BadFormatException If encoding is invalid for the given tag
-	 */
-	@SuppressWarnings("unchecked")
-	static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
-		return (T) CVMEncoder.INSTANCE.read(tag, blob, offset);
 	}
 
 

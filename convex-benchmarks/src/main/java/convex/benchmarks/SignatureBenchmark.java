@@ -60,7 +60,7 @@ public class SignatureBenchmark {
 	@SuppressWarnings("unchecked")
 	@Benchmark
 	public void verifyFromStore() {
-		SignedData<ABlob> signed=(SignedData<ABlob>) Ref.forHash(SIGNED.getHash()).getValue();
+		SignedData<ABlob> signed=(SignedData<ABlob>) Ref.forHash(SIGNED.getHash(), Stores.current()).getValue();
 		signed.checkSignature();
 	}
 

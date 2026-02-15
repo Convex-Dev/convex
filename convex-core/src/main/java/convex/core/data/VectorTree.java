@@ -200,38 +200,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 	
 
-	/**
-	 * Reads a VectorTree from the provided Blob 
-	 * 
-	 * Assumes the header byte and count is already checked.
-	 * 
-	 * @param count Number of elements, assumed to be valid
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
-		int n = computeArraySize(count);
-
-		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
-
-		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
-		for (int i = 0; i < n; i++) {
-			Ref<AVector<T>> ref = Format.readRef(b,rpos);
-			// if (ref==Ref.NULL_VALUE) throw new BadFormatException("Null VectorTree child");
-			items[i] = ref;
-			rpos+=ref.getEncodingLength();
-		}
-
-		VectorTree<T> result= new VectorTree<T>(items, count);
-		// Attach encoding only if "real"
-		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
-		return result;
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public VectorTree<T> appendChunk(AVector<T> b) {

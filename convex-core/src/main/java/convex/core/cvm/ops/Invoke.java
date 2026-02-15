@@ -144,22 +144,4 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		return bb.check(limit);
 	}
 
-	/**
-	 * Read an Invoke Op from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static<T extends ACell> Invoke<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos;
-		AVector<AOp<ACell>> ops = Vectors.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
-		
-		Invoke<T> result=create(ops);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 }

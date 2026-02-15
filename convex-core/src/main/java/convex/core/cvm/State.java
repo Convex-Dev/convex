@@ -136,24 +136,6 @@ public class State extends ARecordGeneric {
 	}
 
 	/**
-	 * Reads a State from an encoding. Assumes tag byte already read.
-	 *
-	 * @param b Blob to read from
-	 * @param pos start position in Blob 
-	 * @return Decoded State
-	 * @throws BadFormatException If a State could not be read
-	 */
-	public static State read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-		
-		State result=create(values);
-		if (result==null) throw new BadFormatException("Bad format for CVM global state");
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
-	/**
 	 * Get all Accounts in this State
 	 * @return Vector of Accounts
 	 */

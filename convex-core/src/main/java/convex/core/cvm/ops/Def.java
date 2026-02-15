@@ -117,27 +117,6 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 		return 100;
 	}
 
-	/**
-	 * Decodes a Def op from a Blob encoding
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Def<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag and opcode to get to data
-
-		Ref<ACell> symbol = Format.readRef(b,epos);
-		epos+=symbol.getEncodingLength();
-		
-		Ref<AOp<T>> ref = Format.readRef(b,epos);
-		epos+=ref.getEncodingLength();
-		
-		Def<T> result= new Def<T>(symbol, ref);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 
 	@Override
 	public void validateCell() throws InvalidDataException {

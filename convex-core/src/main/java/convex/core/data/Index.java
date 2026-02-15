@@ -567,68 +567,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
 	}
 	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQCount(b,pos+1);
-		if (count < 0) throw new BadFormatException("Negative count!");
-		if (count == 0) return (Index<K, V>) EMPTY;
-		
-		// index for reading
-		int epos=pos+1+Format.getVLQCountLength(count);
-		
-		MapEntry<K,V> me;
-		boolean hasEntry;
-		if (count==1) {
-			hasEntry=true;
-		} else {
-			byte c=b.byteAt(epos++); // Read byte
-			switch (c) {
-			case Tag.NULL: hasEntry=false; break;
-			case Tag.VECTOR: hasEntry=true; break;
-			default: throw new BadFormatException("Invalid MapEntry tag in Index: "+c);
-			}
-		}
-		if (hasEntry) {
-			Ref<K> kr=Format.readRef(b,epos);
-			epos+=kr.getEncodingLength();
-			Ref<V> vr=Format.readRef(b,epos);
-			epos+=vr.getEncodingLength();
-			me=MapEntry.fromRefs(kr, vr);
-			
-			if (count == 1) {
-				// single entry map, doesn't need separate depth encoding
-				long depth=kr.isEmbedded()?kr.getValue().hexLength():MAX_DEPTH;
-				Index<K,V> result = new Index<K, V>(depth, me, EMPTY_CHILDREN, (short) 0, 1L);
-				result.attachEncoding(b.slice(pos, epos));
-				return result;
-			} 
-		} else {
-			me=null;
-		}
-
-		Index<K,V> result;
-		int depth = 0xFF & b.byteAt(epos);
-		if (depth >=MAX_DEPTH) {
-			if (depth==MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
-			throw new BadFormatException("Excessive depth!");
-		}
-		epos+=1;
-
-		// Need to include children
-		short mask = b.shortAt(epos);
-		epos+=2;
-		int n = Utils.bitCount(mask);
-		Ref<Index>[] children = new Ref[n];
-		for (int i = 0; i < n; i++) {
-			Ref<Index> cr=Format.readRef(b,epos);
-			epos+=cr.getEncodingLength();
-			children[i] =cr; 
-		}
-		result= new Index<K, V>(depth, me, children, mask, count);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
 		throw new UnsupportedOperationException();

@@ -216,24 +216,6 @@ public class PeerStatus extends ARecordGeneric {
 		return metadata;
 	}
 
-	/**
-	 * Decodes a PeerStatus from a Blob.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static PeerStatus read(Blob b, int pos) throws BadFormatException{
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-		
-		PeerStatus result=new PeerStatus(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-
-	}
-
 	@Override
 	public boolean isCanonical() {
 		return true;

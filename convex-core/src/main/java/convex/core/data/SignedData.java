@@ -221,37 +221,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	}
 
 	/**
-	 * Reads a SignedData instance from the given Blob encoding
-	 *
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> SignedData<T>  read(Blob b, int pos, boolean includeKey) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		AccountKey pubKey;
-		if (includeKey) {
-			pubKey=AccountKey.readRaw(b,epos);
-			epos+=AccountKey.LENGTH;
-		} else {
-			pubKey=null;
-		}
-		
-		ASignature sig = Ed25519Signature.readRaw(b,epos);
-		epos+=Ed25519Signature.SIGNATURE_LENGTH;
-		
-		Ref<T> value=Format.readRef(b, epos);
-		epos+=value.getEncodingLength();
-		
-		SignedData<T> result=create(pubKey, sig, value);
-		Blob enc=b.slice(pos, epos);
-		result.attachEncoding(enc);
-		return result;
-	}
-
-	/**
 	 * Validates the signature in this SignedData instance. Caches result
 	 *
 	 * @return true if valid, false otherwise. No key considered invalid.

@@ -104,26 +104,6 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		// nothing to do?
 	}
 
-	/**
-	 * Decodes a MultiFn instance from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> MultiFn<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		AVector<AClosure<T>> fns=Format.read(b,epos);
-		if (fns==null) throw new BadFormatException("Null fns!");
-		epos+=Cells.getEncodingLength(fns);
-		
-		MultiFn<T> result= new MultiFn<T>(fns);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public <F extends AClosure<T>> F withEnvironment(AVector<ACell> env) {

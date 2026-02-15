@@ -988,8 +988,7 @@ public class ChainAPI extends ABaseAPI {
 
 		ATransaction trans = null;
 		try {
-			Ref<?> ref = Format.readRef(h, 0);
-			ACell maybeTrans = ref.getValue();
+			ACell maybeTrans = server.getStore().decodeRef(h).getValue();
 			if (!(maybeTrans instanceof ATransaction))
 				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
 			trans = (ATransaction) maybeTrans;

@@ -55,21 +55,15 @@ public class StoresTest {
 
 	@Test public void testInitState() throws InvalidDataException, IOException {
 		AStore temp=Stores.current();
-		try {
-			Stores.setCurrent(testStore);
+		// Use fresh State
+		State s=InitTest.createState();
+		Ref<State> sr=Cells.persist(s, testStore).getRef();
 
-			// Use fresh State
-			State s=InitTest.createState();
-			Ref<State> sr=Cells.persist(s, testStore).getRef();
+		Hash hash=sr.getHash();
 
-			Hash hash=sr.getHash();
-
-			Ref<State> sr2=Ref.forHash(hash);
-			State s2=sr2.getValue();
-			s2.validate();
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		Ref<State> sr2=Ref.forHash(hash, testStore);
+		State s2=sr2.getValue();
+		s2.validate();
 	}
 	
 	@Test public void testCrossStores() throws InvalidDataException, IOException {
@@ -314,16 +308,10 @@ public class StoresTest {
 	@Test
 	public void testNullStoreRefMissing() {
 		// RefSoft created with NullStore should throw MissingDataException on getValue
-		AStore saved = Stores.current();
-		Stores.setCurrent(NullStore.INSTANCE);
-		try {
-			Hash h = Samples.NON_EMBEDDED_STRING.getHash();
-			Ref<ACell> ref = Ref.forHash(h);
-			assertNotNull(ref);
-			assertThrows(MissingDataException.class, () -> ref.getValue());
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		Hash h = Samples.NON_EMBEDDED_STRING.getHash();
+		Ref<ACell> ref = Ref.forHash(h, NullStore.INSTANCE);
+		assertNotNull(ref);
+		assertThrows(MissingDataException.class, () -> ref.getValue());
 	}
 
 	/**

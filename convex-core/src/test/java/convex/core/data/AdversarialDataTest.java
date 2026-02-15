@@ -154,7 +154,7 @@ public class AdversarialDataTest {
 			byte[] bs=new byte[256];
 			bs[0]=Tag.KEYWORD;
 			bs[1]=(byte)160;
-			assertThrows(BadFormatException.class,()->Keyword.read(Blob.wrap(bs),0));
+			assertThrows(BadFormatException.class,()->Format.read(Blob.wrap(bs)));
 		}
 	}
 	

@@ -5,7 +5,7 @@ import convex.core.exceptions.BadFormatException;
 /**
  * Abstract base class for encoders, which convert data to / from Blob instances.
  *
- * Subclasses implement tag-based dispatch in {@link #read(byte, Blob, int)}.
+ * Subclasses implement tag-based dispatch in {@link #read(DecodeState)}.
  */
 public abstract class AEncoder<T> {
 
@@ -71,32 +71,21 @@ public abstract class AEncoder<T> {
 	 */
 	public T decode(Blob encoding) throws BadFormatException {
 		if (encoding.count()<1) throw new BadFormatException("Empty encoding");
-		return read(encoding,0);
+		return read(new DecodeState(encoding));
 	}
 
 	/**
-	 * Reads a value from a Blob at the given offset. Extracts the tag byte
-	 * and delegates to {@link #read(byte, Blob, int)}.
+	 * Reads a value from a Blob at the given offset using DecodeState.
 	 * @param encoding Blob to read from
 	 * @param offset Offset of tag byte
 	 * @return Decoded value
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	protected T read(Blob encoding, int offset) throws BadFormatException {
-		byte tag = encoding.byteAtUnchecked(offset);
-		return read(tag,encoding,offset);
+		DecodeState ds = new DecodeState(encoding);
+		ds.pos += offset;
+		return read(ds);
 	}
-
-	/**
-	 * Reads a value from a Blob given the tag byte. Subclasses implement
-	 * tag-based dispatch here.
-	 * @param tag Tag byte (first byte of encoding)
-	 * @param encoding Blob to read from
-	 * @param offset Offset of tag byte in blob
-	 * @return Decoded value
-	 * @throws BadFormatException If encoding is invalid for the given tag
-	 */
-	public abstract T read(byte tag, Blob encoding, int offset) throws BadFormatException;
 
 	/**
 	 * Reads a value from a DecodeState, advancing pos past the encoding.

@@ -110,23 +110,4 @@ public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> 
 		return bb.check(limit);
 	}
 
-	/**
-	 * Decodes a Do op from a Blob encoding
-	 * 
-	 * @param <T> Return type of Do
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Try<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
-
-		Ref<AVector<AOp<ACell>>> ops = Format.readRef(b,epos);
-		epos+=ops.getEncodingLength();
-		
-		Try<T> result=new Try<>(CODE,ops);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
 }

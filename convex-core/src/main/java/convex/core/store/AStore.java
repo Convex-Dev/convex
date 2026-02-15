@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
+import convex.core.data.CAD3Encoder;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -138,6 +139,20 @@ public abstract class AStore implements Closeable {
 	public abstract  <T extends ACell> T decode(Blob encoding) throws BadFormatException;
 	
 	public abstract AEncoder<ACell> getEncoder();
+
+	/**
+	 * Decodes a Ref-format encoding (as produced by {@code ref.getEncoding()}).
+	 * Handles both non-embedded refs (Tag.REF + hash → store lookup) and
+	 * embedded cells (inline encoding).
+	 *
+	 * @param <T> Type of referenced value
+	 * @param encoding Blob in ref format
+	 * @return Ref to the decoded value
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public <T extends ACell> Ref<T> decodeRef(Blob encoding) throws BadFormatException {
+		return ((CAD3Encoder)getEncoder()).decodeRef(encoding);
+	}
 
 	/**
 	 * checks in-memory cache for a stored Ref. Returns store-native Ref if found, null otherwise. Does not access underlying storage.

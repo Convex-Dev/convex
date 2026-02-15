@@ -18,6 +18,7 @@ import convex.core.cvm.State;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.AEncoder.DecodeState;
+import convex.core.data.SignedData;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
@@ -844,5 +845,108 @@ public class EncoderTest {
 		CodedValue cv = CodedValue.create(0xC5, CVMLong.ONE, Keyword.create("test"));
 		doDecodeStateRoundTrip(cv, CVM);
 		doDecodeStateRoundTrip(cv, CAD3);
+	}
+
+	// ==================== decodeRef tests ====================
+
+	/**
+	 * decodeRef handles Ref-format encodings as produced by ref.getEncoding().
+	 * This is how the prepare/submit API passes transaction hashes.
+	 */
+
+	@Test public void testDecodeRefEmbeddedTransaction() throws BadFormatException {
+		// Small transaction is embedded — ref encoding is the full cell encoding
+		Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
+		assertTrue(tx.isEmbedded(), "Small Invoke should be embedded");
+
+		Ref<Invoke> ref = tx.getRef();
+		Blob refEnc = ref.getEncoding();
+		// Embedded: ref encoding starts with the cell tag, not Tag.REF
+		assertFalse(refEnc.byteAt(0) == Tag.REF, "Embedded ref encoding should not start with Tag.REF");
+
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		Ref<ACell> decoded = enc.decodeRef(refEnc);
+		assertEquals(tx, decoded.getValue());
+	}
+
+	@Test public void testDecodeRefNonEmbedded() throws BadFormatException, java.io.IOException {
+		// Non-embedded cell — ref encoding is Tag.REF + 32-byte hash
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			// Use a non-embedded vector (INT_VECTOR_300) persisted to store
+			ACell big = Cells.persist(Samples.INT_VECTOR_300, Samples.TEST_STORE);
+			assertFalse(big.isEmbedded(), "INT_VECTOR_300 should not be embedded");
+
+			Ref<?> ref = big.getRef();
+			Blob refEnc = ref.getEncoding();
+			// Non-embedded: ref encoding is Tag.REF + 32-byte hash = 33 bytes
+			assertEquals(Tag.REF, refEnc.byteAt(0));
+			assertEquals(33, refEnc.count());
+
+			CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+			Ref<ACell> decoded = enc.decodeRef(refEnc);
+			assertEquals(big, decoded.getValue());
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeRefViaStore() throws BadFormatException {
+		// Test AStore.decodeRef convenience method
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
+			Ref<Invoke> ref = tx.getRef();
+			Blob refEnc = ref.getEncoding();
+
+			Ref<ACell> decoded = Samples.TEST_STORE.decodeRef(refEnc);
+			assertEquals(tx, decoded.getValue());
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeRefNull() throws BadFormatException {
+		// Tag.NULL (0x00) is a valid ref encoding for null
+		Blob nilEnc = Blob.wrap(new byte[] { 0x00 });
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		Ref<ACell> decoded = enc.decodeRef(nilEnc);
+		assertNull(decoded.getValue());
+	}
+
+	@Test public void testDecodeRefEmpty() {
+		// Empty blob should throw
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		assertThrows(BadFormatException.class, () -> enc.decodeRef(Blob.EMPTY));
+	}
+
+	@Test public void testDecodeRefSignedDataFormat() throws BadFormatException, java.io.IOException {
+		// SignedData.getMessageForRef(ref) returns ref.getEncoding().
+		// Verify decodeRef can round-trip what SignedData produces.
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
+			tx = Cells.persist(tx, Samples.TEST_STORE);
+			Ref<Invoke> ref = tx.getRef();
+
+			Blob messageForRef = SignedData.getMessageForRef(ref);
+			CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+			Ref<ACell> decoded = enc.decodeRef(messageForRef);
+			assertEquals(tx, decoded.getValue());
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeRefTransfer() throws BadFormatException {
+		// Transfer transaction
+		Transfer tx = Transfer.create(Address.create(1), 0, Address.create(2), 1000L);
+		Ref<Transfer> ref = tx.getRef();
+		Blob refEnc = ref.getEncoding();
+
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		Ref<ACell> decoded = enc.decodeRef(refEnc);
+		assertEquals(tx, decoded.getValue());
+		assertTrue(decoded.getValue() instanceof Transfer);
 	}
 }

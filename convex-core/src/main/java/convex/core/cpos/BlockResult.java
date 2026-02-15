@@ -138,24 +138,6 @@ public class BlockResult extends ARecordGeneric {
 		}
 	}
 
-	/**
-	 * Decodes a BlockResult from a Blob
-	 * @param b Blob to read from
-	 * @param pos start position in Blob 
-	 * @return BlockResult instance
-	 * @throws BadFormatException If encoding format has errors
-	 */
-	public static BlockResult read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=BLOCKRESULT_KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		BlockResult result=new BlockResult(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 	
 	@Override 
 	public boolean equals(ACell a) {

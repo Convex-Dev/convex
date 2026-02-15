@@ -37,8 +37,6 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
-import convex.core.data.CodedValue;
-import convex.core.data.DenseRecord;
 import convex.core.data.ExtensionValue;
 import convex.core.data.Format;
 import convex.core.data.List;
@@ -170,7 +168,7 @@ public class OpsTest extends ACVMTest {
 		Blob enc=op.getEncoding();
 		
 		assertEquals(CVMTag.OP_DO,op.getTag());
-		assertEquals(op,DenseRecord.read(CVMTag.OP_DO, enc,0));
+		assertEquals(op,Format.read(enc));
 
 		ObjectsTest.doCAD3Tests(op);
 		
@@ -201,9 +199,9 @@ public class OpsTest extends ACVMTest {
 		assertFalse(c2.getEnvironment().containsKey(Symbols.FOO));
 		
 		Blob enc=op.getEncoding();
-		CodedValue cv=CodedValue.read(op.getTag(), enc, 0);
-		assertEquals(op,cv);
-		assertEquals(op.getRefCount(),cv.getRefCount());
+		ACell decoded=Format.read(enc);
+		assertEquals(op,decoded);
+		assertEquals(op.getRefCount(),decoded.getRefCount());
 		
 		doOpTest(op);
 	}

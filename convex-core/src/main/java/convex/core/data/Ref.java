@@ -326,16 +326,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * available data in the store, in which case calls to getValue() may result in
 	 * a MissingDataException
 	 * 
-	 * WARNING: Does not mark as either embedded or non-embedded, as this might be a top level 
-	 * entry in the store. isEmbedded() will query the store to determine status.
-	 * 
-	 * @param hash The hash value for this Ref to refer to
-	 * @return Ref for the specific hash.
-	 */
-	public static <T extends ACell> Ref<T> forHash(Hash hash) {
-		return RefSoft.createForHash(hash);
-	}
-
 	/**
 	 * Gets a Ref for a given Hash, targeting a specific store.
 	 *
@@ -363,24 +353,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		return this;
 	}
 	
-	/**
-	 * Reads a ref from the given Blob position. Assumes no tag.
-	 * 
-	 * Marks as non-embedded, since only non-embedded cells should be encoded this way
-	 * 
-	 * @param b Blob containing the data to read at the current position
-	 * @param pos position in Blob to read
-	 * @return Ref read from ByteBuffer
-	 * @throws BadFormatException If there are insufficient bytes to read a full Ref
-	 */
-	public static <T extends ACell> Ref<T> readRaw(Blob b, int pos) throws BadFormatException {
-		Hash h = Hash.wrap(b,pos);
-		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref at position: "+pos);
-		Ref<T> ref=Ref.forHash(h);
-		ref=ref.markEmbedded(false);
-		return ref;
-	}
-
 	public void validate() throws InvalidDataException {
 		if (hash != null) hash.validate();
 		// TODO should be using a stack for validation

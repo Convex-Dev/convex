@@ -117,32 +117,6 @@ public class Blobs {
 	}
 
 	/**
-	 * Reads a canonical Blob from a Blob source
-	 * @param <T> Type of Blob result
-	 * @param source Source blob, containing tag
-	 * @param pos position to read from source, assumed to be tag
-	 * @return Canonical Blob
-	 * @throws BadFormatException if the Blob encoding format is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ABlob> T read(Blob source, int pos) throws BadFormatException {
-		int sLen = source.size()-pos;
-		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
-		// read length at position 1 (skipping tag)
-		long count = Format.readVLQCount(source.store, source.offset + pos+ 1); // skip pos and tag
-
-		T result = null;
-		if (count < 0L) throw new BadFormatException("Negative blob length?");
-		if (count > Blob.CHUNK_LENGTH) {
-			result = (T) BlobTree.read(count,source, pos);
-		} else {
-			result = (T) Blob.read(source,pos, count);
-		}
-		// encoding should be attached from Blob reads
-		return result;
-	}
-
-	/**
 	 * Create a Blob entirely filled with a given value. Optimised to re-use child chunks for very large blobs
 	 * 
 	 * @param value Byte value to fill with (low 8 bits used)

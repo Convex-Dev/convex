@@ -56,17 +56,6 @@ public class Transfer extends ATransaction {
 		return new Transfer(origin,sequence, target, amount);
 	}
 
-	public static ATransaction read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Transfer result=new Transfer(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 	@Override
 	public Context apply(Context ctx) {
 		// consume juice, ensure we have enough to make transfer!

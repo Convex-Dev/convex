@@ -205,39 +205,6 @@ public class Blob extends AArrayBlob {
 		return Blob.wrap(bs);
 	}
 
-	/**
-	 * Fast read of a Blob from its encoding inside another Blob object. Assumes
-	 * count is correct at start of encoding (pos+1)
-	 * 
-	 * @param source Source Blob object.
-	 * @param pos    Position in source to start reading from (location of tag byte)
-	 * @param count  Length in bytes to take from the source Blob
-	 * @return Blob read from the source
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static Blob read(Blob source, int pos, long count) throws BadFormatException {
-		if (count == 0)
-			return EMPTY; // important! Don't want to allocate new empty Blobs or mess with EMPTY encoding
-		if (count > CHUNK_LENGTH)
-			throw new BadFormatException("Trying to read flat blob with count = " + count);
-
-		// compute data length, excluding tag and encoded length
-		int headerLength = (1 + Format.getVLQCountLength(count));
-		long start = pos + headerLength;
-		if (start + count > source.count()) {
-			throw new BadFormatException("Insufficient bytes to read Blob required count =" + count);
-		}
-
-		Blob result = source.slice(start, start + count);
-		if (result == null)
-			throw new IllegalArgumentException("Failed to slice Blob source");
-		if (source.byteAtUnchecked(pos) == Tag.BLOB) {
-			// Only attach encoding if we were reading a genuine Blob
-			result.attachEncoding(source.slice(pos, pos + (headerLength + count)));
-		}
-		return result;
-	}
-
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		if (count > CHUNK_LENGTH) {

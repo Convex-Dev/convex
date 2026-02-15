@@ -331,37 +331,6 @@ public class BlobTree extends ABlob {
 	 */
 	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLQ_COUNT_LENGTH+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
-	/**
-	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
-	 * @param count Length to read
-	 * @param src Source data, assumed to include tag and count at start
-	 * @param pos Position to read from, assumed to be tag byte
-	 * @return BlobTree instance.
-	 * @throws BadFormatException If BlobTree encoding is invalid
-	 */
-	public static BlobTree read(long count, Blob src, int pos) throws BadFormatException {
-		int headerLength = (1 + Format.getVLQCountLength(count));
-		long chunks = calcChunks(count);
-		int shift = calcShift(chunks);
-		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
-
-		@SuppressWarnings("unchecked")
-		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
-		
-		int rpos=pos+headerLength; // ref position
-		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Format.readRef(src,rpos);
-			if (ref==Ref.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
-			children[i] = ref;
-			rpos+=ref.getEncodingLength();
-		}
-
-		BlobTree result= new BlobTree(children, shift, count);
-		Blob enc=src.slice(pos, rpos);
-		result.attachEncoding(enc);
-		return result;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		return 1 + Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
