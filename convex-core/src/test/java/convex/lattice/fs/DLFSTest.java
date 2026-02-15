@@ -717,14 +717,8 @@ public class DLFSTest {
 	}
 
 	/**
-	 * Test that demonstrates the timestamp bug in DLFSLocal.merge().
-	 *
-	 * CURRENT BEHAVIOR: This test FAILS because DLFSLocal.merge() incorrectly uses
-	 * getTimestamp() (drive timestamp for new operations) instead of timestamps
-	 * from the nodes being merged.
-	 *
-	 * CORRECT BEHAVIOR: Merge should use timestamps FROM the existing nodes,
-	 * not the drive's "current time" for new operations.
+	 * Test that merge uses timestamps from the nodes being merged,
+	 * not the drive's current timestamp for new operations.
 	 */
 	@Test
 	public void testMergeShouldUseNodeTimestampsNotDriveTimestamp() throws IOException {
@@ -753,22 +747,9 @@ public class DLFSTest {
 		AVector<ACell> rootAfterMerge = driveA.getNode(driveA.getRoot());
 		CVMLong timeAfterMerge = DLFSNode.getUTime(rootAfterMerge);
 
-		// EXPECTED: Root should still be at 2000 (max of node timestamps)
-		// ACTUAL: Root will be at 1000 (incorrectly using drive timestamp)
-		//
-		// This test currently FAILS due to the bug in DLFSLocal.merge()
-		// Uncomment when bug is fixed:
-		//
-		// assertEquals(2000L, timeAfterMerge.longValue(),
-		//     "Merge should use node timestamps (2000), not drive timestamp (1000)");
-
-		// For now, document the buggy behavior:
-		System.out.println("WARNING: Merge incorrectly uses drive timestamp");
-		System.out.println("  Expected root time: 2000 (from nodes)");
-		System.out.println("  Actual root time: " + timeAfterMerge.longValue() + " (from drive.getTimestamp())");
-
-		// The bug: merge uses driveA.getTimestamp() which is 1000
-		// Correct behavior: merge should use max(2000, 2000) = 2000 from the nodes
+		// Root should still be at 2000 (max of node timestamps), not drive timestamp (1000)
+		assertEquals(2000L, timeAfterMerge.longValue(),
+		    "Merge should use node timestamps (2000), not drive timestamp (1000)");
 	}
 
 }
