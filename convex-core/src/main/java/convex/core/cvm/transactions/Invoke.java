@@ -46,6 +46,15 @@ public class Invoke extends ATransaction {
 		super(CVMTag.INVOKE,FORMAT,values);
 	}
 
+	/**
+	 * Creates an Invoke transaction from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Invoke instance
+	 */
+	public static Invoke create(AVector<ACell> values) {
+		return new Invoke(values);
+	}
+
 	public static Invoke create(Address origin,long sequence, ACell command) {
 		if (sequence<0) throw new IllegalArgumentException("Illegal sequence number: "+sequence);
 		return new Invoke(origin,sequence, command);

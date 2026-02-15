@@ -61,6 +61,15 @@ public class Belief extends ARecordGeneric {
 		super(CVMTag.BELIEF,BELIEF_FORMAT,newValues);
 	}
 
+	/**
+	 * Creates a Belief from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Belief instance
+	 */
+	public static Belief create(AVector<ACell> values) {
+		return new Belief(values);
+	}
+
 	@Override
 	public ACell get(Keyword k) {
 		if (Keywords.ORDERS.equals(k)) return getOrders();

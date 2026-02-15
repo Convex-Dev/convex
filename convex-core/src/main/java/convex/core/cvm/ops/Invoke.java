@@ -32,6 +32,17 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		super(CVMTag.OP_INVOKE,ops);
 	}
 
+	/**
+	 * Creates an Invoke op from decoded vector data.
+	 * @param <T> Result type
+	 * @param data Decoded record fields
+	 * @return Invoke instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Invoke<T> fromData(AVector<ACell> data) {
+		return new Invoke<>((AVector<AOp<ACell>>)(AVector<?>)data);
+	}
+
 	public static <T extends ACell> Invoke<T> create(ASequence<AOp<ACell>> ops) {
 		AVector<AOp<ACell>> vops = ops.toVector();
 		return new Invoke<T>(vops);

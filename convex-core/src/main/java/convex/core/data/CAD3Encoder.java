@@ -67,6 +67,10 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Uses the encoder's bound store if available, otherwise falls back to
 	 * the thread-local store. Ensures the thread-local is set correctly for
 	 * RefSoft creation during the decode.
+	 *
+	 * When switching to DecodeState path: attach encoding on result via
+	 * result.attachEncoding(encoding), since the input Blob is the complete
+	 * single-cell encoding.
 	 */
 	@Override
 	public ACell decode(Blob encoding) throws BadFormatException {
@@ -252,15 +256,29 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 	/**
 	 * Reads a VLQ-encoded count from the decode state, advancing pos.
+	 * Inlined for performance: decodes VLQ bytes and advances pos in a
+	 * single pass (no separate length recomputation).
 	 *
 	 * @param ds Decode state to read from
 	 * @return Decoded count value
 	 * @throws BadFormatException If VLQ encoding is invalid
 	 */
 	public long readVLQCount(DecodeState ds) throws BadFormatException {
-		long count = Format.readVLQCount(ds.data, ds.pos);
-		ds.pos += Format.getVLQCountLength(count);
-		return count;
+		byte[] data = ds.data;
+		int pos = ds.pos;
+		byte octet = data[pos++];
+		if ((octet & 0xff) == 0x80) throw new BadFormatException("Superfluous leading zero on VLQ count");
+		long result = octet & 0x7f;
+		int bits = 7;
+		while ((octet & 0x80) != 0) {
+			if (bits > 64) throw new BadFormatException("VLQ encoding too long for long value");
+			octet = data[pos++];
+			result = (result << 7) | (octet & 0x7F);
+			bits += 7;
+		}
+		if (bits > 63) throw new BadFormatException("VLQ Count overflow");
+		ds.pos = pos;
+		return result;
 	}
 
 	/**
@@ -351,7 +369,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	}
 
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> AVector<T> readVector(DecodeState ds) throws BadFormatException {
+	protected <T extends ACell> AVector<T> readVector(DecodeState ds) throws BadFormatException {
 		long count = readVLQCount(ds);
 		if (count < 0) throw new BadFormatException("Negative length");
 
@@ -570,12 +588,12 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
 			ds.pos += 2;
 			int ilength = Integer.bitCount(mask & 0xFFFF);
-			@SuppressWarnings("rawtypes")
-			Ref<AHashSet<V>>[] blocks = (Ref<AHashSet<V>>[]) new Ref[ilength];
+			
+			Ref<AHashSet<V>>[] childRefs = (Ref<AHashSet<V>>[]) new Ref[ilength];
 			for (int i = 0; i < ilength; i++) {
-				blocks[i] = readRef(ds);
+				childRefs[i] = readRef(ds);
 			}
-			SetTree<V> result = new SetTree<>(blocks, shift, mask, count);
+			SetTree<V> result = new SetTree<>(childRefs, shift, mask, count);
 			if (!result.isValidStructure()) throw new BadFormatException("Problem with SetTree invariants");
 			return result;
 		}
@@ -670,6 +688,10 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * If this encoder has an associated store, sets the thread-local store
 	 * for the duration of the decode. Otherwise installs a temporary
 	 * MessageStore for child cell resolution.
+	 *
+	 * TODO: Consider attaching encoding on DecodeState-decoded cells. Dangerous here
+	 * because the input Blob may be large (entire multi-cell message), and attaching
+	 * it would pin the full byte array in memory via the top cell.
 	 *
 	 * @param data Multi-cell encoded data
 	 * @return Decoded top-level cell
@@ -859,12 +881,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			while(ds.pos < ds.limit) {
 				long encLength = readVLQCount(ds);
 
-				int childStart = ds.pos;
-				int childEnd = childStart + (int)encLength;
+				int childEnd = ds.pos + (int)encLength;
 				if (childEnd > ds.limit) throw new BadFormatException("Child encoding exceeds message bounds");
-
-				// Compute hash from raw bytes before reading
-				Hash h = Blob.wrap(ds.data, childStart, (int)encLength).getContentHash();
 
 				ACell c = this.read(ds);
 
@@ -872,7 +890,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
 				if (ds.pos != childEnd) throw new BadFormatException("Child encoding length mismatch");
 
-				acc.put(h, c);
+				// getHash() forces encoding creation, which is useful for caching later
+				acc.put(c.getHash(), c);
 			}
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Insufficient bytes to decode Cells");

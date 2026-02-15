@@ -33,6 +33,17 @@ public class Lambda<T extends ACell> extends ACodedOp<T,ACell,AClosure<T>> {
 	protected Lambda(Ref<AClosure<T>> newFunction) {
 		super(CVMTag.OP_CODED,OPCODE,newFunction);
 	}
+
+	/**
+	 * Creates a Lambda op from a decoded value ref.
+	 * @param <T> Result type
+	 * @param value Value ref (closure)
+	 * @return Lambda instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Lambda<T> createFromRef(Ref<ACell> value) {
+		return new Lambda<>((Ref<AClosure<T>>)(Ref<?>)value);
+	}
 	
 	public static <T extends ACell> Lambda<T> create(AVector<ACell> params, AOp<T> body) {
 		return new Lambda<T>(Fn.create(params,body).getRef());

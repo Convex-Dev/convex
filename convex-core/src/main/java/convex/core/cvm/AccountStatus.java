@@ -91,6 +91,15 @@ public class AccountStatus extends ARecordGeneric {
 	}
 
 	/**
+	 * Creates an AccountStatus from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return AccountStatus instance
+	 */
+	public static AccountStatus create(AVector<ACell> values) {
+		return new AccountStatus(values);
+	}
+
+	/**
 	 * Create a regular account, with the specified balance and zero memory allowance
 	 * 
 	 * @param sequence Sequence number

@@ -32,6 +32,17 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 	}
 
 	/**
+	 * Creates a Cond op from decoded vector data.
+	 * @param <T> Result type
+	 * @param data Decoded record fields
+	 * @return Cond instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Cond<T> create(AVector<ACell> data) {
+		return new Cond<>((AVector<AOp<ACell>>)(AVector<?>)data);
+	}
+
+	/**
 	 * Create a Cond operation with the given nested operations
 	 * 
 	 * @param <T> Return type of Cond

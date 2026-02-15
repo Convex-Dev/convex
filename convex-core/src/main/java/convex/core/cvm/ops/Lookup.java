@@ -31,6 +31,18 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 		super (CVMTag.OP_LOOKUP,address,symbol);
 	}
 
+	/**
+	 * Creates a Lookup op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (address op)
+	 * @param value Value ref (symbol)
+	 * @return Lookup instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Lookup<T> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Lookup<>((Ref<AOp<Address>>)(Ref<?>)code, (Ref<Symbol>)(Ref<?>)value);
+	}
+
 	public static <T extends ACell> Lookup<T> create(AOp<Address> address, Symbol form) {
 		return new Lookup<T>(Ref.get(address),form.getRef());
 	}

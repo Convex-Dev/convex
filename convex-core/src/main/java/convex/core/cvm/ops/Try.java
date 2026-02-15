@@ -31,6 +31,18 @@ public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> 
 	protected Try(Ref<ACell> code,Ref<AVector<AOp<ACell>>> ops) {
 		super(CVMTag.OP_CODED,code,ops);
 	}
+
+	/**
+	 * Creates a Try op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (opcode ByteFlag)
+	 * @param value Value ref (ops vector)
+	 * @return Try instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Try<T> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Try<>(code, (Ref<AVector<AOp<ACell>>>)(Ref<?>)value);
+	}
 	
 	protected Try(Ref<AVector<AOp<ACell>>> ops) {
 		this(CODE,ops);

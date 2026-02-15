@@ -32,6 +32,18 @@ public class Set<T extends ACell> extends ACodedOp<T,CVMLong,AOp<T>> {
 		super(CVMTag.OP_CODED,code,value);
 		this.position = code.getValue().longValue(); // safe because always embedded
 	}
+
+	/**
+	 * Creates a Set op from decoded refs.
+	 * @param <R> Result type
+	 * @param code Code ref (CVMLong position)
+	 * @param value Value ref (op)
+	 * @return Set instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <R extends ACell> Set<R> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Set<>((Ref<CVMLong>)(Ref<?>)code, (Ref<AOp<R>>)(Ref<?>)value);
+	}
 	
 	private Set(long position, Ref<AOp<T>> op) {
 		this(CVMLong.create(position).getRef(),op);

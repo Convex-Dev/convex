@@ -71,7 +71,16 @@ public final class Block extends ARecordGeneric {
 	private Block(AVector<ACell> values) {
 		super(CVMTag.BLOCK,FORMAT,values);
 		this.timestamp=RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
-		
+
+	}
+
+	/**
+	 * Creates a Block from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Block instance
+	 */
+	public static Block create(AVector<ACell> values) {
+		return new Block(values);
 	}
 
 	@Override

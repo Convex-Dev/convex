@@ -50,6 +50,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	protected RefSoft(AStore store, Hash hash) {
 		// We don't know anything about this Ref.
+		// TODO: avoid allocating SoftReference(null) here — could use a sentinel or null field
 		this(store,new SoftReference<T>(null), hash, UNKNOWN);
 	}
 	

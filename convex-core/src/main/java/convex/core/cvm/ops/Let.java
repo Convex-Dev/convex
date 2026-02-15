@@ -32,6 +32,20 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 		this.isLoop = tag==CVMTag.OP_LOOP;
 	}
 
+	/**
+	 * Creates a Let/Loop op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (symbols vector)
+	 * @param value Value ref (ops vector)
+	 * @param isLoop true for loop, false for let
+	 * @return Let instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Let<T> createFromRefs(Ref<ACell> code, Ref<ACell> value, boolean isLoop) {
+		byte tag = isLoop ? CVMTag.OP_LOOP : CVMTag.OP_LET;
+		return new Let<>(tag, (Ref<AVector<ACell>>)(Ref<?>)code, (Ref<AVector<AOp<ACell>>>)(Ref<?>)value);
+	}
+
 	public static <T extends ACell> Let<T> create(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
 		return new Let<T>(isLoop?CVMTag.OP_LOOP:CVMTag.OP_LET, syms.getRef(),ops.getRef());
 	}

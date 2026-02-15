@@ -59,6 +59,15 @@ public class Order extends ARecordGeneric {
 		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
 		this.consensusPoints = RT.toLongArray((AVector<ACell>)values.get(IX_CONSENSUS));
 	}
+
+	/**
+	 * Creates an Order from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Order instance
+	 */
+	public static Order create(AVector<ACell> values) {
+		return new Order(values);
+	}
 	
 	private Order(long timestamp, long[] consensusPoints, AVector<SignedData<Block>> blocks) {
 		super(CVMTag.ORDER,FORMAT,Vectors.create(CVMLong.create(timestamp),Vectors.createLongs(consensusPoints),blocks));

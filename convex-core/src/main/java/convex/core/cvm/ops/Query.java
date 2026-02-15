@@ -35,6 +35,18 @@ public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>
 		super(CVMTag.OP_CODED,code,ops);
 	}
 
+	/**
+	 * Creates a Query op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (opcode ByteFlag)
+	 * @param value Value ref (ops vector)
+	 * @return Query instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Query<T> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Query<>(code, (Ref<AVector<AOp<ACell>>>)(Ref<?>)value);
+	}
+
 	protected Query(Ref<AVector<AOp<ACell>>> ops) {
 		this(CODE,ops);
 	}

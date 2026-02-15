@@ -32,6 +32,17 @@ public class Do<T extends ACell> extends AFlatMultiOp<T> {
 		super(CVMTag.OP_DO,ops);
 	}
 
+	/**
+	 * Creates a Do op from decoded vector data.
+	 * @param <T> Result type
+	 * @param data Decoded record fields
+	 * @return Do instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Do<T> create(AVector<ACell> data) {
+		return new Do<>((AVector<AOp<ACell>>)(AVector<?>)data);
+	}
+
 	public static <T extends ACell> Do<T> create(AOp<?>... ops) {
 		return new Do<T>(Vectors.create(ops));
 	}

@@ -29,6 +29,18 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 		super(CVMTag.OP_DEF,key,op);
 		// if (!validKey(key)) throw new IllegalArgumentException("Invalid Def key: "+key);
 	}
+
+	/**
+	 * Creates a Def op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (symbol/syntax key)
+	 * @param value Value ref (op)
+	 * @return Def instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Def<T> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Def<>(code, (Ref<AOp<T>>)(Ref<?>)value);
+	}
 	
 	public static <T extends ACell> Def<T> create(ACell key, Ref<AOp<T>> op) {
 		if (!validKey(key)) throw new IllegalArgumentException("Invalid Def key: "+key);
