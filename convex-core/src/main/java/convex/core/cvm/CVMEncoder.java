@@ -106,26 +106,30 @@ public class CVMEncoder extends CAD3Encoder {
 		Ref<ACell> r1 = readRef(ds);
 		Ref<ACell> r2 = readRef(ds);
 
-		if (tag == CVMTag.OP_CODED) {
-			ACell code = r1.getValue();
-			if (code instanceof AByteFlag) {
-				byte opCode = ((AByteFlag) code).getTag();
-				switch (opCode) {
-					case CVMTag.OPCODE_CONSTANT: return Constant.createFromRef(r2);
-					case CVMTag.OPCODE_TRY: return Try.createFromRefs(r1, r2);
-					case CVMTag.OPCODE_LAMBDA: return Lambda.createFromRef(r2);
-					case CVMTag.OPCODE_QUERY: return Query.createFromRefs(r1, r2);
+		try {
+			if (tag == CVMTag.OP_CODED) {
+				ACell code = r1.getValue();
+				if (code instanceof AByteFlag) {
+					byte opCode = ((AByteFlag) code).getTag();
+					switch (opCode) {
+						case CVMTag.OPCODE_CONSTANT: return Constant.createFromRef(r2);
+						case CVMTag.OPCODE_TRY: return Try.createFromRefs(r1, r2);
+						case CVMTag.OPCODE_LAMBDA: return Lambda.createFromRef(r2);
+						case CVMTag.OPCODE_QUERY: return Query.createFromRefs(r1, r2);
+					}
 				}
+				// CVMLong codes (0x10-0x18) encode Set op position
+				return Set.createFromRefs(r1, r2);
 			}
-			// CVMLong codes (0x10-0x18) encode Set op position
-			return Set.createFromRefs(r1, r2);
+			if (tag == CVMTag.OP_LOOKUP) return Lookup.createFromRefs(r1, r2);
+			if (tag == CVMTag.OP_DEF) return Def.createFromRefs(r1, r2);
+			if (tag == CVMTag.OP_LET) return Let.createFromRefs(r1, r2, false);
+			if (tag == CVMTag.OP_LOOP) return Let.createFromRefs(r1, r2, true);
+		} catch (Exception e) {
+			// Catch all: tag may be shared with a generic CAD3 coded value
 		}
-		if (tag == CVMTag.OP_LOOKUP) return Lookup.createFromRefs(r1, r2);
-		if (tag == CVMTag.OP_DEF) return Def.createFromRefs(r1, r2);
-		if (tag == CVMTag.OP_LET) return Let.createFromRefs(r1, r2, false);
-		if (tag == CVMTag.OP_LOOP) return Let.createFromRefs(r1, r2, true);
 
-		// Unknown coded tag — generic CodedValue
+		// Unknown or failed CVM coded tag — generic CodedValue
 		return CodedValue.create(tag & 0xFF, r1.getValue(), r2.getValue());
 	}
 
@@ -147,24 +151,28 @@ public class CVMEncoder extends CAD3Encoder {
 	protected ACell readDenseRecord(byte tag, DecodeState ds) throws BadFormatException {
 		AVector<ACell> data = readVector(ds);
 
-		if (tag == CVMTag.INVOKE) return Invoke.create(data);
-		if (tag == CVMTag.TRANSFER) return Transfer.create(data);
-		if (tag == CVMTag.CALL) return Call.create(data);
-		if (tag == CVMTag.MULTI) return Multi.create(data);
-		if (tag == CVMTag.FN) return readFn(data);
-		if (tag == CVMTag.STATE) return new State(data);
-		if (tag == CVMTag.BELIEF) return Belief.create(data);
-		if (tag == CVMTag.BLOCK) return Block.create(data);
-		if (tag == CVMTag.RESULT) return Result.buildFromVector(data);
-		if (tag == CVMTag.ORDER) return Order.create(data);
-		if (tag == CVMTag.BLOCK_RESULT) return new BlockResult(data);
-		if (tag == CVMTag.OP_DO) return Do.create(data);
-		if (tag == CVMTag.OP_COND) return Cond.create(data);
-		if (tag == CVMTag.OP_INVOKE) return convex.core.cvm.ops.Invoke.fromData(data);
-		if (tag == CVMTag.PEER_STATUS) return new PeerStatus(data);
-		if (tag == CVMTag.ACCOUNT_STATUS) return AccountStatus.create(data);
+		try {
+			if (tag == CVMTag.INVOKE) return Invoke.create(data);
+			if (tag == CVMTag.TRANSFER) return Transfer.create(data);
+			if (tag == CVMTag.CALL) return Call.create(data);
+			if (tag == CVMTag.MULTI) return Multi.create(data);
+			if (tag == CVMTag.FN) return readFn(data);
+			if (tag == CVMTag.STATE) return new State(data);
+			if (tag == CVMTag.BELIEF) return Belief.create(data);
+			if (tag == CVMTag.BLOCK) return Block.create(data);
+			if (tag == CVMTag.RESULT) return Result.buildFromVector(data);
+			if (tag == CVMTag.ORDER) return Order.create(data);
+			if (tag == CVMTag.BLOCK_RESULT) return new BlockResult(data);
+			if (tag == CVMTag.OP_DO) return Do.create(data);
+			if (tag == CVMTag.OP_COND) return Cond.create(data);
+			if (tag == CVMTag.OP_INVOKE) return convex.core.cvm.ops.Invoke.fromData(data);
+			if (tag == CVMTag.PEER_STATUS) return new PeerStatus(data);
+			if (tag == CVMTag.ACCOUNT_STATUS) return AccountStatus.create(data);
+		} catch (Exception e) {
+			// Catch all: tag may be shared with a generic CAD3 dense record
+		}
 
-		// Unknown dense record tag — generic DenseRecord
+		// Unknown or failed CVM tag — generic DenseRecord
 		DenseRecord dr = DenseRecord.create(tag & 0xFF, data);
 		if (dr == null) throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 		return dr;

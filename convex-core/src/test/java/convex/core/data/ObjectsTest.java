@@ -15,6 +15,7 @@ import java.io.IOException;
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
 import convex.core.cvm.CVMEncoder;
+import convex.core.data.AEncoder.DecodeState;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -111,6 +112,20 @@ public class ObjectsTest {
 
 			b.attachEncoding(null);
 			assertEquals(encoding,b.getEncoding());
+
+			// DecodeState round-trip: verify read(DecodeState) produces equal
+			// result with identical re-encoding for both encoder types
+			DecodeState ds1 = new DecodeState(encoding);
+			ACell fromDSCVM = CVM_ENCODER.read(ds1);
+			assertEquals(a, fromDSCVM, "CVM DecodeState round-trip mismatch");
+			assertEquals(ds1.limit, ds1.pos, "CVM DecodeState pos should be at limit");
+			assertEquals(encoding, Cells.encode(fromDSCVM), "CVM DecodeState re-encoding mismatch");
+
+			DecodeState ds2 = new DecodeState(encoding);
+			ACell fromDSCAD3 = CAD3_ENCODER.read(ds2);
+			assertEquals(a, fromDSCAD3, "CAD3 DecodeState round-trip mismatch");
+			assertEquals(ds2.limit, ds2.pos, "CAD3 DecodeState pos should be at limit");
+			assertEquals(encoding, Cells.encode(fromDSCAD3), "CAD3 DecodeState re-encoding mismatch");
 
 			// For completely encoded cells (no branches), single-cell decode
 			// must produce an identical result to multi-cell decode
