@@ -282,6 +282,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			case 1: // Numerics
 				return readNumeric(tag, ds);
 
+			case 3: // 0x30-0x3F : Strings, blobs, symbols, keywords, chars
+				return readBasicObject(tag, ds);
+
 			case 8: // Data structures
 				if (tag == Tag.VECTOR) return readVector(ds);
 				break;
@@ -373,6 +376,83 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			}
 			return new VectorTree<T>(items, count);
 		}
+	}
+
+	private ACell readBasicObject(byte tag, DecodeState ds) throws BadFormatException {
+		if (tag == Tag.BLOB) {
+			// Blob: VLQ count + flat data or child refs (BlobTree)
+			long count = readVLQCount(ds);
+			if (count < 0) throw new BadFormatException("Negative blob length");
+			if (count <= Blob.CHUNK_LENGTH) {
+				if (count == 0) return Blob.EMPTY;
+				Blob result = Blob.wrap(ds.data, ds.pos, (int) count);
+				ds.pos += (int) count;
+				return result;
+			}
+			return readBlobTree(count, ds);
+		}
+		if (tag == Tag.STRING) {
+			// String: VLQ length + flat UTF-8 data or child refs (StringTree wrapping BlobTree)
+			long length = readVLQCount(ds);
+			if (length < 0) throw new BadFormatException("Negative string length");
+			if (length > Integer.MAX_VALUE) throw new BadFormatException("String length too long: " + length);
+			if (length <= StringShort.MAX_LENGTH) {
+				Blob data = Blob.wrap(ds.data, ds.pos, (int) length);
+				ds.pos += (int) length;
+				return StringShort.create(data);
+			}
+			// StringTree wraps a BlobTree with same structure
+			BlobTree bt = readBlobTree(length, ds);
+			return StringTree.create(bt);
+		}
+		if (tag == Tag.SYMBOL) {
+			// Symbol: 1-byte length + UTF-8 name bytes
+			int len = 0xff & ds.data[ds.pos++];
+			AString name = Strings.create(Blob.wrap(ds.data, ds.pos, len));
+			ds.pos += len;
+			Symbol sym = Symbol.create(name);
+			if (sym == null) throw new BadFormatException("Can't read symbol");
+			return sym;
+		}
+		if (tag == Tag.KEYWORD) {
+			// Keyword: 1-byte length + UTF-8 name bytes
+			int len = 0xff & ds.data[ds.pos++];
+			if (len > Keyword.MAX_CHARS) throw new BadFormatException("Keyword too long");
+			AString name = Strings.create(Blob.wrap(ds.data, ds.pos, len));
+			ds.pos += len;
+			Keyword kw = Keyword.create(name);
+			if (kw == null) throw new BadFormatException("Can't read keyword");
+			return kw;
+		}
+		// CVMChar: tag 0x3c-0x3f, low 2 bits encode length-1
+		if ((tag & Tag.CHAR_MASK) == Tag.CHAR_BASE) {
+			int len = (tag & 0x03) + 1;
+			if (len > 4) throw new BadFormatException("Can't read char type with length: " + len);
+			int value = 0xff000000; // sentinel high byte, shifted away
+			for (int i = 0; i < len; i++) {
+				if (value == 0) throw new BadFormatException("Leading zero in CVMChar encoding");
+				value = (value << 8) + (0xff & ds.data[ds.pos++]);
+			}
+			CVMChar result = CVMChar.create(value);
+			if (result == null) throw new BadFormatException("CVMChar out of Unicode range");
+			return result;
+		}
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
+	}
+
+	@SuppressWarnings("unchecked")
+	private BlobTree readBlobTree(long count, DecodeState ds) throws BadFormatException {
+		// BlobTree: child refs to blob chunks
+		long chunks = BlobTree.calcChunks(count);
+		int shift = BlobTree.calcShift(chunks);
+		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
+		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
+		for (int i = 0; i < numChildren; i++) {
+			Ref<ABlob> ref = readRef(ds);
+			if (ref == Ref.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
+			children[i] = ref;
+		}
+		return new BlobTree(children, shift, count);
 	}
 
 	// ==================== Multi-cell decode ====================

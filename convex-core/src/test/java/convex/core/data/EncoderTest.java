@@ -580,6 +580,51 @@ public class EncoderTest {
 		}
 	}
 
+	@Test public void testDecodeStateBlob() throws BadFormatException {
+		ACell[] values = {
+			Blob.EMPTY, Blob.wrap(new byte[]{1,2,3}), Samples.SMALL_BLOB,
+			Blob.createRandom(new java.util.Random(42), Blob.CHUNK_LENGTH), // max flat blob
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateBlobTree() throws BadFormatException {
+		// Large blob requiring tree structure
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			ABlob big = Blob.createRandom(new java.util.Random(99), Blob.CHUNK_LENGTH + 100);
+			doDecodeStateRoundTrip(big, CVM);
+			doDecodeStateRoundTrip(big, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateString() throws BadFormatException {
+		ACell[] values = {
+			Strings.EMPTY, Strings.create("hello"), Strings.create("a"),
+			Strings.create("\u00e9\u00e8\u00ea"), // accented chars
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateSymbolKeyword() throws BadFormatException {
+		ACell[] values = {
+			Symbol.create("foo"), Symbol.create("x"),
+			Keyword.create("test"), Keyword.create("a"),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
 	@Test public void testDecodeStateByteFlags() throws BadFormatException {
 		doDecodeStateRoundTrip(CVMBool.TRUE, CVM);
 		doDecodeStateRoundTrip(CVMBool.TRUE, CAD3);

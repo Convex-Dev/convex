@@ -40,7 +40,7 @@ public class BlobTree extends ABlob {
 	 */
 	private final int shift;
 
-	private BlobTree(Ref<ABlob>[] children, int shift, long count) {
+	BlobTree(Ref<ABlob>[] children, int shift, long count) {
 		super(count);
 		this.children = children;
 		this.shift = shift;
