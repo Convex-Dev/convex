@@ -90,14 +90,14 @@ public class PeerStatus extends ARecordGeneric {
 		this.balance=balance;
 	}
 
-	@SuppressWarnings("unchecked")
 	public PeerStatus(AVector<ACell> values) {
 		super(CVMTag.PEER_STATUS,FORMAT,values);
 		this.controller = RT.ensureAddress(values.get(IX_CONTROLLER));
 		this.peerStake = RT.ensureLong(values.get(IX_STAKE)).longValue();
-		this.stakes = RT.ensureIndex(values.get(IX_STAKES));
+		// stakes and metadata may be non-embedded — defer to lazy getters
+		this.stakes = null;
 		this.delegatedStake = RT.ensureLong(values.get(IX_DEL_STAKE)).longValue();
-		this.metadata = (AHashMap<ACell,ACell>)(values.get(IX_METADATA));
+		this.metadata = null;
 		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
 		this.balance = RT.ensureLong(values.get(IX_BALANCE)).longValue();
 	}
@@ -296,7 +296,7 @@ public class PeerStatus extends ARecordGeneric {
 	}
 
 	public PeerStatus withPeerData(AHashMap<ACell,ACell> newMeta) {
-		if (metadata==newMeta) return this;	
+		if (getMetadata()==newMeta) return this;
 		return new PeerStatus(controller, peerStake, getStakes(), delegatedStake, newMeta,timestamp,balance);
     }
 	
@@ -315,9 +315,9 @@ public class PeerStatus extends ARecordGeneric {
 		
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.STAKE.equals(key)) return values.get(IX_STAKE); // already a CVMLong
-		if (Keywords.STAKES.equals(key)) return stakes;
+		if (Keywords.STAKES.equals(key)) return values.get(IX_STAKES);
 		if (Keywords.DELEGATED_STAKE.equals(key)) return values.get(IX_DEL_STAKE); // already a CVMLong
-		if (Keywords.METADATA.equals(key)) return metadata;
+		if (Keywords.METADATA.equals(key)) return values.get(IX_METADATA);
 		if (Keywords.TIMESTAMP.equals(key)) return values.get(IX_TIMESTAMP); // already a CVMLong
 		if (Keywords.BALANCE.equals(key)) return values.get(IX_BALANCE); // already a CVMLong
 

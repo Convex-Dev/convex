@@ -180,13 +180,18 @@ public class CVMEncoder extends CAD3Encoder {
 
 	/**
 	 * Reads a function (Fn or MultiFn) from decoded vector data.
-	 * Dispatches based on first element type flag.
+	 * Dispatches based on first element: if embedded ByteFlag FN_NORMAL → Fn,
+	 * otherwise MultiFn. Uses isEmbedded() to avoid dereferencing non-embedded
+	 * refs (which may not be resolvable during multi-cell child decode).
 	 */
 	private ACell readFn(AVector<ACell> data) throws BadFormatException {
 		if (data.isEmpty()) throw new BadFormatException("Empty record in Fn");
-		ACell typeFlag = data.get(0);
-		if (typeFlag instanceof AByteFlag && ((AByteFlag) typeFlag).getTag() == CVMTag.FN_NORMAL) {
-			return Fn.create(data);
+		Ref<ACell> firstRef = data.getRef(0);
+		if (firstRef.isEmbedded()) {
+			ACell typeFlag = firstRef.getValue();
+			if (typeFlag instanceof AByteFlag && ((AByteFlag) typeFlag).getTag() == CVMTag.FN_NORMAL) {
+				return Fn.create(data);
+			}
 		}
 		return MultiFn.create(data);
 	}

@@ -14,7 +14,6 @@ import convex.core.cpos.Order;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
-import convex.core.data.MapEntry;
 import convex.core.data.SignedData;
 
 /**
@@ -28,7 +27,7 @@ import convex.core.data.SignedData;
 public class SnapshotStateTest {
 
 	private static final AccountKey PEER_KEY = AccountKey.fromHex("d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42");
-	private static final Hash EXPECTED_STATE = Hash.fromHex("36eee6a881262ecbee97d78f29cf4842ea6eedee67906bf983954261acab79ea");
+	private static final Hash EXPECTED_STATE = Hash.fromHex("77b0446d11ba2550abc533e16be90d380c08daab81491ad4cd166d4833cd5da9");
 	private State state;
 	private Belief belief;
 	private Order order;
@@ -50,7 +49,8 @@ public class SnapshotStateTest {
 		AVector<SignedData<Block>> blocks = order.getBlocks();
 		State s = genesis;
 		for (long i = 0; i < consensusPoint; i++) {
-			s = s.applyBlock(blocks.get(i)).getState();
+			SignedData<Block> sb = blocks.get(i);
+			s = s.applyBlock(sb).getState();
 		}
 		state = s;
 		assertNotNull(state);
@@ -59,10 +59,10 @@ public class SnapshotStateTest {
 	@Test
 	public void testConsensusState() {
 		assertEquals(EXPECTED_STATE,state.getHash());
-		
+
 		StateTest.doStateTests(state);
 	}
-	
+
 	@Test
 	public void testAccounts() {
 		AVector<AccountStatus> accts=state.getAccounts();

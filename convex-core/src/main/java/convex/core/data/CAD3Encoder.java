@@ -67,10 +67,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Uses the encoder's bound store if available, otherwise falls back to
 	 * the thread-local store. Ensures the thread-local is set correctly for
 	 * RefSoft creation during the decode.
-	 *
-	 * When switching to DecodeState path: attach encoding on result via
-	 * result.attachEncoding(encoding), since the input Blob is the complete
-	 * single-cell encoding.
 	 */
 	@Override
 	public ACell decode(Blob encoding) throws BadFormatException {
@@ -241,7 +237,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			Hash h = Hash.wrap(ds.data, ds.pos);
 			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref");
 			ds.pos += Hash.LENGTH;
-			Ref<T> ref = Ref.forHash(h, store);
+			AStore s = (store != null) ? store : Stores.current();
+			Ref<T> ref = Ref.forHash(h, s);
 			return ref.markEmbedded(false);
 		}
 		if (tag==Tag.NULL) {
@@ -702,68 +699,16 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		int ml=Utils.checkedInt(data.count());
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
-		// Use encoder's bound store, falling back to thread-local store
-		AStore effectiveStore = (this.store != null) ? this.store : Stores.current();
-		if (effectiveStore != null) {
-			return decodeMultiCellWithStore(effectiveStore, data, ml);
+		DecodeState ds = new DecodeState(data);
+		ACell result = this.read(ds);
+		if (result==null) {
+			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+			return null;
 		}
+		if (ds.pos==ds.limit) return result; // single cell, done
 
-		// No store available: install a temporary MessageStore so that
-		// RefSoft.createForHash can capture it during top cell decode
 		HashMap<Hash,ACell> hm=new HashMap<>();
-		Stores.setCurrent(new MessageStore(hm, null));
-		try {
-			ACell result= this.read(data,0);
-			if (result==null) {
-				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-				return null;
-			}
-			int rl=Utils.checkedInt(result.getEncodingLength());
-			if (rl==ml) return result; // single cell, done
-			return resolveChildren(result, hm, data, rl, ml);
-		} finally {
-			Stores.setCurrent(null);
-		}
-	}
-
-	/**
-	 * Multi-cell decode with a known store.
-	 * Sets the thread-local store for RefSoft creation during reads.
-	 */
-	private ACell decodeMultiCellWithStore(AStore effectiveStore, Blob data, int ml) throws BadFormatException {
-		AStore saved = Stores.current();
-		boolean needsRestore = (saved != effectiveStore);
-		if (needsRestore) Stores.setCurrent(effectiveStore);
-		try {
-			ACell result= this.read(data,0);
-			if (result==null) {
-				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-				return null;
-			}
-			int rl=Utils.checkedInt(result.getEncodingLength());
-			if (rl==ml) return result; // single cell, done
-			return resolveChildren(result, data, rl, ml);
-		} finally {
-			if (needsRestore) Stores.setCurrent(saved);
-		}
-	}
-
-	/**
-	 * Resolves child cells from multi-cell encoded data when a store is set.
-	 * Decodes children and uses a replacement scan to wire up refs.
-	 */
-	private ACell resolveChildren(ACell result, Blob data, int rl, int ml) throws BadFormatException {
-		HashMap<Hash,ACell> hm=new HashMap<>();
-		readChildCells(hm, data, rl, ml);
-		return resolveRefs(result, hm);
-	}
-
-	/**
-	 * Resolves child cells from multi-cell encoded data when using a MessageStore.
-	 * Children are decoded into the same HashMap backing the MessageStore.
-	 */
-	private ACell resolveChildren(ACell result, HashMap<Hash,ACell> hm, Blob data, int rl, int ml) throws BadFormatException {
-		readChildCells(hm, data, rl, ml);
+		readChildCells(hm, ds);
 		return resolveRefs(result, hm);
 	}
 
