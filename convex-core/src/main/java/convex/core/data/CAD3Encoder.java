@@ -285,6 +285,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			case 8: // Data structures
 				if (tag == Tag.VECTOR) return readVector(ds);
 				break;
+
+			case 11: // 0xB0-0xBF : Byte flags including booleans
+				return AByteFlag.read(tag);
 			}
 		} catch (BadFormatException e) {
 			throw e;

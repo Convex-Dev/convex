@@ -580,6 +580,13 @@ public class EncoderTest {
 		}
 	}
 
+	@Test public void testDecodeStateByteFlags() throws BadFormatException {
+		doDecodeStateRoundTrip(CVMBool.TRUE, CVM);
+		doDecodeStateRoundTrip(CVMBool.TRUE, CAD3);
+		doDecodeStateRoundTrip(CVMBool.FALSE, CVM);
+		doDecodeStateRoundTrip(CVMBool.FALSE, CAD3);
+	}
+
 	@Test public void testDecodeStateCVMLong() throws BadFormatException {
 		CVMLong[] values = {
 			CVMLong.ZERO, CVMLong.ONE, CVMLong.MINUS_ONE,
