@@ -2,10 +2,10 @@ package convex.core.store;
 
 import java.util.function.Consumer;
 
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -21,6 +21,8 @@ import convex.core.exceptions.BadFormatException;
 public class NullStore extends AStore {
 
 	public static final NullStore INSTANCE = new NullStore();
+
+	private final CVMEncoder encoder = new CVMEncoder(this);
 
 	private NullStore() {}
 
@@ -53,14 +55,15 @@ public class NullStore extends AStore {
 	public void close() {
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
-		return Format.read(encoding);
+		return (T) encoder.decode(encoding);
 	}
 
 	@Override
 	public AEncoder<ACell> getEncoder() {
-		return null;
+		return encoder;
 	}
 
 	@Override

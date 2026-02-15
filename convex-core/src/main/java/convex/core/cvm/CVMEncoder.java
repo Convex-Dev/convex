@@ -26,6 +26,7 @@ import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Core;
 import convex.core.lang.impl.Fn;
+import convex.core.store.AStore;
 import convex.core.util.ErrorMessages;
 
 /**
@@ -38,11 +39,20 @@ import convex.core.util.ErrorMessages;
 public class CVMEncoder extends CAD3Encoder {
 
 	/**
-	 * Default encoder instance used by Format.read for all decode operations.
+	 * Default storeless encoder instance used by Format.read for all decode operations.
 	 */
 	public static final CVMEncoder INSTANCE = new CVMEncoder();
 
 	public CVMEncoder() {}
+
+	/**
+	 * Creates a store-bound encoder. The encoder will manage the thread-local
+	 * store context during decode operations.
+	 * @param store Store to associate with this encoder
+	 */
+	public CVMEncoder(AStore store) {
+		super(store);
+	}
 
 	@Override
 	protected ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {

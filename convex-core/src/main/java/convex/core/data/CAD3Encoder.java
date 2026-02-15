@@ -39,11 +39,47 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 	public static final CAD3Encoder INSTANCE = new CAD3Encoder();
 
-	public CAD3Encoder() {}
+	/**
+	 * Store associated with this encoder. When non-null, the encoder manages
+	 * the thread-local store context during decode operations so that
+	 * RefSoft.createForHash captures the correct store.
+	 */
+	protected final AStore store;
+
+	public CAD3Encoder() {
+		this.store = null;
+	}
+
+	public CAD3Encoder(AStore store) {
+		this.store = store;
+	}
 
 	@Override
 	public Blob encode(ACell a) {
 		return Cells.encode(a);
+	}
+
+	/**
+	 * Decodes a single cell from a complete Blob encoding.
+	 * Uses the encoder's bound store if available, otherwise falls back to
+	 * the thread-local store. Ensures the thread-local is set correctly for
+	 * RefSoft creation during the decode.
+	 */
+	@Override
+	public ACell decode(Blob encoding) throws BadFormatException {
+		if (encoding.count()<1) throw new BadFormatException("Empty encoding");
+		AStore effectiveStore = (this.store != null) ? this.store : Stores.current();
+		if (effectiveStore != null) {
+			AStore saved = Stores.current();
+			if (saved == effectiveStore) return read(encoding, 0);
+			Stores.setCurrent(effectiveStore);
+			try {
+				return read(encoding, 0);
+			} finally {
+				Stores.setCurrent(saved);
+			}
+		}
+		return read(encoding, 0);
 	}
 
 	@Override
@@ -184,12 +220,13 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * followed by VLQ-prefixed child cells. All reads dispatch through this
 	 * encoder's virtual {@link #read} methods, so CAD3Encoder produces generic
 	 * types and CVMEncoder produces CVM-specific types.
-	 * 
+	 *
 	 * PERFORMANCE: This is a hot path for all incoming messages on network. Must be optimal, minimal GC
 	 * SECURITY: Input may come from untrusted sources, so must be robust to adversarial input (reject in at most O(n) time)
 	 *
-	 * Uses the current thread-local store for Ref resolution. If no store is
-	 * set, installs a temporary MessageStore for the duration of child decoding.
+	 * If this encoder has an associated store, sets the thread-local store
+	 * for the duration of the decode. Otherwise installs a temporary
+	 * MessageStore for child cell resolution.
 	 *
 	 * @param data Multi-cell encoded data
 	 * @return Decoded top-level cell
@@ -200,21 +237,13 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		int ml=Utils.checkedInt(data.count());
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
-		// Fast path: if a store is already set, read the top cell directly.
-		// Any non-embedded refs will create RefSoft pointing to the existing store.
-		if (Stores.current()!=null) {
-			// Fast path: always try loading a single cell first (common case)
-			ACell result= this.read(data,0);
-			if (result==null) {
-				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-				return null;
-			}
-			int rl=Utils.checkedInt(result.getEncodingLength());
-			if (rl==ml) return result; // single cell, done
-			return resolveChildren(result, data, rl, ml);
+		// Use encoder's bound store, falling back to thread-local store
+		AStore effectiveStore = (this.store != null) ? this.store : Stores.current();
+		if (effectiveStore != null) {
+			return decodeMultiCellWithStore(effectiveStore, data, ml);
 		}
 
-		// No store set: install a temporary MessageStore so that
+		// No store available: install a temporary MessageStore so that
 		// RefSoft.createForHash can capture it during top cell decode
 		HashMap<Hash,ACell> hm=new HashMap<>();
 		Stores.setCurrent(new MessageStore(hm, null));
@@ -229,6 +258,28 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			return resolveChildren(result, hm, data, rl, ml);
 		} finally {
 			Stores.setCurrent(null);
+		}
+	}
+
+	/**
+	 * Multi-cell decode with a known store.
+	 * Sets the thread-local store for RefSoft creation during reads.
+	 */
+	private ACell decodeMultiCellWithStore(AStore effectiveStore, Blob data, int ml) throws BadFormatException {
+		AStore saved = Stores.current();
+		boolean needsRestore = (saved != effectiveStore);
+		if (needsRestore) Stores.setCurrent(effectiveStore);
+		try {
+			ACell result= this.read(data,0);
+			if (result==null) {
+				if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+				return null;
+			}
+			int rl=Utils.checkedInt(result.getEncodingLength());
+			if (rl==ml) return result; // single cell, done
+			return resolveChildren(result, data, rl, ml);
+		} finally {
+			if (needsRestore) Stores.setCurrent(saved);
 		}
 	}
 

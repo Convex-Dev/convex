@@ -23,8 +23,11 @@ import convex.core.exceptions.MissingDataException;
  */
 public class MemoryStore extends AStore {
 	public static final MemoryStore DEFAULT = new MemoryStore();
-	
-	protected static final CVMEncoder encoder=new CVMEncoder();
+
+	/**
+	 * Store-bound encoder. Manages thread-local store context during decode.
+	 */
+	protected final CVMEncoder encoder=new CVMEncoder(this);
 
 	/**
 	 * Storage of persisted Refs for each hash value
@@ -58,18 +61,9 @@ public class MemoryStore extends AStore {
 		Hash hash=encoding.getContentHash();
 		Ref<?> cached= hashRefs.get(hash);
 		if (cached!=null) return (T) cached.getValue();
-		
-		// Need to ensure we are reading with the current store set
-		AStore tempStore=Stores.current();
-		ACell decoded;
-		if (tempStore==this) {
-			decoded = encoder.decode(encoding);
-		} else try {
-			Stores.setCurrent(this);
-			decoded = encoder.decode(encoding);
-		} finally {
-			Stores.setCurrent(tempStore);
-		}
+
+		// Encoder manages thread-local store context
+		ACell decoded = encoder.decode(encoding);
 		return (T)decoded;
 	}
 	
