@@ -213,6 +213,98 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		return ExtensionValue.create(tag, code);
 	}
 
+	// ==================== DecodeState-based operations ====================
+
+	/**
+	 * Reads a Ref or embedded cell from the decode state, advancing pos.
+	 * For non-embedded refs, creates RefSoft bound to this encoder's store
+	 * (no thread-local lookup). For embedded cells, dispatches through this
+	 * encoder's virtual read for correct type resolution.
+	 *
+	 * @param <T> Type of referenced value
+	 * @param ds Decode state to read from
+	 * @return Ref to the decoded value
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> Ref<T> readRef(DecodeState ds) throws BadFormatException {
+		byte tag = ds.data[ds.pos];
+		if (tag==Tag.REF) {
+			ds.pos++;
+			Hash h = Hash.wrap(ds.data, ds.pos);
+			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref at position: "+ds.pos);
+			ds.pos += Hash.LENGTH;
+			Ref<T> ref = Ref.forHash(h, store);
+			return ref.markEmbedded(false);
+		}
+		if (tag==Tag.NULL) {
+			ds.pos++;
+			return Ref.nil();
+		}
+		// Embedded cell — dispatch through this encoder's virtual read
+		T cell = (T) this.read(ds);
+		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref");
+		return cell.getRef();
+	}
+
+	/**
+	 * Reads a VLQ-encoded count from the decode state, advancing pos.
+	 *
+	 * @param ds Decode state to read from
+	 * @return Decoded count value
+	 * @throws BadFormatException If VLQ encoding is invalid
+	 */
+	public long readVLQCount(DecodeState ds) throws BadFormatException {
+		long count = Format.readVLQCount(ds.data, ds.pos);
+		ds.pos += Format.getVLQCountLength(count);
+		return count;
+	}
+
+	/**
+	 * Reads a cell from the decode state by extracting tag and dispatching.
+	 * Advances ds.pos past the full encoding.
+	 *
+	 * @param ds Decode state to read from
+	 * @return Decoded cell (may be null for Tag.NULL)
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public ACell read(DecodeState ds) throws BadFormatException {
+		int startPos = ds.pos;
+		byte tag = ds.readByte();
+		return read(tag, ds, startPos);
+	}
+
+	/**
+	 * Tag-dispatch read from DecodeState. Override in subclasses for
+	 * domain-specific types (see CVMEncoder).
+	 *
+	 * NOTE: ds.pos is past the tag byte. startPos points to the tag.
+	 * Implementations must advance ds.pos past all remaining data and
+	 * should call ds.attachEncoding(result, startPos) before returning.
+	 *
+	 * Current implementation delegates to the existing Blob-based read
+	 * methods. Type classes will be migrated to DecodeState in later phases.
+	 *
+	 * @param tag Tag byte already read
+	 * @param ds Decode state (pos is past tag)
+	 * @param startPos Position of tag byte
+	 * @return Decoded cell
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	protected ACell read(byte tag, DecodeState ds, int startPos) throws BadFormatException {
+		// Delegate to existing Blob-based read for now.
+		// This creates a Blob view over the same backing array.
+		// IMPORTANT: inefficient, must be removed by encoder refactor
+		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
+		ACell result = read(tag, b, 0);
+		// Advance DecodeState pos past the encoding
+		if (result != null) {
+			ds.advanceTo(startPos + result.getEncodingLength());
+		}
+		// else: null is single-byte (tag only), pos already past it from readByte()
+		return result;
+	}
+
 	// ==================== Multi-cell decode ====================
 
 	/**
@@ -396,6 +488,41 @@ public class CAD3Encoder extends AEncoder<ACell> {
 				ix+=(int)encLength;
 			}
 			if (ix!=end) throw new BadFormatException("Bad message length when decoding");
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Insufficient bytes to decode Cells");
+		}
+	}
+
+	/**
+	 * Decodes VLQ-prefixed non-embedded child cells using DecodeState.
+	 * Dispatches through this encoder's virtual {@link #read} methods.
+	 * Reads from ds.pos to ds.limit.
+	 *
+	 * @param acc Accumulator for cells, keyed by content hash
+	 * @param ds Decode state positioned at start of child cells
+	 * @throws BadFormatException If encoding is invalid or contains embedded cells
+	 */
+	@SuppressWarnings("unused")
+	private void readChildCells(HashMap<Hash,ACell> acc, DecodeState ds) throws BadFormatException {
+		try {
+			while(ds.pos < ds.limit) {
+				long encLength = readVLQCount(ds);
+
+				int childStart = ds.pos;
+				int childEnd = childStart + (int)encLength;
+				if (childEnd > ds.limit) throw new BadFormatException("Child encoding exceeds message bounds");
+
+				// Compute hash from raw bytes before reading
+				Hash h = Blob.wrap(ds.data, childStart, (int)encLength).getContentHash();
+
+				ACell c = this.read(ds);
+
+				if (c==null) throw new BadFormatException("Null child encoding");
+				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
+				if (ds.pos != childEnd) throw new BadFormatException("Child encoding length mismatch");
+
+				acc.put(h, c);
+			}
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Insufficient bytes to decode Cells");
 		}
