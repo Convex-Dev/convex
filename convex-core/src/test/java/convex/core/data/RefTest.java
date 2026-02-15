@@ -357,7 +357,7 @@ public class RefTest {
 		// assertEquals(0,rts.persisted); Might not be true if Sample is persisted?
 	}
 	
-	@Test 
+	@Test
 	public void testInternal() {
 		checkInternal(null);
 		checkInternal(CVMBool.TRUE);
@@ -387,9 +387,13 @@ public class RefTest {
 		Ref<T> ref=Ref.get(a);
 		assertTrue(ref.isInternal(),()->"Not internal ref: "+a+" of type "+Utils.getClass(a));
 		assertSame(a,ref.getValue());
-		
-		Stores.runWithMemoryStore(()->assertSame(a,Cells.persist(a, Stores.current())));
-		
+
+		try {
+			assertSame(a,Cells.persist(a, new convex.core.store.MemoryStore()));
+		} catch (IOException e) {
+			throw new AssertionError("Unexpected IOException persisting to MemoryStore",e);
+		}
+
 	}
 
 	@Test

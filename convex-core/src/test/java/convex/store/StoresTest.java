@@ -134,34 +134,37 @@ public class StoresTest {
 		assertEquals(a1,a2);
 	}
 
-	// ========== ThreadUtils.runWithStore tests ==========
+	// ========== Thread-local store isolation tests ==========
 
 	@Test
-	public void testRunWithStorePropagation() throws Exception {
+	public void testVirtualThreadStorePropagation() throws Exception {
 		MemoryStore ms = new MemoryStore();
 		CompletableFuture<AStore> observed = new CompletableFuture<>();
 
-		ThreadUtils.runWithStore(ms, () -> {
+		ThreadUtils.runVirtual(() -> {
+			Stores.setCurrent(ms);
 			observed.complete(Stores.current());
 		});
 
 		AStore result = observed.get(5, TimeUnit.SECONDS);
-		assertSame(ms, result, "Virtual thread should see the store passed to runWithStore");
+		assertSame(ms, result, "Virtual thread should see the store set on it");
 	}
 
 	@Test
-	public void testRunWithStoreIsolation() throws Exception {
+	public void testVirtualThreadStoreIsolation() throws Exception {
 		MemoryStore ms1 = new MemoryStore();
 		MemoryStore ms2 = new MemoryStore();
 		CompletableFuture<AStore> obs1 = new CompletableFuture<>();
 		CompletableFuture<AStore> obs2 = new CompletableFuture<>();
 
 		// Launch two concurrent virtual threads with different stores
-		ThreadUtils.runWithStore(ms1, () -> {
+		ThreadUtils.runVirtual(() -> {
+			Stores.setCurrent(ms1);
 			try { Thread.sleep(10); } catch (InterruptedException e) {}
 			obs1.complete(Stores.current());
 		});
-		ThreadUtils.runWithStore(ms2, () -> {
+		ThreadUtils.runVirtual(() -> {
+			Stores.setCurrent(ms2);
 			try { Thread.sleep(10); } catch (InterruptedException e) {}
 			obs2.complete(Stores.current());
 		});
@@ -171,12 +174,15 @@ public class StoresTest {
 	}
 
 	@Test
-	public void testRunWithStoreRestoresOnCompletion() throws Exception {
+	public void testVirtualThreadDoesNotAffectCaller() throws Exception {
 		AStore before = Stores.current();
 
 		MemoryStore ms = new MemoryStore();
 		CompletableFuture<Void> done = new CompletableFuture<>();
-		ThreadUtils.runWithStore(ms, () -> done.complete(null));
+		ThreadUtils.runVirtual(() -> {
+			Stores.setCurrent(ms);
+			done.complete(null);
+		});
 		done.get(5, TimeUnit.SECONDS);
 
 		// Calling thread's store should be unaffected
