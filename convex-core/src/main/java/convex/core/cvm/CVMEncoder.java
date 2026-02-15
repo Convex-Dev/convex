@@ -32,6 +32,7 @@ import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.prim.AByteFlag;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
@@ -125,6 +126,8 @@ public class CVMEncoder extends CAD3Encoder {
 			if (tag == CVMTag.OP_DEF) return Def.createFromRefs(r1, r2);
 			if (tag == CVMTag.OP_LET) return Let.createFromRefs(r1, r2, false);
 			if (tag == CVMTag.OP_LOOP) return Let.createFromRefs(r1, r2, true);
+		} catch (MissingDataException e) {
+			throw e; // fail-fast: don't degrade type on unresolvable refs
 		} catch (Exception e) {
 			// Catch all: tag may be shared with a generic CAD3 coded value
 		}
@@ -141,6 +144,8 @@ public class CVMEncoder extends CAD3Encoder {
 			if (tag == CVMTag.OP_DEF) return Def.read(b, pos);
 			if (tag == CVMTag.OP_LET) return Let.read(b,pos,false);
 			if (tag == CVMTag.OP_LOOP) return Let.read(b,pos,true);
+		} catch (MissingDataException e) {
+			throw e;
 		} catch (Exception e) {
 			// Catch all: tag may be shared with a generic CAD3 coded value
 		}
@@ -168,6 +173,8 @@ public class CVMEncoder extends CAD3Encoder {
 			if (tag == CVMTag.OP_INVOKE) return convex.core.cvm.ops.Invoke.fromData(data);
 			if (tag == CVMTag.PEER_STATUS) return new PeerStatus(data);
 			if (tag == CVMTag.ACCOUNT_STATUS) return AccountStatus.create(data);
+		} catch (MissingDataException e) {
+			throw e; // fail-fast: don't degrade type on unresolvable refs
 		} catch (Exception e) {
 			// Catch all: tag may be shared with a generic CAD3 dense record
 		}
@@ -215,6 +222,8 @@ public class CVMEncoder extends CAD3Encoder {
 			if (tag == CVMTag.OP_INVOKE) return convex.core.cvm.ops.Invoke.read(b,pos);
 			if (tag == CVMTag.PEER_STATUS) return PeerStatus.read(b,pos);
 			if (tag == CVMTag.ACCOUNT_STATUS) return AccountStatus.read(b,pos);
+		} catch (MissingDataException e) {
+			throw e;
 		} catch (Exception e) {
 			// Catch all: tag may be shared with a generic CAD3 dense record
 		}

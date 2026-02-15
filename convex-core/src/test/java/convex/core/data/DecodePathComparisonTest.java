@@ -5,71 +5,87 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.CVMEncoder;
+import convex.core.cvm.GenesisStateTest;
+import convex.core.cvm.SnapshotStateTest;
 import convex.core.data.AEncoder.DecodeState;
+import convex.core.exceptions.BadFormatException;
 
 /**
- * Tests that cells decoded via DecodeState re-encode to identical bytes.
- * If re-encoding differs, the hash will differ, breaking multi-cell ref
- * resolution in decodeMultiCell.
+ * Tests that cells decoded via DecodeState produce identical results to
+ * the Blob-based decode path: same encoding AND same Java type.
+ *
+ * The MultiFn bug showed that a cell can have correct encoding/hash but
+ * wrong Java type (DenseRecord instead of MultiFn), causing CVM divergence.
  */
 public class DecodePathComparisonTest {
 
 	static final CVMEncoder enc = CVMEncoder.INSTANCE;
 
-	/**
-	 * For each child cell in the belief multi-cell blob:
-	 * 1. Decode via DecodeState (no encoding attached)
-	 * 2. Re-encode the decoded cell
-	 * 3. Compare re-encoded bytes with original bytes
-	 *
-	 * Any mismatch means the DecodeState path produces a cell
-	 * that encodes differently, causing hash mismatch in resolveRefs.
-	 */
 	@Test
-	public void testChildCellReencoding() throws Exception {
-		Blob beliefBlob = convex.core.cpos.BeliefSnapshotTest.getBeliefBlob();
+	public void testBelief() throws Exception {
+		Blob blob = convex.core.cpos.BeliefSnapshotTest.getBeliefBlob();
+		checkMultiCellChildren(blob);
+	}
 
-		DecodeState ds = new DecodeState(beliefBlob);
+	@Test
+	public void testGenesisState() throws Exception {
+		Blob blob = GenesisStateTest.getGenesisBlob();
+		checkMultiCellChildren(blob);
+	}
+
+	@Test
+	public void testConsensusState() throws Exception {
+		ACell state = SnapshotStateTest.getConsensusState();
+		Blob blob = Format.encodeMultiCell(state, true);
+		checkMultiCellChildren(blob);
+	}
+
+	/**
+	 * For each child cell in a multi-cell blob, decode via both paths and verify:
+	 * 1. Re-encoding matches original bytes (hash correctness)
+	 * 2. Java type matches between DecodeState and Blob decode paths
+	 */
+	private void checkMultiCellChildren(Blob multiCellBlob) throws Exception {
+		DecodeState ds = new DecodeState(multiCellBlob);
 
 		// Skip top cell
 		ACell topCell = enc.read(ds);
 		assertNotNull(topCell);
 
-		// Check each child cell
 		int childCount = 0;
-		int mismatches = 0;
 		while (ds.pos < ds.limit) {
 			long encLength = enc.readVLQCount(ds);
 			int childStart = ds.pos;
 			int childEnd = childStart + (int) encLength;
 
-			// Original encoding bytes for this child
 			Blob originalEncoding = Blob.wrap(ds.data, childStart, (int) encLength);
 
-			// Decode via DecodeState
-			ACell child = enc.read(ds);
+			// Decode via DecodeState path
+			ACell dsCell = enc.read(ds);
 			assertEquals(childEnd, ds.pos, "DecodeState pos mismatch at child #" + childCount);
-			assertNotNull(child, "Child should not be null");
+			assertNotNull(dsCell, "Child should not be null");
 
-			// Re-encode the decoded cell
-			Blob reEncoded = Cells.encode(child);
+			// Check encoding round-trip
+			Blob reEncoded = Cells.encode(dsCell);
+			assertEquals(originalEncoding, reEncoded,
+				"Re-encoding mismatch at child #" + childCount
+				+ " type=" + dsCell.getClass().getSimpleName());
 
-			if (!originalEncoding.equals(reEncoded)) {
-				mismatches++;
-				System.out.println("MISMATCH child #" + childCount
-					+ " type=" + child.getClass().getSimpleName()
-					+ " origLen=" + originalEncoding.count()
-					+ " reEncLen=" + reEncoded.count()
-					+ " origHash=" + originalEncoding.getContentHash().toHexString()
-					+ " reEncHash=" + reEncoded.getContentHash().toHexString());
-				// Show first few bytes of each
-				int showLen = (int) Math.min(40, originalEncoding.count());
-				System.out.println("  orig: " + originalEncoding.slice(0, showLen).toHexString());
-				System.out.println("  reEnc: " + reEncoded.slice(0, Math.min(40, reEncoded.count())).toHexString());
+			// Check type match between DecodeState and Blob paths.
+			// Blob decode may fail for cells with non-embedded refs (no store),
+			// but for cells where it succeeds the types must match.
+			try {
+				ACell blobCell = enc.read(originalEncoding, 0);
+				assertEquals(blobCell.getClass(), dsCell.getClass(),
+					"Type mismatch at child #" + childCount
+					+ ": Blob path=" + blobCell.getClass().getSimpleName()
+					+ " DecodeState path=" + dsCell.getClass().getSimpleName());
+			} catch (BadFormatException e) {
+				// Expected for cells with non-embedded refs when no store is set
 			}
+
 			childCount++;
 		}
-		System.out.println("Compared " + childCount + " children, " + mismatches + " mismatches");
-		assertEquals(0, mismatches, "All child cells should re-encode identically");
+		assertTrue(childCount > 0, "Should have at least one child cell");
 	}
 }

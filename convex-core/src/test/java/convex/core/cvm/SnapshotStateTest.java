@@ -28,32 +28,47 @@ public class SnapshotStateTest {
 
 	private static final AccountKey PEER_KEY = AccountKey.fromHex("d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42");
 	private static final Hash EXPECTED_STATE = Hash.fromHex("77b0446d11ba2550abc533e16be90d380c08daab81491ad4cd166d4833cd5da9");
+
+	private static State cachedState;
+
+	/**
+	 * Returns the consensus state produced by applying belief blocks to genesis.
+	 * Computed once and cached for reuse across tests.
+	 */
+	public static synchronized State getConsensusState() {
+		if (cachedState != null) return cachedState;
+		try {
+			State genesis = GenesisStateTest.getGenesisState();
+			Belief belief = BeliefSnapshotTest.getBelief();
+			Order order = belief.getOrders().get(PEER_KEY).getValue();
+			long consensusPoint = order.getConsensusPoint();
+			AVector<SignedData<Block>> blocks = order.getBlocks();
+			State s = genesis;
+			for (long i = 0; i < consensusPoint; i++) {
+				s = s.applyBlock(blocks.get(i)).getState();
+			}
+			cachedState = s;
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to compute consensus state", e);
+		}
+		return cachedState;
+	}
+
 	private State state;
 	private Belief belief;
 	private Order order;
 
 	@BeforeAll
 	void computeConsensusState() throws Exception {
-		State genesis = GenesisStateTest.getGenesisState();
-		belief = BeliefSnapshotTest.getBelief();
+		state = getConsensusState();
+		assertNotNull(state);
 
-		// Pick the first order from the belief
+		belief = BeliefSnapshotTest.getBelief();
 		assertTrue(belief.getOrders().count() > 0, "Belief should have at least one order");
 
 		order = belief.getOrders().get(PEER_KEY).getValue();
 		assertNotNull(order, "Order should exist");
-		assertEquals(728, order.getConsensusPoint()); // observed consensus point
-
-		// Apply consensus blocks from the order to the genesis state
-		long consensusPoint = order.getConsensusPoint();
-		AVector<SignedData<Block>> blocks = order.getBlocks();
-		State s = genesis;
-		for (long i = 0; i < consensusPoint; i++) {
-			SignedData<Block> sb = blocks.get(i);
-			s = s.applyBlock(sb).getState();
-		}
-		state = s;
-		assertNotNull(state);
+		assertEquals(728, order.getConsensusPoint());
 	}
 
 	@Test
