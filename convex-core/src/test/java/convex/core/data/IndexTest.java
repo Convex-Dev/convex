@@ -25,7 +25,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class IndexTest {
@@ -139,8 +138,7 @@ public class IndexTest {
 		Index<ABlob, CVMLong> m = Index.of(Address.ZERO,Samples.IPSUM);
 
 		Blob enc=m.getEncoding();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try { assertEquals(m,Format.read(enc)); } finally { Stores.setCurrent(null); }
+		assertEquals(m,Samples.TEST_STORE.decode(enc));
 	}
 
 	@Test

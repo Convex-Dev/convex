@@ -13,6 +13,7 @@ import convex.core.data.AEncoder.DecodeState;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.test.Samples;
 /**
  * Tests decoding a real Belief snapshot from CAD3 multi-cell format
  * using the DecodeState path.
@@ -46,7 +47,7 @@ public class BeliefSnapshotTest {
 		assertTrue(beliefBlob.count() > 100, "Belief file too small");
 
 		try {
-			ACell result = Format.decodeMultiCell(beliefBlob);
+			ACell result = Samples.TEST_STORE.decodeMultiCell(beliefBlob);
 			assertInstanceOf(Belief.class, result);
 			belief = (Belief) result;
 		} catch (Exception e) {
@@ -61,7 +62,7 @@ public class BeliefSnapshotTest {
 
 	@Test
 	public void testDecodeStateMultiCell() throws Exception {
-		CVMEncoder encoder = CVMEncoder.INSTANCE;
+		CVMEncoder encoder = new CVMEncoder(convex.test.Samples.TEST_STORE);
 		DecodeState ds = new DecodeState(getBeliefBlob());
 
 		// Read top cell via DecodeState
@@ -96,7 +97,7 @@ public class BeliefSnapshotTest {
 		Blob reEncoded = Format.encodeMultiCell(getBelief(), true);
 
 		// Decode the re-encoded data via DecodeState
-		CVMEncoder encoder = CVMEncoder.INSTANCE;
+		CVMEncoder encoder = new CVMEncoder(convex.test.Samples.TEST_STORE);
 		DecodeState ds = new DecodeState(reEncoded);
 		ACell topCell = encoder.read(ds);
 		assertNotNull(topCell);

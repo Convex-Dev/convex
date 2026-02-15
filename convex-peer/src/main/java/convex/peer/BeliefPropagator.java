@@ -341,7 +341,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			// Add to map of new Beliefs received for each Peer
 			beliefReceivedCount++;			
 			try {
-				ACell payload=m.getPayload();
+				ACell payload=m.getPayload(getStore());
 				// log.info("Merging Belief message: "+Cells.getHash(payload));
 				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
 				for (SignedData<Order> so:a ) {
@@ -389,8 +389,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (MissingDataException e) {
 				log.debug("Missing data in Belief message "+m.getHash());
 				server.getConnectionManager().alertMissing(m,e,null);
+			} catch (BadFormatException e1) {
+				log.debug("Malformed Belief message");
 			}
-		} catch (ClassCastException | BadFormatException e) {
+		} catch (ClassCastException e) {
 			// Bad message from Peer
 			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
 		}  

@@ -9,8 +9,8 @@ import convex.core.cpos.Block;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
-import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.test.Samples;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 
@@ -63,7 +63,7 @@ public class BlocksTest {
 		
 		
 		Blob enc=b1.getEncoding();
-		Block decoded=Format.read(enc);
+		Block decoded=Samples.TEST_STORE.decode(enc);
 		assertEquals(enc,decoded.getEncoding());
 		assertEquals(b1,decoded);
 		

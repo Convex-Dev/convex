@@ -14,6 +14,7 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.store.AStore;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
@@ -124,10 +125,10 @@ public abstract class AGenericAPI {
 	 * @return CVM Value
 	 * @throws BadRequestResponse if the body is invalid
 	 */
-	protected <T extends ACell> T getRawBody(Context ctx) {
+	protected <T extends ACell> T getRawBody(Context ctx, AStore store) {
 		try {
 			byte[] bs=ctx.bodyAsBytes();
-			T result=Format.decodeMultiCell(Blob.wrap(bs));
+			T result=store.decodeMultiCell(Blob.wrap(bs));
 			return result;
 		} catch (Exception e) {
 			throw new BadRequestResponse(jsonError("Invalid Raw body"));

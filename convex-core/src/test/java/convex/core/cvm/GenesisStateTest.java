@@ -12,6 +12,7 @@ import convex.core.data.AEncoder.DecodeState;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.test.Samples;
 /**
  * Tests decoding a real genesis state from CAD3 multi-cell format
  * using the DecodeState path.
@@ -45,7 +46,7 @@ public class GenesisStateTest {
 		assertTrue(genesisBlob.count() > 100, "Genesis file too small");
 
 		try {
-			ACell result = Format.decodeMultiCell(genesisBlob);
+			ACell result = Samples.TEST_STORE.decodeMultiCell(genesisBlob);
 			assertInstanceOf(State.class, result);
 			genesisState = (State) result;
 		} catch (Exception e) {
@@ -65,7 +66,7 @@ public class GenesisStateTest {
 
 	@Test
 	public void testDecodeStateMultiCell() throws Exception {
-		CVMEncoder encoder = CVMEncoder.INSTANCE;
+		CVMEncoder encoder = new CVMEncoder(convex.test.Samples.TEST_STORE);
 		DecodeState ds = new DecodeState(getGenesisBlob());
 
 		// Read top cell via DecodeState
@@ -100,7 +101,7 @@ public class GenesisStateTest {
 		Blob reEncoded = Format.encodeMultiCell(getGenesisState(), true);
 
 		// Decode the re-encoded data via DecodeState
-		CVMEncoder encoder = CVMEncoder.INSTANCE;
+		CVMEncoder encoder = new CVMEncoder(convex.test.Samples.TEST_STORE);
 		DecodeState ds = new DecodeState(reEncoded);
 		ACell topCell = encoder.read(ds);
 		assertNotNull(topCell);

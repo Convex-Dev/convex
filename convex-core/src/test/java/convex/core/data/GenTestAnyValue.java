@@ -79,8 +79,8 @@ public class GenTestAnyValue {
 			Cells.persist(o, Samples.TEST_STORE); // NOTE: may have child refs to persist
 			
 			Blob data=Cells.encode(o);
-			ACell o2=Format.read(data);
-			
+			ACell o2=Samples.TEST_STORE.decode(data);
+
 			// check round trip properties
 			assertEquals(o,o2);
 			AArrayBlob data2=Cells.encode(o2);
@@ -113,7 +113,7 @@ public class GenTestAnyValue {
 		assertEquals(dataRef.getHash(),hash);
 		
 		// re-read data, should be canonical
-		ACell o2=Format.read(data);
+		ACell o2=Samples.TEST_STORE.decode(data);
 		assertTrue(Cells.isCanonical(o2));
 		
 		// equality checks

@@ -37,7 +37,7 @@ public class ListsTest {
 		// Encoding should be list tag plus zero for VLC length count
 		Blob expectedEncoding=Blob.create(new byte[] {Tag.LIST,0});
 		assertEquals(expectedEncoding,e.getEncoding());
-		assertSame(e,Format.read(expectedEncoding));
+		assertSame(e,Samples.TEST_STORE.decode(expectedEncoding));
 		
 		// Reverse gets back to empty vector
 		assertSame(Vectors.empty(),e.reversed());

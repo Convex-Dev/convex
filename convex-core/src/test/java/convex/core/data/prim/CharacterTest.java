@@ -11,8 +11,8 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.test.Samples;
 import convex.core.data.Strings;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -57,13 +57,13 @@ public class CharacterTest {
 	@Test 
 	public void testBadFormats() {
 		// Leading zero in encoding of 2-byte character
-		assertThrows(BadFormatException.class,()->Format.read("3d0012"));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("3d0012")));
+
 		// Leading zero in encoding of 4-byte character
-		assertThrows(BadFormatException.class,()->Format.read("3f00123456"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("3f00123456")));
 
 		// Out of Unicode range
-		assertThrows(BadFormatException.class,()->Format.read("3f12345678"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("3f12345678")));
 
 	}
 	
@@ -75,7 +75,7 @@ public class CharacterTest {
 	public void doValidCharTests(CVMChar a) throws BadFormatException {
 		assertNotNull(a);
 		Blob b=a.getEncoding();
-		assertEquals(a,Format.read(b));
+		assertEquals(a,Samples.TEST_STORE.decode(b));
 		
 		byte[] bs=a.toUTFBytes();
 		assertEquals(a.toString(),new String(bs,StandardCharsets.UTF_8));

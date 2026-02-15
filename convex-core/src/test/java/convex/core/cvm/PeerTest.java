@@ -64,9 +64,7 @@ public class PeerTest {
 		temp.toFile().deleteOnExit();
 		
 		FileUtils.writeCAD3(temp,data);
-		Stores.setCurrent(Samples.TEST_STORE);
-		AMap<Keyword, ACell> data2;
-		try { data2=FileUtils.loadCAD3(temp); } finally { Stores.setCurrent(null); }
+		AMap<Keyword, ACell> data2=FileUtils.loadCAD3(temp, Samples.TEST_STORE);
 		
 		Peer p4=Peer.fromData(KP, data2);
 		assertEquals(p.getBelief(),p4.getBelief());

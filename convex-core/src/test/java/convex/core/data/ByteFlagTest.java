@@ -14,6 +14,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.test.Samples;
 
 public class ByteFlagTest {
 
@@ -68,7 +69,7 @@ public class ByteFlagTest {
 		assertSame(b,Reader.read(rd));
 		
 		// should all be singletons!
-		assertSame(b,Format.read(enc));
+		assertSame(b,Samples.TEST_STORE.decode(enc));
 		
 		ObjectsTest.doAnyValueTests(b);
 	}

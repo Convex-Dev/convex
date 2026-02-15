@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.cvm.ARecordGeneric;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -16,6 +17,7 @@ import convex.core.cvm.RecordFormat;
 import convex.core.cvm.exception.AExceptional;
 import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ACell;
+import convex.core.data.AEncoder;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -540,8 +542,10 @@ public final class Result extends ARecordGeneric {
 		long count=Format.readVLQCount(messageData, rpos);
 		if (count<1) throw new BadFormatException("Result with no elements");
 		rpos+=Format.getVLQCountLength(count);
-		// First element is the ID — always embedded, so decode directly
-		return Format.read(messageData, rpos);
+		// First element is the ID — always embedded, so decode inline
+		AEncoder.DecodeState ds = new AEncoder.DecodeState(messageData);
+		ds.pos = rpos;
+		return CVMEncoder.INSTANCE.read(ds);
 	}
 
 

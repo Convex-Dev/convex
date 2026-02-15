@@ -72,7 +72,7 @@ public class SymbolTest {
 	@Test
 	public void testBadFormat() {
 		// should fail because this is an empty String (0 length field)
-		assertThrows(BadFormatException.class, () -> Format.read(Blob.fromHex("3200")));
+		assertThrows(BadFormatException.class, () -> Samples.TEST_STORE.decode(Blob.fromHex("3200")));
 	}
 
 	@Test

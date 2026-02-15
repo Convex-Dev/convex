@@ -29,7 +29,6 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -57,24 +56,19 @@ public class MessageTest {
 		Blob enc=mq.getMessageData();
 
 		// Decoding messages with non-embedded content requires a store
-		AStore saved=Stores.current();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			Message mr=Message.create(enc);
-			AVector<ACell> v=mr.toResult().getValue();
+		Message mr=Message.create(enc);
+		mr.getPayload(Samples.TEST_STORE);
+		AVector<ACell> v=mr.toResult().getValue();
 
-			assertEquals(b,v.get(0));
-			Cells.persist(b, Samples.TEST_STORE);
+		assertEquals(b,v.get(0));
+		Cells.persist(b, Samples.TEST_STORE);
 
-			Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
-			doMessageTest(md);
+		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
+		doMessageTest(md);
 
-			Message mdr=md.makeDataResponse(Samples.TEST_STORE);
-			assertEquals(mq,mdr);
-			doMessageTest(mdr);
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		Message mdr=md.makeDataResponse(Samples.TEST_STORE);
+		assertEquals(mq,mdr);
+		doMessageTest(mdr);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -91,19 +85,15 @@ public class MessageTest {
 		
 		Blob enc=m.getMessageData();
 		
-		Stores.setCurrent(Samples.TEST_STORE);
-		ACell b2;
-		try { b2=Format.decodeMultiCell(enc); } finally { Stores.setCurrent(null); }
+		ACell b2=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(belief.getHash(),b2.getHash());
 		
 		Message m2=Message.create(enc);
 		assertNull(m.getResultID());
 
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			assertEquals(MessageType.BELIEF,m2.getType());
-			assertEquals(belief,m2.getPayload());
-		} finally { Stores.setCurrent(null); }
+		assertEquals(MessageType.BELIEF,m2.getType());
+		m2.getPayload(Samples.TEST_STORE);
+		assertEquals(belief,m2.getPayload());
 
 
 	}
@@ -121,18 +111,13 @@ public class MessageTest {
 		Blob enc=mr.getMessageData();
 
 		// Decoding messages with non-embedded content requires a store
-		AStore saved=Stores.current();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			Message mrs=Message.create(enc);
-			AVector<ACell> v=mrs.getPayload();
-			assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
-			assertEquals(MessageType.DATA_REQUEST,mrs.getType());
-			assertEquals(MessageTag.DATA_REQUEST,v.get(0));
-			doMessageTest(mrs);
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		Message mrs=Message.create(enc);
+		mrs.getPayload(Samples.TEST_STORE);
+		AVector<ACell> v=mrs.getPayload();
+		assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
+		assertEquals(MessageType.DATA_REQUEST,mrs.getType());
+		assertEquals(MessageTag.DATA_REQUEST,v.get(0));
+		doMessageTest(mrs);
 	}
 	
 	
@@ -154,12 +139,12 @@ public class MessageTest {
 		}
 	}
 	
-	@Test public void testQuery() {
+	@Test public void testQuery() throws BadFormatException {
 		Message m=Message.createQuery(0, Symbols.STAR_BALANCE, Address.ZERO);
 		doMessageTest(m);
 	}
 	
-	@Test public void testTransact() {
+	@Test public void testTransact() throws BadFormatException {
 		ATransaction tx=Invoke.create(Address.create(134564), 124334, Symbols.STAR_BALANCE);
 		SignedData<ATransaction> stx=KP.signData(tx);
 		Message m=Message.createTransaction(12, stx);
@@ -193,7 +178,7 @@ public class MessageTest {
 	}
 	
 	@Test
-	public void testStatusMessage() {
+	public void testStatusMessage() throws BadFormatException {
 		Message m=Message.createStatusRequest(2);
 		assertEquals(RT.cvm(2),m.getID());
 		doMessageTest(m);
@@ -208,8 +193,9 @@ public class MessageTest {
 	/**
 	 * Generic tests for any valid message
 	 * @param m Message to test
+	 * @throws BadFormatException 
 	 */
-	public void doMessageTest(Message m) {
+	public void doMessageTest(Message m) throws BadFormatException {
 		MessageType type=m.getType();
 		assertNotNull(type);
 		
@@ -233,9 +219,7 @@ public class MessageTest {
 			Blob data=m.getMessageData();
 			assertTrue(data.count()>0);
 		
-			Stores.setCurrent(Samples.TEST_STORE);
-			ACell dp;
-			try { dp=Format.decodeMultiCell(data); } finally { Stores.setCurrent(null); }
+			ACell dp=Samples.TEST_STORE.decodeMultiCell(data);
 			Message m2=Message.create(null, dp);
 			
 			assertEquals(type,m2.getType());

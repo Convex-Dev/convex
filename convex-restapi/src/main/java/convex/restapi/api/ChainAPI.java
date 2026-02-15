@@ -252,7 +252,7 @@ public class ChainAPI extends ABaseAPI {
 		
 		ACell r;
 		try {
-			r = Format.decodeMultiCell(value.toFlatBlob());
+			r = server.getStore().decodeMultiCell(value.toFlatBlob());
 		} catch (BadFormatException e) {
 			this.failBadRequest("Error decoding CAD3 data - bad format");
 			return;
@@ -886,7 +886,7 @@ public class ChainAPI extends ABaseAPI {
 		
 		if (ContentTypes.CVX_RAW.equals(type)) {
 			// Can accept a raw convex signed transaction
-			ACell c=getRawBody(ctx);
+			ACell c=getRawBody(ctx, server.getStore());
 			if ((c instanceof SignedData)&&(((SignedData<?>) c).getValue() instanceof ATransaction)) {
 				sd=(SignedData<ATransaction>) c;
 				// System.out.println("tx enc: "+sd.getEncoding());

@@ -8,12 +8,12 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.ops.Constant;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.ACVMTest;
+import convex.test.Samples;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 
@@ -27,7 +27,7 @@ public class FunctionTest extends ACVMTest {
 		assertEquals(CVMBool.TRUE,ctx.getResult());
 		
 		Blob enc=f.getEncoding();
-		assertTrue(Format.read(enc) instanceof Fn);
+		assertTrue(Samples.TEST_STORE.decode(enc) instanceof Fn);
 		
 		doFunctionTest(f);
 	}

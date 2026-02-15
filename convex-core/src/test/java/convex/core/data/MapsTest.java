@@ -156,7 +156,7 @@ public class MapsTest {
 		assertEquals(trans.isEmbedded(),me.getValueRef().isEmbedded());
 
 		Blob b=m.getEncoding();
-		AMap<CVMLong,ATransaction> m2=Format.read(b);
+		AMap<CVMLong,ATransaction> m2=Samples.TEST_STORE.decode(b);
 
 		assertEquals(m,m2);
 

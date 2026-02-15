@@ -33,7 +33,11 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				break;
 			}
 			case RESULT: {
-				handleResultMessage(m);
+				try {
+					handleResultMessage(m);
+				} catch (BadFormatException e) {
+					throw new IllegalStateException("Trying to handle malformed message");
+				}
 				break;
 			}
 			default: {
@@ -60,14 +64,15 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * Method called when a result is received.
 	 *
 	 * By default, delegates to handleResult and handleError
+	 * @throws BadFormatException 
 	 */
-	private final void handleResultMessage(Message m) {
+	private final void handleResultMessage(Message m) throws BadFormatException {
 		try {
 			Result result = m.getPayload();
 			// we now have the full result, so notify those interested
 			ACell cid=m.getID();
 			handleResult(cid,result);
-		} catch (BadFormatException | MissingDataException e) {
+		} catch (MissingDataException e) {
 			// If there is missing data, re-buffer the message
 			// Ignore. We probably lost this result?
 			log.warn("Exception handling result",e);

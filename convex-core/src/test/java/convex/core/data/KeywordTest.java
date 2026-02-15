@@ -37,7 +37,7 @@ public class KeywordTest {
 	@Test
 	public void testBadFormat() {
 		// should fail because this is an empty String
-		assertThrows(BadFormatException.class, () -> Format.read(Blob.fromHex("3300")));
+		assertThrows(BadFormatException.class, () -> Samples.TEST_STORE.decode(Blob.fromHex("3300")));
 	}
 	
 	@Test 
@@ -47,7 +47,7 @@ public class KeywordTest {
 		Blob enc=Blob.fromHex("33056b65793137");
 		
 		assertEquals(enc,k.getEncoding());
-		Keyword k2=Format.read(enc);
+		Keyword k2=Samples.TEST_STORE.decode(enc);
 		
 		assertEquals(k,k2);
 		assertEquals(enc,k.getEncoding());

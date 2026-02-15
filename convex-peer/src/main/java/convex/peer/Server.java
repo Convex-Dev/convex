@@ -40,6 +40,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
@@ -47,7 +48,6 @@ import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
@@ -90,15 +90,15 @@ public class Server implements Closeable {
 	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> receiveAction = m->{
-		// Ensure server store is available on Netty IO threads for message decoding
-		AStore saved=Stores.current();
-		Stores.setCurrent(getStore());
 		try {
-			observeMessageReceived(m);
-			processMessage(m);
-		} finally {
-			Stores.setCurrent(saved);
+			// Decode message payload using server's store before processing
+			m.getPayload(getStore());
+		} catch (Exception e) {
+			m.returnMessage(Message.createResult(Result.fromException(e).withID(m.getRequestID())));
+			return;
 		}
+		observeMessageReceived(m);
+		processMessage(m);
 	};
 
 	/**
@@ -461,7 +461,7 @@ public class Server implements Closeable {
 				processStatus(m);
 				break;
 			default:
-				log.info("Unrecognised message: "+m);
+				log.info("Unrecognised message");
 				break;
 			}
 		} catch (MissingDataException e) {
@@ -597,7 +597,7 @@ public class Server implements Closeable {
 		manager.processChallenge(m, getPeer());
 	}
 
-	protected void processResponse(Message m) {
+	protected void processResponse(Message m) throws BadFormatException {
 		manager.processResponse(m, getPeer());
 	}
 

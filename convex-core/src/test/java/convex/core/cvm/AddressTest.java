@@ -15,7 +15,6 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.BlobsTest;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Ref;
@@ -47,7 +46,7 @@ public class AddressTest {
 		Address a= Address.create(17);
 		Blob enc=a.getEncoding();
 		assertEquals(Utils.toHexString(CVMTag.ADDRESS)+"11",enc.toHexString());
-		ACell ra=Format.read(enc);
+		ACell ra=Samples.TEST_STORE.decode(enc);
 		assertTrue(ra instanceof Address);
 		assertEquals(a,ra);
 	}

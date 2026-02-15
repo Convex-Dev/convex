@@ -5,10 +5,8 @@ import java.util.function.Consumer;
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
-import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.exceptions.BadFormatException;
 
 /**
  * A store that never persists anything. Ref lookups always return null,
@@ -53,12 +51,6 @@ public class NullStore extends AStore {
 
 	@Override
 	public void close() {
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
-		return (T) encoder.decode(encoding);
 	}
 
 	@Override

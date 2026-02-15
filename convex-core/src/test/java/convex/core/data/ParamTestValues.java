@@ -126,7 +126,7 @@ public class ParamTestValues extends ACVMTest {
 		Cells.persist(data, Samples.TEST_STORE);
 		String hex = Cells.encode(data).toHexString();
 		Blob d2 = Blob.fromHex(hex);
-		ACell rec = Format.read(d2);
+		ACell rec = Samples.TEST_STORE.decode(d2);
 		
 		assertEquals(data, rec);
 		

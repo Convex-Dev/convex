@@ -82,7 +82,7 @@ public class FuzzTestFormat {
 	private static void doFuzzTest(Blob b) throws BadFormatException {
 		ACell v;
 		try {
-			v = Format.read(b,0);
+			v = Samples.TEST_STORE.decode(b);
 		} catch (ArrayIndexOutOfBoundsException e) {
 			// We read past buffer, so basically OK up to that point
 			// Try again with bigger buffer!
@@ -104,7 +104,7 @@ public class FuzzTestFormat {
 		assertTrue(Cells.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
 		
 		Blob b2 = Cells.encode(v);
-		assertEquals(v, Format.read(b2),
+		assertEquals(v, Samples.TEST_STORE.decode(b2),
 				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
 
 		// recursive fuzzing on this value

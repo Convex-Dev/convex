@@ -27,7 +27,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class BlobsTest {
@@ -333,8 +332,8 @@ public class BlobsTest {
 		assertSame(e,e.append(e));
 		assertSame(e,new BlobBuilder().toBlob());
 		
-		assertSame(e,Format.read(Cells.encode(e)));	
-		assertSame(e,Format.read(e.getEncoding()));
+		assertSame(e,Samples.TEST_STORE.decode(Cells.encode(e)));
+		assertSame(e,Samples.TEST_STORE.decode(e.getEncoding()));
 		
 		assertSame(e,e.getChunk(0));
 		
@@ -422,7 +421,7 @@ public class BlobsTest {
 		assertEquals(Blob.fromHex("3100"),Blobs.empty().getEncoding());
 		
 		// Bad VLC length
-		assertThrows(BadFormatException.class,()->Format.read(Blob.fromHex("318000")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("318000")));
 	}
 	
 	@Test
@@ -572,19 +571,16 @@ public class BlobsTest {
 		bb.validate();
 
 		Ref<BlobTree> rb = Cells.persist(bb, Samples.TEST_STORE).getRef();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			BlobTree bbb = Format.read(bb.getEncoding());
-			bbb.validate();
-			assertEquals(bb, bbb);
-			assertEquals(bb, rb.getValue());
-			assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
+		BlobTree bbb = Samples.TEST_STORE.decode(bb.getEncoding());
+		bbb.validate();
+		assertEquals(bb, bbb);
+		assertEquals(bb, rb.getValue());
+		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
 
-			// Check streaming a BlobTree
-			assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
+		// Check streaming a BlobTree
+		assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
 
-			doBlobTests(bb);
-		} finally { Stores.setCurrent(null); }
+		doBlobTests(bb);
 	}
 	
 	@Test
@@ -704,13 +700,13 @@ public class BlobsTest {
 	@Test
 	public void testBlobEncoding() throws BadFormatException {
 		byte[] bf = new byte[] { Tag.BLOB, 0 };
-		Blob b = Format.read(Blob.wrap(bf));
+		Blob b = Samples.TEST_STORE.decode(Blob.wrap(bf));
 		assertSame(Blob.EMPTY,b);
-		
+
 		Blob enc=Blob.createRandom(new InsecureRandom(3452534), 100).getEncoding();
-		
+
 		// Blob should re-use encoding array
-		Blob b2=Format.read(enc);
+		Blob b2=Samples.TEST_STORE.decode(enc);
 		assertSame(enc.getInternalArray(),b2.getInternalArray());	
 		assertTrue(b2.isEmbedded());
 		assertEquals(0,b2.getBranchCount());
@@ -727,9 +723,7 @@ public class BlobsTest {
 	   Ref<ACell> pref = Cells.persist(value, Samples.TEST_STORE).getRef(); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
 	   Blob b = value.getEncoding();
-	   Stores.setCurrent(Samples.TEST_STORE);
-	   ACell o;
-	   try { o = Format.read(b); } finally { Stores.setCurrent(null); }
+	   ACell o = Samples.TEST_STORE.decode(b);
 
 	   assertEquals(RT.getType(value), RT.getType(o));
 	   assertEquals(value, o);

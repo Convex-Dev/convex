@@ -27,7 +27,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -134,9 +133,7 @@ public class RefTest {
 		Blob enc=r.getEncoding();
 		
 		// Should be able to read incomplete encoding
-		Stores.setCurrent(Samples.TEST_STORE);
-		ABlob b;
-		try { b=Format.read(enc); } finally { Stores.setCurrent(null); }
+		ABlob b=Samples.TEST_STORE.decode(enc);
 		
 		assertEquals(enc,b.getEncoding());
 		assertEquals(b,r); // Shouldn't hit store!
@@ -421,7 +418,7 @@ public class RefTest {
 		Blob b=ref.getEncoding();
 		assertSame(a.getEncoding(),b); // ref encoding should just be the embedded value encoding
 		// Embedded value: decode from encoding and compare Ref
-		ACell decoded = Format.read(b);
+		ACell decoded = Samples.TEST_STORE.decode(b);
 		assertEquals(ref, decoded.getRef());
 	}
 }

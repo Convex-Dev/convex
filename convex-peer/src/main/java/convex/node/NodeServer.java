@@ -175,6 +175,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private void handleIncomingMessage(Message message) {
 		log.debug("Received message from peer: {}", message);
+		System.err.println("NodeServer handle: "+message);
 		
 		try {
 			MessageType type = message.getType();
@@ -195,10 +196,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				log.debug("Unhandled message type: {}", type);
 				break;
 			}
-		} catch (BadFormatException e) {
-			log.warn("Bad format in message: {}", message, e);
 		} catch (Exception e) {
-			log.warn("Error handling incoming message", e);
+			message.returnResult(Result.fromException(e));
+			System.err.println("Error handling incoming message "+ e);
 		}
 	}
 	
@@ -228,7 +228,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws BadFormatException If message format is invalid
 	 */
 	private void processLatticeQuery(Message message) throws BadFormatException {
-		AVector<?> payload = RT.ensureVector(message.getPayload());
+		AVector<?> payload = RT.ensureVector(message.getPayload(store));
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_QUERY message format");
 			Result error = Result.create(message.getID(), Strings.create("Invalid LATTICE_QUERY format"), ErrorCodes.ARGUMENT);
@@ -611,7 +611,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				
 				// Check if result is an error
 				if (result.isError()) {
-					String errorMsg = result.getValue() != null ? result.getValue().toString() : "Unknown error";
+					String errorMsg = result.toString();
 					log.warn("Sync failed with error: {}", errorMsg);
 					throw new RuntimeException("Sync failed: " + errorMsg);
 				}

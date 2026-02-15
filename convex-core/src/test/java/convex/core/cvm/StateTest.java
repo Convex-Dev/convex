@@ -27,7 +27,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 /**
@@ -78,17 +77,14 @@ public class StateTest {
 		// assertTrue(s.getRef().isPersisted());
 
 		Blob b = Cells.encode(s);
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			State s2 = Format.read(b);
-			assertEquals(s, s2);
+		State s2 = Samples.TEST_STORE.decode(b);
+		assertEquals(s, s2);
 
-			AccountStatus as=s2.getAccount(InitTest.HERO);
-			assertNotNull(as);
+		AccountStatus as=s2.getAccount(InitTest.HERO);
+		assertNotNull(as);
 
-			doStateTests(s2);
-			RecordTest.doRecordTests(as);
-		} finally { Stores.setCurrent(null); }
+		doStateTests(s2);
+		RecordTest.doRecordTests(as);
 	}
 	
 	@Test
@@ -104,9 +100,8 @@ public class StateTest {
 		
 		Blob b=Format.encodeMultiCell(s,true);
 		
-		Stores.setCurrent(Samples.TEST_STORE);
 		State s2;
-		try { s2=Format.decodeMultiCell(b); } finally { Stores.setCurrent(null); }
+		s2=Samples.TEST_STORE.decodeMultiCell(b);
 		// System.err.println(Refs.printMissingTree(s2));
 		assertEquals(s,s2);
 		

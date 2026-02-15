@@ -22,6 +22,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Blob;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -102,7 +103,7 @@ public class ConvexHTTP extends convex.api.Convex {
 			} else if (ContentTypes.CVX_RAW.equals(type)) {
 				byte[] body = response.body();
 				try {
-					ACell v = Format.decodeMultiCell(Blob.wrap(body));
+					ACell v = CVMEncoder.INSTANCE.decodeMultiCell(Blob.wrap(body));
 					if (v instanceof Result) return (Result)v;
 					return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
 				} catch (MissingDataException e) {

@@ -38,7 +38,6 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.ExtensionValue;
-import convex.core.data.Format;
 import convex.core.data.List;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
@@ -52,6 +51,7 @@ import convex.core.init.Init;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 /**
  * Tests for ops functionality.
@@ -168,7 +168,7 @@ public class OpsTest extends ACVMTest {
 		Blob enc=op.getEncoding();
 		
 		assertEquals(CVMTag.OP_DO,op.getTag());
-		assertEquals(op,Format.read(enc));
+		assertEquals(op,Samples.TEST_STORE.decode(enc));
 
 		ObjectsTest.doCAD3Tests(op);
 		
@@ -199,7 +199,7 @@ public class OpsTest extends ACVMTest {
 		assertFalse(c2.getEnvironment().containsKey(Symbols.FOO));
 		
 		Blob enc=op.getEncoding();
-		ACell decoded=Format.read(enc);
+		ACell decoded=Samples.TEST_STORE.decode(enc);
 		assertEquals(op,decoded);
 		assertEquals(op.getRefCount(),decoded.getRefCount());
 		
@@ -245,7 +245,7 @@ public class OpsTest extends ACVMTest {
 		AOp<Address> op = Set.create(45, Constant.nil());
 		Blob expectedEncoding=Blob.fromHex("c0112dc0b000");
 		assertEquals(expectedEncoding,op.getEncoding());
-		assertEquals(op,Format.read(expectedEncoding));
+		assertEquals(op,Samples.TEST_STORE.decode(expectedEncoding));
 		doOpTest(op);
 	}
 
@@ -399,7 +399,7 @@ public class OpsTest extends ACVMTest {
 	@Test 
 	public void testLocalRegression() throws BadFormatException {
 		Blob enc=Blob.fromHex("cc0bf554"); // Local with negative index
-		assertThrows(BadFormatException.class,()->Format.read(enc));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(enc));
 	}
 
 	public static <T extends ACell> void doOpTest(AOp<T> op) {

@@ -15,7 +15,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
@@ -31,7 +30,7 @@ public class GenTestFormat {
 	public void messageRoundTrip(String str) throws BadFormatException {
 		AString s=Strings.create(str);
 		Blob b = Cells.encode(s);
-		AString s2 = Format.read(b);
+		AString s2 = Samples.TEST_STORE.decode(b);
 		assertEquals(s, s2);
 		assertEquals(b, Cells.encode(s2));
 
@@ -45,7 +44,7 @@ public class GenTestFormat {
 			// persist in case large
 			Cells.persist(prim, Samples.TEST_STORE);
 		}
-		ACell o = Format.read(b);
+		ACell o = Samples.TEST_STORE.decode(b);
 		assertEquals(prim, o);
 		assertEquals(b, Cells.encode(o));
 
@@ -57,7 +56,7 @@ public class GenTestFormat {
 		Ref<ACell> pref = Ref.get(Cells.persist(value, Samples.TEST_STORE)); // ensure persisted
 		Blob b = Cells.encode(value);
 		try {
-			ACell o = Format.read(b);
+			ACell o = Samples.TEST_STORE.decode(b);
 			
 			assertEquals(value, o);
 			assertEquals(b, Cells.encode(o));

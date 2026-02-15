@@ -18,6 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
+import convex.test.Samples;
 
 public class FunctionTest {
 
@@ -61,7 +62,7 @@ public class FunctionTest {
 
 		// Encode as multi-cell (children include the non-embedded Fn objects)
 		Blob encoded = Format.encodeMultiCell(mfn, true);
-		ACell decoded = Format.decodeMultiCell(encoded);
+		ACell decoded = Samples.TEST_STORE.decodeMultiCell(encoded);
 
 		// Must be MultiFn, not DenseRecord
 		assertInstanceOf(MultiFn.class, decoded,

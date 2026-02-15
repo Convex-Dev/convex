@@ -169,9 +169,6 @@ public class TransactionHandler extends AThreadedComponent {
 			this.clientTransactionCount++;
 			
 			registerInterest(sd.getHash(), m);		
-		} catch (BadFormatException e) {
-			log.warn("Unhandled exception in transaction handler",e);
-			m.closeConnection();
 		} catch (MissingDataException e) {
 			m.returnResult(Result.fromException(e).withSource(SourceCodes.PEER));
 			return;

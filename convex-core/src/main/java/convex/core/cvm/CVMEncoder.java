@@ -63,6 +63,11 @@ public class CVMEncoder extends CAD3Encoder {
 	}
 
 	@Override
+	protected CVMEncoder withStore(AStore store) {
+		return new CVMEncoder(store);
+	}
+
+	@Override
 	protected ACell readExtension(byte tag, DecodeState ds) throws BadFormatException {
 		long code = readVLQCount(ds);
 		if (tag == CVMTag.CORE_DEF) {

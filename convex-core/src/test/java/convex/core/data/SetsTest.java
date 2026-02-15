@@ -17,7 +17,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 /**
@@ -61,9 +60,8 @@ public class SetsTest {
 		Ref<ACell> pref = Ref.get(Cells.persist(s, Samples.TEST_STORE)); // ensure persisted
 
 		Blob enc=s.getEncoding();
-		Stores.setCurrent(Samples.TEST_STORE);
-		try { assertEquals(s,Format.read(enc)); } finally { Stores.setCurrent(null); }
-		
+		assertEquals(s,Samples.TEST_STORE.decode(enc));
+
 		assertEquals(s,pref.getValue());
 	}
 	
@@ -139,7 +137,7 @@ public class SetsTest {
 		ASet<CVMLong> v1=Sets.of(43);
 		Blob b1 = Cells.encode(v1);
 		
-		ASet<CVMLong> v2=Format.read(b1);
+		ASet<CVMLong> v2=Samples.TEST_STORE.decode(b1);
 		Blob b2 = Cells.encode(v2);
 		
 		assertEquals(v1, v2);

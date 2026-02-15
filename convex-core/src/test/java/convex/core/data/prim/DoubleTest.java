@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.test.Samples;
 import convex.core.exceptions.BadFormatException;
 
 public class DoubleTest {
@@ -30,7 +30,7 @@ public class DoubleTest {
 		
 		// IEEEE754 / CAD3 allows NaNs that are not the canonical CVM NaN
 		Blob BAD_NAN=Blob.fromHex("1d7ff8000000ffffff");
-		CVMDouble badNan=Format.read(BAD_NAN);
+		CVMDouble badNan=Samples.TEST_STORE.decode(BAD_NAN);
 		assertEquals("#[1d7ff8000000ffffff]",badNan.toString());
 		assertEquals(badNaNDouble,badNan.doubleValue());
 		

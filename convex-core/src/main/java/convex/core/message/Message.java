@@ -4,7 +4,6 @@ import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Address;
@@ -116,16 +115,39 @@ public class Message {
 		return BYE_MESSAGE;
 	}
 
+	/**
+	 * Gets the decoded payload for this message. If not already encoded, assumes
+	 * a completely encoded message with a null store.
+	 *
+	 * @param <T> Expected payload type
+	 * @return Payload value
+	 * @throws IllegalStateException If the message has not yet been decoded
+	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> T getPayload() throws BadFormatException {
+	public <T extends ACell> T getPayload() {
+		if (payload!=null) return (T) payload;
+		throw new IllegalStateException("Payload null - not yet decoded?");
+	}
+
+	/**
+	 * Gets the payload for this message, using the given store to resolve any
+	 * refs not contained within the message itself (e.g. delta-encoded beliefs).
+	 *
+	 * @param <T> Expected payload type
+	 * @param store Store for resolving external refs
+	 * @return Payload value
+	 * @throws BadFormatException If the message data is malformed
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T getPayload(AStore store) throws BadFormatException {
 		if (payload!=null) return (T) payload;
 		if (messageData==null) return null; // no message data, so must actually be null
-		
+
 		// detect actual message data for null payload :-)
 		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
-		
-		payload=Format.decodeMultiCell(messageData);
-		
+
+		payload=store.decodeMultiCell(messageData);
+
 		return (T) payload;
 	}
 	
@@ -147,7 +169,7 @@ public class Message {
 	}
 
 	/**
-	 * Get the type of this message. May be UNKOWN if the message cannot be understood / processed
+	 * Get the type of this message. May be UNKNOWN if the message cannot be understood / processed
 	 * @return Type of message
 	 */
 	public MessageType getType() {
@@ -196,14 +218,15 @@ public class Message {
 	@Override
 	public String toString() {
 		try {
-			ACell payload=getPayload();
-			AString ps=RT.print(payload,10000);
+			ACell pl=payload; // use cached payload only, don't force decode
+			if (pl==null) {
+				return "<UNDECODED MESSAGE [" + getType() + "] ENC "+getMessageData().toHexString(16)+">";
+			}
+			AString ps=RT.print(pl,10000);
 			if (ps==null) return ("<BIG MESSAGE "+RT.count(getMessageData())+" TYPE ["+getType()+"]>");
 			return ps.toString();
 		} catch (MissingDataException e) {
 			return "<PARTIAL MESSAGE [" + getType() + "] MISSING "+e.getMissingHash()+" ENC "+getMessageData().toHexString(16)+">";
-		} catch (BadFormatException e) {
-			return "<CORRUPTED MESSAGE ["+getType()+"]>: "+e.getMessage();
 		}
 	}
 	
@@ -219,11 +242,9 @@ public class Message {
 	
 	@Override
 	public int hashCode() {
-		try {
-			return Utils.hashCode(getPayload());
-		} catch (BadFormatException e) {
-			return 0;
-		}
+		ACell pl=payload;
+		if (pl!=null) return Utils.hashCode(pl);
+		return getMessageData().hashCode();
 	}
 
 	/**
@@ -231,11 +252,16 @@ public class Message {
 	 *
 	 * @return Message ID, or null if the message does not have a message ID
 	 */
-	public ACell getID()  {
+	public ACell getID() {
 		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
 		switch (getType()) {	
 			// Result is a special record type
-			case RESULT: return getResultID();
+			case RESULT: try {
+				return getResultID();
+			} catch (BadFormatException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 
 			default: return getRequestID();
 		}
@@ -246,26 +272,22 @@ public class Message {
 	 * @return ID of message (usually an Integer) or null if no ID present
 	 */
 	public ACell getRequestID() {
-		// if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
-		try {
-			switch (getType()) {	
-			
-				// ID in position 1
-				case STATUS:
-				case TRANSACT: 
-				case QUERY:
-				case DATA_REQUEST:
-				case LATTICE_QUERY:
-				case PING:{
-					AVector<?> v=RT.ensureVector(getPayload());
-					if (v.count()<2) return null;
-					return RT.ensureLong(v.get(1));
-				}
-	
-				default: return null;
+		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
+		switch (getType()) {	
+		
+			// ID in position 1
+			case STATUS:
+			case TRANSACT: 
+			case QUERY:
+			case DATA_REQUEST:
+			case LATTICE_QUERY:
+			case PING:{
+				AVector<?> v=RT.ensureVector(getPayload());
+				if (v.count()<2) return null;
+				return RT.ensureLong(v.get(1));
 			}
-		} catch (Exception e) {
-			return null;
+
+			default: return null;
 		}
 	}
 	
@@ -275,8 +297,9 @@ public class Message {
 	 * This needs to work even if the payload is not yet decoded, for message routing (possibly with a different store)
 	 * 
 	 * @return ID of Result, or null if no ID present
+	 * @throws BadFormatException If a Result with malformed ID
 	 */
-	public ACell getResultID() {
+	public ACell getResultID() throws BadFormatException {
 		if (payload!=null) {
 			if (payload instanceof Result) {
 				return ((Result)payload).getID();
@@ -284,16 +307,14 @@ public class Message {
 			return null;
 		}
 		
-		if (hasData()) try {
+		if (hasData()) {
 			// Check tag is a Result
 			byte tag=messageData.byteAt(0);
 			if (tag!=CVMTag.RESULT) return null;
 			
 			// Peek at Result ID without loading whole payload
 			return Result.peekResultID(messageData,0);
-		} catch (BadFormatException e) {
-			return null;
-		}
+		} 
 		
 		return null;
 	}
@@ -330,9 +351,9 @@ public class Message {
 	
 				default: return null;
 			}
-		} catch (BadFormatException | ClassCastException | IndexOutOfBoundsException e) {
+		} catch (ClassCastException | IndexOutOfBoundsException e) {
 			return null;
-		}
+		} 
 	}
 
 
@@ -353,7 +374,7 @@ public class Message {
 			Message msg=Message.createResult(res);
 			return returnMessage(msg);
 		} else {
-			throw new IllegalStateException("Trying to return result with no original request ID");
+			throw new IllegalStateException("Trying to return result with no original request ID in "+this);
 		}
 	}
 	
@@ -367,7 +388,7 @@ public class Message {
 	 */
 	public boolean returnMessage(Message m) {
 		Predicate<Message> handler=returnHandler;
-		if (handler==null) return false;
+		if (handler==null) throw new IllegalStateException("No return handler for message");
 		return handler.test(m);
 	}
 
@@ -434,22 +455,18 @@ public class Message {
 	}
 
 	public Result toResult() {
-		try {
-			MessageType type=getType();
-			switch (type) {
-			case MessageType.RESULT: 
-				Result result=getPayload();
-				return result;
-				
-			case MessageType.DATA: 
-				// Wrap data responses in a successful Result
-				return Result.create(getID(), getPayload(), null);
-				
-			default:
-				return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
-			}
-		} catch (BadFormatException e) {
-			return Result.fromException(e).withSource(SourceCodes.CLIENT);
+		MessageType type=getType();
+		switch (type) {
+		case MessageType.RESULT:
+			Result result=getPayload();
+			return result;
+
+		case MessageType.DATA:
+			// Wrap data responses in a successful Result
+			return Result.create(getID(), getPayload(), null);
+
+		default:
+			return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
 		}
 	}
 
@@ -504,13 +521,7 @@ public class Message {
 	 * @return Hash, or null if message format is invalid
 	 */
 	public Hash getHash() {
-		try {
-			return getPayload().getHash();
-		} catch (BadFormatException e) {
-			return null;
-		}
+		return getPayload().getHash();	
 	}
-
-
 
 }

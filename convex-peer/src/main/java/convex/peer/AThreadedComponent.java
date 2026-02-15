@@ -3,6 +3,7 @@ package convex.peer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.LoadMonitor;
 
@@ -26,12 +27,14 @@ public abstract class AThreadedComponent {
 			// Run main component loop
 			while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 				try {
-					loop();		
+					loop();
 				} catch (InterruptedException e) {
 					// Interrupted, so we are exiting
 					log.trace("Component thread interrupted: {}",thread);
 					Thread.currentThread().interrupt();
 					break;
+				} catch (Exception e) {
+					log.error("Unexpected error in component loop: {}",thread,e);
 				}
 			}
 			
@@ -53,6 +56,10 @@ public abstract class AThreadedComponent {
 	protected abstract void loop() throws InterruptedException;
 	
 	protected abstract String getThreadName();
+	
+	protected AStore getStore() {
+		return server.getStore();
+	}
 
 	/**
 	 * Start the threaded component

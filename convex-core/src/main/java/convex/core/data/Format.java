@@ -8,7 +8,6 @@ import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
-import convex.core.cvm.CVMEncoder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
@@ -422,63 +421,6 @@ public class Format {
 	}
 	
 	/**
-	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
-	 * throws an exception if the Blob contents are not fully consumed
-	 * 
-	 * @param blob Blob representing the Encoding of the Value
-	 * @return Value read from the blob of encoded data
-	 * @throws BadFormatException In case of encoding error
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
-		long n=blob.count();
-		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		AEncoder.DecodeState ds = new AEncoder.DecodeState(blob);
-		T result= (T) CVMEncoder.INSTANCE.read(ds);
-		if (result==null) {
-			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);
-		} else {
-			long consumed = ds.pos - blob.getInternalOffset();
-			if (consumed!=n) throw new BadFormatException("Excess bytes in read from Blob");
-			result.attachEncoding(blob);
-		}
-		return result;
-	}
-
-	/**
-	 * Decodes a single Value from a Blob, starting at a given offset. Assumes the presence of a tag.
-	 *
-	 * @param blob Blob representing the Encoding of the Value
-	 * @param offset Offset of tag byte in blob
-	 * @return Value read from the blob of encoded data
-	 * @throws BadFormatException In case of encoding error
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T read(Blob blob, int offset) throws BadFormatException {
-		AEncoder.DecodeState ds = new AEncoder.DecodeState(blob);
-		ds.pos += offset;
-		int startPos = ds.pos;
-		T result = (T) CVMEncoder.INSTANCE.read(ds);
-		if (result != null) {
-			result.attachEncoding(Blob.wrap(ds.data, startPos, ds.pos - startPos));
-		}
-		return result;
-	}
-
-	/**
-	 * Helper method to read a CVM value encoded as a hex string
-	 * @param <T> Type of value to read
-	 * @param hexString A valid hex String
-	 * @return Value read
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <T extends ACell> T read(String hexString) throws BadFormatException {
-		Blob enc=Blob.fromHex(hexString);
-		if (enc==null) throw new BadFormatException("Invalid hex string");
-		return read(Blob.fromHex(hexString));
-	}
-
-
 	/**
 	 * Writes hex digits from digit position start, total length.
 	 * 
@@ -528,34 +470,23 @@ public class Format {
 		if (ml==0) return Cells.EMPTY_ARRAY;
 
 		ArrayList<ACell> cells=new ArrayList<>();
-		ACell first=Format.read(data, 0);
+		// First cell: decode from start of blob (may have trailing cells)
+		AEncoder.DecodeState ds = new AEncoder.DecodeState(data);
+		ACell first = store.getEncoder().read(ds);
+		if (first!=null) first.attachEncoding(data.slice(0, ds.pos - data.getInternalOffset()));
 		cells.add(first);
-		int pos=first.getEncodingLength();
+		int pos = ds.pos - data.getInternalOffset();
 		while (pos<ml) {
 			long encLength=Format.readVLQCount(data.getInternalArray(), data.getInternalOffset()+pos);
 			pos+=Format.getVLQCountLength(encLength);
 			Blob enc=data.slice(pos, pos+encLength);
 			ACell result=store.decode(enc);
-			// ACell result=Format.read(enc);
 			pos+=enc.count;
 			cells.add(result);
 		}
 		return cells.toArray(ACell[]::new);
 	}
 	
-	/**
-	 * Decodes a cell from multi-cell encoded data using the default CVM encoder.
-	 * Convenience method equivalent to {@code CVMEncoder.INSTANCE.decodeMultiCell(data)}.
-	 *
-	 * @param data Data to decode (top cell encoding followed by VLQ-prefixed children)
-	 * @return Cell instance
-	 * @throws BadFormatException If encoding format is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
-		return (T) CVMEncoder.INSTANCE.decodeMultiCell(data);
-	}
-
 	/**
 	 * Encode a Cell completely in multi-cell message format. Format places top level
 	 * cell first, following cells in arbitrary order.

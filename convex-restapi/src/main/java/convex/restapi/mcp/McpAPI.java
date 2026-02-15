@@ -851,7 +851,7 @@ public class McpAPI extends ABaseAPI {
 				return toolError("cad3 must be valid hex data");
 			}
 			try {
-				ACell decoded = Format.decodeMultiCell(cad3Blob);
+				ACell decoded = server.getStore().decodeMultiCell(cad3Blob);
 				AString cvx = RT.print(decoded);
 				AMap<AString, ACell> result = Maps.of(
 					"cvx", cvx == null ? "" : cvx

@@ -23,11 +23,13 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
+import convex.core.store.NullStore;
 import convex.core.store.Stores;
 import convex.net.AConnection;
 import convex.net.impl.netty.NettyConnection;
@@ -132,6 +134,11 @@ public class ConvexRemote extends Convex {
 				return Result.fromException(e);
 			}
 			
+			try {
+				m.getPayload(awaitingStore);
+			} catch (BadFormatException e1) {
+				e1.printStackTrace();
+			}
 			Result r=m.toResult();
 			if (r.getErrorCode()!=null) {
 				sequence=null;
@@ -145,32 +152,38 @@ public class ConvexRemote extends Convex {
 	 * Result handler for Messages received back from a remote connection
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
-		ACell id=m.getResultID();
-
-		if (id!=null) {
-			// Check if we are waiting for a Result with this ID for this connection
-			synchronized (awaiting) {
-				// We save and restore the Store, since completing the future might change it
-				AStore savedStore=Stores.current();
-				try {
-					CompletableFuture<Message> cf = awaiting.get(id);
-					if (cf != null) {
-						// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-						boolean didComplete = cf.complete(m);
-						if (!didComplete) {
-							log.warn("Message return future already completed with value: "+cf.join());
+		try {
+			
+			ACell id=m.getResultID();
+	
+			if (id!=null) {
+				// Check if we are waiting for a Result with this ID for this connection
+				synchronized (awaiting) {
+					// We save and restore the Store, since completing the future might change it
+					AStore savedStore=Stores.current();
+					try {
+						CompletableFuture<Message> cf = awaiting.get(id);
+						if (cf != null) {
+							// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
+							boolean didComplete = cf.complete(m);
+							if (!didComplete) {
+								log.warn("Message return future already completed with value: "+cf.join());
+							}
+							awaiting.remove(id);
 						}
+					} catch (Exception e) {
+						log.warn("Unexpected error completing result",e);
+					} finally {
+						Stores.setCurrent(savedStore);
 						awaiting.remove(id);
 					}
-				} catch (Exception e) {
-					log.warn("Unexpected error completing result",e);
-				} finally {
-					Stores.setCurrent(savedStore);
+	
 				}
-
+			} else {
+				// Ignore the message, we are a client side connection so not interested.
 			}
-		} else {
-			// Ignore the message, we are a client side connection so not interested.
+		} catch (Exception e) {
+			System.err.println(e);
 		}
 	};
 	

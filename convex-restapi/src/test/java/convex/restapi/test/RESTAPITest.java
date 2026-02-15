@@ -81,7 +81,7 @@ public class RESTAPITest extends ARESTTest {
 			
 			Blob data=Blob.parse(responseMap.getIn(Strings.DATA));
 			assertNotNull(data);
-			ACell txValue=Format.decodeMultiCell(data);
+			ACell txValue=server.getServer().getStore().decodeMultiCell(data);
 			assertTrue(txValue instanceof ATransaction);
 			
 			// Get the hash value required for signing

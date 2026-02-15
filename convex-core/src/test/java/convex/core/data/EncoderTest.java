@@ -593,15 +593,10 @@ public class EncoderTest {
 	}
 
 	@Test public void testDecodeStateBlobTree() throws BadFormatException {
-		// Large blob requiring tree structure
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			ABlob big = Blob.createRandom(new java.util.Random(99), Blob.CHUNK_LENGTH + 100);
-			doDecodeStateRoundTrip(big, CVM);
-			doDecodeStateRoundTrip(big, CAD3);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		// Large blob requiring tree structure - needs store for non-embedded child refs
+		ABlob big = Blob.createRandom(new java.util.Random(99), Blob.CHUNK_LENGTH + 100);
+		doDecodeStateRoundTrip(big, new CVMEncoder(Samples.TEST_STORE));
+		doDecodeStateRoundTrip(big, new CAD3Encoder(Samples.TEST_STORE));
 	}
 
 	@Test public void testDecodeStateString() throws BadFormatException {
@@ -696,13 +691,8 @@ public class EncoderTest {
 
 	@Test public void testDecodeStateVectorWithPrefix() throws BadFormatException {
 		// INT_VECTOR_300 is a VectorLeaf with a prefix (300 = 256 + 44, tail has 44 mod 16 = 12 items)
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			doDecodeStateRoundTrip(Samples.INT_VECTOR_300, CVM);
-			doDecodeStateRoundTrip(Samples.INT_VECTOR_300, CAD3);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		doDecodeStateRoundTrip(Samples.INT_VECTOR_300, new CVMEncoder(Samples.TEST_STORE));
+		doDecodeStateRoundTrip(Samples.INT_VECTOR_300, new CAD3Encoder(Samples.TEST_STORE));
 	}
 
 	@Test public void testDecodeStateMapLeaf() throws BadFormatException {

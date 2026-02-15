@@ -19,7 +19,6 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
@@ -67,7 +66,7 @@ public class BigIntegerTest {
 		assertFalse(bi.isCanonical());
 		
 		Blob enc=Cells.encode(bi);
-		assertEquals(bi,Format.read(enc));
+		assertEquals(bi,Samples.TEST_STORE.decode(enc));
 		assertNotEquals(enc,Blobs.empty().getEncoding());
 		
 		doBigTest(bi);
@@ -109,8 +108,8 @@ public class BigIntegerTest {
 	
 	@Test public void test0980Regression () {
 		Blob b=Blob.fromHex("1980");
-		assertThrows(BadFormatException.class,()->Format.read(b));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(b));
+
 		BigInteger b1=BigInteger.valueOf(-128);
 		CVMBigInteger cb=CVMBigInteger.wrap(b1);
 		Blob bb=cb.getEncoding();
@@ -224,15 +223,15 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void testBadEncoding() throws BadFormatException {
-		assertThrows(BadFormatException.class,()->Format.read("19")); // no data
-		assertThrows(BadFormatException.class,()->Format.read("1900")); // Zero length
-		assertThrows(BadFormatException.class,()->Format.read("190017")); // Zero length plus extra bytes
-		assertThrows(BadFormatException.class,()->Format.read("190113")); // non-canonical length
-		assertThrows(BadFormatException.class,()->Format.read("1909ffffff")); // short length
-		assertThrows(BadFormatException.class,()->Format.read("1909ffffffffffffffffff")); // excess leading ff
-		assertThrows(BadFormatException.class,()->Format.read("1909000000000000000000")); // excess leading 00
-		assertThrows(BadFormatException.class,()->Format.read("190988888888888888888888")); // excess bytes
-		Format.read("1909888888888888888888"); // OK with 9 valid bytes exactly 
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("19"))); // no data
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1900"))); // Zero length
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("190017"))); // Zero length plus extra bytes
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("190113"))); // non-canonical length
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1909ffffff"))); // short length
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1909ffffffffffffffffff"))); // excess leading ff
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1909000000000000000000"))); // excess leading 00
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("190988888888888888888888"))); // excess bytes
+		Samples.TEST_STORE.decode(Blob.fromHex("1909888888888888888888")); // OK with 9 valid bytes exactly
 		
 	}
 	

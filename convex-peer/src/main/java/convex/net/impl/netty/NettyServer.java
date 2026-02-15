@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.message.Message;
+import convex.core.store.NullStore;
 import convex.core.util.Shutdown;
 import convex.net.AServer;
 import convex.peer.Server;
@@ -48,10 +49,10 @@ public class NettyServer extends AServer {
 	// Receive action. Default is just an echo. Users should set a receive action
 	private Consumer<Message> receiveAction=m->{
 		try {
-			ACell payload=m.getPayload();
+			ACell payload=m.getPayload(NullStore.INSTANCE);
 			m.returnMessage(Message.createResult(m.getRequestID(), payload, null));
 		} catch (Exception e) {
-			log.warn("Unexpected exception handling message receipt",e);
+			System.err.println(e);
 		}
 	};
 

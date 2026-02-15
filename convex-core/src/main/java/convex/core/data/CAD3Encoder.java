@@ -20,7 +20,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
@@ -57,6 +56,14 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		this.store = store;
 	}
 
+	/**
+	 * Creates a new encoder of the same type with a different store.
+	 * Subclasses should override to preserve their type.
+	 */
+	protected CAD3Encoder withStore(AStore store) {
+		return new CAD3Encoder(store);
+	}
+
 	@Override
 	public Blob encode(ACell a) {
 		return Cells.encode(a);
@@ -68,10 +75,15 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 */
 	@Override
 	public ACell decode(Blob encoding) throws BadFormatException {
-		if (encoding.count()<1) throw new BadFormatException("Empty encoding");
+		long n = encoding.count();
+		if (n < 1) throw new BadFormatException("Empty encoding");
 		DecodeState ds = new DecodeState(encoding);
 		ACell result = read(ds);
-		if (result != null) {
+		if (result == null) {
+			if (n != 1) throw new BadFormatException("Decode of nil value but blob size = " + n);
+		} else {
+			long consumed = ds.pos - encoding.getInternalOffset();
+			if (consumed != n) throw new BadFormatException("Excess bytes in read from Blob");
 			result.attachEncoding(encoding);
 		}
 		return result;
@@ -115,8 +127,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			Hash h = Hash.wrap(ds.data, ds.pos);
 			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref");
 			ds.pos += Hash.LENGTH;
-			AStore s = (store != null) ? store : Stores.current();
-			Ref<T> ref = Ref.forHash(h, s);
+			if (store==null) throw new IllegalStateException("Cannot read Ref without a store in encoder");
+			Ref<T> ref = Ref.forHash(h, store);
 			return ref.markEmbedded(false);
 		}
 		if (tag==Tag.NULL) {
@@ -578,15 +590,28 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
 		DecodeState ds = new DecodeState(data);
-		ACell result = this.read(ds);
+
+		// When storeless, use a MessageStore so readRef has a store during decode.
+		// resolveRefs will replace refs with direct child refs afterwards.
+		// When a real store is provided, use it directly.
+		HashMap<Hash,ACell> hm=new HashMap<>();
+		CAD3Encoder readEncoder;
+		if (store==null) {
+			MessageStore ms = new MessageStore(hm, null);
+			readEncoder = withStore(ms);
+			ms.setEncoder(readEncoder);
+		} else {
+			readEncoder = this;
+		}
+
+		ACell result = readEncoder.read(ds);
 		if (result==null) {
 			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
 			return null;
 		}
 		if (ds.pos==ds.limit) return result; // single cell, done
 
-		HashMap<Hash,ACell> hm=new HashMap<>();
-		readChildCells(hm, ds);
+		readEncoder.readChildCells(hm, ds);
 		return resolveRefs(result, hm);
 	}
 
@@ -694,10 +719,15 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	private static class MessageStore extends AStore {
 		private final HashMap<Hash, ACell> cells;
 		private final AStore delegate;
+		private CAD3Encoder encoder;
 
 		MessageStore(HashMap<Hash, ACell> cells, AStore delegate) {
 			this.cells = cells;
 			this.delegate = delegate;
+		}
+
+		void setEncoder(CAD3Encoder encoder) {
+			this.encoder = encoder;
 		}
 
 		@SuppressWarnings("unchecked")
@@ -726,14 +756,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		@Override public void close() {}
 
 		@Override
-		public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
-			if (delegate != null) return delegate.decode(encoding);
-			return Format.read(encoding);
-		}
-
-		@Override
 		public AEncoder<ACell> getEncoder() {
-			return (delegate != null) ? delegate.getEncoder() : null;
+			return encoder;
 		}
 
 		@SuppressWarnings("unchecked")

@@ -106,12 +106,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 						System.err.println("Inbound enexpected error: "+e);
 					}
 					// Return error result to client so futures don't hang
-					try {
-						m.returnResult(Result.fromException(e).withID(m.getID()));
-					} catch (Exception e2) {
-						// best effort, ignore if we can't return an error
-						System.err.println("Inbound failure to return result: "+e2);
-					}
+					m.returnResult(Result.fromException(e).withID(m.getID()));
 				} finally {
 					receivedCount++;
 				}

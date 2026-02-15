@@ -9,6 +9,7 @@ import convex.core.cvm.GenesisStateTest;
 import convex.core.cvm.SnapshotStateTest;
 import convex.core.data.AEncoder.DecodeState;
 import convex.core.exceptions.BadFormatException;
+import convex.test.Samples;
 
 /**
  * Tests that cells decoded via DecodeState produce identical results to
@@ -19,7 +20,7 @@ import convex.core.exceptions.BadFormatException;
  */
 public class DecodePathComparisonTest {
 
-	static final CVMEncoder enc = CVMEncoder.INSTANCE;
+	static final CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
 
 	@Test
 	public void testBelief() throws Exception {
