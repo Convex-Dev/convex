@@ -14,7 +14,6 @@ import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.util.Bits;
-import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
 

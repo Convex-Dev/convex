@@ -239,7 +239,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (tag==Tag.REF) {
 			ds.pos++;
 			Hash h = Hash.wrap(ds.data, ds.pos);
-			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref at position: "+ds.pos);
+			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref");
 			ds.pos += Hash.LENGTH;
 			Ref<T> ref = Ref.forHash(h, store);
 			return ref.markEmbedded(false);
@@ -418,7 +418,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			// String: VLQ length + flat UTF-8 data or child refs (StringTree wrapping BlobTree)
 			long length = readVLQCount(ds);
 			if (length < 0) throw new BadFormatException("Negative string length");
-			if (length > Integer.MAX_VALUE) throw new BadFormatException("String length too long: " + length);
+			if (length > Integer.MAX_VALUE) throw new BadFormatException("String length too long");
 			if (length <= StringShort.MAX_LENGTH) {
 				Blob data = Blob.wrap(ds.data, ds.pos, (int) length);
 				ds.pos += (int) length;
