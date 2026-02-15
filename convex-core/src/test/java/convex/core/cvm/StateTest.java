@@ -41,12 +41,11 @@ public class StateTest {
 	public void testEmptyState() {
 		State s = State.EMPTY;
 		assertSame(s,s.updateRefs(rf->rf));
-		
+
 		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
 
-
-		RecordTest.doRecordTests(s);
+		doStateTests(s);
 	}
 
 	@Test
@@ -56,9 +55,13 @@ public class StateTest {
 		assertSame(s, s.withPeers(s.getPeers()));
 
 		s.validate();
-		
+
 		assertEquals(s.getEncodingLength(),s.getEncoding().size());
 
+		doStateTests(s);
+	}
+
+	public static void doStateTests(State s) {
 		RecordTest.doRecordTests(s);
 	}
 
@@ -83,7 +86,7 @@ public class StateTest {
 			AccountStatus as=s2.getAccount(InitTest.HERO);
 			assertNotNull(as);
 
-			RecordTest.doRecordTests(s2);
+			doStateTests(s2);
 			RecordTest.doRecordTests(as);
 		} finally { Stores.setCurrent(null); }
 	}
