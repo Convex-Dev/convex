@@ -17,6 +17,8 @@ import convex.core.cvm.CVMTag;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
+import convex.core.data.AEncoder.DecodeState;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -558,5 +560,83 @@ public class EncoderTest {
 
 		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(bad),
 			"Single trailing byte should be rejected");
+	}
+
+	// ==================== DecodeState round-trip tests ====================
+
+	/**
+	 * Helper: encode a value, decode via DecodeState using the given encoder,
+	 * assert result equals original and pos advanced correctly.
+	 */
+	private void doDecodeStateRoundTrip(ACell value, CAD3Encoder enc) throws BadFormatException {
+		Blob encoding = Cells.encode(value);
+		DecodeState ds = new DecodeState(encoding);
+		ACell decoded = enc.read(ds);
+		assertEquals(value, decoded, "DecodeState round-trip mismatch for: " + value);
+		assertEquals(ds.limit, ds.pos, "DecodeState pos should be at limit after reading complete encoding");
+		// Re-encoding must match
+		if (decoded != null) {
+			assertEquals(encoding, Cells.encode(decoded), "Re-encoding mismatch after DecodeState read");
+		}
+	}
+
+	@Test public void testDecodeStateCVMLong() throws BadFormatException {
+		CVMLong[] values = {
+			CVMLong.ZERO, CVMLong.ONE, CVMLong.MINUS_ONE,
+			CVMLong.create(42), CVMLong.create(-42),
+			CVMLong.create(127), CVMLong.create(128),
+			CVMLong.create(-128), CVMLong.create(-129),
+			CVMLong.MAX_VALUE, CVMLong.MIN_VALUE,
+		};
+		for (CVMLong v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateCVMBigInteger() throws BadFormatException {
+		CVMBigInteger[] values = {
+			CVMBigInteger.MIN_POSITIVE,  // Long.MAX_VALUE + 1
+			CVMBigInteger.MIN_NEGATIVE,  // Long.MIN_VALUE - 1
+		};
+		for (CVMBigInteger v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateVectorLeaf() throws BadFormatException {
+		AVector<?>[] values = {
+			Vectors.empty(),
+			Vectors.of(1),
+			Vectors.of(1, 2, 3),
+			Vectors.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16), // MAX_SIZE
+		};
+		for (AVector<?> v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateVectorTree() throws BadFormatException {
+		// INT_VECTOR_256 is a VectorTree (256 elements = 16 chunks of 16)
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CVM);
+			doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateVectorWithPrefix() throws BadFormatException {
+		// INT_VECTOR_300 is a VectorLeaf with a prefix (300 = 256 + 44, tail has 44 mod 16 = 12 items)
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			doDecodeStateRoundTrip(Samples.INT_VECTOR_300, CVM);
+			doDecodeStateRoundTrip(Samples.INT_VECTOR_300, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
 	}
 }

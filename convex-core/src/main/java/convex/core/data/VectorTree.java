@@ -215,9 +215,9 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
 		int n = computeArraySize(count);
-		
+
 		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
-		
+
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<AVector<T>> ref = Format.readRef(b,rpos);
@@ -230,6 +230,28 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		// Attach encoding only if "real"
 		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
 		return result;
+	}
+
+	/**
+	 * Reads a VectorTree from a DecodeState. Tag byte and VLQ count already consumed.
+	 * Encoding attachment is handled by the caller.
+	 *
+	 * @param count Element count (already read from VLQ)
+	 * @param enc Encoder for reading refs
+	 * @param ds Decode state (pos past tag and count)
+	 * @return Decoded VectorTree
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> VectorTree<T> read(long count, CAD3Encoder enc, AEncoder.DecodeState ds) throws BadFormatException {
+		int n = computeArraySize(count);
+
+		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
+		for (int i = 0; i < n; i++) {
+			items[i] = enc.readRef(ds);
+		}
+
+		return new VectorTree<T>(items, count);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -54,15 +54,6 @@ public abstract class AEncoder<T> {
 			return limit - pos;
 		}
 
-		/**
-		 * Attach encoding from [startPos, current pos) onto a cell.
-		 * Uses Blob.wrap to share the backing array (no copy).
-		 * @param cell Cell to attach encoding to
-		 * @param startPos Start position of the encoding
-		 */
-		public void attachEncoding(ACell cell, int startPos) {
-			cell.attachEncoding(Blob.wrap(data, startPos, pos - startPos));
-		}
 	}
 
 	/**
@@ -106,6 +97,14 @@ public abstract class AEncoder<T> {
 	 * @throws BadFormatException If encoding is invalid for the given tag
 	 */
 	public abstract T read(byte tag, Blob encoding, int offset) throws BadFormatException;
+
+	/**
+	 * Reads a value from a DecodeState, advancing pos past the encoding.
+	 * @param ds Decode state to read from
+	 * @return Decoded value (may be null for Tag.NULL)
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public abstract T read(DecodeState ds) throws BadFormatException;
 
 	/**
 	 * Decodes a value from multi-cell encoded data (top cell followed by

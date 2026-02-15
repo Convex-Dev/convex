@@ -766,21 +766,31 @@ public class Format {
 	 * @throws BadFormatException If the Long format is not canonical (i.e. starts with 0x00)
 	 */
 	public static long readLong(Blob blob, int offset, int length) throws BadFormatException {
-		byte[] bs=blob.getInternalArray();
-		offset+=blob.getInternalOffset();
-			long v=(long)(bs[offset]);
+		return readLong(blob.getInternalArray(), blob.getInternalOffset()+offset, length);
+	}
+
+	/**
+	 * Reads a Long value from a byte array at the specified offset.
+	 * @param bs Byte array to read from
+	 * @param offset Offset in the byte array
+	 * @param length Number of bytes to read (1-8)
+	 * @return Decoded long value
+	 * @throws BadFormatException If the Long format is not canonical
+	 */
+	public static long readLong(byte[] bs, int offset, int length) throws BadFormatException {
+		long v=(long)(bs[offset]);
 		if (v==0) {
 			if (length==1) throw new BadFormatException("Long encoding: 0x00 not valid");
 			if (bs[offset+1]>=0) throw new BadFormatException("Excess 0x00 at start of Long encoding");
 		} else if (v==-1) {
 			if ((length>1)&&(bs[offset+1]<0)) {
 				throw new BadFormatException("Excess 0xff at start of Long encoding");
-			}	
+			}
 		}
-		
+
 		// sign extend first byte
 		v=(v<<56)>>56;
-		
+
 		for (int i=1; i<length; i++) {
 			v=(v<<8)+(bs[offset+i]&0xFFl);
 		}

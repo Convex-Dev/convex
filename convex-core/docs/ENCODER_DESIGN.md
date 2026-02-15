@@ -102,10 +102,8 @@ public abstract class AEncoder<T> {
             return data[pos++];
         }
 
-        /** Attach encoding [startPos, pos) onto cell */
-        public void attachEncoding(ACell cell, int startPos) {
-            cell.attachEncoding(Blob.wrap(data, startPos, pos - startPos));
-        }
+        /** Advance to new absolute position, throws if past limit */
+        public void advanceTo(int newPos) { ... }
 
         /** Remaining bytes */
         public int remaining() {
@@ -171,22 +169,22 @@ static VectorLeaf read(long count, Blob b, int pos) {
     int rpos = pos + 1 + Format.getVLQCountLength(count);
     Ref[] items = new Ref[n];
     for (int i = 0; i < n; i++) {
-        Ref ref = Format.readRef(b, rpos);
+        Ref ref = Format.readRef(b, rpos);   // uses Stores.current()!
         items[i] = ref;
-        rpos += ref.getEncodingLength();
+        rpos += ref.getEncodingLength();      // manual tracking
     }
-    result.attachEncoding(b.slice(pos, rpos));
+    result.attachEncoding(b.slice(pos, rpos)); // caches encoding
 }
 
 // VectorLeaf — after:
-static VectorLeaf read(long count, CAD3Encoder enc, DecodeState ds, int startPos) {
+static VectorLeaf read(long count, CAD3Encoder enc, DecodeState ds) {
     Ref[] items = new Ref[n];
     for (int i = 0; i < n; i++) {
         items[i] = enc.readRef(ds);
     }
-    // prefix ref if present:
     if (count > MAX_SIZE) pfx = enc.readRef(ds);
-    ds.attachEncoding(result, startPos);
+    return new VectorLeaf(items, pfx, count);
+    // No attachEncoding — type re-encodes on demand if needed
 }
 ```
 
@@ -214,7 +212,7 @@ No thread-local involved in the decode chain. The encoder's `store` field is set
 |--------|---------|-----------------|
 | Byte access | `Blob.byteAt(i)` = `store[offset+i]` | `data[pos]` = direct array |
 | Ref position tracking | `readRef` + `getEncodingLength()` (2 calls) | `readRef(ds)` (1 call, auto-advance) |
-| Encoding attachment | `b.slice(pos, epos)` = Blob.wrap | `ds.attachEncoding(cell, start)` = Blob.wrap |
+| Encoding attachment | `b.slice(pos, epos)` = Blob.wrap (cached) | None — re-encode on demand (less GC pressure) |
 | Store lookup | Thread-local get per ref | Field access on encoder |
 | Allocations per decode | Cell + Refs + encoding Blob | Same + 1 DecodeState (reused) |
 
@@ -239,9 +237,56 @@ VectorLeaf, VectorTree, Vectors, MapLeaf, MapTree, Maps, SetLeaf, SetTree, Sets,
 
 Ops (~11), transactions (~4), consensus (~4), other (~2). ~18 files.
 
-### Phase 4: Remove Old Path
+### Phase 4: Wire DecodeState into Production Entry Points
 
-Delete `Format.readRef(Blob, int)`, `Ref.readRaw(Blob, int)`, `RefSoft.createForHash(Hash)` (1-arg). Remove thread-local management from encoder entry points.
+Once all type reads are migrated (Phase 2-3), the bridge `read(byte, DecodeState, int)` is gone and all reads go through DecodeState natively. Now wire DecodeState into the production decode entries.
+
+**Modify:** `CAD3Encoder.java`
+- `decode(Blob)`: Create `DecodeState`, call `read(ds)`. No thread-local needed.
+- `decodeMultiCell(Blob)`: Create `DecodeState`, read top cell via `read(ds)`, read children via `readChildCells(acc, ds)`. No thread-local needed.
+- Delete `decodeMultiCellWithStore(AStore, Blob, int)` — thread-local management no longer required.
+- Delete `resolveChildren(ACell, Blob, int, int)` — replaced by DecodeState path.
+- Delete `readChildCells(HashMap, Blob, int, int)` — replaced by DecodeState version.
+- Simplify or delete `MessageStore` inner class — may still be needed for storeless decode if `readRef(ds)` encounters a non-embedded ref with `this.store == null`. Evaluate whether storeless decode is a real use case or can be rejected.
+
+### Phase 5: Delete Old Decode Infrastructure
+
+Remove all static decode methods that are now dead code.
+
+**Delete from `Format.java`:**
+- `readRef(Blob, int)` — 36 call sites, all migrated by Phase 2-3 except REST API (see below)
+
+**Delete from `Ref.java`:**
+- `readRaw(Blob, int)` — only caller is `Format.readRef`, removed above
+- `forHash(Hash)` (1-arg) — delegates to `RefSoft.createForHash(hash)` using thread-local. 13 callers, mostly tests.
+
+**Delete from `RefSoft.java`:**
+- `createForHash(Hash)` (1-arg) — uses `Stores.current()`. Only 2 callers: `Ref.forHash(Hash)` and 1 test.
+
+**Delete from type classes (~44 files):**
+- Old static `read(Blob, int)` methods — either delete outright or make them delegate to the new `read(CAD3Encoder, DecodeState)` form. Deletion is cleaner since the encoder dispatch methods no longer call them.
+
+**Migrate external callers:**
+- `convex-restapi/ChainAPI.java:991` — `Format.readRef(h, 0)` → use `Ref.forHash(hash, store)` directly
+- `convex-restapi/McpAPI.java:493` — same pattern
+- `Result.java:565` — `Format.readRef(messageData, rpos)` → migrate to DecodeState or use `Ref.forHash`
+
+**Migrate test callers:**
+- `RefTest.java` — 2 calls to `Format.readRef`, 9 calls to `Ref.forHash` (1-arg) → use 2-arg version with explicit store
+- `StoresTest.java` — 2 calls to `Ref.forHash` (1-arg) → use 2-arg version
+- `GenTestAnyValue.java` — 2 calls to `Ref.forHash` (1-arg) → use 2-arg version
+- `MemoryStoreTest.java` — 1 call to `RefSoft.createForHash` (1-arg) → use 2-arg version
+- `SignatureBenchmark.java` — 1 call to `Ref.forHash` (1-arg) → use 2-arg version
+
+### Phase 6: Remove Thread-Local Store from Decode Chain
+
+With all decode paths using `encoder.readRef(ds)` (which uses `this.store` directly), the thread-local is no longer needed in the decode chain.
+
+**Modify:** `CAD3Encoder.java`
+- Remove all `Stores.current()` / `Stores.setCurrent()` calls from `decode()` and `decodeMultiCell()` (10 call sites total)
+- Remove `MessageStore` inner class if storeless decode is handled differently (e.g. reject, or require store at encoder construction)
+
+**Verify:** `Stores.current()` is no longer called anywhere in the decode chain. The thread-local remains available for other uses (e.g. `ACell.persist()`, direct store access) but decode is fully decoupled.
 
 ## File Inventory
 
@@ -266,7 +311,12 @@ Delete `Format.readRef(Blob, int)`, `Ref.readRaw(Blob, int)`, `RefSoft.createFor
 - `cpos/Block.java`, `cpos/BlockResult.java`, `cpos/Belief.java`, `cpos/Order.java`
 - `Syntax.java`, `State.java`
 
-### Static utility (to be cleaned up in Phase 4)
-- `Format.java` — `readRef(Blob, int)` static method
-- `Ref.java` — `readRaw(Blob, int)`, `forHash(Hash)` 1-arg
-- `RefSoft.java` — `createForHash(Hash)` 1-arg
+### Static utility (to be cleaned up in Phase 5)
+- `Format.java` — `readRef(Blob, int)` static method (36 call sites)
+- `Ref.java` — `readRaw(Blob, int)`, `forHash(Hash)` 1-arg (13 callers, mostly tests)
+- `RefSoft.java` — `createForHash(Hash)` 1-arg (2 callers)
+
+### External callers (to be migrated in Phase 5)
+- `convex-restapi/ChainAPI.java` — `Format.readRef(h, 0)` for hash-based ref lookup
+- `convex-restapi/McpAPI.java` — same pattern
+- `convex-core/Result.java` — `Format.readRef(messageData, rpos)` for result decoding

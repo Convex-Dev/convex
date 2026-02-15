@@ -264,44 +264,25 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Reads a cell from the decode state by extracting tag and dispatching.
 	 * Advances ds.pos past the full encoding.
 	 *
+	 * Currently bridges to the existing Blob-based read path. As type
+	 * classes are migrated to DecodeState, this method will dispatch
+	 * directly to native DecodeState reads.
+	 *
 	 * @param ds Decode state to read from
 	 * @return Decoded cell (may be null for Tag.NULL)
 	 * @throws BadFormatException If encoding is invalid
 	 */
+	@Override
 	public ACell read(DecodeState ds) throws BadFormatException {
 		int startPos = ds.pos;
 		byte tag = ds.readByte();
-		return read(tag, ds, startPos);
-	}
-
-	/**
-	 * Tag-dispatch read from DecodeState. Override in subclasses for
-	 * domain-specific types (see CVMEncoder).
-	 *
-	 * NOTE: ds.pos is past the tag byte. startPos points to the tag.
-	 * Implementations must advance ds.pos past all remaining data and
-	 * should call ds.attachEncoding(result, startPos) before returning.
-	 *
-	 * Current implementation delegates to the existing Blob-based read
-	 * methods. Type classes will be migrated to DecodeState in later phases.
-	 *
-	 * @param tag Tag byte already read
-	 * @param ds Decode state (pos is past tag)
-	 * @param startPos Position of tag byte
-	 * @return Decoded cell
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	protected ACell read(byte tag, DecodeState ds, int startPos) throws BadFormatException {
-		// Delegate to existing Blob-based read for now.
-		// This creates a Blob view over the same backing array.
-		// IMPORTANT: inefficient, must be removed by encoder refactor
+		// Bridge: wrap as Blob view, dispatch through existing read path
+		// TODO: remove bridge once all types use native DecodeState reads
 		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
 		ACell result = read(tag, b, 0);
-		// Advance DecodeState pos past the encoding
 		if (result != null) {
 			ds.advanceTo(startPos + result.getEncodingLength());
 		}
-		// else: null is single-byte (tag only), pos already past it from readByte()
 		return result;
 	}
 

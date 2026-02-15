@@ -4,6 +4,7 @@ import java.math.BigInteger;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AEncoder;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -140,7 +141,7 @@ public final class CVMLong extends AInteger {
 		int numBytes=tag-Tag.INTEGER;
 		if (numBytes==0) return ZERO;
 		long v=Format.readLong(blob,offset+1,numBytes);
-		
+
 		long end=offset+1+numBytes;
 		CVMLong result= create(v);
 		if (result.encoding==null) {
@@ -148,6 +149,23 @@ public final class CVMLong extends AInteger {
 			result.attachEncoding(blob.slice(offset,end));
 		}
 		return result;
+	}
+
+	/**
+	 * Reads a CVMLong from a DecodeState. Tag byte already consumed.
+	 * Encoding attachment is handled by the caller.
+	 *
+	 * @param tag Tag byte (0x10-0x18)
+	 * @param ds Decode state (pos past tag)
+	 * @return Decoded CVMLong
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public static CVMLong read(byte tag, AEncoder.DecodeState ds) throws BadFormatException {
+		int numBytes=tag-Tag.INTEGER;
+		if (numBytes==0) return ZERO;
+		long v=Format.readLong(ds.data,ds.pos,numBytes);
+		ds.pos+=numBytes;
+		return create(v);
 	}
 
 	@Override
