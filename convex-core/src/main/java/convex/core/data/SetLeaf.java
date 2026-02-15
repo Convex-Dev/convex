@@ -278,7 +278,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 
-	private static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
+	static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
 		long count = entries.length;
 		for (int i = 0; i < count - 1; i++) {
 			Hash a = entries[i].getHash();

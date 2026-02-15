@@ -10,7 +10,7 @@ public class CodedValue extends ACell {
 	private final Ref<ACell> codeRef;
 	private final Ref<ACell> valueRef;
 
-	private CodedValue(byte tag, Ref<ACell> code, Ref<ACell> value) {
+	CodedValue(byte tag, Ref<ACell> code, Ref<ACell> value) {
 		this.tag=tag;
 		codeRef=code;
 		valueRef=value;

@@ -9,6 +9,8 @@ import convex.core.Constants;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Syntax;
+import convex.core.crypto.ASignature;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
@@ -285,12 +287,18 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			case 3: // 0x30-0x3F : Strings, blobs, symbols, keywords, chars
 				return readBasicObject(tag, ds);
 
-			case 8: // Data structures
-				if (tag == Tag.VECTOR) return readVector(ds);
+			case 8: // Data structures (Syntax excluded — needs ref-taking constructor, Phase 3)
+				if (tag != CVMTag.SYNTAX) return readDataStructure(tag, ds);
 				break;
+
+			case 9: // 0x90-0x9F : Signed data
+				return readSignedData(tag, ds);
 
 			case 11: // 0xB0-0xBF : Byte flags including booleans
 				return AByteFlag.read(tag);
+
+			case 14: // 0xE0-0xEF : Extension values
+				return readExtension(tag, ds);
 			}
 		} catch (BadFormatException e) {
 			throw e;
@@ -453,6 +461,186 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			children[i] = ref;
 		}
 		return new BlobTree(children, shift, count);
+	}
+
+	// ---- Protected category methods for DecodeState (overridable by CVMEncoder) ----
+
+	protected ACell readDataStructure(byte tag, DecodeState ds) throws BadFormatException {
+		if (tag == Tag.VECTOR) return readVector(ds);
+		if (tag == Tag.MAP) return readMap(ds);
+		if (tag == Tag.SET) return readSet(ds);
+		if (tag == Tag.LIST) return readList(ds);
+		if (tag == Tag.INDEX) return readIndex(ds);
+		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
+	}
+
+	protected SignedData<?> readSignedData(byte tag, DecodeState ds) throws BadFormatException {
+		if (tag == Tag.SIGNED_DATA) {
+			// Full signed data: 32-byte public key + 64-byte signature + value ref
+			AccountKey pubKey = AccountKey.wrap(ds.data, ds.pos);
+			ds.pos += AccountKey.LENGTH;
+			ASignature sig = Ed25519Signature.wrap(ds.data, ds.pos);
+			ds.pos += Ed25519Signature.SIGNATURE_LENGTH;
+			Ref<ACell> value = readRef(ds);
+			return SignedData.create(pubKey, sig, value);
+		}
+		if (tag == Tag.SIGNED_DATA_SHORT) {
+			// Short signed data: 64-byte signature + value ref (no key)
+			ASignature sig = Ed25519Signature.wrap(ds.data, ds.pos);
+			ds.pos += Ed25519Signature.SIGNATURE_LENGTH;
+			Ref<ACell> value = readRef(ds);
+			return SignedData.create(null, sig, value);
+		}
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
+	}
+
+	protected ACell readCodedData(byte tag, DecodeState ds) throws BadFormatException {
+		// Generic coded value: code ref + value ref
+		Ref<ACell> cref = readRef(ds);
+		Ref<ACell> vref = readRef(ds);
+		return new CodedValue(tag, cref, vref);
+	}
+
+	protected ACell readDenseRecord(byte tag, DecodeState ds) throws BadFormatException {
+		// Dense record: reads as vector data, wraps with tag
+		AVector<ACell> data = readVector(ds);
+		DenseRecord dr = DenseRecord.create(tag & 0xFF, data);
+		if (dr == null) throw new BadFormatException(ErrorMessages.badTagMessage(tag));
+		return dr;
+	}
+
+	protected ACell readExtension(byte tag, DecodeState ds) throws BadFormatException {
+		long code = readVLQCount(ds);
+		return ExtensionValue.create(tag, code);
+	}
+
+	// ---- Private data structure read helpers ----
+
+	@SuppressWarnings("unchecked")
+	private <K extends ACell, V extends ACell> AHashMap<K, V> readMap(DecodeState ds) throws BadFormatException {
+		long count = readVLQCount(ds);
+		if (count == 0) return Maps.empty();
+		if (count < 0) throw new BadFormatException("Overflowed count of map elements!");
+
+		if (count <= MapLeaf.MAX_ENTRIES) {
+			// MapLeaf: count key-value ref pairs, sorted by key hash
+			MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
+			for (int i = 0; i < count; i++) {
+				Ref<K> kr = readRef(ds);
+				Ref<V> vr = readRef(ds);
+				items[i] = MapEntry.fromRefs(kr, vr);
+			}
+			if (!MapLeaf.isValidOrder(items)) {
+				throw new BadFormatException("Bad ordering of keys!");
+			}
+			return new MapLeaf<>(items);
+		} else {
+			// MapTree: shift byte + mask short + child refs
+			int shift = ds.data[ds.pos++];
+			short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
+			ds.pos += 2;
+			int ilength = Integer.bitCount(mask & 0xFFFF);
+			Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
+			for (int i = 0; i < ilength; i++) {
+				blocks[i] = readRef(ds);
+			}
+			MapTree<K, V> result = new MapTree<>(blocks, shift, mask, count);
+			if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
+			return result;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private <V extends ACell> ASet<V> readSet(DecodeState ds) throws BadFormatException {
+		long count = readVLQCount(ds);
+
+		if (count <= SetLeaf.MAX_ELEMENTS) {
+			// SetLeaf: count element refs, sorted by hash
+			if (count == 0) return Sets.empty();
+			if (count < 0) throw new BadFormatException("Negative count of set elements!");
+			Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
+			for (int i = 0; i < count; i++) {
+				items[i] = readRef(ds);
+			}
+			if (!SetLeaf.isValidOrder(items)) {
+				throw new BadFormatException("Set elements out of order in encoding");
+			}
+			return new SetLeaf<V>(items);
+		} else {
+			// SetTree: shift byte + mask short + child refs
+			int shift = ds.data[ds.pos++];
+			short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
+			ds.pos += 2;
+			int ilength = Integer.bitCount(mask & 0xFFFF);
+			@SuppressWarnings("rawtypes")
+			Ref<AHashSet<V>>[] blocks = (Ref<AHashSet<V>>[]) new Ref[ilength];
+			for (int i = 0; i < ilength; i++) {
+				blocks[i] = readRef(ds);
+			}
+			SetTree<V> result = new SetTree<>(blocks, shift, mask, count);
+			if (!result.isValidStructure()) throw new BadFormatException("Problem with SetTree invariants");
+			return result;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> List<T> readList(DecodeState ds) throws BadFormatException {
+		// List encoding matches Vector (VLQ count + refs), wrapped in List
+		AVector<T> data = readVector(ds);
+		if (data.isEmpty()) return (List<T>) List.EMPTY;
+		return List.wrap(data);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private <K extends ABlobLike<?>, V extends ACell> Index<K, V> readIndex(DecodeState ds) throws BadFormatException {
+		long count = readVLQCount(ds);
+		if (count < 0) throw new BadFormatException("Negative count!");
+		if (count == 0) return (Index<K, V>) Index.EMPTY;
+
+		// Check for entry presence
+		MapEntry<K, V> me;
+		boolean hasEntry;
+		if (count == 1) {
+			hasEntry = true;
+		} else {
+			byte c = ds.readByte();
+			switch (c) {
+				case Tag.NULL: hasEntry = false; break;
+				case Tag.VECTOR: hasEntry = true; break;
+				default: throw new BadFormatException("Invalid MapEntry tag in Index: " + c);
+			}
+		}
+
+		if (hasEntry) {
+			Ref<K> kr = readRef(ds);
+			Ref<V> vr = readRef(ds);
+			me = MapEntry.fromRefs(kr, vr);
+
+			if (count == 1) {
+				// Single entry — depth derived from key
+				long depth = kr.isEmbedded() ? kr.getValue().hexLength() : 64;
+				return new Index<K, V>(depth, me, Index.EMPTY_CHILDREN, (short) 0, 1L);
+			}
+		} else {
+			me = null;
+		}
+
+		// Read depth byte, mask, and children
+		int depth = 0xFF & ds.data[ds.pos++];
+		if (depth >= 64) {
+			if (depth == 64) throw new BadFormatException("More than one entry and MAX_DEPTH");
+			throw new BadFormatException("Excessive depth!");
+		}
+
+		short mask = (short) ((ds.data[ds.pos] << 8) | (ds.data[ds.pos + 1] & 0xFF));
+		ds.pos += 2;
+		int n = Integer.bitCount(mask & 0xFFFF);
+		Ref<Index>[] children = new Ref[n];
+		for (int i = 0; i < n; i++) {
+			children[i] = readRef(ds);
+		}
+
+		return new Index<K, V>(depth, me, children, mask, count);
 	}
 
 	// ==================== Multi-cell decode ====================

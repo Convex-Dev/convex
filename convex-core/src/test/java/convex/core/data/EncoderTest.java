@@ -703,4 +703,113 @@ public class EncoderTest {
 			Stores.setCurrent(null);
 		}
 	}
+
+	@Test public void testDecodeStateMapLeaf() throws BadFormatException {
+		ACell[] values = {
+			Maps.empty(),
+			Maps.of(Keyword.create("a"), CVMLong.ONE),
+			Maps.of(Keyword.create("a"), CVMLong.ONE, Keyword.create("b"), CVMLong.create(2)),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateMapTree() throws BadFormatException {
+		// Build a map with >15 entries to force MapTree
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			AHashMap<ACell, ACell> big = Maps.empty();
+			for (int i = 0; i < 20; i++) {
+				big = big.assoc(Keyword.create("k" + i), CVMLong.create(i));
+			}
+			doDecodeStateRoundTrip(big, CVM);
+			doDecodeStateRoundTrip(big, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateSetLeaf() throws BadFormatException {
+		ACell[] values = {
+			Sets.empty(),
+			Sets.of(CVMLong.ONE),
+			Sets.of(CVMLong.ONE, CVMLong.create(2), CVMLong.create(3)),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateSetTree() throws BadFormatException {
+		// Build a set with >15 entries to force SetTree
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			ASet<ACell> big = Sets.empty();
+			for (int i = 0; i < 20; i++) {
+				big = big.include(Keyword.create("s" + i));
+			}
+			doDecodeStateRoundTrip(big, CVM);
+			doDecodeStateRoundTrip(big, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateList() throws BadFormatException {
+		ACell[] values = {
+			List.EMPTY,
+			List.of(1),
+			List.of(1, 2, 3),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateIndex() throws BadFormatException {
+		ACell[] values = {
+			Index.none(),
+			Index.of(Keyword.create("key"), CVMLong.ONE),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateSignedData() throws BadFormatException {
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			convex.core.crypto.AKeyPair kp = convex.core.crypto.AKeyPair.generate();
+			SignedData<CVMLong> sd = SignedData.sign(kp, CVMLong.create(42));
+			doDecodeStateRoundTrip(sd, CVM);
+			doDecodeStateRoundTrip(sd, CAD3);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateAddress() throws BadFormatException {
+		ACell[] values = {
+			Address.create(0),
+			Address.create(1),
+			Address.create(1000),
+			Address.create(Long.MAX_VALUE),
+		};
+		for (ACell v : values) {
+			// Address is a CVM extension type — only CVMEncoder decodes it as Address
+			doDecodeStateRoundTrip(v, CVM);
+		}
+	}
+
+	@Test public void testDecodeStateExtensionValue() throws BadFormatException {
+		// Generic extension value (non-CVM tag)
+		ExtensionValue ev = ExtensionValue.create((byte) 0xE0, 42);
+		doDecodeStateRoundTrip(ev, CVM);
+		doDecodeStateRoundTrip(ev, CAD3);
+	}
 }

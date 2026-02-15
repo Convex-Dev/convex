@@ -49,7 +49,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	private final short mask;
 
-	private MapTree(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
+	MapTree(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
 		super(count);
 		this.children = children;
 		this.shift = shift;
@@ -892,7 +892,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Check for top level structural integrity. Does not traverse branch refs.
 	 * @return
 	 */
-	private boolean isValidStructure() {
+	boolean isValidStructure() {
 		if (shift<0) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;

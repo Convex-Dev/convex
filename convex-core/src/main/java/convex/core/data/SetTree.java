@@ -37,7 +37,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 */
 	final short mask;
 
-	private SetTree(Ref<AHashSet<T>>[] children, int shift, short mask, long count) {
+	SetTree(Ref<AHashSet<T>>[] children, int shift, short mask, long count) {
 		super(count);
 		this.children = children;
 		this.shift = shift;
@@ -689,7 +689,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		}
 	}
 
-	private boolean isValidStructure() {
+	boolean isValidStructure() {
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		int n=children.length;
 		if (n<2) return false;

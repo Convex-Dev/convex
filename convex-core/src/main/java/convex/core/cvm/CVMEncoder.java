@@ -77,6 +77,22 @@ public class CVMEncoder extends CAD3Encoder {
 	}
 
 	@Override
+	protected ACell readExtension(byte tag, DecodeState ds) throws BadFormatException {
+		long code = readVLQCount(ds);
+		if (tag == CVMTag.CORE_DEF) {
+			ACell cc = Core.fromCode(code);
+			if (cc != null) return cc;
+		}
+		if ((tag == CVMTag.OP_SPECIAL) && (code < Special.NUM_SPECIALS)) {
+			Special<?> spec = Special.create((int) code);
+			if (spec != null) return spec;
+		}
+		if (tag == CVMTag.OP_LOCAL) return Local.create(code);
+		if (tag == CVMTag.ADDRESS) return Address.create(code);
+		return ExtensionValue.create(tag, code);
+	}
+
+	@Override
 	protected ACell readCodedData(byte tag, Blob b, int pos) throws BadFormatException {
 		try {
 			if (tag == CVMTag.OP_CODED) return Ops.readCodedOp(tag,b, pos);

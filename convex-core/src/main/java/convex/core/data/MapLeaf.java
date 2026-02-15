@@ -39,7 +39,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	private final MapEntry<K, V>[] entries;
 
-	private MapLeaf(MapEntry<K, V>[] items) {
+	MapLeaf(MapEntry<K, V>[] items) {
 		super(items.length);
 		entries = items;
 	}
@@ -387,7 +387,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
-	private static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
+	static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
 		long count = entries.length;
 		for (int i = 0; i < count - 1; i++) {
 			Hash a = entries[i].getKeyHash();
