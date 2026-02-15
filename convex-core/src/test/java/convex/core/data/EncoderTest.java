@@ -594,6 +594,18 @@ public class EncoderTest {
 		}
 	}
 
+	@Test public void testDecodeStateCVMDouble() throws BadFormatException {
+		CVMDouble[] values = {
+			CVMDouble.ZERO, CVMDouble.ONE, CVMDouble.MINUS_ONE,
+			CVMDouble.NaN, CVMDouble.POSITIVE_INFINITY, CVMDouble.NEGATIVE_INFINITY,
+			CVMDouble.NEGATIVE_ZERO, CVMDouble.create(Math.PI),
+		};
+		for (CVMDouble v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
 	@Test public void testDecodeStateCVMBigInteger() throws BadFormatException {
 		CVMBigInteger[] values = {
 			CVMBigInteger.MIN_POSITIVE,  // Long.MAX_VALUE + 1

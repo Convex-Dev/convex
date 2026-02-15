@@ -272,40 +272,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return result;
 	}
 
-	/**
-	 * Reads a VectorLeaf from a DecodeState. Tag byte and VLQ count already consumed.
-	 * Encoding attachment is handled by the caller.
-	 *
-	 * @param count Element count (already read from VLQ)
-	 * @param enc Encoder for reading refs
-	 * @param ds Decode state (pos past tag and count)
-	 * @return Decoded VectorLeaf
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> read(long count, CAD3Encoder enc, AEncoder.DecodeState ds) throws BadFormatException {
-		if (count == 0) return (VectorLeaf<T>)EMPTY;
-
-		int n = ((int) count) & 0xF;
-		if (n == 0) {
-			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
-			n = VectorLeaf.MAX_SIZE;
-		}
-
-		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
-		for (int i = 0; i < n; i++) {
-			items[i] = enc.readRef(ds);
-		}
-
-		Ref<AVector<T>> pfx = null;
-		if (count > MAX_SIZE) {
-			pfx = enc.readRef(ds);
-		}
-
-		return new VectorLeaf<T>(items, pfx, count);
-	}
-
-
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;

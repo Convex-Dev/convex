@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import convex.core.Constants;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Syntax;
@@ -264,10 +265,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Reads a cell from the decode state by extracting tag and dispatching.
 	 * Advances ds.pos past the full encoding.
 	 *
-	 * Currently bridges to the existing Blob-based read path. As type
-	 * classes are migrated to DecodeState, this method will dispatch
-	 * directly to native DecodeState reads.
-	 *
 	 * @param ds Decode state to read from
 	 * @return Decoded cell (may be null for Tag.NULL)
 	 * @throws BadFormatException If encoding is invalid
@@ -276,7 +273,30 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	public ACell read(DecodeState ds) throws BadFormatException {
 		int startPos = ds.pos;
 		byte tag = ds.readByte();
-		// Bridge: wrap as Blob view, dispatch through existing read path
+		try {
+			switch ((tag & 0xFF)>>4) {
+			case 0:
+				if (tag==Tag.NULL) return null;
+				break;
+
+			case 1: // Numerics
+				return readNumeric(tag, ds);
+
+			case 8: // Data structures
+				if (tag == Tag.VECTOR) return readVector(ds);
+				break;
+			}
+		} catch (BadFormatException e) {
+			throw e;
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Read out of bounds when decoding with tag 0x"+Utils.toHexString(tag),e);
+		} catch (MissingDataException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
+		}
+
+		// Fall through: bridge to Blob-based read for unmigrated types
 		// TODO: remove bridge once all types use native DecodeState reads
 		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
 		ACell result = read(tag, b, 0);
@@ -284,6 +304,72 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			ds.advanceTo(startPos + result.getEncodingLength());
 		}
 		return result;
+	}
+
+	// ---- DecodeState type reads (private) ----
+
+	private ANumeric readNumeric(byte tag, DecodeState ds) throws BadFormatException {
+		// CVMLong: tag 0x10-0x18, tag encodes byte count
+		if (tag<0x19) {
+			int numBytes=tag-Tag.INTEGER;
+			if (numBytes==0) return CVMLong.ZERO;
+			long v=Format.readLong(ds.data, ds.pos, numBytes);
+			ds.pos+=numBytes;
+			return CVMLong.create(v);
+		}
+		// CVMBigInteger: tag 0x19, VLQ byte count + raw bytes
+		if (tag == 0x19) {
+			long bc=Format.readVLQCount(ds.data, ds.pos);
+			ds.pos+=Format.getVLQCountLength(bc);
+			if (bc<=8) throw new BadFormatException("Non-canonical big integer length");
+			if (bc>Constants.MAX_BIG_INTEGER_LENGTH) throw new BadFormatException("Encoding exceeds max big integer length");
+			Blob blobData=Blob.wrap(ds.data, ds.pos, (int)bc);
+			ds.pos+=(int)bc;
+			CVMBigInteger result=CVMBigInteger.create(blobData);
+			if (result==null) throw new BadFormatException("Illegal creation of BigInteger from blob");
+			if (result.byteLength()!=bc) throw new BadFormatException("Excess leading bytes in BigInteger representation");
+			return result;
+		}
+		// CVMDouble: tag 0x1D, 8 raw bytes (IEEE 754)
+		if (tag == Tag.DOUBLE) {
+			long bits=Utils.readLong(ds.data, ds.pos, 8);
+			ds.pos+=8;
+			return CVMDouble.unsafeCreate(Double.longBitsToDouble(bits));
+		}
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> AVector<T> readVector(DecodeState ds) throws BadFormatException {
+		long count = readVLQCount(ds);
+		if (count < 0) throw new BadFormatException("Negative length");
+
+		if (VectorLeaf.isValidCount(count)) {
+			// VectorLeaf: 0-16 tail items with optional packed prefix
+			if (count == 0) return (AVector<T>) VectorLeaf.EMPTY;
+			int n = ((int) count) & 0xF;
+			if (n == 0) {
+				if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
+				n = VectorLeaf.MAX_SIZE;
+			}
+			Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
+			for (int i = 0; i < n; i++) {
+				items[i] = readRef(ds);
+			}
+			Ref<AVector<T>> pfx = null;
+			if (count > VectorLeaf.MAX_SIZE) {
+				pfx = readRef(ds);
+			}
+			return new VectorLeaf<T>(items, pfx, count);
+		} else {
+			// VectorTree: merkle tree of child vector refs
+			int n = VectorTree.computeArraySize(count);
+			Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
+			for (int i = 0; i < n; i++) {
+				items[i] = readRef(ds);
+			}
+			return new VectorTree<T>(items, count);
+		}
 	}
 
 	// ==================== Multi-cell decode ====================

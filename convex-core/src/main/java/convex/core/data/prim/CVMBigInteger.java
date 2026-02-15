@@ -5,7 +5,6 @@ import java.math.BigInteger;
 import convex.core.Constants;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AEncoder;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -297,38 +296,6 @@ public final class CVMBigInteger extends AInteger {
 
 		// Attach the encoding, will be same length as Blob encoding
 		result.attachEncoding(blob.slice(offset,offset+b.getEncodingLength()));
-		return result;
-	}
-
-	/**
-	 * Reads a CVMBigInteger from a DecodeState. Tag byte (0x19) already consumed.
-	 * BigInteger encoding is: tag + VLQ(byteLength) + bytes (same structure as Blob).
-	 * Since MAX_BYTELENGTH (4096) <= Blob.CHUNK_LENGTH, data is always flat.
-	 * Encoding attachment is handled by the caller.
-	 *
-	 * @param ds Decode state (pos past tag)
-	 * @return Decoded CVMBigInteger
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static CVMBigInteger read(AEncoder.DecodeState ds) throws BadFormatException {
-		long bc=Format.readVLQCount(ds.data, ds.pos);
-		ds.pos+=Format.getVLQCountLength(bc);
-
-		if (bc<=LONG_BYTELENGTH) {
-			throw new BadFormatException("Non-canonical big integer length");
-		}
-		if (bc>MAX_BYTELENGTH) {
-			throw new BadFormatException("Encoding exceeds max big integer length");
-		}
-
-		// Read bytes directly as a Blob (no copy, shares backing array)
-		Blob blobData=Blob.wrap(ds.data, ds.pos, (int)bc);
-		ds.pos+=(int)bc;
-
-		CVMBigInteger result= create(blobData);
-		if (result==null) throw new BadFormatException("Illegal creation of BigInteger from blob");
-		if (result.byteLength()!=bc) throw new BadFormatException("Excess leading bytes in BigInteger representation");
-
 		return result;
 	}
 

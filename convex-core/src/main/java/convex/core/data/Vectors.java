@@ -172,26 +172,6 @@ public class Vectors {
 	}
 
 	/**
-	 * Reads a Vector from a DecodeState. Tag byte already consumed.
-	 * Encoding attachment is handled by the caller.
-	 *
-	 * @param enc Encoder for reading refs
-	 * @param ds Decode state (pos past tag)
-	 * @return Decoded vector
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <T extends ACell> AVector<T> read(CAD3Encoder enc, AEncoder.DecodeState ds) throws BadFormatException {
-		long count = enc.readVLQCount(ds);
-		if (count < 0) throw new BadFormatException("Negative length");
-
-		if (VectorLeaf.isValidCount(count)) {
-			return VectorLeaf.read(count, enc, ds);
-		} else {
-			return VectorTree.read(count, enc, ds);
-		}
-	}
-
-	/**
 	 * Create a Vector which represents a range of integers from start to end
 	 * @param start Start index (inclusive)
 	 * @param end End index (exclusive)
