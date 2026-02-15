@@ -78,6 +78,19 @@ public final class Syntax extends ACell {
 	 * @param meta Metadata to merge, may be null
 	 * @return Syntax instance
 	 */
+	/**
+	 * Creates a Syntax object from a datum Ref and metadata.
+	 * Used by decoder to preserve refs without unwrapping/rewrapping.
+	 *
+	 * @param datumRef Ref to the datum value
+	 * @param meta Metadata map (null treated as empty)
+	 * @return Syntax instance
+	 */
+	public static Syntax createRef(Ref<ACell> datumRef, AHashMap<ACell, ACell> meta) {
+		if (meta==null) meta=Maps.empty();
+		return new Syntax(datumRef, meta);
+	}
+
 	public static Syntax create(ACell value, AHashMap<ACell, ACell> meta) {
 		if (value instanceof Syntax) {
 			Syntax stx=((Syntax) value);

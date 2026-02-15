@@ -273,7 +273,6 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 */
 	@Override
 	public ACell read(DecodeState ds) throws BadFormatException {
-		int startPos = ds.pos;
 		byte tag = ds.readByte();
 		try {
 			switch ((tag & 0xFF)>>4) {
@@ -287,15 +286,20 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			case 3: // 0x30-0x3F : Strings, blobs, symbols, keywords, chars
 				return readBasicObject(tag, ds);
 
-			case 8: // Data structures (Syntax excluded — needs ref-taking constructor, Phase 3)
-				if (tag != CVMTag.SYNTAX) return readDataStructure(tag, ds);
-				break;
+			case 8: // 0x80-0x8F : Data structures
+				return readDataStructure(tag, ds);
 
 			case 9: // 0x90-0x9F : Signed data
 				return readSignedData(tag, ds);
 
 			case 11: // 0xB0-0xBF : Byte flags including booleans
 				return AByteFlag.read(tag);
+
+			case 12: // 0xC0-0xCF : Coded data objects
+				return readCodedData(tag, ds);
+
+			case 13: // 0xD0-0xDF : Dense records
+				return readDenseRecord(tag, ds);
 
 			case 14: // 0xE0-0xEF : Extension values
 				return readExtension(tag, ds);
@@ -310,14 +314,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
 		}
 
-		// Fall through: bridge to Blob-based read for unmigrated types
-		// TODO: remove bridge once all types use native DecodeState reads
-		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
-		ACell result = read(tag, b, 0);
-		if (result != null) {
-			ds.advanceTo(startPos + result.getEncodingLength());
-		}
-		return result;
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	// ---- DecodeState type reads (private) ----
@@ -471,6 +468,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (tag == Tag.SET) return readSet(ds);
 		if (tag == Tag.LIST) return readList(ds);
 		if (tag == Tag.INDEX) return readIndex(ds);
+		if (tag == CVMTag.SYNTAX) return readSyntax(ds);
 		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
 	}
 
@@ -641,6 +639,21 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		}
 
 		return new Index<K, V>(depth, me, children, mask, count);
+	}
+
+	private Syntax readSyntax(DecodeState ds) throws BadFormatException {
+		// Syntax: datum ref + embedded props (hashmap, null encodes empty)
+		Ref<ACell> datum = readRef(ds);
+		@SuppressWarnings("unchecked")
+		AHashMap<ACell, ACell> props = (AHashMap<ACell, ACell>) this.read(ds);
+		if (props == null) {
+			props = Maps.empty();
+		} else {
+			if (props.isEmpty()) {
+				throw new BadFormatException("Empty Syntax metadata should be encoded as nil");
+			}
+		}
+		return Syntax.createRef(datum, props);
 	}
 
 	// ==================== Multi-cell decode ====================

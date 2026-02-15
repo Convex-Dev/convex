@@ -812,4 +812,37 @@ public class EncoderTest {
 		doDecodeStateRoundTrip(ev, CVM);
 		doDecodeStateRoundTrip(ev, CAD3);
 	}
+
+	@Test public void testDecodeStateSyntax() throws BadFormatException {
+		ACell[] values = {
+			convex.core.cvm.Syntax.create(CVMLong.ONE),
+			convex.core.cvm.Syntax.create(Symbol.create("foo")),
+			convex.core.cvm.Syntax.create(CVMLong.create(42), Maps.of(Keyword.create("line"), CVMLong.create(10))),
+		};
+		for (ACell v : values) {
+			doDecodeStateRoundTrip(v, CVM);
+			doDecodeStateRoundTrip(v, CAD3);
+		}
+	}
+
+	@Test public void testDecodeStateDenseRecord() throws BadFormatException {
+		// CVM dense record types (transactions, ops) decoded via bridge
+		Stores.setCurrent(Samples.TEST_STORE);
+		try {
+			ACell invoke = Invoke.create(Address.create(1), 0, Core.PLUS);
+			doDecodeStateRoundTrip(invoke, CVM);
+
+			ACell transfer = Transfer.create(Address.create(1), 0, Address.create(2), 1000L);
+			doDecodeStateRoundTrip(transfer, CVM);
+		} finally {
+			Stores.setCurrent(null);
+		}
+	}
+
+	@Test public void testDecodeStateCodedData() throws BadFormatException {
+		// Generic coded value
+		CodedValue cv = CodedValue.create(0xC5, CVMLong.ONE, Keyword.create("test"));
+		doDecodeStateRoundTrip(cv, CVM);
+		doDecodeStateRoundTrip(cv, CAD3);
+	}
 }

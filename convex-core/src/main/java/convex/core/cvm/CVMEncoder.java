@@ -93,6 +93,21 @@ public class CVMEncoder extends CAD3Encoder {
 	}
 
 	@Override
+	protected ACell readCodedData(byte tag, DecodeState ds) throws BadFormatException {
+		// Bridge CVM coded ops to Blob-based reads until Phase 3 migration
+		int startPos = ds.pos - 1; // include tag byte
+		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
+		try {
+			ACell result = readCodedData(tag, b, 0);
+			ds.advanceTo(startPos + (int) result.getEncodingLength());
+			return result;
+		} catch (Exception e) {
+			// Fall through to generic CAD3 coded value
+		}
+		return super.readCodedData(tag, ds);
+	}
+
+	@Override
 	protected ACell readCodedData(byte tag, Blob b, int pos) throws BadFormatException {
 		try {
 			if (tag == CVMTag.OP_CODED) return Ops.readCodedOp(tag,b, pos);
@@ -104,6 +119,21 @@ public class CVMEncoder extends CAD3Encoder {
 			// Catch all: tag may be shared with a generic CAD3 coded value
 		}
 		return CodedValue.read(tag,b,pos);
+	}
+
+	@Override
+	protected ACell readDenseRecord(byte tag, DecodeState ds) throws BadFormatException {
+		// Bridge CVM dense record types to Blob-based reads until Phase 3 migration
+		int startPos = ds.pos - 1; // include tag byte
+		Blob b = Blob.wrap(ds.data, startPos, ds.limit - startPos);
+		try {
+			ACell result = readDenseRecord(tag, b, 0);
+			ds.advanceTo(startPos + (int) result.getEncodingLength());
+			return result;
+		} catch (Exception e) {
+			// Fall through to generic CAD3 dense record
+		}
+		return super.readDenseRecord(tag, ds);
 	}
 
 	@Override
