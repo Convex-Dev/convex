@@ -16,8 +16,6 @@ import convex.core.data.AEncoder.DecodeState;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.RecordTest;
-
 /**
  * Tests decoding a real Belief snapshot from CAD3 multi-cell format
  * using the DecodeState path.
@@ -47,7 +45,7 @@ public class BeliefSnapshotTest {
 
 	@Test
 	public void testBeliefRecord() {
-		RecordTest.doRecordTests(belief);
+		BeliefTest.doBeliefTests(belief);
 	}
 
 	@Test

@@ -43,13 +43,13 @@ public class BeliefTest {
 			orders[i]=kp.signData(o);
 		}		
 		Belief b=Belief.create(orders);
-		
-		RecordTest.doRecordTests(b);
-		
-		b=Cells.persist(b, Samples.TEST_STORE);
-		
-		RecordTest.doRecordTests(b);
-		
+
+		doBeliefTests(b);
+
 		EncodingTest.testFullencoding(b);
+	}
+
+	public static void doBeliefTests(Belief b) {
+		RecordTest.doRecordTests(b);
 	}
 }
