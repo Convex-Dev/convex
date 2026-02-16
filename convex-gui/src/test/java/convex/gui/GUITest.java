@@ -29,8 +29,8 @@ import convex.peer.Server;
  */
 public class GUITest {
 	
-	static Server SERVER;
-	static Convex CONVEX;
+	public static Server SERVER;
+	public static Convex CONVEX;
 	private static PeerGUI manager = null;
 	
 
