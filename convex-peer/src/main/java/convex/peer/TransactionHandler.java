@@ -87,6 +87,21 @@ public class TransactionHandler extends AThreadedComponent {
 	public boolean offerTransaction(Message m) {
 		return txMessageQueue.offer(m);
 	}
+
+	/**
+	 * Offer a transaction for handling, blocking until space is available or timeout.
+	 * Used as the retry predicate for backpressure.
+	 * @param m Message offered
+	 * @return True if queued for handling, false on timeout or interruption
+	 */
+	public boolean offerTransactionBlocking(Message m) {
+		try {
+			return txMessageQueue.offer(m, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
 	
 	/**
 	 * Register of client interests in receiving transaction responses

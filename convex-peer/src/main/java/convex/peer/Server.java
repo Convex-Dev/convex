@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,25 +87,22 @@ public class Server implements Closeable {
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
-	 * Message Consumer that handles received client messages received by this peer
-	 * Called on NIO thread: should never block
+	 * Message Consumer that handles received client messages received by this peer.
+	 * Delegates to deliverMessage and handles the retry predicate by blocking the
+	 * caller's thread if a queue is full. Used by legacy NIO path and tests.
 	 */
 	Consumer<Message> receiveAction = m->{
-		try {
-			// Decode message payload using server's store before processing
-			m.getPayload(getStore());
-		} catch (Exception e) {
-			log.debug("Failed to decode message: {}", e.getMessage());
-			try {
-				ACell id = m.getRequestID(); // safe: returns null if undecoded
-				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
-			} catch (Exception e2) {
-				// best effort -- connection may be bad
+		Predicate<Message> retry = deliverMessage(m);
+		if (retry != null) {
+			if (!retry.test(m)) {
+				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
+				try {
+					m.returnResult(r);
+				} catch (Exception e) {
+					// best effort
+				}
 			}
-			return;
 		}
-		observeMessageReceived(m);
-		processMessage(m);
 	};
 
 	/**
@@ -131,6 +129,14 @@ public class Server implements Closeable {
 	 * Query handler instance.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
+
+	/**
+	 * Pre-allocated retry predicates for backpressure. These are returned by
+	 * processMessage when a queue is full, and block until space is available.
+	 * Zero allocation on the reject path — method references are bound once.
+	 */
+	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
+	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -429,48 +435,49 @@ public class Server implements Closeable {
 	 * 
 	 * SECURITY: Should anticipate malicious messages
 	 *
-	 * Runs on receiver thread, so we want to offload to a queue ASAP, never block
+	 * Non-blocking on the fast path: offloads to a queue and returns immediately.
+	 * Returns null if the message was accepted, or a blocking retry predicate
+	 * if the target queue was full (backpressure signal to the caller).
 	 *
-	 * @param m
+	 * @param m Message to process
+	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
 	 */
-	protected void processMessage(Message m) {
-		// log.info("Message received: "+m.getMessageData());
+	public Predicate<Message> processMessage(Message m) {
 		try {
 			MessageType type = m.getType();
 			switch (type) {
+			case TRANSACT:
+				if (transactionHandler.offerTransaction(m)) return null;
+				return txnRetry;
+
+			case QUERY: case DATA_REQUEST:
+				if (queryHandler.offerQuery(m)) return null;
+				return queryRetry;
+
+			// Protocol messages — always accepted, handled inline
 			case BELIEF:
 				processBelief(m);
-				break;
+				return null;
 			case CHALLENGE:
 				processChallenge(m);
-				break;
+				return null;
 			case RESPONSE:
 				processResponse(m);
-				break;
-			case COMMAND:
-				break;
-			case DATA_REQUEST:
-				processQuery(m); // goes on Query handler
-				break;
-			case QUERY:
-				processQuery(m);
-				break;
-			case RESULT:
-				// We aren't expecting results here (on an inbound connection)
-				log.debug("unexpected Result received");
-				break;
-			case TRANSACT:
-				processTransact(m);
-				break;
+				return null;
 			case GOODBYE:
 				processClose(m);
-				break;
+				return null;
 			case STATUS:
 				processStatus(m);
-				break;
+				return null;
+			case COMMAND:
+				return null;
+			case RESULT:
+				log.debug("unexpected Result received");
+				return null;
 			default:
 				log.debug("Unrecognised message type: {}", type);
-				break;
+				return null;
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
@@ -480,6 +487,7 @@ public class Server implements Closeable {
 			} catch (Exception e2) {
 				// best effort -- some message types don't have return handlers
 			}
+			return null;
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
 			try {
@@ -487,7 +495,34 @@ public class Server implements Closeable {
 			} catch (Exception e2) {
 				// best effort
 			}
+			return null;
 		}
+	}
+
+	/**
+	 * Delivers an inbound message: decodes payload, observes, and dispatches.
+	 * Returns null if accepted, or a blocking retry predicate if the queue was full.
+	 *
+	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
+	 *
+	 * @param m Message to deliver
+	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 */
+	public Predicate<Message> deliverMessage(Message m) {
+		try {
+			m.getPayload(getStore());
+		} catch (Exception e) {
+			log.debug("Failed to decode message: {}", e.getMessage());
+			try {
+				ACell id = m.getRequestID();
+				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
+			} catch (Exception e2) {
+				// best effort -- connection may be bad
+			}
+			return null;
+		}
+		observeMessageReceived(m);
+		return processMessage(m);
 	}
 
 	/**
@@ -498,17 +533,6 @@ public class Server implements Closeable {
 		return getPeer().getConsensusState();
 	}
 
-	protected void processTransact(Message m) {
-		boolean queued=transactionHandler.offerTransaction(m);
-		
-		if (queued) {
-			// log.info("transaction queued");
-		} else {
-			// Failed to queue transaction
-			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
-			m.returnResult(r);
-		} 
-	}
 
 	/**
 	 * Called by a remote peer to close connections to the remote peer.
@@ -614,13 +638,6 @@ public class Server implements Closeable {
 		manager.processResponse(m, getPeer());
 	}
 
-	protected void processQuery(Message m) {
-		boolean queued= queryHandler.offerQuery(m);
-		if (!queued) {
-			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-			m.returnResult(r);
-		} 
-	}
 
 	/**
 	 * Process an incoming message that represents a Belief

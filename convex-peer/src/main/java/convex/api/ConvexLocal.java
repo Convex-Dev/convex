@@ -8,6 +8,7 @@ import java.util.function.Predicate;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
+import convex.core.data.Strings;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
@@ -120,11 +121,19 @@ public class ConvexLocal extends Convex {
 			Result r=Result.error(ErrorCodes.CONNECT, "Disconnected").withSource(SourceCodes.CLIENT);
 			return CompletableFuture.completedFuture(r);
 		}
-		
+
 		CompletableFuture<Result> cf=new CompletableFuture<>();
 		Predicate<Message> resultHandler=makeResultHandler(cf);
 		Message ml=message.withResultHandler(resultHandler);
-		server.getReceiveAction().accept(ml);
+
+		// Deliver directly to server. If queue is full, block caller's thread.
+		Predicate<Message> retry = server.deliverMessage(ml);
+		if (retry != null) {
+			if (!retry.test(ml)) {
+				cf.complete(Result.create(ml.getID(), Strings.SERVER_LOADED,
+					ErrorCodes.LOAD).withSource(SourceCodes.PEER));
+			}
+		}
 		return cf;
 	}
 
@@ -154,12 +163,19 @@ public class ConvexLocal extends Convex {
 	public CompletableFuture<Result> message(Message message) {
 		ACell id=message.getRequestID();
 		if (id==null) {
-			// directly forward message to Server
-			server.getReceiveAction().accept(message);
+			// Directly forward message to Server, blocking if queue full
+			Predicate<Message> retry = server.deliverMessage(message);
+			if (retry != null) {
+				if (!retry.test(message)) {
+					return CompletableFuture.completedFuture(
+						Result.create(null, Strings.SERVER_LOADED, ErrorCodes.LOAD)
+							.withSource(SourceCodes.PEER));
+				}
+			}
 			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 		}
-			
-		// We are expecting a return message, so build a completable future for it	
+
+		// We are expecting a return message, so build a completable future for it
 		return makeMessageFuture(message);
 	}
 

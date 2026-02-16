@@ -28,8 +28,8 @@ public class QueryHandler extends AThreadedComponent {
 	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Config.QUERY_QUEUE_SIZE);
 
 	public QueryHandler(Server server) {
-		super(server);	
-		queryQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
+		super(server);
+		queryQueue= new ArrayBlockingQueue<>(Config.QUERY_QUEUE_SIZE);
 	}
 	
 	/**
@@ -39,6 +39,21 @@ public class QueryHandler extends AThreadedComponent {
 	 */
 	public boolean offerQuery(Message m) {
 		return queryQueue.offer(m);
+	}
+
+	/**
+	 * Offer a query for handling, blocking until space is available or timeout.
+	 * Used as the retry predicate for backpressure.
+	 * @param m Message offered
+	 * @return True if queued for handling, false on timeout or interruption
+	 */
+	public boolean offerQueryBlocking(Message m) {
+		try {
+			return queryQueue.offer(m, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
 	}
 	
 

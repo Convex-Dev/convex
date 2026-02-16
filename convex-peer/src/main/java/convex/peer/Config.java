@@ -102,6 +102,13 @@ public class Config {
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
+	 * Maximum number of inbound client connections accepted by the server.
+	 * Each connection consumes ~200KB idle (~300KB under load), so at 1024
+	 * connections the total is ~200-300MB (mostly kernel socket buffers).
+	 */
+	public static final int MAX_CLIENT_CONNECTIONS = 1024;
+
+	/**
 	 * Checks if the config specifies a valid store
 	 * @param config Configuration map for peer
 	 * @return Store specified in Config, or null if not specified
