@@ -109,6 +109,12 @@ public class Config {
 	public static final int MAX_CLIENT_CONNECTIONS = 1024;
 
 	/**
+	 * Size of bounded outbound message queue per client connection.
+	 * Absorbs brief bursts; backpressure kicks in when the queue fills.
+	 */
+	public static final int OUTBOUND_QUEUE_SIZE = 128;
+
+	/**
 	 * Checks if the config specifies a valid store
 	 * @param config Configuration map for peer
 	 * @return Store specified in Config, or null if not specified

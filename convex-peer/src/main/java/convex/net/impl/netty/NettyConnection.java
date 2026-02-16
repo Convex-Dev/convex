@@ -3,6 +3,8 @@ package convex.net.impl.netty;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -46,11 +48,11 @@ public class NettyConnection extends AConnection {
 	private NettyInboundHandler inboundHandler;
 
 	/**
-	 * Lock used for client-side write backpressure. Application threads wait on
-	 * this when the channel is not writable; the writability change handler
-	 * notifies when the channel becomes writable again.
+	 * Bounded outbound message queue. Application threads put messages here;
+	 * the Netty event loop drains them to the channel when writable.
 	 */
-	final Object writabilityLock = new Object();
+	private final ArrayBlockingQueue<Message> outbound =
+		new ArrayBlockingQueue<>(Config.OUTBOUND_QUEUE_SIZE);
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -121,17 +123,20 @@ public class NettyConnection extends AConnection {
 
 		NettyConnection client = new NettyConnection(chan,inbound);
 
-		// Add writability change handler to wake application threads on backpressure clear
+		// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
 		f.channel().pipeline().addLast(
 			new ChannelInboundHandlerAdapter() {
 				@Override
 				public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-					if (ctx.channel().isWritable()) {
-						synchronized (client.writabilityLock) {
-							client.writabilityLock.notifyAll();
-						}
-					}
+					client.doFlush();
 					ctx.fireChannelWritabilityChanged();
+				}
+
+				@Override
+				public void channelInactive(ChannelHandlerContext ctx) {
+					// Clear queue to wake any threads blocked on offer(timeout)
+					client.outbound.clear();
+					ctx.fireChannelInactive();
 				}
 			},
 			inbound,
@@ -139,6 +144,54 @@ public class NettyConnection extends AConnection {
 		);
 
 		return client;
+	}
+
+	/**
+	 * Sends a message, blocking until the message can be queued or timeout.
+	 * Safe to call from virtual threads.
+	 */
+	@Override
+	public boolean sendMessage(Message m) {
+		if (!channel.isActive()) return false;
+		try {
+			boolean queued = outbound.offer(m, Config.DEFAULT_CLIENT_TIMEOUT,
+				TimeUnit.MILLISECONDS);
+			if (queued) flushPending();
+			return queued;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
+
+	/**
+	 * Tries to send a message without blocking. Returns immediately.
+	 */
+	@Override
+	public boolean trySendMessage(Message m) {
+		if (!channel.isActive()) return false;
+		boolean queued = outbound.offer(m);
+		if (queued) flushPending();
+		return queued;
+	}
+
+	/**
+	 * Schedule a drain on the Netty event loop.
+	 */
+	private void flushPending() {
+		channel.eventLoop().execute(this::doFlush);
+	}
+
+	/**
+	 * Drain the outbound queue to the channel. Runs on the Netty event loop
+	 * — single-threaded, no synchronisation needed.
+	 */
+	private void doFlush() {
+		while (channel.isWritable() && channel.isActive()) {
+			Message m = outbound.poll();
+			if (m == null) break;
+			channel.writeAndFlush(m);
+		}
 	}
 
 	protected ChannelFuture send(Message m) {
@@ -151,30 +204,6 @@ public class NettyConnection extends AConnection {
 		});
 
 		client.send(Message.create(MessageType.QUERY,Vectors.of(1,2,3,4))).sync();
-	}
-
-	@Override
-	public boolean sendMessage(Message m)  {
-		if (!channel.isActive()) return false;
-
-		// Wait if channel is not writable (TCP backpressure from server).
-		// Blocks the APPLICATION thread, not the Netty event loop.
-		if (!channel.isWritable()) {
-			try {
-				synchronized (writabilityLock) {
-					while (!channel.isWritable() && channel.isActive()) {
-						writabilityLock.wait(100); // periodic check
-					}
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return false;
-			}
-			if (!channel.isActive()) return false;
-		}
-
-		channel.writeAndFlush(m);
-		return true;
 	}
 
 	@Override
