@@ -181,7 +181,7 @@ public class StressPanel extends JPanel {
 		optionPanel.add(repeatTimeSpinner);
 
 
-		JLabel lblTxType=new JLabel("Transaction Type");
+		JLabel lblTxType=new JLabel("Op Type");
 		txTypeBox=new JComboBox<String>();
 		txTypeBox.addItem("Transfer");
 		txTypeBox.addItem("Define Data");
@@ -487,25 +487,29 @@ public class StressPanel extends JPanel {
 
 		protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
 			Address target=clients.get((1+reqNo+txNo*6969)%clients.size()).getAddress();
-			if (type.equals("Transfer")) {
-				ATransaction t = Transfer.create(origin,ATransaction.UNKNOWN_SEQUENCE, target, 100);
-				return t;
-			}
-			
-			StringBuilder tsb = new StringBuilder();
-			if (opCount>1) tsb.append("(loop [i 0] ");
+			ATransaction single = buildSingleOp(reqNo, txNo, origin, target);
+			if (opCount <= 1) return single;
+
+			// Nest opCount operations in a Multi sub-transaction
+			ATransaction[] ops = new ATransaction[opCount];
 			for (int j = 0; j < opCount; j++) {
-				switch(type) {
-					case "Define Data": tsb.append("(def a"+txNo+" "+reqNo+") "); break;
-					case "Invoke Const": tsb.append("nil "); break;
-					case "Actor Call": tsb.append("(call #9 (lookup *address*)) "); break;
-					default: throw new Error("Bad TX type: "+type);
-				}
+				ops[j] = buildSingleOp(reqNo, txNo, origin, target);
 			}
-			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i))))");
-			String source = tsb.toString();
-			ATransaction t = Invoke.create(origin,ATransaction.UNKNOWN_SEQUENCE, Reader.read(source));
-			return t;
+			return Multi.create(origin, ATransaction.UNKNOWN_SEQUENCE, Multi.MODE_ANY, ops);
+		}
+
+		private ATransaction buildSingleOp(int reqNo, int txNo, Address origin, Address target) {
+			switch (type) {
+				case "Transfer":
+					return Transfer.create(origin, ATransaction.UNKNOWN_SEQUENCE, target, 100);
+				case "Define Data":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("(def a" + txNo + " " + reqNo + ")"));
+				case "Invoke Const":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("nil"));
+				case "Actor Call":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("(call #9 (lookup *address*))"));
+				default: throw new Error("Bad TX type: " + type);
+			}
 		}
 
 		@Override
