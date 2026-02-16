@@ -46,6 +46,19 @@ import convex.core.util.Utils;
 public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
+	 *
+	 * This pause serves two purposes:
+	 * 1. In multi-peer networks: waits for incoming peer beliefs to accumulate before
+	 *    performing a belief merge, reducing the number of merge operations.
+	 * 2. As a side effect: controls the loop period and therefore how frequently
+	 *    maybeGenerateBlocks() is called, acting as a transaction batching delay.
+	 *
+	 * On a single-peer network (or when no remote beliefs arrive), the full wait
+	 * elapses every iteration — even when transactionQueue has pending transactions.
+	 * The actual block publication rate guard is minBlockTime (default 10ms) in
+	 * TransactionHandler.maybeGenerateBlocks().
+	 *
+	 * See TRANSACTION_PATH.md for pipeline analysis and potential improvements.
 	 */
 	private static final long AWAIT_BELIEFS_PAUSE = 30L;
 
@@ -289,15 +302,21 @@ public class BeliefPropagator extends AThreadedComponent {
 	
 	/**
 	 * Await incoming Belief for all incoming belief merges / potential update. This merges multiple incoming beliefs into a single Belief
-	 * which compacts the number of incoming orders for the upcoming Belief Merge
-	 * 
-	 * @return Incoming Belief, or null if nothing arrived within time window 
+	 * which compacts the number of incoming orders for the upcoming Belief Merge.
+	 *
+	 * This method blocks for up to AWAIT_BELIEFS_PAUSE (30ms) waiting for remote
+	 * peer beliefs. On a single-peer network no beliefs ever arrive, so this always
+	 * waits the full duration — adding 30ms of latency per loop iteration even when
+	 * transactions are pending in the transactionQueue.
+	 *
+	 * @return Incoming Belief, or null if nothing arrived within time window
 	 * @throws InterruptedException
 	 */
 	private Belief awaitBelief() throws InterruptedException {
 		ArrayList<Message> beliefMessages=new ArrayList<>();
-		
-		// if we did a belief merge recently, pause for a bit to await more Beliefs
+
+		// Pause to accumulate incoming beliefs from remote peers before merging.
+		// On a single-peer network this always times out after AWAIT_BELIEFS_PAUSE ms.
 		LoadMonitor.down();
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();

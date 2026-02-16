@@ -57,7 +57,19 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final long OWN_BLOCK_DELAY=10000;
 
 	/**
-	 * Default minimum delay between proposing a block as a peer
+	 * Default minimum delay (ms) between proposing blocks as a peer.
+	 *
+	 * This batching guard prevents the peer from creating a new block for every
+	 * individual transaction. Without it, a peer receiving a steady stream of
+	 * transactions would sign and persist a separate block for each one — wasting
+	 * Ed25519 signing (~70us), persistence I/O, and network bandwidth on block
+	 * overhead that dwarfs the transaction payload.
+	 *
+	 * The 10ms default allows transactions to accumulate in the transactionQueue
+	 * between block creation attempts, producing larger (more efficient) blocks.
+	 * At 10ms intervals, up to 1024 transactions can be batched per block.
+	 *
+	 * Configurable via the :min-block-time server config key.
 	 */
 	private static final long DEFAULT_MIN_BLOCK_TIME=10;
 	
@@ -69,12 +81,17 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Queue for valid received Transactions submitted for clients of this Peer
 	 */
+	/**
+	 * Queue for valid transactions awaiting block creation.
+	 * Larger than txMessageQueue so the handler never blocks during normal operation.
+	 * External backpressure is applied at txMessageQueue.
+	 */
 	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
-	
+
 	public TransactionHandler(Server server) {
-		super(server);	
+		super(server);
 		txMessageQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
-		transactionQueue=new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);	
+		transactionQueue=new ArrayBlockingQueue<>(3 * Config.TRANSACTION_QUEUE_SIZE);
 	}
 	
 	/**
@@ -193,10 +210,11 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
 				continue;
 			}
-			LoadMonitor.down();
-			transactionQueue.put(sd);
+			if (!transactionQueue.offer(sd)) {
+				m.returnResult(Result.error(ErrorCodes.LOAD, Strings.SERVER_LOADED).withSource(SourceCodes.PEER));
+				continue;
+			}
 			observeTransactionRequest(sd);
-			LoadMonitor.up();
 			this.clientTransactionCount++;
 			registerInterest(sd.getHash(), m);
 		}
@@ -291,19 +309,27 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 	
 	/**
-	 * Gets the next Blocks for publication, or null if nothing to publish
+	 * Gets the next Blocks for publication, or null if nothing to publish.
 	 * Checks for pending transactions, and if found propose them as new Block(s).
 	 *
-	 * @return New signed Block, or null if nothing to publish yet
+	 * Called from the BeliefPropagator loop (not from TransactionHandler's own loop).
+	 * The minBlockTime guard ensures we don't create blocks too frequently — allowing
+	 * transactions to accumulate in the transactionQueue between calls, producing
+	 * larger and more efficient blocks.
+	 *
+	 * @return New signed Block(s), or null if nothing to publish yet
 	 */
 	protected SignedData<Block>[] maybeGenerateBlocks() {
 		Peer peer=server.getPeer();
 		long timestamp=Utils.getCurrentTimestamp();
 
 		if (!peer.isReadyToPublish()) return null;
-		
+
 		long minBlockTime=getMinBlockTime();
-		
+
+		// Batching guard: don't create blocks more often than minBlockTime (default 10ms).
+		// This allows transactions to accumulate, producing larger blocks and reducing
+		// per-block overhead (Ed25519 signing, persistence, network broadcast).
 		if (timestamp<lastBlockPublishedTime+minBlockTime) return null;
 			
 		// possibly have own transactions to publish as a Peer
