@@ -87,7 +87,7 @@ public class Server implements Closeable {
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
-	 * Message Consumer that handles received client messages received by this peer.
+	 * Message Consumer that handles received messages for this peer.
 	 * Delegates to deliverMessage and handles the retry predicate by blocking the
 	 * caller's thread if a queue is full. Used by legacy NIO path and tests.
 	 */
@@ -168,33 +168,11 @@ public class Server implements Closeable {
 		
 	}
 
-	// This doesn't actually do anything useful? Do we need this?
-//	/**
-//	 * Establish the controller Account for this Peer.
-//	 */
-//	private void establishController() {
-//		Peer peer=getPeer();
-//		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
-//		if (controlAddress==null) {
-//			controlAddress=peer.getController();
-//			if (controlAddress==null) {
-//				throw new IllegalStateException("Peer Controller account does not exist for Peer Key: "+peer.getPeerKey());
-//			}
-//		}
-//		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
-//		if (as==null) {
-//			log.warn("Peer Controller Account does not currently exist (perhaps pending sync?): "+controlAddress);	
-//		} else if (!Utils.equals(as.getAccountKey(),getKeyPair().getAccountKey())) {
-//			// TODO: not a problem?
-//			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
-//		}
-//	}
-
 	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",store);
 		AKeyPair keyPair = Config.ensurePeerKey(config);
 		if (keyPair==null) {
-			log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
+			log.warn("No keypair provided for Server, defaulting to generated keypair for testing purposes");
 			keyPair=AKeyPair.generate();
 			config.put(Keywords.KEYPAIR,keyPair);
 			log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
@@ -299,7 +277,6 @@ public class Server implements Closeable {
 				SignedData<Order> newOrder=keyPair.signData(Order.create());
 				belF=belF.withOrders(belF.getOrders().assoc(keyPair.getAccountKey(),newOrder));
 			}
-			// System.out.println(Lists.of(peerOrder.getValue().getConsensusPoints()));
 
 			Peer peer=Peer.create(keyPair, genF, belF);
 			return peer;
@@ -406,15 +383,12 @@ public class Server implements Closeable {
 			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, this::close);
 
-
-
 			// Start threaded components
 			manager.start();
 			queryHandler.start();
 			propagator.start();
 			transactionHandler.start();
 			executor.start();
-
 
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
@@ -571,7 +545,7 @@ public class Server implements Closeable {
 	/**
 	 * Adds an event to the inbound server event queue.
 	 * @param event Signed event to add to inbound event queue
-	 * @return True if Belief was successfullly queued, false otherwise
+	 * @return True if Belief was successfully queued, false otherwise
 	 */
 	public boolean queueBelief(Message event) {
 		boolean offered=propagator.queueBelief(event);
@@ -624,8 +598,6 @@ public class Server implements Closeable {
 		return reply;
 	}
 	
-	public static final AVector<Keyword> sTATUS_KEYS=Vectors.create(Keywords.BELIEF,Keywords.STATES,Keywords.GENESIS);
-	
 	public AMap<Keyword,ACell> getStatusMap() {
 		return Maps.zipMap(API.STATUS_KEYS,getStatusData());
 	}
@@ -641,8 +613,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Process an incoming message that represents a Belief
-	 *
-	 * @param m
+	 * @param m Belief message to process
 	 */
 	protected void processBelief(Message m) {
 		if (!propagator.queueBelief(m)) {
@@ -774,7 +745,7 @@ public class Server implements Closeable {
 			AccountStatus as=getPeer().getConsensusState().getAccount(getPeerController());
 			if (Cells.equals(as.getAccountKey(), kp.getAccountKey())) return kp;
 		} catch (Exception e) {
-			log.warn("Unexpected exception trying to get contreoller key",e);
+			log.warn("Unexpected exception trying to get controller key",e);
 		}
 		return null;
 	}

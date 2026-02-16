@@ -29,28 +29,17 @@ matches processing capacity rather than queue capacity.
                     ┌──────────▼───────────────────┐
                     │   NettyInboundHandler          │
                     │                               │
-                    │   has: ChannelHandlerContext    │
-                    │   has: deliver function         │
-                    │   has: backpressured flag       │
-                    │                               │
                     │   manages: setAutoRead()       │
+                    │   manages: backpressure gate   │
                     │   manages: virtual thread      │
-                    │   manages: decode gating       │
                     └───────────────────────────────┘
 ```
 
-### Server Dispatch
+### Dispatch
 
-`Server.processMessage(Message)` returns `Predicate<Message>`:
-
-- **null** — message accepted (fast path, zero allocation)
-- **non-null** — queue full; the returned predicate is a pre-allocated blocking retry
-  function (`transactionHandler::offerTransactionBlocking` or
-  `queryHandler::offerQueryBlocking`)
-
-The retry methods use `queue.offer(m, timeout, MILLISECONDS)` internally. The timeout
-is `Config.DEFAULT_CLIENT_TIMEOUT` (8 seconds) — the same duration the client would
-wait before giving up.
+`Server.processMessage(Message)` returns either **null** (accepted — fast path, zero
+allocation) or a **pre-allocated retry predicate** (queue full — the predicate blocks
+with timeout until space is available).
 
 `Server.deliverMessage(Message)` wraps decode + observe + processMessage for callers
 that need the full pipeline (NettyServer, ConvexLocal).
@@ -61,103 +50,66 @@ that need the full pipeline (NettyServer, ConvexLocal).
 |------|-------------|--------|
 | TRANSACT | Yes — `txMessageQueue` | Primary client workload |
 | QUERY, DATA_REQUEST | Yes — `queryQueue` | Primary client workload |
-| BELIEF | No | Peer protocol, small dedicated queue (200), must not block |
+| BELIEF | No | Peer protocol, small dedicated queue, must not block |
 | STATUS | No | Inline response, no queue |
 | CHALLENGE / RESPONSE | No | Authentication protocol, must complete promptly |
 | GOODBYE | No | Connection teardown, must not delay |
 
-### Handler Backpressure Flow
+### Backpressure Flow
 
-The `NettyInboundHandler` owns the backpressure lifecycle. A per-handler `volatile boolean
-backpressured` flag gates decoding — when true, `decode()` returns without consuming bytes,
-stopping the `ByteToMessageDecoder` loop.
+When a queue is full, the Netty handler pauses socket reads for that channel,
+retries delivery on a virtual thread, and resumes reads when the retry succeeds
+or times out. The I/O thread never blocks. See `NettyInboundHandler` for the
+full lifecycle including cumulation buffer flush on resume.
 
 ```
 I/O thread: decode()
                 │
-                ├─ backpressured? → return (don't consume bytes, loop stops)
+                ├─ backpressured? → return (stop decode loop)
                 │
                 ▼
-          parse message
-                │
-                ▼
-          deliver.apply(m)
+          parse message → deliver(m)
                 │
        ┌────────┴────────┐
      null              Predicate
        │                  │
-     done            backpressured = true
-   (fast path)       setAutoRead(false)
-                          │
-                          ▼
-                    virtual thread:
-                      retry.test(m)
+     done            pause reads
+   (fast path)       spawn virtual thread → retry
                           │
                    ┌──────┴──────┐
-                 true          false (timeout)
+                 success       timeout
                    │              │
-                 done          return :LOAD
-                   │              │
+                   │           return :LOAD
                    └──────┬───────┘
                           ▼
-                    backpressured = false
-                    setAutoRead(true)
-                          │
-                          ▼
-                    fire synthetic channelRead
-                    (flush cumulation buffer)
-                          │
-                          ▼
-                    remaining bytes decoded in order
+                    resume reads
+                    flush stranded data
 ```
 
-### Cumulation Buffer Flush
+### ConvexLocal
 
-When `decode()` returns early (backpressured gate), `ByteToMessageDecoder` sees no
-progress and stops its decode loop. Any bytes already read from the socket remain in
-the cumulation buffer. When backpressure clears and `setAutoRead(true)` is called,
-Netty resumes reading from the OS socket — but if all data was already read into the
-cumulation buffer before autoRead was disabled, no new `channelRead` event fires and
-the stranded data is never processed.
+For in-JVM clients (no network), there is no Netty handler. If the queue is full,
+`ConvexLocal` calls the retry predicate directly on the caller's thread — blocking
+is safe because the caller is an application thread, not an I/O thread.
 
-To handle this, the virtual thread fires a synthetic `channelRead` with an empty buffer
-through the pipeline after clearing backpressure:
+## Queue Processing
 
-```java
-ctx.channel().eventLoop().execute(() -> {
-    ctx.pipeline().fireChannelRead(Unpooled.EMPTY_BUFFER);
-});
-```
+Both `TransactionHandler` and `QueryHandler` use batch-drain processing: block
+until at least one message arrives, then `drainTo()` to grab all queued messages
+in a single lock acquisition. This significantly reduces contention under load
+compared to per-message polling.
 
-This triggers `ByteToMessageDecoder.channelRead()`, which merges the empty buffer with
-the existing cumulation (no-op) and calls `callDecode()` — our `decode()` method runs
-with `backpressured = false` and processes the stranded data. The event loop scheduling
-ensures this runs on the correct thread.
-
-**The I/O thread never blocks.** `deliver.apply(m)` is a non-blocking `offer()`. If it
-fails, setting the flag and spawning a virtual thread both return immediately. The I/O
-thread moves on to service other channels.
-
-### ConvexLocal — Direct Blocking
-
-For `ConvexLocal` (in-JVM, no network), there is no TCP and no Netty handler. The
-calling thread is the client's application thread, so blocking is safe. `ConvexLocal`
-calls `server.deliverMessage(m)`, and if it returns a retry predicate, calls it directly
-on the caller's thread. No virtual thread needed.
+The TransactionHandler further batches messages into blocks for consensus. The
+QueryHandler processes each query against the current consensus state independently.
 
 ## Connection Limiting
 
-`NettyServer` maintains a `DefaultChannelGroup` tracking all active inbound channels.
-This is purely a Netty-layer concern — `Server` is unaware.
-
 - **Limit:** `Config.MAX_CLIENT_CONNECTIONS` (default 1024)
-- **Enforcement:** `initChannel()` rejects and closes if limit reached
+- **Enforcement:** `NettyServer.initChannel()` rejects and closes if limit reached
 - **Cleanup:** `DefaultChannelGroup` auto-removes channels on close
 - **Shutdown:** `clientChannels.close()` provides clean bulk teardown
 
 ### Memory Budget
-
-Each client connection consumes approximately:
 
 | Component | Memory | Notes |
 |-----------|--------|-------|
@@ -173,25 +125,25 @@ Operators can adjust `MAX_CLIENT_CONNECTIONS` for high-traffic or constrained en
 
 ## Design Rationale
 
-### Why Per-Channel, Not Global?
+### Per-Channel, Not Global
 
 A global backpressure mechanism (e.g. pause all reads when any queue fills) would
 penalise well-behaved clients for a single fast sender. Per-channel backpressure
 isolates the effect: only the specific client that hit the full queue is throttled.
 
-### Why Virtual Threads?
+### Virtual Threads for Retry
 
-The Netty I/O thread must never block (Rule 1). The blocking retry needs *some* thread
-to park on `queue.offer(timeout)`. Virtual threads are ideal: lightweight (~1 KB),
-bounded by timeout, and don't consume a platform thread while parked.
+The Netty I/O thread must never block. The blocking retry needs *some* thread to
+park on the queue. Virtual threads are ideal: lightweight (~1 KB), bounded by
+timeout, and don't consume a platform thread while parked.
 
-### Why Pre-Allocated Predicates?
+### Pre-Allocated Predicates
 
-The retry predicates (`txnRetry`, `queryRetry`) are method references bound once at
-server construction. Zero allocation on the reject path — important since rejects
-happen precisely when the server is under load.
+The retry predicates (`txnRetry`, `queryRetry`) are method references bound once
+at server construction. Zero allocation on the reject path — important since
+rejects happen precisely when the server is under load.
 
-### Dependency Direction
+### Clean Dependency Direction
 
 `Message` is in `convex-core` and carries no Netty-specific references. The server
 exposes `processMessage` as a pure `Function<Message, Predicate<Message>>`. The
@@ -199,60 +151,60 @@ handler orchestrates all channel-level backpressure. The server never sees a cha
 
 ### Deadlock Safety
 
-The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not apply:
-
-- Server write volume is tiny (Result messages, ~100 bytes each)
-- Client's Netty event loop is never blocked (only the application thread waits)
-- Client continues reading results even while the application thread is blocked
-- Virtual threads hold no locks and don't write to channels
-
-## Thread Safety
-
-| Operation | Thread | Blocking? | Notes |
-|-----------|--------|-----------|-------|
-| `deliver.apply(m)` | Netty I/O | No | Non-blocking `offer()` |
-| `backpressured = true` | Netty I/O | N/A | Volatile write |
-| `setAutoRead(false)` | Netty I/O | No | Netty serialises internally |
-| `retry.test(m)` | Virtual thread | Yes | Bounded by timeout |
-| `backpressured = false` | Virtual thread | N/A | Volatile write, before `setAutoRead` |
-| `setAutoRead(true)` | Virtual thread | No | Netty serialises internally |
-| `fireChannelRead(EMPTY)` | Event loop (scheduled) | No | Flushes stranded cumulation data |
-
-**Ordering:** The virtual thread sets `backpressured = false` before `setAutoRead(true)`.
-When Netty resumes reading and calls `decode()`, the volatile read sees `false` and
-decoding proceeds. The volatile write/read provides the necessary happens-before.
+The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
+apply: server write volume is tiny (Result messages), the client's event loop is
+never blocked, and virtual threads hold no locks.
 
 ## Backward Compatibility
 
 - `:LOAD` error only on timeout — existing retry logic still works but fires rarely
 - Wire protocol unchanged
 - API unchanged (`transact()` / `query()` still return `CompletableFuture<Result>`)
-- Only observable change: calls may take longer to return under load (blocking instead
-  of immediate error)
+- Only observable change: calls may take longer to return under load (blocking
+  instead of immediate error)
+
+## Performance
+
+Measured on a single peer with `ConvexLocal` (in-JVM, no network overhead):
+
+| Workload | Throughput |
+|----------|-----------|
+| Simple query (constant), 20 sync clients | ~1M QPS |
+| Simple query (constant), 20 async clients | ~1.3M QPS |
+| Loop x100 query, 20 sync clients | ~80k QPS |
+| Pre-signed transfers, 20 async clients | ~190k TPS |
+
+Query load does not materially affect transaction throughput — they use separate
+queues and handler threads. 100k+ TPS is achievable under 600k+ QPS sustained
+query load.
 
 ## Future Direction
 
 ### Per-Channel Max Message Size
 
-The protocol allows messages up to `CPoSConstants.MAX_MESSAGE_LENGTH` (50 MB),
-primarily for peer Belief messages. A client has no reason to send a 50 MB message —
-transactions and queries are typically under 100 KB. A malicious client could force the
-cumulation buffer to grow to 50 MB before the message is fully received.
-
-**TODO:** Once peer/client channel classification is implemented, pass a smaller
-`maxMessageLength` (e.g. 1 MB) to `NettyInboundHandler` for client channels. Peer
-channels keep the 50 MB limit. The handler constructor already has the check point —
-make the limit a parameter instead of the global constant.
+The protocol allows messages up to 50 MB, primarily for peer Belief messages. A
+client has no reason to send a 50 MB message — transactions and queries are
+typically under 100 KB. Once peer/client channel classification is implemented,
+client channels should enforce a smaller limit (e.g. 1 MB) to prevent malicious
+cumulation buffer growth.
 
 ### Peer Priority
 
-Peer-to-peer Belief propagation should not be affected by client load. This requires
-distinguishing peer channels from client channels — a prerequisite for both max message
-size and priority scheduling. See [PEER_PRIORITY.md](PEER_PRIORITY.md).
+Peer-to-peer Belief propagation should not be affected by client load. This
+requires distinguishing peer channels from client channels — a prerequisite for
+both max message size and priority scheduling. See [PEER_PRIORITY.md](PEER_PRIORITY.md).
+
+### QueryHandler Parallelism
+
+The QueryHandler is currently single-threaded (`AThreadedComponent`). Under high
+async load from many clients, the single consumer becomes the bottleneck despite
+batch draining. Queries are read-only against the consensus state, so multiple
+handler threads could process them in parallel without ordering concerns. This
+would require either multiple `AThreadedComponent` instances sharing a queue, or
+a different threading model for the query path.
 
 ## References
 
 - [Netty #10254: Write Throttling / Back Pressure](https://github.com/netty/netty/issues/10254) — Norman Maurer's guidance
 - [Netty PR #6662: FlowControlHandler](https://github.com/netty/netty/pull/6662) — rejected due to bidirectional deadlock risk
-- [Netty #5970: Write watermark settings](https://github.com/netty/netty/issues/5970) — watermark tuning
 - [Cassandra Backpressure](https://cassandra.apache.org/_/blog/Improving-Apache-Cassandras-Front-Door-and-Backpressure.html) — production `setAutoRead(false)` at scale

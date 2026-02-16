@@ -54,12 +54,11 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		this.returnAction=returnAction;
 	}
 
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) { // (4)
-        // Close the connection when an exception is raised.
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 		log.debug("Closed Netty channel due to: "+cause.getMessage(),cause);
-        ctx.close();
-    }
+		ctx.close();
+	}
 
 	public long getReceivedCount() {
 		return receivedCount;
@@ -73,26 +72,25 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		if (backpressured) return;
 
 		try {
-	   		ByteBuf buf=(ByteBuf)in;
-	   		buf.markReaderIndex(); // mark reader position, may revert to this if no complete message
+	   		in.markReaderIndex(); // mark reader position, may revert to this if no complete message
 
 	   		int mlen=0;
-			int newBytes=buf.readableBytes();
+			int newBytes=in.readableBytes();
 			if (newBytes==0) return;
 
 			for (int i=0; ; i++) {
 				if (i>=newBytes) {
 					// insufficient bytes for message length, need to wait for more
-					buf.resetReaderIndex();
+					in.resetReaderIndex();
 					return;
 				}
 
-				byte b=buf.readByte();
+				byte b=in.readByte();
 
 				if ((i==0)&&(b==0x80)) {
 					byte[] bytes=new byte[newBytes];
 					bytes[0]=b;
-					buf.readBytes(bytes, 1, newBytes-1);
+					in.readBytes(bytes, 1, newBytes-1);
 					Blob tmp=Blob.wrap(bytes);
 					throw new BadFormatException("Zero leading bits in message length, content: "+tmp);
 				}
@@ -103,26 +101,23 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				if ((b&0x80)==0) {
 					// we have a complete message length
 					break;
-				};
+				}
 			}
 
-			if (buf.readableBytes()<mlen) {
+			if (in.readableBytes()<mlen) {
 				// insufficient bytes for message, need to wait for more
-				buf.resetReaderIndex();
+				in.resetReaderIndex();
 				return;
 			}
 
 			byte[] messageData=new byte[mlen];
 
 			// We now have a complete message!
-			buf.readBytes(messageData);
+			in.readBytes(messageData);
 			receivedCount++;
 
-			// Create message with return action, unspecified (null) type and Blob data
 			Message m=Message.create(returnAction,null,Blob.wrap(messageData));
 			out.add(m);
-
-			// Deliver message to server and handle backpressure
 			Predicate<Message> retry = deliver.apply(m);
 			if (retry != null) {
 				// Queue full — pause this channel, retry on virtual thread
