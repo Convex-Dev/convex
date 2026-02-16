@@ -592,16 +592,17 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 		DecodeState ds = new DecodeState(data);
 
-		// When storeless, use a MessageStore so readRef has a store during decode.
-		// resolveRefs will replace refs with direct child refs afterwards.
-		// When a real store is provided, use it directly.
-		HashMap<Hash,ACell> hm=new HashMap<>();
+		// Select encoder. Storeless decode needs a MessageStore so readRef can
+		// register branch hashes during decode; store-based uses this directly.
 		CAD3Encoder readEncoder;
+		HashMap<Hash,ACell> hm;
 		if (store==null) {
+			hm=new HashMap<>();
 			MessageStore ms = new MessageStore(hm, null);
 			readEncoder = withStore(ms);
 			ms.setEncoder(readEncoder);
 		} else {
+			hm=null;
 			readEncoder = this;
 		}
 
@@ -612,6 +613,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		}
 		if (ds.pos==ds.limit) return result; // single cell, done
 
+		// Multi-cell: read and resolve remaining children
+		if (hm==null) hm=new HashMap<>();
 		readEncoder.readChildCells(hm, ds);
 		return resolveRefs(result, hm, store==null);
 	}
