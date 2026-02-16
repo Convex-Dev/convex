@@ -24,6 +24,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.PartialMessageException;
 import convex.core.lang.Core;
 import convex.core.store.Stores;
 import convex.test.Samples;
@@ -341,7 +342,8 @@ public class EncoderTest {
 
 	@Test public void testMultiCellNoStorePartialTopOnly() throws BadFormatException {
 		// Encoding just the top cell of a multi-cell value (children not included).
-		// With no store set, unresolved refs remain as RefSoft pointing to dead MessageStore.
+		// Storeless decode throws PartialMessageException: branches exist but
+		// no child cells are available to resolve them.
 		ACell big = Samples.INT_VECTOR_300;
 		Blob topOnly = Cells.encode(big);
 
@@ -350,17 +352,9 @@ public class EncoderTest {
 
 		assertNull(Stores.current());
 
-		// Decode succeeds but the result has non-direct refs (RefSoft to dead MessageStore)
-		ACell decoded = CVM.decodeMultiCell(topOnly);
-		assertNotNull(decoded);
-		assertFalse(Refs.allRefsDirect(decoded),
-			"Partial message decode should leave non-direct refs");
-
-		// Same for CAD3Encoder
-		ACell fromCAD3 = CAD3.decodeMultiCell(topOnly);
-		assertNotNull(fromCAD3);
-		assertFalse(Refs.allRefsDirect(fromCAD3),
-			"Partial message decode should leave non-direct refs");
+		// Storeless decode fails fast on partial message
+		assertThrows(PartialMessageException.class, () -> CVM.decodeMultiCell(topOnly));
+		assertThrows(PartialMessageException.class, () -> CAD3.decodeMultiCell(topOnly));
 	}
 
 	@Test public void testMultiCellNoStoreSingleEmbedded() throws BadFormatException {

@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import convex.core.Constants;
@@ -21,6 +20,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.PartialMessageException;
 import convex.core.store.AStore;
+import convex.core.store.NullStore;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
@@ -63,6 +63,18 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 */
 	protected CAD3Encoder withStore(AStore store) {
 		return new CAD3Encoder(store);
+	}
+
+	private static final CAD3Encoder NULL_STORE_ENCODER = new CAD3Encoder(NullStore.INSTANCE);
+
+	/**
+	 * Returns a cached encoder of this type backed by NullStore. Used for
+	 * storeless multi-cell decode: readRef creates NullStore-backed refs
+	 * (zero allocation) that are replaced during resolveRefs.
+	 * Subclasses should override to return an encoder of their own type.
+	 */
+	protected CAD3Encoder nullStoreEncoder() {
+		return NULL_STORE_ENCODER;
 	}
 
 	@Override
@@ -128,8 +140,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			Hash h = Hash.wrap(ds.data, ds.pos);
 			if (h==null) throw new BadFormatException("Insufficient bytes to read Ref");
 			ds.pos += Hash.LENGTH;
+			ds.branchCount++;
 			if (store==null) throw new IllegalStateException("Cannot read Ref without a store in encoder");
-			Ref<T> ref = Ref.forHash(h, store);
+			Ref<T> ref = Ref.forHash(h, store); // TODO: should be store method?
 			return ref.markEmbedded(false);
 		}
 		if (tag==Tag.NULL) {
@@ -570,20 +583,25 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * encoder's virtual {@link #read} methods, so CAD3Encoder produces generic
 	 * types and CVMEncoder produces CVM-specific types.
 	 *
-	 * PERFORMANCE: This is a hot path for all incoming messages on network. Must be optimal, minimal GC
+	 * PERFORMANCE: This is a hot path for all incoming messages on network. Must be optimal, minimal GC.
+	 * For single-cell messages with no branches (90%+ of traffic), this method
+	 * performs zero allocations beyond the DecodeState and the decoded cell itself.
 	 * SECURITY: Input may come from untrusted sources, so must be robust to adversarial input (reject in at most O(n) time)
 	 *
-	 * If this encoder has an associated store, sets the thread-local store
-	 * for the duration of the decode. Otherwise installs a temporary
-	 * MessageStore for child cell resolution.
+	 * Storeless decode (store==null): uses a NullStore-backed encoder (static
+	 * singleton, no allocation). readRef creates temporary NullStore-backed refs
+	 * that are replaced by resolveRefs using the message's own child cells.
+	 * If any branch cannot be resolved from the message data alone, throws
+	 * {@link PartialMessageException}.
 	 *
-	 * TODO: Consider attaching encoding on DecodeState-decoded cells. Dangerous here
-	 * because the input Blob may be large (entire multi-cell message), and attaching
-	 * it would pin the full byte array in memory via the top cell.
+	 * Store-based decode (store!=null): uses this encoder directly. Branches
+	 * resolve lazily from the store on demand. Any branches included in the
+	 * message's child cells are resolved eagerly via resolveRefs.
 	 *
 	 * @param data Multi-cell encoded data
 	 * @return Decoded top-level cell
 	 * @throws BadFormatException If encoding format is invalid
+	 * @throws PartialMessageException If storeless decode encounters an unresolvable branch
 	 */
 	@Override
 	public ACell decodeMultiCell(Blob data) throws BadFormatException {
@@ -591,32 +609,30 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 
 		DecodeState ds = new DecodeState(data);
+		boolean storeless = (store==null);
 
-		// Select encoder. Storeless decode needs a MessageStore so readRef can
-		// register branch hashes during decode; store-based uses this directly.
-		CAD3Encoder readEncoder;
-		HashMap<Hash,ACell> hm;
-		if (store==null) {
-			hm=new HashMap<>();
-			MessageStore ms = new MessageStore(hm, null);
-			readEncoder = withStore(ms);
-			ms.setEncoder(readEncoder);
-		} else {
-			hm=null;
-			readEncoder = this;
-		}
+		// For storeless decode, use a NullStore-backed encoder (static singleton,
+		// zero allocation). readRef creates NullStore-backed refs and increments
+		// ds.branchCount. For store-based decode, use this encoder directly.
+		CAD3Encoder readEncoder = storeless ? nullStoreEncoder() : this;
 
 		ACell result = readEncoder.read(ds);
 		if (result==null) {
 			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
 			return null;
 		}
-		if (ds.pos==ds.limit) return result; // single cell, done
 
-		// Multi-cell: read and resolve remaining children
-		if (hm==null) hm=new HashMap<>();
+		// Fast path: single cell, no branches — zero allocations
+		if (ds.branchCount==0 && ds.pos==ds.limit) return result;
+
+		// Store-based single cell: branches resolve lazily from store
+		if (!storeless && ds.pos==ds.limit) return result;
+
+		// Multi-cell or storeless with unresolved branches:
+		// read child cells into HashMap and resolve branch refs
+		HashMap<Hash,ACell> hm = new HashMap<>();
 		readEncoder.readChildCells(hm, ds);
-		return resolveRefs(result, hm, store==null);
+		return resolveRefs(result, hm, storeless);
 	}
 
 	/**
@@ -624,7 +640,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 *
 	 * @param result Top-level cell to resolve
 	 * @param childMap Decoded child cells from the message, keyed by hash
-	 * @param failOnMissing If true, throws MissingDataException when a branch is
+	 * @param failOnMissing If true, throws PartialMessageException when a branch is
 	 *        not in childMap. Used for storeless decode where there is no backing
 	 *        store to fall back to. If false, unresolvable branches are left as-is
 	 *        (they are expected to be resolvable via the backing store on demand).
@@ -724,66 +740,4 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		}
 	}
 
-	/**
-	 * Temporary store used during multi-cell message decoding when no store
-	 * is set on the current thread. Resolves Refs from the message's decoded
-	 * child cells first, then delegates to any backing store for refs not
-	 * in the message (partial messages).
-	 */
-	private static class MessageStore extends AStore {
-		private final HashMap<Hash, ACell> cells;
-		private final AStore delegate;
-		private CAD3Encoder encoder;
-
-		MessageStore(HashMap<Hash, ACell> cells, AStore delegate) {
-			this.cells = cells;
-			this.delegate = delegate;
-		}
-
-		void setEncoder(CAD3Encoder encoder) {
-			this.encoder = encoder;
-		}
-
-		@SuppressWarnings("unchecked")
-		@Override
-		public <T extends ACell> Ref<T> refForHash(Hash hash) {
-			ACell cell = cells.get(hash);
-			if (cell != null) return (Ref<T>) cell.getRef();
-			if (delegate != null) return delegate.refForHash(hash);
-			return null;
-		}
-
-		@Override
-		public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
-			if (delegate != null) try { return delegate.storeRef(ref, status, handler); } catch (Exception e) {}
-			return ref;
-		}
-
-		@Override
-		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> handler) {
-			if (delegate != null) try { return delegate.storeTopRef(ref, status, handler); } catch (Exception e) {}
-			return ref;
-		}
-
-		@Override public Hash getRootHash() { return null; }
-		@Override public <T extends ACell> Ref<T> setRootData(T data) { return Ref.get(data); }
-		@Override public void close() {}
-
-		@Override
-		public AEncoder<ACell> getEncoder() {
-			return encoder;
-		}
-
-		@SuppressWarnings("unchecked")
-		@Override
-		public <T extends ACell> Ref<T> checkCache(Hash h) {
-			ACell cell = cells.get(h);
-			if (cell != null) return (Ref<T>) cell.getRef();
-			if (delegate != null) return delegate.checkCache(h);
-			return null;
-		}
-
-		@Override
-		public String shortName() { return "message"; }
-	}
 }

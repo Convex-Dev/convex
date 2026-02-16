@@ -41,18 +41,53 @@ Each type's static `read(Blob, int)` method:
 2. Tracks position manually: `epos += ref.getEncodingLength()`
 3. Attaches encoding: `result.attachEncoding(b.slice(pos, epos))`
 
-### Multi-Cell Decode (Current)
+### Multi-Cell Decode
 
 Network messages use multi-cell encoding: top cell followed by VLQ-prefixed child cells.
 
 ```
 CAD3Encoder.decodeMultiCell(Blob data)
-  1. Set thread-local store (or install MessageStore for storeless decode)
-  2. Read top cell via read(data, 0)
-  3. Read VLQ-prefixed child cells into HashMap<Hash, ACell>
-  4. Replacement scan: resolve non-embedded Refs from child map
-  5. Restore thread-local store
+  1. Select encoder: NullStore-backed singleton (storeless) or this (store-based)
+  2. Read top cell via readEncoder.read(ds)
+  3. Fast path: if branchCount==0 && all data consumed → return immediately (zero allocations)
+  4. If store-based single cell → return immediately (branches resolve lazily from store)
+  5. Read VLQ-prefixed child cells into HashMap<Hash, ACell>
+  6. Replacement scan: resolve non-embedded Refs from child map
+     - Storeless: throw PartialMessageException if any branch not in child map
+     - Store-based: leave unresolvable branches as lazy store-backed refs
 ```
+
+#### NullStore Encoder Pattern
+
+For storeless decode, `decodeMultiCell` uses a NullStore-backed encoder (static singleton via
+`nullStoreEncoder()`). This avoids allocating a MessageStore, HashMap, or new encoder instance
+during the fast path. Each encoder subclass caches its own NullStore-backed singleton:
+
+- `CAD3Encoder.NULL_STORE_ENCODER` — CAD3 types only
+- `CVMEncoder.NULL_STORE_CVM_ENCODER` — CVM-specific types
+
+During `readRef`, non-embedded refs (Tag.REF) create NullStore-backed RefSoft instances and
+increment `ds.branchCount`. These refs are temporary — replaced during `resolveRefs` with
+actual child cell data from the message. If any branch cannot be resolved, `resolveRefs`
+throws `PartialMessageException` (storeless) or leaves the ref as a lazy store-backed ref
+(store-based).
+
+#### Branch Counter on DecodeState
+
+`DecodeState.branchCount` (int, initially 0) is incremented by `readRef` each time a
+non-embedded ref (Tag.REF) is encountered. This enables the zero-allocation fast path:
+if `branchCount==0` after reading the top cell and all data is consumed, the message
+is a complete single cell with no branches — return immediately.
+
+#### Allocation Profile
+
+| Scenario | Allocations |
+|----------|-------------|
+| Single cell, no branches (90%+ of messages) | DecodeState + decoded cell only |
+| Single cell with branches, store-based | Same — branches resolve lazily from store |
+| Single cell with branches, storeless | Throws PartialMessageException (partial message) |
+| Multi-cell, store-based | + HashMap + child cells |
+| Multi-cell, storeless | + HashMap + child cells (refs replaced via resolveRefs) |
 
 ### Problems with Current Decode
 
@@ -90,6 +125,7 @@ public abstract class AEncoder<T> {
         public final byte[] data;   // backing array
         public int pos;             // current absolute position
         public final int limit;     // end boundary
+        public int branchCount;     // non-embedded branch refs encountered
 
         public DecodeState(Blob source) {
             this.data = source.getInternalArray();
@@ -243,11 +279,11 @@ Once all type reads are migrated (Phase 2-3), the bridge `read(byte, DecodeState
 
 **Modify:** `CAD3Encoder.java`
 - `decode(Blob)`: Create `DecodeState`, call `read(ds)`. No thread-local needed.
-- `decodeMultiCell(Blob)`: Create `DecodeState`, read top cell via `read(ds)`, read children via `readChildCells(acc, ds)`. No thread-local needed.
+- `decodeMultiCell(Blob)`: Create `DecodeState`, read top cell via `read(ds)`, read children via `readChildCells(acc, ds)`. No thread-local needed. Storeless decode uses NullStore-backed encoder singleton (no MessageStore allocation).
 - Delete `decodeMultiCellWithStore(AStore, Blob, int)` — thread-local management no longer required.
 - Delete `resolveChildren(ACell, Blob, int, int)` — replaced by DecodeState path.
 - Delete `readChildCells(HashMap, Blob, int, int)` — replaced by DecodeState version.
-- Simplify or delete `MessageStore` inner class — may still be needed for storeless decode if `readRef(ds)` encounters a non-embedded ref with `this.store == null`. Evaluate whether storeless decode is a real use case or can be rejected.
+- `MessageStore` inner class removed — replaced by NullStore encoder pattern.
 
 ### Phase 5: Delete Old Decode Infrastructure
 
@@ -284,7 +320,7 @@ With all decode paths using `encoder.readRef(ds)` (which uses `this.store` direc
 
 **Modify:** `CAD3Encoder.java`
 - Remove all `Stores.current()` / `Stores.setCurrent()` calls from `decode()` and `decodeMultiCell()` (10 call sites total)
-- Remove `MessageStore` inner class if storeless decode is handled differently (e.g. reject, or require store at encoder construction)
+- `MessageStore` inner class already removed — replaced by NullStore encoder pattern with `nullStoreEncoder()` virtual method and static singletons per encoder subclass.
 
 **Verify:** `Stores.current()` is no longer called anywhere in the decode chain. The thread-local remains available for other uses (e.g. `ACell.persist()`, direct store access) but decode is fully decoupled.
 

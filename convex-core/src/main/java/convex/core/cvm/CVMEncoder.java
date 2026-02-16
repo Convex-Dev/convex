@@ -35,6 +35,7 @@ import convex.core.lang.Core;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
 import convex.core.store.AStore;
+import convex.core.store.NullStore;
 import convex.core.util.ErrorMessages;
 
 /**
@@ -65,6 +66,13 @@ public class CVMEncoder extends CAD3Encoder {
 	@Override
 	protected CVMEncoder withStore(AStore store) {
 		return new CVMEncoder(store);
+	}
+
+	private static final CVMEncoder NULL_STORE_CVM_ENCODER = new CVMEncoder(NullStore.INSTANCE);
+
+	@Override
+	protected CAD3Encoder nullStoreEncoder() {
+		return NULL_STORE_CVM_ENCODER;
 	}
 
 	@Override

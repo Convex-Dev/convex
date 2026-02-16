@@ -28,6 +28,10 @@ public abstract class AEncoder<T> {
 		/** End boundary (absolute index in data[]) */
 		public final int limit;
 
+		/** Count of non-embedded branch refs (Tag.REF) encountered during decode.
+		 *  Used by decodeMultiCell to detect whether resolution is needed. */
+		public int branchCount;
+
 		public DecodeState(Blob source) {
 			this.data = source.getInternalArray();
 			this.pos = source.getInternalOffset();
