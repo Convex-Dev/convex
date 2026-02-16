@@ -17,6 +17,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 
+/**
+ * One handler created for each inbound channel
+ */
 class NettyInboundHandler extends ByteToMessageDecoder { 
 	
 	static final Logger log = LoggerFactory.getLogger(NettyInboundHandler.class.getName());
