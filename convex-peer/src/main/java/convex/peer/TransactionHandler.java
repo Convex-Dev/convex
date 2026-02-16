@@ -201,7 +201,13 @@ public class TransactionHandler extends AThreadedComponent {
 		// Phase 2: Parallel signature verification — results cached on each SignedData
 		Peer.preValidateSignatures(toVerify);
 
-		// Phase 3: Check cached signature results and queue valid transactions
+		// Phase 3: Check cached signature results and queue valid transactions.
+		// Interest is registered BEFORE queuing so that result reporting can never
+		// race ahead of registration (the transaction becomes visible to
+		// BeliefPropagator as soon as it enters the queue).
+		// put() blocks if transactionQueue is full — this propagates backpressure:
+		// TransactionHandler blocks → stops draining txMessageQueue → txMessageQueue
+		// fills → connection-level backpressure kicks in → senders slow down.
 		for (int i=0; i<n; i++) {
 			SignedData<ATransaction> sd=sigs[i];
 			if (sd==null) continue; // already rejected in Phase 1
@@ -210,13 +216,10 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
 				continue;
 			}
-			if (!transactionQueue.offer(sd)) {
-				m.returnResult(Result.error(ErrorCodes.LOAD, Strings.SERVER_LOADED).withSource(SourceCodes.PEER));
-				continue;
-			}
+			registerInterest(sd.getHash(), m);
+			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			this.clientTransactionCount++;
-			registerInterest(sd.getHash(), m);
 		}
 	}
 	
