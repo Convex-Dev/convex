@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -57,24 +58,37 @@ public class QueryHandler extends AThreadedComponent {
 	}
 	
 
+	/** Reusable drain buffer — only accessed from the handler thread */
+	private final ArrayList<Message> batch = new ArrayList<>();
+
 	@Override
 	protected void loop() throws InterruptedException {
+		// Block until at least one message arrives
 		LoadMonitor.down();
-		Message m = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
+		Message first = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();
-		if (m==null) return;
-		
-		MessageType type=m.getType();
-		switch (type) {
-		case QUERY:
-			handleQuery(m);
-			break;
-		case DATA_REQUEST:
-			handleDataRequest(m);
-			break;
-		default:
-			log.warn("Unexpected Message type on query queue: "+type);
+		if (first == null) return;
+
+		// Drain any additional queued messages (single lock acquisition)
+		batch.clear();
+		batch.add(first);
+		queryQueue.drainTo(batch);
+
+		for (int i = 0; i < batch.size(); i++) {
+			Message m = batch.get(i);
+			MessageType type = m.getType();
+			switch (type) {
+			case QUERY:
+				handleQuery(m);
+				break;
+			case DATA_REQUEST:
+				handleDataRequest(m);
+				break;
+			default:
+				log.warn("Unexpected Message type on query queue: " + type);
+			}
 		}
+		batch.clear(); // release references
 	}
 	
 	/**

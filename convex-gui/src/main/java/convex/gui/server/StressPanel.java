@@ -87,6 +87,20 @@ public class StressPanel extends JPanel {
 		actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
+		JButton btnLoadSim = new JButton("Load Simulator");
+		actionPanel.add(btnLoadSim);
+		btnLoadSim.addActionListener(e -> {
+			Server server = peerConvex.getLocalServer();
+			if (server == null) {
+				JOptionPane.showMessageDialog(this, "No local server available");
+				return;
+			}
+			LoadSimulatorFrame frame = new LoadSimulatorFrame(
+				server, peerConvex.getAddress(), peerConvex.getKeyPair());
+			frame.setLocationByPlatform(true);
+			frame.setVisible(true);
+		});
+
 		btnRun = new JButton("Run Test");
 		actionPanel.add(btnRun);
 		btnRun.addActionListener(e -> {
