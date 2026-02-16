@@ -22,6 +22,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
+import convex.core.data.Strings;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
@@ -119,25 +120,27 @@ public class ConvexRemote extends Convex {
 		}
 		CompletableFuture<Result> cr=cf.handle((m,e)->{
 			synchronized(awaiting) {
-				// no longer want to wait for this result 
-				// either we go a result back, or the future failed 
+				// no longer want to wait for this result
+				// either we got a result back, or the future failed
 				awaiting.remove(resultID);
 			}
-			
+
 			// Set the store. Likely to be needed by anyone waiting on the future
 			// We don't need to restore it because the return message handler does that for us
 			Stores.setCurrent(awaitingStore);
-			
+
 			// clear sequence if something went wrong. It is probably invalid now....
 			if (e!=null) {
 				sequence=null;
 				return Result.fromException(e);
 			}
-			
+
 			try {
 				m.getPayload(awaitingStore);
 			} catch (BadFormatException e1) {
-				e1.printStackTrace();
+				log.warn("Bad message format in result: {}",e1.getMessage());
+				sequence=null;
+				return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+e1.getMessage()));
 			}
 			Result r=m.toResult();
 			if (r.getErrorCode()!=null) {
@@ -183,7 +186,7 @@ public class ConvexRemote extends Convex {
 				// Ignore the message, we are a client side connection so not interested.
 			}
 		} catch (Exception e) {
-			System.err.println(e);
+			log.warn("Error in return message handler: {}",e.getMessage());
 		}
 	};
 	

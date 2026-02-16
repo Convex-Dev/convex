@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.cpos.CPoSConstants;
+import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.Result;
 import convex.core.exceptions.BadFormatException;
@@ -99,23 +100,24 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				try {
 					receiveAction.accept(m);
 				} catch (Exception e) {
-					if (e instanceof BadFormatException) {
-						// Probably a malformed request, we can safely ignore
-					} else {
+					if (!(e instanceof BadFormatException)) {
 						log.warn("Unexpected error in NettyInboundHandler",e);
-						System.err.println("Inbound enexpected error: "+e);
 					}
 					// Return error result to client so futures don't hang
-					m.returnResult(Result.fromException(e).withID(m.getID()));
+					try {
+						ACell id = m.getID(); // safe: returns null if undecoded
+						m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
+					} catch (Exception e2) {
+						// best effort -- message may not have a return handler
+					}
 				} finally {
 					receivedCount++;
 				}
 			} else {
 				log.warn("Message ignored, no receiveAction");
-				System.err.println("Inbound message ignored, no receiveAction");
 			}
 		} catch (Throwable e) {
-			System.err.println("Inbound message handling error: "+e);
+			log.warn("Inbound message handling error: {}",e.getMessage());
 			throw e;
 		}
 	}

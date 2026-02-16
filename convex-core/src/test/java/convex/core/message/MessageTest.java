@@ -190,15 +190,88 @@ public class MessageTest {
 		doMessageTest(m);
 	}
 	
+	@Test public void testStorelessTransactDecode() throws BadFormatException {
+		// Create a transaction message with CVM-specific Invoke type
+		ATransaction tx=Invoke.create(Address.create(42), 1, Reader.read("(+ 1 2)"));
+		SignedData<ATransaction> stx=KP.signData(tx);
+		Message m=Message.createTransaction(7, stx);
+
+		// Encode to wire format
+		Blob data=m.getMessageData();
+		assertTrue(data.count()>0);
+
+		// Simulate receiving from network: raw data, no payload, no store
+		Message received=Message.create(data);
+		assertNull(received.payload); // not yet decoded
+
+		// getRequestID() returns null before decode (A1 error handling fix: no crash)
+		assertNull(received.getRequestID());
+
+		// getType() triggers storeless decode for vector-based message types
+		assertEquals(MessageType.TRANSACT,received.getType());
+
+		// After type inference decoded the payload, request ID is now available
+		assertEquals(RT.cvm(7),received.getRequestID());
+		assertEquals(RT.cvm(7),received.getID());
+
+		// Storeless decode via getPayload() returns the already-decoded payload
+		ACell payload=received.getPayload();
+		assertNotNull(payload);
+		assertEquals(m.getPayload(),payload);
+
+		// Verify the CVM Invoke transaction survived the round-trip
+		AVector<?> v=RT.ensureVector(payload);
+		assertNotNull(v);
+		assertEquals(MessageTag.TRANSACT,v.get(0));
+		SignedData<?> decodedStx=(SignedData<?>)v.get(2);
+		ATransaction decodedTx=(ATransaction)decodedStx.getValue();
+		assertTrue(decodedTx instanceof Invoke);
+		assertEquals(Address.create(42),decodedTx.getOrigin());
+	}
+
+	@Test public void testStorelessResultDecode() throws BadFormatException {
+		// Create a Result message
+		Result res=Result.create(CVMLong.create(5), Reader.read("42"), null);
+		Message m=Message.createResult(res);
+
+		// Encode and simulate network receive
+		Blob data=m.getMessageData();
+		Message received=Message.create(data);
+
+		// Result type and ID should be inferrable from raw data (no decode needed)
+		assertEquals(MessageType.RESULT,received.getType());
+		assertEquals(RT.cvm(5),received.getResultID());
+		assertEquals(RT.cvm(5),received.getID());
+
+		// Storeless decode
+		Result decoded=received.getPayload();
+		assertNotNull(decoded);
+		assertEquals(res,decoded);
+		assertEquals(RT.cvm(42),decoded.getValue());
+	}
+
+	@Test public void testStorelessQueryDecode() throws BadFormatException {
+		Message m=Message.createQuery(3, "(+ 1 2)", Address.create(12));
+
+		Blob data=m.getMessageData();
+		Message received=Message.create(data);
+
+		// Storeless decode should recover full payload
+		ACell payload=received.getPayload();
+		assertEquals(m.getPayload(),payload);
+		assertEquals(MessageType.QUERY,received.getType());
+		assertEquals(RT.cvm(3),received.getID());
+	}
+
 	/**
 	 * Generic tests for any valid message
 	 * @param m Message to test
-	 * @throws BadFormatException 
+	 * @throws BadFormatException
 	 */
 	public void doMessageTest(Message m) throws BadFormatException {
 		MessageType type=m.getType();
 		assertNotNull(type);
-		
+
 		ACell id=m.getID();
 		ACell reqID=m.getRequestID();
 		ACell resultID=m.getResultID();
@@ -206,26 +279,36 @@ public class MessageTest {
 			assertNull(resultID); // should be both a request and a result
 			assertEquals(id,reqID);
 		}
-		
+
 		if (resultID!=null) {
 			assertEquals(MessageType.RESULT,type);
 			assertNull(reqID);
 			assertEquals(id,resultID);
 		}
-		
+
 		try {
 			ACell payload=m.getPayload();
-			
+
 			Blob data=m.getMessageData();
 			assertTrue(data.count()>0);
-		
+
+			// Test store-based decode round-trip
 			ACell dp=Samples.TEST_STORE.decodeMultiCell(data);
 			Message m2=Message.create(null, dp);
-			
+
 			assertEquals(type,m2.getType());
 			assertEquals(id,m2.getID());
 			assertEquals(payload,m2.getPayload());
-			
+
+			// Test storeless decode round-trip (complete messages only)
+			if (type!=MessageType.BELIEF) {
+				Message m3=Message.create(data);
+				ACell storelessPayload=m3.getPayload();
+				assertEquals(payload,storelessPayload);
+				assertEquals(type,m3.getType());
+				assertEquals(id,m3.getID());
+			}
+
 		} catch (BadFormatException e) {
 			fail("Bad format: "+m,e);
 		}

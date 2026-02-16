@@ -486,7 +486,8 @@ public class Format {
 		}
 		return cells.toArray(ACell[]::new);
 	}
-	
+
+
 	/**
 	 * Encode a Cell completely in multi-cell message format. Format places top level
 	 * cell first, following cells in arbitrary order.

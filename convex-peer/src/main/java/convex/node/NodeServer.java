@@ -170,13 +170,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Handles an incoming message from a peer node.
 	 * Supports PING, LATTICE_QUERY, LATTICE_VALUE, and DATA_REQUEST message types.
-	 * 
+	 *
 	 * @param message The incoming message
 	 */
 	private void handleIncomingMessage(Message message) {
 		log.debug("Received message from peer: {}", message);
-		System.err.println("NodeServer handle: "+message);
-		
+
+		try {
+			// Decode message payload using node's store before processing
+			message.getPayload(store);
+		} catch (Exception e) {
+			log.warn("Failed to decode incoming message: {}", e.getMessage());
+			try {
+				ACell id = message.getRequestID(); // safe: returns null if undecoded
+				message.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
+			} catch (Exception e2) {
+				// best effort -- connection may be bad
+			}
+			return;
+		}
+
 		try {
 			MessageType type = message.getType();
 			switch (type) {
@@ -197,8 +210,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 				break;
 			}
 		} catch (Exception e) {
-			message.returnResult(Result.fromException(e));
-			System.err.println("Error handling incoming message "+ e);
+			log.warn("Error handling message: {}", e.getMessage());
+			try {
+				ACell id = message.getRequestID();
+				if (id != null) {
+					message.returnResult(Result.fromException(e));
+				}
+			} catch (Exception e2) {
+				// best effort
+			}
 		}
 	}
 	
@@ -208,12 +228,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param message The PING message
 	 */
 	private void processPing(Message message) {
-		ACell id = message.getID();
+		ACell id = message.getRequestID();
 		if (id == null) {
 			log.warn("PING message missing ID");
 			return;
 		}
-		
+
 		Result result = Result.create(id, Strings.create("PONG"));
 		message.returnResult(result);
 		log.debug("Responded to PING with ID: {}", id);
@@ -228,10 +248,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws BadFormatException If message format is invalid
 	 */
 	private void processLatticeQuery(Message message) throws BadFormatException {
-		AVector<?> payload = RT.ensureVector(message.getPayload(store));
+		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_QUERY message format");
-			Result error = Result.create(message.getID(), Strings.create("Invalid LATTICE_QUERY format"), ErrorCodes.ARGUMENT);
+			Result error = Result.create(message.getRequestID(), Strings.create("Invalid LATTICE_QUERY format"), ErrorCodes.ARGUMENT);
 			message.returnResult(error);
 			return;
 		}

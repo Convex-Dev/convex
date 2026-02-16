@@ -94,7 +94,13 @@ public class Server implements Closeable {
 			// Decode message payload using server's store before processing
 			m.getPayload(getStore());
 		} catch (Exception e) {
-			m.returnMessage(Message.createResult(Result.fromException(e).withID(m.getRequestID())));
+			log.debug("Failed to decode message: {}", e.getMessage());
+			try {
+				ACell id = m.getRequestID(); // safe: returns null if undecoded
+				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
+			} catch (Exception e2) {
+				// best effort -- connection may be bad
+			}
 			return;
 		}
 		observeMessageReceived(m);
@@ -466,7 +472,12 @@ public class Server implements Closeable {
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.info("Missing data: {} in message", missingHash);
+			log.info("Missing data: {} in message of type {}", missingHash, m.getType());
+			try {
+				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
+			} catch (Exception e2) {
+				// best effort -- some message types don't have return handlers
+			}
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
 			try {

@@ -13,6 +13,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -116,25 +117,38 @@ public class Message {
 	}
 
 	/**
-	 * Gets the decoded payload for this message. If not already encoded, assumes
-	 * a completely encoded message with a null store.
+	 * Gets the decoded payload for this message. If not already decoded, attempts
+	 * storeless decode producing a RefDirect tree from the message data alone.
+	 * This works for complete messages (queries, transactions, results) where all
+	 * branches are included in the multi-cell encoding.
+	 *
+	 * For partial messages (e.g. delta-encoded beliefs where branches may
+	 * reference previously stored data), use {@link #getPayload(AStore)} instead.
 	 *
 	 * @param <T> Expected payload type
-	 * @return Payload value
-	 * @throws IllegalStateException If the message has not yet been decoded
+	 * @return Payload value, or null if no message data
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() {
 		if (payload!=null) return (T) payload;
-		throw new IllegalStateException("Payload null - not yet decoded?");
+		if (messageData==null) return null;
+		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
+		// Storeless decode via CVMEncoder: produces RefDirect tree from complete message data
+		try {
+			payload=CVMEncoder.INSTANCE.decodeMultiCell(messageData);
+		} catch (BadFormatException e) {
+			throw new IllegalStateException("Failed to decode message payload: "+e.getMessage(), e);
+		}
+		return (T) payload;
 	}
 
 	/**
 	 * Gets the payload for this message, using the given store to resolve any
-	 * refs not contained within the message itself (e.g. delta-encoded beliefs).
+	 * branches not contained within the message itself (e.g. delta-encoded beliefs
+	 * where branches may reference previously persisted data).
 	 *
 	 * @param <T> Expected payload type
-	 * @param store Store for resolving external refs
+	 * @param store Store for resolving external branches
 	 * @return Payload value
 	 * @throws BadFormatException If the message data is malformed
 	 */
@@ -253,14 +267,20 @@ public class Message {
 	 * @return Message ID, or null if the message does not have a message ID
 	 */
 	public ACell getID() {
-		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
-		switch (getType()) {	
+		if (payload==null) {
+			// Try to peek at Result ID from raw data without decoding
+			try {
+				return getResultID();
+			} catch (BadFormatException e) {
+				return null;
+			}
+		}
+		switch (getType()) {
 			// Result is a special record type
 			case RESULT: try {
 				return getResultID();
 			} catch (BadFormatException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				return null;
 			}
 
 			default: return getRequestID();
@@ -268,22 +288,23 @@ public class Message {
 	}
 	
 	/**
-	 * Gets the request ID for this message, assuming it is a request expecting a response
+	 * Gets the request ID for this message, assuming it is a request expecting a response.
+	 * Returns null if the message has not been decoded yet or does not have an ID.
 	 * @return ID of message (usually an Integer) or null if no ID present
 	 */
 	public ACell getRequestID() {
-		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
-		switch (getType()) {	
-		
+		if (payload==null) return null; // not yet decoded, can't extract ID
+		switch (getType()) {
+
 			// ID in position 1
 			case STATUS:
-			case TRANSACT: 
+			case TRANSACT:
 			case QUERY:
 			case DATA_REQUEST:
 			case LATTICE_QUERY:
 			case PING:{
 				AVector<?> v=RT.ensureVector(getPayload());
-				if (v.count()<2) return null;
+				if (v==null || v.count()<2) return null;
 				return RT.ensureLong(v.get(1));
 			}
 
