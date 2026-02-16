@@ -202,22 +202,23 @@ public class MessageTest {
 
 		// Simulate receiving from network: raw data, no payload, no store
 		Message received=Message.create(data);
-		assertNull(received.payload); // not yet decoded
+		assertNull(received.getPayload()); // pure accessor, not yet decoded
 
-		// getRequestID() returns null before decode (A1 error handling fix: no crash)
+		// getRequestID() returns null before decode (no crash)
 		assertNull(received.getRequestID());
 
-		// getType() triggers storeless decode for vector-based message types
-		assertEquals(MessageType.TRANSACT,received.getType());
+		// Vector-based type is UNKNOWN until payload is decoded
+		assertEquals(MessageType.UNKNOWN,received.getType());
 
-		// After type inference decoded the payload, request ID is now available
-		assertEquals(RT.cvm(7),received.getRequestID());
-		assertEquals(RT.cvm(7),received.getID());
-
-		// Storeless decode via getPayload() returns the already-decoded payload
-		ACell payload=received.getPayload();
+		// Storeless decode via getPayload(null) — complete message, all branches present
+		ACell payload=received.getPayload(null);
 		assertNotNull(payload);
 		assertEquals(m.getPayload(),payload);
+
+		// After decode, type and IDs are available
+		assertEquals(MessageType.TRANSACT,received.getType());
+		assertEquals(RT.cvm(7),received.getRequestID());
+		assertEquals(RT.cvm(7),received.getID());
 
 		// Verify the CVM Invoke transaction survived the round-trip
 		AVector<?> v=RT.ensureVector(payload);
@@ -238,13 +239,13 @@ public class MessageTest {
 		Blob data=m.getMessageData();
 		Message received=Message.create(data);
 
-		// Result type and ID should be inferrable from raw data (no decode needed)
+		// Result type and ID inferrable from raw tag byte (no decode needed)
 		assertEquals(MessageType.RESULT,received.getType());
 		assertEquals(RT.cvm(5),received.getResultID());
 		assertEquals(RT.cvm(5),received.getID());
 
-		// Storeless decode
-		Result decoded=received.getPayload();
+		// Storeless decode via getPayload(null)
+		Result decoded=received.getPayload(null);
 		assertNotNull(decoded);
 		assertEquals(res,decoded);
 		assertEquals(RT.cvm(42),decoded.getValue());
@@ -256,8 +257,8 @@ public class MessageTest {
 		Blob data=m.getMessageData();
 		Message received=Message.create(data);
 
-		// Storeless decode should recover full payload
-		ACell payload=received.getPayload();
+		// Storeless decode via getPayload(null) recovers full payload
+		ACell payload=received.getPayload(null);
 		assertEquals(m.getPayload(),payload);
 		assertEquals(MessageType.QUERY,received.getType());
 		assertEquals(RT.cvm(3),received.getID());
@@ -300,10 +301,12 @@ public class MessageTest {
 			assertEquals(id,m2.getID());
 			assertEquals(payload,m2.getPayload());
 
-			// Test storeless decode round-trip (complete messages only)
+			// Test storeless decode round-trip for complete messages.
+			// Partial messages (e.g. beliefs with external branches) would throw
+			// PartialMessageException — those require getPayload(store) instead.
 			if (type!=MessageType.BELIEF) {
 				Message m3=Message.create(data);
-				ACell storelessPayload=m3.getPayload();
+				ACell storelessPayload=m3.getPayload(null);
 				assertEquals(payload,storelessPayload);
 				assertEquals(type,m3.getType());
 				assertEquals(id,m3.getID());

@@ -117,40 +117,39 @@ public class Message {
 	}
 
 	/**
-	 * Gets the decoded payload for this message. If not already decoded, attempts
-	 * storeless decode producing a RefDirect tree from the message data alone.
-	 * This works for complete messages (queries, transactions, results) where all
-	 * branches are included in the multi-cell encoding.
+	 * Gets the cached decoded payload for this message. Does not trigger decoding.
+	 * Returns null if the message has not yet been decoded.
 	 *
-	 * For partial messages (e.g. delta-encoded beliefs where branches may
-	 * reference previously stored data), use {@link #getPayload(AStore)} instead.
+	 * To decode, use {@link #getPayload(AStore)} with a store for partial messages
+	 * (e.g. delta-encoded beliefs with external branches), or with null for
+	 * complete messages (storeless decode producing a RefDirect tree).
 	 *
 	 * @param <T> Expected payload type
-	 * @return Payload value, or null if no message data
+	 * @return Payload value, or null if not yet decoded
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() {
-		if (payload!=null) return (T) payload;
-		if (messageData==null) return null;
-		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
-		// Storeless decode via CVMEncoder: produces RefDirect tree from complete message data
-		try {
-			payload=CVMEncoder.INSTANCE.decodeMultiCell(messageData);
-		} catch (BadFormatException e) {
-			throw new IllegalStateException("Failed to decode message payload: "+e.getMessage(), e);
-		}
 		return (T) payload;
 	}
 
 	/**
-	 * Gets the payload for this message, using the given store to resolve any
-	 * branches not contained within the message itself (e.g. delta-encoded beliefs
-	 * where branches may reference previously persisted data).
+	 * Gets the payload for this message, decoding if necessary.
+	 *
+	 * If store is non-null, uses the store to resolve any branches not contained
+	 * within the message itself (partial messages where some branches reference
+	 * previously persisted data).
+	 *
+	 * If store is null, performs storeless decode producing a RefDirect tree.
+	 * All branches must be present in the message data (complete message).
+	 * Throws PartialMessageException if storeless decode encounters a branch that
+	 * cannot be resolved — the format may be correct but the message is partial
+	 * and requires a store.
 	 *
 	 * @param <T> Expected payload type
-	 * @param store Store for resolving external branches
+	 * @param store Store for resolving external branches, or null for storeless decode
 	 * @return Payload value
 	 * @throws BadFormatException If the message data is malformed
+	 * @throws PartialMessageException If storeless decode encounters an unresolvable branch
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload(AStore store) throws BadFormatException {
@@ -160,7 +159,13 @@ public class Message {
 		// detect actual message data for null payload :-)
 		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
 
-		payload=store.decodeMultiCell(messageData);
+		if (store!=null) {
+			payload=store.decodeMultiCell(messageData);
+		} else {
+			// Storeless decode via CVMEncoder: produces RefDirect tree.
+			// Throws BadFormatException if any branch is unresolvable.
+			payload=CVMEncoder.INSTANCE.decodeMultiCell(messageData);
+		}
 
 		return (T) payload;
 	}
@@ -187,29 +192,31 @@ public class Message {
 	 * @return Type of message
 	 */
 	public MessageType getType() {
-		if (type==null) type=inferType();
+		if (type==null||(type==MessageType.UNKNOWN&&payload!=null)) type=inferType();
 		return type;
 	}
 
 	private MessageType inferType() {
 		byte tag;
 		if (hasData()) {
-			// These can be inferred directly from top encoding tag
 			tag=messageData.byteAt(0);
 		} else {
 			if (payload==null) return MessageType.UNKNOWN;
 			tag=payload.getTag();
 		}
-		
-		// Check tag first for special types
+
+		// Types identifiable from top-level encoding tag alone
 		if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
 		if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order> or similar
 		if (tag==CVMTag.RESULT) return MessageType.RESULT;
-		
+
+		// Vector-based types require decoded payload to inspect keyword tag
+		ACell pl=payload;
+		if (pl==null) return MessageType.UNKNOWN;
+
 		try {
-			ACell payload=getPayload();
-			if (payload instanceof AVector) {
-				AVector<?> v=(AVector<?>)payload;
+			if (pl instanceof AVector) {
+				AVector<?> v=(AVector<?>)pl;
 				if (v.count()==0) return MessageType.UNKNOWN;
 				Keyword mt=RT.ensureKeyword(v.get(0));
 				if (mt==null) return MessageType.UNKNOWN;
@@ -223,9 +230,9 @@ public class Message {
 				if (MessageTag.PING.equals(mt)) return MessageType.PING;
 			}
 		} catch (Exception e) {
-			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
+			// fall-through to UNKNOWN
 		}
-		
+
 		return MessageType.UNKNOWN;
 	}
 

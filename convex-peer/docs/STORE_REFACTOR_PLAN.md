@@ -92,15 +92,19 @@ which is fragile. The fix: `Convex` subclasses should hold an explicit store fie
 ### Phase 1: Storeless Decode for Client Code
 
 **Key insight:** Client-side messages (query results, transaction results, status responses)
-are complete -- all cells are included in the multi-cell encoding. They do not need a store.
-`CAD3Encoder.INSTANCE.decodeMultiCell(data)` produces RefDirect trees: fast, no store
+are complete -- all branches are included in the multi-cell encoding. They do not need a store.
+`CVMEncoder.INSTANCE.decodeMultiCell(data)` produces RefDirect trees: fast, no store
 dependency, no GC pressure. MemoryStore should never be used in production code.
 
-**Files:** `Message.java`, `Format.java`, `Convex.java`, `ConvexRemote.java`, `ConvexLocal.java`
+**`Message.getPayload` strategy** (implemented):
+- `getPayload()` -- pure accessor, returns cached payload or null, no side effects
+- `getPayload(null)` -- storeless decode via CVMEncoder, throws `PartialMessageException`
+  if any branch is unresolvable (message is partial, needs a store)
+- `getPayload(store)` -- store-based decode for partial messages
 
-- Add `Format.decodeMultiCell(Blob)` static convenience method (delegates to storeless encoder)
-- Make `Message.getPayload()` (no-arg) attempt storeless decode for complete messages
-- `ConvexRemote` -- remove all `Stores.current()` usage, use storeless decode for results
+**Files:** `Message.java`, `Convex.java`, `ConvexRemote.java`, `ConvexLocal.java`
+
+- `ConvexRemote` -- remove all `Stores.current()` usage, use `m.getPayload(null)` for results
 - `ConvexLocal` -- remove `Stores.current()` in `makeResultHandler`, use `server.getStore()`
   only where persistence is explicitly needed (e.g. `acquire`)
 - `Acquiror` -- still needs a store for incremental acquisition (caller provides it)
@@ -109,7 +113,7 @@ Replace all ThreadLocal usage in client code:
 
 | Current | Replacement |
 |---------|-------------|
-| `Stores.current()` in `awaitResult()` | Remove -- storeless decode via `m.getPayload()` |
+| `Stores.current()` in `awaitResult()` | Remove -- storeless decode via `m.getPayload(null)` |
 | `Stores.setCurrent(awaitingStore)` in future handler | Remove entirely |
 | `Stores.current()` / `setCurrent()` in `returnMessageHandler` | Remove entirely |
 | `Stores.current()` in `makeResultHandler` | Remove -- storeless decode |
@@ -202,19 +206,38 @@ ThreadLocal is fundamentally wrong for this use case:
 - Netty I/O threads are shared across connections
 - The pattern requires discipline that is easily violated
 
-### In-Memory vs Persistent Decode
+### Message Decode Strategy
 
-Messages should be decoded **without a store** by default, producing RefDirect trees:
-- `CAD3Encoder.INSTANCE.decodeMultiCell(data)` (storeless) already handles this:
-  it creates a temporary `MessageStore` from the message's own child cells and resolves
-  all refs into direct references. No store dependency, no GC pressure, fastest access.
-- For complete messages (queries, transactions, results), this produces a full RefDirect tree.
-- Only the server's `BeliefPropagator` needs the persistent `EtchStore` for delta-encoded
-  beliefs that reference previously stored data (partial messages).
-- **MemoryStore should be avoided in production code** -- it's for testing only and carries
-  OOM risk. Client code should never need a store for decoding results.
-- `Message.getPayload()` (no-arg) should decode using the storeless encoder for complete
-  messages. `Message.getPayload(store)` remains for server-side partial message decoding.
+Three `getPayload` methods provide explicit control over decode:
+
+| Method | Behaviour | Use case |
+|--------|-----------|----------|
+| `getPayload()` | Pure accessor, returns cached payload or null | Safe to call anywhere, no side effects |
+| `getPayload(null)` | Storeless decode via `CVMEncoder`, produces RefDirect tree | Client code, complete messages |
+| `getPayload(store)` | Store-based decode, branches resolved from store | Server code, partial messages |
+
+**Storeless decode** (`getPayload(null)`):
+- `CVMEncoder.INSTANCE.decodeMultiCell(data)` creates a temporary `MessageStore` from the
+  message's own child cells and resolves all refs into direct references (RefDirect tree).
+- No store dependency, no GC pressure, fastest access.
+- For complete messages (queries, transactions, results), all branches are included in
+  the multi-cell encoding, so this produces a fully resolved tree.
+- **Fail-fast on partial messages**: if any branch cannot be resolved from the message
+  data alone, throws `PartialMessageException` immediately. This is not a format error --
+  the encoding may be correct, but the message is partial and requires a store.
+  Callers should use `getPayload(store)` instead.
+- **CVMEncoder is the default** for the Convex protocol -- it handles CVM-specific types
+  (transactions, ops, consensus records) that `CAD3Encoder` alone cannot decode.
+
+**Store-based decode** (`getPayload(store)`):
+- Uses the store to resolve any branches not contained within the message itself.
+  Any message may be partial -- beliefs typically are (delta-encoded with branches
+  referencing previously persisted data), but other message types could be too.
+- Never throws `PartialMessageException` -- unresolvable branches are left as lazy
+  refs into the store (resolved on demand).
+
+**MemoryStore should be avoided in production code** -- it's for testing only and
+carries OOM risk. Client code should use storeless decode (`getPayload(null)`) instead.
 
 ### Backward Compatibility
 

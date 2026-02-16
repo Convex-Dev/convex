@@ -19,6 +19,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.PartialMessageException;
 import convex.core.store.AStore;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
@@ -612,13 +613,20 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (ds.pos==ds.limit) return result; // single cell, done
 
 		readEncoder.readChildCells(hm, ds);
-		return resolveRefs(result, hm);
+		return resolveRefs(result, hm, store==null);
 	}
 
 	/**
 	 * Replacement scan: resolve all non-embedded refs using decoded child cells.
+	 *
+	 * @param result Top-level cell to resolve
+	 * @param childMap Decoded child cells from the message, keyed by hash
+	 * @param failOnMissing If true, throws MissingDataException when a branch is
+	 *        not in childMap. Used for storeless decode where there is no backing
+	 *        store to fall back to. If false, unresolvable branches are left as-is
+	 *        (they are expected to be resolvable via the backing store on demand).
 	 */
-	private ACell resolveRefs(ACell result, final HashMap<Hash,ACell> childMap) {
+	private ACell resolveRefs(ACell result, final HashMap<Hash,ACell> childMap, boolean failOnMissing) {
 		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();
 		ArrayList<ACell> stack=new ArrayList<>();
 
@@ -646,7 +654,10 @@ public class CAD3Encoder extends AEncoder<ACell> {
 						return part.getRef();
 					}
 
-					// not in message, must be partial
+					// Branch not in message
+					if (failOnMissing) {
+						throw new PartialMessageException(h);
+					}
 					return r;
 				}
 			}
