@@ -588,6 +588,7 @@ public class ConnectionManager extends AThreadedComponent {
 	public Convex connectToPeer(InetSocketAddress hostAddress) throws InterruptedException, IOException, TimeoutException {
 		try {
 			Convex convex=Convex.connect(hostAddress);
+			convex.setStore(server.getStore());
 			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
 			if (result.isError()) {
 				log.info("Bad status message from remote Peer: "+result);

@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 
 public abstract class AObserverQueue<T> {
 	
@@ -50,8 +49,6 @@ public abstract class AObserverQueue<T> {
 	private class QueueTask implements Runnable {
 		@Override
 		public void run() {
-			// Set Thread-local store for the current Server
-			Stores.setCurrent(store);
 			// Run main component loop
 			while (running) {
 				try {

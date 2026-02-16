@@ -42,6 +42,7 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
 
 /**
@@ -160,6 +161,7 @@ public class ServerTest {
 		synchronized(network.SERVER) {
 
 			Convex convex=Convex.connect(network.SERVER.getHostAddress());
+			convex.setStore(new MemoryStore());
 			assertThrows(ExecutionException.class,()->{
 				ACell c = convex.acquire(BAD_HASH).get();
 				System.out.println("Didn't expect to acquire: "+c);
@@ -198,6 +200,7 @@ public class ServerTest {
 		synchronized(network.SERVER) {
 
 			Convex convex=Convex.connect(network.SERVER.getHostAddress());
+			convex.setStore(new MemoryStore());
 
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);

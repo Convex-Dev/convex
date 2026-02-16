@@ -198,7 +198,9 @@ public class Server implements Closeable {
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
 				try {
-					return syncPeer(keyPair,Convex.connect(source));
+					Convex c=Convex.connect(source);
+					c.setStore(getStore());
+					return syncPeer(keyPair,c);
 				} catch (TimeoutException e) {
 					throw new LaunchException("Timeout trying to connect to remote peer");
 				} catch (IllegalArgumentException e) {

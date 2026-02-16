@@ -17,7 +17,6 @@ import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
-import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -25,13 +24,10 @@ import convex.core.data.Hash;
 import convex.core.data.Strings;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.core.store.NullStore;
-import convex.core.store.Stores;
 import convex.net.AConnection;
 import convex.net.impl.netty.NettyConnection;
 import convex.net.impl.nio.Connection;
@@ -108,35 +104,25 @@ public class ConvexRemote extends Convex {
 	 */
 	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout) {
 		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
-		
-		// Save store from the sending thread. We want to decode the Result on this store!
-		AStore awaitingStore=Stores.current();
-		
+
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
 		awaiting.put(resultID, cf);
-		
+
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
 		CompletableFuture<Result> cr=cf.handle((m,e)->{
 			synchronized(awaiting) {
-				// no longer want to wait for this result
-				// either we got a result back, or the future failed
 				awaiting.remove(resultID);
 			}
 
-			// Set the store. Likely to be needed by anyone waiting on the future
-			// We don't need to restore it because the return message handler does that for us
-			Stores.setCurrent(awaitingStore);
-
-			// clear sequence if something went wrong. It is probably invalid now....
 			if (e!=null) {
 				sequence=null;
 				return Result.fromException(e);
 			}
 
 			try {
-				m.getPayload(awaitingStore);
+				m.getPayload(getStore()); // null → storeless, non-null → store-based for partial messages
 			} catch (BadFormatException e1) {
 				log.warn("Bad message format in result: {}",e1.getMessage());
 				sequence=null;
@@ -152,38 +138,24 @@ public class ConvexRemote extends Convex {
 	}
 
 	/**
-	 * Result handler for Messages received back from a remote connection
+	 * Result handler for Messages received back from a remote connection.
+	 * Completes the awaiting future — no store context needed.
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		try {
-			
 			ACell id=m.getResultID();
-	
+
 			if (id!=null) {
-				// Check if we are waiting for a Result with this ID for this connection
 				synchronized (awaiting) {
-					// We save and restore the Store, since completing the future might change it
-					AStore savedStore=Stores.current();
-					try {
-						CompletableFuture<Message> cf = awaiting.get(id);
-						if (cf != null) {
-							// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-							boolean didComplete = cf.complete(m);
-							if (!didComplete) {
-								log.warn("Message return future already completed with value: "+cf.join());
-							}
-							awaiting.remove(id);
+					CompletableFuture<Message> cf = awaiting.get(id);
+					if (cf != null) {
+						boolean didComplete = cf.complete(m);
+						if (!didComplete) {
+							log.warn("Message return future already completed with value: "+cf.join());
 						}
-					} catch (Exception e) {
-						log.warn("Unexpected error completing result",e);
-					} finally {
-						Stores.setCurrent(savedStore);
 						awaiting.remove(id);
 					}
-	
 				}
-			} else {
-				// Ignore the message, we are a client side connection so not interested.
 			}
 		} catch (Exception e) {
 			log.warn("Error in return message handler: {}",e.getMessage());
@@ -217,21 +189,6 @@ public class ConvexRemote extends Convex {
 	public boolean isConnected() {
 		AConnection c = this.connection;
 		return (c != null) && (!c.isClosed());
-	}
-	
-	@Override
-	public CompletableFuture<State> acquireState() {
-		AStore store=Stores.current();
-		if (store==null) store=new convex.core.store.MemoryStore();
-		final AStore acquireStore=store;
-		return requestStatus().thenCompose(status->{
-			Hash stateHash = RT.ensureHash(status.get(4));
-
-			if (stateHash == null) {
-				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
-			}
-			return acquire(stateHash,acquireStore);
-		});
 	}
 	
 	@Override

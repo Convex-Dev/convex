@@ -41,8 +41,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.core.util.Shutdown;
@@ -282,14 +280,9 @@ public class Connection extends AConnection {
 	 *
 	 */
 	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
-		AStore temp = Stores.current();
-		try {
-			long id = ++idCounter;
-			boolean sent = sendObject(challenge);
-			return (sent) ? id : -1;
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		long id = ++idCounter;
+		boolean sent = sendObject(challenge);
+		return (sent) ? id : -1;
 	}
 
 	/**
@@ -302,14 +295,9 @@ public class Connection extends AConnection {
 	 *
 	 */
 	public long sendResponse(SignedData<ACell> response) throws IOException {
-		AStore temp = Stores.current();
-		try {
-			long id = ++idCounter;
-			boolean sent = sendObject(response);
-			return (sent) ? id : -1;
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		long id = ++idCounter;
+		boolean sent = sendObject(response);
+		return (sent) ? id : -1;
 	}
 
 	@Override
@@ -554,7 +542,6 @@ public class Connection extends AConnection {
 	 * @throws BadFormatException If there is an encoding error
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
-		AStore savedStore = Stores.current();
 		int recd= receiver.receiveFromChannel(channel);
 		int total =recd;
 		while (recd>0) {

@@ -500,7 +500,8 @@ public class NodeServerTest {
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
 		ConvexRemote convex = ConvexRemote.connect(serverAddress);
-		
+		convex.setStore(new MemoryStore());
+
 		try {
 			// Acquire the lattice structure into the client store. This will issue
 			// one or more DATA_REQUEST messages that NodeServer must handle correctly.

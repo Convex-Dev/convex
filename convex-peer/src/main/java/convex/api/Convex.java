@@ -44,7 +44,6 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.IPUtils;
 import convex.peer.Config;
@@ -101,9 +100,32 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected long idCounter=0;
 
+	/**
+	 * Store for this client instance. Null by default — normal operations (transact,
+	 * query) use storeless decode. Only needed for acquire operations that download
+	 * and persist data incrementally.
+	 */
+	protected AStore store = null;
+
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
+	}
+
+	/**
+	 * Gets the store for this client instance.
+	 * @return Store, or null if no store is configured
+	 */
+	public AStore getStore() {
+		return store;
+	}
+
+	/**
+	 * Sets the store for this client instance. Required for acquire operations.
+	 * @param store Store to use, or null to clear
+	 */
+	public void setStore(AStore store) {
+		this.store=store;
 	}
 	
 	/**
@@ -700,18 +722,17 @@ public abstract class Convex implements AutoCloseable {
 
 	/**
 	 * Attempts to asynchronously acquire a complete persistent data structure for the given hash
-	 * from the connected peer. Uses the current thread's store if set, otherwise
-	 * creates a temporary MemoryStore. Subclasses may override for better defaults
-	 * (e.g. ConvexLocal uses the server's store).
+	 * from the connected peer. Uses this client's store field (set via {@link #setStore}).
+	 * Subclasses may override for better defaults (e.g. ConvexLocal uses the server's store).
 	 *
 	 * @param hash Hash of value to acquire.
-	 *
 	 * @return Future for the cell being acquired
+	 * @throws IllegalStateException if no store is configured on this client
 	 */
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
-		AStore store=Stores.current();
-		if (store==null) store=new convex.core.store.MemoryStore();
-		return acquire(hash, store);
+		AStore s=getStore();
+		if (s==null) throw new IllegalStateException("No store configured — call setStore() before acquire");
+		return acquire(hash, s);
 	}
 
 	/**
@@ -968,9 +989,9 @@ public abstract class Convex implements AutoCloseable {
 	 * @return Future for consensus state
 	 */
 	public CompletableFuture<State> acquireState()  {
-		AStore store=Stores.current();
-		if (store==null) store=new convex.core.store.MemoryStore();
-		final AStore acquireStore=store;
+		AStore s=getStore();
+		if (s==null) throw new IllegalStateException("No store configured — call setStore() before acquireState");
+		final AStore acquireStore=s;
 		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 

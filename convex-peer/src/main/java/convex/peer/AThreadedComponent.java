@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.LoadMonitor;
 
 /**
@@ -21,9 +20,6 @@ public abstract class AThreadedComponent {
 	private class ComponentTask implements Runnable {
 		@Override
 		public void run() {
-			// Set server store on this thread so Ref resolution works
-			Stores.setCurrent(server.getStore());
-
 			// Run main component loop
 			while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 				try {

@@ -10,6 +10,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.store.MemoryStore;
 
 /**
  * Demo that acquires the genesis state by hash from a live peer and writes it
@@ -29,6 +30,7 @@ public class AcquireGenesis {
 
 		System.out.println("Connecting to " + host + "...");
 		Convex convex = Convex.connect(host, null, null);
+		convex.setStore(new MemoryStore());
 
 		System.out.println("Acquiring genesis state " + hash + "...");
 		ACell cell = convex.acquire(hash).get(60000, TimeUnit.MILLISECONDS);

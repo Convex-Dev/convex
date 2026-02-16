@@ -787,6 +787,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.warn("Attempted to add null peer connection");
 			return;
 		}
+		convex.setStore(store);
 		peerNodes.add(convex);
 		log.debug("Added peer: {}", convex.getHostAddress());
 	}

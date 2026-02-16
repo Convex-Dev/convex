@@ -23,7 +23,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.peer.Server;
 
@@ -46,6 +45,12 @@ public class ConvexLocal extends Convex {
 	
 	public static ConvexLocal create(Server server, Address address, AKeyPair keyPair) {
 		return new ConvexLocal(server, address,keyPair);
+	}
+
+	@Override
+	public AStore getStore() {
+		if (store!=null) return store; // client override
+		return server.getStore();
 	}
 
 	@Override
@@ -124,21 +129,13 @@ public class ConvexLocal extends Convex {
 	}
 
 	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
-		AStore senderStore=Stores.current();
 		return m->{
-			// Protect message reading in sender store
-			AStore savedStore=Stores.current();
-			try {
-				Stores.setCurrent(senderStore);
-				Result r=m.toResult();
-				if (r.getErrorCode()!=null) {
-					sequence=null;
-				}
-				cf.complete(r);
-				return true;
-			} finally {
-				Stores.setCurrent(savedStore);
+			Result r=m.toResult();
+			if (r.getErrorCode()!=null) {
+				sequence=null;
 			}
+			cf.complete(r);
+			return true;
 		};
 	}
 	

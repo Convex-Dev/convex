@@ -23,7 +23,6 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 
@@ -68,9 +67,11 @@ public class Acquiror {
 			return f;
 		}
 		log.trace("Trying to acquire remotely: {}",hash);
-	
+
+		// Ensure source can decode partial data responses against the acquire store
+		source.setStore(store);
+
 		ThreadUtils.runVirtual(()-> {
-			Stores.setCurrent(store);
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();
 

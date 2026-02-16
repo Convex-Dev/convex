@@ -12,6 +12,7 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.store.MemoryStore;
 import convex.core.lang.RT;
 
 /**
@@ -28,6 +29,7 @@ public class AcquireBelief {
 
 		System.out.println("Connecting to " + host + "...");
 		Convex convex = Convex.connect(host, null, null);
+		convex.setStore(new MemoryStore());
 
 		System.out.println("Requesting status...");
 		Result status = convex.requestStatusSync(15000);
