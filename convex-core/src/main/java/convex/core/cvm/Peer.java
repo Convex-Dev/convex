@@ -1,8 +1,10 @@
 package convex.core.cvm;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -58,6 +60,26 @@ import convex.core.util.Utils;
  * the future is to invent it." - Alan Kay
  */
 public class Peer {
+
+	/**
+	 * Chunk size for parallel signature validation. Each chunk is submitted
+	 * as a single task to the thread pool.
+	 */
+	private static final int SIGN_CHUNK_SIZE = 100;
+
+	/**
+	 * Thread pool for CPU-bound signature validation work.
+	 * Fixed platform threads scaled to available cores.
+	 */
+	private static final ExecutorService SIGN_POOL = Executors.newFixedThreadPool(
+		Runtime.getRuntime().availableProcessors(),
+		r -> {
+			Thread t = new Thread(r, "sig-verify");
+			t.setDaemon(true);
+			return t;
+		}
+	);
+
 	/** This Peer's key */
 	private final AccountKey peerKey;
 
@@ -502,7 +524,7 @@ public class Peer {
 		if (stateIndex>=consensusPoint) return this;
 		
 		// Kick off parallel signature validation
-		validateSignatures(s,blocks,stateIndex,consensusPoint);
+		validateSignatures(blocks,stateIndex,consensusPoint);
 
 		// We need to compute at least one new state update
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
@@ -554,25 +576,52 @@ public class Peer {
 		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);
 	}
 
-	private void validateSignatures(State s, AVector<SignedData<Block>> blocks, long start, long end) {
-		Consumer<SignedData<ATransaction>> transactionValidator=st->{
-			ATransaction t=st.getValue();
-			Address origin=t.getOrigin();
-			AccountStatus as=s.getAccount(origin);
-			if (as==null) return; // ignore, will probably fail with :NOBODY
-			AccountKey pk=as.getAccountKey();
-			if (pk==null) return; // ignore, will probably fail as an actor account
-			st.checkSignature(pk);
-		};
-		
-		Consumer<SignedData<Block>> blockValidator=sb->{
-			AVector<SignedData<ATransaction>> transactions = sb.getValue().getTransactions();
-			Stream<SignedData<ATransaction>> tstream=transactions.parallelStream();
-			tstream.forEach(transactionValidator);
-		};
-		
-		Stream<SignedData<Block>> stream=blocks.parallelStream().skip(start).limit(end-start);
-		stream.forEach(blockValidator);
+	/**
+	 * Pre-validates signatures for transactions in the given block range.
+	 * Uses a fixed thread pool with chunked tasks for parallel Ed25519 verification.
+	 * Results are cached on each SignedData instance for later fast lookup.
+	 */
+	private void validateSignatures(AVector<SignedData<Block>> blocks, long start, long end) {
+		java.util.ArrayList<Future<?>> futures = null;
+		for (long b = start; b < end; b++) {
+			AVector<SignedData<ATransaction>> transactions = blocks.get(b).getValue().getTransactions();
+			int count = (int) transactions.count();
+			if (count == 0) continue;
+
+			if (count <= SIGN_CHUNK_SIZE) {
+				// Small block — main thread handles directly
+				verifyChunk(transactions, 0, count);
+			} else {
+				// Large block — chunk and submit to pool, main thread does last chunk
+				int nChunks = (count + SIGN_CHUNK_SIZE - 1) / SIGN_CHUNK_SIZE;
+				if (futures == null) futures = new java.util.ArrayList<>();
+				for (int c = 0; c < nChunks - 1; c++) {
+					final int from = c * SIGN_CHUNK_SIZE;
+					final int to = from + SIGN_CHUNK_SIZE;
+					futures.add(SIGN_POOL.submit(() -> verifyChunk(transactions, from, to)));
+				}
+				// Main thread does last chunk
+				verifyChunk(transactions, (nChunks - 1) * SIGN_CHUNK_SIZE, count);
+			}
+		}
+		// Wait for any pool tasks
+		if (futures != null) {
+			for (Future<?> f : futures) {
+				try { f.get(); } catch (Exception e) {
+					// Verification failures are cached on the SignedData instances
+				}
+			}
+		}
+	}
+
+	/**
+	 * Verify a chunk of signatures using the embedded public key in each SignedData.
+	 * Caches the result so later calls to checkSignature() are a fast no-op.
+	 */
+	private static void verifyChunk(AVector<SignedData<ATransaction>> txns, int from, int to) {
+		for (int i = from; i < to; i++) {
+			txns.get(i).checkSignature();
+		}
 	}
 
 	/**
