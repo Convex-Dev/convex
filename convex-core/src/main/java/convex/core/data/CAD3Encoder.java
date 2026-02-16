@@ -65,16 +65,21 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		return new CAD3Encoder(store);
 	}
 
-	private static final CAD3Encoder NULL_STORE_ENCODER = new CAD3Encoder(NullStore.INSTANCE);
-
 	/**
 	 * Returns a cached encoder of this type backed by NullStore. Used for
 	 * storeless multi-cell decode: readRef creates NullStore-backed refs
 	 * (zero allocation) that are replaced during resolveRefs.
 	 * Subclasses should override to return an encoder of their own type.
+	 *
+	 * Uses a holder class for lazy init to avoid circular static init
+	 * between NullStore and encoder classes.
 	 */
 	protected CAD3Encoder nullStoreEncoder() {
-		return NULL_STORE_ENCODER;
+		return NullStoreEncoderHolder.INSTANCE;
+	}
+
+	private static class NullStoreEncoderHolder {
+		static final CAD3Encoder INSTANCE = new CAD3Encoder(NullStore.INSTANCE);
 	}
 
 	@Override
@@ -583,10 +588,32 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * encoder's virtual {@link #read} methods, so CAD3Encoder produces generic
 	 * types and CVMEncoder produces CVM-specific types.
 	 *
-	 * PERFORMANCE: This is a hot path for all incoming messages on network. Must be optimal, minimal GC.
-	 * For single-cell messages with no branches (90%+ of traffic), this method
-	 * performs zero allocations beyond the DecodeState and the decoded cell itself.
-	 * SECURITY: Input may come from untrusted sources, so must be robust to adversarial input (reject in at most O(n) time)
+	 * <h3>Security</h3>
+	 *
+	 * This method decodes messages received from the public internet. Input
+	 * must be treated as adversarial. All malformed input must produce
+	 * {@link BadFormatException} with no adverse side effects — no hangs,
+	 * no unbounded allocation, no state corruption. Processing must complete
+	 * in at most O(n) time where n is the input length.
+	 *
+	 * Specific threats defended against:
+	 * <ul>
+	 *   <li>Truncated input (mid-cell, mid-VLQ, mid-ref hash) → BadFormatException</li>
+	 *   <li>Oversized VLQ counts (memory exhaustion) → BadFormatException before allocation</li>
+	 *   <li>Invalid child cells (null, embedded, corrupted, wrong length) → BadFormatException</li>
+	 *   <li>Trailing garbage after valid encoding → BadFormatException</li>
+	 *   <li>Unreferenced extra children → silently ignored (no security risk)</li>
+	 *   <li>Duplicate children → HashMap.put overwrites (idempotent)</li>
+	 *   <li>Partial messages (storeless) → PartialMessageException</li>
+	 * </ul>
+	 *
+	 * <h3>Performance</h3>
+	 *
+	 * Hot path for all incoming network messages. For single-cell messages
+	 * with no branches (90%+ of traffic), this method performs zero allocations
+	 * beyond the DecodeState and the decoded cell itself.
+	 *
+	 * <h3>Decode modes</h3>
 	 *
 	 * Storeless decode (store==null): uses a NullStore-backed encoder (static
 	 * singleton, no allocation). readRef creates temporary NullStore-backed refs
@@ -714,6 +741,14 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	 * Decodes VLQ-prefixed non-embedded child cells using DecodeState.
 	 * Dispatches through this encoder's virtual {@link #read} methods.
 	 * Reads from ds.pos to ds.limit.
+	 *
+	 * Input is adversarial (public internet). Validates:
+	 * <ul>
+	 *   <li>VLQ child length does not exceed remaining data</li>
+	 *   <li>Child encoding consumes exactly the declared length</li>
+	 *   <li>Child is non-null and non-embedded</li>
+	 *   <li>IndexOutOfBoundsException from truncated data → BadFormatException</li>
+	 * </ul>
 	 *
 	 * @param acc Accumulator for cells, keyed by content hash
 	 * @param ds Decode state positioned at start of child cells

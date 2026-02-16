@@ -68,11 +68,13 @@ public class CVMEncoder extends CAD3Encoder {
 		return new CVMEncoder(store);
 	}
 
-	private static final CVMEncoder NULL_STORE_CVM_ENCODER = new CVMEncoder(NullStore.INSTANCE);
-
 	@Override
 	protected CAD3Encoder nullStoreEncoder() {
-		return NULL_STORE_CVM_ENCODER;
+		return NullStoreCVMEncoderHolder.INSTANCE;
+	}
+
+	private static class NullStoreCVMEncoderHolder {
+		static final CVMEncoder INSTANCE = new CVMEncoder(NullStore.INSTANCE);
 	}
 
 	@Override
