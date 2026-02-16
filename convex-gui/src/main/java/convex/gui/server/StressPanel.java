@@ -240,8 +240,6 @@ public class StressPanel extends JPanel {
 			StringBuilder sb = new StringBuilder();
 			resultArea.setText("Connecting clients...");
 
-			// Use client store
-			// Stores.setCurrent(Stores.CLIENT_STORE);
 			ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
 			Convex pc = Convex.connect(sa, address,kp);
 		

@@ -44,7 +44,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 	}
 	
 	public StrimziKafka(Server server) {
-		super(server.getStore());
+		super();
 		// TODO: need to be config params etc.
 		this.topic="transactions";
 		// this.url="https://kfk.walledchannel.net:9092/topics/";
