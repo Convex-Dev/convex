@@ -3,6 +3,7 @@ package convex.peer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -121,7 +122,7 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Register of client interests in receiving transaction responses
 	 */
-	private HashMap<Hash, Message> interests = new HashMap<>();
+	private ConcurrentHashMap<Hash, Message> interests = new ConcurrentHashMap<>();
 
 	public long clientTransactionCount=0;
 	public long receivedTransactionCount=0;

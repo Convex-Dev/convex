@@ -1,11 +1,14 @@
 package convex.examples;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -22,30 +25,31 @@ import convex.peer.Server;
 import convex.peer.TransactionHandler;
 
 /**
- * Transaction throughput measurement for a single local peer.
+ * Transaction throughput measurement for a single peer.
  *
- * Pre-signs all transactions, then fires them through ConvexLocal and
- * measures end-to-end pipeline throughput (TransactionHandler -> BeliefPropagator
- * -> CVMExecutor -> result return).
+ * Pre-signs all transactions, then fires them and measures end-to-end
+ * pipeline throughput. Senders submit in a tight loop from virtual threads;
+ * backpressure naturally throttles submission when the pipeline is saturated.
  *
- * Senders submit in a tight loop from virtual threads. Backpressure from the
- * server (blocking offer on txMessageQueue) naturally throttles submission
- * when the pipeline is saturated.
- *
- * Usage: run main(). Prints diagnostics to stdout.
+ * Modes:
+ *   --local   Use ConvexLocal (in-JVM, no network)
+ *   --remote  Use ConvexRemote via Netty (default)
  */
 public class TransactionThroughput {
 
 	static final int TOTAL_TRANSACTIONS = 200_000;
-
-	/** Number of client accounts sending transactions concurrently */
 	static final int NUM_CLIENTS = 20;
-
-	/** Transactions per client */
 	static final int TXN_PER_CLIENT = TOTAL_TRANSACTIONS / NUM_CLIENTS;
 
 	public static void main(String[] args) throws Exception {
+		boolean useLocal = false;
+		for (String arg : args) {
+			if ("--local".equals(arg)) useLocal = true;
+		}
+		String mode = useLocal ? "LOCAL" : "REMOTE (Netty)";
+
 		System.out.println("=== Transaction Throughput Test ===");
+		System.out.println("Mode:         " + mode);
 		System.out.println("Transactions: " + TOTAL_TRANSACTIONS);
 		System.out.println("Clients:      " + NUM_CLIENTS);
 		System.out.println("Per client:   " + TXN_PER_CLIENT);
@@ -59,10 +63,11 @@ public class TransactionThroughput {
 		config.put(Keywords.STATE, genesis);
 		config.put(Keywords.FAUCET, true);
 		Server server = API.launchPeer(config);
+		InetSocketAddress hostAddress = server.getHostAddress();
 
 		System.out.println("Peer launched on port " + server.getPort());
 
-		// --- Create client accounts ---
+		// --- Create client accounts (use local admin for setup) ---
 		ConvexLocal admin = ConvexLocal.create(server, Init.GENESIS_PEER_ADDRESS, peerKP);
 
 		AKeyPair[] clientKPs = new AKeyPair[NUM_CLIENTS];
@@ -75,7 +80,6 @@ public class TransactionThroughput {
 		}
 		System.out.println("Created " + NUM_CLIENTS + " client accounts");
 
-		// Target address for transfers
 		Address target = Address.create(0);
 
 		// --- Pre-sign all transactions ---
@@ -96,10 +100,20 @@ public class TransactionThroughput {
 		System.out.println("done in " + signTime + "ms (" +
 				(TOTAL_TRANSACTIONS * 1000L / Math.max(1, signTime)) + " signs/sec)");
 
-		// --- Create local clients ---
-		ConvexLocal[] clients = new ConvexLocal[NUM_CLIENTS];
-		for (int c = 0; c < NUM_CLIENTS; c++) {
-			clients[c] = ConvexLocal.create(server, clientAddrs[c], clientKPs[c]);
+		// --- Create clients ---
+		Convex[] clients = new Convex[NUM_CLIENTS];
+		if (useLocal) {
+			for (int c = 0; c < NUM_CLIENTS; c++) {
+				clients[c] = ConvexLocal.create(server, clientAddrs[c], clientKPs[c]);
+			}
+			System.out.println("Created " + NUM_CLIENTS + " local clients");
+		} else {
+			for (int c = 0; c < NUM_CLIENTS; c++) {
+				ConvexRemote rc = ConvexRemote.connect(hostAddress);
+				rc.setAddress(clientAddrs[c], clientKPs[c]);
+				clients[c] = rc;
+			}
+			System.out.println("Connected " + NUM_CLIENTS + " remote clients to " + hostAddress);
 		}
 
 		TransactionHandler th = server.getTransactionHandler();
@@ -109,13 +123,13 @@ public class TransactionThroughput {
 		System.out.println("Submitting...");
 		long sendStart = Utils.getTimeMillis();
 
-		// Collect all futures
 		@SuppressWarnings("unchecked")
 		CompletableFuture<Result>[][] futures = new CompletableFuture[NUM_CLIENTS][TXN_PER_CLIENT];
 		AtomicInteger submitted = new AtomicInteger(0);
 
 		// Each client submits from its own virtual thread.
-		// ConvexLocal.transact() blocks via backpressure when txMessageQueue is full.
+		// Backpressure naturally throttles: ConvexLocal blocks on txMessageQueue,
+		// ConvexRemote blocks on outbound queue / TCP writability.
 		Thread[] senders = new Thread[NUM_CLIENTS];
 		for (int c = 0; c < NUM_CLIENTS; c++) {
 			final int ci = c;
@@ -197,6 +211,7 @@ public class TransactionThroughput {
 
 		System.out.println();
 		System.out.println("=== Results ===");
+		System.out.println("Mode:           " + mode);
 		System.out.println("Total time:     " + totalTime + "ms");
 		System.out.println("Succeeded:      " + succeeded);
 		System.out.println("Errors:         " + errCount);
@@ -215,6 +230,8 @@ public class TransactionThroughput {
 		System.out.println("  received txns:     " + th.receivedTransactionCount);
 		System.out.println("  client txns:       " + th.clientTransactionCount);
 
+		// Close clients
+		for (Convex c : clients) c.close();
 		server.close();
 		System.out.println();
 		System.out.println("Done.");

@@ -16,6 +16,7 @@ import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 
@@ -143,10 +144,25 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 							}
 						}
 					} finally {
-						// Always resume. If the next message also can't be
-						// queued, it triggers another cycle.
+						// Resume reading. Order matters: clear the flag first
+						// so decode() will process data, then re-enable autoRead.
 						backpressured = false;
 						ctx.channel().config().setAutoRead(true);
+
+						// Flush data stranded in ByteToMessageDecoder's cumulation
+						// buffer. When decode() returned early (backpressured gate),
+						// any bytes already read from the socket stay in cumulation.
+						// Re-enabling autoRead only helps if NEW data arrives on
+						// the socket. To process already-buffered data, we fire a
+						// synthetic channelRead with an empty buffer — this triggers
+						// ByteToMessageDecoder.callDecode() on the existing cumulation.
+						ctx.channel().eventLoop().execute(() -> {
+							try {
+								ctx.pipeline().fireChannelRead(Unpooled.EMPTY_BUFFER);
+							} catch (Exception e) {
+								ctx.fireExceptionCaught(e);
+							}
+						});
 					}
 				});
 			}
