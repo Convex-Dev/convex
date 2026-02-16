@@ -46,7 +46,8 @@ public abstract class AThreadedComponent {
 
 	protected AThreadedComponent(Server server) {
 		this.server=server;
-		this.thread=new Thread(new ComponentTask());
+		// Virtual thread: ideal for IO-bound queue-polling loops, lower memory footprint
+		this.thread=Thread.ofVirtual().unstarted(new ComponentTask());
 	}
 	
 	protected abstract void loop() throws InterruptedException;

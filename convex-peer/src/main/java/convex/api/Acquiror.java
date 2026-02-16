@@ -71,6 +71,9 @@ public class Acquiror {
 		// Ensure source can decode partial data responses against the acquire store
 		source.setStore(store);
 
+		// Polling loop in virtual thread — intentional design choice over CompletableFuture
+		// composition. Gives better stack traces for debugging and fewer allocations.
+		// Virtual threads make the blocking .get() calls cheap.
 		ThreadUtils.runVirtual(()-> {
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();

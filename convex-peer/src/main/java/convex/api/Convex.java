@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -92,13 +93,14 @@ public abstract class Convex implements AutoCloseable {
 	 * Sequence number for this client, or null if not yet known. Used to number new
 	 * transactions if not otherwise specified.
 	 */
-	protected Long sequence = null;
+	protected volatile Long sequence = null;
 
 	
 	/**
-	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result
+	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result.
+	 * AtomicLong for thread-safe access from concurrent transact/query calls.
 	 */
-	protected long idCounter=0;
+	private final AtomicLong idCounter=new AtomicLong(0);
 
 	/**
 	 * Store for this client instance. Null by default — normal operations (transact,
@@ -179,7 +181,7 @@ public abstract class Convex implements AutoCloseable {
 	}
 	
 	protected long getNextID() {
-		return idCounter++;
+		return idCounter.getAndIncrement();
 	}
 
 	/**
@@ -430,7 +432,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @param transaction Transaction to prepare
 	 * @return Signed transaction ready to submit
 	 */
-	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
+	public synchronized SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
 		Address origin=transaction.getOrigin();
 		if (origin == null) {
 			origin=address;

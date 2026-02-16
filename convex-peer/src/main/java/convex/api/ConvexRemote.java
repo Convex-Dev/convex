@@ -2,8 +2,8 @@ package convex.api;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -89,18 +89,18 @@ public class ConvexRemote extends Convex {
 	}
 	
 	/**
-	 * Map of results awaiting completion.
+	 * Map of results awaiting completion. ConcurrentHashMap allows lock-free access
+	 * from both client threads (put/remove) and network I/O threads (get/complete).
 	 */
-	private HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
+	private final ConcurrentHashMap<ACell, CompletableFuture<Message>> awaiting = new ConcurrentHashMap<>();
 
 	/**
-	 * Method to start waiting for a return Message. 
-	 * 
-	 * Must be called with lock on
-	 * `awaiting` map to prevent risk of missing results before it is called.
-	 * 
+	 * Registers a future to await a return Message for the given result ID.
+	 * Must be called BEFORE sending the message to prevent a race where the
+	 * response arrives before the future is registered.
+	 *
 	 * @param resultID ID of result message to await
-	 * @return
+	 * @return CompletableFuture for the Result
 	 */
 	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout) {
 		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
@@ -112,9 +112,7 @@ public class ConvexRemote extends Convex {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
 		CompletableFuture<Result> cr=cf.handle((m,e)->{
-			synchronized(awaiting) {
-				awaiting.remove(resultID);
-			}
+			awaiting.remove(resultID);
 
 			if (e!=null) {
 				sequence=null;
@@ -140,21 +138,16 @@ public class ConvexRemote extends Convex {
 	/**
 	 * Result handler for Messages received back from a remote connection.
 	 * Completes the awaiting future — no store context needed.
+	 * Uses ConcurrentHashMap.remove() for atomic get-and-remove.
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		try {
 			ACell id=m.getResultID();
 
 			if (id!=null) {
-				synchronized (awaiting) {
-					CompletableFuture<Message> cf = awaiting.get(id);
-					if (cf != null) {
-						boolean didComplete = cf.complete(m);
-						if (!didComplete) {
-							log.warn("Message return future already completed with value: "+cf.join());
-						}
-						awaiting.remove(id);
-					}
+				CompletableFuture<Message> cf = awaiting.remove(id);
+				if (cf != null) {
+					cf.complete(m);
 				}
 			}
 		} catch (Exception e) {
@@ -214,34 +207,26 @@ public class ConvexRemote extends Convex {
 		if (conn==null) {
 			return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
 		}
-		
+
 		ACell id=m.getRequestID();
 		try {
 			if (id==null) {
 				// Not expecting any return message, so just report sending
 				boolean sent = conn.sendMessage(m);
-				if (sent) {
-					// log.info("Sent message: "+m);
-				} else {
-					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
-				}
+				if (!sent) return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 			}
-			
-			synchronized (awaiting) {
-				boolean sent = conn.sendMessage(m);				
-				if (sent) {
-					// All OK
-					// log.info("Sent message: "+m);
-				} else {
-					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
-				}
-	
-				// Make sure we call this while synchronised on awaiting map
-				CompletableFuture<Result> cf = awaitResult(id,timeout);
-				return cf;
+
+			// Register future BEFORE send — response handler can find it immediately
+			CompletableFuture<Result> cf = awaitResult(id, timeout);
+			boolean sent = conn.sendMessage(m);
+			if (!sent) {
+				awaiting.remove(id); // cleanup orphaned future
+				return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 			}
+			return cf;
 		} catch (Exception e) {
+			if (id!=null) awaiting.remove(id); // cleanup on exception
 			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
 			return CompletableFuture.completedFuture(r);
 		}
