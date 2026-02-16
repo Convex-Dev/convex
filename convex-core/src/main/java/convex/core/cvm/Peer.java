@@ -624,6 +624,42 @@ public class Peer {
 		}
 	}
 
+	private static void verifyChunk(java.util.List<SignedData<ATransaction>> txns, int from, int to) {
+		for (int i = from; i < to; i++) {
+			txns.get(i).checkSignature();
+		}
+	}
+
+	/**
+	 * Pre-validates signatures for a list of signed transactions using the shared
+	 * thread pool for parallel Ed25519 verification. Results are cached on each
+	 * SignedData instance so subsequent calls to checkSignature() are a fast no-op.
+	 *
+	 * @param txns List of signed transactions to verify
+	 */
+	public static void preValidateSignatures(java.util.List<SignedData<ATransaction>> txns) {
+		int count = txns.size();
+		if (count == 0) return;
+		if (count <= SIGN_CHUNK_SIZE) {
+			verifyChunk(txns, 0, count);
+			return;
+		}
+		int nChunks = (count + SIGN_CHUNK_SIZE - 1) / SIGN_CHUNK_SIZE;
+		java.util.ArrayList<Future<?>> futures = new java.util.ArrayList<>(nChunks - 1);
+		for (int c = 0; c < nChunks - 1; c++) {
+			final int from = c * SIGN_CHUNK_SIZE;
+			final int to = from + SIGN_CHUNK_SIZE;
+			futures.add(SIGN_POOL.submit(() -> verifyChunk(txns, from, to)));
+		}
+		// Main thread does last chunk
+		verifyChunk(txns, (nChunks - 1) * SIGN_CHUNK_SIZE, count);
+		for (Future<?> f : futures) {
+			try { f.get(); } catch (Exception e) {
+				// Verification failures are cached on the SignedData instances
+			}
+		}
+	}
+
 	/**
 	 * Gets a historical State for the specified position
 	 * @param consensusMatch
@@ -695,42 +731,56 @@ public class Peer {
 		return result;
 	}
 	
+	/**
+	 * Performs all transaction checks: cheap validation followed by signature verification.
+	 * @param sd Signed transaction to check
+	 * @return Error Result, or null if all checks pass
+	 */
 	public Result checkTransaction(SignedData<ATransaction> sd) {
+		Result r=checkTransactionFast(sd);
+		if (r!=null) return r;
 
-		// TODO: throttle?
-		ATransaction tx=RT.ensureTransaction(sd.getValue());
-		
-		// System.out.println("transact: "+v);
-		if (tx==null) {
-			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
-		}
-		
-		State s=getConsensusState();
-		AccountStatus as=s.getAccount(tx.getOrigin());
-		if (as==null) {
-			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
-		}
-		
-		if (tx.getSequence()<=as.getSequence()) {
-			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
-		}
-		
-		AccountKey expectedKey=as.getAccountKey();
-		if (expectedKey==null) {
-			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
-		}
-		
-		AccountKey pubKey=sd.getAccountKey();
-		if (!expectedKey.equals(pubKey)) {
-			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
-		}
-		
 		if (!sd.checkSignature()) {
 			// SECURITY: Client tried to send a badly signed transaction!
 			return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
 		// All checks passed OK!
+		return null;
+	}
+
+	/**
+	 * Performs cheap transaction validation (format, account, sequence, key match)
+	 * without signature verification. Use before parallel signature pre-validation.
+	 * @param sd Signed transaction to check
+	 * @return Error Result, or null if cheap checks pass
+	 */
+	public Result checkTransactionFast(SignedData<ATransaction> sd) {
+		ATransaction tx=RT.ensureTransaction(sd.getValue());
+		if (tx==null) {
+			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
+		}
+
+		State s=getConsensusState();
+		AccountStatus as=s.getAccount(tx.getOrigin());
+		if (as==null) {
+			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
+		}
+
+		if (tx.getSequence()<=as.getSequence()) {
+			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
+		}
+
+		AccountKey expectedKey=as.getAccountKey();
+		if (expectedKey==null) {
+			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
+		}
+
+		AccountKey pubKey=sd.getAccountKey();
+		if (!expectedKey.equals(pubKey)) {
+			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
+		}
+
 		return null;
 	}
 

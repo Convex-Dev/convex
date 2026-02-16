@@ -36,8 +36,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
@@ -148,45 +146,59 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 
 	
+	@SuppressWarnings("unchecked")
 	private void processMessages() throws InterruptedException {
 		Result problem=checkPeerState();
-		for (Message msg: messages) {
-			if (problem==null) {
-				processMessage(msg);
-			} else {
+		if (problem!=null) {
+			for (Message msg: messages) {
 				msg.returnResult(problem);
 			}
+			return;
 		}
-	}
-	
-	protected void processMessage(Message m) throws InterruptedException {
-		try {
+
+		int n=messages.size();
+		Peer peer=server.getPeer();
+
+		// Phase 1: Extract SignedData, run cheap checks, reject failures immediately.
+		// Survivors go to toVerify for parallel signature validation.
+		SignedData<ATransaction>[] sigs=(SignedData<ATransaction>[]) new SignedData<?>[n];
+		ArrayList<SignedData<ATransaction>> toVerify=new ArrayList<>(n);
+		for (int i=0; i<n; i++) {
+			Message m=messages.get(i);
 			this.receivedTransactionCount++;
-			// log.info("Got TX message: "+m);
-			
-			// Transaction is a vector [:TX, id , signed-tx]
-			AVector<ACell> v = m.getPayload();
-			@SuppressWarnings("unchecked")
-			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
-			
-			// Check our transaction is valid and we want to process it
-			Result error=server.getPeer().checkTransaction(sd);
-			if (error!=null) {
-				m.returnResult(error.withSource(SourceCodes.PEER));
-				return;
+			try {
+				AVector<ACell> v = m.getPayload();
+				SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
+				Result error=peer.checkTransactionFast(sd);
+				if (error!=null) {
+					m.returnResult(error.withSource(SourceCodes.PEER));
+					continue;
+				}
+				sigs[i]=sd;
+				toVerify.add(sd);
+			} catch (Exception e) {
+				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 			}
-	
-			// Put on Server's transaction queue. We are OK to block here
+		}
+
+		// Phase 2: Parallel signature verification — results cached on each SignedData
+		Peer.preValidateSignatures(toVerify);
+
+		// Phase 3: Check cached signature results and queue valid transactions
+		for (int i=0; i<n; i++) {
+			SignedData<ATransaction> sd=sigs[i];
+			if (sd==null) continue; // already rejected in Phase 1
+			Message m=messages.get(i);
+			if (!sd.checkSignature()) {
+				m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+				continue;
+			}
 			LoadMonitor.down();
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
 			LoadMonitor.up();
 			this.clientTransactionCount++;
-			
-			registerInterest(sd.getHash(), m);		
-		} catch (MissingDataException e) {
-			m.returnResult(Result.fromException(e).withSource(SourceCodes.PEER));
-			return;
+			registerInterest(sd.getHash(), m);
 		}
 	}
 	
