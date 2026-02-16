@@ -57,18 +57,22 @@ import convex.net.impl.nio.NIOServer;
 
 
 /**
- * A self contained Peer Server that can be launched with a config.
- * 
- * The primary role for the Server is to respond to incoming messages and maintain
- * network consensus.
+ * A self-contained Peer Server that can be launched with a config.
  *
- * Components contained within the Server handle specific tasks, e.g:
- * - Client transaction handling
- * - CPoS Belief merges
- * - Belief Propagation
- * - CVM Execution
+ * <p>The Server is the top-level coordinator for a Convex peer. It accepts inbound
+ * messages, dispatches them to specialised components, and orchestrates the peer
+ * lifecycle (launch, sync, persistence, shutdown).
  *
- * "Programming is a science dressed up as art, because most of us don't
+ * <p>Each major responsibility is handled by a dedicated threaded component:
+ * <ul>
+ *   <li>{@link TransactionHandler} — validates and batches client transactions into blocks</li>
+ *   <li>{@link QueryHandler} — executes read-only queries against the latest consensus state</li>
+ *   <li>{@link BeliefPropagator} — merges incoming beliefs and broadcasts updates to peers</li>
+ *   <li>{@link CVMExecutor} — applies confirmed blocks to advance the CVM state machine</li>
+ *   <li>{@link ConnectionManager} — maintains authenticated outbound connections to peers</li>
+ * </ul>
+ *
+ * <p>"Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
  * physics of software is not algorithms, data structures, languages, and
  * abstractions. These are just tools we make, use, and throw away. The real
@@ -77,7 +81,6 @@ import convex.net.impl.nio.NIOServer;
  * solve large problems in pieces. This is the science of programming: make
  * building blocks that people can understand and use easily, and people will
  * work together to solve the very largest problems." ― Pieter Hintjens
- *
  */
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = Constants.DEFAULT_PEER_PORT;
@@ -87,9 +90,9 @@ public class Server implements Closeable {
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
-	 * Message Consumer that handles received messages for this peer.
-	 * Delegates to deliverMessage and handles the retry predicate by blocking the
-	 * caller's thread if a queue is full. Used by legacy NIO path and tests.
+	 * Blocking message consumer for the NIO path and tests. Delegates to
+	 * {@link #deliverMessage} and, if a retry predicate is returned, blocks the
+	 * caller's thread until the message is accepted or times out.
 	 */
 	Consumer<Message> receiveAction = m->{
 		Predicate<Message> retry = deliverMessage(m);
@@ -106,27 +109,27 @@ public class Server implements Closeable {
 	};
 
 	/**
-	 * Connection manager instance.
+	 * Manages authenticated outbound connections to other peers in the network.
 	 */
 	protected final ConnectionManager manager = new ConnectionManager(this);
-	
+
 	/**
-	 * Belief propagator instance.
+	 * Merges incoming beliefs from peers and broadcasts consensus updates across the network.
 	 */
 	protected final BeliefPropagator propagator=new BeliefPropagator(this);
-	
+
 	/**
-	 * Transaction handler instance.
+	 * Validates client transactions, batches them into blocks, and feeds them into consensus.
 	 */
 	protected final TransactionHandler transactionHandler=new TransactionHandler(this);
-	
+
 	/**
-	 * CVM Executor instance.
+	 * Applies confirmed blocks to advance the CVM state machine and deliver results to clients.
 	 */
 	protected final CVMExecutor executor=new CVMExecutor(this);
 
 	/**
-	 * Query handler instance.
+	 * Executes read-only queries against the latest consensus state, independently of transaction processing.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
 
@@ -149,7 +152,7 @@ public class Server implements Closeable {
 	private final HashMap<Keyword, Object> config;
 
 	/**
-	 * NIO Server instance
+	 * Network server (Netty or NIO) that accepts inbound client and peer connections.
 	 */
 	private AServer nio;
 
@@ -404,16 +407,19 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Process a message received from a peer or client. We know at this point that the
-	 * message decoded successfully, not much else.....
-	 * 
-	 * SECURITY: Should anticipate malicious messages
+	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
-	 * Non-blocking on the fast path: offloads to a queue and returns immediately.
-	 * Returns null if the message was accepted, or a blocking retry predicate
-	 * if the target queue was full (backpressure signal to the caller).
+	 * <p>Client messages (transactions and queries) are offered to bounded queues. Protocol
+	 * messages (beliefs, challenges, status) are handled inline since they are lightweight.
 	 *
-	 * @param m Message to process
+	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
+	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
+	 * the caller (typically {@link convex.net.impl.netty.NettyInboundHandler}) parks the
+	 * channel and lets the predicate block on a virtual thread until space is available.
+	 *
+	 * <p>SECURITY: Must anticipate malicious or malformed messages.
+	 *
+	 * @param m Message to process (already decoded)
 	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
 	 */
 	public Predicate<Message> processMessage(Message m) {

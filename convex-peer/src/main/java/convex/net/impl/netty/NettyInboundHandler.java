@@ -21,11 +21,19 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 
 /**
- * One handler created for each inbound channel.
+ * Decodes inbound messages from a single client channel and delivers them to the server.
  *
- * Implements per-channel backpressure: when the server cannot accept a message
- * (queue full), this handler pauses reads on its channel and retries on a
- * virtual thread. Only this channel is affected — other clients continue normally.
+ * <p>One instance is created per inbound connection. Implements per-channel backpressure:
+ * when the server cannot accept a message (queue full), this handler pauses reads on
+ * its channel and retries on a virtual thread. Only the affected client is throttled —
+ * all other clients continue at full speed.
+ *
+ * <p>The backpressure mechanism leverages TCP flow control: pausing socket reads causes
+ * the kernel receive buffer to fill, which triggers a TCP zero-window advertisement
+ * back to the sender. This naturally slows the client without any application-level
+ * error codes or retry logic.
+ *
+ * @see <a href="https://docs.convex.world/blog/parking-ticket-pattern">The Parking Ticket Pattern</a>
  */
 class NettyInboundHandler extends ByteToMessageDecoder {
 
@@ -37,8 +45,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	private final Function<Message, Predicate<Message>> deliver;
 
+	/**
+	 * Action to send a result back to the client on this channel.
+	 */
 	private final Predicate<Message> returnAction;
 
+	/**
+	 * Count of complete messages decoded on this channel.
+	 */
 	private long receivedCount=0;
 
 	/**
@@ -49,6 +63,13 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	private volatile boolean backpressured = false;
 
+	/**
+	 * Creates a handler for a single inbound channel.
+	 *
+	 * @param deliver  Dispatch function. Returns null if the message was accepted,
+	 *                 or a blocking retry predicate if the queue was full.
+	 * @param returnAction Action to send results back to the client on this channel.
+	 */
 	public NettyInboundHandler(Function<Message, Predicate<Message>> deliver, Predicate<Message> returnAction)  {
 		this.deliver=deliver;
 		this.returnAction=returnAction;
