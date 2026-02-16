@@ -72,6 +72,7 @@ public class StressPanel extends JPanel {
 	private JCheckBox repeatCheckBox;
 	private JCheckBox queryCheckBox;
 	private JCheckBox localCheckBox;
+	private JCheckBox preCompileCheckBox;
 
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
@@ -169,6 +170,11 @@ public class StressPanel extends JPanel {
 		optionPanel.add(localCheckBox);
 		localCheckBox.setSelected(false);
 
+		optionPanel.add(new JLabel("Pre-compile"));
+		preCompileCheckBox=new JCheckBox();
+		optionPanel.add(preCompileCheckBox);
+		preCompileCheckBox.setSelected(false);
+
 		optionPanel.add(new JLabel("Repeat timeout"));
 		repeatTimeSpinner = new JSpinner();
 		repeatTimeSpinner.setModel(new SpinnerNumberModel(60, 0, 3600, 1));
@@ -180,7 +186,8 @@ public class StressPanel extends JPanel {
 		txTypeBox.addItem("Transfer");
 		txTypeBox.addItem("Define Data");
 		// txTypeBox.addItem("AMM Trade");
-		txTypeBox.addItem("Null Op");
+		txTypeBox.addItem("Invoke Const");
+		txTypeBox.addItem("Actor Call");
 		optionPanel.add(lblTxType);
 		optionPanel.add(txTypeBox);
 
@@ -288,6 +295,31 @@ public class StressPanel extends JPanel {
 				Address origin = clients.get(c).getAddress();
 				for (int i = 0; i < requestCount; i++) {
 					allTransactions[c][i] = buildTransaction(origin, i);
+				}
+			}
+
+			// Pre-compile Invoke commands if enabled
+			if (preCompileCheckBox.isSelected() && !type.equals("Transfer")) {
+				resultArea.setText("Compiling...");
+				HashMap<ACell, ACell> compileCache = new HashMap<>();
+				for (int c = 0; c < clientCount; c++) {
+					for (int i = 0; i < requestCount; i++) {
+						ATransaction t = allTransactions[c][i];
+						if (t instanceof Invoke inv) {
+							ACell code = inv.getCommand();
+							ACell compiled = compileCache.computeIfAbsent(code, k -> {
+								try {
+									Result r = pc.preCompile(k).get();
+									return r.isError() ? k : r.getValue();
+								} catch (Exception e) {
+									return k;
+								}
+							});
+							if (compiled != code) {
+								allTransactions[c][i] = Invoke.create(t.getOrigin(), t.getSequence(), compiled);
+							}
+						}
+					}
 				}
 			}
 
@@ -465,11 +497,12 @@ public class StressPanel extends JPanel {
 			for (int j = 0; j < opCount; j++) {
 				switch(type) {
 					case "Define Data": tsb.append("(def a"+txNo+" "+reqNo+") "); break;
-					case "Null Op": tsb.append("nil "); break;
+					case "Invoke Const": tsb.append("nil "); break;
+					case "Actor Call": tsb.append("(call #9 (lookup *address*)) "); break;
 					default: throw new Error("Bad TX type: "+type);
 				}
 			}
-			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)))");
+			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i))))");
 			String source = tsb.toString();
 			ATransaction t = Invoke.create(origin,ATransaction.UNKNOWN_SEQUENCE, Reader.read(source));
 			return t;

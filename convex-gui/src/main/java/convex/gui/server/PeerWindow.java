@@ -15,6 +15,8 @@ import convex.api.ConvexLocal;
 import convex.gui.components.AbstractGUI;
 import convex.gui.peer.PeerComponent;
 import convex.gui.repl.REPLPanel;
+import convex.gui.utils.Toolkit;
+import convex.peer.API;
 import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 
@@ -66,5 +68,14 @@ public class PeerWindow extends AbstractGUI {
 	public void setupFrame(JFrame frame) {
 		frame.getContentPane().setLayout(new MigLayout());
 		frame.getContentPane().add(this,"dock center");
+	}
+
+	public static void main(String[] args) throws Exception {
+		Toolkit.init();
+		Server server = API.launchPeer();
+		ConvexLocal convex = Convex.connect(server, server.getPeerController(), server.getKeyPair());
+		PeerWindow pw = new PeerWindow(convex);
+		pw.runUntilClosed();
+		System.exit(0);
 	}
 }
