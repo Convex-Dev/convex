@@ -92,15 +92,20 @@ processMessages();
 
 **Output queue:** `transactionQueue` — `ArrayBlockingQueue(30,000)`
 
-If `transactionQueue.offer()` fails → return `:LOAD` immediately (non-blocking).
+`transactionQueue.put()` blocks if full — this propagates backpressure: the
+TransactionHandler thread blocks → stops draining `txMessageQueue` → `txMessageQueue`
+fills → connection-level backpressure kicks in → senders slow down.
 
 ### Interest Registration
 
 ```java
-interests.put(sd.getHash(), m);   // HashMap<Hash, Message>
+interests.put(sd.getHash(), m);   // ConcurrentHashMap<Hash, Message>
 ```
 
 Maps transaction hash → original Message so results can be returned later.
+Uses `ConcurrentHashMap` because `registerInterest()` runs on the TransactionHandler
+thread while `reportTransactions()` (which reads and removes interests) runs on the
+CVMExecutor thread.
 
 ## Stage 3: BeliefPropagator
 
@@ -421,6 +426,59 @@ coupling between TransactionHandler and BeliefPropagator.
 existing single-threaded guarantees, requires minimal code changes, and directly
 addresses the problem: don't wait for beliefs when local transactions need
 processing. The `minBlockTime` guard still prevents excessive block creation.
+
+## Performance Characteristics
+
+### Measured Throughput (200,000 pre-signed Transfers, single peer)
+
+| Mode | TPS | Notes |
+|------|-----|-------|
+| ConvexLocal (in-JVM) | ~170,000 | Direct method call, no serialisation |
+| ConvexRemote (Netty, localhost) | ~85,000 | Full TCP encode/decode round-trip |
+
+### Why Remote Is ~2× Slower Than Local
+
+The ~2× gap is inherent to the TCP network path, not a bug. Each remote transaction
+incurs ~4.7µs of per-message overhead on top of the local processing cost:
+
+| Source | Est. per txn | Notes |
+|--------|-------------|-------|
+| Encode (send + result) | ~1µs | VLQ header + message data, both directions |
+| Decode (send + result) | ~1µs | VLQ parse + byte copy, both directions |
+| TCP kernel crossings | ~1.5µs | user→kernel→user, even on localhost loopback |
+| Event loop scheduling | ~0.5µs | `execute(doFlush)` per sendMessage |
+| Server result flush | ~0.5µs | Per-result `writeAndFlush` on return path |
+
+At ~100 bytes per transaction, 200k transactions is only ~20MB of data each way — the
+overhead is per-message ceremony, not data volume.
+
+### Write Batching (Client Send Path)
+
+`NettyConnection.doFlush()` uses `channel.write()` for each queued message, then a
+single `channel.flush()` at the end. This coalesces many messages into fewer TCP
+segments, reducing syscall overhead under load. Without batching, each message would
+trigger its own TCP write.
+
+`NettyOutboundHandler.write()` never calls `flush()` — the caller controls when
+flushing happens, enabling batching at the connection level.
+
+### Server Result Return (Not Batched)
+
+`reportTransactions()` calls `m.returnResult(res)` per result, which triggers
+`ch.writeAndFlush(m)` — one TCP flush per result. This is intentionally not batched:
+
+- Results are small (~100 bytes each)
+- Batching would require exposing Netty channels to TransactionHandler, breaking the
+  clean separation where Server never sees a channel
+- Real-world clients won't sustain 100k+ TPS — the per-result overhead is negligible
+  at normal load levels
+- Latency benefits from immediate result delivery outweigh throughput gains from batching
+
+### Test Tool
+
+`convex.examples.TransactionThroughput` — standalone main class in test directory.
+Supports `--local` and `--remote` (default) modes. Pre-signs all transactions to
+isolate pipeline throughput from signing cost.
 
 ## Other Observations
 

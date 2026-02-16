@@ -185,12 +185,21 @@ public class NettyConnection extends AConnection {
 	/**
 	 * Drain the outbound queue to the channel. Runs on the Netty event loop
 	 * — single-threaded, no synchronisation needed.
+	 *
+	 * Uses write() without flush for each message, then a single flush() at
+	 * the end. This coalesces many messages into fewer TCP segments, reducing
+	 * syscall overhead dramatically under load.
 	 */
 	private void doFlush() {
+		int count = 0;
 		while (channel.isWritable() && channel.isActive()) {
 			Message m = outbound.poll();
 			if (m == null) break;
-			channel.writeAndFlush(m);
+			channel.write(m);
+			count++;
+		}
+		if (count > 0) {
+			channel.flush();
 		}
 	}
 

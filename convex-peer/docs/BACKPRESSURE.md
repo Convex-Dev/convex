@@ -104,8 +104,35 @@ I/O thread: decode()
                     setAutoRead(true)
                           │
                           ▼
+                    fire synthetic channelRead
+                    (flush cumulation buffer)
+                          │
+                          ▼
                     remaining bytes decoded in order
 ```
+
+### Cumulation Buffer Flush
+
+When `decode()` returns early (backpressured gate), `ByteToMessageDecoder` sees no
+progress and stops its decode loop. Any bytes already read from the socket remain in
+the cumulation buffer. When backpressure clears and `setAutoRead(true)` is called,
+Netty resumes reading from the OS socket — but if all data was already read into the
+cumulation buffer before autoRead was disabled, no new `channelRead` event fires and
+the stranded data is never processed.
+
+To handle this, the virtual thread fires a synthetic `channelRead` with an empty buffer
+through the pipeline after clearing backpressure:
+
+```java
+ctx.channel().eventLoop().execute(() -> {
+    ctx.pipeline().fireChannelRead(Unpooled.EMPTY_BUFFER);
+});
+```
+
+This triggers `ByteToMessageDecoder.channelRead()`, which merges the empty buffer with
+the existing cumulation (no-op) and calls `callDecode()` — our `decode()` method runs
+with `backpressured = false` and processes the stranded data. The event loop scheduling
+ensures this runs on the correct thread.
 
 **The I/O thread never blocks.** `deliver.apply(m)` is a non-blocking `offer()`. If it
 fails, setting the flag and spawning a virtual thread both return immediately. The I/O
@@ -189,6 +216,7 @@ The Netty PR #6662 deadlock (both sides block on writes simultaneously) does not
 | `retry.test(m)` | Virtual thread | Yes | Bounded by timeout |
 | `backpressured = false` | Virtual thread | N/A | Volatile write, before `setAutoRead` |
 | `setAutoRead(true)` | Virtual thread | No | Netty serialises internally |
+| `fireChannelRead(EMPTY)` | Event loop (scheduled) | No | Flushes stranded cumulation data |
 
 **Ordering:** The virtual thread sets `backpressured = false` before `setAutoRead(true)`.
 When Netty resumes reading and calls `decode()`, the volatile read sees `false` and

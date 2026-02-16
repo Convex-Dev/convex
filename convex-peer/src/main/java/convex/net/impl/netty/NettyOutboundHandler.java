@@ -31,10 +31,10 @@ class NettyOutboundHandler extends ChannelOutboundHandlerAdapter {
 		// Buffer for message data
 		ByteBuf encodedBuf = Unpooled.wrappedBuffer(data.getInternalArray(), data.getInternalOffset(), mlen);
 
-		// Write the buffers, flushing at the end of the message
-		ctx.write(headBuf);
-		ctx.write(encodedBuf);
-		ctx.flush();
+		// Write the buffers. Caller controls flushing (via channel.flush()
+		// or writeAndFlush) so we only write here — no per-message flush.
+		ctx.write(headBuf, ctx.voidPromise());
+		ctx.write(encodedBuf, promise);
     }
 	
 	/**
