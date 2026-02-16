@@ -50,11 +50,14 @@ public class PeerAuthTest {
 		AKeyPair clientKP = AKeyPair.generate();
 		AString jwt = createSelfIssuedJWT(clientKP, 300);
 
-		// Tamper by changing last character of the JWT
+		// Tamper by flipping a character in the signature section.
+		// Avoid the very last character: base64url padding bits mean some
+		// substitutions don't change the decoded bytes.
 		String s = jwt.toString();
-		char last = s.charAt(s.length() - 1);
-		char replaced = (last == 'A') ? 'B' : 'A';
-		AString tampered = Strings.create(s.substring(0, s.length() - 1) + replaced);
+		int idx = s.lastIndexOf('.') + 2; // second char of signature section
+		char c = s.charAt(idx);
+		char replaced = (c == 'A') ? 'B' : 'A';
+		AString tampered = Strings.create(s.substring(0, idx) + replaced + s.substring(idx + 1));
 
 		assertNull(AUTH.verifyBearerToken(tampered), "Tampered JWT should be rejected");
 	}

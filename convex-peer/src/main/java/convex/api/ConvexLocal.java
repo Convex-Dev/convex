@@ -146,6 +146,7 @@ public class ConvexLocal extends Convex {
 	public CompletableFuture<Result> messageRaw(Blob rawData) {
 		try {
 			Message m=Message.create(rawData);
+			m.getPayload(null); // decode payload for type inference and ID extraction
 			return message(m);
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));

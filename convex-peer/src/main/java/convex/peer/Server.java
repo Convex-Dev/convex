@@ -467,7 +467,7 @@ public class Server implements Closeable {
 				processStatus(m);
 				break;
 			default:
-				log.info("Unrecognised message");
+				log.debug("Unrecognised message type: {}", type);
 				break;
 			}
 		} catch (MissingDataException e) {
