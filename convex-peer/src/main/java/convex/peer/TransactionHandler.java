@@ -485,12 +485,6 @@ public class TransactionHandler extends AThreadedComponent {
 			LoadMonitor.up();
 			if (m==null) return;
 			
-			LoadMonitor.down();
-			// Brief pause in case more transactions are coming in
-			Thread.sleep(1);
-			LoadMonitor.up();
-
-			
 			// We have at least one transaction to handle, drain queue to get the rest
 			messages.add(m);
 			txMessageQueue.drainTo(messages);
