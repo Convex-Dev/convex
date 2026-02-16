@@ -58,6 +58,11 @@ public abstract class AEncoder<T> {
 			return limit - pos;
 		}
 
+		/** True if all input has been consumed (pos has reached limit) */
+		public boolean isConsumed() {
+			return pos == limit;
+		}
+
 	}
 
 	/**

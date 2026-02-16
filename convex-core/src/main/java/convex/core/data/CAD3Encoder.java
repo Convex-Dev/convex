@@ -622,14 +622,16 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			return null;
 		}
 
-		// Fast path: single cell, no branches — zero allocations
-		if (ds.branchCount==0 && ds.pos==ds.limit) return result;
+		// Single cell fast path — zero allocations for 90%+ of messages
+		if (ds.isConsumed()) {
+			if (ds.branchCount==0) return result;
+			if (!storeless) return result; // branches resolve lazily from store
+			// Storeless with branches but no child data — partial message.
+			// Fall through: resolveRefs will throw PartialMessageException
+			// with the specific missing hash.
+		}
 
-		// Store-based single cell: branches resolve lazily from store
-		if (!storeless && ds.pos==ds.limit) return result;
-
-		// Multi-cell or storeless with unresolved branches:
-		// read child cells into HashMap and resolve branch refs
+		// Multi-cell or storeless partial: read children and resolve branch refs
 		HashMap<Hash,ACell> hm = new HashMap<>();
 		readEncoder.readChildCells(hm, ds);
 		return resolveRefs(result, hm, storeless);
