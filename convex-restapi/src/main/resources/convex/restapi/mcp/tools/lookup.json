@@ -4,8 +4,7 @@
   "description": "Look up a symbol in a Convex account environment. Returns existence, value (with optional path navigation), and metadata.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

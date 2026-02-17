@@ -4,8 +4,7 @@
   "description": "Sign hex-encoded bytes using a stored signing service key. Authenticated.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

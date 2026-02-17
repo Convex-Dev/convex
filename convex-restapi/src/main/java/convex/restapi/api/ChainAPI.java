@@ -713,9 +713,9 @@ public class ChainAPI extends ABaseAPI {
 		if (l == null) {failBadRequest("Faucet requires an 'amount' field containing a long value."); return;}
 
 		long amt = l.longValue();
-		// Do any limits on faucet issue here
-		if (amt > Coin.GOLD)
-			amt = Coin.GOLD;
+		long max = restServer.getFaucetMax();
+		if (amt > max)
+			amt = max;
 
 		// SECURITY: Make sure this is not subject to injection attack
 		// Optional: pre-compile to Op

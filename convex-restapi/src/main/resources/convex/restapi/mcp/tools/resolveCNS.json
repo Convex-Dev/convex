@@ -4,8 +4,7 @@
   "description": "Resolve a CNS name to its record: value (usually an address), controller, metadata, and child node.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

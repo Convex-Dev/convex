@@ -4,8 +4,7 @@
   "description": "Decode CAD3 multi-cell hex bytes back into a CVM literal.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

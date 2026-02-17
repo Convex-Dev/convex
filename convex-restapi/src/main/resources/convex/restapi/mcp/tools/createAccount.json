@@ -3,7 +3,8 @@
   "title": "Create Account",
   "description": "Create a new Convex account with the specified public key. Optionally fund via faucet (1 CVM = 1,000,000,000 copper, max 1 CVM).",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",
@@ -14,7 +15,11 @@
       },
       "faucet": {
         "type": "string",
-        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper, max 1 CVM). Omit for no funding."
+        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper). Omit for no funding."
+      },
+      "controller": {
+        "type": "string",
+        "description": "Controller for new account. Default '*caller*' (faucet account). Use 'nil' for self-sovereign, or '#ADDR' for a specific address."
       }
     },
     "required": ["accountKey"]

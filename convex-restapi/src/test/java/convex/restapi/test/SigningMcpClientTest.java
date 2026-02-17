@@ -117,7 +117,7 @@ public class SigningMcpClientTest extends ARESTTest {
 				.build());
 
 		assertNotNull(result);
-		Map<String, Object> structured = result.structuredContent();
+		@SuppressWarnings("unchecked") Map<String, Object> structured = (Map<String, Object>) result.structuredContent();
 		assertNotNull(structured, "Should have structured content");
 		assertEquals(true, structured.get("available"));
 	}
@@ -134,7 +134,7 @@ public class SigningMcpClientTest extends ARESTTest {
 
 		assertNotNull(createResult);
 		assertFalse(createResult.isError() != null && createResult.isError(), "createKey should not be error");
-		Map<String, Object> createData = createResult.structuredContent();
+		@SuppressWarnings("unchecked") Map<String, Object> createData = (Map<String, Object>) createResult.structuredContent();
 		assertNotNull(createData);
 		String publicKey = (String) createData.get("publicKey");
 		assertNotNull(publicKey, "Should return publicKey");
@@ -148,7 +148,7 @@ public class SigningMcpClientTest extends ARESTTest {
 
 		assertNotNull(listResult);
 		assertFalse(listResult.isError() != null && listResult.isError(), "listKeys should not be error");
-		Map<String, Object> listData = listResult.structuredContent();
+		@SuppressWarnings("unchecked") Map<String, Object> listData = (Map<String, Object>) listResult.structuredContent();
 		assertNotNull(listData);
 
 		@SuppressWarnings("unchecked")
@@ -166,7 +166,8 @@ public class SigningMcpClientTest extends ARESTTest {
 				.name("signingCreateKey")
 				.arguments(Map.of("passphrase", "sdk-sign-pass"))
 				.build());
-		String publicKey = (String) createResult.structuredContent().get("publicKey");
+		@SuppressWarnings("unchecked") Map<String, Object> cd = (Map<String, Object>) createResult.structuredContent();
+		String publicKey = (String) cd.get("publicKey");
 
 		// Sign some data
 		CallToolResult signResult = mcpAlice.callTool(CallToolRequest.builder()
@@ -180,7 +181,7 @@ public class SigningMcpClientTest extends ARESTTest {
 
 		assertNotNull(signResult);
 		assertFalse(signResult.isError() != null && signResult.isError(), "sign should not be error");
-		Map<String, Object> signData = signResult.structuredContent();
+		@SuppressWarnings("unchecked") Map<String, Object> signData = (Map<String, Object>) signResult.structuredContent();
 		String signature = (String) signData.get("signature");
 		assertNotNull(signature, "Should return signature");
 		assertEquals(publicKey, signData.get("publicKey"), "Should echo back publicKey");
@@ -195,7 +196,8 @@ public class SigningMcpClientTest extends ARESTTest {
 				.name("signingCreateKey")
 				.arguments(Map.of("passphrase", "sdk-jwt-pass"))
 				.build());
-		String publicKey = (String) createResult.structuredContent().get("publicKey");
+		@SuppressWarnings("unchecked") Map<String, Object> cd = (Map<String, Object>) createResult.structuredContent();
+		String publicKey = (String) cd.get("publicKey");
 
 		// Get JWT
 		CallToolResult jwtResult = mcpAlice.callTool(CallToolRequest.builder()
@@ -210,7 +212,7 @@ public class SigningMcpClientTest extends ARESTTest {
 
 		assertNotNull(jwtResult);
 		assertFalse(jwtResult.isError() != null && jwtResult.isError(), "getJWT should not be error");
-		Map<String, Object> jwtData = jwtResult.structuredContent();
+		@SuppressWarnings("unchecked") Map<String, Object> jwtData = (Map<String, Object>) jwtResult.structuredContent();
 		String jwt = (String) jwtData.get("jwt");
 		assertNotNull(jwt, "Should return JWT");
 

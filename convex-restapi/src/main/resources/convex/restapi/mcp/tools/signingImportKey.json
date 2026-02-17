@@ -3,7 +3,8 @@
   "title": "Import Key (Signing Service)",
   "description": "Import an Ed25519 seed into the signing service. Elevated: first call returns confirmUrl for browser approval, retry with confirmToken.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

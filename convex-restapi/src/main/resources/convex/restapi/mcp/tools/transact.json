@@ -3,7 +3,8 @@
   "title": "Convex Transaction (Quick)",
   "description": "Execute a Convex transaction in one step. Sends seed over network — use HTTPS with trusted peers only. For sensitive operations prefer prepare → signAndSubmit.\n\nTransactions update global state atomically. Amounts in copper (1 CVM = 1,000,000,000 copper).",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

@@ -3,7 +3,8 @@
   "title": "Transact via Signing Service",
   "description": "Execute a Convex transaction using a stored signing key. Private key never leaves the server. Authenticated.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

@@ -4,8 +4,7 @@
   "description": "Check if the peer's signing service is available. No authentication required.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

@@ -46,7 +46,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
-import convex.core.exceptions.ResultException;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -117,6 +116,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_LIFETIME = Strings.intern("lifetime");
 	public static final StringShort ARG_CONFIRM_TOKEN = Strings.intern("confirmToken");
 	public static final StringShort ARG_NEW_PASSPHRASE = Strings.intern("newPassphrase");
+	public static final StringShort ARG_CONTROLLER = Strings.intern("controller");
 
 	/** ThreadLocal to make the current Javalin Context available to tool handlers */
 	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
@@ -320,7 +320,7 @@ public class McpAPI extends ABaseAPI {
 			"prompts", EMPTY_MAP
 		);
 		AMap<AString, ACell> result = Maps.of(
-			"protocolVersion", "2025-03-26",
+			"protocolVersion", "2025-06-18",
 			"serverInfo", serverInfo,
 			"capabilities", capabilities
 		);
@@ -966,9 +966,9 @@ public class McpAPI extends ABaseAPI {
 			return null;
 		}
 		long amt = faucetAmount;
-		// Apply same limit as ChainAPI.faucetRequest
-		if (amt > Coin.GOLD) {
-			amt = Coin.GOLD;
+		long max = restServer.getFaucetMax();
+		if (amt > max) {
+			amt = max;
 		}
 		return faucetClient.transferSync(address, amt);
 	}
@@ -984,18 +984,18 @@ public class McpAPI extends ABaseAPI {
 			if (accountKeyCell == null) {
 				return protocolError(-32602, "CreateAccount requires 'accountKey' string");
 			}
-			
+
 			Convex faucetClient = restServer.getFaucet();
 			if (faucetClient == null) {
 				return toolError("Faucet use not authorised on this server");
 			}
-			
+
 			try {
 				AccountKey accountKey = AccountKey.parse(accountKeyCell.toString());
 				if (accountKey == null) {
 					return toolError("Unable to parse accountKey: " + accountKeyCell);
 				}
-				
+
 				ACell faucetCell = arguments.get(ARG_FAUCET);
 				Long faucetAmount = null;
 				if (faucetCell != null) {
@@ -1005,23 +1005,50 @@ public class McpAPI extends ABaseAPI {
 					}
 					faucetAmount = faucetLong.longValue();
 				}
-				
-				Address address = faucetClient.createAccountSync(accountKey);
-				
-				// Perform faucet payout if requested
-				if (faucetAmount != null) {
-					Result transferResult = performFaucetPayout(faucetClient, address, faucetAmount);
-					if (transferResult != null && transferResult.isError()) {
-						return toolResult(transferResult);
+
+				// Resolve controller: default *caller* (faucet address), "nil" for self-sovereign
+				AString controllerCell = RT.ensureString(arguments.get(ARG_CONTROLLER));
+				String controllerStr = (controllerCell != null) ? controllerCell.toString() : "*caller*";
+
+				String controllerCVM;
+				if ("nil".equals(controllerStr)) {
+					controllerCVM = null; // no controller — self-sovereign
+				} else if ("*caller*".equals(controllerStr)) {
+					controllerCVM = "#" + faucetClient.getAddress().longValue();
+				} else {
+					// Parse as address literal e.g. "#13"
+					Address cAddr = Address.parse(controllerStr);
+					if (cAddr == null) {
+						return toolError("Invalid controller address: " + controllerStr);
 					}
+					controllerCVM = "#" + cAddr.longValue();
 				}
-				
+
+				// Build CVM source using deploy pattern
+				String source;
+				if (controllerCVM != null) {
+					source = "(deploy '(do (set-controller " + controllerCVM + ") (set-key 0x" + accountKey.toHexString() + ")))";
+				} else {
+					source = "(create-account 0x" + accountKey.toHexString() + ")";
+				}
+
+				// Add faucet transfer if requested
+				if (faucetAmount != null) {
+					long max = restServer.getFaucetMax();
+					long amt = Math.min(faucetAmount, max);
+					source = "(let [addr " + source + "] (transfer addr " + amt + ") addr)";
+				}
+
+				Result r = faucetClient.transactSync(source);
+				if (r.isError()) {
+					return toolResult(r);
+				}
+
+				Address address = (Address)r.getValue();
 				AMap<AString, ACell> result = Maps.of(
 					"address", CVMLong.create(address.longValue())
 				);
 				return toolSuccess(result);
-			} catch (ResultException e) {
-				return toolResult(e.getResult());
 			} catch (Exception e) {
 				return toolError("Account creation failed: " + e.getMessage());
 			}

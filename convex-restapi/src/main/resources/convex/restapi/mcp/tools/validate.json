@@ -4,8 +4,7 @@
   "description": "Validate an Ed25519 signature against a public key and message bytes.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

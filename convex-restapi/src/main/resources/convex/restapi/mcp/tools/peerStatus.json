@@ -4,8 +4,7 @@
   "description": "Return current Convex peer status including consensus point and network state.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

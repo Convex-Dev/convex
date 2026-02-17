@@ -2,6 +2,10 @@
   "name": "signingDeleteKey",
   "title": "Delete Key (Signing Service)",
   "description": "Permanently delete a key from the signing service. Irreversible. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "annotations": {
+    "destructiveHint": true,
+    "openWorldHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

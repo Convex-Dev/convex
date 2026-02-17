@@ -4,8 +4,7 @@
   "description": "Execute a Convex Lisp query. Queries are read-only, free, and instant.\n\nCommon patterns:\n- (balance #13) — coin balance in copper (1 CVM = 1,000,000,000 copper)\n- *balance* — caller's own balance\n- (account #13) — full account record\n- (@convex.fungible/balance #TOKEN #USER) — fungible token balance\n- (call #ACTOR (fn-name args)) — call actor function read-only\n- (lookup #ADDR 'symbol) — look up a definition\n- *state* — full network state (large!)",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

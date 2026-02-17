@@ -4,8 +4,7 @@
   "description": "Export (reveal) the private seed for a stored key. Elevated: first call returns confirmUrl, retry with confirmToken.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

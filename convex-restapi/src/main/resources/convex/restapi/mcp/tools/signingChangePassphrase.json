@@ -3,7 +3,8 @@
   "title": "Change Passphrase (Signing Service)",
   "description": "Change the passphrase for a stored signing key. Elevated: first call returns confirmUrl, retry with confirmToken.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

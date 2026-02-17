@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.core.Coin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -61,6 +62,7 @@ public class RESTServer implements Closeable {
 	protected Javalin javalin;
 	
 	protected static final Integer DEFAULT_PORT=8080;
+	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
 	private RESTServer(Server server) {
 		this.server = server;
@@ -70,6 +72,14 @@ public class RESTServer implements Closeable {
 			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
 		} else {
 			this.convexFaucet=null;
+		}
+
+		// Configurable faucet max (in copper). Default 1 Gold = 1,000,000,000 copper
+		Object fmObj = getConfig().get(K_FAUCET_MAX);
+		if (fmObj instanceof Number) {
+			this.faucetMax = ((Number)fmObj).longValue();
+		} else {
+			this.faucetMax = Coin.GOLD;
 		}
 
 		AKeyPair kp = server.getKeyPair();
@@ -99,6 +109,11 @@ public class RESTServer implements Closeable {
 	protected OAuthService oauthService;
 	protected ConfirmAPI confirmAPI;
 	protected AuthPage authPage;
+	protected final long faucetMax;
+
+	public long getFaucetMax() {
+		return faucetMax;
+	}
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;

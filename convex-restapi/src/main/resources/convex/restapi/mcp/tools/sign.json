@@ -4,8 +4,7 @@
   "description": "Sign raw hex data with an Ed25519 seed. For transactions, sign the 'hash' from prepare.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

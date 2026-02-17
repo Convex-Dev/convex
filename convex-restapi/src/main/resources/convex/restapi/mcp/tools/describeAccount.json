@@ -4,8 +4,7 @@
   "description": "Get account info: balance, sequence number, defined symbols with metadata.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

@@ -3,7 +3,8 @@
   "title": "Sign and Submit Transaction",
   "description": "Sign and submit a prepared transaction. Use after 'prepare'. Sends seed over network — HTTPS only.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

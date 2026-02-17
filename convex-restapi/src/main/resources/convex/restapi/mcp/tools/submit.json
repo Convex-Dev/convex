@@ -3,7 +3,8 @@
   "title": "Submit Prepared Transaction",
   "description": "Submit a previously prepared transaction with hash, public key, and signature.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",

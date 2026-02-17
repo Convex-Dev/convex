@@ -4,8 +4,7 @@
   "description": "Compute a SHA-256 or SHA3 hash of supplied data.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

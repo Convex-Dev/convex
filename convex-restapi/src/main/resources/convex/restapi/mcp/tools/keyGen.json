@@ -4,7 +4,7 @@
   "description": "Generate a new Ed25519 key pair. Provide a seed for deterministic output, or omit for secure random.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",

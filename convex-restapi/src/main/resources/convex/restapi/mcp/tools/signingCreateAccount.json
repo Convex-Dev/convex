@@ -3,7 +3,8 @@
   "title": "Create Account via Signing Service",
   "description": "Create a new signing key and on-chain account in one step. Optionally fund via faucet. Authenticated.",
   "annotations": {
-    "destructiveHint": false
+    "destructiveHint": false,
+    "openWorldHint": true
   },
   "inputSchema": {
     "type": "object",
@@ -14,7 +15,11 @@
       },
       "faucet": {
         "type": "number",
-        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper, max 1 CVM)."
+        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper)."
+      },
+      "controller": {
+        "type": "string",
+        "description": "Controller for new account. Default '*caller*' (faucet account). Use 'nil' for self-sovereign, or '#ADDR' for a specific address."
       }
     },
     "required": ["passphrase"]

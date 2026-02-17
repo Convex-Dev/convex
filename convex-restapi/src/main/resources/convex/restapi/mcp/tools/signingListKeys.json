@@ -4,8 +4,7 @@
   "description": "List all public keys stored in the signing service for the authenticated identity.",
   "annotations": {
     "readOnlyHint": true,
-    "destructiveHint": false,
-    "idempotentHint": true
+    "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",
