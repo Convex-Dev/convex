@@ -15,6 +15,7 @@ import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.restapi.mcp.McpAPI;
+import convex.restapi.mcp.McpProtocol;
 
 /**
  * Tests for MCP Prompts (Stage 15): prompts/list, prompts/get,
@@ -38,7 +39,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testPromptsListReturnsPrompts() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Should have result");
 
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
@@ -49,7 +50,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testPromptsMetadataHasRequiredFields() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		for (long i = 0; i < prompts.count(); i++) {
@@ -68,7 +69,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testAlwaysAvailablePrompts() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		// Collect prompt names
@@ -93,7 +94,7 @@ public class McpPromptsTest extends ARESTTest {
 		assertNotNull(server.getSigningService(), "Test server should have signing service");
 
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		boolean hasCreateAccount = false;
@@ -120,7 +121,7 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetExploreAccount() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"explore-account\",\"arguments\":{\"address\":\"#42\"}}");
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Should have result");
 
 		// Should have description
@@ -148,7 +149,7 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetNetworkStatus() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"network-status\"}");
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 
 		AVector<ACell> messages = RT.ensureVector(result.get(Strings.create("messages")));
@@ -165,7 +166,7 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetConvexGuide() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"convex-guide\",\"arguments\":{\"topic\":\"actors\"}}");
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 
 		AVector<ACell> messages = RT.ensureVector(result.get(Strings.create("messages")));
@@ -180,7 +181,7 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetCreateAccount() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"create-account\",\"arguments\":{\"passphrase\":\"secret123\"}}");
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 
 		AVector<ACell> messages = RT.ensureVector(result.get(Strings.create("messages")));
@@ -197,17 +198,17 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetUnknownPrompt() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"nonexistent-prompt\"}");
-		AMap<AString, ACell> error = RT.ensureMap(response.get(McpAPI.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.ensureMap(response.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Should return error for unknown prompt");
-		assertEquals(-32601L, RT.ensureLong(error.get(McpAPI.FIELD_CODE)).longValue());
+		assertEquals(-32601L, RT.ensureLong(error.get(McpProtocol.FIELD_CODE)).longValue());
 	}
 
 	@Test
 	public void testGetMissingName() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get", "{}");
-		AMap<AString, ACell> error = RT.ensureMap(response.get(McpAPI.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.ensureMap(response.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Should return error for missing name");
-		assertEquals(-32602L, RT.ensureLong(error.get(McpAPI.FIELD_CODE)).longValue());
+		assertEquals(-32602L, RT.ensureLong(error.get(McpProtocol.FIELD_CODE)).longValue());
 	}
 
 	// ===== Initialize capability =====
@@ -215,7 +216,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testInitializeIncludesPromptsCapability() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("initialize", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpAPI.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 
 		AMap<AString, ACell> capabilities = RT.ensureMap(result.get(Strings.create("capabilities")));

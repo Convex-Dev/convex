@@ -1,15 +1,14 @@
 package convex.restapi.mcp;
 
+import static convex.restapi.mcp.McpProtocol.*;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Hashing;
 import convex.core.crypto.Ed25519Signature;
-import convex.core.Coin;
 import convex.core.crypto.Providers;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
@@ -84,20 +82,6 @@ public class McpAPI extends ABaseAPI {
 
 	private static final Logger log = LoggerFactory.getLogger(McpAPI.class);
 
-	public static final StringShort FIELD_ID = Strings.intern("id");
-	public static final StringShort FIELD_METHOD = Strings.intern("method");
-	public static final StringShort FIELD_PARAMS = Strings.intern("params");
-	public static final StringShort FIELD_NAME = Strings.intern("name");
-	public static final StringShort FIELD_ARGUMENTS = Strings.intern("arguments");
-	public static final StringShort FIELD_RESULT = Strings.intern("result");
-	public static final StringShort FIELD_ERROR = Strings.intern("error");
-	public static final StringShort FIELD_CODE = Strings.intern("code");
-	public static final StringShort FIELD_MESSAGE = Strings.intern("message");
-	public static final StringShort FIELD_CONTENT = Strings.intern("content");
-	public static final StringShort FIELD_STRUCTURED_CONTENT = Strings.intern("structuredContent");
-	public static final StringShort FIELD_TYPE = Strings.intern("type");
-	public static final StringShort FIELD_TEXT = Strings.intern("text");
-	public static final StringShort FIELD_IS_ERROR = Strings.intern("isError");
 	public static final StringShort SERVER_URL_FIELD=Strings.intern("server_url");
 
 	public static final StringShort ARG_SOURCE = Strings.intern("source");
@@ -138,11 +122,6 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort KEY_ERROR_CODE = Strings.intern("errorCode");
 	public static final StringShort KEY_INFO = Strings.intern("info");
 
-	private static final String HEADER_SESSION_ID = "Mcp-Session-Id";
-	private static final long SSE_KEEPALIVE_MS = 30000;
-
-	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
-	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
 	private final AMap<AString, ACell> serverInfo;
 	private final Map<String, McpTool> tools = new LinkedHashMap<>();
 	private final Map<String, McpPrompt> prompts = new LinkedHashMap<>();
@@ -151,7 +130,9 @@ public class McpAPI extends ABaseAPI {
 
 	public McpAPI(RESTServer restServer) {
 		super(restServer);
-		stateWatcher = new StateWatcher(server, sessions);
+		stateWatcher = new StateWatcher(
+			path -> { var s = server.getState(); return s != null ? RT.getIn(s, path) : null; },
+			sessions);
 		AMap<AString, ACell> info = Maps.of(
 			"name", "convex-mcp",
 			"title", "Convex MCP",
@@ -195,7 +176,7 @@ public class McpAPI extends ABaseAPI {
 			return;
 		}
 
-		String sessionId = ctx.header(HEADER_SESSION_ID);
+		String sessionId = ctx.header(McpProtocol.HEADER_SESSION_ID);
 		McpSession session = (sessionId != null) ? sessions.get(sessionId) : null;
 		if (session == null) {
 			ctx.status(400);
@@ -215,20 +196,22 @@ public class McpAPI extends ABaseAPI {
 			session.sseConnections.add(conn);
 			try {
 				// Keep-alive loop — blocks virtual thread until client disconnects
-				while (!conn.closed) {
+				while (!conn.isClosed()) {
 					writer.write(": keepalive\n\n");
 					writer.flush();
 					if (writer.checkError()) break;
-					Thread.sleep(SSE_KEEPALIVE_MS);
+					Thread.sleep(McpProtocol.SSE_KEEPALIVE_MS);
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 			} finally {
 				conn.close();
 				session.sseConnections.remove(conn);
-				// When no SSE connections remain, watches are undeliverable — clear them
+				// When no SSE connections remain, destroy the session entirely
+				// (public peer — no persistent state from anonymous clients)
 				if (session.sseConnections.isEmpty()) {
-					session.clearWatches();
+					sessions.remove(session.id);
+					session.close();
 				}
 			}
 		} catch (IOException e) {
@@ -355,13 +338,6 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/**
-	 * Check if a JSON-RPC message is a notification (no "id" field).
-	 */
-	private boolean isNotification(AMap<?, ?> request) {
-		return !request.containsKey(FIELD_ID);
-	}
-
-	/**
 	 * Process a notification message (no response expected).
 	 */
 	private void processNotification(AMap<?, ?> request) {
@@ -435,25 +411,6 @@ public class McpAPI extends ABaseAPI {
 		return Maps.of("tools", listToolsVector());
 	}
 
-	/* JSON-RPC protocol result */
-	AMap<AString, ACell> protocolResult(AMap<AString, ACell> result) {
-		return BASE_RESPONSE.assoc(FIELD_RESULT, result);
-	}
-
-	/* JSON-RPC protocol error */
-	AMap<AString, ACell> protocolError(int code, String message) {
-		AMap<AString, ACell> error = Maps.of(
-			FIELD_CODE, CVMLong.create(code),
-			FIELD_MESSAGE, message
-		);
-		return BASE_RESPONSE.assoc(FIELD_ERROR, error);
-	}
-
-	private AMap<AString, ACell> maybeAttachId(AMap<AString, ACell> response, ACell idCell) {
-		if (idCell == null) return response;
-		return response.assoc(FIELD_ID, idCell);
-	}
-
 	private AMap<AString, ACell> toolCall(ACell paramsCell) {
 		if (!(paramsCell instanceof AMap<?, ?> params)) {
 			return protocolError(-32602, "params must be an object");
@@ -478,7 +435,23 @@ public class McpAPI extends ABaseAPI {
 		return tool.handle(arguments);
 	}
 
-	/* Create a Result from a CVM Result */
+	// ===== Delegating methods for tool extensions (e.g. SigningMcpTools) =====
+
+	/* JSON-RPC protocol error — delegates to McpProtocol */
+	AMap<AString, ACell> protocolError(int code, String message) {
+		return McpProtocol.protocolError(code, message);
+	}
+
+	/* MCP tool success — delegates to McpProtocol */
+	AMap<AString, ACell> toolSuccess(ACell structuredResult) {
+		return McpProtocol.toolSuccess(structuredResult);
+	}
+
+	/* MCP tool error — delegates to McpProtocol */
+	AMap<AString, ACell> toolError(String message) {
+		return McpProtocol.toolError(message);
+	}
+
 	/* Create a Result from a CVM Result - package-private for use by tool extensions */
 	AMap<AString, ACell> toolResult(Result result) {
 		AMap<AString, ACell> structured = EMPTY_MAP;
@@ -495,34 +468,6 @@ public class McpAPI extends ABaseAPI {
 			structured = structured.assoc(KEY_INFO, info);
 		}
 		return protocolResult(buildMcpResult(structured, result.isError()));
-	}
-
-	AMap<AString, ACell> toolSuccess(ACell structuredResult) {
-		AMap<AString, ACell> payload = RT.ensureMap(structuredResult);
-		if (payload == null) payload = EMPTY_MAP;
-		return protocolResult(buildMcpResult(payload, false));
-	}
-
-	/* Create an error result for a tool call (but protocol valid) */
-	AMap<AString, ACell> toolError(String message) {
-		AMap<AString, ACell> payload = Maps.of(
-			"message", message
-		);
-		return protocolResult(buildMcpResult(payload, true));
-	}
-
-	AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
-		AString jsonText = JSON.print(structured);
-		AMap<AString, ACell> textContent = Maps.of(
-			FIELD_TYPE, "text",
-			FIELD_TEXT, jsonText
-		);
-		AVector<AMap<AString, ACell>> content = Vectors.of(textContent);
-		return Maps.of(
-			FIELD_CONTENT, content,
-			FIELD_STRUCTURED_CONTENT, structured,
-			FIELD_IS_ERROR, isError?CVMBool.TRUE:CVMBool.FALSE
-		);
 	}
 
 	private void registerTools() {
@@ -1631,186 +1576,14 @@ public class McpAPI extends ABaseAPI {
 	// ===== SSE and Session support =====
 
 	/**
-	 * Check if the client exclusively wants SSE (text/event-stream) responses.
-	 * When the client accepts both JSON and SSE, we prefer JSON since our tools
-	 * return synchronously. SSE on POST is reserved for streaming scenarios.
-	 */
-	private boolean acceptsEventStream(Context ctx) {
-		String accept = ctx.header("Accept");
-		if (accept == null) return false;
-		if (accept.contains("application/json")) return false;
-		return accept.contains("text/event-stream");
-	}
-
-	/**
-	 * Extract the JSON-RPC method name from a request map.
-	 */
-	private String getMethodName(AMap<?, ?> request) {
-		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
-		return methodCell != null ? methodCell.toString().trim() : null;
-	}
-
-	/**
 	 * Send a JSON-RPC response as either SSE or JSON, depending on client preference.
 	 */
 	private void sendResponse(Context ctx, ACell response, boolean useSSE) {
 		if (useSSE) {
-			sendSseResponse(ctx, response);
+			McpProtocol.sendResponse(ctx, response, true);
 		} else {
 			ctx.contentType(ContentTypes.JSON);
 			setContent(ctx, response);
-		}
-	}
-
-	/**
-	 * Send a single JSON-RPC response as an SSE event, writing directly to the
-	 * servlet response to ensure correct Content-Type for SSE clients.
-	 */
-	private void sendSseResponse(Context ctx, ACell response) {
-		try {
-			writeSseToServletResponse(ctx, formatSseEvent(response));
-		} catch (IOException e) {
-			log.debug("Failed to send SSE response", e);
-		}
-	}
-
-	/**
-	 * Send batch responses as individual SSE events on one stream.
-	 */
-	private void sendSseBatchResponse(Context ctx, AVector<AMap<AString, ACell>> responses) {
-		try {
-			StringBuilder sb = new StringBuilder();
-			long n = responses.count();
-			for (long i = 0; i < n; i++) {
-				appendSseEvent(sb, responses.get(i));
-			}
-			writeSseToServletResponse(ctx, sb.toString());
-		} catch (IOException e) {
-			log.debug("Failed to send SSE batch response", e);
-		}
-	}
-
-	/**
-	 * Write SSE content directly to the servlet response, bypassing Javalin's
-	 * result mechanism to ensure Content-Type: text/event-stream is preserved.
-	 * Commits the response via flushBuffer() so Javalin cannot override it.
-	 */
-	private void writeSseToServletResponse(Context ctx, String sseBody) throws IOException {
-		HttpServletResponse res = ctx.res();
-		res.setStatus(200);
-		res.setContentType("text/event-stream");
-		res.setCharacterEncoding("UTF-8");
-		res.setHeader("Cache-Control", "no-cache");
-		res.setHeader("X-Accel-Buffering", "no");
-		PrintWriter writer = res.getWriter();
-		writer.write(sseBody);
-		writer.flush();
-		res.flushBuffer(); // Commit response so Javalin can't override headers/body
-	}
-
-	/**
-	 * Format a single SSE event: event: message\ndata: JSON\n\n
-	 */
-	private String formatSseEvent(ACell data) {
-		StringBuilder sb = new StringBuilder();
-		appendSseEvent(sb, data);
-		return sb.toString();
-	}
-
-	private void appendSseEvent(StringBuilder sb, ACell data) {
-		sb.append("event: message\n");
-		sb.append("data: ");
-		sb.append(JSON.print(data).toString());
-		sb.append("\n\n");
-	}
-
-	/**
-	 * An MCP session, created on initialize, tracks SSE connections and state watches.
-	 * Watches are session-scoped and automatically cleared when SSE connections close.
-	 */
-	static class McpSession {
-		final String id;
-		final Set<SseConnection> sseConnections = ConcurrentHashMap.newKeySet();
-		final ConcurrentHashMap<String, StateWatcher.WatchEntry> watches = new ConcurrentHashMap<>();
-		private final AtomicLong watchCounter = new AtomicLong(0);
-
-		McpSession(String id) {
-			this.id = id;
-		}
-
-		/**
-		 * Add a watch to this session.
-		 * @return The watch ID
-		 */
-		String addWatch(ACell[] path, AVector<ACell> pathVec, String pathString, Hash initialHash) {
-			String watchId = "w-" + watchCounter.incrementAndGet();
-			StateWatcher.WatchEntry entry = new StateWatcher.WatchEntry(watchId, path, pathVec, pathString, initialHash);
-			watches.put(watchId, entry);
-			return watchId;
-		}
-
-		/**
-		 * Remove a watch from this session.
-		 * @return true if the watch existed and was removed
-		 */
-		boolean removeWatch(String watchId) {
-			return watches.remove(watchId) != null;
-		}
-
-		/**
-		 * Remove all watches whose path vector starts with the given prefix vector.
-		 * @return the number of watches removed
-		 */
-		long removeWatchesByPathPrefix(AVector<ACell> prefix) {
-			long count = 0;
-			var it = watches.values().iterator();
-			while (it.hasNext()) {
-				if (it.next().pathStartsWith(prefix)) {
-					it.remove();
-					count++;
-				}
-			}
-			return count;
-		}
-
-		boolean hasWatches() {
-			return !watches.isEmpty();
-		}
-
-		void clearWatches() {
-			watches.clear();
-		}
-
-		void close() {
-			clearWatches();
-			for (SseConnection conn : sseConnections) conn.close();
-			sseConnections.clear();
-		}
-	}
-
-	/**
-	 * A server-to-client SSE connection opened via GET /mcp.
-	 */
-	static class SseConnection {
-		final PrintWriter writer;
-		volatile boolean closed = false;
-
-		SseConnection(PrintWriter writer) {
-			this.writer = writer;
-		}
-
-		void sendEvent(String eventType, String data) {
-			if (closed) return;
-			synchronized (writer) {
-				writer.write("event: " + eventType + "\n");
-				writer.write("data: " + data + "\n\n");
-				writer.flush();
-				if (writer.checkError()) close();
-			}
-		}
-
-		void close() {
-			closed = true;
 		}
 	}
 
