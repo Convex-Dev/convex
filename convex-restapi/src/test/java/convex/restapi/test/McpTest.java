@@ -1597,4 +1597,177 @@ public class McpTest extends ARESTTest {
 		HttpResponse<String> response = post(MCP_PATH, request);
 		assertEquals(202, response.statusCode());
 	}
+
+	// ===== watchState / unwatchState tests =====
+
+	/**
+	 * Helper to initialize and get a session ID.
+	 */
+	private String initSession() throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"s-init\"}";
+		HttpResponse<String> response = post(MCP_PATH, request);
+		assertEquals(200, response.statusCode());
+		return response.headers().firstValue("Mcp-Session-Id").orElse(null);
+	}
+
+	/**
+	 * Helper to make a tool call with a session header.
+	 */
+	private AMap<AString, ACell> makeToolCallWithSession(String toolName, AMap<AString, ACell> arguments, String sessionId)
+			throws IOException, InterruptedException {
+		AMap<AString, ACell> params = Maps.of(
+			"name", toolName,
+			"arguments", (arguments != null) ? arguments : Maps.empty()
+		);
+		AMap<AString, ACell> request = Maps.of(
+			"jsonrpc", "2.0",
+			"method", "tools/call",
+			"params", params,
+			"id", "test-" + toolName
+		);
+		java.net.http.HttpRequest httpReq = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(MCP_PATH))
+				.header("Content-Type", "application/json")
+				.header("Mcp-Session-Id", sessionId)
+				.POST(java.net.http.HttpRequest.BodyPublishers.ofString(JSON.toString(request)))
+				.build();
+		HttpResponse<String> response = httpClient.send(httpReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, response.statusCode());
+		ACell parsed = JSON.parse(response.body());
+		return RT.ensureMap(parsed);
+	}
+
+	@Test
+	public void testWatchStateReturnsWatchId() throws IOException, InterruptedException {
+		String sessionId = initSession();
+		assertNotNull(sessionId);
+
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
+		AMap<AString, ACell> responseMap = makeToolCallWithSession("watchState", args, sessionId);
+
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertNotNull(structured.get(Strings.create("watchId")), "Should return watchId");
+	}
+
+	@Test
+	public void testWatchStateWithoutSession() throws IOException, InterruptedException {
+		// Call without session header — should get tool error
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
+		AMap<AString, ACell> responseMap = makeToolCall("watchState", args);
+
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
+		assertNotNull(result);
+		assertEquals(CVMBool.TRUE, result.get(McpAPI.FIELD_IS_ERROR));
+	}
+
+	@Test
+	public void testWatchStateInvalidPath() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		// Empty vector
+		AMap<AString, ACell> args = Maps.of("path", "[]");
+		AMap<AString, ACell> responseMap = makeToolCallWithSession("watchState", args, sessionId);
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpAPI.FIELD_IS_ERROR));
+
+		// Not a vector
+		args = Maps.of("path", ":not-a-vector");
+		responseMap = makeToolCallWithSession("watchState", args, sessionId);
+		result = RT.ensureMap(responseMap.get(McpAPI.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpAPI.FIELD_IS_ERROR));
+	}
+
+	@Test
+	public void testUnwatchStateRemoves() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		// Create a watch
+		AMap<AString, ACell> watchArgs = Maps.of("path", "[:accounts #0 :balance]");
+		AMap<AString, ACell> watchResponse = makeToolCallWithSession("watchState", watchArgs, sessionId);
+		AMap<AString, ACell> watchResult = expectResult(watchResponse);
+		String watchId = watchResult.get(Strings.create("watchId")).toString();
+		assertNotNull(watchId);
+
+		// Unwatch it
+		AMap<AString, ACell> unwatchArgs = Maps.of("watchId", watchId);
+		AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState", unwatchArgs, sessionId);
+		AMap<AString, ACell> unwatchResult = expectResult(unwatchResponse);
+		assertEquals(CVMLong.ONE, unwatchResult.get(Strings.create("removed")));
+
+		// Unwatch again — should be 0
+		unwatchResponse = makeToolCallWithSession("unwatchState", unwatchArgs, sessionId);
+		unwatchResult = expectResult(unwatchResponse);
+		assertEquals(CVMLong.ZERO, unwatchResult.get(Strings.create("removed")));
+	}
+
+	@Test
+	public void testUnwatchStateUnknownId() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		AMap<AString, ACell> args = Maps.of("watchId", "w-nonexistent");
+		AMap<AString, ACell> responseMap = makeToolCallWithSession("unwatchState", args, sessionId);
+		AMap<AString, ACell> result = expectResult(responseMap);
+		assertEquals(CVMLong.ZERO, result.get(Strings.create("removed")));
+	}
+
+	@Test
+	public void testUnwatchStateByPathPrefix() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		// Create watches under the same account
+		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :balance]"), sessionId);
+		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :environment]"), sessionId);
+		// And one under a different account
+		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #1 :balance]"), sessionId);
+
+		// Remove all watches for account #0 by path prefix vector
+		AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState",
+				Maps.of("path", "[:accounts #0]"), sessionId);
+		AMap<AString, ACell> unwatchResult = expectResult(unwatchResponse);
+		assertEquals(CVMLong.create(2), unwatchResult.get(Strings.create("removed")));
+
+		// Account #1 watch should still be there — remove by its prefix
+		unwatchResponse = makeToolCallWithSession("unwatchState",
+				Maps.of("path", "[:accounts #1]"), sessionId);
+		unwatchResult = expectResult(unwatchResponse);
+		assertEquals(CVMLong.ONE, unwatchResult.get(Strings.create("removed")));
+	}
+
+	@Test
+	public void testUnwatchStateRequiresParam() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		// Neither watchId nor path — should be protocol error
+		AMap<AString, ACell> responseMap = makeToolCallWithSession("unwatchState", Maps.empty(), sessionId);
+		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpAPI.FIELD_ERROR));
+		assertNotNull(error, "Should return protocol error when neither param provided");
+	}
+
+	@Test
+	public void testDeleteSessionCleansWatches() throws IOException, InterruptedException {
+		String sessionId = initSession();
+
+		// Create watches
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
+		AMap<AString, ACell> watchResponse = makeToolCallWithSession("watchState", args, sessionId);
+		AMap<AString, ACell> watchResult = expectResult(watchResponse);
+		String watchId = watchResult.get(Strings.create("watchId")).toString();
+
+		// Delete session
+		java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(MCP_PATH))
+				.header("Mcp-Session-Id", sessionId)
+				.DELETE()
+				.build();
+		HttpResponse<String> deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, deleteResponse.statusCode());
+
+		// Unwatch should return 0 — already cleaned up
+		// Need a new session for this call
+		String newSessionId = initSession();
+		AMap<AString, ACell> unwatchArgs = Maps.of("watchId", watchId);
+		AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState", unwatchArgs, newSessionId);
+		AMap<AString, ACell> unwatchResult = expectResult(unwatchResponse);
+		assertEquals(CVMLong.ZERO, unwatchResult.get(Strings.create("removed")));
+	}
 }

@@ -98,7 +98,8 @@ public class MCPClientTest extends ARESTTest {
 			"sign", "validate", "keyGen", "hash", "encode", "decode",
 			"peerStatus", "createAccount", "describeAccount",
 			"lookup", "resolveCNS", "getTransaction",
-			"getBalance", "transfer"
+			"getBalance", "transfer",
+			"watchState", "unwatchState"
 		};
 		for (String name : expected) {
 			assertTrue(tools.stream().anyMatch(t -> name.equals(t.name())),

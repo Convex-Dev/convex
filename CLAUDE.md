@@ -91,6 +91,8 @@ See BUILD.md for complete release workflow.
 - **Lambda calculus VM** for functional smart contracts, pure functions that update state
 - **Lattice technology** - data merges like CRDTs, not linear blockchain
 - **Global state model** with atomic transactions on Convex with self-sovereign accounts like #1337
+- **Peer / REST API Security** these are public by default and should be robust to malicious messages
+- **Lattice Node security** These are private by default. Operators chooses who to share / merge with 
 
 ## Resources
 

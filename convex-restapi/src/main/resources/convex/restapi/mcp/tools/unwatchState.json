@@ -1,0 +1,28 @@
+{
+  "name": "unwatchState",
+  "title": "Unwatch State",
+  "description": "Stop watching state paths. Provide a watchId to remove a single watch, or a path to remove all watches whose path starts with the given prefix. At least one of watchId or path must be provided.",
+  "annotations": {
+    "readOnlyHint": false,
+    "idempotentHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "watchId": {
+        "type": "string",
+        "description": "Watch ID returned by watchState — removes that single watch"
+      },
+      "path": {
+        "type": "string",
+        "description": "CVM path prefix vector — removes all watches whose path starts with this prefix, e.g. '[:accounts #56785]' removes all watches under that account"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "removed": { "type": "integer", "description": "Number of watches removed" }
+    }
+  }
+}

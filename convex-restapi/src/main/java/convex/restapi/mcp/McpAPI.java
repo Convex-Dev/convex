@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,6 +126,8 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_TOKEN = Strings.intern("token");
 	public static final StringShort ARG_TO = Strings.intern("to");
 	public static final StringShort ARG_AMOUNT = Strings.intern("amount");
+	public static final StringShort ARG_PATH = Strings.intern("path");
+	public static final StringShort ARG_WATCH_ID = Strings.intern("watchId");
 
 	/** ThreadLocal to make the current Javalin Context available to tool handlers */
 	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
@@ -144,9 +147,11 @@ public class McpAPI extends ABaseAPI {
 	private final Map<String, McpTool> tools = new LinkedHashMap<>();
 	private final Map<String, McpPrompt> prompts = new LinkedHashMap<>();
 	private final ConcurrentHashMap<String, McpSession> sessions = new ConcurrentHashMap<>();
+	private final StateWatcher stateWatcher;
 
 	public McpAPI(RESTServer restServer) {
 		super(restServer);
+		stateWatcher = new StateWatcher(server, sessions);
 		AMap<AString, ACell> info = Maps.of(
 			"name", "convex-mcp",
 			"title", "Convex MCP",
@@ -221,6 +226,10 @@ public class McpAPI extends ABaseAPI {
 			} finally {
 				conn.close();
 				session.sseConnections.remove(conn);
+				// When no SSE connections remain, watches are undeliverable — clear them
+				if (session.sseConnections.isEmpty()) {
+					session.clearWatches();
+				}
 			}
 		} catch (IOException e) {
 			log.debug("SSE connection setup failed", e);
@@ -536,6 +545,8 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new GetTransactionTool());
 		registerTool(new GetBalanceTool());
 		registerTool(new TransferTool());
+		registerTool(new WatchStateTool());
+		registerTool(new UnwatchStateTool());
 
 		// Signing service tools (standard + elevated)
 		new SigningMcpTools(this).registerAll();
@@ -1513,6 +1524,110 @@ public class McpAPI extends ABaseAPI {
 		}
 	}
 
+	// ===== State watch tools =====
+
+	private class WatchStateTool extends McpTool {
+		WatchStateTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/watchState.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString pathCell = RT.ensureString(arguments.get(ARG_PATH));
+			if (pathCell == null) {
+				return protocolError(-32602, "watchState requires 'path' string");
+			}
+
+			// Parse path as CVM vector
+			ACell parsed;
+			try {
+				parsed = Reader.read(pathCell.toString());
+			} catch (Exception e) {
+				return toolError("Failed to parse path: " + e.getMessage());
+			}
+			AVector<ACell> pathVec = RT.ensureVector(parsed);
+			if (pathVec == null || pathVec.isEmpty()) {
+				return toolError("path must be a non-empty CVM vector, e.g. [:accounts #56785 :environment myvar]");
+			}
+
+			// Convert to array
+			int len = (int) pathVec.count();
+			ACell[] pathKeys = new ACell[len];
+			for (int i = 0; i < len; i++) {
+				pathKeys[i] = pathVec.get(i);
+			}
+
+			// Require session
+			Context ctx = currentContext.get();
+			String sessionId = (ctx != null) ? ctx.header(HEADER_SESSION_ID) : null;
+			McpSession session = (sessionId != null) ? sessions.get(sessionId) : null;
+			if (session == null) {
+				return toolError("watchState requires an active MCP session with SSE support");
+			}
+
+			// Validate path resolves (may be null — that's OK, we watch for it to appear)
+			ACell currentValue = stateWatcher.resolveValue(pathKeys);
+			Hash currentHash = Hash.get(currentValue);
+
+			// Register watch in the session
+			String watchId = session.addWatch(pathKeys, pathVec, pathCell.toString(), currentHash);
+			stateWatcher.ensureRunning();
+
+			// Return initial state
+			AMap<AString, ACell> out = Maps.of(
+				"watchId", watchId
+			);
+			long memSize = ACell.getMemorySize(currentValue);
+			if (memSize <= StateWatcher.VALUE_SIZE_THRESHOLD) {
+				out = out.assoc(Strings.create("value"), RT.print(currentValue));
+			}
+			return toolSuccess(out);
+		}
+	}
+
+	private class UnwatchStateTool extends McpTool {
+		UnwatchStateTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/unwatchState.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString watchIdCell = RT.ensureString(arguments.get(ARG_WATCH_ID));
+			AString pathCell = RT.ensureString(arguments.get(ARG_PATH));
+			if (watchIdCell == null && pathCell == null) {
+				return protocolError(-32602, "unwatchState requires 'watchId' or 'path'");
+			}
+
+			// Remove from the calling session
+			Context ctx = currentContext.get();
+			String sessionId = (ctx != null) ? ctx.header(HEADER_SESSION_ID) : null;
+			McpSession session = (sessionId != null) ? sessions.get(sessionId) : null;
+			if (session == null) {
+				return toolSuccess(Maps.of("removed", CVMLong.ZERO));
+			}
+
+			long removed;
+			if (watchIdCell != null) {
+				// Remove single watch by ID
+				removed = session.removeWatch(watchIdCell.toString()) ? 1 : 0;
+			} else {
+				// Parse path as CVM vector for structural prefix comparison
+				ACell parsed;
+				try {
+					parsed = Reader.read(pathCell.toString());
+				} catch (Exception e) {
+					return toolError("Failed to parse path: " + e.getMessage());
+				}
+				AVector<ACell> prefixVec = RT.ensureVector(parsed);
+				if (prefixVec == null) {
+					return toolError("path must be a CVM vector");
+				}
+				removed = session.removeWatchesByPathPrefix(prefixVec);
+			}
+			return toolSuccess(Maps.of("removed", CVMLong.create(removed)));
+		}
+	}
+
 	// ===== SSE and Session support =====
 
 	/**
@@ -1610,17 +1725,64 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/**
-	 * An MCP session, created on initialize, tracks SSE connections.
+	 * An MCP session, created on initialize, tracks SSE connections and state watches.
+	 * Watches are session-scoped and automatically cleared when SSE connections close.
 	 */
-	private static class McpSession {
+	static class McpSession {
 		final String id;
 		final Set<SseConnection> sseConnections = ConcurrentHashMap.newKeySet();
+		final ConcurrentHashMap<String, StateWatcher.WatchEntry> watches = new ConcurrentHashMap<>();
+		private final AtomicLong watchCounter = new AtomicLong(0);
 
 		McpSession(String id) {
 			this.id = id;
 		}
 
+		/**
+		 * Add a watch to this session.
+		 * @return The watch ID
+		 */
+		String addWatch(ACell[] path, AVector<ACell> pathVec, String pathString, Hash initialHash) {
+			String watchId = "w-" + watchCounter.incrementAndGet();
+			StateWatcher.WatchEntry entry = new StateWatcher.WatchEntry(watchId, path, pathVec, pathString, initialHash);
+			watches.put(watchId, entry);
+			return watchId;
+		}
+
+		/**
+		 * Remove a watch from this session.
+		 * @return true if the watch existed and was removed
+		 */
+		boolean removeWatch(String watchId) {
+			return watches.remove(watchId) != null;
+		}
+
+		/**
+		 * Remove all watches whose path vector starts with the given prefix vector.
+		 * @return the number of watches removed
+		 */
+		long removeWatchesByPathPrefix(AVector<ACell> prefix) {
+			long count = 0;
+			var it = watches.values().iterator();
+			while (it.hasNext()) {
+				if (it.next().pathStartsWith(prefix)) {
+					it.remove();
+					count++;
+				}
+			}
+			return count;
+		}
+
+		boolean hasWatches() {
+			return !watches.isEmpty();
+		}
+
+		void clearWatches() {
+			watches.clear();
+		}
+
 		void close() {
+			clearWatches();
 			for (SseConnection conn : sseConnections) conn.close();
 			sseConnections.clear();
 		}
