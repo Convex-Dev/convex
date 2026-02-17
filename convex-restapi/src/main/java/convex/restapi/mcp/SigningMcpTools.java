@@ -429,11 +429,13 @@ class SigningMcpTools {
 				if (r.isError()) return api.toolResult(r);
 
 				Address address = (Address)r.getValue();
-				AMap<AString, ACell> result = Maps.of(
+				AMap<AString, ACell> out = Maps.of(
 					"address", CVMLong.create(address.longValue()),
 					"publicKey", publicKey.toString()
 				);
-				return api.toolSuccess(result);
+				ACell info = r.getInfo();
+				if (info != null) out = out.assoc(McpAPI.KEY_INFO, info);
+				return api.toolSuccess(out);
 			} catch (Exception e) {
 				return api.toolError("Account creation failed: " + e.getMessage());
 			}

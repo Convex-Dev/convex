@@ -117,6 +117,9 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_CONFIRM_TOKEN = Strings.intern("confirmToken");
 	public static final StringShort ARG_NEW_PASSPHRASE = Strings.intern("newPassphrase");
 	public static final StringShort ARG_CONTROLLER = Strings.intern("controller");
+	public static final StringShort ARG_TOKEN = Strings.intern("token");
+	public static final StringShort ARG_TO = Strings.intern("to");
+	public static final StringShort ARG_AMOUNT = Strings.intern("amount");
 
 	/** ThreadLocal to make the current Javalin Context available to tool handlers */
 	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
@@ -447,6 +450,8 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new LookupTool());
 		registerTool(new ResolveCNSTool());
 		registerTool(new GetTransactionTool());
+		registerTool(new GetBalanceTool());
+		registerTool(new TransferTool());
 
 		// Signing service tools (standard + elevated)
 		new SigningMcpTools(this).registerAll();
@@ -1045,16 +1050,135 @@ public class McpAPI extends ABaseAPI {
 				}
 
 				Address address = (Address)r.getValue();
-				AMap<AString, ACell> result = Maps.of(
+				AMap<AString, ACell> out = Maps.of(
 					"address", CVMLong.create(address.longValue())
 				);
-				return toolSuccess(result);
+				ACell info = r.getInfo();
+				if (info != null) out = out.assoc(KEY_INFO, info);
+				return toolSuccess(out);
 			} catch (Exception e) {
 				return toolError("Account creation failed: " + e.getMessage());
 			}
 		}
 	}
 	
+	/**
+	 * Resolves an optional token address from arguments. Returns null for CVM native coin.
+	 */
+	private Address resolveTokenAddress(ACell tokenCell) {
+		if (tokenCell == null) return null;
+		String tokenStr = tokenCell.toString();
+		if (tokenStr.isEmpty() || "nil".equals(tokenStr)) return null;
+		return Address.parse(tokenStr);
+	}
+
+	private class GetBalanceTool extends McpTool {
+		GetBalanceTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/getBalance.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			try {
+				Address address = resolveAddress(arguments.get(ARG_ADDRESS));
+				if (address == null) {
+					return protocolError(-32602, "getBalance requires 'address'");
+				}
+
+				Address token = resolveTokenAddress(arguments.get(ARG_TOKEN));
+
+				Convex convex = restServer.getConvex();
+				String source;
+				if (token == null) {
+					source = "(balance " + address + ")";
+				} else {
+					source = "(@convex.fungible/balance " + token + " " + address + ")";
+				}
+
+				Result result = convex.querySync(source);
+				if (result.isError()) {
+					return toolResult(result);
+				}
+
+				AMap<AString, ACell> out = Maps.of(
+					"address", CVMLong.create(address.longValue()),
+					"balance", result.getValue()
+				);
+				if (token != null) {
+					out = out.assoc(ARG_TOKEN, CVMLong.create(token.longValue()));
+				}
+				return toolSuccess(out);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return toolError("Tool call interrupted");
+			}
+		}
+	}
+
+	private class TransferTool extends McpTool {
+		TransferTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/transfer.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString seedCell = RT.ensureString(arguments.get(ARG_SEED));
+			if (seedCell == null) {
+				return protocolError(-32602, "transfer requires 'seed' string");
+			}
+			AString addressCell = RT.ensureString(arguments.get(ARG_ADDRESS));
+			if (addressCell == null) {
+				return protocolError(-32602, "transfer requires 'address' string");
+			}
+
+			try {
+				Address from = resolveAddress(addressCell);
+				if (from == null) return toolError("Invalid origin address");
+
+				Address to = resolveAddress(arguments.get(ARG_TO));
+				if (to == null) return protocolError(-32602, "transfer requires 'to' address");
+
+				CVMLong amountCell = CVMLong.parse(arguments.get(ARG_AMOUNT));
+				if (amountCell == null) return protocolError(-32602, "transfer requires 'amount' number");
+				long amount = amountCell.longValue();
+
+				Blob seedBlob = Blob.parse(seedCell);
+				if (seedBlob == null || seedBlob.count() != 32) {
+					return toolError("Invalid seed: expected 32-byte hex string");
+				}
+				AKeyPair kp = AKeyPair.create(seedBlob);
+
+				Address token = resolveTokenAddress(arguments.get(ARG_TOKEN));
+
+				String source;
+				if (token == null) {
+					source = "(transfer " + to + " " + amount + ")";
+				} else {
+					source = "(@convex.fungible/transfer " + token + " " + to + " " + amount + ")";
+				}
+
+				try (Convex client = Convex.connect(server)) {
+					client.setAddress(from);
+					client.setKeyPair(kp);
+					Result r = client.transactSync(source);
+					if (r.isError()) return toolResult(r);
+
+					AMap<AString, ACell> out = Maps.of(
+						"value", r.getValue()
+					);
+					ACell info = r.getInfo();
+					if (info != null) out = out.assoc(KEY_INFO, info);
+					return toolSuccess(out);
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return toolError("Tool call interrupted");
+			} catch (Exception e) {
+				return toolError("Transfer failed: " + e.getMessage());
+			}
+		}
+	}
+
 	private class DescribeAccountTool extends McpTool {
 		DescribeAccountTool() {
 			super(McpTool.loadMetadata("convex/restapi/mcp/tools/describeAccount.json"));

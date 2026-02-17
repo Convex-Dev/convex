@@ -1,0 +1,49 @@
+{
+  "name": "transfer",
+  "title": "Transfer",
+  "description": "Transfer CVM coins or fungible tokens to another account. Amounts in copper for CVM (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Origin account address (e.g. '#13'). Transaction executes from this account."
+      },
+      "to": {
+        "type": "string",
+        "description": "Destination account address (e.g. '#42')"
+      },
+      "amount": {
+        "type": "number",
+        "description": "Amount to transfer (copper for CVM, token units for fungible tokens)"
+      },
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed (64 hex chars) for the origin account. SECURITY: Sent to peer — use HTTPS only."
+      },
+      "token": {
+        "type": "string",
+        "description": "Token actor address for fungible token transfer (e.g. '#128'). Omit or nil for native CVM coin."
+      }
+    },
+    "required": ["address", "to", "amount", "seed"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "description": "Resulting CVM value from the transfer"
+      },
+      "errorCode": {
+        "description": "CVM error code if the transfer failed"
+      },
+      "info": {
+        "description": "Execution metadata including juice used, fees, and transaction hash"
+      }
+    }
+  }
+}
