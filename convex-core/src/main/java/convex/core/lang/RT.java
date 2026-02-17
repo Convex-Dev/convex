@@ -1059,7 +1059,7 @@ public class RT {
 	}
 
 	/**
-	 * Prints a value to a String as long as the result fits within a given print
+	 * Prints a value to a CVX-fromat String as long as the result fits within a given print
 	 * limit. WARNING: May return null
 	 * 
 	 * @param a Cell value to print
@@ -1070,7 +1070,7 @@ public class RT {
 	}
 
 	/**
-	 * Prints a value after converting to appropriate CVM type
+	 * Prints a value in CVX-format after converting to appropriate CVM type
 	 * 
 	 * @param o Any value to print
 	 * @return Printed representation of object, or null if print limit exceeded

@@ -1,7 +1,7 @@
 grammar Convex;
 
 /*  =========================================
- *  Grammar for Convex Reader
+ *  Grammar for Convex Reader - CVX Format
  *  =========================================
  *  
  *  Refers to tokens defined in the lexer at the bottom of this file

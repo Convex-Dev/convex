@@ -165,7 +165,7 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingCreateKey requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingCreateKey requires 'passphrase' string");
 
 			try {
 				AccountKey publicKey = svc.createKey(identity, passphrase);
@@ -216,13 +216,13 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return api.protocolError(-32602, "signingSign requires 'publicKey' string");
+			if (publicKeyCell == null) return api.toolError("signingSign requires 'publicKey' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingSign requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingSign requires 'passphrase' string");
 
 			AString valueCell = RT.ensureString(arguments.get(McpAPI.ARG_VALUE));
-			if (valueCell == null) return api.protocolError(-32602, "signingSign requires 'value' hex string");
+			if (valueCell == null) return api.toolError("signingSign requires 'value' hex string");
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");
@@ -258,10 +258,10 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return api.protocolError(-32602, "signingGetJWT requires 'publicKey' string");
+			if (publicKeyCell == null) return api.toolError("signingGetJWT requires 'publicKey' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingGetJWT requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingGetJWT requires 'passphrase' string");
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");
@@ -320,13 +320,13 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString sourceCell = RT.ensureString(arguments.get(McpAPI.ARG_SOURCE));
-			if (sourceCell == null) return api.protocolError(-32602, "signingTransact requires 'source' string");
+			if (sourceCell == null) return api.toolError("signingTransact requires 'source' string");
 
 			AString addressCell = RT.ensureString(arguments.get(McpAPI.ARG_ADDRESS));
-			if (addressCell == null) return api.protocolError(-32602, "signingTransact requires 'address' string");
+			if (addressCell == null) return api.toolError("signingTransact requires 'address' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingTransact requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingTransact requires 'passphrase' string");
 
 			Address address = parseAddress(addressCell);
 			if (address == null) return api.toolError("Invalid address format");
@@ -383,7 +383,7 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingCreateAccount requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingCreateAccount requires 'passphrase' string");
 
 			Convex faucetClient = api.getRESTServer().getFaucet();
 			if (faucetClient == null) return api.toolError("Faucet not available on this server");
@@ -488,10 +488,10 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString seedCell = RT.ensureString(arguments.get(McpAPI.ARG_SEED));
-			if (seedCell == null) return api.protocolError(-32602, "signingImportKey requires 'seed' string");
+			if (seedCell == null) return api.toolError("signingImportKey requires 'seed' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingImportKey requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingImportKey requires 'passphrase' string");
 
 			Blob seedBlob = Blob.parse(seedCell.toString());
 			if (seedBlob == null || seedBlob.count() != AKeyPair.SEED_LENGTH) {
@@ -525,10 +525,10 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return api.protocolError(-32602, "signingExportKey requires 'publicKey' string");
+			if (publicKeyCell == null) return api.toolError("signingExportKey requires 'publicKey' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingExportKey requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingExportKey requires 'passphrase' string");
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");
@@ -561,10 +561,10 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return api.protocolError(-32602, "signingDeleteKey requires 'publicKey' string");
+			if (publicKeyCell == null) return api.toolError("signingDeleteKey requires 'publicKey' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingDeleteKey requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingDeleteKey requires 'passphrase' string");
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");
@@ -596,13 +596,13 @@ class SigningMcpTools {
 			if (svc == null) return api.toolError("Signing service not available");
 
 			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
-			if (publicKeyCell == null) return api.protocolError(-32602, "signingChangePassphrase requires 'publicKey' string");
+			if (publicKeyCell == null) return api.toolError("signingChangePassphrase requires 'publicKey' string");
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
-			if (passphrase == null) return api.protocolError(-32602, "signingChangePassphrase requires 'passphrase' string");
+			if (passphrase == null) return api.toolError("signingChangePassphrase requires 'passphrase' string");
 
 			AString newPassphrase = RT.ensureString(arguments.get(McpAPI.ARG_NEW_PASSPHRASE));
-			if (newPassphrase == null) return api.protocolError(-32602, "signingChangePassphrase requires 'newPassphrase' string");
+			if (newPassphrase == null) return api.toolError("signingChangePassphrase requires 'newPassphrase' string");
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");

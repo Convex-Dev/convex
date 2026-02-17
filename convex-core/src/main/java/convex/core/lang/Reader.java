@@ -12,7 +12,7 @@ import convex.core.lang.reader.AntlrReader;
 import convex.core.util.Utils;
 
 /**
- * Reader implementation which reads source code and produces a tree
+ * Reader implementation which reads CVX format source code and produces a tree
  * of parsed objects.
  * 
  * Supports reading in either raw form (ACell) mode or wrapping with Syntax Objects. The

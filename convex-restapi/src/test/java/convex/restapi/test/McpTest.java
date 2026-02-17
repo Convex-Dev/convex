@@ -325,9 +325,10 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> args = Maps.of("seed", seedHex);
 		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
 
-		// Should return a protocol error for missing required parameter
-		ACell errorCell = response.get(McpProtocol.FIELD_ERROR);
-		assertNotNull(errorCell, "Missing hash should return a protocol error");
+		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		assertNotNull(result, "Missing hash should return a tool error result");
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
 	/**
@@ -338,9 +339,10 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> args = Maps.of("hash", "0x1234567890abcdef");
 		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
 
-		// Should return a protocol error for missing required parameter
-		ACell errorCell = response.get(McpProtocol.FIELD_ERROR);
-		assertNotNull(errorCell, "Missing seed should return a protocol error");
+		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		assertNotNull(result, "Missing seed should return a tool error result");
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
 	/**
@@ -419,8 +421,11 @@ public class McpTest extends ARESTTest {
 	@Test
 	public void testGetTransactionMissingHash() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = makeToolCall("getTransaction", Maps.empty());
-		ACell errorCell = response.get(McpProtocol.FIELD_ERROR);
-		assertNotNull(errorCell, "Missing hash should return a protocol error");
+
+		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
+		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		assertNotNull(result, "Missing hash should return a tool error result");
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
 	/**
@@ -1198,9 +1203,10 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> args = Maps.of("algorithm", "sha3");
 		AMap<AString, ACell> responseMap = makeToolCall("hash", args);
 
-		// Should return a protocol error for missing required parameter
-		ACell errorCell = responseMap.get(McpProtocol.FIELD_ERROR);
-		assertNotNull(errorCell, "Missing value should return a protocol error");
+		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertNotNull(result, "Missing value should return a tool error result");
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
 	/**
@@ -1528,28 +1534,25 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
-	 * DELETE /mcp with valid session should terminate it.
+	 * DELETE /mcp with valid session should terminate the connection.
 	 */
 	@Test
-	public void testDeleteSession() throws IOException, InterruptedException {
-		// First initialize to get a session
-		String initRequest = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"del-1\"}";
-		HttpResponse<String> initResponse = post(MCP_PATH, initRequest);
-		String sessionId = initResponse.headers().firstValue("Mcp-Session-Id").orElse(null);
-		assertNotNull(sessionId);
+	public void testDeleteSession() throws Exception {
+		// Open a GET /mcp stream — this creates the McpConnection
+		try (SseSession session = openSseSession()) {
+			// Delete the session
+			java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
+					.uri(java.net.URI.create(MCP_PATH))
+					.header("Mcp-Session-Id", session.id())
+					.DELETE()
+					.build();
+			HttpResponse<String> deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+			assertEquals(200, deleteResponse.statusCode());
 
-		// Delete the session
-		java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
-				.uri(java.net.URI.create(MCP_PATH))
-				.header("Mcp-Session-Id", sessionId)
-				.DELETE()
-				.build();
-		HttpResponse<String> deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
-		assertEquals(200, deleteResponse.statusCode());
-
-		// Deleting again should return 404
-		HttpResponse<String> secondDelete = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
-		assertEquals(404, secondDelete.statusCode());
+			// Deleting again should return 404 (already removed)
+			HttpResponse<String> secondDelete = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+			assertEquals(404, secondDelete.statusCode());
+		}
 	}
 
 	/**
@@ -1575,17 +1578,15 @@ public class McpTest extends ARESTTest {
 	}
 
 	/**
-	 * GET /mcp with SSE Accept but no session should return 400.
+	 * GET /mcp with SSE Accept but no session should generate a session ID
+	 * and open a connection.
 	 */
 	@Test
-	public void testGetSseWithoutSession() throws IOException, InterruptedException {
-		java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-				.uri(java.net.URI.create(MCP_PATH))
-				.header("Accept", "text/event-stream")
-				.GET()
-				.build();
-		HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-		assertEquals(400, response.statusCode());
+	public void testGetSseOpensConnection() throws Exception {
+		try (SseSession session = openSseSession()) {
+			assertNotNull(session.id(), "GET /mcp should return Mcp-Session-Id");
+			assertFalse(session.id().isEmpty(), "Session ID should not be empty");
+		}
 	}
 
 	/**
@@ -1602,13 +1603,47 @@ public class McpTest extends ARESTTest {
 	// ===== watchState / unwatchState tests =====
 
 	/**
-	 * Helper to initialize and get a session ID.
+	 * Record holding an SSE-backed session: the session ID and the background thread
+	 * that keeps the SSE connection alive.
 	 */
-	private String initSession() throws IOException, InterruptedException {
-		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"s-init\"}";
-		HttpResponse<String> response = post(MCP_PATH, request);
-		assertEquals(200, response.statusCode());
-		return response.headers().firstValue("Mcp-Session-Id").orElse(null);
+	private record SseSession(String id, Thread thread) implements AutoCloseable {
+		@Override public void close() { thread.interrupt(); }
+	}
+
+	/**
+	 * Open an SSE connection (GET /mcp) in a background thread and return the
+	 * session ID from the response header. The session lives until {@link SseSession#close()}.
+	 */
+	private SseSession openSseSession() throws Exception {
+		var sessionIdHolder = new java.util.concurrent.CompletableFuture<String>();
+		Thread sseThread = Thread.ofVirtual().start(() -> {
+			try {
+				var req = java.net.http.HttpRequest.newBuilder()
+						.uri(java.net.URI.create(MCP_PATH))
+						.header("Accept", "text/event-stream")
+						.GET()
+						.build();
+				httpClient.send(req, responseInfo -> {
+					String sid = responseInfo.headers().firstValue("Mcp-Session-Id").orElse(null);
+					sessionIdHolder.complete(sid);
+					// Return a discarding subscriber that keeps the connection open
+					return HttpResponse.BodySubscribers.ofInputStream();
+				});
+			} catch (Exception e) {
+				sessionIdHolder.completeExceptionally(e);
+			}
+		});
+		String sessionId = sessionIdHolder.get(5, java.util.concurrent.TimeUnit.SECONDS);
+		assertNotNull(sessionId, "SSE response should include Mcp-Session-Id header");
+		return new SseSession(sessionId, sseThread);
+	}
+
+	/**
+	 * Open an SSE session and return the session ID for use in tool calls.
+	 * The background SSE thread keeps the connection alive.
+	 */
+	private String initSession() throws Exception {
+		return openSseSession().id();
 	}
 
 	/**
@@ -1638,8 +1673,101 @@ public class McpTest extends ARESTTest {
 		return RT.ensureMap(parsed);
 	}
 
+	// ===== queryState tool =====
+
 	@Test
-	public void testWatchStateReturnsWatchId() throws IOException, InterruptedException {
+	public void testQueryStateBasic() throws Exception {
+		// Query a known path — accounts vector indexed by integer, not address
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts 0 :balance]");
+		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
+
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertEquals(CVMBool.TRUE, structured.get(Strings.create("exists")));
+		assertNotNull(structured.get(Strings.create("value")));
+	}
+
+	@Test
+	public void testQueryStateNonExistentPath() throws Exception {
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts 999999999 :balance]");
+		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
+
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertEquals(CVMBool.FALSE, structured.get(Strings.create("exists")));
+	}
+
+	@Test
+	public void testQueryStateInvalidPath() throws Exception {
+		// Empty vector
+		AMap<AString, ACell> args = Maps.of("path", "[]");
+		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
+
+		// Not a vector
+		args = Maps.of("path", "42");
+		responseMap = makeToolCall("queryState", args);
+		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
+
+		// Missing path
+		responseMap = makeToolCall("queryState", null);
+		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
+	}
+
+	@Test
+	public void testQueryStateAdversarial() throws Exception {
+		// Navigate into a non-collection (balance is a number, can't key into it)
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts 0 :balance :foo]");
+		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertEquals(CVMBool.FALSE, structured.get(Strings.create("exists")));
+
+		// Very deep nonsense path
+		args = Maps.of("path", "[:accounts 0 :balance :a :b :c :d :e :f]");
+		responseMap = makeToolCall("queryState", args);
+		structured = expectResult(responseMap);
+		assertEquals(CVMBool.FALSE, structured.get(Strings.create("exists")));
+
+		// Path through non-existent intermediate key
+		args = Maps.of("path", "[:nonexistent :foo :bar]");
+		responseMap = makeToolCall("queryState", args);
+		structured = expectResult(responseMap);
+		assertEquals(CVMBool.FALSE, structured.get(Strings.create("exists")));
+
+		// Single key that doesn't exist in state
+		args = Maps.of("path", "[:nonexistent]");
+		responseMap = makeToolCall("queryState", args);
+		structured = expectResult(responseMap);
+		assertEquals(CVMBool.FALSE, structured.get(Strings.create("exists")));
+
+		// Malformed CVM expression
+		args = Maps.of("path", "[this is not valid {{{");
+		responseMap = makeToolCall("queryState", args);
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
+
+		// String instead of vector
+		args = Maps.of("path", "\"hello\"");
+		responseMap = makeToolCall("queryState", args);
+		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
+	}
+
+	@Test
+	public void testQueryStateNoSessionRequired() throws Exception {
+		// queryState should work without a session (unlike watchState)
+		AMap<AString, ACell> args = Maps.of("path", "[:accounts 0 :balance]");
+		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
+
+		AMap<AString, ACell> structured = expectResult(responseMap);
+		assertEquals(CVMBool.TRUE, structured.get(Strings.create("exists")));
+	}
+
+	// ===== watchState / unwatchState tools =====
+
+	@Test
+	public void testWatchStateReturnsWatchId() throws Exception {
 		String sessionId = initSession();
 		assertNotNull(sessionId);
 
@@ -1651,7 +1779,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testWatchStateWithoutSession() throws IOException, InterruptedException {
+	public void testWatchStateWithoutSession() throws Exception {
 		// Call without session header — should get tool error
 		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
 		AMap<AString, ACell> responseMap = makeToolCall("watchState", args);
@@ -1662,7 +1790,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testWatchStateInvalidPath() throws IOException, InterruptedException {
+	public void testWatchStateInvalidPath() throws Exception {
 		String sessionId = initSession();
 
 		// Empty vector
@@ -1679,7 +1807,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testUnwatchStateRemoves() throws IOException, InterruptedException {
+	public void testUnwatchStateRemoves() throws Exception {
 		String sessionId = initSession();
 
 		// Create a watch
@@ -1702,7 +1830,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testUnwatchStateUnknownId() throws IOException, InterruptedException {
+	public void testUnwatchStateUnknownId() throws Exception {
 		String sessionId = initSession();
 
 		AMap<AString, ACell> args = Maps.of("watchId", "w-nonexistent");
@@ -1712,7 +1840,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testUnwatchStateByPathPrefix() throws IOException, InterruptedException {
+	public void testUnwatchStateByPathPrefix() throws Exception {
 		String sessionId = initSession();
 
 		// Create watches under the same account
@@ -1735,7 +1863,7 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testUnwatchStateRequiresParam() throws IOException, InterruptedException {
+	public void testUnwatchStateRequiresParam() throws Exception {
 		String sessionId = initSession();
 
 		// Neither watchId nor path — should be protocol error
@@ -1745,26 +1873,25 @@ public class McpTest extends ARESTTest {
 	}
 
 	@Test
-	public void testDeleteSessionCleansWatches() throws IOException, InterruptedException {
-		String sessionId = initSession();
-
-		// Create watches
+	public void testDeleteSessionCleansWatches() throws Exception {
+		// Open SSE session and create a watch
+		SseSession session = openSseSession();
 		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
-		AMap<AString, ACell> watchResponse = makeToolCallWithSession("watchState", args, sessionId);
+		AMap<AString, ACell> watchResponse = makeToolCallWithSession("watchState", args, session.id());
 		AMap<AString, ACell> watchResult = expectResult(watchResponse);
 		String watchId = watchResult.get(Strings.create("watchId")).toString();
 
-		// Delete session
+		// Delete session — should destroy the connection and all its watches
 		java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
 				.uri(java.net.URI.create(MCP_PATH))
-				.header("Mcp-Session-Id", sessionId)
+				.header("Mcp-Session-Id", session.id())
 				.DELETE()
 				.build();
 		HttpResponse<String> deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, deleteResponse.statusCode());
+		session.close();
 
-		// Unwatch should return 0 — already cleaned up
-		// Need a new session for this call
+		// Open a new session and try to unwatch — should return 0 (already cleaned up)
 		String newSessionId = initSession();
 		AMap<AString, ACell> unwatchArgs = Maps.of("watchId", watchId);
 		AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState", unwatchArgs, newSessionId);

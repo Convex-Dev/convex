@@ -361,9 +361,10 @@ public class MCPClientTest extends ARESTTest {
 
 	@Test
 	public void testMissingRequiredParams() {
-		// MCP server rejects missing required params — SDK throws
-		assertThrows(Exception.class, () -> callTool("query", Map.of()));
-		assertThrows(Exception.class, () -> callTool("getBalance", Map.of()));
+		// Per MCP 2025-11-25: tool input validation errors are returned as tool
+		// results with isError=true (not JSON-RPC errors), enabling LLM self-correction.
+		callToolExpectError("query", Map.of());
+		callToolExpectError("getBalance", Map.of());
 	}
 
 	@Test

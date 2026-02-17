@@ -136,8 +136,17 @@ public class McpProtocol {
 
 	/**
 	 * Create an error tool result wrapped in a JSON-RPC response.
-	 * The error is protocol-valid (not a JSON-RPC error) but flagged via isError.
-	 * @param message Error message
+	 *
+	 * <p>Returns a successful JSON-RPC response containing an MCP tool result with
+	 * {@code isError: true}. This is distinct from a JSON-RPC error (code -32602 etc.):
+	 * the response is protocol-valid, but the tool signals failure in its result payload.</p>
+	 *
+	 * <p>Per MCP spec 2025-11-25: tool input validation errors (missing/invalid arguments)
+	 * SHOULD be returned as tool results with {@code isError: true} rather than as JSON-RPC
+	 * errors. This enables LLM clients to see the error message and self-correct, rather
+	 * than having the SDK throw an exception that hides the details.</p>
+	 *
+	 * @param message Error message describing the validation failure
 	 * @return JSON-RPC response with MCP tool error result
 	 */
 	public static AMap<AString, ACell> toolError(String message) {
