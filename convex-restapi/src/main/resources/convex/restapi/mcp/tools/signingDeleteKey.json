@@ -1,7 +1,7 @@
 {
   "name": "signingDeleteKey",
   "title": "Delete Key (Signing Service)",
-  "description": "Permanently deletes an Ed25519 key from the peer's signing service key store. Requires authentication. This is an elevated operation — on first call (without confirmToken), returns a confirmation URL that the user must visit in a browser to approve. After approval, retry with the confirmToken to complete the deletion. WARNING: this is irreversible — the key cannot be recovered. Part of the signing service: see also signingServiceInfo, signingCreateKey, signingListKeys, signingSign, signingGetJWT, signingImportKey, signingExportKey, signingChangePassphrase.",
+  "description": "Permanently delete a key from the signing service. Irreversible. Elevated: first call returns confirmUrl, retry with confirmToken.",
   "inputSchema": {
     "type": "object",
     "properties": {

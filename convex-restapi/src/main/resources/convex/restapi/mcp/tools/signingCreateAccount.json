@@ -1,7 +1,10 @@
 {
   "name": "signingCreateAccount",
   "title": "Create Account via Signing Service",
-  "description": "Creates a new Ed25519 key in the signing service and a corresponding on-chain Convex account. Optionally funds the account via faucet. The private key is stored encrypted server-side.\n\nRequires authentication via bearer token and a peer with faucet enabled.",
+  "description": "Create a new signing key and on-chain account in one step. Optionally fund via faucet. Authenticated.",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -11,7 +14,7 @@
       },
       "faucet": {
         "type": "number",
-        "description": "Optional amount of Convex coins to request from faucet (in copper). Max 1 CVX."
+        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper, max 1 CVM)."
       }
     },
     "required": ["passphrase"]

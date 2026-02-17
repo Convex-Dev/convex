@@ -1,7 +1,10 @@
 {
   "name": "signAndSubmit",
   "title": "Sign and Submit Transaction",
-  "description": "Sign a prepared transaction with an Ed25519 seed and submit it for execution. This combines the 'sign' and 'submit' tools into a single convenient step. Use after calling 'prepare' to get the transaction hash. SECURITY WARNING: This sends your Ed25519 seed over the network. Only use with HTTPS connections to peers you trust.",
+  "description": "Sign and submit a prepared transaction. Use after 'prepare'. Sends seed over network — HTTPS only.",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

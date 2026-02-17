@@ -1,7 +1,12 @@
 {
   "name": "sign",
   "title": "Value Signer",
-  "description": "Sign raw data (provided as a hex string) using a provided Ed25519 seed",
+  "description": "Sign raw hex data with an Ed25519 seed. For transactions, sign the 'hash' from prepare.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

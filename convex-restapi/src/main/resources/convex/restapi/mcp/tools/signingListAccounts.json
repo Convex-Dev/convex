@@ -1,7 +1,12 @@
 {
   "name": "signingListAccounts",
   "title": "List Signing Accounts",
-  "description": "Lists the signing keys for the authenticated identity. Returns entries with the public key for each stored key. On-chain address resolution will be added when peers have a key-to-account index.\n\nRequires authentication via bearer token.",
+  "description": "List signing keys and associated on-chain addresses for the authenticated identity.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {}

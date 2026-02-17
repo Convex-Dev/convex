@@ -1,7 +1,12 @@
 {
   "name": "getTransaction",
   "title": "Get Transaction",
-  "description": "Look up a transaction by its hash. Returns the signed transaction data, its position in the ordering, and the execution result. Use this to verify that a transaction was successfully included in consensus and to check its outcome.",
+  "description": "Look up a transaction by hash. Returns signed data, consensus position, and execution result.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

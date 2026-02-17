@@ -1,7 +1,11 @@
 {
   "name": "prepare",
   "title": "Prepare Transaction",
-  "description": "Prepare a Convex transaction for signing. Returns a hash to pass to 'signAndSubmit' or 'submit'.\n\nCommon source patterns:\n- Transfer coins: (transfer #DEST_ADDR AMOUNT)\n- Check balance: *balance*\n- Deploy actor: (deploy '(do (defn greet [x] (str \"Hello \" x)) (export greet)))\n- Call actor function: (call #ACTOR_ADDR (function-name arg1 arg2))\n- Define value: (def my-var 42)\n- Set controller: (set-controller #CONTROLLER_ADDR)\n- Register CNS: (call #9 (cns-update 'my.name *address*))\n\nWorkflow: prepare -> signAndSubmit (or prepare -> sign -> submit for separate signing)",
+  "description": "Prepare a Convex transaction for signing. Returns a hash to pass to 'signAndSubmit' or 'submit'.\n\nCommon source patterns:\n- Transfer: (transfer #DEST AMOUNT)\n- Deploy actor: (deploy '(do (defn greet [x] (str \"Hello \" x)) (export greet)))\n- Call actor: (call #ACTOR (function-name arg1 arg2))\n- Define value: (def my-var 42)\n- Set controller: (set-controller #ADDR)\n- Register CNS: (call #9 (cns-update 'my.name *address*))\n\nAmounts in copper (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

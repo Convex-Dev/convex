@@ -1,7 +1,12 @@
 {
   "name": "signingServiceInfo",
   "title": "Signing Service Info",
-  "description": "Returns information about the peer's signing service capabilities. No authentication required.",
+  "description": "Check if the peer's signing service is available. No authentication required.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {},

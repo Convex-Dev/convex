@@ -1,7 +1,10 @@
 {
   "name": "signingChangePassphrase",
   "title": "Change Passphrase (Signing Service)",
-  "description": "Changes the passphrase for a key stored in the peer's signing service. Re-encrypts the key with the new passphrase. Requires authentication. This is an elevated operation — on first call (without confirmToken), returns a confirmation URL that the user must visit in a browser to approve. After approval, retry with the confirmToken to complete the change. Part of the signing service: see also signingServiceInfo, signingCreateKey, signingListKeys, signingSign, signingGetJWT, signingImportKey, signingExportKey, signingDeleteKey.",
+  "description": "Change the passphrase for a stored signing key. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

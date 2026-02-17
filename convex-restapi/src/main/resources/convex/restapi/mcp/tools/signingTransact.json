@@ -1,7 +1,10 @@
 {
   "name": "signingTransact",
   "title": "Transact via Signing Service",
-  "description": "Execute a Convex transaction using a key stored in the peer's signing service. The private key never leaves the server. Looks up the account's on-chain public key and signs the transaction using the matching stored key.\n\nRequires authentication via bearer token and a stored signing key matching the account's on-chain key.",
+  "description": "Execute a Convex transaction using a stored signing key. Private key never leaves the server. Authenticated.",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

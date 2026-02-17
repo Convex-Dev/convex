@@ -1,7 +1,12 @@
 {
   "name": "signingSign",
   "title": "Sign with Stored Key",
-  "description": "Signs arbitrary hex-encoded bytes using a key stored in the signing service. The key is identified by public key and decrypted using the passphrase. Requires authentication via bearer token.",
+  "description": "Sign hex-encoded bytes using a stored signing service key. Authenticated.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

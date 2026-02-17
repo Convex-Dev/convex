@@ -1,7 +1,10 @@
 {
   "name": "transact",
   "title": "Convex Transaction (Quick)",
-  "description": "Execute a Convex transaction in one step. Convenient but sends seed over network.\n\n⚠️ SECURITY WARNING: This tool sends your Ed25519 seed to the peer for signing. Only use this:\n- Over HTTPS connections\n- With peers you fully trust\n- For testing/development\n\nFor production or sensitive operations, use the safer two-step flow: prepare -> signAndSubmit (seed stays local until submit).\n\nTransactions are atomic operations on the CVM that update global state and can interact with digital assets and smart contracts.",
+  "description": "Execute a Convex transaction in one step. Sends seed over network — use HTTPS with trusted peers only. For sensitive operations prefer prepare → signAndSubmit.\n\nTransactions update global state atomically. Amounts in copper (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

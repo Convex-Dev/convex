@@ -1,7 +1,10 @@
 {
   "name": "signingCreateKey",
   "title": "Create Signing Key",
-  "description": "Creates a new Ed25519 key pair in the peer's signing service. The private key is encrypted and stored server-side, associated with the authenticated identity and passphrase. Requires authentication via bearer token.",
+  "description": "Create a new Ed25519 key pair in the signing service. Private key stored encrypted server-side. Authenticated.",
+  "annotations": {
+    "destructiveHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

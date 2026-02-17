@@ -1,7 +1,12 @@
 {
   "name": "signingListKeys",
   "title": "List Signing Keys",
-  "description": "Lists all public keys stored in the signing service for the authenticated identity. Requires authentication via bearer token.",
+  "description": "List all public keys stored in the signing service for the authenticated identity.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {},

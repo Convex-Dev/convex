@@ -1,7 +1,12 @@
 {
   "name": "describeAccount",
   "title": "Describe Account",
-  "description": "Get key information for an account including defined symbols with metadata and summary of account status.",
+  "description": "Get account info: balance, sequence number, defined symbols with metadata.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

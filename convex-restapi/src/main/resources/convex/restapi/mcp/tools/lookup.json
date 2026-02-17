@@ -1,7 +1,12 @@
 {
   "name": "lookup",
   "title": "Symbol Lookup",
-  "description": "Look up a symbolic value in a Convex account. Returns whether the symbol exists, its value (optionally using a path), and its metadata.",
+  "description": "Look up a symbol in a Convex account environment. Returns existence, value (with optional path navigation), and metadata.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {
