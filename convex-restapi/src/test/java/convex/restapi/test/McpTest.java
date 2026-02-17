@@ -1449,4 +1449,152 @@ public class McpTest extends ARESTTest {
 		ACell result = responseMap.get(McpAPI.FIELD_RESULT);
 		assertNotNull(result, "Initialize should succeed even with wrong jsonrpc version");
 	}
+
+	// ===== SSE and Session tests =====
+
+	/**
+	 * Helper to send a POST to /mcp with custom Accept header.
+	 */
+	private HttpResponse<String> postWithAccept(String url, String jsonBody, String accept) throws IOException, InterruptedException {
+		java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(url))
+				.header("Content-Type", "application/json")
+				.header("Accept", accept)
+				.POST(java.net.http.HttpRequest.BodyPublishers.ofString(jsonBody))
+				.build();
+		return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+	}
+
+	/**
+	 * POST with Accept: text/event-stream (SSE-only) should return SSE response.
+	 */
+	@Test
+	public void testSseResponseOnPost() throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"sse-1\"}";
+		HttpResponse<String> response = postWithAccept(MCP_PATH, request, "text/event-stream");
+		assertEquals(200, response.statusCode());
+		assertTrue(response.headers().firstValue("Content-Type").orElse("").contains("text/event-stream"),
+				"Should return SSE content type");
+
+		String body = response.body();
+		assertTrue(body.contains("event: message"), "SSE response should contain event: message");
+		assertTrue(body.contains("data: "), "SSE response should contain data: prefix");
+		assertTrue(body.contains("\"protocolVersion\""), "SSE data should contain initialize result");
+	}
+
+	/**
+	 * POST with Accept: application/json should return JSON (not SSE).
+	 */
+	@Test
+	public void testJsonResponseOnPost() throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"json-1\"}";
+		HttpResponse<String> response = postWithAccept(MCP_PATH, request, "application/json");
+		assertEquals(200, response.statusCode());
+		assertTrue(response.headers().firstValue("Content-Type").orElse("").contains("application/json"),
+				"Should return JSON content type");
+
+		// Should be valid JSON (not SSE)
+		ACell parsed = JSON.parse(response.body());
+		assertNotNull(parsed, "Response body should be valid JSON");
+		AMap<AString, ACell> map = RT.ensureMap(parsed);
+		assertNotNull(map.get(McpAPI.FIELD_RESULT), "Should have result");
+	}
+
+	/**
+	 * POST with Accept: application/json, text/event-stream should prefer JSON.
+	 */
+	@Test
+	public void testPreferJsonWhenBothAccepted() throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"both-1\"}";
+		HttpResponse<String> response = postWithAccept(MCP_PATH, request, "application/json, text/event-stream");
+		assertEquals(200, response.statusCode());
+		assertTrue(response.headers().firstValue("Content-Type").orElse("").contains("application/json"),
+				"Should prefer JSON when both are accepted");
+	}
+
+	/**
+	 * Initialize should return Mcp-Session-Id header.
+	 */
+	@Test
+	public void testInitializeReturnsSessionId() throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"sess-1\"}";
+		HttpResponse<String> response = post(MCP_PATH, request);
+		assertEquals(200, response.statusCode());
+
+		String sessionId = response.headers().firstValue("Mcp-Session-Id").orElse(null);
+		assertNotNull(sessionId, "Initialize should return Mcp-Session-Id header");
+		assertFalse(sessionId.isEmpty(), "Session ID should not be empty");
+	}
+
+	/**
+	 * DELETE /mcp with valid session should terminate it.
+	 */
+	@Test
+	public void testDeleteSession() throws IOException, InterruptedException {
+		// First initialize to get a session
+		String initRequest = "{\"jsonrpc\": \"2.0\", \"method\": \"initialize\", \"params\": {}, \"id\": \"del-1\"}";
+		HttpResponse<String> initResponse = post(MCP_PATH, initRequest);
+		String sessionId = initResponse.headers().firstValue("Mcp-Session-Id").orElse(null);
+		assertNotNull(sessionId);
+
+		// Delete the session
+		java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(MCP_PATH))
+				.header("Mcp-Session-Id", sessionId)
+				.DELETE()
+				.build();
+		HttpResponse<String> deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, deleteResponse.statusCode());
+
+		// Deleting again should return 404
+		HttpResponse<String> secondDelete = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+		assertEquals(404, secondDelete.statusCode());
+	}
+
+	/**
+	 * DELETE /mcp without session ID should return 400.
+	 */
+	@Test
+	public void testDeleteWithoutSessionId() throws IOException, InterruptedException {
+		java.net.http.HttpRequest deleteRequest = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(MCP_PATH))
+				.DELETE()
+				.build();
+		HttpResponse<String> response = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+		assertEquals(400, response.statusCode());
+	}
+
+	/**
+	 * GET /mcp without Accept: text/event-stream should return 405.
+	 */
+	@Test
+	public void testGetWithoutSseAccept() throws IOException, InterruptedException {
+		HttpResponse<String> response = get(MCP_PATH);
+		assertEquals(405, response.statusCode());
+	}
+
+	/**
+	 * GET /mcp with SSE Accept but no session should return 400.
+	 */
+	@Test
+	public void testGetSseWithoutSession() throws IOException, InterruptedException {
+		java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+				.uri(java.net.URI.create(MCP_PATH))
+				.header("Accept", "text/event-stream")
+				.GET()
+				.build();
+		HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+		assertEquals(400, response.statusCode());
+	}
+
+	/**
+	 * Notification should return 202 with application/json content type.
+	 */
+	@Test
+	public void testNotificationReturns202() throws IOException, InterruptedException {
+		// Notification has no "id" field
+		String request = "{\"jsonrpc\": \"2.0\", \"method\": \"notifications/initialized\", \"params\": {}}";
+		HttpResponse<String> response = post(MCP_PATH, request);
+		assertEquals(202, response.statusCode());
+	}
 }

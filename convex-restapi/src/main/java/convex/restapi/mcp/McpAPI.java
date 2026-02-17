@@ -1,10 +1,14 @@
 package convex.restapi.mcp;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +61,7 @@ import convex.restapi.api.ChainAPI;
 import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.model.JsonRPCRequest;
 import convex.restapi.model.JsonRPCResponse;
+import jakarta.servlet.http.HttpServletResponse;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.openapi.HttpMethod;
@@ -130,11 +135,15 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort KEY_ERROR_CODE = Strings.intern("errorCode");
 	public static final StringShort KEY_INFO = Strings.intern("info");
 
+	private static final String HEADER_SESSION_ID = "Mcp-Session-Id";
+	private static final long SSE_KEEPALIVE_MS = 30000;
+
 	private static final AHashMap<AString, ACell> BASE_RESPONSE = Maps.of("jsonrpc", "2.0");
 	private static final AMap<AString, ACell> EMPTY_MAP = Maps.empty();
 	private final AMap<AString, ACell> serverInfo;
 	private final Map<String, McpTool> tools = new LinkedHashMap<>();
 	private final Map<String, McpPrompt> prompts = new LinkedHashMap<>();
+	private final ConcurrentHashMap<String, McpSession> sessions = new ConcurrentHashMap<>();
 
 	public McpAPI(RESTServer restServer) {
 		super(restServer);
@@ -165,15 +174,75 @@ public class McpAPI extends ABaseAPI {
 	public void addRoutes(Javalin app) {
 		app.post("/mcp", this::handleMcpRequest);
 		app.get("/mcp", this::handleMcpGet);
+		app.delete("/mcp", this::handleMcpDelete);
 		app.get("/.well-known/mcp", this::getMCPWellKnown);
 	}
 
 	/**
-	 * GET /mcp — SSE streaming not supported. Return 405 Method Not Allowed
-	 * per MCP Streamable HTTP spec.
+	 * GET /mcp — Open SSE stream for server-to-client messages.
+	 * Requires a valid session (Mcp-Session-Id header) and Accept: text/event-stream.
+	 * Returns 405 if SSE not requested, 400 if session invalid.
 	 */
 	private void handleMcpGet(Context ctx) {
-		ctx.status(405);
+		String accept = ctx.header("Accept");
+		if (accept == null || !accept.contains("text/event-stream")) {
+			ctx.status(405);
+			return;
+		}
+
+		String sessionId = ctx.header(HEADER_SESSION_ID);
+		McpSession session = (sessionId != null) ? sessions.get(sessionId) : null;
+		if (session == null) {
+			ctx.status(400);
+			return;
+		}
+
+		try {
+			HttpServletResponse res = ctx.res();
+			res.setContentType("text/event-stream");
+			res.setCharacterEncoding("UTF-8");
+			res.setHeader("Cache-Control", "no-cache");
+			res.setHeader("X-Accel-Buffering", "no");
+			res.flushBuffer();
+
+			PrintWriter writer = res.getWriter();
+			SseConnection conn = new SseConnection(writer);
+			session.sseConnections.add(conn);
+			try {
+				// Keep-alive loop — blocks virtual thread until client disconnects
+				while (!conn.closed) {
+					writer.write(": keepalive\n\n");
+					writer.flush();
+					if (writer.checkError()) break;
+					Thread.sleep(SSE_KEEPALIVE_MS);
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			} finally {
+				conn.close();
+				session.sseConnections.remove(conn);
+			}
+		} catch (IOException e) {
+			log.debug("SSE connection setup failed", e);
+		}
+	}
+
+	/**
+	 * DELETE /mcp — Terminate an MCP session.
+	 */
+	private void handleMcpDelete(Context ctx) {
+		String sessionId = ctx.header(HEADER_SESSION_ID);
+		if (sessionId == null) {
+			ctx.status(400);
+			return;
+		}
+		McpSession session = sessions.remove(sessionId);
+		if (session == null) {
+			ctx.status(404);
+			return;
+		}
+		session.close();
+		ctx.status(200);
 	}
 
 	@OpenApi(path = "/mcp", 
@@ -210,23 +279,33 @@ public class McpAPI extends ABaseAPI {
 										) })
 					})	
 	private void handleMcpRequest(Context ctx) {
-		ctx.contentType(ContentTypes.JSON);
 		currentContext.set(ctx);
 		try {
+			boolean useSSE = acceptsEventStream(ctx);
 			ACell body = JSONReader.read(ctx.bodyInputStream());
+
 			if (body instanceof AMap<?, ?> map) {
 				if (isNotification(map)) {
-					// Notification (no id) — process but return 202 with no body
 					processNotification(map);
-					ctx.status(202).result("");
-				} else {
-					AMap<AString, ACell> response = createResponse(map);
-					setContent(ctx, response);
+					ctx.status(202).contentType(ContentTypes.JSON);
+					return;
 				}
+
+				AMap<AString, ACell> response = createResponse(map);
+
+				// Create session on successful initialize
+				String method = getMethodName(map);
+				if ("initialize".equals(method) && response.containsKey(FIELD_RESULT)) {
+					McpSession session = new McpSession(UUID.randomUUID().toString());
+					sessions.put(session.id, session);
+					ctx.header(HEADER_SESSION_ID, session.id);
+				}
+
+				sendResponse(ctx, response, useSSE);
 			} else if (body instanceof AVector<?> vector) {
 				long n = vector.count();
 				if (n == 0) {
-					setContent(ctx, protocolError(-32600, "Invalid batch request (empty)"));
+					sendResponse(ctx, protocolError(-32600, "Invalid batch request (empty)"), useSSE);
 					return;
 				}
 				AVector<AMap<AString, ACell>> responses = Vectors.empty();
@@ -243,18 +322,23 @@ public class McpAPI extends ABaseAPI {
 					}
 				}
 				if (responses.isEmpty()) {
-					// All entries were notifications
-					ctx.status(202).result("");
+					ctx.status(202).contentType(ContentTypes.JSON);
+				} else if (useSSE) {
+					// SSE: send each batch response as a separate event
+					sendSseBatchResponse(ctx, responses);
 				} else {
+					ctx.contentType(ContentTypes.JSON);
 					setContent(ctx, responses);
 				}
 			} else {
-				setContent(ctx, protocolError(-32600, "Request must be a JSON object or array"));
+				sendResponse(ctx, protocolError(-32600, "Request must be a JSON object or array"), useSSE);
 			}
 		} catch (ParseException | IOException e) {
+			ctx.contentType(ContentTypes.JSON);
 			setContent(ctx, protocolError(-32700, "Parse error"));
 		} catch (Exception e) {
 			log.warn("Unexpected error handling MCP request", e);
+			ctx.contentType(ContentTypes.JSON);
 			setContent(ctx, protocolError(-32603, "Internal error"));
 		} finally {
 			currentContext.remove();
@@ -1426,6 +1510,145 @@ public class McpAPI extends ABaseAPI {
 			} catch (Exception e) {
 				return toolError("getTransaction failed: " + e.getMessage());
 			}
+		}
+	}
+
+	// ===== SSE and Session support =====
+
+	/**
+	 * Check if the client exclusively wants SSE (text/event-stream) responses.
+	 * When the client accepts both JSON and SSE, we prefer JSON since our tools
+	 * return synchronously. SSE on POST is reserved for streaming scenarios.
+	 */
+	private boolean acceptsEventStream(Context ctx) {
+		String accept = ctx.header("Accept");
+		if (accept == null) return false;
+		if (accept.contains("application/json")) return false;
+		return accept.contains("text/event-stream");
+	}
+
+	/**
+	 * Extract the JSON-RPC method name from a request map.
+	 */
+	private String getMethodName(AMap<?, ?> request) {
+		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
+		return methodCell != null ? methodCell.toString().trim() : null;
+	}
+
+	/**
+	 * Send a JSON-RPC response as either SSE or JSON, depending on client preference.
+	 */
+	private void sendResponse(Context ctx, ACell response, boolean useSSE) {
+		if (useSSE) {
+			sendSseResponse(ctx, response);
+		} else {
+			ctx.contentType(ContentTypes.JSON);
+			setContent(ctx, response);
+		}
+	}
+
+	/**
+	 * Send a single JSON-RPC response as an SSE event, writing directly to the
+	 * servlet response to ensure correct Content-Type for SSE clients.
+	 */
+	private void sendSseResponse(Context ctx, ACell response) {
+		try {
+			writeSseToServletResponse(ctx, formatSseEvent(response));
+		} catch (IOException e) {
+			log.debug("Failed to send SSE response", e);
+		}
+	}
+
+	/**
+	 * Send batch responses as individual SSE events on one stream.
+	 */
+	private void sendSseBatchResponse(Context ctx, AVector<AMap<AString, ACell>> responses) {
+		try {
+			StringBuilder sb = new StringBuilder();
+			long n = responses.count();
+			for (long i = 0; i < n; i++) {
+				appendSseEvent(sb, responses.get(i));
+			}
+			writeSseToServletResponse(ctx, sb.toString());
+		} catch (IOException e) {
+			log.debug("Failed to send SSE batch response", e);
+		}
+	}
+
+	/**
+	 * Write SSE content directly to the servlet response, bypassing Javalin's
+	 * result mechanism to ensure Content-Type: text/event-stream is preserved.
+	 * Commits the response via flushBuffer() so Javalin cannot override it.
+	 */
+	private void writeSseToServletResponse(Context ctx, String sseBody) throws IOException {
+		HttpServletResponse res = ctx.res();
+		res.setStatus(200);
+		res.setContentType("text/event-stream");
+		res.setCharacterEncoding("UTF-8");
+		res.setHeader("Cache-Control", "no-cache");
+		res.setHeader("X-Accel-Buffering", "no");
+		PrintWriter writer = res.getWriter();
+		writer.write(sseBody);
+		writer.flush();
+		res.flushBuffer(); // Commit response so Javalin can't override headers/body
+	}
+
+	/**
+	 * Format a single SSE event: event: message\ndata: JSON\n\n
+	 */
+	private String formatSseEvent(ACell data) {
+		StringBuilder sb = new StringBuilder();
+		appendSseEvent(sb, data);
+		return sb.toString();
+	}
+
+	private void appendSseEvent(StringBuilder sb, ACell data) {
+		sb.append("event: message\n");
+		sb.append("data: ");
+		sb.append(JSON.print(data).toString());
+		sb.append("\n\n");
+	}
+
+	/**
+	 * An MCP session, created on initialize, tracks SSE connections.
+	 */
+	private static class McpSession {
+		final String id;
+		final Set<SseConnection> sseConnections = ConcurrentHashMap.newKeySet();
+
+		McpSession(String id) {
+			this.id = id;
+		}
+
+		void close() {
+			for (SseConnection conn : sseConnections) conn.close();
+			sseConnections.clear();
+		}
+	}
+
+	/**
+	 * A server-to-client SSE connection opened via GET /mcp.
+	 */
+	static class SseConnection {
+		final PrintWriter writer;
+		volatile boolean closed = false;
+
+		SseConnection(PrintWriter writer) {
+			this.writer = writer;
+		}
+
+		void sendEvent(String eventType, String data) {
+			if (closed) return;
+			synchronized (writer) {
+				writer.write("event: " + eventType + "\n");
+				writer.write("data: " + data + "\n\n");
+				writer.flush();
+				if (writer.checkError()) close();
+			}
+		}
+
+		void close() {
+			closed = true;
 		}
 	}
 
