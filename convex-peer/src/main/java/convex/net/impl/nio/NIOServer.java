@@ -52,7 +52,7 @@ public class NIOServer extends AServer {
 
 	private boolean running = false;
 
-	private final Consumer<Message> receiveAction;
+	private Consumer<Message> receiveAction;
 
 	
 	protected NIOServer(Consumer<Message> receiveAction) {
@@ -268,6 +268,11 @@ public class NIOServer extends AServer {
 	@Override
 	public Consumer<Message> getReceiveAction() {
 		return receiveAction;
+	}
+
+	@Override
+	public void setReceiveAction(Consumer<Message> action) {
+		this.receiveAction = action;
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {

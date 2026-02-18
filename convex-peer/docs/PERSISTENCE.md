@@ -126,7 +126,7 @@ public void launch() {
 ### Running: Periodic + Triggered Persistence
 
 Persistence is triggered by:
-- **Value change** — `updateLocal()` and incoming merges signal the pipeline
+- **Value change** — cursor updates and incoming merges signal the pipeline
 - **Timer** — periodic snapshots at configurable interval (default 30s)
 - **Shutdown** — final persist before close
 

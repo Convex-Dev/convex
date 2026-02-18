@@ -110,7 +110,8 @@ public class KVReplicationDemo {
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
-				servers.get(i).updateLocalPath(replica, Keywords.KV);
+				servers.get(i).getCursor().set(replica, Keywords.KV);
+			servers.get(i).getPropagator().triggerBroadcast(servers.get(i).getLocalValue());
 			}
 
 			// --- Sync network ---
@@ -162,7 +163,7 @@ public class KVReplicationDemo {
 			// --- Propagator stats ---
 			System.out.println("\n=== Propagator Stats ===");
 			for (int i = 0; i < NUM_NODES; i++) {
-				LatticePropagator<?> p = servers.get(i).getPropagator();
+				LatticePropagator p = servers.get(i).getPropagator();
 				System.out.println("Node " + i + ": "
 					+ p.getBroadcastCount() + " broadcasts, "
 					+ p.getRootSyncCount() + " root syncs");

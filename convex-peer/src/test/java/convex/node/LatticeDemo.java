@@ -153,7 +153,8 @@ public class LatticeDemo {
 				// 2. Compute what's new (delta)
 				// 3. Broadcast the delta to all connected peers
 				// All of this happens automatically in the background!
-				node1.updateLocalPath(dataIndex, dataKeyword);
+				node1.getCursor().set(dataIndex, dataKeyword);
+				node1.getPropagator().triggerBroadcast(node1.getLocalValue());
 
 				if ((merge + 1) % 10 == 0) {
 					System.out.println("Completed " + (merge + 1) + " merges (" + ((merge + 1) * MODS) + " total modifications)");
@@ -232,7 +233,7 @@ public class LatticeDemo {
 				// This is because the propagator intelligently batches and only sends deltas
 				System.out.println("\nPropagator Statistics (how automatic sync worked):");
 				for (int i = 0; i < NUM_NODES; i++) {
-					LatticePropagator<?> propagator = servers.get(i).getPropagator();
+					LatticePropagator propagator = servers.get(i).getPropagator();
 					System.out.println("  Node " + (i + 1) + ": " +
 						propagator.getBroadcastCount() + " delta broadcasts, " +
 						propagator.getRootSyncCount() + " root syncs");

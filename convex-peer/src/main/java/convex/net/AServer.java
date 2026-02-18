@@ -46,8 +46,15 @@ public abstract class AServer implements Closeable {
 	/**
 	 * Get the receiver action for the server, which handles an incoming Message
 	 * Receive action is responsible for all message handling
-	 * 
+	 *
 	 * @return Receive action
 	 */
 	public abstract Consumer<Message> getReceiveAction();
+
+	/**
+	 * Set the receiver action for the server. Must be called before launch.
+	 *
+	 * @param action Receive action to handle incoming messages
+	 */
+	public abstract void setReceiveAction(Consumer<Message> action);
 }

@@ -124,7 +124,8 @@ public class LatticePropagatorTest {
 			dataIndex = emptyIndex;
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
-		server2.updateLocalPath(updatedDataIndex, dataKeyword);
+		server2.getCursor().set(updatedDataIndex, dataKeyword);
+		server2.getPropagator().triggerBroadcast(server2.getLocalValue());
 
 		// Sync server1 to ensure it has received the broadcast from server2
 		assertTrue(server1.sync(), "Sync should complete successfully");
@@ -154,7 +155,8 @@ public class LatticePropagatorTest {
 				dataIndex = emptyIndex;
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
-			server1.updateLocalPath(updatedDataIndex, dataKeyword);
+			server1.getCursor().set(updatedDataIndex, dataKeyword);
+			server1.getPropagator().triggerBroadcast(server1.getLocalValue());
 
 			// Sync server2 to ensure it received the update from server1
 			assertTrue(server2.sync(), "Sync should complete successfully for update " + (i + 1));
