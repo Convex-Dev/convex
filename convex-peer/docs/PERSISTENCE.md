@@ -2,14 +2,14 @@
 
 ## Status Quo
 
-NodeServer holds all lattice state in a `Root<V>` cursor backed by `AtomicReference<V>`. On
-shutdown, everything is lost. The `AStore` field is used only for network data resolution
-(delta encoding, missing data acquisition) — never for persisting the lattice value itself.
+NodeServer by default holds all lattice state in a `Root<V>` cursor backed by `AtomicReference<V>`. On
+shutdown, everything is lost. Applications are required to define their own persistence / replication strategy
+which is not ideal as it is a likely cause of bugs / security risks. 
 
-The existing `Server` (CVM peer) has a complete persistence lifecycle:
+The existing `Server` (Convex peer) has a complete persistence lifecycle:
 `persistPeerData()` → `store.setRootData()` → Etch on disk → `Peer.restorePeer()` on restart.
 NodeServer needs the equivalent, but adapted for lattice semantics and the needs of lattice
-applications like DLFS.
+applications like DLFS which are not public by default.
 
 ## Design Goals
 
