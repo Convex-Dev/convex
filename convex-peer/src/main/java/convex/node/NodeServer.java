@@ -121,7 +121,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		V initialValue = lattice.zero();
 		this.cursor = Root.create(initialValue);
 		
-		this.peerNodes = new java.util.HashSet<>();
+		this.peerNodes = java.util.concurrent.ConcurrentHashMap.newKeySet();
 		
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;

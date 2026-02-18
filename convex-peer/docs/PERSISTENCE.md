@@ -17,7 +17,7 @@ applications like DLFS.
    happens asynchronously or on demand
 2. **Hot push to trusted replicas** with novelty detection (delta encoding)
 3. **Filtering before push** — exclude local/private data from outbound lattice values
-4. **Works with any AStore** — including non-persistent (memory) stores
+4. **Works with any AStore** — `store.isPersistent()` determines if disk writes occur
 5. **Atomic operations** — persist, merge, and filter are all-or-nothing
 6. **O(1) snapshots** — immutable lattice data structures make cheap snapshots the norm;
    hand copies to other threads freely
@@ -31,7 +31,7 @@ applications like DLFS.
                         ┌──────────────────────────────┐
                         │        NodeServer             │
                         │                               │
-  App writes ──────────►│  cursor: Root<V>              │
+  App writes ──────────►│  cursor: ACursor<V>           │
   (instant, in-memory)  │    │                          │
                         │    │ O(1) snapshot             │
                         │    ▼                          │
@@ -62,13 +62,19 @@ cursor.set(value)               ← instant, in-memory
 │                                                          │
 │  1. V snapshot = cursor.get()          ← O(1) ref copy  │
 │  2. V filtered = filter(snapshot)      ← strip private   │
-│  3. Cells.persist(snapshot, store)     ← write to Etch   │
-│  4. store.setRootData(snapshot)        ← anchor for      │
-│                                          restore         │
-│  5. Cells.announce(filtered, handler)  ← collect novelty │
-│  6. broadcast(filtered, novelty)       ← delta push      │
+│  3. Cells.announce(filtered, handler)  ← collect novelty │
+│  4. broadcast(filtered, novelty)       ← delta push      │
+│  5. if config.persist:                                    │
+│       Cells.persist(snapshot, store)   ← write to Etch   │
+│       store.setRootData(snapshot)      ← anchor restore  │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**Pipeline ordering rationale:** Announce the filtered value *before* persisting the full
+snapshot. This ensures cells that are private (present in the full snapshot but absent from
+the filtered version) are never marked as novelty — they never enter the announce tracking
+at all. Shared cells (present in both filtered and full) will be announced during step 3
+and then deduplicate when persisted in step 5 with no significant performance cost.
 
 Key invariant: the cursor is **never blocked** by persistence or network I/O. Apps write
 to the cursor and continue immediately. The pipeline picks up the latest value at its own
@@ -92,21 +98,23 @@ pipeline never contend on the same mutable state.
 
 ### Startup: Restore
 
+The lattice value is stored directly as the Etch root data — one NodeServer per store.
+Applications that need multiple lattice regions use sub-cursors within a single root value.
+
+Both restore and persist are **configuration options**, not purely determined by store type.
+An operator may want a clean start even on a persistent EtchStore (e.g. clearing corrupted
+state, testing fresh behaviour, or starting a new replication topology). Similarly, a node
+may want to broadcast without persisting (e.g. a relay node, or during testing). Both flags
+default to `true` — they only take effect when the store is also persistent.
+
 ```java
 public void launch() {
-    // 1. Check if store has persistent data
-    if (store.isPersistent()) {
-        Hash rootHash = store.getRootHash();
-        if (rootHash != null) {
-            Ref<?> rootRef = store.refForHash(rootHash);
-            if (rootRef != null) {
-                AMap<ACell,ACell> rootData = (AMap<ACell,ACell>) rootRef.getValue();
-                V restored = (V) rootData.get(rootKey);
-                if (restored != null) {
-                    cursor.set(restored);
-                    log.info("Restored lattice value from store");
-                }
-            }
+    // 1. Restore from persistent store if configured
+    if (config.restore && store.isPersistent()) {
+        V restored = (V) store.getRootData();
+        if (restored != null) {
+            cursor.set(restored);
+            log.info("Restored lattice value from store");
         }
     }
 
@@ -131,7 +139,7 @@ snapshot is persisted. This is correct because lattice merge is idempotent.
 public void close() {
     // 1. Stop accepting new connections and messages
     // 2. Final persist of current value
-    if (store.isPersistent()) {
+    if (config.persist && store.isPersistent()) {
         persistSnapshot(cursor.get());
     }
     // 3. Close propagator, network server, peer connections
@@ -140,13 +148,17 @@ public void close() {
 
 ### Store Compatibility
 
-Not all stores are persistent (e.g. `MemoryStore` for testing). The pipeline must
-handle this gracefully:
+`AStore.isPersistent()` determines whether the store *can* persist. `config.persist` and
+`config.restore` determine whether the server *does* persist and restore. All three are
+independent:
 
-```java
-boolean isPersistent = store instanceof EtchStore;
-// or: add isPersistent() to AStore interface
-```
+| `isPersistent()` | `config.restore` | `config.persist` | Behaviour |
+|-------------------|-------------------|-------------------|-----------|
+| `true` | `true` | `true` | Full persist/restore cycle (normal operation) |
+| `true` | `false` | `true` | Persist new state, but start fresh (clear start) |
+| `true` | `true` | `false` | Restore existing state, but don't write updates (read-only replay) |
+| `true` | `false` | `false` | Relay node — broadcast only, no disk I/O |
+| `false` | `*` | `*` | In-memory only — restore/persist flags are no-ops |
 
 When using a non-persistent store:
 - Skip `setRootData()` and disk writes
@@ -183,16 +195,24 @@ public interface LatticeFilter<V extends ACell> {
 
 ### Filter Placement
 
-Filtering happens **after snapshot, before broadcast**:
+Filtering happens **after snapshot, before announce**. The filtered value is announced and
+broadcast first; the full value is persisted afterwards:
 
 ```
 cursor.get()  →  snapshot  →  filter(snapshot)  →  announce + broadcast
-                     │
-                     └→  persist(snapshot)  ← full value persisted locally
+                     │                                     │
+                     └─────────────────────────────────────┘
+                                                    then persist(snapshot)
 ```
 
+This ordering is critical: cells that exist only in the full value (private data) are
+**never announced as novelty** because they were never seen by `Cells.announce()`. They
+are written to Etch during persist but remain invisible to the broadcast mechanism.
+
 The **full unfiltered value** is persisted to local store (so private data survives
-restart). Only the **filtered value** is announced and broadcast to peers.
+restart). Only the **filtered value** is announced and broadcast to peers. Shared cells
+(present in both) deduplicate naturally — `Cells.persist()` is a no-op for cells already
+tracked by announce.
 
 ### Per-Connection Filters
 
@@ -221,20 +241,25 @@ This enables:
 
 ### Change for Persistence
 
-The persistence pipeline integrates with the existing propagator:
+The persistence pipeline integrates with the existing propagator. Announce happens before
+persist to ensure private cells are never tracked as novelty:
 
 ```
 Pipeline run:
   1. snapshot = cursor.get()
   2. filtered = filter(snapshot)
-  3. persist(snapshot, store)              ← NEW: write full value to Etch
-  4. announce(filtered, noveltyHandler)    ← existing: collect novelty for filtered value
-  5. broadcast(filtered, novelty)          ← existing: delta push
+  3. announce(filtered, noveltyHandler)    ← collect novelty for filtered value only
+  4. broadcast(filtered, novelty)          ← delta push (filtered)
+  5. if config.persist:
+       persist(snapshot, store)            ← NEW: write full value to Etch
+       store.setRootData(snapshot)         ← anchor for restore
 ```
 
-Step 3 (persist) writes the full tree to Etch. This also populates the store's hash
-index, which means step 4 (announce) can efficiently detect novelty — cells already
-persisted are not novel.
+Steps 3-4 announce and broadcast the **filtered** value. Only cells in the filtered tree
+are marked as novelty and transmitted. Step 5 then persists the **full** snapshot to Etch.
+Cells already announced in step 3 deduplicate — the store recognises them as already
+written, so the persist cost is dominated by private-only cells (which are typically a
+small fraction).
 
 ### Atomicity
 
@@ -310,29 +335,28 @@ Subsequent updates use delta push (via LatticePropagator).
 
 ## Configuration
 
-### NodeServer Builder
-
 ```java
 NodeServer<V> server = NodeServer.builder(lattice, store)
     .port(8765)
-    .rootKey(Keywords.create("myapp"))     // key in store root data
+    .cursor(rootCursor)                    // ACursor<V>, default creates new Root<V>
     .filter(myFilter)                      // default outbound filter
+    .persist(true)                         // write state to store (default: true)
+    .restore(true)                         // restore from store on startup (default: true)
     .persistInterval(30_000)               // ms between periodic persists
-    .restore(true)                         // restore from store on startup
     .build();
 ```
 
-### Configuration Keywords
-
-| Keyword | Type | Default | Description |
-|---------|------|---------|-------------|
-| `:port` | Integer | null (random) | Network listen port |
-| `:store` | AStore | MemoryStore | Persistence backend |
-| `:root-key` | ACell | null | Key in store root data map |
-| `:restore` | Boolean | true | Restore from store on startup |
-| `:persist` | Boolean | true | Persist on shutdown |
-| `:persist-interval` | Long | 30000 | Periodic persist interval (ms) |
-| `:filter` | LatticeFilter | null | Default outbound filter |
+Key options:
+- **`cursor`** — an `ACursor<V>` to use. If omitted, creates a `Root<V>` with the lattice
+  zero value. Pass a `PathCursor` to attach this server at a sub-path of a larger tree.
+- **`persist`** — whether to write state to the store. Defaults to `true`. Set to `false`
+  for relay nodes or testing scenarios where only broadcast is needed.
+- **`restore`** — whether to load existing data from the store on startup. Defaults to
+  `true`. Set to `false` for a clean start even on a persistent store.
+- **`filter`** — default `LatticeFilter<V>` for outbound replication. Can be overridden
+  per-connection via `addReplica()`.
+- **`persistInterval`** — milliseconds between periodic persistence runs. Set to `0` to
+  disable periodic persistence (persist only on shutdown and explicit trigger).
 
 ## Interaction with Lattice Apps
 
@@ -373,6 +397,158 @@ fork.set(value3, path3);
 fork.sync();  // atomic merge back to parent — always succeeds (lattice)
 ```
 
+## Hierarchical Cursor Sync
+
+### Motivation
+
+A single NodeServer may host a lattice tree with independently-syncable sub-regions.
+Examples:
+- **DLFS** — each drive is a sub-tree that could sync with a different set of peers
+- **Database subsystem** — a SQL database occupies one branch of the lattice; it may
+  replicate to database-specific peers that don't need the full tree
+- **Multi-tenant** — each owner's data is a sub-tree with independent replication policy
+
+The cursor hierarchy (`Root` → `PathCursor` → `DescendedLatticeCursor`) supports this
+natively.
+
+### Architecture
+
+```
+                  Root<V>  (full lattice tree)
+                     │
+         ┌───────────┼───────────┐
+         │           │           │
+    PathCursor    PathCursor   PathCursor
+    (:fs)         (:db)        (:meta)
+         │           │
+    ┌────┴────┐      │
+    │         │      │
+ PathCursor  ...   NodeServer (DB-level sync)
+ (owner,drive)       ↕ peers
+    │
+ DLFSLocal
+ NodeServer (drive-level sync)
+    ↕ peers
+```
+
+### How It Works
+
+`PathCursor` delegates reads and writes to the parent cursor with an automatic path prefix.
+All writes are atomic — `PathCursor.updateAndGet()` runs a CAS loop on the root
+`AtomicReference`, so concurrent writes to different sub-paths compose correctly.
+
+A `NodeServer` only requires an `ACursor<V>` — it does not assume it holds the root.
+This means a NodeServer can be attached at any level of the tree:
+
+```java
+// Root-level NodeServer: persists and syncs the entire tree
+NodeServer<V> rootServer = NodeServer.create(lattice, rootCursor, store);
+
+// Drive-level NodeServer: syncs only one DLFS drive
+ACursor<AVector<ACell>> driveCursor = rootCursor.path(Keyword.intern("fs"), ownerKey, driveName);
+NodeServer<AVector<ACell>> driveServer = NodeServer.create(dlfsLattice, driveCursor, null);
+// null store — persistence handled by root server
+```
+
+### Persistence Responsibility
+
+**Only the root-level NodeServer should persist to store.** Sub-path NodeServers set
+`store = null` (or use a non-persistent store) because their writes propagate atomically
+to the root cursor, which the root server persists. Double-persisting would be redundant
+and could cause ordering issues.
+
+```
+Write to drive cursor
+    │
+    ▼
+PathCursor.updateAndGet()      ← atomic CAS on Root<V>
+    │
+    ▼
+Root<V> now holds updated tree ← root NodeServer's persistence pipeline picks this up
+    │
+    ▼
+Root server: snapshot → filter → announce → broadcast → persist
+```
+
+### Independent Replication
+
+Sub-path NodeServers replicate independently at their own level:
+
+- **Drive sync**: a DLFS drive syncs with backup peers at the drive granularity — peers
+  receive only that drive's tree, not the full lattice
+- **DB sync**: a database subsystem syncs with database-specific peers
+- **Root sync**: the root server syncs the full tree with trusted infrastructure peers
+
+Each NodeServer at each level has its own `LatticePropagator`, its own peer connections,
+and its own filter configuration. Changes propagate upward through the cursor hierarchy
+and downward through each server's broadcast.
+
+### Merge Direction
+
+When a sub-path NodeServer receives an update from a remote peer, it merges into its
+cursor. Because the cursor is a `PathCursor`, the merge atomically updates the root value.
+The root server's propagator detects the change and includes it in the next root-level
+broadcast.
+
+Conversely, when the root server receives an update that touches a sub-path, the sub-path
+NodeServer sees the change (its `PathCursor.get()` reflects the new root value) and can
+broadcast to its own peers.
+
+This bidirectional propagation works because lattice merge is commutative and idempotent —
+the same update arriving via two paths produces the same result.
+
+## Convergence with CVM Peer Server
+
+NodeServer and the CVM `Server` implement the same distributed systems pattern. The
+table below maps equivalent mechanisms:
+
+| Concern | Server (CVM Peer) | NodeServer (Lattice) |
+|---------|-------------------|----------------------|
+| **State holder** | `Peer` (Belief + State) | `Root<V>` cursor |
+| **Persist** | `persistPeerData()` → `setRootData()` | `persistSnapshot()` → `setRootData()` |
+| **Restore** | `Peer.restorePeer(store, kp, rootKey)` | `store.getRootData()` → `cursor.set()` |
+| **Delta broadcast** | `BeliefPropagator` | `LatticePropagator` |
+| **Novelty detection** | `Cells.announce()` + `Format.encodeDelta()` | Same |
+| **Network layer** | `AServer` (Netty/NIO) | `AServer` (Netty) |
+| **Peer connections** | `ConnectionManager` (`HashMap<AccountKey, Convex>`) | `Set<Convex>` (ConcurrentHashMap.newKeySet) |
+| **Shutdown order** | Components → persist → close network | Same |
+
+### What should converge
+
+**Already shared:** `AStore`, `Cells`, `Format`, `Message`, `AServer`, `Ref`, delta
+encoding. The novelty detection mechanism (`Cells.announce` → `Format.encodeDelta`) is
+identical.
+
+**Candidates for extraction:**
+
+1. **Propagator base class** — `BeliefPropagator` and `LatticePropagator` both:
+   - Run a background loop waiting on a trigger queue
+   - Snapshot a value, announce to store, collect novelty
+   - Encode delta, broadcast to peers
+   - Periodically re-sync for divergence detection
+
+   An `APropagator<T>` base class could factor out the loop, trigger queue, broadcast
+   mechanics, and timing. Subclasses implement only message format and merge semantics.
+
+2. **Persist/restore lifecycle** — Both servers do `Cells.persist(value, store)` +
+   `store.setRootData(value)` on shutdown, and `store.getRootData()` on startup. This
+   is a 10-line pattern, simple enough to share via a utility method rather than a base
+   class.
+
+3. **`AServer.setReceiveAction()`** — NodeServer currently casts to `NettyServer` to set
+   the receive action. Adding `setReceiveAction(Consumer<Message>)` to `AServer` would
+   eliminate this cast.
+
+### What should stay separate
+
+- **Server** manages CVM consensus (Beliefs, Orders, Blocks), transaction processing, and
+  the CVM executor. These have no lattice equivalent.
+- **NodeServer** manages lattice merge semantics, path-based cursors, and foreign value
+  validation. These have no CVM equivalent.
+- **Connection management** differs: Server authenticates peers via challenge-response and
+  keys connections by `AccountKey`. NodeServer's lattice sync is simpler (private network,
+  trusted connections). Forcing a common abstraction would over-complicate both.
+
 ## Relation to Existing Docs
 
 ### DLFS_LATTICE_INTEGRATION_STRATEGY.md
@@ -395,23 +571,17 @@ This document does not change the sync protocol — it adds a persistence layer 
 The key integration point: the persistence pipeline feeds into the existing
 LatticePropagator rather than replacing it.
 
-### STORE_REFACTOR_PLAN.md
-
-Describes removing ThreadLocal stores in favour of explicit store passing. This
-document assumes explicit stores throughout — NodeServer already holds its store as
-a field. The persistence pipeline uses `this.store` directly.
-
 ## Implementation Phases
 
 ### Phase 1: Core Persistence
 
 Add persist/restore to NodeServer using the existing `Server.persistPeerData()` pattern.
 
-- Add `rootKey` configuration field
 - Add `persistSnapshot(V value)` method — `Cells.persist()` + `store.setRootData()`
-- Add restore logic in `launch()` — read from `store.getRootHash()` + `rootKey`
+- Add restore logic in `launch()` — `config.restore && store.isPersistent()` → load
+- Accept `ACursor<V>` in builder (support sub-path attachment)
 - Add final persist in `close()`
-- Add `isPersistent()` check (skip disk ops for MemoryStore)
+- Use `store.isPersistent()` to gate disk operations
 
 ### Phase 2: Periodic + Triggered Persistence
 
@@ -420,7 +590,7 @@ Integrate persistence into the LatticePropagator loop.
 - Add persist trigger alongside broadcast trigger
 - Configurable persist interval (default 30s)
 - Coalesce rapid updates — only persist latest snapshot
-- Persist before broadcast (so store is populated for novelty detection)
+- Announce filtered value before persist (so private cells are never marked as novelty)
 
 ### Phase 3: Filtering
 
@@ -441,6 +611,15 @@ Add connection management with per-replica configuration.
 - Auto-reconnect with backoff
 - Immediate root sync on connect
 
+### Phase 5: Propagator Convergence
+
+Extract common propagator base from `BeliefPropagator` and `LatticePropagator`.
+
+- Define `APropagator<T>` with shared loop, trigger queue, broadcast mechanics
+- Migrate `LatticePropagator` first (simpler, lower risk)
+- Migrate `BeliefPropagator` second (higher stakes, more testing needed)
+- Add `setReceiveAction()` to `AServer` interface
+
 ## Verification
 
 ```bash
@@ -457,7 +636,10 @@ pushd C:/Users/mike_/git/convex && mvn test -pl convex-dlfs
 Test scenarios:
 - Persist + restart + restore: value survives restart
 - Non-persistent store: no errors, value resets to zero on restart
-- Filter: filtered value broadcast, full value persisted
+- Restore disabled (`config.restore = false`): persistent store ignored, fresh start
+- Filter: filtered value broadcast, full value persisted; private cells never announced
 - Rapid writes: only latest snapshot persisted (coalescing)
 - Concurrent app writes during persist: no blocking, no corruption
 - Multi-node: two NodeServers with Etch stores, sync, restart one, verify convergence
+- Hierarchical sync: sub-path NodeServer syncs independently, writes propagate to root
+- Sub-path isolation: sub-path server's peers receive only the sub-tree, not full lattice

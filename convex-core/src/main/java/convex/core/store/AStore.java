@@ -180,4 +180,13 @@ public abstract class AStore implements Closeable {
 	public abstract <T extends ACell> Ref<T> checkCache(Hash h);
 
 	public abstract String shortName();
+
+	/**
+	 * Returns true if this store persists data durably across JVM restarts.
+	 *
+	 * @return true if data survives restart, false for in-memory stores
+	 */
+	public boolean isPersistent() {
+		return false;
+	}
 }

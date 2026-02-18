@@ -301,5 +301,8 @@ public class EtchStore extends ACachedStore {
 		return "Etch: "+etch.getFileName();
 	}
 
-
+	@Override
+	public boolean isPersistent() {
+		return true;
+	}
 }
