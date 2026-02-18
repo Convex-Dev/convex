@@ -21,19 +21,23 @@ import convex.dlfs.DLFSServer;
 
 /**
  * WebDAV tests using the Sardine client for PROPFIND/MKCOL,
- * plus raw HTTP for edge cases.
+ * plus raw HTTP for edge cases. All tests operate within pre-seeded drives.
  */
 public class WebDAVTest {
 
 	private static DLFSServer server;
 	private static String baseURL;
+	/** Base URL for the pre-seeded "webdav" drive */
+	private static String driveURL;
 	private static HttpClient httpClient;
 
 	@BeforeAll
 	static void setUp() {
 		server = DLFSServer.create(null);
+		server.getDriveManager().createDrive(null, "webdav");
 		server.start(0);
 		baseURL = "http://localhost:" + server.getPort() + "/dlfs/";
+		driveURL = baseURL + "webdav/";
 		httpClient = HttpClient.newHttpClient();
 	}
 
@@ -45,24 +49,31 @@ public class WebDAVTest {
 	// ==================== PROPFIND ====================
 
 	@Test
-	void testPropfindRoot() throws Exception {
+	void testPropfindDriveRoot() throws Exception {
 		Sardine sardine = SardineFactory.begin();
-		List<DavResource> resources = sardine.list(baseURL);
-		assertFalse(resources.isEmpty(), "Root listing should not be empty");
+		List<DavResource> resources = sardine.list(driveURL);
+		assertFalse(resources.isEmpty(), "Drive root listing should not be empty");
 
 		DavResource root = resources.get(0);
-		assertTrue(root.isDirectory(), "Root should be a directory");
+		assertTrue(root.isDirectory(), "Drive root should be a directory");
+	}
+
+	@Test
+	void testPropfindDriveListing() throws Exception {
+		Sardine sardine = SardineFactory.begin();
+		List<DavResource> resources = sardine.list(baseURL);
+		assertFalse(resources.isEmpty(), "Drive listing should not be empty");
+		assertTrue(resources.get(0).isDirectory(), "Root should be a directory");
 	}
 
 	@Test
 	void testPropfindAfterPut() throws Exception {
-		// Create a file first
 		Sardine sardine = SardineFactory.begin();
 		byte[] content = "propfind test".getBytes();
-		sardine.put(baseURL + "propfind-file.txt", content);
+		sardine.put(driveURL + "propfind-file.txt", content);
 
-		// PROPFIND root should list the file
-		List<DavResource> resources = sardine.list(baseURL);
+		// PROPFIND drive root should list the file
+		List<DavResource> resources = sardine.list(driveURL);
 		boolean found = resources.stream()
 				.anyMatch(r -> r.getName().equals("propfind-file.txt"));
 		assertTrue(found, "File should appear in PROPFIND listing");
@@ -70,9 +81,8 @@ public class WebDAVTest {
 
 	@Test
 	void testPropfindDepthZero() throws Exception {
-		// Use raw HTTP to send Depth: 0
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL))
+				.uri(URI.create(driveURL))
 				.method("PROPFIND", HttpRequest.BodyPublishers.noBody())
 				.header("Depth", "0")
 				.build();
@@ -86,9 +96,34 @@ public class WebDAVTest {
 	}
 
 	@Test
+	void testPropfindDriveListingDepthZero() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL))
+				.method("PROPFIND", HttpRequest.BodyPublishers.noBody())
+				.header("Depth", "0")
+				.build();
+		HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(207, resp.statusCode());
+		String body = resp.body();
+		int responseCount = countOccurrences(body, "<D:response>");
+		assertEquals(1, responseCount, "Depth 0 on drive listing should have exactly 1 response");
+	}
+
+	@Test
 	void testPropfindNotFound() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL + "nonexistent-dir/"))
+				.uri(URI.create(driveURL + "nonexistent-dir/"))
+				.method("PROPFIND", HttpRequest.BodyPublishers.noBody())
+				.header("Depth", "0")
+				.build();
+		HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(404, resp.statusCode());
+	}
+
+	@Test
+	void testPropfindNonexistentDrive() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "nosuchdrive/"))
 				.method("PROPFIND", HttpRequest.BodyPublishers.noBody())
 				.header("Depth", "0")
 				.build();
@@ -101,7 +136,7 @@ public class WebDAVTest {
 	@Test
 	void testMkcol() throws Exception {
 		Sardine sardine = SardineFactory.begin();
-		String dirURL = baseURL + "testdir/";
+		String dirURL = driveURL + "testdir/";
 
 		sardine.createDirectory(dirURL);
 
@@ -114,7 +149,7 @@ public class WebDAVTest {
 	@Test
 	void testMkcolAndListContents() throws Exception {
 		Sardine sardine = SardineFactory.begin();
-		String dirURL = baseURL + "parent-dir/";
+		String dirURL = driveURL + "parent-dir/";
 
 		sardine.createDirectory(dirURL);
 
@@ -130,7 +165,7 @@ public class WebDAVTest {
 
 	@Test
 	void testMkcolAlreadyExists() throws Exception {
-		String dirURL = baseURL + "existing-dir/";
+		String dirURL = driveURL + "existing-dir/";
 
 		// Create directory
 		HttpRequest req1 = HttpRequest.newBuilder()
@@ -151,7 +186,7 @@ public class WebDAVTest {
 
 	@Test
 	void testMkcolNoParent() throws Exception {
-		String dirURL = baseURL + "no-such-parent/child-dir/";
+		String dirURL = driveURL + "no-such-parent/child-dir/";
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(dirURL))
 				.method("MKCOL", HttpRequest.BodyPublishers.noBody())
@@ -167,7 +202,7 @@ public class WebDAVTest {
 		Sardine sardine = SardineFactory.begin();
 
 		// Create directory
-		String dir = baseURL + "crud-dir/";
+		String dir = driveURL + "crud-dir/";
 		sardine.createDirectory(dir);
 
 		// Put file

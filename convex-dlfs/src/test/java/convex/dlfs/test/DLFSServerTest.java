@@ -6,7 +6,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -15,19 +14,24 @@ import org.junit.jupiter.api.Test;
 import convex.dlfs.DLFSServer;
 
 /**
- * Basic HTTP tests for the DLFS WebDAV server.
+ * Basic HTTP tests for the DLFS WebDAV server with multi-drive support.
  */
 public class DLFSServerTest {
 
 	private static DLFSServer server;
 	private static HttpClient client;
 	private static String baseURL;
+	/** Base URL for the pre-seeded "test" drive */
+	private static String driveURL;
 
 	@BeforeAll
 	static void setUp() {
 		server = DLFSServer.create(null); // no auth for basic tests
+		// Pre-seed a "test" drive for anonymous user
+		server.getDriveManager().createDrive(null, "test");
 		server.start(0); // random port
 		baseURL = "http://localhost:" + server.getPort() + "/dlfs/";
+		driveURL = baseURL + "test/";
 		client = HttpClient.newHttpClient();
 	}
 
@@ -39,7 +43,7 @@ public class DLFSServerTest {
 	@Test
 	void testPutAndGetRoundTrip() throws Exception {
 		String content = "Hello DLFS!";
-		String path = baseURL + "test.txt";
+		String path = driveURL + "test.txt";
 
 		// PUT file
 		HttpRequest putReq = HttpRequest.newBuilder()
@@ -61,7 +65,7 @@ public class DLFSServerTest {
 
 	@Test
 	void testPutOverwrite() throws Exception {
-		String path = baseURL + "overwrite.txt";
+		String path = driveURL + "overwrite.txt";
 
 		// First PUT — create
 		HttpRequest put1 = HttpRequest.newBuilder()
@@ -91,7 +95,7 @@ public class DLFSServerTest {
 	@Test
 	void testGetNotFound() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL + "nonexistent.txt"))
+				.uri(URI.create(driveURL + "nonexistent.txt"))
 				.GET()
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
@@ -100,7 +104,7 @@ public class DLFSServerTest {
 
 	@Test
 	void testDelete() throws Exception {
-		String path = baseURL + "to-delete.txt";
+		String path = driveURL + "to-delete.txt";
 
 		// Create file
 		HttpRequest putReq = HttpRequest.newBuilder()
@@ -129,7 +133,7 @@ public class DLFSServerTest {
 	@Test
 	void testDeleteNotFound() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL + "no-such-file.txt"))
+				.uri(URI.create(driveURL + "no-such-file.txt"))
 				.DELETE()
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
@@ -139,7 +143,7 @@ public class DLFSServerTest {
 	@Test
 	void testHead() throws Exception {
 		String content = "head test content";
-		String path = baseURL + "head-test.txt";
+		String path = driveURL + "head-test.txt";
 
 		// Create file
 		HttpRequest putReq = HttpRequest.newBuilder()
@@ -163,7 +167,7 @@ public class DLFSServerTest {
 	@Test
 	void testHeadNotFound() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL + "missing.txt"))
+				.uri(URI.create(driveURL + "missing.txt"))
 				.method("HEAD", HttpRequest.BodyPublishers.noBody())
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
@@ -189,21 +193,21 @@ public class DLFSServerTest {
 	}
 
 	@Test
-	void testGetRoot() throws Exception {
+	void testGetDriveRoot() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
-				.uri(URI.create(baseURL))
+				.uri(URI.create(driveURL))
 				.GET()
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, resp.statusCode());
-		assertTrue(resp.body().startsWith("Directory:"), "Root should be a directory");
+		assertTrue(resp.body().startsWith("Directory:"), "Drive root should be a directory");
 	}
 
 	@Test
 	void testBinaryContent() throws Exception {
 		byte[] binary = new byte[256];
 		for (int i = 0; i < 256; i++) binary[i] = (byte) i;
-		String path = baseURL + "binary.bin";
+		String path = driveURL + "binary.bin";
 
 		// PUT binary
 		HttpRequest putReq = HttpRequest.newBuilder()
@@ -224,7 +228,7 @@ public class DLFSServerTest {
 
 	@Test
 	void testContentType() throws Exception {
-		String path = baseURL + "data.json";
+		String path = driveURL + "data.json";
 		HttpRequest putReq = HttpRequest.newBuilder()
 				.uri(URI.create(path))
 				.PUT(HttpRequest.BodyPublishers.ofString("{\"key\":\"value\"}"))
@@ -242,13 +246,122 @@ public class DLFSServerTest {
 
 	@Test
 	void testPutToNonexistentParent() throws Exception {
-		// PUT to a path where parent directory doesn't exist
-		String path = baseURL + "no-parent/child.txt";
+		String path = driveURL + "no-parent/child.txt";
 		HttpRequest putReq = HttpRequest.newBuilder()
 				.uri(URI.create(path))
 				.PUT(HttpRequest.BodyPublishers.ofString("orphan"))
 				.build();
 		HttpResponse<String> resp = client.send(putReq, HttpResponse.BodyHandlers.ofString());
 		assertEquals(409, resp.statusCode(), "Should conflict when parent doesn't exist");
+	}
+
+	@Test
+	void testPutToDriveRoot() throws Exception {
+		// Trying to PUT at drive level (no file path) should be rejected
+		String path = baseURL + "test";
+		HttpRequest putReq = HttpRequest.newBuilder()
+				.uri(URI.create(path))
+				.PUT(HttpRequest.BodyPublishers.ofString("bad"))
+				.build();
+		HttpResponse<String> resp = client.send(putReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(403, resp.statusCode(), "PUT to drive root should be Forbidden");
+		assertTrue(resp.body().contains("MKCOL"), "Error should suggest using MKCOL");
+	}
+
+	@Test
+	void testPutToNonexistentDrive() throws Exception {
+		String path = baseURL + "nosuchdrive/file.txt";
+		HttpRequest putReq = HttpRequest.newBuilder()
+				.uri(URI.create(path))
+				.PUT(HttpRequest.BodyPublishers.ofString("orphan"))
+				.build();
+		HttpResponse<String> resp = client.send(putReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(404, resp.statusCode(), "Should return Not Found when drive doesn't exist");
+	}
+
+	@Test
+	void testCreateAndDeleteDrive() throws Exception {
+		// Create drive via MKCOL
+		HttpRequest mkcolReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "newdrive/"))
+				.method("MKCOL", HttpRequest.BodyPublishers.noBody())
+				.build();
+		HttpResponse<String> mkcolResp = client.send(mkcolReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, mkcolResp.statusCode());
+
+		// Verify drive exists (PUT + GET)
+		HttpRequest putReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "newdrive/hello.txt"))
+				.PUT(HttpRequest.BodyPublishers.ofString("hello"))
+				.build();
+		HttpResponse<String> putResp = client.send(putReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, putResp.statusCode());
+
+		// Duplicate create should fail
+		HttpResponse<String> dup = client.send(mkcolReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(405, dup.statusCode());
+
+		// Delete drive
+		HttpRequest delReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "newdrive"))
+				.DELETE()
+				.build();
+		HttpResponse<String> delResp = client.send(delReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(204, delResp.statusCode());
+	}
+
+	@Test
+	void testRenameDrive() throws Exception {
+		// Create drive via MKCOL
+		HttpRequest mkcolReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "before-rename/"))
+				.method("MKCOL", HttpRequest.BodyPublishers.noBody())
+				.build();
+		HttpResponse<String> mkcolResp = client.send(mkcolReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, mkcolResp.statusCode());
+
+		// Put a file in it
+		HttpRequest putReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "before-rename/data.txt"))
+				.PUT(HttpRequest.BodyPublishers.ofString("rename test"))
+				.build();
+		client.send(putReq, HttpResponse.BodyHandlers.ofString());
+
+		// Rename via MOVE
+		HttpRequest moveReq = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "before-rename/"))
+				.method("MOVE", HttpRequest.BodyPublishers.noBody())
+				.header("Destination", baseURL + "after-rename/")
+				.build();
+		HttpResponse<String> moveResp = client.send(moveReq, HttpResponse.BodyHandlers.ofString());
+		assertEquals(201, moveResp.statusCode(), "Drive rename should succeed");
+
+		// Old name should be gone
+		HttpRequest getOld = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "before-rename/data.txt"))
+				.GET()
+				.build();
+		HttpResponse<String> oldResp = client.send(getOld, HttpResponse.BodyHandlers.ofString());
+		assertEquals(404, oldResp.statusCode(), "Old drive name should not exist");
+
+		// New name should have the file
+		HttpRequest getNew = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "after-rename/data.txt"))
+				.GET()
+				.build();
+		HttpResponse<String> newResp = client.send(getNew, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, newResp.statusCode());
+		assertEquals("rename test", newResp.body(), "File content should survive rename");
+	}
+
+	@Test
+	void testDriveListing() throws Exception {
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL))
+				.GET()
+				.build();
+		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, resp.statusCode());
+		assertTrue(resp.body().contains("test"), "Should list the 'test' drive");
 	}
 }

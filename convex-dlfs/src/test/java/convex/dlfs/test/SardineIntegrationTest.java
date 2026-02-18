@@ -19,17 +19,22 @@ import convex.dlfs.DLFSServer;
 /**
  * Full Sardine WebDAV integration tests covering CRUD lifecycle,
  * nested directories, binary content, large files, and edge cases.
+ * All tests operate within pre-seeded drives.
  */
 public class SardineIntegrationTest {
 
 	private static DLFSServer server;
 	private static String baseURL;
+	/** Base URL for the pre-seeded "sardine" drive */
+	private static String driveURL;
 
 	@BeforeAll
 	static void setUp() {
 		server = DLFSServer.create(null);
+		server.getDriveManager().createDrive(null, "sardine");
 		server.start(0);
 		baseURL = "http://localhost:" + server.getPort() + "/dlfs/";
+		driveURL = baseURL + "sardine/";
 	}
 
 	@AfterAll
@@ -44,7 +49,7 @@ public class SardineIntegrationTest {
 		Sardine sardine = SardineFactory.begin();
 
 		// Create directory
-		String dir = baseURL + "lifecycle/";
+		String dir = driveURL + "lifecycle/";
 		sardine.createDirectory(dir);
 
 		// Put file
@@ -84,12 +89,12 @@ public class SardineIntegrationTest {
 	void testNestedDirectories() throws Exception {
 		Sardine sardine = SardineFactory.begin();
 
-		sardine.createDirectory(baseURL + "level1/");
-		sardine.createDirectory(baseURL + "level1/level2/");
-		sardine.createDirectory(baseURL + "level1/level2/level3/");
+		sardine.createDirectory(driveURL + "level1/");
+		sardine.createDirectory(driveURL + "level1/level2/");
+		sardine.createDirectory(driveURL + "level1/level2/level3/");
 
 		// Put file deep in tree
-		String file = baseURL + "level1/level2/level3/deep.txt";
+		String file = driveURL + "level1/level2/level3/deep.txt";
 		sardine.put(file, "deep content".getBytes());
 
 		// Read back
@@ -98,7 +103,7 @@ public class SardineIntegrationTest {
 		is.close();
 
 		// List intermediate directory
-		List<DavResource> resources = sardine.list(baseURL + "level1/level2/");
+		List<DavResource> resources = sardine.list(driveURL + "level1/level2/");
 		boolean foundLevel3 = resources.stream().anyMatch(r -> r.getName().equals("level3") && r.isDirectory());
 		assertTrue(foundLevel3, "Level3 directory should be listed");
 	}
@@ -112,7 +117,7 @@ public class SardineIntegrationTest {
 		byte[] binary = new byte[256];
 		for (int i = 0; i < 256; i++) binary[i] = (byte) i;
 
-		String file = baseURL + "binary.bin";
+		String file = driveURL + "binary.bin";
 		sardine.put(file, binary);
 
 		InputStream is = sardine.get(file);
@@ -132,7 +137,7 @@ public class SardineIntegrationTest {
 		byte[] large = new byte[100 * 1024]; // 100KB
 		new Random(42).nextBytes(large);
 
-		String file = baseURL + "large.bin";
+		String file = driveURL + "large.bin";
 
 		// PUT
 		var putReq = java.net.http.HttpRequest.newBuilder()
@@ -158,7 +163,7 @@ public class SardineIntegrationTest {
 	void testEmptyFile() throws Exception {
 		Sardine sardine = SardineFactory.begin();
 
-		String file = baseURL + "empty.txt";
+		String file = driveURL + "empty.txt";
 		sardine.put(file, new byte[0]);
 
 		InputStream is = sardine.get(file);
@@ -175,10 +180,10 @@ public class SardineIntegrationTest {
 		Sardine sardine = SardineFactory.begin();
 
 		byte[] content = "known length".getBytes();
-		String file = baseURL + "sized.txt";
+		String file = driveURL + "sized.txt";
 		sardine.put(file, content);
 
-		List<DavResource> resources = sardine.list(baseURL);
+		List<DavResource> resources = sardine.list(driveURL);
 		DavResource sized = resources.stream()
 				.filter(r -> r.getName().equals("sized.txt"))
 				.findFirst()
@@ -192,9 +197,9 @@ public class SardineIntegrationTest {
 	void testDirectoryResourceType() throws Exception {
 		Sardine sardine = SardineFactory.begin();
 
-		sardine.createDirectory(baseURL + "typedir/");
+		sardine.createDirectory(driveURL + "typedir/");
 
-		List<DavResource> resources = sardine.list(baseURL + "typedir/");
+		List<DavResource> resources = sardine.list(driveURL + "typedir/");
 		assertFalse(resources.isEmpty());
 		assertTrue(resources.get(0).isDirectory(), "Directory should have collection resourcetype");
 	}
@@ -205,7 +210,7 @@ public class SardineIntegrationTest {
 	void testMultipleFilesInDirectory() throws Exception {
 		Sardine sardine = SardineFactory.begin();
 
-		String dir = baseURL + "multi/";
+		String dir = driveURL + "multi/";
 		sardine.createDirectory(dir);
 		sardine.put(dir + "a.txt", "aaa".getBytes());
 		sardine.put(dir + "b.txt", "bbb".getBytes());
@@ -223,7 +228,7 @@ public class SardineIntegrationTest {
 	void testOverwritePreservesCorrectContent() throws Exception {
 		Sardine sardine = SardineFactory.begin();
 
-		String file = baseURL + "overwrite-test.txt";
+		String file = driveURL + "overwrite-test.txt";
 		sardine.put(file, "short".getBytes());
 		sardine.put(file, "this is a much longer string that replaces the short one".getBytes());
 
@@ -240,9 +245,9 @@ public class SardineIntegrationTest {
 	@Test
 	void testRootListing() throws Exception {
 		Sardine sardine = SardineFactory.begin();
-		List<DavResource> resources = sardine.list(baseURL);
+		List<DavResource> resources = sardine.list(driveURL);
 		assertNotNull(resources);
-		assertFalse(resources.isEmpty(), "Root should be listable");
-		assertTrue(resources.get(0).isDirectory(), "Root should be a directory");
+		assertFalse(resources.isEmpty(), "Drive root should be listable");
+		assertTrue(resources.get(0).isDirectory(), "Drive root should be a directory");
 	}
 }

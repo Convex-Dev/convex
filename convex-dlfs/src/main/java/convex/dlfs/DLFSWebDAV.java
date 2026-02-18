@@ -20,12 +20,19 @@ import io.javalin.Javalin;
 import io.javalin.http.Context;
 
 /**
- * WebDAV-compatible HTTP handler backed by a Java NIO {@link FileSystem}.
+ * WebDAV-compatible HTTP handler with multi-drive support.
  *
- * <p>Registers routes on a Javalin app for standard WebDAV methods: GET, PUT,
- * DELETE, HEAD, OPTIONS, PROPFIND, and MKCOL. The handler uses only the
- * standard {@code java.nio.file} API, so it works with any compliant
- * {@link FileSystem} implementation (including DLFS).
+ * <p>URL structure:
+ * <pre>
+ * /dlfs/                              - list drives
+ * /dlfs/{drive}/                      - drive root
+ * /dlfs/{drive}/path/to/file.txt      - file within drive
+ * </pre>
+ *
+ * <p>Each authenticated user has their own set of named drives, managed by
+ * a {@link DLFSDriveManager}. The handler uses only the standard
+ * {@code java.nio.file} API, so it works with any compliant
+ * {@link FileSystem} implementation.
  */
 public class DLFSWebDAV {
 
@@ -33,17 +40,15 @@ public class DLFSWebDAV {
 	private static final String ROUTE_BARE = "/dlfs";
 	private static final String ROUTE_PATH = ROUTE + "<path>";
 
-	private final FileSystem fs;
-	private final Path root;
+	private final DLFSDriveManager driveManager;
 	private boolean requireAuthForWrites = false;
 
-	public DLFSWebDAV(FileSystem fs) {
-		this.fs = fs;
-		this.root = fs.getRootDirectories().iterator().next();
+	public DLFSWebDAV(DLFSDriveManager driveManager) {
+		this.driveManager = driveManager;
 	}
 
-	public FileSystem getFileSystem() {
-		return fs;
+	public DLFSDriveManager getDriveManager() {
+		return driveManager;
 	}
 
 	/**
@@ -104,6 +109,84 @@ public class DLFSWebDAV {
 		});
 	}
 
+	// ==================== Path Resolution ====================
+
+	/**
+	 * Parsed drive path: drive name + path within the drive's filesystem.
+	 * If driveName is null, this is the drive listing root.
+	 */
+	record DrivePath(String driveName, String filePath) {}
+
+	/**
+	 * Extracts the drive name and file path from the request URI.
+	 *
+	 * <pre>
+	 * /dlfs/                    → (null, null)        drive listing
+	 * /dlfs/personal            → ("personal", "")    drive root
+	 * /dlfs/personal/           → ("personal", "")    drive root
+	 * /dlfs/personal/docs/f.txt → ("personal", "docs/f.txt")
+	 * </pre>
+	 */
+	DrivePath parseDrivePath(Context ctx) {
+		String pathParam = null;
+
+		// Try Javalin path param first (standard routes, already URL-decoded)
+		try {
+			pathParam = ctx.pathParam("path");
+		} catch (Exception e) {
+			// not available (custom methods in before handler)
+		}
+
+		// Fall back to URI extraction
+		if (pathParam == null || pathParam.isEmpty()) {
+			String uri = ctx.req().getRequestURI();
+			if (uri.startsWith(ROUTE) && uri.length() > ROUTE.length()) {
+				pathParam = uri.substring(ROUTE.length());
+				pathParam = java.net.URLDecoder.decode(pathParam, java.nio.charset.StandardCharsets.UTF_8);
+			} else {
+				return new DrivePath(null, null); // drive listing
+			}
+		}
+
+		if (pathParam == null || pathParam.isEmpty()) {
+			return new DrivePath(null, null); // drive listing
+		}
+
+		// Strip trailing slash
+		if (pathParam.endsWith("/")) {
+			pathParam = pathParam.substring(0, pathParam.length() - 1);
+		}
+
+		// Split into drive name + remainder
+		int slash = pathParam.indexOf('/');
+		if (slash < 0) {
+			return new DrivePath(pathParam, ""); // drive root
+		}
+		String driveName = pathParam.substring(0, slash);
+		String filePath = pathParam.substring(slash + 1);
+		return new DrivePath(driveName, filePath);
+	}
+
+	/**
+	 * Gets the identity string for the current request (DID from JWT, or null).
+	 */
+	private String getIdentity(Context ctx) {
+		var id = AuthMiddleware.getIdentity(ctx);
+		return id != null ? id.toString() : null;
+	}
+
+	/**
+	 * Resolves a DrivePath to a filesystem Path. Returns null if the drive doesn't exist.
+	 */
+	private Path resolveFilePath(Context ctx, DrivePath dp) {
+		if (dp.driveName() == null) return null;
+		FileSystem fs = driveManager.getDrive(getIdentity(ctx), dp.driveName());
+		if (fs == null) return null;
+		Path root = fs.getRootDirectories().iterator().next();
+		if (dp.filePath() == null || dp.filePath().isEmpty()) return root;
+		return fs.getPath("/" + dp.filePath());
+	}
+
 	// ==================== Handlers ====================
 
 	/**
@@ -117,7 +200,22 @@ public class DLFSWebDAV {
 	}
 
 	void handleGet(Context ctx) throws IOException {
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		// Drive listing
+		if (dp.driveName() == null) {
+			List<String> drives = driveManager.listDrives(getIdentity(ctx));
+			ctx.status(200);
+			ctx.contentType("text/plain; charset=utf-8");
+			ctx.result("Drives: " + String.join(", ", drives));
+			return;
+		}
+
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(404).result("Not Found: drive '" + dp.driveName() + "' does not exist");
+			return;
+		}
 
 		BasicFileAttributes attrs = readAttributesSafe(path);
 		if (attrs == null) {
@@ -128,7 +226,7 @@ public class DLFSWebDAV {
 		if (attrs.isDirectory()) {
 			ctx.status(200);
 			ctx.contentType("text/plain; charset=utf-8");
-			ctx.result("Directory: " + path);
+			ctx.result("Directory: " + dp.driveName() + path);
 			return;
 		}
 
@@ -146,7 +244,25 @@ public class DLFSWebDAV {
 
 	void handlePut(Context ctx) throws IOException {
 		if (rejectUnauthenticatedWrite(ctx)) return;
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		if (dp.driveName() == null) {
+			ctx.status(403).result("Forbidden: cannot create files outside a drive. Create a drive first with MKCOL.");
+			return;
+		}
+
+		// Reject PUT to drive root (files must have a path within the drive)
+		if (dp.filePath() == null || dp.filePath().isEmpty()) {
+			ctx.status(403).result("Forbidden: cannot PUT to a drive root. Use MKCOL to create drives, or PUT files inside a drive.");
+			return;
+		}
+
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(404).result("Not Found: drive '" + dp.driveName() + "' does not exist. Create it first with MKCOL /dlfs/" + dp.driveName() + "/");
+			return;
+		}
+
 		byte[] body = ctx.bodyAsBytes();
 
 		// Ensure parent directory exists
@@ -168,7 +284,30 @@ public class DLFSWebDAV {
 
 	void handleDelete(Context ctx) {
 		if (rejectUnauthenticatedWrite(ctx)) return;
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		if (dp.driveName() == null) {
+			ctx.status(405).result("Method Not Allowed");
+			return;
+		}
+
+		// Drive-level delete (empty file path)
+		if (dp.filePath() == null || dp.filePath().isEmpty()) {
+			boolean deleted = driveManager.deleteDrive(getIdentity(ctx), dp.driveName());
+			if (deleted) {
+				ctx.status(204);
+			} else {
+				ctx.status(404).result("Not Found");
+			}
+			return;
+		}
+
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(404).result("Not Found");
+			return;
+		}
+
 		try {
 			Files.delete(path);
 			ctx.status(204);
@@ -180,7 +319,19 @@ public class DLFSWebDAV {
 	}
 
 	void handleHead(Context ctx) throws IOException {
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		if (dp.driveName() == null) {
+			ctx.status(200);
+			return;
+		}
+
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(404);
+			return;
+		}
+
 		BasicFileAttributes attrs = readAttributesSafe(path);
 		if (attrs == null) {
 			ctx.status(404);
@@ -204,7 +355,26 @@ public class DLFSWebDAV {
 	}
 
 	void handlePropfind(Context ctx) throws IOException {
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		// Drive listing
+		if (dp.driveName() == null) {
+			String depthHeader = ctx.header("Depth");
+			int depth = "0".equals(depthHeader) ? 0 : 1;
+			List<String> drives = driveManager.listDrives(getIdentity(ctx));
+			String xml = PropfindResponse.buildDriveList(drives, depth);
+			ctx.status(207);
+			ctx.contentType("application/xml; charset=utf-8");
+			ctx.result(xml);
+			return;
+		}
+
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(404).result("Not Found: drive '" + dp.driveName() + "' does not exist");
+			return;
+		}
+
 		BasicFileAttributes attrs = readAttributesSafe(path);
 		if (attrs == null) {
 			ctx.status(404).result("Not Found");
@@ -214,7 +384,6 @@ public class DLFSWebDAV {
 		String depthHeader = ctx.header("Depth");
 		int depth = "0".equals(depthHeader) ? 0 : 1;
 
-		// Collect children if depth >= 1 and this is a directory
 		List<Path> children = new ArrayList<>();
 		if (depth >= 1 && attrs.isDirectory()) {
 			try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
@@ -224,7 +393,7 @@ public class DLFSWebDAV {
 			}
 		}
 
-		String xml = PropfindResponse.build(path, attrs, children);
+		String xml = PropfindResponse.build(dp.driveName(), path, attrs, children);
 		ctx.status(207);
 		ctx.contentType("application/xml; charset=utf-8");
 		ctx.result(xml);
@@ -232,9 +401,35 @@ public class DLFSWebDAV {
 
 	void handleMkcol(Context ctx) {
 		if (rejectUnauthenticatedWrite(ctx)) return;
-		Path path = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		if (dp.driveName() == null) {
+			ctx.status(405).result("Method Not Allowed");
+			return;
+		}
+
+		// Drive-level creation (empty file path)
+		if (dp.filePath() == null || dp.filePath().isEmpty()) {
+			boolean created = driveManager.createDrive(getIdentity(ctx), dp.driveName());
+			if (created) {
+				ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/");
+				ctx.status(201);
+			} else {
+				ctx.status(405).result("Method Not Allowed: drive already exists");
+			}
+			return;
+		}
+
+		// Directory creation within a drive
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null) {
+			ctx.status(409).result("Conflict: drive '" + dp.driveName() + "' does not exist");
+			return;
+		}
+
 		try {
 			Files.createDirectory(path);
+			ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
 			ctx.status(201);
 		} catch (FileAlreadyExistsException e) {
 			ctx.status(405).result("Method Not Allowed: resource already exists");
@@ -247,7 +442,31 @@ public class DLFSWebDAV {
 
 	void handleMove(Context ctx) throws IOException {
 		if (rejectUnauthenticatedWrite(ctx)) return;
-		Path source = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+
+		// Drive-level rename (e.g. Windows Explorer renaming "New folder" to user's name)
+		if (dp.driveName() != null && (dp.filePath() == null || dp.filePath().isEmpty())) {
+			DrivePath destDp = parseDestinationDrivePath(ctx);
+			if (destDp == null || destDp.driveName() == null) {
+				ctx.status(400).result("Bad Request: missing or invalid Destination header");
+				return;
+			}
+			boolean renamed = driveManager.renameDrive(getIdentity(ctx), dp.driveName(), destDp.driveName());
+			if (renamed) {
+				ctx.header("Location", ROUTE + encodePathComponent(destDp.driveName()) + "/");
+				ctx.status(201);
+			} else {
+				ctx.status(409).result("Conflict: source drive not found or target already exists");
+			}
+			return;
+		}
+
+		Path source = resolveFilePath(ctx, dp);
+		if (source == null) {
+			ctx.status(404).result("Not Found");
+			return;
+		}
+
 		Path dest = resolveDestination(ctx);
 		if (dest == null) {
 			ctx.status(400).result("Bad Request: missing or invalid Destination header");
@@ -266,7 +485,6 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		// Copy content then delete source
 		byte[] data = Files.readAllBytes(source);
 		Files.write(dest, data,
 				StandardOpenOption.CREATE,
@@ -279,7 +497,13 @@ public class DLFSWebDAV {
 
 	void handleCopy(Context ctx) throws IOException {
 		if (rejectUnauthenticatedWrite(ctx)) return;
-		Path source = resolvePath(ctx);
+		DrivePath dp = parseDrivePath(ctx);
+		Path source = resolveFilePath(ctx, dp);
+		if (source == null) {
+			ctx.status(404).result("Not Found");
+			return;
+		}
+
 		Path dest = resolveDestination(ctx);
 		if (dest == null) {
 			ctx.status(400).result("Bad Request: missing or invalid Destination header");
@@ -308,14 +532,14 @@ public class DLFSWebDAV {
 	}
 
 	void handleProppatch(Context ctx) throws IOException {
-		Path path = resolvePath(ctx);
-		if (!Files.exists(path)) {
+		DrivePath dp = parseDrivePath(ctx);
+		Path path = resolveFilePath(ctx, dp);
+		if (path == null || !Files.exists(path)) {
 			ctx.status(404).result("Not Found");
 			return;
 		}
 
-		// Accept all property changes — return 200 OK for each property
-		String href = "/dlfs/" + path.toString().replaceFirst("^/", "");
+		String href = ROUTE + dp.driveName() + "/" + path.toString().replaceFirst("^/", "");
 		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 				+ "<D:multistatus xmlns:D=\"DAV:\">"
 				+ "<D:response>"
@@ -332,7 +556,6 @@ public class DLFSWebDAV {
 	}
 
 	void handleLock(Context ctx) {
-		// Minimal LOCK response — returns a lock token so clients can proceed
 		String token = "opaquelocktoken:" + java.util.UUID.randomUUID();
 		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
 				+ "<D:prop xmlns:D=\"DAV:\">"
@@ -353,13 +576,48 @@ public class DLFSWebDAV {
 	// ==================== Utilities ====================
 
 	/**
+	 * Parses the Destination header into a DrivePath (for drive-level MOVE/COPY).
+	 */
+	private DrivePath parseDestinationDrivePath(Context ctx) {
+		String destHeader = ctx.header("Destination");
+		if (destHeader == null) return null;
+		try {
+			java.net.URI destURI = java.net.URI.create(destHeader);
+			String destPath = destURI.getPath();
+			if (destPath == null) return null;
+
+			// Strip the /dlfs/ prefix
+			String remainder;
+			if (destPath.startsWith(ROUTE)) {
+				remainder = destPath.substring(ROUTE.length());
+			} else if (destPath.startsWith(ROUTE_BARE)) {
+				remainder = destPath.substring(ROUTE_BARE.length());
+				if (remainder.startsWith("/")) remainder = remainder.substring(1);
+			} else {
+				return null;
+			}
+
+			if (remainder.endsWith("/")) remainder = remainder.substring(0, remainder.length() - 1);
+			if (remainder.isEmpty()) return new DrivePath(null, null);
+
+			int slash = remainder.indexOf('/');
+			if (slash < 0) {
+				return new DrivePath(remainder, "");
+			}
+			return new DrivePath(remainder.substring(0, slash), remainder.substring(slash + 1));
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/**
 	 * Resolves the Destination header to a filesystem path.
+	 * Destination must be within the same drive.
 	 */
 	private Path resolveDestination(Context ctx) {
 		String destHeader = ctx.header("Destination");
 		if (destHeader == null) return null;
 		try {
-			// Destination is a full URL — extract the path portion
 			java.net.URI destURI = java.net.URI.create(destHeader);
 			String destPath = destURI.getPath();
 			if (destPath == null) return null;
@@ -369,49 +627,35 @@ public class DLFSWebDAV {
 				destPath = destPath.substring(ROUTE.length());
 			} else if (destPath.startsWith(ROUTE_BARE)) {
 				destPath = destPath.substring(ROUTE_BARE.length());
+				if (destPath.startsWith("/")) destPath = destPath.substring(1);
 			} else {
 				return null;
 			}
 
 			if (destPath.endsWith("/")) destPath = destPath.substring(0, destPath.length() - 1);
-			if (destPath.isEmpty()) return root;
-			return fs.getPath("/" + destPath);
+			if (destPath.isEmpty()) return null;
+
+			// Parse drive name from destination
+			int slash = destPath.indexOf('/');
+			String destDrive;
+			String destFile;
+			if (slash < 0) {
+				destDrive = destPath;
+				destFile = "";
+			} else {
+				destDrive = destPath.substring(0, slash);
+				destFile = destPath.substring(slash + 1);
+			}
+
+			FileSystem fs = driveManager.getDrive(getIdentity(ctx), destDrive);
+			if (fs == null) return null;
+
+			Path root = fs.getRootDirectories().iterator().next();
+			if (destFile.isEmpty()) return root;
+			return fs.getPath("/" + destFile);
 		} catch (Exception e) {
 			return null;
 		}
-	}
-
-
-	Path resolvePath(Context ctx) {
-		// Try Javalin path param first (works for standard routes — already URL-decoded)
-		String pathParam;
-		try {
-			pathParam = ctx.pathParam("path");
-		} catch (Exception e) {
-			pathParam = null;
-		}
-
-		// Fall back to extracting from URI (needed for custom methods in before handler)
-		if (pathParam == null || pathParam.isEmpty()) {
-			String uri = ctx.req().getRequestURI();
-			if (uri.startsWith(ROUTE) && uri.length() > ROUTE.length()) {
-				pathParam = uri.substring(ROUTE.length());
-			} else if (uri.equals(ROUTE_BARE)) {
-				return root;
-			}
-			if (pathParam != null) {
-				// URL-decode (getRequestURI returns raw/encoded form)
-				pathParam = java.net.URLDecoder.decode(pathParam, java.nio.charset.StandardCharsets.UTF_8);
-				if (pathParam.endsWith("/")) {
-					pathParam = pathParam.substring(0, pathParam.length() - 1);
-				}
-			}
-		}
-
-		if (pathParam == null || pathParam.isEmpty()) {
-			return root;
-		}
-		return fs.getPath("/" + pathParam);
 	}
 
 	/**
@@ -434,6 +678,34 @@ public class DLFSWebDAV {
 			ctx.header("Last-Modified", DateTimeFormatter.RFC_1123_DATE_TIME
 					.format(ft.toInstant().atZone(ZoneOffset.UTC)));
 		}
+	}
+
+	/**
+	 * URL-encodes a single path component (e.g. a drive name or file name).
+	 * Spaces become %20 (not +), slashes are preserved.
+	 */
+	static String encodePathComponent(String component) {
+		try {
+			return java.net.URLEncoder.encode(component, "UTF-8").replace("+", "%20");
+		} catch (java.io.UnsupportedEncodingException e) {
+			return component; // UTF-8 is always supported
+		}
+	}
+
+	/**
+	 * URL-encodes a full path (encoding each component separately, preserving slashes).
+	 */
+	static String encodePath(String path) {
+		if (path == null || path.isEmpty()) return path;
+		String[] parts = path.split("/", -1);
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < parts.length; i++) {
+			if (i > 0) sb.append("/");
+			if (!parts[i].isEmpty()) {
+				sb.append(encodePathComponent(parts[i]));
+			}
+		}
+		return sb.toString();
 	}
 
 	static String guessContentType(String path) {

@@ -14,46 +14,54 @@ import convex.restapi.auth.AuthMiddleware;
 import io.javalin.Javalin;
 
 /**
- * Standalone DLFS WebDAV server.
+ * Standalone DLFS WebDAV server with multi-drive support.
  *
  * <p>Creates a lightweight Javalin HTTP server with a {@link DLFSWebDAV}
  * handler and optional Ed25519 JWT bearer token authentication via
  * {@link AuthMiddleware}.
+ *
+ * <p>Each authenticated user gets their own set of named drives. Drives
+ * appear as top-level directories under {@code /dlfs/}.
  */
 public class DLFSServer implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(DLFSServer.class);
 
-	private final FileSystem fs;
+	private final DLFSDriveManager driveManager;
 	private final DLFSWebDAV webdav;
 	private final AKeyPair keyPair;
 	private Javalin app;
 
-	private DLFSServer(FileSystem fs, AKeyPair keyPair) {
-		this.fs = fs;
+	private DLFSServer(DLFSDriveManager driveManager, AKeyPair keyPair) {
+		this.driveManager = driveManager;
 		this.keyPair = keyPair;
-		this.webdav = new DLFSWebDAV(fs);
+		this.webdav = new DLFSWebDAV(driveManager);
 	}
 
 	/**
-	 * Creates a DLFS server with a new local filesystem.
+	 * Creates a DLFS server with a fresh drive manager.
 	 *
 	 * @param keyPair Ed25519 key pair for auth (null for no auth)
 	 * @return New DLFSServer instance
 	 */
 	public static DLFSServer create(AKeyPair keyPair) {
-		return create(DLFS.createLocal(), keyPair);
+		return new DLFSServer(new DLFSDriveManager(), keyPair);
 	}
 
 	/**
-	 * Creates a DLFS server with the given filesystem.
+	 * Creates a DLFS server with a single filesystem exposed as a named drive.
+	 * Useful for backwards-compatible testing with a single drive.
 	 *
-	 * @param fs      The filesystem to serve via WebDAV
-	 * @param keyPair Ed25519 key pair for auth (null for no auth)
+	 * @param fs        The filesystem to serve
+	 * @param driveName The drive name to use
+	 * @param identity  The owner identity (null for anonymous)
+	 * @param keyPair   Ed25519 key pair for auth (null for no auth)
 	 * @return New DLFSServer instance
 	 */
-	public static DLFSServer create(FileSystem fs, AKeyPair keyPair) {
-		return new DLFSServer(fs, keyPair);
+	public static DLFSServer create(FileSystem fs, String driveName, String identity, AKeyPair keyPair) {
+		DLFSDriveManager dm = new DLFSDriveManager();
+		dm.seedDrive(identity, driveName, fs);
+		return new DLFSServer(dm, keyPair);
 	}
 
 	/**
@@ -114,10 +122,10 @@ public class DLFSServer implements Closeable {
 	}
 
 	/**
-	 * Gets the filesystem being served.
+	 * Gets the drive manager.
 	 */
-	public FileSystem getFileSystem() {
-		return fs;
+	public DLFSDriveManager getDriveManager() {
+		return driveManager;
 	}
 
 	/**
@@ -139,7 +147,8 @@ public class DLFSServer implements Closeable {
 	 * Launches a standalone DLFS WebDAV server for local testing.
 	 *
 	 * <p>Usage: {@code java convex.dlfs.DLFSServer [port]}
-	 * <p>Default port is 8080. No authentication is required.
+	 * <p>Default port is 8080. No authentication required.
+	 * <p>Seeds a "home" drive with a test.txt file.
 	 */
 	public static void main(String[] args) {
 		int port = 8080;
@@ -153,12 +162,13 @@ public class DLFSServer implements Closeable {
 		}
 
 		DLFSServer server = DLFSServer.create(null);
-		server.start(port);
 
-		// Seed a demo file so reads can be verified immediately
+		// Seed a "home" drive with a demo file
+		DLFSDriveManager dm = server.getDriveManager();
+		dm.createDrive(null, "home");
+		FileSystem homeFs = dm.getDrive(null, "home");
 		try {
-			java.nio.file.FileSystem fs = server.getFileSystem();
-			java.nio.file.Path testFile = fs.getPath("/test.txt");
+			java.nio.file.Path testFile = homeFs.getPath("/test.txt");
 			java.nio.file.Files.write(testFile, "Hello from DLFS!\n".getBytes(),
 					java.nio.file.StandardOpenOption.CREATE,
 					java.nio.file.StandardOpenOption.WRITE);
@@ -166,7 +176,10 @@ public class DLFSServer implements Closeable {
 			System.err.println("Warning: could not seed demo file: " + e.getMessage());
 		}
 
+		server.start(port);
+
 		System.out.println("DLFS WebDAV server running on http://localhost:" + server.getPort() + "/dlfs/");
+		System.out.println("Drive 'home' seeded with test.txt");
 		System.out.println("No authentication required.");
 		System.out.println("Press Ctrl+C to stop.");
 
