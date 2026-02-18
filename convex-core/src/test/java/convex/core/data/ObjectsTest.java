@@ -21,9 +21,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -447,33 +445,26 @@ public class ObjectsTest {
 
 	@SuppressWarnings("unused")
 	private static void doCellStorageTest(ACell a) throws InvalidDataException, IOException {
-		
-		AStore temp=Stores.current();
-		try {
-			// test using a new memory store
-			MemoryStore ms=new MemoryStore();
-			Stores.setCurrent(ms);
-			
-			Ref<ACell> r=a.getRef();
-			
-			Hash hash=r.getHash();
-			
-			assertNull(ms.refForHash(hash));
-			
-			// persist the cell
-			Cells.persist(a, ms);
-			
-			// retrieve from store
-			Ref<ACell> rr=ms.refForHash(hash);
-			
-			// should be able to retrieve and validate complete structure
-			assertNotNull(rr,()->"Failed to retrieve from store with "+Utils.getClassName(a) + " = "+a);
-			ACell b=rr.getValue();
-			b.validate();
-			assertEquals(a,b);
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		// test using a new memory store
+		MemoryStore ms=new MemoryStore();
+
+		Ref<ACell> r=a.getRef();
+
+		Hash hash=r.getHash();
+
+		assertNull(ms.refForHash(hash));
+
+		// persist the cell
+		Cells.persist(a, ms);
+
+		// retrieve from store
+		Ref<ACell> rr=ms.refForHash(hash);
+
+		// should be able to retrieve and validate complete structure
+		assertNotNull(rr,()->"Failed to retrieve from store with "+Utils.getClassName(a) + " = "+a);
+		ACell b=rr.getValue();
+		b.validate();
+		assertEquals(a,b);
 	}
 
 	/**

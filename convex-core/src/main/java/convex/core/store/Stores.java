@@ -12,28 +12,6 @@ public class Stores {
 	// Configured global store
 	private static volatile AStore globalStore=null;
 	
-	// Thread local current store, in case servers want different stores
-	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>();
-	
-	/**
-	 * Gets the current (thread-local) Store instance. This is initialised to be the
-	 * global store, but can be changed with Stores.setCurrent(...)
-	 * 
-	 * @return Store for the current thread
-	 */
-	public static AStore current() {
-		return Stores.currentStore.get();
-	}
-
-	/**
-	 * Sets the current thread-local store for this thread
-	 * 
-	 * @param store Any AStore instance
-	 */
-	public static void setCurrent(AStore store) {
-		currentStore.set(store);
-	}
-	
 	private synchronized static AStore getDefaultStore() {
 		if (defaultStore==null) {
 			try {

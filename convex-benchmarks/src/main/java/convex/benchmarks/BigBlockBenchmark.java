@@ -57,7 +57,7 @@ public class BigBlockBenchmark {
 	@Benchmark
 	public void benchmark() throws BadSignatureException, IOException {
 		BlockResult br=state.applyBlock(block);
-		Cells.persist(br.getState(), Stores.current());
+		Cells.persist(br.getState(), Stores.getGlobalStore());
 	}
 
 	public static void main(String[] args) throws Exception {

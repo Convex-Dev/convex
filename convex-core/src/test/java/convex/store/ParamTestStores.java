@@ -21,7 +21,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 
@@ -41,66 +40,47 @@ public class ParamTestStores {
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testStoreTopRefStoredStatus(AStore store) throws IOException {
-		AStore saved = Stores.current();
-		try {
-			Stores.setCurrent(store);
-			AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
-			Ref<AVector<CVMLong>> ref = v.getRef();
-			Ref<AVector<CVMLong>> stored = store.storeTopRef(ref, Ref.STORED, null);
-			assertTrue(stored.getStatus() >= Ref.STORED);
+		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
+		Ref<AVector<CVMLong>> ref = v.getRef();
+		Ref<AVector<CVMLong>> stored = store.storeTopRef(ref, Ref.STORED, null);
+		assertTrue(stored.getStatus() >= Ref.STORED);
 
-			// Should be retrievable by hash
-			Ref<?> found = store.refForHash(stored.getHash());
-			assertNotNull(found);
-			assertTrue(found.getStatus() >= Ref.STORED);
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		// Should be retrievable by hash
+		Ref<?> found = store.refForHash(stored.getHash());
+		assertNotNull(found);
+		assertTrue(found.getStatus() >= Ref.STORED);
 	}
 
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testStoreTopRefPersistedStatus(AStore store) throws IOException {
-		AStore saved = Stores.current();
-		try {
-			Stores.setCurrent(store);
-			AVector<CVMLong> v = Vectors.of(4L, 5L, 6L);
-			Ref<AVector<CVMLong>> ref = v.getRef();
-			Ref<AVector<CVMLong>> persisted = store.storeTopRef(ref, Ref.PERSISTED, null);
-			assertTrue(persisted.getStatus() >= Ref.PERSISTED);
+		AVector<CVMLong> v = Vectors.of(4L, 5L, 6L);
+		Ref<AVector<CVMLong>> ref = v.getRef();
+		Ref<AVector<CVMLong>> persisted = store.storeTopRef(ref, Ref.PERSISTED, null);
+		assertTrue(persisted.getStatus() >= Ref.PERSISTED);
 
-			Ref<?> found = store.refForHash(persisted.getHash());
-			assertNotNull(found);
-			assertTrue(found.getStatus() >= Ref.PERSISTED);
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		Ref<?> found = store.refForHash(persisted.getHash());
+		assertNotNull(found);
+		assertTrue(found.getStatus() >= Ref.PERSISTED);
 	}
 
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testNestedDescendantsRetrievable(AStore store) throws IOException {
-		AStore saved = Stores.current();
-		try {
-			Stores.setCurrent(store);
+		// Build a non-trivial nested structure
+		AVector<CVMLong> inner = Vectors.of(10L, 20L, 30L, 40L, 50L);
+		AVector<ACell> outer = Vectors.of(inner, inner, CVMLong.create(99));
 
-			// Build a non-trivial nested structure
-			AVector<CVMLong> inner = Vectors.of(10L, 20L, 30L, 40L, 50L);
-			AVector<ACell> outer = Vectors.of(inner, inner, CVMLong.create(99));
+		AVector<ACell> persisted = Cells.persist(outer, store);
+		Hash outerHash = Cells.getHash(persisted);
+		Hash innerHash = Cells.getHash(inner);
 
-			AVector<ACell> persisted = Cells.persist(outer, store);
-			Hash outerHash = Cells.getHash(persisted);
-			Hash innerHash = Cells.getHash(inner);
-
-			// Both parent and child should be retrievable
-			assertNotNull(store.refForHash(outerHash));
-			if (!inner.isEmbedded()) {
-				Ref<?> innerRef = store.refForHash(innerHash);
-				assertNotNull(innerRef, "Child cell should be individually retrievable after persist");
-				assertTrue(innerRef.getStatus() >= Ref.PERSISTED);
-			}
-		} finally {
-			Stores.setCurrent(saved);
+		// Both parent and child should be retrievable
+		assertNotNull(store.refForHash(outerHash));
+		if (!inner.isEmbedded()) {
+			Ref<?> innerRef = store.refForHash(innerHash);
+			assertNotNull(innerRef, "Child cell should be individually retrievable after persist");
+			assertTrue(innerRef.getStatus() >= Ref.PERSISTED);
 		}
 	}
 
@@ -116,23 +96,16 @@ public class ParamTestStores {
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testLargeSetPersist(AStore store) throws IOException {
-		AStore saved = Stores.current();
-		try {
-			Stores.setCurrent(store);
-
-			// Build a set large enough to have tree branches (non-embedded children)
-			ASet<ACell> set = (ASet<ACell>) Sets.empty();
-			for (int i = 0; i < 500; i++) {
-				set = (ASet<ACell>) set.conj(CVMLong.create(i));
-			}
-			set = Cells.persist(set, store);
-			Hash h = Cells.getHash(set);
-			Ref<?> ref = store.refForHash(h);
-			assertNotNull(ref);
-			assertTrue(ref.getStatus() >= Ref.PERSISTED);
-			assertEquals(500L, set.count());
-		} finally {
-			Stores.setCurrent(saved);
+		// Build a set large enough to have tree branches (non-embedded children)
+		ASet<ACell> set = (ASet<ACell>) Sets.empty();
+		for (int i = 0; i < 500; i++) {
+			set = (ASet<ACell>) set.conj(CVMLong.create(i));
 		}
+		set = Cells.persist(set, store);
+		Hash h = Cells.getHash(set);
+		Ref<?> ref = store.refForHash(h);
+		assertNotNull(ref);
+		assertTrue(ref.getStatus() >= Ref.PERSISTED);
+		assertEquals(500L, set.count());
 	}
 }

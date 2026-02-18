@@ -27,7 +27,7 @@ public class SignatureBenchmark {
 	private static SignedData<ABlob> makeSigned() {
 		SignedData<ABlob> signed= KEYPAIR.signData(Blobs.fromHex("cafebabe"));
 		try {
-			Cells.persist(signed, Stores.current());
+			Cells.persist(signed, Stores.getGlobalStore());
 		} catch (IOException e) {
 			throw new Error(e);
 		}
@@ -60,7 +60,7 @@ public class SignatureBenchmark {
 	@SuppressWarnings("unchecked")
 	@Benchmark
 	public void verifyFromStore() {
-		SignedData<ABlob> signed=(SignedData<ABlob>) Ref.forHash(SIGNED.getHash(), Stores.current()).getValue();
+		SignedData<ABlob> signed=(SignedData<ABlob>) Ref.forHash(SIGNED.getHash(), Stores.getGlobalStore()).getValue();
 		signed.checkSignature();
 	}
 

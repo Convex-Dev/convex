@@ -43,8 +43,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitTest;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.test.Samples;
@@ -64,29 +62,20 @@ public class EtchStoreTest {
 
 	@Test
 	public void testEmptyStore() throws IOException {
-		AStore oldStore = Stores.current();
-		try {
-			Stores.setCurrent(store);
-			assertTrue(oldStore != store);
-			assertEquals(store, Stores.current());
+		assertNull(store.refForHash(BAD_HASH));
 
-			assertNull(store.refForHash(BAD_HASH));
+		AMap<ACell, ACell> data = Maps.of(Keywords.FOO,Symbols.FOO);
+		Ref<AMap<ACell, ACell>> goodRef = data.getRef();
+		Hash goodHash = goodRef.getHash();
+		assertNull(store.refForHash(goodHash));
 
-			AMap<ACell, ACell> data = Maps.of(Keywords.FOO,Symbols.FOO);
-			Ref<AMap<ACell, ACell>> goodRef = data.getRef();
-			Hash goodHash = goodRef.getHash();
-			assertNull(store.refForHash(goodHash));
+		goodRef.persist(store);
 
-			goodRef.persist(store);
+		if (!data.isEmbedded()) {
+			Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
+			assertNotNull(recRef);
 
-			if (!data.isEmbedded()) {
-				Ref<AMap<ACell, ACell>> recRef = store.refForHash(goodHash);
-				assertNotNull(recRef);
-
-				assertEquals(data, recRef.getValue());
-			}
-		} finally {
-			Stores.setCurrent(oldStore);
+			assertEquals(data, recRef.getValue());
 		}
 	}
 	
@@ -142,170 +131,144 @@ public class EtchStoreTest {
 
 	@Test
 	public void testPersistedStatus() throws BadFormatException, IOException {
-		AStore oldStore = Stores.current();
-		try {
-			Stores.setCurrent(store);
+		// generate Hash of unique secure random bytes to test - should not already be
+		// in store
+		Blob randomBlob = Blob.createRandom(new Random(), Format.MAX_EMBEDDED_LENGTH+1);
+		Hash hash = randomBlob.getHash();
+		assertNotEquals(hash, randomBlob);
 
-			// generate Hash of unique secure random bytes to test - should not already be
-			// in store
-			Blob randomBlob = Blob.createRandom(new Random(), Format.MAX_EMBEDDED_LENGTH+1);
-			Hash hash = randomBlob.getHash();
-			assertNotEquals(hash, randomBlob);
+		Ref<Blob> initialRef = randomBlob.getRef();
+		assertEquals(Ref.UNKNOWN, initialRef.getStatus());
+		assertNull(store.refForHash(hash));
 
-			Ref<Blob> initialRef = randomBlob.getRef();
-			assertEquals(Ref.UNKNOWN, initialRef.getStatus());
-			assertNull(Stores.current().refForHash(hash));
+		// shallow persistence first
+		Ref<Blob> refShallow=initialRef.persistShallow(store);
+		assertEquals(Ref.STORED, refShallow.getStatus());
 
-			// shallow persistence first
-			Ref<Blob> refShallow=initialRef.persistShallow(store);
-			assertEquals(Ref.STORED, refShallow.getStatus());
+		Ref<Blob> ref = initialRef.persist(store);
+		assertEquals(Ref.PERSISTED, ref.getStatus());
+		assertTrue(ref.isPersisted());
 
-			Ref<Blob> ref = initialRef.persist(store);
-			assertEquals(Ref.PERSISTED, ref.getStatus());
-			assertTrue(ref.isPersisted());
-
-			Ref<Blob> newRef = Stores.current().refForHash(hash);
-			assertEquals(initialRef, newRef);
-			assertEquals(randomBlob, newRef.getValue());
-		} finally {
-			Stores.setCurrent(oldStore);
-		}
+		Ref<Blob> newRef = store.refForHash(hash);
+		assertEquals(initialRef, newRef);
+		assertEquals(randomBlob, newRef.getValue());
 	}
 
 	@Test
 	public void testBeliefAnnounce() throws IOException {
-		AStore oldStore = Stores.current();
 		AtomicLong counter=new AtomicLong(0L);
 
 		AKeyPair kp=InitTest.HERO_KEYPAIR;
-		try {
-			Stores.setCurrent(store);
 
-			ATransaction t1=Invoke.create(InitTest.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
-			ATransaction t2=Transfer.create(InitTest.HERO,1, InitTest.VILLAIN,1000000);
-			Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
+		ATransaction t1=Invoke.create(InitTest.HERO,0, Lists.of(Symbols.PLUS, Symbols.STAR_BALANCE, 1000L));
+		ATransaction t2=Transfer.create(InitTest.HERO,1, InitTest.VILLAIN,1000000);
+		Block b=Block.of(Utils.getCurrentTimestamp(),kp.signData(t1),kp.signData(t2));
 
-			Order ord=Order.create().append(kp.signData(b));
+		Order ord=Order.create().append(kp.signData(b));
 
-			Belief belief=Belief.create(kp,ord);
+		Belief belief=Belief.create(kp,ord);
 
-			Ref<Belief> rb=belief.getRef();
-			Ref<ATransaction> rt=t1.getRef();
-			assertEquals(Ref.UNKNOWN,rb.getStatus());
-			assertEquals(Ref.UNKNOWN,rt.getStatus());
+		Ref<Belief> rb=belief.getRef();
+		Ref<ATransaction> rt=t1.getRef();
+		assertEquals(Ref.UNKNOWN,rb.getStatus());
+		assertEquals(Ref.UNKNOWN,rt.getStatus());
 
-			assertEquals(3,Cells.refCount(t1));
-			assertEquals(4,Cells.refCount(t2));
-			assertEquals(30,Refs.totalRefCount(belief));
+		assertEquals(3,Cells.refCount(t1));
+		assertEquals(4,Cells.refCount(t2));
+		assertEquals(30,Refs.totalRefCount(belief));
 
 
-			Consumer<Ref<ACell>> noveltyHandler=r-> {
-				counter.incrementAndGet();
-			};
+		Consumer<Ref<ACell>> noveltyHandler=r-> {
+			counter.incrementAndGet();
+		};
 
-			// First try shallow persistence
-			counter.set(0L);
-			Ref<Belief> srb=rb.persistShallow(noveltyHandler, store);
-			assertEquals(Ref.STORED,srb.getStatus());
-			// One cell persisted, should only be novelty if embedded
-			assertEquals(belief.isEmbedded()?0L:1L,counter.get());
+		// First try shallow persistence
+		counter.set(0L);
+		Ref<Belief> srb=rb.persistShallow(noveltyHandler, store);
+		assertEquals(Ref.STORED,srb.getStatus());
+		// One cell persisted, should only be novelty if embedded
+		assertEquals(belief.isEmbedded()?0L:1L,counter.get());
 
-			// assertEquals(srb,store.refForHash(rb.getHash()));
-			assertNull(store.refForHash(t1.getRef().getHash()));
+		// assertEquals(srb,store.refForHash(rb.getHash()));
+		assertNull(store.refForHash(t1.getRef().getHash()));
 
-			// Persist belief
-			counter.set(0L);
-			Ref<Belief> prb=srb.persist(noveltyHandler, store);
-			assertEquals(3L,counter.get());
+		// Persist belief
+		counter.set(0L);
+		Ref<Belief> prb=srb.persist(noveltyHandler, store);
+		assertEquals(3L,counter.get());
 
-			// Persist again. Should be no new novelty
-			counter.set(0L);
-			Ref<Belief> prb2=srb.persist(noveltyHandler, store);
-			assertEquals(prb2,prb);
-			assertEquals(0L,counter.get()); // Nothing new persisted
+		// Persist again. Should be no new novelty
+		counter.set(0L);
+		Ref<Belief> prb2=srb.persist(noveltyHandler, store);
+		assertEquals(prb2,prb);
+		assertEquals(0L,counter.get()); // Nothing new persisted
 
-			// Announce belief
-			counter.set(0L);
-			Ref<Belief> arb=Cells.announce(belief,noveltyHandler,store).getRef();
-			assertEquals(srb,arb);
-			assertEquals(3L,counter.get());
+		// Announce belief
+		counter.set(0L);
+		Ref<Belief> arb=Cells.announce(belief,noveltyHandler,store).getRef();
+		assertEquals(srb,arb);
+		assertEquals(3L,counter.get());
 
-			// Announce again. Should be no new novelty
-			counter.set(0L);
-			Ref<Belief> arb2=Cells.announce(belief,noveltyHandler,store).getRef();
-			assertEquals(srb,arb2);
-			assertEquals(0L,counter.get()); // Nothing new announced
+		// Announce again. Should be no new novelty
+		counter.set(0L);
+		Ref<Belief> arb2=Cells.announce(belief,noveltyHandler,store).getRef();
+		assertEquals(srb,arb2);
+		assertEquals(0L,counter.get()); // Nothing new announced
 
-			// Check re-stored ref has correct status
-			counter.set(0L);
-			Ref<Belief> arb3=srb.persistShallow(noveltyHandler, store);
-			assertEquals(0L,counter.get()); // Nothing new persisted
-			assertTrue(Ref.STORED<=arb3.getStatus());
+		// Check re-stored ref has correct status
+		counter.set(0L);
+		Ref<Belief> arb3=srb.persistShallow(noveltyHandler, store);
+		assertEquals(0L,counter.get()); // Nothing new persisted
+		assertTrue(Ref.STORED<=arb3.getStatus());
 
-			// Recover Belief from store. Should be top level stored
-			Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
-			assertEquals(belief,recb);
-		} finally {
-			Stores.setCurrent(oldStore);
-		}
+		// Recover Belief from store. Should be top level stored
+		Belief recb=(Belief) store.refForHash(belief.getHash()).getValue();
+		assertEquals(belief,recb);
 	}
 
 	@Test
 	public void testNoveltyHandler() throws IOException {
-		AStore oldStore = Stores.current();
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
-		try {
-			Stores.setCurrent(store);
-			// create a random item that shouldn't already be in the store
-			AVector<Blob> data = Vectors.of(Blob.createRandom(new Random(), 100),Blob.createRandom(new Random(), 100));
+		// create a random item that shouldn't already be in the store
+		AVector<Blob> data = Vectors.of(Blob.createRandom(new Random(), 100),Blob.createRandom(new Random(), 100));
 
-			// handler that records added refs
-			Consumer<Ref<ACell>> handler = r -> al.add(r);
+		// handler that records added refs
+		Consumer<Ref<ACell>> handler = r -> al.add(r);
 
-			Ref<AVector<Blob>> dataRef = data.getRef();
-			Hash dataHash = dataRef.getHash();
-			assertNull(store.refForHash(dataHash));
+		Ref<AVector<Blob>> dataRef = data.getRef();
+		Hash dataHash = dataRef.getHash();
+		assertNull(store.refForHash(dataHash));
 
-			Cells.announce(data,handler,store);
-			int num=al.size(); // number of novel cells persisted
-			assertTrue(num>0); // got new novelty
-			assertEquals(data, al.get(num-1).getValue());
+		Cells.announce(data,handler,store);
+		int num=al.size(); // number of novel cells persisted
+		assertTrue(num>0); // got new novelty
+		assertEquals(data, al.get(num-1).getValue());
 
-			data.getRef().persist(store);
-			assertEquals(num, al.size()); // no new novelty transmitted
-		} finally {
-			Stores.setCurrent(oldStore);
-		}
+		data.getRef().persist(store);
+		assertEquals(num, al.size()); // no new novelty transmitted
 	}
 	
 	@Test public void testDecodeCache() throws BadFormatException, IOException {
-		AStore oldStore = Stores.current();
-		try {
-			Stores.setCurrent(store);
+		// Use a non-embedded Blob
+		Blob a1=Blobs.createRandom(Format.MAX_EMBEDDED_LENGTH+1);
+		assertFalse(a1.isEmbedded());
 
-			// Use a non-embedded Blob
-			Blob a1=Blobs.createRandom(Format.MAX_EMBEDDED_LENGTH+1);
-			assertFalse(a1.isEmbedded());
-			
-			ACell cell=store.decode(a1.getEncoding());
-			assertNotSame(cell,a1);
-			assertEquals(cell,a1);
-			
-			Ref<?> r=Cells.persist(cell, store).getRef();
-			assertTrue(r.isPersisted());
-			cell=r.getValue();
-			
-			// TODO: might not happen?
-			//assertTrue(r instanceof RefSoft);
-			//assertTrue(cell.getRef() instanceof RefSoft);
-			
-			// decoding again should get same value with very high probability
-			ACell cell2=store.decode(a1.getEncoding());
-			assertSame(cell,cell2);
-			assertSame(r,cell.getRef());
-		} finally {
-			Stores.setCurrent(oldStore);
-		}
+		ACell cell=store.decode(a1.getEncoding());
+		assertNotSame(cell,a1);
+		assertEquals(cell,a1);
+
+		Ref<?> r=Cells.persist(cell, store).getRef();
+		assertTrue(r.isPersisted());
+		cell=r.getValue();
+
+		// TODO: might not happen?
+		//assertTrue(r instanceof RefSoft);
+		//assertTrue(cell.getRef() instanceof RefSoft);
+
+		// decoding again should get same value with very high probability
+		ACell cell2=store.decode(a1.getEncoding());
+		assertSame(cell,cell2);
+		assertSame(r,cell.getRef());
 	}
 
 	@Test

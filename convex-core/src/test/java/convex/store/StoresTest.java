@@ -9,8 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
@@ -36,8 +34,6 @@ import convex.core.init.InitTest;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.NullStore;
-import convex.core.store.Stores;
-import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.test.Samples;
@@ -54,7 +50,6 @@ public class StoresTest {
 	}
 
 	@Test public void testInitState() throws InvalidDataException, IOException {
-		AStore temp=Stores.current();
 		// Use fresh State
 		State s=InitTest.createState();
 		Ref<State> sr=Cells.persist(s, testStore).getRef();
@@ -96,23 +91,17 @@ public class StoresTest {
 			}
 		};
 		
-		AStore temp=Stores.current();
-		try {
-			Stores.setCurrent(e1);
-			assertSame(ev,Cells.persist(ev, e1));
-			
-			// vector shouldn't be in other stores
-			Hash hv=v.getHash();
-			assertNull(e2.refForHash(hv));
-			assertNull(m1.refForHash(hv));
-			
-			crossTest.accept(nv);
-			crossTest.accept(ev);
-			crossTest.accept(v);
-			crossTest.accept(null);
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		assertSame(ev,Cells.persist(ev, e1));
+
+		// vector shouldn't be in other stores
+		Hash hv=v.getHash();
+		assertNull(e2.refForHash(hv));
+		assertNull(m1.refForHash(hv));
+
+		crossTest.accept(nv);
+		crossTest.accept(ev);
+		crossTest.accept(v);
+		crossTest.accept(null);
 	}
 
 	private void doCrossStoreTest(ACell a, AStore s1, AStore s2) throws IOException {
@@ -126,61 +115,6 @@ public class StoresTest {
 
 		assertNotNull(s2.refForHash(ha));
 		assertEquals(a1,a2);
-	}
-
-	// ========== Thread-local store isolation tests ==========
-
-	@Test
-	public void testVirtualThreadStorePropagation() throws Exception {
-		MemoryStore ms = new MemoryStore();
-		CompletableFuture<AStore> observed = new CompletableFuture<>();
-
-		ThreadUtils.runVirtual(() -> {
-			Stores.setCurrent(ms);
-			observed.complete(Stores.current());
-		});
-
-		AStore result = observed.get(5, TimeUnit.SECONDS);
-		assertSame(ms, result, "Virtual thread should see the store set on it");
-	}
-
-	@Test
-	public void testVirtualThreadStoreIsolation() throws Exception {
-		MemoryStore ms1 = new MemoryStore();
-		MemoryStore ms2 = new MemoryStore();
-		CompletableFuture<AStore> obs1 = new CompletableFuture<>();
-		CompletableFuture<AStore> obs2 = new CompletableFuture<>();
-
-		// Launch two concurrent virtual threads with different stores
-		ThreadUtils.runVirtual(() -> {
-			Stores.setCurrent(ms1);
-			try { Thread.sleep(10); } catch (InterruptedException e) {}
-			obs1.complete(Stores.current());
-		});
-		ThreadUtils.runVirtual(() -> {
-			Stores.setCurrent(ms2);
-			try { Thread.sleep(10); } catch (InterruptedException e) {}
-			obs2.complete(Stores.current());
-		});
-
-		assertSame(ms1, obs1.get(5, TimeUnit.SECONDS), "Thread 1 should see store 1");
-		assertSame(ms2, obs2.get(5, TimeUnit.SECONDS), "Thread 2 should see store 2");
-	}
-
-	@Test
-	public void testVirtualThreadDoesNotAffectCaller() throws Exception {
-		AStore before = Stores.current();
-
-		MemoryStore ms = new MemoryStore();
-		CompletableFuture<Void> done = new CompletableFuture<>();
-		ThreadUtils.runVirtual(() -> {
-			Stores.setCurrent(ms);
-			done.complete(null);
-		});
-		done.get(5, TimeUnit.SECONDS);
-
-		// Calling thread's store should be unaffected
-		assertSame(before, Stores.current(), "Calling thread store should not change");
 	}
 
 	// ========== Cross-store lattice merge tests ==========
@@ -328,15 +262,9 @@ public class StoresTest {
 
 		Blob enc = Format.encodeMultiCell(result, true);
 
-		// peekResultID should work without any store set (uses NullStore internally)
-		AStore saved = Stores.current();
-		Stores.setCurrent(null);
-		try {
-			ACell id = Result.peekResultID(enc, 0);
-			assertEquals(CVMLong.create(7), id);
-		} finally {
-			Stores.setCurrent(saved);
-		}
+		// peekResultID should work without any store (uses NullStore internally)
+		ACell id = Result.peekResultID(enc, 0);
+		assertEquals(CVMLong.create(7), id);
 	}
 
 	// ========== Cross-store acquisition round-trip ==========
@@ -347,39 +275,32 @@ public class StoresTest {
 		EtchStore source = EtchStore.createTemp();
 		MemoryStore target = new MemoryStore();
 
-		AStore saved = Stores.current();
-		try {
-			// Build and persist a deep structure in source
-			Stores.setCurrent(source);
-			ASet<ACell> set = Sets.empty();
-			for (int i = 0; i < 300; i++) {
-				set = set.conj(CVMLong.create(i));
-			}
-			set = Cells.persist(set, source);
-			Hash rootHash = Cells.getHash(set);
-
-			// Verify fully persisted in source
-			Ref<?> srcRef = source.refForHash(rootHash);
-			assertNotNull(srcRef);
-			assertTrue(srcRef.getStatus() >= Ref.PERSISTED);
-
-			// Now store in target (simulating incremental acquisition)
-			Stores.setCurrent(target);
-			Cells.store(set, target);
-			Ref<?> tgtStored = target.refForHash(rootHash);
-			assertNotNull(tgtStored, "Root should be in target after store");
-
-			// Persist fully in target
-			Cells.persist(set, target);
-			Ref<?> tgtPersisted = target.refForHash(rootHash);
-			assertNotNull(tgtPersisted);
-			assertTrue(tgtPersisted.getStatus() >= Ref.PERSISTED,
-				"Should be fully persisted in target");
-
-			// Verify value integrity
-			assertEquals(300L, ((ASet<?>) tgtPersisted.getValue()).count());
-		} finally {
-			Stores.setCurrent(saved);
+		// Build and persist a deep structure in source
+		ASet<ACell> set = Sets.empty();
+		for (int i = 0; i < 300; i++) {
+			set = set.conj(CVMLong.create(i));
 		}
+		set = Cells.persist(set, source);
+		Hash rootHash = Cells.getHash(set);
+
+		// Verify fully persisted in source
+		Ref<?> srcRef = source.refForHash(rootHash);
+		assertNotNull(srcRef);
+		assertTrue(srcRef.getStatus() >= Ref.PERSISTED);
+
+		// Now store in target (simulating incremental acquisition)
+		Cells.store(set, target);
+		Ref<?> tgtStored = target.refForHash(rootHash);
+		assertNotNull(tgtStored, "Root should be in target after store");
+
+		// Persist fully in target
+		Cells.persist(set, target);
+		Ref<?> tgtPersisted = target.refForHash(rootHash);
+		assertNotNull(tgtPersisted);
+		assertTrue(tgtPersisted.getStatus() >= Ref.PERSISTED,
+			"Should be fully persisted in target");
+
+		// Verify value integrity
+		assertEquals(300L, ((ASet<?>) tgtPersisted.getValue()).count());
 	}
 }

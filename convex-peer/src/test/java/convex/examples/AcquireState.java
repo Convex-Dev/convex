@@ -12,9 +12,6 @@ import convex.core.cvm.State;
 public class AcquireState {
 
 	public static void main(String[] args) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		// Use a fresh store
-		//EtchStore etch=EtchStore.createTemp("acquire-testing");
-		//Stores.setCurrent(etch);
 
 		InetSocketAddress hostAddress = new InetSocketAddress("convex.world",  18888);
 

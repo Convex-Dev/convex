@@ -8,7 +8,6 @@ import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.store.Stores;
 import convex.etch.EtchStore;
 
 /**
@@ -20,7 +19,6 @@ public class EtchStressTest {
 	public static void main(String[] args) throws IOException {
 		Random r=new Random(123);
 		EtchStore store=EtchStore.createTemp();
-		Stores.setCurrent(store);
 		long rc=0;
 		long STEP=10000000; // threshold at which to print a status line
 		

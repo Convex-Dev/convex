@@ -26,7 +26,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.PartialMessageException;
 import convex.core.lang.Core;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 /**
@@ -146,12 +145,7 @@ public class EncoderTest {
 
 	@Test public void testEmptyState() throws BadFormatException {
 		// State (tag 0xD5) is a large CVM consensus record
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			doCVMTypeTest(State.EMPTY, State.class, DenseRecord.class);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		doCVMTypeTest(State.EMPTY, State.class, DenseRecord.class);
 	}
 
 	// ==================== CVM extension values (0xE0 range) ====================
@@ -222,20 +216,15 @@ public class EncoderTest {
 
 	@Test public void testMultiCellCrossEncoder() throws BadFormatException {
 		// Multi-cell encoding with non-embedded children
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			ACell big = Samples.INT_VECTOR_300;
-			Blob enc = Format.encodeMultiCell(big, true);
+		ACell big = Samples.INT_VECTOR_300;
+		Blob enc = Format.encodeMultiCell(big, true);
 
-			ACell fromCVM = CVM.decodeMultiCell(enc);
-			ACell fromCAD3 = CAD3.decodeMultiCell(enc);
+		ACell fromCVM = CVM.decodeMultiCell(enc);
+		ACell fromCAD3 = CAD3.decodeMultiCell(enc);
 
-			assertEquals(big, fromCVM);
-			assertEquals(big, fromCAD3);
-			assertEquals(fromCVM, fromCAD3);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		assertEquals(big, fromCVM);
+		assertEquals(big, fromCAD3);
+		assertEquals(fromCVM, fromCAD3);
 	}
 
 	// ==================== Encoding consistency ====================
@@ -284,27 +273,22 @@ public class EncoderTest {
 
 	@Test public void testCVMTypeIdentity() throws BadFormatException {
 		// CVMEncoder must produce the specific CVM Java type for known CVM values
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			Object[][] cases = new Object[][] {
-				{ Samples.INVOKE_TRANSACTION, Invoke.class },
-				{ Samples.TRANSFER_TRANSACTION, Transfer.class },
-				{ Samples.EMPTY_ORDER, Order.class },
-				{ State.EMPTY, State.class },
-				{ Core.VECTOR, Core.VECTOR.getClass() },
-			};
-			for (Object[] c : cases) {
-				ACell value = (ACell) c[0];
-				Class<?> expected = (Class<?>) c[1];
-				Blob enc = Cells.encode(value);
-				ACell decoded = CVM.decode(enc);
-				assertInstanceOf(expected, decoded,
-					"CVMEncoder should produce " + expected.getSimpleName() + " for " + value);
-				assertTrue(decoded.isCVMValue(),
-					"CVMEncoder-decoded value should be a CVM value: " + decoded);
-			}
-		} finally {
-			Stores.setCurrent(null);
+		Object[][] cases = new Object[][] {
+			{ Samples.INVOKE_TRANSACTION, Invoke.class },
+			{ Samples.TRANSFER_TRANSACTION, Transfer.class },
+			{ Samples.EMPTY_ORDER, Order.class },
+			{ State.EMPTY, State.class },
+			{ Core.VECTOR, Core.VECTOR.getClass() },
+		};
+		for (Object[] c : cases) {
+			ACell value = (ACell) c[0];
+			Class<?> expected = (Class<?>) c[1];
+			Blob enc = Cells.encode(value);
+			ACell decoded = CVM.decode(enc);
+			assertInstanceOf(expected, decoded,
+				"CVMEncoder should produce " + expected.getSimpleName() + " for " + value);
+			assertTrue(decoded.isCVMValue(),
+				"CVMEncoder-decoded value should be a CVM value: " + decoded);
 		}
 	}
 
@@ -320,7 +304,6 @@ public class EncoderTest {
 		assertTrue(enc.count() > Cells.encode(big).count(), "Should be multi-cell encoding");
 
 		// Decode with no store
-		assertNull(Stores.current());
 		ACell decoded = CVM.decodeMultiCell(enc);
 		assertEquals(big, decoded);
 
@@ -350,8 +333,6 @@ public class EncoderTest {
 		// Confirm the original value has non-embedded child refs
 		assertTrue(big.getRefCount() > 0, "Test value should have child refs");
 
-		assertNull(Stores.current());
-
 		// Storeless decode fails fast on partial message
 		assertThrows(PartialMessageException.class, () -> CVM.decodeMultiCell(topOnly));
 		assertThrows(PartialMessageException.class, () -> CAD3.decodeMultiCell(topOnly));
@@ -363,7 +344,6 @@ public class EncoderTest {
 		assertTrue(small.isEmbedded(), "Test value should be embedded");
 		Blob enc = Cells.encode(small);
 
-		assertNull(Stores.current());
 		ACell decoded = CVM.decodeMultiCell(enc);
 		assertEquals(small, decoded);
 		assertTrue(Refs.allRefsDirect(decoded));
@@ -434,7 +414,6 @@ public class EncoderTest {
 
 		// Decode should succeed — extra children are silently ignored by resolveRefs
 		// (they go into the HashMap but are never looked up)
-		assertNull(Stores.current());
 		ACell decoded = CVM.decodeMultiCell(extraMessage);
 		assertEquals(big, decoded);
 	}
@@ -527,7 +506,6 @@ public class EncoderTest {
 		// Append children twice
 		Blob doubled = topEnc.append(childrenPortion).append(childrenPortion).toFlatBlob();
 
-		assertNull(Stores.current());
 		ACell decoded = CVM.decodeMultiCell(doubled);
 		assertEquals(big, decoded);
 	}
@@ -674,13 +652,8 @@ public class EncoderTest {
 
 	@Test public void testDecodeStateVectorTree() throws BadFormatException {
 		// INT_VECTOR_256 is a VectorTree (256 elements = 16 chunks of 16)
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CVM);
-			doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CAD3);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CVM);
+		doDecodeStateRoundTrip(Samples.INT_VECTOR_256, CAD3);
 	}
 
 	@Test public void testDecodeStateVectorWithPrefix() throws BadFormatException {
@@ -703,17 +676,12 @@ public class EncoderTest {
 
 	@Test public void testDecodeStateMapTree() throws BadFormatException {
 		// Build a map with >15 entries to force MapTree
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			AHashMap<ACell, ACell> big = Maps.empty();
-			for (int i = 0; i < 20; i++) {
-				big = big.assoc(Keyword.create("k" + i), CVMLong.create(i));
-			}
-			doDecodeStateRoundTrip(big, CVM);
-			doDecodeStateRoundTrip(big, CAD3);
-		} finally {
-			Stores.setCurrent(null);
+		AHashMap<ACell, ACell> big = Maps.empty();
+		for (int i = 0; i < 20; i++) {
+			big = big.assoc(Keyword.create("k" + i), CVMLong.create(i));
 		}
+		doDecodeStateRoundTrip(big, CVM);
+		doDecodeStateRoundTrip(big, CAD3);
 	}
 
 	@Test public void testDecodeStateSetLeaf() throws BadFormatException {
@@ -730,17 +698,12 @@ public class EncoderTest {
 
 	@Test public void testDecodeStateSetTree() throws BadFormatException {
 		// Build a set with >15 entries to force SetTree
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			ASet<ACell> big = Sets.empty();
-			for (int i = 0; i < 20; i++) {
-				big = big.include(Keyword.create("s" + i));
-			}
-			doDecodeStateRoundTrip(big, CVM);
-			doDecodeStateRoundTrip(big, CAD3);
-		} finally {
-			Stores.setCurrent(null);
+		ASet<ACell> big = Sets.empty();
+		for (int i = 0; i < 20; i++) {
+			big = big.include(Keyword.create("s" + i));
 		}
+		doDecodeStateRoundTrip(big, CVM);
+		doDecodeStateRoundTrip(big, CAD3);
 	}
 
 	@Test public void testDecodeStateList() throws BadFormatException {
@@ -767,15 +730,10 @@ public class EncoderTest {
 	}
 
 	@Test public void testDecodeStateSignedData() throws BadFormatException {
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			convex.core.crypto.AKeyPair kp = convex.core.crypto.AKeyPair.generate();
-			SignedData<CVMLong> sd = SignedData.sign(kp, CVMLong.create(42));
-			doDecodeStateRoundTrip(sd, CVM);
-			doDecodeStateRoundTrip(sd, CAD3);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		convex.core.crypto.AKeyPair kp = convex.core.crypto.AKeyPair.generate();
+		SignedData<CVMLong> sd = SignedData.sign(kp, CVMLong.create(42));
+		doDecodeStateRoundTrip(sd, CVM);
+		doDecodeStateRoundTrip(sd, CAD3);
 	}
 
 	@Test public void testDecodeStateAddress() throws BadFormatException {
@@ -812,16 +770,11 @@ public class EncoderTest {
 
 	@Test public void testDecodeStateDenseRecord() throws BadFormatException {
 		// CVM dense record types (transactions, ops) decoded via bridge
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			ACell invoke = Invoke.create(Address.create(1), 0, Core.PLUS);
-			doDecodeStateRoundTrip(invoke, CVM);
+		ACell invoke = Invoke.create(Address.create(1), 0, Core.PLUS);
+		doDecodeStateRoundTrip(invoke, CVM);
 
-			ACell transfer = Transfer.create(Address.create(1), 0, Address.create(2), 1000L);
-			doDecodeStateRoundTrip(transfer, CVM);
-		} finally {
-			Stores.setCurrent(null);
-		}
+		ACell transfer = Transfer.create(Address.create(1), 0, Address.create(2), 1000L);
+		doDecodeStateRoundTrip(transfer, CVM);
 	}
 
 	@Test public void testDecodeStateCodedData() throws BadFormatException {
@@ -855,39 +808,29 @@ public class EncoderTest {
 
 	@Test public void testDecodeRefNonEmbedded() throws BadFormatException, java.io.IOException {
 		// Non-embedded cell — ref encoding is Tag.REF + 32-byte hash
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			// Use a non-embedded vector (INT_VECTOR_300) persisted to store
-			ACell big = Cells.persist(Samples.INT_VECTOR_300, Samples.TEST_STORE);
-			assertFalse(big.isEmbedded(), "INT_VECTOR_300 should not be embedded");
+		// Use a non-embedded vector (INT_VECTOR_300) persisted to store
+		ACell big = Cells.persist(Samples.INT_VECTOR_300, Samples.TEST_STORE);
+		assertFalse(big.isEmbedded(), "INT_VECTOR_300 should not be embedded");
 
-			Ref<?> ref = big.getRef();
-			Blob refEnc = ref.getEncoding();
-			// Non-embedded: ref encoding is Tag.REF + 32-byte hash = 33 bytes
-			assertEquals(Tag.REF, refEnc.byteAt(0));
-			assertEquals(33, refEnc.count());
+		Ref<?> ref = big.getRef();
+		Blob refEnc = ref.getEncoding();
+		// Non-embedded: ref encoding is Tag.REF + 32-byte hash = 33 bytes
+		assertEquals(Tag.REF, refEnc.byteAt(0));
+		assertEquals(33, refEnc.count());
 
-			CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
-			Ref<ACell> decoded = enc.decodeRef(refEnc);
-			assertEquals(big, decoded.getValue());
-		} finally {
-			Stores.setCurrent(null);
-		}
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		Ref<ACell> decoded = enc.decodeRef(refEnc);
+		assertEquals(big, decoded.getValue());
 	}
 
 	@Test public void testDecodeRefViaStore() throws BadFormatException {
 		// Test AStore.decodeRef convenience method
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
-			Ref<Invoke> ref = tx.getRef();
-			Blob refEnc = ref.getEncoding();
+		Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
+		Ref<Invoke> ref = tx.getRef();
+		Blob refEnc = ref.getEncoding();
 
-			Ref<ACell> decoded = Samples.TEST_STORE.decodeRef(refEnc);
-			assertEquals(tx, decoded.getValue());
-		} finally {
-			Stores.setCurrent(null);
-		}
+		Ref<ACell> decoded = Samples.TEST_STORE.decodeRef(refEnc);
+		assertEquals(tx, decoded.getValue());
 	}
 
 	@Test public void testDecodeRefNull() throws BadFormatException {
@@ -907,19 +850,14 @@ public class EncoderTest {
 	@Test public void testDecodeRefSignedDataFormat() throws BadFormatException, java.io.IOException {
 		// SignedData.getMessageForRef(ref) returns ref.getEncoding().
 		// Verify decodeRef can round-trip what SignedData produces.
-		Stores.setCurrent(Samples.TEST_STORE);
-		try {
-			Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
-			tx = Cells.persist(tx, Samples.TEST_STORE);
-			Ref<Invoke> ref = tx.getRef();
+		Invoke tx = Invoke.create(Address.create(12), 1, CVMLong.create(42));
+		tx = Cells.persist(tx, Samples.TEST_STORE);
+		Ref<Invoke> ref = tx.getRef();
 
-			Blob messageForRef = SignedData.getMessageForRef(ref);
-			CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
-			Ref<ACell> decoded = enc.decodeRef(messageForRef);
-			assertEquals(tx, decoded.getValue());
-		} finally {
-			Stores.setCurrent(null);
-		}
+		Blob messageForRef = SignedData.getMessageForRef(ref);
+		CVMEncoder enc = new CVMEncoder(Samples.TEST_STORE);
+		Ref<ACell> decoded = enc.decodeRef(messageForRef);
+		assertEquals(tx, decoded.getValue());
 	}
 
 	@Test public void testDecodeRefTransfer() throws BadFormatException {
