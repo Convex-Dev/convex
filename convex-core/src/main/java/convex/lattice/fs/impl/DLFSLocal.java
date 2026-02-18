@@ -1,6 +1,6 @@
 package convex.lattice.fs.impl;
 
-import java.io.FileNotFoundException;
+import java.nio.file.NoSuchFileException;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
@@ -85,7 +85,7 @@ public class DLFSLocal extends DLFileSystem {
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
 		if (parentNode==null) {
-			throw new FileNotFoundException(parent.toString());
+			throw new NoSuchFileException(parent.toString());
 		}
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(dir.toString());
@@ -103,7 +103,7 @@ public class DLFSLocal extends DLFileSystem {
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
 		if (parentNode==null) {
-			throw new FileNotFoundException("Parent directory does not exist: "+parent.toString());
+			throw new NoSuchFileException(parent.toString(), null, "Parent directory does not exist");
 		}
 		AVector<ACell> oldNode=DLFSNode.getDirectoryEntries(parentNode).get(name);
 		if (oldNode!=null) {
