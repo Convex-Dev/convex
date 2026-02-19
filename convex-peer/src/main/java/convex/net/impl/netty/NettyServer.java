@@ -35,7 +35,7 @@ public class NettyServer extends AServer {
 
 	static final Logger log = LoggerFactory.getLogger(NettyServer.class);
 
-	static EventLoopGroup bossGroup=null;
+	static volatile EventLoopGroup bossGroup=null;
 
 	private Channel channel;
 
@@ -53,10 +53,13 @@ public class NettyServer extends AServer {
 
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
-		bossGroup=new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
+		// Boss group only accepts inbound connections — 1 thread is sufficient
+		bossGroup=new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
 		Shutdown.addHook(Shutdown.SERVER,()->{
-			if (bossGroup!=null) {
-				bossGroup.shutdownGracefully();
+			EventLoopGroup bg=bossGroup;
+			if (bg!=null) {
+				bossGroup=null;
+				bg.shutdownGracefully();
 			}
 		});
 		return bossGroup;

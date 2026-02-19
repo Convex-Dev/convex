@@ -130,10 +130,7 @@ public class DecimalAmountField extends JTextField {
 			}
 			BigInteger bi=(exact?dec.toBigIntegerExact():dec.toBigInteger());
 			return AInteger.create(bi);
-		} catch (NumberFormatException e) {
-			return null;
-		}catch (Exception e) {
-			e.printStackTrace();
+		} catch (NumberFormatException | ArithmeticException e) {
 			return null;
 		}
 	}

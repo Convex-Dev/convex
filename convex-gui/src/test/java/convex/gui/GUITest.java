@@ -74,11 +74,14 @@ public class GUITest {
 	 * Simple test that DLFSBrowser can be constructed and functionality is working
 	 */
 	@Test
-	public void testDLFSBrowser() {
+	public void testDLFSBrowser() throws Exception {
 		GUITest.assumeGUI();
-		
-		DLFSBrowser browser=new DLFSBrowser();
-		DLFileSystem drive=browser.getDrive();
+
+		java.io.File tempDb = java.io.File.createTempFile("dlfs-guitest-", ".db");
+		tempDb.deleteOnExit();
+		DLFSBrowser browser=new DLFSBrowser(tempDb);
+		DLFileSystem drive=browser.getDrive("demo");
+		assertNotNull(drive);
 		assertEquals(0,drive.getRoot().getNameCount());
 	}
 	

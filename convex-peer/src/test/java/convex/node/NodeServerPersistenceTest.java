@@ -62,9 +62,6 @@ public class NodeServerPersistenceTest {
 		}
 		dataIndex = dataIndex.assoc(valueHash, testValue);
 		server.getCursor().set(dataIndex, dataKey);
-		if (server.getPropagator() != null) {
-			server.getPropagator().triggerBroadcast(server.getLocalValue());
-		}
 	}
 
 	/**

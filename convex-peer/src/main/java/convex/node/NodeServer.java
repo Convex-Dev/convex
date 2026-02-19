@@ -31,6 +31,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
+import convex.core.util.Shutdown;
 import convex.lattice.ALattice;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.PathCursor;
@@ -190,21 +191,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 
-		// Create Netty server if not already created
-		if (networkServer == null) {
-			networkServer = new NettyServer(port);
-			// Set the receive action for handling incoming messages
-			networkServer.setReceiveAction(receiveAction);
-		}
+		// Create and launch network server unless port is negative (local-only mode)
+		boolean localOnly = (port != null && port < 0);
+		if (!localOnly) {
+			if (networkServer == null) {
+				networkServer = new NettyServer(port);
+				// Set the receive action for handling incoming messages
+				networkServer.setReceiveAction(receiveAction);
+			}
 
-		// Configure and launch network server
-		if (port != null) {
-			networkServer.setPort(port);
+			if (port != null) {
+				networkServer.setPort(port);
+			}
+			networkServer.launch();
+			port = networkServer.getPort();
 		}
-		networkServer.launch();
-		port = networkServer.getPort();
 
 		running = true;
+
+		// Register shutdown hook to persist before Etch closes its files
+		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
 
 		// Start automatic lattice propagator
 		propagator.start();
@@ -933,6 +939,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 		Cells.persist(value, store);
 		store.setRootData(value);
 		log.debug("Persisted lattice snapshot to store");
+	}
+
+	/**
+	 * Persists final state during JVM shutdown, before Etch closes its files.
+	 * Called by the {@link Shutdown} hook at {@link Shutdown#SERVER} priority.
+	 */
+	private void shutdownPersist() {
+		if (!running) return;
+		try {
+			close();
+		} catch (IOException e) {
+			log.warn("Error during shutdown persist", e);
+		}
 	}
 
 	@Override

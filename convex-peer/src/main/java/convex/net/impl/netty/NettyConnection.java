@@ -39,9 +39,9 @@ public class NettyConnection extends AConnection {
 	/**
 	 * Static client connection worker
 	 */
-	static EventLoopGroup workerGroup = null;
+	static volatile EventLoopGroup workerGroup = null;
 
-	static Bootstrap clientBootstrap = null;
+	static volatile Bootstrap clientBootstrap = null;
 
 	private Channel channel;
 
@@ -66,11 +66,17 @@ public class NettyConnection extends AConnection {
 		synchronized (NettyConnection.class) {
 			if (workerGroup != null)
 				return workerGroup;
-			workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
+			// Worker group handles NIO I/O for all connections. 2 threads is sufficient
+			// since actual message processing happens on virtual threads.
+			workerGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
 
 			Shutdown.addHook(Shutdown.CONNECTION, () -> {
-				if (workerGroup != null) {
-					workerGroup.shutdownGracefully();
+				EventLoopGroup wg = workerGroup;
+				Bootstrap cb = clientBootstrap;
+				workerGroup = null;
+				clientBootstrap = null;
+				if (wg != null) {
+					wg.shutdownGracefully();
 				}
 			});
 			return workerGroup;

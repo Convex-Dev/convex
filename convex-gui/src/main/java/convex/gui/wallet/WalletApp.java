@@ -50,7 +50,7 @@ public class WalletApp extends AbstractGUI {
 
 		addTab("Friends",0xf233, new FriendPanel(convex));
 		
-		addTab("Drive", 0xe1db, new DLFSPanel(DLFS.createLocal()));
+		addTab("Drive", 0xe1db, new DLFSPanel(DLFS.createLocal()).createView());
 
 		addTab("Staking", 0xf56e, new PeerStakePanel(convex));
 

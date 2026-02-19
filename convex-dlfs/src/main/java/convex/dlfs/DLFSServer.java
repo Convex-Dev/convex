@@ -104,9 +104,11 @@ public class DLFSServer implements Closeable {
 		// Register WebDAV routes
 		webdav.addRoutes(app);
 
-		// Configure Jetty port
+		// Configure Jetty connector with minimal platform threads.
+		// Request handling uses virtual threads (useVirtualThreads=true above),
+		// so we only need 1 acceptor + 1 selector for the connector.
 		org.eclipse.jetty.server.Server jettyServer = app.jettyServer().server();
-		ServerConnector connector = new ServerConnector(jettyServer);
+		ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
 		connector.setPort(port);
 		jettyServer.addConnector(connector);
 

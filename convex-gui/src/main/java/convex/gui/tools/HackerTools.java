@@ -12,11 +12,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.gui.components.AbstractGUI;
+import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
-import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFileSystem;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -58,7 +59,7 @@ public class HackerTools extends AbstractGUI {
 	
 	private SignerPanel signerPanel;
 	
-	private DLFSPanel dataPanel=new DLFSPanel(DLFS.createLocal());
+	private DLFSPanel dataPanel=new DLFSPanel(createToolsDrive());
 
 	/**
 	 * Create the application.
@@ -78,7 +79,7 @@ public class HackerTools extends AbstractGUI {
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("KeyRing", new KeyRingPanel());
 		tabs.add("Encoding", messagePanel);
-		tabs.add("Data Lattice", dataPanel);
+		tabs.add("Data Lattice", dataPanel.createView());
 		tabs.add("System Info", new SystemInfoPanel());
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
@@ -97,6 +98,11 @@ public class HackerTools extends AbstractGUI {
 		System.err.println("Missing tab: " + title);
 	}
 	
+	private static DLFileSystem createToolsDrive() {
+		DLFileSystem drive = DLFSBrowser.createDemoDrive();
+		return drive;
+	}
+
 	@Override
 	public void setupFrame(JFrame frame) {
 		frame.getContentPane().setLayout(new MigLayout());
