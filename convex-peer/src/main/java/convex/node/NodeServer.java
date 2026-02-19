@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +18,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Strings;
-import convex.core.data.Vectors;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
@@ -28,7 +25,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
-import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
@@ -87,13 +83,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * or a different store if the operator chooses a different topology.
 	 */
 	private final AStore store;
-
-	/**
-	 * Connection manager for outbound peer connections.
-	 * Used for sync, data acquisition, and peer management.
-	 * Typically shared with the primary propagator.
-	 */
-	private LatticeConnectionManager connectionManager;
 
 	/**
 	 * Propagators for persistence and broadcast. Index 0 is the primary propagator
@@ -172,11 +161,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		log.debug("Launching NodeServer on port {}", port);
 
-		// Create connection manager (shared between server and propagator)
-		connectionManager = new LatticeConnectionManager(store);
-
 		// Create primary propagator if none have been added
 		if (propagators.isEmpty() && store != null) {
+			LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
 			LatticePropagator primary = new LatticePropagator(store, connectionManager);
 			if (!config.isPersist()) {
 				primary.setPersistInterval(-1); // disable setRootData
@@ -337,6 +324,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		// Get the value at the path
 		V valueAtPath = cursor.get(path);
+
+		// Announce to store so DATA_REQUEST from the requester can resolve children
+		try {
+			if (valueAtPath != null) {
+				Cells.announce(valueAtPath, r -> {}, store);
+			}
+		} catch (IOException e) {
+			log.warn("Failed to announce query response to store", e);
+		}
 
 		Result result = Result.create(id, valueAtPath);
 		message.returnResult(result);
@@ -625,7 +621,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Acquires missing data from connected peers via the connection manager.
+	 * Acquires missing data from connected peers via the primary propagator's peers.
 	 *
 	 * Tries each peer in turn until the data is successfully acquired.
 	 *
@@ -633,9 +629,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return Acquired cell, or null if not found
 	 */
 	private ACell acquireFromPeers(Hash missingHash) {
-		if (connectionManager == null) return null;
+		if (propagators.isEmpty()) return null;
 
-		for (Convex peer : connectionManager.getPeers()) {
+		for (Convex peer : propagators.get(0).getPeers()) {
 			if (peer == null || !peer.isConnected()) continue;
 
 			try {
@@ -673,117 +669,40 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Pulls the latest lattice value from a specific peer and merges it locally.
 	 *
-	 * <p>Sends a LATTICE_QUERY to the peer, receives its root value, and merges
-	 * it into the local cursor. Returns a future that completes with the merged value.
+	 * <p>Delegates to the primary propagator which acquires the full value tree
+	 * into its store, feeds it into the cursor via the merge callback, and queues
+	 * it for broadcast to other peers.
 	 *
 	 * @param convex Convex connection to the peer node
-	 * @return CompletableFuture that completes with the merged value, or fails on error
+	 * @return CompletableFuture that completes with the current cursor value after merge
 	 */
 	public CompletableFuture<V> pull(Convex convex) {
-		if (convex == null) {
-			return CompletableFuture.failedFuture(new IllegalArgumentException("Convex connection cannot be null"));
+		if (propagators.isEmpty()) {
+			return CompletableFuture.failedFuture(new IllegalStateException("No propagators configured"));
 		}
-
-		log.debug("Pulling from peer: {}", convex.getHostAddress());
-
-		return CompletableFuture.supplyAsync(() -> {
-			try {
-				// Check if connection is still valid
-				if (!convex.isConnected()) {
-					throw new RuntimeException("Convex connection is not connected");
-				}
-
-				// Create LATTICE_QUERY message with empty path (root)
-				// Payload format: [:LQ id []]
-				CVMLong queryId = CVMLong.create(System.currentTimeMillis());
-				AVector<ACell> emptyPath = Vectors.empty();
-				AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, emptyPath);
-				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
-
-				// Send query and wait for result with timeout
-				CompletableFuture<Result> resultFuture = convex.message(queryMessage);
-				Result result = resultFuture.get(10, TimeUnit.SECONDS);
-
-				// Check if result is an error
-				if (result.isError()) {
-					String errorMsg = result.toString();
-					log.warn("Pull failed with error: {}", errorMsg);
-					throw new RuntimeException("Pull failed: " + errorMsg);
-				}
-
-				// Get the received value and merge it
-				ACell receivedValue = result.getValue();
-
-				// Cast and merge the value
-				@SuppressWarnings("unchecked")
-				V typedValue = (V) receivedValue;
-				V merged = mergeValue(typedValue);
-
-				log.debug("Pull completed from peer: {}", convex.getHostAddress());
-				return merged;
-
-			} catch (TimeoutException e) {
-				log.warn("Pull timeout from peer: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Pull timeout: " + e.getMessage(), e);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				log.warn("Pull interrupted from peer: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Pull interrupted", e);
-			} catch (Exception e) {
-				log.warn("Pull failed from peer: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Pull failed: " + e.getMessage(), e);
-			}
-		});
+		// Delegate to primary propagator; return cursor value after merge callback has run
+		return propagators.get(0).pull(convex).thenApply(v -> cursor.get());
 	}
 
 	/**
 	 * Pulls the latest lattice value from all connected peers and merges locally.
 	 *
-	 * <p>Sends LATTICE_QUERY to each connected peer in parallel and waits for
-	 * all to complete. Each response is merged into the local cursor.
+	 * <p>Delegates to the primary propagator which queries each peer, acquires
+	 * full value trees, and merges via the merge callback.
 	 *
 	 * @return true if all pulls completed successfully, false otherwise
 	 */
 	public boolean pull() {
-		if (connectionManager == null) {
-			log.debug("No connection manager — cannot pull");
+		if (propagators.isEmpty()) {
+			log.debug("No propagators configured — cannot pull");
 			return true;
 		}
-
-		Set<Convex> peers = connectionManager.getPeers();
-
-		if (peers.isEmpty()) {
-			log.debug("No peer nodes to pull from");
-			return true;
-		}
-
-		log.debug("Pulling from {} peer nodes", peers.size());
-
-		// Create pull futures for all peers
-		List<CompletableFuture<V>> pullFutures = new ArrayList<>();
-		for (Convex peer : peers) {
-			if (peer != null && peer.isConnected()) {
-				pullFutures.add(pull(peer));
-			} else {
-				log.debug("Skipping disconnected peer: {}", peer);
-			}
-		}
-
-		if (pullFutures.isEmpty()) {
-			log.debug("No connected peers to pull from");
-			return true;
-		}
-
-		// Wait for all pulls to complete (or fail)
-		CompletableFuture<Void> allPulls = CompletableFuture.allOf(
-			pullFutures.toArray(new CompletableFuture[0])
-		);
 
 		try {
-			allPulls.join();
+			propagators.get(0).pull().get(30, TimeUnit.SECONDS);
 			return true;
 		} catch (Exception e) {
-			log.warn("Pull failed with error: {}", e.getMessage());
+			log.warn("Pull failed: {}", e.getMessage());
 			return false;
 		}
 	}
@@ -829,26 +748,30 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Adds a peer connection. Delegates to the connection manager.
+	 * Adds a peer connection to the primary propagator.
 	 *
 	 * @param convex Convex connection to the peer node
+	 * @deprecated Use {@code getPropagator().addPeer(convex)} directly
 	 */
+	@Deprecated
 	public void addPeer(Convex convex) {
-		if (connectionManager == null) {
-			log.warn("Cannot add peer: connection manager not initialised");
+		if (propagators.isEmpty()) {
+			log.warn("Cannot add peer: no propagators configured");
 			return;
 		}
-		connectionManager.addPeer(convex);
+		propagators.get(0).addPeer(convex);
 	}
 
 	/**
-	 * Removes a peer connection. Delegates to the connection manager.
+	 * Removes a peer connection from the primary propagator.
 	 *
 	 * @param convex Convex connection to remove
+	 * @deprecated Use {@code getPropagator().removePeer(convex)} directly
 	 */
+	@Deprecated
 	public void removePeer(Convex convex) {
-		if (connectionManager == null) return;
-		connectionManager.removePeer(convex);
+		if (propagators.isEmpty()) return;
+		propagators.get(0).removePeer(convex);
 	}
 
 	/**
@@ -927,23 +850,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Gets the set of connected peer Convex instances.
-	 * Delegates to the connection manager.
+	 * Gets the set of connected peer Convex instances from the primary propagator.
 	 *
 	 * @return Set of peer Convex connections (defensive copy)
+	 * @deprecated Use {@code getPropagator().getPeers()} directly
 	 */
+	@Deprecated
 	public Set<Convex> getPeerNodes() {
-		if (connectionManager == null) return java.util.Collections.emptySet();
-		return connectionManager.getPeers();
+		if (propagators.isEmpty()) return java.util.Collections.emptySet();
+		return propagators.get(0).getPeers();
 	}
 
 	/**
-	 * Gets the connection manager for this server.
+	 * Gets the connection manager from the primary propagator.
 	 *
-	 * @return LatticeConnectionManager instance, or null if not launched
+	 * @return LatticeConnectionManager instance, or null if no propagators
+	 * @deprecated Access via {@code getPropagator().getConnectionManager()} directly
 	 */
+	@Deprecated
 	public LatticeConnectionManager getConnectionManager() {
-		return connectionManager;
+		return propagators.isEmpty() ? null : propagators.get(0).getConnectionManager();
 	}
 
 	/**

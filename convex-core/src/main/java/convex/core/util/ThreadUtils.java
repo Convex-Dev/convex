@@ -103,11 +103,14 @@ public class ThreadUtils {
 	}
 
 	/**
-	 * Runs a (probably IO-bound) task in a virtual thread if available, 
+	 * Runs a task in a virtual thread with a given name via the shared executor.
+	 * @param name Short name for the virtual thread (for debugging/tracking)
 	 * @param task Task to run
 	 */
-	public static void runVirtual(Runnable task) {
-		getVirtualExecutor().execute(task);
+	public static void runVirtual(String name, Runnable task) {
+		getVirtualExecutor().execute(() -> {
+			Thread.currentThread().setName(name);
+			task.run();
+		});
 	}
-
 }

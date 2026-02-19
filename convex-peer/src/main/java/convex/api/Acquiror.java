@@ -74,7 +74,7 @@ public class Acquiror {
 		// Polling loop in virtual thread — intentional design choice over CompletableFuture
 		// composition. Gives better stack traces for debugging and fewer allocations.
 		// Virtual threads make the blocking .get() calls cheap.
-		ThreadUtils.runVirtual(()-> {
+		ThreadUtils.runVirtual("acquiror", ()-> {
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();
 

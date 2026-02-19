@@ -210,8 +210,7 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test peer management with Convex connections
-	 * TODO: should be using full connection manager
+	 * Test peer management via the propagator
 	 */
 	@Test
 	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
@@ -219,27 +218,30 @@ public class NodeServerTest {
 		maxNodeServer = new NodeServer<>(lattice, store, null);
 		maxNodeServer.launch();
 
+		LatticePropagator propagator = maxNodeServer.getPropagator();
+		assertNotNull(propagator);
+
 		// Create Convex connections to the server (using loopback addresses for testing)
 		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
 		ConvexRemote peer1 = ConvexRemote.connect(serverAddress);
 		ConvexRemote peer2 = ConvexRemote.connect(serverAddress);
 
 		// Initially no peers
-		Set<Convex> peers = maxNodeServer.getPeerNodes();
+		Set<Convex> peers = propagator.getPeers();
 		assertTrue(peers.isEmpty());
 
 		// Add peers
-		maxNodeServer.addPeer(peer1);
-		maxNodeServer.addPeer(peer2);
+		propagator.addPeer(peer1);
+		propagator.addPeer(peer2);
 
-		peers = maxNodeServer.getPeerNodes();
+		peers = propagator.getPeers();
 		assertEquals(2, peers.size());
 		assertTrue(peers.contains(peer1));
 		assertTrue(peers.contains(peer2));
 
 		// Remove a peer
-		maxNodeServer.removePeer(peer1);
-		peers = maxNodeServer.getPeerNodes();
+		propagator.removePeer(peer1);
+		peers = propagator.getPeers();
 		assertEquals(1, peers.size());
 		assertTrue(peers.contains(peer2));
 		assertFalse(peers.contains(peer1));

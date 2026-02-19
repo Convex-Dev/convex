@@ -68,7 +68,7 @@ public class ConvexLocal extends Convex {
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		ThreadUtils.runVirtual(()-> {
+		ThreadUtils.runVirtual("local-acquire", ()-> {
 			AStore peerStore=server.getStore();
 			Ref<ACell> ref=peerStore.refForHash(hash);
 			if (ref==null) {

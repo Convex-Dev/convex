@@ -31,6 +31,9 @@ import net.miginfocom.swing.MigLayout;
  */
 public class DLFSPanel {
 
+	/** Set to true to stop all background threads */
+	private volatile boolean closed = false;
+
 	protected DLFileSystem fileSystem;
 
 	DirectoryTree directoryTree;
@@ -162,9 +165,9 @@ public class DLFSPanel {
 
 	private void startBackgroundThread(DLFileSystem dlfs) {
 		lastRootHash = dlfs.getRootHash();
-		ThreadUtils.runVirtual(() -> {
+		ThreadUtils.runVirtual("dlfs-monitor", () -> {
 			try {
-				while (dlfs.isOpen() && dlfs == fileSystem) {
+				while (!closed && dlfs.isOpen() && dlfs == fileSystem) {
 					dlfs.updateTimestamp();
 
 					// Check if lattice state changed (e.g. via WebDAV)
@@ -260,6 +263,12 @@ public class DLFSPanel {
 		JPanel view = new JPanel(new MigLayout("fill, insets 0"));
 		view.add(outerSplit, "grow");
 		return view;
+	}
+
+	/** Stops background threads. Call on window close. */
+	public void close() {
+		closed = true;
+		fileSystem = null;
 	}
 
 	public DLPath getSelectedPath() {

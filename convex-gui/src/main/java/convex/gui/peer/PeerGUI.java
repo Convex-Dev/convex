@@ -240,7 +240,7 @@ public class PeerGUI extends AbstractGUI {
 		
 		tabs.setSelectedComponent(serverPanel);
 
-		ThreadUtils.runVirtual(updateThread);
+		ThreadUtils.runVirtual("peer-gui-update", updateThread);
 	}
 
 	private boolean updateRunning = true;

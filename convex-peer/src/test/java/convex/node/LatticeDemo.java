@@ -99,7 +99,7 @@ public class LatticeDemo {
 
 						// Add this peer to the node's peer list
 						// Now this node can send broadcasts to this peer
-						server.addPeer(peer);
+						server.getPropagator().addPeer(peer);
 					}
 				}
 				System.out.println("Node " + (i + 1) + " connected to " + (NUM_NODES - 1) + " peers");

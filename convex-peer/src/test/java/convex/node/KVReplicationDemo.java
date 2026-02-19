@@ -75,7 +75,7 @@ public class KVReplicationDemo {
 					if (i != j) {
 						Convex peer = ConvexRemote.connect(
 							new InetSocketAddress("localhost", BASE_PORT + j));
-						servers.get(i).addPeer(peer);
+						servers.get(i).getPropagator().addPeer(peer);
 					}
 				}
 			}

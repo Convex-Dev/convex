@@ -81,7 +81,7 @@ public class AccountOverview extends JPanel {
 		//add(KeyPairCombo.forConvex(convex));
 		 
 		update();
-		ThreadUtils.runVirtual(this::updateLoop);
+		ThreadUtils.runVirtual("account-update", this::updateLoop);
 	}
 	
 	private void updateLoop() {

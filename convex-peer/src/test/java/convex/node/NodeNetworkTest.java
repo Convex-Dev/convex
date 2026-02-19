@@ -119,7 +119,7 @@ public class NodeNetworkTest {
 					InetSocketAddress otherAddress = otherServer.getHostAddress();
 					try {
 						Convex peerConnection = ConvexRemote.connect(otherAddress);
-						server.addPeer(peerConnection);
+						server.getPropagator().addPeer(peerConnection);
 					} catch (Exception e) {
 						throw new RuntimeException("Failed to create peer connection from server " + i + " to server " + j, e);
 					}

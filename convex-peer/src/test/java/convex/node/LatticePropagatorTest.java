@@ -60,10 +60,10 @@ public class LatticePropagatorTest {
 			InetSocketAddress server2Address = server2.getHostAddress();
 
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
-			server1.addPeer(peer1to2);
+			server1.getPropagator().addPeer(peer1to2);
 
 			Convex peer2to1 = ConvexRemote.connect(server1Address);
-			server2.addPeer(peer2to1);
+			server2.getPropagator().addPeer(peer2to1);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to establish peer connections", e);
 		}

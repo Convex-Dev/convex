@@ -3,19 +3,27 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Convex;
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
+import convex.core.exceptions.MissingDataException;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -217,6 +225,36 @@ public class LatticePropagator implements Closeable {
 	 */
 	public AStore getStore() {
 		return store;
+	}
+
+	// ========== Peer Management ==========
+
+	/**
+	 * Adds an outbound peer connection. The peer's store is set to this
+	 * propagator's store, establishing the security boundary.
+	 *
+	 * @param peer Convex connection to the peer node
+	 */
+	public void addPeer(Convex peer) {
+		connectionManager.addPeer(peer);
+	}
+
+	/**
+	 * Removes an outbound peer connection.
+	 *
+	 * @param peer Convex connection to remove
+	 */
+	public void removePeer(Convex peer) {
+		connectionManager.removePeer(peer);
+	}
+
+	/**
+	 * Gets a snapshot of current peer connections.
+	 *
+	 * @return Defensive copy of the peer set
+	 */
+	public Set<Convex> getPeers() {
+		return connectionManager.getPeers();
 	}
 
 	/**
@@ -472,5 +510,106 @@ public class LatticePropagator implements Closeable {
 		} catch (IOException e) {
 			log.warn("Error persisting lattice snapshot", e);
 		}
+	}
+
+	// ========== Pull (Fetch from Peers) ==========
+
+	/**
+	 * Pulls the latest lattice value from a specific peer into this propagator's store.
+	 *
+	 * <p>Sends a LATTICE_QUERY to the peer, acquires the full value tree into
+	 * this propagator's store via {@link Convex#acquire}, feeds the acquired value
+	 * into the cursor via the merge callback, and queues it for background
+	 * processing (announce + persist + broadcast to other peers).
+	 *
+	 * <p>The future completes after the merge callback has run (cursor is updated)
+	 * but before the background broadcast to other peers.
+	 *
+	 * @param peer Convex connection to the peer node
+	 * @return CompletableFuture that completes with the acquired value
+	 */
+	public CompletableFuture<ACell> pull(Convex peer) {
+		if (peer == null) {
+			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
+		}
+
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				if (!peer.isConnected()) {
+					throw new RuntimeException("Peer is not connected");
+				}
+
+				// 1. Query peer for their root lattice value
+				CVMLong queryId = CVMLong.create(System.currentTimeMillis());
+				AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, Vectors.empty());
+				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+
+				CompletableFuture<Result> resultFuture = peer.message(queryMessage);
+				Result result = resultFuture.get(10, TimeUnit.SECONDS);
+
+				if (result.isError()) {
+					throw new RuntimeException("Pull query failed: " + result);
+				}
+
+				ACell receivedValue = result.getValue();
+				if (receivedValue == null) return null;
+
+				// 2. Store the received value locally. For small values that are
+				// fully encoded in the result, announce succeeds immediately.
+				// For large values with missing children, fall back to acquire.
+				ACell acquired;
+				try {
+					acquired = Cells.announce(receivedValue, r -> {}, store);
+				} catch (MissingDataException mde) {
+					// Value has children not in our store — acquire full tree from peer
+					Hash rootHash = Hash.get(receivedValue);
+					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
+				}
+
+				// 3. Feed into cursor via merge callback (inline — cursor updated before future completes)
+				if (mergeCallback != null) {
+					mergeCallback.accept(acquired);
+				}
+
+				// 4. Queue for background processing (announce + persist + broadcast to other peers)
+				triggerBroadcast(acquired);
+
+				log.debug("Pulled value from peer: {}", peer.getHostAddress());
+				return acquired;
+
+			} catch (Exception e) {
+				log.warn("Pull failed from peer: {}", peer.getHostAddress(), e);
+				throw new RuntimeException("Pull failed from peer", e);
+			}
+		});
+	}
+
+	/**
+	 * Pulls the latest lattice value from all connected peers.
+	 *
+	 * <p>Sends LATTICE_QUERY to each connected peer in parallel, acquires their
+	 * values into this propagator's store, and merges via the merge callback.
+	 *
+	 * @return CompletableFuture that completes when all pulls are done
+	 */
+	public CompletableFuture<ACell> pull() {
+		Set<Convex> peerSet = connectionManager.getPeers();
+		if (peerSet.isEmpty()) {
+			return CompletableFuture.completedFuture(null);
+		}
+
+		List<CompletableFuture<ACell>> futures = new ArrayList<>();
+		for (Convex peer : peerSet) {
+			if (peer != null && peer.isConnected()) {
+				futures.add(pull(peer));
+			}
+		}
+
+		if (futures.isEmpty()) {
+			return CompletableFuture.completedFuture(null);
+		}
+
+		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+			.thenApply(v -> lastAnnouncedValue);
 	}
 }

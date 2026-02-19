@@ -80,7 +80,7 @@ public class NodeServerPersistenceTest {
 	private void connectPrimaryToBackup() throws Exception {
 		InetSocketAddress backupAddr = backup.getHostAddress();
 		Convex conn = ConvexRemote.connect(backupAddr);
-		primary.addPeer(conn);
+		primary.getPropagator().addPeer(conn);
 	}
 
 	/**
@@ -90,10 +90,10 @@ public class NodeServerPersistenceTest {
 		InetSocketAddress primaryAddr = primary.getHostAddress();
 		Convex conn = ConvexRemote.connect(primaryAddr);
 		try {
-			backup.addPeer(conn);
+			backup.getPropagator().addPeer(conn);
 			assertTrue(backup.pull(), "Pull should complete");
 		} finally {
-			backup.removePeer(conn);
+			backup.getPropagator().removePeer(conn);
 			conn.close();
 		}
 	}

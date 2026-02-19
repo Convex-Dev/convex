@@ -99,6 +99,9 @@ public class DLFSBrowser extends AbstractGUI {
 	/** Path to current store file */
 	private File storeFile;
 
+	/** Current Etch store (owned by this browser — must be closed on shutdown) */
+	private EtchStore etchStore;
+
 	// UI
 	private final JMenuBar menuBar = new JMenuBar();
 	private final JList<String> driveList;
@@ -232,10 +235,36 @@ public class DLFSBrowser extends AbstractGUI {
 	private void openStore(File file) {
 		this.storeFile = file;
 		try {
-			EtchStore store = EtchStore.create(FileUtils.ensureFilePath(file));
+			etchStore = EtchStore.create(FileUtils.ensureFilePath(file));
+		} catch (java.nio.channels.OverlappingFileLockException e) {
+			log.warn("Store is already locked: {}", file);
+			int choice = JOptionPane.showOptionDialog(this,
+				"Store file is already in use:\n" + file.getAbsolutePath()
+					+ "\n\nAnother DLFS browser may be open. Use a temporary store instead?",
+				"Store Locked",
+				JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE,
+				null, new String[]{"Use Temp Store", "Cancel"}, "Use Temp Store");
+			if (choice == 0) {
+				try {
+					etchStore = EtchStore.createTemp("dlfs-temp");
+					this.storeFile = new File(etchStore.getFileName());
+					log.info("Using temporary store: {}", storeFile);
+				} catch (IOException e2) {
+					log.error("Failed to create temporary store", e2);
+					throw new RuntimeException("Failed to create temporary DLFS store", e2);
+				}
+			} else {
+				throw new RuntimeException("Store is locked: " + file);
+			}
+		} catch (Exception e) {
+			log.error("Failed to open store: {}", file, e);
+			throw new RuntimeException("Failed to open DLFS store: " + file, e);
+		}
+
+		try {
 			// Local-only mode (port -1): persistence + cursor, no Netty network server
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
-			nodeServer = new NodeServer<>(DRIVES_LATTICE, store, null, localConfig);
+			nodeServer = new NodeServer<>(DRIVES_LATTICE, etchStore, null, localConfig);
 			nodeServer.launch();
 
 			// Rebuild drives from restored lattice state
@@ -259,7 +288,7 @@ public class DLFSBrowser extends AbstractGUI {
 				log.info("Created new DLFS store with demo drive: {}", file);
 			}
 		} catch (Exception e) {
-			log.error("Failed to open store: {}", file, e);
+			log.error("Failed to launch NodeServer: {}", file, e);
 			throw new RuntimeException("Failed to open DLFS store: " + file, e);
 		}
 	}
@@ -304,6 +333,10 @@ public class DLFSBrowser extends AbstractGUI {
 				log.warn("Error closing NodeServer: {}", e.getMessage());
 			}
 			nodeServer = null;
+		}
+		if (etchStore != null) {
+			etchStore.close();
+			etchStore = null;
 		}
 	}
 
@@ -587,18 +620,32 @@ public class DLFSBrowser extends AbstractGUI {
 
 	@Override
 	public void setupFrame(JFrame frame) {
+		frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		frame.getContentPane().setLayout(new MigLayout());
 		frame.getContentPane().add(this, "dock center");
 		frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			@Override
 			public void windowClosing(java.awt.event.WindowEvent e) {
-				if (webdavServer != null) {
-					webdavServer.close();
-					webdavServer = null;
-				}
-				closeNodeServer();
+				shutdown();
 			}
 		});
+	}
+
+	/** Idempotent shutdown — safe to call from windowClosing, close(), etc. */
+	private void shutdown() {
+		if (panel != null) {
+			panel.close();
+		}
+		if (webdavServer != null) {
+			webdavServer.close();
+			webdavServer = null;
+		}
+		closeNodeServer();
+	}
+
+	@Override
+	public void close() {
+		shutdown();
 	}
 
 	public static void main(String[] args) {
