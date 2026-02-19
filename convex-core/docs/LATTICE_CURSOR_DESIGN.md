@@ -564,10 +564,10 @@ This behavior is intentional - it's optimal for the common case of transactional
 
 ## Migration Path
 
-Existing code using `ABranchedCursor` (to be renamed `AForkableCursor`):
-- **Rename**: `sync(detached)` → `merge(detached)` (CAS-based)
-- **Gradual adoption**: Use `ALatticeCursor` where lattice semantics needed
-- **Coexistence**: Both cursor types can reference same underlying data
+✓ `ABranchedCursor` renamed to `AForkableCursor`. All cursor classes implemented:
+- `RootLatticeCursor`, `ForkedLatticeCursor`, `DescendedLatticeCursor`
+- `fork()`, `sync()`, `merge(V)`, `descend()` all operational
+- CAS-based `AForkableCursor.merge(detached)` coexists with lattice-aware `ALatticeCursor.sync()`
 
 ## Future Considerations
 

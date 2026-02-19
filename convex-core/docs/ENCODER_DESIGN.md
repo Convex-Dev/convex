@@ -169,61 +169,15 @@ points create the DecodeState and the encoder provides all format operations.
 | Store lookup | Thread-local get per ref | Field access on encoder |
 | Multi-cell fast path | Always allocates HashMap + MessageStore | Zero allocations for single-cell |
 
-## Remaining Migration
+## Migration Status
 
-### Status
+All phases complete. The encoder hierarchy is the sole decode path.
 
-Phases 1–4 are complete: DecodeState exists, all core data structure and CVM type reads
-are on the encoder, `decode()` and `decodeMultiCell()` use DecodeState natively, and
-the NullStore encoder pattern replaces MessageStore.
-
-The old static decode infrastructure (`Format.readRef`, `Type.read(Blob, int)`,
-thread-local store management) still exists alongside the new path. It needs to be
-removed.
-
-### Phase 5: Delete Old Decode Infrastructure
-
-Remove all static decode methods that are now dead code.
-
-**Delete from `Format.java`:**
-- `readRef(Blob, int)` — 36 call sites, all migrated except REST API (see below)
-
-**Delete from `Ref.java`:**
-- `readRaw(Blob, int)` — only caller is `Format.readRef`, removed above
-- `forHash(Hash)` (1-arg) — delegates to `RefSoft.createForHash(hash)` using thread-local.
-  13 callers, mostly tests.
-
-**Delete from `RefSoft.java`:**
-- `createForHash(Hash)` (1-arg) — uses `Stores.current()`. Only 2 callers:
-  `Ref.forHash(Hash)` and 1 test.
-
-**Delete from type classes (~44 files):**
-- Old static `read(Blob, int)` methods — no longer called from encoder dispatch.
-
-**Migrate external callers:**
-- `convex-restapi/ChainAPI.java` — `Format.readRef(h, 0)` → `Ref.forHash(hash, store)`
-- `convex-restapi/McpAPI.java` — same pattern
-- `Result.java` — `Format.readRef(messageData, rpos)` → migrate to DecodeState or `Ref.forHash`
-
-**Migrate test callers:**
-- `RefTest.java` — 2 `Format.readRef`, 9 `Ref.forHash(Hash)` → 2-arg with explicit store
-- `StoresTest.java` — 2 `Ref.forHash(Hash)` → 2-arg
-- `GenTestAnyValue.java` — 2 `Ref.forHash(Hash)` → 2-arg
-- `MemoryStoreTest.java` — 1 `RefSoft.createForHash(Hash)` → 2-arg
-- `SignatureBenchmark.java` — 1 `Ref.forHash(Hash)` → 2-arg
-
-### Phase 6: Remove Thread-Local Store from Decode Chain
-
-With all decode paths using `encoder.readRef(ds)` (which uses `this.store` directly),
-the thread-local is no longer needed in the decode chain.
-
-**Modify:** `CAD3Encoder.java`
-- Remove all `Stores.current()` / `Stores.setCurrent()` calls from `decode()` and
-  `decodeMultiCell()` (if any remain from the old path)
-
-**Verify:** `Stores.current()` is not called anywhere in the decode chain. The
-thread-local remains available for other uses (e.g. `ACell.persist()`, direct store
-access) but decode is fully decoupled.
+- ✓ **Phases 1–4**: DecodeState, encoder-based reads, `decodeMultiCell`, NullStore pattern
+- ✓ **Phase 5**: Old static decode infrastructure removed (`Format.readRef`, `Ref.readRaw`,
+  1-arg `Ref.forHash(Hash)`, `RefSoft.createForHash(Hash)`)
+- ✓ **Phase 6**: Thread-local store (`Stores.current()`/`setCurrent()`) removed from
+  convex-core entirely. All decode paths use `encoder.readRef(ds)` with `this.store`.
 
 ## File Inventory
 
@@ -245,8 +199,8 @@ access) but decode is fully decoupled.
 - `readDenseRecord` — DenseRecord (CAD3), transactions/consensus (CVMEncoder)
 - `readExtension` — ExtensionValue (CAD3), Address/Core (CVMEncoder)
 
-### Legacy static infrastructure (to be removed in Phase 5)
-- `Format.java` — `readRef(Blob, int)` (36 call sites)
-- `Ref.java` — `readRaw(Blob, int)`, `forHash(Hash)` 1-arg (13 callers)
-- `RefSoft.java` — `createForHash(Hash)` 1-arg (2 callers)
-- ~44 type classes with static `read(Blob, int)` methods
+### Legacy static infrastructure (removed)
+- ~~`Format.readRef(Blob, int)`~~ — removed, migrated to `CAD3Encoder.readRef(DecodeState)`
+- ~~`Ref.readRaw(Blob, int)`~~ — removed
+- ~~`Ref.forHash(Hash)` 1-arg~~ — removed, only 2-arg `forHash(Hash, AStore)` remains
+- ~~`Stores.current()`/`setCurrent()`~~ — removed from convex-core

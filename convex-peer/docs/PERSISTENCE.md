@@ -626,20 +626,20 @@ each with their own propagator and store.
 - Restore in `launch()` from primary propagator's store
 - Final persist in propagator `close()`
 
-### Phase 2: Explicit Sync API
+### Phase 2: Explicit Sync API ✓
 
 - `sync()` triggers propagators — NodeServer has no store of its own
 - Propagators own filter, store, peers — all output goes through them
 - Incoming merges optionally call `sync()` based on autoSync config
 - Periodic auto-sync as configurable safety net
 
-### Phase 3: Speculative Fork + Acquire
+### Phase 3: Speculative Fork + Acquire ✓
 
 - Fork cursor before merge to detect missing data safely
 - Use `Acquiror` to pull missing cells from sender
 - Retry merge after acquisition
 
-### Phase 4: Root-Only Periodic Sync
+### Phase 4: Root-Only Periodic Sync ✓
 
 - Propagator broadcasts root cell hash to peers on timer
 - Peers detect divergence from hash mismatch
@@ -647,7 +647,7 @@ each with their own propagator and store.
 
 ### Phase 5: Filtering + Security Tiers
 
-- `LatticeFilter<V>` interface
+- `LatticeFilter<V>` interface ✓ (interface exists, not yet integrated into propagator)
 - Each propagator owns its own filter, applied internally before announce
 - Multiple propagators with separate stores
 - Per-propagator filter and peer set
