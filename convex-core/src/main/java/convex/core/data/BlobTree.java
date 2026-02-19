@@ -384,6 +384,46 @@ public class BlobTree extends ABlob {
 		return acc;
 	}
 
+	/**
+	 * Tree-aware replaceSlice. Navigates to affected children, replaces only
+	 * what changed, and preserves identity of unchanged subtrees.
+	 */
+	@Override
+	public ABlob replaceSlice(long position, ABlob b) {
+		long blen = b.count();
+		if (blen == 0) return this;
+		// If replacement extends past end, fall back to base (which handles growth)
+		if (position + blen > count) return super.replaceSlice(position, b);
+		long end = position + blen;
+
+		long csize = childLength();
+		int firstChild = (int)(position / csize);
+		int lastChild = (int)((end - 1) / csize);
+
+		Ref<ABlob>[] newChildren = null; // lazy clone
+		long boff = 0;
+
+		for (int i = firstChild; i <= lastChild; i++) {
+			ABlob oldChild = getChild(i);
+			long cstart = i * csize;
+			long replaceStart = Math.max(position - cstart, 0);
+			long replaceEnd = Math.min(end - cstart, oldChild.count());
+			long pieceLen = replaceEnd - replaceStart;
+
+			ABlob piece = b.slice(boff, boff + pieceLen);
+			boff += pieceLen;
+
+			ABlob newChild = oldChild.replaceSlice(replaceStart, piece);
+			if (newChild != oldChild) {
+				if (newChildren == null) newChildren = children.clone();
+				newChildren[i] = newChild.getRef();
+			}
+		}
+
+		if (newChildren == null) return this;
+		return new BlobTree(newChildren, shift, count);
+	}
+
 	private int childCount() {
 		return children.length;
 	}

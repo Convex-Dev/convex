@@ -590,10 +590,99 @@ public class BlobsTest {
 
 		ABlob dd=data.append(data);
 		assertEquals(data,dd.slice(SIZE));
-		
+
 		ABlob cc=dd.replaceSlice(SIZE/2, data);
 		ABlob data2=cc.slice(SIZE/2, SIZE/2+SIZE);
 		assertEquals(data,data2);
+	}
+
+	@Test
+	public void testReplaceSliceIdentity() {
+		// Small Blob: replacing with same bytes preserves identity
+		Blob small = Blob.fromHex("0123456789abcdef");
+		assertSame(small, small.replaceSlice(0, small));
+		assertSame(small, small.replaceSlice(2, small.slice(2, small.count())));
+		assertSame(small, small.replaceSlice(0, small.slice(0, 4)));
+
+		// Empty replacement preserves identity
+		assertSame(small, small.replaceSlice(3, Blob.EMPTY));
+
+		// BlobTree: replacing with same bytes preserves identity
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		assertSame(big, big.replaceSlice(0, big.slice(0, 100)));
+		assertSame(big, big.replaceSlice(4000, big.slice(4000, 5000)));
+		assertSame(big, big.replaceSlice(0, Blob.EMPTY));
+	}
+
+	@Test
+	public void testReplaceSliceSingleChunk() {
+		// Write a single byte in the middle of a BlobTree
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		long pos = 5000;
+		byte original = big.byteAt(pos);
+		byte replacement = (byte)(original ^ 0xFF); // flip all bits
+
+		ABlob modified = big.replaceSlice(pos, Blob.forByte(replacement));
+		assertEquals(big.count(), modified.count());
+		assertEquals(replacement, modified.byteAt(pos));
+		// Surrounding bytes unchanged
+		assertEquals(big.byteAt(pos - 1), modified.byteAt(pos - 1));
+		assertEquals(big.byteAt(pos + 1), modified.byteAt(pos + 1));
+		// First and last bytes unchanged
+		assertEquals(big.byteAt(0), modified.byteAt(0));
+		assertEquals(big.byteAt(big.count() - 1), modified.byteAt(big.count() - 1));
+	}
+
+	@Test
+	public void testReplaceSliceCrossChunk() {
+		// Write spanning a chunk boundary (4096 bytes per chunk)
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		long pos = Blob.CHUNK_LENGTH - 2; // 2 bytes before chunk boundary
+		Blob replacement = Blob.fromHex("DEADBEEF"); // 4 bytes across boundary
+
+		ABlob modified = big.replaceSlice(pos, replacement);
+		assertEquals(big.count(), modified.count());
+		assertEquals((byte) 0xDE, modified.byteAt(pos));
+		assertEquals((byte) 0xAD, modified.byteAt(pos + 1));
+		assertEquals((byte) 0xBE, modified.byteAt(pos + 2));
+		assertEquals((byte) 0xEF, modified.byteAt(pos + 3));
+		// Byte before and after the write are unchanged
+		assertEquals(big.byteAt(pos - 1), modified.byteAt(pos - 1));
+		assertEquals(big.byteAt(pos + 4), modified.byteAt(pos + 4));
+	}
+
+	@Test
+	public void testReplaceSliceBoundary() {
+		BlobTree big = Samples.BIG_BLOB_TREE;
+
+		// Write at position 0
+		Blob rep = Blob.fromHex("FF");
+		ABlob modified = big.replaceSlice(0, rep);
+		assertEquals((byte) 0xFF, modified.byteAt(0));
+		assertEquals(big.byteAt(1), modified.byteAt(1));
+
+		// Write at end
+		long last = big.count() - 1;
+		ABlob modified2 = big.replaceSlice(last, rep);
+		assertEquals((byte) 0xFF, modified2.byteAt(last));
+		assertEquals(big.byteAt(last - 1), modified2.byteAt(last - 1));
+	}
+
+	@Test
+	public void testReplaceSliceZeroBlob() {
+		// ZeroBlob replaceSlice should work correctly
+		ABlob zeros = Blobs.createZero(10000).toCanonical();
+		Blob patch = Blob.fromHex("CAFE");
+		ABlob modified = zeros.replaceSlice(5000, patch);
+		assertEquals(zeros.count(), modified.count());
+		assertEquals((byte) 0xCA, modified.byteAt(5000));
+		assertEquals((byte) 0xFE, modified.byteAt(5001));
+		assertEquals((byte) 0x00, modified.byteAt(4999));
+		assertEquals((byte) 0x00, modified.byteAt(5002));
+
+		// Replacing zeros with zeros preserves identity
+		Blob zerosPatch = Blob.wrap(new byte[100]);
+		assertSame(zeros, zeros.replaceSlice(500, zerosPatch));
 	}
 
 	@Test

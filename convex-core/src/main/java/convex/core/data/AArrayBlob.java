@@ -415,6 +415,17 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
+	public ABlob replaceSlice(long position, ABlob b) {
+		long blen = b.count();
+		if (blen == 0) return this;
+		// If replacement extends past end, can't preserve identity
+		if (position + blen > count()) return super.replaceSlice(position, b);
+		// Check if bytes are the same
+		if (b.equalsBytes(store, offset + (int) position)) return this;
+		return super.replaceSlice(position, b);
+	}
+
+	@Override
 	public InputStream getInputStream() {
 		return new ByteArrayInputStream(store, offset, size());
 	}

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.runner.RunWith;
 
@@ -37,10 +38,11 @@ public class GenTestBlobs {
 		ABlob slice=full.slice(off, off+len).toCanonical();
 		ABlob tail=full.slice(off+len, size).toCanonical();
 		
-		// Replacing with same slice should work
+		// Replacing with same slice should preserve identity
 		assertEquals(len,slice.count());
 		ABlob rep=full.replaceSlice(off, slice);
 		assertEquals(full,rep);
+		assertSame(full,rep);
 		
 		// Reassembling pieces should work
 		BlobBuilder bb=new BlobBuilder();
