@@ -250,10 +250,10 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test syncWithPeer using Convex connection
+	 * Test pull(Convex) using Convex connection
 	 */
 	@Test
-	public void testSyncWithPeer() throws Exception {
+	public void testPullFromPeer() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store, null);
 		maxNodeServer.launch();
@@ -263,8 +263,8 @@ public class NodeServerTest {
 		ConvexRemote peer = ConvexRemote.connect(serverAddress);
 		
 		try {
-			// Sync with peer - should get the current value (zero initially)
-			CompletableFuture<AInteger> future = maxNodeServer.syncWithPeer(peer);
+			// Pull from peer - should get the current value (zero initially)
+			CompletableFuture<AInteger> future = maxNodeServer.pull(peer);
 			AInteger result = future.get(5, TimeUnit.SECONDS);
 			
 			assertNotNull(result);

@@ -96,10 +96,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private LatticeConnectionManager connectionManager;
 
 	/**
-	 * Automatic lattice propagator for broadcasting updates.
-	 * Owns its own store and connection manager (may be shared with this server).
+	 * Propagators for persistence and broadcast. Index 0 is the primary propagator
+	 * (if present) — NodeServer sets a merge callback on it to feed store-backed
+	 * refs into the cursor. Additional propagators handle public/backup broadcast.
 	 */
-	private LatticePropagator propagator;
+	private final List<LatticePropagator> propagators = new ArrayList<>();
 
 	/**
 	 * Message receiver action for handling incoming lattice sync messages
@@ -174,17 +175,30 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Create connection manager (shared between server and propagator)
 		connectionManager = new LatticeConnectionManager(store);
 
-		// Create propagator with shared store and connection manager
-		propagator = new LatticePropagator(store, connectionManager);
-
-		// Configure persistence based on config
-		if (!config.isPersist()) {
-			propagator.setPersistInterval(-1); // disable persistence
+		// Create primary propagator if none have been added
+		if (propagators.isEmpty() && store != null) {
+			LatticePropagator primary = new LatticePropagator(store, connectionManager);
+			if (!config.isPersist()) {
+				primary.setPersistInterval(-1); // disable setRootData
+			}
+			propagators.add(primary);
 		}
 
-		// Restore from propagator's store if configured
-		if (config.isRestore()) {
-			ACell restored = propagator.restore();
+		// Wire merge callback on primary propagator: feeds store-backed refs
+		// into the cursor via lattice merge, preventing OOM from strong refs
+		if (!propagators.isEmpty()) {
+			propagators.get(0).setMergeCallback(persisted -> {
+				cursor.updateAndGet(current -> {
+					@SuppressWarnings("unchecked")
+					V merged = lattice.merge(current, (V) persisted);
+					return merged;
+				});
+			});
+		}
+
+		// Restore from primary propagator's store if configured
+		if (config.isRestore() && !propagators.isEmpty()) {
+			ACell restored = propagators.get(0).restore();
 			if (restored != null) {
 				cursor.set((V) restored);
 				log.info("Restored lattice value from store");
@@ -212,8 +226,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Register shutdown hook to persist before Etch closes its files
 		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
 
-		// Start automatic lattice propagator
-		propagator.start();
+		// Start all propagator threads
+		for (LatticePropagator p : propagators) {
+			p.start();
+		}
 
 		log.debug("NodeServer started successfully on port {}", port);
 	}
@@ -460,9 +476,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				cursor.set(merged);
 				log.debug("Merged lattice value successfully");
 
-				// Trigger immediate delta broadcast
-				if (propagator != null) {
-					propagator.triggerBroadcast(merged);
+				// Trigger immediate delta broadcast on all propagators
+				for (LatticePropagator p : propagators) {
+					p.triggerBroadcast(merged);
 				}
 			}
 		} catch (Exception e) {
@@ -555,8 +571,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 
 			// Trigger immediate delta broadcast after successful merge
-			if (merged && propagator != null) {
-				propagator.triggerBroadcast(cursor.get());
+			if (merged) {
+				V snapshot = cursor.get();
+				for (LatticePropagator p : propagators) {
+					p.triggerBroadcast(snapshot);
+				}
 			}
 		} catch (Exception e) {
 			log.warn("Error during path merge with acquire", e);
@@ -637,31 +656,35 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Syncs lattice value with a remote peer node using the provided Convex connection.
+	 * Flushes the current cursor value to all propagators (non-blocking).
 	 *
-	 * @param convex Convex connection to the peer node
-	 * @return Future that completes when sync is done, returning the merged value
+	 * <p>Like filesystem {@code fsync}: triggers persistence on the primary
+	 * propagator (announce + setRootData + mergeCallback) and delta broadcast
+	 * on network propagators. Returns immediately — actual I/O happens on
+	 * each propagator's background thread.
 	 */
-	public CompletableFuture<V> syncWithPeer(Convex convex) {
-		// Use the sync method which handles the LATTICE_QUERY
-		return sync(convex);
+	public void sync() {
+		V snapshot = cursor.get();
+		for (LatticePropagator p : propagators) {
+			p.triggerBroadcast(snapshot);
+		}
 	}
 
 	/**
-	 * Syncs with a target node by requesting its root lattice value and merging it.
+	 * Pulls the latest lattice value from a specific peer and merges it locally.
 	 *
-	 * Uses the provided Convex connection to send a LATTICE_QUERY with an empty path (root),
-	 * receives the result, merges it with the local value, and returns the merged value.
+	 * <p>Sends a LATTICE_QUERY to the peer, receives its root value, and merges
+	 * it into the local cursor. Returns a future that completes with the merged value.
 	 *
-	 * @param convex Convex connection to the target node
-	 * @return CompletableFuture that completes with the merged value after sync, or fails if sync fails
+	 * @param convex Convex connection to the peer node
+	 * @return CompletableFuture that completes with the merged value, or fails on error
 	 */
-	public CompletableFuture<V> sync(Convex convex) {
+	public CompletableFuture<V> pull(Convex convex) {
 		if (convex == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Convex connection cannot be null"));
 		}
 
-		log.debug("Syncing with target node: {}", convex.getHostAddress());
+		log.debug("Pulling from peer: {}", convex.getHostAddress());
 
 		return CompletableFuture.supplyAsync(() -> {
 			try {
@@ -684,8 +707,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 				// Check if result is an error
 				if (result.isError()) {
 					String errorMsg = result.toString();
-					log.warn("Sync failed with error: {}", errorMsg);
-					throw new RuntimeException("Sync failed: " + errorMsg);
+					log.warn("Pull failed with error: {}", errorMsg);
+					throw new RuntimeException("Pull failed: " + errorMsg);
 				}
 
 				// Get the received value and merge it
@@ -696,74 +719,81 @@ public class NodeServer<V extends ACell> implements Closeable {
 				V typedValue = (V) receivedValue;
 				V merged = mergeValue(typedValue);
 
-				log.debug("Sync completed successfully with target node: {}", convex.getHostAddress());
+				log.debug("Pull completed from peer: {}", convex.getHostAddress());
 				return merged;
 
 			} catch (TimeoutException e) {
-				log.warn("Sync timeout with target node: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Sync timeout: " + e.getMessage(), e);
+				log.warn("Pull timeout from peer: {}", convex.getHostAddress(), e);
+				throw new RuntimeException("Pull timeout: " + e.getMessage(), e);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				log.warn("Sync interrupted with target node: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Sync interrupted", e);
+				log.warn("Pull interrupted from peer: {}", convex.getHostAddress(), e);
+				throw new RuntimeException("Pull interrupted", e);
 			} catch (Exception e) {
-				log.warn("Sync failed with target node: {}", convex.getHostAddress(), e);
-				throw new RuntimeException("Sync failed: " + e.getMessage(), e);
+				log.warn("Pull failed from peer: {}", convex.getHostAddress(), e);
+				throw new RuntimeException("Pull failed: " + e.getMessage(), e);
 			}
 		});
 	}
 
 	/**
-	 * Syncs with all connected peer nodes.
+	 * Pulls the latest lattice value from all connected peers and merges locally.
 	 *
-	 * Calls sync(convex) for each connected peer Convex instance and waits for all to complete.
+	 * <p>Sends LATTICE_QUERY to each connected peer in parallel and waits for
+	 * all to complete. Each response is merged into the local cursor.
 	 *
-	 * @return true if all syncs completed successfully, false otherwise
+	 * @return true if all pulls completed successfully, false otherwise
 	 */
-	public boolean sync() {
+	public boolean pull() {
 		if (connectionManager == null) {
-			log.debug("No connection manager — cannot sync");
+			log.debug("No connection manager — cannot pull");
 			return true;
 		}
 
 		Set<Convex> peers = connectionManager.getPeers();
 
 		if (peers.isEmpty()) {
-			log.debug("No peer nodes to sync with");
+			log.debug("No peer nodes to pull from");
 			return true;
 		}
 
-		log.debug("Syncing with {} peer nodes", peers.size());
+		log.debug("Pulling from {} peer nodes", peers.size());
 
-		// Create sync futures for all peers
-		List<CompletableFuture<V>> syncFutures = new ArrayList<>();
+		// Create pull futures for all peers
+		List<CompletableFuture<V>> pullFutures = new ArrayList<>();
 		for (Convex peer : peers) {
-			// Only sync with connected peers
 			if (peer != null && peer.isConnected()) {
-				syncFutures.add(sync(peer));
+				pullFutures.add(pull(peer));
 			} else {
 				log.debug("Skipping disconnected peer: {}", peer);
 			}
 		}
 
-		if (syncFutures.isEmpty()) {
-			log.debug("No connected peers to sync with");
+		if (pullFutures.isEmpty()) {
+			log.debug("No connected peers to pull from");
 			return true;
 		}
 
-		// Wait for all syncs to complete (or fail)
-		CompletableFuture<Void> allSyncs = CompletableFuture.allOf(
-			syncFutures.toArray(new CompletableFuture[0])
+		// Wait for all pulls to complete (or fail)
+		CompletableFuture<Void> allPulls = CompletableFuture.allOf(
+			pullFutures.toArray(new CompletableFuture[0])
 		);
 
-		// Log completion status
 		try {
-			allSyncs.join();
+			allPulls.join();
 			return true;
 		} catch (Exception e) {
-			log.warn("Sync failed with error: {}", e.getMessage());
+			log.warn("Pull failed with error: {}", e.getMessage());
 			return false;
 		}
+	}
+
+	/**
+	 * @deprecated Use {@link #pull(Convex)} instead
+	 */
+	@Deprecated
+	public CompletableFuture<V> syncWithPeer(Convex convex) {
+		return pull(convex);
 	}
 
 	/**
@@ -917,28 +947,45 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Gets the automatic lattice propagator instance.
+	 * Gets the primary propagator (index 0).
 	 *
-	 * @return LatticePropagator instance, or null if server is not launched
+	 * @return Primary LatticePropagator instance, or null if none configured
 	 */
 	public LatticePropagator getPropagator() {
-		return propagator;
+		return propagators.isEmpty() ? null : propagators.get(0);
 	}
 
 	/**
-	 * Persists the given lattice value to the store if persistence is enabled.
-	 * Writes the full value tree and sets it as the store's root data.
+	 * Gets all propagators managed by this server.
+	 *
+	 * @return List of propagators (index 0 is primary if present)
+	 */
+	public List<LatticePropagator> getPropagators() {
+		return propagators;
+	}
+
+	/**
+	 * Adds a propagator to this server. The first added propagator becomes the
+	 * primary (index 0) — NodeServer will set a merge callback on it during
+	 * launch to feed store-backed refs into the cursor.
+	 *
+	 * @param propagator The propagator to add
+	 */
+	public void addPropagator(LatticePropagator propagator) {
+		propagators.add(propagator);
+	}
+
+	/**
+	 * Persists the given lattice value to the primary propagator's store.
+	 * Delegates to the primary propagator's explicit persist method.
 	 *
 	 * @param value The lattice value to persist
 	 * @throws IOException If an IO error occurs during persistence
 	 */
 	public void persistSnapshot(ACell value) throws IOException {
-		if (!config.isPersist() || !store.isPersistent()) return;
-		if (value == null) return;
-
-		Cells.persist(value, store);
-		store.setRootData(value);
-		log.debug("Persisted lattice snapshot to store");
+		if (!config.isPersist()) return;
+		if (propagators.isEmpty()) return;
+		propagators.get(0).persist(value);
 	}
 
 	/**
@@ -964,10 +1011,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		running = false;
 
-		// Stop propagator thread first, then persist final value
-		if (propagator != null) {
-			propagator.close();
-			propagator.persist(cursor.get());
+		// Final sync: trigger all propagators with current value and wait for drain.
+		// This guarantees persistence on the primary propagator (announce + setRootData
+		// + mergeCallback). Broadcast to peers is best-effort.
+		V snapshot = cursor.get();
+		for (LatticePropagator p : propagators) {
+			p.triggerAndClose(snapshot);
 		}
 
 		if (networkServer != null) {

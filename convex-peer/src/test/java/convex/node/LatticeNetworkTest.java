@@ -160,12 +160,12 @@ public class LatticeNetworkTest {
 			NodeServer<?> server = nodeServers.get(i);
 			Set<Convex> peers = server.getPeerNodes();
 			
-			// For each peer, create a sync future
+			// For each peer, create a pull future
 			for (Convex peer : peers) {
 				if (peer != null && peer.isConnected()) {
-					// Use the sync method which returns a CompletableFuture
-					CompletableFuture<?> syncFuture = server.sync(peer);
-					allSyncFutures.add(syncFuture);
+					// Use the pull method which returns a CompletableFuture
+					CompletableFuture<?> pullFuture = server.pull(peer);
+					allSyncFutures.add(pullFuture);
 				}
 			}
 		}

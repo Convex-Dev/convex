@@ -173,11 +173,11 @@ public class LatticeDemo {
 			for (int i = 0; i < NUM_NODES; i++) {
 				NodeServer<?> server = servers.get(i);
 
-				// sync() queries all peers for their current state and merges it locally
+				// pull() queries all peers for their current state and merges it locally
 				// This ensures this node has the latest data from everyone
 				// In production, this happens automatically - we're just being explicit here
-				boolean syncResult = server.sync();
-				System.out.println("Node " + (i + 1) + " sync: " + (syncResult ? "SUCCESS" : "FAILED"));
+				boolean pullResult = server.pull();
+				System.out.println("Node " + (i + 1) + " pull: " + (pullResult ? "SUCCESS" : "FAILED"));
 			}
 			long syncTime = System.currentTimeMillis() - syncStart;
 			System.out.println("Synchronization completed in " + syncTime + "ms");

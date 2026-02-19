@@ -114,11 +114,11 @@ public class KVReplicationDemo {
 			servers.get(i).getPropagator().triggerBroadcast(servers.get(i).getLocalValue());
 			}
 
-			// --- Sync network ---
-			System.out.println("Syncing network...");
-			for (NodeServer<?> server : servers) server.sync();
+			// --- Pull from peers ---
+			System.out.println("Pulling from peers...");
+			for (NodeServer<?> server : servers) server.pull();
 			Thread.sleep(500);
-			for (NodeServer<?> server : servers) server.sync();
+			for (NodeServer<?> server : servers) server.pull();
 
 			// --- Verify lattice convergence ---
 			System.out.println("\n=== Lattice Convergence ===");

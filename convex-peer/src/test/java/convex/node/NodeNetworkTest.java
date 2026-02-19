@@ -230,7 +230,7 @@ public class NodeNetworkTest {
 		// Peer connections should already be established by setUpNetwork
 		
 		// Call sync on the last server to sync with server 0
-		assertTrue(lastServer.sync(), "Sync should succeed");
+		assertTrue(lastServer.pull(), "Pull should succeed");
 		
 		// Verify the last server has the new data value at [:data valueHash] path via LATTICE_QUERY
 		InetSocketAddress lastServerAddress = lastServer.getHostAddress();

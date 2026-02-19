@@ -24,21 +24,27 @@ import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
 
 /**
- * Self-contained component for propagating lattice values to peer nodes.
+ * Self-contained component for propagating lattice values.
+ *
+ * <p>A LatticePropagator handles the complete output pipeline for a lattice node:
+ * announce to store (writes cells + tracks novelty), set root data (persistence),
+ * invoke merge callback (feed store-backed refs to cursor), and broadcast deltas
+ * to peers.
  *
  * <p>A LatticePropagator owns:
  * <ul>
- *   <li>An {@link AStore} — used for delta tracking (announce/novelty detection) and
- *       persistence. If the store is persistent (e.g. EtchStore), values are automatically
- *       persisted. If not (e.g. MemoryStore), the propagator handles delta tracking only.</li>
+ *   <li>An {@link AStore} — for delta tracking (announce/novelty detection),
+ *       persistence (setRootData), and security boundary (DATA_REQUEST resolution).</li>
  *   <li>A {@link LatticeConnectionManager} — outbound peer connections and broadcast.</li>
- *   <li>A background thread — event-driven broadcast loop with periodic root sync.</li>
+ *   <li>An optional merge callback — called after announce with the store-backed value.
+ *       Set by NodeServer on the primary propagator to feed store-backed refs into
+ *       the cursor via lattice merge.</li>
+ *   <li>A background thread — event-driven processing loop with periodic root sync.</li>
  * </ul>
  *
- * <p>The propagator has no back-reference to {@link NodeServer}. Values are pushed in
- * via {@link #triggerBroadcast(ACell)}. The propagator announces each value to its store
- * (detecting novelty for delta encoding), broadcasts deltas to peers, and periodically
- * persists the root data pointer for restore.
+ * <p>The propagator has no knowledge of cursors or lattices. Values are pushed in
+ * via {@link #triggerBroadcast(ACell)}. The merge callback is a plain
+ * {@code Consumer<ACell>} — NodeServer owns the merge logic.
  *
  * <p>The store also serves as the <b>security boundary</b>: peer connections are configured
  * with the propagator's store, so DATA_REQUEST from peers can only resolve data that
@@ -65,13 +71,8 @@ public class LatticePropagator implements Closeable {
 	public static final long ROOT_SYNC_INTERVAL = 30_000L;
 
 	/**
-	 * Default interval between periodic persistence runs (milliseconds)
-	 */
-	public static final long DEFAULT_PERSIST_INTERVAL = 30_000L;
-
-	/**
-	 * Store for delta tracking (novelty detection via announce) and persistence.
-	 * Also the security boundary for peer data resolution.
+	 * Store for delta tracking (novelty detection via announce), persistence
+	 * (setRootData), and security boundary for peer data resolution.
 	 */
 	private final AStore store;
 
@@ -91,11 +92,30 @@ public class LatticePropagator implements Closeable {
 	private volatile boolean running = false;
 
 	/**
-	 * Queue for receiving lattice values to broadcast.
+	 * Queue for receiving lattice values to process.
 	 * Uses LatestUpdateQueue which only stores the most recent value,
-	 * coalescing rapid updates into a single broadcast of the latest state.
+	 * coalescing rapid updates into a single processing of the latest state.
+	 * Safe because lattice values are monotonic (V2 >= V1 implies V1 is subsumed).
 	 */
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
+
+	/**
+	 * Merge callback — called after announce with the store-backed value.
+	 * Set by NodeServer on the primary propagator to feed store-backed refs
+	 * into the cursor via lattice merge.
+	 *
+	 * <p>The propagator has no knowledge of cursors or lattices — it just calls
+	 * this Consumer with the announced value. NodeServer owns the merge logic.
+	 */
+	private Consumer<ACell> mergeCallback;
+
+	/**
+	 * Controls whether setRootData is called after announce.
+	 * Positive = persist enabled; zero or negative = disabled.
+	 * This does NOT affect announce (which always runs for delta tracking
+	 * and store-backed refs).
+	 */
+	private long persistInterval = 30_000L;
 
 	/**
 	 * Last value that was announced to the store
@@ -103,7 +123,7 @@ public class LatticePropagator implements Closeable {
 	private ACell lastAnnouncedValue;
 
 	/**
-	 * Last value that was triggered for broadcast (used for periodic root sync)
+	 * Last value that was triggered (used for periodic root sync)
 	 */
 	private volatile ACell lastTriggeredValue;
 
@@ -128,16 +148,6 @@ public class LatticePropagator implements Closeable {
 	private long rootSyncCount = 0L;
 
 	/**
-	 * Timestamp of last persistence
-	 */
-	private long lastPersistTime = 0L;
-
-	/**
-	 * Interval between periodic persists
-	 */
-	private long persistInterval = DEFAULT_PERSIST_INTERVAL;
-
-	/**
 	 * Creates a new LatticePropagator with the given store and connection manager.
 	 *
 	 * @param store Store for delta tracking and persistence
@@ -160,6 +170,37 @@ public class LatticePropagator implements Closeable {
 		this(store, new LatticeConnectionManager(store));
 	}
 
+	// ========== Configuration ==========
+
+	/**
+	 * Sets the merge callback, called after announce with the store-backed value.
+	 *
+	 * <p>Typically set by NodeServer on the primary propagator:
+	 * <pre>{@code
+	 * propagator.setMergeCallback(persisted ->
+	 *     cursor.updateAndGet(current -> lattice.merge(persisted, current)));
+	 * }</pre>
+	 *
+	 * @param callback Consumer receiving the store-backed value after announce,
+	 *                 or null to disable
+	 */
+	public void setMergeCallback(Consumer<ACell> callback) {
+		this.mergeCallback = callback;
+	}
+
+	/**
+	 * Sets the persist interval. Positive enables setRootData after announce;
+	 * zero or negative disables it. This does NOT affect announce (which always
+	 * runs for delta tracking).
+	 *
+	 * @param intervalMs Interval in milliseconds (0 or negative to disable)
+	 */
+	public void setPersistInterval(long intervalMs) {
+		this.persistInterval = intervalMs;
+	}
+
+	// ========== Accessors ==========
+
 	/**
 	 * Gets the connection manager for this propagator.
 	 *
@@ -179,15 +220,6 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Sets the interval between periodic persistence runs.
-	 *
-	 * @param intervalMs Interval in milliseconds (0 or negative to disable)
-	 */
-	public void setPersistInterval(long intervalMs) {
-		this.persistInterval = intervalMs;
-	}
-
-	/**
 	 * Restores the last persisted value from this propagator's store.
 	 *
 	 * @return The restored value, or null if no persisted value exists
@@ -202,6 +234,13 @@ public class LatticePropagator implements Closeable {
 			return null;
 		}
 	}
+
+	public boolean isRunning() { return running; }
+	public long getBroadcastCount() { return broadcastCount; }
+	public ACell getLastAnnouncedValue() { return lastAnnouncedValue; }
+	public long getLastBroadcastTime() { return lastBroadcastTime; }
+	public long getLastRootSyncTime() { return lastRootSyncTime; }
+	public long getRootSyncCount() { return rootSyncCount; }
 
 	// ========== Lifecycle ==========
 
@@ -219,7 +258,6 @@ public class LatticePropagator implements Closeable {
 		lastTriggeredValue = null;
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
-		lastPersistTime = 0L;
 
 		propagationThread = new Thread(this::propagationLoop, "Lattice propagator thread");
 		propagationThread.setDaemon(true);
@@ -229,41 +267,61 @@ public class LatticePropagator implements Closeable {
 	}
 
 	/**
-	 * Stops the propagator gracefully.
+	 * Triggers a final value and shuts down gracefully.
+	 *
+	 * <p>The propagator processes any remaining queued values (including the
+	 * final value if non-null) before stopping. This is the only blocking
+	 * handoff in the system — used during shutdown to guarantee persistence.
+	 *
+	 * @param finalValue Final value to process before stopping, or null
 	 */
-	@Override
-	public void close() {
-		if (!running) return;
+	public void triggerAndClose(ACell finalValue) {
+		if (!running && propagationThread == null) return;
 
-		log.debug("Stopping LatticePropagator");
 		running = false;
 
+		if (finalValue != null) {
+			triggerQueue.offer(finalValue); // wakes thread via notify
+		} else if (propagationThread != null) {
+			propagationThread.interrupt(); // wake thread from poll wait
+		}
+
 		if (propagationThread != null) {
-			propagationThread.interrupt();
 			try {
-				propagationThread.join(5000);
+				propagationThread.join(10_000);
 				if (propagationThread.isAlive()) {
-					log.warn("LatticePropagator thread did not terminate within timeout");
+					log.warn("LatticePropagator thread did not drain within timeout, interrupting");
+					propagationThread.interrupt();
+					propagationThread.join(2000);
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				log.warn("Interrupted while waiting for LatticePropagator to stop");
 			}
+			propagationThread = null;
 		}
 
-		log.debug("LatticePropagator stopped (sent {} delta broadcasts, {} root syncs)",
+		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
 			broadcastCount, rootSyncCount);
+	}
+
+	/**
+	 * Stops the propagator gracefully. Equivalent to {@code triggerAndClose(null)}.
+	 */
+	@Override
+	public void close() {
+		triggerAndClose(null);
 	}
 
 	// ========== Trigger API ==========
 
 	/**
-	 * Triggers an immediate broadcast of the given lattice value.
+	 * Triggers processing of the given lattice value.
 	 *
-	 * <p>Uses LatestUpdateQueue which automatically overwrites any previous value,
-	 * coalescing rapid updates into a single broadcast of the latest state.
+	 * <p>Non-blocking: the value is queued and processed by the background thread.
+	 * Uses LatestUpdateQueue which automatically coalesces rapid triggers —
+	 * safe because lattice values are monotonic (V2 >= V1 implies V1 is subsumed).
 	 *
-	 * @param value The lattice value to broadcast (must not be null)
+	 * @param value The lattice value to process (must not be null)
 	 */
 	public void triggerBroadcast(ACell value) {
 		if (!running) return;
@@ -275,124 +333,101 @@ public class LatticePropagator implements Closeable {
 	// ========== Propagation Loop ==========
 
 	/**
-	 * Main propagation loop (no external references).
+	 * Main propagation loop. Processes values from the trigger queue through
+	 * the full output pipeline: announce, setRootData, mergeCallback, broadcast.
+	 *
+	 * <p>When {@code running} is false, switches to drain mode: processes
+	 * remaining queued values without waiting, then exits.
 	 */
 	private void propagationLoop() {
-		while (running && !Thread.currentThread().isInterrupted()) {
+		while (running || !triggerQueue.isEmpty()) {
 			try {
-				// Wait for a value to broadcast (with timeout for periodic tasks)
-				ACell value = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
-				long currentTime = Utils.getCurrentTimestamp();
+				ACell value;
+				if (running) {
+					value = triggerQueue.poll(ROOT_SYNC_INTERVAL, TimeUnit.MILLISECONDS);
+				} else {
+					// Drain mode: non-blocking poll, exit when empty
+					value = triggerQueue.poll();
+					if (value == null) break;
+				}
 
-				// If we received a value, broadcast and persist it
 				if (value != null) {
-					sendDeltaIfReady(value, currentTime);
-					maybePersist(value, currentTime);
+					processValue(value);
 				}
 
-				// Periodic persistence even without broadcast trigger
-				ACell current = lastTriggeredValue;
-				if (current != null) {
-					maybePersist(current, Utils.getCurrentTimestamp());
+				// Periodic root sync only while running
+				if (running) {
+					maybePerformRootSync(lastTriggeredValue, Utils.getCurrentTimestamp());
 				}
-
-				// Periodic root-only sync for divergence detection
-				maybePerformRootSync(lastTriggeredValue, currentTime);
 
 			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				log.debug("LatticePropagator interrupted");
+				// Drain remaining items before exiting
+				ACell remaining;
+				while ((remaining = triggerQueue.poll()) != null) {
+					processValue(remaining);
+				}
 				break;
 			} catch (Exception e) {
 				log.warn("Unexpected error in propagation loop", e);
+				if (!running) break;
 			}
 		}
 		log.debug("LatticePropagator loop ended");
 	}
 
 	/**
-	 * Sends a delta broadcast if ready (respects minimum delay).
-	 * After sending, checks if newer values arrived and sends again.
+	 * Processes a single lattice value through the full output pipeline:
+	 * <ol>
+	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
+	 *   <li>Set root data — anchor for restore (if persist enabled)</li>
+	 *   <li>Merge callback — feed store-backed value back to cursor (if set)</li>
+	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
+	 * </ol>
+	 *
+	 * <p>Announce always runs (for delta tracking and store-backed refs).
+	 * setRootData is gated by {@link #persistInterval}. The merge callback
+	 * is gated by whether it was set (primary propagator only). Broadcast
+	 * is gated by peer existence and minimum delay.
 	 */
-	private void sendDeltaIfReady(ACell value, long currentTime) {
-		if (value == null) return;
+	private void processValue(ACell value) {
+		try {
+			// 1. Announce to store (writes cells, collects novelty for delta)
+			ArrayList<ACell> novelty = new ArrayList<>();
+			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
+			value = Cells.announce(value, noveltyHandler, store);
 
-		// Enforce minimum delay between broadcasts
-		if (currentTime < lastBroadcastTime + MIN_BROADCAST_DELAY) {
-			log.trace("Skipping broadcast due to minimum delay");
-			return;
-		}
+			// 2. Set root data for restore (if persist enabled)
+			if (persistInterval > 0) {
+				store.setRootData(value);
+			}
 
-		// Send delta broadcasts in a loop until no more changes
-		do {
-			try {
-				broadcast(value);
-				lastAnnouncedValue = value;
+			// 3. Merge callback (feed store-backed value back to cursor)
+			if (mergeCallback != null) {
+				mergeCallback.accept(value);
+			}
+
+			// 4. Broadcast to peers (only if peers exist and delay elapsed)
+			long currentTime = Utils.getCurrentTimestamp();
+			if (!connectionManager.getPeers().isEmpty()
+					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
+				// Ensure root value is in the novelty list
+				if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
+					novelty.add(value);
+				}
+				Blob deltaData = Format.encodeDelta(novelty);
+				AVector<ACell> emptyPath = Vectors.empty();
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
+				connectionManager.broadcast(message);
 				lastBroadcastTime = currentTime;
 				broadcastCount++;
-				log.debug("Delta broadcast sent (count: {})", broadcastCount);
-
-				// Check if a newer value arrived while we were broadcasting
-				ACell newer = triggerQueue.poll();
-				if (newer == null) break;
-
-				value = newer;
-				currentTime = Utils.getCurrentTimestamp();
-				log.debug("Newer value arrived during broadcast, sending another delta");
-
-			} catch (IOException e) {
-				log.warn("Error during lattice broadcast", e);
-				break;
 			}
-		} while (running && !Thread.currentThread().isInterrupted());
-	}
 
-	// ========== Broadcast ==========
+			lastAnnouncedValue = value;
 
-	/**
-	 * Broadcasts the given lattice value to all connected peers using delta encoding.
-	 */
-	private void broadcast(ACell value) throws IOException {
-		if (connectionManager.getPeers().isEmpty()) {
-			log.trace("No peers to broadcast to");
-			return;
+		} catch (IOException e) {
+			log.warn("Error processing lattice value", e);
 		}
-
-		Message message = createLatticeUpdateMessage(value);
-		connectionManager.broadcast(message);
-
-		log.debug("Broadcasted lattice update ({} bytes)", message.getMessageData().count());
-	}
-
-	/**
-	 * Creates a delta-encoded LATTICE_VALUE message for the given value.
-	 * Announces value to own store, collecting novel cells for delta encoding.
-	 */
-	private Message createLatticeUpdateMessage(ACell value) throws IOException {
-		ArrayList<ACell> novelty = new ArrayList<>();
-
-		Consumer<Ref<ACell>> noveltyHandler = r -> {
-			novelty.add(r.getValue());
-		};
-
-		// Announce to own store — this is both delta tracking AND persistence
-		value = Cells.announce(value, noveltyHandler, store);
-
-		// Ensure value is in the novelty list
-		if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
-			novelty.add(value);
-		}
-
-		Blob deltaData = Format.encodeDelta(novelty);
-
-		AVector<ACell> emptyPath = Vectors.empty();
-		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
-		Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
-
-		log.trace("Created lattice update message with {} novel cells, {} bytes",
-			novelty.size(), deltaData.count());
-
-		return message;
 	}
 
 	// ========== Root Sync ==========
@@ -406,67 +441,36 @@ public class LatticePropagator implements Closeable {
 		if (connectionManager.getPeers().isEmpty()) return;
 
 		try {
-			Message message = createRootOnlyMessage(value);
+			Blob rootData = value.getEncoding();
+			AVector<ACell> emptyPath = Vectors.empty();
+			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+			Message message = Message.create(MessageType.LATTICE_VALUE, payload, rootData);
 			connectionManager.broadcast(message);
 			lastRootSyncTime = currentTime;
 			rootSyncCount++;
-			log.debug("Sent root sync ({} bytes)", message.getMessageData().count());
+			log.debug("Sent root sync ({} bytes)", rootData.count());
 		} catch (Exception e) {
 			log.warn("Error during root sync broadcast", e);
 		}
 	}
 
-	/**
-	 * Creates a root-only LATTICE_VALUE message containing only the top cell.
-	 */
-	private Message createRootOnlyMessage(ACell value) {
-		Blob rootData = value.getEncoding();
-		AVector<ACell> emptyPath = Vectors.empty();
-		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
-		return Message.create(MessageType.LATTICE_VALUE, payload, rootData);
-	}
-
-	// ========== Persistence ==========
+	// ========== Explicit Persistence ==========
 
 	/**
-	 * Persists the current value if sufficient time has elapsed.
-	 * Called after broadcast so announced cells deduplicate.
-	 */
-	private void maybePersist(ACell value, long currentTime) {
-		if (value == null) return;
-		if (persistInterval <= 0) return;
-		if (!store.isPersistent()) return;
-		if (currentTime < lastPersistTime + persistInterval) return;
-
-		persist(value);
-		lastPersistTime = currentTime;
-	}
-
-	/**
-	 * Persists a value to the store's root data.
+	 * Explicitly persists a value to the store. Used for forced persistence
+	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of persistInterval.
 	 *
 	 * @param value The value to persist
 	 */
 	void persist(ACell value) {
 		if (value == null) return;
-		if (persistInterval <= 0) return;
 		if (!store.isPersistent()) return;
-
 		try {
-			Cells.persist(value, store);
+			value = Cells.announce(value, r -> {}, store);
 			store.setRootData(value);
 			log.debug("Persisted lattice snapshot to store");
 		} catch (IOException e) {
 			log.warn("Error persisting lattice snapshot", e);
 		}
 	}
-
-	// ========== Accessors ==========
-
-	public boolean isRunning() { return running; }
-	public long getBroadcastCount() { return broadcastCount; }
-	public ACell getLastAnnouncedValue() { return lastAnnouncedValue; }
-	public long getLastBroadcastTime() { return lastBroadcastTime; }
-	public long getLastRootSyncTime() { return lastRootSyncTime; }
-	public long getRootSyncCount() { return rootSyncCount; }
 }

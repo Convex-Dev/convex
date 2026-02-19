@@ -186,6 +186,10 @@ When a peer sends a `LATTICE_VALUE` message:
 2. If autoSync policy is enabled, calls `sync()` to propagate
 3. If autoSync is disabled, the merged value sits in the cursor until app calls `sync()`
 
+NodeServer also supports explicit pull via `pull()` (query all connected peers)
+or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives
+the peer's current value, and merges it into the cursor.
+
 ### Shutdown
 
 Shutdown is the one place where blocking is acceptable — we must guarantee persistence.

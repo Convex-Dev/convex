@@ -128,7 +128,7 @@ public class LatticePropagatorTest {
 		server2.getPropagator().triggerBroadcast(server2.getLocalValue());
 
 		// Sync server1 to ensure it has received the broadcast from server2
-		assertTrue(server1.sync(), "Sync should complete successfully");
+		assertTrue(server1.pull(), "Pull should complete successfully");
 
 		// Verify server1 received the value from server2
 		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
@@ -159,7 +159,7 @@ public class LatticePropagatorTest {
 			server1.getPropagator().triggerBroadcast(server1.getLocalValue());
 
 			// Sync server2 to ensure it received the update from server1
-			assertTrue(server2.sync(), "Sync should complete successfully for update " + (i + 1));
+			assertTrue(server2.pull(), "Pull should complete successfully for update " + (i + 1));
 
 			// Verify server2 received this specific value
 			assertEquals(testValue, RT.getIn(server2.getLocalValue(), dataKeyword, valueHash),

@@ -91,7 +91,7 @@ public class NodeServerPersistenceTest {
 		Convex conn = ConvexRemote.connect(primaryAddr);
 		try {
 			backup.addPeer(conn);
-			assertTrue(backup.sync(), "Sync should complete");
+			assertTrue(backup.pull(), "Pull should complete");
 		} finally {
 			backup.removePeer(conn);
 			conn.close();
