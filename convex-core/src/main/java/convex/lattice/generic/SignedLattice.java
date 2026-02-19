@@ -126,6 +126,4 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return null;
 	}
 
-	
-
 }

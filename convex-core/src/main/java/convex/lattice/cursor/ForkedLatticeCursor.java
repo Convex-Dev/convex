@@ -48,9 +48,12 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 			if (parentValue == forkPoint) {
 				// Fast path: parent unchanged since fork
 				return localVal;
-			} else {
+			} else if (lattice != null) {
 				// Parent changed: perform lattice merge
 				return lattice.merge(context, parentValue, localVal);
+			} else {
+				// Null lattice: write-back (overwrite parent)
+				return localVal;
 			}
 		});
 

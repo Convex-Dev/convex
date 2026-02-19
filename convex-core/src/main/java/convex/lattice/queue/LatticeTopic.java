@@ -77,7 +77,7 @@ public class LatticeTopic {
 		// Index.EMPTY first, subsequent assoc() calls preserve the Index type.
 		ensureInitialised();
 
-		ALatticeCursor<AVector<ACell>> partCursor = cursor.descend(TopicLattice.KEY_PARTITIONS, id);
+		ALatticeCursor<AVector<ACell>> partCursor = cursor.path(TopicLattice.KEY_PARTITIONS, id);
 		return new LatticeQueue(partCursor);
 	}
 

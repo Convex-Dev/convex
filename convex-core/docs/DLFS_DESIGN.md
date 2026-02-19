@@ -26,7 +26,7 @@ built on Convex immutable data structures with Java NIO compatibility.
 │           ACursor<AVector<ACell>> Cursor                      │
 │        (Atomic mutable reference — or lattice cursor)        │
 │  - Root<V>: simple atomic reference                          │
-│  - DescendedLatticeCursor<V>: path into larger lattice       │
+│  - DescendedCursor<V>: path into larger lattice       │
 │  - updateAndGet(rootNode -> ...)                             │
 └──────────────────────┬───────────────────────────────────────┘
                        │
@@ -59,7 +59,7 @@ and `path()` for the lattice cursor hierarchy.
 **DLFSLocal** — Mutable Java NIO filesystem backed by a cursor. All file operations
 (`createFile`, `write`, `delete`, `createDirectory`) go through `cursor.updateAndGet()`
 with pure DLFSNode functions. The cursor can be a simple `Root<V>` (standalone drive)
-or a `DescendedLatticeCursor<V>` (path into a larger lattice tree).
+or a `DescendedCursor<V>` (path into a larger lattice tree).
 
 ### Key Files
 
@@ -122,7 +122,7 @@ All operations are atomic via the underlying cursor:
 DLFileSystem drive = DLFS.createLocal();
 
 // Cursor-backed drive (path into larger lattice)
-ACursor<AVector<ACell>> cursor = rootCursor.descend(Strings.create("myDrive"));
+ACursor<AVector<ACell>> cursor = rootCursor.path(Strings.create("myDrive"));
 DLFSLocal drive = new DLFSLocal(DLFS.provider(), "myDrive", cursor);
 ```
 
@@ -155,7 +155,7 @@ AVector<ACell> node = drive.getNode(path);     // Get raw node at path
 ### Cursor-Backed Drives
 
 A `DLFSLocal` can be backed by any `ACursor<AVector<ACell>>`, including a
-`DescendedLatticeCursor` that represents a path into a larger lattice tree.
+`DescendedCursor` that represents a path into a larger lattice tree.
 This enables multi-drive setups where each drive is a key in a `MapLattice`:
 
 ```java
@@ -165,7 +165,7 @@ RootLatticeCursor<AHashMap<AString, AVector<ACell>>> drivesRoot =
     Cursors.createLattice(drivesLattice);
 
 // Descend to a specific drive
-ACursor<AVector<ACell>> driveCursor = drivesRoot.descend(Strings.create("myDrive"));
+ACursor<AVector<ACell>> driveCursor = drivesRoot.path(Strings.create("myDrive"));
 DLFSLocal drive = new DLFSLocal(DLFS.provider(), "myDrive", driveCursor);
 
 // File operations automatically update the cursor, which propagates

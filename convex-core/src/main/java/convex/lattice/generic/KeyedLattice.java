@@ -9,6 +9,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * Lattice implementation that handles a set of keyword-mapped child lattices.
@@ -78,6 +79,37 @@ public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
 			ACell b=otherValue.get(key);
 
 			ACell m=lattice.merge(a, b); // child merge
+
+			if (!Utils.equals(m, a)) {
+				result=result.assoc(key, m);
+			}
+		}
+
+		return result;
+	}
+
+	@Override
+	public Index<Keyword, ACell> merge(LatticeContext context, Index<Keyword, ACell> ownValue, Index<Keyword, ACell> otherValue) {
+		if (ownValue==null) {
+			if (checkForeign(otherValue)) return otherValue;
+			return null;
+		}
+		if (otherValue==null) return ownValue;
+
+		Index<Keyword, ACell> result=ownValue;
+
+		int n=lattices.size();
+		for (int i=0; i<n; i++) {
+			@SuppressWarnings("unchecked")
+			ALattice<ACell> lattice=(ALattice<ACell>) lattices.get(i);
+			Keyword key=keys.get(i);
+
+			if (!otherValue.containsKey(key)) continue;
+
+			ACell a=ownValue.get(key);
+			ACell b=otherValue.get(key);
+
+			ACell m=lattice.merge(context, a, b); // child merge with context
 
 			if (!Utils.equals(m, a)) {
 				result=result.assoc(key, m);

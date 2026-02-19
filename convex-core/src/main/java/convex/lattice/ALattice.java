@@ -188,7 +188,7 @@ public abstract class ALattice<V extends ACell> {
 		int d=path.length;
 		if (d==0) return (ALattice<T>) path();
 		if (d==1) return (ALattice<T>) path((ACell)RT.cvm(path[0]));
-		
+
 		ACell[] cellPath=Cells.toCellArray(path);
 		return path(cellPath,0);
 	}

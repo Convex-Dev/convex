@@ -5,6 +5,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * A lattice representing a hash map that merges values
@@ -34,6 +35,14 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 		if (otherValue==null) return ownValue;
 		if (ownValue==null) return otherValue;
 		return ownValue.mergeDifferences(otherValue, mergeFunction);
+	}
+
+	@Override
+	public AHashMap<K,V> merge(LatticeContext context, AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
+		if (otherValue==null) return ownValue;
+		if (ownValue==null) return otherValue;
+		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
+		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}
 
 	@Override

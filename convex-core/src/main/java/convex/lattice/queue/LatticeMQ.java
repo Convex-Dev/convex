@@ -82,7 +82,7 @@ public class LatticeMQ {
 	 * @return Topic handle
 	 */
 	public LatticeTopic topic(ACell name) {
-		return new LatticeTopic(cursor.descend(name));
+		return new LatticeTopic(cursor.path(name));
 	}
 
 	/**

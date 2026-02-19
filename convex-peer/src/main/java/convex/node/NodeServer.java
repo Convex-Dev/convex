@@ -29,6 +29,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.PathCursor;
 import convex.lattice.cursor.Root;
@@ -90,6 +91,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * refs into the cursor. Additional propagators handle public/backup broadcast.
 	 */
 	private final List<LatticePropagator> propagators = new ArrayList<>();
+
+	/**
+	 * Context used for all merge operations. Carries signing key and owner
+	 * verifier through the lattice hierarchy. Default is EMPTY (no signing,
+	 * no owner verification).
+	 */
+	private LatticeContext mergeContext = LatticeContext.EMPTY;
 
 	/**
 	 * Message receiver action for handling incoming lattice sync messages
@@ -177,7 +185,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			propagators.get(0).setMergeCallback(persisted -> {
 				cursor.updateAndGet(current -> {
 					@SuppressWarnings("unchecked")
-					V merged = lattice.merge(current, (V) persisted);
+					V merged = lattice.merge(mergeContext, current, (V) persisted);
 					return merged;
 				});
 			});
@@ -495,7 +503,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			try {
 				// Attempt merge
 				V currentValue = cursor.get();
-				V merged = lattice.merge(currentValue, receivedValue);
+				V merged = lattice.merge(mergeContext, currentValue, receivedValue);
 
 				// Try to persist (triggers MissingDataException if data missing)
 				merged = Cells.persist(merged, store);
@@ -738,7 +746,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Atomically update the cursor by merging the current value with the received value
 		// This ensures thread-safe updates even if multiple threads are merging concurrently
 		V merged = cursor.updateAndGet(currentValue -> {
-			V newValue= lattice.merge(currentValue, receivedValue);
+			V newValue= lattice.merge(mergeContext, currentValue, receivedValue);
 			return newValue;
 		});
 
@@ -790,6 +798,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public ACursor<V> getCursor() {
 		return cursor;
+	}
+
+	/**
+	 * Sets the merge context used for all lattice merge operations.
+	 * The context carries signing keys and owner verification through the
+	 * lattice hierarchy (e.g. OwnerLattice, SignedLattice).
+	 *
+	 * @param context Merge context (must not be null — use LatticeContext.EMPTY for default)
+	 */
+	public void setMergeContext(LatticeContext context) {
+		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
+		this.mergeContext = context;
 	}
 
 	/**

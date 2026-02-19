@@ -29,11 +29,14 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Maps;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.FileUtils;
@@ -43,8 +46,10 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
@@ -52,6 +57,7 @@ import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.MapLattice;
+import convex.lattice.generic.OwnerLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import net.miginfocom.swing.MigLayout;
@@ -61,9 +67,15 @@ import net.miginfocom.swing.MigLayout;
  * DLFS as a persistent lattice node with a WebDAV interface on top.
  *
  * <p>The browser runs a NodeServer backed by an Etch store (default
- * {@code ~/.convex/dlfs/dlfs.db}). The lattice value is a map of drive names
- * to DLFS node vectors. Each drive is a {@link DLFSLocal} backed by a
- * descended cursor into this map.
+ * {@code ~/.convex/dlfs/dlfs.db}). The lattice uses an
+ * {@link OwnerLattice} wrapping a {@link MapLattice} of
+ * {@link DLFSLattice} — matching the {@code :fs} branch of
+ * {@code Lattice.ROOT}. Drive updates are signed with a local key pair.
+ *
+ * <p>A {@link SignedCursor} transparently handles signing when writes
+ * propagate up through the OwnerLattice. Each drive is a
+ * {@link DLFSLocal} backed by a {@link convex.lattice.cursor.PathCursor}
+ * into the signed drives map.
  *
  * <p>A WebDAV server starts alongside the viewer, exposing drives over HTTP.
  * Since both GUI and WebDAV share the same DLFSLocal instances, operations
@@ -80,12 +92,28 @@ public class DLFSBrowser extends AbstractGUI {
 	/** Default store path */
 	static final String DEFAULT_STORE_PATH = "~/.convex/dlfs/dlfs.db";
 
-	/** Lattice type: map of drive names to DLFS node trees */
-	static final MapLattice<AString, AVector<ACell>> DRIVES_LATTICE =
+	/** Key file extension (placed alongside the store file) */
+	static final String KEY_FILE_EXTENSION = ".key";
+
+	/** Inner lattice: map of drive names to DLFS trees */
+	static final MapLattice<AString, AVector<ACell>> DRIVES_MAP_LATTICE =
 		MapLattice.create(DLFSLattice.INSTANCE);
 
+	/** Outer lattice: owner-signed map of drives (matches Lattice.ROOT :fs) */
+	static final OwnerLattice<AHashMap<AString, AVector<ACell>>> OWNER_LATTICE =
+		OwnerLattice.create(DRIVES_MAP_LATTICE);
+
 	/** NodeServer hosting the DLFS lattice with persistence and networking */
-	private NodeServer<AHashMap<AString, AVector<ACell>>> nodeServer;
+	private NodeServer<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> nodeServer;
+
+	/** Local key pair for signing drive updates */
+	private AKeyPair keyPair;
+
+	/** Owner key (derived from keyPair) */
+	private AccountKey ownerKey;
+
+	/** Cursor into the owner's unsigned drives map (writes re-sign via SignedCursor) */
+	private ACursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
 
 	/** Active drives keyed by name (insertion ordered) */
 	private final Map<String, DLFSLocal> drives = new LinkedHashMap<>();
@@ -262,20 +290,34 @@ public class DLFSBrowser extends AbstractGUI {
 		}
 
 		try {
+			// Generate a local key pair for signing drive updates
+			keyPair = AKeyPair.generate();
+			ownerKey = keyPair.getAccountKey();
+
 			// Local-only mode (port -1): persistence + cursor, no Netty network server
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
-			nodeServer = new NodeServer<>(DRIVES_LATTICE, etchStore, null, localConfig);
+			nodeServer = new NodeServer<>(OWNER_LATTICE, etchStore, null, localConfig);
+
+			// Set merge context with signing key for OwnerLattice verification
+			LatticeContext ctx = LatticeContext.create(null, keyPair);
+			nodeServer.setMergeContext(ctx);
 			nodeServer.launch();
+
+			// Navigate to owner's signed entry, wrap in SignedCursor
+			ACursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
+				nodeServer.getCursor();
+			@SuppressWarnings("unchecked")
+			ACursor<SignedData<AHashMap<AString, AVector<ACell>>>> ownerEntry =
+				rootCursor.path(ownerKey);
+			drivesCursor = SignedCursor.create(ownerEntry, keyPair);
 
 			// Rebuild drives from restored lattice state
 			drives.clear();
-			ACursor<AHashMap<AString, AVector<ACell>>> cursor = nodeServer.getCursor();
-			AHashMap<AString, AVector<ACell>> driveMap = cursor.get();
+			AHashMap<AString, AVector<ACell>> driveMap = drivesCursor.get();
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
-					AForkableCursor<AVector<ACell>> driveCursor =
-						((AForkableCursor<AHashMap<AString, AVector<ACell>>>) cursor).path(entry.getKey());
+					ACursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 					driveFS.updateTimestamp();
 					drives.put(name, driveFS);
@@ -340,15 +382,10 @@ public class DLFSBrowser extends AbstractGUI {
 		}
 	}
 
-	/** Gets the lattice cursor from the NodeServer */
-	private AForkableCursor<AHashMap<AString, AVector<ACell>>> getLatticeRoot() {
-		return (AForkableCursor<AHashMap<AString, AVector<ACell>>>) nodeServer.getCursor();
-	}
-
 	// ========== Drive Management ==========
 
 	/**
-	 * Creates a new drive backed by a lattice cursor descended from the NodeServer.
+	 * Creates a new drive backed by a cursor descended from the signed drives map.
 	 * @param name Drive name
 	 * @return true if created, false if already exists
 	 */
@@ -356,7 +393,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (drives.containsKey(name)) return false;
 
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> driveCursor = getLatticeRoot().path(cvmName);
+		ACursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
 		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
@@ -401,7 +438,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 		// Clear from lattice
 		AString cvmName = Strings.create(name);
-		AForkableCursor<AVector<ACell>> cursor = getLatticeRoot().path(cvmName);
+		ACursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
 		cursor.set(null);
 
 		// Remove from WebDAV

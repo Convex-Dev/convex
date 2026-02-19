@@ -1,6 +1,5 @@
 package convex.lattice.fs.impl;
 
-import java.nio.file.NoSuchFileException;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;

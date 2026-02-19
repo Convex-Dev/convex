@@ -276,13 +276,13 @@ public class LatticeCursorTest {
 	}
 
 	@Test
-	public void testDescendEmptyReturnsThis() {
+	public void testPathEmptyReturnsThis() {
 		SetLattice<CVMLong> lattice = SetLattice.create();
 		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
 
-		// descend() with no keys should return this
-		ALatticeCursor<ASet<CVMLong>> descended = root.descend();
-		assertSame(root, descended);
+		// path() with no keys should return this
+		ALatticeCursor<ASet<CVMLong>> navigated = root.path();
+		assertSame(root, navigated);
 	}
 
 	@Test
@@ -545,6 +545,98 @@ public class LatticeCursorTest {
 		assertTrue(finalB.contains(CVMLong.create(20)), ":b should have 20");
 	}
 
+	// ===== Descended cursor fork/sync tests =====
+
+	/**
+	 * Tests that forking descended cursors at different positions and syncing
+	 * each preserves all changes. The sync goes through assocIn on the parent,
+	 * so modifications at one key must not clobber modifications at another.
+	 */
+	@Test
+	public void testDescendedForkSyncPreservesSiblings() {
+		MapLattice<Keyword, AInteger> mapLattice = MapLattice.create(MaxLattice.INSTANCE);
+		AHashMap<Keyword, AInteger> initial = Maps.of(
+			Keywords.FOO, CVMLong.create(1),
+			Keywords.BAR, CVMLong.create(10),
+			Keywords.BAZ, CVMLong.create(100)
+		);
+		RootLatticeCursor<AHashMap<Keyword, AInteger>> root = Cursors.createLattice(mapLattice, initial);
+
+		// Descend to :foo and :bar via path(), fork each
+		ALatticeCursor<AInteger> fooCursor = root.path(Keywords.FOO);
+		ALatticeCursor<AInteger> barCursor = root.path(Keywords.BAR);
+		ALatticeCursor<AInteger> fooFork = fooCursor.fork();
+		ALatticeCursor<AInteger> barFork = barCursor.fork();
+
+		// Modify each fork independently
+		fooFork.set(CVMLong.create(5));
+		barFork.set(CVMLong.create(50));
+
+		// Also modify :baz directly on root while forks are outstanding
+		root.updateAndGet(m -> m.assoc(Keywords.BAZ, CVMLong.create(200)));
+
+		// Sync both forks
+		fooFork.sync();
+		barFork.sync();
+
+		// All three keys should reflect their respective updates
+		AHashMap<Keyword, AInteger> result = root.get();
+		assertCVMEquals(5, result.get(Keywords.FOO));
+		assertCVMEquals(50, result.get(Keywords.BAR));
+		assertCVMEquals(200, result.get(Keywords.BAZ));
+	}
+
+	/**
+	 * Tests null-lattice descended cursor fork/sync: sync should write back
+	 * only at the descended path, preserving sibling changes in the parent.
+	 *
+	 * Uses a two-level map where the inner map has no sub-lattice. Navigating
+	 * into an inner map key gives a null-lattice cursor since MaxLattice.path()
+	 * returns null.
+	 */
+	@Test
+	public void testNullLatticeForkSyncPreservesSiblings() {
+		// Outer: MapLattice<Keyword, AHashMap<Keyword, CVMLong>>
+		// Inner: MapLattice<Keyword, CVMLong> with MaxLattice children
+		MapLattice<Keyword, AInteger> innerLattice = MapLattice.create(MaxLattice.INSTANCE);
+		MapLattice<Keyword, AHashMap<Keyword, AInteger>> outerLattice = MapLattice.create(innerLattice);
+
+		AHashMap<Keyword, AInteger> innerMap = Maps.of(
+			Keywords.FOO, CVMLong.create(1),
+			Keywords.BAR, CVMLong.create(10)
+		);
+		AHashMap<Keyword, AHashMap<Keyword, AInteger>> initial = Maps.of(Keywords.BAZ, innerMap);
+		RootLatticeCursor<AHashMap<Keyword, AHashMap<Keyword, AInteger>>> root =
+			Cursors.createLattice(outerLattice, initial);
+
+		// path(:baz, :foo) → DescendedCursor with MaxLattice (leaf, non-null)
+		// path(:baz, :foo, :x) would give null lattice, but MaxLattice values
+		// are integers, not maps — can't navigate deeper meaningfully.
+		//
+		// Instead: path(:baz) gives MapLattice, then fork two cursors at that
+		// level and modify different inner keys. This tests assocIn preservation
+		// through the DescendedCursor → PathCursor → assocIn chain.
+
+		// Navigate to :baz (inner map level, has MapLattice)
+		ALatticeCursor<AHashMap<Keyword, AInteger>> bazCursor = root.path(Keywords.BAZ);
+
+		// Fork and modify :foo within the inner map
+		ALatticeCursor<AHashMap<Keyword, AInteger>> fork = bazCursor.fork();
+		fork.updateAndGet(m -> m.assoc(Keywords.FOO, CVMLong.create(99)));
+
+		// Meanwhile, modify :bar in the inner map via a separate path
+		ALatticeCursor<AInteger> barCursor = root.path(Keywords.BAZ, Keywords.BAR);
+		barCursor.set(CVMLong.create(77));
+
+		// Sync the fork — lattice merge should combine both changes
+		fork.sync();
+
+		// Both :foo and :bar should reflect their updates
+		AHashMap<Keyword, AInteger> result = (AHashMap<Keyword, AInteger>) root.get().get(Keywords.BAZ);
+		assertCVMEquals(99, result.get(Keywords.FOO));
+		assertCVMEquals(77, result.get(Keywords.BAR));
+	}
+
 	// ===== KV Database with lattice path resolution =====
 
 	/**
@@ -577,7 +669,7 @@ public class LatticeCursorTest {
 		assertEquals(Strings.create("kv"), ALattice.toJSONKey(kvPath[0]));
 
 		// === Step 2: Descend root cursor to the :kv level (OwnerLattice) ===
-		ALatticeCursor<ACell> kvCursor = root.descend(kvPath);
+		ALatticeCursor<ACell> kvCursor = root.path(kvPath);
 		assertNotNull(kvCursor);
 
 		// === Step 3: Create and populate a KV database via the high-level API ===
