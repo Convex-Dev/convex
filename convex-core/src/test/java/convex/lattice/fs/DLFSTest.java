@@ -493,10 +493,12 @@ public class DLFSTest {
 		assertTrue(lattice.checkForeign(merged), "Merged DLFS node should pass checkForeign");
 		assertFalse(lattice.checkForeign(null), "Null should fail checkForeign");
 		
-		// Test path support - directory entries should return the same lattice
-		AVector<ACell> rootDir = merged;
+		// Test path support - navigate through vector index to directory entries
 		convex.core.data.AString dirName = convex.core.data.Strings.create("dir2");
-		ALattice<?> childLattice = lattice.path(dirName);
+		// path(0) gets the directory entries lattice, path("dir2") gets the child DLFSLattice
+		ALattice<?> dirEntriesLattice = lattice.path(convex.core.data.prim.CVMLong.ZERO);
+		assertNotNull(dirEntriesLattice, "Path to directory entries (index 0) should return a lattice");
+		ALattice<?> childLattice = dirEntriesLattice.path(dirName);
 		assertNotNull(childLattice, "Path to directory entry should return a lattice");
 		assertSame(lattice, childLattice, "Directory entry should use same DLFSLattice");
 	}

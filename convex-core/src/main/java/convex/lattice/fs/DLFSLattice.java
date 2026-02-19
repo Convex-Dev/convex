@@ -3,12 +3,11 @@ package convex.lattice.fs;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Index;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
+import convex.lattice.generic.IndexLattice;
 
 /**
  * Lattice implementation for DLFS (Data Lattice FileSystem) nodes.
@@ -30,6 +29,13 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	 * Singleton instance of DLFSLattice
 	 */
 	public static final DLFSLattice INSTANCE = new DLFSLattice();
+
+	/**
+	 * Lattice for directory entries (Index&lt;AString, AVector&lt;ACell&gt;&gt;).
+	 * Merges entries using DLFSLattice for child node values.
+	 */
+	static final IndexLattice<AString, AVector<ACell>> DIR_ENTRIES_LATTICE =
+		IndexLattice.create(INSTANCE);
 
 	private DLFSLattice() {
 		// Private constructor for singleton
@@ -118,109 +124,31 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public ACell resolveKey(ACell key) {
+		// DLFS node is a vector — only integer keys are valid at this level
 		if (key instanceof AInteger) return key;
 		if (key instanceof AString) {
-			// Try parsing as integer for vector position access
+			// Try parsing as integer for vector position access (e.g. "0" → 0)
 			AInteger n = AInteger.parse(key);
 			if (n != null) return n;
-			return key; // String filename
 		}
-		return key;
+		return null;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		// Handle numeric index (0 = directory entries, POS_DIR)
+		// DLFS node value is AVector<ACell> — only integer indices are valid
 		if (childKey instanceof AInteger) {
 			long idx = ((AInteger) childKey).longValue();
 			if (idx == DLFSNode.POS_DIR) {
-				// Return a lattice for directory entries (Index<AString, AVector<ACell>>)
-				// This lattice will return DLFSLattice when path(AString) is called
-				return (ALattice<T>) DirectoryEntriesLattice.INSTANCE;
+				// Position 0: directory entries (Index<AString, AVector<ACell>>)
+				// Navigate further with path(AString) on the IndexLattice
+				return (ALattice<T>) DIR_ENTRIES_LATTICE;
 			}
-			// Other indices (1=data, 2=metadata, 3=utime) don't have child lattices
+			// Other positions (1=data, 2=metadata, 3=utime) are leaf values
 			return null;
 		}
-		
-		// For DLFS, child paths can also be directory entry names (AString)
-		// This handles direct access when the path doesn't start with [0]
-		// Each directory entry points to another DLFS node, which uses the same lattice
-		if (childKey instanceof AString) {
-			// Return the same lattice type for child nodes (they're also DLFS nodes)
-			return (ALattice<T>) this;
-		}
-		
-		// Invalid path key type
 		return null;
-	}
-
-	/**
-	 * Lattice for directory entries (Index<AString, AVector<ACell>>).
-	 * When path(AString) is called, returns DLFSLattice for the child node.
-	 */
-	private static class DirectoryEntriesLattice extends ALattice<Index<AString, AVector<ACell>>> {
-		static final DirectoryEntriesLattice INSTANCE = new DirectoryEntriesLattice();
-		
-		private DirectoryEntriesLattice() {
-			// Private constructor for singleton
-		}
-		
-		@Override
-		public Index<AString, AVector<ACell>> merge(Index<AString, AVector<ACell>> ownValue, Index<AString, AVector<ACell>> otherValue) {
-			if (ownValue == null) {
-				if (otherValue == null) return zero();
-				return otherValue;
-			}
-			if (otherValue == null) {
-				return ownValue;
-			}
-
-			// Merge directory entries using DLFSLattice for values
-			MergeFunction<AVector<ACell>> mergeFunction = (a, b) -> {
-				return DLFSLattice.INSTANCE.merge(a, b);
-			};
-
-			return ownValue.mergeDifferences(otherValue, mergeFunction);
-		}
-
-		@Override
-		public Index<AString, AVector<ACell>> merge(convex.lattice.LatticeContext context, Index<AString, AVector<ACell>> ownValue, Index<AString, AVector<ACell>> otherValue) {
-			if (ownValue == null) {
-				if (otherValue == null) return zero();
-				return otherValue;
-			}
-			if (otherValue == null) {
-				return ownValue;
-			}
-
-			// Merge directory entries using context-aware DLFSLattice for values
-			MergeFunction<AVector<ACell>> mergeFunction = (a, b) -> {
-				return DLFSLattice.INSTANCE.merge(context, a, b);
-			};
-
-			return ownValue.mergeDifferences(otherValue, mergeFunction);
-		}
-		
-		@Override
-		public Index<AString, AVector<ACell>> zero() {
-			return Index.none();
-		}
-		
-		@Override
-		public boolean checkForeign(Index<AString, AVector<ACell>> value) {
-			return (value instanceof Index);
-		}
-		
-		@SuppressWarnings("unchecked")
-		@Override
-		public <T extends ACell> ALattice<T> path(ACell childKey) {
-			// Directory entry names (AString) point to DLFS nodes
-			if (childKey instanceof AString) {
-				return (ALattice<T>) DLFSLattice.INSTANCE;
-			}
-			return null;
-		}
 	}
 
 }
