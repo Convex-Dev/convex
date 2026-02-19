@@ -73,7 +73,7 @@ The descended cursor supports all operations, with simpler semantics:
 | `get()` | `RT.getIn(parent, key)` | Same |
 | `set(v)` | `parent.set(assocIn(parent, key, v))` | Same |
 | `fork()` | Local copy, sync uses lattice merge | Local copy, sync overwrites |
-| `sync()` | Three-way lattice merge with parent | Write-back (overwrite parent) |
+| `sync()` | Lattice merge with parent (`merge(parentVal, localVal)`) | Write-back (overwrite at path) |
 | `merge(v)` | `sublattice.merge(current, v)`, write to parent | `parent.merge(assocIn(parent.get(), key, v))` |
 
 **merge() with null lattice** bubbles up: the cursor constructs a parent-level value via `assocIn` and calls `merge()` on the parent cursor. This propagates up the chain until it reaches a cursor with a lattice, which performs the actual lattice merge. This means a merge at a deep path with no local lattice still benefits from ancestor lattice semantics.

@@ -3,6 +3,7 @@ package convex.lattice.generic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.Set;
 import java.util.function.BiPredicate;
@@ -13,11 +14,14 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.SignedData;
@@ -35,7 +39,7 @@ public class GenericLatticeTest {
 		
 		ALattice<AHashMap<ACell,AInteger>> l=MapLattice.create(MaxLattice.create());
 		
-		assertEquals(Maps.empty(), l.merge(Maps.empty(), null));
+		assertSame(Maps.empty(), l.merge(Maps.empty(), null));
 		
 		assertEquals(Maps.of(1,2,3,4), l.merge(Maps.of(1,2), Maps.of(3,4)));
 
@@ -58,6 +62,23 @@ public class GenericLatticeTest {
 		LatticeTest.doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Index.of(Keywords.FOO,CVMLong.ONE), Index.of(Keywords.BAR,Sets.of(1,2)), Keywords.FOO);
 
 		LatticeTest.doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
+
+		LatticeTest.doLatticeTest(MinLattice.create(), CVMLong.ONE, CVMLong.TWO);
+
+		LatticeTest.doLatticeTest(FunctionLattice.create((AInteger a, AInteger b) -> (a.compareTo(b) >= 0) ? a : b), CVMLong.ONE, CVMLong.TWO);
+
+		LatticeTest.doLatticeTest(LWWLattice.INSTANCE,
+			Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(100), Keyword.intern("data"), Strings.create("a")),
+			Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(200), Keyword.intern("data"), Strings.create("b")));
+
+		LatticeTest.doLatticeTest(LWWLattice.create(v -> ((CVMLong)v).longValue()), CVMLong.create(100), CVMLong.create(200));
+
+		LatticeTest.doLatticeTest(TupleLattice.create(MaxLattice.create(), SetLattice.create()),
+			(AVector<ACell>) Vectors.of(CVMLong.ONE, Sets.of(1, 2)),
+			(AVector<ACell>) Vectors.of(CVMLong.TWO, Sets.of(2, 3)), 0);
+
+		LatticeTest.doLatticeTest(VectorLattice.create(MaxLattice.create()),
+			Vectors.of(1, 5, 3), Vectors.of(4, 2, 6), 0);
 	}
 
 	@Test
@@ -288,6 +309,102 @@ public class GenericLatticeTest {
 		AHashMap<ACell, SignedData<AInteger>> incomingRogue = Maps.of(ownerKey, signedRogue);
 		AHashMap<ACell, SignedData<AInteger>> resultRogue = ownerLattice.merge(ctx, Maps.empty(), incomingRogue);
 		assertNull(resultRogue.get(ownerKey), "Rogue key should be rejected");
+	}
+
+	@Test
+	public void testMinLattice() {
+		MinLattice lat = MinLattice.create();
+		assertSame(CVMLong.ONE, lat.merge(CVMLong.ONE, CVMLong.TWO));
+		assertSame(CVMLong.ONE, lat.merge(CVMLong.TWO, CVMLong.ONE));
+		assertSame(CVMLong.ONE, lat.merge(CVMLong.ONE, null));
+		assertSame(CVMLong.ONE, lat.merge(null, CVMLong.ONE));
+		assertNull(lat.merge(null, null));
+
+		LatticeTest.doLatticeTest(lat, CVMLong.ONE, CVMLong.TWO);
+		LatticeTest.doLatticeTest(lat, CVMLong.MAX_VALUE, CVMLong.ZERO);
+	}
+
+	@Test
+	public void testFunctionLattice() {
+		// Create a "max" lattice via FunctionLattice
+		FunctionLattice<AInteger> lat = FunctionLattice.create(
+			(a, b) -> (a.compareTo(b) >= 0) ? a : b
+		);
+		assertSame(CVMLong.TWO, lat.merge(CVMLong.ONE, CVMLong.TWO));
+		assertSame(CVMLong.TWO, lat.merge(CVMLong.TWO, CVMLong.ONE));
+		assertSame(CVMLong.ONE, lat.merge(CVMLong.ONE, null));
+		assertSame(CVMLong.ONE, lat.merge(null, CVMLong.ONE));
+
+		LatticeTest.doLatticeTest(lat, CVMLong.ONE, CVMLong.TWO);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testTupleLattice() {
+		// Tuple: [MaxLattice, SetLattice]
+		TupleLattice lat = TupleLattice.create(MaxLattice.create(), SetLattice.create());
+
+		AVector<ACell> v1 = (AVector<ACell>) Vectors.of(CVMLong.ONE, Sets.of(1, 2));
+		AVector<ACell> v2 = (AVector<ACell>) Vectors.of(CVMLong.TWO, Sets.of(2, 3));
+
+		AVector<ACell> merged = lat.merge(v1, v2);
+		assertEquals(CVMLong.TWO, merged.get(0));
+		assertEquals(Sets.of(1, 2, 3), merged.get(1));
+
+		// Identity preservation
+		assertSame(v1, lat.merge(v1, null));
+		assertSame(v1, lat.merge(null, v1));
+		assertSame(v1, lat.merge(v1, v1));
+
+		// zero
+		AVector<ACell> zero = lat.zero();
+		assertEquals(2, zero.count());
+
+		// path — child lattice at index
+		assertNotNull(lat.path(CVMLong.ZERO));
+		assertNotNull(lat.path(CVMLong.ONE));
+		assertNull(lat.path(CVMLong.TWO));
+		assertNull(lat.path(Keywords.FOO));
+
+		LatticeTest.doLatticeTest(lat, v1, v2, 0);
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@Test
+	public void testVectorLattice() {
+		VectorLattice lat = VectorLattice.create(MaxLattice.create());
+
+		AVector v1 = Vectors.of(1, 5, 3);
+		AVector v2 = Vectors.of(4, 2, 6);
+
+		AVector merged = lat.merge(v1, v2);
+		assertEquals(Vectors.of(4, 5, 6), merged);
+
+		// Identity preservation
+		assertSame(v1, lat.merge(v1, null));
+		assertSame(v1, lat.merge(null, v1));
+		assertSame(v1, lat.merge(v1, v1));
+
+		// Merge where one side wins completely
+		AVector low = Vectors.of(0, 0, 0);
+		assertSame(v1, lat.merge(v1, low));
+		assertSame(v1, lat.merge(low, v1));
+
+		// Different-length merge
+		AVector longer = Vectors.of(0, 0, 0, 10, 20);
+		AVector m2 = lat.merge(v1, longer);
+		assertEquals(5, m2.count());
+		assertEquals(CVMLong.ONE, m2.get(0));
+		assertEquals(CVMLong.create(5), m2.get(1));
+		assertEquals(CVMLong.create(3), m2.get(2));
+		assertEquals(CVMLong.create(10), m2.get(3));
+
+		// zero and path
+		assertEquals(Vectors.empty(), lat.zero());
+		assertNotNull(lat.path(CVMLong.ZERO));
+		assertNull(lat.path(Keywords.FOO));
+
+		LatticeTest.doLatticeTest(lat, v1, v2, 0);
 	}
 
 	@Test

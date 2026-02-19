@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -199,6 +200,37 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		return 12 + (64 * (children.length+3));
 	}
 	
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
+		if (this == b) return this;
+		if (!(b instanceof VectorTree) || b.count() != count) return super.mergeWith(b, func);
+		if (this.equals(b)) return this;
+
+		VectorTree<T> bt = (VectorTree<T>) b;
+		boolean sameAsThis = true;
+		boolean sameAsOther = true;
+
+		Ref<AVector<T>>[] newChildren = children;
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			if (children[i].equals(bt.children[i])) continue; // identical subtree
+			AVector<T> ownChild = children[i].getValue();
+			AVector<T> otherChild = bt.children[i].getValue();
+			AVector<T> merged = ownChild.mergeWith(otherChild, func);
+			if (merged != ownChild) {
+				if (newChildren == children) newChildren = children.clone();
+				newChildren[i] = merged.getRef();
+				sameAsThis = false;
+			}
+			if (merged != otherChild) sameAsOther = false;
+		}
+
+		if (sameAsThis) return this;
+		if (sameAsOther) return b;
+		return new VectorTree<>(newChildren, count);
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

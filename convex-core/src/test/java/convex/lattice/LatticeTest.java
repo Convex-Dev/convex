@@ -44,22 +44,22 @@ public class LatticeTest {
 		assertEquals(v1,lattice.merge(zero,v1));
 		assertSame(v1,lattice.merge(v1,zero));
 
-		// Null merge
+		// Null merge — all lattices return other by identity
 		assertSame(v1,lattice.merge(v1,null));
-		assertEquals(v1,lattice.merge(null,v1));
+		assertSame(v1,lattice.merge(null,v1));
 
-		
+
 		assertEquals(v2,lattice.merge(zero,v2));
-		assertEquals(v2,lattice.merge(v2,zero));
-		
+		assertSame(v2,lattice.merge(v2,zero));
+
 		// Merge of both values should be idempotent (lattice join)
-		V merged=lattice.merge(v1, v2);		
+		V merged=lattice.merge(v1, v2);
 		assertEquals(merged,lattice.merge(zero,merged));
-		assertEquals(merged,lattice.merge(merged,zero));
+		assertSame(merged,lattice.merge(merged,zero));
 		assertEquals(merged,lattice.merge(v1,merged));
 		assertEquals(merged,lattice.merge(v2,merged));
-		assertEquals(merged,lattice.merge(merged,v1));
-		assertEquals(merged,lattice.merge(merged,v2));
+		assertSame(merged,lattice.merge(merged,v1));
+		assertSame(merged,lattice.merge(merged,v2));
 		
 		// Identity merges
 		assertSame(merged,lattice.merge(merged,merged));

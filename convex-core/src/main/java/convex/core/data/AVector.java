@@ -289,7 +289,33 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 *         passed @
 	 */
 	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
-		throw new UnsupportedOperationException();
+		if (this.equals(b)) return this;
+
+		long ac = count;
+		long bc = b.count();
+		long maxCount = Math.max(ac, bc);
+
+		// Track whether result is identical to this or b
+		boolean sameAsThis = (ac >= bc);
+		boolean sameAsOther = (bc >= ac);
+
+		// Start from the longer vector and update differing positions
+		AVector<T> result = (ac >= bc) ? this : b;
+
+		for (long i = 0; i < maxCount; i++) {
+			T av = (i < ac) ? get(i) : null;
+			T bv = (i < bc) ? b.get(i) : null;
+			T merged = func.merge(av, bv);
+			if (merged != av) sameAsThis = false;
+			if (merged != bv) sameAsOther = false;
+			if (merged != result.get(i)) {
+				result = result.assoc(i, merged);
+			}
+		}
+
+		if (sameAsThis) return this;
+		if (sameAsOther) return b;
+		return result;
 	}
 	
 	@Override

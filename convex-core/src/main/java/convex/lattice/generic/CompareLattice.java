@@ -3,17 +3,16 @@ package convex.lattice.generic;
 import java.util.Comparator;
 
 import convex.core.data.ACell;
-import convex.lattice.ALattice;
 
 /**
  * Lattice node implementing a comparison function.
- * 
- * Suitable for lattice values where "greater" values replace previous ones, 
- * e.g. taking a value with a more recent timestamp 
- * 
+ *
+ * Suitable for lattice values where "greater" values replace previous ones,
+ * e.g. taking a value with a more recent timestamp
+ *
  * @param <V> Type of lattice values
  */
-public class CompareLattice<V extends ACell> extends ALattice<V> {
+public class CompareLattice<V extends ACell> extends AValueLattice<V> {
 
 	private Comparator<V> comparator;
 
@@ -45,18 +44,6 @@ public class CompareLattice<V extends ACell> extends ALattice<V> {
 	public boolean checkForeign(V value) {
 		if (value==null) return false;
 		return true;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <T extends ACell> ALattice<T> path(ACell[] path,int pos) {
-		if (path.length==pos) return (ALattice<T>)this;
-		return null;
-	}
-
-	@Override
-	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		return null;
 	}
 
 }

@@ -1,39 +1,37 @@
 package convex.lattice.generic;
 
 import convex.core.data.prim.AInteger;
-import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 /**
- * Lattice implementing a max function on natural numbers expressed as CVM integers
+ * Lattice implementing a min function on CVM integers.
  */
-public class MaxLattice extends AValueLattice<AInteger> {
+public class MinLattice extends AValueLattice<AInteger> {
 
-	private MaxLattice() {
+	private MinLattice() {
 		// private to enforce Singleton
 	}
-	
-	public static final MaxLattice INSTANCE = new MaxLattice();
+
+	public static final MinLattice INSTANCE = new MinLattice();
 
 	@Override
 	public AInteger merge(AInteger ownValue, AInteger otherValue) {
 		if (otherValue==null) return ownValue;
 		if (ownValue==null) return otherValue;
-		return (AInteger) RT.max(ownValue, otherValue);
+		return (AInteger) RT.min(ownValue, otherValue);
 	}
 
-	public static MaxLattice create() {
+	public static MinLattice create() {
 		return INSTANCE;
 	}
 
 	@Override
 	public AInteger zero() {
-		return CVMLong.ZERO;
+		return null;
 	}
 
 	@Override
 	public boolean checkForeign(AInteger value) {
 		return (value instanceof AInteger);
 	}
-
 }

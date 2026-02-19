@@ -10,6 +10,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeTest;
 
 /**
  * Tests for LWWLattice — Last-Write-Wins register with timestamp-based merge.
@@ -139,6 +140,36 @@ public class LWWLatticeTest {
 	@Test
 	public void testIdempotencyNull() {
 		assertNull(LWW.merge(null, null));
+	}
+
+	// ===== Custom timestamp extractor =====
+
+	@Test
+	public void testCustomTimestampExtractor() {
+		// LWW lattice where the value IS the timestamp (CVMLong)
+		LWWLattice<CVMLong> lat = LWWLattice.create(v -> v.longValue());
+
+		CVMLong a = CVMLong.create(100);
+		CVMLong b = CVMLong.create(200);
+
+		assertSame(b, lat.merge(a, b));
+		assertSame(b, lat.merge(b, a));
+		assertSame(a, lat.merge(a, a));
+		assertSame(a, lat.merge(a, null));
+		assertSame(a, lat.merge(null, a));
+	}
+
+	// ===== Generic lattice property tests =====
+
+	@Test
+	public void testLWWGenericProperties() {
+		LatticeTest.doLatticeTest(LWW, value(100, "a"), value(200, "b"));
+	}
+
+	@Test
+	public void testCustomExtractorGenericProperties() {
+		LWWLattice<CVMLong> lat = LWWLattice.create(v -> v.longValue());
+		LatticeTest.doLatticeTest(lat, CVMLong.create(100), CVMLong.create(200));
 	}
 
 	// ===== zero() and checkForeign() =====

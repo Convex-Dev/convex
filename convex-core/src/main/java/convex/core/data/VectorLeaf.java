@@ -11,6 +11,7 @@ import java.util.function.Predicate;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -228,6 +229,55 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			if (tl == newTail) return (AVector<T>) this;
 			return new VectorLeaf<T>((Ref[])items, newTail.getRef(), count);
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
+		if (this == b) return this;
+		if (!(b instanceof VectorLeaf) || b.count() != count) return super.mergeWith(b, func);
+		if (this.equals(b)) return this;
+
+		VectorLeaf<T> bl = (VectorLeaf<T>) b;
+		boolean sameAsThis = true;
+		boolean sameAsOther = true;
+
+		// Merge prefix (tree-wise: skip identical subtrees)
+		Ref<AVector<T>> newPrefix = prefix;
+		if (prefix != null) {
+			if (prefix.equals(bl.prefix)) {
+				// Identical subtrees — no merge needed
+			} else {
+				AVector<T> ownP = prefix.getValue();
+				AVector<T> otherP = bl.prefix.getValue();
+				AVector<T> mergedP = ownP.mergeWith(otherP, func);
+				if (mergedP != ownP) {
+					sameAsThis = false;
+					newPrefix = mergedP.getRef();
+				}
+				if (mergedP != otherP) sameAsOther = false;
+			}
+		}
+
+		// Merge items (skip identical Refs)
+		Ref<T>[] newItems = items;
+		int n = items.length;
+		for (int i = 0; i < n; i++) {
+			if (items[i].equals(bl.items[i])) continue;
+			T own = items[i].getValue();
+			T other = bl.items[i].getValue();
+			T merged = func.merge(own, other);
+			if (merged != own) {
+				if (newItems == items) newItems = items.clone();
+				newItems[i] = Ref.get(merged);
+				sameAsThis = false;
+			}
+			if (merged != other) sameAsOther = false;
+		}
+
+		if (sameAsThis) return this;
+		if (sameAsOther) return b;
+		return new VectorLeaf<>(newItems, newPrefix, count);
 	}
 
 	@Override
