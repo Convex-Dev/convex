@@ -152,15 +152,15 @@ public class BlobTree extends ABlob {
 			return createSmall(blobs, offset, chunkCount);
 		} else {
 			int shift = calcShift(chunkCount);
-			int childChunks = 1 << shift; // number of chunks in children
+			long childChunks = 1L << shift; // number of chunks in children
 			int numChildren = ((chunkCount - 1) >> shift) + 1;
 			@SuppressWarnings("unchecked")
 			Ref<ABlob>[] children = new Ref[numChildren];
 
 			long length = 0;
 			for (int i = 0; i < numChildren; i++) {
-				int childOffset = i * childChunks;
-				int chunks= Math.min(childChunks, chunkCount - childOffset);
+				int childOffset = (int)(i * childChunks);
+				int chunks= (int)Math.min(childChunks, chunkCount - childOffset);
 				ABlob child;
 				if (chunks==1) {
 					child=blobs[offset+childOffset];
@@ -439,7 +439,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public Blob getChunk(long chunkIndex) {
-		long childSize = 1 << shift;
+		long childSize = 1L << shift;
 		int child = Utils.checkedInt(chunkIndex >> shift);
 		return getChild(child).getChunk(chunkIndex - child * childSize);
 	}

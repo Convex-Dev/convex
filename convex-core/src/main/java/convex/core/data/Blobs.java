@@ -6,7 +6,6 @@ import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
 
-import convex.core.data.impl.ZeroBlob;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -143,13 +142,29 @@ public class Blobs {
 	}
 	
 	/**
-	 * Create a Blob entirely filled with zeros
+	 * Create a Blob entirely filled with zeros. Uses structural sharing via
+	 * Blob.EMPTY_CHUNK so that arbitrarily large sparse blobs are efficient
+	 * (O(log₁₆ n) unique nodes).
+	 *
 	 * @param length Length of Blob to create
 	 * @return Blob filled with zeros
 	 */
 	public static ABlob createZero(long length) {
+		if (length<=0) {
+			if (length==0) return Blob.EMPTY;
+			throw new IllegalArgumentException("Negative length");
+		}
 		if (length<=Blob.CHUNK_LENGTH) return Blob.EMPTY_CHUNK.slice(0,length);
-		return ZeroBlob.create(length);
+
+		int n=BlobTree.childCount(length);
+		long subSize=BlobTree.childSize(length);
+		ABlob fullChild=createZero(subSize); // shared across all full children
+
+		ABlob[] children=new ABlob[n];
+		for (int i=0; i<n-1; i++) children[i]=fullChild;
+		long lastSize=length-((long)(n-1)*subSize);
+		children[n-1]=lastSize==subSize?fullChild:createZero(lastSize);
+		return BlobTree.createWithChildren(children);
 	}
 
 	public static Blob empty() {

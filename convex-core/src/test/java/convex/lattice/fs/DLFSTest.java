@@ -34,6 +34,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -752,6 +753,84 @@ public class DLFSTest {
 		// Root should still be at 2000 (max of node timestamps), not drive timestamp (1000)
 		assertEquals(2000L, timeAfterMerge.longValue(),
 		    "Merge should use node timestamps (2000), not drive timestamp (1000)");
+	}
+
+	/**
+	 * Test structural sharing with an exabyte-scale sparse file.
+	 *
+	 * Blobs.createZero() builds a BlobTree where all full children at each
+	 * tree level share the same object (Blob.EMPTY_CHUNK at the leaf level).
+	 * This means a 1 EB sparse file uses ~15 unique BlobTree nodes, not 2^48 chunks.
+	 *
+	 * We then write a small payload to the middle and verify the tree-aware
+	 * replaceSlice preserves all unchanged subtrees.
+	 */
+	@Test
+	public void testExabyteSparseFile() throws IOException {
+		// 1 exabyte = 2^60 bytes. A perfect power of the tree so all children share structure.
+		long SIZE = 1L << 60;
+
+		// Construct the sparse zero BlobTree directly
+		ABlob sparse = Blobs.createZero(SIZE);
+		assertTrue(sparse instanceof BlobTree);
+		assertEquals(SIZE, sparse.count());
+
+		// All full chunks should be the interned EMPTY_CHUNK singleton
+		assertSame(Blob.EMPTY_CHUNK, sparse.getChunk(0));
+		assertSame(Blob.EMPTY_CHUNK, sparse.getChunk(1));
+		assertSame(Blob.EMPTY_CHUNK, sparse.getChunk(SIZE / Blob.CHUNK_LENGTH - 1));
+
+		// Verify zero bytes at arbitrary positions
+		assertEquals(0, sparse.byteAt(0));
+		assertEquals(0, sparse.byteAt(SIZE / 2));
+		assertEquals(0, sparse.byteAt(SIZE - 1));
+
+		// Write a small payload to the middle using replaceSlice
+		long middle = SIZE / 2;
+		Blob payload = Blob.fromHex("CAFEBABE");
+		ABlob modified = sparse.replaceSlice(middle, payload);
+
+		// Size unchanged, payload present, surrounding zeros intact
+		assertEquals(SIZE, modified.count());
+		assertEquals((byte) 0xCA, modified.byteAt(middle));
+		assertEquals((byte) 0xFE, modified.byteAt(middle + 1));
+		assertEquals((byte) 0xBA, modified.byteAt(middle + 2));
+		assertEquals((byte) 0xBE, modified.byteAt(middle + 3));
+		assertEquals(0, modified.byteAt(middle - 1));
+		assertEquals(0, modified.byteAt(middle + 4));
+		assertEquals(0, modified.byteAt(0));
+		assertEquals(0, modified.byteAt(SIZE - 1));
+
+		// Identity: replacing with same bytes returns same object
+		assertSame(modified, modified.replaceSlice(middle, payload));
+
+		// Now use DLFS to create a sparse file via channel seek + write
+		DLFileSystem fs = DLFS.createLocal();
+		Path file = Files.createFile(fs.getPath("sparse.dat"));
+
+		byte[] message = "Hello from the middle of an exabyte!".getBytes();
+		try (SeekableByteChannel fc = Files.newByteChannel(file, StandardOpenOption.WRITE)) {
+			fc.position(middle);
+			fc.write(ByteBuffer.wrap(message));
+		}
+
+		// File should be middle + message.length bytes
+		assertEquals(middle + message.length, Files.size(file));
+
+		// Read back the message
+		try (SeekableByteChannel fc = Files.newByteChannel(file, StandardOpenOption.READ)) {
+			fc.position(middle);
+			ByteBuffer buf = ByteBuffer.allocate(message.length);
+			fc.read(buf);
+			assertEquals(Blob.wrap(message), Blob.wrap(buf.array()));
+		}
+
+		// Read zeros at position 0
+		try (SeekableByteChannel fc = Files.newByteChannel(file, StandardOpenOption.READ)) {
+			ByteBuffer buf = ByteBuffer.allocate(8);
+			fc.read(buf);
+			assertEquals(Blob.wrap(new byte[8]), Blob.wrap(buf.array()));
+		}
 	}
 
 }

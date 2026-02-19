@@ -20,7 +20,6 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.InsecureRandom;
 import convex.core.cvm.Address;
 import convex.core.data.impl.LongBlob;
-import convex.core.data.impl.ZeroBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -728,25 +727,75 @@ public class BlobsTest {
 	
 	@Test
 	public void testZeroBlobs() {
-		ZeroBlob z0=ZeroBlob.create(0);
-		ZeroBlob z1=ZeroBlob.create(10);
-		ZeroBlob z2=ZeroBlob.create(100);
-		ZeroBlob z3=ZeroBlob.create(10000);
-		ZeroBlob z4=ZeroBlob.create(100000);
-		
-		assertSame(Blob.EMPTY,z0.toFlatBlob());
-		
-		assertTrue(z3.append(z4) instanceof ZeroBlob);
-		
+		ABlob z0=Blobs.createZero(0);
+		ABlob z1=Blobs.createZero(10);
+		ABlob z2=Blobs.createZero(100);
+		ABlob z3=Blobs.createZero(10000);
+		ABlob z4=Blobs.createZero(100000);
+
+		assertSame(Blob.EMPTY,z0);
+
+		// All already canonical
+		assertTrue(z3.isCanonical());
+		assertTrue(z4.isCanonical());
+		assertTrue(z4 instanceof BlobTree);
+
 		doBlobTests(z0);
 		doBlobTests(z1);
 		doBlobTests(z2);
 		doBlobTests(z3);
 		doBlobTests(z4);
-		
-		// non-canonical so should convert to blob tree
-		ABlob cz4=z4.getCanonical();
-		assertTrue(cz4 instanceof BlobTree);
+
+		// Structural sharing: all full chunks should be EMPTY_CHUNK
+		assertSame(Blob.EMPTY_CHUNK, z4.getChunk(0));
+		assertSame(Blob.EMPTY_CHUNK, z3.getChunk(0));
+
+		// Ridiculous sizes — structural sharing makes these instant.
+		// Mix of clean powers (all full children) and ugly sizes (partial tails at every level).
+		for (long size : new long[] {
+				4097,                    // 1 chunk + 1 byte
+				Blob.CHUNK_LENGTH * 17,  // one level overshoot
+				1_000_000_007L,          // prime, ~1 GB
+				(1L << 40) + 999,        // 1 TB + partial tail
+				(1L << 50) - 1,          // 1 PB - 1, max partial at every level
+				(1L << 60) + 7777,       // 1 EB + odd tail
+				Long.MAX_VALUE }) {       // ~9.2 EB, not a clean power
+			ABlob huge = Blobs.createZero(size);
+			assertTrue(huge instanceof BlobTree);
+			assertTrue(huge.isCanonical());
+			assertEquals(size, huge.count());
+
+			// Full chunks should be the shared EMPTY_CHUNK singleton
+			long fullChunks = size / Blob.CHUNK_LENGTH;
+			assertSame(Blob.EMPTY_CHUNK, huge.getChunk(0));
+			if (fullChunks > 1) {
+				assertSame(Blob.EMPTY_CHUNK, huge.getChunk(fullChunks / 2));
+				assertSame(Blob.EMPTY_CHUNK, huge.getChunk(fullChunks - 1));
+			}
+			// Partial last chunk (if any) should be zero-filled
+			long remainder = size % Blob.CHUNK_LENGTH;
+			if (remainder != 0) {
+				Blob lastChunk = huge.getChunk(fullChunks);
+				assertEquals(remainder, lastChunk.count());
+				assertEquals(Blobs.createZero(remainder), lastChunk);
+			}
+
+			// Spot-check zero bytes at extremes and middle
+			assertEquals(0, huge.byteAt(0));
+			assertEquals(0, huge.byteAt(size / 2));
+			assertEquals(0, huge.byteAt(size - 1));
+
+			// replaceSlice identity: writing zeros back gives same object
+			Blob zeros = Blob.wrap(new byte[8]);
+			assertSame(huge, huge.replaceSlice(size / 2, zeros));
+
+			// replaceSlice with real data works
+			ABlob patched = huge.replaceSlice(size / 2, Blob.fromHex("DEADBEEF"));
+			assertEquals(size, patched.count());
+			assertEquals((byte) 0xDE, patched.byteAt(size / 2));
+			assertEquals(0, patched.byteAt(size / 2 - 1));
+			assertEquals(0, patched.byteAt(size / 2 + 4));
+		}
 	}
 	
 	@Test
