@@ -3,6 +3,7 @@ package convex.lattice.cursor;
 import convex.core.data.ACell;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeOps;
 import convex.lattice.generic.SignedLattice;
 
 /**
@@ -111,6 +112,18 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 			throw new UnsupportedOperationException("Cannot merge without a lattice");
 		}
 		return updateAndGet(current -> lattice.merge(context, current, other));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public void assoc(ACell key, ACell value) {
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, lattice, key));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public void assocIn(ACell value, ACell... keys) {
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, lattice, keys));
 	}
 
 	/**

@@ -193,7 +193,7 @@ public class NodeNetworkTest {
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		
 		// Update the :data path with the updated Index
-		server0.getCursor().set(updatedDataIndex, dataKeyword);
+		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
 		// System.out.println("Server0 value: "+server0.getCursor().get());
 		
 		// Create the query path [:data valueHash] for reuse

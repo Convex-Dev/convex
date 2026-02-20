@@ -108,16 +108,158 @@ The `:active` flag enables follow/unfollow toggling. `MapLattice` + LWW means th
 timestamped record for each followed key wins. This was chosen over `SetLattice` because
 sets are grow-only — they cannot represent unfollowing.
 
-## Node Filtering and Selective Replication
+## Lattice Propagation and Filtering
 
-Nodes only replicate feeds they care about:
+### How Lattice Sync Works (Background)
 
-1. **Compute follow set** — union of active followed keys across all local users
-2. **Selective pull** — path-based `LATTICE_QUERY` for `[:social <followed-key>]`
-3. **Store as boundary** — unfollowed feeds are not stored and cannot leak to peers
+`LatticePropagator` handles the output pipeline for a lattice node. It owns a store, a
+connection manager, and a background thread. The pipeline is:
 
-This uses the existing `LatticePropagator` infrastructure with path-based queries. No new
-sync protocol is needed.
+1. **Announce** — write cells to store, collect novelty (cells the store hasn't seen)
+2. **Persist** — `setRootData()` for crash recovery
+3. **Merge callback** — feed store-backed refs back into the cursor
+4. **Broadcast** — delta-encode novelty and send `LATTICE_VALUE` to peers
+
+The message protocol has two relevant types:
+
+- **`LATTICE_VALUE`** `[:LV [path...] value]` — push a value (optionally at a path)
+- **`LATTICE_QUERY`** `[:LQ id [path...]]` — request a value at a path
+
+Both carry a **path vector**. `NodeServer` already handles path-based queries: it calls
+`cursor.get(path)` for queries and `lattice.path(path)` + `PathCursor` for merges.
+
+### Path Resolution Through the Social Hierarchy
+
+Path-based access navigates through the lattice type hierarchy **and** the data structure:
+
+```
+Path: [:social <owner-key>]
+
+Lattice resolution (for merge semantics):
+  KeyedLattice.path(:social)     → OwnerLattice
+  OwnerLattice.path(<owner-key>) → SignedLattice
+  SignedLattice.path(:value)     → SocialLattice
+  SocialLattice.path(:feed)      → IndexLattice<Blob, ACell>
+
+Data resolution (for get/set):
+  cursor.get(:social, <owner-key>)
+    → RT.getIn(rootValue, [:social, <owner-key>])
+    → navigates Index → AHashMap → returns SignedData<SocialLattice value>
+```
+
+`OwnerLattice.path()` returns the same `SignedLattice` for all owner keys — it resolves
+the lattice *type*, not a per-owner view. The actual per-owner data selection happens
+via `RT.getIn()` navigating the map. This means path-based queries and merges at
+`[:social <owner-key>]` work correctly: the data is specific to that owner, and the merge
+semantics are the same `SignedLattice` for everyone.
+
+### Pulling Feeds from Followed Accounts
+
+A node that wants to replicate a specific user's feed sends a path-based `LATTICE_QUERY`:
+
+```
+LATTICE_QUERY: [:LQ <id> [:social <followed-key>]]
+```
+
+The responding node's `NodeServer.processLatticeQuery()` calls `cursor.get(:social,
+<followed-key>)`, which returns just that owner's `SignedData<SocialLattice>`. The
+requester then announces it to their store and merges at the same path via `PathCursor`.
+
+The pull flow for a social node:
+
+1. **Compute follow set** — `SocialHelpers.computeFollowSet()` unions active followed keys
+   across all local users
+2. **For each followed key**, send a path-based `LATTICE_QUERY` to connected peers
+3. **Merge response** at path `[:social <followed-key>]` — `NodeServer.mergePathWithAcquire()`
+   handles missing data recovery automatically
+4. **Trigger broadcast** — the merged value propagates to other connected peers
+
+This requires extending `LatticePropagator.pull()` to accept a path parameter. Currently
+it always sends an empty path (full root query). The extension is minimal:
+
+```java
+// New method on LatticePropagator
+public CompletableFuture<ACell> pull(Convex peer, ACell... path) {
+    // Same as pull(peer) but with path in the LATTICE_QUERY payload
+    AVector<?> pathVector = Vectors.create(path);
+    AVector<?> queryPayload = Vectors.create(
+        MessageTag.LATTICE_QUERY, queryId, pathVector);
+    // ... rest is identical
+}
+```
+
+### Supporting Nodes That Pull Our Feeds
+
+When a peer sends a `LATTICE_QUERY` with path `[:social <owner-key>]`, `NodeServer`
+already handles it — no changes needed. `processLatticeQuery()`:
+
+1. Extracts the path vector from the message
+2. Calls `cursor.get(path)` to navigate into the local data
+3. Announces the result to the store (so `DATA_REQUEST` can resolve children)
+4. Returns the value via `RESULT`
+
+Any node with social data can serve path-based queries out of the box.
+
+### Push Filtering (Outbound)
+
+For push (broadcast), the current `LatticePropagator` always broadcasts the full root
+value. For social, this means every connected peer receives every user's feed — wasteful.
+
+`LatticeFilter` is defined for this purpose but not yet wired in:
+
+```java
+@FunctionalInterface
+public interface LatticeFilter<V extends ACell> {
+    V filter(V value);
+}
+```
+
+Integration into `LatticePropagator.processValue()` would apply the filter before
+broadcast, so only relevant data leaves the node. The unfiltered value is still persisted
+locally and fed to the merge callback.
+
+However, push filtering alone isn't sufficient for social — a node can't know which feeds
+each peer wants. The better model is **pull-dominant** with periodic push of metadata:
+
+1. **Push**: broadcast root hash or lightweight summary (periodic root sync already does
+   this every 30 seconds)
+2. **Pull**: peers detect divergence from root sync and pull specific paths they care about
+
+### Store as Security Boundary
+
+The store is the security boundary for outbound data. `DATA_REQUEST` messages from peers
+can only resolve cells that exist in the propagator's store. A node can run two
+propagators with different stores:
+
+```java
+// Primary propagator: full data, local persistence
+LatticePropagator primary = new LatticePropagator(persistentStore);
+
+// Public propagator: filtered data only
+LatticePropagator publicProp = new LatticePropagator(publicStore);
+```
+
+Cells not announced to the public store are invisible to peers connecting through it —
+even if they guess the hash. This is how nodes prevent leaking private/local-only data.
+
+### Summary: What Works Today vs. What Needs Extension
+
+| Capability | Status | Detail |
+|-----------|--------|--------|
+| Path-based `LATTICE_QUERY` processing | **Works** | `NodeServer.processLatticeQuery()` handles arbitrary paths |
+| Path-based `LATTICE_VALUE` merge | **Works** | `NodeServer.mergePathWithAcquire()` with sub-lattice resolution |
+| Path resolution through `KeyedLattice → OwnerLattice → SignedLattice` | **Works** | `lattice.path(path)` navigates the hierarchy correctly |
+| Missing data recovery | **Works** | Automatic retry with `acquireFromPeers()` |
+| Store-based security boundary | **Works** | `DATA_REQUEST` only resolves store contents |
+| Periodic root sync (divergence detection) | **Works** | Every 30 seconds via `maybePerformRootSync()` |
+| `LatticePropagator.pull()` with path | **Needs extension** | Currently always sends empty path (full root query) |
+| `LatticeFilter` integration | **Needs wiring** | Interface defined, not connected to `processValue()` |
+| Subscription model (peer interest) | **Future** | Peers declare which owner keys they want |
+
+The pull-based model is the natural fit for social: nodes pull feeds they follow, serve
+feeds they have when asked, and use periodic root sync for divergence detection. The
+protocol and merge infrastructure already support path-based operations — the main
+extension needed is adding a `path` parameter to `LatticePropagator.pull()`.
 
 ## Timeline Construction
 

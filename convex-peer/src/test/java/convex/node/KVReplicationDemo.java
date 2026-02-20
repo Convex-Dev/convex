@@ -110,7 +110,7 @@ public class KVReplicationDemo {
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
-				servers.get(i).getCursor().set(replica, Keywords.KV);
+				servers.get(i).getCursor().assoc(Keywords.KV, replica);
 			servers.get(i).getPropagator().triggerBroadcast(servers.get(i).getLocalValue());
 			}
 

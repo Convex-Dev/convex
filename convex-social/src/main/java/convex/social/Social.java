@@ -1,20 +1,40 @@
 package convex.social;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.SignedData;
-import convex.core.data.AHashMap;
+import convex.core.cvm.Keywords;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.OwnerLattice;
 
 /**
- * Static definitions for the Convex social network lattice.
+ * Cursor-based application layer for the Convex social network.
  *
- * <p>The social lattice is an {@link OwnerLattice} mapping owner keys
- * (Ed25519 public keys) to signed per-user state. Each user's state
- * is managed by {@link SocialLattice} containing their feed, profile,
- * and follows.</p>
+ * <p>{@code Social} wraps a lattice cursor at the {@code :social} level
+ * (an {@link OwnerLattice} mapping owner keys to signed per-user state)
+ * and provides domain-specific accessors for users, feeds, and follows.</p>
  *
+ * <h2>Usage</h2>
+ * <pre>{@code
+ * // Standalone
+ * Social social = Social.create(myKeyPair);
+ * social.user(myKeyPair.getAccountKey()).feed().post("Hello!");
+ *
+ * // Connected to a root lattice cursor (e.g. from NodeServer)
+ * Social social = Social.connect(rootCursor, myKeyPair);
+ *
+ * // Fork for batch operations
+ * Social forked = social.fork();
+ * forked.user(myKey).feed().post("Post 1");
+ * forked.user(myKey).feed().post("Post 2");
+ * forked.sync();
+ * }</pre>
+ *
+ * <h2>Integration</h2>
  * <p>Nodes opt in to social support by adding the social lattice to their
  * root lattice instance:</p>
  * <pre>{@code
@@ -37,4 +57,83 @@ public class Social {
 	 */
 	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
 		OwnerLattice.create(SocialLattice.INSTANCE);
+
+	private final ALatticeCursor<?> cursor;
+
+	Social(ALatticeCursor<?> cursor) {
+		this.cursor = cursor;
+	}
+
+	/**
+	 * Creates a standalone Social instance with its own cursor.
+	 *
+	 * @param keyPair Key pair for signing updates
+	 * @return New Social instance
+	 */
+	public static Social create(AKeyPair keyPair) {
+		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		ALatticeCursor<?> cursor = Cursors.createLattice(SOCIAL_LATTICE);
+		cursor.withContext(ctx);
+		return new Social(cursor);
+	}
+
+	/**
+	 * Connects to an existing root lattice cursor by navigating to {@code :social}.
+	 *
+	 * <p>The root cursor is typically held by a {@code NodeServer} for lattice
+	 * push/pull. Writes through this Social instance propagate up to the root.</p>
+	 *
+	 * @param rootCursor Root lattice cursor (e.g. from NodeServer)
+	 * @param keyPair Key pair for signing updates
+	 * @return Social instance connected to the root cursor
+	 */
+	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
+		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		ALatticeCursor<?> socialCursor = rootCursor.path(KEY_SOCIAL);
+		socialCursor.withContext(ctx);
+		return new Social(socialCursor);
+	}
+
+	/**
+	 * Gets a user view by navigating through the owner/signing boundary.
+	 *
+	 * <p>The returned {@link SocialUser} wraps a cursor at the per-user
+	 * {@link SocialLattice} level. Writes are automatically signed using
+	 * the key pair from the context.</p>
+	 *
+	 * @param ownerKey The user's account key (Ed25519 public key)
+	 * @return SocialUser for the specified owner
+	 */
+	public SocialUser user(AccountKey ownerKey) {
+		ALatticeCursor<Index<Keyword, ACell>> userCursor =
+			cursor.path(ownerKey, Keywords.VALUE);
+		return new SocialUser(userCursor, ownerKey);
+	}
+
+	/**
+	 * Creates a forked copy for independent operation.
+	 * Changes don't affect the parent until {@link #sync()}.
+	 *
+	 * @return Forked Social instance
+	 */
+	public Social fork() {
+		return new Social(cursor.fork());
+	}
+
+	/**
+	 * Syncs this forked instance back to its parent using lattice merge.
+	 * Always succeeds — concurrent changes are merged.
+	 */
+	public void sync() {
+		cursor.sync();
+	}
+
+	/**
+	 * Returns the underlying lattice cursor for direct lattice operations.
+	 *
+	 * @return The cursor at the OwnerLattice level
+	 */
+	public ALatticeCursor<?> cursor() {
+		return cursor;
+	}
 }

@@ -7,12 +7,13 @@ import convex.core.data.ACell;
 import convex.core.lang.RT;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.LatticeOps;
 
 /**
  * A cursor descended into a sub-path of a parent lattice cursor.
  *
  * <p>Delegates read/write operations to a {@link PathCursor} for
- * {@code RT.getIn}/{@code RT.assocIn} through the parent. Adds lattice
+ * {@code RT.getIn}/{@code LatticeOps.assocIn} through the parent. Adds lattice
  * operations (merge, fork, sync) using the sub-lattice at this path.</p>
  *
  * <p>With a null lattice (navigated beyond the lattice hierarchy),
@@ -40,7 +41,7 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 		super(lattice, context, null);
 		this.parent = parent;
 		this.pathKeys = (start == 0 && end == keys.length) ? keys : copyRange(keys, start, end);
-		this.pathCursor = new PathCursor<>(parent, pathKeys);
+		this.pathCursor = new PathCursor<>(parent, pathKeys, parent.getLattice());
 	}
 
 	private static ACell[] copyRange(ACell[] keys, int start, int end) {
@@ -61,7 +62,7 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 			return updateAndGet(current -> lattice.merge(context, current, other));
 		}
 		// Null lattice: construct parent-level value and bubble up
-		P parentLevel = (P) RT.assocIn(parent.get(), other, pathKeys);
+		P parentLevel = LatticeOps.assocIn(parent.get(), other, parent.getLattice(), pathKeys);
 		parent.merge(parentLevel);
 		return get();
 	}

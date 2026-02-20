@@ -153,7 +153,7 @@ public class LatticeDemo {
 				// 2. Compute what's new (delta)
 				// 3. Broadcast the delta to all connected peers
 				// All of this happens automatically in the background!
-				node1.getCursor().set(dataIndex, dataKeyword);
+				node1.getCursor().assoc(dataKeyword, dataIndex);
 				node1.getPropagator().triggerBroadcast(node1.getLocalValue());
 
 				if ((merge + 1) % 10 == 0) {

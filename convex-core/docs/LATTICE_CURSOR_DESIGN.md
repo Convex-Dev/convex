@@ -34,19 +34,30 @@ ACursor<V>
 
 ## Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `get()` | Returns current value |
-| `set(V)` | Sets value atomically |
-| `compareAndSet(expected, new)` | CAS operation |
-| `updateAndGet(fn)` | Apply function, return new value |
-| `path(keys...)` | Navigate to sub-path (lattice-aware on `ALatticeCursor`) |
-| `fork()` | Create independent working copy |
-| `sync()` | Push local changes to parent |
-| `merge(V)` | Merge external value into cursor |
-| `getLattice()` | Get lattice for this cursor (may be null) |
-| `getContext()` | Get merge context |
-| `withContext(ctx)` | Return cursor with new context |
+| Operation | Level | Description |
+|-----------|-------|-------------|
+| `get()` | `ACursor` | Returns current value |
+| `set(V)` | `ACursor` | Sets value atomically |
+| `assoc(key, value)` | `ACursor` | Write at a single key (lattice-aware on `ALatticeCursor`) |
+| `assocIn(value, keys...)` | `ACursor` | Write at a nested path (lattice-aware on `ALatticeCursor`) |
+| `compareAndSet(expected, new)` | `ACursor` | CAS operation |
+| `updateAndGet(fn)` | `ACursor` | Apply function, return new value |
+| `path(keys...)` | `ACursor` | Navigate to sub-path (lattice-aware on `ALatticeCursor`) |
+| `fork()` | `ALatticeCursor` | Create independent working copy |
+| `sync()` | `ALatticeCursor` | Push local changes to parent |
+| `merge(V)` | `ALatticeCursor` | Merge external value into cursor |
+| `getLattice()` | `ALatticeCursor` | Get lattice for this cursor (may be null) |
+| `getContext()` | `ALatticeCursor` | Get merge context |
+| `withContext(ctx)` | `ALatticeCursor` | Return cursor with new context |
+
+### `assoc` / `assocIn` — Lattice-Aware Writes
+
+`assoc(key, value)` and `assocIn(value, keys...)` are the cursor write primitives for nested data structures. They parallel `RT.assoc` / `RT.assocIn` but operate in a cursor/lattice context:
+
+- **On `ACursor`** (no lattice): Throws if any intermediate is null — callers must pre-initialise the structure. This prevents the silent `null → AHashMap` promotion that `RT.assocIn` performs.
+- **On `ALatticeCursor`** (with lattice): Uses `LatticeOps.assocIn` with the cursor's lattice, which calls `lattice.zero()` for null intermediates to create correctly-typed containers (e.g. `Index` instead of `AHashMap`).
+
+Both delegate to `LatticeOps.assocIn` internally — a lattice-aware two-pass algorithm that replaces `RT.assocIn` for all cursor writes.
 
 ## Unified Navigation: `path()`
 
@@ -57,7 +68,7 @@ ACursor<V>
 
 When `path(key)` is called on a lattice cursor:
 
-1. If at a `SignedLattice` boundary, insert a `SignedCursor` (RT.assocIn cannot write through `SignedData`)
+1. If at a `SignedLattice` boundary, insert a `SignedCursor` (`assocIn` cannot write through `SignedData`)
 2. Otherwise resolve `lattice.path(key)` for a sub-lattice and create a `DescendedCursor` (which may have null lattice)
 
 ### With sub-lattice (lattice-aware navigation)
@@ -71,12 +82,12 @@ The descended cursor supports all operations, with simpler semantics:
 | Operation | With lattice | Without lattice (null) |
 |-----------|-------------|------------------------|
 | `get()` | `RT.getIn(parent, key)` | Same |
-| `set(v)` | `parent.set(assocIn(parent, key, v))` | Same |
+| `set(v)` | `LatticeOps.assocIn(parent, key, v)` | Same |
 | `fork()` | Local copy, sync uses lattice merge | Local copy, sync overwrites |
 | `sync()` | Lattice merge with parent (`merge(parentVal, localVal)`) | Write-back (overwrite at path) |
-| `merge(v)` | `sublattice.merge(current, v)`, write to parent | `parent.merge(assocIn(parent.get(), key, v))` |
+| `merge(v)` | `sublattice.merge(current, v)`, write to parent | `parent.merge(LatticeOps.assocIn(parent.get(), key, v))` |
 
-**merge() with null lattice** bubbles up: the cursor constructs a parent-level value via `assocIn` and calls `merge()` on the parent cursor. This propagates up the chain until it reaches a cursor with a lattice, which performs the actual lattice merge. This means a merge at a deep path with no local lattice still benefits from ancestor lattice semantics.
+**merge() with null lattice** bubbles up: the cursor constructs a parent-level value via `LatticeOps.assocIn` and calls `merge()` on the parent cursor. This propagates up the chain until it reaches a cursor with a lattice, which performs the actual lattice merge. This means a merge at a deep path with no local lattice still benefits from ancestor lattice semantics.
 
 **sync() with null lattice** does a simple write-back — the forked value overwrites the parent at this path. This is correct for leaf-level navigation where there are no meaningful merge semantics. Lattice merge happens at higher levels in the cursor chain where lattices exist.
 
@@ -93,15 +104,24 @@ RootLatticeCursor                                 [KeyedLattice]
       → DescendedCursor(["myDrive"], DLFSLattice)
 ```
 
-The collapsed cursor uses a single `RT.getIn`/`RT.assocIn` call for the full multi-key path instead of nested cursors at each level. The leaf's sub-lattice is used for `merge()`/`fork()`/`sync()`.
+The collapsed cursor uses a single `RT.getIn`/`LatticeOps.assocIn` call for the full multi-key path instead of nested cursors at each level. The leaf's sub-lattice is used for `merge()`/`fork()`/`sync()`.
 
-The chain breaks only at `SignedLattice` boundaries, where `RT.assocIn` cannot write through `SignedData` and a `SignedCursor` must be inserted.
+The chain breaks only at `SignedLattice` boundaries, where `assocIn` cannot write through `SignedData` and a `SignedCursor` must be inserted.
 
 ### Lattice continuity
 
 Lattice hierarchies are continuous trees. Each lattice level explicitly declares its children via `lattice.path(key)` — if this returns null, no child lattice semantics exist at or below that key. Once the sub-lattice becomes null during traversal, it stays null for all remaining keys. There is no mechanism for lattice semantics to "resume" after a gap, because there is no lattice object to call `path()` on.
 
 This means navigating beyond the lattice hierarchy (e.g. into leaf data structures) produces a `DescendedCursor` with null lattice, giving write-back sync and bubble-up merge — the correct semantics for plain data that has no merge function of its own. If lattice semantics are needed at a deeper level, the lattice hierarchy must be extended to be continuous through that path.
+
+### Auto-initialisation via `valueLattice.zero()`
+
+When a `PathCursor` (or `DescendedCursor` which delegates to `PathCursor`) is created with a lattice, it computes a `valueLattice` by walking `baseLattice.path(keys...)` to the endpoint. This enables automatic initialisation of leaf values:
+
+- **`assocIn` (path intermediates)**: `LatticeOps.assocIn` uses `lattice.zero()` for null intermediates at each depth, creating correctly-typed empty containers.
+- **Update lambdas (leaf values)**: `updateAndGet(fn)` and similar methods substitute `valueLattice.zero()` for null, so the lambda receives an empty container instead of null. This eliminates null guards in application code (e.g. `Feed.post()` receives an empty `Index` instead of checking for null).
+
+Note: `get()` still returns null for non-existent paths — the zero-substitution only applies within update lambdas.
 
 ## Signing Enforcement
 
@@ -173,13 +193,26 @@ fooCursor.merge(Sets.of(CVMLong.create(2)));
 // fooCursor.get() == #{1, 2}
 ```
 
+### Lattice-aware writes via assoc
+
+```java
+// On a lattice cursor, assoc auto-initialises from lattice.zero()
+ALatticeCursor<Index<Keyword, ACell>> cursor = root.path(ownerKey, Keywords.FEED);
+cursor.updateAndGet(feed -> feed.assoc(postKey, postData));
+// feed is auto-initialised to Index.EMPTY if it was null
+```
+
 ## Design Decisions
 
 ### Unified `path()` instead of `path()` + `descend()`
 
-A `DescendedCursor` with null lattice is functionally identical to a `PathCursor`: both read via `RT.getIn`, write via `RT.assocIn`, propagate writes to parent. The only difference is whether a lattice is attached for merge/fork/sync. Having two separate navigation methods (`path()` for data, `descend()` for lattice) is an artificial distinction — the lattice hierarchy determines what capabilities exist at each level, not the choice of method.
+A `DescendedCursor` with null lattice is functionally identical to a `PathCursor`: both read via `RT.getIn`, write via `LatticeOps.assocIn`, propagate writes to parent. The only difference is whether a lattice is attached for merge/fork/sync. Having two separate navigation methods (`path()` for data, `descend()` for lattice) is an artificial distinction — the lattice hierarchy determines what capabilities exist at each level, not the choice of method.
 
 `cursor.path(key)` parallels `lattice.path(key)`: one resolves the sub-lattice, the other navigates to a cursor at that key using whatever sub-lattice exists.
+
+### `assoc`/`assocIn` instead of `set` with path
+
+Cursor writes use `assoc(key, value)` and `assocIn(value, keys...)` rather than `set(value, path...)`. This mirrors `RT.assoc`/`RT.assocIn` naming and avoids overload ambiguity with `set(V)`. The critical difference from `RT.assocIn`: cursors **never** silently promote `null` to `AHashMap`. Without a lattice, null intermediates throw. With a lattice, `lattice.zero()` provides the correctly-typed container.
 
 ### `sync()` vs CAS-based `merge()`
 
@@ -187,13 +220,23 @@ A `DescendedCursor` with null lattice is functionally identical to a `PathCursor
 
 ### `SignedCursor` as a separate cursor type
 
-`RT.assocIn` cannot write through `SignedData` (immutable, requires re-signing), so a specialised cursor is needed at this boundary. `SignedCursor` handles sign/verify transparently — code above and below the signing boundary is unaware of signing. Forking from a `SignedCursor` naturally gives unsigned local storage; the existing `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent (`SignedCursor`) handles signing.
+`assocIn` cannot write through `SignedData` (immutable, requires re-signing), so a specialised cursor is needed at this boundary. `SignedCursor` handles sign/verify transparently — code above and below the signing boundary is unaware of signing. Forking from a `SignedCursor` naturally gives unsigned local storage; the existing `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent (`SignedCursor`) handles signing.
 
 ### Multi-key collapsing
 
-Consecutive `path()` steps are collapsed into a single `DescendedCursor` to avoid unnecessary allocations and intermediate merges. The chain breaks only at `SignedLattice` boundaries, where a `SignedCursor` must be inserted because `RT.assocIn` cannot write through `SignedData`. The collapsed cursor holds the full multi-key path and the leaf's sub-lattice.
+Consecutive `path()` steps are collapsed into a single `DescendedCursor` to avoid unnecessary allocations and intermediate merges. The chain breaks only at `SignedLattice` boundaries, where a `SignedCursor` must be inserted because `assocIn` cannot write through `SignedData`. The collapsed cursor holds the full multi-key path and the leaf's sub-lattice.
 
 Lattices define merge semantics only — they have no knowledge of cursors. The cursor's `path()` walks `lattice.path(key)` at each step and handles the `SignedLattice` boundary as a special case (`instanceof` check).
+
+### `LatticeOps` as internal engine
+
+`LatticeOps.assocIn` is the shared implementation for lattice-aware path writes. It is used by:
+- `ACursor.assoc`/`assocIn` (with null lattice — throws on null intermediates)
+- `ALatticeCursor.assoc`/`assocIn` (with lattice — auto-initialises via `zero()`)
+- `PathCursor` internal writes (with the parent cursor's lattice)
+- `DescendedCursor.merge()` bubble-up (with the parent cursor's lattice)
+
+The public API is `assoc`/`assocIn` on the cursor; `LatticeOps` is an implementation detail.
 
 ## Thread Safety
 

@@ -48,36 +48,36 @@ public class CursorTest {
 	}
 	
 	@Test public void testPathCursor() {
-		Root<AInteger> root=new Root<>();
+		Root<AInteger> root=Cursors.of(Maps.of(Symbols.FOO,null));
 		ACursor<AInteger> pc=root.path(Symbols.FOO);
 		assertTrue(pc instanceof PathCursor);
 		doIntCursorTest(pc);
 	}
-	
+
 	@Test public void testDeepPathCursor() {
-		Root<AInteger> root=new Root<>();
+		Root<AInteger> root=Cursors.of(Maps.of(Symbols.FOO,Maps.of(Symbols.BAR,null)));
 		PathCursor<AInteger> pc=new PathCursor<AInteger>(root,Symbols.FOO, Symbols.BAR);
 		doIntCursorTest(pc);
 	}
-	
+
 	@Test public void testVectorPathCursor() {
-		Root<AInteger> root=new Root<>();
+		Root<AInteger> root=Cursors.of(Maps.of(Symbols.BAR,null));
 		PathCursor<AVector<AInteger>> vpc=new PathCursor<>(root,Symbols.BAR);
 		vpc.set(Vectors.of(567,null,78));
 		PathCursor<AInteger> pc=new PathCursor<>(vpc,CVMLong.ONE);
 		doIntCursorTest(pc);
 	}
-	
+
 	@Test public void testIndexPathCursor() {
-		Root<AInteger> root=new Root<>();
+		Root<AInteger> root=Cursors.of(Maps.of(Keywords.FOO,null));
 		PathCursor<AIndex<Keyword,AInteger>> vpc=new PathCursor<>(root,Keywords.FOO);
 		vpc.set(Index.of(Keywords.FOO,null,Keywords.BAR,3));
 		PathCursor<AInteger> pc=new PathCursor<>(vpc,Keywords.FOO);
 		doIntCursorTest(pc);
 	}
-	
+
 	@Test public void testMapPathCursor() {
-		Root<AInteger> root=new Root<>();
+		Root<AInteger> root=Cursors.of(Maps.of(Keywords.FOO,null));
 		PathCursor<AMap<Keyword,AInteger>> vpc=new PathCursor<>(root,Keywords.FOO);
 		vpc.set(Maps.of(Keywords.FOO,null,Keywords.BAR,3));
 		PathCursor<AInteger> pc=new PathCursor<>(vpc,Keywords.FOO);

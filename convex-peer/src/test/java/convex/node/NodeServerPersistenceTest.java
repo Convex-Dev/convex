@@ -61,7 +61,7 @@ public class NodeServerPersistenceTest {
 			dataIndex = (Index<Hash, ACell>) Index.EMPTY;
 		}
 		dataIndex = dataIndex.assoc(valueHash, testValue);
-		server.getCursor().set(dataIndex, dataKey);
+		server.getCursor().assoc(dataKey, dataIndex);
 	}
 
 	/**

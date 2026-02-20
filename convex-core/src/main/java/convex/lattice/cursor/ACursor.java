@@ -5,6 +5,7 @@ import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
+import convex.lattice.LatticeOps;
 
 /**
  * A cursor is a mutable reference to a CVM value with atomic update operations.
@@ -76,38 +77,34 @@ public abstract class ACursor<V extends ACell> {
 	}
 
 	/**
-	 * Atomically sets a value at a nested path within this cursor's value.
+	 * Atomically associates a value at a single key within this cursor's value.
 	 *
-	 * <p>The entire cursor value is atomically updated with the new nested value.
-	 * Uses {@link #getAndUpdate} internally, so the operation is atomic.</p>
+	 * <p>Throws if the current value is null — callers must initialise the
+	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
+	 * from the lattice's zero value.</p>
 	 *
-	 * @param <T> Type of the nested value
-	 * @param newValue New value to set at the path
-	 * @param path Keys identifying the nested location
+	 * @param key Key to write at
+	 * @param value Value to associate
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> void set(T newValue, ACell... path) {
-		getAndUpdate(bv->{
-			return (V) RT.assocIn(bv,newValue,path);
-		});
+	public void assoc(ACell key, ACell value) {
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, key));
 	}
 
 	/**
-	 * Atomically sets a value at a nested path within this cursor's value.
+	 * Atomically associates a value at a nested path within this cursor's value.
 	 *
-	 * <p>Convenience overload that accepts Java objects for the path.</p>
+	 * <p>Throws if any intermediate value is null — callers must initialise the
+	 * structure first. {@link ALatticeCursor} overrides this to auto-initialise
+	 * from the lattice hierarchy.</p>
 	 *
-	 * @param <T> Type of the nested value
-	 * @param newValue New value to set at the path
-	 * @param path Keys identifying the nested location
+	 * @param value Value to set at the end of the path
+	 * @param keys Path of keys to navigate
 	 */
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> void set(T newValue, Object... path) {
-		getAndUpdate(bv->{
-			return (V) RT.assocIn(bv,newValue,path);
-		});
+	public void assocIn(ACell value, ACell... keys) {
+		getAndUpdate(bv -> (V) LatticeOps.assocIn(bv, value, null, keys));
 	}
-
 
 	/**
 	 * Atomically sets the cursor to the new value and returns the old value.
