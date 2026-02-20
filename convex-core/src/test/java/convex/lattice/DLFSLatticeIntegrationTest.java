@@ -10,12 +10,10 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Index;
-import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -198,5 +196,85 @@ public class DLFSLatticeIntegrationTest {
 		assertNotNull(Lattice.ROOT, "ROOT lattice should exist");
 		assertNotNull(Lattice.ROOT.path(Keywords.DATA), ":data sublattice should exist");
 		assertNotNull(Lattice.ROOT.path(Keywords.FS), ":fs sublattice should exist");
+	}
+
+	/**
+	 * Tests that OwnerLattice rejects forged data signed by an attacker
+	 * but placed under the legitimate owner's key.
+	 */
+	@Test
+	public void testForgeryRejection() {
+		AKeyPair legitimateKey = AKeyPair.generate();
+		AKeyPair attackerKey = AKeyPair.generate();
+
+		// Legitimate owner creates a DLFS tree and signs it
+		CVMLong timestamp = CVMLong.create(1000);
+		AVector<ACell> dir = DLFSNode.createDirectory(timestamp);
+		AString fileName = Strings.create("important.txt");
+		AVector<ACell> file = DLFSNode.createEmptyFile(timestamp);
+		file = file.assoc(DLFSNode.POS_DATA, Blob.fromHex("4c656769746d617465")); // "Legitmate"
+
+		Index<AString, AVector<ACell>> entries = Index.of(fileName, file);
+		dir = dir.assoc(DLFSNode.POS_DIR, entries);
+
+		AString driveName = Strings.create("main");
+		AHashMap<AString, AVector<ACell>> driveMap = Maps.of(driveName, dir);
+		SignedData<AHashMap<AString, AVector<ACell>>> signedDriveMap = legitimateKey.signData(driveMap);
+
+		// Legitimate owner's FS map
+		AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>> legitimateFS =
+			Maps.of(legitimateKey.getAccountKey(), signedDriveMap);
+
+		// Attacker creates forged data and signs with THEIR key,
+		// but places it under the LEGITIMATE owner's key
+		CVMLong attackerTimestamp = CVMLong.create(9999); // newer timestamp to try to win merge
+		AVector<ACell> forgedDir = DLFSNode.createDirectory(attackerTimestamp);
+		AVector<ACell> forgedFile = DLFSNode.createEmptyFile(attackerTimestamp);
+		forgedFile = forgedFile.assoc(DLFSNode.POS_DATA, Blob.fromHex("466f72676564")); // "Forged"
+
+		Index<AString, AVector<ACell>> forgedEntries = Index.of(fileName, forgedFile);
+		forgedDir = forgedDir.assoc(DLFSNode.POS_DIR, forgedEntries);
+
+		AHashMap<AString, AVector<ACell>> forgedDriveMap = Maps.of(driveName, forgedDir);
+		// Attacker signs with their own key — the signature is valid, but the signer doesn't match the owner
+		SignedData<AHashMap<AString, AVector<ACell>>> forgedSignedData = attackerKey.signData(forgedDriveMap);
+
+		// Place forgery under the legitimate owner's key
+		AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>> forgedFS =
+			Maps.of(legitimateKey.getAccountKey(), forgedSignedData);
+
+		// Merge with context-aware OwnerLattice — forgery should be rejected
+		ALattice<ACell> fsLattice = Lattice.ROOT.path(Keywords.FS);
+		LatticeContext context = LatticeContext.create(null, legitimateKey);
+		ACell mergedValue = fsLattice.merge(context, legitimateFS, forgedFS);
+
+		@SuppressWarnings("unchecked")
+		AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>> mergedFS =
+			(AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>) mergedValue;
+
+		// Should still have the legitimate owner's entry
+		assertEquals(1, mergedFS.count(), "Should have exactly 1 owner");
+		SignedData<AHashMap<AString, AVector<ACell>>> ownerData = mergedFS.get(legitimateKey.getAccountKey());
+		assertNotNull(ownerData, "Legitimate owner data should survive");
+
+		// Verify the data is the legitimate data, not the forgery
+		assertTrue(ownerData.checkSignature(), "Signature should be valid");
+		assertEquals(legitimateKey.getAccountKey(), ownerData.getAccountKey(),
+			"Signer should be the legitimate owner");
+		AHashMap<AString, AVector<ACell>> ownerDriveMap = ownerData.getValue();
+		AVector<ACell> resultDir = ownerDriveMap.get(driveName);
+		assertNotNull(resultDir, "Drive should exist");
+
+		// Timestamp should be the legitimate one (1000), not the forged one (9999)
+		CVMLong resultTimestamp = DLFSNode.getUTime(resultDir);
+		assertEquals(1000L, resultTimestamp.longValue(),
+			"Should have legitimate timestamp, not forged");
+
+		// File data should be legitimate
+		Index<AString, AVector<ACell>> resultEntries = DLFSNode.getDirectoryEntries(resultDir);
+		AVector<ACell> resultFile = resultEntries.get(fileName);
+		Blob resultData = (Blob) DLFSNode.getData(resultFile);
+		assertEquals(Blob.fromHex("4c656769746d617465"), resultData,
+			"Should have legitimate data, forgery should be rejected");
 	}
 }

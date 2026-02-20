@@ -18,9 +18,10 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
-import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.Root;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFSProvider;
 import convex.lattice.fs.DLFileSystem;
@@ -32,21 +33,21 @@ import convex.lattice.fs.DLPath;
 public class DLFSLocal extends DLFileSystem {
 
 	// Cursor for filesystem root node. This may be a path into a bigger lattice
-	ACursor<AVector<ACell>> rootCursor;
+	ALatticeCursor<AVector<ACell>> rootCursor;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
 		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
-		this.rootCursor=Root.create(rootNode);
+		this.rootCursor=Cursors.createLattice(DLFSLattice.INSTANCE, rootNode);
 	}
 
 	/**
-	 * Creates a DLFSLocal backed by a cursor (which may be a path into a larger lattice).
+	 * Creates a DLFSLocal backed by a lattice cursor (which may be a path into a larger lattice).
 	 *
 	 * @param dlfsProvider Provider for this filesystem
 	 * @param uriPath URI path (may be null)
-	 * @param cursor Cursor pointing to the DLFS tree
+	 * @param cursor Lattice cursor pointing to the DLFS tree
 	 */
-	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ACursor<AVector<ACell>> cursor) {
+	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ALatticeCursor<AVector<ACell>> cursor) {
 		super(dlfsProvider, uriPath, DLFSNode.getUTime(cursor.get()));
 		this.rootCursor =  cursor;
 	}
@@ -156,13 +157,21 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public void merge(AVector<ACell> other) {
-		rootCursor.updateAndGet(rootNode->DLFSNode.merge(rootNode,other));
+		rootCursor.merge(other);
 	}
 
+	@Override
+	public DLFSLocal fork() {
+		return new DLFSLocal(provider(), uriPath, rootCursor.fork());
+	}
 
-	@Override 
+	@Override
+	public void sync() {
+		rootCursor.sync();
+	}
+
+	@Override
 	public DLFSLocal clone() {
-		DLFSLocal result=new DLFSLocal(provider(),uriPath,rootCursor.get());
-		return result;
+		return new DLFSLocal(provider(), uriPath, rootCursor.get());
 	}
 }

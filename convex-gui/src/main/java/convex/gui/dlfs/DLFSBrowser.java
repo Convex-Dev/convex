@@ -48,7 +48,7 @@ import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.AForkableCursor;
+import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSLattice;
@@ -113,7 +113,7 @@ public class DLFSBrowser extends AbstractGUI {
 	private AccountKey ownerKey;
 
 	/** Cursor into the owner's unsigned drives map (writes re-sign via SignedCursor) */
-	private ACursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
+	private ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor;
 
 	/** Active drives keyed by name (insertion ordered) */
 	private final Map<String, DLFSLocal> drives = new LinkedHashMap<>();
@@ -317,7 +317,7 @@ public class DLFSBrowser extends AbstractGUI {
 			if (driveMap != null && !driveMap.isEmpty()) {
 				for (Map.Entry<AString, AVector<ACell>> entry : driveMap.entrySet()) {
 					String name = entry.getKey().toString();
-					ACursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
+					ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
 					driveFS.updateTimestamp();
 					drives.put(name, driveFS);
@@ -393,7 +393,7 @@ public class DLFSBrowser extends AbstractGUI {
 		if (drives.containsKey(name)) return false;
 
 		AString cvmName = Strings.create(name);
-		ACursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
+		ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(cvmName);
 		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
@@ -438,7 +438,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 		// Clear from lattice
 		AString cvmName = Strings.create(name);
-		ACursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
+		ALatticeCursor<AVector<ACell>> cursor = drivesCursor.path(cvmName);
 		cursor.set(null);
 
 		// Remove from WebDAV
