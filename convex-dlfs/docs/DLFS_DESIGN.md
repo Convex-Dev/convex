@@ -22,7 +22,7 @@ built on Convex immutable data structures with Java NIO compatibility.
                        │  java.nio.file API
                        │
 ┌──────────────────────▼───────────────────────────────────────┐
-│                    User Application                          │
+│                    FileSystem layer                          │
 │              (Java NIO FileSystem API)                       │
 └──────────────────────┬───────────────────────────────────────┘
                        │
