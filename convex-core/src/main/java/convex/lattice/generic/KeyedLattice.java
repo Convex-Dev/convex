@@ -57,6 +57,22 @@ public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
 		return new KeyedLattice(lattices,keys);
 	}
 
+	/**
+	 * Returns a new KeyedLattice with an additional key/lattice pair.
+	 * Enables extending an existing lattice definition with new sections.
+	 *
+	 * @param key Keyword for the new section
+	 * @param lattice Lattice for the new section's values
+	 * @return New KeyedLattice with the additional entry
+	 */
+	public KeyedLattice addLattice(Keyword key, ALattice<?> lattice) {
+		ArrayList<ALattice<?>> newLattices = new ArrayList<>(this.lattices);
+		ArrayList<Keyword> newKeys = new ArrayList<>(this.keys);
+		newLattices.add(lattice);
+		newKeys.add(key);
+		return new KeyedLattice(newLattices, newKeys);
+	}
+
 	@Override
 	public Index<Keyword, ACell> merge(Index<Keyword, ACell> ownValue, Index<Keyword, ACell> otherValue) {
 		if (ownValue==null) {
