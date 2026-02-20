@@ -60,6 +60,9 @@ public abstract class AArrayBlob extends ABlob {
 		if (dlength == 0) return this;
 		long length = this.count;
 		if (length == 0) return d;
+		if (length > Long.MAX_VALUE - dlength) {
+			throw new IllegalArgumentException("Blob append would exceed maximum size");
+		}
 		
 		if (length>Blob.CHUNK_LENGTH) {
 			// Need to normalise to a BlobTree first

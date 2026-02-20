@@ -89,11 +89,10 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 				// use hash if available for both Refs
 				if (ha != null) return this.hash.equals(ha);
 			}
-			return value.equals(va);
-		} else {
-			// Don't want to pull from store, so use hash comparison
-			return getHash().equals(a.getHash());
 		}
+		// Fall back to hash comparison. getHash() computes and caches lazily,
+		// so with structural sharing this avoids exponential recursive equals.
+		return getHash().equals(a.getHash());
 	}
 
 	@Override

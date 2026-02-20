@@ -799,6 +799,132 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testMaxBlobBasics() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		BlobTree bt = (BlobTree) max;
+
+		assertEquals(size, max.count());
+		assertTrue(max.isCanonical());
+		assertFalse(max.isChunkPacked());
+		assertFalse(max.isFullyPacked());
+		assertEquals(Tag.BLOB, max.getTag());
+		assertEquals(8, BlobTree.childCount(size));
+		assertEquals(1L << 60, BlobTree.childSize(size));
+		assertEquals(8, bt.getRefCount());
+
+		assertEquals(0, max.byteAt(0));
+		assertEquals(0, max.byteAt(size / 2));
+		assertEquals(0, max.byteAt(size - 1));
+		assertEquals(CVMLong.ZERO, max.get(size / 2));
+		assertEquals(0, max.shortAt(size / 2));
+		assertEquals(0L, max.longValue());
+		assertEquals(max.hashCode(), max.hashCode());
+	}
+
+	@Test
+	public void testMaxBlobChunks() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(0));
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(1));
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(1000));
+		long totalChunks = BlobTree.calcChunks(size);
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(totalChunks / 2));
+
+		long lastChunkIndex = totalChunks - 1;
+		Blob lastChunk = max.getChunk(lastChunkIndex);
+		long remainder = size % Blob.CHUNK_LENGTH;
+		assertEquals(remainder, lastChunk.count());
+		assertEquals(0, lastChunk.byteAt(0));
+		assertEquals(0, lastChunk.byteAt(remainder - 1));
+	}
+
+	@Test
+	public void testMaxBlobSlice() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		long mid = size / 2;
+
+		ABlob singleChunkSlice = max.slice(1000, 2000);
+		assertEquals(1000, singleChunkSlice.count());
+
+		long boundary = Blob.CHUNK_LENGTH - 10;
+		ABlob crossSlice = max.slice(boundary, boundary + 20);
+		assertEquals(20, crossSlice.count());
+
+		long alignedMid = (mid / Blob.CHUNK_LENGTH) * Blob.CHUNK_LENGTH;
+		assertSame(Blob.EMPTY_CHUNK, max.slice(alignedMid, alignedMid + Blob.CHUNK_LENGTH));
+
+		assertSame(max, max.slice(0, size));
+		assertSame(max, max.slice(0));
+		assertEquals(Blob.EMPTY, max.slice(size));
+		assertNull(max.slice(-1, 0));
+		assertNull(max.slice(0, Long.MIN_VALUE));
+
+		ByteBuffer buf = ByteBuffer.allocate(16);
+		assertEquals(16, max.toByteBuffer(mid, 16, buf));
+	}
+
+	@Test
+	public void testMaxBlobEquals() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		ABlob max2 = Blobs.createZero(size);
+
+		// Small slice equality
+		ABlob chunkSlice = max.slice(0, 100);
+		assertTrue(chunkSlice.equalsBytes(Blobs.createZero(100)));
+
+		// Full equality via hash-based BlobTree.equals
+		assertTrue(max.equals(max2));
+		assertEquals(max.hashCode(), max2.hashCode());
+	}
+
+	@Test
+	public void testMaxBlobReplaceSlice() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		long mid = size / 2;
+
+		assertSame(max, max.replaceSlice(0, Blob.wrap(new byte[8])));
+		assertSame(max, max.replaceSlice(mid, Blob.wrap(new byte[8])));
+		assertSame(max, max.replaceSlice(size - 8, Blob.wrap(new byte[8])));
+
+		Blob payload = Blob.fromHex("CAFEBABE");
+		for (long pos : new long[] {0, 4094, mid, size - 4}) {
+			ABlob modified = max.replaceSlice(pos, payload);
+			assertEquals(size, modified.count());
+			assertEquals((byte) 0xCA, modified.byteAt(pos));
+			assertEquals((byte) 0xBE, modified.byteAt(pos + 3));
+			if (pos > 0) assertEquals(0, modified.byteAt(pos - 1));
+			if (pos + 4 < size) assertEquals(0, modified.byteAt(pos + 4));
+		}
+
+		ABlob oneBytePatched = max.replaceSlice(mid, Blob.fromHex("FF"));
+		assertSame(Blob.EMPTY_CHUNK, oneBytePatched.getChunk(0));
+	}
+
+	@Test
+	public void testMaxBlobAppend() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+
+		assertThrows(IllegalArgumentException.class, () -> max.append(Blob.fromHex("00")));
+		assertThrows(IllegalArgumentException.class, () -> max.append(max));
+
+		ABlob chunk = Blob.createRandom(new Random(12345), Blob.CHUNK_LENGTH);
+		assertThrows(IllegalArgumentException.class, () -> max.append(chunk));
+
+		ABlob growing = Blobs.createZero(1L << 60);
+		growing = growing.append(growing); // 2^61
+		growing = growing.append(growing); // 2^62
+		final ABlob huge = growing;
+		assertThrows(IllegalArgumentException.class, () -> huge.append(huge));
+	}
+
+	@Test
 	public void testBlobParse() {
 		assertNull(Blobs.parse(null));
 		assertNull(Blobs.parse("iugiubouib"));

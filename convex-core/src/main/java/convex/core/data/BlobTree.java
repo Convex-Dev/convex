@@ -346,6 +346,9 @@ public class BlobTree extends ABlob {
 		BlobTree acc=this; // accumulator for appended BlobTree
 		long off=0; // offset into d
 		long dlen=d.count();
+		if (dlen > 0 && count > Long.MAX_VALUE - dlen) {
+			throw new IllegalArgumentException("Blob append would exceed maximum size");
+		}
 		
 		// loop until d is fully consumed
 		while (off<dlen) {
