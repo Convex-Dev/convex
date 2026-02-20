@@ -28,7 +28,7 @@ public class SQLRowLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public boolean checkForeign(AVector<ACell> value) {
-		return value instanceof AVector;
+		return value instanceof AVector && value.count() >= 3;
 	}
 
 	@SuppressWarnings("unchecked")

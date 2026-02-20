@@ -48,7 +48,7 @@ public class LatticeTables {
 
 	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
 
-	LatticeTables(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public LatticeTables(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
 		this.cursor = cursor;
 	}
 
@@ -60,6 +60,16 @@ public class LatticeTables {
 	public static LatticeTables create() {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.createLattice(TableStoreLattice.INSTANCE);
+		return new LatticeTables(cursor);
+	}
+
+	/**
+	 * Connects to an existing cursor for cursor chain integration.
+	 *
+	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
+	 * @return New LatticeTables instance connected to the cursor
+	 */
+	public static LatticeTables connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new LatticeTables(cursor);
 	}
 

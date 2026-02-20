@@ -2,6 +2,7 @@ package convex.db.lattice;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 
 /**
@@ -27,13 +28,17 @@ public class SQLTableLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public boolean checkForeign(AVector<ACell> value) {
-		return value instanceof AVector;
+		return value instanceof AVector && value.count() >= 3;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
-		// Table entries have rows as children
-		return (ALattice<T>) TableLattice.INSTANCE;
+		// Table vector: [0]=schema, [1]=rows, [2]=utime
+		// Only rows (position 1) has a sub-lattice
+		if (childKey instanceof CVMLong idx && idx.longValue() == SQLTable.POS_ROWS) {
+			return (ALattice<T>) TableLattice.INSTANCE;
+		}
+		return null;
 	}
 }

@@ -1,10 +1,7 @@
 package convex.db.lattice;
 
-import java.util.function.Predicate;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -12,6 +9,10 @@ import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.generic.MapLattice;
+import convex.lattice.generic.OwnerLattice;
 
 /**
  * A named SQL database within the global lattice, with per-owner signed replicas.
@@ -19,8 +20,8 @@ import convex.core.data.Strings;
  * <p>Sits at the lattice path {@code :sql / <owner-key>} and handles:
  * <ul>
  *   <li>Signing this node's database with its key pair</li>
- *   <li>Merging selected remote replicas into the local store (merge-on-write)</li>
- *   <li>Rejecting replicas with invalid signatures</li>
+ *   <li>Merging remote replicas into the local store (absorption merge)</li>
+ *   <li>Rejecting replicas with invalid signatures via {@link OwnerLattice}</li>
  * </ul>
  *
  * <p>Lattice path structure:
@@ -29,23 +30,33 @@ import convex.core.data.Strings;
  *         owner-key → signed(db-name → table-store)
  * </pre>
  *
- * <p>The owner key may be an AccountKey (Ed25519 public key), a Convex Address,
- * or a DID string.
+ * <p>Two usage modes:
+ * <ul>
+ *   <li><b>Standalone</b> ({@link #create}): owns its own cursor, manual export/merge</li>
+ *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain,
+ *       signing and replication handled by the chain</li>
+ * </ul>
  *
  * <p>Usage:
  * <pre>
- * AKeyPair keyPair = AKeyPair.generate();
+ * // Standalone
  * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- *
- * // Use the LatticeTables facade for operations
  * db.tables().createTable("users", new String[]{"id", "name", "email"});
- * db.tables().insert("users", key, values);
- *
- * // Merge replicas from other nodes
  * db.mergeReplicas(remoteOwnerMap);
+ *
+ * // Connected (e.g. from a SignedCursor in a NodeServer)
+ * SQLDatabase db = SQLDatabase.connect(signedCursor, "mydb");
+ * db.tables().insert("users", key, values);
  * </pre>
  */
 public class SQLDatabase {
+
+	/**
+	 * The OwnerLattice structure for SQL databases in the global lattice.
+	 * Structure: OwnerLattice → SignedLattice → MapLattice → TableStoreLattice
+	 */
+	public static final OwnerLattice<AHashMap<AString, Index<AString, AVector<ACell>>>>
+		OWNER_LATTICE = OwnerLattice.create(MapLattice.create(TableStoreLattice.INSTANCE));
 
 	private final AString dbName;
 	private final AKeyPair keyPair;
@@ -86,6 +97,26 @@ public class SQLDatabase {
 	}
 
 	/**
+	 * Connects to a database within an existing cursor chain (e.g. from a NodeServer).
+	 * The parent cursor should be post-SignedCursor (navigated past the signing boundary).
+	 * Signing and replication are handled by the cursor chain.
+	 *
+	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
+	 * @param name Database name to connect to
+	 * @return New SQLDatabase connected to the cursor chain
+	 */
+	@SuppressWarnings("unchecked")
+	public static SQLDatabase connect(ALatticeCursor<?> parent, String name) {
+		AString dbName = Strings.create(name);
+		ALatticeCursor<Index<AString, AVector<ACell>>> cursor = parent.path(dbName);
+		if (cursor.get() == null) {
+			cursor.set(TableStoreLattice.INSTANCE.zero());
+		}
+		LatticeTables tables = new LatticeTables(cursor);
+		return new SQLDatabase(dbName, null, null, tables);
+	}
+
+	/**
 	 * Returns the LatticeTables facade for performing table operations.
 	 *
 	 * @return LatticeTables instance
@@ -106,7 +137,7 @@ public class SQLDatabase {
 	/**
 	 * Returns this node's owner key in the OwnerLattice.
 	 *
-	 * @return Owner key (AccountKey, Address, or AString DID)
+	 * @return Owner key (AccountKey, Address, or AString DID), or null if connected
 	 */
 	public ACell getOwnerKey() {
 		return ownerKey;
@@ -115,7 +146,7 @@ public class SQLDatabase {
 	/**
 	 * Returns this node's key pair used for signing.
 	 *
-	 * @return Signing key pair
+	 * @return Signing key pair, or null if connected
 	 */
 	public AKeyPair getKeyPair() {
 		return keyPair;
@@ -125,10 +156,14 @@ public class SQLDatabase {
 	 * Returns this owner's signed database map containing this database.
 	 * The signed value is a map of database names to table store state.
 	 *
+	 * <p>Only available in standalone mode (created via {@link #create}).
+	 *
 	 * @return SignedData wrapping a map of {dbName → table store state}
+	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
+		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
 			(AHashMap) Maps.of(dbName, tables.cursor().get());
 		return keyPair.signData(dbMap);
@@ -139,7 +174,10 @@ public class SQLDatabase {
 	 * at the :sql level. Returns a map with a single entry:
 	 * this node's owner key → signed({dbName → table store state}).
 	 *
+	 * <p>Only available in standalone mode (created via {@link #create}).
+	 *
 	 * @return Owner map with this node's signed contribution
+	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportReplica() {
@@ -147,54 +185,31 @@ public class SQLDatabase {
 	}
 
 	/**
-	 * Merges all replicas from a remote owner map into this node's local store.
-	 * Rejects replicas with invalid signatures.
+	 * Merges replicas from a remote owner map into this node's local store.
+	 * Uses {@link OwnerLattice} to verify signatures and owner-key matching,
+	 * then absorbs verified remote data into the local table store.
+	 *
+	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
 	 * @param remoteOwnerMap Map of owner-key → signed({dbName → table store}) from remote nodes
 	 * @return Number of replicas successfully merged
+	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap) {
-		return mergeReplicas(remoteOwnerMap, key -> true);
-	}
-
-	/**
-	 * Merges selected replicas from a remote owner map into this node's local store.
-	 * Only merges replicas whose owner key passes the filter predicate.
-	 * Rejects replicas with invalid signatures regardless of filter.
-	 *
-	 * @param remoteOwnerMap Map of owner-key → signed({dbName → table store}) from remote nodes
-	 * @param ownerFilter Predicate to select which owners' replicas to merge
-	 * @return Number of replicas successfully merged
-	 */
-	public long mergeReplicas(
-			AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap,
-			Predicate<ACell> ownerFilter) {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
+		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
+		// Use OwnerLattice to verify signatures and owner-key matching
+		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> verified =
+			OWNER_LATTICE.merge(ctx, Maps.empty(), remoteOwnerMap);
+
+		// Absorb verified remote data into local store
 		long merged = 0;
-		for (var entry : remoteOwnerMap.entrySet()) {
-			ACell remoteOwnerKey = entry.getKey();
-			SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> signedDbMap = entry.getValue();
-
-			// Skip our own replica
-			if (ownerKey.equals(remoteOwnerKey)) continue;
-
-			// Apply filter
-			if (!ownerFilter.test(remoteOwnerKey)) continue;
-
-			// Validate signature
-			if (!signedDbMap.checkSignature()) continue;
-
-			// Verify signer matches owner key (for AccountKey owners)
-			// For other owner types, this simple merge model doesn't do advanced verification
-			if (remoteOwnerKey instanceof AccountKey ownerAK) {
-				if (!ownerAK.equals(signedDbMap.getAccountKey())) continue;
-			}
-
-			// Extract this database from the remote owner's database map
-			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = signedDbMap.getValue();
+		for (var entry : verified.entrySet()) {
+			if (ownerKey.equals(entry.getKey())) continue; // skip self
+			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = entry.getValue().getValue();
 			if (dbMap == null) continue;
-
 			@SuppressWarnings("unchecked")
 			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
 			if (remoteState != null) {

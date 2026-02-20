@@ -10,12 +10,19 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.lattice.LatticeTables;
 import convex.db.lattice.SQLDatabase;
+import convex.db.lattice.TableStoreLattice;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.SignedCursor;
+import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for SQLDatabase and LatticeTables.
@@ -220,5 +227,106 @@ public class SQLDatabaseTest {
 		long merged = db1.mergeReplicas(tamperedExport);
 		assertEquals(0, merged);
 		assertEquals(0, db1.tables().getRowCount("secure"));
+	}
+
+	@Test
+	public void testConnectedDatabase() throws Exception {
+		// Set up a cursor chain: MapLattice<dbName → TableStore>
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(TableStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+
+		// Connect a named database
+		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+		assertNotNull(db);
+		assertEquals("mydb", db.getName().toString());
+
+		// Use the database
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+		assertEquals(1, db.tables().getRowCount("users"));
+
+		// Verify the root cursor received the update
+		AHashMap<AString, Index<AString, AVector<ACell>>> rootMap = root.get();
+		assertTrue(rootMap.containsKey(Strings.create("mydb")));
+
+		// Connect a second database to the same root
+		SQLDatabase db2 = SQLDatabase.connect(root, "mydb");
+		assertEquals(1, db2.tables().getRowCount("users"));
+		assertNotNull(db2.tables().selectByKey("users", CVMLong.create(1)));
+	}
+
+	@Test
+	public void testOwnerLatticeConstant() {
+		// Verify OWNER_LATTICE can verify and merge signed data correctly
+		AKeyPair kp1 = AKeyPair.generate();
+		AKeyPair kp2 = AKeyPair.generate();
+
+		SQLDatabase db1 = SQLDatabase.create("test", kp1);
+		SQLDatabase db2 = SQLDatabase.create("test", kp2);
+
+		db1.tables().createTable("t", new String[]{"id"});
+		db2.tables().createTable("t", new String[]{"id"});
+		db1.tables().insert("t", 1);
+		db2.tables().insert("t", 2);
+
+		// Merge both exports through OWNER_LATTICE
+		LatticeContext ctx = LatticeContext.create(null, kp1);
+		var merged = SQLDatabase.OWNER_LATTICE.merge(ctx,
+			db1.exportReplica(), db2.exportReplica());
+
+		// Should contain both owners
+		assertEquals(2, merged.count());
+		assertTrue(merged.containsKey(kp1.getAccountKey()));
+		assertTrue(merged.containsKey(kp2.getAccountKey()));
+	}
+
+	@Test
+	public void testForkAndSyncConnected() throws Exception {
+		// Set up cursor chain
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(TableStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+
+		// Connect and populate
+		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+		db.tables().createTable("data", new String[]{"id", "value"});
+		db.tables().insert("data", 1, "original");
+
+		// Fork the tables
+		LatticeTables forked = db.tables().fork();
+		forked.insert("data", 2, "forked");
+
+		// Original unchanged
+		assertEquals(1, db.tables().getRowCount("data"));
+		assertEquals(2, forked.getRowCount("data"));
+
+		// Sync back
+		forked.sync();
+		assertEquals(2, db.tables().getRowCount("data"));
+	}
+
+	@Test
+	public void testConnectedModeRejectsStandaloneOps() {
+		// Connected databases should not have signing capability
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(TableStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+		SQLDatabase db = SQLDatabase.connect(root, "mydb");
+
+		assertNull(db.getKeyPair());
+		assertNull(db.getOwnerKey());
+		assertThrows(IllegalStateException.class, () -> db.getSignedState());
+		assertThrows(IllegalStateException.class, () -> db.exportReplica());
+
+		// mergeReplicas with non-empty map should also throw
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase standalone = SQLDatabase.create("mydb", kp);
+		standalone.tables().createTable("t", new String[]{"id"});
+		var export = standalone.exportReplica();
+		assertThrows(IllegalStateException.class, () -> db.mergeReplicas(export));
 	}
 }
