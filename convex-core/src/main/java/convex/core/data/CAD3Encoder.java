@@ -5,11 +5,10 @@ import java.util.HashMap;
 import java.util.function.Predicate;
 
 import convex.core.Constants;
-import convex.core.cvm.Address;
-import convex.core.cvm.CVMTag;
-import convex.core.cvm.Syntax;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.cvm.CVMTag;
+import convex.core.cvm.Syntax;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;

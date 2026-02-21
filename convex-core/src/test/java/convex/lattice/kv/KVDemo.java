@@ -25,7 +25,7 @@ public class KVDemo {
 		// -------------------------------------------------------
 		// 1. Create a store
 		// -------------------------------------------------------
-		LatticeKV db = LatticeKV.create("node-1");
+		LatticeKV db = LatticeKV.create(Strings.create("node-1"));
 		System.out.println("Created LatticeKV store with replica ID 'node-1'");
 
 		// -------------------------------------------------------
@@ -219,7 +219,7 @@ public class KVDemo {
 		int N = 100_000;
 
 		// SET benchmark
-		LatticeKV bench = LatticeKV.create("bench");
+		LatticeKV bench = LatticeKV.create(Strings.create("bench"));
 		long t0 = System.nanoTime();
 		for (int i = 0; i < N; i++) {
 			bench.set("key:" + i, Strings.create("value-" + i));
@@ -268,7 +268,7 @@ public class KVDemo {
 		System.out.printf("SADD  x%,d : %,d ms  (%,.0f ops/sec)%n", N, saddNs / 1_000_000, N * 1e9 / saddNs);
 
 		// INCR benchmark
-		LatticeKV counterBench = LatticeKV.create("counter-bench");
+		LatticeKV counterBench = LatticeKV.create(Strings.create("counter-bench"));
 		t0 = System.nanoTime();
 		for (int i = 0; i < N; i++) {
 			counterBench.incr("counter");
@@ -278,7 +278,7 @@ public class KVDemo {
 
 		// Fork/Sync benchmark
 		int FORKS = 10_000;
-		LatticeKV forkBench = LatticeKV.create("fork-bench");
+		LatticeKV forkBench = LatticeKV.create(Strings.create("fork-bench"));
 		forkBench.set("base", Strings.create("value"));
 		t0 = System.nanoTime();
 		for (int i = 0; i < FORKS; i++) {
@@ -291,8 +291,8 @@ public class KVDemo {
 
 		// Merge benchmark (two stores with disjoint keys)
 		int MERGE_SIZE = 10_000;
-		LatticeKV mergeA = LatticeKV.create("merge-a");
-		LatticeKV mergeB = LatticeKV.create("merge-b");
+		LatticeKV mergeA = LatticeKV.create(Strings.create("merge-a"));
+		LatticeKV mergeB = LatticeKV.create(Strings.create("merge-b"));
 		for (int i = 0; i < MERGE_SIZE; i++) {
 			mergeA.set("a:" + i, Strings.create("va" + i));
 			mergeB.set("b:" + i, Strings.create("vb" + i));

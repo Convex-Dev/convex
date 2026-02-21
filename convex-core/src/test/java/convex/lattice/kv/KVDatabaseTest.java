@@ -2,8 +2,6 @@ package convex.lattice.kv;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.Set;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -11,10 +9,14 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.AccountKey;
 import convex.core.data.Index;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for KVDatabase — signed, replicated KV stores in the global lattice.
@@ -70,8 +72,8 @@ public class KVDatabaseTest {
 		AKeyPair keyA = AKeyPair.generate();
 		AKeyPair keyB = AKeyPair.generate();
 
-		KVDatabase dbA = KVDatabase.create("shared", keyA, "node-a");
-		KVDatabase dbB = KVDatabase.create("shared", keyB, "node-b");
+		KVDatabase dbA = KVDatabase.create("shared", keyA, Strings.create("node-a"));
+		KVDatabase dbB = KVDatabase.create("shared", keyB, Strings.create("node-b"));
 
 		// Each node writes different keys
 		dbA.kv().set("from-a", Strings.create("value-a"));
@@ -115,33 +117,7 @@ public class KVDatabaseTest {
 	}
 
 	@Test
-	public void testMergeReplicasWithFilter() {
-		AKeyPair keyA = AKeyPair.generate();
-		AKeyPair keyB = AKeyPair.generate();
-		AKeyPair keyC = AKeyPair.generate();
-
-		KVDatabase dbA = KVDatabase.create("filtered", keyA);
-		KVDatabase dbB = KVDatabase.create("filtered", keyB);
-		KVDatabase dbC = KVDatabase.create("filtered", keyC);
-
-		dbB.kv().set("from-b", Strings.create("b"));
-		dbC.kv().set("from-c", Strings.create("c"));
-
-		// Combine B and C exports
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> combined =
-			dbB.exportReplica().merge(dbC.exportReplica());
-
-		// Node A only accepts from node B, ignores C
-		Set<ACell> trusted = Set.of(keyB.getAccountKey());
-		long merged = dbA.mergeReplicas(combined, trusted::contains);
-
-		assertEquals(1, merged);
-		assertEquals(Strings.create("b"), dbA.kv().get("from-b"));
-		assertNull(dbA.kv().get("from-c"));
-	}
-
-	@Test
-	public void testMergeReplicasRejectsInvalidSignature() {
+	public void testMergeReplicasRejectsForgery() {
 		AKeyPair keyA = AKeyPair.generate();
 		AKeyPair keyB = AKeyPair.generate();
 		AKeyPair keyFake = AKeyPair.generate();
@@ -151,30 +127,22 @@ public class KVDatabaseTest {
 
 		dbB.kv().set("legit", Strings.create("data"));
 
-		// Export B's data but tamper: wrap in db-name map and sign with a different key
+		// Export B's data but tamper: sign with a different key
 		Index<AString, AVector<ACell>> bState = dbB.kv().cursor().get();
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		AHashMap<AString, Index<AString, AVector<ACell>>> bDbMap =
-			(AHashMap) convex.core.data.Maps.of(Strings.create("secure"), bState);
+			(AHashMap) Maps.of(Strings.create("secure"), bState);
 		SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> forged = keyFake.signData(bDbMap);
 
 		// Forge an owner map claiming to be from keyB but signed by keyFake
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> forgedMap =
-			(AHashMap) convex.core.data.Maps.of(keyB.getAccountKey(), forged);
+			(AHashMap) Maps.of(keyB.getAccountKey(), forged);
 
-		// Should reject — signature doesn't match the claimed owner key
+		// OwnerLattice rejects: signer (keyFake) doesn't match owner key (keyB)
 		long merged = dbA.mergeReplicas(forgedMap);
-		// The signature IS valid (keyFake signed it), but the AccountKey in SignedData
-		// is keyFake's, not keyB's. The entry key in the map is keyB but the SignedData
-		// contains keyFake's AccountKey. checkSignature validates the sig matches
-		// the embedded AccountKey, so it will pass. However the data integrity is
-		// maintained because the merge uses the actual signed value regardless of
-		// the map key.
-		// In a production system, you'd also check that signedData.getAccountKey()
-		// matches the map key (the owner). For now, verify the merge went through
-		// since the signature itself is valid.
-		assertTrue(merged >= 0);
+		assertEquals(0, merged);
+		assertNull(dbA.kv().get("legit"));
 	}
 
 	@Test
@@ -195,9 +163,9 @@ public class KVDatabaseTest {
 		AKeyPair keyB = AKeyPair.generate();
 		AKeyPair keyC = AKeyPair.generate();
 
-		KVDatabase dbA = KVDatabase.create("trio", keyA, "a");
-		KVDatabase dbB = KVDatabase.create("trio", keyB, "b");
-		KVDatabase dbC = KVDatabase.create("trio", keyC, "c");
+		KVDatabase dbA = KVDatabase.create("trio", keyA, Strings.create("a"));
+		KVDatabase dbB = KVDatabase.create("trio", keyB, Strings.create("b"));
+		KVDatabase dbC = KVDatabase.create("trio", keyC, Strings.create("c"));
 
 		// Each node writes different data
 		dbA.kv().set("key-a", Strings.create("a"));
@@ -229,5 +197,102 @@ public class KVDatabaseTest {
 			assertTrue(db.kv().sismember("shared-set", Strings.create("from-b")));
 			assertTrue(db.kv().sismember("shared-set", Strings.create("from-c")));
 		}
+	}
+
+	@Test
+	public void testConnectedDatabase() {
+		// Set up a cursor chain: MapLattice<dbName → KVStore>
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(KVStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+
+		// Connect a named database
+		KVDatabase db = KVDatabase.connect(root, "mydb");
+		assertNotNull(db);
+		assertEquals("mydb", db.getName().toString());
+
+		// Use the database
+		db.kv().set("greeting", Strings.create("hello"));
+		assertEquals(Strings.create("hello"), db.kv().get("greeting"));
+
+		// Verify the root cursor received the update
+		AHashMap<AString, Index<AString, AVector<ACell>>> rootMap = root.get();
+		assertTrue(rootMap.containsKey(Strings.create("mydb")));
+
+		// Connect a second instance to the same root — sees same data
+		KVDatabase db2 = KVDatabase.connect(root, "mydb");
+		assertEquals(Strings.create("hello"), db2.kv().get("greeting"));
+	}
+
+	@Test
+	public void testOwnerLatticeConstant() {
+		// Verify OWNER_LATTICE can verify and merge signed data correctly
+		AKeyPair kp1 = AKeyPair.generate();
+		AKeyPair kp2 = AKeyPair.generate();
+
+		KVDatabase db1 = KVDatabase.create("test", kp1);
+		KVDatabase db2 = KVDatabase.create("test", kp2);
+
+		db1.kv().set("k1", Strings.create("v1"));
+		db2.kv().set("k2", Strings.create("v2"));
+
+		// Merge both exports through OWNER_LATTICE
+		LatticeContext ctx = LatticeContext.create(null, kp1);
+		var merged = KVDatabase.OWNER_LATTICE.merge(ctx,
+			db1.exportReplica(), db2.exportReplica());
+
+		// Should contain both owners
+		assertEquals(2, merged.count());
+		assertTrue(merged.containsKey(kp1.getAccountKey()));
+		assertTrue(merged.containsKey(kp2.getAccountKey()));
+	}
+
+	@Test
+	public void testForkAndSyncConnected() {
+		// Set up cursor chain
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(KVStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+
+		// Connect and populate
+		KVDatabase db = KVDatabase.connect(root, "mydb");
+		db.kv().set("original", Strings.create("value"));
+
+		// Fork the KV store
+		LatticeKV forked = db.kv().fork();
+		forked.set("forked", Strings.create("data"));
+
+		// Original unchanged
+		assertTrue(db.kv().exists("original"));
+		assertFalse(db.kv().exists("forked"));
+		assertTrue(forked.exists("forked"));
+
+		// Sync back
+		forked.sync();
+		assertTrue(db.kv().exists("forked"));
+		assertEquals(Strings.create("data"), db.kv().get("forked"));
+	}
+
+	@Test
+	public void testConnectedModeRejectsStandaloneOps() {
+		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
+			MapLattice.create(KVStoreLattice.INSTANCE);
+		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
+			Cursors.createLattice(dbMapLattice);
+		KVDatabase db = KVDatabase.connect(root, "mydb");
+
+		assertNull(db.getKeyPair());
+		assertNull(db.getOwnerKey());
+		assertThrows(IllegalStateException.class, () -> db.getSignedState());
+		assertThrows(IllegalStateException.class, () -> db.exportReplica());
+
+		// mergeReplicas with non-empty map should also throw
+		AKeyPair kp = AKeyPair.generate();
+		KVDatabase standalone = KVDatabase.create("mydb", kp);
+		standalone.kv().set("k", Strings.create("v"));
+		var export = standalone.exportReplica();
+		assertThrows(IllegalStateException.class, () -> db.mergeReplicas(export));
 	}
 }

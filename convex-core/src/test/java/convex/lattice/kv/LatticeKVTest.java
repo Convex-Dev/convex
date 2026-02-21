@@ -378,7 +378,7 @@ public class LatticeKVTest {
 
 	@Test
 	public void testConcurrentSetMerge() {
-		LatticeKV root = LatticeKV.create("root");
+		LatticeKV root = LatticeKV.create(Strings.create("root"));
 		root.sadd("tags", Strings.create("initial"));
 
 		LatticeKV fork1 = root.fork();
@@ -399,11 +399,11 @@ public class LatticeKVTest {
 
 	@Test
 	public void testConcurrentCounterMerge() {
-		LatticeKV root = LatticeKV.create("root");
+		LatticeKV root = LatticeKV.create(Strings.create("root"));
 
 		// Create forks with different replica IDs for PN-counter
-		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), "replica-1");
-		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), "replica-2");
+		LatticeKV fork1 = new LatticeKV(root.cursor().fork(), Strings.create("replica-1"));
+		LatticeKV fork2 = new LatticeKV(root.cursor().fork(), Strings.create("replica-2"));
 
 		// Both increment independently
 		fork1.incrby("counter", 5);

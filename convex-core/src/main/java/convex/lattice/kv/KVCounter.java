@@ -4,7 +4,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
@@ -31,12 +30,11 @@ public class KVCounter {
 	 * Increments the counter for a given replica
 	 */
 	@SuppressWarnings("unchecked")
-	public static Index<AString, AVector<ACell>> increment(ACell counterValue, String replicaID, long amount) {
+	public static Index<AString, AVector<ACell>> increment(ACell counterValue, AString replicaID, long amount) {
 		Index<AString, AVector<ACell>> index = (counterValue != null)
 			? (Index<AString, AVector<ACell>>) counterValue
 			: empty();
-		AString replica = Strings.create(replicaID);
-		AVector<ACell> existing = index.get(replica);
+		AVector<ACell> existing = index.get(replicaID);
 		long pos = 0, neg = 0;
 		if (existing != null) {
 			pos = ((CVMLong) existing.get(POS_POSITIVE)).longValue();
@@ -48,7 +46,7 @@ public class KVCounter {
 			neg += (-amount);
 		}
 		AVector<ACell> entry = Vectors.of(CVMLong.create(pos), CVMLong.create(neg));
-		return index.assoc(replica, entry);
+		return index.assoc(replicaID, entry);
 	}
 
 	/**

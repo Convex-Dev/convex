@@ -5,7 +5,6 @@ import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 /**

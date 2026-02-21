@@ -27,7 +27,6 @@ public class LatticeOps {
 	 * @param lattice Lattice describing the type (may be null if a is non-null)
 	 * @return Updated data structure
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T assoc(ACell a, ACell key, ACell value, ALattice<?> lattice) {
 		return assocIn(a, value, lattice, key);
 	}

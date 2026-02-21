@@ -24,10 +24,12 @@ import convex.lattice.cursor.Cursors;
  */
 public class LatticeKV {
 
-	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
-	private final String replicaID;
+	private static final AString DEFAULT_REPLICA = Strings.create("default");
 
-	LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, String replicaID) {
+	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
+	private final AString replicaID;
+
+	public LatticeKV(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		this.cursor = cursor;
 		this.replicaID = replicaID;
 	}
@@ -36,15 +38,36 @@ public class LatticeKV {
 	 * Creates a new empty KV store
 	 */
 	public static LatticeKV create() {
-		return create("default");
+		return create(DEFAULT_REPLICA);
 	}
 
 	/**
 	 * Creates a new empty KV store with a specific replica ID for PN-counter operations
 	 */
-	public static LatticeKV create(String replicaID) {
+	public static LatticeKV create(AString replicaID) {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.createLattice(KVStoreLattice.INSTANCE);
+		return new LatticeKV(cursor, replicaID);
+	}
+
+	/**
+	 * Connects to an existing cursor for cursor chain integration.
+	 *
+	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
+	 * @return New LatticeKV instance connected to the cursor
+	 */
+	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+		return new LatticeKV(cursor, DEFAULT_REPLICA);
+	}
+
+	/**
+	 * Connects to an existing cursor for cursor chain integration with a replica ID.
+	 *
+	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
+	 * @param replicaID Replica ID for PN-counter operations
+	 * @return New LatticeKV instance connected to the cursor
+	 */
+	public static LatticeKV connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor, AString replicaID) {
 		return new LatticeKV(cursor, replicaID);
 	}
 

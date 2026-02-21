@@ -7,10 +7,14 @@ import java.util.Random;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
+/**
+ * Static utilities for working with Blobs
+ * 
+ * "I love Monet - I've nicknamed him King Blob. When you go up to the painting, it's a series of blobs - amazing" - Celia Imrie
+ */
 public class Blobs {
 
 	static final int CHUNK_SHIFT = 12;

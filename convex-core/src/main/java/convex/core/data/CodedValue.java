@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 public class CodedValue extends ACell {

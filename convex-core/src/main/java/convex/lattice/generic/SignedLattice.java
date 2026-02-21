@@ -74,14 +74,6 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		return otherValue.checkSignature();
 	}
 
-	private SignedData<V> sign(V m) {
-		AKeyPair kp=getKeyPair();
-
-		if (kp==null) throw new IllegalStateException("Unable to sign new lattice value");
-
-		return kp.signData(m);
-	}
-
 	private SignedData<V> sign(LatticeContext context, V m) {
 		// Try to get keypair from context first, fall back to instance variable
 		AKeyPair kp = context.getSigningKey();

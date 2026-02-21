@@ -26,7 +26,6 @@ import convex.lattice.ALattice;
 public class JSONValueLattice extends ALattice<ACell> {
 
 	/** Instance that uses {@link Index} as the zero container (sorted keys). */
-	@SuppressWarnings("unchecked")
 	public static final JSONValueLattice INDEX_INSTANCE = new JSONValueLattice(true);
 
 	/** Instance that uses {@link AHashMap} as the zero container (unordered keys). */
@@ -56,7 +55,6 @@ public class JSONValueLattice extends ALattice<ACell> {
 		return (cmp >= 0) ? own : other;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public ACell zero() {
 		return useIndex ? (ACell) Index.EMPTY : (ACell) Maps.empty();

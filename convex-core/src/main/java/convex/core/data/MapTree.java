@@ -10,11 +10,10 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
-import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;

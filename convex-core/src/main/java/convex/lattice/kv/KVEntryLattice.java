@@ -109,7 +109,6 @@ public class KVEntryLattice extends ALattice<AVector<ACell>> {
 		return KVEntry.isValid(value);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
 		return null;

@@ -61,7 +61,7 @@ public class KVReplicationDemo {
 				server.launch();
 				servers.add(server);
 
-				KVDatabase db = KVDatabase.create(DB_NAME, kp, "node-" + i);
+				KVDatabase db = KVDatabase.create(DB_NAME, kp, Strings.create("node-" + i));
 				databases.add(db);
 
 				System.out.println("Node " + i + " started on port " + (BASE_PORT + i)

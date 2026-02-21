@@ -40,7 +40,6 @@ public class KVStoreLattice extends ALattice<Index<AString, AVector<ACell>>> {
 		return delegate.checkForeign(value);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
 		return delegate.path(childKey);

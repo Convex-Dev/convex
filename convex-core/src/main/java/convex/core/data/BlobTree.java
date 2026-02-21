@@ -7,7 +7,6 @@ import java.security.MessageDigest;
 import java.util.Enumeration;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.util.Utils;

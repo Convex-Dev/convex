@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 

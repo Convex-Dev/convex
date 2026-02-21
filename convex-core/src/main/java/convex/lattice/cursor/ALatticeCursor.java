@@ -145,7 +145,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 		return path(keys, 0, keys.length);
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	protected <T extends ACell> ALatticeCursor<T> path(ACell[] keys, int start, int end) {
 		if (start > end) throw new IllegalArgumentException("start > end");
 		if (start == end) return (ALatticeCursor<T>) this;

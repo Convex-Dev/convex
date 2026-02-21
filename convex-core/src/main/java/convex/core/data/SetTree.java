@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
