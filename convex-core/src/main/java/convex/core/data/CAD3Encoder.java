@@ -538,8 +538,9 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			me = MapEntry.fromRefs(kr, vr);
 
 			if (count == 1) {
-				// Single entry — depth derived from key
+				// Single entry — depth derived from key. If not embedded must be > MAX_DEPTH
 				long depth = kr.isEmbedded() ? kr.getValue().hexLength() : Index.MAX_DEPTH;
+				depth = Math.min(depth, Index.MAX_DEPTH);
 				return new Index<K, V>(depth, me, Index.EMPTY_CHILDREN, (short) 0, 1L);
 			}
 		} else {
