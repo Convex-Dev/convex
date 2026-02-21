@@ -443,12 +443,15 @@ public class NodeServerTest {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store, null);
 		
-		// Set an initial value
-		maxNodeServer.getCursor().set(CVMLong.create(42));
-		
 		// Launch the server
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
+
+		// Set a value and sync so it flows through the propagator pipeline
+		maxNodeServer.getCursor().set(CVMLong.create(42));
+		maxNodeServer.sync();
+		// Wait for propagator to process (async)
+		Thread.sleep(100);
 		
 		// Get the server address
 		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();

@@ -16,7 +16,6 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Cells;
 import convex.core.data.Strings;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
@@ -354,7 +353,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Processes a LATTICE_QUERY message by returning the value at the specified path.
 	 *
-	 * Payload format: [:LQ id [*path*]]
+	 * <p>Returns the most recently announced (store-backed) value rather than the
+	 * live cursor, so that subsequent DATA_REQUESTs can resolve child cells from
+	 * the same store. Never announces directly — that is the propagator's job.
+	 *
+	 * <p>Payload format: [:LQ id [*path*]]
 	 *
 	 * @param message The LATTICE_QUERY message
 	 * @throws BadFormatException If message format is invalid
@@ -371,30 +374,20 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell id = payload.get(1);
 		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
 
-		// Convert path to array if it's a vector
-		ACell[] path;
-		if (pathVector != null) {
-			path=pathVector.toCellArray();
+		// Use the last announced value — already persisted in the store, so
+		// DATA_REQUEST can resolve any child cells the requester needs
+		ACell announced = propagators.isEmpty() ? null : propagators.get(0).getLastAnnouncedValue();
+		ACell valueAtPath;
+		if (pathVector != null && pathVector.count() > 0) {
+			valueAtPath = RT.getIn(announced, pathVector.toCellArray());
 		} else {
-			// Empty path means root with empty cell array
-			path = Cells.EMPTY_ARRAY;
-		}
-
-		// Get the value at the path
-		V valueAtPath = cursor.get(path);
-
-		// Announce to store so DATA_REQUEST from the requester can resolve children
-		try {
-			if (valueAtPath != null) {
-				Cells.announce(valueAtPath, r -> {}, store);
-			}
-		} catch (IOException e) {
-			log.warn("Failed to announce query response to store", e);
+			valueAtPath = announced;
 		}
 
 		Result result = Result.create(id, valueAtPath);
 		message.returnResult(result);
-		log.debug("Responded to LATTICE_QUERY at path with length: {}", path.length);
+		log.debug("Responded to LATTICE_QUERY at path with length: {}",
+			(pathVector != null) ? pathVector.count() : 0);
 	}
 
 	/**
