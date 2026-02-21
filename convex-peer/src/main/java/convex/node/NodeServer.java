@@ -421,12 +421,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Processes a LATTICE_VALUE message with automatic missing data recovery.
+	 * Processes an incoming LATTICE_VALUE message from a peer.
 	 *
-	 * Uses speculative merge in a forked cursor to detect missing data,
-	 * then pulls only what's needed before committing the merge.
+	 * <p>Navigates to the target path via {@code cursor.path()}, merges the
+	 * received value, then calls {@link #sync()} to notify propagators. The
+	 * sync is cheap (non-blocking queue offer) and the {@code LatestUpdateQueue}
+	 * coalesces rapid incoming merges, so high-velocity messages are safe.
 	 *
-	 * Payload format: [:LV [*path*] value]
+	 * <p>Payload format: [:LV [*path*] value]
 	 *
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
@@ -453,6 +455,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell[] path = extractPath(pathCell);
 		ALatticeCursor<ACell> target = ((ALatticeCursor<V>) cursor).path(path);
 		mergeIncoming(target, value);
+
+		// Notify propagators that cursor state has changed. This is non-blocking:
+		// sync() offers the current snapshot to each propagator's LatestUpdateQueue,
+		// which coalesces rapid incoming merges into a single latest value. The
+		// propagator decides when to actually broadcast based on MIN_BROADCAST_DELAY.
+		sync();
 	}
 
 	/**
@@ -484,7 +492,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Merges an incoming value into a lattice cursor.
 	 *
-	 * <p>Broadcasting is the propagator's responsibility, not ours.
+	 * <p>Does not notify propagators — the caller is responsible for calling
+	 * {@link #sync()} after the merge if relay is needed. This keeps merge
+	 * and propagation as separate concerns.
 	 *
 	 * @param <T> Type of cursor value
 	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})

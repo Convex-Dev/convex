@@ -80,7 +80,8 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Store for delta tracking (novelty detection via announce), persistence
-	 * (setRootData), and security boundary for peer data resolution.
+	 * (setRootData), and security boundary for peer data resolution. Missing data requests 
+	 * vs announced value should be routed here.
 	 */
 	private final AStore store;
 

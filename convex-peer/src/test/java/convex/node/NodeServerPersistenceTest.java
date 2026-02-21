@@ -84,9 +84,18 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Helper: wait for broadcast to propagate by syncing.
+	 * Helper: sync primary's cursor to its propagator, then pull into backup.
+	 *
+	 * <p>The sync ensures primary's propagator has the latest cursor value
+	 * (announced + persisted) so that LATTICE_QUERY responses are up to date.
+	 * Without this, the propagator would return null for values written to
+	 * the cursor but not yet announced.
 	 */
 	private void syncBackupFromPrimary() throws Exception {
+		// Sync primary so propagator has the latest value for query responses
+		primary.sync();
+		Thread.sleep(100); // Let propagator process the sync
+
 		InetSocketAddress primaryAddr = primary.getHostAddress();
 		Convex conn = ConvexRemote.connect(primaryAddr);
 		try {

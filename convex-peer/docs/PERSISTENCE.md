@@ -52,7 +52,7 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
  into cursor         │                                           │
                      │  Incoming merge:                          │
  From peers ────────►│    cursor.path(path).merge(value)         │
-                     │    └──► propagator handles broadcast      │
+                     │    └──► sync() (non-blocking, coalesced)  │
                      │                                           │
                      │  close()                                  │
                      │    └──► triggerAndClose each propagator    │
@@ -185,7 +185,9 @@ When a peer sends a `LATTICE_VALUE` message:
 1. NodeServer navigates to the target path via `cursor.path(path)`
 2. Merges the received value via `target.merge(value)` — the cursor chain handles
    sub-lattice resolution, signing boundaries, and null-lattice bubble-up automatically
-3. Broadcasting is the propagator's responsibility, not NodeServer's
+3. Calls `sync()` to notify propagators — this is a non-blocking queue offer;
+   the `LatestUpdateQueue` coalesces rapid incoming merges so high-velocity
+   messages don't cause excessive broadcasting
 
 NodeServer also supports explicit pull via `pull()` (query all connected peers)
 or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives

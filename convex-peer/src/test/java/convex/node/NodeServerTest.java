@@ -642,5 +642,126 @@ public class NodeServerTest {
 			server.close();
 		}
 	}
+
+	// ===== Gossip relay tests =====
+	//
+	// These tests verify that incoming lattice values reach the propagator.
+	// IMPORTANT: Neither test calls sync() directly. The incoming message path
+	// (processLatticeValue) calls sync() internally after merging — that is
+	// what we are testing. The control test uses cursor.set + sync to prove
+	// the propagator infrastructure itself works.
+
+	/**
+	 * Regression test: incoming LATTICE_VALUE messages must reach the propagator.
+	 *
+	 * <p>When a peer sends a LATTICE_VALUE, processLatticeValue merges it into
+	 * the cursor and calls sync() to notify propagators. Without that internal
+	 * sync(), the merged value dead-ends in the cursor — never persisted, never
+	 * relayed to other peers. Gossip would be one-hop only.
+	 *
+	 * <p>This test sends a LATTICE_VALUE via the network (the actual incoming
+	 * message path) and verifies the propagator receives it. No explicit sync()
+	 * call is made in the test — we rely on processLatticeValue doing it.
+	 */
+	@Test
+	public void testIncomingMergeRelayedToPropagator() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		AStore testStore = new MemoryStore();
+
+		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, null);
+
+		try {
+			node.launch();
+
+			LatticePropagator propagator = node.getPropagator();
+			assertNotNull(propagator, "Node should have a propagator after launch");
+
+			// Baseline: propagator has not announced anything yet
+			assertEquals(null, propagator.getLastAnnouncedValue(),
+				"Propagator should have no announced value before any merge");
+
+			// Send a LATTICE_VALUE message via the network.
+			// This exercises the full incoming path:
+			//   network → processLatticeValue → mergeIncoming → sync (internal)
+			// We do NOT call sync() here — processLatticeValue must do it.
+			ConvexRemote convex = ConvexRemote.connect(node.getHostAddress());
+			try {
+				AVector<ACell> emptyPath = Vectors.empty();
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, CVMLong.create(42));
+				Message msg = Message.create(MessageType.LATTICE_VALUE, payload);
+				// Fire-and-forget: LATTICE_VALUE has no request ID, no response expected
+				convex.message(msg);
+
+				// Wait for the chain: message delivery → merge → internal sync → propagator
+				// Keep connection open during wait — closing too early can drop unsent data
+				long deadline = System.currentTimeMillis() + 3000;
+				while (System.currentTimeMillis() < deadline) {
+					if (propagator.getLastAnnouncedValue() != null) break;
+					Thread.sleep(50);
+				}
+			} finally {
+				convex.close();
+			}
+
+			// Cursor should have the merged value
+			assertEquals(CVMLong.create(42), node.getLocalValue(),
+				"Cursor should reflect the incoming LATTICE_VALUE");
+
+			// The propagator must have been notified (by processLatticeValue's sync)
+			assertNotNull(propagator.getLastAnnouncedValue(),
+				"Propagator should be notified after incoming LATTICE_VALUE — " +
+				"if null, incoming merges are not relayed (gossip is broken)");
+		} finally {
+			node.close();
+			testStore.close();
+		}
+	}
+
+	/**
+	 * Control test: cursor.set + explicit sync() relays to the propagator.
+	 *
+	 * <p>Verifies that the propagation infrastructure works correctly when
+	 * triggered via the local write path. This proves that any failure in
+	 * {@link #testIncomingMergeRelayedToPropagator} would be due to a missing
+	 * sync in the incoming message path, not a broken propagator.
+	 */
+	@Test
+	public void testExplicitSyncRelaysToPropagator() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		AStore testStore = new MemoryStore();
+
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, null, cfg);
+
+		try {
+			node.launch();
+
+			LatticePropagator propagator = node.getPropagator();
+
+			// Local write path: set value directly on cursor, then sync explicitly.
+			// This is how application code drives the node — sync() is the caller's
+			// responsibility (unlike the incoming message path which syncs internally).
+			node.getCursor().set(CVMLong.create(42));
+			node.sync();
+
+			// Wait for propagator to process
+			long deadline = System.currentTimeMillis() + 3000;
+			while (System.currentTimeMillis() < deadline) {
+				if (propagator.getLastAnnouncedValue() != null) break;
+				Thread.sleep(50);
+			}
+
+			// Explicit sync should always work — this is the control
+			assertNotNull(propagator.getLastAnnouncedValue(),
+				"Propagator should have announced value after explicit sync");
+			assertEquals(CVMLong.create(42), propagator.getLastAnnouncedValue(),
+				"Propagator's announced value should match synced value");
+		} finally {
+			node.close();
+			testStore.close();
+		}
+	}
 }
 
