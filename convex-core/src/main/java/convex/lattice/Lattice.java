@@ -43,6 +43,7 @@ public class Lattice {
 		Keywords.QUEUE, OwnerLattice.create(
 			MapLattice.create(TopicLattice.INSTANCE)
 		),
+		Keywords.P2P, P2PLattice.LATTICE,
 		LocalLattice.KEY_LOCAL, LocalLattice.LATTICE
 	);
 }

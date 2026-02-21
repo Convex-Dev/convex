@@ -458,7 +458,7 @@ All incoming messages flow through `NodeServer.handleIncomingMessage()`:
 
 | Message | Handler | Notes |
 |---------|---------|-------|
-| LATTICE_VALUE | `mergeValueWithAcquire()` | Merge at path, auto-acquire missing data |
+| LATTICE_VALUE | `processLatticeValue()` → `cursor.path(path).merge(value)` | Navigate to target, merge via cursor |
 | LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
 | DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
 | PING | `processPing()` | Respond with RESULT |

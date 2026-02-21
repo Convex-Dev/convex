@@ -18,21 +18,28 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Strings;
-import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
+import convex.core.util.Utils;
+import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.Keyword;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.lattice.ALattice;
+import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.PathCursor;
-import convex.lattice.cursor.Root;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
 
@@ -128,11 +135,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.config = (config != null) ? config : NodeConfig.create();
 		this.port = this.config.getPort();
 
-		// Use provided cursor, or create a Root with lattice zero value
+		// Use provided cursor, or create a lattice-aware root cursor
 		if (cursor != null) {
 			this.cursor = cursor;
 		} else {
-			this.cursor = Root.create(lattice.zero());
+			this.cursor = Cursors.createLattice(lattice);
 		}
 
 		// Initialize receive action for handling incoming messages
@@ -226,7 +233,50 @@ public class NodeServer<V extends ACell> implements Closeable {
 			p.start();
 		}
 
+		// Publish node info if publicly accessible
+		publishNodeInfo();
+
 		log.debug("NodeServer started successfully on port {}", port);
+	}
+
+	/**
+	 * Publishes this node's info into the {@code :p2p :nodes} lattice if the node
+	 * is publicly accessible (URL configured) and has a signing key.
+	 *
+	 * <p>Only advertises when both conditions are met:
+	 * <ul>
+	 *   <li>A public URL is configured (never localhost or private addresses)</li>
+	 *   <li>A signing key is available in the merge context</li>
+	 * </ul>
+	 */
+	@SuppressWarnings("unchecked")
+	private void publishNodeInfo() {
+		// Only advertise if we have a public URL
+		AString url = config.getURL();
+		if (url == null) return;
+
+		// Only advertise if we have a signing key
+		AKeyPair keyPair = mergeContext.getSigningKey();
+		if (keyPair == null) return;
+
+		// Only works with lattice-aware cursors (path navigation needs lattice info)
+		if (!(cursor instanceof ALatticeCursor)) return;
+
+		AString type = Strings.create("Convex Lattice Node");
+		String versionStr = Utils.getVersion();
+		AString version = Strings.create(versionStr != null ? versionStr : "unknown");
+
+		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
+			Vectors.of(url), type, version, null);
+
+		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
+
+		// Navigate to :p2p :nodes and merge the signed entry
+		ALatticeCursor<ACell> nodesCursor =
+			((ALatticeCursor<V>) cursor).path(Keywords.P2P, Keywords.NODES);
+		nodesCursor.merge(entry);
+
+		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
 	}
 
 	/**
@@ -404,25 +454,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return;
 		}
 
-		// Convert path to array
+		if (!(cursor instanceof ALatticeCursor)) return;
+
+		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
-
-		// Get sub-lattice at path for validation
-		ALattice<?> subLattice = lattice.path(path);
-		if (subLattice == null && path.length > 0) {
-			log.warn("Invalid path for LATTICE_VALUE: path length {}", path.length);
-			return;
-		}
-
-		// Merge with fork + acquire pattern
-		if (path.length == 0) {
-			// Root merge: use fork pattern for automatic recovery
-			V receivedValue = (V) value;
-			mergeValueWithAcquire(receivedValue, message);
-		} else {
-			// Path-specific merge: use existing logic with acquire fallback
-			mergePathWithAcquire(path, value, message);
-		}
+		ALatticeCursor<ACell> target = ((ALatticeCursor<V>) cursor).path(path);
+		mergeIncoming(target, value);
 	}
 
 	/**
@@ -452,211 +489,21 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Attempts to merge a value at root, forking the cursor to detect missing data
-	 * and acquiring it automatically before committing the merge.
+	 * Merges an incoming value into a lattice cursor.
 	 *
-	 * This implements the "speculative fork + acquire" pattern:
-	 * 1. Fork the cursor (cheap, copy-on-write)
-	 * 2. Attempt merge in fork
-	 * 3. If MissingDataException => acquire missing cells
-	 * 4. Retry merge after acquisition
-	 * 5. Commit successful merge to main cursor
-	 * 6. Trigger immediate delta broadcast
+	 * <p>Broadcasting is the propagator's responsibility, not ours.
 	 *
-	 * @param receivedValue Value to merge
-	 * @param message Original message (for tracking sender)
-	 */
-	private void mergeValueWithAcquire(V receivedValue, Message message) {
-		try {
-			// Validate foreign value
-			if (!lattice.checkForeign(receivedValue)) {
-				log.debug("Rejected invalid foreign lattice value");
-				return;
-			}
-
-			// Attempt merge with automatic acquisition on missing data
-			V merged = mergeValueWithRetry(receivedValue, 3);
-			if (merged != null) {
-				cursor.set(merged);
-				log.debug("Merged lattice value successfully");
-
-				// Trigger immediate delta broadcast on all propagators
-				for (LatticePropagator p : propagators) {
-					p.triggerBroadcast(merged);
-				}
-			}
-		} catch (Exception e) {
-			log.warn("Error during lattice merge with acquire", e);
-		}
-	}
-
-	/**
-	 * Merges a value with automatic retry on missing data.
-	 *
-	 * @param receivedValue Value to merge
-	 * @param maxRetries Maximum number of acquisition retries
-	 * @return Merged value, or null if merge failed
-	 */
-	private V mergeValueWithRetry(V receivedValue, int maxRetries) {
-		int attempt = 0;
-		while (attempt < maxRetries) {
-			try {
-				// Attempt merge
-				V currentValue = cursor.get();
-				V merged = lattice.merge(mergeContext, currentValue, receivedValue);
-
-				// Try to persist (triggers MissingDataException if data missing)
-				merged = Cells.persist(merged, store);
-				return merged;
-
-			} catch (MissingDataException e) {
-				attempt++;
-				log.debug("Missing data in lattice merge (attempt {}): {}, acquiring...",
-					attempt, e.getMissingHash());
-
-				// Acquire missing data from peers
-				ACell acquired = acquireFromPeers(e.getMissingHash());
-				if (acquired == null) {
-					log.warn("Could not acquire missing data after {} attempts: {}",
-						attempt, e.getMissingHash());
-					return null;
-				}
-
-				log.debug("Acquired missing data, retrying merge");
-				// Loop will retry merge
-
-			} catch (IOException e) {
-				log.warn("IO error during lattice merge", e);
-				return null;
-			}
-		}
-
-		log.warn("Failed to merge after {} acquisition attempts", maxRetries);
-		return null;
-	}
-
-	/**
-	 * Merges a value at a specific path with acquire fallback.
-	 *
-	 * @param path Path array
-	 * @param value Value to merge at path
-	 * @param message Original message
+	 * @param <T> Type of cursor value
+	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})
+	 * @param value Value to merge
 	 */
 	@SuppressWarnings("unchecked")
-	private void mergePathWithAcquire(ACell[] path, ACell value, Message message) {
+	private <T extends ACell> void mergeIncoming(ALatticeCursor<T> target, ACell value) {
 		try {
-			// Get sub-lattice at path
-			ALattice<?> subLattice = lattice.path(path);
-			PathCursor<ACell> pathCursor = PathCursor.create(cursor, path);
-			ACell currentValueAtPath = pathCursor.get();
-
-			boolean merged = false;
-
-			// Check foreign value using sub-lattice
-			if (subLattice != null) {
-				ALattice<ACell> typedSubLattice = (ALattice<ACell>) subLattice;
-				if (!typedSubLattice.checkForeign(value)) {
-					log.debug("Rejected invalid foreign lattice value at path");
-					return;
-				}
-
-				// Attempt merge with retry on missing data
-				ACell mergedValue = mergePathValueWithRetry(typedSubLattice, currentValueAtPath, value, 3);
-				if (mergedValue != null) {
-					pathCursor.set(mergedValue);
-					log.debug("Merged lattice value at path with length: {}", path.length);
-					merged = true;
-				}
-			} else {
-				// No sub-lattice, just set the value
-				pathCursor.set(value);
-				log.debug("Set lattice value at path with length: {}", path.length);
-				merged = true;
-			}
-
-			// Trigger immediate delta broadcast after successful merge
-			if (merged) {
-				V snapshot = cursor.get();
-				for (LatticePropagator p : propagators) {
-					p.triggerBroadcast(snapshot);
-				}
-			}
+			target.merge((T) value);
 		} catch (Exception e) {
-			log.warn("Error during path merge with acquire", e);
+			log.warn("Error during lattice merge", e);
 		}
-	}
-
-	/**
-	 * Merges a value at path with automatic retry on missing data.
-	 *
-	 * @param subLattice Sub-lattice for merge
-	 * @param currentValue Current value at path
-	 * @param receivedValue Received value to merge
-	 * @param maxRetries Maximum acquisition retries
-	 * @return Merged value, or null if failed
-	 */
-	private ACell mergePathValueWithRetry(ALattice<ACell> subLattice, ACell currentValue,
-	                                       ACell receivedValue, int maxRetries) {
-		int attempt = 0;
-		while (attempt < maxRetries) {
-			try {
-				// Attempt merge
-				ACell merged = subLattice.merge(currentValue, receivedValue);
-				merged = Cells.persist(merged, store);
-				return merged;
-
-			} catch (MissingDataException e) {
-				attempt++;
-				log.debug("Missing data in path merge (attempt {}): {}, acquiring...",
-					attempt, e.getMissingHash());
-
-				ACell acquired = acquireFromPeers(e.getMissingHash());
-				if (acquired == null) {
-					log.warn("Could not acquire missing data: {}", e.getMissingHash());
-					return null;
-				}
-
-				log.debug("Acquired missing data, retrying merge");
-				// Loop will retry
-
-			} catch (IOException e) {
-				log.warn("IO error during path merge", e);
-				return null;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Acquires missing data from connected peers via the primary propagator's peers.
-	 *
-	 * Tries each peer in turn until the data is successfully acquired.
-	 *
-	 * @param missingHash Hash of missing data
-	 * @return Acquired cell, or null if not found
-	 */
-	private ACell acquireFromPeers(Hash missingHash) {
-		if (propagators.isEmpty()) return null;
-
-		for (Convex peer : propagators.get(0).getPeers()) {
-			if (peer == null || !peer.isConnected()) continue;
-
-			try {
-				// Use Convex.acquire() to pull missing data
-				ACell acquired = peer.acquire(missingHash).get(5, TimeUnit.SECONDS);
-				log.debug("Acquired missing data from peer {}: {}",
-					peer.getHostAddress(), missingHash);
-				return acquired;
-			} catch (Exception e) {
-				// Try next peer
-				log.trace("Could not acquire from peer {}: {}",
-					peer.getHostAddress(), e.getMessage());
-			}
-		}
-
-		log.warn("Could not acquire missing data from any peer: {}", missingHash);
-		return null;
 	}
 
 	/**
@@ -732,6 +579,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param receivedValue The value received from a peer
 	 * @return The merged value, or null if merge was not performed (e.g., invalid foreign value)
 	 */
+	@SuppressWarnings("unchecked")
 	public V mergeValue(V receivedValue) {
 		if (receivedValue == null) {
 			return null;
@@ -743,16 +591,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return null;
 		}
 
-		// Atomically update the cursor by merging the current value with the received value
-		// This ensures thread-safe updates even if multiple threads are merging concurrently
-		V merged = cursor.updateAndGet(currentValue -> {
-			V newValue= lattice.merge(mergeContext, currentValue, receivedValue);
-			return newValue;
-		});
-
-		log.debug("Merged lattice value atomically");
-
-		return merged;
+		if (cursor instanceof ALatticeCursor) {
+			return ((ALatticeCursor<V>) cursor).merge(receivedValue);
+		}
+		// Fallback for non-lattice cursors
+		return cursor.updateAndGet(current -> lattice.merge(mergeContext, current, receivedValue));
 	}
 
 	/**
@@ -810,6 +653,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
 		this.mergeContext = context;
+		// Propagate to lattice cursor so path-navigated cursors inherit it
+		if (cursor instanceof ALatticeCursor) {
+			((ALatticeCursor<V>) cursor).withContext(context);
+		}
 	}
 
 	/**

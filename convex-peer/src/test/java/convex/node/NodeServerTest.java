@@ -17,14 +17,23 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
+import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AVector;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
@@ -34,7 +43,11 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
+import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
+import convex.lattice.P2PLattice;
 import convex.lattice.cursor.ACursor;
+import convex.lattice.cursor.PathCursor;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 
@@ -520,6 +533,110 @@ public class NodeServerTest {
 			assertTrue(acquiredSet.contains(CVMLong.create(9_999)));
 		} finally {
 			convex.close();
+		}
+	}
+
+	// ===== P2P NodeInfo advertisement tests =====
+
+	/**
+	 * Test that a NodeServer with URL and signing key publishes NodeInfo
+	 * into the :p2p :nodes lattice on launch.
+	 */
+	@Test
+	public void testNodeInfoPublication() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+
+		// Config with public URL
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://peer.example.com:18888"),
+			NodeConfig.PORT, CVMLong.create(-1) // local-only, no network binding
+		));
+
+		NodeServer<Index<Keyword, ACell>> server =
+			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+		server.setMergeContext(LatticeContext.create(null, kp));
+
+		try {
+			server.launch();
+
+			// Read :p2p :nodes from cursor
+			@SuppressWarnings("unchecked")
+			AHashMap<ACell, SignedData<ACell>> nodes =
+				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
+					server.getCursor(),
+					new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+
+			assertNotNull(nodes, ":p2p :nodes should be populated");
+
+			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
+			assertNotNull(info, "NodeInfo should exist for the server's key");
+			assertEquals(Strings.create("tcp://peer.example.com:18888"),
+				((AVector<?>) info.get(Keywords.TRANSPORTS)).get(0));
+			assertEquals(Strings.create("Convex Lattice Node"), info.get(Keywords.TYPE));
+			assertNotNull(info.get(Keywords.VERSION));
+			assertNotNull(info.get(Keywords.TIMESTAMP));
+		} finally {
+			server.close();
+		}
+	}
+
+	/**
+	 * Test that a NodeServer without URL does not publish NodeInfo.
+	 */
+	@Test
+	public void testNoPublicationWithoutURL() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+
+		// No URL configured
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+
+		NodeServer<Index<Keyword, ACell>> server =
+			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+		server.setMergeContext(LatticeContext.create(null, kp));
+
+		try {
+			server.launch();
+
+			ACell nodes = PathCursor.create(
+				server.getCursor(),
+				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+
+			// Should be null (empty/zero) — no publication
+			assertTrue(nodes == null || (nodes instanceof AHashMap && ((AHashMap<?,?>) nodes).isEmpty()),
+				":p2p :nodes should be empty when no URL is configured");
+		} finally {
+			server.close();
+		}
+	}
+
+	/**
+	 * Test that a NodeServer without signing key does not publish NodeInfo.
+	 */
+	@Test
+	public void testNoPublicationWithoutKeyPair() throws IOException, InterruptedException {
+		// URL configured but no signing key (default EMPTY context)
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://peer.example.com:18888"),
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+
+		NodeServer<Index<Keyword, ACell>> server =
+			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+		// mergeContext stays LatticeContext.EMPTY — no signing key
+
+		try {
+			server.launch();
+
+			ACell nodes = PathCursor.create(
+				server.getCursor(),
+				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+
+			assertTrue(nodes == null || (nodes instanceof AHashMap && ((AHashMap<?,?>) nodes).isEmpty()),
+				":p2p :nodes should be empty when no signing key is available");
+		} finally {
+			server.close();
 		}
 	}
 }

@@ -51,8 +51,8 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
  refs merged         │                                           │
  into cursor         │                                           │
                      │  Incoming merge:                          │
- From peers ────────►│    cursor.updateAndGet(merge)             │
-                     │    └──► sync() if autoSync policy         │
+ From peers ────────►│    cursor.path(path).merge(value)         │
+                     │    └──► propagator handles broadcast      │
                      │                                           │
                      │  close()                                  │
                      │    └──► triggerAndClose each propagator    │
@@ -182,9 +182,10 @@ demand.
 ### Incoming Merge
 
 When a peer sends a `LATTICE_VALUE` message:
-1. NodeServer validates and merges into cursor (`cursor.updateAndGet(merge)`)
-2. If autoSync policy is enabled, calls `sync()` to propagate
-3. If autoSync is disabled, the merged value sits in the cursor until app calls `sync()`
+1. NodeServer navigates to the target path via `cursor.path(path)`
+2. Merges the received value via `target.merge(value)` — the cursor chain handles
+   sub-lattice resolution, signing boundaries, and null-lattice bubble-up automatically
+3. Broadcasting is the propagator's responsibility, not NodeServer's
 
 NodeServer also supports explicit pull via `pull()` (query all connected peers)
 or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives
@@ -383,15 +384,9 @@ The receiver knows the peer's latest state but only pulls what's actually missin
 - **Reliability**: Very high (guaranteed complete after pull)
 
 ```java
-// Why fork before merge?
-// DON'T: Merge directly (can corrupt cursor on missing data)
-cursor.set(lattice.merge(current, received)); // May throw, leaves corrupt state
-
-// DO: Fork first (speculative merge, rollback on failure)
-ACursor<V> fork = cursor.detach();             // Cheap copy
-fork.set(lattice.merge(fork.get(), received)); // Test merge in fork
-fork.persist();                                 // May throw MissingDataException
-cursor.set(fork.get());                         // Commit only on success
+// Navigate to the target path and merge — the cursor handles everything
+ALatticeCursor<ACell> target = cursor.path(path);
+target.merge(value);  // cursor handles lattice merge, path write-back, null-lattice bubble-up
 ```
 
 ### Tier Summary
@@ -606,7 +601,7 @@ A single NodeServer may host a lattice tree with independently-syncable sub-regi
                  │
      ┌───────────┼───────────┐
      │           │           │
-PathCursor    PathCursor   PathCursor
+cursor.path  cursor.path  cursor.path
 (:fs)         (:kv)        (:local)
      │
  DLFSLocal

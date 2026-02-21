@@ -35,6 +35,10 @@ public class NodeConfig {
 	/** Interval between periodic persistence runs in ms (Long, default 30000). */
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
+	/** Public URL for this node (AString). If set, node advertises itself in :p2p :nodes.
+	 *  Must be publicly reachable on the internet — never localhost or private addresses. */
+	public static final AString URL = Strings.intern("url");
+
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
@@ -102,6 +106,15 @@ public class NodeConfig {
 	public long getPersistInterval() {
 		CVMLong v = RT.ensureLong(config.get(PERSIST_INTERVAL));
 		return (v != null) ? v.longValue() : 30_000L;
+	}
+
+	/**
+	 * Get the public URL for this node.
+	 * If set, the node will advertise itself in the {@code :p2p :nodes} lattice.
+	 * @return Public URL string, or null if not configured (private node)
+	 */
+	public AString getURL() {
+		return RT.ensureString(config.get(URL));
 	}
 
 	// ========== Helpers ==========

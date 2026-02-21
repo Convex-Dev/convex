@@ -217,7 +217,10 @@ public class Cells {
 	}
 
 	/**
-	 * Announces a Cell, reporting as novelty any cells that have not been previously announced
+	 * Announces a Cell, reporting as novelty any cells that have not been previously announced.
+	 * Should only be called in special circumstances, where novelty is registered for the first time
+	 * typically as part of a broadcast cycle.
+	 * 
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
 	 * @param store Store to announce in

@@ -160,6 +160,15 @@ public class Keywords {
 	public static final Keyword SQL = Keyword.intern("sql");
 	public static final Keyword LOCAL = Keyword.intern("local");
 
+	// P2P node discovery keys
+	public static final Keyword P2P = Keyword.intern("p2p");
+	public static final Keyword NODES = Keyword.intern("nodes");
+
+	// NodeInfo field keys
+	public static final Keyword TRANSPORTS = Keyword.intern("transports");
+	public static final Keyword VERSION = Keyword.intern("version");
+	public static final Keyword REGIONS = Keyword.intern("regions");
+
 	// General API keywords
 	public static final Keyword FAUCET = Keyword.intern("faucet");
 	
