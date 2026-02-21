@@ -36,7 +36,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/**
 	 *  Maximum depth of index, in hex digits
 	 */
-	private static final int MAX_DEPTH=64;
+	public static final int MAX_DEPTH=64;
 	
 	/**
 	 *  Maximum usable size of keys, in bytes

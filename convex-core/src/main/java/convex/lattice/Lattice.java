@@ -21,7 +21,7 @@ import convex.lattice.queue.TopicLattice;
 public class Lattice {
 
 	/**
-	 * ROOT lattice structure with support for:
+	 * Base global lattice lattice structure with support for:
 	 * - :data - General purpose data storage
 	 * - :fs - DLFS replicated filesystem (owner -> drive name -> DLFS node)
 	 *   where drive names are AString (not Keywords)

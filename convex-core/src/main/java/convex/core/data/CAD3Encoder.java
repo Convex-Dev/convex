@@ -539,7 +539,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 			if (count == 1) {
 				// Single entry — depth derived from key
-				long depth = kr.isEmbedded() ? kr.getValue().hexLength() : 64;
+				long depth = kr.isEmbedded() ? kr.getValue().hexLength() : Index.MAX_DEPTH;
 				return new Index<K, V>(depth, me, Index.EMPTY_CHILDREN, (short) 0, 1L);
 			}
 		} else {
@@ -548,8 +548,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 		// Read depth byte, mask, and children
 		int depth = 0xFF & ds.data[ds.pos++];
-		if (depth >= 64) {
-			if (depth == 64) throw new BadFormatException("More than one entry and MAX_DEPTH");
+		if (depth >= Index.MAX_DEPTH) {
+			if (depth == Index.MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
 			throw new BadFormatException("Excessive depth!");
 		}
 

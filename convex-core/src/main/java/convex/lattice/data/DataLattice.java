@@ -10,7 +10,10 @@ import convex.lattice.ALattice;
 /**
  * Lattice that implements an Index hash(x) -> x
  * 
- * This is used for a general data lattice of retained cells
+ * Implements the [:data] path on the global lattice is the simplest and most efficient way
+ * 
+ * This is used for a general data lattice of retained cells. It is efficient and immutable.
+ * Lattice nodes must decide their own strategy on what to retain.
  */
 public class DataLattice extends ALattice<Index<Hash,ACell>> {
 
