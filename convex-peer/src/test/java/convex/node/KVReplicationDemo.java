@@ -57,7 +57,7 @@ public class KVReplicationDemo {
 				AStore store = new MemoryStore();
 				stores.add(store);
 
-				NodeServer<?> server = new NodeServer<>(Lattice.ROOT, store, BASE_PORT + i);
+				NodeServer<?> server = new NodeServer<>(Lattice.ROOT, store, NodeConfig.port(BASE_PORT + i));
 				server.launch();
 				servers.add(server);
 

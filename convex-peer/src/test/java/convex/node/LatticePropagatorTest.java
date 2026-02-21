@@ -45,8 +45,8 @@ public class LatticePropagatorTest {
 		store1 = new MemoryStore();
 		store2 = new MemoryStore();
 
-		server1 = new NodeServer<>(lattice, store1, 19600);
-		server2 = new NodeServer<>(lattice, store2, 19601);
+		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(19600));
+		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(19601));
 
 		// Launch both servers
 		server1.launch();

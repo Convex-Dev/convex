@@ -86,7 +86,7 @@ public class NodeServerTest {
 	@Test
 	public void testCreateMaxLatticeServer() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		assertNotNull(maxNodeServer);
 		assertNotNull(maxNodeServer.getLattice());
@@ -101,7 +101,7 @@ public class NodeServerTest {
 	@Test
 	public void testCreateSetLatticeServer() {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store, null);
+		setNodeServer = new NodeServer<>(lattice, store);
 
 		assertNotNull(setNodeServer);
 		assertNotNull(setNodeServer.getLattice());
@@ -116,7 +116,7 @@ public class NodeServerTest {
 	@Test
 	public void testInitialValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		AInteger initialValue = maxNodeServer.getLocalValue();
 		assertNotNull(initialValue);
@@ -130,7 +130,7 @@ public class NodeServerTest {
 	@Test
 	public void testValueCursor() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		ACursor<AInteger> cursor = maxNodeServer.getCursor();
 		assertNotNull(cursor);
@@ -155,7 +155,7 @@ public class NodeServerTest {
 	@Test
 	public void testMergeValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		// Start with zero
 		assertEquals(CVMLong.ZERO, maxNodeServer.getLocalValue());
@@ -190,7 +190,7 @@ public class NodeServerTest {
 	@Test
 	public void testMergeSetValue() {
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store, null);
+		setNodeServer = new NodeServer<>(lattice, store);
 
 		// Start with empty set
 		assertTrue(setNodeServer.getLocalValue().isEmpty());
@@ -228,7 +228,7 @@ public class NodeServerTest {
 	@Test
 	public void testPeerManagement() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		maxNodeServer.launch();
 
 		LatticePropagator propagator = maxNodeServer.getPropagator();
@@ -270,7 +270,7 @@ public class NodeServerTest {
 	@Test
 	public void testPullFromPeer() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		maxNodeServer.launch();
 
 		// Create a Convex connection to the server
@@ -295,7 +295,7 @@ public class NodeServerTest {
 	@Test
 	public void testLaunchTwice() throws IOException, InterruptedException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		// First launch should work (even though network server is stubbed)
 		maxNodeServer.launch();
@@ -313,7 +313,7 @@ public class NodeServerTest {
 	@Test
 	public void testClose() throws IOException, InterruptedException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
@@ -334,11 +334,11 @@ public class NodeServerTest {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		
 		// Test with null port
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		assertEquals(null, maxNodeServer.getPort());
 
 		// Test with specific port
-		NodeServer<AInteger> server2 = new NodeServer<>(lattice, store, 19999);
+		NodeServer<AInteger> server2 = new NodeServer<>(lattice, store, NodeConfig.port(19999));
 		assertEquals(Integer.valueOf(19999), server2.getPort());
 		
 		try {
@@ -354,7 +354,7 @@ public class NodeServerTest {
 	@Test
 	public void testGetLocalValue() {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 
 		// Initial value
 		AInteger value1 = maxNodeServer.getLocalValue();
@@ -374,7 +374,7 @@ public class NodeServerTest {
 	@Test
 	public void testConvexRemoteConnection() throws IOException, InterruptedException, java.util.concurrent.TimeoutException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		
 		// Launch the server
 		maxNodeServer.launch();
@@ -400,7 +400,7 @@ public class NodeServerTest {
 	@Test
 	public void testPingRequest() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		
 		// Launch the server
 		maxNodeServer.launch();
@@ -441,7 +441,7 @@ public class NodeServerTest {
 	@Test
 	public void testLatticeQueryEmptyPath() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
 		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, null);
+		maxNodeServer = new NodeServer<>(lattice, store);
 		
 		// Launch the server
 		maxNodeServer.launch();
@@ -497,7 +497,7 @@ public class NodeServerTest {
 	public void testAcquireLatticeStructureViaDataRequests() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
 		// Use a SetLattice-backed NodeServer with the shared test store
 		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store, null);
+		setNodeServer = new NodeServer<>(lattice, store);
 		
 		// Create a large lattice value (10,000 distinct elements) so that it spans multiple branches
 		ASet<ACell> latticeValue = Sets.empty();
@@ -556,7 +556,7 @@ public class NodeServerTest {
 		));
 
 		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+			new NodeServer<>(Lattice.ROOT, store, cfg);
 		server.setMergeContext(LatticeContext.create(null, kp));
 
 		try {
@@ -596,7 +596,7 @@ public class NodeServerTest {
 		));
 
 		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+			new NodeServer<>(Lattice.ROOT, store, cfg);
 		server.setMergeContext(LatticeContext.create(null, kp));
 
 		try {
@@ -626,7 +626,7 @@ public class NodeServerTest {
 		));
 
 		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, null, cfg);
+			new NodeServer<>(Lattice.ROOT, store, cfg);
 		// mergeContext stays LatticeContext.EMPTY — no signing key
 
 		try {
@@ -668,7 +668,7 @@ public class NodeServerTest {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		AStore testStore = new MemoryStore();
 
-		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, null);
+		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore);
 
 		try {
 			node.launch();
@@ -733,7 +733,7 @@ public class NodeServerTest {
 		NodeConfig cfg = NodeConfig.create(Maps.of(
 			NodeConfig.PORT, CVMLong.create(-1)
 		));
-		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, null, cfg);
+		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore, cfg);
 
 		try {
 			node.launch();

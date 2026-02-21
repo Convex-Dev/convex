@@ -96,7 +96,7 @@ public class NodeNetworkTest {
 			
 			// Create NodeServer with the common lattice
 			Integer port = BASE_PORT + i;
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, port);
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(port));
 			nodeServers.add(server);
 			
 			// Launch the server
@@ -194,8 +194,11 @@ public class NodeNetworkTest {
 		
 		// Update the :data path with the updated Index
 		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
-		// System.out.println("Server0 value: "+server0.getCursor().get());
-		
+
+		// Sync so the propagator has the value for LATTICE_QUERY responses
+		server0.sync();
+		Thread.sleep(100);
+
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);
 		

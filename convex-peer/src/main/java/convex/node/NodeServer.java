@@ -17,7 +17,6 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -36,7 +35,6 @@ import convex.core.data.Vectors;
 import convex.lattice.ALattice;
 import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.net.AServer;
@@ -77,7 +75,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Cursor for the current local lattice value
 	 */
-	private final ACursor<V> cursor;
+	private final ALatticeCursor<V> cursor;
 
 	/**
 	 * Network server instance for handling connections
@@ -121,25 +119,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private boolean running = false;
 
 	/**
-	 * Creates a new NodeServer with the specified lattice, store, cursor and configuration.
+	 * Creates a new NodeServer with the specified lattice, store and configuration.
 	 *
 	 * @param lattice The lattice instance defining merge semantics
 	 * @param store The store for inbound message decoding and data requests
-	 * @param cursor The cursor to use for lattice state (or null to create a Root)
 	 * @param config Configuration (or null for defaults)
 	 */
-	public NodeServer(ALattice<V> lattice, AStore store, ACursor<V> cursor, NodeConfig config) {
+	public NodeServer(ALattice<V> lattice, AStore store, NodeConfig config) {
 		this.lattice = lattice;
 		this.store = store;
 		this.config = (config != null) ? config : NodeConfig.create();
 		this.port = this.config.getPort();
-
-		// Use provided cursor, or create a lattice-aware root cursor
-		if (cursor != null) {
-			this.cursor = cursor;
-		} else {
-			this.cursor = Cursors.createLattice(lattice);
-		}
+		this.cursor = Cursors.createLattice(lattice);
 
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;
@@ -149,15 +140,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Creates a new NodeServer instance for the specified lattice.
-	 * Convenience constructor that creates a default configuration.
+	 * Creates a new NodeServer instance with default configuration.
 	 *
 	 * @param lattice The lattice instance defining merge semantics
 	 * @param store The store for persisting lattice values
-	 * @param port The port to listen on (null for default/random port)
 	 */
-	public NodeServer(ALattice<V> lattice, AStore store, Integer port) {
-		this(lattice, store, null, (port != null) ? NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(port))) : null);
+	public NodeServer(ALattice<V> lattice, AStore store) {
+		this(lattice, store, (NodeConfig) null);
 	}
 
 	/**
@@ -248,7 +237,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *   <li>A signing key is available in the merge context</li>
 	 * </ul>
 	 */
-	@SuppressWarnings("unchecked")
 	private void publishNodeInfo() {
 		// Only advertise if we have a public URL
 		AString url = config.getURL();
@@ -257,9 +245,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Only advertise if we have a signing key
 		AKeyPair keyPair = mergeContext.getSigningKey();
 		if (keyPair == null) return;
-
-		// Only works with lattice-aware cursors (path navigation needs lattice info)
-		if (!(cursor instanceof ALatticeCursor)) return;
 
 		AString type = Strings.create("Convex Lattice Node");
 		String versionStr = Utils.getVersion();
@@ -271,9 +256,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
 
 		// Navigate to :p2p :nodes and merge the signed entry
-		ALatticeCursor<ACell> nodesCursor =
-			((ALatticeCursor<V>) cursor).path(Keywords.P2P, Keywords.NODES);
-		nodesCursor.merge(entry);
+		cursor.path(Keywords.P2P, Keywords.NODES).merge(entry);
 
 		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
 	}
@@ -433,7 +416,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
 	 */
-	@SuppressWarnings("unchecked")
 	private void processLatticeValue(Message message) throws BadFormatException {
 		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
@@ -449,11 +431,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return;
 		}
 
-		if (!(cursor instanceof ALatticeCursor)) return;
-
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
-		ALatticeCursor<ACell> target = ((ALatticeCursor<V>) cursor).path(path);
+		ALatticeCursor<ACell> target = cursor.path(path);
 		mergeIncoming(target, value);
 
 		// Notify propagators that cursor state has changed. This is non-blocking:
@@ -582,7 +562,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param receivedValue The value received from a peer
 	 * @return The merged value, or null if merge was not performed (e.g., invalid foreign value)
 	 */
-	@SuppressWarnings("unchecked")
 	public V mergeValue(V receivedValue) {
 		if (receivedValue == null) {
 			return null;
@@ -594,11 +573,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return null;
 		}
 
-		if (cursor instanceof ALatticeCursor) {
-			return ((ALatticeCursor<V>) cursor).merge(receivedValue);
-		}
-		// Fallback for non-lattice cursors
-		return cursor.updateAndGet(current -> lattice.merge(mergeContext, current, receivedValue));
+		return cursor.merge(receivedValue);
 	}
 
 	/**
@@ -642,7 +617,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @return The value cursor
 	 */
-	public ACursor<V> getCursor() {
+	public ALatticeCursor<V> getCursor() {
 		return cursor;
 	}
 
@@ -657,9 +632,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
-		if (cursor instanceof ALatticeCursor) {
-			((ALatticeCursor<V>) cursor).withContext(context);
-		}
+		cursor.withContext(context);
 	}
 
 	/**

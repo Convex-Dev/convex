@@ -296,7 +296,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 			// Local-only mode (port -1): persistence + cursor, no Netty network server
 			NodeConfig localConfig = NodeConfig.create(Maps.of(NodeConfig.PORT, CVMLong.create(-1)));
-			nodeServer = new NodeServer<>(OWNER_LATTICE, etchStore, null, localConfig);
+			nodeServer = new NodeServer<>(OWNER_LATTICE, etchStore, localConfig);
 
 			// Set merge context with signing key for OwnerLattice verification
 			LatticeContext ctx = LatticeContext.create(null, keyPair);

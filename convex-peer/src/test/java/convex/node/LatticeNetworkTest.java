@@ -88,7 +88,7 @@ public class LatticeNetworkTest {
 			stores.add(store);
 
 			Integer port = BASE_PORT + i;
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, port);
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(port));
 			nodeServers.add(server);
 
 			server.launch();

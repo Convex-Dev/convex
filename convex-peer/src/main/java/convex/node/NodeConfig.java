@@ -65,6 +65,15 @@ public class NodeConfig {
 	}
 
 	/**
+	 * Create a NodeConfig with a specific port.
+	 * @param port Port number for incoming connections
+	 * @return New NodeConfig instance with port set
+	 */
+	public static NodeConfig port(int port) {
+		return new NodeConfig(Maps.of(PORT, CVMLong.create(port)));
+	}
+
+	/**
 	 * Get the raw config map.
 	 * @return Underlying config map (never null)
 	 */

@@ -126,8 +126,8 @@ public class NodeServerPersistenceTest {
 		backupStore = EtchStore.createTemp("backup");
 
 		// Launch primary and backup
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		primary.launch();
 		backup.launch();
 
@@ -152,7 +152,7 @@ public class NodeServerPersistenceTest {
 		backup = null;
 
 		// Restart primary from same store — should restore
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 		assertEquals(CVMLong.create(42), readDataValue(primary, 42),
 			"Primary should restore value 42 from store");
@@ -160,7 +160,7 @@ public class NodeServerPersistenceTest {
 			"Primary should restore value 99 from store");
 
 		// Restart backup from same store — should restore
-		backup = new NodeServer<>(Lattice.ROOT, backupStore, null);
+		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		backup.launch();
 		assertEquals(CVMLong.create(42), readDataValue(backup, 42),
 			"Backup should restore value 42 from store");
@@ -176,7 +176,7 @@ public class NodeServerPersistenceTest {
 		primaryStore = EtchStore.createTemp("primary");
 
 		// Write and persist some data
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 		writeDataValue(primary, 777);
 		primary.close();
@@ -184,7 +184,7 @@ public class NodeServerPersistenceTest {
 
 		// Restart with restore=false
 		NodeConfig noRestore = NodeConfig.create(Maps.of(NodeConfig.RESTORE, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null, noRestore);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noRestore);
 		primary.launch();
 
 		// Value should NOT be restored
@@ -201,7 +201,7 @@ public class NodeServerPersistenceTest {
 
 		// Launch with persist=false
 		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null, noPersist);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noPersist);
 		primary.launch();
 
 		// Write data
@@ -210,7 +210,7 @@ public class NodeServerPersistenceTest {
 		primary = null;
 
 		// Restart with defaults (restore=true)
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
 		// Value should NOT be there (was never persisted)
@@ -225,7 +225,7 @@ public class NodeServerPersistenceTest {
 	public void testMemoryStoreNoPersistence() throws Exception {
 		primaryStore = new MemoryStore();
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 555);
@@ -235,7 +235,7 @@ public class NodeServerPersistenceTest {
 		primary.close();
 		primary = null;
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 		assertNull(readDataValue(primary, 555),
 			"MemoryStore should not persist data across restarts");
@@ -251,7 +251,7 @@ public class NodeServerPersistenceTest {
 		backupStore = EtchStore.createTemp("backup");
 
 		// Launch primary, write data, close
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 		writeDataValue(primary, 100);
 		writeDataValue(primary, 200);
@@ -259,7 +259,7 @@ public class NodeServerPersistenceTest {
 		primary = null;
 
 		// Restart primary
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
 		// Verify restored
@@ -267,7 +267,7 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(200), readDataValue(primary, 200));
 
 		// Launch backup and sync from restarted primary
-		backup = new NodeServer<>(Lattice.ROOT, backupStore, null);
+		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		backup.launch();
 		syncBackupFromPrimary();
 
@@ -287,8 +287,8 @@ public class NodeServerPersistenceTest {
 		backupStore = EtchStore.createTemp("backup");
 
 		// Launch both
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
-		backup = new NodeServer<>(Lattice.ROOT, backupStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		primary.launch();
 		backup.launch();
 
@@ -307,7 +307,7 @@ public class NodeServerPersistenceTest {
 		writeDataValue(primary, 400);
 
 		// Restart backup — should restore value 300 from its own store
-		backup = new NodeServer<>(Lattice.ROOT, backupStore, null);
+		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		backup.launch();
 		assertEquals(CVMLong.create(300), readDataValue(backup, 300),
 			"Backup should restore value 300 from its own store");
@@ -329,7 +329,7 @@ public class NodeServerPersistenceTest {
 	public void testStoreRootDataIsLatticeValue() throws Exception {
 		primaryStore = EtchStore.createTemp("primary");
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, null);
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
 		writeDataValue(primary, 12345);

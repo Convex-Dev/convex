@@ -77,7 +77,7 @@ public class LatticeDemo {
 				// - Takes the lattice definition (what data structure to use)
 				// - Takes a store (where to persist data)
 				// - Takes a port number (how other nodes can connect to it)
-				NodeServer<?> server = new NodeServer<>(lattice, store, BASE_PORT + i);
+				NodeServer<?> server = new NodeServer<>(lattice, store, NodeConfig.port(BASE_PORT + i));
 				server.launch();  // This automatically starts the LatticePropagator
 				servers.add(server);
 
