@@ -10,7 +10,13 @@ import convex.lattice.kv.KVStoreLattice;
 import convex.lattice.queue.TopicLattice;
 
 /**
- * Static utility base for the lattice
+ * Static utility base for the lattice, defining the standard lattice regions.
+ * 
+ * Lattice applications MAY extend these for their own local / private use 
+ * 
+ * Registration of namespaces and formal specification via CADs is required for interoperability 
+ * and common utility on the public lattice. Violating this rule will probably get your
+ * nodes ignored (for unknown nodes) or kicked (for incorrect usage of existing regions)
  */
 public class Lattice {
 

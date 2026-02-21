@@ -1,107 +1,248 @@
-# Convex Peer Network Design
+# Convex Peer Network Design — PROPOSAL
+
+> **Status**: Design proposal. Sections marked **[EXISTS]** describe current implementation; sections marked **[PROPOSED]** describe new work. Items marked **[DECISION]** require further discussion.
 
 ## 1. Overview
 
-This document describes the design of the Convex peer-to-peer network layer. The network enables peers to discover each other, establish authenticated connections over multiple transports, synchronise consensus state, and serve client requests.
+This document proposes the design for the Convex peer-to-peer network layer. The network enables peers to discover each other, establish authenticated connections over multiple transports, synchronise consensus state, and serve client requests.
 
-The network is built on **lattice technology** — the same algebraic foundation (join-semilattices, CRDTs, cryptographic security) that underlies the entire Convex ecosystem. The P2P network itself is a **lattice region**, meaning peer discovery and metadata propagation use the same merge semantics, delta transmission, and structural sharing as every other part of the lattice.
+The design builds on the existing `NodeServer` infrastructure, which already implements lattice value propagation, path-based merges, and delta gossip. The proposal extends this with:
+
+- **Consensus beliefs as a lattice region** — Belief merge (CPoS) becomes part of the unified lattice, not a separate subsystem
+- **P2P peer discovery lattice** — signed peer metadata with multiple routing strategies
+- **Multi-transport connections** — TCP, WebSocket, HTTPS, SSE with transport advertisement
+- **Reconnection and failover** — automatic reconnect with exponential backoff
 
 The core design principle is **separation of the message protocol from the transport layer**. All transports carry the same CAD3-encoded binary protocol messages — the transport is simply the delivery mechanism.
 
-## 2. Lattice Regions
+## 2. Current Architecture [EXISTS]
 
-The Convex lattice is divided into **regions** (Consensus, Data, DLFS, Execution, P2P, etc.), each defined by its lattice values and merge rules. See [Lattice Technology](https://docs.convex.world/docs/overview/lattice) for the full description of all regions.
+### 2.1 Lattice ROOT
 
-A peer node may participate in any subset of regions based on its role and configuration (**selective attention**). The **P2P Lattice** region, described in this document, is the foundational region that enables discovery and connectivity for all others.
+The global base lattice is defined by `Lattice.ROOT` (`KeyedLattice`):
 
-## 3. The P2P Lattice Region
-
-The P2P Lattice is the foundational region that enables all other lattice communication. It solves the problem of locating and connecting participants in a decentralised network.
-
-### 3.1 Lattice Structure
-
-The P2P Lattice value is a **map of Ed25519 public keys (AccountKey) to SignedData\<PeerInfo\>**:
-
-```clojure
-;; P2P Lattice value (conceptual)
-{
-  0xabc123...  (SignedData <PeerInfo>)   ;; signed by key 0xabc123...
-  0xdef456...  (SignedData <PeerInfo>)   ;; signed by key 0xdef456...
-  0x789012...  (SignedData <PeerInfo>)   ;; signed by key 0x789012...
-}
+```
+Lattice.ROOT
+├── :data  → DataLattice           Content-addressable storage
+├── :fs    → OwnerLattice(MapLattice(DLFSLattice))    Decentralised file systems
+├── :kv    → OwnerLattice(MapLattice(KVStoreLattice))  Key-value databases
+├── :queue → OwnerLattice(MapLattice(TopicLattice))    Message queues
+└── :local → LocalLattice          Peer-local state (not propagated)
 ```
 
-The **key is the actual Ed25519 public key** (AccountKey, 32 bytes). This is critical: the key used to index the map is the same key used to verify the signature on the associated SignedData. This provides immediate verifiability — any node can confirm that a peer entry was genuinely produced by the claimed identity without any additional lookup.
+Each region uses the same algebraic foundations: join-semilattices, SignedData verification, delta transmission, and structural sharing via immutable persistent data structures with CAD3 encoding.
 
-### 3.2 PeerInfo Record
+### 2.2 NodeServer
 
-Each peer publishes a signed PeerInfo record containing its network metadata:
+`NodeServer<V>` is the main implementation for serving and propagating lattice state. It handles:
+
+- **LATTICE_VALUE** (`[:LV [*path*] value]`) — Receive a value at a path, validate via sub-lattice, merge atomically, broadcast delta to propagators
+- **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
+- **DATA_REQUEST** (`[:DR id hash1 hash2 ...]`) — Serve content-addressable data from the store
+- **PING** — Liveness check
+
+Key features:
+- **Automatic missing data recovery** — on `MissingDataException` during merge, acquires data from peers and retries
+- **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
+- **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
+- **LatticePropagator** — manages gossip to connected peers (primary propagator at index 0)
+
+### 2.3 Consensus (Server + BeliefPropagator)
+
+The consensus layer currently operates **outside** the lattice region system:
+
+- `Server` coordinates all peer components: `ConnectionManager`, `BeliefPropagator`, `TransactionHandler`, `QueryHandler`, `CVMExecutor`
+- `BeliefPropagator` queues incoming BELIEF messages, merges via `BeliefMerge`, broadcasts deltas
+- `ConnectionManager` maintains outbound `Convex` client connections, uses stake-weighted random selection
+- Belief = `Index<AccountKey, SignedData<Order>>` — already a lattice value with merge semantics
+
+### 2.4 Protocol Messages [EXISTS]
+
+Current `MessageType` enum (16 types):
+
+| Code | Type | Purpose |
+|------|------|---------|
+| 1 | CHALLENGE | Ed25519 auth challenge `[token, networkId, toPeer]` |
+| 2 | RESPONSE | Auth response `[token, networkId, fromPeer, challengeHash]` |
+| 3 | DATA | Content-addressable data relay |
+| 5 | DATA_REQUEST | Request missing data by hash |
+| 6 | QUERY | Read-only CVM query `[:Q id form address?]` |
+| 7 | TRANSACT | Submit signed transaction `[:TX id signed-data]` |
+| 8 | RESULT | Response to query/transact/command |
+| 9 | BELIEF | Consensus belief propagation (Belief or SignedData\<Order\>) |
+| 10 | REQUEST_BELIEF | Poll for latest belief |
+| 12 | STATUS | Request peer status |
+| 14 | LATTICE_VALUE | Lattice delta `[:LV [*path*] value]` |
+| 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]` |
+| 16 | PING | Connectivity check `[:PING id]` |
+
+### 2.5 Transport [EXISTS]
+
+Currently only **raw TCP** (port 18888) via Netty:
+- `AConnection` — abstract base class with `sendMessage()`/`close()`
+- `NettyConnection` — TCP implementation with outbound queue
+- `NettyServer`/`NIOServer` — inbound connection handlers
+- All messages are length-prefixed CAD3-encoded binary frames
+
+The REST API (`convex-restapi`) runs separately via Javalin on a configurable HTTP port, serving `/api/v1/*` endpoints. MCP transport uses SSE over HTTP.
+
+## 3. Consensus as a Lattice Region [PROPOSED]
+
+### 3.1 Motivation
+
+Belief already has lattice merge semantics (`Index<AccountKey, SignedData<Order>>`, CPoS merge). Currently it's propagated by `BeliefPropagator` as a separate subsystem with its own message types (BELIEF, REQUEST_BELIEF) and broadcast logic. Moving it into the lattice region system means:
+
+- One propagation mechanism for all lattice state (including consensus)
+- Belief merges use the same path-based LATTICE_VALUE protocol as all other regions
+- `NodeServer` handles missing data recovery, delta encoding, and fan-out uniformly
+
+### 3.2 Lattice Path
+
+Consensus beliefs live at:
+
+```
+[:convex <genesis-hash> :peers]
+```
+
+Where `<genesis-hash>` is the network's genesis state hash (32-byte `ABlob`), scoping beliefs to a specific Convex network. This allows a single node to participate in multiple networks simultaneously.
+
+The value at this path is the Belief: `Index<AccountKey, SignedData<Order>>`.
+
+Navigating deeper:
+
+```
+[:convex <genesis-hash> :peers <peer-AccountKey>]
+```
+
+Returns the `SignedData<Order>` for a specific peer.
+
+### 3.3 Merge Semantics
+
+The merge function at the `:peers` level is exactly the existing CPoS belief merge — `BeliefMerge.merge()`. This includes:
+
+- Signature verification on each `SignedData<Order>`
+- Timestamp ordering within Orders
+- Block proposal accumulation
+- Consensus point advancement
+
+The lattice type wrapping this would be a `BeliefLattice` implementing `ALattice<Index<AccountKey, SignedData<Order>>>`, delegating to the existing `BeliefMerge` logic.
+
+### 3.4 Transition Strategy
+
+The migration to lattice-based consensus propagation follows a **gradual** approach:
+
+1. **Phase 1 — P2P lattice first**: Implement the `[:p2p :nodes]` region and get lattice-based peer discovery working. This exercises the `NodeServer` propagation path for a new region without touching consensus. Existing BELIEF messages and `BeliefPropagator` remain unchanged.
+
+2. **Phase 2 — BeliefLattice type**: Implement `BeliefLattice` wrapping `BeliefMerge`, register it at `[:convex <genesis-hash> :peers]`. Add support for beliefs arriving as LATTICE_VALUE at this path alongside the existing BELIEF message type.
+
+3. **Phase 3 — Dual path**: Both BELIEF and LATTICE_VALUE carry consensus updates. Peers accept either. `BeliefPropagator` retains its timing loop (30ms accumulation, 300ms rebroadcast, block generation triggers) but can optionally emit LATTICE_VALUE messages.
+
+4. **Phase 4 — Deprecate BELIEF**: Once the LATTICE_VALUE path is proven, deprecate the dedicated BELIEF message type. `BeliefPropagator` remains as a consensus-specific timing wrapper but speaks the standard lattice protocol.
+
+This approach avoids disrupting the consensus-critical path while progressively unifying the propagation mechanism.
+
+### 3.5 Network Identity via Genesis Hash
+
+The genesis hash uniquely identifies a Convex network. Using it in the lattice path means:
+
+- A node can serve beliefs for multiple networks (e.g., mainnet + testnet)
+- Peers automatically scope their belief merges to the correct network
+- No confusion between networks — genesis hash mismatch means different lattice paths
+
+The `:convex` keyword at the root level is a namespace for Convex-native protocol state (consensus, peer status, governance). Application-level regions (`:data`, `:fs`, `:kv`, `:queue`) remain at their existing root-level paths.
+
+## 4. P2P Discovery Lattice [PROPOSED]
+
+### 4.1 Lattice Paths
+
+P2P state lives under the `:p2p` region with two sub-regions:
+
+```
+[:p2p :nodes]  → OwnerLattice<NodeInfo>   Known peers and their metadata
+[:p2p :kad]    → KadLattice               Kademlia routing table
+```
+
+Both follow standard lattice merge semantics with SignedData verification.
+
+### 4.2 Node Registry: `[:p2p :nodes]`
+
+The node registry is a map of `AccountKey → SignedData<NodeInfo>`:
 
 ```clojure
-;; PeerInfo (wrapped in SignedData, signed by the peer's Ed25519 key)
+;; Value at [:p2p :nodes] (conceptual)
+{0xabc123... → SignedData<NodeInfo>   ;; signed by 0xabc123...
+ 0xdef456... → SignedData<NodeInfo>   ;; signed by 0xdef456...}
+```
+
+This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey used as the map key must match the signer of the `SignedData`, providing immediate verifiability.
+
+#### NodeInfo Record
+
+```clojure
+;; NodeInfo (wrapped in SignedData)
 {:transports  #{"tcp://peer.convex.world:18888"
                 "wss://peer.convex.world/ws"
                 "https://peer.convex.world"}
  :timestamp   1708000000000       ;; monotonic, milliseconds
- :regions     #{:consensus :p2p :data :dlfs}  ;; lattice regions this peer participates in
- :version     "0.8.2"             ;; protocol version
+ :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
+ :version     "0.8.3"             ;; protocol version
  :metadata    {...}}              ;; optional additional metadata
 ```
 
-### 3.3 Merge Function
+#### Merge Function
 
-The merge function for the P2P Lattice follows the standard lattice map merge pattern with merge context:
+Standard `OwnerLattice` merge with additional NodeInfo-specific rules:
 
-```
-new_value = merge(context, existing, received)
+- **Signature verification** via `OwnerLattice` — signer must match owner key
+- **Timestamp monotonicity** — newer NodeInfo replaces older (LWW per owner)
+- **Conditional acceptance** via `LatticeContext` — nodes may reject entries from peers with zero on-chain stake, unregistered peers, etc.
 
-  for each AccountKey k in union(keys(existing), keys(received)):
-    if k only in existing:  keep existing[k]
-    if k only in received:  validate and accept received[k]
-    if k in both:           take the entry with the higher timestamp,
-                            but ONLY if the signature is valid for key k
-```
+#### Relationship to On-Chain PeerStatus
 
-**Merge context** is used for:
-- **Signature verification**: The merge only accepts a PeerInfo entry if its SignedData signature is valid for the AccountKey used as the map key. Invalid signatures are silently discarded.
-- **Timestamp monotonicity**: A received entry replaces an existing one only if its timestamp is strictly greater. This prevents replay of old metadata.
-- **Conditional acceptance**: Nodes may apply additional rules (e.g., rejecting entries from peers with zero stake, or peers not registered on-chain).
+On-chain `PeerStatus` (in global consensus state) is the **single source of truth** for peer identity: AccountKey, stake, controller address, delegated stakes, balance, and metadata (including a `:url` hostname entry). This is the authoritative peer registry — if a peer isn't registered on-chain with stake, it isn't a peer.
 
-This design means:
-- A peer can only update its own entry (only it possesses the private key to sign)
-- Stale or forged entries are automatically rejected
-- The map converges to the latest valid state for each peer under gossip
-- No coordination is needed — the CRDT properties guarantee convergence
+The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain metadata** for operational convenience: multiple transport URIs, supported lattice regions, protocol version, and capabilities. This data propagates faster than on-chain updates (gossip vs. consensus finality) but has weaker guarantees (no finality, latest-timestamp-wins). It is always subordinate to the on-chain record.
 
-### 3.4 Kademlia-Style Routing
+**Bootstrap path**: A new node reads the on-chain peer list (PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then pulls the P2P node registry to discover richer transport metadata. The on-chain URL is always the fallback when P2P metadata is unavailable.
 
-The P2P Lattice operates in a manner similar to Kademlia for routing and peer selection. Peers are addressed by their Ed25519 public key (interpreted as a 256-bit identifier), and XOR distance determines proximity in cryptographic space.
+**Validation**: Nodes should validate P2P entries against on-chain state — reject NodeInfo from AccountKeys not registered on-chain, or from peers with zero stake. The on-chain PeerStatus is the trust anchor; the P2P lattice is a convenience cache.
 
-Each node maintains a **partial view** of the P2P Lattice — specifically, entries for peers that are "near" in XOR distance, plus a selection of more distant peers for logarithmic routing. This follows the Kademlia k-bucket model: nodes only need to store metadata for peers relatively near to them, making this a highly efficient and fault-tolerant decentralised service.
+### 4.3 Kademlia Routing [FUTURE]
 
-Routing provides O(log N) hop discovery of any peer on the network.
+Kademlia provides O(log N) lookup of any peer by AccountKey, using XOR distance. The `Kademlia` utility class already provides `proximity()` and `distance()` functions. `KadLattice` exists as a stub.
 
-### 3.5 Efficiency
+This is planned for **future implementation** when the network scales beyond what the node registry and on-chain peer list can efficiently serve. For current network sizes (up to hundreds of peers), strategies 1-3 in §4.4 are sufficient.
 
-The P2P Lattice benefits from all the standard lattice efficiency mechanisms:
+When implemented, Kademlia routing state would be **node-local** (not propagated) since each node's k-bucket view is inherently specific to its own key position. It would live under `:local` or as a non-propagated local data structure.
 
-- **Delta transmission**: Only changed PeerInfo entries are transmitted during gossip, not the entire map
-- **Structural sharing**: The underlying immutable persistent data structures share unchanged subtrees
-- **Merge coalescing**: Multiple received updates can be merged locally before propagating a single combined update
-- **Garbage collection**: Entries for peers that have been offline beyond a threshold can be pruned
+### 4.4 Peer Discovery Strategies
 
-## 4. Relationship to Other Lattice Regions
+A node uses multiple strategies to discover and maintain connections, in order:
 
-The P2P Lattice follows the same structural pattern as the Consensus Lattice (Belief = map of AccountKey → SignedData\<Order\>) and other lattice regions. All use AccountKey-indexed maps with SignedData, converge through gossip merges, and share the same CAD3 encoding and delta transmission. This means the networking layer treats all regions uniformly — the same gossip protocol propagates all lattice state, differing only in the merge function applied per region. See the [Convex White Paper](https://docs.convex.world/docs/overview/convex-whitepaper) for details on the Consensus Lattice specifically.
+1. **Configured peers** — Explicitly configured connection endpoints (bootstrap nodes, operator preferences). These are tried first and maintained persistently.
 
-## 5. Transport Layer
+2. **On-chain peer registry** — `PeerStatus` entries in consensus state provide hostname/URL for staked peers. Used for bootstrapping and as fallback. `ConnectionManager` already uses stake-weighted random selection from this registry.
+
+3. **P2P node registry** (`[:p2p :nodes]`) — Richer transport metadata propagated via gossip. Provides multi-protocol endpoints and faster updates than on-chain.
+
+4. **Kademlia lookup** [FUTURE] — For discovering specific peers by AccountKey when direct routing is needed. O(log N) hops. Not needed at current network scale; planned for future growth.
+
+### 4.5 Selective Attention
+
+Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry advertises which regions each peer serves, enabling efficient gossip targeting.
+
+This is already natural in the `NodeServer` model — propagators only transmit deltas for paths that have changed, and nodes only merge values for lattice types they have registered.
+
+## 5. Transport Layer [PROPOSED]
 
 ### 5.1 Architecture
 
 ```
 ┌─────────────────────────────────────────┐
-│       Lattice Regions                   │
-│  (Consensus, P2P, Data, DLFS, Exec)    │
+│            Lattice Regions              │
+│  (Consensus, P2P, Data, FS, KV, ...)   │
+├─────────────────────────────────────────┤
+│      NodeServer (merge + propagate)     │
 ├─────────────────────────────────────────┤
 │   Binary Protocol Messages (CAD3)       │
 ├─────────────────────────────────────────┤
@@ -112,173 +253,143 @@ The P2P Lattice follows the same structural pattern as the Consensus Lattice (Be
 └──────┴──────────┴──────────┴────────────┘
 ```
 
-All transports implement a unified connection interface:
-
-```java
-interface PeerConnection {
-    CompletableFuture<Result> send(Message msg);
-    void onReceive(Consumer<Message> handler);
-    ConnectionState getState();
-    void close();
-    void addStateListener(Consumer<ConnectionState> listener);
-    ConnectionType type();  // TCP, WSS, HTTP, STREAM
-}
-```
+`NodeServer` sits at the centre, managing lattice state and dispatching to/from transport adapters. This is the key difference from the current architecture where `Server` manages consensus separately from `NodeServer`.
 
 ### 5.2 Transport Comparison
 
 | Transport | Port | Use Case | Encrypted | Bidirectional | Persistent |
 |---|---|---|---|---|---|
-| Raw TCP | 18888 | Consensus sync, belief merge, validator gossip | No | Yes | Yes |
+| Raw TCP | 18888 | Validator-to-validator: belief gossip, lattice sync | No (public data) | Yes | Yes |
 | WebSocket (WSS) | 443 | Browsers, AI agents, general clients | Yes (TLS) | Yes | Yes |
 | HTTPS req/resp | 443 | Simple queries, transaction submission | Yes (TLS) | No (client-initiated) | No |
 | Streamable HTTP (SSE) | 443 | Subscriptions, MCP transport | Yes (TLS) | Half-duplex (POST + SSE) | Yes |
 
-### 5.3 Raw TCP (Port 18888)
+### 5.3 Raw TCP (Port 18888) [EXISTS]
 
-Used for validator-to-validator consensus communication. Messages are length-prefixed binary frames carrying CAD3-encoded data.
+Validator-to-validator communication via Netty. Messages are length-prefixed CAD3-encoded binary frames.
 
-Encryption is not required because consensus messages (beliefs, blocks) are **public data** and are **individually signed** by the originating peer's Ed25519 key via SignedData. Any tampered message fails signature verification and is dropped. Peer identities and stakes are public on-chain, so metadata privacy is not a concern for consensus traffic.
+Encryption is not required because:
+- Consensus messages (beliefs, orders, blocks) are **individually signed** via SignedData — tampered messages fail verification
+- Peer identities and stakes are public on-chain
+- Lattice values carry their own integrity via Merkle hashing
 
-### 5.4 WebSocket (WSS)
+Raw TCP carries **only** peer-to-peer lattice traffic. Client-facing traffic (queries, transactions with potentially sensitive data) should use TLS-protected transports.
 
-Full-duplex binary channel over TLS. WSS is WebSocket over TLS — the existing TLS configuration for HTTPS covers WSS automatically. The existing binary protocol messages are carried directly as WebSocket binary frames.
+### 5.4 WebSocket (WSS) [PROPOSED]
 
-This is the preferred transport for clients needing persistent connections — browsers, AI agents, wallets, and dApps. Runs on port 443 alongside HTTPS, making it firewall-friendly.
+Full-duplex binary channel over TLS. The existing CAD3 binary protocol messages are carried directly as WebSocket binary frames.
 
-Java support is straightforward: if the peer already runs on Netty or Jetty for HTTP, adding a WebSocket handler is simply adding a route. Java 11+ `HttpClient` supports WebSocket client-side out of the box.
+Preferred transport for clients needing persistent connections — browsers, AI agents, wallets, dApps. Runs on port 443 alongside HTTPS, making it firewall-friendly.
 
-### 5.5 HTTPS Request/Response
+Since the peer already runs Netty, adding a WebSocket handler is adding a route to the existing pipeline.
 
-Stateless HTTP endpoints for simple operations. Supports both CAD3 binary (`Content-Type: application/octet-stream`) and JSON (`application/json`) depending on the `Accept` header.
+### 5.5 HTTPS Request/Response [EXISTS — partial]
 
-### 5.6 Streamable HTTP (SSE)
+The REST API (`convex-restapi`, Javalin) already serves:
 
-Follows the MCP Streamable HTTP pattern: client sends a POST request, and the response is either a single JSON-RPC response or upgrades to an SSE stream for server-initiated push. The client includes a session ID header (`Mcp-Session-Id`) for continuity.
+```
+POST /api/v1/transact              Submit signed transaction
+POST /api/v1/transaction/prepare   Prepare transaction, get hash
+POST /api/v1/transaction/submit    Submit prepared transaction
+POST /api/v1/query                 Read-only CVM query
+POST /api/v1/faucet                Request testnet funds
+POST /api/v1/createAccount         Create new account
+GET  /api/v1/accounts/{addr}       Account info
+GET  /api/v1/status                Peer status
+GET  /api/v1/blocks/{num}          Block data
+GET  /api/v1/data/{hash}           Content-addressable data
+POST /api/v1/data/encode           Encode to CAD3
+POST /api/v1/data/decode           Decode from CAD3
+```
 
-This reuses the existing MCP transport pattern rather than inventing a new streaming protocol, and provides a universal fallback for clients that cannot use WebSocket.
+These endpoints can also support CAD3 binary (`Content-Type: application/octet-stream`) alongside JSON for lower overhead.
 
-## 6. Transport Advertisement
+### 5.6 Streamable HTTP (SSE) [EXISTS — MCP only]
 
-Peers advertise their available transports as a **set of URIs** within the PeerInfo record in the P2P Lattice. Individual API endpoints beneath each transport are standardised and not advertised separately.
+The MCP transport already implements SSE over HTTP for AI agent integration (`POST /mcp` with SSE response stream). This pattern could be generalised for lattice subscriptions.
+
+### 5.7 Server Architecture
+
+Two server frameworks, each handling what it does best:
+
+- **Netty** — Binary protocol over TCP (port 18888) and WSS (port 443). High-performance peer-to-peer lattice traffic: beliefs, lattice deltas, data sync. Length-prefixed CAD3 frames.
+- **Javalin** — HTTP-based APIs: REST endpoints (`/api/v1/*`), MCP transport (`/mcp`), SSE subscriptions. Web/API-friendly with JSON support, middleware, CORS, etc.
+
+Both connect to the same `NodeServer` for lattice operations and the same `Server` for consensus/transaction handling.
+
+## 6. Transport Advertisement [PROPOSED]
 
 ### 6.1 URI Format
 
-```
-tcp://peer.convex.world:18888            Raw binary P2P
-wss://peer.convex.world/ws               WebSocket binary
-https://peer.convex.world                HTTPS (REST + SSE + MCP)
-```
-
-For peer-to-peer addressing by public key:
+Peers advertise available transports as a set of URIs in NodeInfo:
 
 ```
-tcp://<ed25519-pubkey-hex>@peer.convex.world:18888
+tcp://peer.convex.world:18888            Raw binary (peer-to-peer)
+wss://peer.convex.world/ws               WebSocket binary (clients)
+https://peer.convex.world                HTTPS REST + MCP
+```
+
+Public key addressing for peer-to-peer:
+
+```
+tcp://0xabc123...@peer.convex.world:18888
 ```
 
 ### 6.2 Transport Selection
 
 Clients select the best available transport from the peer's advertised set:
 
-- Validators prefer TCP for consensus traffic (lowest overhead)
-- Browsers use WSS (native WebSocket support)
-- Simple API callers use HTTPS
-- AI agents and MCP clients use WSS or Streamable HTTP
+- **Validators** prefer TCP for consensus (lowest overhead)
+- **Browsers** use WSS (native WebSocket support)
+- **Simple API callers** use HTTPS
+- **AI agents / MCP clients** use WSS or Streamable HTTP
 
-### 6.3 On-Chain Peer Registration
+### 6.3 On-Chain as Source of Truth
 
-Peers are registered on-chain with their AccountKey (Ed25519 public key) and stake. The on-chain peer record is the authoritative source of peer identity. The P2P Lattice provides fast off-chain propagation of transport metadata, with on-chain registration as the root of trust.
+On-chain `PeerStatus` is the authoritative peer registry. Its metadata includes a `:url` entry (hostname) which is the primary and always-available connection point. The P2P node registry provides supplementary transport metadata.
 
-```clojure
-;; On-chain peer record (existing)
-{:key        0xabc123...         ;; Ed25519 AccountKey
- :stake      1000000000000       ;; staked amount in copper
- :url        "https://peer.convex.world"}
+**Bootstrap flow**:
 
-;; P2P Lattice extends this with richer off-chain metadata
-;; propagated via gossip with SignedData verification
-```
+1. New node reads on-chain peer list — `PeerStatus` records with hostnames and stakes
+2. Connects to staked peers via on-chain `:url` (TCP or HTTPS)
+3. Optionally pulls P2P node registry (`[:p2p :nodes]`) for richer transport metadata
+4. Establishes preferred connections using advertised URIs where available, falling back to on-chain hostname
 
-## 7. Standardised Endpoints
+## 7. Authentication [EXISTS + PROPOSED]
 
-All HTTPS/WSS endpoints follow a standard structure under the advertised base URI:
+### 7.1 Raw TCP (Peer-to-Peer) [EXISTS]
 
-```
-https://peer.convex.world
-├── /api/v1
-│   ├── /transact          POST   Submit signed transaction
-│   ├── /prepare           POST   Prepare transaction, get hash
-│   ├── /query             POST   Read-only query
-│   ├── /faucet            POST   Request testnet funds
-│   ├── /account/{addr}    GET    Account info
-│   ├── /status            GET    Peer status and network info
-│   └── /block/{hash}      GET    Block data
-│
-├── /ws                     WSS    Persistent binary protocol
-│
-├── /stream/v1
-│   ├── /subscribe          POST   Subscribe to state changes (SSE)
-│   └── /gossip             POST   Peer gossip channel (SSE)
-│
-├── /mcp                    SSE    MCP transport (existing)
-│
-└── /peer/v1
-    ├── /hello              POST   Peer handshake (signed HELLO)
-    ├── /peers              GET    Known peer list (P2P Lattice subset)
-    └── /belief             POST   Submit/request belief merge
-```
+No per-connection authentication needed. Every lattice value and consensus message is wrapped in **SignedData** — signed by the originating peer's Ed25519 key. Any recipient validates the signature against the AccountKey before accepting the merge. Invalid signatures are silently dropped.
 
-## 8. Authentication
+This is fundamental: SignedData provides **end-to-end** authentication independent of transport.
 
-### 8.1 Ed25519 Challenge/Response (WSS, HTTPS Sessions)
+### 7.2 Ed25519 Challenge/Response [EXISTS]
 
-Identity is established via Ed25519 challenge/response. The peer verifies that the connecting party possesses the private key corresponding to a claimed AccountKey:
+`CHALLENGE` (type 1) and `RESPONSE` (type 2) messages already exist for identity verification. The peer verifies that the connecting party possesses the private key for a claimed AccountKey:
 
 ```
 Client                              Peer
   │                                   │
-  ├── HELLO {AccountKey, transports} ──→
+  ├── CHALLENGE request ──────────────→
   │                                   │
-  ←── CHALLENGE {nonce (32 bytes)} ────┤
+  ←── CHALLENGE [token, networkId,    │
+  │               toPeer] ────────────┤
   │                                   │
-  ├── RESPONSE {sig(nonce ‖            │
-  │     peer_AccountKey ‖ timestamp)} ─→
+  ├── RESPONSE [token, networkId,     │
+  │            fromPeer, sig] ────────→
   │                                   │
-  ←── AUTHENTICATED ───────────────────┤
+  ←── AUTHENTICATED ──────────────────┤
 ```
 
-The signed payload includes the peer's AccountKey to prevent MITM forwarding, and a timestamp to prevent replay. The nonce must be server-generated and random.
+The challenge includes `networkId` (genesis hash) to prevent cross-network replay, and the token is server-generated random bytes.
 
-### 8.2 Mutual Authentication
+### 7.3 Re-authentication on Reconnect
 
-For peer-to-peer connections where both sides verify identity:
+On reconnect, challenge/response is re-run (cheap: one Ed25519 sign + verify). The peer can restore session state (subscriptions, pending responses) keyed by AccountKey.
 
-```
-Client                              Peer
-  │                                   │
-  ├── HELLO {key_c, nonce_c} ──────────→
-  │                                   │
-  ←── HELLO {key_p, nonce_p,           │
-  │          sig_p(nonce_c)} ──────────┤
-  │                                   │
-  ├── AUTH {sig_c(nonce_p)} ───────────→
-  │                                   │
-  ←── AUTHENTICATED ───────────────────┤
-```
+## 8. Connection Management [PROPOSED]
 
-Two round trips for mutual authentication, one for client-only.
-
-### 8.3 Raw TCP (Consensus)
-
-No per-connection authentication is needed. Every consensus message (belief, block order) is wrapped in **SignedData** — signed by the peer's Ed25519 key with the AccountKey embedded. Any recipient validates the signature against the AccountKey before accepting the merge. Invalid signatures are dropped.
-
-### 8.4 Re-authentication on Reconnect
-
-On reconnect, the challenge/response is re-run. It is cheap (one Ed25519 signature + one verify). The peer can then restore session state associated with the AccountKey (subscriptions, pending responses).
-
-## 9. Connection Management
-
-### 9.1 Connection Lifecycle
+### 8.1 Connection Lifecycle
 
 ```
 CONNECTING → CONNECTED → DISCONNECTED
@@ -288,138 +399,219 @@ CONNECTING → CONNECTED → DISCONNECTED
                         → FAILED (max retries)
 ```
 
-### 9.2 Client API
+### 8.2 Current Implementation [EXISTS]
 
-```java
-// Simple connection
-Connection conn = Convex.connect("wss://peer.convex.world/ws");
+`ConnectionManager` maintains a `HashMap<AccountKey, Convex>` of outbound connections. It:
+- Uses stake-weighted random selection from on-chain peer registry
+- Drops peers below minimum stake threshold
+- Maintains configurable target connection count (`:outgoing-connections` config)
+- Polls random peers for latest belief
+- Broadcasts messages to all live connections (shuffled order)
 
-// With configuration
-Connection conn = Convex.connect("wss://peer.convex.world/ws",
-    ConnectionConfig.builder()
-        .reconnect(true)              // default: true
-        .maxRetries(5)                // default: unlimited
-        .backoff(1000, 30000)         // initial ms, max ms (exponential)
-        .timeout(5000)                // connect timeout ms
-        .onDisconnect(c -> log)
-        .onReconnect(c -> resubscribe)
-        .build());
+### 8.3 Reconnection [PROPOSED]
+
+Automatic reconnection with exponential backoff:
+
+- **Initial delay**: 1 second
+- **Max delay**: 30 seconds (exponential growth with jitter)
+- **Max retries**: Configurable (default: unlimited for configured peers, limited for discovered peers)
+
+Per message type:
+- **Transactions**: Fail-fast on disconnect. Caller must handle sequence number management.
+- **Queries**: Fail-fast. Idempotent — caller can re-issue.
+- **Lattice subscriptions**: Auto-resubscribe on reconnect.
+
+### 8.4 Transport Failover [PROPOSED]
+
+If a peer advertises multiple transports in `[:p2p :nodes]`, `Convex.connect()` can attempt them in preference order on failure:
+
+1. WSS (full-duplex, TLS)
+2. HTTPS (stateless, TLS)
+3. TCP (raw binary, no TLS)
+
+On reconnect, if the current transport repeatedly fails, the next is tried.
+
+## 9. NodeServer as P2P Core [PROPOSED]
+
+### 9.1 Architecture
+
+`NodeServer` becomes the unified core for all lattice propagation, including consensus:
+
+```
+NodeServer (lattice merge + propagate)
+├── LatticePropagator[0] — primary (peers, gossip)
+├── LatticePropagator[1..N] — additional propagators
+├── BeliefPropagator — consensus-specific timing (gradual migration)
+│   └── Currently: BELIEF messages
+│   └── Future: LATTICE_VALUE at [:convex <genesis> :peers]
+├── ConnectionManager — outbound peer connections
+│   └── Manages Convex clients, stake-weighted selection from on-chain PeerStatus
+└── Transport
+    ├── NettyServer (TCP :18888)           [EXISTS] — peer binary protocol
+    ├── NettyServer (WSS :443)             [PROPOSED] — client binary protocol
+    └── Javalin (HTTPS + MCP)              [EXISTS] — web/API/MCP
 ```
 
-`Convex.connect(uri)` currently supports TCP and HTTPS URIs. This design extends it to also accept `wss://` URIs, selecting the appropriate transport adapter internally.
+### 9.2 Message Routing
 
-### 9.3 Reconnect Behaviour
+All incoming messages flow through `NodeServer.handleIncomingMessage()`:
 
-Automatic reconnection with exponential backoff is the default:
+| Message | Handler | Notes |
+|---------|---------|-------|
+| LATTICE_VALUE | `mergeValueWithAcquire()` | Merge at path, auto-acquire missing data |
+| LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
+| DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
+| PING | `processPing()` | Respond with RESULT |
+| BELIEF | `BeliefPropagator.queueBelief()` | **Transition**: eventually becomes LATTICE_VALUE at consensus path |
+| QUERY | `QueryHandler` | CVM query execution |
+| TRANSACT | `TransactionHandler` | Transaction submission |
+| CHALLENGE/RESPONSE | `ConnectionManager` | Authentication |
+| STATUS | `Server` | Peer status |
 
-- **Transactions**: Fail-fast. The caller must know the message was not delivered so they can handle sequence number management.
-- **Queries**: Fail-fast. Queries are idempotent and the caller can re-issue.
-- **Subscriptions**: Auto-resubscribe on reconnect. Session continuity allows the peer to restore subscription state without the client re-registering.
+### 9.3 Gossip via LatticePropagator
 
-The `CompletableFuture<Result>` return from `send()` naturally handles the async case — it completes when the response arrives, or completes exceptionally if the connection is in FAILED state.
+`LatticePropagator` (already exists) handles the gossip cycle:
 
-### 9.4 Transport Failover
+1. **Receive merge** — `NodeServer` merges incoming LATTICE_VALUE, updates cursor
+2. **Detect delta** — propagator computes what changed since last transmission to each peer
+3. **Transmit delta** — send LATTICE_VALUE messages with only changed sub-trees
+4. **Coalesce** — multiple incoming merges produce at most one outgoing delta per peer
 
-If a peer advertises multiple transports in the P2P Lattice, `Convex.connect()` can attempt them in preference order on failure: WSS → HTTPS → TCP. On reconnect, if the current transport repeatedly fails, the next transport is tried.
+This already works for `:data`, `:fs`, `:kv`, `:queue`. Extending it to `:convex` (consensus) and `:p2p` is adding lattice types, not new propagation mechanisms.
 
-## 10. Protocol Messages
+## 10. Security Model
 
-All messages are CAD3-encoded binary, regardless of transport.
+### 10.1 End-to-End via SignedData [EXISTS]
 
-| Message | Purpose | Transports |
-|---|---|---|
-| `HELLO` | Signed handshake (AccountKey + transports + timestamp) | All |
-| `CHALLENGE` / `RESPONSE` | Ed25519 identity verification | WSS, HTTPS |
-| `BELIEF` | SignedData\<Belief\> — consensus belief propagation | TCP, WSS |
-| `QUERY` | Read-only CVM query | All |
-| `TRANSACT` | Submit SignedData\<Transaction\> | All |
-| `FIND_NODE` | Request peers near a target AccountKey (Kademlia) | TCP, WSS |
-| `PING` / `PONG` | Liveness check | TCP, WSS |
-| `GOSSIP` | P2P Lattice delta (peer metadata updates) | TCP, WSS |
-| `SUBSCRIBE` / `NOTIFY` | State change subscription | WSS, SSE |
-| `ACQUIRE` | Request content-addressable data (Data Lattice) | TCP, WSS |
+SignedData is fundamental to all lattice operations. Every belief, every peer metadata update, every transaction is wrapped in SignedData with the originator's AccountKey. This provides integrity and authentication **independent** of transport security.
 
-## 11. Security Model
+### 10.2 Per-Transport Security
 
 | Transport | Confidentiality | Integrity | Authentication |
 |---|---|---|---|
-| TCP :18888 | None (public data) | SignedData per message | AccountKey in SignedData |
-| WSS :443 | TLS | TLS + SignedData | Challenge/response (AccountKey) |
-| HTTPS :443 | TLS | TLS + SignedData | Challenge/response or API key |
+| TCP :18888 | None | SignedData per value | AccountKey in SignedData |
+| WSS :443 | TLS | TLS + SignedData | Challenge/response |
+| HTTPS :443 | TLS | TLS + SignedData | Challenge/response or bearer token |
 | SSE :443 | TLS | TLS + SignedData | Session ID + challenge/response |
 
-The security model leverages the fact that **SignedData is fundamental to all lattice operations**. Every belief, every peer metadata update, every transaction is wrapped in SignedData with the originator's AccountKey. This provides end-to-end integrity and authentication independent of transport security.
+Raw TCP carries only peer-to-peer lattice traffic (beliefs, peer metadata, data sync) which is individually signed and public. TLS-protected transports are used for client-facing traffic where query results or transaction details may be sensitive.
 
-Raw TCP carries only public consensus data (beliefs, peer metadata) which are individually signed. TLS provides confidentiality for client-facing transports where transaction details or query results may be sensitive.
+### 10.3 Conditional Acceptance via LatticeContext [EXISTS]
 
-## 12. Peer Management and Reputation
+Nodes apply acceptance rules during lattice merges via `LatticeContext`:
 
-### 12.1 Peer Lifecycle
+- **Always**: reject invalid signatures (enforced by `OwnerLattice`/`SignedLattice`)
+- **Always**: reject non-monotonic timestamps (enforced by LWW merge)
+- **Optional**: reject entries from peers with zero on-chain stake
+- **Optional**: reject entries from unregistered peers
+- **Optional**: rate limiting to prevent metadata spam
+
+These rules are enforced locally. Invalid entries are silently discarded and cannot propagate through the network because every honest node independently validates.
+
+## 11. Peer Lifecycle
 
 1. **Registration**: Peer registers on-chain with AccountKey and stake
-2. **Advertisement**: Peer publishes SignedData\<PeerInfo\> to the P2P Lattice
-3. **Discovery**: Other peers discover via Kademlia routing and gossip
-4. **Connection**: Peers establish connections using advertised transports
-5. **Participation**: Peer joins lattice regions (consensus, data, etc.)
-6. **Departure**: Peer's PeerInfo ages out; stake can be withdrawn on-chain
+2. **Bootstrap**: Connects to configured peers or on-chain hostnames
+3. **Advertisement**: Publishes `SignedData<NodeInfo>` to `[:p2p :nodes]`
+4. **Discovery**: Discovered by other peers via P2P gossip (and optionally Kademlia)
+5. **Connection**: Peers establish connections using advertised transport URIs
+6. **Participation**: Peer joins lattice regions (consensus, data, etc.) via selective attention
+7. **Departure**: NodeInfo ages out; peer can withdraw stake on-chain
 
-### 12.2 Reputation Metrics
+## 12. Lattice Path Summary
 
-Peers track reliability per connection:
-
-- **Message delivery ratio**: forwarded vs. acknowledged messages
-- **Latency**: rolling average round-trip time
-- **Liveness**: exponential decay on last-seen — peers that go silent are deprioritised
-- **Stake weight**: on-chain stake influences routing priority for consensus paths
-
-Peers are evicted from Kademlia k-buckets only when a better candidate (closer in XOR distance, higher reliability) becomes available. Stake-weighted reputation ensures active validators maintain strong connectivity.
-
-### 12.3 Conditional Acceptance
-
-Following the lattice merge context model, nodes apply conditional acceptance rules during P2P Lattice merges:
-
-- Reject entries with invalid signatures (always)
-- Reject entries with non-monotonic timestamps (always)
-- Optionally reject entries from peers with zero on-chain stake
-- Optionally reject entries from peers not registered on-chain
-- Optionally apply rate limits to prevent metadata spam
-
-These rules are enforced locally by each node. Invalid entries are simply discarded — they cannot propagate through the network because every honest node independently applies the same validation.
-
-## 13. Lattice Gossip Protocol
-
-### 13.1 Gossip Cycle
-
-The gossip protocol for lattice regions follows a simple pattern:
-
-1. **Merge locally**: Coalesce all recently received lattice updates
-2. **Compute delta**: Determine what has changed since the last transmission to each connected peer (using structural sharing and fast comparison)
-3. **Transmit delta**: Send only the changed portions (CAD3 delta encoding)
-4. **Receive and merge**: Accept deltas from peers, apply merge function with context
-
-This cycle runs continuously. Merge coalescing naturally reduces traffic — a node receiving N updates produces at most one outgoing delta per peer.
-
-### 13.2 Cross-Region Gossip
-
-A single gossip message can carry deltas for multiple lattice regions simultaneously. This is efficient because the top-level lattice structure is itself a map of region identifiers to region values:
-
-```clojure
-;; Gossip message (conceptual)
-{:p2p       <delta of P2P Lattice>
- :consensus <delta of Consensus Belief>
- :data      <delta of Data Lattice acquisitions>}
+```
+Lattice.ROOT (KeyedLattice)
+│
+├── :convex
+│   └── <genesis-hash>
+│       └── :peers → BeliefLattice (CPoS merge)          [Phase 2]
+│           └── <AccountKey> → SignedData<Order>
+│
+├── :p2p
+│   └── :nodes → OwnerLattice<NodeInfo>                   [Phase 1]
+│       └── <AccountKey> → SignedData<NodeInfo>
+│
+├── :data  → DataLattice
+├── :fs    → OwnerLattice(MapLattice(DLFSLattice))
+├── :kv    → OwnerLattice(MapLattice(KVStoreLattice))
+├── :queue → OwnerLattice(MapLattice(TopicLattice))
+├── :sql   → OwnerLattice(MapLattice(TableStoreLattice))  [convex-db]
+└── :local → LocalLattice (not propagated)
 ```
 
-Peers only include deltas for regions they and the recipient both participate in.
+## 13. Design Decisions
 
-## 14. Summary
+### 13.1 Belief Propagation Timing — Gradual Migration (DECIDED)
 
-The Convex peer network is not a separate system bolted onto the lattice — it **is** a lattice region. The P2P Lattice uses the same algebraic foundations (join-semilattices), the same data structures (immutable persistent Merkle trees with CAD3 encoding), the same security model (SignedData with Ed25519 AccountKeys), and the same propagation mechanisms (gossip with delta transmission and merge coalescing) as every other part of the Convex ecosystem.
+`BeliefPropagator` retains its consensus-specific timing loop (30ms accumulation, 300ms rebroadcast, block generation triggers) throughout the migration. The lattice propagator is optimised for eventual consistency; consensus requires tighter timing. The gradual migration (§3.4) keeps BELIEF messages working while progressively adding LATTICE_VALUE support.
 
-This uniformity means:
-- One protocol implementation serves all lattice regions
-- One gossip mechanism propagates all state
+### 13.2 KadLattice — Future Work (DECIDED)
+
+Kademlia routing is deferred until network scale demands it. Current peer discovery via on-chain PeerStatus + P2P node registry + configured peers is sufficient for hundreds of peers. When implemented, Kademlia state will be node-local (not propagated) since each node's k-bucket view is specific to its own key position.
+
+### 13.3 Server Architecture — Netty + Javalin (DECIDED)
+
+Netty handles binary protocol (TCP + WSS): high-performance peer-to-peer lattice traffic. Javalin handles HTTP-based APIs (REST + MCP + SSE): web-friendly with JSON, middleware, CORS. Both frameworks connect to the same `NodeServer` and `Server` instances.
+
+### 13.4 PeerStatus as Source of Truth (DECIDED)
+
+On-chain `PeerStatus` is the single source of truth for peer identity, stake, and primary hostname. The P2P node registry (`[:p2p :nodes]`) provides supplementary off-chain metadata (transport URIs, supported regions, protocol version) validated against on-chain state. Nodes reject P2P entries from unregistered or zero-stake peers.
+
+### 13.5 BeliefLattice Merge Context (OPEN)
+
+**Question**: `BeliefMerge` currently requires consensus state (peer stakes, timestamp ordering) as context for the merge function. How does this integrate with `LatticeContext`?
+
+`LatticeContext` currently carries a signing key pair and an optional verifier. BeliefMerge needs access to the current consensus `State` to check peer stakes and compute voting weights. Options:
+- Extend `LatticeContext` with an optional `State` reference
+- Have `BeliefLattice` capture the state at construction time (stale-safe since beliefs are merged frequently)
+- Pass state through a separate mechanism alongside the lattice path
+
+This needs to be resolved before Phase 2 of the consensus migration.
+
+## 14. Implementation Phases
+
+### Phase 1 — P2P Node Registry
+- Implement `NodeInfoLattice` (LWW per owner, validated against on-chain PeerStatus)
+- Register `[:p2p :nodes]` in `Lattice.ROOT` with `OwnerLattice<NodeInfo>`
+- `NodeServer` propagates P2P metadata via existing LATTICE_VALUE gossip
+- Peers advertise transport URIs; `ConnectionManager` uses them for connection selection
+- Existing BELIEF messages and `BeliefPropagator` unchanged
+
+### Phase 2 — Consensus as Lattice Region
+- Implement `BeliefLattice` wrapping `BeliefMerge` with CPoS semantics
+- Register `[:convex <genesis-hash> :peers]` in `Lattice.ROOT`
+- Resolve `LatticeContext` integration for consensus state (§13.5)
+- `BeliefPropagator` accepts beliefs via both BELIEF and LATTICE_VALUE paths
+
+### Phase 3 — Multi-Transport
+- Add WSS transport to Netty (binary protocol over WebSocket)
+- Reconnection with exponential backoff and transport failover
+- NodeInfo transport URIs drive automatic transport selection
+
+### Phase 4 — Deprecate BELIEF Messages
+- LATTICE_VALUE becomes the sole consensus propagation path
+- `BeliefPropagator` retains timing loop but speaks standard lattice protocol
+- BELIEF message type deprecated
+
+### Future — Kademlia
+- Implement `KadLattice` for O(log N) routing when network scale demands it
+- Node-local only (not propagated)
+
+## 15. Summary
+
+The Convex peer network is built on lattice technology — the same algebraic foundations, data structures, security model, and propagation mechanisms used by every other part of the ecosystem. On-chain `PeerStatus` is the single source of truth for peer identity and stake.
+
+The design extends this with:
+
+1. **P2P peer discovery** at `[:p2p :nodes]` — `OwnerLattice`-based signed peer metadata, validated against on-chain PeerStatus, propagated via `NodeServer` gossip
+2. **Consensus beliefs as a lattice region** at `[:convex <genesis-hash> :peers]` — gradual migration from dedicated BELIEF messages to standard LATTICE_VALUE protocol
+3. **NodeServer as the unified P2P core** — all lattice propagation (including consensus) through one mechanism, with `BeliefPropagator` as a timing-specific wrapper
+4. **Multi-transport support** — Netty for binary (TCP + WSS), Javalin for HTTP (REST + MCP), with transport advertisement and failover
+
+This means:
+- One propagation mechanism (`NodeServer` + `LatticePropagator`) serves all regions
 - One security model (SignedData + AccountKey) authenticates everything
-- One encoding format (CAD3) represents everything on the wire and in storage
-
-The transport layer (TCP, WSS, HTTPS, SSE) is a thin adapter beneath this unified lattice protocol, chosen based on the use case: raw performance for validators, firewall-friendly encrypted channels for clients, and standard HTTP for simple integrations.
+- One encoding format (CAD3) on the wire and in storage
+- On-chain PeerStatus as the trust anchor; P2P lattice as the operational layer
+- Transport is a thin adapter layer beneath the unified lattice protocol
