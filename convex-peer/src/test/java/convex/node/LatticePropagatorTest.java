@@ -125,7 +125,7 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		server2.sync();
+		server2.getCursor().sync();
 		Thread.sleep(100); // Let propagator process the sync
 
 		// Pull from server2 into server1
@@ -157,7 +157,7 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			server1.sync();
+			server1.getCursor().sync();
 			Thread.sleep(100); // Let propagator process the sync
 
 			// Pull from server1 into server2

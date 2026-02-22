@@ -37,6 +37,7 @@ import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.RootLatticeCursor;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
 
@@ -75,7 +76,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Cursor for the current local lattice value
 	 */
-	private final ALatticeCursor<V> cursor;
+	private final RootLatticeCursor<V> cursor;
 
 	/**
 	 * Network server instance for handling connections
@@ -131,6 +132,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.config = (config != null) ? config : NodeConfig.create();
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
+
+		// Hook sync callback: cursor.sync() triggers all propagators
+		this.cursor.onSync(value -> {
+			for (LatticePropagator p : propagators) {
+				p.triggerBroadcast(value);
+			}
+			return value;
+		});
 
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;
@@ -407,7 +416,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Processes an incoming LATTICE_VALUE message from a peer.
 	 *
 	 * <p>Navigates to the target path via {@code cursor.path()}, merges the
-	 * received value, then calls {@link #sync()} to notify propagators. The
+	 * received value, then calls {@code cursor.sync()} to notify propagators. The
 	 * sync is cheap (non-blocking queue offer) and the {@code LatestUpdateQueue}
 	 * coalesces rapid incoming merges, so high-velocity messages are safe.
 	 *
@@ -437,10 +446,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		mergeIncoming(target, value);
 
 		// Notify propagators that cursor state has changed. This is non-blocking:
-		// sync() offers the current snapshot to each propagator's LatestUpdateQueue,
+		// cursor.sync() offers the current snapshot to each propagator's LatestUpdateQueue,
 		// which coalesces rapid incoming merges into a single latest value. The
 		// propagator decides when to actually broadcast based on MIN_BROADCAST_DELAY.
-		sync();
+		cursor.sync();
 	}
 
 	/**
@@ -473,7 +482,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Merges an incoming value into a lattice cursor.
 	 *
 	 * <p>Does not notify propagators — the caller is responsible for calling
-	 * {@link #sync()} after the merge if relay is needed. This keeps merge
+	 * {@code cursor.sync()} after the merge if relay is needed. This keeps merge
 	 * and propagation as separate concerns.
 	 *
 	 * @param <T> Type of cursor value
@@ -486,21 +495,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			target.merge((T) value);
 		} catch (Exception e) {
 			log.warn("Error during lattice merge", e);
-		}
-	}
-
-	/**
-	 * Flushes the current cursor value to all propagators (non-blocking).
-	 *
-	 * <p>Like filesystem {@code fsync}: triggers persistence on the primary
-	 * propagator (announce + setRootData + mergeCallback) and delta broadcast
-	 * on network propagators. Returns immediately — actual I/O happens on
-	 * each propagator's background thread.
-	 */
-	public void sync() {
-		V snapshot = cursor.get();
-		for (LatticePropagator p : propagators) {
-			p.triggerBroadcast(snapshot);
 		}
 	}
 

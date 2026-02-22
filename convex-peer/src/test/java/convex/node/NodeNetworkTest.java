@@ -196,7 +196,7 @@ public class NodeNetworkTest {
 		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
 
 		// Sync so the propagator has the value for LATTICE_QUERY responses
-		server0.sync();
+		server0.getCursor().sync();
 		Thread.sleep(100);
 
 		// Create the query path [:data valueHash] for reuse

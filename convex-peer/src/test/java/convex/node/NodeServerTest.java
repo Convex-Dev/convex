@@ -449,7 +449,7 @@ public class NodeServerTest {
 
 		// Set a value and sync so it flows through the propagator pipeline
 		maxNodeServer.getCursor().set(CVMLong.create(42));
-		maxNodeServer.sync();
+		maxNodeServer.getCursor().sync();
 		// Wait for propagator to process (async)
 		Thread.sleep(100);
 		
@@ -744,7 +744,7 @@ public class NodeServerTest {
 			// This is how application code drives the node — sync() is the caller's
 			// responsibility (unlike the incoming message path which syncs internally).
 			node.getCursor().set(CVMLong.create(42));
-			node.sync();
+			node.getCursor().sync();
 
 			// Wait for propagator to process
 			long deadline = System.currentTimeMillis() + 3000;

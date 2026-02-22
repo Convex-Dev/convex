@@ -93,7 +93,7 @@ public class NodeServerPersistenceTest {
 	 */
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses
-		primary.sync();
+		primary.getCursor().sync();
 		Thread.sleep(100); // Let propagator process the sync
 
 		InetSocketAddress primaryAddr = primary.getHostAddress();

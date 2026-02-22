@@ -9,23 +9,25 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
    freely for instant in-memory reads and writes. The cursor is the single source of truth.
 2. **No automatic sync on cursor write** — apps write to the cursor without triggering
    any I/O. Sync is a separate, explicit action.
-3. **Apps trigger sync when ready** — `nodeServer.sync()` signals that the current cursor
-   state should be propagated (persisted and/or broadcast).
+3. **Apps trigger sync when ready** — `cursor.sync()` guarantees the cursor is synced
+   with the level below (parent cursor or, at root, the sync callback). Sync propagates
+   up the cursor hierarchy to the root. May block if the sync callback does blocking work
+   (e.g. synchronous persistence).
 4. **Automatic sync is configurable policy** — periodic sync, on-incoming-merge, or
    manual-only. Controlled by NodeServer configuration.
 5. **Propagators handle ALL output** — persistence IS propagation (to disk instead of to
    peers). Each propagator owns its own store, filter, and peer connections.
-   NodeServer has no store of its own — `sync()` just triggers propagators.
-6. **Everything is async and lattice-native** — `sync()` is non-blocking. All handoffs
-   between app, NodeServer, and propagators are either non-blocking queue offers or
-   atomic lattice merges. Lattice properties (commutative, associative, idempotent)
-   make all interleavings safe — no locks needed.
+   NodeServer hooks a sync callback on the cursor that triggers propagators.
+6. **Lattice-native concurrency** — `cursor.sync()` is currently non-blocking (async
+   propagation), but may become synchronous for persistence in future. All handoffs
+   between app, NodeServer, and propagators use atomic lattice merges. Lattice properties
+   (commutative, associative, idempotent) make all interleavings safe — no locks needed.
 7. **Store-backed refs via merge callback** — the primary propagator calls a merge
    callback after announce, which merges the store-backed value into the cursor.
    This replaces in-memory refs with soft references, allowing GC to reclaim cell data
    that can be reloaded from the store on demand. Without this, OOM.
-8. **A NodeServer with no propagator is purely in-memory** — `sync()` is a no-op. The
-   cursor works fine but nothing is persisted or broadcast.
+8. **A NodeServer with no propagator is purely in-memory** — `cursor.sync()` is a no-op.
+   The cursor works fine but nothing is persisted or broadcast.
 9. **Shutdown guarantees persistence, not broadcast** — `close()` ensures each propagator
    persists its final state. Broadcast to peers is best-effort during operation.
 
@@ -35,14 +37,14 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
                      ┌──────────────────────────────────────────┐
                      │              NodeServer                   │
                      │                                           │
- App writes ────────►│  cursor: ALatticeCursor<V> (in-memory)    │
+ App writes ────────►│  cursor: RootLatticeCursor<V> (in-memory) │
  (instant, no I/O)   │   (AtomicReference — all writes atomic)  │
                      │                                           │
                      │  propagators: [LatticePropagator...]      │
                      │                                           │
- App calls ─────────►│  sync()   (non-blocking, returns fast)   │
- (when ready)        │    └──► trigger ALL propagators           │
-                     │         (non-blocking queue offer)        │
+ App calls ─────────►│  cursor.sync() (non-blocking, fast)      │
+ (when ready)        │    └──► sync callback triggers ALL       │
+                     │         propagators (queue offer)         │
                      │                                           │
                      │  Each propagator's background thread:     │
                      │    filter → announce → setRootData        │
@@ -52,7 +54,7 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
  into cursor         │                                           │
                      │  Incoming merge:                          │
  From peers ────────►│    cursor.path(path).merge(value)         │
-                     │    └──► sync() (non-blocking, coalesced)  │
+                     │    └──► cursor.sync() (non-blocking)      │
                      │                                           │
                      │  close()                                  │
                      │    └──► triggerAndClose each propagator    │
@@ -63,8 +65,8 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 
 | Component | Responsibility |
 |-----------|---------------|
-| **Cursor** (`ALatticeCursor<V>`) | In-memory state. Apps read/write freely. Thread-safe via AtomicReference. |
-| **NodeServer** | Orchestration. Owns cursor + propagator list. `sync()` triggers all propagators. |
+| **Cursor** (`RootLatticeCursor<V>`) | In-memory state. Apps read/write freely. `sync()` triggers propagators via callback. Thread-safe via AtomicReference. |
+| **NodeServer** | Orchestration. Owns cursor + propagator list. Hooks sync callback on cursor. |
 | **Propagator** (`LatticePropagator`) | Owns store, filter, peers, background thread. Optional merge callback. |
 
 ### Propagator Roles
@@ -134,18 +136,20 @@ node.getCursor().set(newValue, :myKey);
 
 ```java
 // App decides it's time to sync
-node.sync();  // returns immediately — non-blocking
+cursor.sync();  // returns immediately — non-blocking
 ```
 
-`sync()` is trivial — it just triggers all propagators:
+NodeServer hooks a sync callback on the `RootLatticeCursor` at construction time.
+When `cursor.sync()` is called, the callback triggers all propagators:
 
 ```java
-public void sync() {
-    V snapshot = cursor.get();
+// In NodeServer constructor:
+cursor.onSync(value -> {
     for (LatticePropagator p : propagators) {
-        p.triggerBroadcast(snapshot);  // non-blocking queue offer
+        p.triggerBroadcast(value);  // non-blocking queue offer
     }
-}
+    return value;
+});
 ```
 
 No I/O, no blocking. Each propagator's background thread picks up the value and does
@@ -185,7 +189,7 @@ When a peer sends a `LATTICE_VALUE` message:
 1. NodeServer navigates to the target path via `cursor.path(path)`
 2. Merges the received value via `target.merge(value)` — the cursor chain handles
    sub-lattice resolution, signing boundaries, and null-lattice bubble-up automatically
-3. Calls `sync()` to notify propagators — this is a non-blocking queue offer;
+3. Calls `cursor.sync()` to notify propagators — this is a non-blocking queue offer;
    the `LatestUpdateQueue` coalesces rapid incoming merges so high-velocity
    messages don't cause excessive broadcasting
 
@@ -245,7 +249,7 @@ already has store-backed soft refs — no separate persist step needed.
 ### Running: Sync Triggers
 
 Sync can be triggered by:
-- **App explicitly** — `node.sync()` after a batch of writes
+- **App explicitly** — `cursor.sync()` after a batch of writes
 - **Incoming merge** — if autoSync policy is enabled
 - **Periodic timer** — configurable interval (default 30s), as safety net
 - **Shutdown** — final persist in each propagator's `close()`
@@ -260,7 +264,7 @@ It is a safety net, not the primary mechanism.
 | EtchStore, no peers | Public + backup with peers | Full node: persist + broadcast |
 | EtchStore, no peers | None | Local only: persist, no broadcast |
 | None | Public + backup with peers | Relay: broadcast, no local persist |
-| None | None | In-memory only: sync() is a no-op |
+| None | None | In-memory only: cursor.sync() is a no-op |
 
 ## Propagator Architecture
 
@@ -450,7 +454,7 @@ All handoffs between app, NodeServer, and propagators are non-blocking:
 | From | To | Mechanism | Blocking? |
 |------|----|-----------|-----------|
 | App | Cursor | `AtomicReference.updateAndGet()` | No |
-| NodeServer | Propagators | `LatestUpdateQueue.offer()` via `sync()` | No |
+| Cursor sync callback | Propagators | `LatestUpdateQueue.offer()` via `cursor.sync()` | No |
 | Propagator | Store | `Cells.announce()` + `setRootData()` on own thread | Own thread only |
 | Propagator | Cursor | `mergeCallback` → `cursor.updateAndGet(merge)` | No |
 | Propagator | Peers | `broadcast(delta)` on own thread | Own thread only |
@@ -497,22 +501,22 @@ Each propagator owns its own filter. NodeServer passes the full snapshot to ever
 propagator — the propagator applies its filter internally before announcing.
 
 ```
-NodeServer.sync():                     Propagator background threads:
-  snapshot = cursor.get()
+cursor.sync():                         Propagator background threads:
+  sync callback(value)
   │                                    propagators[0] (primary):
-  ├──► trigger(snapshot) ──queue──►      announce(snapshot)
-  │                                      setRootData(snapshot)
+  ├──► trigger(value) ────queue──►       announce(value)
+  │                                      setRootData(value)
   │                                      mergeCallback(persisted) ──► cursor
   │
   │                                    propagators[1] (public):
-  ├──► trigger(snapshot) ──queue──►      filter(snapshot)
+  ├──► trigger(value) ────queue──►       filter(value)
   │                                      announce(filtered)
   │                                      setRootData(filtered)
   │                                      broadcast(delta)
   │
-  └──► trigger(snapshot) ──queue──►    propagators[2] (backup):
-                                         announce(snapshot)
-  returns immediately                    setRootData(snapshot)
+  └──► trigger(value) ────queue──►     propagators[2] (backup):
+                                         announce(value)
+  returns immediately                    setRootData(value)
                                          broadcast(delta)
 ```
 
@@ -575,24 +579,27 @@ Apps only interact with the cursor. NodeServer handles everything else.
 
 ```java
 NodeServer<V> node = ...;
+ALatticeCursor<V> cursor = node.getCursor();
 
 // App writes directly to cursor (instant, in-memory)
-DLFSLocal drive = new DLFSLocal(provider, uri, node.getCursor().path(ownerKey, driveName));
+DLFSLocal drive = new DLFSLocal(provider, uri, cursor.path(ownerKey, driveName));
 Files.write(drive.getPath("/readme.txt"), "hello".getBytes());
 
 // App triggers sync when ready
-node.sync();
+cursor.sync();
 ```
 
 ### Custom App Pattern
 
 ```java
+ALatticeCursor<V> cursor = node.getCursor();
+
 // Batch writes
-node.getCursor().set(value1, key1);
-node.getCursor().set(value2, key2);
+cursor.set(value1, key1);
+cursor.set(value2, key2);
 
 // Single sync propagates the latest state
-node.sync();
+cursor.sync();
 ```
 
 ## Hierarchical Cursor Sync
@@ -610,8 +617,9 @@ cursor.path  cursor.path  cursor.path
  DLFSLocal
 ```
 
-**Only the root-level NodeServer propagates.** Sub-path cursors write atomically to the
-root `AtomicReference`. The root NodeServer's `sync()` propagates the full tree.
+**Only the root-level cursor propagates.** Sub-path cursors write atomically to the
+root `AtomicReference`. Calling `sync()` on any cursor in the hierarchy propagates up
+to the root, where the sync callback triggers all propagators.
 
 Sub-path NodeServers can replicate sub-trees independently to different peer sets,
 each with their own propagator and store.
@@ -623,7 +631,7 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 ### Completed ✓
 
 - **Core Persistence** — `Cells.announce()` + `store.setRootData()`, restore in `launch()`, final persist in `close()`
-- **Explicit Sync API** — `sync()` triggers propagators, incoming merges call `sync()`, periodic auto-sync
+- **Explicit Sync API** — `cursor.sync()` triggers propagators via callback, incoming merges call `cursor.sync()`, periodic auto-sync
 - **Speculative Fork + Acquire** — fork cursor, `Acquiror` pulls missing cells, retry merge
 - **Root-Only Periodic Sync** — propagator broadcasts root cell hash, peers detect divergence, acquire missing data
 
@@ -646,111 +654,40 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 
 ### Problem
 
-The current `sync()` is non-blocking: it offers the snapshot to propagators via a
-`LatestUpdateQueue` and returns immediately. The propagator's background thread later
-announces cells to the store, persists root data, and calls the merge callback to feed
-store-backed refs back into the cursor. This means:
+The current sync callback is non-blocking: it offers the snapshot to propagators and
+returns immediately. The propagator's background thread later announces cells, persists
+root data, and calls the merge callback. This means `sync()` returns before persistence
+completes, store-backed refs arrive asynchronously, and tests need `Thread.sleep`.
 
-1. **`sync()` returns before persistence completes** — the caller has no guarantee that
-   data has been written to disk.
-2. **Store-backed refs arrive asynchronously** — the cursor may hold strong in-memory refs
-   for an unpredictable duration after sync. Under heavy load this can cause OOM.
-3. **Tests need `Thread.sleep`** — to wait for the propagator thread to process the value,
-   which is fragile and slow.
+### Design: Synchronous Commit via Sync Callback
 
-### Design: Two Cursors + Synchronous Commit
+The sync callback (already hooked on `RootLatticeCursor`) would perform the full commit
+pipeline synchronously on the caller's thread: announce, persist, and merge store-backed
+refs back into the cursor — all before `sync()` returns.
 
-Replace the single cursor with two:
+Two cursors:
+- **truthCursor** (internal) — committed state with store-backed refs
+- **appCursor** (returned by `getCursor()`) — application working copy
 
-- **truthCursor** (`RootLatticeCursor<V>`, internal) — the committed state with store-backed refs
-- **appCursor** (`RootLatticeCursor<V>`, returned by `getCursor()`) — the application's working copy
+Sync flow:
+1. `truthCursor.merge(appCursor.get())` — push app changes to truth
+2. `Cells.announce()` + `store.setRootData()` on caller's thread — persist and collect novelty
+3. Enqueue novelty for propagator's background thread — async broadcast
+4. `appCursor.merge(truthCursor.get())` — pull store-backed refs back
 
-Applications read and write the appCursor freely. When `appCursor.sync()` is called,
-NodeServer performs the full commit pipeline synchronously on the caller's thread:
+**Key constraint:** `Cells.announce()` tags cells as persisted — cannot re-announce to
+collect novelty. Announce + novelty collection must happen in the sync callback, with
+novelty handed to the propagator for async broadcast.
 
-```
-appCursor.sync()
-    │
-    ├─ 1. truthCursor.merge(appCursor.get())    push app changes to truth
-    │
-    ├─ 2. commitSync(truthCursor.get())          on caller's thread:
-    │      ├─ Cells.announce(value, noveltyHandler, store)   collect novelty
-    │      ├─ store.setRootData(value)                       persist
-    │      └─ enqueue novelty for propagator                 non-blocking handoff
-    │
-    ├─ 3. appCursor.merge(truthCursor.get())     pull store-backed refs back
-    │
-    └─ return                                    caller knows: persisted + store-backed
-```
-
-**Key constraint:** `Cells.announce()` tags cells as persisted in the store. Announced
-cells cannot be re-announced to collect novelty a second time. Therefore the announce +
-novelty collection must happen in `commitSync`, not in the propagator's background thread.
-The collected novelty is handed to the propagator via a `ConcurrentLinkedQueue` for async
-broadcast — the propagator thread drains this queue instead of re-announcing.
-
-### Unified Code Path
-
-Both app-initiated sync and incoming `LATTICE_VALUE` messages use the same method:
-
-```java
-// In NodeServer:
-private void mergeAndCommit(V incomingValue) {
-    truthCursor.merge(incomingValue);
-    propagator.commitSync(truthCursor.get());  // announce + persist + enqueue novelty
-    appCursor.merge(truthCursor.get());        // store-backed refs into app cursor
-}
-```
-
-- `appCursor.sync()` calls `mergeAndCommit(appCursor.get())`
-- `processLatticeValue` calls `mergeAndCommit(receivedValue)` after path resolution
-
-No duplicate code paths.
-
-### RootLatticeCursor Sync Callback
-
-Add an optional callback to `RootLatticeCursor` that fires when `sync()` is called:
-
-```java
-// In RootLatticeCursor:
-private Runnable syncAction;
-
-public void onSync(Runnable action) { this.syncAction = action; }
-
-@Override
-public V sync() {
-    if (syncAction != null) syncAction.run();
-    return get();
-}
-```
-
-Only `sync()` is affected — `get()`, `set()`, `merge()`, `path()` are untouched.
-No hot-path impact.
-
-### LatticePropagator Changes
-
-The propagator gains:
-
-- **`commitSync(V value)`** — announce + persist + enqueue novelty. Called on the app's
-  thread, not the propagator's background thread.
-- **`pendingNovelty`** (`ConcurrentLinkedQueue`) — novelty collected by `commitSync`,
-  drained by the background thread for broadcast.
-- **`lastAnnouncedValue`** made `volatile` — read by query handler on Netty threads.
-
-The existing `processValue` method is refactored: instead of calling `Cells.announce()`
-itself, it checks `pendingNovelty` first. If novelty is already queued (from `commitSync`),
-it uses that for broadcast. Otherwise it falls back to announcing directly (for propagators
-without the sync callback, e.g. backup/public propagators).
+Both `appCursor.sync()` and `processLatticeValue` use the same `mergeAndCommit` method
+— no duplicate code paths.
 
 ### Benefits
 
-- **`sync()` guarantees persistence** — returns only after `store.setRootData()` completes
-- **Store-backed refs are immediate** — the app cursor has soft refs when `sync()` returns
-- **No `Thread.sleep` in tests** — sync is deterministic
-- **No locking** — `commitSync` runs on the caller's thread; the propagator's background
-  thread only handles broadcast (no contention on announce)
-- **Lattice-safe** — all merges are commutative/associative/idempotent; concurrent writes
-  to appCursor during commitSync are preserved by the final `appCursor.merge()`
+- `sync()` guarantees persistence before returning
+- Store-backed refs are immediate — no OOM from lingering strong refs
+- No `Thread.sleep` in tests
+- No locking — caller's thread does announce; background thread only broadcasts
 
 ## Testing Strategy
 
