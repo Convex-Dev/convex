@@ -57,9 +57,13 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	@Override
 	public V sync() {
 		if (syncCallback != null) {
-			V synced = syncCallback.apply(get());
-			set(synced);
-			return synced;
+			V current = get();
+			V synced = syncCallback.apply(current);
+			// Fast path: no concurrent writes, CAS succeeds
+			if (compareAndSet(current, synced)) return synced;
+			// Concurrent write: fall back to lattice merge
+			if (lattice == null) throw new IllegalStateException("Concurrent write during sync with no lattice to resolve merge");
+			return merge(synced);
 		}
 		return get();
 	}
