@@ -125,9 +125,10 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		server2.getPropagator().triggerBroadcast(server2.getLocalValue());
+		server2.sync();
+		Thread.sleep(100); // Let propagator process the sync
 
-		// Sync server1 to ensure it has received the broadcast from server2
+		// Pull from server2 into server1
 		assertTrue(server1.pull(), "Pull should complete successfully");
 
 		// Verify server1 received the value from server2
@@ -156,9 +157,10 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			server1.getPropagator().triggerBroadcast(server1.getLocalValue());
+			server1.sync();
+			Thread.sleep(100); // Let propagator process the sync
 
-			// Sync server2 to ensure it received the update from server1
+			// Pull from server1 into server2
 			assertTrue(server2.pull(), "Pull should complete successfully for update " + (i + 1));
 
 			// Verify server2 received this specific value
