@@ -91,11 +91,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	 * Syncs local changes back to the parent using lattice merge.
 	 * Always succeeds when a lattice is present. For root cursors, returns current value.
 	 *
-	 * @return The synced value
+	 * @return The synced value from the underlying parent
 	 */
-	public V sync() {
-		return get();
-	}
+	public abstract V sync();
 
 	/**
 	 * Merges an external value using lattice merge semantics.

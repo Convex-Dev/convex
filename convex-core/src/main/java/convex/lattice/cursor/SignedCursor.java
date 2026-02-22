@@ -64,6 +64,14 @@ public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	@Override
+	public V sync() {
+		if (base instanceof ALatticeCursor<?> lc) {
+			lc.sync();
+		}
+		return get();
+	}
+
+	@Override
 	public V get() {
 		SignedData<V> sd = base.get();
 		return (sd != null) ? sd.getValue() : null;

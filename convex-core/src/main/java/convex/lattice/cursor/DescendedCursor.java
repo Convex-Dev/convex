@@ -50,6 +50,12 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 		return result;
 	}
 
+	@Override
+	public V sync() {
+		parent.sync();
+		return get();
+	}
+
 	/**
 	 * Merge with null lattice: bubble up via parent.
 	 * Constructs a parent-level value via assocIn and calls parent.merge(),
@@ -108,4 +114,6 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
 		return pathCursor.accumulateAndGet(x, accumulatorFunction);
 	}
+
+
 }
