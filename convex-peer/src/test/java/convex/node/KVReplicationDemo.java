@@ -106,12 +106,13 @@ public class KVReplicationDemo {
 			System.out.println("\nPublishing signed replicas to lattice...");
 			for (int i = 0; i < NUM_NODES; i++) {
 				// exportReplica returns {ownerKey → signed({dbName → kvStore})}
-				// which is the OwnerLattice value shape at :kv
+				// which is the OwnerLattice value shape at :kv.
+				// Use merge (not assoc) so concurrent broadcasts don't get clobbered.
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell, ACell> replica =
 					(AHashMap<ACell, ACell>)(AHashMap<?,?>) databases.get(i).exportReplica();
-				servers.get(i).getCursor().assoc(Keywords.KV, replica);
-			servers.get(i).getPropagator().triggerBroadcast(servers.get(i).getLocalValue());
+				servers.get(i).getCursor().path(Keywords.KV).merge(replica);
+				servers.get(i).getCursor().sync();
 			}
 
 			// --- Pull from peers ---

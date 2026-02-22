@@ -147,14 +147,10 @@ public class LatticeDemo {
 					dataIndex = dataIndex.assoc(valueHash, cellValue);
 				}
 
-				// Update node 1's lattice with the new data
-				// This triggers the LatticePropagator to:
-				// 1. Detect the change
-				// 2. Compute what's new (delta)
-				// 3. Broadcast the delta to all connected peers
-				// All of this happens automatically in the background!
+				// Update node 1's lattice with the new data and sync.
+				// cursor.sync() announces the value and triggers broadcast to all peers.
 				node1.getCursor().assoc(dataKeyword, dataIndex);
-				node1.getPropagator().triggerBroadcast(node1.getLocalValue());
+				node1.getCursor().sync();
 
 				if ((merge + 1) % 10 == 0) {
 					System.out.println("Completed " + (merge + 1) + " merges (" + ((merge + 1) * MODS) + " total modifications)");

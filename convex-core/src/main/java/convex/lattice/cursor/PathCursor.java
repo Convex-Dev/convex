@@ -96,7 +96,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * @implNote When a {@code valueLattice} is present, the update function receives
+	 * <p>Implementation note: when a {@code valueLattice} is present, the update function receives
 	 * {@code valueLattice.zero()} instead of null for non-existent values. This means
 	 * {@code get()} may return null while the update function sees an empty container.
 	 */
@@ -114,7 +114,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	/**
 	 * {@inheritDoc}
 	 *
-	 * @implNote When a {@code valueLattice} is present, the update function receives
+	 * <p>Implementation note: when a {@code valueLattice} is present, the update function receives
 	 * {@code valueLattice.zero()} instead of null for non-existent values. This means
 	 * {@code get()} may return null while the update function sees an empty container.
 	 */

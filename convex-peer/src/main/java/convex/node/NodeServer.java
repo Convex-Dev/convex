@@ -532,6 +532,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		try {
 			propagators.get(0).pull().get(30, TimeUnit.SECONDS);
+			// Sync cursor so the full merged state (not just individual pulled
+			// values) gets announced — ensures LATTICE_QUERY returns current data
+			cursor.sync();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull failed: {}", e.getMessage());
