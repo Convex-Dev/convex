@@ -5,7 +5,6 @@ import convex.core.data.ACollection;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -17,7 +16,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 

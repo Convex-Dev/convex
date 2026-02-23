@@ -59,7 +59,7 @@ public class TupleLattice extends ALattice<AVector<ACell>> {
 		for (int i = 0; i < n; i++) {
 			zeros[i] = children[i].zero();
 		}
-		return Vectors.of(zeros);
+		return Vectors.create(zeros);
 	}
 
 	@Override

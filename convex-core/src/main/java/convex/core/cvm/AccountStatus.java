@@ -7,7 +7,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Index;
@@ -18,7 +17,6 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
