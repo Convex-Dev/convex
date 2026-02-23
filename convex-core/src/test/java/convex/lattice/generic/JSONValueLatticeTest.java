@@ -30,7 +30,7 @@ public class JSONValueLatticeTest {
 
 	@Test
 	public void testZeroMapInstance() {
-		ACell zero = JSONValueLattice.MAP_INSTANCE.zero();
+		ACell zero = JSONValueLattice.INSTANCE.zero();
 		assertNotNull(zero);
 		assertTrue(zero instanceof AHashMap, "MAP_INSTANCE.zero() should return AHashMap");
 	}
@@ -38,7 +38,7 @@ public class JSONValueLatticeTest {
 	@Test
 	public void testPathReturnsSelf() {
 		assertSame(JSONValueLattice.INDEX_INSTANCE, JSONValueLattice.INDEX_INSTANCE.path(KEY_A));
-		assertSame(JSONValueLattice.MAP_INSTANCE, JSONValueLattice.MAP_INSTANCE.path(KEY_B));
+		assertSame(JSONValueLattice.INSTANCE, JSONValueLattice.INSTANCE.path(KEY_B));
 	}
 
 	@Test
@@ -46,7 +46,7 @@ public class JSONValueLatticeTest {
 		AHashMap<Keyword, ACell> a = Maps.of(KEY_A, CVMLong.create(1));
 		AHashMap<Keyword, ACell> b = Maps.of(KEY_B, CVMLong.create(2));
 
-		ACell merged = JSONValueLattice.MAP_INSTANCE.merge(a, b);
+		ACell merged = JSONValueLattice.INSTANCE.merge(a, b);
 		assertTrue(merged instanceof AHashMap);
 
 		@SuppressWarnings("unchecked")
@@ -60,7 +60,7 @@ public class JSONValueLatticeTest {
 		AHashMap<Keyword, ACell> a = Maps.of(KEY_A, CVMLong.create(1), KEY_B, CVMLong.create(10));
 		AHashMap<Keyword, ACell> b = Maps.of(KEY_A, CVMLong.create(2), KEY_C, CVMLong.create(30));
 
-		ACell merged = JSONValueLattice.MAP_INSTANCE.merge(a, b);
+		ACell merged = JSONValueLattice.INSTANCE.merge(a, b);
 		assertTrue(merged instanceof AHashMap);
 
 		@SuppressWarnings("unchecked")
@@ -94,7 +94,7 @@ public class JSONValueLatticeTest {
 		ACell a = CVMLong.create(1);
 		ACell b = CVMLong.create(2);
 
-		ACell merged = JSONValueLattice.MAP_INSTANCE.merge(a, b);
+		ACell merged = JSONValueLattice.INSTANCE.merge(a, b);
 		// Non-map leaves: deterministic by hash comparison
 		assertNotNull(merged);
 		assertTrue(merged.equals(a) || merged.equals(b));
@@ -105,8 +105,8 @@ public class JSONValueLatticeTest {
 		AHashMap<Keyword, ACell> a = Maps.of(KEY_A, CVMLong.create(1));
 		AHashMap<Keyword, ACell> b = Maps.of(KEY_A, CVMLong.create(2));
 
-		ACell ab = JSONValueLattice.MAP_INSTANCE.merge(a, b);
-		ACell ba = JSONValueLattice.MAP_INSTANCE.merge(b, a);
+		ACell ab = JSONValueLattice.INSTANCE.merge(a, b);
+		ACell ba = JSONValueLattice.INSTANCE.merge(b, a);
 		assertEquals(ab, ba, "Merge should be commutative");
 	}
 
@@ -118,7 +118,7 @@ public class JSONValueLatticeTest {
 		AHashMap<Keyword, ACell> outerA = Maps.of(KEY_C, innerA);
 		AHashMap<Keyword, ACell> outerB = Maps.of(KEY_C, innerB);
 
-		ACell merged = JSONValueLattice.MAP_INSTANCE.merge(outerA, outerB);
+		ACell merged = JSONValueLattice.INSTANCE.merge(outerA, outerB);
 		assertTrue(merged instanceof AHashMap);
 
 		@SuppressWarnings("unchecked")
@@ -135,6 +135,6 @@ public class JSONValueLatticeTest {
 	@Test
 	public void testCheckForeign() {
 		assertTrue(JSONValueLattice.INDEX_INSTANCE.checkForeign(CVMLong.create(1)));
-		assertTrue(JSONValueLattice.MAP_INSTANCE.checkForeign(null));
+		assertTrue(JSONValueLattice.INSTANCE.checkForeign(null));
 	}
 }

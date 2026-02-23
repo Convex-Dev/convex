@@ -18,18 +18,23 @@ import convex.lattice.ALattice;
  * <p>Two singleton instances control the container type for {@link #zero()}:</p>
  * <ul>
  *   <li>{@link #INDEX_INSTANCE} — sorted keys via {@link Index}, suitable
- *       for keyword-keyed records</li>
- *   <li>{@link #MAP_INSTANCE} — unordered keys via {@link AHashMap}, suitable
- *       for dynamic string keys</li>
+ *       for internal short keyword-keyed records</li>
+ *   <li>{@link #INSTANCE} — unordered keys via {@link AHashMap}, suitable
+ *       for external/dynamic string keys</li>
  * </ul>
  */
 public class JSONValueLattice extends ALattice<ACell> {
 
-	/** Instance that uses {@link Index} as the zero container (sorted keys). */
+	/** 
+	 * Instance that uses {@link Index} as the zero container (sorted keys). 
+	 * WARNING: only use for internally produced, known short keys (32 bytes or less)
+	 */
 	public static final JSONValueLattice INDEX_INSTANCE = new JSONValueLattice(true);
 
-	/** Instance that uses {@link AHashMap} as the zero container (unordered keys). */
-	public static final JSONValueLattice MAP_INSTANCE = new JSONValueLattice(false);
+	/**
+	 * Standard singleton Instance that uses {@link AHashMap} (unordered keys). 
+	 */
+	public static final JSONValueLattice INSTANCE = new JSONValueLattice(false);
 
 	private final boolean useIndex;
 
