@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
@@ -13,7 +14,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.json.JWT;
 
 /**
  * Tests for PeerAuth — bearer token verification and peer token issuance.

@@ -52,6 +52,8 @@ module convex.core {
 	exports convex.core.data;
 	exports convex.core.lang;
 	exports convex.core.json;
+	exports convex.auth.did;
+	exports convex.auth.jwt;
 	exports convex.etch;
 	exports convex.lattice;
 	exports convex.lattice.generic;

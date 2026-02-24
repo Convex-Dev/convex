@@ -1027,6 +1027,16 @@ This ensures:
 2. Create new key on new peer → `set-key` on-chain → transfer assets
 3. Create fresh account on new peer, transfer assets
 
+### Implementation Status
+
+All features described in this document are implemented and tested across three modules:
+
+| Module | Key Files | Test Classes |
+|--------|-----------|-------------|
+| `convex-core` | `HKDF`, `AESGCM`, `LocalLattice`, `LWWLattice` | `HKDFTest`, `AESGCMTest`, `LocalLatticeTest`, `LWWLatticeTest` |
+| `convex-peer` | `SigningService`, `PeerAuth`, `PeerConfig` | `SigningServiceTest`, `PeerAuthTest`, `PeerConfigTest` |
+| `convex-restapi` | `SigningMcpTools`, `AuthMiddleware`, `ConfirmAPI`, `OAuthService`, `AuthPage`, `McpPrompts` | `SigningMcpTest`, `ElevatedMcpTest`, `SigningConvenienceTest`, `SigningMcpClientTest`, `SigningE2ETest`, `AuthMiddlewareTest`, `OAuthTest`, `McpPromptsTest`, `PeerConfigFileTest` |
+
 ### Future Enhancements
 
 - **Third-party OAuth clients**: Peer as authorisation server for external services (dApps, Covia venues). Requires scoped tokens and client registration.

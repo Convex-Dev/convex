@@ -47,7 +47,6 @@ import convex.gui.state.StateExplorer;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.SignedCursor;
 import convex.lattice.fs.DLFS;
@@ -304,12 +303,12 @@ public class DLFSBrowser extends AbstractGUI {
 			nodeServer.launch();
 
 			// Navigate to owner's signed entry, wrap in SignedCursor
-			ACursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
+			ALatticeCursor<AHashMap<ACell, SignedData<AHashMap<AString, AVector<ACell>>>>> rootCursor =
 				nodeServer.getCursor();
 			@SuppressWarnings("unchecked")
-			ACursor<SignedData<AHashMap<AString, AVector<ACell>>>> ownerEntry =
-				rootCursor.path(ownerKey);
-			drivesCursor = SignedCursor.create(ownerEntry, keyPair);
+			ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>> ownerEntry =
+				(ALatticeCursor<SignedData<AHashMap<AString, AVector<ACell>>>>) (ALatticeCursor<?>) rootCursor.path(ownerKey);
+			drivesCursor = SignedCursor.create(ownerEntry, DRIVES_MAP_LATTICE, ctx);
 
 			// Rebuild drives from restored lattice state
 			drives.clear();

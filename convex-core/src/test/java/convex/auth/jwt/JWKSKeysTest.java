@@ -1,4 +1,4 @@
-package convex.core.json;
+package convex.auth.jwt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -14,6 +14,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.jwt.JWKSKeys;
+import convex.auth.jwt.JWT;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;

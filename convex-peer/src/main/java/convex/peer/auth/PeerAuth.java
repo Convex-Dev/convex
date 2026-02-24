@@ -1,5 +1,6 @@
 package convex.peer.auth;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
@@ -9,7 +10,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.core.json.JWT;
 import convex.core.lang.RT;
 
 /**

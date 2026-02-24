@@ -1,4 +1,4 @@
-package convex.core.json;
+package convex.auth.jwt;
 
 import java.math.BigInteger;
 import java.security.KeyFactory;

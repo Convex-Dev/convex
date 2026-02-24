@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.util.Multikey;
@@ -19,7 +20,6 @@ import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
-import convex.core.json.JWT;
 import convex.core.lang.RT;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.Root;

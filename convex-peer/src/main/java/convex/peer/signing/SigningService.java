@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AESGCM;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -25,7 +26,6 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.json.JWT;
 import convex.lattice.cursor.ACursor;
 
 /**

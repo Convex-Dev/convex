@@ -1,4 +1,4 @@
-package convex.core.json;
+package convex.auth.jwt;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;

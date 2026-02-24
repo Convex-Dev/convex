@@ -22,7 +22,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.core.json.JWT;
+import convex.auth.jwt.JWT;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.peer.auth.PeerAuth;

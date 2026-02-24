@@ -1,4 +1,4 @@
-package convex.did;
+package convex.auth.did;
 
 import java.net.URI;
 import java.net.URLDecoder;
