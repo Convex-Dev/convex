@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -23,12 +24,10 @@ import convex.lattice.cursor.ALatticeCursor;
  * Set<AccountKey> active = follows.getActive();
  * }</pre>
  */
-public class Follows {
-
-	private final ALatticeCursor<AHashMap<ACell, ACell>> cursor;
+public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> {
 
 	Follows(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
-		this.cursor = cursor;
+		super(cursor);
 	}
 
 	/**
@@ -79,12 +78,4 @@ public class Follows {
 		return SocialHelpers.getActiveFollows(cursor.get());
 	}
 
-	/**
-	 * Returns the underlying lattice cursor for direct operations.
-	 *
-	 * @return Cursor at the follows map level
-	 */
-	public ALatticeCursor<AHashMap<ACell, ACell>> cursor() {
-		return cursor;
-	}
 }

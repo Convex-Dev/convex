@@ -6,6 +6,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.cvm.Keywords;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -41,7 +42,7 @@ import convex.lattice.generic.OwnerLattice;
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>
  */
-public class Social {
+public class Social extends ALatticeComponent<ACell> {
 
 	/**
 	 * Keyword for the social section in a node's root lattice.
@@ -58,10 +59,9 @@ public class Social {
 	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
 		OwnerLattice.create(SocialLattice.INSTANCE);
 
-	private final ALatticeCursor<?> cursor;
-
+	@SuppressWarnings("unchecked")
 	Social(ALatticeCursor<?> cursor) {
-		this.cursor = cursor;
+		super((ALatticeCursor<ACell>) cursor);
 	}
 
 	/**
@@ -120,20 +120,4 @@ public class Social {
 		return new Social(cursor.fork());
 	}
 
-	/**
-	 * Syncs this forked instance back to its parent using lattice merge.
-	 * Always succeeds — concurrent changes are merged.
-	 */
-	public void sync() {
-		cursor.sync();
-	}
-
-	/**
-	 * Returns the underlying lattice cursor for direct lattice operations.
-	 *
-	 * @return The cursor at the OwnerLattice level
-	 */
-	public ALatticeCursor<?> cursor() {
-		return cursor;
-	}
 }

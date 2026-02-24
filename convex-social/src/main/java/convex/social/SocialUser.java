@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -21,13 +22,12 @@ import convex.lattice.cursor.ALatticeCursor;
  *
  * @see Social#user(AccountKey)
  */
-public class SocialUser {
+public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 
-	private final ALatticeCursor<Index<Keyword, ACell>> cursor;
 	private final AccountKey ownerKey;
 
 	SocialUser(ALatticeCursor<Index<Keyword, ACell>> cursor, AccountKey ownerKey) {
-		this.cursor = cursor;
+		super(cursor);
 		this.ownerKey = ownerKey;
 	}
 
@@ -60,12 +60,4 @@ public class SocialUser {
 		return ownerKey;
 	}
 
-	/**
-	 * Returns the underlying lattice cursor for direct operations.
-	 *
-	 * @return Cursor at the SocialLattice level (unsigned inner value)
-	 */
-	public ALatticeCursor<Index<Keyword, ACell>> cursor() {
-		return cursor;
-	}
 }

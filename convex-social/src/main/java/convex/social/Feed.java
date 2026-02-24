@@ -7,6 +7,7 @@ import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -23,13 +24,12 @@ import convex.lattice.cursor.ALatticeCursor;
  * AHashMap<Keyword, ACell> post = feed.getPost(key);
  * }</pre>
  */
-public class Feed {
+public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 
-	private final ALatticeCursor<Index<Blob, ACell>> cursor;
 	private final AccountKey author;
 
 	Feed(ALatticeCursor<Index<Blob, ACell>> cursor, AccountKey author) {
-		this.cursor = cursor;
+		super(cursor);
 		this.author = author;
 	}
 
@@ -120,12 +120,4 @@ public class Feed {
 		return author;
 	}
 
-	/**
-	 * Returns the underlying lattice cursor for direct operations.
-	 *
-	 * @return Cursor at the feed Index level
-	 */
-	public ALatticeCursor<Index<Blob, ACell>> cursor() {
-		return cursor;
-	}
 }
