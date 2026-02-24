@@ -10,16 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.cvm.Symbols;
-import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;

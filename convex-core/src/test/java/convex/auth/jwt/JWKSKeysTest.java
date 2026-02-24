@@ -3,7 +3,6 @@ package convex.auth.jwt;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -14,8 +13,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import convex.auth.jwt.JWKSKeys;
-import convex.auth.jwt.JWT;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
