@@ -3,6 +3,7 @@ package convex.restapi.mcp;
 import java.util.List;
 
 import convex.api.Convex;
+import convex.auth.ucan.UCAN;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -84,6 +85,7 @@ class SigningMcpTools {
 		api.registerTool(new SigningTransactTool());
 		api.registerTool(new SigningCreateAccountTool());
 		api.registerTool(new SigningListAccountsTool());
+		api.registerTool(new SigningDelegateTool());
 
 		// Elevated tools
 		api.registerTool(new SigningImportKeyTool());
@@ -468,6 +470,89 @@ class SigningMcpTools {
 				return api.toolSuccess(Maps.of("accounts", entries));
 			} catch (Exception e) {
 				return api.toolError("List accounts failed: " + e.getMessage());
+			}
+		}
+	}
+
+	private class SigningDelegateTool extends McpTool {
+		private static final AString ARG_UCAN = Strings.intern("ucan");
+
+		SigningDelegateTool() {
+			super(McpTool.loadMetadata("convex/restapi/mcp/tools/signingDelegate.json"));
+		}
+
+		@Override
+		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AString identity = api.getRequestIdentity();
+			if (identity == null) return api.toolError("Authentication required");
+
+			SigningService svc = getSigningService();
+			if (svc == null) return api.toolError("Signing service not available");
+
+			AString publicKeyCell = RT.ensureString(arguments.get(McpAPI.ARG_PUBLIC_KEY));
+			if (publicKeyCell == null) return api.toolError("signingDelegate requires 'publicKey' string");
+
+			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
+			if (passphrase == null) return api.toolError("signingDelegate requires 'passphrase' string");
+
+			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
+			if (publicKey == null) return api.toolError("Invalid public key format");
+
+			// Extract nested ucan object
+			@SuppressWarnings("unchecked")
+			AMap<AString, ACell> ucanArgs = RT.ensureMap(arguments.get(ARG_UCAN));
+			if (ucanArgs == null) return api.toolError("signingDelegate requires 'ucan' object");
+
+			// Parse aud (required) — accept did:key or hex public key
+			AString audCell = RT.ensureString(ucanArgs.get(UCAN.AUD));
+			if (audCell == null) return api.toolError("ucan.aud is required");
+
+			AccountKey audienceKey;
+			String audStr = audCell.toString();
+			if (audStr.startsWith("did:key:")) {
+				audienceKey = UCAN.fromDIDKey(audCell);
+			} else {
+				audienceKey = AccountKey.parse(audStr);
+			}
+			if (audienceKey == null) return api.toolError("Invalid aud: must be a did:key string or hex public key");
+
+			// Parse exp (required)
+			CVMLong expCell = RT.ensureLong(ucanArgs.get(UCAN.EXP));
+			if (expCell == null) return api.toolError("ucan.exp is required (integer, unix seconds)");
+			long expiry = expCell.longValue();
+
+			// Parse optional fields
+			Long notBefore = null;
+			CVMLong nbfCell = RT.ensureLong(ucanArgs.get(UCAN.NBF));
+			if (nbfCell != null) notBefore = nbfCell.longValue();
+
+			@SuppressWarnings("unchecked")
+			AVector<ACell> att = RT.ensureVector(ucanArgs.get(UCAN.ATT));
+			@SuppressWarnings("unchecked")
+			AVector<ACell> prf = RT.ensureVector(ucanArgs.get(UCAN.PRF));
+			ACell fct = ucanArgs.get(UCAN.FCT);
+
+			try {
+				// Build payload and sign via signing service
+				AMap<AString, ACell> payload = UCAN.buildPayload(
+					publicKey, audienceKey, expiry, notBefore, att, prf, fct);
+				Blob message = Ref.get(payload).getEncoding();
+				ASignature signature = svc.sign(identity, publicKey, passphrase, message);
+				if (signature == null) return api.toolError("Key not found or wrong passphrase");
+
+				// Construct UCAN and build response
+				UCAN ucan = UCAN.fromPayload(payload, signature);
+				AMap<AString, ACell> tokenMap = ucan.toMap();
+				Blob cad3 = Cells.encode(tokenMap);
+				String hashHex = Cells.getHash(tokenMap).toHexString();
+
+				return api.toolSuccess(Maps.of(
+					"token", tokenMap,
+					"cad3", cad3.toString(),
+					"hash", hashHex
+				));
+			} catch (Exception e) {
+				return api.toolError("Delegation failed: " + e.getMessage());
 			}
 		}
 	}

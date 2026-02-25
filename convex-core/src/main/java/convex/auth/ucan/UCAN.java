@@ -56,7 +56,7 @@ public class UCAN {
 	public static final AString UCV = Strings.intern("ucv");
 
 	// Fixed header value
-	private static final AMap<AString, ACell> HEADER_VALUE = Maps.of(
+	public static final AMap<AString, ACell> HEADER_VALUE = Maps.of(
 		ALG, Strings.intern("EdDSA"),
 		UCV, Strings.create("0.10.0")
 	);
@@ -138,6 +138,55 @@ public class UCAN {
 	}
 
 	/**
+	 * Build a UCAN payload map without signing. Use with external signing
+	 * services that manage private keys server-side.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audience  Audience's public key
+	 * @param expiry    Expiry time in unix seconds
+	 * @param notBefore Not-before time in unix seconds (null to omit)
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs    Proof tokens vector (null for empty)
+	 * @param facts     Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AccountKey audience,
+			long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		AString issDID = toDIDKey(issuerKey);
+		AString audDID = toDIDKey(audience);
+		AString nonce = generateNonce();
+
+		AMap<AString, ACell> payload = Maps.of(
+			ISS, issDID,
+			AUD, audDID,
+			EXP, CVMLong.create(expiry),
+			NNC, nonce,
+			ATT, (capabilities != null) ? capabilities : Vectors.empty(),
+			PRF, (proofs != null) ? proofs : Vectors.empty()
+		);
+
+		if (notBefore != null) {
+			payload = payload.assoc(NBF, CVMLong.create(notBefore));
+		}
+		if (facts != null) {
+			payload = payload.assoc(FCT, facts);
+		}
+
+		return payload;
+	}
+
+	/**
+	 * Create a UCAN from a pre-built payload and an externally produced signature.
+	 *
+	 * @param payload Payload map (as returned by {@link #buildPayload})
+	 * @param signature Ed25519 signature over the Ref encoding of the payload
+	 * @return New UCAN token
+	 */
+	public static UCAN fromPayload(AMap<AString, ACell> payload, ASignature signature) {
+		return new UCAN(payload, signature);
+	}
+
+	/**
 	 * Parse a UCAN from a CVM map. Returns null if the map is malformed.
 	 *
 	 * @param tokenMap Map with "header", "payload", "sig" keys
@@ -149,7 +198,12 @@ public class UCAN {
 		AMap<AString, ACell> payload = RT.ensureMap(tokenMap.get(PAYLOAD));
 		if (payload == null) return null;
 
-		ABlob sigBlob = RT.ensureBlob(tokenMap.get(SIG));
+		ACell sigCell = tokenMap.get(SIG);
+		ABlob sigBlob = RT.ensureBlob(sigCell);
+		if (sigBlob == null && sigCell instanceof AString) {
+			// Handle hex string from JSON round-trip
+			sigBlob = Blob.parse(sigCell.toString());
+		}
 		if (sigBlob == null || sigBlob.count() != 64) return null;
 
 		ASignature sig = Ed25519Signature.wrap(sigBlob.getBytes());
