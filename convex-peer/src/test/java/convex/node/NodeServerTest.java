@@ -961,5 +961,112 @@ public class NodeServerTest {
 		assertNull(LatticeConnectionManager.resolveTransport(empty),
 			"Null transports should return null");
 	}
+
+	// ===== Challenge/Response verification tests =====
+
+	/**
+	 * Test that verifyPeer succeeds when the NodeServer has a signing key
+	 * and the challenge is addressed to the correct key.
+	 */
+	@Test
+	public void testChallengeResponse() throws Exception {
+		AKeyPair serverKP = AKeyPair.generate();
+		AKeyPair clientKP = AKeyPair.generate();
+
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote convex = ConvexRemote.connect(addr);
+
+		try {
+			boolean verified = convex.verifyPeer(
+				serverKP.getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
+			assertTrue(verified, "verifyPeer should succeed for correct server key");
+		} finally {
+			convex.close();
+		}
+	}
+
+	/**
+	 * Test that verifyPeer fails when the expected key does not match
+	 * the NodeServer's actual key.
+	 */
+	@Test
+	public void testChallengeResponseWrongKey() throws Exception {
+		AKeyPair serverKP = AKeyPair.generate();
+		AKeyPair clientKP = AKeyPair.generate();
+		AKeyPair wrongKP = AKeyPair.generate();
+
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote convex = ConvexRemote.connect(addr);
+
+		try {
+			// Challenge addressed to wrong key — server should not respond
+			boolean verified = convex.verifyPeer(
+				wrongKP.getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
+			assertFalse(verified, "verifyPeer should fail for wrong server key");
+		} finally {
+			convex.close();
+		}
+	}
+
+	/**
+	 * Test that verifyPeer fails when the NodeServer has no signing key.
+	 */
+	@Test
+	public void testChallengeResponseNoKey() throws Exception {
+		AKeyPair clientKP = AKeyPair.generate();
+
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		// No setMergeContext — default EMPTY context, no signing key
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote convex = ConvexRemote.connect(addr);
+
+		try {
+			// Server has no key — can't sign a response
+			boolean verified = convex.verifyPeer(
+				AKeyPair.generate().getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
+			assertFalse(verified, "verifyPeer should fail when server has no signing key");
+		} finally {
+			convex.close();
+		}
+	}
+
+	/**
+	 * Test that verifyPeer works with an optional contextID.
+	 */
+	@Test
+	public void testChallengeResponseWithContext() throws Exception {
+		AKeyPair serverKP = AKeyPair.generate();
+		AKeyPair clientKP = AKeyPair.generate();
+		ACell contextID = Strings.create("test-lattice-v1");
+
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote convex = ConvexRemote.connect(addr);
+
+		try {
+			boolean verified = convex.verifyPeer(
+				serverKP.getAccountKey(), clientKP, contextID).get(5, TimeUnit.SECONDS);
+			assertTrue(verified, "verifyPeer should succeed with contextID");
+		} finally {
+			convex.close();
+		}
+	}
 }
 

@@ -3,6 +3,7 @@ package convex.core.message;
 import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;
+import convex.core.crypto.AKeyPair;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
@@ -11,6 +12,7 @@ import convex.core.cvm.CVMTag;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.cvm.CVMEncoder;
@@ -104,12 +106,85 @@ public class Message {
 		return create(MessageType.REQUEST_BELIEF,null);
 	}
 
-	public static Message createChallenge(SignedData<ACell> challenge) {
-		return create(MessageType.CHALLENGE, challenge);
+	public static Message createChallenge(long id, SignedData<ACell> challenge) {
+		AVector<?> v=Vectors.create(MessageTag.CHALLENGE,CVMLong.create(id),challenge);
+		return create(MessageType.CHALLENGE, v);
 	}
 
-	public static Message createResponse(SignedData<ACell> response) {
-		return create(MessageType.RESPONSE, response);
+	/**
+	 * Responds to a CHALLENGE message using the given key pair.
+	 *
+	 * <p>Extracts the signed challenge data from the message, validates the
+	 * format, checks the target key matches, optionally validates the contextID,
+	 * then signs and returns a response.
+	 *
+	 * <p>On any error, returns an error Result so the caller gets a definite answer.
+	 *
+	 * @param keyPair Key pair to sign the response with (must match the target key in the challenge)
+	 * @param contextValidator Optional predicate to validate contextID (element 2). Null to skip.
+	 */
+	@SuppressWarnings("unchecked")
+	public void respondToChallenge(AKeyPair keyPair, Predicate<ACell> contextValidator) {
+		try {
+			if (keyPair == null) {
+				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("No signing key")));
+				return;
+			}
+
+			// Message payload is [tag, id, signedData]
+			AVector<ACell> msgPayload = getPayload();
+			if (msgPayload == null || msgPayload.count() < 3) {
+				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge format")));
+				return;
+			}
+			SignedData<ACell> signedData = (SignedData<ACell>) msgPayload.get(2);
+			if (signedData == null) {
+				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Missing signed data")));
+				return;
+			}
+
+			AVector<ACell> challengeValues = (AVector<ACell>) signedData.getValue();
+			if (challengeValues == null) {
+				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge data")));
+				return;
+			}
+
+			long n = challengeValues.count();
+			if (n < 2 || n > 3) {
+				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Wrong element count")));
+				return;
+			}
+
+			// Verify challenge is addressed to this key
+			AccountKey targetKey = RT.ensureAccountKey(challengeValues.get(1));
+			if (targetKey == null || !keyPair.getAccountKey().equals(targetKey)) {
+				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Wrong target key")));
+				return;
+			}
+
+			// Optional contextID validation
+			ACell contextID = (n == 3) ? challengeValues.get(2) : null;
+			if (contextID != null && contextValidator != null && !contextValidator.test(contextID)) {
+				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Context mismatch")));
+				return;
+			}
+
+			ACell token = challengeValues.get(0);
+			AccountKey challengerKey = signedData.getAccountKey();
+
+			// Build response: [token, challengerKey, contextID?]
+			AVector<ACell> responseValues = (contextID != null)
+				? Vectors.of(token, challengerKey, contextID)
+				: Vectors.of(token, challengerKey);
+			SignedData<ACell> response = keyPair.signData(responseValues);
+			returnResult(Result.value(response));
+		} catch (Exception e) {
+			try {
+				returnResult(Result.error(ErrorCodes.UNEXPECTED, Strings.create(e.getMessage())));
+			} catch (Exception e2) {
+				// best effort
+			}
+		}
 	}
 
 	public static Message createGoodBye() {
@@ -228,6 +303,7 @@ public class Message {
 				if (MessageTag.LATTICE_VALUE.equals(mt)) return MessageType.LATTICE_VALUE;
 				if (MessageTag.LATTICE_QUERY.equals(mt)) return MessageType.LATTICE_QUERY;
 				if (MessageTag.PING.equals(mt)) return MessageType.PING;
+				if (MessageTag.CHALLENGE.equals(mt)) return MessageType.CHALLENGE;
 			}
 		} catch (Exception e) {
 			// fall-through to UNKNOWN
@@ -309,7 +385,8 @@ public class Message {
 			case QUERY:
 			case DATA_REQUEST:
 			case LATTICE_QUERY:
-			case PING:{
+			case PING:
+			case CHALLENGE:{
 				AVector<?> v=RT.ensureVector(getPayload());
 				if (v==null || v.count()<2) return null;
 				return RT.ensureLong(v.get(1));

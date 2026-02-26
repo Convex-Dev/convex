@@ -21,5 +21,6 @@ public class MessageTag {
 
 	public static final Keyword PING=Keyword.intern("PING");
 
-	
+	public static final Keyword CHALLENGE=Keyword.intern("CH");
+
 }

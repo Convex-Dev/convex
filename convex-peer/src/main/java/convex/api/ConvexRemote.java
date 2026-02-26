@@ -240,7 +240,7 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		Message m=Message.createChallenge(data);
+		Message m=Message.createChallenge(getNextID(), data);
 		return message(m);
 	}
 	

@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
@@ -27,6 +28,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Strings;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
@@ -40,7 +42,6 @@ import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.AConnection;
-import convex.net.ChallengeRequest;
 import convex.net.IPUtils;
 
 /**
@@ -78,11 +79,6 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Map of current connections.
 	 */
 	private final HashMap<AccountKey,Convex> connections = new HashMap<>();
-
-	/**
-	 * The list of outgoing challenges that are being made to remote peers
-	 */
-	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
 	private SecureRandom random = new SecureRandom();
 
@@ -339,186 +335,16 @@ public class ConnectionManager extends AThreadedComponent {
 		return connections.size();
 	}
 
+	/**
+	 * Processes an incoming CHALLENGE message. Validates contextID against
+	 * this peer's network ID if present.
+	 */
 	public void processChallenge(Message m, Peer thisPeer) {
-		SignedData<AVector<ACell>> signedData=null;
-		try {
-			signedData = m.getPayload();
-			if ( signedData == null) {
-				throw new BadFormatException("null challenge?");
-			}
-		} catch (BadFormatException e) {
-			alertBadMessage(m,"Bad format in challenge");
-			return;
-		}
-		
-		AVector<ACell> challengeValues = signedData.getValue();
-
-		if (challengeValues == null || challengeValues.size() != 3) {
-			log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
-			return;
-		}
-		
-		// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing challenge request from: " + pc.getRemoteAddress());
-
-		// get the token to respond with
-		Hash token = RT.ensureHash(challengeValues.get(0));
-		if (token == null) {
-			log.warn( "no challenge token provided");
-			return;
-		}
-
-		// check to see if we are both want to connect to the same network
-		Hash networkId = RT.ensureHash(challengeValues.get(1));
-		if (networkId == null) {
-			log.warn( "challenge data has no networkId");
-			return;
-		}
-		if ( !networkId.equals(thisPeer.getNetworkID())) {
-			log.warn( "challenge data has incorrect networkId");
-			return;
-		}
-		// check to see if the challenge is for this peer
-		AccountKey toPeer = RT.ensureAccountKey(challengeValues.get(2));
-		if (toPeer == null) {
-			log.warn( "challenge data has no toPeer address");
-			return;
-		}
-		if ( !toPeer.equals(thisPeer.getPeerKey())) {
-			log.warn( "challenge data has incorrect addressed peer");
-			return;
-		}
-
-		// get who sent this challenge
-		AccountKey fromPeer = signedData.getAccountKey();
-
-		// send the signed response back
-		AVector<ACell> responseValues = Vectors.of(token, thisPeer.getNetworkID(), fromPeer, signedData.getHash());
-
-		SignedData<ACell> response = thisPeer.sign(responseValues);
-		// log.log(LEVEL_CHALLENGE_RESPONSE, "Sending response to "+ pc.getRemoteAddress());
-		Message resp=Message.createResponse(response);
-		m.returnMessage(resp);
-	}
-
-	/**
-	 * Processes a response message received from a peer
-	 * @param m
-	 * @param thisPeer
-	 * @return
-	 * @throws BadFormatException 
-	 */
-	AccountKey processResponse(Message m, Peer thisPeer) throws BadFormatException {
-		SignedData<ACell> signedData = m.getPayload(getStore());
-
-		log.debug( "Processing response request");
-
-		@SuppressWarnings("unchecked")
-		AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
-
-		if (responseValues.size() != 4) {
-			log.warn( "response data incorrect number of items should be 4 not {}",responseValues.size());
-			return null;
-		}
-
-
-		// get the signed token
-		Hash token = RT.ensureHash(responseValues.get(0));
-		if (token == null) {
-			log.warn( "no response token provided");
-			return null;
-		}
-
-		// check to see if we are both want to connect to the same network
-		Hash networkId = RT.ensureHash(responseValues.get(1));
-		if ( networkId == null || !networkId.equals(thisPeer.getNetworkID())) {
-			log.warn( "response data has incorrect networkId");
-			return null;
-		}
-		// check to see if the challenge is for this peer
-		AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
-		if ( toPeer == null || !toPeer.equals(thisPeer.getPeerKey())) {
-			log.warn( "response data has incorrect addressed peer");
-			return null;
-		}
-
-		// hash sent by the response
-		Hash challengeHash = RT.ensureHash(responseValues.get(3));
-
-		// get who sent this challenge
-		AccountKey fromPeer = signedData.getAccountKey();
-
-
-		if ( !challengeList.containsKey(fromPeer)) {
-			log.warn( "response from an unkown challenge");
-			return null;
-		}
-		
-		synchronized(challengeList) {
-
-			// get the challenge data we sent out for this peer
-			ChallengeRequest challengeRequest = challengeList.get(fromPeer);
-
-			Hash challengeToken = challengeRequest.getToken();
-			if (!challengeToken.equals(token)) {
-				log.warn( "invalid response token sent");
-				return null;
-			}
-
-			AccountKey challengeFromPeer = challengeRequest.getPeerKey();
-			if (!signedData.getAccountKey().equals(challengeFromPeer)) {
-				log.warn("response key does not match requested key, sent from a different peer");
-				return null;
-			}
-
-			// hash sent by this peer for the challenge
-			Hash challengeSourceHash = challengeRequest.getSendHash();
-			if ( !challengeHash.equals(challengeSourceHash)) {
-				log.warn("response hash of the challenge does not match");
-				return null;
-			}
-			// remove from list incase this fails, we can generate another challenge
-			challengeList.remove(fromPeer);
-
-			Convex connection = getConnection(fromPeer);
-			if (connection != null) {
-				// connection.setTrustedKey(fromPeer);
-			}
-
-			// return the trusted peer key
-			return fromPeer;
-		}
-	}
-
-
-
-	/**
-	 * Sends out a challenge to a connection that is not trusted.
-	 * @param toPeerKey Peer key that we need to send the challenge too.
-	 * @param connection untrusted connection
-	 * @param thisPeer Source peer that the challenge is issued from
-	 *
-	 */
-	public void requestChallenge(AccountKey toPeerKey, AConnection connection, Peer thisPeer) {
-		synchronized(challengeList) {
-			if (connection.isTrusted()) {
-				return;
-			}
-			// skip if a challenge is already being sent
-			if (challengeList.containsKey(toPeerKey)) {
-				if (!challengeList.get(toPeerKey).isTimedout()) {
-					// not timed out, then continue to wait
-					return;
-				}
-				// remove the old timed out request
-				challengeList.remove(toPeerKey);
-			}
-			ChallengeRequest request = ChallengeRequest.create(toPeerKey);
-			if (request.send(connection, thisPeer)) {
-				challengeList.put(toPeerKey, request);
-			} else {
-				// TODO: check OK to do nothing and send later?
-			}
-		}
+		Hash networkID = thisPeer.getNetworkID();
+		m.respondToChallenge(thisPeer.getKeyPair(), ctx -> {
+			Hash h = RT.ensureHash(ctx);
+			return (h == null) || h.equals(networkID);
+		});
 	}
 
 	/**

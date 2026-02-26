@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -32,6 +33,7 @@ import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -39,6 +41,7 @@ import convex.core.data.Hash;
 import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -792,6 +795,76 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the requestChallenge
 	 */
 	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data);
+
+	/**
+	 * Verifies the identity of the remote peer via challenge/response.
+	 *
+	 * <p>Sends a CHALLENGE containing a random token and the expected peer key,
+	 * signed by the caller's key pair. The remote peer must respond with the
+	 * same token and the caller's key, signed by the expected peer key.
+	 *
+	 * <p>Protocol format (symmetric): {@code [token, otherKey, contextID?]}
+	 * <ul>
+	 *   <li>Challenge: {@code SignedData([token, targetKey, contextID?])} signed by caller</li>
+	 *   <li>Response:  {@code SignedData([token, callerKey, contextID?])} signed by target</li>
+	 * </ul>
+	 *
+	 * <p>Works with both NodeServer (lattice) and peer Server (consensus).
+	 *
+	 * @param expectedKey AccountKey the remote peer is expected to hold
+	 * @param signingKey  Key pair to sign the challenge with (proves caller's identity)
+	 * @return Future that completes with true if verification succeeded
+	 */
+	public CompletableFuture<Boolean> verifyPeer(AccountKey expectedKey, AKeyPair signingKey) {
+		return verifyPeer(expectedKey, signingKey, null);
+	}
+
+	/**
+	 * Verifies the identity of the remote peer via challenge/response with an
+	 * optional context ID.
+	 *
+	 * @param expectedKey AccountKey the remote peer is expected to hold
+	 * @param signingKey  Key pair to sign the challenge with
+	 * @param contextID   Optional context (e.g. network ID for consensus peers), or null
+	 * @return Future that completes with true if verification succeeded
+	 */
+	@SuppressWarnings("unchecked")
+	public CompletableFuture<Boolean> verifyPeer(AccountKey expectedKey, AKeyPair signingKey, ACell contextID) {
+		Hash token = Blob.createRandom(new SecureRandom(), 32).getHash();
+		AccountKey ownKey = signingKey.getAccountKey();
+
+		AVector<ACell> challenge = (contextID != null)
+			? Vectors.of(token, expectedKey, contextID)
+			: Vectors.of(token, expectedKey);
+		SignedData<ACell> signed = signingKey.signData(challenge);
+
+		return requestChallenge(signed).thenApply(result -> {
+			try {
+				if (result == null || result.isError()) return false;
+				ACell rv = result.getValue();
+				if (!(rv instanceof SignedData)) return false;
+				SignedData<ACell> response = (SignedData<ACell>) rv;
+
+				// Response must be signed by the expected key
+				if (!expectedKey.equals(response.getAccountKey())) return false;
+
+				// Response contents: [token, callerKey] or [token, callerKey, contextID]
+				ACell inner = response.getValue();
+				if (!(inner instanceof AVector)) return false;
+				AVector<ACell> values = (AVector<ACell>) inner;
+				long n = values.count();
+				if (n < 2 || n > 3) return false;
+				if (!token.equals(values.get(0))) return false;
+				if (!ownKey.equals(values.get(1))) return false;
+				if (n == 3 && !Utils.equals(contextID, values.get(2))) return false;
+
+				return true;
+			} catch (Exception e) {
+				log.debug("verifyPeer failed: {}", e.getMessage());
+				return false;
+			}
+		});
+	}
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has

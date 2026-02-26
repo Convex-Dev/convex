@@ -101,7 +101,7 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		return makeMessageFuture(MessageType.CHALLENGE,data);
+		return makeMessageFuture(Message.createChallenge(getNextID(), data));
 	}
 
 	@Override

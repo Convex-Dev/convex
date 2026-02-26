@@ -335,6 +335,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 			case DATA_REQUEST:
 				processDataRequest(message);
 				break;
+			case CHALLENGE:
+				processChallenge(message);
+				break;
+			case RESPONSE:
+				log.debug("Received RESPONSE (not expected server-side)");
+				break;
 			default:
 				log.debug("Unhandled message type: {}", type);
 				break;
@@ -437,6 +443,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		} catch (Exception e) {
 			log.warn("Unable to deliver missing data due to exception:", e);
 		}
+	}
+
+	private void processChallenge(Message message) {
+		message.respondToChallenge(mergeContext.getSigningKey(), null);
 	}
 
 	/**

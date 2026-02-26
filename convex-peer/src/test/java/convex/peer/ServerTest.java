@@ -35,6 +35,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
+import convex.core.data.AccountKey;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
@@ -236,6 +238,55 @@ public class ServerTest {
 
 			State s=convex.acquireState().get(80000,TimeUnit.MILLISECONDS);
 			assertTrue(s instanceof State);
+		}
+	}
+
+	// ===== Challenge/Response verification tests (peer Server) =====
+
+	@Test
+	public void testChallengeResponse() throws Exception {
+		Server server = network.SERVER;
+		AccountKey serverKey = server.getPeerKey();
+		AKeyPair clientKP = AKeyPair.generate();
+
+		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		try {
+			boolean verified = convex.verifyPeer(serverKey, clientKP).get(5, TimeUnit.SECONDS);
+			assertTrue(verified, "verifyPeer should succeed for correct peer key");
+		} finally {
+			convex.close();
+		}
+	}
+
+	@Test
+	public void testChallengeResponseWrongKey() throws Exception {
+		Server server = network.SERVER;
+		AKeyPair clientKP = AKeyPair.generate();
+		AccountKey wrongKey = AKeyPair.generate().getAccountKey();
+
+		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		try {
+			boolean verified = convex.verifyPeer(wrongKey, clientKP).get(5, TimeUnit.SECONDS);
+			assertFalse(verified, "verifyPeer should fail for wrong key");
+		} finally {
+			convex.close();
+		}
+	}
+
+	@Test
+	public void testChallengeResponseWithContext() throws Exception {
+		Server server = network.SERVER;
+		AccountKey serverKey = server.getPeerKey();
+		AKeyPair clientKP = AKeyPair.generate();
+
+		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		try {
+			// Use the peer's actual network ID as context
+			boolean verified = convex.verifyPeer(serverKey, clientKP,
+				server.getPeer().getNetworkID()).get(5, TimeUnit.SECONDS);
+			assertTrue(verified, "verifyPeer should succeed with matching networkID as context");
+		} finally {
+			convex.close();
 		}
 	}
 }

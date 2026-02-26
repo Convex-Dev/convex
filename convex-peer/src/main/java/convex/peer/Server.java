@@ -442,7 +442,7 @@ public class Server implements Closeable {
 				processChallenge(m);
 				return null;
 			case RESPONSE:
-				processResponse(m);
+				// Response handling is done client-side via verifyPeer()
 				return null;
 			case GOODBYE:
 				processClose(m);
@@ -612,9 +612,6 @@ public class Server implements Closeable {
 		manager.processChallenge(m, getPeer());
 	}
 
-	protected void processResponse(Message m) throws BadFormatException {
-		manager.processResponse(m, getPeer());
-	}
 
 
 	/**
