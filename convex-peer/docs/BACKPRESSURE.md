@@ -196,12 +196,15 @@ both max message size and priority scheduling. See [PEER_PRIORITY.md](PEER_PRIOR
 
 ### QueryHandler Parallelism
 
-The QueryHandler is currently single-threaded (`AThreadedComponent`). Under high
-async load from many clients, the single consumer becomes the bottleneck despite
-batch draining. Queries are read-only against the consensus state, so multiple
-handler threads could process them in parallel without ordering concerns. This
-would require either multiple `AThreadedComponent` instances sharing a queue, or
-a different threading model for the query path.
+The QueryHandler is deliberately single-threaded (`AThreadedComponent`). This
+caps query processing at one core, which is correct for normal peers — most
+queries are fast (immutable state lookups), and limiting to one thread prevents
+query floods from starving transaction processing or consensus.
+
+Parallelisation is technically straightforward (queries are read-only against
+immutable `State`, no ordering dependencies) but not normal peer behaviour. May
+be a future configuration option for specialised query-focused peers that do not
+participate in consensus.
 
 ## References
 

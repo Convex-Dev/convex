@@ -74,6 +74,20 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Checks if this connection supports general message sending (as opposed
+	 * to result-only delivery via {@link #returnMessage(Message)}).
+	 *
+	 * <p>Returns true by default. {@link LocalConnection} returns false for
+	 * return-only connection ends. Callers should check this before attempting
+	 * server-initiated protocol exchange (e.g. challenge/response).</p>
+	 *
+	 * @return true if {@link #sendMessage(Message)} is supported
+	 */
+	public boolean supportsMessage() {
+		return true;
+	}
+
+	/**
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use

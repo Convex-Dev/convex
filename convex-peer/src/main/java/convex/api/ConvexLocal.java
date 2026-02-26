@@ -42,6 +42,7 @@ public class ConvexLocal extends AConvexConnected {
 		this.preCompile=true;
 
 		// Create persistent paired connection to server
+		Predicate<Message> clientHandler = m -> { returnMessageHandler.accept(m); return true; };
 		Predicate<Message> serverHandler = m -> {
 			Predicate<Message> retry = server.deliverMessage(m);
 			if (retry != null) {
@@ -49,10 +50,9 @@ public class ConvexLocal extends AConvexConnected {
 			}
 			return true;
 		};
-		LocalConnection clientEnd = LocalConnection.createPair(
-			m -> { returnMessageHandler.accept(m); return true; },
-			serverHandler
-		);
+		LocalConnection clientEnd = (keyPair != null)
+			? LocalConnection.createPair(clientHandler, serverHandler)       // bidirectional: supports CHALLENGE
+			: LocalConnection.createReturnable(clientHandler, serverHandler); // return-only: results only
 		setConnection(clientEnd);
 	}
 

@@ -133,23 +133,14 @@ subject to backpressure for non-Belief traffic.
 
 See [MESSAGING.md](MESSAGING.md) for the full connection and message architecture.
 
-### Current State (Phase 1)
+`Message` carries a single `connection` field. `returnMessage()` delegates to
+`connection.returnMessage()`. `LocalConnection` is a paired bidirectional
+channel with per-end `acceptsMessages` control — `sendMessage` can be
+structurally disabled while `returnMessage` continues to work.
 
-`Message` carries an optional `AConnection` field alongside a legacy
-`Predicate<Message>` return handler. `returnMessage()` uses
-`conn.trySendMessage()` when present, falls back to the handler for local/HTTP
-paths.
-
-`LocalConnection` provides a uniform `AConnection` for in-JVM delivery.
-`NettyServerConnection` wraps server-side inbound Netty channels.
-
-### Target State
-
-`Message` carries a single `connection` field (no `returnHandler`).
-`LocalConnection` becomes a paired bidirectional channel. See
-[MESSAGING.md §3](MESSAGING.md#3-local-connections--paired-channel) and
-[MESSAGING.md §7](MESSAGING.md#7-migration-from-current-state) for the
-migration plan.
+`AConnection.supportsMessage()` allows the server to check whether a connection
+supports general messaging before attempting protocol exchange. `InboundVerifier`
+checks this early to avoid spawning virtual threads for return-only connections.
 
 ## Implemented: Inbound Belief Deprioritisation (Phase 2)
 
@@ -161,7 +152,7 @@ migration plan.
 | `Server.processBelief()` | Routes by `conn.isTrusted()` — trusted→main, untrusted→low-priority |
 | `InboundVerifier.maybeStart()` | CAS-guarded, virtual thread, sends CHALLENGE |
 | `InboundVerifier.handleResult()` | Routes inbound RESULT to pending verification |
-| `ConvexRemote.returnMessageHandler` | Auto-responds to server-initiated CHALLENGE |
+| `AConvexConnected.returnMessageHandler` | Auto-responds to server-initiated CHALLENGE |
 | Client-side connection on messages | `NettyConnection` sets itself on inbound handler |
 
 ### Flow

@@ -65,6 +65,7 @@ class InboundVerifier {
 	 */
 	void maybeStart(AConnection conn) {
 		if (conn.isTrusted()) return;
+		if (!conn.supportsMessage()) return;
 		if (active.containsKey(conn)) return;
 
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
