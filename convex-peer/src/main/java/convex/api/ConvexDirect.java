@@ -29,6 +29,8 @@ import convex.core.util.Utils;
 
 /**
  * Convex API instance that directly interacts with a Peer instance
+ * 
+ * Avoids Message infrastructure: mainly useful for testing and forked simulations
  */
 public class ConvexDirect extends Convex {
 
