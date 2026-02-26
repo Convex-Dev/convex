@@ -48,7 +48,6 @@ public class UCANValidator {
 				ACell proofCell = proofs.get(i);
 
 				// Parse proof as UCAN
-				@SuppressWarnings("unchecked")
 				AMap<AString, ACell> proofMap = RT.ensureMap(proofCell);
 				if (proofMap == null) return null;
 

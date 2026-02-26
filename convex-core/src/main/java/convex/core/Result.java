@@ -8,8 +8,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.cvm.ARecordGeneric;
-import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
@@ -27,7 +27,6 @@ import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.Ref;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;

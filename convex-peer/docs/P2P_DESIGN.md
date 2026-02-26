@@ -19,16 +19,7 @@ The core design principle is **separation of the message protocol from the trans
 
 ### 2.1 Lattice ROOT
 
-The global base lattice is defined by `Lattice.ROOT` (`KeyedLattice`):
-
-```
-Lattice.ROOT
-├── :data  → DataLattice           Content-addressable storage
-├── :fs    → OwnerLattice(MapLattice(DLFSLattice))    Decentralised file systems
-├── :kv    → OwnerLattice(MapLattice(KVStoreLattice))  Key-value databases
-├── :queue → OwnerLattice(MapLattice(TopicLattice))    Message queues
-└── :local → LocalLattice          Peer-local state (not propagated)
-```
+The global base lattice is defined by `Lattice.ROOT` (`KeyedLattice`). See [LATTICE_REGIONS.md](../../convex-core/docs/LATTICE_REGIONS.md) for the canonical region listing, types, and paths.
 
 Each region uses the same algebraic foundations: join-semilattices, SignedData verification, delta transmission, and structural sharing via immutable persistent data structures with CAD3 encoding.
 
@@ -65,13 +56,16 @@ Current `MessageType` enum (16 types):
 | 1 | CHALLENGE | Ed25519 auth challenge `[token, networkId, toPeer]` |
 | 2 | RESPONSE | Auth response `[token, networkId, fromPeer, challengeHash]` |
 | 3 | DATA | Content-addressable data relay |
+| 4 | COMMAND | Control command to peer (trusted senders only) |
 | 5 | DATA_REQUEST | Request missing data by hash |
 | 6 | QUERY | Read-only CVM query `[:Q id form address?]` |
 | 7 | TRANSACT | Submit signed transaction `[:TX id signed-data]` |
 | 8 | RESULT | Response to query/transact/command |
 | 9 | BELIEF | Consensus belief propagation (Belief or SignedData\<Order\>) |
 | 10 | REQUEST_BELIEF | Poll for latest belief |
+| 11 | GOODBYE | Connection shutdown `[:BYE message?]` |
 | 12 | STATUS | Request peer status |
+| 13 | UNKNOWN | Unrecognised message type |
 | 14 | LATTICE_VALUE | Lattice delta `[:LV [*path*] value]` |
 | 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]` |
 | 16 | PING | Connectivity check `[:PING id]` |
@@ -454,7 +448,9 @@ NodeServer (lattice merge + propagate)
 
 ### 9.2 Message Routing
 
-All incoming messages flow through `NodeServer.handleIncomingMessage()`:
+Messages are currently split between `NodeServer` (lattice operations) and `Server` (consensus and client-facing). As more message types migrate to the lattice protocol, `NodeServer` will handle an increasing share.
+
+**NodeServer** handles lattice messages directly:
 
 | Message | Handler | Notes |
 |---------|---------|-------|
@@ -462,6 +458,11 @@ All incoming messages flow through `NodeServer.handleIncomingMessage()`:
 | LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
 | DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
 | PING | `processPing()` | Respond with RESULT |
+
+**Server** handles consensus and client-facing messages:
+
+| Message | Handler | Notes |
+|---------|---------|-------|
 | BELIEF | `BeliefPropagator.queueBelief()` | **Transition**: eventually becomes LATTICE_VALUE at consensus path |
 | QUERY | `QueryHandler` | CVM query execution |
 | TRANSACT | `TransactionHandler` | Transaction submission |
@@ -520,24 +521,17 @@ These rules are enforced locally. Invalid entries are silently discarded and can
 
 ## 12. Lattice Path Summary
 
+Base regions are documented in [LATTICE_REGIONS.md](../../convex-core/docs/LATTICE_REGIONS.md). This document proposes extending the root with:
+
 ```
 Lattice.ROOT (KeyedLattice)
 │
-├── :convex
-│   └── <genesis-hash>
-│       └── :peers → BeliefLattice (CPoS merge)          [Phase 2]
-│           └── <AccountKey> → SignedData<Order>
+├── ... base regions (see LATTICE_REGIONS.md)
 │
-├── :p2p
-│   └── :nodes → OwnerLattice<NodeInfo>                   [Phase 1]
-│       └── <AccountKey> → SignedData<NodeInfo>
-│
-├── :data  → DataLattice
-├── :fs    → OwnerLattice(MapLattice(DLFSLattice))
-├── :kv    → OwnerLattice(MapLattice(KVStoreLattice))
-├── :queue → OwnerLattice(MapLattice(TopicLattice))
-├── :sql   → OwnerLattice(MapLattice(TableStoreLattice))  [convex-db]
-└── :local → LocalLattice (not propagated)
+└── :convex                                                [Phase 2]
+    └── <genesis-hash>
+        └── :peers → BeliefLattice (CPoS merge)
+            └── <AccountKey> → SignedData<Order>
 ```
 
 ## 13. Design Decisions

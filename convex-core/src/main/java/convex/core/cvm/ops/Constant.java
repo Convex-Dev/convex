@@ -4,14 +4,12 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.List;
 import convex.core.data.Maps;
@@ -23,7 +21,6 @@ import convex.core.data.VectorLeaf;
 import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**

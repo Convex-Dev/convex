@@ -105,7 +105,7 @@ This gives you: owner key → `SignedData<V>` → your application state. The `O
 
 ### 5. Register with the root lattice
 
-Applications plug into a node's root `KeyedLattice` under a keyword:
+Applications plug into a node's root `KeyedLattice` under a keyword. See [LATTICE_REGIONS.md](LATTICE_REGIONS.md) for the existing root regions and their lattice types.
 
 ```java
 KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
