@@ -129,79 +129,27 @@ subject to backpressure for non-Belief traffic.
 4. **Low-priority queue is bounded** — unverified Belief senders can't fill the
    high-priority path.
 
-## Design: Message ↔ Connection
+## Message ↔ Connection
 
-### Problem
+See [MESSAGING.md](MESSAGING.md) for the full connection and message architecture.
 
-Currently `Message` uses a `Predicate<Message>` return handler for routing responses
-back to the sender. This works but has drawbacks:
+### Current State (Phase 1)
 
-- No access to the originating connection (can't check trust, apply backpressure)
-- A closure per message for routing
-- `closeConnection()` just nulls the handler — doesn't actually close a connection
-- `ConvexLocal` and HTTP use the handler for result delivery but have no connection
+`Message` carries an optional `AConnection` field alongside a legacy
+`Predicate<Message>` return handler. `returnMessage()` uses
+`conn.trySendMessage()` when present, falls back to the handler for local/HTTP
+paths.
 
-### Design: Message carries optional AConnection
+`LocalConnection` provides a uniform `AConnection` for in-JVM delivery.
+`NettyServerConnection` wraps server-side inbound Netty channels.
 
-Add an optional `AConnection` field to `Message`. When present, `returnMessage()` uses
-the connection's `sendMessage()` directly. When absent (local/HTTP), falls back to the
-existing handler predicate.
+### Target State
 
-```
-Message
-  ├── payload: ACell
-  ├── messageData: Blob
-  ├── type: MessageType
-  ├── returnHandler: Predicate<Message>     (existing — used for local/HTTP)
-  └── connection: AConnection               (new — set for network messages)
-```
-
-**`returnMessage()` becomes:**
-1. If `connection` is set → `connection.sendMessage(resultMsg)`
-2. Else if `returnHandler` is set → `returnHandler.test(resultMsg)`
-3. Else → throw (no return path)
-
-**`closeConnection()` becomes:** actually close the connection if present.
-
-### LocalConnection
-
-For symmetry, `ConvexLocal` uses a lightweight `AConnection` subclass instead of null:
-
-```java
-public class LocalConnection extends AConnection {
-    private final Predicate<Message> handler;
-
-    public boolean sendMessage(Message msg) {
-        return handler.test(msg);
-    }
-    public InetSocketAddress getRemoteAddress() { return null; }
-    public boolean isClosed() { return false; }
-    public void close() { }
-    public long getReceivedCount() { return 0; }
-}
-```
-
-This keeps the API uniform — every Message has a connection, `Server.processMessage()`
-can always call `m.getConnection().isTrusted()`. The local connection is never trusted
-(it's an in-JVM client, not a peer).
-
-### Benefits
-
-- `Server.processMessage()` can check `m.getConnection().isTrusted()` for Belief priority
-- `closeConnection()` actually closes the network connection
-- Backpressure can target specific connections
-- No per-message closure allocation for network messages
-- Clean API — connection is always available, trust is always queryable
-
-## Implemented: Message ↔ Connection (Phase 1)
-
-`Message` carries an optional `AConnection` field. `returnMessage()` uses
-`conn.trySendMessage()` when present, falls back to the legacy `Predicate<Message>`
-handler for local/HTTP paths. `closeConnection()` actually closes the network connection.
-
-`LocalConnection` provides a uniform `AConnection` for in-JVM delivery (ConvexLocal,
-HTTP REST API). `NettyServerConnection` wraps server-side inbound Netty channels.
-Both `sendMessage()` (may block) and `trySendMessage()` (non-blocking) are abstract.
+`Message` carries a single `connection` field (no `returnHandler`).
+`LocalConnection` becomes a paired bidirectional channel. See
+[MESSAGING.md §3](MESSAGING.md#3-local-connections--paired-channel) and
+[MESSAGING.md §7](MESSAGING.md#7-migration-from-current-state) for the
+migration plan.
 
 ## Implemented: Inbound Belief Deprioritisation (Phase 2)
 
@@ -251,6 +199,6 @@ Both `sendMessage()` (may block) and `trySendMessage()` (non-blocking) are abstr
 | Inbound trust | Server-initiated challenge on first untrusted belief — **implemented** |
 | Belief priority | Trusted → main queue; untrusted → small bounded queue (1 per cycle) — **implemented** |
 | Backpressure | Applied to all inbound connections for non-Belief traffic |
-| Message routing | `Message` carries optional `AConnection`; `LocalConnection` for in-JVM — **implemented** |
+| Message routing | `Message` carries `AConnection`; paired `LocalConnection` for in-JVM — see [MESSAGING.md](MESSAGING.md) |
 | Security invariant | Untrusted clients **never** block Belief propagation — **implemented** |
 | Generic message API | `POST /api/v1/message` — CAD3 raw or CVX text — **implemented** |

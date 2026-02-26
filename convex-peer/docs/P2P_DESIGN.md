@@ -78,6 +78,9 @@ Currently only **raw TCP** (port 18888) via Netty:
 - `NettyServer`/`NIOServer` — inbound connection handlers
 - All messages are length-prefixed CAD3-encoded binary frames
 
+See [MESSAGING.md](MESSAGING.md) for the connection model, paired local
+channels, and client architecture.
+
 The REST API (`convex-restapi`) runs separately via Javalin on a configurable HTTP port, serving `/api/v1/*` endpoints. MCP transport uses SSE over HTTP.
 
 ## 3. Consensus as a Lattice Region [PROPOSED]
