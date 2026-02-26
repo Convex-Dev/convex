@@ -979,12 +979,39 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
-		ConvexRemote convex = ConvexRemote.connect(addr);
+		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
-			boolean verified = convex.verifyPeer(
-				serverKP.getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
-			assertTrue(verified, "verifyPeer should succeed for correct server key");
+			AccountKey result = convex.verifyPeer(
+				serverKP.getAccountKey()).get(5, TimeUnit.SECONDS);
+			assertEquals(serverKP.getAccountKey(), result, "Should return server key");
+			assertEquals(serverKP.getAccountKey(), convex.getVerifiedPeer());
+		} finally {
+			convex.close();
+			assertNull(convex.getVerifiedPeer(), "Should be cleared on close");
+		}
+	}
+
+	/**
+	 * Test that verifyPeer with null expectedKey discovers the remote key.
+	 */
+	@Test
+	public void testChallengeResponseDiscovery() throws Exception {
+		AKeyPair serverKP = AKeyPair.generate();
+		AKeyPair clientKP = AKeyPair.generate();
+
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote convex = Convex.connect(addr, null, clientKP);
+
+		try {
+			// null expectedKey — accept whoever responds
+			AccountKey result = convex.verifyPeer(null).get(5, TimeUnit.SECONDS);
+			assertEquals(serverKP.getAccountKey(), result, "Should discover server key");
 		} finally {
 			convex.close();
 		}
@@ -1006,13 +1033,13 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
-		ConvexRemote convex = ConvexRemote.connect(addr);
+		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
-			// Challenge addressed to wrong key — server should not respond
-			boolean verified = convex.verifyPeer(
-				wrongKP.getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
-			assertFalse(verified, "verifyPeer should fail for wrong server key");
+			AccountKey result = convex.verifyPeer(
+				wrongKP.getAccountKey()).get(5, TimeUnit.SECONDS);
+			assertNull(result, "verifyPeer should fail for wrong server key");
+			assertNull(convex.getVerifiedPeer());
 		} finally {
 			convex.close();
 		}
@@ -1031,13 +1058,12 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
-		ConvexRemote convex = ConvexRemote.connect(addr);
+		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
-			// Server has no key — can't sign a response
-			boolean verified = convex.verifyPeer(
-				AKeyPair.generate().getAccountKey(), clientKP).get(5, TimeUnit.SECONDS);
-			assertFalse(verified, "verifyPeer should fail when server has no signing key");
+			AccountKey result = convex.verifyPeer(
+				AKeyPair.generate().getAccountKey()).get(5, TimeUnit.SECONDS);
+			assertNull(result, "verifyPeer should fail when server has no signing key");
 		} finally {
 			convex.close();
 		}
@@ -1058,12 +1084,12 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
-		ConvexRemote convex = ConvexRemote.connect(addr);
+		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
-			boolean verified = convex.verifyPeer(
-				serverKP.getAccountKey(), clientKP, contextID).get(5, TimeUnit.SECONDS);
-			assertTrue(verified, "verifyPeer should succeed with contextID");
+			AccountKey result = convex.verifyPeer(
+				serverKP.getAccountKey(), contextID).get(5, TimeUnit.SECONDS);
+			assertEquals(serverKP.getAccountKey(), result, "Should succeed with contextID");
 		} finally {
 			convex.close();
 		}

@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -250,9 +251,11 @@ public class ServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		convex.setKeyPair(clientKP);
 		try {
-			boolean verified = convex.verifyPeer(serverKey, clientKP).get(5, TimeUnit.SECONDS);
-			assertTrue(verified, "verifyPeer should succeed for correct peer key");
+			AccountKey result = convex.verifyPeer(serverKey).get(5, TimeUnit.SECONDS);
+			assertEquals(serverKey, result, "verifyPeer should return server key on success");
+			assertEquals(serverKey, convex.getVerifiedPeer());
 		} finally {
 			convex.close();
 		}
@@ -265,9 +268,11 @@ public class ServerTest {
 		AccountKey wrongKey = AKeyPair.generate().getAccountKey();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		convex.setKeyPair(clientKP);
 		try {
-			boolean verified = convex.verifyPeer(wrongKey, clientKP).get(5, TimeUnit.SECONDS);
-			assertFalse(verified, "verifyPeer should fail for wrong key");
+			AccountKey result = convex.verifyPeer(wrongKey).get(5, TimeUnit.SECONDS);
+			assertNull(result, "verifyPeer should return null for wrong key");
+			assertNull(convex.getVerifiedPeer());
 		} finally {
 			convex.close();
 		}
@@ -280,11 +285,13 @@ public class ServerTest {
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ConvexRemote convex = ConvexRemote.connect(server.getHostAddress());
+		convex.setKeyPair(clientKP);
 		try {
 			// Use the peer's actual network ID as context
-			boolean verified = convex.verifyPeer(serverKey, clientKP,
+			AccountKey result = convex.verifyPeer(serverKey,
 				server.getPeer().getNetworkID()).get(5, TimeUnit.SECONDS);
-			assertTrue(verified, "verifyPeer should succeed with matching networkID as context");
+			assertEquals(serverKey, result, "verifyPeer should succeed with matching networkID as context");
+			assertEquals(serverKey, convex.getVerifiedPeer());
 		} finally {
 			convex.close();
 		}

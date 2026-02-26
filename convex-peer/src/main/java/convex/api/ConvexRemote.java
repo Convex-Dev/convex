@@ -257,10 +257,10 @@ public class ConvexRemote extends Convex {
 	public synchronized void close() {
 		AConnection c = this.connection;
 		if (c != null) {
-			// log.info("Connection closed",new Exception());
 			c.close();
 		}
 		connection = null;
+		verifiedPeer = null;
 		awaiting.clear();
 	}
 

@@ -155,11 +155,14 @@ public class Message {
 				return;
 			}
 
-			// Verify challenge is addressed to this key
-			AccountKey targetKey = RT.ensureAccountKey(challengeValues.get(1));
-			if (targetKey == null || !keyPair.getAccountKey().equals(targetKey)) {
-				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Wrong target key")));
-				return;
+			// Verify challenge is addressed to this key (null targetKey = accept any)
+			ACell rawTarget = challengeValues.get(1);
+			if (rawTarget != null) {
+				AccountKey targetKey = RT.ensureAccountKey(rawTarget);
+				if (targetKey == null || !keyPair.getAccountKey().equals(targetKey)) {
+					returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Wrong target key")));
+					return;
+				}
 			}
 
 			// Optional contextID validation

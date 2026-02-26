@@ -70,6 +70,11 @@ public abstract class Convex implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
+	/**
+	 * Size in bytes of the random token used in challenge/response verification.
+	 */
+	private static final int CHALLENGE_TOKEN_BYTES = 16;
+
 	protected long timeout = Config.DEFAULT_CLIENT_TIMEOUT;
 
 	/**
@@ -112,9 +117,23 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected AStore store = null;
 
+	/**
+	 * Verified remote peer key, set by a successful {@link #verifyPeer} call.
+	 * Null if not yet verified. Cleared on disconnect/reconnect.
+	 */
+	protected AccountKey verifiedPeer = null;
+
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
+	}
+
+	/**
+	 * Gets the verified remote peer key, or null if not yet verified.
+	 * @return Verified AccountKey, or null
+	 */
+	public AccountKey getVerifiedPeer() {
+		return verifiedPeer;
 	}
 
 	/**
@@ -800,68 +819,73 @@ public abstract class Convex implements AutoCloseable {
 	 * Verifies the identity of the remote peer via challenge/response.
 	 *
 	 * <p>Sends a CHALLENGE containing a random token and the expected peer key,
-	 * signed by the caller's key pair. The remote peer must respond with the
-	 * same token and the caller's key, signed by the expected peer key.
+	 * signed by this client's key pair. The remote peer must respond with the
+	 * same token and this client's key, signed by the expected peer key.
 	 *
 	 * <p>Protocol format (symmetric): {@code [token, otherKey, contextID?]}
 	 * <ul>
-	 *   <li>Challenge: {@code SignedData([token, targetKey, contextID?])} signed by caller</li>
-	 *   <li>Response:  {@code SignedData([token, callerKey, contextID?])} signed by target</li>
+	 *   <li>Challenge: {@code SignedData([token, targetKey, contextID?])} signed by this client</li>
+	 *   <li>Response:  {@code SignedData([token, clientKey, contextID?])} signed by target</li>
 	 * </ul>
 	 *
 	 * <p>Works with both NodeServer (lattice) and peer Server (consensus).
 	 *
-	 * @param expectedKey AccountKey the remote peer is expected to hold
-	 * @param signingKey  Key pair to sign the challenge with (proves caller's identity)
-	 * @return Future that completes with true if verification succeeded
+	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
+	 * @return Future that completes with the verified remote AccountKey, or null on failure
 	 */
-	public CompletableFuture<Boolean> verifyPeer(AccountKey expectedKey, AKeyPair signingKey) {
-		return verifyPeer(expectedKey, signingKey, null);
+	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
+		return verifyPeer(expectedKey, null);
 	}
 
 	/**
 	 * Verifies the identity of the remote peer via challenge/response with an
 	 * optional context ID.
 	 *
-	 * @param expectedKey AccountKey the remote peer is expected to hold
-	 * @param signingKey  Key pair to sign the challenge with
+	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
 	 * @param contextID   Optional context (e.g. network ID for consensus peers), or null
-	 * @return Future that completes with true if verification succeeded
+	 * @return Future that completes with the verified remote AccountKey, or null on failure
 	 */
 	@SuppressWarnings("unchecked")
-	public CompletableFuture<Boolean> verifyPeer(AccountKey expectedKey, AKeyPair signingKey, ACell contextID) {
-		Hash token = Blob.createRandom(new SecureRandom(), 32).getHash();
-		AccountKey ownKey = signingKey.getAccountKey();
+	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
+		AKeyPair kp = keyPair;
+		if (kp == null) return CompletableFuture.completedFuture(null);
+
+		Hash token = Blob.createRandom(new SecureRandom(), CHALLENGE_TOKEN_BYTES).getHash();
+		AccountKey ownKey = kp.getAccountKey();
 
 		AVector<ACell> challenge = (contextID != null)
 			? Vectors.of(token, expectedKey, contextID)
 			: Vectors.of(token, expectedKey);
-		SignedData<ACell> signed = signingKey.signData(challenge);
+		SignedData<ACell> signed = kp.signData(challenge);
 
 		return requestChallenge(signed).thenApply(result -> {
 			try {
-				if (result == null || result.isError()) return false;
+				if (result == null || result.isError()) return null;
 				ACell rv = result.getValue();
-				if (!(rv instanceof SignedData)) return false;
+				if (!(rv instanceof SignedData)) return null;
 				SignedData<ACell> response = (SignedData<ACell>) rv;
 
-				// Response must be signed by the expected key
-				if (!expectedKey.equals(response.getAccountKey())) return false;
+				AccountKey remoteKey = response.getAccountKey();
 
-				// Response contents: [token, callerKey] or [token, callerKey, contextID]
+				// If expectedKey specified, response must be signed by that key
+				if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
+
+				// Response contents: [token, clientKey] or [token, clientKey, contextID]
 				ACell inner = response.getValue();
-				if (!(inner instanceof AVector)) return false;
+				if (!(inner instanceof AVector)) return null;
 				AVector<ACell> values = (AVector<ACell>) inner;
 				long n = values.count();
-				if (n < 2 || n > 3) return false;
-				if (!token.equals(values.get(0))) return false;
-				if (!ownKey.equals(values.get(1))) return false;
-				if (n == 3 && !Utils.equals(contextID, values.get(2))) return false;
+				if (n < 2 || n > 3) return null;
+				if (!token.equals(values.get(0))) return null;
+				if (!ownKey.equals(values.get(1))) return null;
+				if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
 
-				return true;
+				// Verification succeeded — record the verified peer
+				verifiedPeer = remoteKey;
+				return remoteKey;
 			} catch (Exception e) {
 				log.debug("verifyPeer failed: {}", e.getMessage());
-				return false;
+				return null;
 			}
 		});
 	}
