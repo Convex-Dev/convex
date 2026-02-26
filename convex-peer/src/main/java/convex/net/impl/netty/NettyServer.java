@@ -189,6 +189,11 @@ public class NettyServer extends AServer {
 	}
 
 	@Override
+	public int getClientConnectionCount() {
+		return clientChannels.size();
+	}
+
+	@Override
 	public InetSocketAddress getHostAddress() {
 		return (InetSocketAddress) channel.localAddress();
 	}

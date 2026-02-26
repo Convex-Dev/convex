@@ -18,6 +18,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.NonUpdatingCaret;
 import convex.gui.utils.Toolkit;
 import convex.peer.AThreadedComponent;
+import convex.peer.ConnectionManager;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
@@ -117,7 +118,14 @@ public class PeerInfoPanel extends JPanel {
 	
 
 	private String load(AThreadedComponent  comp) {
-		double ld=comp.getLoad();
+		return loadPct(comp.getLoad());
+	}
+
+	private String load(ConnectionManager cm) {
+		return loadPct(cm.getLoad());
+	}
+
+	private String loadPct(double ld) {
 		return Text.leftPad((long)(ld*100)+"%", 6);
 	}
 

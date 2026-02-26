@@ -57,4 +57,12 @@ public abstract class AServer implements Closeable {
 	 * @param action Receive action to handle incoming messages
 	 */
 	public abstract void setReceiveAction(Consumer<Message> action);
+
+	/**
+	 * Returns the number of active inbound client connections.
+	 * @return Connection count, or -1 if not available
+	 */
+	public int getClientConnectionCount() {
+		return -1;
+	}
 }

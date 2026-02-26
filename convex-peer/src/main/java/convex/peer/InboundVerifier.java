@@ -44,6 +44,7 @@ class InboundVerifier {
 	private final Server server;
 	private final SecureRandom random = new SecureRandom();
 	private final AtomicLong idCounter = new AtomicLong();
+	private final AtomicLong verifiedCount = new AtomicLong();
 
 	/**
 	 * In-progress verifications keyed by connection. The future is completed
@@ -107,6 +108,7 @@ class InboundVerifier {
 				}
 
 				conn.setTrustedKey(remoteKey);
+				verifiedCount.incrementAndGet();
 				log.info("Verified inbound peer: {} from {}", remoteKey, conn.getRemoteAddress());
 			} catch (Exception e) {
 				log.debug("Inbound verification failed for {}: {}", conn, e.getMessage());
@@ -126,6 +128,12 @@ class InboundVerifier {
 	 * @param m Inbound RESULT message
 	 * @return true if consumed by a pending verification, false otherwise
 	 */
+	/** Number of connections successfully verified since startup. */
+	long getVerifiedCount() { return verifiedCount.get(); }
+
+	/** Number of verifications currently in progress. */
+	int getPendingCount() { return active.size(); }
+
 	boolean handleResult(Message m) {
 		if (active.isEmpty()) return false;
 		AConnection conn = m.getConnection();

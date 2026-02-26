@@ -1,12 +1,8 @@
 package convex.node;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -26,11 +22,10 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
-import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.net.IPUtils;
-import convex.peer.Config;
+import convex.peer.AConnectionManager;
 
 /**
  * Manages outbound peer connections for lattice propagation with identity-based
@@ -50,12 +45,11 @@ import convex.peer.Config;
  * security boundary: peers can only resolve data that exists in this store via
  * DATA_REQUEST.
  *
- * <p>Designed for composition with {@link LatticePropagator} (broadcast) and
- * {@link NodeServer} (sync and data acquisition).
+ * <p>Extends {@link AConnectionManager} for shared connection infrastructure.
  *
  * @see DesiredPeer
  */
-public class LatticeConnectionManager implements Closeable {
+public class LatticeConnectionManager extends AConnectionManager {
 
 	private static final Logger log = LoggerFactory.getLogger(LatticeConnectionManager.class.getName());
 
@@ -71,11 +65,6 @@ public class LatticeConnectionManager implements Closeable {
 	static final long MAX_BACKOFF_MS = 30_000L;
 
 	// ========== State ==========
-
-	/**
-	 * Active outbound connections keyed by peer identity.
-	 */
-	private final ConcurrentHashMap<AccountKey, Convex> connections = new ConcurrentHashMap<>();
 
 	/**
 	 * Desired peers — peers this node wants to stay connected to. The maintenance
@@ -154,11 +143,7 @@ public class LatticeConnectionManager implements Closeable {
 			maintenanceThread = null;
 		}
 
-		for (Convex peer : connections.values()) {
-			closeSilently(peer);
-		}
-		connections.clear();
-
+		closeAllConnections();
 		log.debug("LatticeConnectionManager closed");
 	}
 
@@ -169,10 +154,6 @@ public class LatticeConnectionManager implements Closeable {
 	 * connection manager will look up transport information from its known
 	 * desired peers (populated via {@link #updateDesiredPeers}) and connect
 	 * when transport info becomes available.
-	 *
-	 * <p>If transport info is not yet known, the peer is added to the desired
-	 * set with no transports. The maintenance thread will attempt connection
-	 * once transport info arrives via {@link #updateDesiredPeers}.
 	 *
 	 * @param peerKey AccountKey of the peer to connect to
 	 */
@@ -186,9 +167,7 @@ public class LatticeConnectionManager implements Closeable {
 	}
 
 	/**
-	 * Declares intent to connect to a peer at a known address. Creates a
-	 * desired peer entry with a {@code tcp://} transport URI derived from
-	 * the address. The maintenance thread will connect if not already connected.
+	 * Declares intent to connect to a peer at a known address.
 	 *
 	 * @param peerKey AccountKey of the peer
 	 * @param address Network address to connect to
@@ -203,9 +182,7 @@ public class LatticeConnectionManager implements Closeable {
 	}
 
 	/**
-	 * Registers a live connection to a peer. Adds the peer to the desired set
-	 * (using the connection's host address as transport) and records the
-	 * connection as active. The store is set on the connection.
+	 * Registers a live connection to a peer.
 	 *
 	 * @param peerKey AccountKey of the peer
 	 * @param convex Live connection to the peer
@@ -223,7 +200,6 @@ public class LatticeConnectionManager implements Closeable {
 		}
 		connections.put(peerKey, convex);
 
-		// Ensure desired peer entry exists with transport from connection
 		InetSocketAddress addr = convex.getHostAddress();
 		if (addr != null) {
 			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k, addr));
@@ -235,7 +211,6 @@ public class LatticeConnectionManager implements Closeable {
 
 	/**
 	 * Removes a peer from both the desired set and active connections.
-	 * Closes the connection if one exists.
 	 *
 	 * @param peerKey AccountKey of the peer to remove
 	 */
@@ -247,61 +222,6 @@ public class LatticeConnectionManager implements Closeable {
 			closeSilently(removed);
 			log.debug("Removed peer: {}", peerKey);
 		}
-	}
-
-	// ========== Connection Queries ==========
-
-	/**
-	 * Gets the active connection to a specific peer.
-	 *
-	 * @param peerKey AccountKey of the peer
-	 * @return Convex connection, or null if not connected
-	 */
-	public Convex getConnection(AccountKey peerKey) {
-		Convex c = connections.get(peerKey);
-		if (c != null && !c.isConnected()) {
-			connections.remove(peerKey);
-			return null;
-		}
-		return c;
-	}
-
-	/**
-	 * Checks if a specific peer is currently connected.
-	 *
-	 * @param peerKey AccountKey of the peer
-	 * @return true if connected
-	 */
-	public boolean isConnected(AccountKey peerKey) {
-		return getConnection(peerKey) != null;
-	}
-
-	/**
-	 * Gets a defensive copy of all active connections.
-	 *
-	 * @return Map of AccountKey to Convex connection
-	 */
-	public Map<AccountKey, Convex> getConnections() {
-		return new HashMap<>(connections);
-	}
-
-	/**
-	 * Gets all active peer connections as a set. This is the primary method
-	 * used by {@link LatticePropagator} for broadcast and pull operations.
-	 *
-	 * @return Defensive copy of the connection values
-	 */
-	public Set<Convex> getPeers() {
-		return new HashSet<>(connections.values());
-	}
-
-	/**
-	 * Returns the number of active connections.
-	 *
-	 * @return Connection count
-	 */
-	public int getConnectionCount() {
-		return connections.size();
 	}
 
 	// ========== Desired Peer Management ==========
@@ -317,17 +237,9 @@ public class LatticeConnectionManager implements Closeable {
 
 	/**
 	 * Updates the desired peer set from {@code [:p2p :nodes]} lattice data.
-	 * Only adds or updates entries — does not remove peers that are no longer
-	 * in the lattice (they may be configured peers).
 	 *
-	 * <p>Uses LWW timestamp ordering: only updates a desired peer entry if the
-	 * incoming NodeInfo has a newer timestamp. Preserves reconnection state
-	 * (failCount, nextRetryTime) across updates.
-	 *
-	 * @param nodesMap The merged OwnerLattice value at {@code [:p2p :nodes]},
-	 *                 mapping AccountKey to SignedData containing NodeInfo
-	 * @param ownKey This node's own AccountKey (skipped to avoid self-connection),
-	 *               or null if unknown
+	 * @param nodesMap The merged OwnerLattice value at {@code [:p2p :nodes]}
+	 * @param ownKey This node's own AccountKey (skipped), or null
 	 */
 	@SuppressWarnings("unchecked")
 	public void updateDesiredPeers(AHashMap<ACell, SignedData<ACell>> nodesMap, AccountKey ownKey) {
@@ -347,35 +259,12 @@ public class LatticeConnectionManager implements Closeable {
 			DesiredPeer updated = DesiredPeer.fromNodeInfo(peerKey, nodeInfo);
 			desiredPeers.merge(peerKey, updated, (existing, incoming) -> {
 				if (incoming.timestamp > existing.timestamp) {
-					// Preserve reconnection state
 					incoming.failCount = existing.failCount;
 					incoming.nextRetryTime = existing.nextRetryTime;
 					return incoming;
 				}
 				return existing;
 			});
-		}
-	}
-
-	// ========== Broadcast ==========
-
-	/**
-	 * Broadcasts a message to all connected peers. Fire-and-forget:
-	 * failures on individual peers are logged but do not prevent
-	 * delivery to other peers.
-	 *
-	 * @param msg Message to broadcast
-	 */
-	public void broadcast(Message msg) {
-		for (Convex peer : connections.values()) {
-			if (peer != null && peer.isConnected()) {
-				try {
-					peer.message(msg);
-				} catch (Exception e) {
-					log.debug("Failed to broadcast to peer {}: {}",
-						peer.getHostAddress(), e.getMessage());
-				}
-			}
 		}
 	}
 
@@ -401,10 +290,6 @@ public class LatticeConnectionManager implements Closeable {
 
 	// ========== Maintenance Loop ==========
 
-	/**
-	 * Background loop that maintains connections to desired peers.
-	 * Prunes dead connections and reconnects with exponential backoff.
-	 */
 	private void maintenanceLoop() {
 		while (running) {
 			try {
@@ -426,18 +311,10 @@ public class LatticeConnectionManager implements Closeable {
 	 * for desired peers that are not currently connected.
 	 */
 	void maintainConnections() {
+		pruneDeadConnections();
+
 		long now = System.currentTimeMillis();
 
-		// 1. Prune dead connections
-		for (Map.Entry<AccountKey, Convex> entry : connections.entrySet()) {
-			Convex c = entry.getValue();
-			if (c == null || !c.isConnected()) {
-				connections.remove(entry.getKey());
-				log.debug("Pruned dead connection to {}", entry.getKey());
-			}
-		}
-
-		// 2. Connect to desired peers that are not currently connected
 		for (Map.Entry<AccountKey, DesiredPeer> entry : desiredPeers.entrySet()) {
 			AccountKey peerKey = entry.getKey();
 			DesiredPeer desired = entry.getValue();
@@ -472,13 +349,6 @@ public class LatticeConnectionManager implements Closeable {
 
 	// ========== Transport Resolution ==========
 
-	/**
-	 * Resolves the first usable transport address from a desired peer's
-	 * transport URIs. Currently supports {@code tcp://} URIs only.
-	 *
-	 * @param desired The desired peer entry
-	 * @return InetSocketAddress to connect to, or null if no usable transport
-	 */
 	static InetSocketAddress resolveTransport(DesiredPeer desired) {
 		AVector<AString> transports = desired.transports;
 		if (transports == null || transports.isEmpty()) return null;
@@ -488,11 +358,9 @@ public class LatticeConnectionManager implements Closeable {
 			if (uri == null) continue;
 			String uriStr = uri.toString();
 
-			// Strip tcp:// prefix if present
 			if (uriStr.startsWith("tcp://")) {
 				uriStr = uriStr.substring(6);
 			} else if (uriStr.contains("://")) {
-				// Skip non-TCP transports (wss://, https://, etc.) for now
 				continue;
 			}
 
@@ -504,13 +372,6 @@ public class LatticeConnectionManager implements Closeable {
 
 	// ========== Backoff Calculation ==========
 
-	/**
-	 * Calculates reconnection delay with exponential backoff and jitter.
-	 * Initial delay 1s, max 30s, per P2P_DESIGN.md §8.3.
-	 *
-	 * @param failCount Number of consecutive failures (1-based)
-	 * @return Delay in milliseconds before next retry
-	 */
 	static long calculateBackoff(int failCount) {
 		long base = Math.min(MAX_BACKOFF_MS, INITIAL_BACKOFF_MS << Math.min(failCount - 1, 10));
 		long jitter = ThreadLocalRandom.current().nextLong(base / 2 + 1);
@@ -519,15 +380,6 @@ public class LatticeConnectionManager implements Closeable {
 
 	// ========== Verification ==========
 
-	/**
-	 * Attempts challenge/response verification of a peer. Non-blocking:
-	 * fires off the verification and handles the result asynchronously.
-	 * If verification fails or is unsupported, the connection remains
-	 * usable but unverified ({@code getVerifiedPeer()} returns null).
-	 *
-	 * @param convex Connection to verify
-	 * @param peerKey Expected peer key
-	 */
 	private void tryVerifyPeer(Convex convex, AccountKey peerKey) {
 		convex.verifyPeer(peerKey).whenComplete((result, ex) -> {
 			if (result != null) {
@@ -540,48 +392,20 @@ public class LatticeConnectionManager implements Closeable {
 		});
 	}
 
-	// ========== Helpers ==========
-
-	private static void closeSilently(Convex convex) {
-		if (convex == null) return;
-		try {
-			convex.close();
-		} catch (Exception e) {
-			// best effort
-		}
-	}
-
 	// ========== DesiredPeer ==========
 
 	/**
-	 * Describes a peer this node wants to maintain a connection to. Fields
-	 * mirror the P2PLattice {@code NodeInfo} structure so entries can be
-	 * populated directly from {@code [:p2p :nodes]} lattice data.
-	 *
-	 * <p>Reconnection state ({@code failCount}, {@code nextRetryTime}) is
-	 * managed by the maintenance thread and not propagated.
+	 * Describes a peer this node wants to maintain a connection to.
 	 */
 	public static class DesiredPeer {
 
-		/** Peer identity (required). */
 		public final AccountKey peerKey;
-
-		/** Transport URIs from NodeInfo {@code :transports} (nullable). */
 		public final AVector<AString> transports;
-
-		/** Node software type from NodeInfo {@code :type} (nullable). */
 		public final AString type;
-
-		/** Software version from NodeInfo {@code :version} (nullable). */
 		public final AString version;
-
-		/** LWW timestamp from NodeInfo {@code :timestamp}. */
 		public final long timestamp;
 
-		/** Consecutive connection failure count. */
 		int failCount = 0;
-
-		/** Earliest time (millis) to retry connection. */
 		long nextRetryTime = 0;
 
 		private DesiredPeer(AccountKey peerKey, AVector<AString> transports,
@@ -593,13 +417,6 @@ public class LatticeConnectionManager implements Closeable {
 			this.timestamp = timestamp;
 		}
 
-		/**
-		 * Creates a DesiredPeer from a P2PLattice NodeInfo map.
-		 *
-		 * @param peerKey Peer identity
-		 * @param nodeInfo NodeInfo map with :transports, :type, :version, :timestamp
-		 * @return DesiredPeer with fields extracted from the map
-		 */
 		@SuppressWarnings("unchecked")
 		public static DesiredPeer fromNodeInfo(AccountKey peerKey, AHashMap<Keyword, ACell> nodeInfo) {
 			AVector<AString> transports = (AVector<AString>) nodeInfo.get(Keywords.TRANSPORTS);
@@ -610,14 +427,6 @@ public class LatticeConnectionManager implements Closeable {
 			return new DesiredPeer(peerKey, transports, type, version, timestamp);
 		}
 
-		/**
-		 * Creates a DesiredPeer with a known address, wrapping it as a
-		 * {@code tcp://host:port} transport URI.
-		 *
-		 * @param peerKey Peer identity
-		 * @param address Network address
-		 * @return DesiredPeer with a single TCP transport
-		 */
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static DesiredPeer create(AccountKey peerKey, InetSocketAddress address) {
 			String uri = "tcp://" + address.getHostString() + ":" + address.getPort();
@@ -625,14 +434,6 @@ public class LatticeConnectionManager implements Closeable {
 			return new DesiredPeer(peerKey, transports, null, null, System.currentTimeMillis());
 		}
 
-		/**
-		 * Creates a DesiredPeer with no transport info yet. The maintenance
-		 * thread will not attempt connection until transport info arrives
-		 * (e.g. via {@link LatticeConnectionManager#updateDesiredPeers}).
-		 *
-		 * @param peerKey Peer identity
-		 * @return DesiredPeer with null transports
-		 */
 		public static DesiredPeer create(AccountKey peerKey) {
 			return new DesiredPeer(peerKey, null, null, null, System.currentTimeMillis());
 		}

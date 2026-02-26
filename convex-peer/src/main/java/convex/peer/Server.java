@@ -245,9 +245,9 @@ public class Server implements Closeable {
 			}
 			
 			Hash beliefHash=RT.ensureHash(status.get(Keywords.BELIEF));
-			AccountKey remotePeerKey=RT.ensureAccountKey(Keywords.PEER);
+			AccountKey remotePeerKey=RT.ensureAccountKey(status.get(Keywords.PEER));
 			Hash genesisHash=RT.ensureHash(status.get(Keywords.GENESIS));
-			Hash stateHash=RT.ensureHash(Keywords.STATE);
+			Hash stateHash=RT.ensureHash(status.get(Keywords.STATE));
 			
 			if (genesisHash==null) {
 				throw new LaunchException("Remote peer did not provide genesis hash");
@@ -453,6 +453,9 @@ public class Server implements Closeable {
 			case STATUS:
 				processStatus(m);
 				return null;
+			case PING:
+				processPing(m);
+				return null;
 			case COMMAND:
 				return null;
 			case RESULT:
@@ -576,6 +579,12 @@ public class Server implements Closeable {
 		return offered;
 	}
 	
+	protected void processPing(Message m) {
+		ACell id = m.getRequestID();
+		if (id == null) return;
+		m.returnResult(Result.create(id, CVMLong.create(Utils.getCurrentTimestamp())));
+	}
+
 	protected void processStatus(Message m) {
 		// We can ignore payload
 		ACell reply = getStatusData();
@@ -628,6 +637,9 @@ public class Server implements Closeable {
 
 	private void processChallenge(Message m) {
 		manager.processChallenge(m, getPeer());
+		// If they're verifying us, also try to verify them
+		AConnection conn = m.getConnection();
+		if (conn != null) inboundVerifier.maybeStart(conn);
 	}
 
 
@@ -658,6 +670,11 @@ public class Server implements Closeable {
 	 */
 	public Integer getPort() {
 		return nio.getPort();
+	}
+
+	/** Returns the number of active inbound client connections. */
+	public int getInboundConnectionCount() {
+		return nio.getClientConnectionCount();
 	}
 
 	/**
@@ -793,6 +810,16 @@ public class Server implements Closeable {
 
 	public ConnectionManager getConnectionManager() {
 		return manager;
+	}
+
+	/** Number of inbound connections successfully verified since startup. */
+	public long getInboundVerifiedCount() {
+		return inboundVerifier.getVerifiedCount();
+	}
+
+	/** Number of inbound verifications currently in progress. */
+	public int getInboundPendingVerifications() {
+		return inboundVerifier.getPendingCount();
 	}
 
 	public HashMap<Keyword, Object> getConfig() {

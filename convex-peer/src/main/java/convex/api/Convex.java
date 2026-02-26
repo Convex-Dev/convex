@@ -818,6 +818,42 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> requestStatus();
 
 	/**
+	 * Sends a PING message to the connected peer for liveness testing.
+	 * Returns the peer's current timestamp on success.
+	 *
+	 * @return A Future completing with the peer's timestamp, or null on error
+	 */
+	public CompletableFuture<CVMLong> ping() {
+		Message m = Message.createPing(getNextID());
+		return message(m).thenApply(r -> {
+			if (r == null || r.isError()) return null;
+			return RT.ensureLong(r.getValue());
+		});
+	}
+
+	/**
+	 * Synchronous PING returning the peer's timestamp. Throws on failure or timeout.
+	 *
+	 * @param timeoutMillis Maximum time to wait for a response
+	 * @return The peer's current timestamp
+	 * @throws ResultException if the peer responds with an error or no timestamp
+	 * @throws TimeoutException if the peer does not respond in time
+	 */
+	public CVMLong pingSync(long timeoutMillis) throws ResultException, TimeoutException {
+		try {
+			CVMLong ts = ping().get(timeoutMillis, TimeUnit.MILLISECONDS);
+			if (ts == null) throw new ResultException(ErrorCodes.UNEXPECTED, "No timestamp in PING response");
+			return ts;
+		} catch (TimeoutException e) {
+			throw e;
+		} catch (ResultException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResultException(e);
+		}
+	}
+
+	/**
 	 * Request a challenge. This is request is made by any peer that needs to find
 	 * out if another peer can be trusted.
 	 *

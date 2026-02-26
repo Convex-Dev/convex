@@ -675,6 +675,15 @@ public class Message {
 	}
 
 	/**
+	 * Creates a PING message for connection liveness testing.
+	 * @param id Request ID for result correlation
+	 * @return PING message
+	 */
+	public static Message createPing(long id) {
+		return create(MessageType.PING, Vectors.of(MessageTag.PING, CVMLong.create(id)));
+	}
+
+	/**
 	 * Return the Hash of the Message payload
 	 * @return Hash, or null if message format is invalid
 	 */

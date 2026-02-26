@@ -366,14 +366,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private void processPing(Message message) {
 		ACell id = message.getRequestID();
-		if (id == null) {
-			log.warn("PING message missing ID");
-			return;
-		}
-
-		Result result = Result.create(id, Strings.create("PONG"));
-		message.returnResult(result);
-		log.debug("Responded to PING with ID: {}", id);
+		if (id == null) return;
+		message.returnResult(Result.create(id, CVMLong.create(Utils.getCurrentTimestamp())));
 	}
 
 	/**
