@@ -158,7 +158,8 @@ public class NettyConnection extends AConnection {
 	 */
 	@Override
 	public boolean sendMessage(Message m) {
-		if (!channel.isActive()) return false;
+		Channel ch = channel;
+		if (ch == null || !ch.isActive()) return false;
 		try {
 			boolean queued = outbound.offer(m, Config.DEFAULT_CLIENT_TIMEOUT,
 				TimeUnit.MILLISECONDS);
@@ -175,7 +176,8 @@ public class NettyConnection extends AConnection {
 	 */
 	@Override
 	public boolean trySendMessage(Message m) {
-		if (!channel.isActive()) return false;
+		Channel ch = channel;
+		if (ch == null || !ch.isActive()) return false;
 		boolean queued = outbound.offer(m);
 		if (queued) flushPending();
 		return queued;
@@ -185,7 +187,9 @@ public class NettyConnection extends AConnection {
 	 * Schedule a drain on the Netty event loop.
 	 */
 	private void flushPending() {
-		channel.eventLoop().execute(this::doFlush);
+		Channel ch = channel;
+		if (ch == null) return;
+		ch.eventLoop().execute(this::doFlush);
 	}
 
 	/**
@@ -197,15 +201,17 @@ public class NettyConnection extends AConnection {
 	 * syscall overhead dramatically under load.
 	 */
 	private void doFlush() {
+		Channel ch = channel;
+		if (ch == null) return;
 		int count = 0;
-		while (channel.isWritable() && channel.isActive()) {
+		while (ch.isWritable() && ch.isActive()) {
 			Message m = outbound.poll();
 			if (m == null) break;
-			channel.write(m);
+			ch.write(m);
 			count++;
 		}
 		if (count > 0) {
-			channel.flush();
+			ch.flush();
 		}
 	}
 

@@ -23,6 +23,8 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
@@ -110,8 +112,9 @@ public class LatticeNetworkTest {
 				assertNotNull(otherAddress, "Other server " + j + " should have a host address");
 
 				try {
+					AccountKey peerKey = AKeyPair.generate().getAccountKey();
 					Convex peerConnection = ConvexRemote.connect(otherAddress);
-					server.getPropagator().addPeer(peerConnection);
+					server.getPropagator().addPeer(peerKey, peerConnection);
 				} catch (Exception e) {
 					throw new RuntimeException(
 							"Failed to create Convex peer connection from server " + i + " to server " + j, e);

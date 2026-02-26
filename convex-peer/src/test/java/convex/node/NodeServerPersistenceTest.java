@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -79,8 +81,9 @@ public class NodeServerPersistenceTest {
 	 */
 	private void connectPrimaryToBackup() throws Exception {
 		InetSocketAddress backupAddr = backup.getHostAddress();
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(backupAddr);
-		primary.getPropagator().addPeer(conn);
+		primary.getPropagator().addPeer(peerKey, conn);
 	}
 
 	/**
@@ -97,12 +100,13 @@ public class NodeServerPersistenceTest {
 		Thread.sleep(100); // Let propagator process the sync
 
 		InetSocketAddress primaryAddr = primary.getHostAddress();
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(primaryAddr);
 		try {
-			backup.getPropagator().addPeer(conn);
+			backup.getPropagator().addPeer(peerKey, conn);
 			assertTrue(backup.pull(), "Pull should complete");
 		} finally {
-			backup.getPropagator().removePeer(conn);
+			backup.getPropagator().removePeer(peerKey);
 			conn.close();
 		}
 	}

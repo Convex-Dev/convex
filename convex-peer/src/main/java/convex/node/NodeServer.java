@@ -27,6 +27,7 @@ import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
@@ -225,8 +226,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Register shutdown hook to persist before Etch closes its files
 		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
 
-		// Start all propagator threads
+		// Start all propagator threads and connection managers
 		for (LatticePropagator p : propagators) {
+			p.getConnectionManager().start();
 			p.start();
 		}
 
@@ -268,6 +270,31 @@ public class NodeServer<V extends ACell> implements Closeable {
 		cursor.path(Keywords.P2P, Keywords.NODES).merge(entry);
 
 		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
+	}
+
+	/**
+	 * Updates desired peers on all propagator connection managers from the
+	 * current {@code [:p2p :nodes]} lattice value. Called when an incoming
+	 * LATTICE_VALUE changes P2P data.
+	 */
+	@SuppressWarnings("unchecked")
+	private void maybeUpdateDesiredPeers() {
+		try {
+			ACell nodesValue = cursor.get(Keywords.P2P, Keywords.NODES);
+			if (nodesValue == null) return;
+
+			AKeyPair kp = mergeContext.getSigningKey();
+			AccountKey ownKey = (kp != null) ? kp.getAccountKey() : null;
+
+			AHashMap<ACell, SignedData<ACell>> nodesMap =
+				(AHashMap<ACell, SignedData<ACell>>) nodesValue;
+
+			for (LatticePropagator p : propagators) {
+				p.getConnectionManager().updateDesiredPeers(nodesMap, ownKey);
+			}
+		} catch (Exception e) {
+			log.debug("Error updating desired peers from P2P lattice: {}", e.getMessage());
+		}
 	}
 
 	/**
@@ -450,6 +477,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// which coalesces rapid incoming merges into a single latest value. The
 		// propagator decides when to actually broadcast based on MIN_BROADCAST_DELAY.
 		cursor.sync();
+
+		// If P2P node data changed, update desired peers on connection managers
+		if (path.length > 0 && Keywords.P2P.equals(path[0])) {
+			maybeUpdateDesiredPeers();
+		}
 	}
 
 	/**
@@ -576,28 +608,29 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Adds a peer connection to the primary propagator.
 	 *
+	 * @param peerKey AccountKey identifying the remote peer
 	 * @param convex Convex connection to the peer node
-	 * @deprecated Use {@code getPropagator().addPeer(convex)} directly
+	 * @deprecated Use {@code getPropagator().addPeer(peerKey, convex)} directly
 	 */
 	@Deprecated
-	public void addPeer(Convex convex) {
+	public void addPeer(AccountKey peerKey, Convex convex) {
 		if (propagators.isEmpty()) {
 			log.warn("Cannot add peer: no propagators configured");
 			return;
 		}
-		propagators.get(0).addPeer(convex);
+		propagators.get(0).addPeer(peerKey, convex);
 	}
 
 	/**
-	 * Removes a peer connection from the primary propagator.
+	 * Removes a peer from the primary propagator.
 	 *
-	 * @param convex Convex connection to remove
-	 * @deprecated Use {@code getPropagator().removePeer(convex)} directly
+	 * @param peerKey AccountKey of the peer to remove
+	 * @deprecated Use {@code getPropagator().removePeer(peerKey)} directly
 	 */
 	@Deprecated
-	public void removePeer(Convex convex) {
+	public void removePeer(AccountKey peerKey) {
 		if (propagators.isEmpty()) return;
-		propagators.get(0).removePeer(convex);
+		propagators.get(0).removePeer(peerKey);
 	}
 
 	/**
@@ -783,6 +816,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		V snapshot = cursor.get();
 		for (LatticePropagator p : propagators) {
 			p.triggerAndClose(snapshot);
+			p.getConnectionManager().close();
 		}
 
 		if (networkServer != null) {

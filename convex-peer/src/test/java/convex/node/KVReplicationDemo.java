@@ -9,6 +9,7 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.Hash;
 import convex.core.data.Strings;
@@ -73,9 +74,10 @@ public class KVReplicationDemo {
 			for (int i = 0; i < NUM_NODES; i++) {
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {
+						AccountKey peerKey = AKeyPair.generate().getAccountKey();
 						Convex peer = ConvexRemote.connect(
 							new InetSocketAddress("localhost", BASE_PORT + j));
-						servers.get(i).getPropagator().addPeer(peer);
+						servers.get(i).getPropagator().addPeer(peerKey, peer);
 					}
 				}
 			}

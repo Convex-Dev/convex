@@ -7,7 +7,9 @@ import java.util.Random;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -95,11 +97,12 @@ public class LatticeDemo {
 					if (i != j) {  // Don't connect to self
 						// Create a connection to the remote node
 						InetSocketAddress peerAddress = new InetSocketAddress("localhost", BASE_PORT + j);
+						AccountKey peerKey = AKeyPair.generate().getAccountKey();
 						Convex peer = ConvexRemote.connect(peerAddress);
 
 						// Add this peer to the node's peer list
 						// Now this node can send broadcasts to this peer
-						server.getPropagator().addPeer(peer);
+						server.getPropagator().addPeer(peerKey, peer);
 					}
 				}
 				System.out.println("Node " + (i + 1) + " connected to " + (NUM_NODES - 1) + " peers");

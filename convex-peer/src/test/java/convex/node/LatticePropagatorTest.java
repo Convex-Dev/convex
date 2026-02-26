@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -58,11 +60,13 @@ public class LatticePropagatorTest {
 			InetSocketAddress server1Address = server1.getHostAddress();
 			InetSocketAddress server2Address = server2.getHostAddress();
 
+			AccountKey key1 = AKeyPair.generate().getAccountKey();
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
-			server1.getPropagator().addPeer(peer1to2);
+			server1.getPropagator().addPeer(key1, peer1to2);
 
+			AccountKey key2 = AKeyPair.generate().getAccountKey();
 			Convex peer2to1 = ConvexRemote.connect(server1Address);
-			server2.getPropagator().addPeer(peer2to1);
+			server2.getPropagator().addPeer(key2, peer2to1);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to establish peer connections", e);
 		}

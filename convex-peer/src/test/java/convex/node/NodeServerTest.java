@@ -3,6 +3,7 @@ package convex.node;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
@@ -243,17 +245,19 @@ public class NodeServerTest {
 		Set<Convex> peers = propagator.getPeers();
 		assertTrue(peers.isEmpty());
 
-		// Add peers
-		propagator.addPeer(peer1);
-		propagator.addPeer(peer2);
+		// Add peers with identity keys
+		AccountKey key1 = AKeyPair.generate().getAccountKey();
+		AccountKey key2 = AKeyPair.generate().getAccountKey();
+		propagator.addPeer(key1, peer1);
+		propagator.addPeer(key2, peer2);
 
 		peers = propagator.getPeers();
 		assertEquals(2, peers.size());
 		assertTrue(peers.contains(peer1));
 		assertTrue(peers.contains(peer2));
 
-		// Remove a peer
-		propagator.removePeer(peer1);
+		// Remove a peer by identity
+		propagator.removePeer(key1);
 		peers = propagator.getPeers();
 		assertEquals(1, peers.size());
 		assertTrue(peers.contains(peer2));
@@ -762,6 +766,200 @@ public class NodeServerTest {
 			node.close();
 			testStore.close();
 		}
+	}
+
+	// ===== LatticeConnectionManager tests =====
+
+	/**
+	 * Test identity-keyed peer connection: addPeer(AccountKey, Convex),
+	 * getConnection, isConnected, removePeer.
+	 */
+	@Test
+	public void testKeyedPeerConnection() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote peer = ConvexRemote.connect(addr);
+
+		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+
+		try {
+			// Add peer with identity
+			cm.addPeer(peerKey, peer);
+			assertTrue(cm.isConnected(peerKey), "Peer should be connected after addPeer");
+			assertEquals(peer, cm.getConnection(peerKey), "getConnection should return the peer");
+			assertEquals(1, cm.getConnectionCount(), "Should have 1 connection");
+
+			// Verify the peer appears in getPeers()
+			assertTrue(cm.getPeers().contains(peer), "getPeers should include the connection");
+
+			// Verify the peer appears in getDesiredPeers()
+			assertTrue(cm.getDesiredPeers().containsKey(peerKey),
+				"Desired peers should include the peer");
+
+			// Remove peer
+			cm.removePeer(peerKey);
+			assertFalse(cm.isConnected(peerKey), "Peer should not be connected after removePeer");
+			assertNull(cm.getConnection(peerKey), "getConnection should return null after remove");
+			assertEquals(0, cm.getConnectionCount(), "Should have 0 connections");
+			assertFalse(cm.getDesiredPeers().containsKey(peerKey),
+				"Desired peers should not include removed peer");
+		} finally {
+			peer.close();
+		}
+	}
+
+	/**
+	 * Test that addPeer(AccountKey) adds a desired peer with no connection,
+	 * and addPeer(AccountKey, InetSocketAddress) creates a desired peer with transport.
+	 */
+	@Test
+	public void testDesiredPeerWithoutConnection() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, NodeConfig.port(-1));
+		maxNodeServer.launch();
+
+		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
+		AccountKey key1 = AKeyPair.generate().getAccountKey();
+		AccountKey key2 = AKeyPair.generate().getAccountKey();
+
+		// addPeer(AccountKey) — no transport, no connection
+		cm.addPeer(key1);
+		assertTrue(cm.getDesiredPeers().containsKey(key1), "key1 should be in desired peers");
+		assertFalse(cm.isConnected(key1), "key1 should not be connected (no transport)");
+		assertNull(cm.getDesiredPeers().get(key1).transports,
+			"key1 should have null transports");
+
+		// addPeer(AccountKey, InetSocketAddress) — has transport, no live connection yet
+		InetSocketAddress fakeAddr = new InetSocketAddress("localhost", 19999);
+		cm.addPeer(key2, fakeAddr);
+		assertTrue(cm.getDesiredPeers().containsKey(key2), "key2 should be in desired peers");
+		assertFalse(cm.isConnected(key2), "key2 should not be connected yet");
+		assertNotNull(cm.getDesiredPeers().get(key2).transports,
+			"key2 should have transport info");
+
+		// Clean up
+		cm.removePeer(key1);
+		cm.removePeer(key2);
+	}
+
+	/**
+	 * Test updateDesiredPeers from NodeInfo-shaped data (simulating P2P lattice discovery).
+	 */
+	@Test
+	public void testUpdateDesiredPeersFromNodeInfo() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store, NodeConfig.port(-1));
+		maxNodeServer.launch();
+
+		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
+
+		// Create a signed NodeInfo entry (simulating what P2PLattice produces)
+		AKeyPair peerKP = AKeyPair.generate();
+		AccountKey peerKey = peerKP.getAccountKey();
+		AccountKey ownKey = AKeyPair.generate().getAccountKey();
+
+		AHashMap<Keyword, ACell> nodeInfo = Maps.of(
+			Keywords.TRANSPORTS, Vectors.of(Strings.create("tcp://peer.example.com:18888")),
+			Keywords.TYPE, Strings.create("Convex Lattice Node"),
+			Keywords.VERSION, Strings.create("0.8.3"),
+			Keywords.TIMESTAMP, CVMLong.create(System.currentTimeMillis())
+		);
+
+		SignedData<ACell> signedInfo = peerKP.signData((ACell) nodeInfo);
+
+		@SuppressWarnings("unchecked")
+		AHashMap<ACell, SignedData<ACell>> nodesMap =
+			(AHashMap<ACell, SignedData<ACell>>) (AHashMap<?,?>) Maps.of(peerKey, signedInfo);
+
+		// Update desired peers
+		cm.updateDesiredPeers(nodesMap, ownKey);
+
+		// Verify
+		assertTrue(cm.getDesiredPeers().containsKey(peerKey),
+			"Peer from lattice should be in desired peers");
+		LatticeConnectionManager.DesiredPeer dp = cm.getDesiredPeers().get(peerKey);
+		assertNotNull(dp.transports, "Should have transports from NodeInfo");
+		assertEquals(Strings.create("Convex Lattice Node"), dp.type);
+		assertEquals(Strings.create("0.8.3"), dp.version);
+
+		// Own key should be skipped
+		assertFalse(cm.getDesiredPeers().containsKey(ownKey),
+			"Own key should not be in desired peers");
+	}
+
+	/**
+	 * Test that a dead connection is detected and pruned, and the desired
+	 * peer entry survives for reconnection.
+	 */
+	@Test
+	public void testDeadConnectionPruning() throws Exception {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		maxNodeServer.launch();
+
+		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		ConvexRemote peer = ConvexRemote.connect(addr);
+
+		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+
+		cm.addPeer(peerKey, peer);
+		assertTrue(cm.isConnected(peerKey), "Should be connected initially");
+
+		// Kill the connection
+		peer.close();
+
+		// isConnected should detect the dead connection and prune it
+		assertFalse(cm.isConnected(peerKey), "Should detect dead connection");
+		assertEquals(0, cm.getConnectionCount(), "Dead connection should be pruned");
+
+		// Desired peer should still exist (for reconnection)
+		assertTrue(cm.getDesiredPeers().containsKey(peerKey),
+			"Desired peer should survive connection death");
+	}
+
+	/**
+	 * Test backoff calculation produces values in expected range.
+	 */
+	@Test
+	public void testBackoffCalculation() {
+		// First failure: should be in [500, 1000] ms (base=1000, half+jitter)
+		for (int i = 0; i < 10; i++) {
+			long backoff = LatticeConnectionManager.calculateBackoff(1);
+			assertTrue(backoff >= 500 && backoff <= 1000,
+				"First backoff should be in [500,1000], got " + backoff);
+		}
+
+		// Many failures: should cap at MAX_BACKOFF (30s)
+		for (int i = 0; i < 10; i++) {
+			long backoff = LatticeConnectionManager.calculateBackoff(20);
+			assertTrue(backoff >= 15000 && backoff <= 30000,
+				"Max backoff should be in [15000,30000], got " + backoff);
+		}
+	}
+
+	/**
+	 * Test transport resolution from DesiredPeer entries.
+	 */
+	@Test
+	public void testTransportResolution() {
+		AccountKey key = AKeyPair.generate().getAccountKey();
+
+		// TCP URI resolves
+		InetSocketAddress addr = new InetSocketAddress("localhost", 18888);
+		LatticeConnectionManager.DesiredPeer dp = LatticeConnectionManager.DesiredPeer.create(key, addr);
+		InetSocketAddress resolved = LatticeConnectionManager.resolveTransport(dp);
+		assertNotNull(resolved, "TCP transport should resolve");
+		assertEquals(18888, resolved.getPort());
+
+		// No transports → null
+		LatticeConnectionManager.DesiredPeer empty = LatticeConnectionManager.DesiredPeer.create(key);
+		assertNull(LatticeConnectionManager.resolveTransport(empty),
+			"Null transports should return null");
 	}
 }
 

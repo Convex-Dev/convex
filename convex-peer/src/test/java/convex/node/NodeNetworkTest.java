@@ -21,6 +21,8 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Result;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
@@ -119,7 +121,8 @@ public class NodeNetworkTest {
 					InetSocketAddress otherAddress = otherServer.getHostAddress();
 					try {
 						Convex peerConnection = ConvexRemote.connect(otherAddress);
-						server.getPropagator().addPeer(peerConnection);
+						AccountKey peerKey = AKeyPair.generate().getAccountKey();
+						server.getPropagator().addPeer(peerKey, peerConnection);
 					} catch (Exception e) {
 						throw new RuntimeException("Failed to create peer connection from server " + i + " to server " + j, e);
 					}

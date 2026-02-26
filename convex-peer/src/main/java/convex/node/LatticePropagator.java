@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
+import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -231,22 +232,23 @@ public class LatticePropagator implements Closeable {
 	// ========== Peer Management ==========
 
 	/**
-	 * Adds an outbound peer connection. The peer's store is set to this
-	 * propagator's store, establishing the security boundary.
+	 * Adds an outbound peer connection with known identity. The peer's store
+	 * is set to this propagator's store, establishing the security boundary.
 	 *
+	 * @param peerKey AccountKey identifying the remote peer
 	 * @param peer Convex connection to the peer node
 	 */
-	public void addPeer(Convex peer) {
-		connectionManager.addPeer(peer);
+	public void addPeer(AccountKey peerKey, Convex peer) {
+		connectionManager.addPeer(peerKey, peer);
 	}
 
 	/**
-	 * Removes an outbound peer connection.
+	 * Removes a peer by identity, closing the connection if active.
 	 *
-	 * @param peer Convex connection to remove
+	 * @param peerKey AccountKey of the peer to remove
 	 */
-	public void removePeer(Convex peer) {
-		connectionManager.removePeer(peer);
+	public void removePeer(AccountKey peerKey) {
+		connectionManager.removePeer(peerKey);
 	}
 
 	/**
