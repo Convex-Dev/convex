@@ -184,11 +184,7 @@ public abstract class AConnectionManager implements Closeable {
 	public void broadcast(Message msg) {
 		for (Convex peer : connections.values()) {
 			if (peer != null && peer.isConnected()) {
-				try {
-					peer.message(msg);
-				} catch (Exception e) {
-					log.debug("Failed to broadcast to peer: {}", e.getMessage());
-				}
+				peer.trySend(msg);
 			}
 		}
 	}

@@ -154,11 +154,7 @@ public class ConnectionManager extends AConnectionManager {
 		for (Map.Entry<AccountKey, Convex> me : list) {
 			Convex pc = me.getValue();
 			if (pc != null && pc.isConnected()) {
-				try {
-					pc.message(msg);
-				} catch (Exception e) {
-					log.debug("Failed to broadcast to peer {}: {}", me.getKey(), e.getMessage());
-				}
+				pc.trySend(msg);
 			}
 		}
 	}

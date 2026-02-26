@@ -4,21 +4,19 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.net.InetSocketAddress;
-import java.util.List;
 import java.util.Map;
 
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.Timer;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.data.AccountKey;
+import java.util.List;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
-import convex.gui.utils.Toolkit;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
 
@@ -31,7 +29,6 @@ public class ConnectionReportDialog extends JDialog {
 
 	private final PeerGUI manager;
 	private final JTextArea textArea;
-	private Timer refreshTimer;
 
 	public ConnectionReportDialog(JFrame parent, PeerGUI manager) {
 		super(parent, "Connection Report", false);
@@ -52,18 +49,8 @@ public class ConnectionReportDialog extends JDialog {
 
 		refresh();
 
-		// Auto-refresh every 2 seconds
-		refreshTimer = new Timer(2000, e -> refresh());
-		refreshTimer.start();
-
 		pack();
 		setLocationRelativeTo(parent);
-	}
-
-	@Override
-	public void dispose() {
-		if (refreshTimer != null) refreshTimer.stop();
-		super.dispose();
 	}
 
 	private void refresh() {
@@ -118,6 +105,9 @@ public class ConnectionReportDialog extends JDialog {
 				AccountKey key = entry.getKey();
 				Convex conn = entry.getValue();
 				sb.append("    -> 0x").append(key.toHexString(8)).append("...");
+
+				// Connection type (ConvexLocal, ConvexRemote, etc.)
+				sb.append("  ").append(conn.getClass().getSimpleName());
 
 				InetSocketAddress addr = conn.getHostAddress();
 				if (addr != null) {

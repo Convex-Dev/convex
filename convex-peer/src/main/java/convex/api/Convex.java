@@ -740,7 +740,30 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the Result of the query. May just be "Sent" if no other result expected, or an immediate error if sending failed.
 	 */
 	public abstract CompletableFuture<Result> message(Message message);
-	
+
+	/**
+	 * Non-blocking fire-and-forget message send. Returns false immediately if
+	 * the message cannot be queued (buffer full, connection closed).
+	 *
+	 * <p>Intended for broadcast scenarios where blocking on one slow peer must
+	 * not delay delivery to other peers. Callers should not expect a result.
+	 *
+	 * <p>Default implementation delegates to {@link #message(Message)} which
+	 * may block. Subclasses with connection-level access should override.
+	 *
+	 * @param msg Message to send
+	 * @return true if queued successfully, false otherwise
+	 */
+	public boolean trySend(Message msg) {
+		CompletableFuture<Result> f = message(msg);
+		if (f == null) return false;
+		if (f.isDone()) {
+			Result r = f.join();
+			return r != null && !r.isError();
+		}
+		return true;
+	}
+
 	/**
 	 * Attempts to resolve a CNS name
 	 *

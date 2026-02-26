@@ -187,6 +187,13 @@ public abstract class AConvexConnected extends Convex {
 	}
 
 	@Override
+	public boolean trySend(Message msg) {
+		AConnection conn = connection;
+		if (conn == null) return false;
+		return conn.trySendMessage(msg);
+	}
+
+	@Override
 	public void close() {
 		AConnection c = this.connection;
 		if (c != null) {
