@@ -30,7 +30,6 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
-import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
@@ -169,8 +168,8 @@ public class ConvexHTTP extends convex.api.Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		throw new UnsupportedOperationException();
+	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+		return message(Message.createChallenge(getNextID(), data));
 	}
 
 	@Override
@@ -206,13 +205,24 @@ public class ConvexHTTP extends convex.api.Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> messageRaw(Blob message) {
-		throw new TODOException();
+	public CompletableFuture<Result> messageRaw(Blob rawData) {
+		String messagePath = getAPIPath() + "/message";
+
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(messagePath))
+				.header("Accept", ContentTypes.CVX_RAW)
+				.header("Content-Type", ContentTypes.CVX_RAW)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(rawData.getBytes()))
+				.build();
+
+		return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+				.thenApply(this::extractResult);
 	}
-	
+
 	@Override
 	public CompletableFuture<Result> message(Message message) {
-		throw new TODOException();
+		Blob encoded = message.getMessageData();
+		return messageRaw(encoded);
 	}
 
 	@Override

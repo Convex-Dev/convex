@@ -137,6 +137,17 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Called when peer verification succeeds. Sets the verified peer key and
+	 * allows subclasses to propagate trust to the underlying connection.
+	 * Subclasses should call {@code super.setVerifiedPeer(key)}.
+	 *
+	 * @param key Verified remote peer AccountKey
+	 */
+	protected void setVerifiedPeer(AccountKey key) {
+		verifiedPeer = key;
+	}
+
+	/**
 	 * Gets the store for this client instance.
 	 * @return Store, or null if no store is configured
 	 */
@@ -811,9 +822,9 @@ public abstract class Convex implements AutoCloseable {
 	 * out if another peer can be trusted.
 	 *
 	 * @param data Signed data to send to the peer for the challenge.
-	 * @return A Future for the result of the requestChallenge
+	 * @return A Future for the result of the sendChallenge
 	 */
-	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data);
+	protected abstract CompletableFuture<Result> sendChallenge(SignedData<ACell> data);
 
 	/**
 	 * Verifies the identity of the remote peer via challenge/response.
@@ -858,7 +869,7 @@ public abstract class Convex implements AutoCloseable {
 			: Vectors.of(token, expectedKey);
 		SignedData<ACell> signed = kp.signData(challenge);
 
-		return requestChallenge(signed).thenApply(result -> {
+		return sendChallenge(signed).thenApply(result -> {
 			try {
 				if (result == null || result.isError()) return null;
 				ACell rv = result.getValue();
@@ -880,8 +891,8 @@ public abstract class Convex implements AutoCloseable {
 				if (!ownKey.equals(values.get(1))) return null;
 				if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
 
-				// Verification succeeded — record the verified peer
-				verifiedPeer = remoteKey;
+				// Verification succeeded — record and propagate trust
+				setVerifiedPeer(remoteKey);
 				return remoteKey;
 			} catch (Exception e) {
 				log.debug("verifyPeer failed: {}", e.getMessage());

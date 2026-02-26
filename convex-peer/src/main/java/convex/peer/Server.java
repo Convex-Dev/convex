@@ -38,6 +38,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -453,10 +454,10 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
-				log.debug("unexpected Result received");
+				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
 				return null;
 			default:
-				log.debug("Unrecognised message type: {}", type);
+				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
 				return null;
 			}
 		} catch (MissingDataException e) {
@@ -520,6 +521,18 @@ public class Server implements Closeable {
 	 */
 	protected void processClose(Message m) {
 		m.closeConnection();
+	}
+
+	/**
+	 * Best-effort error return to the sender of a message.
+	 * Silently ignores failures (message may not have a return handler or ID).
+	 */
+	private void returnError(Message m, Keyword errorCode, AString message) {
+		try {
+			m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
+		} catch (Exception e) {
+			// best effort — some message types don't have return handlers
+		}
 	}
 
 	/**

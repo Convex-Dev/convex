@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -55,7 +56,10 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.util.JSON;
+import convex.peer.Config;
 import convex.restapi.RESTServer;
 import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.model.CreateAccountRequest;
@@ -126,7 +130,9 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "blocks/{blockNum}", this::getBlock);
 		
 		app.get(prefix + "status", this::getStatus);
-		
+
+		app.post(prefix + "message", this::handleMessage);
+
 		app.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 	}
 
@@ -512,6 +518,49 @@ public class ChainAPI extends ABaseAPI {
 	public void getStatus(Context ctx) {
 		AMap<Keyword,ACell> statusMap = server.getStatusMap();
 		setContent(ctx, statusMap);
+	}
+
+	/**
+	 * Generic message endpoint. Accepts a Message in CAD3 raw or CVX text format,
+	 * delivers it to the server, and returns the Result honouring the Accept header.
+	 *
+	 * CAD3 raw supports all message types including SignedData. CVX text supports
+	 * vector-based messages (queries, status requests, etc.) but not SignedData.
+	 */
+	public void handleMessage(Context ctx) {
+		try {
+			String contentType = ctx.req().getContentType();
+			Message message;
+			if (ContentTypes.CVX_RAW.equals(contentType)) {
+				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
+				message = Message.create(rawData);
+				message.getPayload(server.getStore());
+			} else {
+				// Accept CVX text or default — parse as CVX data
+				ACell body = getCVXBody(ctx);
+				message = Message.create(MessageType.UNKNOWN, body);
+			}
+
+			CompletableFuture<Result> cf = new CompletableFuture<>();
+			Message ml = message.withResultHandler(m -> {
+				cf.complete(m.toResult());
+				return true;
+			});
+
+			java.util.function.Predicate<Message> retry = server.deliverMessage(ml);
+			if (retry != null) {
+				if (!retry.test(ml)) {
+					cf.complete(Result.error(ErrorCodes.LOAD, "Server loaded"));
+				}
+			}
+
+			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			setResult(ctx, r);
+		} catch (BadRequestResponse e) {
+			throw e;
+		} catch (Exception e) {
+			setResult(ctx, Result.fromException(e));
+		}
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 

@@ -16,8 +16,10 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Vectors;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -108,10 +110,28 @@ public class ConvexDirect extends Convex {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		// TODO Auto-generated method stub
-		return null;
+	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+		// Optimised direct path: respond using the local peer's key pair
+		// without going through Message return routing
+		try {
+			AKeyPair peerKP = peer.getKeyPair();
+			if (peerKP == null) return CompletableFuture.completedFuture(Result.error(ErrorCodes.TRUST, "No peer key"));
+			AVector<ACell> challengeValues = (AVector<ACell>) data.getValue();
+			long n = challengeValues.count();
+			ACell token = challengeValues.get(0);
+			AccountKey challengerKey = data.getAccountKey();
+			ACell contextID = (n == 3) ? challengeValues.get(2) : null;
+
+			AVector<ACell> responseValues = (contextID != null)
+				? Vectors.of(token, challengerKey, contextID)
+				: Vectors.of(token, challengerKey);
+			SignedData<ACell> response = peerKP.signData(responseValues);
+			return CompletableFuture.completedFuture(Result.value(response));
+		} catch (Exception e) {
+			return CompletableFuture.completedFuture(Result.fromException(e));
+		}
 	}
 
 	@Override

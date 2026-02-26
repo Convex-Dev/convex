@@ -39,6 +39,8 @@ public class Strings {
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");
 	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
+	public static final StringShort UNRECOGNISED_MESSAGE_TYPE = StringShort.create("Unrecognised message type");
+	public static final StringShort UNEXPECTED_RESULT = StringShort.create("Unexpected result message");
 	
 
 	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);

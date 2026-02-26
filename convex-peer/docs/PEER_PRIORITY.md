@@ -24,21 +24,50 @@ clients submit transactions, or whether any queue is full.
 
 ## Current State
 
-### Existing Trust Infrastructure
+### Trust Infrastructure
 
-The codebase already has the building blocks for trust classification:
+The challenge/response protocol is fully implemented and the trust loop is closed:
 
 | Component | Status |
 |-----------|--------|
-| `AConnection.isTrusted()` / `setTrustedKey()` | Implemented but `setTrustedKey()` is never called |
-| `ChallengeRequest` protocol | Fully implemented |
-| `ConnectionManager.processChallenge()` | Fully implemented |
-| `ConnectionManager.processResponse()` | Implemented but `setTrustedKey()` call is **commented out** |
-| `ConnectionManager.requestChallenge()` | Fully implemented with timeout/dedup |
+| `AConnection.isTrusted()` / `setTrustedKey()` | Implemented — set by `ConvexRemote.setVerifiedPeer()` |
+| `Message.respondToChallenge()` | Shared handler — used by both peer Server and NodeServer |
+| `Convex.verifyPeer()` | Client-side API — returns `CompletableFuture<AccountKey>` |
+| `Convex.verifiedPeer` field | Set on success, cleared on close/reconnect |
+| `ConnectionManager.identifyPeer()` | Async verify → fallback to status (untrusted) |
+| `LatticeConnectionManager.tryVerifyPeer()` | Async fire-and-forget verification |
+| `ConnectionManager.processChallenge()` | One-liner via `respondToChallenge()` with networkID context |
+| `NodeServer.processChallenge()` | One-liner via `respondToChallenge()` |
+| `ConvexLocal.sendChallenge()` | Routes through server message delivery |
+| `ConvexDirect.sendChallenge()` | Optimised direct path using local peer key |
 
-The **protocol** is complete — mutual challenge/response proves possession of a peer's
-private key. The **trust loop never closes** because the final `setTrustedKey()` call
-is commented out.
+### Protocol
+
+Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
+
+| Direction | Payload | `otherKey` is... |
+|-----------|---------|------------------|
+| Challenge (client → server) | `SignedData([token, targetKey, contextID?])` | server's expected key (or null for discovery) |
+| Response (server → client) | `SignedData([token, challengerKey, contextID?])` | challenger's key (from SignedData) |
+
+- **token** — random 16-byte nonce, proves response matches this challenge
+- **otherKey** — the key of the other party
+- **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
+- CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
+
+### Outbound Connection Flow
+
+**Peer `ConnectionManager.connectToPeer()`** (async `CompletableFuture<Convex>`):
+1. Connect to remote address
+2. Try `verifyPeer(null, networkID)` — discovery mode with network context
+3. If verified → `verifiedPeer` set, `AConnection.trustedKey` set, peer key proven
+4. If verification fails → fall back to `requestStatus()` (untrusted, self-reported key)
+5. Add connection keyed by peer identity
+
+**Lattice `LatticeConnectionManager`**:
+1. Connect to remote address
+2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
+3. Connection immediately usable; `verifiedPeer` set when verification completes
 
 ## Design: Channel Trust Classification
 
@@ -72,7 +101,7 @@ might not appear immediately, but the challenge can be retried.
 
 Trusted status is revoked when:
 
-1. **Channel closes** — cleanup on disconnect
+1. **Channel closes** — `ConvexRemote.close()` clears `verifiedPeer` and connection
 2. **Peer removed from state** — periodic sweep (optional, low priority)
 3. **Invalid data from trusted channel** — demote on malformed messages
 
@@ -100,23 +129,19 @@ peer floods us? Mitigations:
 4. **Separate queues** — peer transaction forwarding (if implemented) can use a
    separate high-priority queue with its own capacity.
 
-## Implementation Sequence
+## Remaining Work
 
-### Phase 1: Channel Tracking
+### Phase 1: Inbound Channel Trust (next)
 
 1. Wire channel reference into `Message` (or handler context) so `Server` can
    look up trust status per message
 2. Register inbound channels on connection, remove on disconnect
 3. All channels start as untrusted
+4. Trigger challenge on first Belief from untrusted channel
+5. Validate peer key against consensus state before promoting
+6. Add `promoteToTrusted()` to Server — moves channel from client set to peer set
 
-### Phase 2: Trust Completion
-
-1. Uncomment `setTrustedKey()` in `ConnectionManager.processResponse()`
-2. Validate peer key against consensus state before promoting
-3. Trigger challenge on first Belief from untrusted channel
-4. Add `promoteToTrusted()` to Server — moves channel from client set to peer set
-
-### Phase 3: Backpressure Integration
+### Phase 2: Backpressure Integration
 
 1. Restrict `setAutoRead(false)` to client channels only
 2. Verify peer channels are never paused
@@ -132,4 +157,4 @@ peer floods us? Mitigations:
 | Revocation | Channel close, or malformed data from trusted channel |
 | Backpressure | Applied to client channels only; peer channels always read |
 | Security invariant | Untrusted clients **never** block Belief propagation |
-| Key fix needed | Uncomment `setTrustedKey()` in `processResponse()` |
+| Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` |

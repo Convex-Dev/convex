@@ -12,6 +12,7 @@ import convex.core.SourceCodes;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Cells;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.store.AStore;
@@ -165,8 +166,15 @@ public abstract class AGenericAPI {
 	 * @param ctx Javalin context
 	 * @param content Return content
 	 */
+	private static final long MAX_CONTENT_SIZE = 1_000_000; // 1MB limit
+
 	public void setContent(Context ctx, ACell content) {
-		
+		long size = Cells.storageSize(content);
+		if (size > MAX_CONTENT_SIZE) {
+			setResult(ctx, Result.error(ErrorCodes.LIMIT, "Response too large: " + size + " bytes").withSource(SourceCodes.PEER));
+			return;
+		}
+
 		String type = calcResponseContentType(ctx);
 		
 		if (type.equals(ContentTypes.JSON)) {

@@ -19,6 +19,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Strings;
@@ -56,6 +57,13 @@ public class ConvexRemote extends Convex {
 
 	protected ConvexRemote(Address address, AKeyPair keyPair) {
 		super(address, keyPair);
+	}
+
+	@Override
+	protected void setVerifiedPeer(AccountKey key) {
+		super.setVerifiedPeer(key);
+		AConnection c = connection;
+		if (c != null) c.setTrustedKey(key);
 	}
 	
 	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
@@ -239,7 +247,7 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
+	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
 		Message m=Message.createChallenge(getNextID(), data);
 		return message(m);
 	}
