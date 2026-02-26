@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -29,6 +30,7 @@ import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.net.IPUtils;
+import convex.peer.Config;
 
 /**
  * Manages outbound peer connections for lattice propagation with identity-based
@@ -88,6 +90,12 @@ public class LatticeConnectionManager implements Closeable {
 	 */
 	private final AStore store;
 
+	/**
+	 * Optional key pair for challenge/response peer verification. If null,
+	 * peer verification is skipped and connections are unverified.
+	 */
+	private volatile AKeyPair keyPair;
+
 	/** Maintenance thread for reconnection. */
 	private Thread maintenanceThread;
 
@@ -104,6 +112,16 @@ public class LatticeConnectionManager implements Closeable {
 	public LatticeConnectionManager(AStore store) {
 		if (store == null) throw new IllegalArgumentException("Store must not be null");
 		this.store = store;
+	}
+
+	/**
+	 * Sets the key pair used for challenge/response peer verification.
+	 * If set, the manager will attempt to verify peers on connection.
+	 *
+	 * @param keyPair Key pair for signing challenges, or null to disable verification
+	 */
+	public void setKeyPair(AKeyPair keyPair) {
+		this.keyPair = keyPair;
 	}
 
 	// ========== Lifecycle ==========
@@ -198,6 +216,11 @@ public class LatticeConnectionManager implements Closeable {
 			return;
 		}
 		convex.setStore(store);
+		AKeyPair kp = this.keyPair;
+		if (kp != null && convex.getVerifiedPeer() == null) {
+			convex.setKeyPair(kp);
+			tryVerifyPeer(convex, peerKey);
+		}
 		connections.put(peerKey, convex);
 
 		// Ensure desired peer entry exists with transport from connection
@@ -428,10 +451,16 @@ public class LatticeConnectionManager implements Closeable {
 			try {
 				Convex convex = Convex.connect(target);
 				convex.setStore(store);
+				AKeyPair kp = this.keyPair;
+				if (kp != null) {
+					convex.setKeyPair(kp);
+					tryVerifyPeer(convex, peerKey);
+				}
 				connections.put(peerKey, convex);
 				desired.failCount = 0;
 				desired.nextRetryTime = 0;
-				log.info("Connected to peer {} at {}", peerKey, target);
+				log.info("Connected to peer {} at {} (verified={})",
+					peerKey, target, convex.getVerifiedPeer() != null);
 			} catch (Exception e) {
 				desired.failCount++;
 				desired.nextRetryTime = now + calculateBackoff(desired.failCount);
@@ -486,6 +515,29 @@ public class LatticeConnectionManager implements Closeable {
 		long base = Math.min(MAX_BACKOFF_MS, INITIAL_BACKOFF_MS << Math.min(failCount - 1, 10));
 		long jitter = ThreadLocalRandom.current().nextLong(base / 2 + 1);
 		return base / 2 + jitter;
+	}
+
+	// ========== Verification ==========
+
+	/**
+	 * Attempts challenge/response verification of a peer. Non-blocking:
+	 * fires off the verification and handles the result asynchronously.
+	 * If verification fails or is unsupported, the connection remains
+	 * usable but unverified ({@code getVerifiedPeer()} returns null).
+	 *
+	 * @param convex Connection to verify
+	 * @param peerKey Expected peer key
+	 */
+	private void tryVerifyPeer(Convex convex, AccountKey peerKey) {
+		convex.verifyPeer(peerKey).whenComplete((result, ex) -> {
+			if (result != null) {
+				log.debug("Verified peer: {} at {}", peerKey, convex.getHostAddress());
+			} else if (ex != null) {
+				log.debug("Peer verification not available for {}: {}", peerKey, ex.getMessage());
+			} else {
+				log.debug("Peer verification failed for {}", peerKey);
+			}
+		});
 	}
 
 	// ========== Helpers ==========

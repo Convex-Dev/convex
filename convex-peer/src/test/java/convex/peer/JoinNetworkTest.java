@@ -70,8 +70,8 @@ public class JoinNetworkTest {
 			Server newServer=API.launchPeer(config);
 
 			// make peer connections directly
-			newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress());
-			network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
+			newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress()).join();
+			network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress()).join();
 
 			// TODO: should these be in consensus at this point since just synced
 			// note: shouldn't matter which is the current store

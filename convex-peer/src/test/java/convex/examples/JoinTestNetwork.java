@@ -39,7 +39,7 @@ public class JoinTestNetwork {
 		Server newServer=API.launchPeer(config);
 
 		// make peer connections directly
-		newServer.getConnectionManager().connectToPeer(hostAddress);
+		newServer.getConnectionManager().connectToPeer(hostAddress).join();
 
 		Thread.sleep(10000);
 		Peer peer=newServer.getPeer();

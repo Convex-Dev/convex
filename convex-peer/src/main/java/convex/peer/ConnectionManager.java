@@ -10,13 +10,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
@@ -28,20 +26,14 @@ import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
-import convex.core.data.Strings;
-import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.data.SignedData;
-import convex.core.data.Vectors;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.AConnection;
 import convex.net.IPUtils;
 
 /**
@@ -187,9 +179,6 @@ public class ConnectionManager extends AThreadedComponent {
 				}
 			}
 
-			// send request for a trusted peer connection if necessary
-			// TODO: need to find out why the response message is not being received by the peers
-			// requestChallenge(p, conn, server.getPeer());
 		}
 
 		// refresh peers list
@@ -201,7 +190,7 @@ public class ConnectionManager extends AThreadedComponent {
 		lastConnectionUpdate=Utils.getCurrentTimestamp();
 	}
 
-	private void tryRandomConnect(State s) throws InterruptedException {
+	private void tryRandomConnect(State s) {
 		// Connect to a random peer with host address by stake
 		// SECURITY: stake weighted connection is important to avoid bad / irrelevant peers
 		// influencing the connection pool
@@ -234,11 +223,11 @@ public class ConnectionManager extends AThreadedComponent {
 
 		if (target!=null) {
 			// Try to connect to Peer. If it fails, no worry, will retry another peer next time
-			try {
-				connectToPeer(target);
-			} catch (IOException|TimeoutException e) {
-				log.debug("Failed to connect to Peer at "+target,e);
-			}
+			InetSocketAddress connectTarget=target;
+			connectToPeer(target).exceptionally(e -> {
+				log.debug("Failed to connect to Peer at "+connectTarget+": "+e.getMessage());
+				return null;
+			});
 		}
 	}
 
@@ -404,47 +393,89 @@ public class ConnectionManager extends AThreadedComponent {
 	}
 
 	/**
-	 * Connects explicitly to a Peer at the given host address
+	 * Connects explicitly to a Peer at the given host address. Attempts
+	 * challenge/response verification; falls back to status-based (untrusted)
+	 * identification if verification is not supported.
+	 *
 	 * @param hostAddress Address to connect to
-	 * @return new Convex connection, or null if attempt fails
-	 * @throws InterruptedException 
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @return Future completing with the Convex connection, or exceptionally on failure
 	 */
-	public Convex connectToPeer(InetSocketAddress hostAddress) throws InterruptedException, IOException, TimeoutException {
+	public CompletableFuture<Convex> connectToPeer(InetSocketAddress hostAddress) {
+		CompletableFuture<Convex> result = new CompletableFuture<>();
+
 		try {
 			Convex convex=Convex.connect(hostAddress);
 			convex.setStore(server.getStore());
-			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
-			if (result.isError()) {
-				log.info("Bad status message from remote Peer: "+result);
-				convex.close();
-				return null;
-			} else {
-				log.debug("Got status from peer: "+result);
-			}
-			
-			ACell statusValue=result.getValue();
-			
-			AMap<Keyword,ACell> status = API.ensureStatusMap(statusValue);
-			// close the temp connection to Convex API
-			
-			AccountKey peerKey =RT.ensureAccountKey(status.get(Keywords.PEER));
-			if (peerKey==null) return null;
+			convex.setKeyPair(server.getKeyPair());
 
-			Convex existing=getConnection(peerKey);
-			if ((existing!=null)&&existing.isConnected()) {
-				log.info("Trying to connect with existing connection");
-				convex.close();
-				return existing;
-			} else {
-				addConnection(peerKey, convex);
-			}
-			return convex;
-		} catch (UnresolvedAddressException e) {
-			log.info("Unable to resolve host address: "+hostAddress);
-			return null;
+			// Try to identify peer: verify first, fall back to status
+			identifyPeer(convex).whenComplete((peerKey, ex) -> {
+				if (peerKey==null || ex!=null) {
+					convex.close();
+					result.completeExceptionally(ex!=null ? ex
+						: new IOException("Unable to identify peer at "+hostAddress));
+					return;
+				}
+
+				Convex existing=getConnection(peerKey);
+				if ((existing!=null)&&existing.isConnected()) {
+					convex.close();
+					result.complete(existing);
+				} else {
+					addConnection(peerKey, convex);
+					result.complete(convex);
+				}
+			});
+		} catch (Exception e) {
+			result.completeExceptionally(e);
 		}
+		return result;
+	}
+
+	/**
+	 * Identifies a remote peer, first attempting challenge/response verification
+	 * (trusted), then falling back to status request (untrusted).
+	 *
+	 * @param convex Connection to the remote peer
+	 * @return Future completing with the peer's AccountKey
+	 */
+	private CompletableFuture<AccountKey> identifyPeer(Convex convex) {
+		Peer peer=server.getPeer();
+		Hash networkID=peer.getNetworkID();
+
+		// Try verification with network ID as context
+		return convex.verifyPeer(null, networkID).thenCompose(verified -> {
+			if (verified!=null) {
+				log.info("Verified peer: "+verified+" at "+convex.getHostAddress());
+				return CompletableFuture.completedFuture(verified);
+			}
+
+			// Verification returned null — fall back to status
+			return fallbackIdentify(convex);
+		}).exceptionallyCompose(ex -> {
+			// Verification failed (timeout, unsupported, etc.) — fall back to status
+			log.debug("Peer verification not available at "+convex.getHostAddress()+": "+ex.getMessage());
+			return fallbackIdentify(convex);
+		});
+	}
+
+	/**
+	 * Identifies a peer via status request (untrusted fallback).
+	 */
+	private CompletableFuture<AccountKey> fallbackIdentify(Convex convex) {
+		return convex.requestStatus().thenApply(result -> {
+			if (result.isError()) {
+				log.info("Bad status from remote peer: "+result);
+				return null;
+			}
+			AMap<Keyword,ACell> status=API.ensureStatusMap(result.getValue());
+			if (status==null) return null;
+			AccountKey peerKey=RT.ensureAccountKey(status.get(Keywords.PEER));
+			if (peerKey!=null) {
+				log.info("Identified peer via status (unverified): "+peerKey+" at "+convex.getHostAddress());
+			}
+			return peerKey;
+		});
 	}
 
 

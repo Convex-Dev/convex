@@ -177,6 +177,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Create primary propagator if none have been added
 		if (propagators.isEmpty() && store != null) {
 			LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
+			AKeyPair signingKey = mergeContext.getSigningKey();
+			if (signingKey != null) {
+				connectionManager.setKeyPair(signingKey);
+			}
 			LatticePropagator primary = new LatticePropagator(store, connectionManager);
 			if (!config.isPersist()) {
 				primary.setPersistInterval(-1); // disable setRootData

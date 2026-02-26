@@ -177,16 +177,16 @@ public class API {
 		try {
 			for (int i = 1; i < count; i++) {
 				Server server=serverList.get(i);
-	
+
 				// Join each additional Server to the Peer #0
 				ConnectionManager cm=server.getConnectionManager();
-				cm.connectToPeer(genesisServer.getHostAddress());
-	
+				cm.connectToPeer(genesisServer.getHostAddress()).join();
+
 				// Join server #0 to this server
-				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
+				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress()).join();
 				server.setHostname("localhost:"+server.getPort());
 			}
-		} catch (IOException|TimeoutException e) {
+		} catch (Exception e) {
 			throw new LaunchException("Error setting up peer connections",e);
 		}
 
