@@ -47,11 +47,6 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	private final Function<Message, Predicate<Message>> deliver;
 
 	/**
-	 * Action to send a result back to the client on this channel.
-	 */
-	private final Predicate<Message> returnAction;
-
-	/**
 	 * Connection associated with this handler. Set for server-side inbound channels.
 	 */
 	private AConnection connection;
@@ -74,11 +69,10 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 *
 	 * @param deliver  Dispatch function. Returns null if the message was accepted,
 	 *                 or a blocking retry predicate if the queue was full.
-	 * @param returnAction Action to send results back to the client on this channel.
+	 * @param returnAction Unused, kept for compatibility (will be removed)
 	 */
 	public NettyInboundHandler(Function<Message, Predicate<Message>> deliver, Predicate<Message> returnAction)  {
 		this.deliver=deliver;
-		this.returnAction=returnAction;
 	}
 
 	@Override
@@ -155,7 +149,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 			AConnection conn=connection;
 		Message m = (conn!=null)
 			? Message.create(conn, Blob.wrap(messageData))
-			: Message.create(returnAction,null,Blob.wrap(messageData));
+			: Message.create(Blob.wrap(messageData));
 			out.add(m);
 			Predicate<Message> retry = deliver.apply(m);
 			if (retry != null) {

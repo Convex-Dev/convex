@@ -49,27 +49,17 @@ public class Message {
 	protected ACell payload;
 	protected Blob messageData; // encoding of payload (possibly multi-cell)
 	protected MessageType type;
-	protected Predicate<Message> returnHandler;
 	protected AConnection connection;
 
-	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler, AConnection connection) {
+	protected Message(MessageType type, ACell payload, Blob data, AConnection connection) {
 		this.type = type;
 		this.messageData=data;
 		this.payload = payload;
-		this.returnHandler=handler;
 		this.connection=connection;
 	}
 
-	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler) {
-		this(type, payload, data, handler, null);
-	}
-
-	public static Message create(Predicate<Message> handler, MessageType type, Blob data) {
-		return new Message(type, null,data,handler);
-	}
-
 	public static Message create(AConnection conn, Blob data) {
-		return new Message(null, null,data,null,conn);
+		return new Message(null, null,data,conn);
 	}
 	
 	public static Message create(Blob data) throws BadFormatException {
@@ -555,10 +545,8 @@ public class Message {
 	 */
 	public boolean returnMessage(Message m) {
 		AConnection conn=connection;
-		if (conn!=null) return conn.trySendMessage(m);
-		Predicate<Message> handler=returnHandler;
-		if (handler==null) throw new IllegalStateException("No return handler for message");
-		return handler.test(m);
+		if (conn==null) throw new IllegalStateException("No connection for return message");
+		return conn.returnMessage(m);
 	}
 
 	/**
@@ -587,7 +575,6 @@ public class Message {
 			conn.close();
 			connection=null;
 		}
-		returnHandler=null;
 	}
 
 	public Message makeDataResponse(AStore store) throws BadFormatException {
@@ -645,34 +632,13 @@ public class Message {
 	}
 
 	/**
-	 * Create an instance with the given message data
-	 * @param type Message type
-	 * @param payload Message payload
-	 * @param handler Handler for Results
-	 * @return New MessageLocal instance
-	 */
-	public static Message create(MessageType type, ACell payload, Predicate<Message> handler) {
-		return new Message(type,payload,null,handler);
-	}
-	
-	/**
-	 * Updates this message with a new result handler
-	 * @param resultHandler New result handler to set (may be null to remove handler)
-	 * @return Updated Message. May be the same Message if no change to result handler
-	 */
-	public Message withResultHandler(Predicate<Message> resultHandler) {
-		if (this.returnHandler==resultHandler) return this;
-		return new Message(type,payload,messageData,resultHandler,connection);
-	}
-
-	/**
 	 * Updates this message with the given connection for return routing
 	 * @param conn Connection to use for returning messages, or null to remove
 	 * @return Updated Message
 	 */
 	public Message withConnection(AConnection conn) {
 		if (this.connection==conn) return this;
-		return new Message(type,payload,messageData,returnHandler,conn);
+		return new Message(type,payload,messageData,conn);
 	}
 
 	/**

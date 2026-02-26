@@ -59,6 +59,21 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Returns a result message to the other end of this connection. This is
+	 * the non-blocking result delivery path used by server processing threads.
+	 *
+	 * <p>Default implementation delegates to {@link #trySendMessage(Message)}.
+	 * Subclasses may override if result delivery requires different behaviour
+	 * from general message sending.</p>
+	 *
+	 * @param msg Result message to deliver
+	 * @return true if delivered successfully, false otherwise
+	 */
+	public boolean returnMessage(Message msg) {
+		return trySendMessage(msg);
+	}
+
+	/**
 	 * Sends a message over this connection. May block with a bounded timeout
 	 * if the outbound queue is full (e.g. outbound client connections under
 	 * backpressure). Callers that must not block should use

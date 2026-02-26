@@ -124,7 +124,7 @@ public class ConvexLocal extends Convex {
 		}
 
 		CompletableFuture<Result> cf=new CompletableFuture<>();
-		LocalConnection conn=new LocalConnection(m->{
+		LocalConnection clientEnd=LocalConnection.create(m->{
 			Result r=m.toResult();
 			if (r.getErrorCode()!=null) {
 				sequence=null;
@@ -132,7 +132,7 @@ public class ConvexLocal extends Convex {
 			cf.complete(r);
 			return true;
 		});
-		Message ml=message.withConnection(conn);
+		Message ml=message.withConnection(clientEnd);
 
 		// Deliver directly to server. If queue is full, block caller's thread.
 		Predicate<Message> retry = server.deliverMessage(ml);
@@ -149,7 +149,7 @@ public class ConvexLocal extends Convex {
 	public CompletableFuture<Result> messageRaw(Blob rawData) {
 		try {
 			Message m=Message.create(rawData);
-			m.getPayload(null); // decode payload for type inference and ID extraction
+			m.getPayload(getStore()); // decode payload for type inference and ID extraction
 			return message(m);
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));

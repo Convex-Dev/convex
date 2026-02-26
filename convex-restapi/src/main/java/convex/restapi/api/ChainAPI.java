@@ -56,7 +56,6 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.JSON;
@@ -531,29 +530,19 @@ public class ChainAPI extends ABaseAPI {
 	public void handleMessage(Context ctx) {
 		try {
 			String contentType = ctx.req().getContentType();
-			Message message;
+			if (ContentTypes.JSON.equals(contentType)) {
+				throw new BadRequestResponse(jsonError("JSON not acceptable as message format"));
+			}
+
+			CompletableFuture<Result> cf;
 			if (ContentTypes.CVX_RAW.equals(contentType)) {
 				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
-				message = Message.create(rawData);
-				message.getPayload(server.getStore());
+				cf = convex.messageRaw(rawData);
 			} else {
 				// Accept CVX text or default — parse as CVX data
 				ACell body = getCVXBody(ctx);
-				message = Message.create(MessageType.UNKNOWN, body);
-			}
-
-			CompletableFuture<Result> cf = new CompletableFuture<>();
-			LocalConnection conn = new LocalConnection(m -> {
-				cf.complete(m.toResult());
-				return true;
-			});
-			Message ml = message.withConnection(conn);
-
-			java.util.function.Predicate<Message> retry = server.deliverMessage(ml);
-			if (retry != null) {
-				if (!retry.test(ml)) {
-					cf.complete(Result.error(ErrorCodes.LOAD, "Server loaded"));
-				}
+				Message message = Message.create(MessageType.UNKNOWN, body);
+				cf = convex.message(message);
 			}
 
 			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);

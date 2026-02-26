@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +38,7 @@ public class MessageReceiver {
 
 	/**
 	 * Buffer for receiving partial messages. Maintained ready for writing.
-	 * 
+	 *
 	 * Maybe use a direct buffer since we are copying from the socket channel? But probably doesn't make any difference.
 	 */
 	private ByteBuffer buffer = ByteBuffer.allocate(INITIAL_RECEIVE_BUFFER_SIZE);
@@ -47,16 +46,14 @@ public class MessageReceiver {
 
 	private final Consumer<Message> action;
 	private Consumer<Message> hook=null;
-	private final Predicate<Message> returnHandler;
 	private AConnection connection;
 
 	private long receivedMessageCount = 0;
 
 	private static final Logger log = LoggerFactory.getLogger(MessageReceiver.class.getName());
 
-	public MessageReceiver(Consumer<Message> receiveAction, Predicate<Message> returnHandler) {
+	public MessageReceiver(Consumer<Message> receiveAction) {
 		this.action = receiveAction;
-		this.returnHandler = returnHandler;
 	}
 
 	/**
@@ -66,7 +63,7 @@ public class MessageReceiver {
 	public void setConnection(AConnection conn) {
 		this.connection = conn;
 	}
-	
+
 
 	/**
 	 * Get the number of messages received in total by this Receiver
@@ -108,10 +105,10 @@ public class MessageReceiver {
 			// peek message length at start of buffer. May throw BFE.
 			int len = Format.peekMessageLength(buffer);
 			if (len<0) return numRead; // Not enough bytes for a message length yet
-			
+
 			int lengthLength = Format.getVLQCountLength(len);
 			int totalFrameSize=lengthLength + len;
-			
+
 			if (totalFrameSize>buffer.capacity()) {
 				int newSize=Math.max(totalFrameSize, buffer.position());
 				ByteBuffer newBuffer=ByteBuffer.allocate(newSize);
@@ -119,14 +116,14 @@ public class MessageReceiver {
 				newBuffer.put(buffer);
 				buffer=newBuffer;
 			}
-			
+
 			// Exit if we hven't got the full message yet
 			if (buffer.position()<totalFrameSize) return numRead;
-	
+
 			// At this point we know we have a full message. Wrap it as a Blob ready to receive message
 			// From this point onwards MUST NOT mutate buffer backing array
 			Blob messageData=Blob.wrap(buffer.array(),lengthLength,len);
-	
+
 			// check if we have more bytes
 			int receivedLimit=buffer.position();
 			if (receivedLimit>totalFrameSize) {
@@ -162,15 +159,15 @@ public class MessageReceiver {
 	 */
 	private void receiveMessage(Blob messageData) throws BadFormatException, HandlerException {
 		if (messageData.count()<1) throw new BadFormatException("Empty message");
-		
+
 		AConnection conn=connection;
 		Message message = (conn!=null)
 			? Message.create(conn, messageData)
-			: Message.create(returnHandler, null, messageData);
-		
+			: Message.create(messageData);
+
 		// call the receiver hook, if registered
 		maybeCallHook(message);
-		
+
 		// Otherwise, send to the message receive action
 		receivedMessageCount++;
 		if (action != null) {

@@ -216,6 +216,7 @@ public abstract class AGenericAPI {
 	
 	public int statusForResult(Result r) {
 		if (!r.isError()) {
+			if (r==Result.SENT_MESSAGE) return 202; // Accepted, no result expected
 			return 200;
 		}
 		Keyword source=r.getSource();

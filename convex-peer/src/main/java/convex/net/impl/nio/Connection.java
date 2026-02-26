@@ -18,7 +18,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +96,7 @@ public class Connection extends AConnection {
 			AccountKey trustedPeerKey) {
 		this.channel = channel;
 
-		receiver = new MessageReceiver(receiveAction, this::sendMessage);
+		receiver = new MessageReceiver(receiveAction);
 		receiver.setConnection(this); // messages carry this connection
 		sender = new MessageSender(channel);
 		this.lastActivity=Utils.getCurrentTimestamp();

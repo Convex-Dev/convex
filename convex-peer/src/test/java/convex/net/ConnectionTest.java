@@ -32,7 +32,7 @@ public class ConnectionTest {
 			synchronized (received) {
 				received.add(a);
 			}
-		}, null);
+		});
 		
 		Thread receiveThread=new Thread(()-> {
 			while (!Thread.currentThread().isInterrupted()) {
