@@ -56,6 +56,7 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.JSON;
@@ -542,10 +543,11 @@ public class ChainAPI extends ABaseAPI {
 			}
 
 			CompletableFuture<Result> cf = new CompletableFuture<>();
-			Message ml = message.withResultHandler(m -> {
+			LocalConnection conn = new LocalConnection(m -> {
 				cf.complete(m.toResult());
 				return true;
 			});
+			Message ml = message.withConnection(conn);
 
 			java.util.function.Predicate<Message> retry = server.deliverMessage(ml);
 			if (retry != null) {

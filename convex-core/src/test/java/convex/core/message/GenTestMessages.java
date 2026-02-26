@@ -35,7 +35,7 @@ public class GenTestMessages {
 	@Property
 	public void testCAD3Message(@From(ValueGen.class) ACell a) throws BadFormatException {
 		// Any CAD3 object should encode as a complete message
-		Message m=Message.create(null,a);
+		Message m=Message.create((MessageType)null,a);
 		
 		MessageType mtype=m.getType();
 		assertNotNull(mtype);

@@ -106,20 +106,11 @@ public class NettyServer extends AServer {
             	 }
             	 clientChannels.add(ch);
 
-            	 // Per-result writeAndFlush: each result is flushed individually
-            	 // to the client channel. This is not batched — under high load
-            	 // (e.g. 200k txns) each result triggers a separate TCP write.
-            	 // Acceptable because: (a) results are small (~100 bytes), (b) real
-            	 // clients won't sustain 100k+ TPS, and (c) batching would require
-            	 // exposing channel references to TransactionHandler, breaking the
-            	 // clean separation where Server never sees a channel.
-            	 Predicate<Message> returnHandler=m->{
-            		 ch.writeAndFlush(m);
-            		 return true;
-            	 };
             	 Function<Message, Predicate<Message>> deliverFn =
             		 (deliver != null) ? deliver : wrapReceiveAction();
-            	 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,returnHandler);
+            	 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null);
+            	 NettyServerConnection conn=new NettyServerConnection(ch,inbound);
+            	 inbound.setConnection(conn);
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
              }
          })

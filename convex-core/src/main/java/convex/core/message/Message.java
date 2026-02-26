@@ -50,16 +50,26 @@ public class Message {
 	protected Blob messageData; // encoding of payload (possibly multi-cell)
 	protected MessageType type;
 	protected Predicate<Message> returnHandler;
+	protected AConnection connection;
 
-	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler) {
+	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler, AConnection connection) {
 		this.type = type;
 		this.messageData=data;
 		this.payload = payload;
 		this.returnHandler=handler;
+		this.connection=connection;
+	}
+
+	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler) {
+		this(type, payload, data, handler, null);
 	}
 
 	public static Message create(Predicate<Message> handler, MessageType type, Blob data) {
 		return new Message(type, null,data,handler);
+	}
+
+	public static Message create(AConnection conn, Blob data) {
+		return new Message(null, null,data,null,conn);
 	}
 	
 	public static Message create(Blob data) throws BadFormatException {
@@ -488,13 +498,15 @@ public class Message {
 	
 	/**
 	 * Returns a message back to the originator of the message.
-	 * 
+	 *
 	 * Will set response ID if necessary.
-	 * 
+	 *
 	 * @param m Message
 	 * @return True if sent successfully, false otherwise
 	 */
 	public boolean returnMessage(Message m) {
+		AConnection conn=connection;
+		if (conn!=null) return conn.trySendMessage(m);
 		Predicate<Message> handler=returnHandler;
 		if (handler==null) throw new IllegalStateException("No return handler for message");
 		return handler.test(m);
@@ -521,6 +533,11 @@ public class Message {
 	 * Closes any connection associated with this message, probably because of bad behaviour
 	 */
 	public void closeConnection() {
+		AConnection conn=connection;
+		if (conn!=null) {
+			conn.close();
+			connection=null;
+		}
 		returnHandler=null;
 	}
 
@@ -596,7 +613,25 @@ public class Message {
 	 */
 	public Message withResultHandler(Predicate<Message> resultHandler) {
 		if (this.returnHandler==resultHandler) return this;
-		return new Message(type,payload,messageData,resultHandler);
+		return new Message(type,payload,messageData,resultHandler,connection);
+	}
+
+	/**
+	 * Updates this message with the given connection for return routing
+	 * @param conn Connection to use for returning messages, or null to remove
+	 * @return Updated Message
+	 */
+	public Message withConnection(AConnection conn) {
+		if (this.connection==conn) return this;
+		return new Message(type,payload,messageData,returnHandler,conn);
+	}
+
+	/**
+	 * Gets the connection associated with this message, or null if none
+	 * @return AConnection instance, or null
+	 */
+	public AConnection getConnection() {
+		return connection;
 	}
 
 	public static Message createQuery(long id, String code, Address address) {

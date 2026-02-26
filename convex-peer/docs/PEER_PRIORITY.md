@@ -22,11 +22,11 @@ are healthy.
 This invariant must hold regardless of how many client connections exist, how fast
 clients submit transactions, or whether any queue is full.
 
-## Current State
+## Implemented: Challenge/Response Protocol
 
-### Trust Infrastructure
+The challenge/response protocol is fully implemented and the trust loop is closed.
 
-The challenge/response protocol is fully implemented and the trust loop is closed:
+### Components
 
 | Component | Status |
 |-----------|--------|
@@ -40,6 +40,7 @@ The challenge/response protocol is fully implemented and the trust loop is close
 | `NodeServer.processChallenge()` | One-liner via `respondToChallenge()` |
 | `ConvexLocal.sendChallenge()` | Routes through server message delivery |
 | `ConvexDirect.sendChallenge()` | Optimised direct path using local peer key |
+| `ConvexHTTP.sendChallenge()` | Via generic `/api/v1/message` endpoint |
 
 ### Protocol
 
@@ -47,7 +48,7 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 
 | Direction | Payload | `otherKey` is... |
 |-----------|---------|------------------|
-| Challenge (client → server) | `SignedData([token, targetKey, contextID?])` | server's expected key (or null for discovery) |
+| Challenge (client → server) | `SignedData([token, targetKey, contextID?])` | server's expected key |
 | Response (server → client) | `SignedData([token, challengerKey, contextID?])` | challenger's key (from SignedData) |
 
 - **token** — random 16-byte nonce, proves response matches this challenge
@@ -55,7 +56,7 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 - **contextID** — optional; peer Server uses networkID (genesis hash), NodeServer uses null
 - CHALLENGE messages use ID-based correlation like QUERY/STATUS/TRANSACT
 
-### Outbound Connection Flow
+### Outbound Connection Flow (Implemented)
 
 **Peer `ConnectionManager.connectToPeer()`** (async `CompletableFuture<Convex>`):
 1. Connect to remote address
@@ -69,92 +70,162 @@ Challenge/response uses the vector shape `[token, otherKey, contextID?]`:
 2. If key pair available, fire async `verifyPeer(peerKey)` — non-blocking
 3. Connection immediately usable; `verifiedPeer` set when verification completes
 
-## Design: Channel Trust Classification
+## Implemented: Generic Message API
 
-### Goal
+`POST /api/v1/message` accepts messages in CAD3 raw (`application/cvx-raw`) or CVX text
+(`application/cvx`) format. Delivers to the peer server and returns the Result, honouring
+the `Accept` header for response format (JSON, CVX, CVX raw). This enables challenge/response
+over HTTP — `ConvexHTTP.sendChallenge()` uses this endpoint.
 
-Classify every inbound channel as either **trusted** (peer) or **untrusted** (client).
-Only untrusted channels are subject to backpressure. Trusted channels are always read.
+Response size is capped at 1MB via `Cells.storageSize()` in `setContent()`.
 
-### Trust Lifecycle
+## Implemented: Error Responses
 
-1. **Connection arrives** — registered as untrusted (client) by default
-2. **Belief received from untrusted channel** — triggers challenge/response handshake
-3. **Successful mutual authentication** — channel promoted to trusted (peer)
-4. **Channel closes** — trust revoked, channel unregistered
+`Server.processMessage()` returns specific errors for unhandled messages:
+- Unknown message type → `Result.error(:FORMAT, "Unrecognised message type")`
+- Unexpected result message → `Result.error(:UNEXPECTED, "Unexpected result message")`
 
-### Authentication Trigger
+All error strings are static constants in `Strings` — no per-message string construction.
 
-Receiving a `BELIEF` message from an untrusted channel is a natural trigger to verify
-the sender. Legitimate peers broadcast Beliefs; clients never do. The Belief is still
-processed during authentication — don't drop it while verifying.
+## Trust Model
 
-### Peer Validation
+Trust is **asymmetric** between outbound and inbound connections:
 
-A connection should only be promoted to trusted if the remote peer's `AccountKey` is
-a valid active peer in the current consensus state with minimum effective stake. This
-prevents authentication with a valid key pair that isn't actually a registered peer.
-The check uses local consensus state (eventually consistent) — a newly joined peer
-might not appear immediately, but the challenge can be retried.
+| Direction | Trust | Rationale |
+|-----------|-------|-----------|
+| **Outbound** (we connected to them) | Verified via `verifyPeer()` → trusted | We chose who to connect to; verified their identity |
+| **Inbound** (they connected to us) | Always client by default | We don't know who they are; they could be anyone |
 
-### Trust Revocation
+Inbound connections are **never promoted to full peer status**. The outbound connections
+are what matter for secure Belief broadcast — we control who we broadcast to.
 
-Trusted status is revoked when:
+However, other peers' outbound connections appear as our inbound connections. A remote
+peer connecting to us will send Beliefs that we need to process. We must accept these
+but protect against untrusted clients flooding the Belief queue.
 
-1. **Channel closes** — `ConvexRemote.close()` clears `verifiedPeer` and connection
-2. **Peer removed from state** — periodic sweep (optional, low priority)
-3. **Invalid data from trusted channel** — demote on malformed messages
+### Inbound Belief Handling
 
-## Integration with Backpressure
+Beliefs from inbound connections are **accepted but deprioritised until verified**:
 
-[BACKPRESSURE.md](BACKPRESSURE.md) defines the mechanism; this document defines the
-policy for which channels it applies to:
+1. **Belief arrives from inbound connection `C`**
+2. **If `C.isTrusted()`** → normal Belief processing (high priority)
+3. **If not trusted** → accept into bounded low-priority Belief queue; trigger
+   server-side challenge to verify the sender
+4. **Challenge succeeds** → `C.setTrustedKey(key)`, subsequent Beliefs get normal priority
+5. **Challenge fails or low-priority queue full** → drop the Belief
 
-| Channel Type | Backpressure | Rationale |
-|-------------|-------------|-----------|
-| **Client** (untrusted) | Yes — pause reads when queue full | Protects server from client flood |
-| **Peer** (trusted) | Never | Belief propagation must not be interrupted |
+This means Beliefs are signed (so can be verified), and a verified inbound connection
+gets faster Belief processing. But it is still an inbound client connection — still
+subject to backpressure for non-Belief traffic.
 
-### Peer Channel Flood Protection
+### Flood Mitigations
 
-Exempting peer channels from backpressure raises the question: what if a compromised
-peer floods us? Mitigations:
-
-1. **Peer count is bounded** — limited by staking requirements. A few dozen trusted
-   channels cannot overwhelm the server.
+1. **Peer count is bounded** — limited by staking requirements. A few dozen verified
+   inbound connections cannot overwhelm the server.
 2. **Beliefs are deduplicated** — `BeliefPropagator` handles duplicate detection.
    Repeated identical Beliefs are cheap to reject.
 3. **Peers are accountable** — a misbehaving peer's key is known. The operator can
    blacklist it or the network can slash its stake.
-4. **Separate queues** — peer transaction forwarding (if implemented) can use a
-   separate high-priority queue with its own capacity.
+4. **Low-priority queue is bounded** — unverified Belief senders can't fill the
+   high-priority path.
+
+## Design: Message ↔ Connection
+
+### Problem
+
+Currently `Message` uses a `Predicate<Message>` return handler for routing responses
+back to the sender. This works but has drawbacks:
+
+- No access to the originating connection (can't check trust, apply backpressure)
+- A closure per message for routing
+- `closeConnection()` just nulls the handler — doesn't actually close a connection
+- `ConvexLocal` and HTTP use the handler for result delivery but have no connection
+
+### Design: Message carries optional AConnection
+
+Add an optional `AConnection` field to `Message`. When present, `returnMessage()` uses
+the connection's `sendMessage()` directly. When absent (local/HTTP), falls back to the
+existing handler predicate.
+
+```
+Message
+  ├── payload: ACell
+  ├── messageData: Blob
+  ├── type: MessageType
+  ├── returnHandler: Predicate<Message>     (existing — used for local/HTTP)
+  └── connection: AConnection               (new — set for network messages)
+```
+
+**`returnMessage()` becomes:**
+1. If `connection` is set → `connection.sendMessage(resultMsg)`
+2. Else if `returnHandler` is set → `returnHandler.test(resultMsg)`
+3. Else → throw (no return path)
+
+**`closeConnection()` becomes:** actually close the connection if present.
+
+### LocalConnection
+
+For symmetry, `ConvexLocal` uses a lightweight `AConnection` subclass instead of null:
+
+```java
+public class LocalConnection extends AConnection {
+    private final Predicate<Message> handler;
+
+    public boolean sendMessage(Message msg) {
+        return handler.test(msg);
+    }
+    public InetSocketAddress getRemoteAddress() { return null; }
+    public boolean isClosed() { return false; }
+    public void close() { }
+    public long getReceivedCount() { return 0; }
+}
+```
+
+This keeps the API uniform — every Message has a connection, `Server.processMessage()`
+can always call `m.getConnection().isTrusted()`. The local connection is never trusted
+(it's an in-JVM client, not a peer).
+
+### Benefits
+
+- `Server.processMessage()` can check `m.getConnection().isTrusted()` for Belief priority
+- `closeConnection()` actually closes the network connection
+- Backpressure can target specific connections
+- No per-message closure allocation for network messages
+- Clean API — connection is always available, trust is always queryable
 
 ## Remaining Work
 
-### Phase 1: Inbound Channel Trust (next)
+### Phase 1: Message ↔ Connection (next)
 
-1. Wire channel reference into `Message` (or handler context) so `Server` can
-   look up trust status per message
-2. Register inbound channels on connection, remove on disconnect
-3. All channels start as untrusted
-4. Trigger challenge on first Belief from untrusted channel
-5. Validate peer key against consensus state before promoting
-6. Add `promoteToTrusted()` to Server — moves channel from client set to peer set
+1. Add `AConnection connection` field to `Message` with getter
+2. Update `returnMessage()` to use connection when available
+3. Create `LocalConnection extends AConnection` for `ConvexLocal`
+4. Set connection on Messages from network (Netty/NIO receive path)
+5. Update `ConvexLocal.makeMessageFuture()` to use `LocalConnection`
 
-### Phase 2: Backpressure Integration
+### Phase 2: Inbound Belief Deprioritisation
 
-1. Restrict `setAutoRead(false)` to client channels only
-2. Verify peer channels are never paused
+1. Server checks `m.getConnection().isTrusted()` when processing Beliefs
+2. Trusted → existing high-priority path
+3. Untrusted → bounded low-priority queue; trigger server-side challenge
+4. On successful challenge → `connection.setTrustedKey(key)`
+5. Validate peer key against consensus state (minimum stake)
+
+### Phase 3: Backpressure Integration
+
+1. Restrict `setAutoRead(false)` to connections where `!isTrusted()`
+2. Verify trusted (outbound peer) connections are never paused
+3. Inbound verified connections: Beliefs exempt from backpressure,
+   other traffic (transactions, queries) still subject to it
 
 ## Summary
 
 | Aspect | Design |
 |--------|--------|
-| Default trust | All inbound channels start as **untrusted** (client) |
-| Promotion | Challenge/response authentication → promote to trusted |
-| Trigger | First Belief received from untrusted channel |
-| Validation | Peer key must be active in consensus state with minimum stake |
-| Revocation | Channel close, or malformed data from trusted channel |
-| Backpressure | Applied to client channels only; peer channels always read |
+| Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` — **implemented** |
+| Inbound trust | Always client; verified for Belief priority only |
+| Belief priority | Trusted connections → high priority; untrusted → low-priority bounded queue |
+| Backpressure | Applied to all inbound connections for non-Belief traffic |
+| Message routing | `Message` carries optional `AConnection`; `LocalConnection` for in-JVM |
 | Security invariant | Untrusted clients **never** block Belief propagation |
-| Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` |
+| Generic message API | `POST /api/v1/message` — CAD3 raw or CVX text — **implemented** |

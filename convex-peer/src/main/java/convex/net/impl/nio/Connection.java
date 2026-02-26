@@ -44,7 +44,7 @@ import convex.core.message.Message;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.core.util.Shutdown;
-import convex.net.AConnection;
+import convex.core.message.AConnection;
 import convex.net.MessageReceiver;
 import convex.net.MessageSender;
 import convex.net.impl.HandlerException;
@@ -103,8 +103,9 @@ public class Connection extends AConnection {
 				return false;
 			}
 		};
-		
+
 		receiver = new MessageReceiver(receiveAction, handler);
+		receiver.setConnection(this); // messages carry this connection
 		sender = new MessageSender(channel);
 		this.lastActivity=Utils.getCurrentTimestamp();
 		this.trustedPeerKey = trustedPeerKey;

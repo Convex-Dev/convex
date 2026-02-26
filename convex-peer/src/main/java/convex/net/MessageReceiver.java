@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.net.impl.HandlerException;
 
@@ -47,6 +48,7 @@ public class MessageReceiver {
 	private final Consumer<Message> action;
 	private Consumer<Message> hook=null;
 	private final Predicate<Message> returnHandler;
+	private AConnection connection;
 
 	private long receivedMessageCount = 0;
 
@@ -55,6 +57,14 @@ public class MessageReceiver {
 	public MessageReceiver(Consumer<Message> receiveAction, Predicate<Message> returnHandler) {
 		this.action = receiveAction;
 		this.returnHandler = returnHandler;
+	}
+
+	/**
+	 * Sets the AConnection for this receiver. Messages will carry this connection.
+	 * @param conn Connection to associate with received messages
+	 */
+	public void setConnection(AConnection conn) {
+		this.connection = conn;
 	}
 	
 
@@ -153,7 +163,10 @@ public class MessageReceiver {
 	private void receiveMessage(Blob messageData) throws BadFormatException, HandlerException {
 		if (messageData.count()<1) throw new BadFormatException("Empty message");
 		
-		Message message = Message.create(returnHandler, null, messageData);
+		AConnection conn=connection;
+		Message message = (conn!=null)
+			? Message.create(conn, messageData)
+			: Message.create(returnHandler, null, messageData);
 		
 		// call the receiver hook, if registered
 		maybeCallHook(message);

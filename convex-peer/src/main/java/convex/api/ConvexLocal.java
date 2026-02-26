@@ -21,6 +21,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -123,8 +124,15 @@ public class ConvexLocal extends Convex {
 		}
 
 		CompletableFuture<Result> cf=new CompletableFuture<>();
-		Predicate<Message> resultHandler=makeResultHandler(cf);
-		Message ml=message.withResultHandler(resultHandler);
+		LocalConnection conn=new LocalConnection(m->{
+			Result r=m.toResult();
+			if (r.getErrorCode()!=null) {
+				sequence=null;
+			}
+			cf.complete(r);
+			return true;
+		});
+		Message ml=message.withConnection(conn);
 
 		// Deliver directly to server. If queue is full, block caller's thread.
 		Predicate<Message> retry = server.deliverMessage(ml);
@@ -135,17 +143,6 @@ public class ConvexLocal extends Convex {
 			}
 		}
 		return cf;
-	}
-
-	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
-		return m->{
-			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
-			}
-			cf.complete(r);
-			return true;
-		};
 	}
 	
 	@Override

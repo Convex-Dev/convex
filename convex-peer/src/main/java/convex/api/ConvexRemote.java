@@ -29,7 +29,7 @@ import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.net.AConnection;
+import convex.core.message.AConnection;
 import convex.net.impl.netty.NettyConnection;
 import convex.net.impl.nio.Connection;
 import convex.peer.Config;

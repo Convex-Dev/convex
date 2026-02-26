@@ -34,7 +34,7 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
-import convex.net.AConnection;
+import convex.core.message.AConnection;
 import convex.peer.TestNetwork;
 
 /**

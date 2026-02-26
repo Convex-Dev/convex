@@ -16,7 +16,7 @@ import convex.core.data.Vectors;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
-import convex.net.AConnection;
+import convex.core.message.AConnection;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
