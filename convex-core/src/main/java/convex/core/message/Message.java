@@ -200,6 +200,55 @@ public class Message {
 		}
 	}
 
+	/**
+	 * Builds and signs a challenge vector: {@code [token, targetKey, contextID?]}.
+	 *
+	 * @param kp        Key pair to sign with
+	 * @param token     Random nonce
+	 * @param targetKey Expected key of the challenged party, or null to accept any
+	 * @param contextID Optional context (e.g. network ID), or null to omit
+	 * @return Signed challenge data
+	 */
+	public static SignedData<ACell> signChallenge(AKeyPair kp, Hash token, AccountKey targetKey, ACell contextID) {
+		AVector<ACell> challenge = (contextID != null)
+			? Vectors.of(token, targetKey, contextID)
+			: Vectors.of(token, (ACell) targetKey);
+		return kp.signData(challenge);
+	}
+
+	/**
+	 * Validates a challenge response. Checks that the signed response contains
+	 * the expected token, own key, and optional context ID.
+	 *
+	 * @param result      The Result from the challenge response
+	 * @param token       The random token sent in the challenge
+	 * @param ownKey      The challenger's own AccountKey (expected in slot 1)
+	 * @param contextID   Optional context ID (expected in slot 2 if present), or null
+	 * @param expectedKey Expected signer key, or null to accept any
+	 * @return The verified remote AccountKey, or null if validation fails
+	 */
+	@SuppressWarnings("unchecked")
+	public static AccountKey verifyChallengeResponse(Result result, Hash token, AccountKey ownKey, ACell contextID, AccountKey expectedKey) {
+		if (result == null || result.isError()) return null;
+		ACell rv = result.getValue();
+		if (!(rv instanceof SignedData)) return null;
+		SignedData<ACell> response = (SignedData<ACell>) rv;
+		AccountKey remoteKey = response.getAccountKey();
+
+		if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
+
+		ACell inner = response.getValue();
+		if (!(inner instanceof AVector)) return null;
+		AVector<ACell> values = (AVector<ACell>) inner;
+		long n = values.count();
+		if (n < 2 || n > 3) return null;
+		if (!token.equals(values.get(0))) return null;
+		if (!ownKey.equals(values.get(1))) return null;
+		if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
+
+		return remoteKey;
+	}
+
 	public static Message createGoodBye() {
 		return BYE_MESSAGE;
 	}

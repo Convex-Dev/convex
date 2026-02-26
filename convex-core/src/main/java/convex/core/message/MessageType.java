@@ -15,12 +15,6 @@ public enum MessageType {
 	CHALLENGE(1),
 
 	/**
-	 * A response to a challenge. The challengee must sign the response as proof of
-	 * possession of the claimed address.
-	 */
-	RESPONSE(2),
-
-	/**
 	 * A message relaying data.
 	 * 
 	 * Payload is a Result:
@@ -161,8 +155,6 @@ public enum MessageType {
 		switch (i) {
 		case 1:
 			return CHALLENGE;
-		case 2:
-			return RESPONSE;
 		case 3:
 			return DATA;
 		case 4:

@@ -338,7 +338,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 	/**
 	 * Broadcasts a Message to all connected Peers
-	 * 
+	 *
 	 * @param msg Message to broadcast
 	 *
 	 */

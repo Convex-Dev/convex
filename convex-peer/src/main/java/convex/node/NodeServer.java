@@ -342,9 +342,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			case CHALLENGE:
 				processChallenge(message);
 				break;
-			case RESPONSE:
-				log.debug("Received RESPONSE (not expected server-side)");
-				break;
 			default:
 				log.debug("Unhandled message type: {}", type);
 				break;

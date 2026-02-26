@@ -42,11 +42,11 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -133,6 +133,11 @@ public class Server implements Closeable {
 	 * Executes read-only queries against the latest consensus state, independently of transaction processing.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
+
+	/**
+	 * Verifies untrusted inbound connections via server-initiated challenge/response.
+	 */
+	private final InboundVerifier inboundVerifier = new InboundVerifier(this);
 
 	/**
 	 * Pre-allocated retry predicates for backpressure. These are returned by
@@ -442,9 +447,6 @@ public class Server implements Closeable {
 			case CHALLENGE:
 				processChallenge(m);
 				return null;
-			case RESPONSE:
-				// Response handling is done client-side via verifyPeer()
-				return null;
 			case GOODBYE:
 				processClose(m);
 				return null;
@@ -454,6 +456,8 @@ public class Server implements Closeable {
 			case COMMAND:
 				return null;
 			case RESULT:
+				// Check if this is a response to a server-initiated verification
+				if (inboundVerifier.handleResult(m)) return null;
 				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
 				return null;
 			default:
@@ -527,11 +531,12 @@ public class Server implements Closeable {
 	 * Best-effort error return to the sender of a message.
 	 * Silently ignores failures (message may not have a return handler or ID).
 	 */
-	private void returnError(Message m, Keyword errorCode, AString message) {
+	private boolean returnError(Message m, Keyword errorCode, AString message) {
 		try {
-			m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
+			return m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
 		} catch (Exception e) {
 			// best effort — some message types don't have return handlers
+			return false;
 		}
 	}
 
@@ -628,12 +633,22 @@ public class Server implements Closeable {
 
 
 	/**
-	 * Process an incoming message that represents a Belief
+	 * Process an incoming message that represents a Belief.
+	 * Trusted connections go to the main queue; untrusted go to a small
+	 * best-effort queue and trigger server-initiated verification.
 	 * @param m Belief message to process
 	 */
 	protected void processBelief(Message m) {
-		if (!propagator.queueBelief(m)) {
-			log.warn("Incoming belief queue full");
+		AConnection conn=m.getConnection();
+		if (conn==null || conn.isTrusted()) {
+			// Trusted or local (ConvexLocal) — main queue
+			if (!propagator.queueBelief(m)) {
+				log.warn("Incoming belief queue full");
+			}
+		} else {
+			// Untrusted inbound — best-effort queue, trigger verification
+			propagator.queueUntrustedBelief(m);
+			inboundVerifier.maybeStart(conn);
 		}
 	}
 

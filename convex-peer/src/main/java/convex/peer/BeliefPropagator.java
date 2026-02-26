@@ -82,10 +82,16 @@ public class BeliefPropagator extends AThreadedComponent {
 	public static final int BELIEF_BROADCAST_POLL_TIME=1000;
 	
 	/**
-	 * Queue on which Beliefs messages are received 
+	 * Queue on which Beliefs messages are received from trusted connections
 	 */
 	// TODO: use config if provided
 	private ArrayBlockingQueue<Message> beliefQueue = new ArrayBlockingQueue<>(Config.BELIEF_QUEUE_SIZE);
+
+	/**
+	 * Small bounded queue for Beliefs from unverified inbound connections.
+	 * Best-effort buffering during the brief verification round-trip.
+	 */
+	private ArrayBlockingQueue<Message> untrustedBeliefQueue = new ArrayBlockingQueue<>(Config.UNTRUSTED_BELIEF_QUEUE_SIZE);
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
@@ -123,6 +129,16 @@ public class BeliefPropagator extends AThreadedComponent {
 			log.trace("Belief queued "+server.getPort()+" : "+beliefMessage.getHash());
 		}
 		return beliefQueue.offer(beliefMessage);
+	}
+
+	/**
+	 * Queues a Belief from an unverified connection on a best-effort basis.
+	 * Silently drops if the small untrusted queue is full.
+	 * @param beliefMessage Belief Message to queue
+	 * @return True if Belief is queued successfully
+	 */
+	public boolean queueUntrustedBelief(Message beliefMessage) {
+		return untrustedBeliefQueue.offer(beliefMessage);
 	}
 	
 	Belief belief=null;
@@ -320,27 +336,31 @@ public class BeliefPropagator extends AThreadedComponent {
 		LoadMonitor.down();
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();
-		if (firstEvent==null) return null; // nothing arrived
-		
-		// Drain queue of all incoming Beliefs
+		if (firstEvent==null) return null; // nothing from trusted peers, don't wake up for untrusted alone
+
+		// Drain all trusted beliefs
 		beliefMessages.add(firstEvent);
-		beliefQueue.drainTo(beliefMessages); 
-		
+		beliefQueue.drainTo(beliefMessages);
+
+		// Peek at one untrusted belief per cycle (non-blocking, never wait)
+		Message untrusted=untrustedBeliefQueue.poll();
+		if (untrusted!=null) beliefMessages.add(untrusted);
+
 		if (log.isDebugEnabled()) {
 			log.debug("Belief Messages received: "+beliefMessages.size());
 		}
-		
+
 		// Build a Map of current Orders. We compare incoming Orders to this
 		// So that we can identify new information
 		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
-		
+
 		boolean anyOrderChanged=false;
 		for (Message m: beliefMessages) {
 			boolean changed=mergeBeliefMessage(newOrders,m);
 			if (changed) anyOrderChanged=true;
 		}
 		if (!anyOrderChanged) return null;
-		
+
 		Belief newBelief= Belief.create(newOrders);
 		// log.info("New Belief received");
 		return newBelief;

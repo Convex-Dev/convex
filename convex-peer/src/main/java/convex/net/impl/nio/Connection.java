@@ -279,21 +279,6 @@ public class Connection extends AConnection {
 		return (sent) ? id : -1;
 	}
 
-	/**
-	 * Sends a RESPONSE Request Message on this connection.
-	 *
-	 * @param response Signed response for the remote peer
-	 * @return The ID of the message sent, or -1 if the message cannot be sent.
-	 *
-	 * @throws IOException If IO error occurs
-	 *
-	 */
-	public long sendResponse(SignedData<ACell> response) throws IOException {
-		long id = ++idCounter;
-		boolean sent = sendObject(response);
-		return (sent) ? id : -1;
-	}
-
 	@Override
 	public boolean sendMessage(Message msg) {
 		try {

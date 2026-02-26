@@ -864,34 +864,13 @@ public abstract class Convex implements AutoCloseable {
 		Hash token = Blob.createRandom(new SecureRandom(), CHALLENGE_TOKEN_BYTES).getHash();
 		AccountKey ownKey = kp.getAccountKey();
 
-		AVector<ACell> challenge = (contextID != null)
-			? Vectors.of(token, expectedKey, contextID)
-			: Vectors.of(token, expectedKey);
-		SignedData<ACell> signed = kp.signData(challenge);
+		SignedData<ACell> signed = Message.signChallenge(kp, token, expectedKey, contextID);
 
 		return sendChallenge(signed).thenApply(result -> {
 			try {
-				if (result == null || result.isError()) return null;
-				ACell rv = result.getValue();
-				if (!(rv instanceof SignedData)) return null;
-				SignedData<ACell> response = (SignedData<ACell>) rv;
+				AccountKey remoteKey = Message.verifyChallengeResponse(result, token, ownKey, contextID, expectedKey);
+				if (remoteKey == null) return null;
 
-				AccountKey remoteKey = response.getAccountKey();
-
-				// If expectedKey specified, response must be signed by that key
-				if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
-
-				// Response contents: [token, clientKey] or [token, clientKey, contextID]
-				ACell inner = response.getValue();
-				if (!(inner instanceof AVector)) return null;
-				AVector<ACell> values = (AVector<ACell>) inner;
-				long n = values.count();
-				if (n < 2 || n > 3) return null;
-				if (!token.equals(values.get(0))) return null;
-				if (!ownKey.equals(values.get(1))) return null;
-				if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
-
-				// Verification succeeded — record and propagate trust
 				setVerifiedPeer(remoteKey);
 				return remoteKey;
 			} catch (Exception e) {

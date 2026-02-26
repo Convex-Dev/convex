@@ -102,6 +102,12 @@ public class Config {
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
+	 * Size of bounded queue for Beliefs from unverified inbound connections.
+	 * Small — best-effort buffering during the brief verification round-trip.
+	 */
+	public static final int UNTRUSTED_BELIEF_QUEUE_SIZE = 10;
+
+	/**
 	 * Maximum number of inbound client connections accepted by the server.
 	 * Each connection consumes ~200KB idle (~300KB under load), so at 1024
 	 * connections the total is ~200-300MB (mostly kernel socket buffers).

@@ -129,6 +129,9 @@ public class NettyConnection extends AConnection {
 
 		NettyConnection client = new NettyConnection(chan,inbound);
 
+		// Set connection on inbound handler so received messages can route responses back
+		inbound.setConnection(client);
+
 		// Pipeline: writability handler triggers drain, inbound handler decodes, outbound handler encodes
 		f.channel().pipeline().addLast(
 			new ChannelInboundHandlerAdapter() {

@@ -28,6 +28,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.message.AConnection;
 import convex.net.impl.netty.NettyConnection;
@@ -147,15 +148,28 @@ public class ConvexRemote extends Convex {
 	 * Result handler for Messages received back from a remote connection.
 	 * Completes the awaiting future — no store context needed.
 	 * Uses ConcurrentHashMap.remove() for atomic get-and-remove.
+	 *
+	 * Also auto-responds to server-initiated CHALLENGE messages so that
+	 * inbound connections can be verified by the remote peer.
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		try {
+			// Fast path: RESULT messages (the common case)
 			ACell id=m.getResultID();
-
 			if (id!=null) {
 				CompletableFuture<Message> cf = awaiting.remove(id);
 				if (cf != null) {
 					cf.complete(m);
+				}
+				return;
+			}
+
+			// Non-RESULT message — check for server-initiated CHALLENGE
+			m.getPayload(null); // storeless decode (challenge is small and self-contained)
+			if (m.getType() == MessageType.CHALLENGE) {
+				AKeyPair kp = keyPair;
+				if (kp != null) {
+					m.respondToChallenge(kp, null);
 				}
 			}
 		} catch (Exception e) {

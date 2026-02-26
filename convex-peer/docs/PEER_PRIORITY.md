@@ -193,23 +193,47 @@ can always call `m.getConnection().isTrusted()`. The local connection is never t
 - No per-message closure allocation for network messages
 - Clean API — connection is always available, trust is always queryable
 
+## Implemented: Message ↔ Connection (Phase 1)
+
+`Message` carries an optional `AConnection` field. `returnMessage()` uses
+`conn.trySendMessage()` when present, falls back to the legacy `Predicate<Message>`
+handler for local/HTTP paths. `closeConnection()` actually closes the network connection.
+
+`LocalConnection` provides a uniform `AConnection` for in-JVM delivery (ConvexLocal,
+HTTP REST API). `NettyServerConnection` wraps server-side inbound Netty channels.
+Both `sendMessage()` (may block) and `trySendMessage()` (non-blocking) are abstract.
+
+## Implemented: Inbound Belief Deprioritisation (Phase 2)
+
+### Components
+
+| Component | Status |
+|-----------|--------|
+| `BeliefPropagator.untrustedBeliefQueue` | Small bounded queue (10), non-blocking poll |
+| `Server.processBelief()` | Routes by `conn.isTrusted()` — trusted→main, untrusted→low-priority |
+| `InboundVerifier.maybeStart()` | CAS-guarded, virtual thread, sends CHALLENGE |
+| `InboundVerifier.handleResult()` | Routes inbound RESULT to pending verification |
+| `ConvexRemote.returnMessageHandler` | Auto-responds to server-initiated CHALLENGE |
+| Client-side connection on messages | `NettyConnection` sets itself on inbound handler |
+
+### Flow
+
+1. **Untrusted belief arrives** → `Server.processBelief()` checks `conn.isTrusted()`
+2. **Untrusted** → `propagator.queueUntrustedBelief(m)` (best-effort, bounded queue)
+3. **Trigger verification** → `InboundVerifier.maybeStart(conn)` (no-op if already in progress)
+4. **Virtual thread** sends CHALLENGE on `conn`, client auto-responds via `respondToChallenge()`
+5. **Client RESULT** routed through `Server.processMessage()` → `InboundVerifier.handleResult()`
+6. **Verification succeeds** → `conn.setTrustedKey(remoteKey)`, subsequent beliefs go to main queue
+7. **awaitBelief()** drains main queue first, then polls one untrusted belief per cycle (non-blocking)
+
+### Fast Path Guarantees
+
+- **Per-message cost (trusted):** two field reads (`getConnection()`, `isTrusted()`) + queue offer
+- **Per-message cost (untrusted, verification in progress):** above + `containsKey()` check → return
+- **No blocking** on inbound connection — reads continue for challenge response
+- **No concurrent verifications** per connection — `ConcurrentHashMap.putIfAbsent()` guard
+
 ## Remaining Work
-
-### Phase 1: Message ↔ Connection (next)
-
-1. Add `AConnection connection` field to `Message` with getter
-2. Update `returnMessage()` to use connection when available
-3. Create `LocalConnection extends AConnection` for `ConvexLocal`
-4. Set connection on Messages from network (Netty/NIO receive path)
-5. Update `ConvexLocal.makeMessageFuture()` to use `LocalConnection`
-
-### Phase 2: Inbound Belief Deprioritisation
-
-1. Server checks `m.getConnection().isTrusted()` when processing Beliefs
-2. Trusted → existing high-priority path
-3. Untrusted → bounded low-priority queue; trigger server-side challenge
-4. On successful challenge → `connection.setTrustedKey(key)`
-5. Validate peer key against consensus state (minimum stake)
 
 ### Phase 3: Backpressure Integration
 
@@ -217,15 +241,16 @@ can always call `m.getConnection().isTrusted()`. The local connection is never t
 2. Verify trusted (outbound peer) connections are never paused
 3. Inbound verified connections: Beliefs exempt from backpressure,
    other traffic (transactions, queries) still subject to it
+4. Validate verified peer key against consensus state (minimum stake)
 
 ## Summary
 
 | Aspect | Design |
 |--------|--------|
 | Outbound trust | `verifyPeer()` sets `verifiedPeer` + `AConnection.trustedKey` — **implemented** |
-| Inbound trust | Always client; verified for Belief priority only |
-| Belief priority | Trusted connections → high priority; untrusted → low-priority bounded queue |
+| Inbound trust | Server-initiated challenge on first untrusted belief — **implemented** |
+| Belief priority | Trusted → main queue; untrusted → small bounded queue (1 per cycle) — **implemented** |
 | Backpressure | Applied to all inbound connections for non-Belief traffic |
-| Message routing | `Message` carries optional `AConnection`; `LocalConnection` for in-JVM |
-| Security invariant | Untrusted clients **never** block Belief propagation |
+| Message routing | `Message` carries optional `AConnection`; `LocalConnection` for in-JVM — **implemented** |
+| Security invariant | Untrusted clients **never** block Belief propagation — **implemented** |
 | Generic message API | `POST /api/v1/message` — CAD3 raw or CVX text — **implemented** |
