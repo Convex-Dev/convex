@@ -96,15 +96,8 @@ public class Connection extends AConnection {
 	private Connection(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) {
 		this.channel = channel;
-		Predicate<Message> handler=t -> {
-			try {
-				return sendMessage(t);
-			} catch (IOException e) {
-				return false;
-			}
-		};
 
-		receiver = new MessageReceiver(receiveAction, handler);
+		receiver = new MessageReceiver(receiveAction, this::sendMessage);
 		receiver.setConnection(this); // messages carry this connection
 		sender = new MessageSender(channel);
 		this.lastActivity=Utils.getCurrentTimestamp();
@@ -302,8 +295,17 @@ public class Connection extends AConnection {
 	}
 
 	@Override
-	public boolean sendMessage(Message msg) throws IOException  {
-		return sendBuffer(msg.getMessageData());
+	public boolean sendMessage(Message msg) {
+		try {
+			return sendBuffer(msg.getMessageData());
+		} catch (IOException e) {
+			return false;
+		}
+	}
+
+	@Override
+	public boolean trySendMessage(Message msg) {
+		return sendMessage(msg);
 	}
 
 	/**

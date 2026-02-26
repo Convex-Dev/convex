@@ -155,6 +155,10 @@ public class NettyConnection extends AConnection {
 	/**
 	 * Sends a message, blocking until the message can be queued or timeout.
 	 * Safe to call from virtual threads.
+	 *
+	 * <p>This is an outbound client connection, so blocking with a bounded
+	 * timeout is acceptable — the caller's virtual thread parks while the
+	 * outbound queue drains.</p>
 	 */
 	@Override
 	public boolean sendMessage(Message m) {
@@ -172,7 +176,7 @@ public class NettyConnection extends AConnection {
 	}
 
 	/**
-	 * Tries to send a message without blocking. Returns immediately.
+	 * Non-blocking send. Returns immediately if the outbound queue is full.
 	 */
 	@Override
 	public boolean trySendMessage(Message m) {

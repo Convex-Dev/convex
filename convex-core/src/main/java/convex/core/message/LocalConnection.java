@@ -27,6 +27,11 @@ public class LocalConnection extends AConnection {
 	}
 
 	@Override
+	public boolean trySendMessage(Message msg) {
+		return handler.test(msg);
+	}
+
+	@Override
 	public InetSocketAddress getRemoteAddress() {
 		return null;
 	}

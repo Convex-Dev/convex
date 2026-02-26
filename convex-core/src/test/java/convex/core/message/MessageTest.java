@@ -333,6 +333,7 @@ public class MessageTest {
 		java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean(false);
 		AConnection conn = new AConnection() {
 			@Override public boolean sendMessage(Message msg) { return true; }
+			@Override public boolean trySendMessage(Message msg) { return true; }
 			@Override public java.net.InetSocketAddress getRemoteAddress() { return null; }
 			@Override public boolean isClosed() { return closed.get(); }
 			@Override public void close() { closed.set(true); }

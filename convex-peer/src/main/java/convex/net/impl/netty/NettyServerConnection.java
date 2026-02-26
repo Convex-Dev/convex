@@ -31,6 +31,11 @@ class NettyServerConnection extends AConnection {
 	}
 
 	@Override
+	public boolean trySendMessage(Message msg) {
+		return sendMessage(msg);
+	}
+
+	@Override
 	public InetSocketAddress getRemoteAddress() {
 		Channel ch = channel;
 		if (ch == null) return null;

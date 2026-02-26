@@ -1,6 +1,5 @@
 package convex.core.message;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import convex.core.data.AccountKey;
@@ -60,28 +59,31 @@ public abstract class AConnection {
 	}
 
 	/**
-	 * Sends a message over this connection, blocking until the message can be
-	 * queued or a timeout is reached. Safe to call from virtual threads.
+	 * Sends a message over this connection. May block with a bounded timeout
+	 * if the outbound queue is full (e.g. outbound client connections under
+	 * backpressure). Callers that must not block should use
+	 * {@link #trySendMessage(Message)} instead.
 	 *
 	 * @param msg Message to send
-	 * @return true if message queued successfully, false on timeout, full buffer, or closed connection
-	 * @throws IOException If IO error occurs while sending
+	 * @return true if message queued/sent successfully, false otherwise
 	 */
-	public abstract boolean sendMessage(Message msg) throws IOException;
+	public abstract boolean sendMessage(Message msg);
 
 	/**
-	 * Tries to send a message without blocking. Returns immediately.
+	 * Sends a message without blocking. Returns immediately with false if the
+	 * message cannot be queued (buffer full, connection closed, etc.).
+	 *
+	 * <p>Used by {@link Message#returnMessage(Message)} to deliver results
+	 * back to the originator. Server processing threads must never block on
+	 * I/O, so result delivery always goes through this method.</p>
+	 *
+	 * <p>Implementations must guarantee this method never blocks. For queue-based
+	 * connections, use a non-blocking offer (no timeout).</p>
 	 *
 	 * @param msg Message to send
-	 * @return true if message queued successfully, false if the outbound queue is full or connection is closed
+	 * @return true if message queued successfully, false if it could not be sent without blocking
 	 */
-	public boolean trySendMessage(Message msg) {
-		try {
-			return sendMessage(msg);
-		} catch (IOException e) {
-			return false;
-		}
-	}
+	public abstract boolean trySendMessage(Message msg);
 
 	/**
 	 * Returns the remote socket address associated with this connection, or null if
