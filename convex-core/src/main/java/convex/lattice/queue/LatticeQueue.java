@@ -94,7 +94,6 @@ public class LatticeQueue {
 	 * @param headers Record headers (may be null)
 	 * @return Absolute offset assigned to the entry
 	 */
-	@SuppressWarnings("unchecked")
 	public long offer(ACell key, ACell value, AHashMap<ACell, ACell> headers) {
 		if (value == null) {
 			throw new IllegalArgumentException("Queue value must not be null");

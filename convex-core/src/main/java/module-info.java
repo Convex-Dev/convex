@@ -61,6 +61,7 @@ module convex.core {
 	exports convex.lattice.cursor;
 	exports convex.lattice.data;
 	exports convex.lattice.fs;
+	exports convex.lattice.fs.impl;
 	exports convex.lattice.kv;
 
 	requires transitive org.antlr.antlr4.runtime;

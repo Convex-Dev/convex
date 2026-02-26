@@ -9,13 +9,10 @@ import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Lists;
 import convex.core.data.Vectors;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**

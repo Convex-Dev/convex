@@ -8,8 +8,6 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;

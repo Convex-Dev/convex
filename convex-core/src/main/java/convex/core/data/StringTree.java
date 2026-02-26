@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
 import convex.core.util.ErrorMessages;

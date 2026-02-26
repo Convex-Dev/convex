@@ -8,7 +8,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
 import convex.core.util.MergeFunction;
@@ -231,7 +230,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
 		if (this == b) return this;

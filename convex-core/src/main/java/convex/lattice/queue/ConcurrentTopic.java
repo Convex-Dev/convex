@@ -50,7 +50,6 @@ public class ConcurrentTopic implements AutoCloseable {
 	private final int queueCapacity;
 	private final int batchSize;
 
-	@SuppressWarnings("unchecked")
 	private final ArrayBlockingQueue<InboundRecord>[] inboxes;
 	private Worker[] workers;
 	private Thread[] threads;

@@ -169,7 +169,6 @@ public class QueueLattice extends ALattice<AVector<ACell>> {
 	/**
 	 * Merges two metadata maps. Own entries take precedence on key conflict.
 	 */
-	@SuppressWarnings("unchecked")
 	private static AHashMap<ACell, ACell> mergeMeta(AHashMap<ACell, ACell> own, AHashMap<ACell, ACell> other) {
 		if (other == null || other.isEmpty()) return own;
 		if (own == null || own.isEmpty()) return other;

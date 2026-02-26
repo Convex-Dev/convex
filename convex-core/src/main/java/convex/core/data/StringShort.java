@@ -8,7 +8,6 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
 import convex.core.util.ErrorMessages;
-import convex.core.util.Utils;
 
 /**
  * Class representing a short CVM string, backed by a flat Blob

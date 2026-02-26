@@ -17,7 +17,6 @@ import convex.core.data.impl.StringStore;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
 import convex.core.util.Utils;

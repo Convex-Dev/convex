@@ -8,7 +8,6 @@ import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;

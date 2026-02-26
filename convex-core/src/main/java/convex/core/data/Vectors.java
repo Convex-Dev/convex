@@ -6,7 +6,6 @@ import java.util.Comparator;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;

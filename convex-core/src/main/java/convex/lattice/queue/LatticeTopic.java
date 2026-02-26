@@ -70,7 +70,6 @@ public class LatticeTopic {
 	 * @param id Partition key (typically CVMLong)
 	 * @return Queue for the specified partition
 	 */
-	@SuppressWarnings("unchecked")
 	public LatticeQueue partition(ACell id) {
 		// Ensure topic state is Index before descended cursors write through it.
 		// RT.assocIn creates MapLeaf for null intermediaries; by initialising to

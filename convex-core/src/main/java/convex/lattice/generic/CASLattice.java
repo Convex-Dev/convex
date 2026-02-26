@@ -3,7 +3,6 @@ package convex.lattice.generic;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Index;
-import convex.core.util.Utils;
 import convex.lattice.ALattice;
 
 /**
@@ -42,12 +41,11 @@ public class CASLattice<K extends ABlobLike<?>, V extends ACell> extends ALattic
 		return INSTANCE;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public Index<K, V> merge(Index<K, V> ownValue, Index<K, V> otherValue) {
 		if (otherValue == null) return ownValue;
 		if (ownValue == null) return otherValue;
-		if (Utils.equals(ownValue, otherValue)) return ownValue;
+		if (ownValue.equals(otherValue)) return ownValue;
 
 		return (Index<K, V>) ownValue.merge(otherValue);
 	}
