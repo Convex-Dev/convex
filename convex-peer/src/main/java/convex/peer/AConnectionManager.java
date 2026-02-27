@@ -175,9 +175,10 @@ public abstract class AConnectionManager implements Closeable {
 	// ========== Broadcast ==========
 
 	/**
-	 * Broadcasts a message to all connected peers. Fire-and-forget:
-	 * failures on individual peers are logged but do not prevent delivery
-	 * to other peers.
+	 * Broadcasts a message to all connected peers using non-blocking sends.
+	 * If a peer's outbound queue is full, it is skipped rather than blocking
+	 * the caller. Beliefs are rebroadcast periodically, so skipping one
+	 * cycle is acceptable.
 	 *
 	 * @param msg Message to broadcast
 	 */

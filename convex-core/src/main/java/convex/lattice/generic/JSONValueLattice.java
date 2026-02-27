@@ -12,8 +12,11 @@ import convex.lattice.ALattice;
  * A recursive lattice for arbitrary-depth JSON-like structures.
  *
  * <p>Children at any key are also {@code JSONValueLattice}, enabling
- * recursive per-key merge of nested maps. Non-map leaf values use a
- * deterministic hash-based tiebreaker (commutative and associative).</p>
+ * recursive per-key merge of nested maps. Non-map leaf values prefer
+ * the own (local) value. This reduces risk from malicious or spurious
+ * incoming values, retains existing structure for caching, and avoids
+ * unnecessary state churn. Map-level merges are still additive
+ * (disjoint keys are union-merged).</p>
  *
  * <p>Two singleton instances control the container type for {@link #zero()}:</p>
  * <ul>
@@ -55,9 +58,8 @@ public class JSONValueLattice extends ALattice<ACell> {
 			return ownMap.mergeDifferences(otherMap, mergeFunction);
 		}
 
-		// Leaf values: deterministic tiebreaker (hash comparison)
-		int cmp = own.getHash().compareTo(other.getHash());
-		return (cmp >= 0) ? own : other;
+		// Leaf values: prefer own value
+		return own;
 	}
 
 	@Override

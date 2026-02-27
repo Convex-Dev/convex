@@ -11,8 +11,11 @@ import convex.core.data.prim.CVMLong;
  * Last-Write-Wins register lattice.
  *
  * <p>Merge picks the value with the higher timestamp, as extracted by a
- * caller-provided function. If timestamps are equal but values differ,
- * a deterministic tiebreaker (encoding hash comparison) ensures commutativity.</p>
+ * caller-provided function. On a tie (equal timestamps, different values)
+ * the own (local) value is preferred. This reduces risk from malicious or
+ * spurious incoming values, retains existing structure for caching, and
+ * avoids unnecessary state churn. Convergence is achieved when a
+ * definitively newer write arrives with a higher timestamp.</p>
  *
  * @param <V> Type of lattice values
  */
@@ -50,12 +53,8 @@ public class LWWLattice<V extends ACell> extends AValueLattice<V> {
 		long otherTS = timestampFn.applyAsLong(other);
 
 		if (otherTS > ownTS) return other;
-		if (ownTS > otherTS) return own;
-
-		// Equal timestamps — tiebreak deterministically for commutativity
-		if (own.equals(other)) return own; // idempotent
-		int cmp = own.getHash().compareTo(other.getHash());
-		return (cmp >= 0) ? own : other;
+		// Equal or own is newer — prefer own value
+		return own;
 	}
 
 	@SuppressWarnings("unchecked")

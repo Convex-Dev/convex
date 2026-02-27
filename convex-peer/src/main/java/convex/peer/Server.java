@@ -579,6 +579,9 @@ public class Server implements Closeable {
 		return offered;
 	}
 	
+	/**
+	 * Responds to a PING with the peer's current timestamp.
+	 */
 	protected void processPing(Message m) {
 		ACell id = m.getRequestID();
 		if (id == null) return;

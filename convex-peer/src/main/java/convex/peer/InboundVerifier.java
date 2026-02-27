@@ -120,6 +120,12 @@ class InboundVerifier {
 		}
 	}
 
+	/** Number of connections successfully verified since startup. */
+	long getVerifiedCount() { return verifiedCount.get(); }
+
+	/** Number of verifications currently in progress. */
+	int getPendingCount() { return active.size(); }
+
 	/**
 	 * Routes an inbound RESULT to a pending verification by connection.
 	 * Called from {@link Server#processMessage(Message)}.
@@ -128,12 +134,6 @@ class InboundVerifier {
 	 * @param m Inbound RESULT message
 	 * @return true if consumed by a pending verification, false otherwise
 	 */
-	/** Number of connections successfully verified since startup. */
-	long getVerifiedCount() { return verifiedCount.get(); }
-
-	/** Number of verifications currently in progress. */
-	int getPendingCount() { return active.size(); }
-
 	boolean handleResult(Message m) {
 		if (active.isEmpty()) return false;
 		AConnection conn = m.getConnection();

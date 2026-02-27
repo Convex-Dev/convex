@@ -47,6 +47,7 @@ public class TupleLattice extends ALattice<AVector<ACell>> {
 			if (mv != tv) sameAsOther = false;
 		}
 
+		// optimisation to avoid new structure if possible
 		if (sameAsOwn) return own;
 		if (sameAsOther) return other;
 		return result;

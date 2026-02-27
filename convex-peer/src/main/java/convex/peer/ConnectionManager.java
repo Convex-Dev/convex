@@ -138,6 +138,7 @@ public class ConnectionManager extends AConnectionManager {
 
 	/**
 	 * Broadcasts a Message to all connected Peers in shuffled order.
+	 * Uses non-blocking sends to avoid stalling on one slow peer.
 	 */
 	@Override
 	public void broadcast(Message msg) {

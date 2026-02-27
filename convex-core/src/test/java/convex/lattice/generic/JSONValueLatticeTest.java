@@ -65,7 +65,7 @@ public class JSONValueLatticeTest {
 
 		@SuppressWarnings("unchecked")
 		AHashMap<Keyword, ACell> result = (AHashMap<Keyword, ACell>) merged;
-		// :a has a conflict — resolved by hash tiebreaker (deterministic)
+		// :a has a conflict — resolved by preferring own value
 		assertNotNull(result.get(KEY_A));
 		// :b from a, :c from b
 		assertEquals(CVMLong.create(10), result.get(KEY_B));
@@ -90,24 +90,24 @@ public class JSONValueLatticeTest {
 	}
 
 	@Test
-	public void testLeafTiebreaker() {
+	public void testLeafPrefersOwn() {
 		ACell a = CVMLong.create(1);
 		ACell b = CVMLong.create(2);
 
-		ACell merged = JSONValueLattice.INSTANCE.merge(a, b);
-		// Non-map leaves: deterministic by hash comparison
-		assertNotNull(merged);
-		assertTrue(merged.equals(a) || merged.equals(b));
+		// Non-map leaves: prefer own value
+		assertSame(a, JSONValueLattice.INSTANCE.merge(a, b));
+		assertSame(b, JSONValueLattice.INSTANCE.merge(b, a));
 	}
 
 	@Test
-	public void testCommutativity() {
+	public void testMapMergeCommutativity() {
+		// Disjoint keys — commutative because there's no leaf conflict
 		AHashMap<Keyword, ACell> a = Maps.of(KEY_A, CVMLong.create(1));
-		AHashMap<Keyword, ACell> b = Maps.of(KEY_A, CVMLong.create(2));
+		AHashMap<Keyword, ACell> b = Maps.of(KEY_B, CVMLong.create(2));
 
 		ACell ab = JSONValueLattice.INSTANCE.merge(a, b);
 		ACell ba = JSONValueLattice.INSTANCE.merge(b, a);
-		assertEquals(ab, ba, "Merge should be commutative");
+		assertEquals(ab, ba, "Disjoint map merge should be commutative");
 	}
 
 	@Test

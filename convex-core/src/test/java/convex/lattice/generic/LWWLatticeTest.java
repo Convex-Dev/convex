@@ -78,14 +78,13 @@ public class LWWLatticeTest {
 	}
 
 	@Test
-	public void testCommutativityEqualTimestampsDifferentValues() {
-		// This is the tricky case — hash-based tiebreaker must be deterministic
+	public void testEqualTimestampsPrefersOwn() {
+		// Equal timestamps: each side prefers its own value
 		ACell a = value(100, "alpha");
 		ACell b = value(100, "beta");
 
-		ACell mergeAB = LWW.merge(a, b);
-		ACell mergeBA = LWW.merge(b, a);
-		assertEquals(mergeAB, mergeBA, "Merge must be commutative even with equal timestamps");
+		assertSame(a, LWW.merge(a, b), "Should prefer own value on equal timestamp");
+		assertSame(b, LWW.merge(b, a), "Should prefer own value on equal timestamp");
 	}
 
 	@Test
@@ -110,6 +109,9 @@ public class LWWLatticeTest {
 
 	@Test
 	public void testAssociativityAllSameTimestamp() {
+		// With prefer-own, merge(a,b)=a, merge(a,c)=a, merge(b,c)=b
+		// left = merge(merge(a,b),c) = merge(a,c) = a
+		// right = merge(a,merge(b,c)) = merge(a,b) = a
 		ACell a = value(100, "a");
 		ACell b = value(100, "b");
 		ACell c = value(100, "c");

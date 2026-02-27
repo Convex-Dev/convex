@@ -126,10 +126,11 @@ public class P2PLatticeTest {
 			null, 1000L
 		);
 
-		// Equal timestamps — deterministic tiebreak via hash comparison
+		// Equal timestamps — prefer own value
 		ACell mergeAB = LWWLattice.INSTANCE.merge(a, b);
 		ACell mergeBA = LWWLattice.INSTANCE.merge(b, a);
-		assertEquals(mergeAB, mergeBA, "Merge must be commutative");
+		assertSame(a, mergeAB, "Should prefer own value");
+		assertSame(b, mergeBA, "Should prefer own value");
 	}
 
 	// ===== OwnerLattice signature verification =====

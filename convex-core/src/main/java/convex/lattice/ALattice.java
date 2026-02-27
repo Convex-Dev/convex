@@ -9,13 +9,21 @@ import convex.core.data.Strings;
 import convex.core.lang.RT;
 
 /**
- * Abstract base class for lattice functions
- * 
- * Lattices represent merge functions for lattice values and support:
- * - a `zero` initial value
- * - ability to validate foreign values (pre-merge checks)
- * - ability to obtain child lattices
- * 
+ * Abstract base class for lattice functions.
+ *
+ * <p>Lattices represent merge functions for lattice values and support:</p>
+ * <ul>
+ *   <li>a {@code zero} initial value</li>
+ *   <li>ability to validate foreign values (pre-merge checks)</li>
+ *   <li>ability to obtain child lattices</li>
+ * </ul>
+ *
+ * <p><b>Tiebreaker convention:</b> when a merge has no clear winner
+ * (e.g. equal timestamps in LWW, conflicting leaf values in JSON),
+ * implementations should prefer the own (local) value. This reduces
+ * risk from malicious or spurious incoming values, retains existing
+ * structure beneficial for caching, and avoids unnecessary state churn.</p>
+ *
  * @param <V> Type of values in this lattice
  */
 public abstract class ALattice<V extends ACell> {

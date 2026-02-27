@@ -18,6 +18,9 @@ import convex.lattice.LatticeContext;
  * comparison. This means both {@link Keyword} and {@code AString} keys
  * with the same text resolve to the same entry, enabling JSON path
  * compatibility (JSON strings map to the same blob as keywords).
+ * 
+ * Used for data structures using known sets of interned Keywords as keys
+ * requiring different child lattices.
  */
 public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
 
