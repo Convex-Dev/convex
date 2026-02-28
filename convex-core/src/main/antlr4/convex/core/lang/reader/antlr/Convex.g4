@@ -136,9 +136,9 @@ BOOL : 'true' | 'false' ;
 // Number. Needs to go before Symbols!
 
 // NUMBER_GUARD detects improper termination: if a non-terminating character
-// follows a number, consuming one character is enough to make the token fail
-// validation. Only whitespace, delimiters, quotes, and reader macro characters
-// terminate a number.
+// follows a number, it is consumed into the number token causing validation
+// to fail. Characters that start their own lexer rules (: # etc.) will still
+// split into separate tokens — this is a lexer-level limitation.
 DOUBLE:
   (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL NUMBER_GUARD?;
 

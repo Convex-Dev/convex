@@ -80,8 +80,8 @@ import convex.core.util.Utils;
 public class AntlrReader {
 	
 	private static final int MAX_TOKEN_DISPLAY = 20;
-	private static final String KEYWORD_TOO_LONG = "keyword too long (max "+Constants.MAX_NAME_LENGTH+" bytes): ";
-	private static final String SYMBOL_TOO_LONG = "symbol too long (max "+Constants.MAX_NAME_LENGTH+" bytes): ";
+	private static final String KEYWORD_TOO_LONG = "Keyword too long (max "+Constants.MAX_NAME_LENGTH+"): ";
+	private static final String SYMBOL_TOO_LONG = "Symbol too long (max "+Constants.MAX_NAME_LENGTH+"): ";
 
 	/**
 	 * Truncate a token string for safe inclusion in error messages.

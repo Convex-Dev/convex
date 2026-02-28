@@ -18,11 +18,14 @@ public class ConvexErrorListener extends BaseErrorListener {
 			String startText=startToken.getText();
 			boolean isUnclosed="(".equals(startText)||"[".equals(startText)||"{".equals(startText);
 			if (isUnclosed) {
-				// Check if the offending token is EOF — if so, emphasise the truncation
+				String openPos=startToken.getLine()+":"+startToken.getCharPositionInLine();
 				if (offendingSymbol instanceof Token tok && "<EOF>".equals(tok.getText())) {
-					msg="unexpected end of input (unclosed '"+startText+"' at "+startToken.getLine()+":"+startToken.getCharPositionInLine()+")";
+					msg="unexpected end of input (unclosed '"+startText+"' at "+openPos+")";
+				} else if (offendingSymbol instanceof Token tok) {
+					String closePos=tok.getLine()+":"+tok.getCharPositionInLine();
+					msg="'"+startText+"' at "+openPos+" closed by mismatched '"+tok.getText()+"' at "+closePos;
 				} else {
-					msg="Unmatched '"+startText+"'";
+					msg="unmatched '"+startText+"' at "+openPos;
 				}
 			}
 		} else if (offendingSymbol instanceof Token tok) {
@@ -50,6 +53,9 @@ public class ConvexErrorListener extends BaseErrorListener {
 			if (text.startsWith("\"")) return "unterminated string";
 			text=AntlrReader.truncate(text);
 			if (text.startsWith("#")) return "invalid '#' sequence: '"+text+"'";
+			if (text.length()==1 && Character.isISOControl(text.charAt(0))) {
+				return "unexpected control character (0x"+Integer.toHexString(text.charAt(0))+")";
+			}
 			return "unexpected '"+text+"'";
 		}
 		return msg;
