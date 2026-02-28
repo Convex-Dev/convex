@@ -161,18 +161,50 @@ public class JSONTest {
 		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(JSON.json(Maps.of(Vectors.of("",3),4))));
 	}
 	
-	@Test 
+	@Test
 	public void testJSONObjects() {
 		assertEquals(Maps.of("1",2), JSONReader.read("{\"1\" : 2}"));
 		assertEquals(CVMLong.ONE,JSONReader.read("1"));
 		assertNull(JSONReader.read("  null"));
 		assertEquals(Strings.COLON,JSONReader.read("\":\""));
 		assertEquals(Vectors.of(1,2),JSONReader.read("[1,2]"));
-		
-		JSONReader.read("{\"a\":[{\"b\":\"c\"},2]}");
-		
-		assertThrows(ParseException.class,()->JSONReader.readObject("[]")); // not an object
 
+		JSONReader.read("{\"a\":[{\"b\":\"c\"},2]}");
+
+		assertThrows(ParseException.class,()->JSONReader.readObject("[]")); // not an object
+	}
+
+	/**
+	 * Malformed JSON via JSONReader must throw ParseException, never internal errors.
+	 * Same ANTLR listener unwinding issue as JSON5Reader.
+	 */
+	@Test
+	public void testMalformedJSONReaderNeverThrowsInternalError() {
+		String[] malformed = {
+			"{\"a\":{\"b\":",
+			"{\"a\":{",
+			"{}}}",
+			"{\"a\":\"b\"}}",
+			"}{",
+			"{",
+			"}",
+			"",
+			"   ",
+			"{\"a\":[}",
+			"[{]",
+			"{\"a\":{\"b\":{\"c\":",
+		};
+
+		for (String input : malformed) {
+			try {
+				JSONReader.read(input);
+			} catch (ParseException e) {
+				// Expected
+			} catch (Exception e) {
+				fail("JSONReader.read(\"" + input + "\") threw " + e.getClass().getSimpleName()
+					+ " instead of ParseException: " + e.getMessage());
+			}
+		}
 	}
 	
 	@Test 
