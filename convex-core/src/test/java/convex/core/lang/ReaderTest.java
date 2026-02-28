@@ -57,6 +57,10 @@ public class ReaderTest {
 			"\"unterminated", "'",
 			"(\n  1\n  2\n  )",  // valid multiline
 			"(\n  1\n  2\n",     // unclosed multiline
+			// Number termination (Clojure-style: consume until terminating char)
+			"2.0e0.1234", "[2.0e0.1234]", "2.0e5abc",
+			"2.0.1", "2.0e5:foo", "[2.0e5:foo]", "[2.0e5#42]",
+			"1:2", "42abc", "1.2.3.4",
 		};
 		for (String input : inputs) {
 			String display = input.replace("\n","\\n");

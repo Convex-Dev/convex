@@ -29,7 +29,9 @@ public class ConvexErrorListener extends BaseErrorListener {
 			// Parser error: produce human-readable messages instead of ANTLR jargon
 			String text=tok.getText();
 			if ("<EOF>".equals(text)) {
-				msg="unexpected end of input";
+				msg="empty input (expected a form)";
+			} else if (")".equals(text)||"]".equals(text)||"}".equals(text)) {
+				msg="unmatched closing '"+text+"'";
 			} else {
 				msg="unexpected '"+text+"'";
 			}

@@ -50,13 +50,12 @@ atom
   | implicitSymbol
   ;
   
-literal 
+literal
 	: nil
 	| bool
 	| blob
 	| character
 	| keyword
-	| symbol
 	| address
 	| string
 	| longValue
@@ -136,20 +135,24 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
+// NUMBER_GUARD ensures proper termination: greedily consumes any non-terminating
+// character so e.g. 2.0e5:foo is one token (fails validation) rather than
+// silently splitting into DOUBLE + KEYWORD. Only whitespace, delimiters, quotes,
+// and other reader macro characters terminate a number.
 DOUBLE:
-  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL;
-  
-fragment  
+  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL NUMBER_GUARD*;
+
+fragment
 DOUBLE_TAIL:
   DECIMAL EPART | DECIMAL | EPART;
 
-fragment  
+fragment
 DECIMAL:
   '.' DIGITS;
-  
-fragment 
+
+fragment
 EPART:
-  [eE] (DIGITS | SIGNED_DIGITS) SYMBOL_FOLLOWING*;  
+  [eE] (DIGITS | SIGNED_DIGITS);
 
 ADDRESS:
   '#' [0-9]+;
@@ -170,7 +173,7 @@ AT_SYMBOL:
   '@' NAME;
 
 LONG_VALUE:
-  DIGITS | SIGNED_DIGITS;
+  (DIGITS | SIGNED_DIGITS) NUMBER_GUARD*;
 
 fragment
 DIGITS:
@@ -280,12 +283,18 @@ SYMBOL_FOLLOWING
 fragment
 ALPHA: [a-z] | [A-Z];
 
+// Non-terminating characters for number tokens: anything except whitespace,
+// delimiters, quotes, and reader macro characters. Matches Clojure's approach
+// where numbers consume until a terminating character.
+fragment
+NUMBER_GUARD: ~[ \t\n\r,;@^()\[\]{}'"`~\\];
+
 /*
  * Whitespace and comments
  *
  * TODO: Should these be skip or channel(HIDDEN)?
  */
- 
+
 WS: [ \n\r\t,]+ -> skip;
 
 COMMENT: ';' ~[\r\n]* -> skip;
