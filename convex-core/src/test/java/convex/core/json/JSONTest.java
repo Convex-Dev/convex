@@ -42,6 +42,24 @@ import convex.core.util.Utils;
 
 public class JSONTest {
 
+	/** Quick test function for error messages */
+	public static void main(String[] args) {
+		String[] inputs = {
+			"{\"a\":{\"b\":", "{\"a\":{", "{\"a\":[}", "[1,2,",
+			"{\"a\": }", "}{", "{\"a\":\"b\"}}", "", "{true: 1}",
+			"{\n  \"a\": 1,\n  \"b\": }\n}",
+		};
+		for (String input : inputs) {
+			try { JSON5Reader.read(input); System.out.println("  OK: \"" + input + "\"");
+			} catch (ParseException e) { System.out.println("  \"" + input + "\" => " + e.getMessage()); }
+		}
+		System.out.println("--- JSONReader ---");
+		for (String input : inputs) {
+			try { JSONReader.read(input); System.out.println("  OK: \"" + input + "\"");
+			} catch (ParseException e) { System.out.println("  \"" + input + "\" => " + e.getMessage()); }
+		}
+	}
+
 	@Test public void testPrint() {
 		assertEquals("null",JSON.toString(null));
 		

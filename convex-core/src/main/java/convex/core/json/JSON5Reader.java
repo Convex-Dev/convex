@@ -173,7 +173,7 @@ public class JSON5Reader {
 		 @Override
 		public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e)
 		   throws ParseCancellationException {
-		       throw new ParseCancellationException("line " + line + ":" + charPositionInLine + " " + msg);
+		       throw new ParseCancellationException(msg, e);
 		 }
 	}
 
@@ -215,7 +215,7 @@ public class JSON5Reader {
 		try {
 			parser.json();
 		} catch (ParseCancellationException pe) {
-			throw toParseException(pe);
+			throw toParseException(pe,"JSON5");
 		} catch (NoSuchElementException e) {
 			// ANTLR's generated finally blocks fire listener exit events during exception
 			// unwinding, which can underflow the listener's stack. The original parse error
@@ -223,8 +223,14 @@ public class JSON5Reader {
 			// it during unwinding. Check suppressed exceptions for the original cause.
 			for (Throwable suppressed : e.getSuppressed()) {
 				if (suppressed instanceof ParseCancellationException pe) {
-					throw toParseException(pe);
+					throw toParseException(pe,"JSON5");
 				}
+			}
+			// No original parse error available — use parser's last token for position
+			Token tok=parser.getCurrentToken();
+			if (tok!=null) {
+				throw new ParseException("JSON5 parse error at line "+tok.getLine()+":"+tok.getCharPositionInLine()
+					+": "+describeToken(tok),e);
 			}
 			throw new ParseException("JSON5 parse error (malformed input)",e);
 		}
@@ -237,17 +243,23 @@ public class JSON5Reader {
 		return top.get(0);
 	}
 
-	private static ParseException toParseException(ParseCancellationException pe) {
+	static String describeToken(Token tok) {
+		String text=tok.getText();
+		if ("<EOF>".equals(text)) return "unexpected end of input";
+		return "unexpected '"+text+"'";
+	}
+
+	static ParseException toParseException(ParseCancellationException pe, String format) {
 		Throwable cause=pe.getCause();
 		if (cause instanceof RecognitionException re) {
 			Token offending=re.getOffendingToken();
 			if (offending!=null) {
-				return new ParseException("JSON5 parse error at line "+offending.getLine()+":"+offending.getCharPositionInLine()
-					+" near '"+offending.getText()+"'",cause);
+				return new ParseException(format+" parse error at line "+offending.getLine()+":"+offending.getCharPositionInLine()
+					+": "+describeToken(offending),cause);
 			}
 		}
 		String msg=pe.getMessage();
-		return new ParseException(msg!=null ? msg : "JSON5 parse error",cause);
+		return new ParseException(msg!=null ? msg : format+" parse error",cause);
 	}
 
 }

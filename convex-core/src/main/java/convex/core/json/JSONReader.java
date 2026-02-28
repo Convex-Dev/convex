@@ -9,7 +9,6 @@ import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
@@ -206,7 +205,7 @@ public class JSONReader {
 		try {
 			parser.json();
 		} catch (ParseCancellationException pe) {
-			throw toParseException(pe);
+			throw JSON5Reader.toParseException(pe,"JSON");
 		} catch (NoSuchElementException e) {
 			// ANTLR's generated finally blocks fire listener exit events during exception
 			// unwinding, which can underflow the listener's stack. The original parse error
@@ -214,8 +213,13 @@ public class JSONReader {
 			// it during unwinding. Check suppressed exceptions for the original cause.
 			for (Throwable suppressed : e.getSuppressed()) {
 				if (suppressed instanceof ParseCancellationException pe) {
-					throw toParseException(pe);
+					throw JSON5Reader.toParseException(pe,"JSON");
 				}
+			}
+			Token tok=parser.getCurrentToken();
+			if (tok!=null) {
+				throw new ParseException("JSON parse error at line "+tok.getLine()+":"+tok.getCharPositionInLine()
+					+": "+JSON5Reader.describeToken(tok),e);
 			}
 			throw new ParseException("JSON parse error (malformed input)",e);
 		}
@@ -226,19 +230,6 @@ public class JSONReader {
 		}
 
 		return top.get(0);
-	}
-
-	private static ParseException toParseException(ParseCancellationException pe) {
-		Throwable cause=pe.getCause();
-		if (cause instanceof RecognitionException re) {
-			Token offending=re.getOffendingToken();
-			if (offending!=null) {
-				return new ParseException("JSON parse error at line "+offending.getLine()+":"+offending.getCharPositionInLine()
-					+" near '"+offending.getText()+"'",cause);
-			}
-		}
-		String msg=pe.getMessage();
-		return new ParseException(msg!=null ? msg : "JSON parse error",cause);
 	}
 
 }
