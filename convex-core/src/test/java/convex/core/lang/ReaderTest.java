@@ -46,6 +46,26 @@ import convex.test.Samples;
  */
 public class ReaderTest {
 
+	public static void main(String[] args) {
+		String[] inputs = {
+			"(", "[", "{", "(1 2", "[1 2", "{:a",
+			")", "]", "}", "1)", "1]", ":a}",
+			"((())", "[[[]", "{{{}",
+			"", "   ",
+			"(1 2 3))", "[1 2]]", "{:a 1}}",
+			"#", "#-1", "@", ":",
+			"\"unterminated", "'",
+			"(\n  1\n  2\n  )",  // valid multiline
+			"(\n  1\n  2\n",     // unclosed multiline
+		};
+		for (String input : inputs) {
+			String display = input.replace("\n","\\n");
+			try { Reader.read(input); System.out.println("  OK: \"" + display + "\"");
+			} catch (ParseException e) { System.out.println("  \"" + display + "\" => " + e.getMessage()); }
+			catch (Exception e) { System.out.println("  \"" + display + "\" => [" + e.getClass().getSimpleName() + "] " + e.getMessage()); }
+		}
+	}
+
 	@Test
 	public void testVectors() {
 		assertSame(Vectors.empty(), Reader.read("[]"));

@@ -243,7 +243,10 @@ public class JSON5Reader {
 		return top.get(0);
 	}
 
-	static String describeToken(Token tok) {
+	/**
+	 * Describe a token for human-readable error messages
+	 */
+	public static String describeToken(Token tok) {
 		String text=tok.getText();
 		if ("<EOF>".equals(text)) return "unexpected end of input";
 		return "unexpected '"+text+"'";

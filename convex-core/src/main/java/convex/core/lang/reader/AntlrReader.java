@@ -3,11 +3,13 @@ package convex.core.lang.reader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ErrorNode;
@@ -69,7 +71,10 @@ import convex.core.lang.reader.antlr.ConvexParser.TaggedFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
 import convex.core.text.Text;
 import convex.core.util.Utils;
- 
+
+/**
+ * Reader for Convex CVX format. Basically stringified CAD3 with some CVM-specific features.
+ */
 public class AntlrReader {
 	
 	static class CRListener extends ConvexBaseListener {
@@ -430,6 +435,15 @@ public class AntlrReader {
 				// almost certainly with invalid results. So, record the fact an exception occurred
 				listenerExceptionOccurred = true;
 				throw e;
+			}
+			catch (NoSuchElementException e) {
+				// Listener stack underflow due to malformed input (e.g. lone quote character).
+				listenerExceptionOccurred = true;
+				Token tok=getCurrentToken();
+				String desc=(tok!=null&&"<EOF>".equals(tok.getText())) ? "unexpected end of input" : "unexpected token";
+				throw new ParseException("Parse error at "
+					+(tok!=null ? tok.getLine()+":"+tok.getCharPositionInLine() : "unknown position")
+					+": "+desc,e);
 			}
 		}
 		
