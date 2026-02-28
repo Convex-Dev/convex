@@ -17,6 +17,7 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
+import convex.core.Constants;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Symbols;
@@ -78,6 +79,19 @@ import convex.core.util.Utils;
  */
 public class AntlrReader {
 	
+	private static final int MAX_TOKEN_DISPLAY = 20;
+	private static final String KEYWORD_TOO_LONG = "keyword too long (max "+Constants.MAX_NAME_LENGTH+" bytes): ";
+	private static final String SYMBOL_TOO_LONG = "symbol too long (max "+Constants.MAX_NAME_LENGTH+" bytes): ";
+
+	/**
+	 * Truncate a token string for safe inclusion in error messages.
+	 * Prevents OOM from constructing huge error strings for malicious input.
+	 */
+	static String truncate(String s) {
+		if (s.length()<=MAX_TOKEN_DISPLAY) return s;
+		return s.substring(0,MAX_TOKEN_DISPLAY)+"...";
+	}
+
 	/**
 	 * Create a ParseException with position info from an ANTLR context
 	 */
@@ -182,7 +196,7 @@ public class AntlrReader {
 			// Just looking at the last token probably most efficient way to get string?
 			String s=ctx.getStop().getText();
 			AInteger a= AInteger.parse(s);
-			if (a==null) throw parseError(ctx,"unparseable number: "+s);
+			if (a==null) throw parseError(ctx,"unparseable number: "+truncate(s));
 			push(a);
 		}
 		
@@ -195,7 +209,7 @@ public class AntlrReader {
 		public void exitDoubleValue(DoubleValueContext ctx) {
 			String s=ctx.getStop().getText();
 			CVMDouble v=CVMDouble.parse(s);
-			if (v==null) throw parseError(ctx,"bad double format: "+s);
+			if (v==null) throw parseError(ctx,"bad double format: "+truncate(s));
 			push(v);	
 		}
 
@@ -221,7 +235,7 @@ public class AntlrReader {
 		public void exitKeyword(KeywordContext ctx) {
 			String s=ctx.getStop().getText();
 			Keyword k=Keyword.create(s.substring(1));
-			if (k==null) throw parseError(ctx,"bad keyword format: "+s);
+			if (k==null) throw parseError(ctx,KEYWORD_TOO_LONG+truncate(s));
 			push( k);
 		}
 
@@ -229,7 +243,7 @@ public class AntlrReader {
 		public void exitSymbol(SymbolContext ctx) {
 			String s=ctx.getStop().getText();
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw parseError(ctx,"bad symbol format: "+s);
+			if (sym==null) throw parseError(ctx,SYMBOL_TOO_LONG+truncate(s));
 			push( sym);
 		}
 
@@ -299,7 +313,7 @@ public class AntlrReader {
 		public void exitBlob(BlobContext ctx) {
 			String s=ctx.getStop().getText();
 			Blob b=Blob.fromHex(s.substring(2));
-			if (b==null) throw parseError(ctx,"invalid blob syntax: "+s);
+			if (b==null) throw parseError(ctx,"invalid blob syntax: "+truncate(s));
 			push(b);
 		}
 

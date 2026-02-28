@@ -135,12 +135,12 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
-// NUMBER_GUARD ensures proper termination: greedily consumes any non-terminating
-// character so e.g. 2.0e5:foo is one token (fails validation) rather than
-// silently splitting into DOUBLE + KEYWORD. Only whitespace, delimiters, quotes,
-// and other reader macro characters terminate a number.
+// NUMBER_GUARD detects improper termination: if a non-terminating character
+// follows a number, consuming one character is enough to make the token fail
+// validation. Only whitespace, delimiters, quotes, and reader macro characters
+// terminate a number.
 DOUBLE:
-  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL NUMBER_GUARD*;
+  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL NUMBER_GUARD?;
 
 fragment
 DOUBLE_TAIL:
@@ -173,7 +173,7 @@ AT_SYMBOL:
   '@' NAME;
 
 LONG_VALUE:
-  (DIGITS | SIGNED_DIGITS) NUMBER_GUARD*;
+  (DIGITS | SIGNED_DIGITS) NUMBER_GUARD?;
 
 fragment
 DIGITS:

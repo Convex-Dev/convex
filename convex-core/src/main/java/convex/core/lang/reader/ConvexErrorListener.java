@@ -27,7 +27,7 @@ public class ConvexErrorListener extends BaseErrorListener {
 			}
 		} else if (offendingSymbol instanceof Token tok) {
 			// Parser error: produce human-readable messages instead of ANTLR jargon
-			String text=tok.getText();
+			String text=AntlrReader.truncate(tok.getText());
 			if ("<EOF>".equals(text)) {
 				msg="empty input (expected a form)";
 			} else if (")".equals(text)||"]".equals(text)||"}".equals(text)) {
@@ -48,6 +48,7 @@ public class ConvexErrorListener extends BaseErrorListener {
 		if (msg!=null && msg.startsWith(prefix) && msg.endsWith("'")) {
 			String text=msg.substring(prefix.length(), msg.length()-1);
 			if (text.startsWith("\"")) return "unterminated string";
+			text=AntlrReader.truncate(text);
 			if (text.startsWith("#")) return "invalid '#' sequence: '"+text+"'";
 			return "unexpected '"+text+"'";
 		}

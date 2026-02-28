@@ -246,9 +246,12 @@ public class JSON5Reader {
 	/**
 	 * Describe a token for human-readable error messages
 	 */
+	private static final int MAX_TOKEN_DISPLAY = 40;
+
 	public static String describeToken(Token tok) {
 		String text=tok.getText();
 		if ("<EOF>".equals(text)) return "unexpected end of input";
+		if (text.length()>MAX_TOKEN_DISPLAY) text=text.substring(0,MAX_TOKEN_DISPLAY)+"...";
 		return "unexpected '"+text+"'";
 	}
 
