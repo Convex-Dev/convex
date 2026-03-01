@@ -198,7 +198,7 @@ public class ChainAPI extends ABaseAPI {
 			try {
 				value=Reader.read(field.toString());
 			} catch (ParseException e) {
-				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
+				throw new BadRequestResponse(jsonError("Could not parse CVX data: "+e.getMessage()));
 			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
 			try {
@@ -985,7 +985,7 @@ public class ChainAPI extends ABaseAPI {
 		try {
 			return Reader.read((String) srcValue);
 		} catch (ParseException e) {
-			throw new BadRequestResponse("Could not parse source code: "+e.getMessage());
+			throw new BadRequestResponse(jsonError("Could not parse source code: "+e.getMessage()));
 		}
 	}
 

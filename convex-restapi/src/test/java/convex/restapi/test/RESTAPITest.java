@@ -71,6 +71,8 @@ public class RESTAPITest extends ARESTTest {
 					"source","]bad");
 			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", JSON.toStringPretty(req));
 			assertEquals(400, res.statusCode());
+			assertTrue(res.body().contains("Could not parse source code"),
+				"Response should contain parse error: "+res.body());
 		}
 
 		{ // prepare should work
@@ -141,6 +143,8 @@ public class RESTAPITest extends ARESTTest {
 			String tx = JSON.toStringPretty(Maps.of("address", Init.GENESIS_ADDRESS, "source", "((", "seed", KP.getSeed()));
 			HttpResponse<String> res = post(API_PATH+"/transact", tx);
 			assertEquals(400, res.statusCode());
+			assertTrue(res.body().contains("Could not parse source code"),
+				"Response should contain parse error: "+res.body());
 		}
 
 		{ // should execute successfully on genesis account
@@ -176,6 +180,8 @@ public class RESTAPITest extends ARESTTest {
 			String payload = "{ \"data\": \"((\" }";
 			HttpResponse<String> res = post(API_PATH + "/data/encode", payload);
 			assertEquals(400, res.statusCode());
+			assertTrue(res.body().contains("Could not parse CVX data"),
+				"Response should contain parse error: "+res.body());
 		}
 	}
 
