@@ -15,7 +15,10 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
@@ -25,6 +28,7 @@ import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.peer.auth.PeerAuth;
 import convex.peer.signing.SigningService;
+import convex.restapi.api.AGenericAPI;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.ConfirmAPI;
 import convex.restapi.api.DIDAPI;
@@ -39,8 +43,11 @@ import convex.restapi.web.AuthPage;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
 import convex.restapi.web.WebApp;
+import convex.api.ContentTypes;
+import convex.core.util.JSON;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
+import io.javalin.http.HttpResponseException;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
@@ -208,6 +215,32 @@ public class RESTServer implements Closeable {
 		});
 		
 
+
+		// Custom handler for HTTP error responses (BadRequestResponse, NotFoundResponse, etc.)
+		// Produces consistent output in the requested content type: {:error "message"} or {"error":"message"}
+		app.exception(HttpResponseException.class, (e, ctx) -> {
+			ctx.status(e.getStatus());
+			String msg=e.getMessage();
+			if (msg==null) msg="Error";
+			String type=AGenericAPI.calcResponseContentType(ctx);
+			if (type.equals(ContentTypes.CVX_RAW)) {
+				ctx.contentType(ContentTypes.CVX_RAW);
+				ACell body=Maps.of(Keywords.ERROR, Strings.create(msg));
+				ctx.result(Format.encodeMultiCell(body, true).getBytes());
+			} else if (type.equals(ContentTypes.CVX)) {
+				ctx.contentType(ContentTypes.CVX);
+				ACell body=Maps.of(Keywords.ERROR, Strings.create(msg));
+				ctx.result(RT.print(body).toString());
+			} else if (type.equals(ContentTypes.TEXT)) {
+				ctx.contentType(ContentTypes.TEXT);
+				ctx.result(msg);
+			} else {
+				ctx.contentType(ContentTypes.JSON);
+				HashMap<String,Object> body=new HashMap<>();
+				body.put("error", msg);
+				ctx.result(JSON.toString(body));
+			}
+		});
 
 		app.exception(Exception.class, (e, ctx) -> {
 			e.printStackTrace();

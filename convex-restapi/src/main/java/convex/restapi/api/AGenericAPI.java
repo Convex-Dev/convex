@@ -41,7 +41,7 @@ public abstract class AGenericAPI {
 	 */
 	public abstract void addRoutes(Javalin app);
 	
-	protected String calcResponseContentType(Context ctx) {
+	public static String calcResponseContentType(Context ctx) {
 		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
 		String type=ContentTypes.JSON;
 		// TODO: look at quality weights perhaps
@@ -76,10 +76,10 @@ public abstract class AGenericAPI {
 			Map<String, Object> req= RT.jvm(JSON.parse(ctx.body()));
 			return req;
 		} catch (IllegalArgumentException | ParseException e) {
-			throw new BadRequestResponse(jsonError("Invalid JSON body"));
+			throw new BadRequestResponse("Invalid JSON body");
 		}
 	}
-	
+
 	/**
 	 * Gets JSON body from a Context as a CVM Value
 	 * @param ctx Request context
@@ -91,10 +91,10 @@ public abstract class AGenericAPI {
 			AMap<AString, ACell> req= JSONReader.readObject(ctx.bodyInputStream());
 			return req;
 		} catch (IllegalArgumentException | ParseException | IOException e) {
-			throw new BadRequestResponse(jsonError("Invalid JSON body: "+e.getMessage()));
+			throw new BadRequestResponse("Invalid JSON body: "+e.getMessage());
 		}
 	}
-	
+
 	/**
 	 * Gets CVX body from a Context as a cell
 	 * @param ctx Request context
@@ -106,7 +106,7 @@ public abstract class AGenericAPI {
 		try {
 			String contentType = ctx.contentType();
 			T req;
-			
+
 			// Check for JSON content type and use JSON.parse
 			if (ContentTypes.JSON.equals(contentType)) {
 				req = (T) JSON.parse(ctx.body());
@@ -116,10 +116,10 @@ public abstract class AGenericAPI {
 			}
 			return req;
 		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Invalid CVX body"));
+			throw new BadRequestResponse("Invalid CVX body");
 		}
 	}
-	
+
 	/**
 	 * Gets body from a Context as a cell
 	 * @param ctx Request context
@@ -132,19 +132,10 @@ public abstract class AGenericAPI {
 			T result=store.decodeMultiCell(Blob.wrap(bs));
 			return result;
 		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Invalid Raw body"));
+			throw new BadRequestResponse("Invalid Raw body");
 		}
 	}
 	
-	/**
-	 * Gets a generic JSON response for an error message
-	 * @param string
-	 * @return
-	 */
-	protected static String jsonError(String string) {
-		return "{\"error\":\"" + string + "\"}";
-	}
-
 	/**
 	 * Set content to a CVM Result according to requested content type. Updates status according to result error status
 	 * @param ctx Javalin context
@@ -192,7 +183,6 @@ public abstract class AGenericAPI {
 			AString rs=RT.print(content);
 			if (rs==null) {
 				setResult(ctx,Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
-				ctx.status(403); // Forbidden because of result size
 				return;
 			}
 			ctx.result(rs.toString());
@@ -206,7 +196,12 @@ public abstract class AGenericAPI {
 			ctx.result(htmlContent.toString());
 		} else if (type.equals(ContentTypes.TEXT)) {
 			ctx.contentType(ContentTypes.TEXT);
-			ctx.result("Unsupported content type: "+type);
+			AString rs=RT.print(content);
+			if (rs==null) {
+				setResult(ctx,Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
+				return;
+			}
+			ctx.result(rs.toString());
 		} else {
 			ctx.contentType(ContentTypes.TEXT);
 			ctx.status(415); // unsupported media type for "Accept" header
@@ -228,8 +223,10 @@ public abstract class AGenericAPI {
 		} else if (SourceCodes.PEER.equals(source)) {
 			if (ErrorCodes.SIGNATURE.equals(error)) return 403; // Forbidden
 			if (ErrorCodes.FUNDS.equals(error)) return 402; // payment required
+			if (ErrorCodes.LIMIT.equals(error)) return 413; // Content too large
 		}
 		if (ErrorCodes.FORMAT.equals(error)) return 400; // bad request
+		if (ErrorCodes.MISSING.equals(error)) return 404; // not found
 		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
 		int status = 422;
 		return status;
