@@ -40,6 +40,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.reader.AntlrReader;
 import convex.core.text.Text;
 import convex.test.Samples;
 
@@ -102,6 +103,14 @@ public class ReaderTest {
 			try { ACell r = Reader.read(input); System.out.println("  OK: \"" + display + "\" => " + r);
 			} catch (ParseException e) { System.out.println("  \"" + display + "\" => " + e.getMessage()); }
 			catch (Exception e) { System.out.println("  \"" + display + "\" => [" + e.getClass().getSimpleName() + "] " + e.getMessage()); }
+		}
+
+		// Token dump for investigating lexer behaviour
+		System.out.println("\n--- Token dumps ---");
+		String[] tokenTests = { "[2.0e5:foo]", "[2.0e5#42]", "2.0e5:foo", "1:2", "42abc", "2.0e5abc", "[42abc]" };
+		for (String t : tokenTests) {
+			System.out.println("Tokens for: " + t);
+			AntlrReader.dumpTokens(t);
 		}
 	}
 
@@ -588,8 +597,8 @@ public class ReaderTest {
 		assertParseError("b".repeat(129), "Symbol too long");
 
 		// Number termination — letters after number
-		assertParseError("42abc", "unexpected");
-		assertParseError("1:2", "unexpected");
+		assertParseError("42abc", "bad number");
+		assertParseError("1:2", "bad number");
 		assertParseError("2.0e5abc", "bad double format");
 		assertParseError("2.0e0.1234", "bad double format");
 		assertParseError("1.2.3.4", "bad double format");

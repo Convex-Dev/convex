@@ -141,7 +141,9 @@ public class AntlrReader {
 
 		@Override
 		public void visitErrorNode(ErrorNode node) {
-			throw new ParseException(node.getSourceInterval()+" "+node.getText());
+			Token tok=node.getSymbol();
+			throw new ParseException("Parse error at "+tok.getLine()+":"+tok.getCharPositionInLine()
+				+": unexpected '"+truncate(tok.getText())+"'");
 		}
 
 		@Override
@@ -196,7 +198,7 @@ public class AntlrReader {
 			// Just looking at the last token probably most efficient way to get string?
 			String s=ctx.getStop().getText();
 			AInteger a= AInteger.parse(s);
-			if (a==null) throw parseError(ctx,"unparseable number: "+truncate(s));
+			if (a==null) throw parseError(ctx,"bad number format: "+truncate(s));
 			push(a);
 		}
 		
@@ -472,6 +474,19 @@ public class AntlrReader {
 		
 	}
 	
+	/**
+	 * Dump lexer tokens for debugging. Not used in production.
+	 */
+	public static void dumpTokens(String input) {
+		ConvexLexer lexer=new ConvexLexer(CharStreams.fromString(input));
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		tokens.fill();
+		for (Token t : tokens.getTokens()) {
+			System.out.println("  " + ConvexLexer.VOCABULARY.getSymbolicName(t.getType())
+				+ " '" + t.getText() + "' at " + t.getLine()+":"+t.getStartIndex()+"-"+t.getStopIndex());
+		}
+	}
+
 	static ConvexParser getParser(CharStream cs, CRListener listener) {
 		// Create lexer and paser for the CharStream
 		ConvexLexer lexer=new ConvexLexer(cs);

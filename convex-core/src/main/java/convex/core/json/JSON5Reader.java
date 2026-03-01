@@ -124,10 +124,12 @@ public class JSON5Reader {
 					push(dv);
 					return;
 				}
-			} catch (Exception e) {
-
+			} catch (NumberFormatException e) {
+				// fall through to error
 			}
-			throw new ParseException("Can't parse as number: "+num);
+			Token tok=ctx.getStart();
+			throw new ParseException("JSON5 parse error at line "+tok.getLine()+":"+tok.getCharPositionInLine()
+				+": invalid number: "+num);
 		}
 
 		@Override

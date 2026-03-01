@@ -135,6 +135,12 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
+// Non-terminating characters for number tokens: anything except whitespace,
+// delimiters, quotes, and reader macro characters. Matches Clojure's approach
+// where numbers consume until a terminating character.
+fragment
+NUMBER_GUARD: ~[ \t\n\r,;()[\]{}];
+
 // NUMBER_GUARD detects improper termination: if a non-terminating character
 // follows a number, it is consumed into the number token causing validation
 // to fail. Characters that start their own lexer rules (: # etc.) will still
@@ -172,6 +178,8 @@ CAD3:
 AT_SYMBOL: 
   '@' NAME;
 
+BLOB: '0x' HEX_DIGIT*;
+
 LONG_VALUE:
   (DIGITS | SIGNED_DIGITS) NUMBER_GUARD?;
 
@@ -183,7 +191,7 @@ fragment
 SIGNED_DIGITS:
   '-' DIGITS;
   
-BLOB: '0x' HEX_DIGIT*;
+
 
 fragment           
 HEX_BYTE: HEX_DIGIT HEX_DIGIT;
@@ -283,11 +291,7 @@ SYMBOL_FOLLOWING
 fragment
 ALPHA: [a-z] | [A-Z];
 
-// Non-terminating characters for number tokens: anything except whitespace,
-// delimiters, quotes, and reader macro characters. Matches Clojure's approach
-// where numbers consume until a terminating character.
-fragment
-NUMBER_GUARD: ~[ \t\n\r,;@^()\[\]{}'"`~\\];
+
 
 /*
  * Whitespace and comments

@@ -109,10 +109,12 @@ public class JSONReader {
 					push(dv);
 					return;
 				}
-			} catch (Exception e) {
-				// fall through to exception
+			} catch (NumberFormatException e) {
+				// fall through to error
 			}
-			throw new ParseException("Can't parse as number: "+num);
+			Token tok=ctx.getStart();
+			throw new ParseException("JSON parse error at line "+tok.getLine()+":"+tok.getCharPositionInLine()
+				+": invalid number: "+num);
 		}
 
 		@Override
@@ -166,7 +168,7 @@ public class JSONReader {
 		if (a instanceof AMap object) {
 			return object;
 		}
-		throw new ParseException("Not a JSON object, got: "+Utils.getClassName(a));
+		throw new ParseException("JSON parse error: expected object, got "+Utils.getClassName(a));
 	}
 
 	static JSONParser getParser(CharStream cs, JSONListener listener) {
