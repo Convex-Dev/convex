@@ -524,9 +524,9 @@ public class RESTAPITest extends ARESTTest {
 	@Test public void testAdversarialInputs() throws IOException, InterruptedException {
 		// Test various malformed and adversarial inputs
 
-		{ // Extremely long source code
+		{ // Long source code (under body size limit but still large)
 			StringBuilder longSource = new StringBuilder("(+ 1");
-			for (int i = 0; i < 10000; i++) {
+			for (int i = 0; i < 1000; i++) {
 				longSource.append(" 1");
 			}
 			longSource.append(")");
