@@ -64,7 +64,15 @@ public class RESTAPITest extends ARESTTest {
 			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", "");
 			assertEquals(400, res.statusCode());
 		}
-		
+
+		{ // should be a bad request with unparseable CVX source
+			AMap<AString,ACell> req=Maps.of(
+					"address",Init.GENESIS_ADDRESS,
+					"source","]bad");
+			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", JSON.toStringPretty(req));
+			assertEquals(400, res.statusCode());
+		}
+
 		{ // prepare should work
 			AMap<AString,ACell> req=Maps.of(
 					"address",Init.GENESIS_ADDRESS,
@@ -129,6 +137,12 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(400, res.statusCode());
 		}
 
+		{ // should be a bad request with unparseable source code
+			String tx = JSON.toStringPretty(Maps.of("address", Init.GENESIS_ADDRESS, "source", "((", "seed", KP.getSeed()));
+			HttpResponse<String> res = post(API_PATH+"/transact", tx);
+			assertEquals(400, res.statusCode());
+		}
+
 		{ // should execute successfully on genesis account
 			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
 			HttpResponse<String> res = post(API_PATH+"/transact", tx);
@@ -157,6 +171,12 @@ public class RESTAPITest extends ARESTTest {
 		assertCad3RoundTrip("nil", "00");
 		assertCad3RoundTrip("[]", "8000");
 		assertCad3RoundTrip("()", "8100");
+
+		{ // malformed CVX in encode should return 400
+			String payload = "{ \"data\": \"((\" }";
+			HttpResponse<String> res = post(API_PATH + "/data/encode", payload);
+			assertEquals(400, res.statusCode());
+		}
 	}
 
 	private void assertCad3RoundTrip(String cvxLiteral, String expectedHex) throws IOException, InterruptedException {

@@ -195,7 +195,11 @@ public class ChainAPI extends ABaseAPI {
 			ACell body=this.readJSONBody(ctx);
 			AString field=RT.ensureString(RT.getIn(body, Strings.DATA));
 			if (field==null) throw new BadRequestResponse("Encode requires 'data' field");
-			value=Reader.read(field.toString());
+			try {
+				value=Reader.read(field.toString());
+			} catch (ParseException e) {
+				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
+			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
 			try {
 				value=Reader.read(ctx.bodyInputStream());
@@ -978,7 +982,11 @@ public class ChainAPI extends ABaseAPI {
 		if (!(srcValue instanceof String)) {
 			throw new BadRequestResponse("Source code must be a string");
 		}
-		return Reader.read((String) srcValue);
+		try {
+			return Reader.read((String) srcValue);
+		} catch (ParseException e) {
+			throw new BadRequestResponse("Could not parse source code: "+e.getMessage());
+		}
 	}
 
 	@OpenApi(path = ROUTE+"transaction/submit",
