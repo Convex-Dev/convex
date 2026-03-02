@@ -1841,25 +1841,27 @@ public class McpTest extends ARESTTest {
 
 	@Test
 	public void testUnwatchStateByPathPrefix() throws Exception {
-		String sessionId = initSession();
+		try (SseSession session = openSseSession()) {
+			String sessionId = session.id();
 
-		// Create watches under the same account
-		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :balance]"), sessionId);
-		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :environment]"), sessionId);
-		// And one under a different account
-		makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #1 :balance]"), sessionId);
+			// Create watches under the same account
+			expectResult(makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :balance]"), sessionId));
+			expectResult(makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #0 :environment]"), sessionId));
+			// And one under a different account
+			expectResult(makeToolCallWithSession("watchState", Maps.of("path", "[:accounts #1 :balance]"), sessionId));
 
-		// Remove all watches for account #0 by path prefix vector
-		AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState",
-				Maps.of("path", "[:accounts #0]"), sessionId);
-		AMap<AString, ACell> unwatchResult = expectResult(unwatchResponse);
-		assertEquals(CVMLong.create(2), unwatchResult.get(Strings.create("removed")));
+			// Remove all watches for account #0 by path prefix vector
+			AMap<AString, ACell> unwatchResponse = makeToolCallWithSession("unwatchState",
+					Maps.of("path", "[:accounts #0]"), sessionId);
+			AMap<AString, ACell> unwatchResult = expectResult(unwatchResponse);
+			assertEquals(CVMLong.create(2), unwatchResult.get(Strings.create("removed")));
 
-		// Account #1 watch should still be there — remove by its prefix
-		unwatchResponse = makeToolCallWithSession("unwatchState",
-				Maps.of("path", "[:accounts #1]"), sessionId);
-		unwatchResult = expectResult(unwatchResponse);
-		assertEquals(CVMLong.ONE, unwatchResult.get(Strings.create("removed")));
+			// Account #1 watch should still be there — remove by its prefix
+			unwatchResponse = makeToolCallWithSession("unwatchState",
+					Maps.of("path", "[:accounts #1]"), sessionId);
+			unwatchResult = expectResult(unwatchResponse);
+			assertEquals(CVMLong.ONE, unwatchResult.get(Strings.create("removed")));
+		}
 	}
 
 	@Test
