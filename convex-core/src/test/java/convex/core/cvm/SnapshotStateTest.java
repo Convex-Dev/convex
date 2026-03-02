@@ -11,10 +11,14 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefSnapshotTest;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
+import convex.core.data.AArrayBlob;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.SignedData;
+import convex.core.lang.RT;
 
 /**
  * Tests a consensus state produced by applying a live Belief snapshot
@@ -27,11 +31,9 @@ import convex.core.data.SignedData;
 public class SnapshotStateTest {
 
 	private static final AccountKey PEER_KEY = AccountKey.fromHex("d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42");
-	// Previous: 77b0446d11ba2550abc533e16be90d380c08daab81491ad4cd166d4833cd5da9
-	// Changed by fix to PeerStatus.withDelegatedStake which was silently losing peer metadata
-	// after decode (lazy null sentinel passed instead of getMetadata()). Any peer that had a
-	// delegated stake change during block application now correctly retains its metadata.
-	private static final Hash EXPECTED_STATE = Hash.fromHex("9359348383b11973856e100abf0ab5785fcb8ea6184e011361fc9138b7ba81a8");
+	// Previous: 9359348383b11973856e100abf0ab5785fcb8ea6184e011361fc9138b7ba81a8 (728 blocks)
+	// Updated for belief-1772448810106.cad3 (730 blocks, consensus point 730)
+	private static final Hash EXPECTED_STATE = Hash.fromHex("a7a4b718dd3be10671af398938016c95ff6d6b275368e8c9b8d73f8ea7edf628");
 
 	private static State cachedState;
 
@@ -72,7 +74,7 @@ public class SnapshotStateTest {
 
 		order = belief.getOrders().get(PEER_KEY).getValue();
 		assertNotNull(order, "Order should exist");
-		assertEquals(728, order.getConsensusPoint());
+		assertEquals(730, order.getConsensusPoint());
 	}
 
 	@Test
@@ -86,6 +88,32 @@ public class SnapshotStateTest {
 	public void testAccounts() {
 		AVector<AccountStatus> accts=state.getAccounts();
 		assertEquals(14303,accts.count()); // observed account count
+	}
+
+	@Test
+	public void testPeers() {
+		Index<AArrayBlob, PeerStatus> peers = state.getPeers();
+		assertTrue(peers.count() > 0, "Should have at least one peer");
+
+		int withURL = 0;
+		for (var entry : peers.entrySet()) {
+			AccountKey key = RT.ensureAccountKey(entry.getKey());
+			PeerStatus ps = entry.getValue();
+			assertNotNull(ps, "PeerStatus should not be null for " + key);
+			assertTrue(ps.getPeerStake() >= 0, "Peer stake should be non-negative");
+			assertTrue(ps.getBalance() >= 0, "Peer balance should be non-negative");
+
+			AString hostname = ps.getHostname();
+			if (hostname != null) {
+				String url = hostname.toString();
+				assertFalse(url.isEmpty(), "URL should not be empty for " + key);
+				// Valid URLs should contain :// scheme or be legacy host:port
+				assertTrue(url.contains("://") || url.contains(":"),
+					"URL should have scheme or port: " + url + " for " + key);
+				withURL++;
+			}
+		}
+		assertTrue(withURL > 0, "At least one peer should have a URL");
 	}
 
 	@Test

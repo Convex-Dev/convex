@@ -22,7 +22,7 @@ import convex.test.Samples;
  */
 public class BeliefSnapshotTest {
 
-	static final String BELIEF_FILE = "/belief-1771151911735.cad3";
+	static final String BELIEF_FILE = "/belief-1772448810106.cad3";
 
 	private static Blob beliefBlob;
 	private static Belief belief;
