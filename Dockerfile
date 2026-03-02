@@ -5,7 +5,7 @@
 FROM maven:3.9.9-eclipse-temurin-22-jammy AS build
 WORKDIR /build
 
-# Copy POMs first for dependency caching
+# Copy POMs first — this layer is cached until a pom.xml changes
 COPY pom.xml .
 COPY convex-core/pom.xml convex-core/
 COPY convex-peer/pom.xml convex-peer/
