@@ -245,7 +245,7 @@ public class PeerStatus extends ARecordGeneric {
 				: stks.assoc(delegator, CVMLong.create(newStake)));
 		if (newStakes.isEmpty()) newStakes=null;
 		
-		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, metadata,timestamp,balance+stakeChange);
+		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, getMetadata(),timestamp,balance+stakeChange);
 	}
 	
 	private PeerStatus withBalance(long newBalance) {
@@ -322,7 +322,7 @@ public class PeerStatus extends ARecordGeneric {
 	 */
 	public boolean equals(PeerStatus a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		return Cells.equalsGeneric(a, a);
+		return Cells.equalsGeneric(this, a);
 	}
 
 	public PeerStatus addReward(long peerFees) {

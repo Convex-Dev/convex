@@ -27,7 +27,11 @@ import convex.core.data.SignedData;
 public class SnapshotStateTest {
 
 	private static final AccountKey PEER_KEY = AccountKey.fromHex("d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42");
-	private static final Hash EXPECTED_STATE = Hash.fromHex("77b0446d11ba2550abc533e16be90d380c08daab81491ad4cd166d4833cd5da9");
+	// Previous: 77b0446d11ba2550abc533e16be90d380c08daab81491ad4cd166d4833cd5da9
+	// Changed by fix to PeerStatus.withDelegatedStake which was silently losing peer metadata
+	// after decode (lazy null sentinel passed instead of getMetadata()). Any peer that had a
+	// delegated stake change during block application now correctly retains its metadata.
+	private static final Hash EXPECTED_STATE = Hash.fromHex("9359348383b11973856e100abf0ab5785fcb8ea6184e011361fc9138b7ba81a8");
 
 	private static State cachedState;
 
