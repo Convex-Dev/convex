@@ -103,19 +103,28 @@ mvn versions:set -DnewVersion='0.8.4-SNAPSHOT'
 - Add new "Unreleased" section to `CHANGELOG.md`
 - Commit and push `develop`
 
-## Docker build
+## Docker
 
-To build a peer container using docker in the current directory from the provided `Dockerfile`
+Docker images are built and pushed to Docker Hub automatically as part of the release workflow. Each release produces:
+
+- `convexlive/convex:<version>` (e.g. `convexlive/convex:0.8.3`)
+- `convexlive/convex:latest`
+
+Images are multi-architecture (linux/amd64 and linux/arm64).
+
+### Docker Hub secrets
+
+The release workflow requires two secrets configured in the GitHub repository:
+
+- `DOCKERHUB_USERNAME` — Docker Hub username
+- `DOCKERHUB_TOKEN` — Docker Hub access token (not password)
+
+### Local Docker build
+
+To build locally for testing:
 
 ```bash
 docker build -t convexlive/convex:latest .
-```
-
-To deploy to docker hub:
-
-```
-docker login -u "convexlive" docker.io
-docker push convexlive/convex
 ```
 
 ## JPackage Build
