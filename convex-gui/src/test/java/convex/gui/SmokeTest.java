@@ -363,6 +363,7 @@ public class SmokeTest {
 
 	/** Creates a DLFSBrowser backed by a temporary Etch store */
 	private static convex.gui.dlfs.DLFSBrowser createTempBrowser() throws IOException {
+		GUITest.assumeGUI(); // DLFSBrowser extends AbstractGUI, needs display
 		File tempDb = File.createTempFile("dlfs-test-", ".db");
 		tempDb.deleteOnExit();
 		return new convex.gui.dlfs.DLFSBrowser(tempDb);
