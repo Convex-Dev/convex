@@ -1,0 +1,48 @@
+{
+  "name": "signingDeleteKey",
+  "title": "Delete Key (Signing Service)",
+  "description": "Permanently delete a key from the signing service. Irreversible. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "annotations": {
+    "destructiveHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key identifying which key to delete (hex string)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase used when the key was created or imported (verifies ownership)"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["publicKey", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "deleted": {
+        "type": "boolean",
+        "description": "true if the key was successfully deleted"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}

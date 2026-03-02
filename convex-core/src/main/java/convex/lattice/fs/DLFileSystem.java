@@ -185,8 +185,11 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 */
 	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
 
-	DLFSFileAttributes getFileAttributes(DLPath path) {
+	DLFSFileAttributes getFileAttributes(DLPath path) throws java.nio.file.NoSuchFileException {
 		AVector<ACell> node=getNode(path);
+		if (node==null || DLFSNode.isTombstone(node)) {
+			throw new java.nio.file.NoSuchFileException(path.toString());
+		}
 		return DLFSFileAttributes.create(node);
 	}
 
@@ -247,8 +250,22 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public void replicate(DLFileSystem other) {
 		merge(other.getNode(other.getRoot()));
 	}
-	
-	@Override 
+
+	/**
+	 * Creates an independent fork for isolated batch operations.
+	 * Changes to the fork do not affect this filesystem until {@link #sync()}
+	 * is called on the fork.
+	 * @return A new forked filesystem with its own local cursor
+	 */
+	public abstract DLFileSystem fork();
+
+	/**
+	 * Syncs local changes back to the parent cursor using lattice merge.
+	 * Only meaningful on forked filesystems — calling on a root filesystem is a no-op.
+	 */
+	public abstract void sync();
+
+	@Override
 	public abstract DLFileSystem clone();
 	
 }

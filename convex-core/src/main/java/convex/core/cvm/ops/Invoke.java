@@ -9,13 +9,10 @@ import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Lists;
 import convex.core.data.Vectors;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**
@@ -30,6 +27,17 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 
 	protected Invoke(AVector<AOp<ACell>> ops) {
 		super(CVMTag.OP_INVOKE,ops);
+	}
+
+	/**
+	 * Creates an Invoke op from decoded vector data.
+	 * @param <T> Result type
+	 * @param data Decoded record fields
+	 * @return Invoke instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Invoke<T> fromData(AVector<ACell> data) {
+		return new Invoke<>((AVector<AOp<ACell>>)(AVector<?>)data);
 	}
 
 	public static <T extends ACell> Invoke<T> create(ASequence<AOp<ACell>> ops) {
@@ -131,24 +139,6 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		}
 		bb.append(')');
 		return bb.check(limit);
-	}
-
-	/**
-	 * Read an Invoke Op from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static<T extends ACell> Invoke<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos;
-		AVector<AOp<ACell>> ops = Vectors.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
-		
-		Invoke<T> result=create(ops);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 }

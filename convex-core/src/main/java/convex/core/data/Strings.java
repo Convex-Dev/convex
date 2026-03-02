@@ -17,7 +17,6 @@ import convex.core.data.impl.StringStore;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -39,6 +38,8 @@ public class Strings {
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");
 	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
+	public static final StringShort UNRECOGNISED_MESSAGE_TYPE = StringShort.create("Unrecognised message type");
+	public static final StringShort UNEXPECTED_RESULT = StringShort.create("Unexpected result message");
 	
 
 	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
@@ -92,31 +93,23 @@ public class Strings {
 
 	public static final StringShort SYMBOL = StringShort.intern("symbol");
 
+	public static final StringShort SOURCE = StringShort.intern("source");
+
+	
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());
 	};
 
 
-
-
-
-	/**
-	 * Reads a String from a Blob encoding.
-	 * 
-	 * @param blob Blob to read from
-	 * @param offset Offset within blob
-	 * @return String instance
-	 * @throws BadFormatException If any problem with encoding
-	 */
-	public static AString read(Blob blob, int offset) throws BadFormatException {
-		long length=Format.readVLQCount(blob,offset+1);
-		if (length<0) throw new BadFormatException("Negative string length!");
-		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
-		if (length<=StringShort.MAX_LENGTH) {
-			return StringShort.read(length,blob,offset);
+	public static AString wrap(byte[] utfBytes) {
+		if (utfBytes.length<=StringShort.MAX_LENGTH) {
+			return StringShort.wrap(utfBytes);
+		} else {
+			return StringTree.create(Blob.wrap(utfBytes));
 		}
-		return StringTree.read(length,blob,offset);
 	}
+
+
 
 	/**
 	 * Create a canonical CVM String from a regular Java String
@@ -326,6 +319,8 @@ public class Strings {
 	public static AString fromStream(InputStream inputStream) throws IOException {
 		return create(Blobs.fromStream(inputStream));
 	}
+
+
 
 
 

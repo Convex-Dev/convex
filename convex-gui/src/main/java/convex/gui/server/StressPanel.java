@@ -41,6 +41,7 @@ import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
+import convex.core.data.SignedData;
 import convex.core.cvm.Address;
 import convex.core.data.Strings;
 import convex.core.lang.Reader;
@@ -49,6 +50,7 @@ import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.utils.Toolkit;
+import convex.peer.Server;
 
 @SuppressWarnings("serial")
 public class StressPanel extends JPanel {
@@ -69,7 +71,9 @@ public class StressPanel extends JPanel {
 	private JCheckBox distCheckBox;
 	private JCheckBox repeatCheckBox;
 	private JCheckBox queryCheckBox;
-	
+	private JCheckBox localCheckBox;
+	private JCheckBox preCompileCheckBox;
+
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
 	private JTextArea resultArea;
@@ -83,11 +87,25 @@ public class StressPanel extends JPanel {
 		actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
+		JButton btnLoadSim = new JButton("Load Simulator");
+		actionPanel.add(btnLoadSim);
+		btnLoadSim.addActionListener(e -> {
+			Server server = peerConvex.getLocalServer();
+			if (server == null) {
+				JOptionPane.showMessageDialog(this, "No local server available");
+				return;
+			}
+			LoadSimulatorFrame frame = new LoadSimulatorFrame(
+				server, peerConvex.getAddress(), peerConvex.getKeyPair());
+			frame.setLocationByPlatform(true);
+			frame.setVisible(true);
+		});
+
 		btnRun = new JButton("Run Test");
 		actionPanel.add(btnRun);
 		btnRun.addActionListener(e -> {
 			Hash network=peerView.getLocalServer().getPeer().getGenesisHash();
-			if (network.equals(Networks.PRONONET_GENESIS)) {
+			if (network.equals(Networks.PROTONET_GENESIS)) {
 				int confirm=JOptionPane.showConfirmDialog(this, "This is the live network. Running a stress test is likley to be expensive! Are you really sure you want to do this?", "Run test on Live network?", JOptionPane.WARNING_MESSAGE);
 				if (confirm!=JOptionPane.OK_OPTION) return;
 			}
@@ -160,19 +178,30 @@ public class StressPanel extends JPanel {
 		queryCheckBox=new JCheckBox();
 		optionPanel.add(queryCheckBox);
 		queryCheckBox.setSelected(false);
-		
+
+		optionPanel.add(new JLabel("Local (in-JVM)"));
+		localCheckBox=new JCheckBox();
+		optionPanel.add(localCheckBox);
+		localCheckBox.setSelected(false);
+
+		optionPanel.add(new JLabel("Pre-compile"));
+		preCompileCheckBox=new JCheckBox();
+		optionPanel.add(preCompileCheckBox);
+		preCompileCheckBox.setSelected(false);
+
 		optionPanel.add(new JLabel("Repeat timeout"));
 		repeatTimeSpinner = new JSpinner();
 		repeatTimeSpinner.setModel(new SpinnerNumberModel(60, 0, 3600, 1));
 		optionPanel.add(repeatTimeSpinner);
 
 
-		JLabel lblTxType=new JLabel("Transaction Type");
+		JLabel lblTxType=new JLabel("Op Type");
 		txTypeBox=new JComboBox<String>();
 		txTypeBox.addItem("Transfer");
 		txTypeBox.addItem("Define Data");
 		// txTypeBox.addItem("AMM Trade");
-		txTypeBox.addItem("Null Op");
+		txTypeBox.addItem("Invoke Const");
+		txTypeBox.addItem("Actor Call");
 		optionPanel.add(lblTxType);
 		optionPanel.add(txTypeBox);
 
@@ -202,7 +231,6 @@ public class StressPanel extends JPanel {
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int requestCount = (Integer) requestCountSpinner.getValue();
 		int opCount = (Integer) opCountSpinner.getValue();
-		// TODO: enable multiple clients
 		int clientCount = (Integer) clientCountSpinner.getValue();
 		String type=(String) txTypeBox.getSelectedItem();
 		ArrayList<AKeyPair> kps=new ArrayList<>(clientCount);
@@ -238,16 +266,27 @@ public class StressPanel extends JPanel {
 
 		protected String doStressRun() throws Exception {
 			StringBuilder sb = new StringBuilder();
-			resultArea.setText("Connecting clients...");
 
-			// Use client store
-			// Stores.setCurrent(Stores.CLIENT_STORE);
-			ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-			Convex pc = Convex.connect(sa, address,kp);
-		
+			// Reset state for this run
+			kps.clear();
+			clients.clear();
+			errors = 0;
+			values = 0;
+
+			resultArea.setText("Connecting clients...");
+			boolean isLocal = localCheckBox.isSelected();
+			Server server = peerConvex.getLocalServer();
+
+			Convex pc;
+			if (isLocal && server != null) {
+				pc = Convex.connect(server, address, kp);
+			} else {
+				pc = Convex.connect(sa, address, kp);
+			}
+
 			// Generate client accounts
 			StringBuilder cmdsb=new StringBuilder();
-			cmdsb.append("(let [f (fn [k] (let [a (deploy `(do (set-key ~k) (set-controller #13))] (transfer a 1000000000) a))] ");
+			cmdsb.append("(let [f (fn [k] (let [a (deploy `(do (set-key ~k) (set-controller #13)))] (transfer a 1000000000) a))] ");
 			cmdsb.append("  (mapv f [");
 			for (int i=0; i<clientCount; i++) {
 				AKeyPair kp=AKeyPair.generate();
@@ -262,57 +301,120 @@ public class StressPanel extends JPanel {
 
 			connectClients(clientAddresses);
 			setupClients();
-			
+
+			// Pre-build transactions
+			resultArea.setText("Building transactions...");
+			ATransaction[][] allTransactions = new ATransaction[clientCount][requestCount];
+			for (int c = 0; c < clientCount; c++) {
+				Address origin = clients.get(c).getAddress();
+				for (int i = 0; i < requestCount; i++) {
+					allTransactions[c][i] = buildTransaction(origin, i);
+				}
+			}
+
+			// Pre-compile Invoke commands if enabled
+			if (preCompileCheckBox.isSelected() && !type.equals("Transfer")) {
+				resultArea.setText("Compiling...");
+				HashMap<ACell, ACell> compileCache = new HashMap<>();
+				for (int c = 0; c < clientCount; c++) {
+					for (int i = 0; i < requestCount; i++) {
+						ATransaction t = allTransactions[c][i];
+						if (t instanceof Invoke inv) {
+							ACell code = inv.getCommand();
+							ACell compiled = compileCache.computeIfAbsent(code, k -> {
+								try {
+									Result r = pc.preCompile(k).get();
+									return r.isError() ? k : r.getValue();
+								} catch (Exception e) {
+									return k;
+								}
+							});
+							if (compiled != code) {
+								allTransactions[c][i] = Invoke.create(t.getOrigin(), t.getSequence(), compiled);
+							}
+						}
+					}
+				}
+			}
+
+			// Pre-sign transactions (skipped for query mode)
+			boolean isQuery = queryCheckBox.isSelected();
+			SignedData<ATransaction>[][] signedTransactions = null;
+			if (!isQuery) {
+				resultArea.setText("Signing transactions...");
+				@SuppressWarnings("unchecked")
+				SignedData<ATransaction>[][] signed = new SignedData[clientCount][requestCount];
+				signedTransactions = signed;
+				for (int c = 0; c < clientCount; c++) {
+					Convex cc = clients.get(c);
+					for (int i = 0; i < requestCount; i++) {
+						signed[c][i] = cc.prepareTransaction(allTransactions[c][i]);
+					}
+				}
+			}
+
 			resultArea.setText("Syncing...");
 			// Make sure we are in consensus
 			pc.transactSync(Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, Strings.create("sync")));
 			long startTime = Utils.getCurrentTimestamp();
-			
+
 			resultArea.setText("Sending transactions...");
-			
-			ExecutorService ex=ThreadUtils.getVirtualExecutor();
-			ArrayList<CompletableFuture<Object>> cfutures=ThreadUtils.futureMap(ex,cc->{
+
+			// Per-client futures — no synchronisation needed
+			@SuppressWarnings("unchecked")
+			CompletableFuture<Result>[][] clientFutures = new CompletableFuture[clientCount][requestCount];
+
+			final SignedData<ATransaction>[][] finalSigned = signedTransactions;
+			boolean isSyncMode = syncCheckBox.isSelected();
+
+			ExecutorService ex = ThreadUtils.getVirtualExecutor();
+			ArrayList<Integer> indices = new ArrayList<>(clientCount);
+			for (int i = 0; i < clientCount; i++) indices.add(i);
+
+			ArrayList<CompletableFuture<Object>> cfutures = ThreadUtils.futureMap(ex, idx -> {
 				try {
+					Convex cc = clients.get(idx);
 					for (int i = 0; i < requestCount; i++) {
-						Address origin=cc.getAddress();
-						ATransaction t = buildTransaction(origin, i);
-						
 						CompletableFuture<Result> fr;
-						if (queryCheckBox.isSelected()) {
-							if (syncCheckBox.isSelected()) {
-								Result r=cc.querySync(t);
-								fr=CompletableFuture.completedFuture(r);
-							} else {	
-								fr = cc.query(t);
+						if (isQuery) {
+							if (isSyncMode) {
+								Result r = cc.querySync(allTransactions[idx][i]);
+								fr = CompletableFuture.completedFuture(r);
+							} else {
+								fr = cc.query(allTransactions[idx][i]);
 							}
 						} else {
-							if (syncCheckBox.isSelected()) {
-								Result r=cc.transactSync(t);
-								fr=CompletableFuture.completedFuture(r);
-							} else {	
-								fr = cc.transact(t);
+							if (isSyncMode) {
+								Result r = cc.transactSync(finalSigned[idx][i]);
+								fr = CompletableFuture.completedFuture(r);
+							} else {
+								fr = cc.transact(finalSigned[idx][i]);
 							}
 						}
-						synchronized(frs) {
-							// synchronised so we don't collide with other threads
-							frs.add(fr);
-						}
+						clientFutures[idx][i] = fr;
 					}
 				} catch (Exception e) {
 					throw Utils.sneakyThrow(e);
 				}
 				return null;
-			},clients);
-			
-			// wait for everything to be sent
-			for (int i=0; i<clientCount; i++) {
+			}, indices);
+
+			// Wait for all sends to complete
+			for (int i = 0; i < clientCount; i++) {
 				cfutures.get(i).get();
 			}
-			// long sendTime = Utils.getCurrentTimestamp();
+			long sendTime = Utils.getCurrentTimestamp();
 
-			int futureCount=frs.size();
-			resultArea.setText("Awaiting "+futureCount+" results...");
-			
+			// Flatten per-client futures
+			ArrayList<CompletableFuture<Result>> frs = new ArrayList<>(clientCount * requestCount);
+			for (int c = 0; c < clientCount; c++) {
+				for (int i = 0; i < requestCount; i++) {
+					frs.add(clientFutures[c][i]);
+				}
+			}
+
+			int futureCount = frs.size();
+			resultArea.setText("Awaiting " + futureCount + " results...");
 
 			List<Result> results = ThreadUtils.completeAll(frs).get();
 			long endTime = Utils.getCurrentTimestamp();
@@ -341,14 +443,17 @@ public class StressPanel extends JPanel {
 				sb.append(errorMap);
 				sb.append("\n");
 			}
-			
-			double time=(endTime - startTime) * 0.001;
+
+			double sendTimeSec=(sendTime - startTime) * 0.001;
+			double totalTime=(endTime - startTime) * 0.001;
 			sb.append("\n");
-			sb.append("Total time:     " + formatter.format(time) + "s\n");
+			sb.append("Mode:           " + (isLocal ? "Local (in-JVM)" : "Remote (network)") + "\n");
+			sb.append("Send time:      " + formatter.format(sendTimeSec) + "s\n");
+			sb.append("Total time:     " + formatter.format(totalTime) + "s\n");
 			sb.append("\n");
-			
-			sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/time) + "\n");
-			sb.append("Approx OPS:     " + Text.toFriendlyIntString(opCount*totalCount/time) + "\n");
+
+			sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/totalTime) + "\n");
+			sb.append("Approx OPS:     " + Text.toFriendlyIntString(opCount*totalCount/totalTime) + "\n");
 
 			String report = sb.toString();
 			return report;
@@ -366,16 +471,16 @@ public class StressPanel extends JPanel {
 		}
 
 		protected void connectClients(AVector<Address> clientAddresses) throws IOException, TimeoutException, InterruptedException {
+			Server server = peerConvex.getLocalServer();
 			for (int i=0; i<clientCount; i++) {
 				AKeyPair kp=kps.get(i);
 				Address clientAddr = clientAddresses.get(i);
 				Convex cc;
-				//if (distCheckBox.isSelected()) {
-				//	InetSocketAddress pa=manager.getRandomServer().getHostAddress();
-				//	cc=Convex.connect(pa,clientAddr,kp);
-				//} else {
+				if (localCheckBox.isSelected() && server != null) {
+					cc=Convex.connect(server,clientAddr,kp);
+				} else {
 					cc=Convex.connect(sa,clientAddr,kp);
-				//}
+				}
 				clients.add(cc);
 			}
 		}
@@ -396,24 +501,29 @@ public class StressPanel extends JPanel {
 
 		protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
 			Address target=clients.get((1+reqNo+txNo*6969)%clients.size()).getAddress();
-			if (type.equals("Transfer")) {
-				ATransaction t = Transfer.create(origin,ATransaction.UNKNOWN_SEQUENCE, target, 100);
-				return t;
-			}
-			
-			StringBuilder tsb = new StringBuilder();
-			if (opCount>1) tsb.append("(loop [i 0] ");
+			ATransaction single = buildSingleOp(reqNo, txNo, origin, target);
+			if (opCount <= 1) return single;
+
+			// Nest opCount operations in a Multi sub-transaction
+			ATransaction[] ops = new ATransaction[opCount];
 			for (int j = 0; j < opCount; j++) {
-				switch(type) {
-					case "Define Data": tsb.append("(def a"+txNo+" "+reqNo+") "); break;
-					case "Null Op": tsb.append("nil "); break;
-					default: throw new Error("Bad TX type: "+type);
-				}
+				ops[j] = buildSingleOp(reqNo, txNo, origin, target);
 			}
-			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)) ) )");
-			String source = tsb.toString();
-			ATransaction t = Invoke.create(origin,ATransaction.UNKNOWN_SEQUENCE, Reader.read(source));
-			return t;
+			return Multi.create(origin, ATransaction.UNKNOWN_SEQUENCE, Multi.MODE_ANY, ops);
+		}
+
+		private ATransaction buildSingleOp(int reqNo, int txNo, Address origin, Address target) {
+			switch (type) {
+				case "Transfer":
+					return Transfer.create(origin, ATransaction.UNKNOWN_SEQUENCE, target, 100);
+				case "Define Data":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("(def a" + txNo + " " + reqNo + ")"));
+				case "Invoke Const":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("nil"));
+				case "Actor Call":
+					return Invoke.create(origin, ATransaction.UNKNOWN_SEQUENCE, Reader.read("(call #9 (lookup *address*))"));
+				default: throw new Error("Bad TX type: " + type);
+			}
 		}
 
 		@Override

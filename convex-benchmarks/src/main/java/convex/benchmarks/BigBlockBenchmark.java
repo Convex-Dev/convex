@@ -9,6 +9,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.cpos.Block;
+import convex.core.store.Stores;
 import convex.core.cpos.BlockResult;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
@@ -56,7 +57,7 @@ public class BigBlockBenchmark {
 	@Benchmark
 	public void benchmark() throws BadSignatureException, IOException {
 		BlockResult br=state.applyBlock(block);
-		Cells.persist(br.getState());
+		Cells.persist(br.getState(), Stores.getGlobalStore());
 	}
 
 	public static void main(String[] args) throws Exception {

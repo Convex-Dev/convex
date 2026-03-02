@@ -56,10 +56,10 @@ public class EncodingTrials {
 	private static void runTrial2(ACell data, long REPS) throws BadFormatException {
 		long start=System.nanoTime();
 		Blob encoded=Format.encodeMultiCell(data,true);
-		State warmUp=Format.decodeMultiCell(encoded);
+		State warmUp=Samples.TEST_STORE.decodeMultiCell(encoded);
 		long len=encoded.count();
 		for (int i=0; i<REPS; i++) {
-			State s2=Format.decodeMultiCell(encoded);
+			State s2=Samples.TEST_STORE.decodeMultiCell(encoded);
 		}
 		long end=System.nanoTime();
 		

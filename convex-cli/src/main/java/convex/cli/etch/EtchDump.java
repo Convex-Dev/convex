@@ -41,7 +41,7 @@ public class EtchDump extends AEtchCommand{
 
 	@Override
 	public void execute() {
-		cli().setOut(outputFilename);
+		if (outputFilename!=null) cli().setOut(outputFilename);
 		
 		try (EtchStore store=store()) {
 			store.getEtch().visitIndex(new DumpVisitor(cli()));

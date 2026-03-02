@@ -3,52 +3,16 @@ package convex.core.data;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import convex.core.Result;
-import convex.core.cpos.Belief;
-import convex.core.cpos.Block;
-import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
-import convex.core.cpos.Order;
-import convex.core.cvm.ACVMRecord;
-import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Address;
-import convex.core.cvm.CVMTag;
-import convex.core.cvm.Ops;
-import convex.core.cvm.PeerStatus;
-import convex.core.cvm.State;
-import convex.core.cvm.Syntax;
-import convex.core.cvm.ops.Cond;
-import convex.core.cvm.ops.Def;
-import convex.core.cvm.ops.Do;
-import convex.core.cvm.ops.Let;
-import convex.core.cvm.ops.Local;
-import convex.core.cvm.ops.Lookup;
-import convex.core.cvm.ops.Special;
-import convex.core.cvm.transactions.Call;
-import convex.core.cvm.transactions.Invoke;
-import convex.core.cvm.transactions.Multi;
-import convex.core.cvm.transactions.Transfer;
-import convex.core.data.prim.AByteFlag;
-import convex.core.data.prim.ANumeric;
-import convex.core.data.prim.CVMBigInteger;
-import convex.core.data.prim.CVMChar;
-import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.Panic;
-import convex.core.lang.Core;
 import convex.core.lang.RT;
-import convex.core.lang.impl.Fn;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Bits;
-import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
 
@@ -457,304 +421,6 @@ public class Format {
 	}
 	
 	/**
-	 * Reads a Ref or embedded Cell value from a Blob
-	 * 
-	 * Converts Embedded Cells to Direct Refs automatically.
-	 * 
-	 * @param <T> Type of referenced value
-	 * @param b Blob containing a ref to read
-	 * @param pos Position to read Ref from (should point to tag)
-	 * @return Ref as read from Blob at the specified position
-	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
-	 *                            value is found where it should be a Ref.
-	 */
-	public static <T extends ACell> Ref<T> readRef(Blob b,int pos) throws BadFormatException {
-		byte tag=b.byteAt(pos);
-		if (tag==Tag.REF) return Ref.readRaw(b,pos+1);
-		
-		if (tag==Tag.NULL) return Ref.nil();
-		
-		// We now expect a non-null embedded cell
-		T cell= Format.read(tag,b,pos);
-		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref: type = " +RT.getType(cell));
-		return cell.getRef();
-	}
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.VECTOR) return (T) Vectors.read(b,pos);
-
-		if (tag == Tag.MAP) return (T) Maps.read(b,pos);
-
-		if (tag == CVMTag.SYNTAX) return (T) Syntax.read(b,pos);
-		
-		if (tag == Tag.SET) return (T) Sets.read(b,pos);
-
-		if (tag == Tag.LIST) return (T) List.read(b,pos);
-
-		if (tag == Tag.INDEX) return (T) Index.read(b,pos);
-
-		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
-	}
-
-	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
-		try {
-			if (tag == CVMTag.OP_CODED) return Ops.readCodedOp(tag,b, pos); 
-			
-			if (tag == CVMTag.OP_LOOKUP) return Lookup.read(b,pos);
-			
-			if (tag == CVMTag.OP_DEF) {
-				return Def.read(b, pos);
-			}
-			
-			if (tag == CVMTag.OP_LET) {
-				return Let.read(b,pos,false);
-			}
-		    
-			if (tag == CVMTag.OP_LOOP) {
-				return Let.read(b,pos,true);
-			}
-		} catch (Exception e) {
-			// something went wrong, fall through to reading a generic coded value
-		}
-		
-		return CodedValue.read(tag,b,pos);
-	}
-	
-	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
-		// We expect a VLQ Count following the tag
-		long code=readVLQCount(blob,offset+1);
-		
-		if (tag == CVMTag.CORE_DEF) {
-			ACell cc=Core.fromCode(code);
-			if (cc!=null) return cc;
-		}
-
-		if ((tag == CVMTag.OP_SPECIAL)&&(code<Special.NUM_SPECIALS)) {
-			Special<?> spec= Special.create((int)code);
-			if (spec!=null) {
-				return spec;
-			}
-		}
-		
-		if (tag == CVMTag.OP_LOCAL) {
-			Local<?> loc=Local.create(code);
-			return loc;
-		}
-
-
-		return ExtensionValue.create(tag, code);
-	}
-
-	/**
-	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
-	 * throws an exception if the Blob contents are not fully consumed
-	 * 
-	 * @param blob Blob representing the Encoding of the Value
-	 * @return Value read from the blob of encoded data
-	 * @throws BadFormatException In case of encoding error
-	 */
-	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
-		long n=blob.count();
-		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		byte tag = blob.byteAtUnchecked(0);
-		T result= read(tag,blob,0);
-		if (result==null) {
-			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);
-		} else {
-			if (result.getEncoding().count()!=n) throw new BadFormatException("Excess bytes in read from Blob");
-		}
-		return result;
-	}
-	
-	/**
-	 * Decodes a single Value from a Blob, starting at a given offset Assumes the presence of a tag.
-	 * throws an exception if the Blob contents are not fully consumed
-	 * 
-	 * @param blob Blob representing the Encoding of the Value
-	 * @param offset Offset of tag byte in blob
-	 * @return Value read from the blob of encoded data
-	 * @throws BadFormatException In case of encoding error
-	 */
-	public static <T extends ACell> T read(Blob blob, int offset) throws BadFormatException {
-		byte tag = blob.byteAt(offset);
-		T result= read(tag,blob,offset);
-		return result;
-	}
-	
-	/**
-	 * Helper method to read a CVM value encoded as a hex string
-	 * @param <T> Type of value to read
-	 * @param hexString A valid hex String
-	 * @return Value read
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <T extends ACell> T read(String hexString) throws BadFormatException {
-		Blob enc=Blob.fromHex(hexString);
-		if (enc==null) throw new BadFormatException("Invalid hex string");
-		return read(Blob.fromHex(hexString));
-	}
-	
-	/**
-	 * Read from a Blob with the specified tag, assumed to be at position 0
-	 * @param <T> Type of value to read
-	 * @param tag Tag to use for reading
-	 * @param blob Blob to read from
-	 * @param offset Offset of tag byte in blob
-	 * @return Value decoded
-	 * @throws BadFormatException If encoding is invalid for the given tag
-	 */
-	@SuppressWarnings("unchecked")
-	static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
-
-		// Fast paths for common one-byte instances. TODO: might switch have better performance if compiled correctly into a table?
-		if (tag==Tag.NULL) return null;
-		if (tag==Tag.INTEGER) return (T) CVMLong.ZERO; 
-
-		try {
-			int high=(tag & 0xF0);
-			if (high == 0x10) return (T) readNumeric(tag,blob,offset);
-			
-			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-			
-			if (tag == CVMTag.ADDRESS) return (T) Address.read(blob,offset);
-			
-			if (high == 0xB0) return (T) AByteFlag.read(tag);
-			
-			if (high == 0xC0) return (T) readCode(tag,blob,offset);
-
-			if (high == 0x80) return readDataStructure(tag,blob,offset);
-			
-			if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
-
-			if (high == 0xD0) return (T) readDenseRecord(tag, blob, offset);
-
-			if (high == 0xE0) return (T) readExtension(tag, blob, offset);
-			
- 			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
-		} catch (BadFormatException e) {
-			throw e;
-		} catch (IndexOutOfBoundsException e) {
-			throw new BadFormatException("Read out of bounds when decoding with tag 0x"+Utils.toHexString(tag),e);
-		} catch (MissingDataException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
-		}
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag,blob,offset));
-	}
-
-
-	private static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
-		if (tag==Tag.SIGNED_DATA) return SignedData.read(blob,offset,true);	
-		if (tag==Tag.SIGNED_DATA_SHORT) return SignedData.read(blob,offset,false);	
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (tag<0x19) return CVMLong.read(tag,blob,offset);
-		if (tag == 0x19) return CVMBigInteger.read(blob,offset);
-		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
-		
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
-		switch (tag) {
-			case Tag.SYMBOL: return Symbol.read(blob,offset);
-			case Tag.KEYWORD: return Keyword.read(blob,offset);
-			case Tag.BLOB: return Blobs.read(blob,offset);
-			case Tag.STRING: return Strings.read(blob,offset);
-		} 
-		
-		if ((tag&Tag.CHAR_MASK)==Tag.CHAR_BASE) {
-			int len=CVMChar.byteCountFromTag(tag);
-			if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
-			return CVMChar.read(len, blob,offset); // skip tag byte
-		}
-
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	
-	/**
-	 * Reads a Record with the given tag
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	private static <T extends ACVMRecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-	}
-
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readDenseRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		try {
-			if (tag == CVMTag.INVOKE) {
-				return (T) Invoke.read(b,pos);
-			} else if (tag == CVMTag.TRANSFER) {
-				return (T) Transfer.read(b,pos);
-			} else if (tag == CVMTag.CALL) {
-				return (T) Call.read(b,pos);
-			} else if (tag == CVMTag.MULTI) {
-				return (T) Multi.read(b,pos);
-			}
-			
-			if (tag == CVMTag.FN) {
-				return (T) Fn.read(b,pos);
-			}
-			
-			if (tag == CVMTag.STATE) {
-				return (T) State.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BELIEF) {
-				return (T) Belief.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BLOCK) {
-				return (T) Block.read(b,pos);
-			}
-			
-			if (tag == CVMTag.RESULT) {
-				return (T) Result.read(b,pos);
-			}
-			
-			if (tag == CVMTag.ORDER) {
-				return (T) Order.read(b,pos);
-			}
-			
-			if (tag == CVMTag.BLOCK_RESULT) {
-				return (T) BlockResult.read(b,pos);
-			}
-			
-			if (tag == CVMTag.OP_DO) {
-				return (T) Do.read(b,pos);
-			}
-			
-			if (tag == CVMTag.OP_COND) {
-				return (T) Cond.read(b,pos);
-			}
-
-			if (tag == CVMTag.OP_INVOKE) {
-				 // Note name clash with transaction type
-				return (T) convex.core.cvm.ops.Invoke.read(b,pos);
-			}
-			
-			if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
-			if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
-		} catch (Exception e) {
-			// something failed, might be generic DenseRecord
-		}
-		
-		// Might be a generic Dense Record
-		DenseRecord dr=DenseRecord.read(tag,b,pos);
-		if (dr==null) throw new BadFormatException(ErrorMessages.badTagMessage(tag));
-		return (T) dr;
-	}
-
 	/**
 	 * Writes hex digits from digit position start, total length.
 	 * 
@@ -798,153 +464,29 @@ public class Format {
 	 * @return Array of decoded cells
 	 * @throws BadFormatException In event of any encoding error detected
 	 */
-	public static ACell[] decodeCells(Blob data) throws BadFormatException {
+	public static ACell[] decodeCells(Blob data, AStore store) throws BadFormatException {
 		long ml=data.count();
 		if (ml>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml==0) return Cells.EMPTY_ARRAY;
-		
+
 		ArrayList<ACell> cells=new ArrayList<>();
-		ACell first=Format.read(data, 0);
+		// First cell: decode from start of blob (may have trailing cells)
+		AEncoder.DecodeState ds = new AEncoder.DecodeState(data);
+		ACell first = store.getEncoder().read(ds);
+		if (first!=null) first.attachEncoding(data.slice(0, ds.pos - data.getInternalOffset()));
 		cells.add(first);
-		int pos=first.getEncodingLength();
-		AStore store=Stores.current();
+		int pos = ds.pos - data.getInternalOffset();
 		while (pos<ml) {
 			long encLength=Format.readVLQCount(data.getInternalArray(), data.getInternalOffset()+pos);
 			pos+=Format.getVLQCountLength(encLength);
 			Blob enc=data.slice(pos, pos+encLength);
 			ACell result=store.decode(enc);
-			// ACell result=Format.read(enc);
 			pos+=enc.count;
 			cells.add(result);
 		}
 		return cells.toArray(ACell[]::new);
 	}
-	
-	/**
-	 * Reads a cell from a Blob of data, allowing for non-embedded branches following the first cell
-	 * @param data Data to decode
-	 * @return Cell instance
-	 * @throws BadFormatException If encoding format is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
-		long ml=data.count();
-		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		
-		// read first cell
-		T result= Format.read(data,0);
-		if (result==null) {
-			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
-			return null; // null value OK at top level
-		}
-		
-		int rl=Utils.checkedInt(result.getEncodingLength());
-		if (rl==ml) return result; // Fast path if already complete
-		
-		// read remaining cells
-		HashMap<Hash,ACell> hm=new HashMap<>();
-		decodeCells(hm,data.slice(rl,ml));
 
-		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();		
-		ArrayList<ACell> stack=new ArrayList<>();
-
-		IRefFunction func=new IRefFunction() {
-			@SuppressWarnings("rawtypes")
-			@Override
-			public Ref apply(Ref r) {
-				if (r.isEmbedded()) {
-					ACell cc=r.getValue();
-					if (cc==null) return r;
-					ACell nc=cc.updateRefs(this);
-					if (cc==nc) return r;
-					return nc.getRef();
-				} else {
-					Hash h=r.getHash();
-					
-					// if done, just replace with done version
-					ACell doneVal=done.get(h);
-					if (doneVal!=null) return doneVal.getRef();
-					
-					// if in map, push cell to stack
-					ACell part=hm.get(h);
-					if (part!=null) {
-						stack.add(part);
-						return part.getRef();
-					}
-					
-					// not in message, must be partial
-					return r;
-				}
-			} 
-		};
-		
-		stack.add(result); 
-		Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
-			@Override
-			public boolean test(ACell c) {
-				Hash h=c.getHash();
-				if (done.containsKey(h)) return true;
-				
-				int pos=stack.size();
-				// Update Refs, adding new non-embedded cells to stack
-				ACell nc=c.updateRefs(func);
-				
-				if (stack.size()==pos) {
-					// we must be done since nothing new added to stack
-					done.put(h,nc);
-					return true;
-				} else {
-					// something extra on the stack to handle first
-					stack.set(pos-1,nc);
-					return false;
-				}
-			}
-		});
-		
-		// ACell cc=done.get(check);
-		
-		result=(T) done.get(result.getHash());
-		
-		return result;
-	}
-	
-	/**
-	 * Decode encoded non-embedded Cells into an accumulator HashMap
-	 * @param acc Accumulator for Cells, keyed by Hash
-	 * @param data Encoding to read
-	 * @throws BadFormatException In case of bad format, including any embedded values
-	 */
-	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data) throws BadFormatException {
-		long dataLength=data.count();
-		try {
-			int ix=0;
-			AStore store=Stores.current();
-			while( ix<dataLength) {
-				long encLength=Format.readVLQCount(data,ix);
-				ix+=Format.getVLQCountLength(encLength);
-				
-				Blob enc=data.slice(ix, ix+encLength);
-				if (enc==null) {
-					throw new BadFormatException("Incomplete encoding");
-				}
-				Hash h=enc.getContentHash();
-				
-				// Check store for Ref - avoids duplicate objects in many cases
-				ACell c=store.decode(enc);
-				
-				if (c==null) {
-					throw new BadFormatException("Null child encoding");
-				}
-				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
-				
-				acc.put(h, c);
-				ix+=encLength;
-			}
-			if (ix!=dataLength) throw new BadFormatException("Bad message length when decoding");
-		} catch (IndexOutOfBoundsException e) {
-			throw new BadFormatException("Insufficient bytes to decode Cells");
-		}
-	}
 
 	/**
 	 * Encode a Cell completely in multi-cell message format. Format places top level
@@ -1123,21 +665,31 @@ public class Format {
 	 * @throws BadFormatException If the Long format is not canonical (i.e. starts with 0x00)
 	 */
 	public static long readLong(Blob blob, int offset, int length) throws BadFormatException {
-		byte[] bs=blob.getInternalArray();
-		offset+=blob.getInternalOffset();
-			long v=(long)(bs[offset]);
+		return readLong(blob.getInternalArray(), blob.getInternalOffset()+offset, length);
+	}
+
+	/**
+	 * Reads a Long value from a byte array at the specified offset.
+	 * @param bs Byte array to read from
+	 * @param offset Offset in the byte array
+	 * @param length Number of bytes to read (1-8)
+	 * @return Decoded long value
+	 * @throws BadFormatException If the Long format is not canonical
+	 */
+	public static long readLong(byte[] bs, int offset, int length) throws BadFormatException {
+		long v=(long)(bs[offset]);
 		if (v==0) {
 			if (length==1) throw new BadFormatException("Long encoding: 0x00 not valid");
 			if (bs[offset+1]>=0) throw new BadFormatException("Excess 0x00 at start of Long encoding");
 		} else if (v==-1) {
 			if ((length>1)&&(bs[offset+1]<0)) {
 				throw new BadFormatException("Excess 0xff at start of Long encoding");
-			}	
+			}
 		}
-		
+
 		// sign extend first byte
 		v=(v<<56)>>56;
-		
+
 		for (int i=1; i<length; i++) {
 			v=(v<<8)+(bs[offset+i]&0xFFl);
 		}

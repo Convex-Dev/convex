@@ -16,7 +16,7 @@ public class SetLattice<V extends ACell> extends ALattice<ASet<V>> {
 		// private to enforce Singleton
 	}
 	
-	private static final SetLattice<?> INSTANCE = new SetLattice<>();
+	public static final SetLattice<?> INSTANCE = new SetLattice<>();
 
 	@Override
 	public ASet<V> merge(ASet<V> ownValue, ASet<V> otherValue) {
@@ -38,6 +38,11 @@ public class SetLattice<V extends ACell> extends ALattice<ASet<V>> {
 	@Override
 	public boolean checkForeign(ASet<V> value) {
 		return (value instanceof ASet);
+	}
+
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		return null;
 	}
 
 }

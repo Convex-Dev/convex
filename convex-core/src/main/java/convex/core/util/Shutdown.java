@@ -25,7 +25,7 @@ public class Shutdown {
 			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 				@Override
 				public void run() {
-					Shutdown.runHooks();
+					Shutdown.shutdownNow();
 				}
 			},"Convex Shutdown"));
 		} catch(Exception e) {
@@ -81,16 +81,17 @@ public class Shutdown {
 	}
 
 	/**
-	 * Execute all hooks. Called by standard Java shutdown process.
+	 * Execute all hooks in priority order. Called automatically by the JVM
+	 * shutdown process, but can also be called explicitly for clean
+	 * programmatic shutdown (e.g. after closing all servers in a demo).
+	 *
+	 * <p>Hooks are cleared after execution, so a subsequent JVM shutdown
+	 * hook invocation becomes a no-op.
 	 */
-	private static void runHooks() {
+	public static void shutdownNow() {
 		for (Map.Entry<Integer,Group> me: order.entrySet()) {
 			me.getValue().runHooks();
 		}
 		order.clear();
-	}
-	
-	public void shoutDownNow() {
-		runHooks();
 	}
 }

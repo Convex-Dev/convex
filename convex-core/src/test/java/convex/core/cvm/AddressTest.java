@@ -15,12 +15,12 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.BlobsTest;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 public class AddressTest {
 
@@ -46,7 +46,7 @@ public class AddressTest {
 		Address a= Address.create(17);
 		Blob enc=a.getEncoding();
 		assertEquals(Utils.toHexString(CVMTag.ADDRESS)+"11",enc.toHexString());
-		ACell ra=Format.read(enc);
+		ACell ra=Samples.TEST_STORE.decode(enc);
 		assertTrue(ra instanceof Address);
 		assertEquals(a,ra);
 	}
@@ -65,7 +65,7 @@ public class AddressTest {
 		Hash h=Hash.get(a);
 		
 		try {
-			a=Cells.persist(a);
+			a=Cells.persist(a, Samples.TEST_STORE);
 		} catch (IOException e) {
 			fail(e);
 		}

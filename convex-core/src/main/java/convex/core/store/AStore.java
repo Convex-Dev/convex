@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
+import convex.core.data.CAD3Encoder;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -128,16 +129,47 @@ public abstract class AStore implements Closeable {
 	public abstract void close();
 	
 	/**
-	 * Decodes a Cell from an Encoding. Looks up Cell in cache if available. Otherwise
-	 * equivalent to Format.read(Blob).
+	 * Decodes a Cell from an Encoding using this store's encoder.
+	 * Subclasses may override to add caching.
 	 * @param encoding Encoding of Cell
-	 * @return Decoded Cell (may be a a null value)
-	 * 
+	 * @return Decoded Cell (may be a null value)
+	 *
 	 * @throws BadFormatException If cell encoding is invalid
 	 */
-	public abstract  <T extends ACell> T decode(Blob encoding) throws BadFormatException;
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T decode(Blob encoding) throws BadFormatException {
+		return (T) getEncoder().decode(encoding);
+	}
 	
 	public abstract AEncoder<ACell> getEncoder();
+
+	/**
+	 * Decodes a cell from multi-cell encoded data using this store's encoder.
+	 * Non-embedded refs not found within the message resolve from this store.
+	 *
+	 * @param <T> Expected cell type
+	 * @param data Multi-cell encoded data
+	 * @return Decoded cell
+	 * @throws BadFormatException If encoding format is invalid
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
+		return (T) getEncoder().decodeMultiCell(data);
+	}
+
+	/**
+	 * Decodes a Ref-format encoding (as produced by {@code ref.getEncoding()}).
+	 * Handles both non-embedded refs (Tag.REF + hash → store lookup) and
+	 * embedded cells (inline encoding).
+	 *
+	 * @param <T> Type of referenced value
+	 * @param encoding Blob in ref format
+	 * @return Ref to the decoded value
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public <T extends ACell> Ref<T> decodeRef(Blob encoding) throws BadFormatException {
+		return ((CAD3Encoder)getEncoder()).decodeRef(encoding);
+	}
 
 	/**
 	 * checks in-memory cache for a stored Ref. Returns store-native Ref if found, null otherwise. Does not access underlying storage.
@@ -148,4 +180,13 @@ public abstract class AStore implements Closeable {
 	public abstract <T extends ACell> Ref<T> checkCache(Hash h);
 
 	public abstract String shortName();
+
+	/**
+	 * Returns true if this store persists data durably across JVM restarts.
+	 *
+	 * @return true if data survives restart, false for in-memory stores
+	 */
+	public boolean isPersistent() {
+		return false;
+	}
 }

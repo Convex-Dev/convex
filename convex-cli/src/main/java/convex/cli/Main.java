@@ -124,7 +124,7 @@ public class Main extends ACommand {
 			} catch (ParameterException t) {
 				informError("ERROR: Unable to parse arguments: " + t.getMessage());
 				informWarning("For more information on options and commands try 'convex help'.");
-				return ExitCodes.ERROR;
+				return ExitCodes.USAGE;
 			}
 
 			if (commandLine.isUsageHelpRequested()) {
@@ -147,6 +147,8 @@ public class Main extends ACommand {
 	}
 
 	private void setupVerbosity() {
+		// Verbosity levels 0-5 map to SLF4J levels. Levels 4 and 5 both map to TRACE
+		// since SLF4J has no finer level than TRACE.
 		Level[] verboseLevels = { Level.ERROR, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.TRACE };
 
 		if (verbose == null)

@@ -33,7 +33,6 @@ import convex.core.util.Utils;
  */
 public class ConvexJSON {
 
-
 	private final String url;
 	private final HttpClient httpClient;
 	private AKeyPair keyPair;

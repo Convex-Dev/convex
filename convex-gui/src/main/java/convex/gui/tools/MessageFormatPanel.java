@@ -11,6 +11,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -118,7 +119,7 @@ public class MessageFormatPanel extends JPanel {
 			if (b==null) {
 				data = "Invalid hex";
 			} else {
-				o = Format.decodeMultiCell(b);
+				o = CVMEncoder.INSTANCE.decodeMultiCell(b);
 				data = Utils.print(o);
 				updateHashLabel(o,b);
 			}
@@ -159,13 +160,14 @@ public class MessageFormatPanel extends JPanel {
 		messageArea.setText(msg);
 	}
 	
-	@SuppressWarnings("null")
+
 	private void updateHashLabel(ACell v, Blob b) {
+		// TODO: change to if (b!=null)
 		StringBuilder sb=new StringBuilder();
 		boolean empty=(b==null);
-		sb.append("Hash:          " + (empty?"<none>":b.getContentHash().toString()));
-		sb.append("\n");
 		sb.append("Type:          "+(empty?"<none>":RT.getType(v).toString()));
+		sb.append("\n");
+		sb.append("Hash:          " + (empty?"<none>":b.getContentHash().toString()));
 		sb.append("\n");
 		sb.append("Encoding Size: "+(empty?"<none>":b.count()));
 		sb.append("\n");

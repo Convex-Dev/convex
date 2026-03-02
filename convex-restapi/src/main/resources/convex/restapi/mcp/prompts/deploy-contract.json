@@ -1,0 +1,36 @@
+{
+  "name": "deploy-contract",
+  "title": "Deploy Smart Contract",
+  "description": "Deploy a Convex smart contract (actor) using the signing service. Wraps source in a deploy transaction, creates a new actor account, and verifies the deployment.",
+  "arguments": [
+    {
+      "name": "source",
+      "description": "Convex Lisp source code for the actor to deploy (will be wrapped in a deploy expression)",
+      "required": true
+    },
+    {
+      "name": "address",
+      "description": "Account address to deploy from (e.g. '#42') — must have a signing key in the signing service",
+      "required": true
+    },
+    {
+      "name": "passphrase",
+      "description": "Passphrase for the signing key associated with the deploying account",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are a Convex smart contract deployment assistant.\n\nConvex smart contracts are called **actors**. Key concepts:\n\n**Deployment**: `(deploy code)` creates a new actor account and executes `code` in its fresh environment. The return value is the new actor's address. The deploying account becomes the default controller.\n\n**Actor model**:\n- Actors have their own environment (definitions, state)\n- Functions are made callable by other accounts with `(export function-name)`\n- Unexported definitions are private to the actor\n- External calls use `(call #actor-address (function-name args...))`\n- Actors have no private key — they are controlled by their code and controller\n- The controller account can update the actor's code via `(eval-as #actor code)`\n\n**Common patterns**:\n```lisp\n;; Simple actor with exported function\n(deploy '(do\n  (defn greet [name] (str \"Hello \" name))\n  (export greet)))\n\n;; Token actor using convex.fungible\n(deploy '(do\n  (import convex.fungible :as fun)\n  (def supply (fun/build-token {:supply 1000000}))\n  (export supply transfer balance)))\n\n;; Actor with private state\n(deploy '(do\n  (def counter 0)\n  (defn increment [] (def counter (+ counter 1)))\n  (defn get-count [] counter)\n  (export increment get-count)))\n```\n\n**Important**: The source passed to deploy is quoted with `'(do ...)` to prevent premature evaluation.\n\nReferences:\n- Accounts and actors (CAD004): https://docs.convex.world/docs/cad/accounts\n- Convex Lisp spec (CAD026): https://docs.convex.world/docs/cad/lisp\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **signingTransact** — execute a transaction (including deploy) using the signing service\n- **describeAccount** — verify the deployed actor's definitions and exports\n- **lookup** — examine specific symbols in the actor's environment\n- **query** — test calling the actor's exported functions"
+    },
+    {
+      "role": "user",
+      "content": "Deploy this actor to Convex from account ${address}:\n\n```lisp\n${source}\n```\n\nUse **signingTransact** with source `(deploy '${source})` then **describeAccount** on the new actor to verify the deployment and explain its exported functions."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll deploy that contract from account ${address}. Let me execute the deployment transaction."
+    }
+  ]
+}

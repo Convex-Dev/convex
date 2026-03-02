@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn test:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(mvn test-compile exec:java:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(mvn test-compile:*)",
+      "Bash(find:*)",
+      "Bash(mvn compile:*)",
+      "Bash(cat:*)",
+      "Bash(git stash:*)",
+      "Bash(grep:*)",
+      "Bash(mvn clean install:*)",
+      "Bash(git fetch:*)",
+      "Bash(xxd:*)",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(mvn install:*)",
+      "Bash(java -jar convex-cli/target/convex-cli.jar account create:*)",
+      "Bash(java -jar:*)"
+    ]
+  }
+}

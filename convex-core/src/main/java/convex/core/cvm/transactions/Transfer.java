@@ -10,12 +10,10 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.ErrorMessages;
@@ -42,20 +40,18 @@ public class Transfer extends ATransaction {
 		this.amount = RT.ensureLong(values.get(3)).longValue();
 	}
 
+	/**
+	 * Creates a Transfer transaction from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Transfer instance
+	 */
+	public static Transfer create(AVector<ACell> values) {
+		return new Transfer(values);
+	}
+
 	public static Transfer create(Address origin,long sequence, Address target, long amount) {
 		if (!Coin.isValidAmount(amount)) throw new IllegalArgumentException(ErrorMessages.BAD_AMOUNT);
 		return new Transfer(origin,sequence, target, amount);
-	}
-
-	public static ATransaction read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Transfer result=new Transfer(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
 	}
 
 	@Override

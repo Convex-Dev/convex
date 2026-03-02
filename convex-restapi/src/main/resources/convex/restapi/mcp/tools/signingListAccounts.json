@@ -1,0 +1,22 @@
+{
+  "name": "signingListAccounts",
+  "title": "List Signing Accounts",
+  "description": "List signing keys and associated on-chain addresses for the authenticated identity.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "accounts": {
+        "type": "array",
+        "description": "Array of entries with publicKey and addresses[] for each signing key"
+      }
+    }
+  }
+}

@@ -4,7 +4,6 @@ import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -139,30 +138,6 @@ public final class Symbol extends ASymbolic {
 	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=(byte)(name.count());
 		return name.writeRawData(bs, pos);
-	}
-
-	/**
-	 * Reads a Symbol from the given Blob
-	 * 
-	 * @param blob Encoding source
-	 * @return The Symbol read
-	 * @throws BadFormatException If a Symbol could not be read correctly.
-	 */
-	public static Symbol read(Blob blob, int offset) throws BadFormatException {
-		int len=0xff&blob.byteAt(offset+1); // skip tag
-		AString name=Format.readUTF8String(blob,offset+2,len);
-		Symbol sym = Symbol.create(name);
-		
-		if (sym == null) throw new BadFormatException("Can't read symbol");
-		
-		// Note we sometimes call this with a fake tag, and there is a cache
-		// we only want to attach encoding if not already done, and if tag is correct
-		if (sym.cachedEncoding()==null) {
-			if (blob.byteAt(offset)==Tag.SYMBOL) {
-				sym.attachEncoding(blob.slice(offset, offset+2+len));
-			}
-		}
-		return sym;
 	}
 
 	@Override

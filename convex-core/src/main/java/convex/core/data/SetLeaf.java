@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.BiFunction;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
@@ -227,41 +226,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	
 	public static int MAX_ENCODING_LENGTH=  2 + MAX_ELEMENTS * Format.MAX_EMBEDDED_LENGTH;
 
-	/**
-	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
-	 * already read.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @param count Count of map elements	 
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	
-	public static <V extends ACell> SetLeaf<V> read(Blob b, int pos, long count) throws BadFormatException {
-		int headerLen=1+1; // tag plus VLQ Count length which is always 1
-		
-		int epos=pos+headerLen;
-		if (count == 0) return Sets.empty();
-		if (count < 0) throw new BadFormatException("Negative count of set elements!");
-		if (count > MAX_ELEMENTS) throw new BadFormatException("SetLeaf too big: " + count);
-		
-		@SuppressWarnings("unchecked")
-		Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
-		for (int i = 0; i < count; i++) {
-			Ref<V> ref=Format.readRef(b,epos);
-			epos+=ref.getEncodingLength();
-			items[i]=ref;
-		}
-		if (!isValidOrder(items)) throw new BadFormatException("Set elements out of order in encoding");
-		
-		SetLeaf<V> result=new SetLeaf<V>(items);
-		
-		Blob enc=b.slice(pos, epos);
-		result.attachEncoding(enc);
-		return result;
-	}
-
 	
 
 	@SuppressWarnings("unchecked")
@@ -278,7 +242,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return true;
 	}
 
-	private static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
+	static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
 		long count = entries.length;
 		for (int i = 0; i < count - 1; i++) {
 			Hash a = entries[i].getHash();

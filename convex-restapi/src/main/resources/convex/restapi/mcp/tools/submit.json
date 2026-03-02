@@ -1,7 +1,11 @@
 {
   "name": "submit",
   "title": "Submit Prepared Transaction",
-  "description": "Submit a previously prepared transaction. Requires the transaction hash reference, the account public key, and the Ed25519 signature over the provided hash.",
+  "description": "Submit a previously prepared transaction with hash, public key, and signature.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -21,7 +25,7 @@
     "required": [
       "hash",
       "accountKey",
-      "signature"
+      "sig"
     ]
   },
   "outputSchema": {

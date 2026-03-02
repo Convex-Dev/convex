@@ -1,0 +1,23 @@
+{
+  "name": "signingListKeys",
+  "title": "List Signing Keys",
+  "description": "List all public keys stored in the signing service for the authenticated identity.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "keys": {
+        "type": "array",
+        "description": "Array of hex-encoded Ed25519 public keys for this identity"
+      }
+    }
+  }
+}

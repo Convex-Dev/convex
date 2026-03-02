@@ -4,6 +4,29 @@
 
 Convex main repository is structured as a multi-module Maven project.
 
+## Automated Builds
+
+### Snapshot Builds (develop branch)
+
+Every push to the `develop` branch triggers an automated snapshot build:
+- Builds and tests the project
+- Creates/updates a `snapshot-develop` pre-release on GitHub
+- Uploads `convex.jar` with current version and commit info
+- ⚠️ Marked as pre-release (unstable, for development/testing only)
+
+Access: [Snapshot Release](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop)
+
+### Release Builds (tagged versions)
+
+Pushing a tag matching `*.*.*` (e.g., `0.8.3`) triggers an automated release build:
+- Builds and tests the project
+- Extracts changelog from CHANGELOG.md
+- Creates a stable GitHub Release
+- Uploads `convex.jar` as a release asset
+- Marked as stable production release
+
+See "Release preparation" section below for the full release process.
+
 
 ## Release preparation
 
@@ -39,13 +62,26 @@ mvn versions:set -DnewVersion='0.8.2' -DartifactId=* -DgroupId=*
 
 Commit as "Prepare for Release 0.8.2"
 
-### Tag release
+### Tag and push release
 
-- Tag Release Commit e.g. `0.8.2`
+Tag the release commit and push to trigger automated build:
 
-### Build and deploy
-
+```bash
+git tag 0.8.3
+git push origin 0.8.3
 ```
+
+This will trigger the GitHub Actions release workflow which:
+- Builds and tests the project (`mvn -B clean verify`)
+- Extracts changelog for this version from CHANGELOG.md
+- Creates a GitHub Release with the changelog
+- Uploads `convex.jar` as a release asset
+
+The JAR will be available as a GitHub Release asset named `convex-{version}.jar`
+
+### Manual deploy to Maven Central (if needed)
+
+```bash
 mvn -B clean verify
 mvn deploy -Prelease
 ```

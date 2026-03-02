@@ -27,6 +27,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
+import convex.test.Samples;
 
 /**
  * Tests for the State data structure
@@ -39,12 +40,11 @@ public class StateTest {
 	public void testEmptyState() {
 		State s = State.EMPTY;
 		assertSame(s,s.updateRefs(rf->rf));
-		
+
 		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
 
-
-		RecordTest.doRecordTests(s);
+		doStateTests(s);
 	}
 
 	@Test
@@ -54,9 +54,13 @@ public class StateTest {
 		assertSame(s, s.withPeers(s.getPeers()));
 
 		s.validate();
-		
+
 		assertEquals(s.getEncodingLength(),s.getEncoding().size());
 
+		doStateTests(s);
+	}
+
+	public static void doStateTests(State s) {
 		RecordTest.doRecordTests(s);
 	}
 
@@ -66,20 +70,20 @@ public class StateTest {
 
 		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = Cells.persist(s).getRef();
+		Ref<State> rs = Cells.persist(s, Samples.TEST_STORE).getRef();
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 
 		// TODO: consider if cached ref in state should now have persisted status?
 		// assertTrue(s.getRef().isPersisted());
 
 		Blob b = Cells.encode(s);
-		State s2 = Format.read(b);
+		State s2 = Samples.TEST_STORE.decode(b);
 		assertEquals(s, s2);
 
 		AccountStatus as=s2.getAccount(InitTest.HERO);
 		assertNotNull(as);
-		
-		RecordTest.doRecordTests(s2);
+
+		doStateTests(s2);
 		RecordTest.doRecordTests(as);
 	}
 	
@@ -96,7 +100,8 @@ public class StateTest {
 		
 		Blob b=Format.encodeMultiCell(s,true);
 		
-		State s2=Format.decodeMultiCell(b);
+		State s2;
+		s2=Samples.TEST_STORE.decodeMultiCell(b);
 		// System.err.println(Refs.printMissingTree(s2));
 		assertEquals(s,s2);
 		
@@ -109,7 +114,7 @@ public class StateTest {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));
 		
-		Ref<State> r1=Cells.persist(s).getRef();
+		Ref<State> r1=Cells.persist(s, Samples.TEST_STORE).getRef();
 		RefTreeStats rs1=Refs.getRefTreeStats(r1);
 		
 		assertTrue(r1.isPersisted());

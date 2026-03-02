@@ -7,7 +7,6 @@ import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Index;
@@ -18,7 +17,6 @@ import convex.core.data.Sets;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
@@ -91,6 +89,15 @@ public class AccountStatus extends ARecordGeneric {
 	}
 
 	/**
+	 * Creates an AccountStatus from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return AccountStatus instance
+	 */
+	public static AccountStatus create(AVector<ACell> values) {
+		return new AccountStatus(values);
+	}
+
+	/**
 	 * Create a regular account, with the specified balance and zero memory allowance
 	 * 
 	 * @param sequence Sequence number
@@ -141,22 +148,6 @@ public class AccountStatus extends ARecordGeneric {
 		return balance;
 	}
 	
-	/**
-	 * Decode AccountStatus from Blob
-	 * @param b Blob to read from
-	 * @param pos start position in Blob 
-	 * @return AccountStatus instance
-	 * @throws BadFormatException in case of any encoding error
-	 */
-	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-		
-		AccountStatus result=new AccountStatus(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		return 30+Format.estimateEncodingSize(environment)+Format.estimateEncodingSize(holdings)+Format.estimateEncodingSize(controller)+33;

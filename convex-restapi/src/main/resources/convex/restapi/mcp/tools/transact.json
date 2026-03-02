@@ -1,21 +1,25 @@
 {
   "name": "transact",
-  "title": "Convex Transaction",
-  "description": "Submit a Convex transaction. Transactions require an origin account with a CVM balance and a valid Ed25519 signature. Transactions are atomic operations on the CVM that can update global state and take economic actions (e.g. interact with digital assets and smart contracts)",
+  "title": "Convex Transaction (Quick)",
+  "description": "Execute a Convex transaction in one step. Sends seed over network — use HTTPS with trusted peers only. For sensitive operations prefer prepare → signAndSubmit.\n\nTransactions update global state atomically. Amounts in copper (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {
       "source": {
         "type": "string",
-        "description": "CVM source code to execute e.g. '(transfer #13 10000000000)'"
+        "description": "Convex Lisp source code to execute, e.g. '(transfer #13 1000000000)'"
       },
       "seed": {
          "type": "string",
-         "description": "Ed25519 seed (64 hex chars) used to sign the transaction. Only submit this if you trust the host!"
+         "description": "Ed25519 seed (64 hex chars). ⚠️ SECURITY: Sent over network to peer for signing. Use HTTPS and trusted peers only!"
       },
       "address": {
         "type": "string",
-        "description": "Origin account address (e.g. '#13'). This is the account in which the transaction will execute."
+        "description": "Origin account address (e.g. '#13'). Transaction executes from this account."
       }
     },
     "required": ["source", "seed", "address"]
@@ -23,11 +27,10 @@
   "outputSchema": {
     "type": "object",
     "properties": {
-      "value": {"description": "Resulting CVM value"},
+      "value": {"description": "Resulting CVM value from execution"},
       "errorCode": {"description": "CVM error code if the transaction failed"},
-      "info": {"description": "Additional execution metadata"},
+      "info": {"description": "Execution metadata including juice used, fees, and transaction hash"},
       "message": {"type": "string", "description": "Optional human-readable message"}
     }
   }
 }
-

@@ -1,11 +1,9 @@
 package convex.core.util;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -27,7 +25,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import convex.core.data.ACell;
 import convex.core.data.AObject;
@@ -43,6 +40,8 @@ import convex.core.lang.RT;
  */
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];
+	public static final byte[] ZERO_BYTES_32 = new byte[32];
+	public static final byte[] ZERO_BYTES_64 = new byte[64];
 
 	/**
 	 * Converts an int to a hex string e.g. "80cafe80"
@@ -718,9 +717,7 @@ public class Utils {
 	 */
 	public static String readResourceAsString(String path) throws IOException {
 		try (InputStream inputStream = getResourceAsStream(path)) {
-			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-				return reader.lines().collect(Collectors.joining(System.lineSeparator()));
-			}
+			return new String(inputStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
 		}
 	}
 	

@@ -1,11 +1,11 @@
 package convex.core;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertNobodyError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -129,11 +129,11 @@ public class PeerTest {
 		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr).context);
 		
 		// Beyond this point, we need to assume fork recovery is enabled
-		assumeTrue(CPoSConstants.ENABLE_FORK_RECOVERY);
-		
-		p=p.updateState();
-		assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());
-		assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr).context);
+		if (CPoSConstants.ENABLE_FORK_RECOVERY) {
+			p=p.updateState();
+			assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());
+			assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr).context);
+		}
 	}
 
 

@@ -6,21 +6,17 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 import convex.core.util.ErrorMessages;
-import convex.core.util.Utils;
 
 /**
  * Op representing special Symbols like *address* and *caller*
@@ -214,16 +210,6 @@ public class Special<T extends ACell> extends AOp<T> {
 		return Bits.hash32((long)specialCode);
 	}
 
-
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
-
-		byte scode=b.byteAt(epos);
-		Special<T> special=(Special<T>) Special.create(scode);
-		if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString(scode));
-		return special;
-	}
 
 
 }

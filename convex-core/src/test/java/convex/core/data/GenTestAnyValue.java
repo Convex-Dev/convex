@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 
+import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -15,14 +16,13 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestAnyValue {
-	
+
 	@Property
 	public void printFormats(@From(ValueGen.class) ACell o) {
 		String s=Utils.print(o);
@@ -67,7 +67,7 @@ public class GenTestAnyValue {
 				byte[] badBytes=r.getHash().getBytes();
 				Utils.writeInt(badBytes, 28,12255);
 				Hash badHash=Hash.wrap(badBytes);
-				return Ref.forHash(badHash);
+				return Ref.forHash(badHash, Samples.TEST_STORE);
 			});
 			c.validateCell();
 		}
@@ -76,11 +76,11 @@ public class GenTestAnyValue {
 	@Property
 	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
 		if (Cells.isEmbedded(o)) {
-			Cells.persist(o); // NOTE: may have child refs to persist
+			Cells.persist(o, Samples.TEST_STORE); // NOTE: may have child refs to persist
 			
 			Blob data=Cells.encode(o);
-			ACell o2=Format.read(data);
-			
+			ACell o2=Samples.TEST_STORE.decode(data);
+
 			// check round trip properties
 			assertEquals(o,o2);
 			AArrayBlob data2=Cells.encode(o2);
@@ -107,13 +107,13 @@ public class GenTestAnyValue {
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toFlatBlob();
 		
 		// check persistence
-		o=Cells.persist(o);
+		o=Cells.persist(o, Samples.TEST_STORE);
 		Ref<ACell> dataRef=Ref.get(o); // ensure in store
 		Hash hash=Hash.get(o);
 		assertEquals(dataRef.getHash(),hash);
 		
 		// re-read data, should be canonical
-		ACell o2=Format.read(data);
+		ACell o2=Samples.TEST_STORE.decode(data);
 		assertTrue(Cells.isCanonical(o2));
 		
 		// equality checks
@@ -126,11 +126,11 @@ public class GenTestAnyValue {
 		assertEquals(data,data2);
 		
 		// simulate retrieval via hash
-		Ref<ACell> dataRef2=Stores.current().refForHash(hash);
+		Ref<ACell> dataRef2=Samples.TEST_STORE.refForHash(hash);
 		if (dataRef2!=null) {
 			// Have in store
 			assertEquals(dataRef,dataRef2);
-			Ref<ACell> r2=Ref.forHash(hash);
+			Ref<ACell> r2=Ref.forHash(hash, Samples.TEST_STORE);
 			ACell o3=r2.getValue();
 			assertEquals(o,o3);
 		}

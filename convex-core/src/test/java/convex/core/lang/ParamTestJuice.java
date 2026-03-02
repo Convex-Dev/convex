@@ -17,13 +17,13 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.exceptions.BadFormatException;
 import convex.core.init.InitTest;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 @RunWith(Parameterized.class)
 public class ParamTestJuice {
@@ -105,7 +105,7 @@ public class ParamTestJuice {
 	public void testOpRoundTrip() throws BadFormatException {
 		AOp<?> op = compile(source);
 		Blob b = Cells.encode(op);
-		AOp<?> op2 = Format.read(b);
+		AOp<?> op2 = Samples.TEST_STORE.decode(b);
 		Blob b2 = Cells.encode(op2);
 		assertEquals(b, b2);
 	}

@@ -13,6 +13,7 @@ import javax.swing.plaf.basic.BasicComboBoxEditor;
 
 import convex.core.cvm.Address;
 import convex.core.data.Vectors;
+import convex.core.init.Init;
 import convex.core.text.AddressFormat;
 import convex.core.util.Utils;
 import convex.gui.utils.Toolkit;
@@ -23,7 +24,9 @@ public class AddressCombo extends JComboBox<Address> {
 	private static Address PROTOTYPE=Address.create(100000);
 	
 	private static TreeSet<Address> usedAddresses=new TreeSet<>();
-	
+	static {
+		usedAddresses.add(Init.GENESIS_ADDRESS);
+	}
 	private class AddressEditor extends BasicComboBoxEditor {	
 		@Override 
 		public Address getItem() {
@@ -55,6 +58,16 @@ public class AddressCombo extends JComboBox<Address> {
 		super(model);
 		setEditor(new AddressEditor());
 		setEditable(true);
+		
+		try {
+			Address initial=model.getElementAt(0);
+			if (initial!=null) {
+				getEditor().setItem(initial);
+			}
+		} catch (Exception e) {
+			// ignore
+		}
+		
 		this.addItemListener(e->{
 			Address address=(Address) getSelectedItem();
 			if ((address!=null)&&(model.getIndexOf(address)<0)) {
@@ -63,6 +76,7 @@ public class AddressCombo extends JComboBox<Address> {
 			}
 			Toolkit.relinquishFocus(AddressCombo.this);
 		});
+
 	}
 
 	public AddressCombo() {

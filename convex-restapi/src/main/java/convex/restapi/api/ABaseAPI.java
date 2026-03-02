@@ -18,6 +18,17 @@ import convex.core.data.Symbol;
  */
 public abstract class ABaseAPI extends AGenericAPI {
 	
+	/**
+	 * Default busy timeout for simultaneous requests
+	 */
+	public static final long BUSY_TIMEOUT = 5000;
+
+	
+	/**
+	 * Default pagination limit
+	 */
+	private static final long DEFAULT_LIMIT = 10;
+	
 	protected final RESTServer restServer;
 	protected final Server server;
 
@@ -109,7 +120,7 @@ public abstract class ABaseAPI extends AGenericAPI {
 	    return baseUrl.toString();
 	}
 	
-	private static final long DEFAULT_LIMIT = 10;
+
 
 	/**
 	 * Get a pagination range from query params as an [start,end, fullLimit] array

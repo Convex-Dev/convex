@@ -3,11 +3,7 @@ package convex.core.lang.impl;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -102,26 +98,6 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// nothing to do?
-	}
-
-	/**
-	 * Decodes a MultiFn instance from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> MultiFn<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		AVector<AClosure<T>> fns=Format.read(b,epos);
-		if (fns==null) throw new BadFormatException("Null fns!");
-		epos+=Cells.getEncodingLength(fns);
-		
-		MultiFn<T> result= new MultiFn<T>(fns);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })

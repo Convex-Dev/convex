@@ -7,7 +7,6 @@ import java.security.MessageDigest;
 import java.util.Enumeration;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
 import convex.core.util.Utils;
@@ -40,7 +39,7 @@ public class BlobTree extends ABlob {
 	 */
 	private final int shift;
 
-	private BlobTree(Ref<ABlob>[] children, int shift, long count) {
+	BlobTree(Ref<ABlob>[] children, int shift, long count) {
 		super(count);
 		this.children = children;
 		this.shift = shift;
@@ -152,15 +151,15 @@ public class BlobTree extends ABlob {
 			return createSmall(blobs, offset, chunkCount);
 		} else {
 			int shift = calcShift(chunkCount);
-			int childChunks = 1 << shift; // number of chunks in children
+			long childChunks = 1L << shift; // number of chunks in children
 			int numChildren = ((chunkCount - 1) >> shift) + 1;
 			@SuppressWarnings("unchecked")
 			Ref<ABlob>[] children = new Ref[numChildren];
 
 			long length = 0;
 			for (int i = 0; i < numChildren; i++) {
-				int childOffset = i * childChunks;
-				int chunks= Math.min(childChunks, chunkCount - childOffset);
+				int childOffset = (int)(i * childChunks);
+				int chunks= (int)Math.min(childChunks, chunkCount - childOffset);
 				ABlob child;
 				if (chunks==1) {
 					child=blobs[offset+childOffset];
@@ -331,37 +330,6 @@ public class BlobTree extends ABlob {
 	 */
 	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLQ_COUNT_LENGTH+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
-	/**
-	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
-	 * @param count Length to read
-	 * @param src Source data, assumed to include tag and count at start
-	 * @param pos Position to read from, assumed to be tag byte
-	 * @return BlobTree instance.
-	 * @throws BadFormatException If BlobTree encoding is invalid
-	 */
-	public static BlobTree read(long count, Blob src, int pos) throws BadFormatException {
-		int headerLength = (1 + Format.getVLQCountLength(count));
-		long chunks = calcChunks(count);
-		int shift = calcShift(chunks);
-		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
-
-		@SuppressWarnings("unchecked")
-		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
-		
-		int rpos=pos+headerLength; // ref position
-		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Format.readRef(src,rpos);
-			if (ref==Ref.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
-			children[i] = ref;
-			rpos+=ref.getEncodingLength();
-		}
-
-		BlobTree result= new BlobTree(children, shift, count);
-		Blob enc=src.slice(pos, rpos);
-		result.attachEncoding(enc);
-		return result;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		return 1 + Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
@@ -377,6 +345,9 @@ public class BlobTree extends ABlob {
 		BlobTree acc=this; // accumulator for appended BlobTree
 		long off=0; // offset into d
 		long dlen=d.count();
+		if (dlen > 0 && count > Long.MAX_VALUE - dlen) {
+			throw new IllegalArgumentException("Blob append would exceed maximum size");
+		}
 		
 		// loop until d is fully consumed
 		while (off<dlen) {
@@ -415,6 +386,46 @@ public class BlobTree extends ABlob {
 		return acc;
 	}
 
+	/**
+	 * Tree-aware replaceSlice. Navigates to affected children, replaces only
+	 * what changed, and preserves identity of unchanged subtrees.
+	 */
+	@Override
+	public ABlob replaceSlice(long position, ABlob b) {
+		long blen = b.count();
+		if (blen == 0) return this;
+		// If replacement extends past end, fall back to base (which handles growth)
+		if (position + blen > count) return super.replaceSlice(position, b);
+		long end = position + blen;
+
+		long csize = childLength();
+		int firstChild = (int)(position / csize);
+		int lastChild = (int)((end - 1) / csize);
+
+		Ref<ABlob>[] newChildren = null; // lazy clone
+		long boff = 0;
+
+		for (int i = firstChild; i <= lastChild; i++) {
+			ABlob oldChild = getChild(i);
+			long cstart = i * csize;
+			long replaceStart = Math.max(position - cstart, 0);
+			long replaceEnd = Math.min(end - cstart, oldChild.count());
+			long pieceLen = replaceEnd - replaceStart;
+
+			ABlob piece = b.slice(boff, boff + pieceLen);
+			boff += pieceLen;
+
+			ABlob newChild = oldChild.replaceSlice(replaceStart, piece);
+			if (newChild != oldChild) {
+				if (newChildren == null) newChildren = children.clone();
+				newChildren[i] = newChild.getRef();
+			}
+		}
+
+		if (newChildren == null) return this;
+		return new BlobTree(newChildren, shift, count);
+	}
+
 	private int childCount() {
 		return children.length;
 	}
@@ -430,7 +441,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public Blob getChunk(long chunkIndex) {
-		long childSize = 1 << shift;
+		long childSize = 1L << shift;
 		int child = Utils.checkedInt(chunkIndex >> shift);
 		return getChild(child).getChunk(chunkIndex - child * childSize);
 	}

@@ -625,8 +625,12 @@ public class RT {
 		}
 
 		if (a instanceof APrimitive) {
-			if (a instanceof CVMBool)
-				return null; // disallow boolean -> long cast
+			// disallow boolean -> long cast since (long false) would still be truthy
+			if (a instanceof CVMBool) {
+				return null; 
+			}
+			
+			// Other primitives are OK as a long
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
 
@@ -1055,7 +1059,7 @@ public class RT {
 	}
 
 	/**
-	 * Prints a value to a String as long as the result fits within a given print
+	 * Prints a value to a CVX-fromat String as long as the result fits within a given print
 	 * limit. WARNING: May return null
 	 * 
 	 * @param a Cell value to print
@@ -1066,7 +1070,7 @@ public class RT {
 	}
 
 	/**
-	 * Prints a value after converting to appropriate CVM type
+	 * Prints a value in CVX-format after converting to appropriate CVM type
 	 * 
 	 * @param o Any value to print
 	 * @return Printed representation of object, or null if print limit exceeded
@@ -1434,7 +1438,43 @@ public class RT {
 		}
 		return (T) result;
 	}
-	
+
+	/**
+	 * Checks whether a path exists in a nested data structure.
+	 * Returns false if any intermediate value is null or not a data structure.
+	 *
+	 * @param coll Root collection to check
+	 * @param keys Key path to test
+	 * @return true if all intermediate values exist and the final value is non-null
+	 */
+	public static boolean pathExists(ACell coll, ACell... keys) {
+		ACell current = coll;
+		for (int i = 0; i < keys.length; i++) {
+			if (current == null) return false;
+			if (current instanceof ADataStructure<?> ds) {
+				current = ds.get(keys[i]);
+			} else {
+				return false;
+			}
+		}
+		return current != null;
+	}
+
+	/**
+	 * Checks whether a single key exists in a data structure.
+	 *
+	 * @param coll Collection to check
+	 * @param key Key to test
+	 * @return true if the key exists and its value is non-null
+	 */
+	public static boolean pathExists(ACell coll, ACell key) {
+		if (coll == null) return false;
+		if (coll instanceof ADataStructure<?> ds) {
+			return ds.get(key) != null;
+		}
+		return false;
+	}
+
 	@SuppressWarnings("unchecked")
 	public static <T extends ADataStructure<?>> T assocIn(ACell a, ACell value, Object... keys) {
 		int n=keys.length;
@@ -2046,5 +2086,4 @@ public class RT {
 		}
 		return (T) result;
 	}
-
 }

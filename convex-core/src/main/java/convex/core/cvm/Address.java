@@ -13,7 +13,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -171,15 +170,6 @@ public final class Address extends AExtensionValue {
 		return null;
 	}
 	
-	public static Address read(Blob b, int pos) throws BadFormatException {
-		long value=Format.readVLQCount(b,pos+1); // skip tag, we assume correct
-		Address a= Address.create(value);
-		if (a==null) throw new BadFormatException("Invalid Address: "+value);
-		int epos=pos+1+Format.getVLQCountLength(value);
-		a.attachEncoding(b.slice(pos, epos));
-		return a;
-	}
-
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.ADDRESS;

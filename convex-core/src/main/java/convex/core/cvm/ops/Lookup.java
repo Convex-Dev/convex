@@ -7,12 +7,9 @@ import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.data.ACell;
-import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
@@ -29,6 +26,18 @@ import convex.core.lang.RT;
 public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 	private Lookup(Ref<AOp<Address>> address,Ref<Symbol> symbol) {
 		super (CVMTag.OP_LOOKUP,address,symbol);
+	}
+
+	/**
+	 * Creates a Lookup op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (address op)
+	 * @param value Value ref (symbol)
+	 * @return Lookup instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Lookup<T> createFromRefs(Ref<ACell> code, Ref<ACell> value) {
+		return new Lookup<>((Ref<AOp<Address>>)(Ref<?>)code, (Ref<Symbol>)(Ref<?>)value);
 	}
 
 	public static <T extends ACell> Lookup<T> create(AOp<Address> address, Symbol form) {
@@ -79,28 +88,6 @@ public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
 		}
 		Symbol symbol=value.getValue();
 		return symbol.print(bb,limit);
-	}
-
-	/**
-	 * Reads a Lookup op from a Blob encoding
-	 * @param <T> Type of Lookup value
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Lookup<T> read(Blob b,int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag to get to data
-		
-		Ref<AOp<Address>> addr=Format.readRef(b, epos);
-		epos+=addr.getEncodingLength();
-		
-		Ref<Symbol> sym=Format.readRef(b, epos);
-		epos+=sym.getEncodingLength();
-		
-		Lookup<T> result= new Lookup<T>(addr,sym);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 

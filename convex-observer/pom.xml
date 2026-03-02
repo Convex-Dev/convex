@@ -8,7 +8,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.2</version>
+		<version>0.8.3-SNAPSHOT</version>
 	</parent>
 
 	<name>Convex Observer</name>
@@ -28,23 +28,12 @@
 			<artifactId>convex-peer</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
-		<dependency>
-			<groupId>com.googlecode.json-simple</groupId>
-			<artifactId>json-simple</artifactId>
-			<version>1.1.1</version>
-		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
 			<version>${junit.version}</version>
 			<scope>test</scope>
-		</dependency>
-
-		<dependency>
-			<groupId>world.convex</groupId>
-			<artifactId>convex-java</artifactId>
-			<version>0.8.2</version>
 		</dependency>
 	</dependencies>
 </project>

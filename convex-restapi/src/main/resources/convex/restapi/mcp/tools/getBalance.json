@@ -1,0 +1,38 @@
+{
+  "name": "getBalance",
+  "title": "Get Balance",
+  "description": "Get coin or token balance for an account. Returns balance in copper (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Account address to check (e.g. '#13')"
+      },
+      "token": {
+        "type": "string",
+        "description": "Token actor address for fungible token balance (e.g. '#128'). Omit or nil for native CVM coin."
+      }
+    },
+    "required": ["address"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "number",
+        "description": "Account address queried"
+      },
+      "balance": {
+        "description": "Balance amount (copper for CVM, token units for fungible tokens)"
+      },
+      "token": {
+        "description": "Token address if a fungible token was queried, null for CVM"
+      }
+    }
+  }
+}

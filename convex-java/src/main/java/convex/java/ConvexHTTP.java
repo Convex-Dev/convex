@@ -22,6 +22,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Blob;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -29,7 +30,6 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
-import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
@@ -38,7 +38,7 @@ import convex.core.util.JSON;
 import convex.core.util.Utils;
 
 /**
- * Convex client instance that uses HTTP
+ * Convex client instance that uses HTTP with native CVX content
  */
 public class ConvexHTTP extends convex.api.Convex {
 	
@@ -55,6 +55,10 @@ public class ConvexHTTP extends convex.api.Convex {
 	
 	public static ConvexHTTP connect(URI uri,Address address, AKeyPair keyPair) {
 		return new ConvexHTTP(address,keyPair,uri);
+	}
+	
+	public static ConvexHTTP connect(URI uri) {
+		return new ConvexHTTP(null,null,uri);
 	}
 	
 
@@ -98,7 +102,7 @@ public class ConvexHTTP extends convex.api.Convex {
 			} else if (ContentTypes.CVX_RAW.equals(type)) {
 				byte[] body = response.body();
 				try {
-					ACell v = Format.decodeMultiCell(Blob.wrap(body));
+					ACell v = CVMEncoder.INSTANCE.decodeMultiCell(Blob.wrap(body));
 					if (v instanceof Result) return (Result)v;
 					return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
 				} catch (MissingDataException e) {
@@ -164,8 +168,8 @@ public class ConvexHTTP extends convex.api.Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		throw new UnsupportedOperationException();
+	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+		return message(Message.createChallenge(getNextID(), data));
 	}
 
 	@Override
@@ -201,13 +205,24 @@ public class ConvexHTTP extends convex.api.Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> messageRaw(Blob message) {
-		throw new TODOException();
+	public CompletableFuture<Result> messageRaw(Blob rawData) {
+		String messagePath = getAPIPath() + "/message";
+
+		HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(messagePath))
+				.header("Accept", ContentTypes.CVX_RAW)
+				.header("Content-Type", ContentTypes.CVX_RAW)
+				.POST(HttpRequest.BodyPublishers.ofByteArray(rawData.getBytes()))
+				.build();
+
+		return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray())
+				.thenApply(this::extractResult);
 	}
-	
+
 	@Override
 	public CompletableFuture<Result> message(Message message) {
-		throw new TODOException();
+		Blob encoded = message.getMessageData();
+		return messageRaw(encoded);
 	}
 
 	@Override

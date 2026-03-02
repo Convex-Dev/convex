@@ -23,3 +23,5 @@ target/
 /peers-shared-db
 .metadata
 /pom.xml.versionsBackup
+.lsp
+.clj-kondo

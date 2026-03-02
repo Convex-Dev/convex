@@ -268,5 +268,11 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
 		throw new TODOException();
 	}
+	
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new UnsupportedOperationException("Cannot seek by index in records");
+	}
+
 
 }

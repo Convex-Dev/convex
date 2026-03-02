@@ -1,7 +1,11 @@
 {
   "name": "peerStatus",
   "title": "Peer Status",
-  "description": "Return current peer status information",
+  "description": "Return current Convex peer status including consensus point and network state.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {}

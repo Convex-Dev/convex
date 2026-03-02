@@ -9,9 +9,9 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
+import convex.core.exceptions.TODOException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
@@ -38,7 +38,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	private final MapEntry<K, V>[] entries;
 
-	private MapLeaf(MapEntry<K, V>[] items) {
+	MapLeaf(MapEntry<K, V>[] items) {
 		super(items.length);
 		entries = items;
 	}
@@ -333,37 +333,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	
 	public static int MAX_ENCODING_LENGTH=  2 + 2 * MAX_ENTRIES * Format.MAX_EMBEDDED_LENGTH;
 
-	/**
-	 * Reads a MapLeaf from the provided Blob encoding.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (index of tag byte)
-	 * @param count Count of map elements
-	 * @return A Map as deserialised from the provided ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(Blob b, int pos, long count) throws BadFormatException {
-		int epos=pos+2; // Note: Tag byte plus VLQ Count length which is always 1
-		
-		@SuppressWarnings("unchecked")
-		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
-		for (int i = 0; i < count; i++) {
-			Ref<K> kr=Format.readRef(b,epos);
-			epos+=kr.getEncodingLength();
-			Ref<V> vr=Format.readRef(b,epos);
-			epos+=vr.getEncodingLength();
-			items[i] = MapEntry.fromRefs(kr, vr);
-		}
-
-		if (!isValidOrder(items)) {
-			throw new BadFormatException("Bad ordering of keys!");
-		}
-		
-		MapLeaf<K,V> result=new MapLeaf<>(items);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-	
 
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> emptyMap() {
@@ -386,7 +355,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
-	private static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
+	static <K extends ACell, V extends ACell> boolean isValidOrder(MapEntry<K, V>[] entries) {
 		long count = entries.length;
 		for (int i = 0; i < count - 1; i++) {
 			Hash a = entries[i].getKeyHash();
@@ -520,14 +489,14 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			// new entry
 			MapEntry<K, V> newE = null;
 			if (c < 0) {
-				V r = func.merge(ae.getValue(), null);
+				V r = func.merge(ae.getKey(), ae.getValue(), null);
 				if (r != null) newE = ae.withValue(r);
 			} else if (c > 0) {
-				V r = func.merge(null, be.getValue());
+				V r = func.merge(be.getKey(), null, be.getValue());
 				if (r != null) newE = be.withValue(r);
 			} else {
 				// we have matched keys
-				V r = func.merge(ae.getValue(), be.getValue());
+				V r = func.merge(ae.getKey(), ae.getValue(), be.getValue());
 				if (r != null) newE = ae.withValue(r);
 			}
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
@@ -567,17 +536,17 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			MapEntry<K, V> newE = null;
 			if (c < 0) {
 				// lowest key in this map only
-				V r = func.merge(ae.getValue(), null);
+				V r = func.merge(ae.getKey(), ae.getValue(), null);
 				if (r != null) newE = ae.withValue(r);
 			} else if (c > 0) {
 				// lowest key in other map b only
-				V r = func.merge(null, be.getValue());
+				V r = func.merge(be.getKey(), null, be.getValue());
 				if (r != null) newE = be.withValue(r);
 			} else {
 				// keys are equal (i.e. value in both maps)
 				V av = ae.getValue();
 				V bv = be.getValue();
-				V r = (Cells.equals(av, bv)) ? av : func.merge(ae.getValue(), be.getValue());
+				V r = (Cells.equals(av, bv)) ? av : func.merge(ae.getKey(), ae.getValue(), be.getValue());
 				if (r != null) newE = ae.withValue(r);
 			}
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {
@@ -751,6 +720,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return entries[0].getKeyHash();
 	}
 
-
-
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new TODOException();
+	}
 }

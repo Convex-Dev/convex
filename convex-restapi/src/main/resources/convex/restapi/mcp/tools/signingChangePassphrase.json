@@ -1,0 +1,52 @@
+{
+  "name": "signingChangePassphrase",
+  "title": "Change Passphrase (Signing Service)",
+  "description": "Change the passphrase for a stored signing key. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key identifying which key to re-encrypt (hex string)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Current passphrase for key decryption"
+      },
+      "newPassphrase": {
+        "type": "string",
+        "description": "New passphrase for re-encryption"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["publicKey", "passphrase", "newPassphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "updated": {
+        "type": "boolean",
+        "description": "true if the passphrase was successfully changed"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}

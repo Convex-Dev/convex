@@ -44,7 +44,7 @@ public class RestoreTest {
 	@Test
 	public void restoreTest() throws InterruptedException, ExecutionException, TimeoutException, ResultException, IOException, PeerException {
 //		 {
-//		   System.out.println("Test store = "+Stores.current());
+//		   System.out.println("Test store");
 //
 //		   State s=Init.STATE;
 //		   System.out.println("Init Ref = "+s.getRef());

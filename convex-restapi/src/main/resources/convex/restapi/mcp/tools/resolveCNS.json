@@ -1,7 +1,11 @@
 {
   "name": "resolveCNS",
   "title": "Resolve CNS Name",
-  "description": "Resolves a Convex Name Service (CNS) name to its full record, including value, controller, metadata, and child node.",
+  "description": "Resolve a CNS name to its record: value (usually an address), controller, metadata, and child node.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

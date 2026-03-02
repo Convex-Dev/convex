@@ -4,14 +4,12 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.List;
 import convex.core.data.Maps;
@@ -23,7 +21,6 @@ import convex.core.data.VectorLeaf;
 import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**
@@ -100,16 +97,6 @@ public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
 	@Override
 	public int estimatedEncodingSize() {
 		return 1+Format.MAX_EMBEDDED_LENGTH;
-	}
-
-	public static <T extends ACell> Constant<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
-
-		Ref<T> ref = Format.readRef(b,epos);
-		epos+=ref.getEncodingLength();
-		Constant<T> result= createFromRef(ref);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 	public T getValue() {

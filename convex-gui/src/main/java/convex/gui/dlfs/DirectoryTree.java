@@ -24,9 +24,13 @@ public class DirectoryTree extends JTree {
 	protected DLFileSystem fileSystem;
 
 	public DirectoryTree(DLFileSystem dlfs) {
+		this(dlfs, null);
+	}
+
+	public DirectoryTree(DLFileSystem dlfs, String driveName) {
 		this.fileSystem=dlfs;
-		
-		setModel(new DirectoryTree.DLFileTreeModel(dlfs));
+
+		setModel(new DirectoryTree.DLFileTreeModel(dlfs, driveName));
 		setExpandsSelectedPaths(true);
 		setEnabled(true);
 		
@@ -36,7 +40,7 @@ public class DirectoryTree extends JTree {
 		setShowsRootHandles(false);
 		setRootVisible(true);
 		setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
-
+ 
 		addMouseListener(new MouseAdapter() {
 		     public void mousePressed(MouseEvent e) {
 		         TreePath selPath = getPathForLocation(e.getX(), e.getY());
@@ -65,40 +69,66 @@ public class DirectoryTree extends JTree {
 	
 	public static class DLFileTreeModel extends DefaultTreeModel {
 		protected Path root;
-	
-		public DLFileTreeModel(DLFileSystem filesystem) {
-			super(getNode(filesystem.getRoot()));
+
+		public DLFileTreeModel(DLFileSystem filesystem, String driveName) {
+			super(getNode(filesystem.getRoot(), driveName));
 		}
-	
-		static DirectoryTree.Node getNode(Path path) {
-			DirectoryTree.Node node= new DirectoryTree.Node(path);
+
+		static DirectoryTree.Node getNode(Path path, String driveName) {
+			DirectoryTree.Node node= new DirectoryTree.Node(path, driveName);
 			node.loadChildren();
 			return node;
 		}
 	}
 
+	/**
+	 * Reloads children of the currently selected node (or root) and
+	 * notifies the model so the tree display updates.
+	 */
+	public void refreshSelectedNode() {
+		Node node = null;
+		TreePath selPath = getSelectionPath();
+		if (selPath != null && selPath.getLastPathComponent() instanceof Node) {
+			node = (Node) selPath.getLastPathComponent();
+		}
+		if (node == null) {
+			node = (Node) getModel().getRoot();
+		}
+		if (node == null) return;
+		node.loadChildren();
+		((DefaultTreeModel) getModel()).nodeStructureChanged(node);
+		// Re-select to keep selection visible
+		if (selPath != null) setSelectionPath(selPath);
+	}
+
 	public static class Node extends DefaultMutableTreeNode {
 		private boolean childrenLoaded = false;
 		private boolean isDirectory = false;
-		
+		private String displayName;
+
 		public Node(Path path) {
+			this(path, null);
+		}
+
+		public Node(Path path, String displayName) {
 			super(path);
+			this.displayName = displayName;
 			isDirectory=Files.isDirectory(path);
 			if (isDirectory) {
 				setAllowsChildren(true);
 			}
 		}
-	
+
 		public Path getFilePath() {
 			return (Path)this.getUserObject();
 		}
-	
+
 		public void loadChildren() {
 			if (childrenLoaded) {
 				this.removeAllChildren();
 			}
 			if (!isDirectory) return;
-			
+
 			Path p=getFilePath();
 			try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
 		        for (Path path : stream) {
@@ -108,19 +138,33 @@ public class DirectoryTree extends JTree {
 		        }
 		    } catch (Exception e) {
 		    	System.err.println(e.getMessage());
-		    } 
+		    }
 	        childrenLoaded=true;
 		}
-		
+
 		@Override
 		public boolean isLeaf() {
-			return !isDirectory;
+			if (!isDirectory) return true;
+			if (childrenLoaded) return getChildCount() == 0;
+			// Quick check: any subdirectory exists?
+			Path p = getFilePath();
+			try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
+				for (Path path : stream) {
+					if (Files.isDirectory(path)) return false;
+				}
+			} catch (Exception e) {
+				// treat as leaf on error
+			}
+			return true;
 		}
 		
 		@Override
 		public String toString() {
 			Path name=getFilePath().getFileName();
-			return (name==null)?"DLFS Root":name.toString();
+			if (name == null) {
+				return (displayName != null) ? "DLFS Drive: " + displayName : "DLFS Root";
+			}
+			return name.toString();
 		}
 		
 	}

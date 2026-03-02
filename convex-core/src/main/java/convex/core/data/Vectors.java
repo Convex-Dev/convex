@@ -6,7 +6,6 @@ import java.util.Comparator;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -143,32 +142,6 @@ public class Vectors {
 		ACell[] obs = new ACell[count];
 		Arrays.fill(obs, m);
 		return (AVector<T>) create(obs);
-	}
-
-	/**
-	 * Reads a Vector for the specified Blob. 
-	 * 
-	 * Assumes Tag byte already checked, attaches encoding iff tag is Tag.VECTOR.
-	 * 
-	 * Distinguishes between child types according to count.
-	 * 
-	 * @param <T> Type of elements
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQCount(b,pos+1);
-		if (count < 0) throw new BadFormatException("Negative length");
-		
-		AVector<T> result;
-		if (VectorLeaf.isValidCount(count)) {
-			result= VectorLeaf.read(count,b,pos);
-		} else {
-			result= VectorTree.read(count,b,pos);
-		}
-		return result;
 	}
 
 	/**

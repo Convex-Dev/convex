@@ -263,6 +263,9 @@ public class Text {
 		            case '\'':
 		                ch = '\'';
 		                break;
+		            case '/': // this is for JSON compatibility, a bit permissive in Java?
+		                ch = '/';
+		                break;
 		            // Hex Unicode: u????
 		            case 'u':
 		                if (i+6 > n) {

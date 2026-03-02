@@ -1,0 +1,23 @@
+{
+  "name": "signingServiceInfo",
+  "title": "Signing Service Info",
+  "description": "Check if the peer's signing service is available. No authentication required.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "available": {
+        "type": "boolean",
+        "description": "Whether the signing service is available on this peer"
+      }
+    }
+  }
+}

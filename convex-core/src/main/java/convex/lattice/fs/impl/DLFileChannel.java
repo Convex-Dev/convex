@@ -109,7 +109,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			
 			if (data.count()<pos) {
 				// extend file with zeros to start at new position
-				// ZeroBlob implementation makes this relatively cheap
+				// Sparse zero blob uses structural sharing, so this is cheap
 				data=data.append(Blobs.createZero(pos-data.count()));
 			}
 			

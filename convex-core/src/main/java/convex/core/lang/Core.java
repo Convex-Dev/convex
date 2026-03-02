@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 
 import convex.core.Constants;
@@ -2511,10 +2510,15 @@ public class Core {
 
 			int lastIndex=alen-1;
 			ACell lastArg = args[lastIndex];
-			ASequence<ACell> coll = RT.ensureSequence(lastArg);
-			if (coll == null) return context.withCastError(lastIndex,args, Types.SEQUENCE);
+			ADataStructure<ACell> coll = (lastArg==null)?Vectors.empty():RT.ensureDataStructure(lastArg);
+			if (coll == null) return context.withCastError(lastIndex,args, Types.DATA_STRUCTURE);
 
 			int vlen = coll.size(); // variable arg length
+			
+			// Pre-consume juice based on number of extra args copied
+			long argJuice=Juice.BUILD_PER_ELEMENT*vlen;
+			context=context.consumeJuice(Juice.APPLY+argJuice);
+			if (context.isExceptional()) return context;
 
 			// Build an array of arguments for the function
 			// TODO: bounds on number of arguments?
@@ -2526,15 +2530,15 @@ public class Core {
 					applyArgs[i] = args[i + 1];
 				}
 				int ix = alen - 2;
-				for (Iterator<ACell> it = coll.iterator(); it.hasNext();) {
-					applyArgs[ix++] = it.next();
+				for (int i = 0; i < vlen; i++) {
+					applyArgs[ix++] = coll.get(i);
 				}
 			} else {
 				applyArgs = coll.toCellArray();
 			}
 
 			Context rctx = context.invoke(fn, applyArgs);
-			return rctx.consumeJuice(Juice.APPLY);
+			return rctx;
 		}
 	});
 

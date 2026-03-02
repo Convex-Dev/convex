@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -55,8 +56,12 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.util.JSON;
+import convex.peer.Config;
 import convex.restapi.RESTServer;
+import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
@@ -87,28 +92,34 @@ public class ChainAPI extends ABaseAPI {
 
 	public ChainAPI(RESTServer restServer) {
 		super(restServer);
+		this.convex = restServer.getConvex();
 	}
 
 	private static final String ROUTE = "/api/v1/";
 
+	private ConcurrentLimit faucetLimit=new ConcurrentLimit(10);
+	private ConcurrentLimit identiconLimit=new ConcurrentLimit(10);
+	private ConcurrentLimit transactLimit=new ConcurrentLimit(2);
+	
 	@Override
 	public void addRoutes(Javalin app) {
 		String prefix = ROUTE;
 
-		app.post(prefix + "createAccount", this::createAccount);
 		app.post(prefix + "query", this::query);
-
-		app.post(prefix + "faucet", this::faucetRequest);
 
 		app.post(prefix + "transaction/prepare", this::transactionPrepare);
 		app.post(prefix + "transaction/submit", this::transactionSubmit);
+		app.post(prefix + "transact", transactLimit.handler(this::transact));
 
-		app.post(prefix + "transact", this::transact);
+		app.post(prefix + "createAccount", faucetLimit.handler(this::createAccount));
+		app.post(prefix + "faucet",  faucetLimit.handler(this::faucetRequest));
+
 
 		app.get(prefix + "accounts/{addr}", this::queryAccount);
 		app.get(prefix + "peers/{addr}", this::queryPeer);
 
-		app.get(prefix + "data/<hash>", this::getData);
+	
+		app.get(prefix + "data/{hash}", this::getData);
 		app.post(prefix + "data/encode", this::encodeData);
 		app.post(prefix + "data/decode", this::decodeData);
 		
@@ -119,11 +130,10 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix + "blocks/{blockNum}", this::getBlock);
 		
 		app.get(prefix + "status", this::getStatus);
-		
-		app.get("/identicon/{hex}", this::getIdenticon);
-		
-		convex = restServer.getConvex();
 
+		app.post(prefix + "message", this::handleMessage);
+
+		app.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
@@ -143,16 +153,16 @@ public class ChainAPI extends ABaseAPI {
 		String hashParam = ctx.pathParam("hash");
 		Hash h = Hash.parse(hashParam);
 		if (h == null) {
-			throw new BadRequestResponse(jsonError("Invalid hash: " + hashParam));
+			throw new BadRequestResponse("Invalid hash: " + hashParam);
 		}
 
 		ACell d;
 		try {
 			d = convex.acquire(h).get(1000, TimeUnit.MILLISECONDS);
 		} catch (ExecutionException e) {
-			throw new BadRequestResponse(jsonError("Missing Data: " + e.getMessage()));
+			throw new BadRequestResponse("Missing Data: " + e.getMessage());
 		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Error: " + e.getMessage()));
+			throw new BadRequestResponse("Error: " + e.getMessage());
 		}
 		setContent(ctx,d);
 	}
@@ -185,7 +195,11 @@ public class ChainAPI extends ABaseAPI {
 			ACell body=this.readJSONBody(ctx);
 			AString field=RT.ensureString(RT.getIn(body, Strings.DATA));
 			if (field==null) throw new BadRequestResponse("Encode requires 'data' field");
-			value=Reader.read(field.toString());
+			try {
+				value=Reader.read(field.toString());
+			} catch (ParseException e) {
+				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
+			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
 			try {
 				value=Reader.read(ctx.bodyInputStream());
@@ -199,8 +213,8 @@ public class ChainAPI extends ABaseAPI {
 		Blob b=Format.encodeMultiCell(value, true);
 
 		ctx.status(200);
-		String rtype=this.calcResponseContentType(ctx);
-		if (ContentTypes.CVX_RAW.equals(rtype)||ContentTypes.BYTES.equals(type)) {
+		String responseType=this.calcResponseContentType(ctx);
+		if (ContentTypes.CVX_RAW.equals(responseType)||ContentTypes.BYTES.equals(type)) {
 			ctx.result(b.getInputStream());
 		} else {
 			AMap<AString, ACell> result = Maps.of(
@@ -248,10 +262,9 @@ public class ChainAPI extends ABaseAPI {
 		
 		ACell r;
 		try {
-			r = Format.decodeMultiCell(value.toFlatBlob());
+			r = server.getStore().decodeMultiCell(value.toFlatBlob());
 		} catch (BadFormatException e) {
-			this.failBadRequest("Error decoding CAD3 data - bad format");
-			return;
+			throw new BadRequestResponse("Error decoding CAD3 data - bad format");
 		}
 
 		ctx.status(200);
@@ -510,6 +523,40 @@ public class ChainAPI extends ABaseAPI {
 		setContent(ctx, statusMap);
 	}
 
+	/**
+	 * Generic message endpoint. Accepts a Message in CAD3 raw or CVX text format,
+	 * delivers it to the server, and returns the Result honouring the Accept header.
+	 *
+	 * CAD3 raw supports all message types including SignedData. CVX text supports
+	 * vector-based messages (queries, status requests, etc.) but not SignedData.
+	 */
+	public void handleMessage(Context ctx) {
+		try {
+			String contentType = ctx.req().getContentType();
+			if (ContentTypes.JSON.equals(contentType)) {
+				throw new BadRequestResponse("JSON not acceptable as message format");
+			}
+
+			CompletableFuture<Result> cf;
+			if (ContentTypes.CVX_RAW.equals(contentType)) {
+				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
+				cf = convex.messageRaw(rawData);
+			} else {
+				// Accept CVX text or default — parse as CVX data
+				ACell body = getCVXBody(ctx);
+				Message message = Message.create(MessageType.UNKNOWN, body);
+				cf = convex.message(message);
+			}
+
+			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			setResult(ctx, r);
+		} catch (BadRequestResponse e) {
+			throw e;
+		} catch (Exception e) {
+			setResult(ctx, Result.fromException(e));
+		}
+	}
+
 	@OpenApi(path = ROUTE + "createAccount", 
 			versions="peer-v1",
 			methods = HttpMethod.POST, 
@@ -543,11 +590,11 @@ public class ChainAPI extends ABaseAPI {
 		AMap<AString, ACell> req = readJSONBody(ctx);
 		AString key = req.getIn("accountKey");
 		if (key == null)
-			throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
+			throw new BadRequestResponse("Expected JSON body containing 'accountKey' field");
 
 		AccountKey pk = AccountKey.parse(key);
 		if (pk == null)
-			throw new BadRequestResponse(jsonError("Unable to parse accountKey: " + key));
+			throw new BadRequestResponse("Unable to parse accountKey: " + key);
 
 		ACell faucet = req.getIn("faucet");
 		AInteger amt = AInteger.parse(faucet);
@@ -576,7 +623,7 @@ public class ChainAPI extends ABaseAPI {
 			},
 			responses = {
 				@OpenApiResponse(status = "200", 
-						description = "Account queried sucecssfully", 
+						description = "Account queried successfully", 
 						content = {
 							@OpenApiContent(
 									from=QueryAccountResponse.class,
@@ -594,7 +641,7 @@ public class ChainAPI extends ABaseAPI {
 
 		addr = Address.parse(addrParam);
 		if (addr == null) {
-			throw new BadRequestResponse(jsonError("Invalid address: " + addrParam));
+			throw new BadRequestResponse("Invalid address: " + addrParam);
 		}
 
 		Result r = convex.querySync(Lists.of(Symbols.ACCOUNT, addr));
@@ -612,6 +659,12 @@ public class ChainAPI extends ABaseAPI {
 			return;
 		}
 
+		String jsonAccountInfo = JSON.toString(getAccountInfo(addr, as));
+		
+		ctx.result(jsonAccountInfo);
+	}
+
+	public static HashMap<String, Object> getAccountInfo(Address addr, AccountStatus as) {
 		boolean isUser = !as.isActor();
 		AccountKey publicKey=as.getAccountKey();
 
@@ -623,19 +676,19 @@ public class ChainAPI extends ABaseAPI {
 		hm.put("memorySize", as.getMemorySize());
 		hm.put("sequence", as.getSequence());
 		hm.put("type", isUser ? "user" : "actor");
-
-		ctx.result(JSON.toString(hm));
+		return hm;
 	}
 
+	
 	public void queryPeer(Context ctx) throws InterruptedException {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
 
 		addr = AccountKey.parse(addrParam);
 		if (addr == null) {
-			throw new BadRequestResponse(jsonError("Invalid peer key: " + addrParam));
+			throw new BadRequestResponse("Invalid peer key: " + addrParam);
 		}
-
+ 
 		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
@@ -658,7 +711,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST, 
 			operationId = "faucetRequest", 
 			tags = { "Account"},
-			summary = "Request coins from a Faucet provider. Requires a peer winning to accept faucet requests.", 
+			summary = "Request coins from a Faucet provider. Requires a peer willing to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
 				description = "Faucet request, must provide an address for coins to be deposited in", 
 				content = {@OpenApiContent(
@@ -696,23 +749,22 @@ public class ChainAPI extends ABaseAPI {
 
 		AMap<AString, ACell> req = readJSONBody(ctx);
 		Address addr = Address.parse(req.getIn("address"));
-		if (addr == null) failBadRequest("Expected JSON body containing valid 'address' field");
+		if (addr == null) throw new BadRequestResponse("Expected JSON body containing valid 'address' field");
 
 		ACell o = req.getIn("amount");
 		CVMLong l = CVMLong.parse(o);
-		if (l == null) {failBadRequest("Faucet requires an 'amount' field containing a long value."); return;}
+		if (l == null) throw new BadRequestResponse("Faucet requires an 'amount' field containing a long value.");
 
 		long amt = l.longValue();
-		// Do any limits on faucet issue here
-		if (amt > Coin.GOLD)
-			amt = Coin.GOLD;
+		long max = restServer.getFaucetMax();
+		if (amt > max)
+			amt = max;
 
 		// SECURITY: Make sure this is not subject to injection attack
 		// Optional: pre-compile to Op
 		Result r = faucetClient.transactSync("(transfer " + addr + " " + amt + ")");
 		if (r.isError()) {
-			setContent(ctx,r);
-			ctx.status(422);
+			setResult(ctx,r);
 		} else {
 			req=req.assoc(Strings.ADDRESS, RT.castLong(addr));
 			req=req.assoc(Strings.AMOUNT, r.getValue());
@@ -720,20 +772,6 @@ public class ChainAPI extends ABaseAPI {
 		}
 	}
 
-	/**
-	 *  Throws a bad request exception, with the given message, formatted as a result
-	 * @param message Message to include as error value
-	 */
-	protected void failBadRequest(String message) {
-		HashMap<String, Object> hm = new HashMap<>();
-		hm.put("errorCode","FAILED");
-		hm.put("value","message");
-		failBadRequest(hm);
-	}
-	
-	protected void failBadRequest(HashMap<String, Object> result) {
-		throw new BadRequestResponse(JSON.toString(result));
-	}
 
 
 
@@ -800,16 +838,16 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
-		trans=Cells.persist(trans); // persist data so we have a full copy if needed
-		Ref<ATransaction> ref = Cells.persist(trans).getRef();
-		HashMap<String, Object> rmap = new HashMap<>();
-		rmap.put("source", srcValue);
-		rmap.put("address", JSON.json(addr));
-		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
-		rmap.put("data", Format.encodeMultiCell(trans, true).toHexString());
-		rmap.put("sequence", sequence);
+		trans=Cells.persist(trans, server.getStore()); // persist data so we have a full copy if needed
+		Ref<ATransaction> ref = trans.getRef();
+		HashMap<String, Object> result = new HashMap<>();
+		result.put("source", srcValue);
+		result.put("address", JSON.json(addr));
+		result.put("hash", SignedData.getMessageForRef(ref).toHexString());
+		result.put("data", Format.encodeMultiCell(trans, true).toHexString());
+		result.put("sequence", sequence);
 		ctx.status(200);
-		ctx.result(JSON.toString(rmap));
+		ctx.result(JSON.toString(result));
 	}
 
 
@@ -876,7 +914,7 @@ public class ChainAPI extends ABaseAPI {
 		
 		if (ContentTypes.CVX_RAW.equals(type)) {
 			// Can accept a raw convex signed transaction
-			ACell c=getRawBody(ctx);
+			ACell c=getRawBody(ctx, server.getStore());
 			if ((c instanceof SignedData)&&(((SignedData<?>) c).getValue() instanceof ATransaction)) {
 				sd=(SignedData<ATransaction>) c;
 				// System.out.println("tx enc: "+sd.getEncoding());
@@ -920,11 +958,19 @@ public class ChainAPI extends ABaseAPI {
 
 	/**
 	 * Read code on best efforts basis, expecting a String
-	 * @param srcValue
+	 * @param srcValue Source value to read
 	 * @return Object to interpret as code
+	 * @throws BadRequestResponse if srcValue is not a valid String
 	 */
 	private static ACell readCode(Object srcValue) {
-		return Reader.read((String) srcValue);
+		if (!(srcValue instanceof String)) {
+			throw new BadRequestResponse("Source code must be a string");
+		}
+		try {
+			return Reader.read((String) srcValue);
+		} catch (ParseException e) {
+			throw new BadRequestResponse("Could not parse source code: "+e.getMessage());
+		}
 	}
 
 	@OpenApi(path = ROUTE+"transaction/submit",
@@ -974,18 +1020,15 @@ public class ChainAPI extends ABaseAPI {
 
 		ATransaction trans = null;
 		try {
-			Ref<?> ref = Format.readRef(h, 0);
-			ACell maybeTrans = ref.getValue();
+			ACell maybeTrans = server.getStore().decodeRef(h).getValue();
 			if (!(maybeTrans instanceof ATransaction))
 				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
 			trans = (ATransaction) maybeTrans;
 		} catch (MissingDataException e) {
-			setContent(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
-			ctx.status(404);
+			setResult(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
 			return;
 		} catch (BadFormatException e) {
-			setContent(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
-			ctx.status(400);
+			setResult(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
 			return;
 		} 
 
@@ -995,8 +1038,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Expected JSON body containing 'accountKey' field");
 		AccountKey key = AccountKey.parse(keyValue);
 		if (key == null)
-			throw new BadRequestResponse(
-					"Parameter 'accountKey' did not parse correctly, must be 64 hex characters (32 bytes).");
+			throw new BadRequestResponse("Parameter 'accountKey' did not parse correctly, must be 64 hex characters (32 bytes).");
 
 		// Get the signature
 		Object sigValue = req.get("sig");
@@ -1067,21 +1109,21 @@ public class ChainAPI extends ABaseAPI {
 			String type=ctx.req().getContentType();
 			
 			if (ContentTypes.CVX.equals(type)) {
-				ACell rbody=getCVXBody(ctx);
-				if (!(rbody instanceof AMap)) {
+				ACell body=getCVXBody(ctx);
+				if (!(body instanceof AMap)) {
 					throw new BadRequestResponse("query body is not a map.");
 				}
 				@SuppressWarnings("unchecked")
-				AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) rbody;
+				AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) body;
 				addr=Address.parse(RT.get(req, Keywords.ADDRESS));
 				form=RT.get(req, Keywords.SOURCE);
 			} else {
-				Map<String, Object> req = getJSONBody(ctx);
+				AMap<AString, ACell> req = readJSONBody(ctx);
 				// System.out.println("query data: "+req+ " of type "+Utils.getClassName(req));
-				addr = Address.parse(req.get("address"));
-				Object srcValue = req.get("source");
+				addr = Address.parse(req.get(Strings.ADDRESS));
+				AString srcValue = RT.ensureString(req.get(Strings.SOURCE));
 				// System.out.println("query source: "+srcValue);
-				form = readCode(srcValue);
+				form = Reader.read(srcValue);
 			}
 	
 			Result r = convex.querySync(form, addr);
@@ -1133,9 +1175,9 @@ public class ChainAPI extends ABaseAPI {
 			image.setRGB(0, 0, IdenticonBuilder.SIZE, IdenticonBuilder.SIZE, identiconData, 0, IdenticonBuilder.SIZE);
 			
 			// Convert to PNG bytes
-			ByteArrayOutputStream baos = new ByteArrayOutputStream();
-			ImageIO.write(image, "PNG", baos);
-			byte[] pngBytes = baos.toByteArray();
+			ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+			ImageIO.write(image, "PNG", byteStream);
+			byte[] pngBytes = byteStream.toByteArray();
 			
 			// Set response headers for caching and content type
 			ctx.header("Content-Type", "image/png");

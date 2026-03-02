@@ -1,10 +1,10 @@
 package convex.core.cvm;
 
 import java.io.IOException;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
@@ -15,7 +15,9 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -33,7 +35,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 /**
@@ -58,6 +59,26 @@ import convex.core.util.Utils;
  * the future is to invent it." - Alan Kay
  */
 public class Peer {
+
+	/**
+	 * Chunk size for parallel signature validation. Each chunk is submitted
+	 * as a single task to the thread pool.
+	 */
+	private static final int SIGN_CHUNK_SIZE = 100;
+
+	/**
+	 * Thread pool for CPU-bound signature validation work.
+	 * Fixed platform threads scaled to available cores.
+	 */
+	private static final ExecutorService SIGN_POOL = Executors.newFixedThreadPool(
+		Runtime.getRuntime().availableProcessors(),
+		r -> {
+			Thread t = new Thread(r, "sig-verify");
+			t.setDaemon(true);
+			return t;
+		}
+	);
+
 	/** This Peer's key */
 	private final AccountKey peerKey;
 
@@ -246,7 +267,6 @@ public class Peer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static AMap<Keyword, ACell> getPeerData(AStore store, ACell rootKey) throws IOException {
-		Stores.setCurrent(store);
 		Hash root = store.getRootHash();
 		Ref<ACell> ref=store.refForHash(root);
 		if (ref==null) return null; // not found case
@@ -316,10 +336,9 @@ public class Peer {
 			return  ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existant account");
 		}
 
-		// Run query in a fake context
-		Context ctx=Context.create(state, address, Constants.MAX_TRANSACTION_JUICE);
-		ctx=ctx.run(form);
-		ResultContext rctx=ResultContext.fromContext(ctx);
+		// Run query in a fake transaction for given address
+		ATransaction tx=Invoke.create(address, state.getAccount(address).getSequence()+1, form);
+		ResultContext rctx=state.applyTransaction(tx);
 		return rctx;
 	}
 
@@ -332,7 +351,11 @@ public class Peer {
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
 		State s=getConsensusState();
-		ResultContext ctx=getConsensusState().applyTransaction(transaction,TransactionContext.create(s));
+		TransactionContext tctx=TransactionContext.create(s);
+		
+		// This is a fake transaction
+		tctx.signedTx=SignedData.create(AccountKey.ZERO, Ed25519Signature.ZERO, transaction.getRef());
+		ResultContext ctx=s.applyTransaction(transaction,tctx);
 		return ctx;
 	}
 
@@ -500,7 +523,7 @@ public class Peer {
 		if (stateIndex>=consensusPoint) return this;
 		
 		// Kick off parallel signature validation
-		validateSignatures(s,blocks,stateIndex,consensusPoint);
+		validateSignatures(blocks,stateIndex,consensusPoint);
 
 		// We need to compute at least one new state update
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
@@ -552,25 +575,88 @@ public class Peer {
 		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);
 	}
 
-	private void validateSignatures(State s, AVector<SignedData<Block>> blocks, long start, long end) {
-		Consumer<SignedData<ATransaction>> transactionValidator=st->{
-			ATransaction t=st.getValue();
-			Address origin=t.getOrigin();
-			AccountStatus as=s.getAccount(origin);
-			if (as==null) return; // ignore, will probably fail with :NOBODY
-			AccountKey pk=as.getAccountKey();
-			if (pk==null) return; // ignore, will probably fail as an actor account
-			st.checkSignature(pk);
-		};
-		
-		Consumer<SignedData<Block>> blockValidator=sb->{
-			AVector<SignedData<ATransaction>> transactions = sb.getValue().getTransactions();
-			Stream<SignedData<ATransaction>> tstream=transactions.parallelStream();
-			tstream.forEach(transactionValidator);
-		};
-		
-		Stream<SignedData<Block>> stream=blocks.parallelStream().skip(start).limit(end-start);
-		stream.forEach(blockValidator);
+	/**
+	 * Pre-validates signatures for transactions in the given block range.
+	 * Uses a fixed thread pool with chunked tasks for parallel Ed25519 verification.
+	 * Results are cached on each SignedData instance for later fast lookup.
+	 */
+	private void validateSignatures(AVector<SignedData<Block>> blocks, long start, long end) {
+		java.util.ArrayList<Future<?>> futures = null;
+		for (long b = start; b < end; b++) {
+			AVector<SignedData<ATransaction>> transactions = blocks.get(b).getValue().getTransactions();
+			int count = (int) transactions.count();
+			if (count == 0) continue;
+
+			if (count <= SIGN_CHUNK_SIZE) {
+				// Small block — main thread handles directly
+				verifyChunk(transactions, 0, count);
+			} else {
+				// Large block — chunk and submit to pool, main thread does last chunk
+				int nChunks = (count + SIGN_CHUNK_SIZE - 1) / SIGN_CHUNK_SIZE;
+				if (futures == null) futures = new java.util.ArrayList<>();
+				for (int c = 0; c < nChunks - 1; c++) {
+					final int from = c * SIGN_CHUNK_SIZE;
+					final int to = from + SIGN_CHUNK_SIZE;
+					futures.add(SIGN_POOL.submit(() -> verifyChunk(transactions, from, to)));
+				}
+				// Main thread does last chunk
+				verifyChunk(transactions, (nChunks - 1) * SIGN_CHUNK_SIZE, count);
+			}
+		}
+		// Wait for any pool tasks
+		if (futures != null) {
+			for (Future<?> f : futures) {
+				try { f.get(); } catch (Exception e) {
+					// Verification failures are cached on the SignedData instances
+				}
+			}
+		}
+	}
+
+	/**
+	 * Verify a chunk of signatures using the embedded public key in each SignedData.
+	 * Caches the result so later calls to checkSignature() are a fast no-op.
+	 */
+	private static void verifyChunk(AVector<SignedData<ATransaction>> txns, int from, int to) {
+		for (int i = from; i < to; i++) {
+			txns.get(i).checkSignature();
+		}
+	}
+
+	private static void verifyChunk(java.util.List<SignedData<ATransaction>> txns, int from, int to) {
+		for (int i = from; i < to; i++) {
+			txns.get(i).checkSignature();
+		}
+	}
+
+	/**
+	 * Pre-validates signatures for a list of signed transactions using the shared
+	 * thread pool for parallel Ed25519 verification. Results are cached on each
+	 * SignedData instance so subsequent calls to checkSignature() are a fast no-op.
+	 *
+	 * @param txns List of signed transactions to verify
+	 */
+	public static void preValidateSignatures(java.util.List<SignedData<ATransaction>> txns) {
+		int count = txns.size();
+		if (count == 0) return;
+		if (count <= SIGN_CHUNK_SIZE) {
+			verifyChunk(txns, 0, count);
+			return;
+		}
+		int nChunks = (count + SIGN_CHUNK_SIZE - 1) / SIGN_CHUNK_SIZE;
+		java.util.ArrayList<Future<?>> futures = new java.util.ArrayList<>(nChunks - 1);
+		for (int c = 0; c < nChunks - 1; c++) {
+			final int from = c * SIGN_CHUNK_SIZE;
+			final int to = from + SIGN_CHUNK_SIZE;
+			futures.add(SIGN_POOL.submit(() -> verifyChunk(txns, from, to)));
+		}
+		// Main thread does last chunk
+		verifyChunk(txns, (nChunks - 1) * SIGN_CHUNK_SIZE, count);
+		for (Future<?> f : futures) {
+			try { f.get(); } catch (Exception e) {
+				// Verification failures are cached on the SignedData instances
+			}
+		}
 	}
 
 	/**
@@ -644,42 +730,56 @@ public class Peer {
 		return result;
 	}
 	
+	/**
+	 * Performs all transaction checks: cheap validation followed by signature verification.
+	 * @param sd Signed transaction to check
+	 * @return Error Result, or null if all checks pass
+	 */
 	public Result checkTransaction(SignedData<ATransaction> sd) {
+		Result r=checkTransactionFast(sd);
+		if (r!=null) return r;
 
-		// TODO: throttle?
-		ATransaction tx=RT.ensureTransaction(sd.getValue());
-		
-		// System.out.println("transact: "+v);
-		if (tx==null) {
-			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
-		}
-		
-		State s=getConsensusState();
-		AccountStatus as=s.getAccount(tx.getOrigin());
-		if (as==null) {
-			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
-		}
-		
-		if (tx.getSequence()<=as.getSequence()) {
-			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
-		}
-		
-		AccountKey expectedKey=as.getAccountKey();
-		if (expectedKey==null) {
-			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
-		}
-		
-		AccountKey pubKey=sd.getAccountKey();
-		if (!expectedKey.equals(pubKey)) {
-			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
-		}
-		
 		if (!sd.checkSignature()) {
 			// SECURITY: Client tried to send a badly signed transaction!
 			return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
 		// All checks passed OK!
+		return null;
+	}
+
+	/**
+	 * Performs cheap transaction validation (format, account, sequence, key match)
+	 * without signature verification. Use before parallel signature pre-validation.
+	 * @param sd Signed transaction to check
+	 * @return Error Result, or null if cheap checks pass
+	 */
+	public Result checkTransactionFast(SignedData<ATransaction> sd) {
+		ATransaction tx=RT.ensureTransaction(sd.getValue());
+		if (tx==null) {
+			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
+		}
+
+		State s=getConsensusState();
+		AccountStatus as=s.getAccount(tx.getOrigin());
+		if (as==null) {
+			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
+		}
+
+		if (tx.getSequence()<=as.getSequence()) {
+			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
+		}
+
+		AccountKey expectedKey=as.getAccountKey();
+		if (expectedKey==null) {
+			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
+		}
+
+		AccountKey pubKey=sd.getAccountKey();
+		if (!expectedKey.equals(pubKey)) {
+			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
+		}
+
 		return null;
 	}
 

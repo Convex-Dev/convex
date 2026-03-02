@@ -11,11 +11,10 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.json.simple.JSONValue;
-
 import convex.core.cpos.Order;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.Result;
+import convex.core.data.AString;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
@@ -45,7 +44,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 	}
 	
 	public StrimziKafka(Server server) {
-		super(server.getStore());
+		super();
 		// TODO: need to be config params etc.
 		this.topic="transactions";
 		// this.url="https://kfk.walledchannel.net:9092/topics/";
@@ -158,12 +157,12 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		HashMap<String,Object> json=new HashMap<>();
 		json.put("records", recs);
 		
-		String jsonBody=JSONValue.toJSONString(json);
+		AString js=JSON.toAString(json);
 		// System.out.println(jsonBody);
 		
 		HttpRequest request = HttpRequest.newBuilder(URI.create(url + topic))
 			.header("content-type", STRMZI_CONTENT_TYPE_NAME)
-			.POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+			.POST(HttpRequest.BodyPublishers.ofByteArray(js.getBytes()))
 			.build();
 
 		HTTP_CLIENT.sendAsync(request, HttpResponse.BodyHandlers.discarding())

@@ -6,12 +6,15 @@ import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
 
-import convex.core.data.impl.ZeroBlob;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
+/**
+ * Static utilities for working with Blobs
+ * 
+ * "I love Monet - I've nicknamed him King Blob. When you go up to the painting, it's a series of blobs - amazing" - Celia Imrie
+ */
 public class Blobs {
 
 	static final int CHUNK_SHIFT = 12;
@@ -117,32 +120,6 @@ public class Blobs {
 	}
 
 	/**
-	 * Reads a canonical Blob from a Blob source
-	 * @param <T> Type of Blob result
-	 * @param source Source blob, containing tag
-	 * @param pos position to read from source, assumed to be tag
-	 * @return Canonical Blob
-	 * @throws BadFormatException if the Blob encoding format is invalid
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ABlob> T read(Blob source, int pos) throws BadFormatException {
-		int sLen = source.size()-pos;
-		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
-		// read length at position 1 (skipping tag)
-		long count = Format.readVLQCount(source.store, source.offset + pos+ 1); // skip pos and tag
-
-		T result = null;
-		if (count < 0L) throw new BadFormatException("Negative blob length?");
-		if (count > Blob.CHUNK_LENGTH) {
-			result = (T) BlobTree.read(count,source, pos);
-		} else {
-			result = (T) Blob.read(source,pos, count);
-		}
-		// encoding should be attached from Blob reads
-		return result;
-	}
-
-	/**
 	 * Create a Blob entirely filled with a given value. Optimised to re-use child chunks for very large blobs
 	 * 
 	 * @param value Byte value to fill with (low 8 bits used)
@@ -169,13 +146,29 @@ public class Blobs {
 	}
 	
 	/**
-	 * Create a Blob entirely filled with zeros
+	 * Create a Blob entirely filled with zeros. Uses structural sharing via
+	 * Blob.EMPTY_CHUNK so that arbitrarily large sparse blobs are efficient
+	 * (O(log₁₆ n) unique nodes).
+	 *
 	 * @param length Length of Blob to create
 	 * @return Blob filled with zeros
 	 */
 	public static ABlob createZero(long length) {
+		if (length<=0) {
+			if (length==0) return Blob.EMPTY;
+			throw new IllegalArgumentException("Negative length");
+		}
 		if (length<=Blob.CHUNK_LENGTH) return Blob.EMPTY_CHUNK.slice(0,length);
-		return ZeroBlob.create(length);
+
+		int n=BlobTree.childCount(length);
+		long subSize=BlobTree.childSize(length);
+		ABlob fullChild=createZero(subSize); // shared across all full children
+
+		ABlob[] children=new ABlob[n];
+		for (int i=0; i<n-1; i++) children[i]=fullChild;
+		long lastSize=length-((long)(n-1)*subSize);
+		children[n-1]=lastSize==subSize?fullChild:createZero(lastSize);
+		return BlobTree.createWithChildren(children);
 	}
 
 	public static Blob empty() {

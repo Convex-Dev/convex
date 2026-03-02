@@ -18,7 +18,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,12 +40,10 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.core.util.Shutdown;
-import convex.net.AConnection;
+import convex.core.message.AConnection;
 import convex.net.MessageReceiver;
 import convex.net.MessageSender;
 import convex.net.impl.HandlerException;
@@ -98,15 +95,9 @@ public class Connection extends AConnection {
 	private Connection(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) {
 		this.channel = channel;
-		Predicate<Message> handler=t -> {
-			try {
-				return sendMessage(t);
-			} catch (IOException e) {
-				return false;
-			}
-		};
-		
-		receiver = new MessageReceiver(receiveAction, handler);
+
+		receiver = new MessageReceiver(receiveAction);
+		receiver.setConnection(this); // messages carry this connection
 		sender = new MessageSender(channel);
 		this.lastActivity=Utils.getCurrentTimestamp();
 		this.trustedPeerKey = trustedPeerKey;
@@ -282,39 +273,23 @@ public class Connection extends AConnection {
 	 *
 	 */
 	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
-		AStore temp = Stores.current();
-		try {
-			long id = ++idCounter;
-			boolean sent = sendObject(challenge);
-			return (sent) ? id : -1;
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		long id = ++idCounter;
+		boolean sent = sendObject(challenge);
+		return (sent) ? id : -1;
 	}
 
-	/**
-	 * Sends a RESPONSE Request Message on this connection.
-	 *
-	 * @param response Signed response for the remote peer
-	 * @return The ID of the message sent, or -1 if the message cannot be sent.
-	 *
-	 * @throws IOException If IO error occurs
-	 *
-	 */
-	public long sendResponse(SignedData<ACell> response) throws IOException {
-		AStore temp = Stores.current();
+	@Override
+	public boolean sendMessage(Message msg) {
 		try {
-			long id = ++idCounter;
-			boolean sent = sendObject(response);
-			return (sent) ? id : -1;
-		} finally {
-			Stores.setCurrent(temp);
+			return sendBuffer(msg.getMessageData());
+		} catch (IOException e) {
+			return false;
 		}
 	}
 
 	@Override
-	public boolean sendMessage(Message msg) throws IOException  {
-		return sendBuffer(msg.getMessageData());
+	public boolean trySendMessage(Message msg) {
+		return sendMessage(msg);
 	}
 
 	/**
@@ -554,7 +529,6 @@ public class Connection extends AConnection {
 	 * @throws BadFormatException If there is an encoding error
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
-		AStore savedStore = Stores.current();
 		int recd= receiver.receiveFromChannel(channel);
 		int total =recd;
 		while (recd>0) {

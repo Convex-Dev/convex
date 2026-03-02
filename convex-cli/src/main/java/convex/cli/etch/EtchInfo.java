@@ -23,7 +23,7 @@ public class EtchInfo extends AEtchCommand{
 
 	@Override
 	public void execute() {
-		cli().setOut(outputFilename);
+		if (outputFilename!=null) cli().setOut(outputFilename);
 		
 		EtchStore store=store();
 		try {

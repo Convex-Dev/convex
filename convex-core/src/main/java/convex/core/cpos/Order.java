@@ -6,13 +6,11 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
@@ -38,7 +36,7 @@ public class Order extends ARecordGeneric {
 	private static final int IX_CONSENSUS = 1;
 	private static final int IX_BLOCKS = 2;
 	
-	private static final long NUM_FIELDS=FORMAT.count();
+	static final long NUM_FIELDS=FORMAT.count();
 
 	/**
 	 * Timestamp of this Order, i.e. the timestamp of the peer at the time it was created
@@ -58,6 +56,15 @@ public class Order extends ARecordGeneric {
 		super(CVMTag.ORDER,FORMAT,values);
 		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
 		this.consensusPoints = RT.toLongArray((AVector<ACell>)values.get(IX_CONSENSUS));
+	}
+
+	/**
+	 * Creates an Order from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Order instance
+	 */
+	public static Order create(AVector<ACell> values) {
+		return new Order(values);
 	}
 	
 	private Order(long timestamp, long[] consensusPoints, AVector<SignedData<Block>> blocks) {
@@ -102,24 +109,6 @@ public class Order extends ARecordGeneric {
 	 */
 	public static Order create() {
 		return new Order(0, EMPTY_CONSENSUS_ARRAY,Vectors.empty());
-	}
-
-	/**
-	 * Decode an Order from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Order read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values = Vectors.read(b, pos);
-		if (values.count()!=NUM_FIELDS) throw new BadFormatException("Wrong number of Order fields");
-		long epos=pos+values.getEncodingLength();
-		
-		Order result=new Order(values);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 	/**
@@ -358,6 +347,7 @@ public class Order extends ARecordGeneric {
 
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
-		return new Order(values);
+		if (values==newValues) return this;
+		return new Order(newValues);
 	}
 }

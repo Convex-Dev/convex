@@ -11,7 +11,6 @@ import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.reader.ReaderUtils;
 import convex.core.util.Bits;
@@ -194,41 +193,6 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		if (c<=MAX_CODEPOINT) return 4;
 		return -1;
 	}
-	
-	/**
-	 * Reads char data from Blob
-	 * @param len Length in UTF-8 bytes
-	 * @param blob Blob to read from
-	 * @param pos Position of tag
-	 * @return CVMChar instance
-	 * @throws BadFormatException if any format error
-	 */
-	public static CVMChar read(int len, Blob blob, int pos) throws BadFormatException {
-		CVMChar result=readRaw(len,blob,pos+1); // read 
-		result.attachEncoding(blob.slice(pos, pos+1+len));
-		return result;
-	}
-	
-	/**
-	 * Reads raw char data from Blob
-	 * @param len Length in UTF=8 bytes
-	 * @param blob Blob to read from
-	 * @param pos Position of first UTF-9 byte
-	 * @return CVMChar instance
-	 * @throws BadFormatException if any format error
-	 */
-	private static CVMChar readRaw(int len, Blob blob, int pos) throws BadFormatException {
-		int value=0xff000000; // High byte should be shifted away, here to catch errors
-		for (int i=0; i<len;i++) {
-			if (value==0) throw new BadFormatException("Leading zero in CVMChar encoding");
-			byte b=blob.byteAt(pos+i);
-			value=(value<<8)+(b&0xFF);
-		}
-		CVMChar result=create(value);
-		if (result==null) throw new BadFormatException("CVMChar out of Unicode range");
-		return result;
-	}
-
 
 	@Override
 	public int encode(byte[] bs, int pos) {

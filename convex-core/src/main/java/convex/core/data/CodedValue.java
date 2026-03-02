@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 public class CodedValue extends ACell {
@@ -10,7 +9,7 @@ public class CodedValue extends ACell {
 	private final Ref<ACell> codeRef;
 	private final Ref<ACell> valueRef;
 
-	private CodedValue(byte tag, Ref<ACell> code, Ref<ACell> value) {
+	CodedValue(byte tag, Ref<ACell> code, Ref<ACell> value) {
 		this.tag=tag;
 		codeRef=code;
 		valueRef=value;
@@ -104,22 +103,6 @@ public class CodedValue extends ACell {
 		sb.append(getEncoding().toHexString());
 		sb.append("]");
 		return sb.check(limit);
-	}
-
-	public static CodedValue read(byte tag, Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		Ref<ACell> cref=Format.readRef(b, epos);
-		epos+=cref.getEncodingLength();
-		
-		Ref<ACell> vref=Format.readRef(b, epos);
-		epos+=vref.getEncodingLength();
-		
-		CodedValue result=new  CodedValue(tag,cref,vref);
-		if (tag==b.byteAtUnchecked(pos)) {
-			result.attachEncoding(b.slice(pos,epos));
-		}
-		return result;
 	}
 
 

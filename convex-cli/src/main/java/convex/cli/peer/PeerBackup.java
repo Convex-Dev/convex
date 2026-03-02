@@ -25,7 +25,6 @@ public class PeerBackup extends APeerCommand {
 	private String outFile;
 
 
-	@SuppressWarnings("resource")
 	@Override
 	protected void execute() throws InterruptedException {
 

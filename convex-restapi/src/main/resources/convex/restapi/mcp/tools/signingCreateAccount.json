@@ -1,0 +1,40 @@
+{
+  "name": "signingCreateAccount",
+  "title": "Create Account via Signing Service",
+  "description": "Create a new signing key and on-chain account in one step. Optionally fund via faucet. Authenticated.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to encrypt the new signing key"
+      },
+      "faucet": {
+        "type": "number",
+        "description": "Faucet amount in copper (1 CVM = 1,000,000,000 copper)."
+      },
+      "controller": {
+        "type": "string",
+        "description": "Controller for new account. Default '*caller*' (faucet account). Use 'nil' for self-sovereign, or '#ADDR' for a specific address."
+      }
+    },
+    "required": ["passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "number",
+        "description": "Address of the newly created account"
+      },
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded public key of the created signing key"
+      }
+    }
+  }
+}

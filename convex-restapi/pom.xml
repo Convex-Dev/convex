@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.2</version>
+		<version>0.8.3-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -65,11 +65,6 @@
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.googlecode.json-simple</groupId>
-			<artifactId>json-simple</artifactId>
-			<version>${json.simple.version}</version>
-		</dependency>
-		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
@@ -104,6 +99,14 @@
 			<groupId>io.javalin.community.openapi</groupId>
 			<artifactId>javalin-redoc-plugin</artifactId>
 			<version>${javalin.version}</version>
+		</dependency>
+
+		<!-- MCP SDK for client tests -->
+		<dependency>
+			<groupId>io.modelcontextprotocol.sdk</groupId>
+			<artifactId>mcp</artifactId>
+			<version>0.13.0</version>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>

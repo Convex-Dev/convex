@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.util.VectorBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.util.MergeFunction;
 import convex.core.util.VisitCounter;
 import convex.test.Samples;
 
@@ -436,6 +437,36 @@ public class VectorsTest {
 		}
 
 		assertEquals(v.toVector(), Vectors.of(v.toArray()));
+
+		// mergeWith tests — identity and object preservation
+		{
+			MergeFunction<T> pickFirst = (a, x) -> a;
+			MergeFunction<T> pickSecond = (a, x) -> x;
+
+			// Self-merge returns same object
+			assertSame(v, v.mergeWith(v, pickFirst));
+			assertSame(v, v.mergeWith(v, pickSecond));
+
+			// Merge with equal vector preserves this
+			AVector<T> copy = Vectors.of(v.toArray());
+			assertSame(v, v.mergeWith(copy, pickFirst));
+
+			if (n > 0) {
+				// Modified vector — replace first element with null
+				AVector<T> modified = v.assoc(0, null);
+				if (!v.equals(modified)) {
+					// pickFirst preserves this, pickSecond preserves modified
+					assertSame(v, v.mergeWith(modified, pickFirst));
+					assertSame(modified, v.mergeWith(modified, pickSecond));
+				}
+
+				// Different-length merge
+				AVector<T> shorter = v.slice(0, n / 2);
+				AVector<T> merged = v.mergeWith(shorter, pickFirst);
+				// pickFirst returns v[i] for overlap, v[i] for tail (merge(v[i],null)=v[i])
+				assertSame(v, merged);
+			}
+		}
 
 		CollectionsTest.doSequenceTests(v);
 	}

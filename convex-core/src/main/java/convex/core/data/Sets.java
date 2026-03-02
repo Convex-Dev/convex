@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -94,15 +93,6 @@ public class Sets {
 			set=set.include(source.get(i));
 		}
 		return (ASet<T>) set;
-	}
-
-	public static <T extends ACell> ASet<T> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQCount(b,pos+1);
-		if (count <= SetLeaf.MAX_ELEMENTS) {
-			return SetLeaf.read(b, pos, count);
-		} else {
-			return SetTree.read(b, pos, count);
-		}
 	}
 
 	public static <T extends ACell> AHashSet<T> createWithShift(int shift, ArrayList<Ref<T>> values) {

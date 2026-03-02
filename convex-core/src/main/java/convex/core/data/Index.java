@@ -9,7 +9,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -37,7 +36,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/**
 	 *  Maximum depth of index, in hex digits
 	 */
-	private static final int MAX_DEPTH=64;
+	public static final int MAX_DEPTH=64;
 	
 	/**
 	 *  Maximum usable size of keys, in bytes
@@ -567,68 +566,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
 	}
 	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQCount(b,pos+1);
-		if (count < 0) throw new BadFormatException("Negative count!");
-		if (count == 0) return (Index<K, V>) EMPTY;
-		
-		// index for reading
-		int epos=pos+1+Format.getVLQCountLength(count);
-		
-		MapEntry<K,V> me;
-		boolean hasEntry;
-		if (count==1) {
-			hasEntry=true;
-		} else {
-			byte c=b.byteAt(epos++); // Read byte
-			switch (c) {
-			case Tag.NULL: hasEntry=false; break;
-			case Tag.VECTOR: hasEntry=true; break;
-			default: throw new BadFormatException("Invalid MapEntry tag in Index: "+c);
-			}
-		}
-		if (hasEntry) {
-			Ref<K> kr=Format.readRef(b,epos);
-			epos+=kr.getEncodingLength();
-			Ref<V> vr=Format.readRef(b,epos);
-			epos+=vr.getEncodingLength();
-			me=MapEntry.fromRefs(kr, vr);
-			
-			if (count == 1) {
-				// single entry map, doesn't need separate depth encoding
-				long depth=kr.isEmbedded()?kr.getValue().hexLength():MAX_DEPTH;
-				Index<K,V> result = new Index<K, V>(depth, me, EMPTY_CHILDREN, (short) 0, 1L);
-				result.attachEncoding(b.slice(pos, epos));
-				return result;
-			} 
-		} else {
-			me=null;
-		}
-
-		Index<K,V> result;
-		int depth = 0xFF & b.byteAt(epos);
-		if (depth >=MAX_DEPTH) {
-			if (depth==MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
-			throw new BadFormatException("Excessive depth!");
-		}
-		epos+=1;
-
-		// Need to include children
-		short mask = b.shortAt(epos);
-		epos+=2;
-		int n = Utils.bitCount(mask);
-		Ref<Index>[] children = new Ref[n];
-		for (int i = 0; i < n; i++) {
-			Ref<Index> cr=Format.readRef(b,epos);
-			epos+=cr.getEncodingLength();
-			children[i] =cr; 
-		}
-		result= new Index<K, V>(depth, me, children, mask, count);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
 		throw new UnsupportedOperationException();
@@ -916,7 +853,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			MapEntry<K,V> mea=this.getEntry(k);
 			if (mea!=null) continue; // skip, will merge in second loop
 			if (!Utils.equals(null,v)) {
-				V nv=func.merge(null,v);
+				V nv=func.merge(k,null,v);
 				if (nv==null) {
 					// key already doewn't exist in this
 				} else {
@@ -934,7 +871,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			MapEntry<K,V> meb=b.getEntry(k);
 			V ov=(meb==null)?null:meb.getValue(); // value at same key in other index
 			if (!Utils.equals(v,ov)) {
-				V nv=func.merge(v,ov);
+				V nv=func.merge(k,v,ov);
 				if (nv==null) {
 					// remove value
 					result=result.dissoc(k);
@@ -951,6 +888,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
 		// Index result=EMPTY;
 		// return result;
+		throw new TODOException();
+	}
+
+	@Override
+	public long seek(ABlobLike<?> key) {
 		throw new TODOException();
 	}
 

@@ -1,11 +1,10 @@
 package convex.api;
- 
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
-import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
@@ -20,32 +19,55 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.LocalConnection;
 import convex.core.message.Message;
-import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.peer.Server;
 
 /**
- * Convex Client implementation supporting a direct connection to a Peer Server in the same JVM.
+ * Convex Client implementation supporting a connection to a Peer Server in the same JVM.
+ *
+ * <p>Uses a persistent paired {@link LocalConnection} for bidirectional messaging
+ * with the local server. Result correlation and CHALLENGE auto-response are handled
+ * by the shared dispatch logic in {@link AConvexConnected}.</p>
  */
-public class ConvexLocal extends Convex {
+public class ConvexLocal extends AConvexConnected {
 
 	private final Server server;
 
 	protected ConvexLocal(Server server, Address address, AKeyPair keyPair) {
 		super(address, keyPair);
 		this.server=server;
-		this.preCompile=true; // pre-compile by default if local peer
+		this.preCompile=true;
+
+		// Create persistent paired connection to server
+		Predicate<Message> clientHandler = m -> { returnMessageHandler.accept(m); return true; };
+		Predicate<Message> serverHandler = m -> {
+			Predicate<Message> retry = server.deliverMessage(m);
+			if (retry != null) {
+				return retry.test(m);
+			}
+			return true;
+		};
+		LocalConnection clientEnd = (keyPair != null)
+			? LocalConnection.createPair(clientHandler, serverHandler)       // bidirectional: supports CHALLENGE
+			: LocalConnection.createReturnable(clientHandler, serverHandler); // return-only: results only
+		setConnection(clientEnd);
 	}
-	
+
 	public static ConvexLocal create(Server server) {
 		return new ConvexLocal(server, null,null);
 	}
-	
+
 	public static ConvexLocal create(Server server, Address address, AKeyPair keyPair) {
 		return new ConvexLocal(server, address,keyPair);
+	}
+
+	@Override
+	public AStore getStore() {
+		if (store!=null) return store;
+		return server.getStore();
 	}
 
 	@Override
@@ -53,11 +75,16 @@ public class ConvexLocal extends Convex {
 		return server.isLive();
 	}
 
+	@Override
+	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
+		return acquire(hash, server.getStore());
+	}
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		ThreadUtils.runVirtual(()-> {
+		ThreadUtils.runVirtual("local-acquire", ()-> {
 			AStore peerStore=server.getStore();
 			Ref<ACell> ref=peerStore.refForHash(hash);
 			if (ref==null) {
@@ -76,71 +103,34 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		return makeMessageFuture(Message.createStatusRequest(getNextID()));
+		Message m=Message.createStatusRequest(getNextID());
+		return message(m);
 	}
-	
+
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
-		
 		maybeUpdateSequence(signed);
-		CompletableFuture<Result> r= makeMessageFuture(Message.createTransaction(getNextID(),signed));
-		return r;
+		Message m=Message.createTransaction(getNextID(),signed);
+		return message(m);
 	}
 
-
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		return makeMessageFuture(MessageType.CHALLENGE,data);
+	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+		Message m=Message.createChallenge(getNextID(), data);
+		return message(m);
 	}
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		return makeMessageFuture(Message.createQuery(getNextID(),query,address));
-	}
-	
-
-
-	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
-		Message ml=Message.create(type,payload);
-		return makeMessageFuture(ml);
-	}
-	
-	private CompletableFuture<Result> makeMessageFuture(Message message) {
-		if (!isConnected()) {
-			Result r=Result.error(ErrorCodes.CONNECT, "Disconnected").withSource(SourceCodes.CLIENT);
-			return CompletableFuture.completedFuture(r);
-		}
-		
-		CompletableFuture<Result> cf=new CompletableFuture<>();
-		Predicate<Message> resultHandler=makeResultHandler(cf);
-		Message ml=message.withResultHandler(resultHandler);
-		server.getReceiveAction().accept(ml);
-		return cf;
+		Message m=Message.createQuery(getNextID(),query,address);
+		return message(m);
 	}
 
-	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
-		AStore senderStore=Stores.current();
-		return m->{
-			// Protect message reading in sender store
-			AStore savedStore=Stores.current();
-			try {
-				Stores.setCurrent(senderStore);
-				Result r=m.toResult();
-				if (r.getErrorCode()!=null) {
-					sequence=null;
-				}
-				cf.complete(r);
-				return true;
-			} finally {
-				Stores.setCurrent(savedStore);
-			}
-		};
-	}
-	
 	@Override
 	public CompletableFuture<Result> messageRaw(Blob rawData) {
 		try {
 			Message m=Message.create(rawData);
+			m.getPayload(getStore());
 			return message(m);
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
@@ -148,37 +138,24 @@ public class ConvexLocal extends Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> message(Message message) {
-		ACell id=message.getRequestID();
-		if (id==null) {
-			// directly forward message to Server
-			server.getReceiveAction().accept(message);
-			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
-		}
-			
-		// We are expecting a return message, so build a completable future for it	
-		return makeMessageFuture(message);
-	}
-
-	@Override
 	public void close() {
-		// Nothing to do
+		// Nothing to close for local connection
 	}
 
 	@Override
 	public CompletableFuture<State> acquireState() {
 		return CompletableFuture.completedFuture(getState());
 	}
-	
+
 	public State getState() {
 		return server.getPeer().getConsensusState();
 	}
-	
+
 	@Override
 	public Server getLocalServer() {
 		return server;
 	}
-	
+
 	@Override
 	public long getSequence() {
 		if (sequence==null) {
@@ -188,7 +165,7 @@ public class ConvexLocal extends Convex {
 		}
 		return sequence;
 	}
-	
+
 	@Override
 	public long getSequence(Address addr) {
 		if (Cells.equals(address, addr)) return getSequence();
@@ -212,9 +189,6 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public void reconnect()  {
-		// Always connected, basically
+		// Always connected
 	}
-
-
-
 }

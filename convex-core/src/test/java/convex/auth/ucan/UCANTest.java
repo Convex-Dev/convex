@@ -1,0 +1,356 @@
+package convex.auth.ucan;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.AccountKey;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+
+public class UCANTest {
+
+	static final AKeyPair ROOT_KP = AKeyPair.createSeeded(1001);
+	static final AKeyPair AGENT_A_KP = AKeyPair.createSeeded(1002);
+	static final AKeyPair AGENT_B_KP = AKeyPair.createSeeded(1003);
+	static final AKeyPair ROGUE_KP = AKeyPair.createSeeded(9999);
+
+	static final long FUTURE_EXPIRY = System.currentTimeMillis() / 1000 + 3600; // 1 hour from now
+	static final long PAST_EXPIRY = System.currentTimeMillis() / 1000 - 3600;   // 1 hour ago
+	static final long NOW = System.currentTimeMillis() / 1000;
+
+	// ===== Token Creation Tests =====
+
+	@Test
+	public void testCreateRootToken() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), Vectors.empty());
+
+		assertNotNull(token);
+		assertNotNull(token.getIssuer());
+		assertNotNull(token.getAudience());
+		assertNotNull(token.getNonce());
+		assertNotNull(token.getSignature());
+		assertNotNull(token.getPayload());
+		assertEquals(FUTURE_EXPIRY, token.getExpiry());
+		assertNull(token.getNotBefore());
+		assertEquals(0, token.getCapabilities().count());
+		assertEquals(0, token.getProofs().count());
+	}
+
+	@Test
+	public void testSignatureValid() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		assertTrue(token.verifySignature());
+	}
+
+	@Test
+	public void testNonceUniqueness() {
+		UCAN t1 = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+		UCAN t2 = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		assertNotEquals(t1.getNonce().toString(), t2.getNonce().toString());
+	}
+
+	@Test
+	public void testDIDDerivation() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		String iss = token.getIssuer().toString();
+		String aud = token.getAudience().toString();
+
+		assertTrue(iss.startsWith("did:key:z6Mk"));
+		assertTrue(aud.startsWith("did:key:z6Mk"));
+		assertNotEquals(iss, aud);
+
+		// Round-trip: key -> DID -> key
+		assertEquals(ROOT_KP.getAccountKey(), token.getIssuerKey());
+		assertEquals(AGENT_A_KP.getAccountKey(), token.getAudienceKey());
+	}
+
+	@Test
+	public void testParseRoundTrip() {
+		UCAN original = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		AMap<AString, ACell> map = original.toMap();
+		assertNotNull(map.get(UCAN.HEADER));
+		assertNotNull(map.get(UCAN.PAYLOAD));
+		assertNotNull(map.get(UCAN.SIG));
+
+		UCAN parsed = UCAN.parse(map);
+		assertNotNull(parsed);
+		assertEquals(original.getIssuer(), parsed.getIssuer());
+		assertEquals(original.getAudience(), parsed.getAudience());
+		assertEquals(original.getExpiry(), parsed.getExpiry());
+		assertEquals(original.getNonce(), parsed.getNonce());
+		assertTrue(parsed.verifySignature());
+	}
+
+	@Test
+	public void testCreateWithCapabilities() {
+		AMap<AString, ACell> cap = Capability.create(
+			Capability.resourceURI("account", 42),
+			Capability.CONVEX_TRANSFER
+		);
+		AVector<ACell> caps = Vectors.of(cap);
+
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, caps, null);
+
+		assertEquals(1, token.getCapabilities().count());
+		assertTrue(token.verifySignature());
+	}
+
+	@Test
+	public void testCreateWithNotBefore() {
+		long nbf = NOW - 60; // 1 minute ago
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, nbf, null, null);
+
+		assertNotNull(token.getNotBefore());
+		assertEquals(nbf, token.getNotBefore().longValue());
+		assertTrue(token.verifySignature());
+	}
+
+	@Test
+	public void testParseMalformed() {
+		assertNull(UCAN.parse(null));
+		assertNull(UCAN.parse(Maps.empty()));
+		assertNull(UCAN.parse(Maps.of(UCAN.PAYLOAD, Strings.create("not a map"))));
+	}
+
+	// ===== Validation Tests =====
+
+	@Test
+	public void testValidateRootToken() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		assertNotNull(UCANValidator.validate(token, NOW));
+	}
+
+	@Test
+	public void testExpiredTokenFails() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			PAST_EXPIRY, null, null);
+
+		assertNull(UCANValidator.validate(token, NOW));
+	}
+
+	@Test
+	public void testNotBeforeFails() {
+		long futureNbf = NOW + 3600; // 1 hour in the future
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, futureNbf, null, null);
+
+		assertNull(UCANValidator.validate(token, NOW));
+	}
+
+	@Test
+	public void testBadSignatureFails() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		// Tamper with the payload by creating a new UCAN with different payload but same sig
+		AMap<AString, ACell> tamperedPayload = token.getPayload().assoc(
+			UCAN.EXP, CVMLong.create(FUTURE_EXPIRY + 9999));
+		AMap<AString, ACell> tamperedMap = Maps.of(
+			UCAN.HEADER, Maps.of(UCAN.ALG, Strings.create("EdDSA"), UCAN.UCV, Strings.create("0.10.0")),
+			UCAN.PAYLOAD, tamperedPayload,
+			UCAN.SIG, token.getSignature()
+		);
+		UCAN tampered = UCAN.parse(tamperedMap);
+		assertNotNull(tampered);
+		assertFalse(tampered.verifySignature());
+		assertNull(UCANValidator.validate(tampered, NOW));
+	}
+
+	@Test
+	public void testWrongIssuerFails() {
+		// Create token claiming to be from ROOT but signed by ROGUE
+		UCAN token = UCAN.create(ROGUE_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		// Token validates because issuer DID matches ROGUE's key (it's self-consistent)
+		assertNotNull(UCANValidator.validate(token, NOW));
+
+		// But if we forge a payload with ROOT's DID and ROGUE's signature, it fails
+		AMap<AString, ACell> forgedPayload = token.getPayload().assoc(
+			UCAN.ISS, UCAN.toDIDKey(ROOT_KP.getAccountKey()));
+		AMap<AString, ACell> forgedMap = Maps.of(
+			UCAN.HEADER, Maps.of(UCAN.ALG, Strings.create("EdDSA"), UCAN.UCV, Strings.create("0.10.0")),
+			UCAN.PAYLOAD, forgedPayload,
+			UCAN.SIG, token.getSignature()
+		);
+		UCAN forged = UCAN.parse(forgedMap);
+		assertFalse(forged.verifySignature());
+		assertNull(UCANValidator.validate(forged, NOW));
+	}
+
+	// ===== Chain Validation Tests =====
+
+	@Test
+	public void testTwoLinkChain() {
+		// Root delegates to Agent A
+		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		// Agent A sub-delegates to Agent B, carrying rootToken as proof
+		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
+		UCAN childToken = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, proofs);
+
+		assertNotNull(UCANValidator.validate(childToken, NOW));
+	}
+
+	@Test
+	public void testThreeLinkChain() {
+		AKeyPair agentCKP = AKeyPair.createSeeded(1004);
+
+		// Root -> Agent A
+		UCAN t1 = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		// Agent A -> Agent B (proof: t1)
+		UCAN t2 = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, Vectors.of(t1.toMap()));
+
+		// Agent B -> Agent C (proof: t2, which embeds t1)
+		UCAN t3 = UCAN.create(AGENT_B_KP, agentCKP.getAccountKey(),
+			FUTURE_EXPIRY, null, Vectors.of(t2.toMap()));
+
+		assertNotNull(UCANValidator.validate(t3, NOW));
+	}
+
+	@Test
+	public void testChainLinkMismatch() {
+		// Root delegates to Agent A
+		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, null);
+
+		// Agent B tries to use rootToken as proof, but rootToken.aud is Agent A, not Agent B
+		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
+		UCAN badChild = UCAN.create(AGENT_B_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, null, proofs);
+
+		// Should fail: rootToken.aud (Agent A) != badChild.iss (Agent B)
+		assertNull(UCANValidator.validate(badChild, NOW));
+	}
+
+	@Test
+	public void testExpiryNarrowing() {
+		long shortExpiry = NOW + 600;  // 10 minutes
+		long longExpiry = NOW + 7200;  // 2 hours
+
+		// Root grants short-lived token
+		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			shortExpiry, null, null);
+
+		// Agent A tries to create longer-lived sub-delegation (violates narrowing)
+		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
+		UCAN badChild = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+			longExpiry, null, proofs);
+
+		// Should fail: child.exp (longExpiry) > proof.exp (shortExpiry)
+		assertNull(UCANValidator.validate(badChild, NOW));
+	}
+
+	@Test
+	public void testExpiryNarrowingValid() {
+		long longExpiry = NOW + 7200;
+		long shortExpiry = NOW + 600;
+
+		// Root grants long-lived token
+		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			longExpiry, null, null);
+
+		// Agent A creates shorter-lived sub-delegation (OK)
+		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
+		UCAN goodChild = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+			shortExpiry, null, proofs);
+
+		assertNotNull(UCANValidator.validate(goodChild, NOW));
+	}
+
+	// ===== Capability Builder Tests =====
+
+	@Test
+	public void testCapabilityCreate() {
+		AMap<AString, ACell> cap = Capability.create(
+			Capability.resourceURI("account", 42),
+			Capability.CONVEX_TRANSFER
+		);
+
+		assertEquals(Strings.create("convex:account:#42"), cap.get(Capability.WITH));
+		assertEquals(Capability.CONVEX_TRANSFER, cap.get(Capability.CAN));
+	}
+
+	@Test
+	public void testCapabilityWithCaveats() {
+		AMap<AString, ACell> caveats = Maps.of(
+			Strings.create("max_amount"), CVMLong.create(1000000000L)
+		);
+		AMap<AString, ACell> cap = Capability.create(
+			Capability.resourceURI("account", 42),
+			Capability.CONVEX_TRANSFER,
+			caveats
+		);
+
+		assertEquals(Strings.create("convex:account:#42"), cap.get(Capability.WITH));
+		assertEquals(Capability.CONVEX_TRANSFER, cap.get(Capability.CAN));
+		assertNotNull(cap.get(Capability.NB));
+	}
+
+	@Test
+	public void testResourceURI() {
+		assertEquals("convex:account:#42", Capability.resourceURI("account", 42).toString());
+		assertEquals("convex:actor:#100", Capability.resourceURI("actor", 100).toString());
+	}
+
+	@Test
+	public void testCapabilityWildcard() {
+		AMap<AString, ACell> cap = Capability.create(
+			Capability.resourceURI("account", 42),
+			Capability.CONVEX_WILDCARD
+		);
+		assertEquals(Strings.create("convex/*"), cap.get(Capability.CAN));
+	}
+
+	// ===== DID Utility Tests =====
+
+	@Test
+	public void testDIDKeyRoundTrip() {
+		AccountKey key = ROOT_KP.getAccountKey();
+		AString did = UCAN.toDIDKey(key);
+
+		assertTrue(did.toString().startsWith("did:key:z6Mk"));
+
+		AccountKey decoded = UCAN.fromDIDKey(did);
+		assertEquals(key, decoded);
+	}
+
+	@Test
+	public void testDIDKeyInvalid() {
+		assertNull(UCAN.fromDIDKey(null));
+		assertNull(UCAN.fromDIDKey(Strings.create("not-a-did")));
+		assertNull(UCAN.fromDIDKey(Strings.create("did:key:invalid")));
+	}
+}

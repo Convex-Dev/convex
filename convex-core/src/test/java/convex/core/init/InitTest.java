@@ -30,6 +30,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
+import convex.test.Samples;
 
 /**
  * Tests for Init functionality
@@ -37,7 +38,7 @@ import convex.core.lang.Core;
  * Also includes static State instances for Testing
  */
 public class InitTest extends ACVMTest {
-	
+
 	public static final AKeyPair[] KEYPAIRS = BaseTest.KEYPAIRS;
 	
 	public static ArrayList<AKeyPair> PEER_KEYPAIRS=BaseTest.PEER_KEYPAIRS;
@@ -128,7 +129,7 @@ public class InitTest extends ACVMTest {
 	@Test
 	public void testInitEncoding() throws BadFormatException {
 		Blob b=Format.encodeMultiCell(STATE, true);
-		State s=Format.decodeMultiCell(b);
+		State s=Samples.TEST_STORE.decodeMultiCell(b);
 		assertEquals(STATE,s);
 		assertEquals(STATE.getAccount(Core.CORE_ADDRESS),s.getAccount(Core.CORE_ADDRESS));
 		assertEquals(STATE.getAccount(29),s.getAccount(29));

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 /**
  * Tests for the Format utility class
@@ -119,9 +120,8 @@ public class FormatTest {
 	}
 	
 	@Test public void testRead() {
-		assertThrows(BadFormatException.class,()->Format.read(""));
-		assertThrows(BadFormatException.class,()->Format.read("0"));
-		assertThrows(BadFormatException.class,()->Format.read("FF"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.EMPTY));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("FF")));
 	}
 	
 	private void checkVLQCount(String hex, long a) {

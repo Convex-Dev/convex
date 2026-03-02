@@ -1,10 +1,7 @@
 package convex.core.store;
 
 import java.io.IOException;
-import java.util.concurrent.Callable;
 
-import convex.core.util.UnsafeRunnable;
-import convex.core.util.Utils;
 import convex.etch.EtchStore;
 
 public class Stores {
@@ -14,33 +11,6 @@ public class Stores {
 	
 	// Configured global store
 	private static volatile AStore globalStore=null;
-	
-	// Thread local current store, in case servers want different stores
-	private static final ThreadLocal<AStore> currentStore = new ThreadLocal<>() {
-		@Override
-		protected AStore initialValue() {
-			return getGlobalStore();
-		}
-	};
-	
-	/**
-	 * Gets the current (thread-local) Store instance. This is initialised to be the
-	 * global store, but can be changed with Stores.setCurrent(...)
-	 * 
-	 * @return Store for the current thread
-	 */
-	public static AStore current() {
-		return Stores.currentStore.get();
-	}
-
-	/**
-	 * Sets the current thread-local store for this thread
-	 * 
-	 * @param store Any AStore instance
-	 */
-	public static void setCurrent(AStore store) {
-		currentStore.set(store);
-	}
 	
 	private synchronized static AStore getDefaultStore() {
 		if (defaultStore==null) {
@@ -77,27 +47,4 @@ public class Stores {
 		globalStore=store;
 	}
 
-	public static void runWithMemoryStore(UnsafeRunnable r) {
-		AStore saved=Stores.current();
-		try {
-			Stores.setCurrent(new MemoryStore());
-			r.run();
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		} finally {
-			Stores.setCurrent(saved);
-		}
-	}
-	
-	public static <V> V runWithMemoryStore(Callable<V> r) {
-		AStore saved=Stores.current();
-		try {
-			Stores.setCurrent(new MemoryStore());
-			return r.call();
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		} finally {
-			Stores.setCurrent(saved);
-		}
-	}
 }

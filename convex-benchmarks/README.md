@@ -1,36 +1,51 @@
 # Convex Benchmarks
 
-## Benchmarking
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-benchmarks.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-Convex includes a wide set of benchmarks, which are used to evaluate performance enhancements. These are mostly implemented with the JMH framework, and reside in the `convex.benchmarks` package.
+Performance benchmarking suite for [Convex](https://convex.world) using the JMH (Java Microbenchmark Harness) framework.
 
-## Preparing to run benchmarks
+## Available Benchmarks
 
-To run benchmarks, it is best to build the full `convex-benchmarks` jar with dependencies which includes all benchmarks, tests and dependencies. This can be done with the following commend:
+| Benchmark | Description |
+|-----------|-------------|
+| `CVMBenchmark` | Convex Virtual Machine execution performance |
+| `EtchBenchmark` | Etch database read/write throughput |
+| `HashBenchmark` | Cryptographic hashing operations |
+| `SignatureBenchmark` | Ed25519 signature generation and verification |
+| `DataStructureBenchmark` | Immutable data structure operations |
 
-`mvn clean install`
+## Running Benchmarks
 
-## Directly running benchmarks
+### Build
 
-After building the testing `.jar`, you can launch benchmarks as main classes in the `convex.benchmarks` package, e.g.
-
-```
-java -cp target/convex-benchmarks-jar-with-dependencies.jar convex.benchmarks.EtchBenchmark
-```
-
-## Running with Java Flight Recorder
-
-If you want to analyse profiling results for the benchmarks, you can run using JFR to produce a profiling output file `flight.jfr`
-
-```
-java -cp target/convex-benchmarks-jar-with-dependencies.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.benchmarks.CVMBenchmark
+```bash
+cd convex
+mvn clean install -pl convex-benchmarks -am
 ```
 
-The resulting `flight.jfr` can the be opened in tools such as JDK Mission Control which enables detailed analysis and visualisation of profiling results. This is a useful approach that the Convex team use to identify performance bottlenecks.
+### Execute
 
-## Benchmark results
+Run a specific benchmark:
 
-After running benchmarks, you should see results similar to this:
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  convex.benchmarks.EtchBenchmark
+```
+
+### With Profiling (Java Flight Recorder)
+
+Generate profiling data for analysis:
+
+```bash
+java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
+  -XX:+FlightRecorder \
+  -XX:StartFlightRecording=duration=200s,filename=flight.jfr \
+  convex.benchmarks.CVMBenchmark
+```
+
+Open `flight.jfr` in JDK Mission Control for detailed analysis.
+
+## Example Results
 
 ```
 Benchmark                      Mode  Cnt        Score        Error  Units
@@ -38,10 +53,16 @@ EtchBenchmark.readDataRandom  thrpt    5  4848620.857 ± 110622.054  ops/s
 EtchBenchmark.writeData       thrpt    5   728486.145 ± 168739.491  ops/s
 ```
 
-For example, this can be interpreted as an indication that the Etch database layer is handling approximately 4.8 million reads and 729k million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
+This indicates ~4.8 million reads/sec and ~728k writes/sec for the Etch database layer. Results vary based on hardware (RAM, disk speed, CPU).
 
-## Copyright
+## Documentation
 
-Code in `convex-benchmarks` provided under the Convex Public License
+- [Convex Documentation](https://docs.convex.world)
+- [JMH Documentation](https://openjdk.org/projects/code-tools/jmh/)
+- [JDK Mission Control](https://www.oracle.com/java/technologies/jdk-mission-control.html)
 
-Copyright 2020-2023 Convex Foundation and Contributors
+## License
+
+Copyright 2020-2025 The Convex Foundation and Contributors
+
+Code in convex-benchmarks is provided under the [Convex Public License](../LICENSE.md).

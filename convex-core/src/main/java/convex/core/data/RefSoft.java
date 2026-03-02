@@ -5,7 +5,6 @@ import java.lang.ref.SoftReference;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 
 /**
  * Reference class implemented via a soft reference and store lookup.
@@ -50,6 +49,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	protected RefSoft(AStore store, Hash hash) {
 		// We don't know anything about this Ref.
+		// TODO: avoid allocating SoftReference(null) here — could use a sentinel or null field
 		this(store,new SoftReference<T>(null), hash, UNKNOWN);
 	}
 	
@@ -74,17 +74,15 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 
 	/**
-	 * Create a RefSoft with a Hash reference.
-	 * 
-	 * Attempts to get the value will trigger a store lookup, which may in turn
-	 * cause a MissingDataException if not found.
-	 * 
-	 * @param <T>  Type of value
-	 * @param hash Hash ID of value.
-	 * @return New RefSoft instance, or cached Refsoft from current store
+	 * Create a RefSoft with a Hash reference and explicit store.
+	 *
+	 * @param <T>   Type of value
+	 * @param hash  Hash ID of value
+	 * @param store Store to look up the value in
+	 * @return New RefSoft instance
 	 */
-	public static <T extends ACell> Ref<T> createForHash(Hash hash) {
-		return new RefSoft<T>(Stores.current(),hash);
+	public static <T extends ACell> Ref<T> createForHash(Hash hash, AStore store) {
+		return new RefSoft<T>(store,hash);
 	}
 
 	@Override

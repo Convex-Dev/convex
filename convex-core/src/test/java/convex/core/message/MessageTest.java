@@ -1,6 +1,7 @@
 package convex.core.message;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -29,7 +30,6 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -37,32 +37,37 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.test.Samples;
 
 public class MessageTest {
+
 	static Hash BAD_HASH=Hash.EMPTY_HASH;
 	static AKeyPair KP=AKeyPair.createSeeded(1567856);
 
 	@Test public void testMissingResponse() throws BadFormatException, IOException {
 		// non-embedded Blob which might be a missing branch
 		Blob b=Blobs.createRandom(400);
-		
+
 		Message mq=Message.createDataResponse(CVMLong.ONE, b);
 		assertEquals(MessageType.RESULT,mq.getType());
 		doMessageTest(mq);
-		
+
 		Blob enc=mq.getMessageData();
-		
+
+		// Decoding messages with non-embedded content requires a store
 		Message mr=Message.create(enc);
+		mr.getPayload(Samples.TEST_STORE);
 		AVector<ACell> v=mr.toResult().getValue();
-		
+
 		assertEquals(b,v.get(0));
-		Cells.persist(b);
-		
+		Cells.persist(b, Samples.TEST_STORE);
+
 		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
 		doMessageTest(md);
-		
-		Message mdr=md.makeDataResponse(Stores.current());
+
+		Message mdr=md.makeDataResponse(Samples.TEST_STORE);
 		assertEquals(mq,mdr);
 		doMessageTest(mdr);
 	}
@@ -81,16 +86,17 @@ public class MessageTest {
 		
 		Blob enc=m.getMessageData();
 		
-		ACell b2=Format.decodeMultiCell(enc);
+		ACell b2=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(belief.getHash(),b2.getHash());
 		
 		Message m2=Message.create(enc);
 		assertNull(m.getResultID());
 
 		assertEquals(MessageType.BELIEF,m2.getType());
+		m2.getPayload(Samples.TEST_STORE);
 		assertEquals(belief,m2.getPayload());
-		
-		
+
+
 	}
 	
 	@Test public void testBigMissingResponse() throws BadFormatException, IOException {
@@ -98,14 +104,16 @@ public class MessageTest {
 		Blob b=Blobs.createRandom(400);
 		Hash[] hashes=new Hash[CPoSConstants.MISSING_LIMIT];
 		Arrays.fill(hashes,b.getHash());
-		
+
 		Message mr=Message.createDataRequest(b,hashes);
 		assertEquals(MessageType.DATA_REQUEST,mr.getType());
 		doMessageTest(mr);
-		
+
 		Blob enc=mr.getMessageData();
-		
+
+		// Decoding messages with non-embedded content requires a store
 		Message mrs=Message.create(enc);
+		mrs.getPayload(Samples.TEST_STORE);
 		AVector<ACell> v=mrs.getPayload();
 		assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
 		assertEquals(MessageType.DATA_REQUEST,mrs.getType());
@@ -119,7 +127,7 @@ public class MessageTest {
 		Message md=Message.createDataRequest(CVMLong.ONE, BAD_HASH);
 		assertEquals(Vectors.of(MessageTag.DATA_REQUEST,1,BAD_HASH),md.getPayload());
 		
-		Message mdr=md.makeDataResponse(Stores.current());
+		Message mdr=md.makeDataResponse(Samples.TEST_STORE);
 		assertEquals(Result.create(CVMLong.ONE, Vectors.of(Cells.NIL)),mdr.getPayload());
 	}
 	
@@ -132,12 +140,12 @@ public class MessageTest {
 		}
 	}
 	
-	@Test public void testQuery() {
+	@Test public void testQuery() throws BadFormatException {
 		Message m=Message.createQuery(0, Symbols.STAR_BALANCE, Address.ZERO);
 		doMessageTest(m);
 	}
 	
-	@Test public void testTransact() {
+	@Test public void testTransact() throws BadFormatException {
 		ATransaction tx=Invoke.create(Address.create(134564), 124334, Symbols.STAR_BALANCE);
 		SignedData<ATransaction> stx=KP.signData(tx);
 		Message m=Message.createTransaction(12, stx);
@@ -153,12 +161,12 @@ public class MessageTest {
 	@Test 
 	public void testDataMessages() throws BadFormatException, IOException {
 		Blob b=Blob.createRandom(new Random(1256785), 1000);
-		Cells.persist(b);
-		
+		Cells.persist(b, Samples.TEST_STORE);
+
 		Message m=Message.createDataRequest(CVMLong.ONE, b.getHash());
 		Message r=Message.createDataResponse(CVMLong.ONE, b);
-		
-		assertEquals(r,m.makeDataResponse(Stores.current()));
+
+		assertEquals(r,m.makeDataResponse(Samples.TEST_STORE));
 		
 		// Check Result
 		Result res=r.toResult();
@@ -171,7 +179,7 @@ public class MessageTest {
 	}
 	
 	@Test
-	public void testStatusMessage() {
+	public void testStatusMessage() throws BadFormatException {
 		Message m=Message.createStatusRequest(2);
 		assertEquals(RT.cvm(2),m.getID());
 		doMessageTest(m);
@@ -179,18 +187,236 @@ public class MessageTest {
 	
 	@Test public void testCoreDefExtension() throws BadFormatException {
 		// This was a regression at one point where Local was badly re-encoded
-		Message m=Message.create(null,Reader.read("#[e645]"));
+		Message m=Message.create((MessageType)null,Reader.read("#[e645]"));
 		doMessageTest(m);
 	}
 	
+	@Test public void testStorelessTransactDecode() throws BadFormatException {
+		// Create a transaction message with CVM-specific Invoke type
+		ATransaction tx=Invoke.create(Address.create(42), 1, Reader.read("(+ 1 2)"));
+		SignedData<ATransaction> stx=KP.signData(tx);
+		Message m=Message.createTransaction(7, stx);
+
+		// Encode to wire format
+		Blob data=m.getMessageData();
+		assertTrue(data.count()>0);
+
+		// Simulate receiving from network: raw data, no payload, no store
+		Message received=Message.create(data);
+		assertNull(received.getPayload()); // pure accessor, not yet decoded
+
+		// getRequestID() returns null before decode (no crash)
+		assertNull(received.getRequestID());
+
+		// Vector-based type is UNKNOWN until payload is decoded
+		assertEquals(MessageType.UNKNOWN,received.getType());
+
+		// Storeless decode via getPayload(null) — complete message, all branches present
+		ACell payload=received.getPayload(null);
+		assertNotNull(payload);
+		assertEquals(m.getPayload(),payload);
+
+		// After decode, type and IDs are available
+		assertEquals(MessageType.TRANSACT,received.getType());
+		assertEquals(RT.cvm(7),received.getRequestID());
+		assertEquals(RT.cvm(7),received.getID());
+
+		// Verify the CVM Invoke transaction survived the round-trip
+		AVector<?> v=RT.ensureVector(payload);
+		assertNotNull(v);
+		assertEquals(MessageTag.TRANSACT,v.get(0));
+		SignedData<?> decodedStx=(SignedData<?>)v.get(2);
+		ATransaction decodedTx=(ATransaction)decodedStx.getValue();
+		assertTrue(decodedTx instanceof Invoke);
+		assertEquals(Address.create(42),decodedTx.getOrigin());
+	}
+
+	@Test public void testStorelessResultDecode() throws BadFormatException {
+		// Create a Result message
+		Result res=Result.create(CVMLong.create(5), Reader.read("42"), null);
+		Message m=Message.createResult(res);
+
+		// Encode and simulate network receive
+		Blob data=m.getMessageData();
+		Message received=Message.create(data);
+
+		// Result type and ID inferrable from raw tag byte (no decode needed)
+		assertEquals(MessageType.RESULT,received.getType());
+		assertEquals(RT.cvm(5),received.getResultID());
+		assertEquals(RT.cvm(5),received.getID());
+
+		// Storeless decode via getPayload(null)
+		Result decoded=received.getPayload(null);
+		assertNotNull(decoded);
+		assertEquals(res,decoded);
+		assertEquals(RT.cvm(42),decoded.getValue());
+	}
+
+	@Test public void testStorelessQueryDecode() throws BadFormatException {
+		Message m=Message.createQuery(3, "(+ 1 2)", Address.create(12));
+
+		Blob data=m.getMessageData();
+		Message received=Message.create(data);
+
+		// Storeless decode via getPayload(null) recovers full payload
+		ACell payload=received.getPayload(null);
+		assertEquals(m.getPayload(),payload);
+		assertEquals(MessageType.QUERY,received.getType());
+		assertEquals(RT.cvm(3),received.getID());
+	}
+
+	// ---- Connection integration tests ----
+
+	@Test public void testLocalConnection() {
+		// LocalConnection paired channel delivers messages to the paired end's handler
+		java.util.concurrent.atomic.AtomicReference<Message> received = new java.util.concurrent.atomic.AtomicReference<>();
+		LocalConnection clientEnd = LocalConnection.create(m -> {
+			received.set(m);
+			return true;
+		});
+
+		assertNull(clientEnd.getRemoteAddress());
+		assertFalse(clientEnd.isClosed());
+		assertFalse(clientEnd.isTrusted());
+		assertEquals(0, clientEnd.getReceivedCount());
+
+		// Sending from client end delivers to handler via paired end
+		Message result = Message.createResult(Result.create(CVMLong.ONE, CVMLong.create(42), null));
+		assertTrue(clientEnd.sendMessage(result));
+		assertNotNull(received.get());
+		assertEquals(result.getPayload(), received.get().getPayload());
+
+		// Received message carries the paired end's connection
+		assertSame(clientEnd.getPaired(), received.get().getConnection());
+
+		// close is a no-op
+		clientEnd.close();
+		assertFalse(clientEnd.isClosed());
+	}
+
+	@Test public void testLocalConnectionBidirectional() {
+		// Both ends of a pair can send and receive
+		java.util.concurrent.atomic.AtomicReference<Message> receivedAtA = new java.util.concurrent.atomic.AtomicReference<>();
+		java.util.concurrent.atomic.AtomicReference<Message> receivedAtB = new java.util.concurrent.atomic.AtomicReference<>();
+		LocalConnection endA = LocalConnection.createPair(
+			m -> { receivedAtA.set(m); return true; },
+			m -> { receivedAtB.set(m); return true; }
+		);
+		LocalConnection endB = endA.getPaired();
+
+		// Send from A → received at B (via B's handler)
+		Message m1 = Message.createResult(Result.create(CVMLong.ONE, CVMLong.create(1), null));
+		assertTrue(endA.sendMessage(m1));
+		assertNotNull(receivedAtB.get());
+		assertSame(endB, receivedAtB.get().getConnection());
+
+		// Send from B → received at A (via A's handler)
+		Message m2 = Message.createResult(Result.create(CVMLong.create(2), CVMLong.create(2), null));
+		assertTrue(endB.sendMessage(m2));
+		assertNotNull(receivedAtA.get());
+		assertSame(endA, receivedAtA.get().getConnection());
+	}
+
+	@Test public void testLocalConnectionReturnOnly() {
+		// Return-only pair: client end can send, but paired end (no handler on client) cannot
+		LocalConnection clientEnd = LocalConnection.create(m -> true);
+		LocalConnection serverEnd = clientEnd.getPaired();
+
+		// Client can send (to server's handler)
+		assertTrue(clientEnd.sendMessage(Message.createResult(Result.create(CVMLong.ONE, CVMLong.ONE, null))));
+
+		// Server cannot send back via sendMessage (client has null handler)
+		assertFalse(serverEnd.sendMessage(Message.createResult(Result.create(CVMLong.ONE, CVMLong.ONE, null))));
+	}
+
+	@Test public void testMessageWithConnection() throws BadFormatException {
+		// Message.withConnection() sets the connection for return routing
+		java.util.concurrent.atomic.AtomicReference<Message> received = new java.util.concurrent.atomic.AtomicReference<>();
+		LocalConnection clientEnd = LocalConnection.create(m -> {
+			received.set(m);
+			return true;
+		});
+
+		Message m = Message.createQuery(1, "(+ 1 2)", Address.ZERO);
+		assertNull(m.getConnection());
+
+		Message mc = m.withConnection(clientEnd);
+		assertSame(clientEnd, mc.getConnection());
+		assertSame(mc, mc.withConnection(clientEnd)); // same connection, same message
+
+		// returnResult should route through the connection to the handler
+		Result r = Result.create(CVMLong.ONE, CVMLong.create(3), null);
+		mc.returnResult(r);
+		assertNotNull(received.get());
+		assertEquals(MessageType.RESULT, received.get().getType());
+	}
+
+	@Test public void testReturnMessageUsesConnection() {
+		// returnMessage routes through the connection
+		java.util.concurrent.atomic.AtomicBoolean connUsed = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+		LocalConnection clientEnd = LocalConnection.create(m -> { connUsed.set(true); return true; });
+
+		Message m = Message.createQuery(1, "(+ 1 2)", Address.ZERO);
+		Message mc = m.withConnection(clientEnd);
+
+		Message result = Message.createResult(Result.create(CVMLong.ONE, CVMLong.create(3), null));
+		mc.returnMessage(result);
+
+		assertTrue(connUsed.get(), "Connection should be used for return routing");
+	}
+
+	@Test public void testCloseConnectionActuallyCloses() {
+		java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean(false);
+		AConnection conn = new AConnection() {
+			@Override public boolean sendMessage(Message msg) { return true; }
+			@Override public boolean trySendMessage(Message msg) { return true; }
+			@Override public java.net.InetSocketAddress getRemoteAddress() { return null; }
+			@Override public boolean isClosed() { return closed.get(); }
+			@Override public void close() { closed.set(true); }
+			@Override public long getReceivedCount() { return 0; }
+		};
+
+		Message m = Message.createQuery(1, "1", Address.ZERO).withConnection(conn);
+		assertSame(conn, m.getConnection());
+
+		m.closeConnection();
+		assertTrue(closed.get(), "closeConnection() should close the underlying connection");
+		assertNull(m.getConnection(), "Connection should be null after close");
+	}
+
+	@Test public void testCreateWithConnection() throws BadFormatException {
+		// Message.create(AConnection, Blob) creates a message with connection set
+		LocalConnection conn = LocalConnection.create(m -> true);
+		Message m = Message.createQuery(1, "(+ 2 3)", Address.ZERO);
+		Blob data = m.getMessageData();
+
+		Message m2 = Message.create(conn, data);
+		assertSame(conn, m2.getConnection());
+
+		// Payload should decode correctly
+		m2.getPayload(null);
+		assertEquals(m.getPayload(), m2.getPayload());
+		assertEquals(MessageType.QUERY, m2.getType());
+	}
+
+	@Test public void testConnectionTrust() {
+		LocalConnection conn = LocalConnection.create(m -> true);
+		assertFalse(conn.isTrusted());
+
+		conn.setTrustedKey(KP.getAccountKey());
+		assertTrue(conn.isTrusted());
+	}
+
 	/**
 	 * Generic tests for any valid message
 	 * @param m Message to test
+	 * @throws BadFormatException
 	 */
-	public void doMessageTest(Message m) {
+	public void doMessageTest(Message m) throws BadFormatException {
 		MessageType type=m.getType();
 		assertNotNull(type);
-		
+
 		ACell id=m.getID();
 		ACell reqID=m.getRequestID();
 		ACell resultID=m.getResultID();
@@ -198,26 +424,38 @@ public class MessageTest {
 			assertNull(resultID); // should be both a request and a result
 			assertEquals(id,reqID);
 		}
-		
+
 		if (resultID!=null) {
 			assertEquals(MessageType.RESULT,type);
 			assertNull(reqID);
 			assertEquals(id,resultID);
 		}
-		
+
 		try {
 			ACell payload=m.getPayload();
-			
+
 			Blob data=m.getMessageData();
 			assertTrue(data.count()>0);
-		
-			ACell dp=Format.decodeMultiCell(data);
-			Message m2=Message.create(null, dp);
-			
+
+			// Test store-based decode round-trip
+			ACell dp=Samples.TEST_STORE.decodeMultiCell(data);
+			Message m2=Message.create((MessageType)null, dp);
+
 			assertEquals(type,m2.getType());
 			assertEquals(id,m2.getID());
 			assertEquals(payload,m2.getPayload());
-			
+
+			// Test storeless decode round-trip for complete messages.
+			// Partial messages (e.g. beliefs with external branches) would throw
+			// PartialMessageException — those require getPayload(store) instead.
+			if (type!=MessageType.BELIEF) {
+				Message m3=Message.create(data);
+				ACell storelessPayload=m3.getPayload(null);
+				assertEquals(payload,storelessPayload);
+				assertEquals(type,m3.getType());
+				assertEquals(id,m3.getID());
+			}
+
 		} catch (BadFormatException e) {
 			fail("Bad format: "+m,e);
 		}

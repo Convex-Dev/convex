@@ -3,17 +3,21 @@ package convex.core.lang.reader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
+import convex.core.Constants;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Symbols;
@@ -69,17 +73,41 @@ import convex.core.lang.reader.antlr.ConvexParser.TaggedFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
 import convex.core.text.Text;
 import convex.core.util.Utils;
- 
+
+/**
+ * Reader for Convex CVX format. Basically stringified CAD3 with some CVM-specific features.
+ */
 public class AntlrReader {
 	
+	private static final int MAX_TOKEN_DISPLAY = 20;
+	private static final String KEYWORD_TOO_LONG = "Keyword too long (max "+Constants.MAX_NAME_LENGTH+"): ";
+	private static final String SYMBOL_TOO_LONG = "Symbol too long (max "+Constants.MAX_NAME_LENGTH+"): ";
+
+	/**
+	 * Truncate a token string for safe inclusion in error messages.
+	 * Prevents OOM from constructing huge error strings for malicious input.
+	 */
+	static String truncate(String s) {
+		if (s.length()<=MAX_TOKEN_DISPLAY) return s;
+		return s.substring(0,MAX_TOKEN_DISPLAY)+"...";
+	}
+
+	/**
+	 * Create a ParseException with position info from an ANTLR context
+	 */
+	static ParseException parseError(ParserRuleContext ctx, String msg) {
+		Token tok=ctx.getStart();
+		return new ParseException("Parse error at "+tok.getLine()+":"+tok.getCharPositionInLine()+": "+msg);
+	}
+
 	static class CRListener extends ConvexBaseListener {
 		ArrayList<ArrayList<ACell>> stack=new ArrayList<>();
 		protected CVMEncoder encoder;
-		
+
 		public CRListener() {
 			this (CVMEncoder.INSTANCE);
 		}
-		
+
 		public CRListener(CVMEncoder encoder) {
 			this.encoder=encoder;
 			stack.add(new ArrayList<>());
@@ -113,7 +141,9 @@ public class AntlrReader {
 
 		@Override
 		public void visitErrorNode(ErrorNode node) {
-			throw new ParseException(node.getSourceInterval()+" "+node.getText());
+			Token tok=node.getSymbol();
+			throw new ParseException("Parse error at "+tok.getLine()+":"+tok.getCharPositionInLine()
+				+": unexpected '"+truncate(tok.getText())+"'");
 		}
 
 		@Override
@@ -158,7 +188,7 @@ public class AntlrReader {
 		public void exitMap(MapContext ctx) {
 			ArrayList<ACell> elements=popList();
 			if (Utils.isOdd(elements.size())) {
-				throw new ParseException("Map requires an even number of forms.");
+				throw parseError(ctx,"map requires an even number of forms");
 			}
 			push(Maps.create(elements.toArray(new ACell[elements.size()])));
 		}
@@ -168,7 +198,7 @@ public class AntlrReader {
 			// Just looking at the last token probably most efficient way to get string?
 			String s=ctx.getStop().getText();
 			AInteger a= AInteger.parse(s);
-			if (a==null) throw new ParseException("Unparseable number: "+s);
+			if (a==null) throw parseError(ctx,"bad number format: "+truncate(s));
 			push(a);
 		}
 		
@@ -181,7 +211,7 @@ public class AntlrReader {
 		public void exitDoubleValue(DoubleValueContext ctx) {
 			String s=ctx.getStop().getText();
 			CVMDouble v=CVMDouble.parse(s);
-			if (v==null) throw new ParseException("Bad double format: "+s);
+			if (v==null) throw parseError(ctx,"bad double format: "+truncate(s));
 			push(v);	
 		}
 
@@ -199,7 +229,7 @@ public class AntlrReader {
 		public void exitCharacter(CharacterContext ctx) {
 			String s=ctx.getStop().getText();
 			CVMChar c=CVMChar.parse(s);
-			if (c==null) throw new ParseException("Bad character literal format: "+s);
+			if (c==null) throw parseError(ctx,"bad character literal: "+s);
 			push(c);
 		}
 
@@ -207,7 +237,7 @@ public class AntlrReader {
 		public void exitKeyword(KeywordContext ctx) {
 			String s=ctx.getStop().getText();
 			Keyword k=Keyword.create(s.substring(1));
-			if (k==null) throw new ParseException("Bad Keyword format: "+s);
+			if (k==null) throw parseError(ctx,KEYWORD_TOO_LONG+truncate(s));
 			push( k);
 		}
 
@@ -215,7 +245,7 @@ public class AntlrReader {
 		public void exitSymbol(SymbolContext ctx) {
 			String s=ctx.getStop().getText();
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Bad Symbol format: "+s);
+			if (sym==null) throw parseError(ctx,SYMBOL_TOO_LONG+truncate(s));
 			push( sym);
 		}
 
@@ -223,7 +253,7 @@ public class AntlrReader {
 		public void exitImplicitSymbol(ImplicitSymbolContext ctx) {
 			String s=ctx.getText();
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Bad implicit symbol: "+s);
+			if (sym==null) throw parseError(ctx,"bad implicit symbol: "+s);
 			push( sym);
 		}
 		
@@ -235,7 +265,7 @@ public class AntlrReader {
 		@Override
 		public void exitTaggedForm(TaggedFormContext ctx) {
 			ArrayList<ACell> elements=popList();
-			if (elements.size()!=2) throw new ParseException("Tagged form tag and form but got:"+ elements);
+			if (elements.size()!=2) throw parseError(ctx,"tagged form requires tag and form but got: "+ elements);
 			Symbol sym=(Symbol) elements.get(0);
 			ACell value=elements.get(1);
 			
@@ -248,7 +278,7 @@ public class AntlrReader {
 			String s=ctx.getText();
 			s=s.substring(1); // skip leading #
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Bad tag: #"+s);
+			if (sym==null) throw parseError(ctx,"bad tag: #"+s);
 			push( sym);
 		}
 
@@ -258,10 +288,10 @@ public class AntlrReader {
 			try {
 				long value=Long.parseLong(s.substring(1));
 				Address addr=Address.create(value);
-				if (addr==null) throw new ParseException("Bad Address format: "+s);
+				if (addr==null) throw parseError(ctx,"bad address format: "+s);
 				push (addr);
 			} catch (NumberFormatException e) {
-				throw new ParseException("Problem parsing Address: "+s,e);
+				throw parseError(ctx,"bad address format: "+s);
 			}
 		}
 
@@ -275,7 +305,7 @@ public class AntlrReader {
 		@Override
 		public void exitSyntax(SyntaxContext ctx) {
 			ArrayList<ACell> elements=popList();
-			if (elements.size()!=2) throw new ParseException("Metadata requires metadata and annotated form but got:"+ elements);
+			if (elements.size()!=2) throw parseError(ctx,"metadata requires metadata and annotated form but got: "+ elements);
 			AHashMap<ACell,ACell> meta=ReaderUtils.interpretMetadata(elements.get(0));
 			ACell value=elements.get(1);
 			push(Syntax.create(value, meta));
@@ -285,7 +315,7 @@ public class AntlrReader {
 		public void exitBlob(BlobContext ctx) {
 			String s=ctx.getStop().getText();
 			Blob b=Blob.fromHex(s.substring(2));
-			if (b==null) throw new ParseException("Invalid Blob syntax: "+s);
+			if (b==null) throw parseError(ctx,"invalid blob syntax: "+truncate(s));
 			push(b);
 		}
 
@@ -297,7 +327,7 @@ public class AntlrReader {
 				ACell cell=encoder.decodeMultiCell(enc);
 				push (cell);
 			} catch (BadFormatException e) {
-				throw new ParseException("Invalid CAD3 encoding: "+e.getMessage(),e);
+				throw parseError(ctx,"invalid CAD3 encoding: "+e.getMessage());
 			}
 		}
 
@@ -306,7 +336,7 @@ public class AntlrReader {
 			ACell form=pop();
 			String qs=ctx.getStart().getText();
 			Symbol qsym=ReaderUtils.getQuotingSymbol(qs);
-			if (qsym==null) throw new ParseException("Invalid quoting reader macro: "+qs);
+			if (qsym==null) throw parseError(ctx,"invalid quoting reader macro: "+qs);
 			push(Lists.of(qsym,form));	
 		}
 
@@ -315,7 +345,7 @@ public class AntlrReader {
 			String s=ctx.getStop().getText();
 			s=s.substring(1); // skip leading @
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Invalid @ symbol: @"+s);
+			if (sym==null) throw parseError(ctx,"invalid @ symbol: @"+s);
 			push(List.of(Symbols.RESOLVE,sym));
 		}
 		
@@ -325,7 +355,7 @@ public class AntlrReader {
 			String s=ctx.getStop().getText();
 			s=s.substring(1); // skip leading /
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Invalid / symbol: /"+s);
+			if (sym==null) throw parseError(ctx,"invalid path symbol: /"+s);
 			push(sym);
 		}
 
@@ -342,7 +372,7 @@ public class AntlrReader {
 		public void exitSpecialLiteral(SpecialLiteralContext ctx) {
 			String s=ctx.getStop().getText();
 			ACell special=ReaderUtils.specialLiteral(s);
-			if (special==null) throw new ParseException("Invalid special literal: "+s);
+			if (special==null) throw parseError(ctx,"invalid special literal: "+s);
 			push(special);
 		}
 
@@ -370,12 +400,12 @@ public class AntlrReader {
 			int n=elements.size();
 			
 			ACell lookup=elements.get(0);
-			if (lookup==null) throw new ParseException("Path must start with Address or Symbol");
+			if (lookup==null) throw parseError(ctx,"path must start with address or symbol");
 			
 			for (int i=1; i<n; i++) {
 				ACell sym=elements.get(i);
 				
-				if (!(sym instanceof Symbol)) throw new ParseException("Expected path element to be a symbol but got: "+ RT.getType(sym));
+				if (!(sym instanceof Symbol)) throw parseError(ctx,"expected path element to be a symbol but got: "+ RT.getType(sym));
 				// System.out.println(elements);
 				lookup=List.create(Symbols.LOOKUP,lookup,sym);
 			}
@@ -431,10 +461,32 @@ public class AntlrReader {
 				listenerExceptionOccurred = true;
 				throw e;
 			}
+			catch (NoSuchElementException e) {
+				// Listener stack underflow due to malformed input (e.g. lone quote character).
+				listenerExceptionOccurred = true;
+				Token tok=getCurrentToken();
+				String desc=(tok!=null&&"<EOF>".equals(tok.getText())) ? "unexpected end of input" : "unexpected token";
+				throw new ParseException("Parse error at "
+					+(tok!=null ? tok.getLine()+":"+tok.getCharPositionInLine() : "unknown position")
+					+": "+desc,e);
+			}
 		}
 		
 	}
 	
+	/**
+	 * Dump lexer tokens for debugging. Not used in production.
+	 */
+	public static void dumpTokens(String input) {
+		ConvexLexer lexer=new ConvexLexer(CharStreams.fromString(input));
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		tokens.fill();
+		for (Token t : tokens.getTokens()) {
+			System.out.println("  " + ConvexLexer.VOCABULARY.getSymbolicName(t.getType())
+				+ " '" + t.getText() + "' at " + t.getLine()+":"+t.getStartIndex()+"-"+t.getStopIndex());
+		}
+	}
+
 	static ConvexParser getParser(CharStream cs, CRListener listener) {
 		// Create lexer and paser for the CharStream
 		ConvexLexer lexer=new ConvexLexer(cs);

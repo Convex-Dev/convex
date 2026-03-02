@@ -4,12 +4,14 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -31,6 +33,7 @@ import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -38,13 +41,13 @@ import convex.core.data.Hash;
 import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.IPUtils;
 import convex.peer.Config;
@@ -66,6 +69,11 @@ import convex.peer.Server;
 public abstract class Convex implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
+
+	/**
+	 * Size in bytes of the random token used in challenge/response verification.
+	 */
+	private static final int CHALLENGE_TOKEN_BYTES = 16;
 
 	protected long timeout = Config.DEFAULT_CLIENT_TIMEOUT;
 
@@ -93,17 +101,66 @@ public abstract class Convex implements AutoCloseable {
 	 * Sequence number for this client, or null if not yet known. Used to number new
 	 * transactions if not otherwise specified.
 	 */
-	protected Long sequence = null;
+	protected volatile Long sequence = null;
 
 	
 	/**
-	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result
+	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result.
+	 * AtomicLong for thread-safe access from concurrent transact/query calls.
 	 */
-	protected long idCounter=0;
+	private final AtomicLong idCounter=new AtomicLong(0);
+
+	/**
+	 * Store for this client instance. Null by default — normal operations (transact,
+	 * query) use storeless decode. Only needed for acquire operations that download
+	 * and persist data incrementally.
+	 */
+	protected AStore store = null;
+
+	/**
+	 * Verified remote peer key, set by a successful {@link #verifyPeer} call.
+	 * Null if not yet verified. Cleared on disconnect/reconnect.
+	 */
+	protected AccountKey verifiedPeer = null;
 
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
+	}
+
+	/**
+	 * Gets the verified remote peer key, or null if not yet verified.
+	 * @return Verified AccountKey, or null
+	 */
+	public AccountKey getVerifiedPeer() {
+		return verifiedPeer;
+	}
+
+	/**
+	 * Called when peer verification succeeds. Sets the verified peer key and
+	 * allows subclasses to propagate trust to the underlying connection.
+	 * Subclasses should call {@code super.setVerifiedPeer(key)}.
+	 *
+	 * @param key Verified remote peer AccountKey
+	 */
+	protected void setVerifiedPeer(AccountKey key) {
+		verifiedPeer = key;
+	}
+
+	/**
+	 * Gets the store for this client instance.
+	 * @return Store, or null if no store is configured
+	 */
+	public AStore getStore() {
+		return store;
+	}
+
+	/**
+	 * Sets the store for this client instance. Required for acquire operations.
+	 * @param store Store to use, or null to clear
+	 */
+	public void setStore(AStore store) {
+		this.store=store;
 	}
 	
 	/**
@@ -157,7 +214,7 @@ public abstract class Convex implements AutoCloseable {
 	}
 	
 	protected long getNextID() {
-		return idCounter++;
+		return idCounter.getAndIncrement();
 	}
 
 	/**
@@ -244,7 +301,7 @@ public abstract class Convex implements AutoCloseable {
 	
 	/**
 	 * Called after a transaction is submitted to update sequence (if possible)
-	 * @param value
+	 * @param signed Signed transaction
 	 */
 	protected void maybeUpdateSequence(SignedData<ATransaction> signed) {
 		try {
@@ -281,8 +338,8 @@ public abstract class Convex implements AutoCloseable {
 	public Address createAccountSync(AccountKey publicKey) throws InterruptedException, ResultException {
 		Address address;
 		try {
-			address = createAccount(publicKey).get();
-		} catch (ExecutionException e) {
+			address = createAccount(publicKey).get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		} catch (ExecutionException | TimeoutException e) {
 			throw new ResultException(Result.fromException(e));
 		}
 		return address;
@@ -408,7 +465,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @param transaction Transaction to prepare
 	 * @return Signed transaction ready to submit
 	 */
-	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
+	public synchronized SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws ResultException, InterruptedException {
 		Address origin=transaction.getOrigin();
 		if (origin == null) {
 			origin=address;
@@ -677,13 +734,36 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> messageRaw(Blob message);
 	
 	/**
-	 * Submits a Message to the connected peer, returning a Future for any Result
+	 * Submits a Message to the connected peer, returning a Future for any Result.
 	 *
-	 * @param message Message data
-	 * @return A Future for the Result of the query. May just be "Sent" if no other result expected, or an immediate error if sending failed.
+	 * @param message Message to send
+	 * @return A Future for the Result. May be an immediate "Sent" if no response is expected, or an immediate error if sending failed.
 	 */
 	public abstract CompletableFuture<Result> message(Message message);
-	
+
+	/**
+	 * Non-blocking fire-and-forget message send. Returns false immediately if
+	 * the message cannot be queued (buffer full, connection closed).
+	 *
+	 * <p>Intended for broadcast scenarios where blocking on one slow peer must
+	 * not delay delivery to other peers. Callers should not expect a result.
+	 *
+	 * <p>Default implementation delegates to {@link #message(Message)} which
+	 * may block. Subclasses with connection-level access should override.
+	 *
+	 * @param msg Message to send
+	 * @return true if queued successfully, false otherwise
+	 */
+	public boolean trySend(Message msg) {
+		CompletableFuture<Result> f = message(msg);
+		if (f == null) return false;
+		if (f.isDone()) {
+			Result r = f.join();
+			return r != null && !r.isError();
+		}
+		return true;
+	}
+
 	/**
 	 * Attempts to resolve a CNS name
 	 *
@@ -700,15 +780,17 @@ public abstract class Convex implements AutoCloseable {
 
 	/**
 	 * Attempts to asynchronously acquire a complete persistent data structure for the given hash
-	 * from the remote peer. Uses the current store configured for the calling
-	 * thread.
+	 * from the connected peer. Uses this client's store field (set via {@link #setStore}).
+	 * Subclasses may override for better defaults (e.g. ConvexLocal uses the server's store).
 	 *
 	 * @param hash Hash of value to acquire.
-	 *
 	 * @return Future for the cell being acquired
+	 * @throws IllegalStateException if no store is configured on this client
 	 */
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash) {
-		return acquire(hash, Stores.current());
+		AStore s=getStore();
+		if (s==null) throw new IllegalStateException("No store configured — call setStore() before acquire");
+		return acquire(hash, s);
 	}
 
 	/**
@@ -759,13 +841,103 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> requestStatus();
 
 	/**
+	 * Sends a PING message to the connected peer for liveness testing.
+	 * Returns the peer's current timestamp on success.
+	 *
+	 * @return A Future completing with the peer's timestamp, or null on error
+	 */
+	public CompletableFuture<CVMLong> ping() {
+		Message m = Message.createPing(getNextID());
+		return message(m).thenApply(r -> {
+			if (r == null || r.isError()) return null;
+			return RT.ensureLong(r.getValue());
+		});
+	}
+
+	/**
+	 * Synchronous PING returning the peer's timestamp. Throws on failure or timeout.
+	 *
+	 * @param timeoutMillis Maximum time to wait for a response
+	 * @return The peer's current timestamp
+	 * @throws ResultException if the peer responds with an error or no timestamp
+	 * @throws TimeoutException if the peer does not respond in time
+	 */
+	public CVMLong pingSync(long timeoutMillis) throws ResultException, TimeoutException {
+		try {
+			CVMLong ts = ping().get(timeoutMillis, TimeUnit.MILLISECONDS);
+			if (ts == null) throw new ResultException(ErrorCodes.UNEXPECTED, "No timestamp in PING response");
+			return ts;
+		} catch (TimeoutException e) {
+			throw e;
+		} catch (ResultException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ResultException(e);
+		}
+	}
+
+	/**
 	 * Request a challenge. This is request is made by any peer that needs to find
 	 * out if another peer can be trusted.
 	 *
 	 * @param data Signed data to send to the peer for the challenge.
-	 * @return A Future for the result of the requestChallenge
+	 * @return A Future for the result of the sendChallenge
 	 */
-	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data);
+	protected abstract CompletableFuture<Result> sendChallenge(SignedData<ACell> data);
+
+	/**
+	 * Verifies the identity of the remote peer via challenge/response.
+	 *
+	 * <p>Sends a CHALLENGE containing a random token and the expected peer key,
+	 * signed by this client's key pair. The remote peer must respond with the
+	 * same token and this client's key, signed by the expected peer key.
+	 *
+	 * <p>Protocol format (symmetric): {@code [token, otherKey, contextID?]}
+	 * <ul>
+	 *   <li>Challenge: {@code SignedData([token, targetKey, contextID?])} signed by this client</li>
+	 *   <li>Response:  {@code SignedData([token, clientKey, contextID?])} signed by target</li>
+	 * </ul>
+	 *
+	 * <p>Works with both NodeServer (lattice) and peer Server (consensus).
+	 *
+	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
+	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 */
+	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
+		return verifyPeer(expectedKey, null);
+	}
+
+	/**
+	 * Verifies the identity of the remote peer via challenge/response with an
+	 * optional context ID.
+	 *
+	 * @param expectedKey AccountKey the remote peer is expected to hold, or null to accept any
+	 * @param contextID   Optional context (e.g. network ID for consensus peers), or null
+	 * @return Future that completes with the verified remote AccountKey, or null on failure
+	 */
+	@SuppressWarnings("unchecked")
+	public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
+		AKeyPair kp = keyPair;
+		if (kp == null) return CompletableFuture.completedFuture(null);
+
+		Hash token = Blob.createRandom(new SecureRandom(), CHALLENGE_TOKEN_BYTES).getHash();
+		AccountKey ownKey = kp.getAccountKey();
+
+		SignedData<ACell> signed = Message.signChallenge(kp, token, expectedKey, contextID);
+
+		return sendChallenge(signed).thenApply(result -> {
+			try {
+				AccountKey remoteKey = Message.verifyChallengeResponse(result, token, ownKey, contextID, expectedKey);
+				if (remoteKey == null) return null;
+
+				setVerifiedPeer(remoteKey);
+				return remoteKey;
+			} catch (Exception e) {
+				log.debug("verifyPeer failed: {}", e.getMessage());
+				return null;
+			}
+		});
+	}
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
@@ -965,15 +1137,17 @@ public abstract class Convex implements AutoCloseable {
 	 * @return Future for consensus state
 	 */
 	public CompletableFuture<State> acquireState()  {
-		AStore store=Stores.current();
+		AStore s=getStore();
+		if (s==null) throw new IllegalStateException("No store configured — call setStore() before acquireState");
+		final AStore acquireStore=s;
 		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 
 			if (stateHash == null) {
 				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
 			}
-			return acquire(stateHash,store);
-		});	
+			return acquire(stateHash,acquireStore);
+		});
 	}
 	
 	/**

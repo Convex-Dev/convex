@@ -7,6 +7,7 @@ import java.util.List;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -77,6 +78,13 @@ public class ServerListPanel extends JPanel {
 			btnLaunch.setEnabled(false);
 		}
 		toolBar.add(btnLaunch);
+
+		ActionButton btnConnections = new ActionButton("Connections", 0xe1b1, e -> {
+			JFrame frame = (JFrame) javax.swing.SwingUtilities.getWindowAncestor(this);
+			new ConnectionReportDialog(frame, manager).setVisible(true);
+		});
+		btnConnections.setToolTipText("Show diagnostic report of inbound and outbound connections for all peers");
+		toolBar.add(btnConnections);
 
 // TODO: We probably want to restore this, but semantics not obvious
 //		JButton btnConnect = new ActionButton("Connect New Peer...",0xe157,e -> {

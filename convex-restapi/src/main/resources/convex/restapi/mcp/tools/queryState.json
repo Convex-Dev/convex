@@ -1,0 +1,28 @@
+{
+  "name": "queryState",
+  "title": "Query State",
+  "description": "Query the current value at a path in the global CVM state. Like watchState but returns immediately without setting up a watch. No session required.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "CVX path vector into the global state, e.g. '[:accounts #56785 :environment myvar :MY-KEY]'"
+      }
+    },
+    "required": ["path"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "exists": { "type": "boolean", "description": "True if the path exists in the state tree (even if the value is null). When false, no other fields are present." },
+      "value": { "description": "JSON-friendly value at the path. Only present when exists=true and value is below size threshold." },
+      "result": { "type": "string", "description": "CVX printed form (e.g. '#42' for address, '0x1234' for blob). Preserves type info that JSON conversion may lose. Only present when exists=true and value is below size threshold." },
+      "size": { "type": "integer", "description": "Memory size in bytes. Returned instead of value/result when the value exceeds the size threshold." }
+    }
+  }
+}

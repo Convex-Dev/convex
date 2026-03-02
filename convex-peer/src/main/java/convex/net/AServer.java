@@ -3,7 +3,13 @@ package convex.net;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.function.Consumer;
 
+import convex.core.message.Message;
+
+/**
+ * Base class for servers that Listen for lattice protocol messages and call a receive action
+ */
 public abstract class AServer implements Closeable {
 
 	/**
@@ -30,5 +36,33 @@ public abstract class AServer implements Closeable {
 		this.port=port;
 	}
 
+	/**
+	 * Launch the Server as currently configured
+	 * @throws IOException If an IO error occurs, e.g. binding to configured port
+	 * @throws InterruptedException If the operation was interrupted
+	 */
 	public abstract void launch() throws IOException, InterruptedException;
+
+	/**
+	 * Get the receiver action for the server, which handles an incoming Message
+	 * Receive action is responsible for all message handling
+	 *
+	 * @return Receive action
+	 */
+	public abstract Consumer<Message> getReceiveAction();
+
+	/**
+	 * Set the receiver action for the server. Must be called before launch.
+	 *
+	 * @param action Receive action to handle incoming messages
+	 */
+	public abstract void setReceiveAction(Consumer<Message> action);
+
+	/**
+	 * Returns the number of active inbound client connections.
+	 * @return Connection count, or -1 if not available
+	 */
+	public int getClientConnectionCount() {
+		return -1;
+	}
 }

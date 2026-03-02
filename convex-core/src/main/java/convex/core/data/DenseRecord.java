@@ -35,19 +35,6 @@ public class DenseRecord extends ACAD3Record {
 		return data.encodeRaw(bs, pos);
 	}
 	
-	public static DenseRecord read(byte tag, Blob b, int pos) throws BadFormatException {
-		AVector<ACell> data=Vectors.read(b, pos);
-		
-		Blob enc=data.cachedEncoding();
-		data.attachEncoding(null); // clear invalid encoding
-		
-		DenseRecord dr=create(tag,data);
-		if ((enc!=null)&&(enc.byteAt(0)==tag)) {
-			dr.attachEncoding(enc);
-		}
-		return dr;
-	}
-
 	@Override
 	public AType getType() {
 		return Types.CAD3;
@@ -110,6 +97,7 @@ public class DenseRecord extends ACAD3Record {
 	public ACell get(ACell key) {
 		return null;
 	}
+
 
 
 

@@ -1,143 +1,300 @@
 # Convex CLI
 
-## Overview
+[![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-The `convex-cli` module provides a CLI interface to Convex, including the ability to operate as either a client or peer on the Convex Network
+Command-line interface for the [Convex](https://convex.world) decentralised network. Query state, execute transactions, manage keys, run local test networks, and operate production peers.
 
-## Usage Examples
+## Quick Start
 
-### List available commands and options
+```bash
+# Check installation
+convex --version
 
-```
+# Get help
 convex --help
-```
 
-### Run a local develop testnet with a GUI
-
-```
+# Start a local test network
 convex local start
 ```
 
-### Run the main Convex Desktop GUI application
+## Installation
 
+### Prerequisites
+
+Java 21+ is required. Download from [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or use your package manager.
+
+### Get the JAR
+
+Download `convex.jar` from the [releases page](https://github.com/Convex-Dev/convex/releases) or build from source (see main [README](../README.md)).
+
+### Create a Wrapper Script
+
+**Linux/macOS** - Create `~/bin/convex`:
+```bash
+#!/bin/bash
+java -jar /path/to/convex.jar "$@"
 ```
-convex desktop
-```
+Then: `chmod +x ~/bin/convex`
 
-### Query the network
-
-This runs the `*balance*` query to get the Convex Coin balance of account `#11`
-
-```
-convex query -a 11 *balance*
-```
-
-Queries are free, don't require a signature and you can query for any account on the network.
-
-## Key Management
-
-Operating Convex based systems correctly requires cryptographic keys for signing and verification. The CLI helpfully provides a number of useful tools for managing your keys.
-
-### Listing keys
-
-You can get a list of all public keys in the current key store as follows:
-
-```
-convex key list
+**Windows PowerShell** - Add to your `$PROFILE`:
+```powershell
+function convex { java -jar C:\path\to\convex.jar $args }
 ```
 
-By default, keys are store in the `.convex/keystore.pfx` file in the user's home director, but you can override this by either sertting the `CONVEX_KEYSTORE` environment variable or passing the `--keystore` option (works with most CLI commands).
+## Use Case 1: Local Test Network
 
-### Generating a key pair
+Spin up a local Convex network for development and testing. This creates a fresh network with genesis accounts you can use immediately.
 
-To execute transactions or operate peers on Convex you will need a cryptographic Ed25519 key pair.
+```bash
+# Start local network with GUI
+convex local start
 
-Key pairs are stored in a PKCS #12 key store. By default this is stored in the user's home directory in the location `~/.convex/keystore.pfx`. The keystore encrypts keys so that they cannot be accessed without the correct passwords.
-
-To generate a cryptographic key, it is recommended to use the following command:
-
+# Start without GUI (headless)
+convex local start --gui=false
 ```
+
+The local network includes:
+- A single peer running on localhost:18888
+- REST API on localhost:8080
+- Pre-funded genesis accounts (#11, #12) for testing
+- Faucet enabled for easy account funding
+
+Test your connection:
+```bash
+convex status --host localhost
+```
+
+## Use Case 2: Key Management
+
+Convex uses Ed25519 cryptographic keys for signing transactions. Keys are stored encrypted in a PKCS#12 keystore (default: `~/.convex/keystore.pfx`).
+
+### Generate a New Key
+
+```bash
 convex key generate
 ```
 
-This generates and outputs a BIP39 mnemonic phrase of 12 words consistent with the BIP39 standard. The words will look something like this:
+This outputs:
+1. A BIP39 mnemonic phrase (12 words) - **back this up securely!**
+2. The public key (32-byte hex)
 
+You'll be prompted for:
+- BIP39 passphrase (used in key derivation)
+- Key encryption password (protects the key in storage)
+
+Example output:
 ```
+BIP39 mnemonic generated with 12 words:
 evidence expand family claw crack dawn name salmon resource leg once curious
+Generated key pair with public key: 0x021efb3ff24898dffb30c9c7e490e86b2d0cb7a87c974a51894354532ff4670f
 ```
 
-You will be also prompted for passwords including:
-- A BIP39 passphrase. This is the passphrase that will be used to generate the private key
-- A private key encryption password. This protects the new key by encrypting it in the key store
+### List Keys
 
-After the key pair is successfully generated, you will be able to use it providing have the private key password.
-
-If the key is important to you, you will want to be able to recover it even if you permanently lose access to the key store (e.g. if your laptop is stolen, disk drive corrupted etc.). In this case, you SHOULD make sure you securely record the following:
-- The BIP39 mnemonic word list
-- The BIP39 passphrase
-
-The command will output a 32 byte hex public key that will look something like this:
-
-```
-021efb3ff24898dffb30c9c7e490e86b2d0cb7a87c974a51894354532ff4670f
+```bash
+convex key list
 ```
 
-The public key MAY be shared publicly, and is important because it is used to:
-- Identify your key pair in the key store
-- Validate signatures made with the key pair (e.g. in Convex transactions)
-- Create a Convex account protected by the key pair (as the "account key")
- 
-### Importing a key pair
+### Import from Mnemonic
 
-To import a key pair from a BIP39 seed generated previously, you can use the following command:
-
-```
+Recover a key from its BIP39 mnemonic:
+```bash
 convex key import --type=bip39 --text='evidence expand family claw crack dawn name salmon resource leg once curious'
 ```
 
-This will re-import the same key pair that was originally generated, assuming you have the correct BIP39 passphrase. You can confirm this by checking that the public key is the one you expect.
+### Export a Key
 
-
-
-## Installation
-
-### Pre-requisites
-
-You need a reasonably modern version of Java, specifically 21+. You can get this here:
-- [Java JDK from Oracle](https://www.oracle.com/uk/java/technologies/downloads/)
-
-### .jar file
-
-You need the `convex.jar` file. See the main [Convex Readme](../README.md) for details.
-
-At this point, assuming Java 21+ is correctly installed, you should simple be able to simply execute `java -jar convex.jar`  (appending any appropriate CLI arguments).
-
-### Convenience Wrappers
-
-It is helpful to have a script, alias or batch file which executes the Java command command for you so you can simply type `convex ....`
-
-For Windows PowerShell, the following should work:
-
-```
-# Windows powershell - convex.ps1
-function convex { 
-  java -jar C:\path\to\convex.jar $args
-}
+Export as seed (hex) or mnemonic for backup:
+```bash
+convex key export --key 021efb --type=seed
+convex key export --key 021efb --type=bip39
 ```
 
-Put this in your PowerShell profile (typically `Profile.ps1` in `$home/documents/PowerShell`) and the `convex` command should be available in all future PowerShell sessions.
+### Environment Variables
 
-For Linux and other Unix-like systems:
+Avoid repeated password prompts:
+```bash
+export CONVEX_KEY=021efb3ff2...        # Public key prefix
+export CONVEX_KEY_PASSWORD=secret       # Key encryption password
+export CONVEX_KEYSTORE=~/my-keys.pfx    # Custom keystore location
+```
+
+## Use Case 3: Query and Transact
+
+Interact with any Convex network: read state with queries (free), modify state with transactions (requires signed account).
+
+### Queries (Free, No Signature Required)
+
+```bash
+# Check balance of account #11
+convex query "*balance*" -a 11
+
+# Read any account's balance
+convex query "(balance #1234)"
+
+# Get account information
+convex account info 11
+
+# Check network status
+convex status
+```
+
+By default, commands connect to the public network (`peer.convex.live`). For local development:
+```bash
+convex query "*balance*" -a 11 --host localhost
+```
+
+### Transactions (Require Key)
+
+Transactions modify state and cost Convex coins. You need:
+- An account address (`-a`)
+- The account's key (`--key`)
+
+```bash
+# Transfer coins
+convex transact "(transfer #1234 1000000)" -a 11 --key 021efb
+
+# Deploy a simple contract
+convex transact "(def my-value 42)" -a 11 --key 021efb
+
+# Call a function
+convex transact "(call #5678 (my-function arg1 arg2))" -a 11 --key 021efb
+```
+
+### Create an Account
+
+**On local network (faucet enabled):**
+```bash
+convex account create --faucet --host localhost
+```
+
+**On production (requires existing funded account):**
+```bash
+convex account create -a 11 --key 021efb
+```
+
+### Fund an Account (Local/Test Networks Only)
+
+```bash
+convex account fund -a 1234 1000000000 --host localhost
+```
+
+Note: The faucet is disabled on production networks like Protonet.
+
+## Use Case 4: Running a Production Peer
+
+Operate a peer node that participates in Convex consensus. Peers validate transactions, maintain state, and serve client requests.
+
+### 1. Generate Peer Key
+
+```bash
+convex key generate
+# Note the public key, e.g., 7e66429ca...
+```
+
+### 2. Create Genesis or Join Existing Network
+
+**Option A: Start a new network (genesis peer):**
+```bash
+convex peer genesis --peer-key 7e66429ca
+```
+
+**Option B: Join an existing network:**
+
+First, create your peer's on-chain account and stake:
+```bash
+# Create peer account on the network
+convex transact "(create-peer 0x7e66429ca... 1000000000000)" -a 11 --key 021efb
+```
+
+### 3. Start the Peer
+
+```bash
+convex peer start --peer-key 7e66429ca --port 18888
+```
+
+### Peer Options
+
+```bash
+convex peer start \
+  --peer-key 7e66429ca \
+  --port 18888 \
+  --bind 0.0.0.0 \
+  --api-port 8080 \
+  --state /var/convex/state
+```
+
+| Option | Description |
+|--------|-------------|
+| `--peer-key` | Public key of peer's key pair |
+| `--port` | Binary protocol port (default: 18888) |
+| `--bind` | Bind address (default: localhost) |
+| `--api-port` | REST API port (default: 8080) |
+| `--state` | Directory for persistent state |
+
+## Global Options
+
+These options work with most commands:
+
+| Option | Environment Variable | Description |
+|--------|---------------------|-------------|
+| `--host` | `CONVEX_HOST` | Peer hostname (default: peer.convex.live) |
+| `--port` | `CONVEX_PORT` | Peer port (default: 18888) |
+| `-a, --address` | `CONVEX_ADDRESS` | Account address |
+| `--key` | `CONVEX_KEY` | Public key (prefix) in keystore |
+| `--keypass` | `CONVEX_KEY_PASSWORD` | Key encryption password |
+| `--keystore` | `CONVEX_KEYSTORE` | Keystore file path |
+| `-n, --noninteractive` | - | Disable interactive prompts |
+| `-S, --strict-security` | - | Require explicit passwords |
+| `-v, --verbose` | `CONVEX_VERBOSE_LEVEL` | Verbosity (0-5) |
+
+## Command Reference
 
 ```
-#!/bin/bash
-java -jar path/to/convex.jar $@
+convex
+  account     Account management
+    create    Create a new account
+    info      Get account information
+    balance   Check account balance
+    fund      Request faucet funds (test networks)
+
+  key         Key management
+    generate  Generate new key pair
+    list      List keys in keystore
+    import    Import key from mnemonic/seed
+    export    Export key
+
+  query       Execute read-only query
+  transact    Execute transaction
+  status      Check peer/network status
+
+  local       Local test network
+    start     Start local network
+
+  peer        Peer operations
+    start     Start a peer node
+    genesis   Create genesis peer
+    create    Create peer on network
+
+  desktop     Launch GUI application
+
+  help        Show help for commands
 ```
 
-Ensure the wrapper is somewhere in your `$PATH`, and you should be good to go!
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 64 | Usage error (bad arguments) |
+| 65 | Data error (invalid input) |
+| 68 | No host (cannot connect) |
+| 75 | Temporary failure (timeout) |
+| 77 | Permission denied |
 
 ## License
 
-Copyright 2021-2024 The Convex Foundation and Contributors
+Copyright 2021-2025 The Convex Foundation and Contributors
 
-Code in `convex-cli` is provided under the Convex Public License
+Code in `convex-cli` is provided under the Convex Public License.

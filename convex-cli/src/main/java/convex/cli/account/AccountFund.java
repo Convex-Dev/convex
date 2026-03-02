@@ -1,68 +1,137 @@
 package convex.cli.account;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 
-import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.core.cvm.Address;
-import convex.core.exceptions.ResultException;
+import convex.core.util.JSON;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
+ * Convex account fund command
  *
- *  Convex account fund command
+ * Requests funds from the peer's faucet for an existing account.
+ * This is useful for getting test coins on development networks.
  *
- *  convex.account.fund
+ * Note: Faucet is typically disabled on production networks.
+ * For transferring between accounts, use: convex transact "(transfer #target amount)"
  *
+ * convex account fund
  */
-
 @Command(name="fund",
-    aliases={"fu"},
+	aliases={"faucet"},
 	mixinStandardHelpOptions=true,
-	description="Transfers funds to account using a public/private key from the keystore.%n"
-		+ "You must provide a valid keystore password to the keystore and a valid address.%n"
-		+ "If the keystore is not at the default location also the keystore filename.")
+	description="Request funds from peer's faucet for an existing account.%n%n" +
+		"Note: Faucet is typically disabled on production networks like Protonet.%n" +
+		"For transfers between accounts, use: convex transact \"(transfer #target amount)\"")
 public class AccountFund extends AAccountCommand {
 
-	private static final Logger log = LoggerFactory.getLogger(AccountFund.class);
-
-	@ParentCommand
-	private Account accountParent;
-
 	@Option(names={"-a", "--address"},
-		description="Account address to use to request funds.")
-	private long addressNumber;
-
+		required=true,
+		description="Account address to fund (e.g. #1234 or 1234).")
+	private String addressSpec;
 
 	@Parameters(paramLabel="amount",
 		defaultValue=""+Constants.ACCOUNT_FUND_AMOUNT,
-		description="Amount to fund the account")
+		description="Amount to request from faucet (default: ${DEFAULT-VALUE}). Max 1 CVX per request.")
 	private long amount;
 
 	@Override
 	public void execute() throws InterruptedException {
-		if (addressNumber == 0) {
-			log.warn("--address. You need to provide a valid address number");
-			return;
+		// Parse address using standard utility
+		Address address = Address.parse(addressSpec);
+		if (address == null) {
+			throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + addressSpec +
+				". Use format #1234 or plain number.");
 		}
 
-		Convex convex = null;
-		Address address = Address.create(addressNumber);
+		// Use faucet REST API
+		String host = peerMixin.getSocketAddress().getHostString();
+		int port = peerMixin.getSocketAddress().getPort();
 
-		convex = connect();
-		convex.transferSync(address, amount);
-		Long balance;
+		// Construct REST API URL
+		int restPort = 8080; // Default REST API port
+		String apiUrl = "http://" + host + ":" + restPort + "/api/v1/faucet";
+
+		inform("Requesting " + amount + " coins from faucet at " + host + ":" + restPort);
+
 		try {
-			balance = convex.getBalance(address);
-			println(balance);
-		} catch (ResultException e) {
-			throw new CLIError("Error getting balance: "+e.getResult().getValue(),e);
+			HttpClient client = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(30))
+				.build();
+
+			// Build JSON request
+			String json = "{\"address\":" + address.longValue() + ",\"amount\":" + amount + "}";
+
+			HttpRequest request = HttpRequest.newBuilder()
+				.uri(URI.create(apiUrl))
+				.header("Content-Type", "application/json")
+				.header("Accept", "application/json")
+				.POST(HttpRequest.BodyPublishers.ofString(json))
+				.timeout(Duration.ofSeconds(30))
+				.build();
+
+			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+			if (response.statusCode() == 403) {
+				throw new CLIError(ExitCodes.NOPERM,
+					"Faucet not available on this peer. For transfers between accounts, use:\n" +
+					"  convex transact -a <source> --key <key> \"(transfer " + address + " " + amount + ")\"");
+			}
+
+			if (response.statusCode() == 400) {
+				throw new CLIError(ExitCodes.DATAERR,
+					"Bad request: " + response.body());
+			}
+
+			if (response.statusCode() != 200) {
+				throw new CLIError(ExitCodes.TEMPFAIL,
+					"Faucet request failed (HTTP " + response.statusCode() + "): " + response.body());
+			}
+
+			// Parse response
+			String body = response.body();
+			Object parsed = JSON.parse(body);
+			if (parsed instanceof java.util.Map) {
+				@SuppressWarnings("unchecked")
+				java.util.Map<String, Object> map = (java.util.Map<String, Object>) parsed;
+
+				// Check for error in response
+				Object errorCode = map.get("errorCode");
+				if (errorCode != null) {
+					Object errorMsg = map.get("value");
+					throw new CLIError(ExitCodes.TEMPFAIL,
+						"Faucet request failed: " + (errorMsg != null ? errorMsg : errorCode));
+				}
+
+				// Success - get the value (amount transferred)
+				Object value = map.get("value");
+				if (value != null) {
+					inform("Funded " + address + " with " + value + " coins");
+					println(value);
+					return;
+				}
+			}
+
+			// Fallback success message
+			inform("Funded " + address + " with " + amount + " coins");
+			println(amount);
+
+		} catch (CLIError e) {
+			throw e;
+		} catch (java.net.ConnectException e) {
+			throw new CLIError(ExitCodes.NOHOST,
+				"Cannot connect to REST API at " + apiUrl + ". Check if peer has REST API enabled on port " + restPort + ".");
+		} catch (Exception e) {
+			throw new CLIError(ExitCodes.TEMPFAIL, "Faucet request failed: " + e.getMessage(), e);
 		}
-		
 	}
 }

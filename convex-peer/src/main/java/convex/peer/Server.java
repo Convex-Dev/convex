@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -44,10 +46,10 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
@@ -56,18 +58,22 @@ import convex.net.impl.nio.NIOServer;
 
 
 /**
- * A self contained Peer Server that can be launched with a config.
- * 
- * The primary role for the Server is to respond to incoming messages and maintain
- * network consensus.
+ * A self-contained Peer Server that can be launched with a config.
  *
- * Components contained within the Server handle specific tasks, e.g:
- * - Client transaction handling
- * - CPoS Belief merges
- * - Belief Propagation
- * - CVM Execution
+ * <p>The Server is the top-level coordinator for a Convex peer. It accepts inbound
+ * messages, dispatches them to specialised components, and orchestrates the peer
+ * lifecycle (launch, sync, persistence, shutdown).
  *
- * "Programming is a science dressed up as art, because most of us don't
+ * <p>Each major responsibility is handled by a dedicated threaded component:
+ * <ul>
+ *   <li>{@link TransactionHandler} — validates and batches client transactions into blocks</li>
+ *   <li>{@link QueryHandler} — executes read-only queries against the latest consensus state</li>
+ *   <li>{@link BeliefPropagator} — merges incoming beliefs and broadcasts updates to peers</li>
+ *   <li>{@link CVMExecutor} — applies confirmed blocks to advance the CVM state machine</li>
+ *   <li>{@link ConnectionManager} — maintains authenticated outbound connections to peers</li>
+ * </ul>
+ *
+ * <p>"Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
  * physics of software is not algorithms, data structures, languages, and
  * abstractions. These are just tools we make, use, and throw away. The real
@@ -76,7 +82,6 @@ import convex.net.impl.nio.NIOServer;
  * solve large problems in pieces. This is the science of programming: make
  * building blocks that people can understand and use easily, and people will
  * work together to solve the very largest problems." ― Pieter Hintjens
- *
  */
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = Constants.DEFAULT_PEER_PORT;
@@ -86,38 +91,61 @@ public class Server implements Closeable {
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
-	 * Message Consumer that handles received client messages received by this peer
-	 * Called on NIO thread: should never block
+	 * Blocking message consumer for the NIO path and tests. Delegates to
+	 * {@link #deliverMessage} and, if a retry predicate is returned, blocks the
+	 * caller's thread until the message is accepted or times out.
 	 */
 	Consumer<Message> receiveAction = m->{
-		observeMessageReceived(m);
-		processMessage(m);
+		Predicate<Message> retry = deliverMessage(m);
+		if (retry != null) {
+			if (!retry.test(m)) {
+				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
+				try {
+					m.returnResult(r);
+				} catch (Exception e) {
+					// best effort
+				}
+			}
+		}
 	};
 
 	/**
-	 * Connection manager instance.
+	 * Manages authenticated outbound connections to other peers in the network.
 	 */
 	protected final ConnectionManager manager = new ConnectionManager(this);
-	
+
 	/**
-	 * Connection manager instance.
+	 * Merges incoming beliefs from peers and broadcasts consensus updates across the network.
 	 */
 	protected final BeliefPropagator propagator=new BeliefPropagator(this);
-	
+
 	/**
-	 * Transaction handler instance.
+	 * Validates client transactions, batches them into blocks, and feeds them into consensus.
 	 */
 	protected final TransactionHandler transactionHandler=new TransactionHandler(this);
-	
+
 	/**
-	 * Transaction handler instance.
+	 * Applies confirmed blocks to advance the CVM state machine and deliver results to clients.
 	 */
 	protected final CVMExecutor executor=new CVMExecutor(this);
 
 	/**
-	 * Query handler instance.
+	 * Executes read-only queries against the latest consensus state, independently of transaction processing.
 	 */
 	protected final QueryHandler queryHandler=new QueryHandler(this);
+
+	/**
+	 * Verifies untrusted inbound connections via server-initiated challenge/response.
+	 */
+	private final InboundVerifier inboundVerifier = new InboundVerifier(this);
+
+	/**
+	 * Pre-allocated retry predicates for backpressure. These are returned by
+	 * processMessage when a queue is full, and block until space is available.
+	 * Zero allocation on the reject path — method references are bound once.
+	 */
+	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
+	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -130,10 +158,11 @@ public class Server implements Closeable {
 	private final HashMap<Keyword, Object> config;
 
 	/**
-	 * NIO Server instance
+	 * Network server (Netty or NIO) that accepts inbound client and peer connections.
 	 */
 	private AServer nio;
 
+	@SuppressWarnings("deprecation")
 	private Server(HashMap<Keyword, Object> config) throws ConfigException {
 		this.config = config;
 		
@@ -148,33 +177,11 @@ public class Server implements Closeable {
 		
 	}
 
-	// This doesn't actually do anything useful? Do we need this?
-//	/**
-//	 * Establish the controller Account for this Peer.
-//	 */
-//	private void establishController() {
-//		Peer peer=getPeer();
-//		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
-//		if (controlAddress==null) {
-//			controlAddress=peer.getController();
-//			if (controlAddress==null) {
-//				throw new IllegalStateException("Peer Controller account does not exist for Peer Key: "+peer.getPeerKey());
-//			}
-//		}
-//		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
-//		if (as==null) {
-//			log.warn("Peer Controller Account does not currently exist (perhaps pending sync?): "+controlAddress);	
-//		} else if (!Utils.equals(as.getAccountKey(),getKeyPair().getAccountKey())) {
-//			// TODO: not a problem?
-//			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
-//		}
-//	}
-
 	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
-		log.debug("Establishing Peer with store: {}",Stores.current());
+		log.debug("Establishing Peer with store: {}",store);
 		AKeyPair keyPair = Config.ensurePeerKey(config);
 		if (keyPair==null) {
-			log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
+			log.warn("No keypair provided for Server, defaulting to generated keypair for testing purposes");
 			keyPair=AKeyPair.generate();
 			config.put(Keywords.KEYPAIR,keyPair);
 			log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
@@ -184,7 +191,9 @@ public class Server implements Closeable {
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
 				try {
-					return syncPeer(keyPair,Convex.connect(source));
+					Convex c=Convex.connect(source);
+					c.setStore(getStore());
+					return syncPeer(keyPair,c);
 				} catch (TimeoutException e) {
 					throw new LaunchException("Timeout trying to connect to remote peer");
 				} catch (IllegalArgumentException e) {
@@ -236,9 +245,9 @@ public class Server implements Closeable {
 			}
 			
 			Hash beliefHash=RT.ensureHash(status.get(Keywords.BELIEF));
-			AccountKey remotePeerKey=RT.ensureAccountKey(Keywords.PEER);
+			AccountKey remotePeerKey=RT.ensureAccountKey(status.get(Keywords.PEER));
 			Hash genesisHash=RT.ensureHash(status.get(Keywords.GENESIS));
-			Hash stateHash=RT.ensureHash(Keywords.STATE);
+			Hash stateHash=RT.ensureHash(status.get(Keywords.STATE));
 			
 			if (genesisHash==null) {
 				throw new LaunchException("Remote peer did not provide genesis hash");
@@ -277,7 +286,6 @@ public class Server implements Closeable {
 				SignedData<Order> newOrder=keyPair.signData(Order.create());
 				belF=belF.withOrders(belF.getOrders().assoc(keyPair.getAccountKey(),newOrder));
 			}
-			// System.out.println(Lists.of(peerOrder.getValue().getConsensusPoints()));
 
 			Peer peer=Peer.create(keyPair, genF, belF);
 			return peer;
@@ -350,10 +358,7 @@ public class Server implements Closeable {
 	public synchronized void launch() throws LaunchException, InterruptedException {
 		if (isRunning) return; // in case of double launch
 		isRunning=true;
-		AStore savedStore=Stores.current();
 		try {
-			Stores.setCurrent(store);
-			
 			// Establish Peer state
 			Peer peer = establishPeer();
 
@@ -362,8 +367,8 @@ public class Server implements Closeable {
 			executor.persistPeerData();
 
 			HashMap<Keyword, Object> config = getConfig();
-			
-			
+
+
 			if (config.containsKey(Keywords.RECALC)) try {
 				Object o=config.get(Keywords.RECALC);
 				if (o!=null) {
@@ -383,12 +388,10 @@ public class Server implements Closeable {
 
 			// set running status now, so that loops don't immediately terminate
 			isRunning = true;
-			
+
 			// Close server on shutdown, should be before Etch stores in priority
-			Shutdown.addHook(Shutdown.SERVER, ()->close());
-			
-			
-			
+			Shutdown.addHook(Shutdown.SERVER, this::close);
+
 			// Start threaded components
 			manager.start();
 			queryHandler.start();
@@ -396,15 +399,12 @@ public class Server implements Closeable {
 			transactionHandler.start();
 			executor.start();
 
-	
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
 		} catch (ConfigException e) {
 			throw new LaunchException("Launch failed due to config problem: "+e,e);
 		} catch (IOException e) {
 			throw new LaunchException("Launch failed due to IO Error: "+e,e);
-		} finally {
-			Stores.setCurrent(savedStore);
 		}
 	}
 
@@ -413,64 +413,104 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Process a message received from a peer or client. We know at this point that the
-	 * message decoded successfully, not much else.....
-	 * 
-	 * SECURITY: Should anticipate malicious messages
+	 * Dispatches a decoded inbound message to the appropriate handler.
 	 *
-	 * Runs on receiver thread, so we want to offload to a queue ASAP, never block
+	 * <p>Client messages (transactions and queries) are offered to bounded queues. Protocol
+	 * messages (beliefs, challenges, status) are handled inline since they are lightweight.
 	 *
-	 * @param m
+	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
+	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
+	 * the caller (typically {@link convex.net.impl.netty.NettyInboundHandler}) parks the
+	 * channel and lets the predicate block on a virtual thread until space is available.
+	 *
+	 * <p>SECURITY: Must anticipate malicious or malformed messages.
+	 *
+	 * @param m Message to process (already decoded)
+	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
 	 */
-	protected void processMessage(Message m) {
-		// log.info("Message received: "+m.getMessageData());
-		AStore tempStore=Stores.current();
+	public Predicate<Message> processMessage(Message m) {
 		try {
-			Stores.setCurrent(this.store);
 			MessageType type = m.getType();
 			switch (type) {
+			case TRANSACT:
+				if (transactionHandler.offerTransaction(m)) return null;
+				return txnRetry;
+
+			case QUERY: case DATA_REQUEST:
+				if (queryHandler.offerQuery(m)) return null;
+				return queryRetry;
+
+			// Protocol messages — always accepted, handled inline
 			case BELIEF:
 				processBelief(m);
-				break;
+				return null;
 			case CHALLENGE:
 				processChallenge(m);
-				break;
-			case RESPONSE:
-				processResponse(m);
-				break;
-			case COMMAND:
-				break;
-			case DATA_REQUEST:
-				processQuery(m); // goes on Query handler
-				break;
-			case QUERY:
-				processQuery(m);
-				break;
-			case RESULT:
-				// We aren't expecting results here (on an inbound connection)
-				log.debug("unexpected Result received");
-				break;
-			case TRANSACT:
-				processTransact(m);
-				break;
+				return null;
 			case GOODBYE:
 				processClose(m);
-				break;
+				return null;
 			case STATUS:
 				processStatus(m);
-				break;
+				return null;
+			case PING:
+				processPing(m);
+				return null;
+			case COMMAND:
+				return null;
+			case RESULT:
+				// Check if this is a response to a server-initiated verification
+				if (inboundVerifier.handleResult(m)) return null;
+				returnError(m,ErrorCodes.UNEXPECTED,Strings.UNEXPECTED_RESULT);
+				return null;
 			default:
-				log.info("Unrecognised message: "+m);
-				break;
+				returnError(m,ErrorCodes.FORMAT,Strings.UNRECOGNISED_MESSAGE_TYPE);
+				return null;
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.info("Missing data: {} in message", missingHash);
+			log.info("Missing data: {} in message of type {}", missingHash, m.getType());
+			try {
+				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Missing data: "+missingHash)).withSource(SourceCodes.PEER));
+			} catch (Exception e2) {
+				// best effort -- some message types don't have return handlers
+			}
+			return null;
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
-		} finally {
-			Stores.setCurrent(tempStore);
+			try {
+				m.returnResult(Result.fromException(e).withID(m.getID()));
+			} catch (Exception e2) {
+				// best effort
+			}
+			return null;
 		}
+	}
+
+	/**
+	 * Delivers an inbound message: decodes payload, observes, and dispatches.
+	 * Returns null if accepted, or a blocking retry predicate if the queue was full.
+	 *
+	 * This is the primary entry point for both Netty and ConvexLocal message delivery.
+	 *
+	 * @param m Message to deliver
+	 * @return null if accepted, or a retry Predicate that blocks until delivered or timeout
+	 */
+	public Predicate<Message> deliverMessage(Message m) {
+		try {
+			m.getPayload(getStore());
+		} catch (Exception e) {
+			log.debug("Failed to decode message: {}", e.getMessage());
+			try {
+				ACell id = m.getRequestID();
+				m.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
+			} catch (Exception e2) {
+				// best effort -- connection may be bad
+			}
+			return null;
+		}
+		observeMessageReceived(m);
+		return processMessage(m);
 	}
 
 	/**
@@ -481,17 +521,6 @@ public class Server implements Closeable {
 		return getPeer().getConsensusState();
 	}
 
-	protected void processTransact(Message m) {
-		boolean queued=transactionHandler.offerTransaction(m);
-		
-		if (queued) {
-			// log.info("transaction queued");
-		} else {
-			// Failed to queue transaction
-			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
-			m.returnResult(r);
-		} 
-	}
 
 	/**
 	 * Called by a remote peer to close connections to the remote peer.
@@ -499,6 +528,19 @@ public class Server implements Closeable {
 	 */
 	protected void processClose(Message m) {
 		m.closeConnection();
+	}
+
+	/**
+	 * Best-effort error return to the sender of a message.
+	 * Silently ignores failures (message may not have a return handler or ID).
+	 */
+	private boolean returnError(Message m, Keyword errorCode, AString message) {
+		try {
+			return m.returnResult(Result.error(errorCode, message).withSource(SourceCodes.PEER));
+		} catch (Exception e) {
+			// best effort — some message types don't have return handlers
+			return false;
+		}
 	}
 
 	/**
@@ -530,13 +572,22 @@ public class Server implements Closeable {
 	/**
 	 * Adds an event to the inbound server event queue.
 	 * @param event Signed event to add to inbound event queue
-	 * @return True if Belief was successfullly queued, false otherwise
+	 * @return True if Belief was successfully queued, false otherwise
 	 */
 	public boolean queueBelief(Message event) {
 		boolean offered=propagator.queueBelief(event);
 		return offered;
 	}
 	
+	/**
+	 * Responds to a PING with the peer's current timestamp.
+	 */
+	protected void processPing(Message m) {
+		ACell id = m.getRequestID();
+		if (id == null) return;
+		m.returnResult(Result.create(id, CVMLong.create(Utils.getCurrentTimestamp())));
+	}
+
 	protected void processStatus(Message m) {
 		// We can ignore payload
 		ACell reply = getStatusData();
@@ -583,36 +634,36 @@ public class Server implements Closeable {
 		return reply;
 	}
 	
-	public static final AVector<Keyword> sTATUS_KEYS=Vectors.create(Keywords.BELIEF,Keywords.STATES,Keywords.GENESIS);
-	
 	public AMap<Keyword,ACell> getStatusMap() {
 		return Maps.zipMap(API.STATUS_KEYS,getStatusData());
 	}
 
 	private void processChallenge(Message m) {
 		manager.processChallenge(m, getPeer());
+		// If they're verifying us, also try to verify them
+		AConnection conn = m.getConnection();
+		if (conn != null) inboundVerifier.maybeStart(conn);
 	}
 
-	protected void processResponse(Message m) {
-		manager.processResponse(m, getPeer());
-	}
 
-	protected void processQuery(Message m) {
-		boolean queued= queryHandler.offerQuery(m);
-		if (!queued) {
-			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-			m.returnResult(r);
-		} 
-	}
 
 	/**
-	 * Process an incoming message that represents a Belief
-	 *
-	 * @param m
+	 * Process an incoming message that represents a Belief.
+	 * Trusted connections go to the main queue; untrusted go to a small
+	 * best-effort queue and trigger server-initiated verification.
+	 * @param m Belief message to process
 	 */
 	protected void processBelief(Message m) {
-		if (!propagator.queueBelief(m)) {
-			log.warn("Incoming belief queue full");
+		AConnection conn=m.getConnection();
+		if (conn==null || conn.isTrusted()) {
+			// Trusted or local (ConvexLocal) — main queue
+			if (!propagator.queueBelief(m)) {
+				log.warn("Incoming belief queue full");
+			}
+		} else {
+			// Untrusted inbound — best-effort queue, trigger verification
+			propagator.queueUntrustedBelief(m);
+			inboundVerifier.maybeStart(conn);
 		}
 	}
 
@@ -622,6 +673,11 @@ public class Server implements Closeable {
 	 */
 	public Integer getPort() {
 		return nio.getPort();
+	}
+
+	/** Returns the number of active inbound client connections. */
+	public int getInboundConnectionCount() {
+		return nio.getClientConnectionCount();
 	}
 
 	/**
@@ -635,33 +691,27 @@ public class Server implements Closeable {
 	 */
 	@SuppressWarnings("unchecked")
 	public Peer persistPeerData() throws IOException {
-		AStore tempStore = Stores.current();
-		try {
-			Peer peer=getPeer();
-			Stores.setCurrent(store);
-			AMap<Keyword,ACell> peerData = peer.toData();
+		Peer peer=getPeer();
+		AMap<Keyword,ACell> peerData = peer.toData();
 
-			// Set up root key for Peer persistence. Default is Peer Account Key
-			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
-			if (rk==null) rk=peer.getPeerKey();
-			ACell rootKey=rk;
+		// Set up root key for Peer persistence. Default is Peer Account Key
+		ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+		if (rk==null) rk=peer.getPeerKey();
+		ACell rootKey=rk;
 
-			Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
-			AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
-			AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
+		Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
+		AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
+		AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 
-			newRootData=store.setRootData(newRootData).getValue();
-			
-			// ensure specific values are persisted, might be needed for lookup
-			store.storeTopRef(peer.getGenesisState().getRef(), Ref.PERSISTED, null);
-			store.storeTopRef(peer.getBelief().getRef(), Ref.PERSISTED, null);
-			
-			peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
-			log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
-			return Peer.fromData(getKeyPair(), peerData);
-		}  finally {
-			Stores.setCurrent(tempStore);
-		}
+		newRootData=store.setRootData(newRootData).getValue();
+
+		// ensure specific values are persisted, might be needed for lookup
+		store.storeTopRef(peer.getGenesisState().getRef(), Ref.PERSISTED, null);
+		store.storeTopRef(peer.getBelief().getRef(), Ref.PERSISTED, null);
+
+		peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
+		log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
+		return Peer.fromData(getKeyPair(), peerData);
 	}
 
 	/**
@@ -746,7 +796,7 @@ public class Server implements Closeable {
 			AccountStatus as=getPeer().getConsensusState().getAccount(getPeerController());
 			if (Cells.equals(as.getAccountKey(), kp.getAccountKey())) return kp;
 		} catch (Exception e) {
-			log.warn("Unexpected exception trying to get contreoller key",e);
+			log.warn("Unexpected exception trying to get controller key",e);
 		}
 		return null;
 	}
@@ -765,6 +815,16 @@ public class Server implements Closeable {
 		return manager;
 	}
 
+	/** Number of inbound connections successfully verified since startup. */
+	public long getInboundVerifiedCount() {
+		return inboundVerifier.getVerifiedCount();
+	}
+
+	/** Number of inbound verifications currently in progress. */
+	public int getInboundPendingVerifications() {
+		return inboundVerifier.getPendingCount();
+	}
+
 	public HashMap<Keyword, Object> getConfig() {
 		return config;
 	}
@@ -778,10 +838,15 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Sets the desired host name for this Server
-	 * @param string Desired host name String, e.g. "my-domain.com:12345"
+	 * Sets the desired URL for this Server. Bare host:port values will be
+	 * normalised to tcp:// URLs, e.g. "my-domain.com:12345" becomes
+	 * "tcp://my-domain.com:12345".
+	 * @param string Desired URL String
 	 */
 	public void setHostname(String string) {
+		if (string!=null && !string.contains("://")) {
+			string = "tcp://" + string;
+		}
 		config.put(Keywords.URL, string);
 	}
 

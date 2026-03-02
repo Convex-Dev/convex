@@ -12,12 +12,10 @@ import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
@@ -59,6 +57,15 @@ public class Belief extends ARecordGeneric {
 
 	private Belief(AVector<ACell> newValues) {
 		super(CVMTag.BELIEF,BELIEF_FORMAT,newValues);
+	}
+
+	/**
+	 * Creates a Belief from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Belief instance
+	 */
+	public static Belief create(AVector<ACell> values) {
+		return new Belief(values);
 	}
 
 	@Override
@@ -140,17 +147,6 @@ public class Belief extends ARecordGeneric {
 	public Belief withOrders(Index<AccountKey, SignedData<Order>> newOrders) {
 		if (newOrders == getOrders()) return this;
 		return Belief.create(newOrders);
-	}
-	
-	public static Belief read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=1) throw new BadFormatException("Wrong number of values for Belief");
-
-		Belief result=new Belief(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
 	}
 	
 	/**

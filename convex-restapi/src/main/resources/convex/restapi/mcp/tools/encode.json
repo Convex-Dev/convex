@@ -1,7 +1,11 @@
 {
   "name": "encode",
   "title": "Encode CAD3",
-  "description": "Encode a CVX literal into CAD3 multi-cell bytes, mirroring /api/v1/data/encode.",
+  "description": "Encode a CVM literal into CAD3 multi-cell hex bytes.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

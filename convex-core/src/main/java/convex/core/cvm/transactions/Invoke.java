@@ -9,14 +9,11 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Reader;
-import convex.core.util.ErrorMessages;
 
 /**
  * Transaction class representing the Invoke of an on-chain operation.
@@ -35,7 +32,7 @@ public class Invoke extends ATransaction {
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.COMMAND};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
-	private static final long FORMAT_COUNT=FORMAT.count();
+	static final long FORMAT_COUNT=FORMAT.count();
 
 	protected Invoke(Address origin,long sequence, ACell command) {
 		super(CVMTag.INVOKE,FORMAT,Vectors.create(origin,CVMLong.create(sequence),command));
@@ -44,6 +41,15 @@ public class Invoke extends ATransaction {
 	
 	protected Invoke(AVector<ACell> values) {
 		super(CVMTag.INVOKE,FORMAT,values);
+	}
+
+	/**
+	 * Creates an Invoke transaction from decoded vector data.
+	 * @param values Decoded record fields
+	 * @return Invoke instance
+	 */
+	public static Invoke create(AVector<ACell> values) {
+		return new Invoke(values);
 	}
 
 	public static Invoke create(Address origin,long sequence, ACell command) {
@@ -69,25 +75,6 @@ public class Invoke extends ATransaction {
 	public ACell getCommand() {
 		if (command==null) command=values.get(2);
 		return command;
-	}
-
-	/**
-	 * Read a Transfer transaction from a Blob encoding
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Invoke read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=FORMAT_COUNT) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Invoke result=new Invoke(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
 	}
 
 	@Override
@@ -131,7 +118,7 @@ public class Invoke extends ATransaction {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Invoke(values);
+		return new Invoke(newValues);
 	}
 
 }

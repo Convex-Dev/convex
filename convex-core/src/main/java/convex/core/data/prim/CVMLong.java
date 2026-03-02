@@ -36,10 +36,12 @@ public final class CVMLong extends AInteger {
 		}
 		ZERO=CACHE[0];
 		ONE=CACHE[1];
+		TWO=CACHE[2];
 	}
 	
 	public static final CVMLong ZERO;
 	public static final CVMLong ONE;
+	public static final CVMLong TWO;
 	public static final CVMLong MINUS_ONE = Cells.intern(CVMLong.create(-1L));
 	public static final CVMLong MAX_VALUE = Cells.intern(CVMLong.create(Long.MAX_VALUE));
 	public static final CVMLong MIN_VALUE = Cells.intern(CVMLong.create(Long.MIN_VALUE));
@@ -134,20 +136,6 @@ public final class CVMLong extends AInteger {
 		return pos+numBytes;
 	}
 	
-	public static CVMLong read(byte tag, Blob blob, int offset) throws BadFormatException {
-		int numBytes=tag-Tag.INTEGER;
-		if (numBytes==0) return ZERO;
-		long v=Format.readLong(blob,offset+1,numBytes);
-		
-		long end=offset+1+numBytes;
-		CVMLong result= create(v);
-		if (result.encoding==null) {
-			// we likely already have a valid encoding if cached!
-			result.attachEncoding(blob.slice(offset,end));
-		}
-		return result;
-	}
-
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.appendLongString(value);
@@ -164,6 +152,19 @@ public final class CVMLong extends AInteger {
 		return (double)value;
 	}
 	
+	/**
+	 * Parse an ACell as a CVM Long.
+	 * @param cell ACell to parse
+	 * @return CVM Long value, or null if not convertible to long
+	 */
+	public static CVMLong parse(ACell cell) {
+		if (cell == null) return null;
+		CVMLong v = RT.ensureLong(cell);
+		if (v != null) return v;
+		if (cell instanceof AString) return parse(cell.toString());
+		return null;
+	}
+
 	/**
 	 * Parse an Object as a CVM Long, on a best efforts basis
 	 * @param o Object to parse

@@ -9,12 +9,14 @@ import java.time.format.DateTimeFormatter;
 
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
+import javax.swing.text.DefaultCaret;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.util.Utils;
-import convex.gui.components.CodePane;
+import convex.gui.utils.Toolkit;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLPath;
 import net.miginfocom.swing.MigLayout;
@@ -23,43 +25,50 @@ import net.miginfocom.swing.MigLayout;
 public class PreviewPanel extends JPanel {
 
 	protected Path path;
-	private CodePane information;
+	private JTextArea information;
 
 	public PreviewPanel() {
-		setLayout(new MigLayout("wrap 1"));
-		information=new CodePane();
+		setLayout(new MigLayout("fill, insets 0"));
+		information = new JTextArea();
+		information.setEditable(false);
+		information.setLineWrap(false);
+		information.setFont(Toolkit.MONO_FONT);
 		information.setBackground(null);
 		information.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		//
-		// header.setPreferredSize(new Dimension(400,50));
-		add(information,"span");
-		
+
+		// Prevent auto-scrolling to caret on selection — keeps viewport stable
+		// when user double-clicks to select long hash strings
+		DefaultCaret caret = (DefaultCaret) information.getCaret();
+		caret.setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
+
+		add(information, "grow");
+
 		setPath(null);
 	}
-	
+
 	DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm z")
             .withZone(ZoneId.systemDefault());
-	
+
 	public void setPath(Path path) {
 		this.path=path;
 		StringBuilder sb=new StringBuilder();
 		try {
 			if ((path!=null)&&Files.exists(path)) {
-				
+
 				boolean isDir=Files.isDirectory(path);
 				Path fname=(path.getFileName());
-				
+
 				sb.append("Name:        "+((fname==null)?"<root>":fname.toString())+"\n");
 				sb.append("Path:        "+path.toString()+"\n");
 				sb.append("Type:        "+(isDir?"Directory":"File")+"\n");
 				sb.append("\n");
-				
+
 				Instant utime=Files.getLastModifiedTime(path).toInstant();
 				sb.append("Modified:    "+formatter.format(utime)+"\n");
 				sb.append("\n");
 				sb.append("             "+utime+"\n");
 				sb.append("\n");
-				
+
 				if (path instanceof DLPath) {
 					DLPath dp=(DLPath)path;
 					AVector<ACell> node=dp.getFileSystem().getNode(dp);
@@ -74,6 +83,8 @@ public class PreviewPanel extends JPanel {
 						sb.append("Data Hash:   "+data.getHash()+"\n");
 					}
 					sb.append("Node Hash:   "+node.getHash()+"\n");
+					sb.append("\n");
+					sb.append("Root Hash:   "+dp.getFileSystem().getRootHash()+"\n");
 				} else {
 					sb.append("Not a DLFS file: "+Utils.getClassName(path));
 				}
@@ -81,10 +92,10 @@ public class PreviewPanel extends JPanel {
 				sb.append("No file selected");
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
 			sb.append("\n\nERROR: "+e.getMessage());
 		}
 		information.setText(sb.toString());
-		
+		information.setCaretPosition(0);
+		information.scrollRectToVisible(new java.awt.Rectangle(0, 0, 1, 1));
 	}
 }

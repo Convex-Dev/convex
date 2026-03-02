@@ -8,9 +8,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -230,48 +230,53 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 	}
 
-	/**
-	 * Reads a {@link VectorLeaf} from the provided Blob 
-	 * 
-	 * Assumes the header byte and count is already read.
-	 * 
-	 * @param b Blob to read from
-	 * @param count Number of elements, assumed to be valid
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> read(long count, Blob b, int pos) throws BadFormatException {
-		if (count == 0) return (VectorLeaf<T>)EMPTY;
-		
-		int n = ((int) count) & 0xF;
-		if (n == 0) {
-			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
-			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
+	@Override
+	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
+		if (this == b) return this;
+		if (!(b instanceof VectorLeaf) || b.count() != count) return super.mergeWith(b, func);
+		if (this.equals(b)) return this;
+
+		VectorLeaf<T> bl = (VectorLeaf<T>) b;
+		boolean sameAsThis = true;
+		boolean sameAsOther = true;
+
+		// Merge prefix (tree-wise: skip identical subtrees)
+		Ref<AVector<T>> newPrefix = prefix;
+		if (prefix != null) {
+			if (prefix.equals(bl.prefix)) {
+				// Identical subtrees — no merge needed
+			} else {
+				AVector<T> ownP = prefix.getValue();
+				AVector<T> otherP = bl.prefix.getValue();
+				AVector<T> mergedP = ownP.mergeWith(otherP, func);
+				if (mergedP != ownP) {
+					sameAsThis = false;
+					newPrefix = mergedP.getRef();
+				}
+				if (mergedP != otherP) sameAsOther = false;
+			}
 		}
-		
-		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
-		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
+
+		// Merge items (skip identical Refs)
+		Ref<T>[] newItems = items;
+		int n = items.length;
 		for (int i = 0; i < n; i++) {
-			Ref<T> ref = Format.readRef(b,rpos);
-			items[i] = ref;
-			rpos+=ref.getEncodingLength();
-		}
-		
-		Ref<AVector<T>> pfx = null;
-		boolean prefixPresent = count > MAX_SIZE;
-		if (prefixPresent) {
-			pfx=Format.readRef(b,rpos);
-			rpos+=pfx.getEncodingLength();
+			if (items[i].equals(bl.items[i])) continue;
+			T own = items[i].getValue();
+			T other = bl.items[i].getValue();
+			T merged = func.merge(own, other);
+			if (merged != own) {
+				if (newItems == items) newItems = items.clone();
+				newItems[i] = Ref.get(merged);
+				sameAsThis = false;
+			}
+			if (merged != other) sameAsOther = false;
 		}
 
-		VectorLeaf<T> result=new VectorLeaf<T>(items, pfx, count);
-		// Attach encoding only if "real"
-		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
-		return result;
+		if (sameAsThis) return this;
+		if (sameAsOther) return b;
+		return new VectorLeaf<>(newItems, newPrefix, count);
 	}
-
 
 	@Override
 	public int encode(byte[] bs, int pos) {

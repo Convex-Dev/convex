@@ -228,6 +228,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * Converts this sequence to a new Cell array
 	 * @return A new cell array containing the elements of this sequence
 	 */
+	@Override
 	public ACell[] toCellArray() {
 		int n=Utils.checkedInt(count());
 		ACell[] cells=new ACell[n];

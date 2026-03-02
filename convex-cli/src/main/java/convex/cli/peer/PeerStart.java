@@ -56,9 +56,8 @@ public class PeerStart extends APeerCommand {
 	private boolean isReset;
 
 	@Option(names = { "--peer-port" }, 
-			defaultValue = "18888",
-			description = "Port number for the peer. Default is ${DEFAULT-VALUE}. If set to 0, will choose a random port.")
-	private int port = 0;
+			description = "Port number for the peer. If unspecified, 18888 will be used if available. If set to 0, will choose a random port.")
+	private Integer port = 0;
 
 	@Option(names = { "--url" }, 
 			description = "URL for the peer to set for other peers to use.")
@@ -81,8 +80,7 @@ public class PeerStart extends APeerCommand {
 	private String genesis;
 
 	@Option(names = { "--api-port" }, 
-			defaultValue = "8080",
-			description = "Port for REST API.")
+			description = "Port for REST API. If unspecified, prefers port 8080.")
 	private Integer apiport;
 
 //	@Option(names = { "-b",
@@ -196,7 +194,7 @@ public class PeerStart extends APeerCommand {
 				}
 				server=API.launchPeer(config);
 				
-				if (!norest) {
+				if (!norest) { 
 					restServer=RESTServer.create(server);
 					restServer.start(apiport);
 				}

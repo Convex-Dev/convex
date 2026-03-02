@@ -16,6 +16,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.test.Samples;
 
 public class BeliefTest {
+
 	static final int PEERS=4;
 	static final AKeyPair[] kps=new AKeyPair[PEERS];
 	static final AccountKey[] keys=new AccountKey[PEERS];
@@ -42,13 +43,13 @@ public class BeliefTest {
 			orders[i]=kp.signData(o);
 		}		
 		Belief b=Belief.create(orders);
-		
-		RecordTest.doRecordTests(b);
-		
-		b=Cells.persist(b);
-		
-		RecordTest.doRecordTests(b);
-		
+
+		doBeliefTests(b);
+
 		EncodingTest.testFullencoding(b);
+	}
+
+	public static void doBeliefTests(Belief b) {
+		RecordTest.doRecordTests(b);
 	}
 }

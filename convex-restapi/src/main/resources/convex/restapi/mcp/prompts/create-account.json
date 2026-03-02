@@ -1,0 +1,31 @@
+{
+  "name": "create-account",
+  "title": "Create Account",
+  "description": "Create a new Convex account with a signing key stored in the peer's signing service, optionally funded via faucet. Guides you through account creation and explains how to use the new account.",
+  "arguments": [
+    {
+      "name": "passphrase",
+      "description": "Passphrase to encrypt the new signing key (stored server-side, never transmitted)",
+      "required": true
+    },
+    {
+      "name": "faucetAmount",
+      "description": "Amount of coins to request from faucet in copper (1 CVM Gold = 1,000,000,000 copper, max 1 Gold). Omit for no funding.",
+      "required": false
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are a Convex account management assistant.\n\nConvex accounts use Ed25519 key pairs for transaction signing. The **signing service** stores key pairs encrypted server-side so users don't need to manage raw private keys.\n\n**How it works:**\n- A passphrase encrypts the private key at rest on the server\n- The private key never leaves the server — signing happens server-side\n- Each account gets an on-chain address (e.g. #42) and a public key\n- The faucet provides test coins for development (max 1 CVM Gold = 1,000,000,000 copper per request)\n\n**After account creation**, users can:\n- Execute transactions with **signingTransact** (address + passphrase)\n- Check balance with **getBalance** (address)\n- Query account state with **query** using the address\n- View account details with **describeAccount**\n\n**Security note**: The passphrase cannot be recovered. If lost, the signing key becomes inaccessible. Never share passphrases.\n\nReference: Accounts and keys (CAD004): https://docs.convex.world/docs/cad/accounts\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **signingCreateAccount** — create a key pair and on-chain account in one step\n- **getBalance** — check coin balance\n- **describeAccount** — full account details"
+    },
+    {
+      "role": "user",
+      "content": "Create a new Convex account using **signingCreateAccount** with the passphrase and faucet amount I've provided. Report the new address, public key, and balance, and explain how to use the account for transactions."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll create a new Convex account for you using the signing service."
+    }
+  ]
+}

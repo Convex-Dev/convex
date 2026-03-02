@@ -1,23 +1,33 @@
-# Convex
+# Convex - Lattice technology for Open Economic Systems
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-<!-- ![Workflow](https://github.com/convex-dev/convex/actions/workflows/tests.yml/badge.svg) -->
+**Convex** is a decentralised network and execution platform that powers the Internet of Value. It realises the vision of a true **Stateful Internet**, where the network itself securely hosts, executes, and persists both code and data.
 
+Convex provides a full-stack platform for decentralised applications and programmable economic systems that manage digital assets. Ownership of accounts and assets is cryptographically enforced and can be governed (optionally) through smart contracts.
 
-Convex is a decentralised network and execution engine for the Internet of Value. It can be seen as an implementation of a "Stateful Internet" where the network itself securely hosts and executes code and data.
+## Core Technology: Lattice-Based Architecture
 
-It is designed as a full stack solution for decentralised applications and programmable economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. 
+Unlike traditional blockchains, Convex is built on **Lattice Technology**, which leverages the mathematical properties of lattices to deliver superior consensus and verifiability. This foundation yields significant advantages over conventional blockchain designs:
 
-Convex is based on Lattice Technology, exploiting the mathematical properties of lattices to achieve efficient consensus and verifiability. Lattice technology can be used to solve problems in a similar manner to blockchains, but offers some significant advantages:
+| Feature                                      | Convex Advantage                                                                 |
+|----------------------------------------------|-----------------------------------------------------------------------------------|
+| **Global State Model**                       | Single, consistent global state with immutable data structures and atomic transactions |
+| **Virtual Machine**                          | Lambda-calculus-based VM supporting fully Turing-complete smart contracts         |
+| **Throughput**                               | Tens of thousands of write TPS today; designed to scale to millions in the future |
+| **Networking**                               | Simple, robust random-gossip protocol                                             |
+| **Confirmation Latency**                     | Millisecond-range global consensus (network-speed dependent)                      |
+| **Energy Efficiency**                        | **100% Green** – powered by Convergent Proof-of-Stake (no energy-intensive mining) |
+| **Programming Language**                     | Integrated on-chain compiler for **Convex Lisp** (a modern, secure Lisp dialect)   |
 
-- Global State model with immutable data structures and atomic transactions
-- Lambda Calculus based VM supporting Turing complete Smart Contracts
-- High transaction throughput (tens of thousands of write transactions per second, potentially scaling to millions in the future)
-- Simple networking protocol based on random gossip
-- Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
-- 100% Green - energy efficiency using the Convergent Proof of Stake consensus algorithm
-- Integrated on-chain compiler (Convex Lisp)
+## Why Convex?
+
+- **Developer-friendly**: Write smart contracts in a powerful, functional Lisp that compiles and executes directly on-chain.
+- **Instant finality**: Transactions confirm in milliseconds with cryptographic guarantees.
+- **Truly scalable**: Lattice agreement eliminates the bottlenecks of linear blockchains.
+- **Sustainable by design**: Minimal energy footprint while maintaining full decentralization and security.
+
+Convex is the high-performance, eco-friendly backbone for the next generation of decentralised finance, agentic economies, self-sovereign ownership, and beyond.
 
 ## About this repository
 
@@ -27,6 +37,7 @@ This repository contains the core Convex distribution including:
 - The standard Convex Peer server implementation (NIO based) implementing Convergent Proof of Stake (CPoS) for consensus
 - CLI Tools for operating Peers, scripting transactions and more
 - The Etch database for persistent data storage
+- SQL database layer with JDBC driver and PostgreSQL wire protocol server
 - A Swing GUI for managing local peers / exploring the network
 - A simple REST API server
 - JMH Benchmarking suite
@@ -49,6 +60,7 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 | [convex-peer](https://github.com/Convex-Dev/convex/tree/develop/convex-peer/) | Peer implementation and networking | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-peer.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-peer/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-peer) |
 | [convex-cli](https://github.com/Convex-Dev/convex/tree/develop/convex-cli/) | Command Line Tools | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-cli.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-cli/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-cli) |
 | [convex-gui](https://github.com/Convex-Dev/convex/tree/develop/convex-gui/) | Convex Desktop GUI Interface | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-gui/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-gui) |
+| [convex-db](https://github.com/Convex-Dev/convex/tree/develop/convex-db/) | SQL database with JDBC and PostgreSQL protocol | [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-db.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex) | [![javadoc](https://javadoc.io/badge2/world.convex/convex-db/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-db) |
 
 For local use of Convex data structures and CVM execution, `convex-core` is typically sufficient. To run a peer or communicate with one over the network, include `convex-peer` as a dependency. Other modules are designed primarily as standalone applications or client libraries.
 
@@ -69,9 +81,14 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 
 ### Download
 
-Recent development snapshot builds of `convex.jar` are made available here:
+**Stable Releases:**
+- [Latest Release](https://github.com/Convex-Dev/convex/releases/latest) - Production-ready builds with full changelog
 
-- [Snapshots](https://drive.google.com/drive/folders/1AZdyuZOmC70i_TtuEW3uEKvjYLOqIMiv?usp=drive_link)
+**Development Snapshots:**
+- [Snapshot Build](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop) - Latest `develop` branch build (⚠️ may be unstable)
+- [Google Drive Snapshots](https://drive.google.com/drive/folders/1AZdyuZOmC70i_TtuEW3uEKvjYLOqIMiv?usp=drive_link) - Archive of development builds
+
+The snapshot build is automatically updated with each push to the `develop` branch.
 
 ### Building locally
 

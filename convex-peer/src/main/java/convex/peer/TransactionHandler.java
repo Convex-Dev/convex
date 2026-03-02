@@ -3,6 +3,7 @@ package convex.peer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -36,8 +37,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
@@ -59,7 +58,19 @@ public class TransactionHandler extends AThreadedComponent {
 	private static final long OWN_BLOCK_DELAY=10000;
 
 	/**
-	 * Default minimum delay between proposing a block as a peer
+	 * Default minimum delay (ms) between proposing blocks as a peer.
+	 *
+	 * This batching guard prevents the peer from creating a new block for every
+	 * individual transaction. Without it, a peer receiving a steady stream of
+	 * transactions would sign and persist a separate block for each one — wasting
+	 * Ed25519 signing (~70us), persistence I/O, and network bandwidth on block
+	 * overhead that dwarfs the transaction payload.
+	 *
+	 * The 10ms default allows transactions to accumulate in the transactionQueue
+	 * between block creation attempts, producing larger (more efficient) blocks.
+	 * At 10ms intervals, up to 1024 transactions can be batched per block.
+	 *
+	 * Configurable via the :min-block-time server config key.
 	 */
 	private static final long DEFAULT_MIN_BLOCK_TIME=10;
 	
@@ -71,12 +82,17 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Queue for valid received Transactions submitted for clients of this Peer
 	 */
+	/**
+	 * Queue for valid transactions awaiting block creation.
+	 * Larger than txMessageQueue so the handler never blocks during normal operation.
+	 * External backpressure is applied at txMessageQueue.
+	 */
 	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
-	
+
 	public TransactionHandler(Server server) {
-		super(server);	
+		super(server);
 		txMessageQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
-		transactionQueue=new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);	
+		transactionQueue=new ArrayBlockingQueue<>(3 * Config.TRANSACTION_QUEUE_SIZE);
 	}
 	
 	/**
@@ -87,11 +103,26 @@ public class TransactionHandler extends AThreadedComponent {
 	public boolean offerTransaction(Message m) {
 		return txMessageQueue.offer(m);
 	}
+
+	/**
+	 * Offer a transaction for handling, blocking until space is available or timeout.
+	 * Used as the retry predicate for backpressure.
+	 * @param m Message offered
+	 * @return True if queued for handling, false on timeout or interruption
+	 */
+	public boolean offerTransactionBlocking(Message m) {
+		try {
+			return txMessageQueue.offer(m, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
 	
 	/**
 	 * Register of client interests in receiving transaction responses
 	 */
-	private HashMap<Hash, Message> interests = new HashMap<>();
+	private ConcurrentHashMap<Hash, Message> interests = new ConcurrentHashMap<>();
 
 	public long clientTransactionCount=0;
 	public long receivedTransactionCount=0;
@@ -133,48 +164,63 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 
 	
+	@SuppressWarnings("unchecked")
 	private void processMessages() throws InterruptedException {
 		Result problem=checkPeerState();
-		for (Message msg: messages) {
-			if (problem==null) {
-				processMessage(msg);
-			} else {
+		if (problem!=null) {
+			for (Message msg: messages) {
 				msg.returnResult(problem);
 			}
+			return;
 		}
-	}
-	
-	protected void processMessage(Message m) throws InterruptedException {
-		try {
+
+		int n=messages.size();
+		Peer peer=server.getPeer();
+
+		// Phase 1: Extract SignedData, run cheap checks, reject failures immediately.
+		// Survivors go to toVerify for parallel signature validation.
+		SignedData<ATransaction>[] sigs=(SignedData<ATransaction>[]) new SignedData<?>[n];
+		ArrayList<SignedData<ATransaction>> toVerify=new ArrayList<>(n);
+		for (int i=0; i<n; i++) {
+			Message m=messages.get(i);
 			this.receivedTransactionCount++;
-			// log.info("Got TX message: "+m);
-			
-			// Transaction is a vector [:TX, id , signed-tx]
-			AVector<ACell> v = m.getPayload();
-			@SuppressWarnings("unchecked")
-			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
-			
-			// Check our transaction is valid and we want to process it
-			Result error=server.getPeer().checkTransaction(sd);
-			if (error!=null) {
-				m.returnResult(error.withSource(SourceCodes.PEER));
-				return;
+			try {
+				AVector<ACell> v = m.getPayload();
+				SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
+				Result error=peer.checkTransactionFast(sd);
+				if (error!=null) {
+					m.returnResult(error.withSource(SourceCodes.PEER));
+					continue;
+				}
+				sigs[i]=sd;
+				toVerify.add(sd);
+			} catch (Exception e) {
+				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 			}
-	
-			// Put on Server's transaction queue. We are OK to block here
-			LoadMonitor.down();
+		}
+
+		// Phase 2: Parallel signature verification — results cached on each SignedData
+		Peer.preValidateSignatures(toVerify);
+
+		// Phase 3: Check cached signature results and queue valid transactions.
+		// Interest is registered BEFORE queuing so that result reporting can never
+		// race ahead of registration (the transaction becomes visible to
+		// BeliefPropagator as soon as it enters the queue).
+		// put() blocks if transactionQueue is full — this propagates backpressure:
+		// TransactionHandler blocks → stops draining txMessageQueue → txMessageQueue
+		// fills → connection-level backpressure kicks in → senders slow down.
+		for (int i=0; i<n; i++) {
+			SignedData<ATransaction> sd=sigs[i];
+			if (sd==null) continue; // already rejected in Phase 1
+			Message m=messages.get(i);
+			if (!sd.checkSignature()) {
+				m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+				continue;
+			}
+			registerInterest(sd.getHash(), m);
 			transactionQueue.put(sd);
 			observeTransactionRequest(sd);
-			LoadMonitor.up();
 			this.clientTransactionCount++;
-			
-			registerInterest(sd.getHash(), m);		
-		} catch (BadFormatException e) {
-			log.warn("Unhandled exception in transaction handler",e);
-			m.closeConnection();
-		} catch (MissingDataException e) {
-			m.returnResult(Result.fromException(e).withSource(SourceCodes.PEER));
-			return;
 		}
 	}
 	
@@ -267,19 +313,27 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 	
 	/**
-	 * Gets the next Blocks for publication, or null if nothing to publish
+	 * Gets the next Blocks for publication, or null if nothing to publish.
 	 * Checks for pending transactions, and if found propose them as new Block(s).
 	 *
-	 * @return New signed Block, or null if nothing to publish yet
+	 * Called from the BeliefPropagator loop (not from TransactionHandler's own loop).
+	 * The minBlockTime guard ensures we don't create blocks too frequently — allowing
+	 * transactions to accumulate in the transactionQueue between calls, producing
+	 * larger and more efficient blocks.
+	 *
+	 * @return New signed Block(s), or null if nothing to publish yet
 	 */
 	protected SignedData<Block>[] maybeGenerateBlocks() {
 		Peer peer=server.getPeer();
 		long timestamp=Utils.getCurrentTimestamp();
 
 		if (!peer.isReadyToPublish()) return null;
-		
+
 		long minBlockTime=getMinBlockTime();
-		
+
+		// Batching guard: don't create blocks more often than minBlockTime (default 10ms).
+		// This allows transactions to accumulate, producing larger blocks and reducing
+		// per-block overhead (Ed25519 signing, persistence, network broadcast).
 		if (timestamp<lastBlockPublishedTime+minBlockTime) return null;
 			
 		// possibly have own transactions to publish as a Peer
@@ -305,7 +359,7 @@ public class TransactionHandler extends AThreadedComponent {
 				int end=Math.min(ntrans, (i+1)*maxBlockSize);
 				Block block = Block.create(timestamp, newTransactions.subList(start, end));
 				SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
-				signedBlock=Cells.persist(signedBlock);
+				signedBlock=Cells.persist(signedBlock, server.getStore());
 				signedBlocks[i]=signedBlock;		
 			}
 			newTransactions.clear();
@@ -430,12 +484,6 @@ public class TransactionHandler extends AThreadedComponent {
 			Message m = txMessageQueue.poll(BLOCKTIME, TimeUnit.MILLISECONDS);
 			LoadMonitor.up();
 			if (m==null) return;
-			
-			LoadMonitor.down();
-			// Brief pause in case more transactions are coming in
-			Thread.sleep(1);
-			LoadMonitor.up();
-
 			
 			// We have at least one transaction to handle, drain queue to get the rest
 			messages.add(m);

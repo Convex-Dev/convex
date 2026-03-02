@@ -1,0 +1,97 @@
+# .github/workflows/snapshot.yml
+name: Snapshot Release
+
+on:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: write       # Needed to create/update releases
+
+jobs:
+  snapshot-build:
+    # Only run if not triggered by a tag (avoid interference with release.yml)
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+          cache: maven
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Get version from pom.xml
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building snapshot version: $VERSION"
+
+      - name: Build with install
+        run: mvn -B clean install -DskipTests
+
+      - name: Get short commit hash
+        id: commit
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Short commit hash: $SHORT_SHA"
+
+      - name: Create or update snapshot release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Snapshot Build - ${{ steps.version.outputs.version }}"
+          tag_name: snapshot-develop
+          body: |
+            ## Development Snapshot Build
+
+            **Version:** `${{ steps.version.outputs.version }}`
+            **Commit:** `${{ github.sha }}` ([${{ steps.commit.outputs.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }}))
+            **Branch:** `develop`
+            **Built:** ${{ github.event.head_commit.timestamp }}
+
+            ### ⚠️ Warning
+            This is an **automated snapshot build** from the develop branch. It may contain:
+            - Incomplete features
+            - Breaking changes
+            - Bugs and instability
+
+            **For production use, download a [stable release](https://github.com/${{ github.repository }}/releases) instead.**
+
+            ### Recent Changes
+            ${{ github.event.head_commit.message }}
+
+            ---
+            🤖 Auto-generated snapshot - Built from commit ${{ steps.commit.outputs.sha }}
+          draft: false
+          prerelease: true
+          files: |
+            convex-integration/target/convex.jar
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "### ✅ Snapshot Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ steps.commit.outputs.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** snapshot-develop" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download: [convex.jar](https://github.com/${{ github.repository }}/releases/tag/snapshot-develop)" >> $GITHUB_STEP_SUMMARY

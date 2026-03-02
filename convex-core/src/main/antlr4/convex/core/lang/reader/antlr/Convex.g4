@@ -1,7 +1,7 @@
 grammar Convex;
 
 /*  =========================================
- *  Grammar for Convex Reader
+ *  Grammar for Convex Reader - CVX Format
  *  =========================================
  *  
  *  Refers to tokens defined in the lexer at the bottom of this file
@@ -50,13 +50,12 @@ atom
   | implicitSymbol
   ;
   
-literal 
+literal
 	: nil
 	| bool
 	| blob
 	| character
 	| keyword
-	| symbol
 	| address
 	| string
 	| longValue
@@ -136,20 +135,30 @@ BOOL : 'true' | 'false' ;
 
 // Number. Needs to go before Symbols!
 
+// Non-terminating characters for number tokens: anything except whitespace,
+// delimiters, quotes, and reader macro characters. Matches Clojure's approach
+// where numbers consume until a terminating character.
+fragment
+NUMBER_GUARD: ~[ \t\n\r,;()[\]{}];
+
+// NUMBER_GUARD detects improper termination: if a non-terminating character
+// follows a number, it is consumed into the number token causing validation
+// to fail. Characters that start their own lexer rules (: # etc.) will still
+// split into separate tokens — this is a lexer-level limitation.
 DOUBLE:
-  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL;
-  
-fragment  
+  (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL NUMBER_GUARD?;
+
+fragment
 DOUBLE_TAIL:
   DECIMAL EPART | DECIMAL | EPART;
 
-fragment  
+fragment
 DECIMAL:
   '.' DIGITS;
-  
-fragment 
+
+fragment
 EPART:
-  [eE] (DIGITS | SIGNED_DIGITS) SYMBOL_FOLLOWING*;  
+  [eE] (DIGITS | SIGNED_DIGITS);
 
 ADDRESS:
   '#' [0-9]+;
@@ -169,8 +178,10 @@ CAD3:
 AT_SYMBOL: 
   '@' NAME;
 
+BLOB: '0x' HEX_DIGIT*;
+
 LONG_VALUE:
-  DIGITS | SIGNED_DIGITS;
+  (DIGITS | SIGNED_DIGITS) NUMBER_GUARD?;
 
 fragment
 DIGITS:
@@ -180,7 +191,7 @@ fragment
 SIGNED_DIGITS:
   '-' DIGITS;
   
-BLOB: '0x' HEX_DIGIT*;
+
 
 fragment           
 HEX_BYTE: HEX_DIGIT HEX_DIGIT;
@@ -280,12 +291,14 @@ SYMBOL_FOLLOWING
 fragment
 ALPHA: [a-z] | [A-Z];
 
+
+
 /*
  * Whitespace and comments
  *
  * TODO: Should these be skip or channel(HIDDEN)?
  */
- 
+
 WS: [ \n\r\t,]+ -> skip;
 
 COMMENT: ';' ~[\r\n]* -> skip;

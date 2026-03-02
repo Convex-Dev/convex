@@ -26,6 +26,8 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public static final AccountKey NULL = null;
 
+	public static final AccountKey ZERO = AccountKey.wrap(Utils.ZERO_BYTES_32);
+
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		this.memorySize=0;

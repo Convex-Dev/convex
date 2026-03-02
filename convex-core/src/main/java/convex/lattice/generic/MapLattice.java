@@ -5,7 +5,13 @@ import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
+/**
+ * A lattice representing a hash map that merges values
+ * @param <K> Key type
+ * @param <V> Value type
+ */
 public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
 
 	protected final ALattice<V> valueNode;
@@ -32,6 +38,14 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 	}
 
 	@Override
+	public AHashMap<K,V> merge(LatticeContext context, AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
+		if (otherValue==null) return ownValue;
+		if (ownValue==null) return otherValue;
+		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
+		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
+	}
+
+	@Override
 	public AHashMap<K, V> zero() {
 		return Maps.empty();
 	}
@@ -39,6 +53,13 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 	@Override
 	public boolean checkForeign(AHashMap<K, V> value) {
 		return (value instanceof AHashMap);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> ALattice<T> path(ACell childKey) {
+		// Any value should use child lattice
+		return (ALattice<T>) valueNode;
 	}
 	
 

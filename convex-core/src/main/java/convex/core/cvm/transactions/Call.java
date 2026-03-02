@@ -9,15 +9,12 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.ErrorMessages;
 
 /**
  * Transaction representing a Call to an Actor.
@@ -68,24 +65,6 @@ public class Call extends ATransaction {
 	}
 
 	
-	/**
-	 * Reads a Call Transaction from a Blob encoding
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static Call read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-
-		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
-
-		Call result=new Call(values);
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		return 100;
@@ -133,7 +112,7 @@ public class Call extends ATransaction {
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Call(values);
+		return new Call(newValues);
 	}
 
 

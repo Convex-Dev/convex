@@ -3,6 +3,8 @@ package convex.core.data.prim;
 import java.math.BigInteger;
 
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -73,6 +75,19 @@ public abstract class AInteger extends ANumeric {
 		}
 	}
 	
+	/**
+	 * Parse an ACell as a canonical integer. Returns the value directly if
+	 * already an AInteger, otherwise attempts to parse from string representation.
+	 * @param cell ACell to parse
+	 * @return AInteger instance, or null if not convertible
+	 */
+	public static AInteger parse(ACell cell) {
+		if (cell == null) return null;
+		if (cell instanceof AInteger ai) return ai;
+		if (cell instanceof AString) return parse(cell.toString());
+		return null;
+	}
+
 	/**
 	 * Parse a  value as a canonical integer
 	 * @param o Object to parse

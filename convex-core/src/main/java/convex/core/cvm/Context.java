@@ -357,7 +357,7 @@ public class Context {
 		long executionJuice=this.juice;
 		rc.juiceUsed=executionJuice;
 
-		// Base fixed juice cost per transaction
+		// Juice cost per transaction, affected by TX memory size
 		long trxJuice=Juice.priceTransaction(rc.tx);
 		
 		long totalJuice=executionJuice+trxJuice;
@@ -442,6 +442,7 @@ public class Context {
 			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+rc.memUsed+" bytes)");
 			rc.source=SourceCodes.CVM;
 		}
+
 		return rctx;
 	}
 
@@ -2407,7 +2408,7 @@ public class Context {
 	}
 
 	public AccountKey getSigner() {
-		SignedData<ATransaction> sd=chainState.getTransactionContext().tx;
+		SignedData<ATransaction> sd=chainState.getTransactionContext().signedTx;
 		if (sd==null) return null;
 		return sd.getAccountKey();
 	}

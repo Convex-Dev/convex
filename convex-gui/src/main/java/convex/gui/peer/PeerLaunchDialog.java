@@ -20,6 +20,7 @@ import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Keyword;
+import convex.core.store.NullStore;
 import convex.core.util.FileUtils;
 import convex.gui.components.FilePicker;
 import convex.gui.components.HostCombo;
@@ -138,7 +139,7 @@ public class PeerLaunchDialog {
 		    	} else if (selected==loadPanel) {
 		    		File f=backupPicker.getFile();
 		    		AKeyPair kp=null; // TODO;
-		    		AMap<Keyword,ACell> peerData=FileUtils.loadCAD3(f.toPath());
+		    		AMap<Keyword,ACell> peerData=FileUtils.loadCAD3(f.toPath(), NullStore.INSTANCE);
 		    		Server server=Server.fromPeerData(kp,peerData);
 		    		PeerGUI.launchPeerGUI(server);
 		    	}

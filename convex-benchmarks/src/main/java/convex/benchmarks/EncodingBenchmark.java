@@ -6,7 +6,7 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Format;
+import convex.core.store.NullStore;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
@@ -32,7 +32,7 @@ public class EncodingBenchmark {
 	
 	@Benchmark
 	public void encodingViaBlob() throws BadFormatException {
-		AVector<?> v2=Format.read(enc);
+		AVector<?> v2=NullStore.INSTANCE.decode(enc);
 		v2.getEncoding();
 	}
 

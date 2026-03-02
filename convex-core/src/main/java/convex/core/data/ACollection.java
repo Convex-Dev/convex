@@ -164,10 +164,7 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	 */
 	protected abstract <R> void copyToArray(R[] arr, int offset);	
 	
-	/**
-	 * Converts this collection to a new Cell array
-	 * @return A new cell array containing the elements of this sequence
-	 */
+	@Override
 	public ACell[] toCellArray() {
 		int n=Utils.checkedInt(count());
 		ACell[] cells=new ACell[n];

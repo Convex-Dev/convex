@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -38,11 +39,12 @@ import convex.test.Samples;
 
 /**
  * Parameterised tests for a representative range of valid CVM values
- * 
+ *
  * Mainly focused on checking generic properties and consistency with core predicate expecations
  */
 @RunWith(Parameterized.class)
 public class ParamTestValues extends ACVMTest {
+
 	private final ACell data;
 	private final AOp<?> constOp;
 
@@ -121,10 +123,10 @@ public class ParamTestValues extends ACVMTest {
 
 	@Test
 	public void testHexRoundTrip() throws InvalidDataException, ValidationException, IOException {
-		Cells.persist(data);
+		Cells.persist(data, Samples.TEST_STORE);
 		String hex = Cells.encode(data).toHexString();
 		Blob d2 = Blob.fromHex(hex);
-		ACell rec = Format.read(d2);
+		ACell rec = Samples.TEST_STORE.decode(d2);
 		
 		assertEquals(data, rec);
 		

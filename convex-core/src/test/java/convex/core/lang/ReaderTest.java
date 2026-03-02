@@ -4,9 +4,11 @@ import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertParseException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -38,6 +40,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.reader.AntlrReader;
 import convex.core.text.Text;
 import convex.test.Samples;
 
@@ -45,6 +48,71 @@ import convex.test.Samples;
  * Test class for general Reader behaviour. More specific ANTLR tests are also provided in ANTLRTest
  */
 public class ReaderTest {
+
+	public static void main(String[] args) {
+		String[] inputs = {
+			// Unclosed brackets
+			"(", "[", "{", "(1 2", "[1 2", "{:a",
+			// Extra closing brackets
+			")", "]", "}", "1)", "1]", ":a}",
+			// Nested unclosed
+			"((())", "[[[]", "{{{}",
+			// Empty / whitespace
+			"", "   ",
+			// Extra after valid form
+			"(1 2 3))", "[1 2]]", "{:a 1}}",
+			// Incomplete reader macros
+			"#", "#-1", "@", ":", "'",
+			// Unterminated string
+			"\"unterminated",
+			// Multiline
+			"(\n  1\n  2\n  )",  // valid
+			"(\n  1\n  2\n",     // unclosed
+			// Number termination
+			"2.0e0.1234", "[2.0e0.1234]", "2.0e5abc",
+			"2.0.1", "2.0e5:foo", "[2.0e5:foo]", "[2.0e5#42]",
+			"1:2", "42abc", "1.2.3.4",
+			// Mismatched brackets
+			"(]", "[}", "{)",
+			// Odd map entries
+			"{:a 1 :b}",
+			// Address overflow
+			"#99999999999999999999",
+			// Multiple forms where one expected
+			"1 2", "foo bar",
+			// Long symbol / keyword (129 chars)
+			":" + "a".repeat(129),
+			"" + "b".repeat(129),
+			// Deep nesting
+			"(".repeat(50) + ")".repeat(50),
+			// Special literals
+			"##NaN", "##Inf", "##-Inf", "##bogus",
+			// Empty blob
+			"0x",
+			// Odd hex blob
+			"0xF",
+			// Quoting edge cases
+			"~@foo", "``foo",
+			// Path symbols
+			"foo/bar", "foo/bar/baz",
+			// Null byte in input
+			"foo\0bar",
+		};
+		for (String input : inputs) {
+			String display = input.replace("\n","\\n");
+			try { ACell r = Reader.read(input); System.out.println("  OK: \"" + display + "\" => " + r);
+			} catch (ParseException e) { System.out.println("  \"" + display + "\" => " + e.getMessage()); }
+			catch (Exception e) { System.out.println("  \"" + display + "\" => [" + e.getClass().getSimpleName() + "] " + e.getMessage()); }
+		}
+
+		// Token dump for investigating lexer behaviour
+		System.out.println("\n--- Token dumps ---");
+		String[] tokenTests = { "[2.0e5:foo]", "[2.0e5#42]", "2.0e5:foo", "1:2", "42abc", "2.0e5abc", "[42abc]" };
+		for (String t : tokenTests) {
+			System.out.println("Tokens for: " + t);
+			AntlrReader.dumpTokens(t);
+		}
+	}
 
 	@Test
 	public void testVectors() {
@@ -493,5 +561,102 @@ public class ReaderTest {
 		String js=printed.toString();
 		ACell b=Reader.read(js);
 		assertEquals(a,b);
+	}
+
+	@Test public void testErrorMessages() {
+		// Unclosed brackets should report position of opening bracket
+		assertParseError("(", "unclosed '('");
+		assertParseError("[", "unclosed '['");
+		assertParseError("{", "unclosed '{'");
+		assertParseError("(1 2", "unclosed '('");
+		assertParseError("{:a", "unclosed '{'");
+
+		// Extra closing brackets
+		assertParseError(")", "unmatched closing ')'");
+		assertParseError("]", "unmatched closing ']'");
+		assertParseError("}", "unmatched closing '}'");
+		assertParseError("(1 2 3))", "unmatched closing ')'");
+
+		// Mismatched brackets
+		assertParseError("(]", "'(' at 1:0 closed by mismatched ']' at 1:1");
+		assertParseError("[}", "'[' at 1:0 closed by mismatched '}' at 1:1");
+		assertParseError("{)", "'{' at 1:0 closed by mismatched ')' at 1:1");
+
+		// Empty input
+		assertParseError("", "empty input");
+		assertParseError("   ", "empty input");
+
+		// Unterminated string
+		assertParseError("\"unterminated", "unterminated string");
+
+		// Odd map entries
+		assertParseError("{:a 1 :b}", "even number of forms");
+
+		// Long symbol / keyword
+		assertParseError(":" + "a".repeat(129), "Keyword too long");
+		assertParseError("b".repeat(129), "Symbol too long");
+
+		// Number termination — letters after number
+		assertParseError("42abc", "bad number");
+		assertParseError("1:2", "bad number");
+		assertParseError("2.0e5abc", "bad double format");
+		assertParseError("2.0e0.1234", "bad double format");
+		assertParseError("1.2.3.4", "bad double format");
+
+		// Multiple forms where single expected
+		assertParseError("1 2", "unexpected '2'");
+
+		// Incomplete reader macros
+		assertParseError("#", "invalid '#'");
+		assertParseError(":", "unexpected ':'");
+
+		// Invalid special literal
+		assertParseError("##bogus", "invalid special literal");
+
+		// Odd hex blob
+		assertParseError("0xF", "invalid blob syntax");
+
+		// Address overflow
+		assertParseError("#99999999999999999999", "bad address format");
+
+		// Control characters
+		assertParseError("foo\0bar", "control character");
+	}
+
+	@Test public void testEdgeCasesParsedCorrectly() {
+		// Deep nesting
+		assertEquals(Reader.read("((()))"), Reader.read("((()))"));
+
+		// Valid special literals
+		assertEquals(CVMDouble.NaN, Reader.read("##NaN"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, Reader.read("##Inf"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, Reader.read("##-Inf"));
+
+		// Empty blob
+		assertEquals(Blob.EMPTY, Reader.read("0x"));
+
+		// Quoting
+		assertNotNull(Reader.read("~@foo"));
+		assertNotNull(Reader.read("``foo"));
+
+		// Path symbols
+		assertNotNull(Reader.read("foo/bar"));
+		assertNotNull(Reader.read("foo/bar/baz"));
+
+		// Multiline
+		assertEquals(Lists.of(1L, 2L), Reader.read("(\n  1\n  2\n  )"));
+	}
+
+	/**
+	 * Assert that reading the input throws a ParseException containing the expected substring
+	 */
+	private void assertParseError(String input, String expectedSubstring) {
+		ParseException e = assertThrows(ParseException.class, () -> Reader.read(input),
+			"Expected ParseException for: \"" + input + "\"");
+		String msg = e.getMessage();
+		assertTrue(msg.contains(expectedSubstring),
+			"Expected message containing \"" + expectedSubstring + "\" but got: " + msg);
+		assertTrue(msg.startsWith("Parse error at "),
+			"Expected message starting with 'Parse error at ' but got: " + msg);
 	}
 }

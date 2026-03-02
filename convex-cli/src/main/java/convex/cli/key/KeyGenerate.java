@@ -126,9 +126,17 @@ public class KeyGenerate extends AKeyCommand {
 			inform("Generated key pair with public key: 0x"+kp.getAccountKey().toChecksumHex());
 
 			if (keyPassword==null) {
-				keyPassword=readPassword("Enter password for generated key: ");
+				if (isInteractive()) {
+					keyPassword=readPassword("Enter password for generated key: ");
+				} else if (isParanoid()) {
+					throw new CLIError(ExitCodes.USAGE,
+						"Password required in strict security mode. Use --keypass or CONVEX_KEY_PASSWORD environment variable.");
+				} else {
+					informWarning("No password provided - using empty password for key encryption.");
+					keyPassword = new char[0];
+				}
 			}
-			
+
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
 			println(publicKeyHexString); // Output generated public key		
 			Arrays.fill(keyPassword, 'p');

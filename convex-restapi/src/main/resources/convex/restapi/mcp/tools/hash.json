@@ -1,7 +1,11 @@
 {
   "name": "hash",
   "title": "Hash Calculator",
-  "description": "Compute a cryptographic hash (sha256 or sha3) of supplied data",
+  "description": "Compute a SHA-256 or SHA3 hash of supplied data.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

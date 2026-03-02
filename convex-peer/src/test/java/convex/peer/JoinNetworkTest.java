@@ -63,15 +63,15 @@ public class JoinNetworkTest {
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
-			config.put(Keywords.STORE,EtchStore.createTemp());
+			config.put(Keywords.STORE,EtchStore.createTemp()); // Etch store as per real peer startup
 			config.put(Keywords.CONTROLLER,controller);
 			config.put(Keywords.SOURCE,network.SERVER.getHostAddress());
 
 			Server newServer=API.launchPeer(config);
 
 			// make peer connections directly
-			newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress());
-			network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress());
+			newServer.getConnectionManager().connectToPeer(network.SERVER.getHostAddress()).join();
+			network.SERVER.getConnectionManager().connectToPeer(newServer.getHostAddress()).join();
 
 			// TODO: should these be in consensus at this point since just synced
 			// note: shouldn't matter which is the current store

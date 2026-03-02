@@ -1,7 +1,11 @@
 {
   "name": "keyGen",
   "title": "Key Pair Generator",
-  "description": "Generate a new Ed25519 key pair. Optionally provide a seed (32-byte hex string), otherwise a secure random seed will be generated.",
+  "description": "Generate a new Ed25519 key pair. Provide a seed for deterministic output, or omit for secure random.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

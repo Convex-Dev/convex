@@ -271,6 +271,165 @@ public class StringsTest {
 		assertSame(ErrorCodes.TIMEOUT,Keyword.create("TIMEOUT"));
 	}
 
+	// ========== toUpperCase Tests ==========
+
+	@Test
+	public void testToUpperCase() {
+		// Basic conversion
+		assertEquals("HELLO", Strings.create("hello").toUpperCase().toString());
+		assertEquals("HELLO", Strings.create("Hello").toUpperCase().toString());
+		assertEquals("HELLO WORLD", Strings.create("hello world").toUpperCase().toString());
+
+		// Already uppercase - should return same instance
+		AString upper = Strings.create("HELLO");
+		assertSame(upper, upper.toUpperCase());
+
+		// Numbers and punctuation - unchanged, return same instance
+		AString nums = Strings.create("123!@#");
+		assertSame(nums, nums.toUpperCase());
+
+		// Mixed - should change
+		AString mixed = Strings.create("Hello123");
+		AString mixedUpper = mixed.toUpperCase();
+		assertEquals("HELLO123", mixedUpper.toString());
+		assertNotSame(mixed, mixedUpper);
+
+		// Empty string - should return same instance
+		assertSame(StringShort.EMPTY, StringShort.EMPTY.toUpperCase());
+
+		// Unicode characters
+		assertEquals("CAFÉ", Strings.create("café").toUpperCase().toString());
+	}
+
+	@Test
+	public void testToUpperCaseSameInstance() {
+		// Test various strings that are already uppercase
+		String[] alreadyUpper = {"", "A", "ABC", "HELLO WORLD", "123", "!@#$%", "ABC123!@#"};
+		for (String s : alreadyUpper) {
+			AString str = Strings.create(s);
+			assertSame(str, str.toUpperCase(), "Should return same instance for: " + s);
+		}
+	}
+
+	// ========== toLowerCase Tests ==========
+
+	@Test
+	public void testToLowerCase() {
+		// Basic conversion
+		assertEquals("hello", Strings.create("HELLO").toLowerCase().toString());
+		assertEquals("hello", Strings.create("Hello").toLowerCase().toString());
+		assertEquals("hello world", Strings.create("HELLO WORLD").toLowerCase().toString());
+
+		// Already lowercase - should return same instance
+		AString lower = Strings.create("hello");
+		assertSame(lower, lower.toLowerCase());
+
+		// Numbers and punctuation - unchanged, return same instance
+		AString nums = Strings.create("123!@#");
+		assertSame(nums, nums.toLowerCase());
+
+		// Mixed - should change
+		AString mixed = Strings.create("Hello123");
+		AString mixedLower = mixed.toLowerCase();
+		assertEquals("hello123", mixedLower.toString());
+		assertNotSame(mixed, mixedLower);
+
+		// Empty string - should return same instance
+		assertSame(StringShort.EMPTY, StringShort.EMPTY.toLowerCase());
+
+		// Unicode characters
+		assertEquals("café", Strings.create("CAFÉ").toLowerCase().toString());
+	}
+
+	@Test
+	public void testToLowerCaseSameInstance() {
+		// Test various strings that are already lowercase
+		String[] alreadyLower = {"", "a", "abc", "hello world", "123", "!@#$%", "abc123!@#"};
+		for (String s : alreadyLower) {
+			AString str = Strings.create(s);
+			assertSame(str, str.toLowerCase(), "Should return same instance for: " + s);
+		}
+	}
+
+	// ========== trim Tests ==========
+
+	@Test
+	public void testTrim() {
+		// Basic trimming
+		assertEquals("hello", Strings.create("  hello  ").trim().toString());
+		assertEquals("hello", Strings.create("hello  ").trim().toString());
+		assertEquals("hello", Strings.create("  hello").trim().toString());
+		assertEquals("hello world", Strings.create("  hello world  ").trim().toString());
+
+		// Tabs, newlines, carriage returns
+		assertEquals("hello", Strings.create("\t\nhello\r\n").trim().toString());
+		assertEquals("hello", Strings.create(" \t \n hello \r \n ").trim().toString());
+
+		// Already trimmed - should return same instance
+		AString trimmed = Strings.create("hello");
+		assertSame(trimmed, trimmed.trim());
+
+		AString trimmedSpaces = Strings.create("hello world");
+		assertSame(trimmedSpaces, trimmedSpaces.trim());
+
+		// Empty string - should return same instance
+		assertSame(StringShort.EMPTY, StringShort.EMPTY.trim());
+
+		// All whitespace - should return empty
+		assertEquals("", Strings.create("   ").trim().toString());
+		assertEquals("", Strings.create("\t\n\r ").trim().toString());
+
+		// Single character
+		assertEquals("a", Strings.create(" a ").trim().toString());
+		AString singleChar = Strings.create("a");
+		assertSame(singleChar, singleChar.trim());
+	}
+
+	@Test
+	public void testTrimSameInstance() {
+		// Test various strings that don't need trimming
+		String[] noTrim = {"", "a", "abc", "hello world", "123", "!@#$%", "a b c"};
+		for (String s : noTrim) {
+			AString str = Strings.create(s);
+			assertSame(str, str.trim(), "Should return same instance for: '" + s + "'");
+		}
+	}
+
+	@Test
+	public void testTrimPreservesInternalSpaces() {
+		// Trimming should only affect leading/trailing whitespace
+		assertEquals("hello  world", Strings.create("  hello  world  ").trim().toString());
+		assertEquals("a b c d", Strings.create(" a b c d ").trim().toString());
+		assertEquals("a\tb\nc", Strings.create(" a\tb\nc ").trim().toString());
+	}
+
+	@Test
+	public void testTrimWithUnicode() {
+		// Unicode characters that are not ASCII whitespace should not be trimmed
+		AString unicode = Strings.create("\u1234hello\u1235");
+		assertSame(unicode, unicode.trim());
+
+		// But ASCII whitespace around unicode should be trimmed
+		assertEquals("\u1234hello\u1235", Strings.create("  \u1234hello\u1235  ").trim().toString());
+	}
+
+	// ========== Combined Tests ==========
+
+	@Test
+	public void testCaseAndTrimCombined() {
+		AString s = Strings.create("  Hello World  ");
+		assertEquals("HELLO WORLD", s.trim().toUpperCase().toString());
+		assertEquals("hello world", s.trim().toLowerCase().toString());
+	}
+
+	@Test
+	public void testCasePreservesLength() {
+		// Upper/lower case should preserve character count for ASCII
+		AString s = Strings.create("Hello World");
+		assertEquals(s.toString().length(), s.toUpperCase().toString().length());
+		assertEquals(s.toString().length(), s.toLowerCase().toString().length());
+	}
+
 	public void doStringTest(AString a) {
 		long n = a.count();
 		assertEquals(Strings.EXCESS_BYTE, a.byteAt(-1));

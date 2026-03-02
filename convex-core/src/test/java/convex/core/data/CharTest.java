@@ -12,6 +12,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.test.Samples;
 
 public class CharTest {
 	@Test public void testASCIIChars() {
@@ -121,7 +122,7 @@ public class CharTest {
 	private void doCharEncodingTest(CVMChar c) {
 		Blob b=c.getEncoding();
 		try {
-			assertEquals(c,Format.read(b));
+			assertEquals(c,Samples.TEST_STORE.decode(b));
 			
 			// should be encoded as unsigned bytes after tag
 			byte[] bs=b.slice(1).getBytes();

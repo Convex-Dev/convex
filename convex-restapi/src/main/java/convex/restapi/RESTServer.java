@@ -10,26 +10,44 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.core.Coin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
+import convex.lattice.cursor.Root;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
+import convex.peer.auth.PeerAuth;
+import convex.peer.signing.SigningService;
+import convex.restapi.api.AGenericAPI;
 import convex.restapi.api.ChainAPI;
+import convex.restapi.api.ConfirmAPI;
+import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
-import convex.restapi.api.McpAPI;
 import convex.restapi.api.X402;
+import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.auth.ConfirmationService;
+import convex.restapi.auth.OAuthService;
+import convex.restapi.mcp.McpAPI;
+import convex.restapi.web.AuthPage;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
 import convex.restapi.web.WebApp;
+import convex.api.ContentTypes;
+import convex.core.util.JSON;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
+import io.javalin.http.HttpResponseException;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
@@ -51,16 +69,36 @@ public class RESTServer implements Closeable {
 	protected Javalin javalin;
 	
 	protected static final Integer DEFAULT_PORT=8080;
+	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
 	private RESTServer(Server server) {
 		this.server = server;
 		this.convex = ConvexLocal.create(server);
-		
+
 		if (RT.bool(getConfig().get(ChainAPI.K_FAUCET))) {
 			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
 		} else {
 			this.convexFaucet=null;
 		}
+
+		// Configurable faucet max (in copper). Default 1 Gold = 1,000,000,000 copper
+		Object fmObj = getConfig().get(K_FAUCET_MAX);
+		if (fmObj instanceof Number) {
+			this.faucetMax = ((Number)fmObj).longValue();
+		} else {
+			this.faucetMax = Coin.GOLD;
+		}
+
+		AKeyPair kp = server.getKeyPair();
+		if (kp != null) {
+			Root<ACell> cursor = new Root<>();
+			this.signingService = new SigningService(kp, cursor);
+			this.signingService.init();
+		} else {
+			this.signingService = null;
+		}
+		this.confirmationService = new ConfirmationService();
+		this.oauthService = new OAuthService(this);
 	}
 	
 	protected ChainAPI chainAPI;
@@ -71,12 +109,48 @@ public class RESTServer implements Closeable {
 	protected ExplorerAPI explorerAPI;
 	protected McpAPI mcpAPI;
 	protected X402 x402API;
+	protected DIDAPI didAPI;
+	protected AuthMiddleware authMiddleware;
+	protected SigningService signingService;
+	protected ConfirmationService confirmationService;
+	protected OAuthService oauthService;
+	protected ConfirmAPI confirmAPI;
+	protected AuthPage authPage;
+	protected final long faucetMax;
+
+	public long getFaucetMax() {
+		return faucetMax;
+	}
 
 	public McpAPI getMcpAPI() {
 		return mcpAPI;
 	}
 
+	public AuthMiddleware getAuthMiddleware() {
+		return authMiddleware;
+	}
+
+	public SigningService getSigningService() {
+		return signingService;
+	}
+
+	public ConfirmationService getConfirmationService() {
+		return confirmationService;
+	}
+
+	public OAuthService getOAuthService() {
+		return oauthService;
+	}
+
 	private void addAPIRoutes(Javalin app) {
+		// Auth middleware — extracts identity from bearer token if present
+		AKeyPair peerKP = server.getKeyPair();
+		if (peerKP != null) {
+			PeerAuth peerAuth = new PeerAuth(peerKP);
+			authMiddleware = new AuthMiddleware(peerAuth);
+			app.before(authMiddleware.handler());
+		}
+
 		chainAPI = new ChainAPI(this);
 		chainAPI.addRoutes(app);
 
@@ -100,6 +174,15 @@ public class RESTServer implements Closeable {
 
 		x402API = new X402(this);
 		x402API.addRoutes(app);
+
+		didAPI = new DIDAPI(this);
+		didAPI.addRoutes(app);
+
+		confirmAPI = new ConfirmAPI(this);
+		confirmAPI.addRoutes(app);
+
+		authPage = new AuthPage(this);
+		authPage.addRoutes(app);
 	}
 	
 	private Javalin buildApp(boolean useSSL) {
@@ -132,6 +215,32 @@ public class RESTServer implements Closeable {
 		});
 		
 
+
+		// Custom handler for HTTP error responses (BadRequestResponse, NotFoundResponse, etc.)
+		// Produces consistent output in the requested content type: {:error "message"} or {"error":"message"}
+		app.exception(HttpResponseException.class, (e, ctx) -> {
+			ctx.status(e.getStatus());
+			String msg=e.getMessage();
+			if (msg==null) msg="Error";
+			String type=AGenericAPI.calcResponseContentType(ctx);
+			if (type.equals(ContentTypes.CVX_RAW)) {
+				ctx.contentType(ContentTypes.CVX_RAW);
+				ACell body=Maps.of(Keywords.ERROR, Strings.create(msg));
+				ctx.result(Format.encodeMultiCell(body, true).getBytes());
+			} else if (type.equals(ContentTypes.CVX)) {
+				ctx.contentType(ContentTypes.CVX);
+				ACell body=Maps.of(Keywords.ERROR, Strings.create(msg));
+				ctx.result(RT.print(body).toString());
+			} else if (type.equals(ContentTypes.TEXT)) {
+				ctx.contentType(ContentTypes.TEXT);
+				ctx.result(msg);
+			} else {
+				ctx.contentType(ContentTypes.JSON);
+				HashMap<String,Object> body=new HashMap<>();
+				body.put("error", msg);
+				ctx.result(JSON.toString(body));
+			}
+		});
 
 		app.exception(Exception.class, (e, ctx) -> {
 			e.printStackTrace();
@@ -222,7 +331,8 @@ public class RESTServer implements Closeable {
 	
 	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer, Integer port) {
 		if (port==null) port=DEFAULT_PORT;
-		ServerConnector connector = new ServerConnector(jettyServer);
+		// 1 acceptor + 1 selector: request handling uses virtual threads
+		ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
 		connector.setPort(port);
 		jettyServer.addConnector(connector);
 	}

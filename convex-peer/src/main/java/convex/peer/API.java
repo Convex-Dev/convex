@@ -24,7 +24,6 @@ import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 
 
 /**
@@ -74,21 +73,15 @@ public class API {
 		Config.ensureFlags(config);
 		Config.checkKeyStore(config);
 		
-		AStore tempStore=Stores.current();
-		try {
-			// Configure the store and use on this thread during launch
-			AStore store=Config.ensureStore(config);
-			Stores.setCurrent(store);
+		// Configure the store
+		Config.ensureStore(config);
 
-			Config.ensurePeerKey(config);	
-			Config.ensureGenesisState(config);
-			
-			Server server = Server.create(config);
-			server.launch();
-			return server;
-		} finally {
-			Stores.setCurrent(tempStore);
-		}
+		Config.ensurePeerKey(config);
+		Config.ensureGenesisState(config);
+
+		Server server = Server.create(config);
+		server.launch();
+		return server;
 	}
 	
 	/**
@@ -156,9 +149,6 @@ public class API {
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
 		
-		// Test code to share a store
-		// config.put(Keywords.STORE, Stores.current());
-
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
 
@@ -187,16 +177,16 @@ public class API {
 		try {
 			for (int i = 1; i < count; i++) {
 				Server server=serverList.get(i);
-	
+
 				// Join each additional Server to the Peer #0
 				ConnectionManager cm=server.getConnectionManager();
-				cm.connectToPeer(genesisServer.getHostAddress());
-	
+				cm.connectToPeer(genesisServer.getHostAddress()).join();
+
 				// Join server #0 to this server
-				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
+				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress()).join();
 				server.setHostname("localhost:"+server.getPort());
 			}
-		} catch (IOException|TimeoutException e) {
+		} catch (Exception e) {
 			throw new LaunchException("Error setting up peer connections",e);
 		}
 

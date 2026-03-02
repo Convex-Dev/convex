@@ -7,11 +7,8 @@ import convex.core.cvm.Juice;
 import convex.core.cvm.exception.RecurValue;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**
@@ -30,6 +27,20 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 	protected Let(byte tag,Ref<AVector<ACell>> syms, Ref<AVector<AOp<ACell>>> ops) {
 		super(tag,syms,ops);
 		this.isLoop = tag==CVMTag.OP_LOOP;
+	}
+
+	/**
+	 * Creates a Let/Loop op from decoded refs.
+	 * @param <T> Result type
+	 * @param code Code ref (symbols vector)
+	 * @param value Value ref (ops vector)
+	 * @param isLoop true for loop, false for let
+	 * @return Let instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Let<T> createFromRefs(Ref<ACell> code, Ref<ACell> value, boolean isLoop) {
+		byte tag = isLoop ? CVMTag.OP_LOOP : CVMTag.OP_LET;
+		return new Let<>(tag, (Ref<AVector<ACell>>)(Ref<?>)code, (Ref<AVector<AOp<ACell>>>)(Ref<?>)value);
 	}
 
 	public static <T extends ACell> Let<T> create(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
@@ -129,27 +140,4 @@ public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<
 		return bb.check(limit);
 	}
 	
-	/**
-	 * Read a Let Op from a Blob encoding
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @param isLoop Indicates if the Op should be considered a loop target	 
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Let<T> read(Blob b, int pos, boolean isLoop) throws BadFormatException {
-		int epos=pos+1; // skip tag 
-
-		byte tag=isLoop?CVMTag.OP_LOOP:CVMTag.OP_LET;
-		
-		Ref<AVector<ACell>> syms = Format.readRef(b,epos);
-		epos+=syms.getEncodingLength();
-		
-		Ref<AVector<AOp<ACell>>> ops = Format.readRef(b,epos);
-		epos+=ops.getEncodingLength();
-		
-		Let<T> result= new Let<>(tag,syms,ops);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
 }

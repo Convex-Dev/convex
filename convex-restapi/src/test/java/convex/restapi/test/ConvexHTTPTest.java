@@ -3,6 +3,7 @@ package convex.restapi.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
@@ -15,6 +16,7 @@ import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cvm.Keywords;
 import convex.core.data.Hash;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
@@ -25,15 +27,7 @@ import convex.java.ConvexHTTP;
 
 public class ConvexHTTPTest extends ARESTTest {
 
-	private ConvexHTTP connect() {
-		try {
-			URI uri=new URI(HOST_PATH);
-			// System.out.println("Connect to: "+uri);
-			return ConvexHTTP.connect(uri,Init.GENESIS_ADDRESS,KP);
-		} catch (URISyntaxException e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
+
 	
 	@Test public void testQuery() throws ResultException, InterruptedException {
 		ConvexHTTP convex=connect();
@@ -45,6 +39,19 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertEquals(CVMLong.create(5),r.getValue());
 	}
 	
+	@Test public void testPreCalculate() throws ResultException, InterruptedException {
+		ConvexHTTP convex=newClient();
+		
+		Result r=convex.querySync("(+ 2 3)");
+		assertFalse(r.isError());
+		AInteger fees=r.getIn(Keywords.INFO,Keywords.FEES);
+		assertNotNull(fees);
+		
+		Result r2=convex.transactSync("(+ 2 3)");
+		assertNull(r2.getErrorCode());
+		assertEquals(fees,r2.getIn(Keywords.INFO,Keywords.FEES));
+	}
+
 	@Test public void testOffensiveMessages() throws ResultException, InterruptedException {
 		ConvexHTTP convex=connect();
 		convex.setAddress(Init.GENESIS_ADDRESS);

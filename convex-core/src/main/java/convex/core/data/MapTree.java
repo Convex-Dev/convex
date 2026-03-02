@@ -10,11 +10,10 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
-import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -49,7 +48,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	private final short mask;
 
-	private MapTree(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
+	MapTree(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
 		super(count);
 		this.children = children;
 		this.shift = shift;
@@ -506,38 +505,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * FANOUT;
 
-	/**
-	 * Reads a ListMap from the provided Blob 
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @param count Count of map entries* 
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> read(Blob b, int pos, long count) throws BadFormatException {
-		int epos=pos+1+Format.getVLQCountLength(count);
-		int shift=b.byteAt(epos);
-		short mask=b.shortAt(epos+1);
-		epos+=3;
-
-		int ilength = Integer.bitCount(mask & 0xFFFF);
-		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
-
-		for (int i = 0; i < ilength; i++) {
-			// need to read as a Ref
-			Ref<AHashMap<K, V>> ref = Format.readRef(b,epos);
-			epos+=ref.getEncodingLength();
-			blocks[i] = ref;
-		}
-		// create directly, we have all values
-		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
-		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
-	}
-
 	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
 		for (Ref<AHashMap<K, V>> sub : children) {
@@ -661,7 +628,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			V value = func.merge(e.getKey(), null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
@@ -743,7 +710,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int en = extras.size();
 		for (int i = 0; i < en; i++) {
 			MapEntry<K, V> e = extras.entryAt(i);
-			V value = func.merge(null, e.getValue());
+			V value = func.merge(e.getKey(), null, e.getValue());
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
@@ -892,7 +859,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Check for top level structural integrity. Does not traverse branch refs.
 	 * @return
 	 */
-	private boolean isValidStructure() {
+	boolean isValidStructure() {
 		if (shift<0) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
@@ -1019,5 +986,8 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return firstHash;
 	}
 
-
+	@Override
+	public long seek(ABlobLike<?> key) {
+		throw new TODOException();
+	}
 }

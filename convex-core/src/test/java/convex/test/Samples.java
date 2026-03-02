@@ -1,11 +1,12 @@
 package convex.test;
 
-import static org.junit.Assert.assertTrue;
-
+import java.io.IOException;
 import java.util.Random;
 import java.util.stream.Stream;
 
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
@@ -59,12 +60,28 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.store.AStore;
+import convex.etch.EtchStore;
 
 /**
  * Miscellaneous value objects for testing purposes
  *
  */
 public class Samples {
+
+	/**
+	 * Shared test store for tests that need to persist data.
+	 * Uses a temp EtchStore so tests don't depend on a global thread-local store.
+	 */
+	public static final AStore TEST_STORE = createTestStore();
+
+	private static AStore createTestStore() {
+		try {
+			return EtchStore.createTemp("test-store");
+		} catch (IOException e) {
+			throw new Error("Failed to create test store", e);
+		}
+	}
 
 	public static Hash BAD_HASH = Hash.fromHex("1234000012340000123400001234000012340000123400001234000012340000");
 	
@@ -73,13 +90,14 @@ public class Samples {
 	 */
 	public static final Address BAD_ADDRESS = Address.create(7777777777L);
 	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("bbbb");
-	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.dummy("0");
+	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.ZERO;
 	
 	public static final AKeyPair KEY_PAIR=AKeyPair.createSeeded(13371337L);
 	public static final AKeyPair[] KEY_PAIRS=new AKeyPair[100];
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
+	public static final ASignature ZERO_SIGNATURE = Ed25519Signature.ZERO;
 
 	public static final VectorLeaf<CVMLong> INT_VECTOR_10 = createTestIntVector(10);
 	public static final VectorLeaf<CVMLong> INT_VECTOR_16 = createTestIntVector(16);
@@ -163,7 +181,12 @@ public class Samples {
 	public static final CVMBigInteger MIN_BIGINT;
 
 	public static final ACell NIL = null;
-	
+
+	// CVM type samples for cross-encoder testing
+	public static final Invoke INVOKE_TRANSACTION = Invoke.create(Address.create(1), 0, Lists.of(Symbols.PLUS, 1L, 2L));
+	public static final convex.core.cvm.transactions.Transfer TRANSFER_TRANSACTION = convex.core.cvm.transactions.Transfer.create(Address.create(1), 0, Address.create(2), 1000);
+	public static final convex.core.cpos.Order EMPTY_ORDER = convex.core.cpos.Order.create();
+
 	static {
 		// we should be able to actually build these, thanks to structural sharing.
 		DIABOLICAL_VECTOR_30_30 = createNastyNestedVector(30, 30);
@@ -188,7 +211,7 @@ public class Samples {
 	/**
 	 * Create a random test Blob of the given size
 	 * @param size
-	 * @return
+	 * @return A random Blob of the correct count
 	 */
 	public static Blob createTestBlob(long size) {
 		Blob b=Blob.createRandom(new Random(), size);
@@ -198,7 +221,7 @@ public class Samples {
 	/**
 	 * Create a test Index of the given size
 	 * @param size
-	 * @return
+	 * @return An Index with the correct number of entries
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static Index<ABlob,CVMLong> createTestIndex(long size) {

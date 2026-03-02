@@ -67,8 +67,14 @@ public class Acquiror {
 			return f;
 		}
 		log.trace("Trying to acquire remotely: {}",hash);
-	
-		ThreadUtils.runWithStore(store,()-> {
+
+		// Ensure source can decode partial data responses against the acquire store
+		source.setStore(store);
+
+		// Polling loop in virtual thread — intentional design choice over CompletableFuture
+		// composition. Gives better stack traces for debugging and fewer allocations.
+		// Virtual threads make the blocking .get() calls cheap.
+		ThreadUtils.runVirtual("acquiror", ()-> {
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();
 
@@ -136,7 +142,7 @@ public class Acquiror {
 						// maybe if other stuff arrived since complete, but not sure
 						try {
 							T a=ref.getValue();
-							a=Cells.persist(a);
+							a=Cells.persist(a, store);
 						} catch (MissingDataException e) {
 							// We will loop
 						}

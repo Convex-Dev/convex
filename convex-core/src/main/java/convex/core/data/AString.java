@@ -296,7 +296,69 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	public boolean startsWith(String prefix) {
 		return startsWith(Strings.create(prefix));
  	}
-	
+
+	/**
+	 * Converts this string to upper case.
+	 *
+	 * @return Upper case string, or this instance if already upper case
+	 */
+	public AString toUpperCase() {
+		if (length == 0) return this;
+
+		String s = toString();
+		String upper = s.toUpperCase();
+		if (s.equals(upper)) return this;
+		return Strings.create(upper);
+	}
+
+	/**
+	 * Converts this string to lower case.
+	 *
+	 * @return Lower case string, or this instance if already lower case
+	 */
+	public AString toLowerCase() {
+		if (length == 0) return this;
+
+		String s = toString();
+		String lower = s.toLowerCase();
+		if (s.equals(lower)) return this;
+		return Strings.create(lower);
+	}
+
+	/**
+	 * Removes leading and trailing whitespace from this string.
+	 *
+	 * Whitespace is defined as ASCII characters with code point &lt;= 32 (space).
+	 *
+	 * @return Trimmed string, or this instance if no trimming needed
+	 */
+	public AString trim() {
+		if (length == 0) return this;
+
+		long start = 0;
+		long end = length;
+
+		// Find first non-whitespace from start
+		while (start < end) {
+			byte b = byteAt(start);
+			if (b < 0 || b > 32) break; // Non-ASCII or non-whitespace
+			start++;
+		}
+
+		// Find first non-whitespace from end
+		while (end > start) {
+			byte b = byteAt(end - 1);
+			if (b < 0 || b > 32) break; // Non-ASCII or non-whitespace
+			end--;
+		}
+
+		// No trimming needed
+		if (start == 0 && end == length) return this;
+
+		// Return trimmed slice
+		return slice(start, end);
+	}
+
 	@Override
 	public final boolean equals(ACell o) {
 		if (!(o instanceof AString)) return false;

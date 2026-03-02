@@ -1,0 +1,135 @@
+{
+	/*
+	 * Convex Peer and REST API Configuration
+	 *
+	 * This JSON5 config file configures a Convex peer server, REST API,
+	 * MCP endpoint, and authentication. Load with:
+	 *
+	 *   RESTConfig config = RESTConfig.load("config.json5");
+	 *   HashMap<Keyword, Object> legacy = config.toLegacy();
+	 *   Server server = API.launchPeer(legacy);
+	 *
+	 * JSON5 supports comments, trailing commas, and unquoted keys.
+	 * All sections and keys are optional — sensible defaults are applied.
+	 */
+
+	// ==================== Peer Configuration ====================
+	// Controls the Convex peer node: networking, storage, consensus.
+
+	"peer": {
+		// Network port for peer-to-peer binary protocol.
+		// Set to 0 for auto-select, null for default port.
+		// "port": 18888,
+
+		// Ed25519 keypair seed as 64-character hex string.
+		// The peer's identity is derived from this seed.
+		// SECURITY: Keep this secret. Consider using a keystore instead.
+		// "keypair": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+
+		// Etch store path for persistent storage.
+		// Use "memory" for a pure in-memory store (fastest, RAM-limited, data lost on restart).
+		// Use "temp" for a temporary file-backed store (data lost on restart).
+		// Omit or set null for default temporary file-backed store.
+		// "store": "/path/to/peer.etch",
+
+		// Public URL for this peer (used for peer discovery and DID documents).
+		// "url": "peer.convex.live",
+
+		// Restore peer state from existing store on startup (default: true).
+		"restore": true,
+
+		// Persist peer state to store on shutdown (default: true).
+		"persist": true,
+
+		// Auto-manage peer account on the network (default: true).
+		"autoManage": true,
+
+		// Maximum outgoing peer connections (default: 10).
+		// "outgoingConnections": 10,
+
+		// Remote peer address to sync from on first start.
+		// Format: "hostname:port" or "hostname" (uses default port).
+		// "source": "convex.world:18888",
+
+		// Timeout for initial peer sync in milliseconds (default: 60000).
+		// "timeout": 60000,
+
+		// Belief propagation poll delay in milliseconds.
+		// Lower values = faster consensus but more network traffic.
+		// "pollDelay": 200,
+	},
+
+	// ==================== REST API Configuration ====================
+	// Controls the HTTP REST API server (Javalin).
+
+	"rest": {
+		// HTTP port for REST API and web interface (default: 8080).
+		"port": 8080,
+
+		// External base URL for links in responses and DID documents.
+		// If not set, derived from request headers (Host, X-Forwarded-*).
+		// Set this when behind a reverse proxy or load balancer.
+		// "baseUrl": "https://peer.convex.live",
+
+		// Enable the faucet endpoint for test coin distribution (default: false).
+		// SECURITY: Only enable on test networks. Faucet has a per-request limit.
+		"faucet": false,
+
+		// CORS allowed origins (default: "*" = all origins).
+		// "cors": "*",
+	},
+
+	// ==================== MCP Configuration ====================
+	// Controls the Model Context Protocol JSON-RPC endpoint at /mcp.
+
+	"mcp": {
+		// Enable the MCP endpoint (default: true).
+		// When disabled, /mcp returns 404.
+		"enabled": true,
+
+		// Enable signing service MCP tools (default: false).
+		// When enabled, provides key management, signing, and JWT tools:
+		//   signingServiceInfo, signingCreateKey, signingListKeys,
+		//   signingSign, signingGetJWT
+		// Requires the peer to have a keypair configured.
+		"signing": false,
+
+		// Enable elevated signing operations (default: same as signing).
+		// When enabled, provides import/export/delete/changePassphrase tools
+		// that require user confirmation via web browser.
+		//   signingImportKey, signingExportKey, signingDeleteKey,
+		//   signingChangePassphrase
+		// "elevated": false,
+
+		// Per-tool configuration overrides.
+		// Each tool can be individually enabled/disabled.
+		// "tools": {
+		//   "transact": { "enabled": true },
+		//   "createAccount": { "enabled": true },
+		// },
+	},
+
+	// ==================== Auth Configuration ====================
+	// Controls authentication and authorisation.
+
+	"auth": {
+		// JWT token lifetime in seconds (default: 86400 = 24 hours).
+		"tokenExpiry": 86400,
+
+		// Allow unauthenticated (public) access to API endpoints (default: true).
+		// When false, all requests require a valid Bearer token.
+		"publicAccess": true,
+
+		// OAuth provider configuration (for social login, Stage 12).
+		// "oauth": {
+		//   "google": {
+		//     "clientId": "YOUR_GOOGLE_CLIENT_ID",
+		//     "clientSecret": "YOUR_GOOGLE_CLIENT_SECRET"
+		//   },
+		//   "github": {
+		//     "clientId": "YOUR_GITHUB_CLIENT_ID",
+		//     "clientSecret": "YOUR_GITHUB_CLIENT_SECRET"
+		//   }
+		// },
+	},
+}

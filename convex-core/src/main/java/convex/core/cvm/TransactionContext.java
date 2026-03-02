@@ -9,7 +9,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
 public final class TransactionContext {
-	public SignedData<ATransaction> tx; 
+	public SignedData<ATransaction> signedTx; 
 	public SignedData<Block> block;
 	public Address origin;
 	public State initialState;

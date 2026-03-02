@@ -1,0 +1,70 @@
+{
+  "name": "signingDelegate",
+  "title": "Create UCAN Delegation Token",
+  "description": "Create a UCAN delegation token using a stored signing key. Private key never leaves the server. Authenticated.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded issuer public key (stored in signing service)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to decrypt the signing key"
+      },
+      "ucan": {
+        "type": "object",
+        "description": "UCAN token fields",
+        "properties": {
+          "aud": {
+            "type": "string",
+            "description": "Delegate's did:key string or hex public key"
+          },
+          "exp": {
+            "type": "integer",
+            "description": "Expiry time in unix seconds"
+          },
+          "att": {
+            "type": "array",
+            "description": "Capabilities vector (optional, defaults to empty)"
+          },
+          "prf": {
+            "type": "array",
+            "description": "Parent proof tokens for sub-delegation (optional)"
+          },
+          "nbf": {
+            "type": "integer",
+            "description": "Not-before time in unix seconds (optional)"
+          },
+          "fct": {
+            "description": "Facts — arbitrary metadata (optional)"
+          }
+        },
+        "required": ["aud", "exp"]
+      }
+    },
+    "required": ["publicKey", "passphrase", "ucan"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "token": {
+        "type": "object",
+        "description": "Complete UCAN token map (header + payload + sig)"
+      },
+      "cad3": {
+        "type": "string",
+        "description": "CAD3 hex encoding of the full token"
+      },
+      "hash": {
+        "type": "string",
+        "description": "SHA3 hash — the token's content address"
+      }
+    }
+  }
+}

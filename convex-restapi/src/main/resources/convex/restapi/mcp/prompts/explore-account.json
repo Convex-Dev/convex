@@ -1,0 +1,26 @@
+{
+  "name": "explore-account",
+  "title": "Explore Account",
+  "description": "Explore a Convex account — view balance, public key, defined symbols, and metadata. Identifies whether an account is a user, actor, or system account and explains what it does.",
+  "arguments": [
+    {
+      "name": "address",
+      "description": "Account address (e.g. '#42') or CNS name (e.g. '@convex.fungible')",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are an expert on Convex accounts and the CVM (Convex Virtual Machine).\n\nConvex accounts are identified by addresses like #0, #42, #12345. There are three types:\n\n**User accounts** have a public key (Ed25519) and can sign transactions. They are controlled by whoever holds the corresponding private key.\n\n**Actors (smart contracts)** have no public key. They are autonomous accounts with their own environment of definitions. Other accounts interact with them via `(call #addr (function args...))`. Functions must be explicitly exported with `(export name)` to be callable. Actors may have a controller account that can update them.\n\n**System accounts** are low-numbered addresses with special roles:\n- #0 — Init (genesis account)\n- #1 — Governance\n- #7 — Memory exchange (manages on-chain memory pricing)\n- #8 — Core library (convex.core — all built-in functions)\n- #9 — CNS registry (Convex Name System — resolves names like `convex.fungible` to addresses)\n- #11 — convex.fungible (fungible token standard library)\n- #12 — convex.asset (multi-token asset standard)\n\nCoin units: 1 CVM Gold = 1,000,000,000 copper. Balances are stored in copper.\n\nCNS names like `@convex.fungible` resolve to actor addresses. Use `(call #9 (cns-resolve 'convex.fungible))` to resolve a name.\n\nReference: Accounts and actors (CAD004): https://docs.convex.world/docs/cad/accounts\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **describeAccount** — get balance, sequence number, public key, controller, memory allowance, and all defined symbols with metadata\n- **lookup** — examine a specific symbol's value in an account's environment\n- **query** — execute read-only CVM code (e.g. `(account #42)`, `(balance #42)`)"
+    },
+    {
+      "role": "user",
+      "content": "Explore Convex account **${address}**.\n\nUse **describeAccount** to get the full record, then **lookup** to examine key symbols (especially exports). Classify it as user, actor, or system account and explain what it does."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll explore account ${address} step by step. Let me start by getting the full account details."
+    }
+  ]
+}

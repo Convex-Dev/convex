@@ -8,7 +8,6 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
 import convex.core.util.ErrorMessages;
-import convex.core.util.Utils;
 
 /**
  * Class representing a short CVM string, backed by a flat Blob
@@ -65,6 +64,15 @@ public final class StringShort extends AString {
 	public static StringShort wrap(Blob b) {
 		if (b.count()>MAX_LENGTH) throw new IllegalArgumentException("Invalid Blob length for StringShort");
 		return new StringShort(b);
+	}
+	
+	/**
+	 * Creates a StringShort, wrapping byte data. Warning: might not be valid UTF=8
+	 * @throws IllegalArgumentException if the wrapped data is too large for a StringShort
+	 */
+	public static StringShort wrap(byte[] utfBytes) {
+		if (utfBytes.length>MAX_LENGTH) throw new IllegalArgumentException("Invalid Blob length for StringShort");
+		return new StringShort(Blob.wrap(utfBytes));
 	}
 
 	/**
@@ -197,24 +205,6 @@ public final class StringShort extends AString {
 		return 0;
 	}
 	
-	/**
-	 * Read a StringShort from an encoding. Assumes tag and length already validated. 
-	 * @param length Length of string in UTF-8 bytes
-	 * @param blob Source of encoding
-	 * @param pos Position of encoding start (i.e. tag)
-	 * @return String instance
-	 */
-	public static StringShort read(long length, Blob blob, int pos) {
-		int len=Utils.checkedInt(length);
-		int headerLen=1+Format.getVLQCountLength(length);
-		int dataOffset=pos+headerLen;
-		Blob data=blob.slice(dataOffset,dataOffset+length);
-		StringShort result= create(data);
-		
-		result.attachEncoding(blob.slice(pos,dataOffset+len));
-		return result;
-	}
-
 	@Override
 	public Blob toBlob() {
 		return data;

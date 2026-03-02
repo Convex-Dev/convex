@@ -15,5 +15,12 @@ public class MessageTag {
 
 	public static final Keyword BYE=Keyword.intern("BYE");
 
+	public static final Keyword LATTICE_VALUE=Keyword.intern("LV");
 	
+	public static final Keyword LATTICE_QUERY=Keyword.intern("LQ");
+
+	public static final Keyword PING=Keyword.intern("PING");
+
+	public static final Keyword CHALLENGE=Keyword.intern("CH");
+
 }

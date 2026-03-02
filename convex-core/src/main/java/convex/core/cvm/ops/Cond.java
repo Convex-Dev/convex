@@ -8,11 +8,8 @@ import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Vectors;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 
 /**
@@ -29,6 +26,17 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 
 	protected Cond(AVector<AOp<ACell>> ops) {
 		super(CVMTag.OP_COND,ops);
+	}
+
+	/**
+	 * Creates a Cond op from decoded vector data.
+	 * @param <T> Result type
+	 * @param data Decoded record fields
+	 * @return Cond instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Cond<T> create(AVector<ACell> data) {
+		return new Cond<>((AVector<AOp<ACell>>)(AVector<?>)data);
 	}
 
 	/**
@@ -90,25 +98,6 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 		}
 		sb.append(')');
 		return sb.check(limit);
-	}
-
-	/**
-	 * Decodes a Cond op from a Blob encoding.
-	 * 
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
-	public static <T extends ACell> Cond<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos;
-
-		AVector<AOp<ACell>> ops = Vectors.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
-		
-		Cond<T> result=create(ops);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
 	}
 
 }

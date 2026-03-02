@@ -1,0 +1,48 @@
+{
+  "name": "signingImportKey",
+  "title": "Import Key (Signing Service)",
+  "description": "Import an Ed25519 seed into the signing service. Elevated: first call returns confirmUrl for browser approval, retry with confirmToken.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed to import (64-character hex string, e.g. 0x...)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase for at-rest encryption of the imported key"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["seed", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key derived from the imported seed (returned after confirmation)"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}

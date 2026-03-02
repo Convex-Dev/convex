@@ -14,9 +14,10 @@ import java.util.HashSet;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.test.Samples;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.NumericsTest;
@@ -43,8 +44,18 @@ public class LongTest {
 		
 		assertNull(CVMLong.parse("1.3"));
 		assertNull(CVMLong.parse(":foo"));
-		assertNull(CVMLong.parse(null));
+		assertNull(CVMLong.parse((String)null));
 		assertNull(CVMLong.parse(CVMBigInteger.MIN_POSITIVE));
+
+		// ACell overloads: doubles must not silently parse as integers
+		assertNull(AInteger.parse(Strings.create("1.3")));
+		assertNull(CVMLong.parse(Strings.create("1.3")));
+		assertNull(AInteger.parse((ACell)null));
+
+		// ACell overloads: valid integers
+		assertCVMEquals(42L, AInteger.parse(Strings.create("42")));
+		assertCVMEquals(42L, AInteger.parse(CVMLong.create(42)));
+		assertCVMEquals(-7L, CVMLong.parse(Strings.create("-7")));
 	}
 
 	@Test 
@@ -64,16 +75,16 @@ public class LongTest {
 	@Test 
 	public void testBadEncoding() {
 		// Excess leading zeros
-		assertThrows(BadFormatException.class,()->Format.read("13000fff"));
-		assertThrows(BadFormatException.class,()->Format.read("1100"));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("13000fff")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1100")));
+
 		// Excess leading ones
-		assertThrows(BadFormatException.class,()->Format.read("13ffffff"));
-		assertThrows(BadFormatException.class,()->Format.read("14ff800000"));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("13ffffff")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("14ff800000")));
+
 		// Wrong lengths
-		assertThrows(BadFormatException.class,()->Format.read("14ff"));
-		assertThrows(BadFormatException.class,()->Format.read("12123456"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("14ff")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("12123456")));
 	}
 	
 	@Test

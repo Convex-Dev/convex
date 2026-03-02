@@ -45,7 +45,7 @@ public class UDPServer {
 			socket.bind(address);
 		}
 		
-		ThreadUtils.runVirtual(this::run);
+		ThreadUtils.runVirtual("udp-server", this::run);
 	}
 	
 	public void run() {

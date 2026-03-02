@@ -24,7 +24,7 @@ public class Ed25519Signature extends ASignature {
 	/**
 	 * A Signature containing zero bytes (not valid)
 	 */
-	public static final Ed25519Signature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
+	public static final Ed25519Signature ZERO = wrap(Utils.ZERO_BYTES_64);
 	
 
 	private Ed25519Signature(byte[] signature) {

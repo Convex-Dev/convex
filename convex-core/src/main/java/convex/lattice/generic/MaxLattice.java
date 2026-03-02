@@ -3,18 +3,17 @@ package convex.lattice.generic;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
-import convex.lattice.ALattice;
 
 /**
  * Lattice implementing a max function on natural numbers expressed as CVM integers
  */
-public class MaxLattice extends ALattice<AInteger> {
+public class MaxLattice extends AValueLattice<AInteger> {
 
 	private MaxLattice() {
 		// private to enforce Singleton
 	}
 	
-	private static final MaxLattice INSTANCE = new MaxLattice();
+	public static final MaxLattice INSTANCE = new MaxLattice();
 
 	@Override
 	public AInteger merge(AInteger ownValue, AInteger otherValue) {

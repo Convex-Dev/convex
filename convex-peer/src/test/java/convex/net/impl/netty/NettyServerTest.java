@@ -8,11 +8,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.parallel.*;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -27,11 +29,13 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
+import convex.core.store.NullStore;
 
+@Execution(ExecutionMode.CONCURRENT)
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {
 
-	@Test public void testServerSetup() throws IOException, InterruptedException, TimeoutException {
+	@Test public void testServerSetup() throws IOException, InterruptedException, TimeoutException, BadFormatException {
 		try (NettyServer server = new NettyServer(0)) {
 			server.launch();
 			Integer port=server.getPort();
@@ -68,16 +72,18 @@ public class NettyServerTest {
 		}
 	}
 	
-	@Test public void testBigMessage() throws IOException, InterruptedException, TimeoutException {
+	@Test public void testBigMessage() throws IOException, InterruptedException, TimeoutException, BadFormatException {
 		try (NettyServer server = new NettyServer(0)) {
 			server.launch();
 			server.setReceiveAction(m->{
+				Result r;
 				try {
-					Result r=Result.create(m.getRequestID(), m.getPayload(), null);
-					m.returnResult(r);
+					m.getPayload(NullStore.INSTANCE);
+					r = Result.create(m.getRequestID(), m.getPayload(), null);
 				} catch (BadFormatException e) {
-					m.returnResult(Result.BAD_FORMAT);
+					throw new Error("Bad format",e);
 				}
+				m.returnResult(r);
 			});
 			Integer port=server.getPort();
 			
@@ -96,7 +102,7 @@ public class NettyServerTest {
 			Message mq=Message.createQuery(10, blob, Address.create(17));
 			client.send(mq);
 			
-			Message m=queue.take();
+			Message m=queue.poll(1000,TimeUnit.MILLISECONDS);
 			assertEquals(RT.cvm(10),m.getResultID());
 			
 

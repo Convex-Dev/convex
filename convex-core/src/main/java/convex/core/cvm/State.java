@@ -20,7 +20,6 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -32,7 +31,6 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -133,24 +131,6 @@ public class State extends ARecordGeneric {
 	@Override
 	public int estimatedEncodingSize() {
 		return values.estimatedEncodingSize();
-	}
-
-	/**
-	 * Reads a State from an encoding. Assumes tag byte already read.
-	 *
-	 * @param b Blob to read from
-	 * @param pos start position in Blob 
-	 * @return Decoded State
-	 * @throws BadFormatException If a State could not be read
-	 */
-	public static State read(Blob b, int pos) throws BadFormatException {
-		AVector<ACell> values=Vectors.read(b, pos);
-		int epos=pos+values.getEncodingLength();
-		
-		State result=create(values);
-		if (result==null) throw new BadFormatException("Bad format for CVM global state");
-		result.attachEncoding(b.slice(pos,epos));
-		return result;
 	}
 
 	/**
@@ -389,7 +369,7 @@ public class State extends ARecordGeneric {
 				SignedData<ATransaction> signed = transactions.get(i);
 				
 				// Update transaction context
-				tctx.tx=signed;
+				tctx.signedTx=signed;
 				tctx.txNumber=i;
 				
 				// execute the transaction using the *latest* state (not necessarily "this")

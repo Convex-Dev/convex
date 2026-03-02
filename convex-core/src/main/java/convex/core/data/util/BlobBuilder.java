@@ -137,6 +137,17 @@ public class BlobBuilder {
 	}
 	
 	/**
+	 * Gets a blob representing the current contents of this BlobBuilder. 
+	 * 
+	 * O(log n) but quite high overhead, avoid calling too frequently
+	 * 
+	 * @return Blob contents of this BlobBuilder
+	 */
+	public AString toAString() {
+		return Strings.create(toBlob());
+	}
+	
+	/**
 	 * Takes a slice of the Blob currently under construction. May be more efficient than toBLob().slice(...).
 	 * @param start Start index of slice (inclusive)
 	 * @param end End index of slice (exclusive)

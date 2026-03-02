@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.cpos.Block;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.CVMTag;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.exceptions.BadFormatException;
+import convex.test.Samples;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 
@@ -63,9 +63,9 @@ public class BlocksTest {
 		
 		
 		Blob enc=b1.getEncoding();
-		DenseRecord dr=DenseRecord.read(CVMTag.BLOCK,enc, 0);
-		assertEquals(enc,dr.getEncoding());
-		assertEquals(b1,dr);
+		Block decoded=Samples.TEST_STORE.decode(enc);
+		assertEquals(enc,decoded.getEncoding());
+		assertEquals(b1,decoded);
 		
 		RecordTest.doRecordTests(b1);
 		

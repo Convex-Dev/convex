@@ -72,7 +72,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -2852,6 +2851,7 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(10L,evalL("(apply + 1 2 [3 4])"));
 		assertEquals(3L,evalL("(apply + 1 2 nil)"));
+		assertEquals(3L,evalL("(apply + 1 2 {})"));
 
 		assertEquals(Vectors.of(1L, 2L, 3L, 4L), eval("(apply vector 1 2 (list 3 4))"));
 		assertEquals(List.of(1L, 2L, 3L, 4L), eval("(apply list 1 2 [3 4])"));
@@ -2876,9 +2876,8 @@ public class CoreTest extends ACVMTest {
 		// Cast error if not applied to collection
 		assertCastError(step("(apply inc 1)"));
 		assertCastError(step("(apply inc :foo)"));
-
-		// not a sequential collection
-		assertCastError(step("(apply + 1 2 {})"));
+		
+		assertEquals(Vectors.empty(), eval("(apply concat {} {})"));
 	}
 
 
@@ -4038,7 +4037,7 @@ public class CoreTest extends ACVMTest {
 			assertSame(def, v);
 
 			Blob b = Cells.encode(def);
-			assertSame(def, Format.read(b));
+			assertSame(def, Samples.TEST_STORE.decode(b));
 
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
 			assertNotNull(meta,"Missing metadata for core symbol: "+sym);
@@ -5339,19 +5338,19 @@ public class CoreTest extends ACVMTest {
 		{ // a core function
 			ACell c = eval("count");
 			Blob b = Cells.encode(c);
-			assertSame(c, Format.read(b));
+			assertSame(c, Samples.TEST_STORE.decode(b));
 		}
 
 		{ // a core macro
 			ACell c = eval("*initial-expander*");
 			Blob b = Cells.encode(c);
-			assertSame(c, Format.read(b));
+			assertSame(c, Samples.TEST_STORE.decode(b));
 		}
 
 		{ // a basic lambda expression
 			ACell c = eval("(fn [x] x)");
 			Blob b = Cells.encode(c);
-			assertEquals(c, Format.read(b));
+			assertEquals(c, Samples.TEST_STORE.decode(b));
 		}
 	}
 }

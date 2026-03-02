@@ -1,0 +1,28 @@
+{
+  "name": "signingCreateKey",
+  "title": "Create Signing Key",
+  "description": "Create a new Ed25519 key pair in the signing service. Private key stored encrypted server-side. Authenticated.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to encrypt the private key. Required for future operations with this key."
+      }
+    },
+    "required": ["passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Hex-encoded Ed25519 public key of the created key pair"
+      }
+    }
+  }
+}

@@ -20,7 +20,6 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.InsecureRandom;
 import convex.core.cvm.Address;
 import convex.core.data.impl.LongBlob;
-import convex.core.data.impl.ZeroBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -30,6 +29,7 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class BlobsTest {
+
 	@Test public void testConstants() {
 		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
 		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
@@ -331,8 +331,8 @@ public class BlobsTest {
 		assertSame(e,e.append(e));
 		assertSame(e,new BlobBuilder().toBlob());
 		
-		assertSame(e,Format.read(Cells.encode(e)));	
-		assertSame(e,Format.read(e.getEncoding()));
+		assertSame(e,Samples.TEST_STORE.decode(Cells.encode(e)));
+		assertSame(e,Samples.TEST_STORE.decode(e.getEncoding()));
 		
 		assertSame(e,e.getChunk(0));
 		
@@ -420,7 +420,7 @@ public class BlobsTest {
 		assertEquals(Blob.fromHex("3100"),Blobs.empty().getEncoding());
 		
 		// Bad VLC length
-		assertThrows(BadFormatException.class,()->Format.read(Blob.fromHex("318000")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("318000")));
 	}
 	
 	@Test
@@ -569,13 +569,13 @@ public class BlobsTest {
 
 		bb.validate();
 
-		Ref<BlobTree> rb = Cells.persist(bb).getRef();
-		BlobTree bbb = Format.read(bb.getEncoding());
+		Ref<BlobTree> rb = Cells.persist(bb, Samples.TEST_STORE).getRef();
+		BlobTree bbb = Samples.TEST_STORE.decode(bb.getEncoding());
 		bbb.validate();
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
 		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
-		
+
 		// Check streaming a BlobTree
 		assertEquals(bb,Blobs.fromStream(bb.getInputStream()));
 
@@ -589,10 +589,99 @@ public class BlobsTest {
 
 		ABlob dd=data.append(data);
 		assertEquals(data,dd.slice(SIZE));
-		
+
 		ABlob cc=dd.replaceSlice(SIZE/2, data);
 		ABlob data2=cc.slice(SIZE/2, SIZE/2+SIZE);
 		assertEquals(data,data2);
+	}
+
+	@Test
+	public void testReplaceSliceIdentity() {
+		// Small Blob: replacing with same bytes preserves identity
+		Blob small = Blob.fromHex("0123456789abcdef");
+		assertSame(small, small.replaceSlice(0, small));
+		assertSame(small, small.replaceSlice(2, small.slice(2, small.count())));
+		assertSame(small, small.replaceSlice(0, small.slice(0, 4)));
+
+		// Empty replacement preserves identity
+		assertSame(small, small.replaceSlice(3, Blob.EMPTY));
+
+		// BlobTree: replacing with same bytes preserves identity
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		assertSame(big, big.replaceSlice(0, big.slice(0, 100)));
+		assertSame(big, big.replaceSlice(4000, big.slice(4000, 5000)));
+		assertSame(big, big.replaceSlice(0, Blob.EMPTY));
+	}
+
+	@Test
+	public void testReplaceSliceSingleChunk() {
+		// Write a single byte in the middle of a BlobTree
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		long pos = 5000;
+		byte original = big.byteAt(pos);
+		byte replacement = (byte)(original ^ 0xFF); // flip all bits
+
+		ABlob modified = big.replaceSlice(pos, Blob.forByte(replacement));
+		assertEquals(big.count(), modified.count());
+		assertEquals(replacement, modified.byteAt(pos));
+		// Surrounding bytes unchanged
+		assertEquals(big.byteAt(pos - 1), modified.byteAt(pos - 1));
+		assertEquals(big.byteAt(pos + 1), modified.byteAt(pos + 1));
+		// First and last bytes unchanged
+		assertEquals(big.byteAt(0), modified.byteAt(0));
+		assertEquals(big.byteAt(big.count() - 1), modified.byteAt(big.count() - 1));
+	}
+
+	@Test
+	public void testReplaceSliceCrossChunk() {
+		// Write spanning a chunk boundary (4096 bytes per chunk)
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		long pos = Blob.CHUNK_LENGTH - 2; // 2 bytes before chunk boundary
+		Blob replacement = Blob.fromHex("DEADBEEF"); // 4 bytes across boundary
+
+		ABlob modified = big.replaceSlice(pos, replacement);
+		assertEquals(big.count(), modified.count());
+		assertEquals((byte) 0xDE, modified.byteAt(pos));
+		assertEquals((byte) 0xAD, modified.byteAt(pos + 1));
+		assertEquals((byte) 0xBE, modified.byteAt(pos + 2));
+		assertEquals((byte) 0xEF, modified.byteAt(pos + 3));
+		// Byte before and after the write are unchanged
+		assertEquals(big.byteAt(pos - 1), modified.byteAt(pos - 1));
+		assertEquals(big.byteAt(pos + 4), modified.byteAt(pos + 4));
+	}
+
+	@Test
+	public void testReplaceSliceBoundary() {
+		BlobTree big = Samples.BIG_BLOB_TREE;
+
+		// Write at position 0
+		Blob rep = Blob.fromHex("FF");
+		ABlob modified = big.replaceSlice(0, rep);
+		assertEquals((byte) 0xFF, modified.byteAt(0));
+		assertEquals(big.byteAt(1), modified.byteAt(1));
+
+		// Write at end
+		long last = big.count() - 1;
+		ABlob modified2 = big.replaceSlice(last, rep);
+		assertEquals((byte) 0xFF, modified2.byteAt(last));
+		assertEquals(big.byteAt(last - 1), modified2.byteAt(last - 1));
+	}
+
+	@Test
+	public void testReplaceSliceZeroBlob() {
+		// ZeroBlob replaceSlice should work correctly
+		ABlob zeros = Blobs.createZero(10000).toCanonical();
+		Blob patch = Blob.fromHex("CAFE");
+		ABlob modified = zeros.replaceSlice(5000, patch);
+		assertEquals(zeros.count(), modified.count());
+		assertEquals((byte) 0xCA, modified.byteAt(5000));
+		assertEquals((byte) 0xFE, modified.byteAt(5001));
+		assertEquals((byte) 0x00, modified.byteAt(4999));
+		assertEquals((byte) 0x00, modified.byteAt(5002));
+
+		// Replacing zeros with zeros preserves identity
+		Blob zerosPatch = Blob.wrap(new byte[100]);
+		assertSame(zeros, zeros.replaceSlice(500, zerosPatch));
 	}
 
 	@Test
@@ -638,27 +727,203 @@ public class BlobsTest {
 	
 	@Test
 	public void testZeroBlobs() {
-		ZeroBlob z0=ZeroBlob.create(0);
-		ZeroBlob z1=ZeroBlob.create(10);
-		ZeroBlob z2=ZeroBlob.create(100);
-		ZeroBlob z3=ZeroBlob.create(10000);
-		ZeroBlob z4=ZeroBlob.create(100000);
-		
-		assertSame(Blob.EMPTY,z0.toFlatBlob());
-		
-		assertTrue(z3.append(z4) instanceof ZeroBlob);
-		
+		ABlob z0=Blobs.createZero(0);
+		ABlob z1=Blobs.createZero(10);
+		ABlob z2=Blobs.createZero(100);
+		ABlob z3=Blobs.createZero(10000);
+		ABlob z4=Blobs.createZero(100000);
+
+		assertSame(Blob.EMPTY,z0);
+
+		// All already canonical
+		assertTrue(z3.isCanonical());
+		assertTrue(z4.isCanonical());
+		assertTrue(z4 instanceof BlobTree);
+
 		doBlobTests(z0);
 		doBlobTests(z1);
 		doBlobTests(z2);
 		doBlobTests(z3);
 		doBlobTests(z4);
-		
-		// non-canonical so should convert to blob tree
-		ABlob cz4=z4.getCanonical();
-		assertTrue(cz4 instanceof BlobTree);
+
+		// Structural sharing: all full chunks should be EMPTY_CHUNK
+		assertSame(Blob.EMPTY_CHUNK, z4.getChunk(0));
+		assertSame(Blob.EMPTY_CHUNK, z3.getChunk(0));
+
+		// Ridiculous sizes — structural sharing makes these instant.
+		// Mix of clean powers (all full children) and ugly sizes (partial tails at every level).
+		for (long size : new long[] {
+				4097,                    // 1 chunk + 1 byte
+				Blob.CHUNK_LENGTH * 17,  // one level overshoot
+				1_000_000_007L,          // prime, ~1 GB
+				(1L << 40) + 999,        // 1 TB + partial tail
+				(1L << 50) - 1,          // 1 PB - 1, max partial at every level
+				(1L << 60) + 7777,       // 1 EB + odd tail
+				Long.MAX_VALUE }) {       // ~9.2 EB, not a clean power
+			ABlob huge = Blobs.createZero(size);
+			assertTrue(huge instanceof BlobTree);
+			assertTrue(huge.isCanonical());
+			assertEquals(size, huge.count());
+
+			// Full chunks should be the shared EMPTY_CHUNK singleton
+			long fullChunks = size / Blob.CHUNK_LENGTH;
+			assertSame(Blob.EMPTY_CHUNK, huge.getChunk(0));
+			if (fullChunks > 1) {
+				assertSame(Blob.EMPTY_CHUNK, huge.getChunk(fullChunks / 2));
+				assertSame(Blob.EMPTY_CHUNK, huge.getChunk(fullChunks - 1));
+			}
+			// Partial last chunk (if any) should be zero-filled
+			long remainder = size % Blob.CHUNK_LENGTH;
+			if (remainder != 0) {
+				Blob lastChunk = huge.getChunk(fullChunks);
+				assertEquals(remainder, lastChunk.count());
+				assertEquals(Blobs.createZero(remainder), lastChunk);
+			}
+
+			// Spot-check zero bytes at extremes and middle
+			assertEquals(0, huge.byteAt(0));
+			assertEquals(0, huge.byteAt(size / 2));
+			assertEquals(0, huge.byteAt(size - 1));
+
+			// replaceSlice identity: writing zeros back gives same object
+			Blob zeros = Blob.wrap(new byte[8]);
+			assertSame(huge, huge.replaceSlice(size / 2, zeros));
+
+			// replaceSlice with real data works
+			ABlob patched = huge.replaceSlice(size / 2, Blob.fromHex("DEADBEEF"));
+			assertEquals(size, patched.count());
+			assertEquals((byte) 0xDE, patched.byteAt(size / 2));
+			assertEquals(0, patched.byteAt(size / 2 - 1));
+			assertEquals(0, patched.byteAt(size / 2 + 4));
+		}
 	}
 	
+	@Test
+	public void testMaxBlobBasics() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		BlobTree bt = (BlobTree) max;
+
+		assertEquals(size, max.count());
+		assertTrue(max.isCanonical());
+		assertFalse(max.isChunkPacked());
+		assertFalse(max.isFullyPacked());
+		assertEquals(Tag.BLOB, max.getTag());
+		assertEquals(8, BlobTree.childCount(size));
+		assertEquals(1L << 60, BlobTree.childSize(size));
+		assertEquals(8, bt.getRefCount());
+
+		assertEquals(0, max.byteAt(0));
+		assertEquals(0, max.byteAt(size / 2));
+		assertEquals(0, max.byteAt(size - 1));
+		assertEquals(CVMLong.ZERO, max.get(size / 2));
+		assertEquals(0, max.shortAt(size / 2));
+		assertEquals(0L, max.longValue());
+		assertEquals(max.hashCode(), max.hashCode());
+	}
+
+	@Test
+	public void testMaxBlobChunks() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(0));
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(1));
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(1000));
+		long totalChunks = BlobTree.calcChunks(size);
+		assertSame(Blob.EMPTY_CHUNK, max.getChunk(totalChunks / 2));
+
+		long lastChunkIndex = totalChunks - 1;
+		Blob lastChunk = max.getChunk(lastChunkIndex);
+		long remainder = size % Blob.CHUNK_LENGTH;
+		assertEquals(remainder, lastChunk.count());
+		assertEquals(0, lastChunk.byteAt(0));
+		assertEquals(0, lastChunk.byteAt(remainder - 1));
+	}
+
+	@Test
+	public void testMaxBlobSlice() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		long mid = size / 2;
+
+		ABlob singleChunkSlice = max.slice(1000, 2000);
+		assertEquals(1000, singleChunkSlice.count());
+
+		long boundary = Blob.CHUNK_LENGTH - 10;
+		ABlob crossSlice = max.slice(boundary, boundary + 20);
+		assertEquals(20, crossSlice.count());
+
+		long alignedMid = (mid / Blob.CHUNK_LENGTH) * Blob.CHUNK_LENGTH;
+		assertSame(Blob.EMPTY_CHUNK, max.slice(alignedMid, alignedMid + Blob.CHUNK_LENGTH));
+
+		assertSame(max, max.slice(0, size));
+		assertSame(max, max.slice(0));
+		assertEquals(Blob.EMPTY, max.slice(size));
+		assertNull(max.slice(-1, 0));
+		assertNull(max.slice(0, Long.MIN_VALUE));
+
+		ByteBuffer buf = ByteBuffer.allocate(16);
+		assertEquals(16, max.toByteBuffer(mid, 16, buf));
+	}
+
+	@Test
+	public void testMaxBlobEquals() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		ABlob max2 = Blobs.createZero(size);
+
+		// Small slice equality
+		ABlob chunkSlice = max.slice(0, 100);
+		assertTrue(chunkSlice.equalsBytes(Blobs.createZero(100)));
+
+		// Full equality via hash-based BlobTree.equals
+		assertTrue(max.equals(max2));
+		assertEquals(max.hashCode(), max2.hashCode());
+	}
+
+	@Test
+	public void testMaxBlobReplaceSlice() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+		long mid = size / 2;
+
+		assertSame(max, max.replaceSlice(0, Blob.wrap(new byte[8])));
+		assertSame(max, max.replaceSlice(mid, Blob.wrap(new byte[8])));
+		assertSame(max, max.replaceSlice(size - 8, Blob.wrap(new byte[8])));
+
+		Blob payload = Blob.fromHex("CAFEBABE");
+		for (long pos : new long[] {0, 4094, mid, size - 4}) {
+			ABlob modified = max.replaceSlice(pos, payload);
+			assertEquals(size, modified.count());
+			assertEquals((byte) 0xCA, modified.byteAt(pos));
+			assertEquals((byte) 0xBE, modified.byteAt(pos + 3));
+			if (pos > 0) assertEquals(0, modified.byteAt(pos - 1));
+			if (pos + 4 < size) assertEquals(0, modified.byteAt(pos + 4));
+		}
+
+		ABlob oneBytePatched = max.replaceSlice(mid, Blob.fromHex("FF"));
+		assertSame(Blob.EMPTY_CHUNK, oneBytePatched.getChunk(0));
+	}
+
+	@Test
+	public void testMaxBlobAppend() {
+		long size = Long.MAX_VALUE;
+		ABlob max = Blobs.createZero(size);
+
+		assertThrows(IllegalArgumentException.class, () -> max.append(Blob.fromHex("00")));
+		assertThrows(IllegalArgumentException.class, () -> max.append(max));
+
+		ABlob chunk = Blob.createRandom(new Random(12345), Blob.CHUNK_LENGTH);
+		assertThrows(IllegalArgumentException.class, () -> max.append(chunk));
+
+		ABlob growing = Blobs.createZero(1L << 60);
+		growing = growing.append(growing); // 2^61
+		growing = growing.append(growing); // 2^62
+		final ABlob huge = growing;
+		assertThrows(IllegalArgumentException.class, () -> huge.append(huge));
+	}
+
 	@Test
 	public void testBlobParse() {
 		assertNull(Blobs.parse(null));
@@ -699,13 +964,13 @@ public class BlobsTest {
 	@Test
 	public void testBlobEncoding() throws BadFormatException {
 		byte[] bf = new byte[] { Tag.BLOB, 0 };
-		Blob b = Format.read(Blob.wrap(bf));
+		Blob b = Samples.TEST_STORE.decode(Blob.wrap(bf));
 		assertSame(Blob.EMPTY,b);
-		
+
 		Blob enc=Blob.createRandom(new InsecureRandom(3452534), 100).getEncoding();
-		
+
 		// Blob should re-use encoding array
-		Blob b2=Format.read(enc);
+		Blob b2=Samples.TEST_STORE.decode(enc);
 		assertSame(enc.getInternalArray(),b2.getInternalArray());	
 		assertTrue(b2.isEmbedded());
 		assertEquals(0,b2.getBranchCount());
@@ -719,10 +984,10 @@ public class BlobsTest {
 	   ABlob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
 	   
-	   Ref<ACell> pref = Cells.persist(value).getRef(); // ensure persisted
+	   Ref<ACell> pref = Cells.persist(value, Samples.TEST_STORE).getRef(); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
 	   Blob b = value.getEncoding();
-	   ACell o = Format.read(b);
+	   ACell o = Samples.TEST_STORE.decode(b);
 
 	   assertEquals(RT.getType(value), RT.getType(o));
 	   assertEquals(value, o);

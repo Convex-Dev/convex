@@ -1,7 +1,11 @@
 {
   "name": "validate",
   "title": "Signature Validator",
-  "description": "Validate an Ed25519 signature. Takes a public key, signature, and message bytes, and returns true if the signature is valid, false otherwise.",
+  "description": "Validate an Ed25519 signature against a public key and message bytes.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
   "inputSchema": {
     "type": "object",
     "properties": {

@@ -1,0 +1,52 @@
+{
+  "name": "signingExportKey",
+  "title": "Export Key (Signing Service)",
+  "description": "Export (reveal) the private seed for a stored key. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "publicKey": {
+        "type": "string",
+        "description": "Public key identifying which key to export (hex string)"
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase used when the key was created or imported"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Confirmation token from browser approval (omit on first call)"
+      }
+    },
+    "required": ["publicKey", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "seed": {
+        "type": "string",
+        "description": "Decrypted Ed25519 seed (hex string, returned after confirmation)"
+      },
+      "publicKey": {
+        "type": "string",
+        "description": "The exported key's public key"
+      },
+      "status": {
+        "type": "string",
+        "description": "confirmation_required when user approval is needed"
+      },
+      "confirmUrl": {
+        "type": "string",
+        "description": "URL for user to visit and approve the operation"
+      },
+      "confirmToken": {
+        "type": "string",
+        "description": "Token to include when retrying after approval"
+      }
+    }
+  }
+}

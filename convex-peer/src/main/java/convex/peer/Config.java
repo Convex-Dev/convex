@@ -13,6 +13,7 @@ import convex.core.cvm.Keywords;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
+import convex.core.store.MemoryStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
@@ -101,6 +102,25 @@ public class Config {
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
+	 * Size of bounded queue for Beliefs from unverified inbound connections.
+	 * Small — best-effort buffering during the brief verification round-trip.
+	 */
+	public static final int UNTRUSTED_BELIEF_QUEUE_SIZE = 10;
+
+	/**
+	 * Maximum number of inbound client connections accepted by the server.
+	 * Each connection consumes ~200KB idle (~300KB under load), so at 1024
+	 * connections the total is ~200-300MB (mostly kernel socket buffers).
+	 */
+	public static final int MAX_CLIENT_CONNECTIONS = 1024;
+
+	/**
+	 * Size of bounded outbound message queue per client connection.
+	 * Absorbs brief bursts; backpressure kicks in when the queue fills.
+	 */
+	public static final int OUTBOUND_QUEUE_SIZE = 128;
+
+	/**
 	 * Checks if the config specifies a valid store
 	 * @param config Configuration map for peer
 	 * @return Store specified in Config, or null if not specified
@@ -113,6 +133,9 @@ public class Config {
 		
 		if ((o instanceof String)||(o instanceof AString)) {
 			String fname=o.toString();
+			if ("memory".equals(fname)) {
+				return (T) new MemoryStore();
+			}
 			if ("temp".equals(fname)) {
 				return (T) EtchStore.createTemp();
 			}

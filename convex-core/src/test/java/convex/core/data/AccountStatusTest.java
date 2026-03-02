@@ -28,7 +28,7 @@ public class AccountStatusTest {
 	@Test public void testEncodingRegression() throws BadFormatException {
 		// Detected with fuzz tests
 		Blob b=Blob.parse("0xc1036632b4");
-		assertThrows(BadFormatException.class,()->Format.read(b));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(b));
 	}
 	
 	@Test public void testBigSequence() throws BadFormatException, InvalidDataException {
@@ -48,7 +48,7 @@ public class AccountStatusTest {
 		as=as.withParent(Core.CORE_ADDRESS);
 		
 		// Round trip through encoding
-		as=Format.decodeMultiCell(as.getEncoding());
+		as=Samples.TEST_STORE.decodeMultiCell(as.getEncoding());
 		
 		assertEquals(10,as.getSequence());
 		assertEquals(1000,as.getBalance());

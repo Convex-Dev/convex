@@ -19,6 +19,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.test.Samples;
 
 public class SyntaxTest {
 
@@ -27,13 +28,13 @@ public class SyntaxTest {
 		Syntax emptyMeta=Syntax.create(RT.cvm(1L));
 		Blob encoded = emptyMeta.getEncoding();
 		assertEquals("88110100",encoded.toHexString());
-		Syntax recovered = Format.read(encoded);
+		Syntax recovered = Samples.TEST_STORE.decode(encoded);
 		assertEquals(emptyMeta,recovered);
-		
+
 		// should be invalid to have an empty map as encoded metadata
-		assertThrows(BadFormatException.class,()->Format.read("881101820000"));
-		assertThrows(BadFormatException.class,()->Format.read("8800820000"));
-		assertThrows(BadFormatException.class,()->Format.read("88008200"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("881101820000")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("8800820000")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("88008200")));
 	}
 	
 	@Test public void testSyntaxExamples() {
@@ -81,11 +82,11 @@ public class SyntaxTest {
 		
 		Syntax s=Reader.read("^{} {#1 -9223372036854775808}");
 		Blob b=s.getEncoding();
-		Syntax s2=Format.read(b);
+		Syntax s2=Samples.TEST_STORE.decode(b);
 		
 		assertEquals(s,s2);
 		
-		Ref<Syntax> pref=Cells.persist(s).getRef();
+		Ref<Syntax> pref=Cells.persist(s, Samples.TEST_STORE).getRef();
 		assertEquals(s,pref.getValue());
 
 	}

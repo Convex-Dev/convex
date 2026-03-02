@@ -7,9 +7,9 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -49,7 +49,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	private final Ref<AVector<T>>[] children;
 
-	private VectorTree(Ref<AVector<T>>[] children, long count) {
+	VectorTree(Ref<AVector<T>>[] children, long count) {
 		super(count);
 		this.shift = computeShift(count);
 		this.children = children;
@@ -200,36 +200,34 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 	
 
-	/**
-	 * Reads a VectorTree from the provided Blob 
-	 * 
-	 * Assumes the header byte and count is already checked.
-	 * 
-	 * @param count Number of elements, assumed to be valid
-	 * @param b Blob to read from
-	 * @param pos Start position in Blob (location of tag byte)
-	 * @return New decoded instance
-	 * @throws BadFormatException In the event of any encoding error
-	 */
+	@Override
+	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {
+		if (this == b) return this;
+		if (!(b instanceof VectorTree) || b.count() != count) return super.mergeWith(b, func);
+		if (this.equals(b)) return this;
 
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
-		int n = computeArraySize(count);
-		
-		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
-		
-		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
+		VectorTree<T> bt = (VectorTree<T>) b;
+		boolean sameAsThis = true;
+		boolean sameAsOther = true;
+
+		Ref<AVector<T>>[] newChildren = children;
+		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			Ref<AVector<T>> ref = Format.readRef(b,rpos);
-			// if (ref==Ref.NULL_VALUE) throw new BadFormatException("Null VectorTree child");
-			items[i] = ref;
-			rpos+=ref.getEncodingLength();
+			if (children[i].equals(bt.children[i])) continue; // identical subtree
+			AVector<T> ownChild = children[i].getValue();
+			AVector<T> otherChild = bt.children[i].getValue();
+			AVector<T> merged = ownChild.mergeWith(otherChild, func);
+			if (merged != ownChild) {
+				if (newChildren == children) newChildren = children.clone();
+				newChildren[i] = merged.getRef();
+				sameAsThis = false;
+			}
+			if (merged != otherChild) sameAsOther = false;
 		}
 
-		VectorTree<T> result= new VectorTree<T>(items, count);
-		// Attach encoding only if "real"
-		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
-		return result;
+		if (sameAsThis) return this;
+		if (sameAsOther) return b;
+		return new VectorTree<>(newChildren, count);
 	}
 
 	@SuppressWarnings("unchecked")

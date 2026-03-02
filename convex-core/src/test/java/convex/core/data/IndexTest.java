@@ -136,9 +136,9 @@ public class IndexTest {
 	
 	@Test public void testIndexEncode() throws BadFormatException {
 		Index<ABlob, CVMLong> m = Index.of(Address.ZERO,Samples.IPSUM);
-		
+
 		Blob enc=m.getEncoding();
-		assertEquals(m,Format.read(enc));
+		assertEquals(m,Samples.TEST_STORE.decode(enc));
 	}
 
 	@Test
@@ -163,6 +163,14 @@ public class IndexTest {
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
 		assertSame(Index.none(), m);
+	}
+	
+	@Test
+	public void testMediumKeys() throws InvalidDataException {
+		doIndexTests(Index.of(Blobs.createRandom(25),1)); // < MAX_DEPTH hex digits
+		doIndexTests(Index.of(Blobs.createRandom(50),1)); // > MAX_DEPTH digits, < MAX_DEPTH bytes
+		doIndexTests(Index.of(Blobs.createRandom(100),1)); // > MAX_DEPTH digits, > MAX_DEPTH bytes
+		doIndexTests(Index.of(Blobs.createRandom(200),1)); // > MAX_DEPTH bytes, non-embedded
 	}
 	
 	@Test

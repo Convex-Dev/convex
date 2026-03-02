@@ -41,7 +41,7 @@ public class TokenListPanel extends JPanel {
 		// add(new AccountOverview(convex),"dock north");
 		
 		// Separate thread to get tokens, in case stuff fails
-		ThreadUtils.runVirtual(()->{
+		ThreadUtils.runVirtual("token-init", ()->{
 			addTokenTracking(TokenInfo.get(convex,null));
 			addTokenTracking(TokenInfo.getFungible(convex,"currency.USDF"));
 			addTokenTracking(TokenInfo.getFungible(convex,"currency.GBPF"));
@@ -71,7 +71,7 @@ public class TokenListPanel extends JPanel {
 		},"Refresh token details and balances"));
 		add(ap,"dock south");
 		
-		ThreadUtils.runVirtual(this::updateLoop);
+		ThreadUtils.runVirtual("token-update", this::updateLoop);
 	}
 	
 	private static boolean addTokenTracking(TokenInfo tokenInfo) {

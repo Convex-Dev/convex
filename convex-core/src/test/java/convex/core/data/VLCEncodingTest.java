@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.test.Samples;
 import convex.test.Testing;
 
 public class VLCEncodingTest {
@@ -98,8 +99,8 @@ public class VLCEncodingTest {
 	@Test
 	public void testLongVLCBadFormat() {
 		// too long encodings
-		assertThrows(BadFormatException.class, () -> Format.read(Blob.fromHex("098000")));
-		assertThrows(BadFormatException.class, () -> Format.read(Blob.fromHex("09FF7F")));
+		assertThrows(BadFormatException.class, () -> Samples.TEST_STORE.decode(Blob.fromHex("098000")));
+		assertThrows(BadFormatException.class, () -> Samples.TEST_STORE.decode(Blob.fromHex("09FF7F")));
 	}
 
 	@Test
@@ -135,13 +136,13 @@ public class VLCEncodingTest {
 	public void testLongVLCRegression2() throws BadFormatException {
 		CVMLong b = CVMLong.create(1496216L);
 		Blob blob = Cells.encode(b);
-		assertEquals(b, Format.read(blob));
+		assertEquals(b, Samples.TEST_STORE.decode(blob));
 	}
 
 	@Test
 	public void testLongVLCRegression() throws BadFormatException {
 		CVMLong b = RT.cvm(1234578);
 		Blob blob = Cells.encode(b);
-		assertEquals(b, Format.read(blob));
+		assertEquals(b, Samples.TEST_STORE.decode(blob));
 	}
 }

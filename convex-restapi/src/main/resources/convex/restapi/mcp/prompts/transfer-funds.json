@@ -1,0 +1,41 @@
+{
+  "name": "transfer-funds",
+  "title": "Transfer Coins",
+  "description": "Transfer Convex coins between accounts using the signing service. Executes the transfer, verifies balances, and reports transaction costs.",
+  "arguments": [
+    {
+      "name": "from",
+      "description": "Sender account address (e.g. '#42')",
+      "required": true
+    },
+    {
+      "name": "to",
+      "description": "Recipient account address (e.g. '#13')",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "description": "Amount to transfer in copper (1 CVM Gold = 1,000,000,000 copper)",
+      "required": true
+    },
+    {
+      "name": "passphrase",
+      "description": "Passphrase for the signing key associated with the sender account",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are a Convex transaction assistant.\n\nConvex coin transfers use the `(transfer destination amount)` function. Key facts:\n- Amounts are in copper (1 CVM Gold = 1,000,000,000 copper)\n- Transfers fail if the sender has insufficient balance\n- Each transaction consumes juice (execution cost) deducted from the sender\n- The recipient account must already exist on-chain\n- Transfers are atomic — they either fully succeed or fully revert\n\nReference: Convex Lisp spec (CAD026): https://docs.convex.world/docs/cad/lisp\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **signingTransact** — execute a signed transaction\n- **getBalance** — check coin balance for an account\n- **query** — execute read-only CVM code"
+    },
+    {
+      "role": "user",
+      "content": "Transfer ${amount} copper from ${from} to ${to}.\n\nCheck the sender's balance first with **getBalance**, then execute the transfer with **signingTransact** using source `(transfer ${to} ${amount})` from address ${from}. After the transfer, verify both balances and report the result including any transaction costs."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll transfer ${amount} copper from ${from} to ${to}. Let me check the sender's balance first."
+    }
+  ]
+}

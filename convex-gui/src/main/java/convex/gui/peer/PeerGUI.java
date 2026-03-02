@@ -32,8 +32,6 @@ import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.Toast;
@@ -242,7 +240,7 @@ public class PeerGUI extends AbstractGUI {
 		
 		tabs.setSelectedComponent(serverPanel);
 
-		ThreadUtils.runVirtual(updateThread);
+		ThreadUtils.runVirtual("peer-gui-update", updateThread);
 	}
 
 	private boolean updateRunning = true;
@@ -367,14 +365,7 @@ public class PeerGUI extends AbstractGUI {
 			if	(model!=null) return model;
 			StateModel<Peer> newModel=StateModel.create(s.getPeer());
 			s.getCVMExecutor().setUpdateHook(p->{
-				AStore tempStore=Stores.current();
-				try {
-					Stores.setCurrent(s.getStore());
-					newModel.setValue(p);
-				} finally {
-					Stores.setCurrent(tempStore);
-				}
-				// latestState.setValue(p.getConsensusState());
+				newModel.setValue(p);
 			});
 			models.put(s, newModel);
 			return newModel;

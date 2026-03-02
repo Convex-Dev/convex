@@ -1,17 +1,22 @@
 {
   "name": "prepare",
   "title": "Prepare Transaction",
-  "description": "Prepare (but do not send) a Convex transaction. This mirrors the /api/v1/transaction/prepare endpoint and returns the encoded transaction along with the sequence that should be signed.",
+  "description": "Prepare a Convex transaction for signing. Returns a hash to pass to 'signAndSubmit' or 'submit'.\n\nCommon source patterns:\n- Transfer: (transfer #DEST AMOUNT)\n- Deploy actor: (deploy '(do (defn greet [x] (str \"Hello \" x)) (export greet)))\n- Call actor: (call #ACTOR (function-name arg1 arg2))\n- Define value: (def my-var 42)\n- Set controller: (set-controller #ADDR)\n- Register CNS: (call #9 (cns-update 'my.name *address*))\n\nAmounts in copper (1 CVM = 1,000,000,000 copper).",
+  "annotations": {
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  },
   "inputSchema": {
     "type": "object",
     "properties": {
       "source": {
         "type": "string",
-        "description": "CVM source code for the transaction (e.g. \"(* 2 3)\")"
+        "description": "Convex Lisp source code for the transaction. See description for common patterns."
       },
       "address": {
         "type": "string",
-        "description": "Origin account address for the transaction (e.g. \"#11\")"
+        "description": "Origin account address (e.g. '#11' or '11'). Transaction executes from this account."
       },
       "sequence": {
         "type": "integer",
@@ -28,22 +33,21 @@
         "description": "Original source expression that was prepared"
       },
       "address": {
-        "type": "string",
+        "type": "integer",
         "description": "Address that will execute the transaction"
       },
       "hash": {
         "type": "string",
-        "description": "Hash of the prepared transaction payload"
+        "description": "Transaction encoding to sign - pass this to signAndSubmit or submit"
       },
       "data": {
         "type": "string",
-        "description": "Hex-encoded transaction bytes suitable for signing"
+        "description": "Hex-encoded transaction bytes"
       },
       "sequence": {
         "type": "integer",
-        "description": "Sequence number used when preparing the transaction"
+        "description": "Sequence number used for this transaction"
       }
     }
   }
 }
-

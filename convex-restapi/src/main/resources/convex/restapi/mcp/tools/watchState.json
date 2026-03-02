@@ -1,0 +1,27 @@
+{
+  "name": "watchState",
+  "title": "Watch State",
+  "description": "Watch a path in the global CVM state for changes. Returns a watchId. Changes are delivered as SSE notifications on the session's GET /mcp stream. Requires an active session (Mcp-Session-Id).",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "CVM path vector into the global state, e.g. '[:accounts #56785 :environment myvar]'"
+      }
+    },
+    "required": ["path"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "watchId": { "type": "string", "description": "Unique watch identifier for unwatchState" },
+      "value": { "description": "Current value at the path (if small enough, otherwise omitted)" },
+      "changed": { "type": "boolean", "description": "Always true if value included" }
+    }
+  }
+}

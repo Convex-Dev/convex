@@ -27,11 +27,10 @@ public class DLFSTreeCellRenderer extends DefaultTreeCellRenderer {
 	public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded,
 			boolean leaf, int row, boolean hasFocus) {
 		super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
-		Path path=(Path) ((DefaultMutableTreeNode)value).getUserObject();
+		DefaultMutableTreeNode treeNode = (DefaultMutableTreeNode) value;
+		setText(treeNode.toString());
 
-		Path name=path.getFileName();
-		setText((name==null)?"DLFS Root":name.toString());
-		
+		Path path = (Path) treeNode.getUserObject();
 		Icon icon = BrowserUtils.getFileIcon(path);
 		
 		setIcon(icon);

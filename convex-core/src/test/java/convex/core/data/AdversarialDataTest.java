@@ -154,7 +154,7 @@ public class AdversarialDataTest {
 			byte[] bs=new byte[256];
 			bs[0]=Tag.KEYWORD;
 			bs[1]=(byte)160;
-			assertThrows(BadFormatException.class,()->Keyword.read(Blob.wrap(bs),0));
+			assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.wrap(bs)));
 		}
 	}
 	
@@ -174,7 +174,7 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testRegressions() throws BadFormatException {
-		invalidTest(Format.read("d401120090"));
+		invalidTest(Samples.TEST_STORE.decode(Blob.fromHex("d401120090")));
 	}
 	
 	@Test
@@ -285,7 +285,7 @@ public class AdversarialDataTest {
 	@Test 
 	public void testBadBlobs() throws BadFormatException {
 		invalidEncoding("828041000000000000");
-		assertEquals(CVMLong.create(0x8041000000000000l),Format.read("188041000000000000"));
+		assertEquals(CVMLong.create(0x8041000000000000l),Samples.TEST_STORE.decode(Blob.fromHex("188041000000000000")));
 	}
 	
 	@Test
@@ -329,7 +329,7 @@ public class AdversarialDataTest {
 	}
 
 	protected void invalidEncoding(Blob b) {
-		assertThrows(BadFormatException.class,()->Format.read(b));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(b));
 	}
 
 	@Test
@@ -360,7 +360,7 @@ public class AdversarialDataTest {
 		
 		ACell c=null;
 		try {
-			c=Format.read(enc);
+			c=Samples.TEST_STORE.decode(enc);
 			c.validateCell(); // If we managed to read it, should validate at cell level
 		} catch (BadFormatException e) {
 			// not a readable format, so probably not dangerous

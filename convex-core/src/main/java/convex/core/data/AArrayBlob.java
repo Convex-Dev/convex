@@ -60,6 +60,9 @@ public abstract class AArrayBlob extends ABlob {
 		if (dlength == 0) return this;
 		long length = this.count;
 		if (length == 0) return d;
+		if (length > Long.MAX_VALUE - dlength) {
+			throw new IllegalArgumentException("Blob append would exceed maximum size");
+		}
 		
 		if (length>Blob.CHUNK_LENGTH) {
 			// Need to normalise to a BlobTree first
@@ -412,6 +415,17 @@ public abstract class AArrayBlob extends ABlob {
 		int n=(int)count;
 		dest.put(store, (int) (this.offset+offset), n);
 		return n;
+	}
+
+	@Override
+	public ABlob replaceSlice(long position, ABlob b) {
+		long blen = b.count();
+		if (blen == 0) return this;
+		// If replacement extends past end, can't preserve identity
+		if (position + blen > count()) return super.replaceSlice(position, b);
+		// Check if bytes are the same
+		if (b.equalsBytes(store, offset + (int) position)) return this;
+		return super.replaceSlice(position, b);
 	}
 
 	@Override

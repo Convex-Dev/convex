@@ -1,0 +1,35 @@
+{
+  "name": "signingTransact",
+  "title": "Transact via Signing Service",
+  "description": "Execute a Convex transaction using a stored signing key. Private key never leaves the server. Authenticated.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "Convex Lisp source code to execute, e.g. '(transfer #13 1000000000)'"
+      },
+      "address": {
+        "type": "string",
+        "description": "Origin account address (e.g. '#13'). Must have a public key matching a stored signing key."
+      },
+      "passphrase": {
+        "type": "string",
+        "description": "Passphrase to decrypt the signing key"
+      }
+    },
+    "required": ["source", "address", "passphrase"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {"description": "Resulting CVM value from execution"},
+      "errorCode": {"description": "CVM error code if the transaction failed"},
+      "info": {"description": "Execution metadata including juice used, fees, and transaction hash"}
+    }
+  }
+}

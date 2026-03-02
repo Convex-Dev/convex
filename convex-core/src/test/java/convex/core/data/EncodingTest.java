@@ -25,6 +25,7 @@ import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.Syntax;
 import convex.core.cvm.ops.Constant;
@@ -42,7 +43,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.test.Samples;
 import convex.test.Testing;
- 
+
 @TestInstance(Lifecycle.PER_CLASS)
 public class EncodingTest {
 
@@ -122,7 +123,7 @@ public class EncodingTest {
 	@Test public void testEmbeddedRegression() throws BadFormatException {
 		Keyword k=Keyword.create("foo");
 		Blob b=Cells.encode(k);
-		ACell o=Format.read(b);
+		ACell o=Samples.TEST_STORE.decode(b);
 		assertEquals(k,o);
 		assertTrue(Cells.isEmbedded(k));
 		Ref<?> r=Ref.get(o);
@@ -130,37 +131,37 @@ public class EncodingTest {
 	}
 	
 	@Test public void testByteFlags() throws BadFormatException {
-		assertEquals(CVMBool.TRUE,Format.read("b1"));
-		assertEquals(CVMBool.FALSE,Format.read("B0"));
-		assertEquals(AByteFlag.create(10),Format.read("bA"));
+		assertEquals(CVMBool.TRUE,Samples.TEST_STORE.decode(Blob.fromHex("b1")));
+		assertEquals(CVMBool.FALSE,Samples.TEST_STORE.decode(Blob.fromHex("B0")));
+		assertEquals(AByteFlag.create(10),Samples.TEST_STORE.decode(Blob.fromHex("bA")));
 	}
 	
 	@Test public void testEmbeddedBigInteger() throws BadFormatException {
 		CVMBigInteger big=CVMBigInteger.MIN_POSITIVE;
 		Blob b=big.getEncoding();
 		assertTrue(big.isEmbedded());
-		assertEquals(big,Format.read(b));
+		assertEquals(big,Samples.TEST_STORE.decode(b));
 	}
 	
 	@Test public void testBadLongFormats() throws BadFormatException {
 		// test high zero bytes
-		assertThrows(BadFormatException.class,()->Format.read("1100"));
-		assertThrows(BadFormatException.class,()->Format.read("12007f"));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("1100")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("12007f")));
+
 		// Test excess bytes
-		assertThrows(BadFormatException.class,()->Format.read("10ff"));
-		assertThrows(BadFormatException.class,()->Format.read("11ffff"));
-		assertThrows(BadFormatException.class,()->Format.read("18ffffffffffffffffdd"));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("10ff")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("11ffff")));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(Blob.fromHex("18ffffffffffffffffdd")));
 	}
 	
 	@Test public void testBlobReading() {
-		assertThrows(BadFormatException.class, ()->Format.read(Blobs.empty()));
+		assertThrows(BadFormatException.class, ()->Samples.TEST_STORE.decode(Blobs.empty()));
 	}
 	
 	@Test public void testStringRegression() throws BadFormatException {
 		StringShort s=StringShort.create("��zI�&$\\ž1�����4�E4�a8�#?$wD(�#");
 		Blob b=Cells.encode(s);
-		StringShort s2=Format.read(b);
+		StringShort s2=Samples.TEST_STORE.decode(b);
 		assertEquals(s,s2);
 	}
 	
@@ -179,7 +180,7 @@ public class EncodingTest {
 		
 		// Should read, since error is in validation not CAD3 encoding
 		Blob enc=a.getEncoding();
-		assertEquals(a,Format.read(enc));
+		assertEquals(a,Samples.TEST_STORE.decode(enc));
 	}
 	
 	@Test public void testListRegression() throws BadFormatException {
@@ -188,7 +189,7 @@ public class EncodingTest {
 		assertEquals(me,l.reversed()); // ensure MapEntry gets converted to canonical vector
 		
 		Blob b=Cells.encode(l);
-		List<ACell> l2=Format.read(b);
+		List<ACell> l2=Samples.TEST_STORE.decode(b);
 		
 		assertEquals(l,l2);
 	}
@@ -211,7 +212,7 @@ public class EncodingTest {
 	@Test public void testReadBlobData() throws BadFormatException {
 		Blob d=Blob.fromHex("cafebabe");
 		Blob edData=Cells.encode(d);
-		AArrayBlob dd=Format.read(edData);
+		AArrayBlob dd=Samples.TEST_STORE.decode(edData);
 		assertEquals(d,dd);
 		assertSame(edData,dd.getEncoding()); // should re-use encoded data object directly
 	}
@@ -220,7 +221,7 @@ public class EncodingTest {
 	public void testBadMessageTooLong() throws BadFormatException {
 		ACell o=Samples.FOO;
 		Blob data=Cells.encode(o).append(Blob.fromHex("ff")).toFlatBlob();
-		assertThrows(BadFormatException.class,()->Format.read(data));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(data));
 	}
 	
 	@Test
@@ -310,14 +311,14 @@ public class EncodingTest {
 		
 		ACell s=Samples.NON_EMBEDDED_STRING;
 		Blob neb=s.getEncoding();
-		assertEquals(s,Format.read(neb)); // valid readable encoding
+		assertEquals(s,Samples.TEST_STORE.decode(neb)); // valid readable encoding
 		assertTrue(neb.count()>Format.MAX_EMBEDDED_LENGTH);
 		
 		// create encoding with non-embedded child ref
 		// This should be invalid, as it should be canonically coded as an indirect ref!
 		Blob b=Blob.fromHex("8001"+neb.toHexString());
 		
-		assertThrows(BadFormatException.class,()->Format.read(b));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decode(b));
 	}
 	
 	@Test public void testDeltaEncoding() throws BadFormatException, IOException {
@@ -325,17 +326,18 @@ public class EncodingTest {
 		AVector<?> v=Vectors.of(1,randBlob,randBlob);
 		
 		ArrayList<ACell> novelty=new ArrayList<>();
-		Cells.announce(v,r->novelty.add(r.getValue()));
+		Cells.announce(v,r->novelty.add(r.getValue()),Samples.TEST_STORE);
 		if (v.isEmbedded()) novelty.add(v);
 		
 		assertEquals(2,novelty.size());
 		
 		Blob b=Format.encodeDelta(novelty);
 		
-		AVector<?> v2 = Format.decodeMultiCell(b);
+		AVector<?> v2;
+		v2 = Samples.TEST_STORE.decodeMultiCell(b);
 		assertEquals(v,v2);
 	}
-	
+
 	@Test public void testMultiCellEncoding() throws BadFormatException {
 		ArrayList<ACell> al=new ArrayList<ACell>();
 		al.add(CVMLong.ONE);
@@ -344,7 +346,7 @@ public class EncodingTest {
 		
 		Blob enc=Format.encodeCells(al);
 		
-		ACell[] cs=Format.decodeCells(enc);
+		ACell[] cs=Format.decodeCells(enc, Samples.TEST_STORE);
 		assertEquals(CVMLong.ONE,cs[0]);
 		assertEquals(CVMDouble.ZERO,cs[2]);
 		assertEquals(3,cs.length);
@@ -359,9 +361,10 @@ public class EncodingTest {
 		
 		Blob enc=Format.encodeMultiCell(v,true);
 		
-		AVector<?> v2=Format.decodeMultiCell(enc);
+		AVector<?> v2;
+		v2=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(v,v2);
-		
+
 		SignedData<ATransaction> dtrans = doMultiEncodingTest(strans);
 		assertEquals(strans.getValue(),dtrans.getValue());
 	}
@@ -391,22 +394,23 @@ public class EncodingTest {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Samples.TEST_STORE);
 		novelty.add(b);
-		
+
 		Blob enc=Format.encodeDelta(novelty);
-		
-		Belief b2=Format.decodeMultiCell(enc);
+
+		Belief b2;
+		b2=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(Refs.totalRefCount(b),Refs.totalRefCount(b2));
-		
+
 		novelty.clear();
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Samples.TEST_STORE);
 		assertTrue(novelty.isEmpty());
 		
 	}
 	
 	@Test public void testMessageEncoding() throws BadFormatException {
-		assertNull(Format.decodeMultiCell(Blob.fromHex("00")));
+		assertNull(Samples.TEST_STORE.decodeMultiCell(Blob.fromHex("00")));
 		
 		doMultiEncodingTest(CVMLong.ONE);
 		doMultiEncodingTest(Samples.NON_EMBEDDED_STRING);
@@ -448,11 +452,12 @@ public class EncodingTest {
 	private <T extends ACell> T doMultiEncodingTest(ACell a) throws BadFormatException {
 		long rc=Refs.totalRefCount(a);
 		Blob enc=Format.encodeMultiCell(a,true);
-		ACell decoded=Format.decodeMultiCell(enc);
+		ACell decoded;
+		decoded=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(a,decoded);
-		
+
 		assertEquals(rc,Refs.totalRefCount(decoded));
-		
+
 		return (T) decoded;
 	}
 	
@@ -495,7 +500,7 @@ public class EncodingTest {
 		
 		Belief b=Belief.create(kp, o);
 		
-		b=Cells.persist(b);
+		b=Cells.persist(b, Samples.TEST_STORE);
 		assertTrue(b.getRef().getStatus()==Ref.PERSISTED);
 		
 		ArrayList<ACell> novelty=new ArrayList<>();
@@ -509,45 +514,45 @@ public class EncodingTest {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Samples.TEST_STORE);
 		novelty.add(b);
 		Blob enc=Format.encodeDelta(novelty);
-		
+
 		// Check decode of full delta
-		Belief b2=Format.decodeMultiCell(enc);
+		Belief b2=Samples.TEST_STORE.decodeMultiCell(enc);
 		assertEquals(b,b2);
-		
+
 		// Check no new novelty if announce again
 		novelty.clear();
-		b=Cells.announce(b, noveltyHandler);
+		b=Cells.announce(b, noveltyHandler, Samples.TEST_STORE);
 		assertEquals(0,novelty.size());
-		
+
 		// Extend Belief with new Peer Order
 		AKeyPair kp2=AKeyPair.createSeeded(156757);
 		Order o2=b.getOrder(kp.getAccountKey());
 		o2=o2.append(kp2.signData(Block.create(400, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 7, o))))));
 		Belief b3=b.withOrders(b.getOrders().assoc(kp2.getAccountKey(), kp2.signData(o2)));
-		
+
 		novelty.clear();
-		b3=Cells.announce(b3, noveltyHandler);
+		b3=Cells.announce(b3, noveltyHandler, Samples.TEST_STORE);
 		assertFalse(novelty.isEmpty());
 		novelty.add(b3);
 		Blob enc2=Format.encodeDelta(novelty);
-		
-		// Check decode of full delta
-		Belief b4=Format.decodeMultiCell(enc2);
+
+		// Check decode of full delta (delta needs store for non-novel cells)
+		Belief b4=(Belief) new CVMEncoder(Samples.TEST_STORE).decodeMultiCell(enc2);
 		Refs.RefTreeStats stats2=Refs.getRefTreeStats(b4.getRef());
 		assertNotEquals(stats2.total,stats2.direct); // should be some non-direct Refs
 	}
 	
 	@Test public void testBadMessageEncoding() {
 		Blob first=Vectors.of(1,2,3).getEncoding();
-		
+
 		// Non-embedded child value
-		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(first.append(Blob.fromHex("00")).toFlatBlob()));
-		
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decodeMultiCell(first.append(Blob.fromHex("00")).toFlatBlob()));
+
 		// illegal child tag
-		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(first.append(Blob.fromHex("00FF")).toFlatBlob()));
+		assertThrows(BadFormatException.class,()->Samples.TEST_STORE.decodeMultiCell(first.append(Blob.fromHex("00FF")).toFlatBlob()));
 	}
 	
 	@Test public void testFullMessageEncoding() throws BadFormatException {
@@ -559,11 +564,12 @@ public class EncodingTest {
 	public static void testFullencoding(ACell s) throws BadFormatException {
 		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
 		Blob b=Format.encodeMultiCell(s,true);
-		
-		ACell s2=Format.decodeMultiCell(b);
+
+		ACell s2;
+		s2=Samples.TEST_STORE.decodeMultiCell(b);
 		// System.err.println(Refs.printMissingTree(s2));
 		assertEquals(s,s2);
-		
+
 		RefTreeStats rstats2  = Refs.getRefTreeStats(s2.getRef());
 		assertEquals(rstats.total,rstats2.total);
 	}

@@ -1,0 +1,37 @@
+{
+  "name": "signAndSubmit",
+  "title": "Sign and Submit Transaction",
+  "description": "Sign and submit a prepared transaction. Use after 'prepare'. Sends seed over network — HTTPS only.",
+  "annotations": {
+    "destructiveHint": false,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "hash": {
+        "type": "string",
+        "description": "Transaction hash returned by the 'prepare' tool (hex string)"
+      },
+      "seed": {
+        "type": "string",
+        "description": "Ed25519 seed (64 hex chars) used to sign the transaction. SECURITY: Only submit this over HTTPS to a trusted peer!"
+      }
+    },
+    "required": ["hash", "seed"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "description": "Resulting CVM value from transaction execution"
+      },
+      "errorCode": {
+        "description": "CVM error code if the transaction failed"
+      },
+      "info": {
+        "description": "Additional execution metadata including juice used, fees, and transaction hash"
+      }
+    }
+  }
+}

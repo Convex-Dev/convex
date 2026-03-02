@@ -5,14 +5,12 @@ import java.math.BigInteger;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
@@ -175,15 +173,6 @@ public final class CVMDouble extends ANumeric {
 		return Tag.DOUBLE;
 	}
 	
-	public static CVMDouble read(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");
-		long bits=Utils.readLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1,8);
-		double d=Double.longBitsToDouble(bits);
-		CVMDouble result= unsafeCreate(d);
-		result.attachEncoding(blob.slice(offset,offset+1+8));
-		return result;
-	}
-
 	@Override
 	public AString toCVMString(long limit) {
 		if (limit<1) return null;

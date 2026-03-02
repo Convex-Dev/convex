@@ -194,6 +194,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @param i Index of entry to get
 	 * @return map entry
 	 */
+	@Override
 	public final MapEntry<K, V> get(long i) {
 		checkIndex(i);
 		return entryAt(i);
@@ -238,6 +239,13 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 			return me.getValue();
 		}
 	}
+	
+	/**
+	 * Finds the position of an entry in a map as indexed by key
+	 * @param key BlobLike index value
+	 * @return position of next element greater than or equal to key (0..count)
+	 */
+	public abstract long seek(ABlobLike<?> key);
 
 	/**
 	 * Reduce over all values in this map

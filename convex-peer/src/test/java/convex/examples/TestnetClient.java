@@ -14,9 +14,6 @@ import convex.core.init.Init;
 public class TestnetClient {
 
 	public static void main(String[] args) throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		// Use a fresh store
-		//EtchStore etch=EtchStore.createTemp("acquire-testing");
-		//Stores.setCurrent(etch);
 
 		InetSocketAddress hostAddress = new InetSocketAddress("convex.world",  18888);
 		//InetSocketAddress hostAddress = new InetSocketAddress("localhost",  58202);
