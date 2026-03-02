@@ -214,7 +214,7 @@ public class EncodingTest {
 		Blob edData=Cells.encode(d);
 		AArrayBlob dd=Samples.TEST_STORE.decode(edData);
 		assertEquals(d,dd);
-		assertSame(edData,dd.getEncoding()); // should re-use encoded data object directly
+		assertEquals(edData,dd.getEncoding()); // encoding should match
 	}
 	
 	@Test

@@ -1,12 +1,12 @@
 package convex.test;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.IOException;
 import java.util.Random;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
@@ -60,7 +60,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
-import convex.core.store.AStore;
 import convex.etch.EtchStore;
 
 /**
@@ -73,9 +72,9 @@ public class Samples {
 	 * Shared test store for tests that need to persist data.
 	 * Uses a temp EtchStore so tests don't depend on a global thread-local store.
 	 */
-	public static final AStore TEST_STORE = createTestStore();
+	public static final EtchStore TEST_STORE = createTestStore();
 
-	private static AStore createTestStore() {
+	private static EtchStore createTestStore() {
 		try {
 			return EtchStore.createTemp("test-store");
 		} catch (IOException e) {
