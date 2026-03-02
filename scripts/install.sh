@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
-# Convex installer — downloads convex.jar and creates a wrapper command.
+# Convex installer for end users (macOS/Linux).
+# Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.sh | bash
 #
 # Options (environment variables):
 #   CONVEX_VERSION=0.8.3    Install a specific version (default: latest)

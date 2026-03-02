@@ -1,7 +1,8 @@
-# Convex installer for Windows PowerShell
+# Convex installer for end users (Windows PowerShell).
+# Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.ps1 | iex
 #
 # Options (environment variables):
 #   $env:CONVEX_VERSION = "0.8.3"            Install a specific version
@@ -82,13 +83,19 @@ java -jar "$ConvexJar" %*
 
     Ok "Created convex.cmd wrapper"
 
-    # Check if ConvexHome is on PATH
+    # Add to PATH if not already there
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if ($userPath -notlike "*$ConvexHome*") {
-        [Environment]::SetEnvironmentVariable("Path", "$userPath;$ConvexHome", "User")
-        $env:Path = "$env:Path;$ConvexHome"
-        Ok "Added $ConvexHome to user PATH"
-        Warn "Restart your terminal for PATH changes to take effect."
+        $reply = Read-Host "  Add $ConvexHome to your PATH? [Y/n]"
+        if ($reply -eq "" -or $reply -match "^[Yy]") {
+            [Environment]::SetEnvironmentVariable("Path", "$userPath;$ConvexHome", "User")
+            $env:Path = "$env:Path;$ConvexHome"
+            Ok "Added $ConvexHome to user PATH"
+            Warn "Restart your terminal for PATH changes to take effect."
+        }
+        else {
+            Info "Skipped. To use 'convex' add $ConvexHome to your PATH manually."
+        }
     }
     else {
         Ok "$ConvexHome already on PATH"

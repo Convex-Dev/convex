@@ -82,13 +82,13 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.ps1 | iex
+irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.ps1 | iex
 ```
 
 This installs `convex.jar` and adds a `convex` command to your PATH.
