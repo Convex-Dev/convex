@@ -1,6 +1,12 @@
 package convex.db;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -10,10 +16,8 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.lattice.LatticeTables;
 import convex.db.lattice.SQLDatabase;
@@ -21,7 +25,6 @@ import convex.db.lattice.TableStoreLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.SignedCursor;
 import convex.lattice.generic.MapLattice;
 
 /**

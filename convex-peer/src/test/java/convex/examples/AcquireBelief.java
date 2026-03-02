@@ -7,13 +7,16 @@ import java.util.concurrent.TimeUnit;
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
-import convex.core.data.AVector;
+import convex.core.data.AMap;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.store.MemoryStore;
 import convex.core.lang.RT;
+import convex.peer.API;
 
 /**
  * Acquires the current Belief from a live peer and writes it
@@ -34,9 +37,9 @@ public class AcquireBelief {
 		System.out.println("Requesting status...");
 		Result status = convex.requestStatusSync(15000);
 		
-		AVector<ACell> statusVector = RT.ensureVector(status.getValue());
-		System.out.println("Status: " + statusVector);
-		Hash beliefHash = RT.ensureHash(statusVector.get(0));
+		AMap<Keyword,ACell> statusMap = API.ensureStatusMap(status.getValue());
+		System.out.println("Status: " + statusMap);
+		Hash beliefHash = RT.ensureHash(statusMap.get(Keywords.BELIEF));
 		if (beliefHash == null) {
 			System.err.println("Could not get belief hash from status");
 			convex.close();

@@ -31,6 +31,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class NettyConnection extends AConnection {
 
@@ -68,7 +69,9 @@ public class NettyConnection extends AConnection {
 				return workerGroup;
 			// Worker group handles NIO I/O for all connections. 2 threads is sufficient
 			// since actual message processing happens on virtual threads.
-			workerGroup = new MultiThreadIoEventLoopGroup(2, NioIoHandler.newFactory());
+			// Daemon threads allow the JVM to exit when all user threads finish.
+			DefaultThreadFactory tf = new DefaultThreadFactory("convex-netty", true);
+			workerGroup = new MultiThreadIoEventLoopGroup(2, tf, NioIoHandler.newFactory());
 
 			Shutdown.addHook(Shutdown.CONNECTION, () -> {
 				EventLoopGroup wg = workerGroup;
