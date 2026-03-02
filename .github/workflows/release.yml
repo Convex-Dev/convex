@@ -34,7 +34,7 @@ jobs:
           restore-keys: ${{ runner.os }}-maven-
 
       - name: Build with tests
-        run: mvn -B clean verify
+        run: mvn -B clean install
 
       - name: Extract changelog for this version
         id: changelog
