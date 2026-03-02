@@ -60,7 +60,32 @@ public class ServerTest {
 	public static void init() {
 		network = TestNetwork.getInstance();
 	}
-	
+
+	@Test
+	public void testHostnameNormalisation() {
+		Server server = network.SERVER;
+		String original = server.getHostname();
+		try {
+			// Bare host:port should be normalised to tcp:// URL
+			server.setHostname("peer.example.com:18888");
+			assertEquals("tcp://peer.example.com:18888", server.getHostname());
+
+			// Already-schemed URL should pass through unchanged
+			server.setHostname("tcp://peer.example.com:9999");
+			assertEquals("tcp://peer.example.com:9999", server.getHostname());
+
+			// Other schemes should pass through unchanged
+			server.setHostname("https://peer.example.com:443");
+			assertEquals("https://peer.example.com:443", server.getHostname());
+
+			// Null should stay null
+			server.setHostname(null);
+			assertNull(server.getHostname());
+		} finally {
+			server.setHostname(original);
+		}
+	}
+
 	/**
 	 * Smoke test for ConvexLocal connection 
 	 * @throws Exception in case of error

@@ -838,10 +838,15 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Sets the desired host name for this Server
-	 * @param string Desired host name String, e.g. "my-domain.com:12345"
+	 * Sets the desired URL for this Server. Bare host:port values will be
+	 * normalised to tcp:// URLs, e.g. "my-domain.com:12345" becomes
+	 * "tcp://my-domain.com:12345".
+	 * @param string Desired URL String
 	 */
 	public void setHostname(String string) {
+		if (string!=null && !string.contains("://")) {
+			string = "tcp://" + string;
+		}
 		config.put(Keywords.URL, string);
 	}
 
