@@ -691,7 +691,7 @@
    ([m k f x]
 	 (assoc m k (f (get m k) x)))
    ([m k f x & more]
-	 (assoc m k (apply f (get m k) more))))
+	 (assoc m k (apply f (get m k) x more))))
  
  (defn update-in
 	^{:doc {:description "Update a value in a nested associative data structure by applying a function."
@@ -701,8 +701,8 @@
 	 (assoc-in m ks (f (get-in m ks))))
    ([m ks f x]
 	 (assoc-in m ks (f (get-in m ks) x)))
-   ([m k f x & more]
-	 (assoc-in m ks (apply f (get-in m ks) more))))
+   ([m ks f x & more]
+	 (assoc-in m ks (apply f (get-in m ks) x more))))
  
  (defn dissoc-in
 	^{:doc {:description "Dissocs from a nested associative data structure. If a nested result is empty? dissoc it as well."
