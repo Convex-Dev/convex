@@ -71,64 +71,67 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 * *Performance and Scalability* - Processes tens of thousands (and sometimes up to millions) of transactions per second with sub-second global consensus.
 * *Eco-Friendly* - Minimal energy consumption with CPoS, ensuring a sustainable platform.
 
-## Running Convex
+## Getting Started
 
-### Pre-requisities
+### Prerequisites
 
-- Java JDK 21+ (for running Convex and related tools)
-- Maven 3.7+ (for building Convex from source)
-- git (for source control / contributing)
+- Java 21+ ([Download](https://www.oracle.com/java/technologies/downloads/))
 
-### Download
+### Quick Install
 
-**Stable Releases:**
-- [Latest Release](https://github.com/Convex-Dev/convex/releases/latest) - Production-ready builds with full changelog
-
-**Development Snapshots:**
-- [Snapshot Build](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop) - Latest `develop` branch build (⚠️ may be unstable)
-- [Google Drive Snapshots](https://drive.google.com/drive/folders/1AZdyuZOmC70i_TtuEW3uEKvjYLOqIMiv?usp=drive_link) - Archive of development builds
-
-The snapshot build is automatically updated with each push to the `develop` branch.
-
-### Building locally
-
-To get a local development build of Convex you need [git](https://git-scm.com/) and [Apache Maven](https://maven.apache.org/). You will also need a recent version of Java ([JDK 21+ recommended](https://www.oracle.com/java/technologies/downloads/).
-
-1. Clone [this repository](https://github.com/Convex-Dev/convex) using `git` - you probably want the `develop` branch (the default)
-2. Build using `mvn install` in the root directory
-
-This should download all necessary dependencies and perform a standard build.
-
-### Running Convex Desktop
-
-Convex Desktop is a GUI application for power users and developers providing full access to the capabilities of Convex. To run, you will need a modern version of Java installed (21+) and the `convex.jar` executable file (which can be found in the outputs of the Maven build above, or downloaded from trusted sources).
-
-If Java is correctly installed, you should be able to double-click the executable `convex.jar` file to run it. Depending on your security settings, you may need to grant approval for this to run.
-
-Alternatively, run Convex Desktop using `java` at the command line as follows:
+**macOS / Linux:**
 
 ```bash
-java -jar convex.jar desktop
+curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.sh | bash
 ```
 
-### Running the Convex Command Line Interface (CLI)
+**Windows (PowerShell):**
 
-If you have an already built version of the Convex CLI `convex.jar` file and installed a recent version of Java you can run it as follows:
+```powershell
+irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/install.ps1 | iex
+```
+
+This installs `convex.jar` and adds a `convex` command to your PATH.
+
+### Other options
+
+**Download directly:**
+- [Latest stable release](https://github.com/Convex-Dev/convex/releases/latest/download/convex.jar)
+- [Snapshot build](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop) (develop branch, may be unstable)
+
+**Docker:**
 
 ```bash
-java -jar convex.jar <optional args>
+docker pull convexlive/convex:latest
+docker run convexlive/convex peer start
 ```
 
-For convenience, there are shell scripts to automate this for common platforms in the root directory of this repo, e.g.
+**Build from source:**
 
 ```bash
-./convex --help
+git clone https://github.com/Convex-Dev/convex.git
+cd convex
+mvn clean install
 ```
 
-Using the CLI, you can start the Convex Desktop GUI for a local peer test network by using the `local gui` command:
+### Running Convex
 
+Launch the desktop GUI:
+
+```bash
+convex desktop
 ```
-./convex local gui
+
+Start a local peer test network with GUI:
+
+```bash
+convex local gui
+```
+
+See all available commands:
+
+```bash
+convex --help
 ```
 
 ## Contributing
