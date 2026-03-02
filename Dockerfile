@@ -5,7 +5,7 @@
 FROM maven:3.9.9-eclipse-temurin-22-jammy AS build
 WORKDIR /build
 
-# Copy POMs first — this layer is cached until a pom.xml changes
+# Copy POMs first for dependency caching
 COPY pom.xml .
 COPY convex-core/pom.xml convex-core/
 COPY convex-peer/pom.xml convex-peer/
@@ -20,11 +20,11 @@ RUN mvn dependency:go-offline -B || true
 
 # Copy source and build
 COPY . .
-RUN mvn -B clean install -DskipTests
+RUN mvn -B clean install
 
 #######################################
 # Run stage
-FROM eclipse-temurin:25-jre-alpine AS run
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL org.opencontainers.image.title="Convex" \
       org.opencontainers.image.description="Convex Peer Node" \

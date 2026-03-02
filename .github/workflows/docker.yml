@@ -1,0 +1,56 @@
+# .github/workflows/docker.yml
+# Builds and pushes Docker image to Docker Hub
+name: Docker
+
+on:
+  # Automatically after a GitHub Release is published
+  release:
+    types: [published]
+
+  # Manually for snapshot builds
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker image tag'
+        required: true
+        default: 'snapshot'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine tags
+        id: tags
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            echo "tags=convexlive/convex:${VERSION},convexlive/convex:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=convexlive/convex:${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Docker image
+        run: |
+          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
+          TAG_ARGS=""
+          for TAG in "${TAGS[@]}"; do
+            TAG_ARGS="$TAG_ARGS -t $TAG"
+          done
+          docker build $TAG_ARGS .
+
+      - name: Push Docker image
+        run: |
+          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
+          for TAG in "${TAGS[@]}"; do
+            docker push "$TAG"
+          done

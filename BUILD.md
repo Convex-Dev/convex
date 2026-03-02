@@ -4,29 +4,29 @@
 
 Convex main repository is structured as a multi-module Maven project.
 
-## Automated Builds
+## CI Workflows
 
-### Snapshot Builds (develop branch)
+Three GitHub Actions workflows handle continuous integration:
 
-Every push to the `develop` branch triggers an automated snapshot build:
-- Builds and tests the project
-- Creates/updates a `snapshot-develop` pre-release on GitHub
-- Uploads `convex.jar` with current version and commit info
-- Marked as pre-release (unstable, for development/testing only)
+### Build (`build.yml`)
 
-Access: [Snapshot Release](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop)
+Runs on every push to any branch. Builds the project and runs all tests.
 
-### Release Builds (tagged versions)
+### Release (`release.yml`)
 
-Pushing a tag matching `*.*.*` (e.g., `0.8.3`) triggers an automated release build:
-- Builds and tests the project
-- Extracts changelog from CHANGELOG.md
-- Creates a stable GitHub Release
-- Uploads `convex.jar` as a release asset
-- Marked as stable production release
+Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
-See "Release process" section below for the full workflow.
+### Docker (`docker.yml`)
 
+Builds a Docker image and pushes to Docker Hub. Triggered automatically when a GitHub Release is published, or manually via workflow dispatch for snapshot builds.
+
+- Release: pushes `convexlive/convex:<version>` and `convexlive/convex:latest`
+- Snapshot: go to Actions > Docker > Run workflow, set tag to `snapshot`
+
+Requires two secrets configured in the GitHub repository:
+
+- `DOCKERHUB_USERNAME` — Docker Hub username
+- `DOCKERHUB_TOKEN` — Docker Hub access token (not password)
 
 ## Release process
 
@@ -66,7 +66,7 @@ git push origin master
 git push origin 0.8.3
 ```
 
-This triggers the GitHub Actions release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
+This triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
 ### 6. Confirm GitHub Release is live
 
@@ -105,27 +105,22 @@ mvn versions:set -DnewVersion='0.8.4-SNAPSHOT'
 
 ## Docker
 
-Docker images are built and pushed to Docker Hub automatically as part of the release workflow. Each release produces:
-
-- `convexlive/convex:<version>` (e.g. `convexlive/convex:0.8.3`)
-- `convexlive/convex:latest`
-
-Images are multi-architecture (linux/amd64 and linux/arm64).
-
-### Docker Hub secrets
-
-The release workflow requires two secrets configured in the GitHub repository:
-
-- `DOCKERHUB_USERNAME` — Docker Hub username
-- `DOCKERHUB_TOKEN` — Docker Hub access token (not password)
+The `Dockerfile` is a self-contained multi-stage build. No pre-built artifacts needed.
 
 ### Local Docker build
-
-To build locally for testing:
 
 ```bash
 docker build -t convexlive/convex:latest .
 ```
+
+### Push to Docker Hub
+
+```bash
+docker login -u convexlive docker.io
+docker push convexlive/convex:latest
+```
+
+Or use the automated Docker workflow as described in "CI Workflows" above.
 
 ## JPackage Build
 
