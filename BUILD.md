@@ -12,7 +12,7 @@ Every push to the `develop` branch triggers an automated snapshot build:
 - Builds and tests the project
 - Creates/updates a `snapshot-develop` pre-release on GitHub
 - Uploads `convex.jar` with current version and commit info
-- ⚠️ Marked as pre-release (unstable, for development/testing only)
+- Marked as pre-release (unstable, for development/testing only)
 
 Access: [Snapshot Release](https://github.com/Convex-Dev/convex/releases/tag/snapshot-develop)
 
@@ -25,72 +25,83 @@ Pushing a tag matching `*.*.*` (e.g., `0.8.3`) triggers an automated release bui
 - Uploads `convex.jar` as a release asset
 - Marked as stable production release
 
-See "Release preparation" section below for the full release process.
+See "Release process" section below for the full workflow.
 
 
-## Release preparation
+## Release process
 
-### Ensure clean build
+### 1. Ensure clean build
 
-```
-mvn -B clean verify
-```
-
-Remember to test headless (i.e. no GUI) e.g. with CI server.
-
-### Update CHANGELOG
-
-Make sure `CHANGELOG.md` is fully up to date before deploy
-
-- Finalise CHANGELOG for current version
-- Annotate with date
-- Commit to release branch
-
-### Merge to master
-
-Switch to `master` branch.
-
-Merge `develop` as a merge commit (“If a fast-forward, create a merge commit” in Eclipse)
-
-### Set version information
-
-Set the version number for the new version to be released
-
-```
-mvn versions:set -DnewVersion='0.8.2' -DartifactId=* -DgroupId=*
+```bash
+mvn -B clean install
 ```
 
-Commit as "Prepare for Release 0.8.2"
+All tests must pass, including headless (no GUI) — the CI server runs on headless Linux.
 
-### Tag and push release
+### 2. Update CHANGELOG
 
-Tag the release commit and push to trigger automated build:
+- Finalise the `CHANGELOG.md` section for the current version
+- Annotate with the release date
+- Commit to `develop`
+
+### 3. Merge to master
+
+```bash
+git checkout master
+git merge develop --no-ff
+```
+
+### 4. Set version
+
+```bash
+mvn versions:set -DnewVersion='0.8.3'
+git add -A && git commit -m "Prepare for Release 0.8.3"
+```
+
+### 5. Tag and push
 
 ```bash
 git tag 0.8.3
+git push origin master
 git push origin 0.8.3
 ```
 
-This will trigger the GitHub Actions release workflow which:
-- Builds and tests the project (`mvn -B clean verify`)
-- Extracts changelog for this version from CHANGELOG.md
-- Creates a GitHub Release with the changelog
-- Uploads `convex.jar` as a release asset
+This triggers the GitHub Actions release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
-The JAR will be available as a GitHub Release asset named `convex-{version}.jar`
+### 6. Confirm GitHub Release is live
 
-### Manual deploy to Maven Central (if needed)
+**Wait for the release workflow to complete successfully** before proceeding. Check at:
+
+https://github.com/Convex-Dev/convex/releases
+
+Verify:
+- Release status is not draft/pre-release
+- `convex.jar` is attached as an asset
+- Changelog content is correct
+
+If the workflow fails, fix the issue, re-tag, and re-push. Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
+
+### 7. Deploy to Maven Central
+
+Only after confirming the GitHub Release is live:
 
 ```bash
-mvn -B clean verify
+git checkout master
 mvn deploy -Prelease
 ```
 
-### Prepare for next develop version
+This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. Requires GPG signing key and Maven Central credentials configured locally.
 
-- Merge `master` back into `develop` (again no FF)
-- Create new CHANGELOG "Unreleased" section for next version
-- Run `mvn versions:set -DnewVersion='0.8.3-SNAPSHOT'` for next snapshot version as required 
+### 8. Prepare next development version
+
+```bash
+git checkout develop
+git merge master --no-ff
+mvn versions:set -DnewVersion='0.8.4-SNAPSHOT'
+```
+
+- Add new "Unreleased" section to `CHANGELOG.md`
+- Commit and push `develop`
 
 ## Docker build
 
