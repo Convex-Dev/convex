@@ -265,11 +265,13 @@ public class McpAPI extends ABaseAPI {
 			res.setHeader("Cache-Control", "no-cache");
 			res.setHeader("X-Accel-Buffering", "no");
 			res.setHeader(HEADER_SESSION_ID, sessionId);
-			res.flushBuffer();
 
 			PrintWriter writer = res.getWriter();
 			McpConnection conn = new McpConnection(writer);
+			// Register connection BEFORE flushing headers so POSTs using
+			// the session ID can find it immediately.
 			connections.put(sessionId, conn);
+			res.flushBuffer();
 			try {
 				// Keep-alive loop — blocks virtual thread until client disconnects
 				while (!conn.isClosed()) {
