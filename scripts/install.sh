@@ -3,8 +3,10 @@
 # Convex installer for end users (macOS/Linux).
 # Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
+# SYNC: also hosted at convex.world/public/install.sh — keep in sync.
+#
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.sh | bash
+#   curl -fsSL https://convex.world/install.sh | bash
 #
 # Options (environment variables):
 #   CONVEX_VERSION=0.8.3    Install a specific version (default: latest)

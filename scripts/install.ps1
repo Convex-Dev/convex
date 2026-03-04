@@ -1,8 +1,10 @@
 # Convex installer for end users (Windows PowerShell).
 # Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
+# SYNC: also hosted at convex.world/public/install.ps1 — keep in sync.
+#
 # Usage:
-#   irm https://raw.githubusercontent.com/Convex-Dev/convex/develop/scripts/install.ps1 | iex
+#   irm https://convex.world/install.ps1 | iex
 #
 # Options (environment variables):
 #   $env:CONVEX_VERSION = "0.8.3"            Install a specific version
