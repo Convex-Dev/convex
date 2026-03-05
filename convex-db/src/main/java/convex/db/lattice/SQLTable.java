@@ -9,11 +9,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
 /**
- * Utility class for SQL table state in the table store lattice.
+ * A single SQL table within the lattice table store.
  *
- * <p>A table entry is a vector: [schema, rows, utime]
+ * <p>Wraps the underlying state vector: [schema, rows, utime]
  * <ul>
- *   <li>schema (AVector) - Column definitions: [[name, type], ...]</li>
+ *   <li>schema (AVector) - Column definitions: [[name, type, precision, scale], ...]</li>
  *   <li>rows (Index) - Row data: primary-key (ABlob) → row entry</li>
  *   <li>utime (CVMLong) - Schema update timestamp for LWW</li>
  * </ul>
@@ -29,108 +29,101 @@ public class SQLTable {
 	/** Position of update timestamp */
 	public static final int POS_UTIME = 2;
 
-	private SQLTable() {}
+	private final AVector<ACell> state;
+
+	private SQLTable(AVector<ACell> state) {
+		this.state = state;
+	}
 
 	/**
-	 * Creates a new table with the given schema.
-	 *
-	 * @param schema Column definitions: [[name, type], ...]
-	 * @param timestamp Creation timestamp
-	 * @return Table state vector
+	 * Wraps a table state vector. Returns null if the state is null.
+	 */
+	public static SQLTable wrap(AVector<ACell> state) {
+		if (state == null) return null;
+		return new SQLTable(state);
+	}
+
+	/**
+	 * Returns the underlying state vector.
+	 */
+	public AVector<ACell> getState() {
+		return state;
+	}
+
+	// ========== Factory Methods ==========
+
+	/**
+	 * Creates a new live table with the given schema.
 	 */
 	@SuppressWarnings("unchecked")
-	public static AVector<ACell> create(AVector<AVector<ACell>> schema, CVMLong timestamp) {
-		return Vectors.of(schema, (Index<ABlob, AVector<ACell>>) Index.EMPTY, timestamp);
+	public static SQLTable create(AVector<AVector<ACell>> schema, CVMLong timestamp) {
+		return new SQLTable(Vectors.of(schema, (Index<ABlob, AVector<ACell>>) Index.EMPTY, timestamp));
 	}
 
 	/**
 	 * Creates a tombstone entry for a dropped table.
-	 *
-	 * @param timestamp Drop timestamp
-	 * @return Tombstone table entry
 	 */
-	public static AVector<ACell> createTombstone(CVMLong timestamp) {
-		return Vectors.of(null, null, timestamp);
+	public static SQLTable createTombstone(CVMLong timestamp) {
+		return new SQLTable(Vectors.of(null, null, timestamp));
 	}
 
+	// ========== Instance Methods ==========
+
 	/**
-	 * Gets the schema from a table entry.
+	 * Gets the schema from this table.
 	 *
-	 * @param table Table state vector
 	 * @return Schema vector, or null if tombstone
 	 */
 	@SuppressWarnings("unchecked")
-	public static AVector<AVector<ACell>> getSchema(AVector<ACell> table) {
-		if (table == null) return null;
-		return (AVector<AVector<ACell>>) table.get(POS_SCHEMA);
+	public AVector<AVector<ACell>> getSchema() {
+		return (AVector<AVector<ACell>>) state.get(POS_SCHEMA);
 	}
 
 	/**
-	 * Gets the rows from a table entry.
+	 * Gets the rows from this table.
 	 *
-	 * @param table Table state vector
 	 * @return Row index, or null if tombstone
 	 */
 	@SuppressWarnings("unchecked")
-	public static Index<ABlob, AVector<ACell>> getRows(AVector<ACell> table) {
-		if (table == null) return null;
-		return (Index<ABlob, AVector<ACell>>) table.get(POS_ROWS);
+	public Index<ABlob, AVector<ACell>> getRows() {
+		return (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 	}
 
 	/**
-	 * Gets the update timestamp from a table entry.
-	 *
-	 * @param table Table state vector
-	 * @return Update timestamp
+	 * Gets the update timestamp.
 	 */
-	public static CVMLong getTimestamp(AVector<ACell> table) {
-		if (table == null) return null;
-		return (CVMLong) table.get(POS_UTIME);
+	public CVMLong getTimestamp() {
+		return (CVMLong) state.get(POS_UTIME);
 	}
 
 	/**
-	 * Checks if a table entry is a tombstone (dropped).
-	 *
-	 * @param table Table state vector
-	 * @return true if tombstone
+	 * Checks if this table is a tombstone (dropped).
 	 */
-	public static boolean isTombstone(AVector<ACell> table) {
-		if (table == null) return false;
-		return table.get(POS_SCHEMA) == null;
+	public boolean isTombstone() {
+		return state.get(POS_SCHEMA) == null;
 	}
 
 	/**
-	 * Checks if a table entry is live (not dropped).
-	 *
-	 * @param table Table state vector
-	 * @return true if live
+	 * Checks if this table is live (not dropped).
 	 */
-	public static boolean isLive(AVector<ACell> table) {
-		return table != null && !isTombstone(table);
+	public boolean isLive() {
+		return !isTombstone();
 	}
 
 	/**
-	 * Returns a new table state with updated rows.
-	 *
-	 * @param table Original table state
-	 * @param rows New row index
-	 * @param timestamp Update timestamp
-	 * @return Updated table state
+	 * Returns a new table with updated rows.
 	 */
-	public static AVector<ACell> withRows(AVector<ACell> table, Index<ABlob, AVector<ACell>> rows, CVMLong timestamp) {
-		AVector<AVector<ACell>> schema = getSchema(table);
-		return Vectors.of(schema, rows, timestamp);
+	public SQLTable withRows(Index<ABlob, AVector<ACell>> rows, CVMLong timestamp) {
+		return new SQLTable(Vectors.of(getSchema(), rows, timestamp));
 	}
 
 	/**
 	 * Gets the column index for a column name.
 	 *
-	 * @param table Table state vector
-	 * @param columnName Column name to find
 	 * @return Column index, or -1 if not found
 	 */
-	public static int getColumnIndex(AVector<ACell> table, AString columnName) {
-		AVector<AVector<ACell>> schema = getSchema(table);
+	public int getColumnIndex(AString columnName) {
+		AVector<AVector<ACell>> schema = getSchema();
 		if (schema == null) return -1;
 		for (int i = 0; i < schema.count(); i++) {
 			AVector<ACell> col = schema.get(i);
@@ -142,25 +135,19 @@ public class SQLTable {
 	}
 
 	/**
-	 * Gets the number of columns in the table.
-	 *
-	 * @param table Table state vector
-	 * @return Column count
+	 * Gets the number of columns.
 	 */
-	public static long getColumnCount(AVector<ACell> table) {
-		AVector<AVector<ACell>> schema = getSchema(table);
+	public long getColumnCount() {
+		AVector<AVector<ACell>> schema = getSchema();
 		if (schema == null) return 0;
 		return schema.count();
 	}
 
 	/**
-	 * Gets the number of live rows in the table.
-	 *
-	 * @param table Table state vector
-	 * @return Live row count
+	 * Gets the number of live rows.
 	 */
-	public static long getRowCount(AVector<ACell> table) {
-		Index<ABlob, AVector<ACell>> rows = getRows(table);
+	public long getRowCount() {
+		Index<ABlob, AVector<ACell>> rows = getRows();
 		if (rows == null) return 0;
 		long count = 0;
 		for (var entry : rows.entrySet()) {
@@ -171,47 +158,48 @@ public class SQLTable {
 		return count;
 	}
 
+	// ========== Static Merge (used by lattice layer) ==========
+
 	/**
-	 * Merges two table entries.
+	 * Merges two table state vectors.
 	 * Schema uses LWW (latest timestamp wins).
 	 * Rows merge using TableLattice.
-	 *
-	 * @param a First table entry
-	 * @param b Second table entry
-	 * @return Merged table entry
 	 */
 	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
 		if (a == null) return b;
 		if (b == null) return a;
 
-		CVMLong timeA = getTimestamp(a);
-		CVMLong timeB = getTimestamp(b);
+		SQLTable ta = new SQLTable(a);
+		SQLTable tb = new SQLTable(b);
+
+		CVMLong timeA = ta.getTimestamp();
+		CVMLong timeB = tb.getTimestamp();
 
 		// Determine schema winner (LWW)
-		AVector<ACell> schemaWinner;
+		SQLTable schemaWinner;
 		if (timeA == null && timeB == null) {
-			schemaWinner = a;
+			schemaWinner = ta;
 		} else if (timeA == null) {
-			schemaWinner = b;
+			schemaWinner = tb;
 		} else if (timeB == null) {
-			schemaWinner = a;
+			schemaWinner = ta;
 		} else if (timeB.longValue() > timeA.longValue()) {
-			schemaWinner = b;
+			schemaWinner = tb;
 		} else {
-			schemaWinner = a;
+			schemaWinner = ta;
 		}
 
 		// If schema winner is tombstone, return tombstone
-		if (isTombstone(schemaWinner)) {
-			return schemaWinner;
+		if (schemaWinner.isTombstone()) {
+			return schemaWinner.state;
 		}
 
 		// Merge rows
-		Index<ABlob, AVector<ACell>> rowsA = getRows(a);
-		Index<ABlob, AVector<ACell>> rowsB = getRows(b);
+		Index<ABlob, AVector<ACell>> rowsA = ta.getRows();
+		Index<ABlob, AVector<ACell>> rowsB = tb.getRows();
 		Index<ABlob, AVector<ACell>> mergedRows = TableLattice.INSTANCE.merge(rowsA, rowsB);
 
 		// Return merged table with schema winner's schema
-		return Vectors.of(getSchema(schemaWinner), mergedRows, getTimestamp(schemaWinner));
+		return Vectors.of(schemaWinner.getSchema(), mergedRows, schemaWinner.getTimestamp());
 	}
 }

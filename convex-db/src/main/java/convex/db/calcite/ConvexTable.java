@@ -25,7 +25,7 @@ import org.apache.calcite.schema.SchemaPlus;
 
 import convex.core.data.ACell;
 import convex.core.data.Vectors;
-import convex.db.lattice.SQLTables;
+import convex.db.lattice.SQLSchema;
 
 /**
  * Calcite Table backed by Convex lattice storage.
@@ -58,7 +58,7 @@ public class ConvexTable extends AbstractQueryableTable
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
 
-		SQLTables tables = schema.getTables();
+		SQLSchema tables = schema.getTables();
 		String[] columnNames = tables.getColumnNames(tableName);
 		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
 

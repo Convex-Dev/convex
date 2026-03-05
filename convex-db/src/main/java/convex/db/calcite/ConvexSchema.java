@@ -8,7 +8,7 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 
 import convex.db.calcite.pgcatalog.PgCatalogSchema;
-import convex.db.lattice.SQLTables;
+import convex.db.lattice.SQLSchema;
 
 /**
  * Calcite Schema backed by Convex lattice tables.
@@ -22,7 +22,7 @@ import convex.db.lattice.SQLTables;
  */
 public class ConvexSchema extends AbstractSchema {
 
-	private final SQLTables tables;
+	private final SQLSchema tables;
 	private final String name;
 
 	/**
@@ -31,7 +31,7 @@ public class ConvexSchema extends AbstractSchema {
 	 * @param tables The LatticeTables backing store
 	 * @param name Schema name
 	 */
-	public ConvexSchema(SQLTables tables, String name) {
+	public ConvexSchema(SQLSchema tables, String name) {
 		this.tables = tables;
 		this.name = name;
 	}
@@ -63,7 +63,7 @@ public class ConvexSchema extends AbstractSchema {
 	 *
 	 * @return LatticeTables backing store
 	 */
-	public SQLTables getTables() {
+	public SQLSchema getTables() {
 		return tables;
 	}
 

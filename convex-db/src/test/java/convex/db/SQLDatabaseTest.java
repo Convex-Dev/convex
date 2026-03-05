@@ -20,7 +20,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.db.lattice.SQLTables;
+import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
@@ -46,7 +46,7 @@ public class SQLDatabaseTest {
 	public void testCreateTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		// Create table
 		boolean created = tables.createTable("users", new String[]{"id", "name", "email"});
@@ -66,7 +66,7 @@ public class SQLDatabaseTest {
 	public void testDropTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("temp", new String[]{"data"});
 		assertTrue(tables.tableExists("temp"));
@@ -84,7 +84,7 @@ public class SQLDatabaseTest {
 	public void testInsertAndSelect() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("users", new String[]{"id", "name", "email"});
 
@@ -109,7 +109,7 @@ public class SQLDatabaseTest {
 	public void testDelete() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("items", new String[]{"id", "name"});
 		tables.insert("items", 1, "Item");
@@ -129,7 +129,7 @@ public class SQLDatabaseTest {
 	public void testSelectAll() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("products", new String[]{"id", "name"});
 		tables.insert("products", 1, "Apple");
@@ -144,7 +144,7 @@ public class SQLDatabaseTest {
 	public void testTableNames() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("alpha", new String[]{"a"});
 		tables.createTable("beta", new String[]{"b"});
@@ -158,13 +158,13 @@ public class SQLDatabaseTest {
 	public void testForkAndSync() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		SQLTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("data", new String[]{"id", "value"});
 		tables.insert("data", 1, "original");
 
 		// Fork
-		SQLTables forked = tables.fork();
+		SQLSchema forked = tables.fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged
@@ -292,7 +292,7 @@ public class SQLDatabaseTest {
 		db.tables().insert("data", 1, "original");
 
 		// Fork the tables
-		SQLTables forked = db.tables().fork();
+		SQLSchema forked = db.tables().fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged

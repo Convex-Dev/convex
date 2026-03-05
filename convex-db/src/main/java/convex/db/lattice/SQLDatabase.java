@@ -166,8 +166,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 *
 	 * @return LatticeTables instance
 	 */
-	public SQLTables tables() {
-		return new SQLTables(cursor.path(KEY_TABLES));
+	public SQLSchema tables() {
+		return new SQLSchema(cursor.path(KEY_TABLES));
 	}
 
 	/**

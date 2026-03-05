@@ -44,9 +44,9 @@ import convex.lattice.cursor.Cursors;
  * tables.dropTable("users");
  * </pre>
  */
-public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>> {
+public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
-	public SQLTables(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+	public SQLSchema(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
 		super(cursor);
 	}
 
@@ -55,10 +55,10 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 *
 	 * @return New LatticeTables instance
 	 */
-	public static SQLTables create() {
+	public static SQLSchema create() {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.createLattice(TableStoreLattice.INSTANCE);
-		return new SQLTables(cursor);
+		return new SQLSchema(cursor);
 	}
 
 	/**
@@ -67,8 +67,8 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeTables instance connected to the cursor
 	 */
-	public static SQLTables connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
-		return new SQLTables(cursor);
+	public static SQLSchema connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+		return new SQLSchema(cursor);
 	}
 
 	/**
@@ -76,8 +76,8 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 *
 	 * @return Forked LatticeTables instance
 	 */
-	public SQLTables fork() {
-		return new SQLTables(cursor.fork());
+	public SQLSchema fork() {
+		return new SQLSchema(cursor.fork());
 	}
 
 	// ========== Internal Helpers ==========
@@ -86,23 +86,39 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return CVMLong.create(System.currentTimeMillis());
 	}
 
-	private AVector<ACell> getTable(AString name) {
+	/**
+	 * Gets a table by name, returning null if not found.
+	 */
+	public SQLTable getTable(AString name) {
 		Index<AString, AVector<ACell>> store = cursor.get();
 		if (store == null) return null;
-		return store.get(name);
+		return SQLTable.wrap(store.get(name));
 	}
 
-	private AVector<ACell> getLiveTable(AString name) {
-		AVector<ACell> table = getTable(name);
-		if (table == null) return null;
-		if (!SQLTable.isLive(table)) return null;
+	/** Convenience overload. */
+	public SQLTable getTable(String name) {
+		return getTable(Strings.create(name));
+	}
+
+	/**
+	 * Gets a live (non-tombstone) table, returning null if not found or dropped.
+	 */
+	public SQLTable getLiveTable(AString name) {
+		SQLTable table = getTable(name);
+		if (table == null || !table.isLive()) return null;
 		return table;
 	}
 
-	private void putTable(AString name, AVector<ACell> table) {
+	/** Convenience overload. */
+	public SQLTable getLiveTable(String name) {
+		return getLiveTable(Strings.create(name));
+	}
+
+	private void putTable(AString name, SQLTable table) {
+		AVector<ACell> state = table.getState();
 		cursor.updateAndGet(store -> {
 			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			return store.assoc(name, table);
+			return store.assoc(name, state);
 		});
 	}
 
@@ -174,8 +190,7 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 			throw new IllegalArgumentException("Columns and types must have same length");
 		}
 
-		AVector<ACell> existing = getLiveTable(name);
-		if (existing != null) return false;
+		if (getLiveTable(name) != null) return false;
 
 		// Build schema: [[name, typeName, precision, scale], ...]
 		AVector schema = Vectors.empty();
@@ -197,8 +212,7 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public boolean dropTable(AString name) {
-		AVector<ACell> table = getLiveTable(name);
-		if (table == null) return false;
+		if (getLiveTable(name) == null) return false;
 		putTable(name, SQLTable.createTombstone(now()));
 		return true;
 	}
@@ -218,9 +232,9 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public AVector<AVector<ACell>> getSchema(AString name) {
-		AVector<ACell> table = getLiveTable(name);
+		SQLTable table = getLiveTable(name);
 		if (table == null) return null;
-		return SQLTable.getSchema(table);
+		return table.getSchema();
 	}
 
 	/** Gets the column names for a table. */
@@ -285,9 +299,9 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public long getRowCount(AString name) {
-		AVector<ACell> table = getLiveTable(name);
+		SQLTable table = getLiveTable(name);
 		if (table == null) return 0;
-		return SQLTable.getRowCount(table);
+		return table.getRowCount();
 	}
 
 	// ========== Row Operations ==========
@@ -305,14 +319,14 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		boolean[] result = new boolean[1];
 		cursor.updateAndGet(store -> {
 			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			AVector<ACell> table = store.get(tableName);
-			if (table == null || !SQLTable.isLive(table)) return store;
+			SQLTable table = SQLTable.wrap(store.get(tableName));
+			if (table == null || !table.isLive()) return store;
 
-			Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
+			Index<ABlob, AVector<ACell>> rows = table.getRows();
 			if (rows == null) rows = TableLattice.INSTANCE.zero();
 			rows = rows.assoc(pk, SQLRow.create(row, timestamp));
 			result[0] = true;
-			return store.assoc(tableName, SQLTable.withRows(table, rows, timestamp));
+			return store.assoc(tableName, table.withRows(rows, timestamp).getState());
 		});
 		return result[0];
 	}
@@ -328,10 +342,10 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public AVector<ACell> selectByKey(AString tableName, ACell primaryKey) {
-		AVector<ACell> table = getLiveTable(tableName);
+		SQLTable table = getLiveTable(tableName);
 		if (table == null) return null;
 
-		Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
+		Index<ABlob, AVector<ACell>> rows = table.getRows();
 		if (rows == null) return null;
 
 		ABlob key = toKey(primaryKey);
@@ -346,10 +360,10 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public boolean deleteByKey(AString tableName, ACell primaryKey) {
-		AVector<ACell> table = getLiveTable(tableName);
+		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
 
-		Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
+		Index<ABlob, AVector<ACell>> rows = table.getRows();
 		if (rows == null) return false;
 
 		ABlob key = toKey(primaryKey);
@@ -358,7 +372,7 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 		CVMLong timestamp = now();
 		rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
-		putTable(tableName, SQLTable.withRows(table, rows, timestamp));
+		putTable(tableName, table.withRows(rows, timestamp));
 		return true;
 	}
 
@@ -369,14 +383,14 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	@SuppressWarnings("unchecked")
 	public Index<ABlob, AVector<ACell>> selectAll(AString tableName) {
-		AVector<ACell> table = getLiveTable(tableName);
-		if (table == null) return (Index<ABlob, AVector<ACell>>) Index.EMPTY;
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return Index.none();
 
-		Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
-		if (rows == null) return (Index<ABlob, AVector<ACell>>) Index.EMPTY;
+		Index<ABlob, AVector<ACell>> rows = table.getRows();
+		if (rows == null) return Index.none();
 
 		// Filter to live rows and extract values
-		Index<ABlob, AVector<ACell>> result = (Index<ABlob, AVector<ACell>>) Index.EMPTY;
+		Index<ABlob, AVector<ACell>> result = Index.none();
 		for (var entry : rows.entrySet()) {
 			AVector<ACell> row = entry.getValue();
 			if (SQLRow.isLive(row)) {
@@ -397,7 +411,8 @@ public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : store.entrySet()) {
-			if (SQLTable.isLive(entry.getValue())) {
+			SQLTable table = SQLTable.wrap(entry.getValue());
+			if (table != null && table.isLive()) {
 				names.add(entry.getKey().toString());
 			}
 		}
