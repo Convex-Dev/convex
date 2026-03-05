@@ -7,26 +7,13 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.AVector;
-import convex.core.data.Index;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.ConvexType;
-import convex.core.data.Strings;
-import convex.db.lattice.LatticeTables;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.TableStoreLattice;
 import convex.etch.EtchStore;
-import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.cursor.Cursors;
-import convex.lattice.cursor.RootLatticeCursor;
-import convex.lattice.generic.MapLattice;
-import convex.node.NodeConfig;
 import convex.node.NodeServer;
 
 /**
@@ -36,30 +23,25 @@ import convex.node.NodeServer;
  * SQLDatabase connected through the cursor chain.
  *
  * Tests:
- * 1. Direct lattice insert (baseline)
- * 2. JDBC individual INSERT statements
- * 3. JDBC PreparedStatement
- * 4. JDBC PreparedStatement batch
+ * 1. Standalone (no persistence, baseline)
+ * 2. Direct lattice insert via NodeServer
+ * 3. JDBC individual INSERT statements
+ * 4. JDBC PreparedStatement
+ * 5. JDBC PreparedStatement batch
  *
- * Each test syncs to Etch storage at the end.
+ * Each NodeServer test syncs to Etch storage at the end.
  */
 public class InsertDemo {
 
 	static final int ROW_COUNT = 10_000;
-
-	// Shared infrastructure
-	static final AKeyPair KP = AKeyPair.generate();
 	static final String DB_NAME = "bench";
-	static final MapLattice<AString, Index<AString, AVector<ACell>>> DB_LATTICE =
-			MapLattice.create(TableStoreLattice.INSTANCE);
 
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== Convex DB Insert Benchmark ===");
 		System.out.println("Row count: " + ROW_COUNT);
 		System.out.println("Setup: NodeServer + EtchStore (temp)\n");
 
-		benchmarkDirectStandalone();
-		benchmarkCursorOnly();
+		benchmarkStandalone();
 		benchmarkDirectLattice();
 		benchmarkJdbcIndividual();
 		benchmarkJdbcPrepared();
@@ -68,138 +50,64 @@ public class InsertDemo {
 		System.out.println("\nDone.");
 	}
 
-	/**
-	 * Creates a NodeServer with temp Etch persistence and connects an SQLDatabase.
-	 * Returns [nodeServer, sqlDatabase].
-	 */
-	static Object[] createNodeAndDb() throws Exception {
-		EtchStore store = EtchStore.createTemp();
-		NodeConfig config = NodeConfig.port(-1); // local-only, no network
-		NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>> server =
-				new NodeServer<>(DB_LATTICE, store, config);
-		server.launch();
-
-		ALatticeCursor<?> cursor = server.getCursor();
-		SQLDatabase db = SQLDatabase.connect(cursor, DB_NAME);
-		return new Object[] { server, db, store };
-	}
+	// ========== Benchmarks ==========
 
 	/**
-	 * Syncs cursor state to Etch storage and reports timing.
+	 * Pure baseline: standalone SQLDatabase (no NodeServer, no persistence)
 	 */
-	static void syncToStorage(NodeServer<?> server, String label) throws Exception {
-		long start = System.nanoTime();
-		server.persistSnapshot(server.getLocalValue());
-		long elapsed = System.nanoTime() - start;
-		System.out.printf("  Sync to Etch:          %,.1f ms%n", elapsed / 1_000_000.0);
-	}
-
-	/**
-	 * Pure baseline: standalone LatticeTables (no NodeServer, no cursor chain)
-	 */
-	static void benchmarkDirectStandalone() throws Exception {
-		SQLDatabase db = SQLDatabase.create(DB_NAME, KP);
-		LatticeTables tables = db.tables();
-		tables.createTable("t", new String[]{"ID", "LEID", "NM"},
-				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+	static void benchmarkStandalone() throws Exception {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create(DB_NAME, kp);
+		createTable(db);
 
 		long start = System.nanoTime();
 		for (int i = 0; i < ROW_COUNT; i++) {
-			tables.insert("t", Vectors.of(CVMLong.create(i), "LEID-" + i, "Name-" + i));
+			db.tables().insert("t", Vectors.of(CVMLong.create(i), "LEID-" + i, "Name-" + i));
 		}
 		long elapsed = System.nanoTime() - start;
 
-		report("Standalone (no cursor)", elapsed, ROW_COUNT);
+		report("Standalone (no persist)", elapsed, ROW_COUNT);
 		verify(db, ROW_COUNT, "Standalone");
-	}
-
-	/**
-	 * Micro-benchmark: raw cursor updateAndGet through DescendedCursor path.
-	 * No LatticeTables — just measures cursor chain overhead.
-	 */
-	static void benchmarkCursorOnly() throws Exception {
-		// Standalone cursor: direct AtomicReference on Index
-		ALatticeCursor<Index<AString, AVector<ACell>>> standaloneCursor =
-				Cursors.createLattice(TableStoreLattice.INSTANCE);
-		AString key = Strings.create("k");
-		AVector<ACell> val = Vectors.of(CVMLong.create(0));
-
-		long start = System.nanoTime();
-		for (int i = 0; i < ROW_COUNT; i++) {
-			standaloneCursor.updateAndGet(store -> {
-				if (store == null) return Index.of(key, val);
-				return store.assoc(key, val);
-			});
-		}
-		long elapsed1 = System.nanoTime() - start;
-		report("Cursor: standalone", elapsed1, ROW_COUNT);
-
-		// NodeServer cursor: DescendedCursor through HashMap path
-		RootLatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> rootCursor =
-				Cursors.createLattice(DB_LATTICE);
-		ALatticeCursor<Index<AString, AVector<ACell>>> descendedCursor =
-				rootCursor.path(Strings.create(DB_NAME));
-
-		start = System.nanoTime();
-		for (int i = 0; i < ROW_COUNT; i++) {
-			descendedCursor.updateAndGet(store -> {
-				if (store == null) return Index.of(key, val);
-				return store.assoc(key, val);
-			});
-		}
-		long elapsed2 = System.nanoTime() - start;
-		report("Cursor: descended", elapsed2, ROW_COUNT);
-		System.out.printf("  Overhead: %.1fx%n", (double) elapsed2 / elapsed1);
 	}
 
 	/**
 	 * Direct LatticeTables.insert() via NodeServer cursor chain
 	 */
 	static void benchmarkDirectLattice() throws Exception {
-		Object[] setup = createNodeAndDb();
-		@SuppressWarnings("unchecked")
-		NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>> server =
-				(NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>>) setup[0];
-		SQLDatabase db = (SQLDatabase) setup[1];
-		EtchStore store = (EtchStore) setup[2];
-
-		LatticeTables tables = db.tables();
-		tables.createTable("t", new String[]{"ID", "LEID", "NM"},
-				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+		EtchStore store = EtchStore.createTemp();
+		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		server.launch();
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		createTable(db);
 
 		long start = System.nanoTime();
 		for (int i = 0; i < ROW_COUNT; i++) {
-			tables.insert("t", Vectors.of(CVMLong.create(i), "LEID-" + i, "Name-" + i));
+			db.tables().insert("t", Vectors.of(CVMLong.create(i), "LEID-" + i, "Name-" + i));
 		}
 		long elapsed = System.nanoTime() - start;
 
 		report("Direct lattice insert", elapsed, ROW_COUNT);
-		syncToStorage(server, "Direct lattice");
+		syncToStorage(server);
 		verify(db, ROW_COUNT, "Direct lattice");
-
 		server.close();
 		store.close();
 	}
 
 	/**
-	 * Individual JDBC INSERT statements — full parse/plan/compile per statement
+	 * Individual JDBC INSERT statements — full Calcite parse/plan/compile per statement
 	 */
 	static void benchmarkJdbcIndividual() throws Exception {
-		Object[] setup = createNodeAndDb();
-		@SuppressWarnings("unchecked")
-		NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>> server =
-				(NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>>) setup[0];
-		SQLDatabase db = (SQLDatabase) setup[1];
-		EtchStore store = (EtchStore) setup[2];
-
-		db.tables().createTable("t", new String[]{"ID", "LEID", "NM"},
-				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+		EtchStore store = EtchStore.createTemp();
+		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		server.launch();
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		createTable(db);
 		ConvexSchemaFactory.register(DB_NAME, db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
 
-			// Warm up
+			// Warm up: trigger Calcite class loading / JIT
 			stmt.executeUpdate("INSERT INTO t VALUES (-1, 'warm', 'up')");
 
 			ConvexTable.resetScanCount();
@@ -211,9 +119,9 @@ public class InsertDemo {
 
 			report("JDBC individual INSERT", elapsed, ROW_COUNT);
 			System.out.println("  Table scans: " + ConvexTable.getScanCount());
-			syncToStorage(server, "JDBC individual");
+			syncToStorage(server);
 		}
-		verify(db, ROW_COUNT + 1, "JDBC individual"); // +1 for warm-up row
+		verify(db, ROW_COUNT, "JDBC individual");
 		ConvexSchemaFactory.unregister(DB_NAME);
 		server.close();
 		store.close();
@@ -223,15 +131,11 @@ public class InsertDemo {
 	 * JDBC PreparedStatement — parse/plan/compile once, bind params each time
 	 */
 	static void benchmarkJdbcPrepared() throws Exception {
-		Object[] setup = createNodeAndDb();
-		@SuppressWarnings("unchecked")
-		NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>> server =
-				(NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>>) setup[0];
-		SQLDatabase db = (SQLDatabase) setup[1];
-		EtchStore store = (EtchStore) setup[2];
-
-		db.tables().createTable("t", new String[]{"ID", "LEID", "NM"},
-				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+		EtchStore store = EtchStore.createTemp();
+		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		server.launch();
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		createTable(db);
 		ConvexSchemaFactory.register(DB_NAME, db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
@@ -249,7 +153,7 @@ public class InsertDemo {
 
 			report("JDBC PreparedStatement", elapsed, ROW_COUNT);
 			System.out.println("  Table scans: " + ConvexTable.getScanCount());
-			syncToStorage(server, "JDBC prepared");
+			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStatement");
 		ConvexSchemaFactory.unregister(DB_NAME);
@@ -258,18 +162,14 @@ public class InsertDemo {
 	}
 
 	/**
-	 * PreparedStatement batch — compile once, batch parameter bindings
+	 * PreparedStatement batch — compile once, batch all parameter bindings
 	 */
 	static void benchmarkJdbcPreparedBatch() throws Exception {
-		Object[] setup = createNodeAndDb();
-		@SuppressWarnings("unchecked")
-		NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>> server =
-				(NodeServer<AHashMap<AString, Index<AString, AVector<ACell>>>>) setup[0];
-		SQLDatabase db = (SQLDatabase) setup[1];
-		EtchStore store = (EtchStore) setup[2];
-
-		db.tables().createTable("t", new String[]{"ID", "LEID", "NM"},
-				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+		EtchStore store = EtchStore.createTemp();
+		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		server.launch();
+		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		createTable(db);
 		ConvexSchemaFactory.register(DB_NAME, db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
@@ -288,7 +188,7 @@ public class InsertDemo {
 
 			report("JDBC PreparedStmt batch", elapsed, ROW_COUNT);
 			System.out.println("  Table scans: " + ConvexTable.getScanCount());
-			syncToStorage(server, "JDBC PS batch");
+			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStmt batch");
 		ConvexSchemaFactory.unregister(DB_NAME);
@@ -296,17 +196,29 @@ public class InsertDemo {
 		store.close();
 	}
 
+	// ========== Helpers ==========
+
+	static void createTable(SQLDatabase db) {
+		db.tables().createTable("t", new String[]{"ID", "LEID", "NM"},
+				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+	}
+
+	static void syncToStorage(NodeServer<?> server) throws Exception {
+		long start = System.nanoTime();
+		server.persistSnapshot(server.getLocalValue());
+		long elapsed = System.nanoTime() - start;
+		System.out.printf("  Sync to Etch:          %,.1f ms%n", elapsed / 1_000_000.0);
+	}
+
 	/**
 	 * Smoke check: verifies row count via lattice API and JDBC SELECT COUNT,
 	 * then spot-checks first (ID=0) and last (ID=ROW_COUNT-1) rows via JDBC.
 	 */
 	static void verify(SQLDatabase db, int minExpectedRows, String label) throws Exception {
-		// 1. Lattice row count
 		long latticeCount = db.tables().getRowCount("t");
 		check(latticeCount >= minExpectedRows, label,
 				"Lattice row count: expected >= " + minExpectedRows + ", got " + latticeCount);
 
-		// 2. JDBC SELECT COUNT(*)
 		ConvexSchemaFactory.register(DB_NAME, db);
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
@@ -314,25 +226,22 @@ public class InsertDemo {
 			ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM t");
 			rs.next();
 			long jdbcCount = rs.getLong("cnt");
-			check(jdbcCount >= minExpectedRows, label,
-					"JDBC COUNT(*): expected >= " + minExpectedRows + ", got " + jdbcCount);
 			check(jdbcCount == latticeCount, label,
 					"Count mismatch: lattice=" + latticeCount + " vs JDBC=" + jdbcCount);
 
-			// 3. Spot-check first row (ID=0)
+			// Spot-check first row
 			rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = 0");
 			check(rs.next(), label, "Row ID=0 not found");
 			check("LEID-0".equals(rs.getString("LEID")), label,
 					"Row ID=0 LEID: expected 'LEID-0', got '" + rs.getString("LEID") + "'");
 
-			// 4. Spot-check last row (ID=ROW_COUNT-1)
+			// Spot-check last row
 			int lastId = ROW_COUNT - 1;
 			rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = " + lastId);
 			check(rs.next(), label, "Row ID=" + lastId + " not found");
 			check(("LEID-" + lastId).equals(rs.getString("LEID")), label,
 					"Row ID=" + lastId + " LEID mismatch");
 		}
-
 		System.out.println("  VERIFIED OK (" + latticeCount + " rows)");
 	}
 

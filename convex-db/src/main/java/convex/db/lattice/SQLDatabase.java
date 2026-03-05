@@ -9,10 +9,14 @@ import convex.core.data.Index;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.store.AStore;
+import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
+import convex.node.NodeConfig;
+import convex.node.NodeServer;
 
 /**
  * A named SQL database within the global lattice, with per-owner signed replicas.
@@ -58,6 +62,13 @@ public class SQLDatabase {
 	public static final OwnerLattice<AHashMap<AString, Index<AString, AVector<ACell>>>>
 		OWNER_LATTICE = OwnerLattice.create(MapLattice.create(TableStoreLattice.INSTANCE));
 
+	/**
+	 * The lattice type for a table store map (db name → table store).
+	 * Use this when creating a {@link NodeServer} for SQL databases.
+	 */
+	public static final MapLattice<AString, Index<AString, AVector<ACell>>>
+		TABLE_STORE_LATTICE = MapLattice.create(TableStoreLattice.INSTANCE);
+
 	private final AString dbName;
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
@@ -94,6 +105,29 @@ public class SQLDatabase {
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
 		LatticeTables tables = LatticeTables.create();
 		return new SQLDatabase(Strings.create(name), keyPair, ownerKey, tables);
+	}
+
+	/**
+	 * Creates a persisted SQL database backed by a local-only {@link NodeServer}.
+	 * The NodeServer handles Etch persistence; call {@code server.close()} to flush
+	 * and shut down.
+	 *
+	 * <p>Usage:
+	 * <pre>
+	 * EtchStore store = EtchStore.createTemp();
+	 * NodeServer&lt;?&gt; server = SQLDatabase.createNodeServer(store);
+	 * server.launch();
+	 * SQLDatabase db = SQLDatabase.connect(server.getCursor(), "mydb");
+	 * // ... use db ...
+	 * server.persistSnapshot(server.getLocalValue()); // flush to Etch
+	 * server.close();
+	 * </pre>
+	 *
+	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
+	 * @return NodeServer configured for SQL database lattice (local-only, no network)
+	 */
+	public static NodeServer<?> createNodeServer(AStore store) {
+		return new NodeServer<>(TABLE_STORE_LATTICE, store, NodeConfig.port(-1));
 	}
 
 	/**

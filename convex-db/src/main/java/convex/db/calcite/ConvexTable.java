@@ -22,15 +22,9 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.ModifiableTable;
 import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.type.SqlTypeName;
 
 import convex.core.data.ACell;
-import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
 import convex.db.lattice.LatticeTables;
 
 /**

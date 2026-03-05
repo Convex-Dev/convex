@@ -9,7 +9,6 @@ import convex.core.data.Index;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.lattice.cursor.ALatticeCursor;
@@ -104,28 +103,23 @@ public class LatticeTables {
 		return CVMLong.create(System.currentTimeMillis());
 	}
 
-	private AString tableName(String name) {
-		return Strings.create(name);
-	}
-
-	private AVector<ACell> getTable(String name) {
+	private AVector<ACell> getTable(AString name) {
 		Index<AString, AVector<ACell>> store = cursor.get();
 		if (store == null) return null;
-		return store.get(tableName(name));
+		return store.get(name);
 	}
 
-	private AVector<ACell> getLiveTable(String name) {
+	private AVector<ACell> getLiveTable(AString name) {
 		AVector<ACell> table = getTable(name);
 		if (table == null) return null;
 		if (!SQLTable.isLive(table)) return null;
 		return table;
 	}
 
-	private void putTable(String name, AVector<ACell> table) {
-		AString key = tableName(name);
+	private void putTable(AString name, AVector<ACell> table) {
 		cursor.updateAndGet(store -> {
 			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			return store.assoc(key, table);
+			return store.assoc(name, table);
 		});
 	}
 
@@ -160,12 +154,22 @@ public class LatticeTables {
 	/**
 	 * Creates a new table with the given column names.
 	 * All columns use ANY type (dynamic typing).
-	 *
-	 * @param name Table name
-	 * @param columns Column names
-	 * @return true if table created, false if already exists
 	 */
 	public boolean createTable(String name, String[] columns) {
+		return createTable(Strings.create(name), columns);
+	}
+
+	/** Creates a new table with explicitly typed columns (no precision/scale). */
+	public boolean createTable(String name, String[] columns, ConvexType[] types) {
+		return createTable(Strings.create(name), columns, types);
+	}
+
+	/** Creates a new table with fully typed columns (including precision/scale). */
+	public boolean createTable(String name, String[] columns, ConvexColumnType[] types) {
+		return createTable(Strings.create(name), columns, types);
+	}
+
+	public boolean createTable(AString name, String[] columns) {
 		ConvexColumnType[] types = new ConvexColumnType[columns.length];
 		for (int i = 0; i < types.length; i++) {
 			types[i] = ConvexColumnType.of(ConvexType.ANY);
@@ -173,16 +177,7 @@ public class LatticeTables {
 		return createTable(name, columns, types);
 	}
 
-	/**
-	 * Creates a new table with explicitly typed columns (no precision/scale).
-	 *
-	 * @param name Table name
-	 * @param columns Column names
-	 * @param types Column base types (must match columns length)
-	 * @return true if table created, false if already exists
-	 * @throws IllegalArgumentException if columns and types have different lengths
-	 */
-	public boolean createTable(String name, String[] columns, ConvexType[] types) {
+	public boolean createTable(AString name, String[] columns, ConvexType[] types) {
 		ConvexColumnType[] columnTypes = new ConvexColumnType[types.length];
 		for (int i = 0; i < types.length; i++) {
 			columnTypes[i] = ConvexColumnType.of(types[i]);
@@ -190,17 +185,8 @@ public class LatticeTables {
 		return createTable(name, columns, columnTypes);
 	}
 
-	/**
-	 * Creates a new table with fully typed columns (including precision/scale).
-	 *
-	 * @param name Table name
-	 * @param columns Column names
-	 * @param types Column types with precision/scale (must match columns length)
-	 * @return true if table created, false if already exists
-	 * @throws IllegalArgumentException if columns and types have different lengths
-	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public boolean createTable(String name, String[] columns, ConvexColumnType[] types) {
+	public boolean createTable(AString name, String[] columns, ConvexColumnType[] types) {
 		if (columns.length != types.length) {
 			throw new IllegalArgumentException("Columns and types must have same length");
 		}
@@ -222,48 +208,44 @@ public class LatticeTables {
 		return true;
 	}
 
-	/**
-	 * Drops a table by creating a tombstone.
-	 *
-	 * @param name Table name
-	 * @return true if table dropped, false if not found
-	 */
+	/** Drops a table by creating a tombstone. */
 	public boolean dropTable(String name) {
+		return dropTable(Strings.create(name));
+	}
+
+	public boolean dropTable(AString name) {
 		AVector<ACell> table = getLiveTable(name);
 		if (table == null) return false;
 		putTable(name, SQLTable.createTombstone(now()));
 		return true;
 	}
 
-	/**
-	 * Checks if a table exists and is live.
-	 *
-	 * @param name Table name
-	 * @return true if table exists
-	 */
+	/** Checks if a table exists and is live. */
 	public boolean tableExists(String name) {
+		return tableExists(Strings.create(name));
+	}
+
+	public boolean tableExists(AString name) {
 		return getLiveTable(name) != null;
 	}
 
-	/**
-	 * Gets the schema (column definitions) for a table.
-	 *
-	 * @param name Table name
-	 * @return Schema vector, or null if table not found
-	 */
+	/** Gets the schema (column definitions) for a table. */
 	public AVector<AVector<ACell>> getSchema(String name) {
+		return getSchema(Strings.create(name));
+	}
+
+	public AVector<AVector<ACell>> getSchema(AString name) {
 		AVector<ACell> table = getLiveTable(name);
 		if (table == null) return null;
 		return SQLTable.getSchema(table);
 	}
 
-	/**
-	 * Gets the column names for a table.
-	 *
-	 * @param name Table name
-	 * @return Array of column names, or null if table not found
-	 */
+	/** Gets the column names for a table. */
 	public String[] getColumnNames(String name) {
+		return getColumnNames(Strings.create(name));
+	}
+
+	public String[] getColumnNames(AString name) {
 		AVector<AVector<ACell>> schema = getSchema(name);
 		if (schema == null) return null;
 		String[] result = new String[(int) schema.count()];
@@ -273,13 +255,12 @@ public class LatticeTables {
 		return result;
 	}
 
-	/**
-	 * Gets the column types for a table (with precision/scale).
-	 *
-	 * @param name Table name
-	 * @return Array of column types, or null if table not found
-	 */
+	/** Gets the column types for a table (with precision/scale). */
 	public ConvexColumnType[] getColumnTypes(String name) {
+		return getColumnTypes(Strings.create(name));
+	}
+
+	public ConvexColumnType[] getColumnTypes(AString name) {
 		AVector<AVector<ACell>> schema = getSchema(name);
 		if (schema == null) return null;
 		ConvexColumnType[] result = new ConvexColumnType[(int) schema.count()];
@@ -315,13 +296,12 @@ public class LatticeTables {
 		return result;
 	}
 
-	/**
-	 * Gets the row count for a table.
-	 *
-	 * @param name Table name
-	 * @return Row count, or 0 if table not found
-	 */
+	/** Gets the row count for a table. */
 	public long getRowCount(String name) {
+		return getRowCount(Strings.create(name));
+	}
+
+	public long getRowCount(AString name) {
 		AVector<ACell> table = getLiveTable(name);
 		if (table == null) return 0;
 		return SQLTable.getRowCount(table);
@@ -329,15 +309,12 @@ public class LatticeTables {
 
 	// ========== Row Operations ==========
 
-	/**
-	 * Inserts a row into a table. First column is used as primary key.
-	 *
-	 * @param tableName Table name
-	 * @param row Complete row (first column is primary key)
-	 * @return true if inserted, false if table not found
-	 */
+	/** Inserts a row into a table. First column is used as primary key. */
 	public boolean insert(String tableName, AVector<ACell> row) {
-		AString key = tableName(tableName);
+		return insert(Strings.create(tableName), row);
+	}
+
+	public boolean insert(AString tableName, AVector<ACell> row) {
 		ABlob pk = toKey(row.get(0));
 		CVMLong timestamp = now();
 
@@ -345,37 +322,29 @@ public class LatticeTables {
 		boolean[] result = new boolean[1];
 		cursor.updateAndGet(store -> {
 			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			AVector<ACell> table = store.get(key);
+			AVector<ACell> table = store.get(tableName);
 			if (table == null || !SQLTable.isLive(table)) return store;
 
 			Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
 			if (rows == null) rows = TableLattice.INSTANCE.zero();
 			rows = rows.assoc(pk, SQLRow.create(row, timestamp));
 			result[0] = true;
-			return store.assoc(key, SQLTable.withRows(table, rows, timestamp));
+			return store.assoc(tableName, SQLTable.withRows(table, rows, timestamp));
 		});
 		return result[0];
 	}
 
-	/**
-	 * Inserts a row with auto-conversion from Java types. First value is primary key.
-	 *
-	 * @param tableName Table name
-	 * @param values Column values (first is primary key)
-	 * @return true if inserted, false if table not found
-	 */
+	/** Inserts a row with auto-conversion from Java types. First value is primary key. */
 	public boolean insert(String tableName, Object... values) {
-		return insert(tableName, Vectors.of(values));
+		return insert(Strings.create(tableName), Vectors.of(values));
 	}
 
-	/**
-	 * Selects a row by primary key.
-	 *
-	 * @param tableName Table name
-	 * @param primaryKey Primary key value
-	 * @return Column values, or null if not found
-	 */
+	/** Selects a row by primary key. */
 	public AVector<ACell> selectByKey(String tableName, ACell primaryKey) {
+		return selectByKey(Strings.create(tableName), primaryKey);
+	}
+
+	public AVector<ACell> selectByKey(AString tableName, ACell primaryKey) {
 		AVector<ACell> table = getLiveTable(tableName);
 		if (table == null) return null;
 
@@ -388,14 +357,12 @@ public class LatticeTables {
 		return SQLRow.getValues(row);
 	}
 
-	/**
-	 * Deletes a row by primary key.
-	 *
-	 * @param tableName Table name
-	 * @param primaryKey Primary key value
-	 * @return true if deleted, false if not found
-	 */
+	/** Deletes a row by primary key. */
 	public boolean deleteByKey(String tableName, ACell primaryKey) {
+		return deleteByKey(Strings.create(tableName), primaryKey);
+	}
+
+	public boolean deleteByKey(AString tableName, ACell primaryKey) {
 		AVector<ACell> table = getLiveTable(tableName);
 		if (table == null) return false;
 
@@ -412,14 +379,13 @@ public class LatticeTables {
 		return true;
 	}
 
-	/**
-	 * Returns all live rows in a table.
-	 *
-	 * @param tableName Table name
-	 * @return Index of primary key (ABlob) to column values, or empty if table not found
-	 */
-	@SuppressWarnings("unchecked")
+	/** Returns all live rows in a table. */
 	public Index<ABlob, AVector<ACell>> selectAll(String tableName) {
+		return selectAll(Strings.create(tableName));
+	}
+
+	@SuppressWarnings("unchecked")
+	public Index<ABlob, AVector<ACell>> selectAll(AString tableName) {
 		AVector<ACell> table = getLiveTable(tableName);
 		if (table == null) return (Index<ABlob, AVector<ACell>>) Index.EMPTY;
 
