@@ -6,7 +6,7 @@ import org.apache.calcite.linq4j.Enumerator;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.db.lattice.LatticeTables;
+import convex.db.lattice.SQLTables;
 
 /**
  * Enumerator for iterating over rows in a Convex lattice table.
@@ -27,7 +27,7 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 	 * @param tables LatticeTables instance
 	 * @param tableName Table to enumerate
 	 */
-	public ConvexEnumerator(LatticeTables tables, String tableName) {
+	public ConvexEnumerator(SQLTables tables, String tableName) {
 		var rows = tables.selectAll(tableName);
 		// Convert Index values to iterator
 		if (rows != null) {

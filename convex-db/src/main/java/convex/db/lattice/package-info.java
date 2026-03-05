@@ -7,7 +7,7 @@
  * <p>Key classes:
  * <ul>
  *   <li>{@link convex.db.lattice.SQLDatabase} - Database instance with signing and replication</li>
- *   <li>{@link convex.db.lattice.LatticeTables} - Facade for table operations</li>
+ *   <li>{@link convex.db.lattice.SQLTables} - Facade for table operations</li>
  *   <li>{@link convex.db.lattice.TableStoreLattice} - Lattice for database's table store</li>
  *   <li>{@link convex.db.lattice.TableLattice} - Lattice for individual table rows</li>
  *   <li>{@link convex.db.lattice.SQLTable} - Table entry structure (schema + rows)</li>

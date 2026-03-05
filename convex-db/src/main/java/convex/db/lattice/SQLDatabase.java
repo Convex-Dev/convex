@@ -4,15 +4,17 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
-import convex.lattice.ALattice;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.node.NodeConfig;
@@ -53,32 +55,42 @@ import convex.node.NodeServer;
  * db.tables().insert("users", key, values);
  * </pre>
  */
-public class SQLDatabase {
+public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
+
+	/** Keyword for the tables section within a database. */
+	public static final Keyword KEY_TABLES = Keyword.intern("tables");
+
+	/**
+	 * The lattice type for a single database.
+	 * Structure: KeyedLattice { :tables → TableStoreLattice }
+	 */
+	public static final KeyedLattice DATABASE_LATTICE =
+		KeyedLattice.create(KEY_TABLES, TableStoreLattice.INSTANCE);
+
+	/**
+	 * The lattice type for a database map (db name → database state).
+	 * Use this when creating a {@link NodeServer} for SQL databases.
+	 */
+	public static final MapLattice<AString, Index<Keyword, ACell>>
+		DATABASE_MAP_LATTICE = MapLattice.create(DATABASE_LATTICE);
 
 	/**
 	 * The OwnerLattice structure for SQL databases in the global lattice.
-	 * Structure: OwnerLattice → SignedLattice → MapLattice → TableStoreLattice
+	 * Structure: OwnerLattice → SignedLattice → MapLattice → DatabaseLattice
 	 */
-	public static final OwnerLattice<AHashMap<AString, Index<AString, AVector<ACell>>>>
-		OWNER_LATTICE = OwnerLattice.create(MapLattice.create(TableStoreLattice.INSTANCE));
-
-	/**
-	 * The lattice type for a table store map (db name → table store).
-	 * Use this when creating a {@link NodeServer} for SQL databases.
-	 */
-	public static final MapLattice<AString, Index<AString, AVector<ACell>>>
-		TABLE_STORE_LATTICE = MapLattice.create(TableStoreLattice.INSTANCE);
+	public static final OwnerLattice<AHashMap<AString, Index<Keyword, ACell>>>
+		OWNER_LATTICE = OwnerLattice.create(DATABASE_MAP_LATTICE);
 
 	private final AString dbName;
 	private final AKeyPair keyPair;
 	private final ACell ownerKey;
-	private final LatticeTables tables;
 
-	private SQLDatabase(AString dbName, AKeyPair keyPair, ACell ownerKey, LatticeTables tables) {
+	private SQLDatabase(ALatticeCursor<Index<Keyword, ACell>> cursor,
+			AString dbName, AKeyPair keyPair, ACell ownerKey) {
+		super(cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
-		this.tables = tables;
 	}
 
 	/**
@@ -103,8 +115,9 @@ public class SQLDatabase {
 	 * @return New SQLDatabase instance
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
-		LatticeTables tables = LatticeTables.create();
-		return new SQLDatabase(Strings.create(name), keyPair, ownerKey, tables);
+		ALatticeCursor<Index<Keyword, ACell>> cursor =
+			Cursors.createLattice(DATABASE_LATTICE);
+		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
 	/**
@@ -127,7 +140,7 @@ public class SQLDatabase {
 	 * @return NodeServer configured for SQL database lattice (local-only, no network)
 	 */
 	public static NodeServer<?> createNodeServer(AStore store) {
-		return new NodeServer<>(TABLE_STORE_LATTICE, store, NodeConfig.port(-1));
+		return new NodeServer<>(DATABASE_MAP_LATTICE, store, NodeConfig.port(-1));
 	}
 
 	/**
@@ -141,12 +154,11 @@ public class SQLDatabase {
 	 */
 	public static SQLDatabase connect(ALatticeCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
-		ALatticeCursor<Index<AString, AVector<ACell>>> cursor = parent.path(dbName);
+		ALatticeCursor<Index<Keyword, ACell>> cursor = parent.path(dbName);
 		if (cursor.get() == null) {
-			cursor.set(TableStoreLattice.INSTANCE.zero());
+			cursor.set(DATABASE_LATTICE.zero());
 		}
-		LatticeTables tables = new LatticeTables(cursor);
-		return new SQLDatabase(dbName, null, null, tables);
+		return new SQLDatabase(cursor, dbName, null, null);
 	}
 
 	/**
@@ -154,8 +166,8 @@ public class SQLDatabase {
 	 *
 	 * @return LatticeTables instance
 	 */
-	public LatticeTables tables() {
-		return tables;
+	public SQLTables tables() {
+		return new SQLTables(cursor.path(KEY_TABLES));
 	}
 
 	/**
@@ -187,25 +199,25 @@ public class SQLDatabase {
 
 	/**
 	 * Returns this owner's signed database map containing this database.
-	 * The signed value is a map of database names to table store state.
+	 * The signed value is a map of database names to database state.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
-	 * @return SignedData wrapping a map of {dbName → table store state}
+	 * @return SignedData wrapping a map of {dbName → database state}
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>> getSignedState() {
+	public SignedData<AHashMap<AString, Index<Keyword, ACell>>> getSignedState() {
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
-		AHashMap<AString, Index<AString, AVector<ACell>>> dbMap =
-			(AHashMap) Maps.of(dbName, tables.cursor().get());
+		AHashMap<AString, Index<Keyword, ACell>> dbMap =
+			(AHashMap) Maps.of(dbName, cursor.get());
 		return keyPair.signData(dbMap);
 	}
 
 	/**
 	 * Exports this node's replica as an owner map entry suitable for lattice merge
 	 * at the :sql level. Returns a map with a single entry:
-	 * this node's owner key → signed({dbName → table store state}).
+	 * this node's owner key → signed({dbName → database state}).
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
@@ -213,40 +225,40 @@ public class SQLDatabase {
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> exportReplica() {
+	public AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> exportReplica() {
 		return (AHashMap) Maps.of(ownerKey, getSignedState());
 	}
 
 	/**
 	 * Merges replicas from a remote owner map into this node's local store.
 	 * Uses {@link OwnerLattice} to verify signatures and owner-key matching,
-	 * then absorbs verified remote data into the local table store.
+	 * then absorbs verified remote data into the local database state.
 	 *
 	 * <p>Only available in standalone mode (created via {@link #create}).
 	 *
-	 * @param remoteOwnerMap Map of owner-key → signed({dbName → table store}) from remote nodes
+	 * @param remoteOwnerMap Map of owner-key → signed({dbName → database state}) from remote nodes
 	 * @return Number of replicas successfully merged
 	 * @throws IllegalStateException if no signing key is available (connected mode)
 	 */
-	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> remoteOwnerMap) {
+	public long mergeReplicas(AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> remoteOwnerMap) {
 		if (remoteOwnerMap == null || remoteOwnerMap.isEmpty()) return 0;
 		if (keyPair == null) throw new IllegalStateException("No signing key (connected mode)");
 
 		// Use OwnerLattice to verify signatures and owner-key matching
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> verified =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> verified =
 			OWNER_LATTICE.merge(ctx, Maps.empty(), remoteOwnerMap);
 
 		// Absorb verified remote data into local store
 		long merged = 0;
 		for (var entry : verified.entrySet()) {
 			if (ownerKey.equals(entry.getKey())) continue; // skip self
-			AHashMap<AString, Index<AString, AVector<ACell>>> dbMap = entry.getValue().getValue();
+			AHashMap<AString, Index<Keyword, ACell>> dbMap = entry.getValue().getValue();
 			if (dbMap == null) continue;
 			@SuppressWarnings("unchecked")
-			Index<AString, AVector<ACell>> remoteState = (Index<AString, AVector<ACell>>) dbMap.get(dbName);
+			Index<Keyword, ACell> remoteState = (Index<Keyword, ACell>) dbMap.get(dbName);
 			if (remoteState != null) {
-				tables.cursor().merge(remoteState);
+				cursor.merge(remoteState);
 				merged++;
 			}
 		}

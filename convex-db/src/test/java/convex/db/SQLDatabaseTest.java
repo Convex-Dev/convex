@@ -16,16 +16,15 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.db.lattice.LatticeTables;
+import convex.db.lattice.SQLTables;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.TableStoreLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.MapLattice;
 
 /**
  * Tests for SQLDatabase and LatticeTables.
@@ -47,7 +46,7 @@ public class SQLDatabaseTest {
 	public void testCreateTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		// Create table
 		boolean created = tables.createTable("users", new String[]{"id", "name", "email"});
@@ -67,7 +66,7 @@ public class SQLDatabaseTest {
 	public void testDropTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("temp", new String[]{"data"});
 		assertTrue(tables.tableExists("temp"));
@@ -85,7 +84,7 @@ public class SQLDatabaseTest {
 	public void testInsertAndSelect() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("users", new String[]{"id", "name", "email"});
 
@@ -110,7 +109,7 @@ public class SQLDatabaseTest {
 	public void testDelete() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("items", new String[]{"id", "name"});
 		tables.insert("items", 1, "Item");
@@ -130,7 +129,7 @@ public class SQLDatabaseTest {
 	public void testSelectAll() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("products", new String[]{"id", "name"});
 		tables.insert("products", 1, "Apple");
@@ -145,7 +144,7 @@ public class SQLDatabaseTest {
 	public void testTableNames() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("alpha", new String[]{"a"});
 		tables.createTable("beta", new String[]{"b"});
@@ -159,13 +158,13 @@ public class SQLDatabaseTest {
 	public void testForkAndSync() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLTables tables = db.tables();
 
 		tables.createTable("data", new String[]{"id", "value"});
 		tables.insert("data", 1, "original");
 
 		// Fork
-		LatticeTables forked = tables.fork();
+		SQLTables forked = tables.fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged
@@ -223,7 +222,7 @@ public class SQLDatabaseTest {
 
 		// Create tampered export - must match expected generic type
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> tamperedExport =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> tamperedExport =
 			(AHashMap) convex.core.data.Maps.of(kp2.getAccountKey(), tamperedSigned);
 
 		// Should reject - signature doesn't match owner key
@@ -234,11 +233,8 @@ public class SQLDatabaseTest {
 
 	@Test
 	public void testConnectedDatabase() throws Exception {
-		// Set up a cursor chain: MapLattice<dbName → TableStore>
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		// Set up a cursor chain using DATABASE_MAP_LATTICE
+		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
 
 		// Connect a named database
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -251,7 +247,7 @@ public class SQLDatabaseTest {
 		assertEquals(1, db.tables().getRowCount("users"));
 
 		// Verify the root cursor received the update
-		AHashMap<AString, Index<AString, AVector<ACell>>> rootMap = root.get();
+		AHashMap<?, ?> rootMap = (AHashMap<?, ?>) root.get();
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second database to the same root
@@ -288,10 +284,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testForkAndSyncConnected() throws Exception {
 		// Set up cursor chain
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
 
 		// Connect and populate
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -299,7 +292,7 @@ public class SQLDatabaseTest {
 		db.tables().insert("data", 1, "original");
 
 		// Fork the tables
-		LatticeTables forked = db.tables().fork();
+		SQLTables forked = db.tables().fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged
@@ -314,10 +307,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

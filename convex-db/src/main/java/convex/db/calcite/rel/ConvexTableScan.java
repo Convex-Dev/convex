@@ -19,7 +19,7 @@ import convex.db.calcite.ConvexTable;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
-import convex.db.lattice.LatticeTables;
+import convex.db.lattice.SQLTables;
 
 /**
  * Table scan in CONVEX convention.
@@ -49,7 +49,7 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 		}
 
 		ConvexSchema schema = convexTable.getSchema();
-		LatticeTables tables = schema.getTables();
+		SQLTables tables = schema.getTables();
 		String tableName = convexTable.getTableName();
 
 		// Get all rows directly as ACell[]

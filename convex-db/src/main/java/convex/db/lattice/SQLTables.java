@@ -11,6 +11,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 
@@ -43,12 +44,10 @@ import convex.lattice.cursor.Cursors;
  * tables.dropTable("users");
  * </pre>
  */
-public class LatticeTables {
+public class SQLTables extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
-	private final ALatticeCursor<Index<AString, AVector<ACell>>> cursor;
-
-	public LatticeTables(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
-		this.cursor = cursor;
+	public SQLTables(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+		super(cursor);
 	}
 
 	/**
@@ -56,10 +55,10 @@ public class LatticeTables {
 	 *
 	 * @return New LatticeTables instance
 	 */
-	public static LatticeTables create() {
+	public static SQLTables create() {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
 			Cursors.createLattice(TableStoreLattice.INSTANCE);
-		return new LatticeTables(cursor);
+		return new SQLTables(cursor);
 	}
 
 	/**
@@ -68,17 +67,8 @@ public class LatticeTables {
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
 	 * @return New LatticeTables instance connected to the cursor
 	 */
-	public static LatticeTables connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
-		return new LatticeTables(cursor);
-	}
-
-	/**
-	 * Returns the underlying lattice cursor for direct lattice operations.
-	 *
-	 * @return Lattice cursor
-	 */
-	public ALatticeCursor<Index<AString, AVector<ACell>>> cursor() {
-		return cursor;
+	public static SQLTables connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
+		return new SQLTables(cursor);
 	}
 
 	/**
@@ -86,15 +76,8 @@ public class LatticeTables {
 	 *
 	 * @return Forked LatticeTables instance
 	 */
-	public LatticeTables fork() {
-		return new LatticeTables(cursor.fork());
-	}
-
-	/**
-	 * Syncs this forked store back to its parent, merging changes.
-	 */
-	public void sync() {
-		cursor.sync();
+	public SQLTables fork() {
+		return new SQLTables(cursor.fork());
 	}
 
 	// ========== Internal Helpers ==========

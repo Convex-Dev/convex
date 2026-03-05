@@ -7,7 +7,7 @@ import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
-import convex.db.lattice.LatticeTables;
+import convex.db.lattice.SQLTables;
 import convex.db.lattice.SQLDatabase;
 
 /**
