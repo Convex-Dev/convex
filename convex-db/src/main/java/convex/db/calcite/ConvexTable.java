@@ -87,8 +87,14 @@ public class ConvexTable extends AbstractQueryableTable
 		return schema.getTables().getColumnTypes(tableName);
 	}
 
+	/** Scan counter for diagnostics — reset via {@link #resetScanCount()} */
+	private static volatile int scanCount = 0;
+	public static int getScanCount() { return scanCount; }
+	public static void resetScanCount() { scanCount = 0; }
+
 	@Override
 	public Enumerable<Object[]> scan(DataContext root) {
+		scanCount++; // TODO: remove after benchmarking complete
 		return new AbstractEnumerable<Object[]>() {
 			@Override
 			public Enumerator<Object[]> enumerator() {

@@ -22,7 +22,11 @@
       "Bash(mvn dependency:tree:*)",
       "Bash(mvn install:*)",
       "Bash(java -jar convex-cli/target/convex-cli.jar account create:*)",
-      "Bash(java -jar:*)"
+      "Bash(java -jar:*)",
+      "Bash(mvn exec:java:*)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "convex-testnet"
+  ]
 }

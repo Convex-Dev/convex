@@ -337,17 +337,24 @@ public class LatticeTables {
 	 * @return true if inserted, false if table not found
 	 */
 	public boolean insert(String tableName, AVector<ACell> row) {
-		AVector<ACell> table = getLiveTable(tableName);
-		if (table == null) return false;
-
-		Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
-		if (rows == null) rows = TableLattice.INSTANCE.zero();
-
+		AString key = tableName(tableName);
+		ABlob pk = toKey(row.get(0));
 		CVMLong timestamp = now();
-		ABlob key = toKey(row.get(0));
-		rows = rows.assoc(key, SQLRow.create(row, timestamp));
-		putTable(tableName, SQLTable.withRows(table, rows, timestamp));
-		return true;
+
+		// Single cursor operation: read table, insert row, write back
+		boolean[] result = new boolean[1];
+		cursor.updateAndGet(store -> {
+			if (store == null) store = TableStoreLattice.INSTANCE.zero();
+			AVector<ACell> table = store.get(key);
+			if (table == null || !SQLTable.isLive(table)) return store;
+
+			Index<ABlob, AVector<ACell>> rows = SQLTable.getRows(table);
+			if (rows == null) rows = TableLattice.INSTANCE.zero();
+			rows = rows.assoc(pk, SQLRow.create(row, timestamp));
+			result[0] = true;
+			return store.assoc(key, SQLTable.withRows(table, rows, timestamp));
+		});
+		return result[0];
 	}
 
 	/**

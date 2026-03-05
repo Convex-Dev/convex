@@ -105,7 +105,6 @@ public class SQLDatabase {
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
-	@SuppressWarnings("unchecked")
 	public static SQLDatabase connect(ALatticeCursor<?> parent, String name) {
 		AString dbName = Strings.create(name);
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor = parent.path(dbName);

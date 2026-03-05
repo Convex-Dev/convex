@@ -54,6 +54,7 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 */
 	public static void register(String name, SQLDatabase database) {
 		REGISTRY.put(name, database);
+		SCHEMA_CACHE.remove(name); // invalidate stale cached schema
 	}
 
 	/**
@@ -63,6 +64,7 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 * @return The removed database, or null if not found
 	 */
 	public static SQLDatabase unregister(String name) {
+		SCHEMA_CACHE.remove(name);
 		return REGISTRY.remove(name);
 	}
 
