@@ -29,7 +29,7 @@ class ExpressionEnhancementsTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		db = SQLDatabase.create("expr_test", AKeyPair.generate());
-		ConvexSchemaFactory.register("expr_test", db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		ConvexColumnType[] types = {
 			ConvexColumnType.of(ConvexType.INTEGER),  // id
@@ -52,7 +52,7 @@ class ExpressionEnhancementsTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister("expr_test");
+		ConvexSchemaFactory.setDatabase(null);
 	}
 
 	// ========== COALESCE Tests ==========

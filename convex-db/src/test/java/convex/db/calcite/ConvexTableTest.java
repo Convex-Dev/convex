@@ -38,7 +38,7 @@ public class ConvexTableTest {
 		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
 		AKeyPair kp = AKeyPair.generate();
 		db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		ConvexSchemaFactory.setDatabase(db);
 		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
 		db.tables().createTable("test_table",
 			new String[]{"id", "name", "amount"},
@@ -49,7 +49,7 @@ public class ConvexTableTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister(dbName);
+		ConvexSchemaFactory.setDatabase(null);
 	}
 
 	@Test

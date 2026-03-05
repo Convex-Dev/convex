@@ -1,134 +1,91 @@
 package convex.db.calcite;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
-import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
+import convex.db.lattice.SQLSchema;
+import convex.lattice.cursor.ALatticeCursor;
 
 /**
- * Factory for creating Convex schemas.
+ * Factory for creating Convex SQL schemas backed by a lattice cursor.
  *
- * <p>Can be used in a Calcite model JSON file:
- * <pre>
- * {
- *   "version": "1.0",
- *   "schemas": [{
- *     "name": "convex",
- *     "type": "custom",
- *     "factory": "convex.db.calcite.ConvexSchemaFactory",
- *     "operand": {
- *       "database": "mydb"
- *     }
- *   }]
- * }
- * </pre>
+ * <p>Holds a reference to the database-level lattice cursor. All schema and
+ * table resolution navigates the cursor tree — no separate registry or cache.
  *
- * <p>Or via JDBC URL:
- * <pre>
- * jdbc:convex:database=mydb
- * </pre>
- *
- * <p>Databases must be registered before connecting:
+ * <p>Usage:
  * <pre>
  * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.register("mydb", db);
+ * ConvexSchemaFactory.setDatabase(db);
  *
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
  * </pre>
  */
 public class ConvexSchemaFactory implements SchemaFactory {
 
-	/** Registry of databases by name */
-	private static final Map<String, SQLDatabase> REGISTRY = new ConcurrentHashMap<>();
+	/** The current database. All navigation goes through its cursor tree. */
+	private static volatile SQLDatabase database;
 
 	/**
-	 * Registers a database for JDBC access.
+	 * Sets the database for JDBC/SQL access.
 	 *
-	 * @param name Database name (used in connection URL)
-	 * @param database The SQLDatabase instance
+	 * @param db The SQLDatabase instance
 	 */
-	public static void register(String name, SQLDatabase database) {
-		REGISTRY.put(name, database);
-		SCHEMA_CACHE.remove(name); // invalidate stale cached schema
+	public static void setDatabase(SQLDatabase db) {
+		database = db;
 	}
 
 	/**
-	 * Unregisters a database.
+	 * Gets the current database.
 	 *
-	 * @param name Database name
-	 * @return The removed database, or null if not found
+	 * @return The SQLDatabase, or null if not set
 	 */
-	public static SQLDatabase unregister(String name) {
-		SCHEMA_CACHE.remove(name);
-		return REGISTRY.remove(name);
+	public static SQLDatabase getDatabase() {
+		return database;
 	}
 
 	/**
-	 * Gets a registered database.
+	 * Creates a ConvexSchema for the current database.
 	 *
-	 * @param name Database name
-	 * @return The database, or null if not registered
+	 * @param schemaName Schema name for the Calcite schema
+	 * @return ConvexSchema, or null if no database set
 	 */
-	public static SQLDatabase get(String name) {
-		return REGISTRY.get(name);
-	}
-
-	/**
-	 * Creates a ConvexSchema from a registered database.
-	 *
-	 * @param name Database name
-	 * @return ConvexSchema, or null if database not registered
-	 */
-	public static ConvexSchema createFromRegistry(String name) {
-		SQLDatabase db = REGISTRY.get(name);
+	public static ConvexSchema createSchema(String schemaName) {
+		SQLDatabase db = database;
 		if (db == null) return null;
-		return new ConvexSchema(db.tables(), name);
+		return new ConvexSchema(db.tables(), schemaName);
 	}
 
-	// ========== Table lookup for code generation ==========
-
-	/** Cache of schemas for table lookup */
-	private static final Map<String, ConvexSchema> SCHEMA_CACHE = new ConcurrentHashMap<>();
+	// ========== Table lookup for generated code ==========
 
 	/**
 	 * Gets a ConvexTable by schema and table name.
 	 * Called from generated code in ConvexTableModify.
+	 * Navigates the database's cursor tree each time, so it always
+	 * reflects the current lattice state.
 	 *
-	 * @param schemaName Schema name
+	 * @param schemaName Schema name (currently maps to the database)
 	 * @param tableName Table name
 	 * @return The ConvexTable
 	 */
 	public static ConvexTable getTable(String schemaName, String tableName) {
-		ConvexSchema schema = SCHEMA_CACHE.computeIfAbsent(schemaName, k -> {
-			SQLDatabase db = REGISTRY.get(k);
-			if (db == null) {
-				throw new IllegalStateException("Database '" + k + "' not registered");
-			}
-			return new ConvexSchema(db.tables(), k);
-		});
-		return schema.getConvexTable(tableName);
+		SQLDatabase db = database;
+		if (db == null) {
+			throw new IllegalStateException("No database set. Call ConvexSchemaFactory.setDatabase() first.");
+		}
+		return new ConvexSchema(db.tables(), schemaName).getConvexTable(tableName);
 	}
 
 	@Override
 	public Schema create(SchemaPlus parentSchema, String name, Map<String, Object> operand) {
-		// Get database name from operand
-		String dbName = (String) operand.get("database");
-		if (dbName == null) {
-			dbName = name;
+		ConvexSchema schema = createSchema(name);
+		if (schema != null) {
+			return schema;
 		}
-
-		// Look up in registry
-		SQLDatabase db = REGISTRY.get(dbName);
-		if (db != null) {
-			return new ConvexSchema(db.tables(), name);
-		}
-
 		throw new IllegalArgumentException(
-			"Database '" + dbName + "' not registered. Call ConvexSchemaFactory.register() first.");
+			"No database set. Call ConvexSchemaFactory.setDatabase() first.");
 	}
 }

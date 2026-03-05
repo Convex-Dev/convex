@@ -102,7 +102,7 @@ public class InsertDemo {
 		server.launch();
 		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.register(DB_NAME, db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
@@ -122,7 +122,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC individual");
-		ConvexSchemaFactory.unregister(DB_NAME);
+		ConvexSchemaFactory.setDatabase(null);
 		server.close();
 		store.close();
 	}
@@ -136,7 +136,7 @@ public class InsertDemo {
 		server.launch();
 		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.register(DB_NAME, db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
@@ -156,7 +156,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStatement");
-		ConvexSchemaFactory.unregister(DB_NAME);
+		ConvexSchemaFactory.setDatabase(null);
 		server.close();
 		store.close();
 	}
@@ -170,7 +170,7 @@ public class InsertDemo {
 		server.launch();
 		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.register(DB_NAME, db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
@@ -191,7 +191,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStmt batch");
-		ConvexSchemaFactory.unregister(DB_NAME);
+		ConvexSchemaFactory.setDatabase(null);
 		server.close();
 		store.close();
 	}
@@ -219,7 +219,7 @@ public class InsertDemo {
 		check(latticeCount >= minExpectedRows, label,
 				"Lattice row count: expected >= " + minExpectedRows + ", got " + latticeCount);
 
-		ConvexSchemaFactory.register(DB_NAME, db);
+		ConvexSchemaFactory.setDatabase(db);
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
 

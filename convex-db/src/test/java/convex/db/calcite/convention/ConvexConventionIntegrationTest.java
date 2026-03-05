@@ -36,7 +36,7 @@ class ConvexConventionIntegrationTest {
 	void setUp() throws Exception {
 		// Create test database
 		db = SQLDatabase.create("convex_conv_test", AKeyPair.generate());
-		ConvexSchemaFactory.register("convex_conv_test", db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		// Create table with typed columns
 		ConvexColumnType[] types = {
@@ -58,7 +58,7 @@ class ConvexConventionIntegrationTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister("convex_conv_test");
+		ConvexSchemaFactory.setDatabase(null);
 	}
 
 	@Test

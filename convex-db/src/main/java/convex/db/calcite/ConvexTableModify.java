@@ -63,7 +63,7 @@ public class ConvexTableModify extends TableModify implements EnumerableRel {
 			getRowType(),
 			pref.preferCustom());
 
-		// Get the ConvexTable via registry lookup
+		// Get the ConvexTable via schema lookup.
 		// Table qualified name is [schemaName, tableName]
 		java.util.List<String> qualifiedName = getTable().getQualifiedName();
 		String schemaName = qualifiedName.get(0);

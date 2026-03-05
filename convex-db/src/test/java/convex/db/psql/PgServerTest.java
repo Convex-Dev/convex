@@ -41,7 +41,7 @@ public class PgServerTest {
 		// Create and register a test database
 		AKeyPair kp = AKeyPair.generate();
 		db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		// Create users table using LatticeTables API
 		ConvexColumnType[] userTypes = {
@@ -67,7 +67,7 @@ public class PgServerTest {
 			server.stop();
 		}
 		if (dbName != null) {
-			ConvexSchemaFactory.unregister(dbName);
+			ConvexSchemaFactory.setDatabase(null);
 		}
 	}
 

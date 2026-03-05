@@ -28,7 +28,7 @@ class SortAggregateTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		db = SQLDatabase.create("sort_agg_test", AKeyPair.generate());
-		ConvexSchemaFactory.register("sort_agg_test", db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		// Create table with test data
 		ConvexColumnType[] types = {
@@ -52,7 +52,7 @@ class SortAggregateTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister("sort_agg_test");
+		ConvexSchemaFactory.setDatabase(null);
 	}
 
 	// ========== Sort Tests ==========

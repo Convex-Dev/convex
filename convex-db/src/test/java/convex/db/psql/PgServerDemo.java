@@ -41,7 +41,7 @@ public class PgServerDemo {
 		System.out.println("Creating demo database: " + dbName);
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		// Create sample tables
 		createSampleData(db);

@@ -18,7 +18,7 @@ AKeyPair keyPair = AKeyPair.generate();
 SQLDatabase db = SQLDatabase.create("mydb", keyPair);
 
 // 2. Register it for JDBC/PostgreSQL access
-ConvexSchemaFactory.register("mydb", db);
+ConvexSchemaFactory.setDatabase(db);
 
 // 3. Connect via JDBC
 Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -109,7 +109,7 @@ Connect to Convex DB using any PostgreSQL client.
 ```java
 // Create and register database
 SQLDatabase db = SQLDatabase.create("mydb", keyPair);
-ConvexSchemaFactory.register("mydb", db);
+ConvexSchemaFactory.setDatabase(db);
 
 // Start PostgreSQL server
 PgServer server = PgServer.builder()

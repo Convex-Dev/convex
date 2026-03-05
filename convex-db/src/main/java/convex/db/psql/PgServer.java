@@ -22,9 +22,9 @@ import java.util.function.Supplier;
  *
  * <p>Usage:
  * <pre>
- * // Create and register a Convex database
+ * // Create and set a Convex database
  * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.register("mydb", db);
+ * ConvexSchemaFactory.setDatabase(db);
  *
  * // Start the PostgreSQL server
  * PgServer server = PgServer.builder()

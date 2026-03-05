@@ -21,7 +21,7 @@ public class SQLDemo {
 		// 1. Create and register database
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("demo", kp);
-		ConvexSchemaFactory.register("demo", db);
+		ConvexSchemaFactory.setDatabase(db);
 		System.out.println("Database: " + db.getName());
 
 		// 2. Create table via database API

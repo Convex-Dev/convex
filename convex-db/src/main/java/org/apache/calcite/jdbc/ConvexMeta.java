@@ -155,9 +155,7 @@ public class ConvexMeta extends CalciteMetaImpl {
 	}
 
 	private SQLDatabase findDatabase() {
-		String schemaName = getSchemaName();
-		if (schemaName == null) return null;
-		return ConvexSchemaFactory.get(schemaName);
+		return ConvexSchemaFactory.getDatabase();
 	}
 
 	private ConvexSchema findConvexSchema(String schemaName) {

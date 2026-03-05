@@ -28,7 +28,7 @@ class JoinSubqueryTest {
 	@BeforeEach
 	void setUp() throws Exception {
 		db = SQLDatabase.create("join_test", AKeyPair.generate());
-		ConvexSchemaFactory.register("join_test", db);
+		ConvexSchemaFactory.setDatabase(db);
 
 		// Create customers table
 		ConvexColumnType[] customerTypes = {
@@ -65,7 +65,7 @@ class JoinSubqueryTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister("join_test");
+		ConvexSchemaFactory.setDatabase(null);
 	}
 
 	// ========== INNER JOIN Tests ==========

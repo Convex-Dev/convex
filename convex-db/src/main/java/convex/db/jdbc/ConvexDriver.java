@@ -35,9 +35,9 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  *
  * <p>Usage:
  * <pre>
- * // 1. Create and register database
+ * // 1. Create and set database
  * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.register("mydb", db);
+ * ConvexSchemaFactory.setDatabase(db);
  *
  * // 2. Connect via JDBC (driver auto-registers)
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -116,14 +116,14 @@ public class ConvexDriver extends Driver {
 
 		// Set up Convex schema if database specified
 		if (database != null && conn instanceof CalciteConnection calciteConn) {
-			ConvexSchema schema = ConvexSchemaFactory.createFromRegistry(database);
+			ConvexSchema schema = ConvexSchemaFactory.createSchema(database);
 			if (schema != null) {
 				SchemaPlus rootSchema = calciteConn.getRootSchema();
 				rootSchema.add(database, schema);
 				calciteConn.setSchema(database);
 			} else {
-				throw new SQLException("Database '" + database + "' not registered. " +
-					"Call ConvexSchemaFactory.register() first.");
+				throw new SQLException("No database set. " +
+					"Call ConvexSchemaFactory.setDatabase() first.");
 			}
 		}
 
