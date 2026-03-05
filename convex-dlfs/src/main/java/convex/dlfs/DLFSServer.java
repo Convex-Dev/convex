@@ -79,9 +79,9 @@ public class DLFSServer implements Closeable {
 			config.useVirtualThreads = true;
 		});
 
-		// Wire auth middleware if key pair provided
+		// Wire auth middleware if key pair provided (with audience checking)
 		if (keyPair != null) {
-			PeerAuth peerAuth = new PeerAuth(keyPair);
+			PeerAuth peerAuth = PeerAuth.createWithDIDAudience(keyPair);
 			AuthMiddleware auth = new AuthMiddleware(peerAuth);
 			app.before(auth.handler());
 		}

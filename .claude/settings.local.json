@@ -26,7 +26,13 @@
       "Bash(mvn exec:java:*)",
       "WebSearch",
       "WebFetch(domain:calcite.apache.org)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(java:*)",
+      "Bash(taskkill:*)",
+      "Bash(wmic process:*)",
+      "Bash(mvn clean:*)",
+      "Bash(rm:*)",
+      "Bash(mvn surefire:test:*)"
     ]
   },
   "enabledMcpjsonServers": [

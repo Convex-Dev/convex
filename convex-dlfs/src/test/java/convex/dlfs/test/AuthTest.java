@@ -12,13 +12,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
+import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
 import convex.dlfs.DLFSServer;
 
@@ -36,10 +35,15 @@ public class AuthTest {
 	private static AKeyPair serverKeyPair;
 	private static AKeyPair clientKeyPair;
 
+	/** Expected audience — the server's DID (did:key:<multikey>) */
+	private static String expectedAudience;
+
+
 	@BeforeAll
 	static void setUp() {
 		serverKeyPair = AKeyPair.generate();
 		clientKeyPair = AKeyPair.generate();
+		expectedAudience = DID.forKey(serverKeyPair.getAccountKey()).toString();
 
 		server = DLFSServer.create(serverKeyPair);
 		server.getWebDAV().setRequireAuthForWrites(true);
@@ -59,18 +63,27 @@ public class AuthTest {
 	// ==================== Helper ====================
 
 	/**
-	 * Creates a self-signed JWT for the given key pair.
+	 * Creates a self-signed JWT for the given key pair with the server's audience.
 	 */
 	static String createSelfIssuedJWT(AKeyPair kp, long lifetimeSeconds) {
+		return createSelfIssuedJWT(kp, lifetimeSeconds, expectedAudience);
+	}
+
+	/**
+	 * Creates a self-signed JWT with a specific audience (or null for no aud claim).
+	 */
+	static String createSelfIssuedJWT(AKeyPair kp, long lifetimeSeconds, String audience) {
 		long now = System.currentTimeMillis() / 1000;
-		AString multikey = Multikey.encodePublicKey(kp.getAccountKey());
-		AString did = Strings.create("did:key:").append(multikey);
+		AString did = DID.forKey(kp.getAccountKey());
 		AMap<AString, ACell> claims = Maps.of(
-			Strings.create("sub"), did,
-			Strings.create("iss"), did,
-			Strings.create("iat"), CVMLong.create(now),
-			Strings.create("exp"), CVMLong.create(now + lifetimeSeconds)
+			JWT.SUB, did,
+			JWT.ISS, did,
+			JWT.IAT, now,
+			JWT.EXP, now + lifetimeSeconds
 		);
+		if (audience != null) {
+			claims = claims.assoc(JWT.AUD, Strings.create(audience));
+		}
 		return JWT.signPublic(claims, kp).toString();
 	}
 
@@ -78,8 +91,7 @@ public class AuthTest {
 	 * Returns the DID string for a key pair.
 	 */
 	static String getDID(AKeyPair kp) {
-		AString multikey = Multikey.encodePublicKey(kp.getAccountKey());
-		return "did:key:" + multikey;
+		return DID.forKey(kp.getAccountKey()).toString();
 	}
 
 	// ==================== Tests ====================
@@ -242,5 +254,60 @@ public class AuthTest {
 				.build();
 		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
 		assertEquals(207, resp.statusCode(), "PROPFIND should succeed without auth");
+	}
+
+	@Test
+	void testWriteWithWrongAudience() throws Exception {
+		// JWT signed correctly but with wrong aud
+		String token = createSelfIssuedJWT(clientKeyPair, 3600, "did:key:zWRONGSERVER");
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(driveURL + "wrong-aud.txt"))
+				.PUT(HttpRequest.BodyPublishers.ofString("wrong audience"))
+				.header("Authorization", "Bearer " + token)
+				.build();
+		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(401, resp.statusCode(), "Write with wrong aud should return 401");
+	}
+
+	@Test
+	void testWriteWithMissingAudience() throws Exception {
+		// JWT signed correctly but no aud claim at all
+		String token = createSelfIssuedJWT(clientKeyPair, 3600, null);
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(driveURL + "no-aud.txt"))
+				.PUT(HttpRequest.BodyPublishers.ofString("missing audience"))
+				.header("Authorization", "Bearer " + token)
+				.build();
+		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(401, resp.statusCode(), "Write with missing aud should return 401");
+	}
+
+	@Test
+	void testWriteWithBadlySignedJWT() throws Exception {
+		// Attacker crafts claims with correct aud but signs with their own key
+		// and puts a different key's DID as sub
+		AKeyPair attackerKP = AKeyPair.generate();
+		AString victimDID = DID.forKey(clientKeyPair.getAccountKey());
+
+		long now = System.currentTimeMillis() / 1000;
+		AMap<AString, ACell> claims = Maps.of(
+			JWT.SUB, victimDID,
+			JWT.ISS, victimDID,
+			JWT.AUD, expectedAudience,
+			JWT.IAT, now,
+			JWT.EXP, now + 3600
+		);
+		// signPublic sets kid to attackerKP's key, so kid != sub → rejected
+		String token = JWT.signPublic(claims, attackerKP).toString();
+
+		HttpRequest req = HttpRequest.newBuilder()
+				.uri(URI.create(driveURL + "forged.txt"))
+				.PUT(HttpRequest.BodyPublishers.ofString("forged identity"))
+				.header("Authorization", "Bearer " + token)
+				.build();
+		HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+		assertEquals(401, resp.statusCode(), "Write with forged JWT (kid != sub) should return 401");
 	}
 }

@@ -336,7 +336,7 @@ public class JWTTest {
 		JWT parsed = JWT.parse(jwtString);
 		assertNotNull(parsed);
 		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
-		assertFalse(parsed.validateClaims(null, null), "Expired token should fail validation");
+		assertFalse(parsed.validateClaims((String) null, null), "Expired token should fail validation");
 	}
 
 	@Test public void testValidateClaimsWrongIssuer() throws Exception {
@@ -378,8 +378,8 @@ public class JWTTest {
 		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
 		assertTrue(parsed.validateClaims("https://accounts.google.com", "my-client-id"));
 		// Null params skip checks
-		assertTrue(parsed.validateClaims(null, null));
+		assertTrue(parsed.validateClaims((String) null, null));
 		assertTrue(parsed.validateClaims("https://accounts.google.com", null));
-		assertTrue(parsed.validateClaims(null, "my-client-id"));
+		assertTrue(parsed.validateClaims((String) null, "my-client-id"));
 	}
 }

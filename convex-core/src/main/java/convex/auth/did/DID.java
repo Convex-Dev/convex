@@ -5,6 +5,11 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
+import convex.core.crypto.util.Multikey;
+import convex.core.data.AString;
+import convex.core.data.AccountKey;
+import convex.core.data.Strings;
+
 /**
  * Represents a W3C Decentralized Identifier (DID) with method and id
  * 
@@ -19,6 +24,7 @@ public class DID {
 
 	private static final String URI_SCHEME = "did";
 	private static final String DID_START = URI_SCHEME+":";
+	private static final AString DID_KEY_PREFIX = Strings.intern("did:key:");
     
     private final String method;
     private final String id;
@@ -139,6 +145,16 @@ public class DID {
 
 	public static DID create(String method, String id) {
 		return new DID(method,id);
+	}
+
+	/**
+	 * Creates a {@code did:key:<multikey>} AString for an Ed25519 public key.
+	 *
+	 * @param publicKey The Ed25519 public key
+	 * @return DID string as AString (e.g. {@code did:key:z6Mk...})
+	 */
+	public static AString forKey(AccountKey publicKey) {
+		return DID_KEY_PREFIX.append(Multikey.encodePublicKey(publicKey));
 	}
 
 	public DID withPath(String string) {
