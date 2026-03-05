@@ -193,7 +193,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (!propagators.isEmpty()) {
 			propagators.get(0).setMergeCallback(persisted -> {
 				cursor.updateAndGet(current -> {
-					@SuppressWarnings("unchecked")
 					V merged = lattice.merge(mergeContext, current, (V) persisted);
 					return merged;
 				});

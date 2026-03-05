@@ -2,13 +2,15 @@ package convex.dlfs;
 
 import java.io.Closeable;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
-import convex.lattice.fs.DLFS;
 import convex.peer.auth.PeerAuth;
 import convex.restapi.auth.AuthMiddleware;
 import io.javalin.Javalin;
@@ -170,10 +172,10 @@ public class DLFSServer implements Closeable {
 		dm.createDrive(null, "home");
 		FileSystem homeFs = dm.getDrive(null, "home");
 		try {
-			java.nio.file.Path testFile = homeFs.getPath("/test.txt");
-			java.nio.file.Files.write(testFile, "Hello from DLFS!\n".getBytes(),
-					java.nio.file.StandardOpenOption.CREATE,
-					java.nio.file.StandardOpenOption.WRITE);
+			Path testFile = homeFs.getPath("/test.txt");
+			Files.write(testFile, "Hello from DLFS!\n".getBytes(),
+					StandardOpenOption.CREATE,
+					StandardOpenOption.WRITE);
 		} catch (Exception e) {
 			System.err.println("Warning: could not seed demo file: " + e.getMessage());
 		}
