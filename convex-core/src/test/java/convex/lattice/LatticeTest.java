@@ -145,7 +145,6 @@ public class LatticeTest {
 		assertNull(Lattice.ROOT.resolvePath(Strings.create("nonexistent")));
 
 		// ASequence overload: invalid key → null
-		@SuppressWarnings("unchecked")
 		AVector<ACell> badSeq=(AVector<ACell>)Vectors.of(Strings.create("nonexistent"));
 		assertNull(Lattice.ROOT.resolvePath(badSeq));
 	}
@@ -212,7 +211,6 @@ public class LatticeTest {
 
 		// --- ASequence overload matches varargs ---
 		{
-			@SuppressWarnings("unchecked")
 			AVector<ACell> seqPath=(AVector<ACell>)Vectors.of(Strings.create("alpha"),Strings.create("abcd"));
 			ACell[] fromSeq=lattice.resolvePath(seqPath);
 			ACell[] fromArgs=lattice.resolvePath(Strings.create("alpha"),Strings.create("abcd"));

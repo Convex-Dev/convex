@@ -1,6 +1,11 @@
 package convex.restapi.test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -9,7 +14,7 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.auth.jwt.JWT;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Providers;
 import convex.core.data.ACell;
@@ -22,11 +27,9 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
-import convex.auth.jwt.JWT;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.peer.auth.PeerAuth;
-import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpProtocol;
 
 /**

@@ -92,7 +92,6 @@ public class ParamTestStores {
 		assertEquals(null, store.refForHash(unknown));
 	}
 
-	@SuppressWarnings("unchecked")
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testLargeSetPersist(AStore store) throws IOException {

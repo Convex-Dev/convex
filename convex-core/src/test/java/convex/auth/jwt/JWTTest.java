@@ -143,7 +143,6 @@ public class JWTTest {
 		// Tamper with the claims (change a character in the middle)
 		String s = jwt.toString();
 		int dot1 = s.indexOf('.');
-		int dot2 = s.indexOf('.', dot1 + 1);
 		String tampered = s.substring(0, dot1 + 2) + "X" + s.substring(dot1 + 3);
 		assertNull(JWT.verifyPublic(Strings.create(tampered)), "Tampered JWT should fail verification");
 	}

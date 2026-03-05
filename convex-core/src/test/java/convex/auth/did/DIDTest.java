@@ -1,14 +1,16 @@
 package convex.auth.did;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.auth.did.DID;
-import convex.auth.did.DIDURL;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AString;
 

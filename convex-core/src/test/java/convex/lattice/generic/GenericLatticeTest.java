@@ -338,7 +338,6 @@ public class GenericLatticeTest {
 		LatticeTest.doLatticeTest(lat, CVMLong.ONE, CVMLong.TWO);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testTupleLattice() {
 		// Tuple: [MaxLattice, SetLattice]

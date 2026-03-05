@@ -13,7 +13,6 @@ import javax.imageio.ImageIO;
 
 import convex.api.ContentTypes;
 import convex.api.Convex;
-import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Block;
@@ -213,7 +212,7 @@ public class ChainAPI extends ABaseAPI {
 		Blob b=Format.encodeMultiCell(value, true);
 
 		ctx.status(200);
-		String responseType=this.calcResponseContentType(ctx);
+		String responseType=ChainAPI.calcResponseContentType(ctx);
 		if (ContentTypes.CVX_RAW.equals(responseType)||ContentTypes.BYTES.equals(type)) {
 			ctx.result(b.getInputStream());
 		} else {
@@ -268,7 +267,7 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ctx.status(200);
-		String rtype=this.calcResponseContentType(ctx);
+		String rtype=ChainAPI.calcResponseContentType(ctx);
 		if (ContentTypes.CVX_RAW.equals(rtype)) {
 			ctx.result(RT.print(r).getInputStream());
 		} else if (ContentTypes.JSON.equals(rtype)) {

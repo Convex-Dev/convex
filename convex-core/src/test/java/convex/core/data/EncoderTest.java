@@ -18,7 +18,6 @@ import convex.core.cvm.State;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.AEncoder.DecodeState;
-import convex.core.data.SignedData;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
@@ -455,14 +454,16 @@ public class EncoderTest {
 			"Zero-length child encoding should be rejected");
 	}
 
+	@SuppressWarnings("unused")
 	@Test public void testAdversarialEmbeddedCellAsChild() {
 		// A child that is embedded (small value) — readChildCells must reject this
 		ACell big = Samples.INT_VECTOR_300;
 		Blob topEnc = Cells.encode(big);
 
-		// Use CVMLong.ONE as "child" — it's embedded (1 byte encoding)
-		ACell embedded = Vectors.of(1); // small vector, should be embedded
+		// Use CVMLong.ONE as "child" — it's embedded (2 byte encoding)
+		ACell embedded = Vectors.of(1); // small vector [1], should be embedded
 		assertTrue(embedded.isEmbedded(), "Test child must be embedded");
+		assertEquals(4,embedded.getEncodingLength());
 
 		Blob msg = buildMultiCell(big, embedded);
 		assertThrows(BadFormatException.class, () -> CVM.decodeMultiCell(msg),

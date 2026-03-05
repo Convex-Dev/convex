@@ -32,7 +32,6 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpProtocol;
 import convex.restapi.mcp.McpTool;
 

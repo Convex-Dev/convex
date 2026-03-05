@@ -1,12 +1,13 @@
 package convex.lattice.queue;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.ACell;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 
 public class LatticeMQTest {
 
