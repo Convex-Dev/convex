@@ -4,7 +4,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
 
+import org.apache.calcite.avatica.AvaticaConnection;
+import org.apache.calcite.avatica.Meta;
 import org.apache.calcite.jdbc.CalciteConnection;
+import org.apache.calcite.jdbc.ConvexMeta;
 import org.apache.calcite.jdbc.Driver;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
@@ -78,6 +81,11 @@ public class ConvexDriver extends Driver {
 
 	public ConvexDriver() {
 		super();
+	}
+
+	@Override
+	public Meta createMeta(AvaticaConnection connection) {
+		return ConvexMeta.create(connection);
 	}
 
 	@Override

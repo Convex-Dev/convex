@@ -23,7 +23,10 @@
       "Bash(mvn install:*)",
       "Bash(java -jar convex-cli/target/convex-cli.jar account create:*)",
       "Bash(java -jar:*)",
-      "Bash(mvn exec:java:*)"
+      "Bash(mvn exec:java:*)",
+      "WebSearch",
+      "WebFetch(domain:calcite.apache.org)",
+      "WebFetch(domain:github.com)"
     ]
   },
   "enabledMcpjsonServers": [

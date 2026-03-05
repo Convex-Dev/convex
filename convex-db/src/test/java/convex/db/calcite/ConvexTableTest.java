@@ -348,6 +348,40 @@ public class ConvexTableTest {
 		}
 	}
 
+	// ========== Transaction Tests (Stage 1: verify Meta hooks work) ==========
+
+	/**
+	 * Tests that setAutoCommit, commit, and rollback don't throw.
+	 * Stage 1: ConvexMeta overrides CalciteMetaImpl's UnsupportedOperationException.
+	 */
+	@Test
+	void testTransactionMethodsDontThrow() throws SQLException {
+		// These would throw UnsupportedOperationException without ConvexMeta
+		assertDoesNotThrow(() -> conn.setAutoCommit(false));
+		assertDoesNotThrow(() -> conn.commit());
+		assertDoesNotThrow(() -> conn.rollback());
+		assertDoesNotThrow(() -> conn.setAutoCommit(true));
+	}
+
+	/**
+	 * Tests that DML works within a transaction block (auto-commit off).
+	 * Stage 1: verifies basic operation, not isolation/atomicity yet.
+	 */
+	@Test
+	void testDMLWithAutoCommitOff() throws SQLException {
+		conn.setAutoCommit(false);
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
+			conn.commit();
+
+			try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM test_table")) {
+				assertTrue(rs.next());
+				assertEquals(1, rs.getInt(1));
+			}
+		}
+		conn.setAutoCommit(true);
+	}
+
 	/**
 	 * Tests ConvexColumnType.parse() for SQL type strings.
 	 */
