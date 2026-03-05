@@ -84,6 +84,22 @@ Convex DB supports standard SQL via Apache Calcite:
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
 
+### Transactions
+
+JDBC transaction support uses Convex's lattice cursor fork/sync model:
+
+```java
+conn.setAutoCommit(false);
+
+stmt.execute("INSERT INTO users VALUES (2, 'Bob', 'bob@example.com')");
+// Changes isolated to this connection until commit
+
+conn.commit();   // Syncs fork back to parent — now visible to other connections
+// conn.rollback() would discard the fork instead
+```
+
+At the lattice level, `SQLDatabase.fork()` creates an isolated copy. `sync()` merges changes back; discarding the fork is a rollback.
+
 ## PostgreSQL Protocol Server
 
 Connect to Convex DB using any PostgreSQL client.
@@ -145,7 +161,7 @@ Some PostgreSQL-specific features are not yet supported:
 - Regex operators (`~`, `!~`, `~*`)
 - Some system catalog tables (pg_proc, pg_index, pg_constraint)
 - PostgreSQL-specific functions
-- Transactions (all operations auto-commit)
+- Transaction isolation across connections (read-committed level via lattice fork/sync)
 
 ## Lattice Tables API
 

@@ -162,6 +162,18 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
+	 * Creates a forked copy of this database for transaction isolation.
+	 * The fork reads from a snapshot at fork time; writes accumulate locally.
+	 * Call {@link #sync()} on the fork to merge changes back into the parent.
+	 * Discard the fork (don't sync) for rollback.
+	 *
+	 * @return Forked SQLDatabase instance
+	 */
+	public SQLDatabase fork() {
+		return new SQLDatabase(cursor.fork(), dbName, keyPair, ownerKey);
+	}
+
+	/**
 	 * Returns the LatticeTables facade for performing table operations.
 	 *
 	 * @return LatticeTables instance

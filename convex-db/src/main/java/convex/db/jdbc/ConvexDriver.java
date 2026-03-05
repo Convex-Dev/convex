@@ -83,6 +83,7 @@ public class ConvexDriver extends Driver {
 		super();
 	}
 
+	/** Returns ConvexMeta for transaction support (commit/rollback via lattice fork/sync). */
 	@Override
 	public Meta createMeta(AvaticaConnection connection) {
 		return ConvexMeta.create(connection);

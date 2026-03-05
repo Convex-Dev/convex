@@ -304,6 +304,84 @@ public class SQLDatabaseTest {
 		assertEquals(2, db.tables().getRowCount("data"));
 	}
 
+	// ========== Transaction Tests (SQLDatabase.fork/sync) ==========
+
+	@Test
+	public void testDatabaseForkNotVisibleUntilCommitted() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork for transaction
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+
+		// Transaction sees its own write
+		assertEquals(2, tx.tables().getRowCount("users"));
+
+		// Parent does NOT see uncommitted data
+		assertEquals(1, db.tables().getRowCount("users"));
+		assertNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkVisibleAfterCommit() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork, insert, commit
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+		tx.sync(); // commit
+
+		// Parent now sees committed data
+		assertEquals(2, db.tables().getRowCount("users"));
+		assertNotNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkRollbackDiscardsChanges() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork, insert, don't sync (rollback)
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+		// tx is discarded — no sync()
+
+		// Parent unchanged
+		assertEquals(1, db.tables().getRowCount("users"));
+		assertNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkAcrossSchemas() {
+		// Transaction should be ACID across all sections of the database
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("orders", new String[]{"id", "item"});
+		db.tables().createTable("items", new String[]{"id", "name"});
+
+		// Fork at database level — encompasses all tables
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("orders", 1, "widget");
+		tx.tables().insert("items", 1, "Widget");
+
+		// Neither table shows uncommitted data in parent
+		assertEquals(0, db.tables().getRowCount("orders"));
+		assertEquals(0, db.tables().getRowCount("items"));
+
+		// Commit — both tables updated atomically
+		tx.sync();
+		assertEquals(1, db.tables().getRowCount("orders"));
+		assertEquals(1, db.tables().getRowCount("items"));
+	}
+
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
