@@ -2,11 +2,15 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Strings;
 
 /**
  * Abstract base class for CVM value types
  */
 public abstract class AType {
+
+	private AString cachedName;
+
 
 	/**
 	 * Checks if a value is an instance of this Type.
@@ -44,6 +48,15 @@ public abstract class AType {
 	 * @return Java Class representing this Type
 	 */
 	public abstract Class<? extends ACell> getJavaClass();
+
+	/**
+	 * Gets the type name as an interned AString. Cached for efficiency.
+	 * @return Type name as AString (e.g. "Map", "Vector", "Long")
+	 */
+	public AString toAString() {
+		if (cachedName == null) cachedName = Strings.intern(toString());
+		return cachedName;
+	}
 
 	/**
 	 * Gets the tag to be used for printing
