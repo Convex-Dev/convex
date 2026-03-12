@@ -71,9 +71,9 @@ public class ConvexSchema extends AbstractSchema {
 	}
 
 	/**
-	 * Gets the underlying LatticeTables instance.
+	 * Gets the underlying SQLSchema instance.
 	 *
-	 * @return LatticeTables backing store
+	 * @return SQLSchema backing store
 	 */
 	public SQLSchema getTables() {
 		return tables;

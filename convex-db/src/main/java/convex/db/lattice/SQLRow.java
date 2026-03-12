@@ -20,11 +20,11 @@ import convex.core.data.prim.CVMLong;
 public class SQLRow {
 
 	/** Position of values in the row vector */
-	public static final int POS_VALUES = 0;
+	static final int POS_VALUES = 0;
 	/** Position of update timestamp */
-	public static final int POS_UTIME = 1;
+	static final int POS_UTIME = 1;
 	/** Position of deletion timestamp */
-	public static final int POS_DELETED = 2;
+	static final int POS_DELETED = 2;
 
 	private SQLRow() {}
 

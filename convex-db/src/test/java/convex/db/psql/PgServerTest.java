@@ -44,7 +44,7 @@ public class PgServerTest {
 		db = cdb.database(dbName);
 		cdb.register(dbName);
 
-		// Create users table using LatticeTables API
+		// Create users table using SQLSchema API
 		ConvexColumnType[] userTypes = {
 			ConvexColumnType.of(ConvexType.INTEGER),   // id
 			ConvexColumnType.varchar(50),              // name

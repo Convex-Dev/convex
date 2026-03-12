@@ -24,7 +24,7 @@ import convex.db.lattice.SQLSchema;
 /**
  * Table scan in CONVEX convention.
  *
- * <p>Reads rows from LatticeTables and returns them as ACell[] directly,
+ * <p>Reads rows from SQLSchema and returns them as ACell[] directly,
  * with no conversion to Java types.
  */
 public class ConvexTableScan extends TableScan implements ConvexRel {

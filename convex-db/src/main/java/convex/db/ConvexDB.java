@@ -162,12 +162,9 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Registers all databases in this ConvexDB for JDBC and PostgreSQL
-	 * wire protocol access. After calling this, any database can be
-	 * connected via {@code jdbc:convex:database=<name>}.
-	 *
-	 * <p>To register a single database by name, use {@link #register(String)}.
-	 * To register all existing databases, iterate {@link #getDatabaseNames()}.
+	 * Registers a named database for JDBC and PostgreSQL wire protocol access.
+	 * After calling this, the database can be connected via
+	 * {@code jdbc:convex:database=<name>}.
 	 *
 	 * @param dbName The database name to register
 	 * @return This ConvexDB instance, for chaining
@@ -175,6 +172,21 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	public ConvexDB register(String dbName) {
 		registry.put(dbName, this);
 		return this;
+	}
+
+	/**
+	 * Returns the names of all databases in this ConvexDB that have state.
+	 *
+	 * @return Array of database names
+	 */
+	public String[] getDatabaseNames() {
+		AHashMap<AString, Index<Keyword, ACell>> map = cursor.get();
+		if (map == null) return new String[0];
+		java.util.List<String> names = new java.util.ArrayList<>();
+		for (var entry : map.entrySet()) {
+			names.add(entry.getKey().toString());
+		}
+		return names.toArray(new String[0]);
 	}
 
 	/**

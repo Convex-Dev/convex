@@ -72,7 +72,7 @@ public class InsertDemo {
 	}
 
 	/**
-	 * Direct LatticeTables.insert() via NodeServer cursor chain
+	 * Direct SQLSchema.insert() via NodeServer cursor chain
 	 */
 	static void benchmarkDirectLattice() throws Exception {
 		EtchStore store = EtchStore.createTemp();

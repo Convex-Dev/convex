@@ -24,7 +24,7 @@ public class ConvexEnumerator implements Enumerator<Object[]> {
 	/**
 	 * Creates a new enumerator for the given table.
 	 *
-	 * @param tables LatticeTables instance
+	 * @param tables SQLSchema instance
 	 * @param tableName Table to enumerate
 	 */
 	public ConvexEnumerator(SQLSchema tables, String tableName) {

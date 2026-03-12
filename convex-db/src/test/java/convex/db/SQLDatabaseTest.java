@@ -29,7 +29,7 @@ import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 
 /**
- * Tests for SQLDatabase and LatticeTables.
+ * Tests for SQLDatabase and SQLSchema.
  */
 public class SQLDatabaseTest {
 

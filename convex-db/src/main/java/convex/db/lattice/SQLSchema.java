@@ -26,22 +26,22 @@ import convex.lattice.cursor.Cursors;
  *
  * <p>Usage:
  * <pre>
- * LatticeTables tables = LatticeTables.create();
+ * SQLSchema schema = SQLSchema.create();
  *
  * // Create a table
- * tables.createTable("users", new String[]{"id", "name", "email"});
+ * schema.createTable("users", new String[]{"id", "name", "email"});
  *
- * // Insert rows (primary key must be blob-like)
- * tables.insert("users", Blob.fromHex("01"), Vectors.of(Strings.create("Alice"), Strings.create("alice@example.com")));
+ * // Insert rows (first column is primary key)
+ * schema.insert("users", 1, "Alice", "alice@example.com");
  *
  * // Query rows
- * AVector&lt;ACell&gt; row = tables.selectByKey("users", Blob.fromHex("01"));
+ * AVector&lt;ACell&gt; row = schema.selectByKey("users", CVMLong.create(1));
  *
  * // Delete rows
- * tables.deleteByKey("users", Blob.fromHex("01"));
+ * schema.deleteByKey("users", CVMLong.create(1));
  *
  * // Drop table
- * tables.dropTable("users");
+ * schema.dropTable("users");
  * </pre>
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
@@ -53,7 +53,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	/**
 	 * Creates a new empty table store.
 	 *
-	 * @return New LatticeTables instance
+	 * @return New SQLSchema instance
 	 */
 	public static SQLSchema create() {
 		ALatticeCursor<Index<AString, AVector<ACell>>> cursor =
@@ -65,7 +65,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * Connects to an existing cursor for cursor chain integration.
 	 *
 	 * @param cursor Lattice cursor (e.g. from a SignedCursor path)
-	 * @return New LatticeTables instance connected to the cursor
+	 * @return New SQLSchema instance connected to the cursor
 	 */
 	public static SQLSchema connect(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
 		return new SQLSchema(cursor);
@@ -74,7 +74,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	/**
 	 * Creates a forked copy of this store for independent operation.
 	 *
-	 * @return Forked LatticeTables instance
+	 * @return Forked SQLSchema instance
 	 */
 	public SQLSchema fork() {
 		return new SQLSchema(cursor.fork());
@@ -87,12 +87,12 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	/**
-	 * Gets a table by name, returning null if not found.
+	 * Gets a cursor-backed table by name, returning null if not found.
 	 */
 	public SQLTable getTable(AString name) {
-		Index<AString, AVector<ACell>> store = cursor.get();
-		if (store == null) return null;
-		return SQLTable.wrap(store.get(name));
+		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		if (tableCursor.get() == null) return null;
+		return new SQLTable(tableCursor);
 	}
 
 	/** Convenience overload. */
@@ -112,14 +112,6 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	/** Convenience overload. */
 	public SQLTable getLiveTable(String name) {
 		return getLiveTable(Strings.create(name));
-	}
-
-	private void putTable(AString name, SQLTable table) {
-		AVector<ACell> state = table.getState();
-		cursor.updateAndGet(store -> {
-			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			return store.assoc(name, state);
-		});
 	}
 
 	/**
@@ -202,7 +194,9 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 			schema = schema.append(Vectors.of(Strings.create(columns[i]), typeName, precision, scale));
 		}
 
-		putTable(name, SQLTable.create((AVector<AVector<ACell>>) schema, now()));
+		// Set state on the table's cursor path
+		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
 		return true;
 	}
 
@@ -213,7 +207,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	public boolean dropTable(AString name) {
 		if (getLiveTable(name) == null) return false;
-		putTable(name, SQLTable.createTombstone(now()));
+		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+		tableCursor.set(SQLTable.createTombstoneState(now()));
 		return true;
 	}
 
@@ -312,23 +307,10 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	}
 
 	public boolean insert(AString tableName, AVector<ACell> row) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return false;
 		ABlob pk = toKey(row.get(0));
-		CVMLong timestamp = now();
-
-		// Single cursor operation: read table, insert row, write back
-		boolean[] result = new boolean[1];
-		cursor.updateAndGet(store -> {
-			if (store == null) store = TableStoreLattice.INSTANCE.zero();
-			SQLTable table = SQLTable.wrap(store.get(tableName));
-			if (table == null || !table.isLive()) return store;
-
-			Index<ABlob, AVector<ACell>> rows = table.getRows();
-			if (rows == null) rows = TableLattice.INSTANCE.zero();
-			rows = rows.assoc(pk, SQLRow.create(row, timestamp));
-			result[0] = true;
-			return store.assoc(tableName, table.withRows(rows, timestamp).getState());
-		});
-		return result[0];
+		return table.insertRow(pk, row, now());
 	}
 
 	/** Inserts a row with auto-conversion from Java types. First value is primary key. */
@@ -362,18 +344,8 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	public boolean deleteByKey(AString tableName, ACell primaryKey) {
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return false;
-
-		Index<ABlob, AVector<ACell>> rows = table.getRows();
-		if (rows == null) return false;
-
 		ABlob key = toKey(primaryKey);
-		AVector<ACell> row = rows.get(key);
-		if (row == null || !SQLRow.isLive(row)) return false;
-
-		CVMLong timestamp = now();
-		rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
-		putTable(tableName, table.withRows(rows, timestamp));
-		return true;
+		return table.deleteRow(key, now());
 	}
 
 	/** Returns all live rows in a table. */
@@ -411,11 +383,21 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 		java.util.List<String> names = new java.util.ArrayList<>();
 		for (var entry : store.entrySet()) {
-			SQLTable table = SQLTable.wrap(entry.getValue());
-			if (table != null && table.isLive()) {
+			if (SQLTable.isLiveState(entry.getValue())) {
 				names.add(entry.getKey().toString());
 			}
 		}
 		return names.toArray(new String[0]);
+	}
+
+	/** Gets the column count for a table. */
+	public int getColumnCount(String name) {
+		return getColumnCount(Strings.create(name));
+	}
+
+	public int getColumnCount(AString name) {
+		SQLTable table = getLiveTable(name);
+		if (table == null) return 0;
+		return (int) table.getColumnCount();
 	}
 }
