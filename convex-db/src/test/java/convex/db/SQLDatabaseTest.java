@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
@@ -20,6 +21,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.db.ConvexDB;
 import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
 import convex.lattice.LatticeContext;
@@ -234,7 +236,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testConnectedDatabase() throws Exception {
 		// Set up a cursor chain using DATABASE_MAP_LATTICE
-		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 
 		// Connect a named database
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -284,7 +286,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testForkAndSyncConnected() throws Exception {
 		// Set up cursor chain
-		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 
 		// Connect and populate
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -383,9 +385,53 @@ public class SQLDatabaseTest {
 	}
 
 	@Test
+	public void testMultipleDatabaseRegistry() throws Exception {
+		// Create and register two databases via ConvexDB
+		ConvexDB cdb = ConvexDB.create();
+		SQLDatabase db1 = cdb.database("db_alpha");
+		SQLDatabase db2 = cdb.database("db_beta");
+		db1.tables().createTable("t1", new String[]{"id", "val"});
+		db2.tables().createTable("t2", new String[]{"id", "val"});
+		db1.tables().insert("t1", 1, "alpha");
+		db2.tables().insert("t2", 1, "beta");
+
+		cdb.register("db_alpha");
+		cdb.register("db_beta");
+
+		try {
+			// Connect to each database independently
+			try (java.sql.Connection conn1 = java.sql.DriverManager.getConnection("jdbc:convex:database=db_alpha");
+				 java.sql.Connection conn2 = java.sql.DriverManager.getConnection("jdbc:convex:database=db_beta")) {
+
+				// Each connection sees only its own tables
+				try (java.sql.Statement stmt1 = conn1.createStatement();
+					 java.sql.ResultSet rs1 = stmt1.executeQuery("SELECT val FROM t1 WHERE id = 1")) {
+					assertTrue(rs1.next());
+					assertEquals("alpha", rs1.getObject(1));
+				}
+				try (java.sql.Statement stmt2 = conn2.createStatement();
+					 java.sql.ResultSet rs2 = stmt2.executeQuery("SELECT val FROM t2 WHERE id = 1")) {
+					assertTrue(rs2.next());
+					assertEquals("beta", rs2.getObject(1));
+				}
+			}
+
+			// Verify lookup returns databases with the correct data
+			assertNotNull(ConvexDB.lookupDatabase("db_alpha"));
+			assertNotNull(ConvexDB.lookupDatabase("db_beta"));
+			assertNull(ConvexDB.lookupDatabase("nonexistent"));
+			assertEquals(1, ConvexDB.lookupDatabase("db_alpha").tables().getRowCount("t1"));
+			assertEquals(1, ConvexDB.lookupDatabase("db_beta").tables().getRowCount("t2"));
+		} finally {
+			cdb.unregister("db_alpha");
+			cdb.unregister("db_beta");
+		}
+	}
+
+	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
-		ALatticeCursor<?> root = Cursors.createLattice(SQLDatabase.DATABASE_MAP_LATTICE);
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

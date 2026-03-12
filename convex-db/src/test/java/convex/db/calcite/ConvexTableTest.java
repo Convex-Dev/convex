@@ -12,7 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
@@ -28,6 +28,7 @@ public class ConvexTableTest {
 
 	private static int testCounter = 0;
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 	private String dbName;
@@ -36,9 +37,9 @@ public class ConvexTableTest {
 	void setUp() throws Exception {
 		// Use unique database name for each test to avoid schema cache conflicts
 		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
-		AKeyPair kp = AKeyPair.generate();
-		db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.setDatabase(db);
+		cdb = ConvexDB.create();
+		db = cdb.database(dbName);
+		cdb.register(dbName);
 		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
 		db.tables().createTable("test_table",
 			new String[]{"id", "name", "amount"},
@@ -49,7 +50,7 @@ public class ConvexTableTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.setDatabase(null);
+		if (cdb != null) cdb.unregister(dbName);
 	}
 
 	@Test

@@ -13,12 +13,12 @@ Convex DB provides SQL query capabilities over lattice data structures, built on
 ## Quick Start
 
 ```java
-// 1. Create a database
-AKeyPair keyPair = AKeyPair.generate();
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+// 1. Create a ConvexDB and a named database
+ConvexDB cdb = ConvexDB.create();
+SQLDatabase db = cdb.database("mydb");
 
-// 2. Register it for JDBC/PostgreSQL access
-ConvexSchemaFactory.setDatabase(db);
+// 2. Register for JDBC/PostgreSQL access
+cdb.register("mydb");
 
 // 3. Connect via JDBC
 Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -108,8 +108,9 @@ Connect to Convex DB using any PostgreSQL client.
 
 ```java
 // Create and register database
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
-ConvexSchemaFactory.setDatabase(db);
+ConvexDB cdb = ConvexDB.create();
+cdb.database("mydb");
+cdb.register("mydb");
 
 // Start PostgreSQL server
 PgServer server = PgServer.builder()
@@ -292,10 +293,11 @@ Index<ABlob, AVector>
 ### Module Structure
 
 ```
-convex.db.lattice    - Lattice-backed table storage
-convex.db.calcite    - Apache Calcite integration
-convex.db.jdbc       - JDBC driver
-convex.db.psql       - PostgreSQL wire protocol server
+convex.db             - ConvexDB root lattice component
+convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow
+convex.db.calcite     - Apache Calcite integration
+convex.db.jdbc        - JDBC driver
+convex.db.psql        - PostgreSQL wire protocol server
 ```
 
 ## Dependencies

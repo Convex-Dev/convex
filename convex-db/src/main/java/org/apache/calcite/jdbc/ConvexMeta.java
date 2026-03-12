@@ -4,7 +4,6 @@ import org.apache.calcite.avatica.AvaticaConnection;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.calcite.ConvexSchema;
-import convex.db.calcite.ConvexSchemaFactory;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -130,7 +129,7 @@ public class ConvexMeta extends CalciteMetaImpl {
 		originalSchema = currentSchema;
 		txDatabase = db.fork();
 
-		ConvexSchema txSchema = new ConvexSchema(txDatabase.tables(), schemaName);
+		ConvexSchema txSchema = new ConvexSchema(txDatabase, schemaName);
 		calciteConnection.getRootSchema().add(schemaName, txSchema);
 	}
 
@@ -155,7 +154,10 @@ public class ConvexMeta extends CalciteMetaImpl {
 	}
 
 	private SQLDatabase findDatabase() {
-		return ConvexSchemaFactory.getDatabase();
+		String schemaName = getSchemaName();
+		if (schemaName == null) return null;
+		ConvexSchema schema = findConvexSchema(schemaName);
+		return (schema != null) ? schema.getDatabase() : null;
 	}
 
 	private ConvexSchema findConvexSchema(String schemaName) {

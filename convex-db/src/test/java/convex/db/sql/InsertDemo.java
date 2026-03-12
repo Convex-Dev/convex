@@ -9,7 +9,8 @@ import java.sql.Statement;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.db.calcite.ConvexSchemaFactory;
+
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
@@ -75,7 +76,7 @@ public class InsertDemo {
 	 */
 	static void benchmarkDirectLattice() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store);
 		server.launch();
 		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
 		createTable(db);
@@ -98,11 +99,12 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcIndividual() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.setDatabase(db);
+		cdb.register(DB_NAME);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
@@ -122,7 +124,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC individual");
-		ConvexSchemaFactory.setDatabase(null);
+		cdb.unregister(DB_NAME);
 		server.close();
 		store.close();
 	}
@@ -132,11 +134,12 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPrepared() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.setDatabase(db);
+		cdb.register(DB_NAME);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
@@ -156,7 +159,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStatement");
-		ConvexSchemaFactory.setDatabase(null);
+		cdb.unregister(DB_NAME);
 		server.close();
 		store.close();
 	}
@@ -166,11 +169,12 @@ public class InsertDemo {
 	 */
 	static void benchmarkJdbcPreparedBatch() throws Exception {
 		EtchStore store = EtchStore.createTemp();
-		NodeServer<?> server = SQLDatabase.createNodeServer(store);
+		NodeServer<?> server = ConvexDB.createNodeServer(store);
 		server.launch();
-		SQLDatabase db = SQLDatabase.connect(server.getCursor(), DB_NAME);
+		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		SQLDatabase db = cdb.database(DB_NAME);
 		createTable(db);
-		ConvexSchemaFactory.setDatabase(db);
+		cdb.register(DB_NAME);
 
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
@@ -191,7 +195,7 @@ public class InsertDemo {
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStmt batch");
-		ConvexSchemaFactory.setDatabase(null);
+		cdb.unregister(DB_NAME);
 		server.close();
 		store.close();
 	}
@@ -219,7 +223,13 @@ public class InsertDemo {
 		check(latticeCount >= minExpectedRows, label,
 				"Lattice row count: expected >= " + minExpectedRows + ", got " + latticeCount);
 
-		ConvexSchemaFactory.setDatabase(db);
+		ConvexDB vcdb = ConvexDB.lookup(DB_NAME);
+		boolean needsUnregister = (vcdb == null);
+		if (needsUnregister) {
+			vcdb = ConvexDB.create();
+			// wrap db in a fresh ConvexDB for JDBC verification
+			vcdb.register(DB_NAME);
+		}
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 Statement stmt = conn.createStatement()) {
 
@@ -241,6 +251,8 @@ public class InsertDemo {
 			check(rs.next(), label, "Row ID=" + lastId + " not found");
 			check(("LEID-" + lastId).equals(rs.getString("LEID")), label,
 					"Row ID=" + lastId + " LEID mismatch");
+		} finally {
+			if (needsUnregister) vcdb.unregister(DB_NAME);
 		}
 		System.out.println("  VERIFIED OK (" + latticeCount + " rows)");
 	}

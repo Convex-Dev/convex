@@ -11,9 +11,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -22,13 +22,15 @@ import convex.db.lattice.SQLDatabase;
  */
 class JoinSubqueryTest {
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 
 	@BeforeEach
 	void setUp() throws Exception {
-		db = SQLDatabase.create("join_test", AKeyPair.generate());
-		ConvexSchemaFactory.setDatabase(db);
+		cdb = ConvexDB.create();
+		db = cdb.database("join_test");
+		cdb.register("join_test");
 
 		// Create customers table
 		ConvexColumnType[] customerTypes = {
@@ -65,7 +67,7 @@ class JoinSubqueryTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.setDatabase(null);
+		if (cdb != null) cdb.unregister("join_test");
 	}
 
 	// ========== INNER JOIN Tests ==========

@@ -11,9 +11,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -22,13 +22,15 @@ import convex.db.lattice.SQLDatabase;
  */
 class SortAggregateTest {
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 
 	@BeforeEach
 	void setUp() throws Exception {
-		db = SQLDatabase.create("sort_agg_test", AKeyPair.generate());
-		ConvexSchemaFactory.setDatabase(db);
+		cdb = ConvexDB.create();
+		db = cdb.database("sort_agg_test");
+		cdb.register("sort_agg_test");
 
 		// Create table with test data
 		ConvexColumnType[] types = {
@@ -52,7 +54,7 @@ class SortAggregateTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.setDatabase(null);
+		if (cdb != null) cdb.unregister("sort_agg_test");
 	}
 
 	// ========== Sort Tests ==========

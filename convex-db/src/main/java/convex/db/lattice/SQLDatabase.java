@@ -9,77 +9,47 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.store.AStore;
+import convex.db.ConvexDB;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.KeyedLattice;
-import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.OwnerLattice;
-import convex.node.NodeConfig;
-import convex.node.NodeServer;
 
 /**
- * A named SQL database within the global lattice, with per-owner signed replicas.
+ * A named SQL database within the lattice, with per-owner signed replicas.
  *
- * <p>Sits at the lattice path {@code :sql / <owner-key>} and handles:
- * <ul>
- *   <li>Signing this node's database with its key pair</li>
- *   <li>Merging remote replicas into the local store (absorption merge)</li>
- *   <li>Rejecting replicas with invalid signatures via {@link OwnerLattice}</li>
- * </ul>
- *
- * <p>Lattice path structure:
- * <pre>
- * :sql → OwnerLattice → SignedLattice → MapLattice → TableStoreLattice
- *         owner-key → signed(db-name → table-store)
- * </pre>
+ * <p>Represents a single database within a {@link ConvexDB} instance.
+ * Each database contains a set of tables accessible via {@link #tables()}.
  *
  * <p>Two usage modes:
  * <ul>
  *   <li><b>Standalone</b> ({@link #create}): owns its own cursor, manual export/merge</li>
- *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain,
- *       signing and replication handled by the chain</li>
+ *   <li><b>Connected</b> ({@link #connect}): connected to a parent cursor chain
+ *       (e.g. from a {@link ConvexDB}), signing and replication handled by the chain</li>
  * </ul>
  *
  * <p>Usage:
  * <pre>
- * // Standalone
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+ * // Via ConvexDB (preferred)
+ * ConvexDB cdb = ConvexDB.create();
+ * SQLDatabase db = cdb.database("mydb");
  * db.tables().createTable("users", new String[]{"id", "name", "email"});
- * db.mergeReplicas(remoteOwnerMap);
  *
- * // Connected (e.g. from a SignedCursor in a NodeServer)
- * SQLDatabase db = SQLDatabase.connect(signedCursor, "mydb");
- * db.tables().insert("users", key, values);
+ * // Standalone (for replication)
+ * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+ * db.tables().insert("users", 1, "Alice", "alice@example.com");
+ * db.mergeReplicas(remoteOwnerMap);
  * </pre>
  */
 public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
-
-	/** Keyword for the tables section within a database. */
-	public static final Keyword KEY_TABLES = Keyword.intern("tables");
-
-	/**
-	 * The lattice type for a single database.
-	 * Structure: KeyedLattice { :tables → TableStoreLattice }
-	 */
-	public static final KeyedLattice DATABASE_LATTICE =
-		KeyedLattice.create(KEY_TABLES, TableStoreLattice.INSTANCE);
-
-	/**
-	 * The lattice type for a database map (db name → database state).
-	 * Use this when creating a {@link NodeServer} for SQL databases.
-	 */
-	public static final MapLattice<AString, Index<Keyword, ACell>>
-		DATABASE_MAP_LATTICE = MapLattice.create(DATABASE_LATTICE);
 
 	/**
 	 * The OwnerLattice structure for SQL databases in the global lattice.
 	 * Structure: OwnerLattice → SignedLattice → MapLattice → DatabaseLattice
 	 */
 	public static final OwnerLattice<AHashMap<AString, Index<Keyword, ACell>>>
-		OWNER_LATTICE = OwnerLattice.create(DATABASE_MAP_LATTICE);
+		OWNER_LATTICE = OwnerLattice.create(ConvexDB.DATABASE_MAP_LATTICE);
 
 	private final AString dbName;
 	private final AKeyPair keyPair;
@@ -94,7 +64,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Creates a new empty SQL database with the given name and signing key pair.
+	 * Creates a new empty standalone SQL database with the given name and signing key pair.
 	 * The owner key defaults to the key pair's AccountKey.
 	 *
 	 * @param name Database name
@@ -106,8 +76,8 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Creates a new empty SQL database with the given name, signing key pair, and owner key.
-	 * The owner key determines the identity under which this replica is published.
+	 * Creates a new empty standalone SQL database with the given name,
+	 * signing key pair, and owner key.
 	 *
 	 * @param name Database name
 	 * @param keyPair Key pair for signing this node's replica
@@ -116,39 +86,15 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 */
 	public static SQLDatabase create(String name, AKeyPair keyPair, ACell ownerKey) {
 		ALatticeCursor<Index<Keyword, ACell>> cursor =
-			Cursors.createLattice(DATABASE_LATTICE);
+			Cursors.createLattice(ConvexDB.DATABASE_LATTICE);
 		return new SQLDatabase(cursor, Strings.create(name), keyPair, ownerKey);
 	}
 
 	/**
-	 * Creates a persisted SQL database backed by a local-only {@link NodeServer}.
-	 * The NodeServer handles Etch persistence; call {@code server.close()} to flush
-	 * and shut down.
-	 *
-	 * <p>Usage:
-	 * <pre>
-	 * EtchStore store = EtchStore.createTemp();
-	 * NodeServer&lt;?&gt; server = SQLDatabase.createNodeServer(store);
-	 * server.launch();
-	 * SQLDatabase db = SQLDatabase.connect(server.getCursor(), "mydb");
-	 * // ... use db ...
-	 * server.persistSnapshot(server.getLocalValue()); // flush to Etch
-	 * server.close();
-	 * </pre>
-	 *
-	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
-	 * @return NodeServer configured for SQL database lattice (local-only, no network)
-	 */
-	public static NodeServer<?> createNodeServer(AStore store) {
-		return new NodeServer<>(DATABASE_MAP_LATTICE, store, NodeConfig.port(-1));
-	}
-
-	/**
-	 * Connects to a database within an existing cursor chain (e.g. from a NodeServer).
-	 * The parent cursor should be post-SignedCursor (navigated past the signing boundary).
+	 * Connects to a database within an existing cursor chain (e.g. from a ConvexDB).
 	 * Signing and replication are handled by the cursor chain.
 	 *
-	 * @param parent Parent lattice cursor (e.g. a SignedCursor for the owner's db map)
+	 * @param parent Parent lattice cursor at the database-map level
 	 * @param name Database name to connect to
 	 * @return New SQLDatabase connected to the cursor chain
 	 */
@@ -156,7 +102,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 		AString dbName = Strings.create(name);
 		ALatticeCursor<Index<Keyword, ACell>> cursor = parent.path(dbName);
 		if (cursor.get() == null) {
-			cursor.set(DATABASE_LATTICE.zero());
+			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
 		}
 		return new SQLDatabase(cursor, dbName, null, null);
 	}
@@ -174,12 +120,12 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Returns the LatticeTables facade for performing table operations.
+	 * Returns the SQLSchema facade for performing table operations.
 	 *
-	 * @return LatticeTables instance
+	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(cursor.path(KEY_TABLES));
+		return new SQLSchema(cursor.path(ConvexDB.KEY_TABLES));
 	}
 
 	/**

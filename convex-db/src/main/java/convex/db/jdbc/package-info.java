@@ -5,9 +5,10 @@
  *
  * <p>Usage:
  * <pre>
- * // 1. Create and set database
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.setDatabase(db);
+ * // 1. Create and register database
+ * ConvexDB cdb = ConvexDB.create();
+ * cdb.database("mydb");
+ * cdb.register("mydb");
  *
  * // 2. Connect via standard JDBC (driver auto-registers)
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -18,6 +19,6 @@
  * </pre>
  *
  * @see convex.db.jdbc.ConvexDriver
- * @see convex.db.calcite.ConvexSchemaFactory#setDatabase
+ * @see convex.db.ConvexDB#register
  */
 package convex.db.jdbc;

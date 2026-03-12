@@ -11,9 +11,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -23,13 +23,15 @@ import convex.db.lattice.SQLDatabase;
  */
 class ExpressionEnhancementsTest {
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 
 	@BeforeEach
 	void setUp() throws Exception {
-		db = SQLDatabase.create("expr_test", AKeyPair.generate());
-		ConvexSchemaFactory.setDatabase(db);
+		cdb = ConvexDB.create();
+		db = cdb.database("expr_test");
+		cdb.register("expr_test");
 
 		ConvexColumnType[] types = {
 			ConvexColumnType.of(ConvexType.INTEGER),  // id
@@ -52,7 +54,7 @@ class ExpressionEnhancementsTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.setDatabase(null);
+		if (cdb != null) cdb.unregister("expr_test");
 	}
 
 	// ========== COALESCE Tests ==========

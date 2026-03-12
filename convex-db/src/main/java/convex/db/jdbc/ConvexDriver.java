@@ -35,11 +35,12 @@ import org.apache.calcite.adapter.enumerable.EnumerableRules;
  *
  * <p>Usage:
  * <pre>
- * // 1. Create and set database
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.setDatabase(db);
+ * // 1. Create database and register for JDBC access
+ * ConvexDB cdb = ConvexDB.create();
+ * cdb.database("mydb").tables().createTable("users", ...);
+ * cdb.register("mydb");
  *
- * // 2. Connect via JDBC (driver auto-registers)
+ * // 2. Connect via JDBC (driver auto-discovers registered databases)
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
  *
  * // 3. Standard JDBC from here
@@ -122,8 +123,8 @@ public class ConvexDriver extends Driver {
 				rootSchema.add(database, schema);
 				calciteConn.setSchema(database);
 			} else {
-				throw new SQLException("No database set. " +
-					"Call ConvexSchemaFactory.setDatabase() first.");
+				throw new SQLException("No database registered with name '" + database +
+					"'. Register via ConvexDB.register(dbName) first.");
 			}
 		}
 

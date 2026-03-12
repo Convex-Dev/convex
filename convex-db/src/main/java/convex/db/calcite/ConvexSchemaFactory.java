@@ -6,57 +6,36 @@ import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
+import convex.db.ConvexDB;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.SQLSchema;
-import convex.lattice.cursor.ALatticeCursor;
 
 /**
- * Factory for creating Convex SQL schemas backed by a lattice cursor.
+ * Calcite {@link SchemaFactory} for Convex SQL databases.
  *
- * <p>Holds a reference to the database-level lattice cursor. All schema and
- * table resolution navigates the cursor tree — no separate registry or cache.
+ * <p>Resolves databases from the {@link ConvexDB} registry.
+ * All schema and table resolution navigates the cursor tree — no separate cache.
  *
  * <p>Usage:
  * <pre>
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.setDatabase(db);
+ * ConvexDB cdb = ConvexDB.create();
+ * SQLDatabase db = cdb.database("mydb");
+ * cdb.register("mydb");
  *
  * Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
  * </pre>
  */
 public class ConvexSchemaFactory implements SchemaFactory {
 
-	/** The current database. All navigation goes through its cursor tree. */
-	private static volatile SQLDatabase database;
-
 	/**
-	 * Sets the database for JDBC/SQL access.
+	 * Creates a ConvexSchema for the named database.
 	 *
-	 * @param db The SQLDatabase instance
+	 * @param name Database/schema name
+	 * @return ConvexSchema, or null if no database registered with that name
 	 */
-	public static void setDatabase(SQLDatabase db) {
-		database = db;
-	}
-
-	/**
-	 * Gets the current database.
-	 *
-	 * @return The SQLDatabase, or null if not set
-	 */
-	public static SQLDatabase getDatabase() {
-		return database;
-	}
-
-	/**
-	 * Creates a ConvexSchema for the current database.
-	 *
-	 * @param schemaName Schema name for the Calcite schema
-	 * @return ConvexSchema, or null if no database set
-	 */
-	public static ConvexSchema createSchema(String schemaName) {
-		SQLDatabase db = database;
+	public static ConvexSchema createSchema(String name) {
+		SQLDatabase db = ConvexDB.lookupDatabase(name);
 		if (db == null) return null;
-		return new ConvexSchema(db.tables(), schemaName);
+		return new ConvexSchema(db, name);
 	}
 
 	// ========== Table lookup for generated code ==========
@@ -67,16 +46,18 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 * Navigates the database's cursor tree each time, so it always
 	 * reflects the current lattice state.
 	 *
-	 * @param schemaName Schema name (currently maps to the database)
+	 * @param schemaName Schema name (maps to a registered database)
 	 * @param tableName Table name
 	 * @return The ConvexTable
 	 */
 	public static ConvexTable getTable(String schemaName, String tableName) {
-		SQLDatabase db = database;
+		SQLDatabase db = ConvexDB.lookupDatabase(schemaName);
 		if (db == null) {
-			throw new IllegalStateException("No database set. Call ConvexSchemaFactory.setDatabase() first.");
+			throw new IllegalStateException(
+				"No database registered with name '" + schemaName +
+				"'. Register via ConvexDB.register(dbName) first.");
 		}
-		return new ConvexSchema(db.tables(), schemaName).getConvexTable(tableName);
+		return new ConvexSchema(db, schemaName).getConvexTable(tableName);
 	}
 
 	@Override
@@ -86,6 +67,7 @@ public class ConvexSchemaFactory implements SchemaFactory {
 			return schema;
 		}
 		throw new IllegalArgumentException(
-			"No database set. Call ConvexSchemaFactory.setDatabase() first.");
+			"No database registered with name '" + name +
+			"'. Register via ConvexDB.register(dbName) first.");
 	}
 }
