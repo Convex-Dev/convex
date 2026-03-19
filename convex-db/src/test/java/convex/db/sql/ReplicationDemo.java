@@ -9,8 +9,9 @@ import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
-import convex.core.store.MemoryStore;
+import convex.core.store.AStore;
 import convex.db.ConvexDB;
+import convex.etch.EtchStore;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
@@ -44,9 +45,9 @@ public class ReplicationDemo {
 		System.out.println("==================================================");
 		System.out.println();
 
-		// We'll need two NodeServers, each with its own store
-		MemoryStore storeLondon = new MemoryStore();
-		MemoryStore storeTokyo  = new MemoryStore();
+		// Each node gets its own Etch persistent store (temp files, auto-cleaned)
+		EtchStore storeLondon = EtchStore.createTemp("london");
+		EtchStore storeTokyo  = EtchStore.createTemp("tokyo");
 
 		// Create NodeServers using the SQL database lattice
 		NodeServer<?> serverLondon = new NodeServer<>(
@@ -115,7 +116,11 @@ public class ReplicationDemo {
 			// ── 5. Network sync — pull from peers ───────────────────────
 			// Each node queries its peers for the latest lattice value,
 			// acquires the full delta, and merges it locally.
+			// Two rounds ensure both sides have each other's data
+			// (first round may not reflect the other's merge result).
 
+			serverLondon.pull();
+			serverTokyo.pull();
 			serverLondon.pull();
 			serverTokyo.pull();
 
@@ -139,7 +144,9 @@ public class ReplicationDemo {
 			serverTokyo.getCursor().sync();
 			System.out.println("  Tokyo:  id=1 -> 'Widget Ultra' @ 15.99 (later timestamp)");
 
-			// Sync
+			// Sync (two rounds for full convergence with Etch stores)
+			serverLondon.pull();
+			serverTokyo.pull();
 			serverLondon.pull();
 			serverTokyo.pull();
 
