@@ -223,36 +223,32 @@ public class InsertDemo {
 		check(latticeCount >= minExpectedRows, label,
 				"Lattice row count: expected >= " + minExpectedRows + ", got " + latticeCount);
 
+		// JDBC verification only when a ConvexDB is registered (standalone dbs
+		// have their own cursor, not reachable via the JDBC registry)
 		ConvexDB vcdb = ConvexDB.lookup(DB_NAME);
-		boolean needsUnregister = (vcdb == null);
-		if (needsUnregister) {
-			vcdb = ConvexDB.create();
-			// wrap db in a fresh ConvexDB for JDBC verification
-			vcdb.register(DB_NAME);
-		}
-		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
-			 Statement stmt = conn.createStatement()) {
+		if (vcdb != null) {
+			try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
+				 Statement stmt = conn.createStatement()) {
 
-			ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM t");
-			rs.next();
-			long jdbcCount = rs.getLong("cnt");
-			check(jdbcCount == latticeCount, label,
-					"Count mismatch: lattice=" + latticeCount + " vs JDBC=" + jdbcCount);
+				ResultSet rs = stmt.executeQuery("SELECT COUNT(*) AS cnt FROM t");
+				rs.next();
+				long jdbcCount = rs.getLong("cnt");
+				check(jdbcCount == latticeCount, label,
+						"Count mismatch: lattice=" + latticeCount + " vs JDBC=" + jdbcCount);
 
-			// Spot-check first row
-			rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = 0");
-			check(rs.next(), label, "Row ID=0 not found");
-			check("LEID-0".equals(rs.getString("LEID")), label,
-					"Row ID=0 LEID: expected 'LEID-0', got '" + rs.getString("LEID") + "'");
+				// Spot-check first row
+				rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = 0");
+				check(rs.next(), label, "Row ID=0 not found");
+				check("LEID-0".equals(rs.getString("LEID")), label,
+						"Row ID=0 LEID: expected 'LEID-0', got '" + rs.getString("LEID") + "'");
 
-			// Spot-check last row
-			int lastId = ROW_COUNT - 1;
-			rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = " + lastId);
-			check(rs.next(), label, "Row ID=" + lastId + " not found");
-			check(("LEID-" + lastId).equals(rs.getString("LEID")), label,
-					"Row ID=" + lastId + " LEID mismatch");
-		} finally {
-			if (needsUnregister) vcdb.unregister(DB_NAME);
+				// Spot-check last row
+				int lastId = ROW_COUNT - 1;
+				rs = stmt.executeQuery("SELECT ID, LEID, NM FROM t WHERE ID = " + lastId);
+				check(rs.next(), label, "Row ID=" + lastId + " not found");
+				check(("LEID-" + lastId).equals(rs.getString("LEID")), label,
+						"Row ID=" + lastId + " LEID mismatch");
+			}
 		}
 		System.out.println("  VERIFIED OK (" + latticeCount + " rows)");
 	}
