@@ -109,6 +109,13 @@ public class ConvexDriver extends Driver {
 			info.setProperty("caseSensitive", "false");
 		}
 
+		// Enable DDL support (CREATE TABLE, DROP TABLE, etc.)
+		// ConvexDdlExecutor.PARSER_FACTORY bundles the DDL parser + executor
+		// that creates lattice-backed tables (not Calcite's in-memory MutableArrayTable)
+		if (!info.containsKey("parserFactory")) {
+			info.setProperty("parserFactory", "convex.db.calcite.ConvexDdlExecutor#PARSER_FACTORY");
+		}
+
 		// Get connection from parent (Calcite)
 		Connection conn = super.connect(url, info);
 		if (conn == null) {

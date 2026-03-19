@@ -215,6 +215,29 @@ public enum ConvexType {
 	}
 
 	/**
+	 * Maps a Calcite SqlTypeName to a ConvexType.
+	 *
+	 * @param sqlTypeName The Calcite type
+	 * @return The ConvexType
+	 */
+	public static ConvexType fromSqlTypeName(SqlTypeName sqlTypeName) {
+		return switch (sqlTypeName) {
+			case BIGINT -> BIGINT;
+			case INTEGER, SMALLINT, TINYINT -> INTEGER;
+			case DECIMAL -> DECIMAL;
+			case DOUBLE, FLOAT, REAL -> DOUBLE;
+			case CHAR -> CHAR;
+			case VARCHAR -> VARCHAR;
+			case BOOLEAN -> BOOLEAN;
+			case VARBINARY -> VARBINARY;
+			case BINARY -> BLOB;
+			case TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE -> TIMESTAMP;
+			case ANY -> ANY;
+			default -> ANY;
+		};
+	}
+
+	/**
 	 * Parses a type name string to a ConvexType.
 	 *
 	 * @param name Type name (case-insensitive)

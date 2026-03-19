@@ -142,6 +142,40 @@ public class ConvexColumnType {
 		}
 	}
 
+	// ========== Calcite Conversion ==========
+
+	/**
+	 * Creates a ConvexColumnType from a Calcite RelDataType.
+	 *
+	 * @param relType Calcite type from DDL parsing
+	 * @return ConvexColumnType
+	 */
+	public static ConvexColumnType fromRelDataType(RelDataType relType) {
+		ConvexType base = ConvexType.fromSqlTypeName(relType.getSqlTypeName());
+
+		// Only carry precision/scale for types that actually support it
+		SqlTypeName sqlType = relType.getSqlTypeName();
+		boolean typeAllowsPrecision = sqlType.allowsPrec();
+		// Integer/boolean types don't use precision even if Calcite reports one
+		if (sqlType == SqlTypeName.BIGINT || sqlType == SqlTypeName.INTEGER
+				|| sqlType == SqlTypeName.SMALLINT || sqlType == SqlTypeName.TINYINT
+				|| sqlType == SqlTypeName.BOOLEAN || sqlType == SqlTypeName.DOUBLE
+				|| sqlType == SqlTypeName.FLOAT || sqlType == SqlTypeName.REAL) {
+			return of(base);
+		}
+
+		int p = relType.getPrecision();
+		int s = relType.getScale();
+		boolean hasPrecision = typeAllowsPrecision && p >= 0 && p < 65536;
+		boolean hasScale = sqlType.allowsScale() && s > 0;
+		if (hasScale && hasPrecision) {
+			return withScale(base, p, s);
+		} else if (hasPrecision) {
+			return withPrecision(base, p);
+		}
+		return of(base);
+	}
+
 	// ========== Parsing ==========
 
 	/**
