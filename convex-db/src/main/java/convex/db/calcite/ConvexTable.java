@@ -18,26 +18,34 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableModify;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexDynamicParam;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.schema.FilterableTable;
 import org.apache.calcite.schema.ModifiableTable;
 import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.SchemaPlus;
+import org.apache.calcite.sql.SqlKind;
 
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Vectors;
+import convex.db.calcite.eval.ConvexExpressionEvaluator;
 import convex.db.lattice.SQLSchema;
 
 /**
  * Calcite Table backed by Convex lattice storage.
  *
- * <p>Implements both ScannableTable (for SELECT queries) and ModifiableTable
- * (for INSERT, UPDATE, DELETE operations).
+ * <p>Implements FilterableTable (for SELECT with filter pushdown) and
+ * ModifiableTable (for INSERT, UPDATE, DELETE operations).
  *
- * <p>All values in the lattice are dynamically typed, so this table maps
- * them to Calcite's ANY type for maximum flexibility.
+ * <p>Primary key equality filters ({@code WHERE id = ?}) are pushed down
+ * to the Index radix tree for O(log n) point lookups instead of full scans.
  */
 public class ConvexTable extends AbstractQueryableTable
-		implements ScannableTable, ModifiableTable {
+		implements ScannableTable, FilterableTable, ModifiableTable {
 
 	private final ConvexSchema schema;
 	private final String tableName;
@@ -88,13 +96,100 @@ public class ConvexTable extends AbstractQueryableTable
 
 	@Override
 	public Enumerable<Object[]> scan(DataContext root) {
-		scanCount++; // TODO: remove after benchmarking complete
+		scanCount++;
 		return new AbstractEnumerable<Object[]>() {
 			@Override
 			public Enumerator<Object[]> enumerator() {
 				return new ConvexEnumerator(schema.getTables(), tableName);
 			}
 		};
+	}
+
+	@Override
+	public Enumerable<Object[]> scan(DataContext root, List<RexNode> filters) {
+		scanCount++;
+
+		// Try primary key pushdown: WHERE column[0] = literal or = ?param
+		ACell pkValue = extractPrimaryKeyEquality(filters, root);
+		if (pkValue != null) {
+			// Point lookup via Index — O(log n)
+			AVector<ACell> row = schema.getTables().selectByKey(tableName, pkValue);
+			if (row == null) {
+				return Linq4j.emptyEnumerable();
+			}
+			// Convert AVector to Object[] using column types
+			ConvexColumnType[] types = getColumnTypes();
+			Object[] javaRow = new Object[(int) row.count()];
+			for (int i = 0; i < javaRow.length; i++) {
+				ConvexColumnType type = (types != null && i < types.length)
+						? types[i] : ConvexColumnType.of(ConvexType.ANY);
+				javaRow[i] = type.toJava(row.get(i));
+			}
+			return Linq4j.singletonEnumerable(javaRow);
+		}
+
+		// Full scan fallback
+		return new AbstractEnumerable<Object[]>() {
+			@Override
+			public Enumerator<Object[]> enumerator() {
+				return new ConvexEnumerator(schema.getTables(), tableName);
+			}
+		};
+	}
+
+	/**
+	 * Extracts a primary key equality value from the filter list.
+	 * Looks for {@code column[0] = literal} or {@code column[0] = ?param}
+	 * and removes it from the list (telling Calcite we've handled it).
+	 *
+	 * @param filters Mutable list of filters from Calcite
+	 * @param root DataContext for resolving dynamic parameters
+	 * @return The PK value as ACell, or null if no PK equality found
+	 */
+	private static ACell extractPrimaryKeyEquality(List<RexNode> filters, DataContext root) {
+		if (filters == null) return null;
+		for (int i = 0; i < filters.size(); i++) {
+			RexNode filter = filters.get(i);
+			if (!(filter instanceof RexCall call)) continue;
+			if (call.getKind() != SqlKind.EQUALS) continue;
+
+			var operands = call.getOperands();
+			if (operands.size() != 2) continue;
+
+			// column[0] = value (literal or bound param only)
+			if (operands.get(0) instanceof RexInputRef ref && ref.getIndex() == 0) {
+				ACell val = resolveValue(operands.get(1), root);
+				if (val != null) {
+					// Don't remove filter — let Calcite re-verify for safety with joins
+					return val;
+				}
+			}
+			// value = column[0]
+			if (operands.get(1) instanceof RexInputRef ref && ref.getIndex() == 0) {
+				ACell val = resolveValue(operands.get(0), root);
+				if (val != null) {
+					return val;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Resolves a RexNode to an ACell value. Handles literals and dynamic params.
+	 */
+	private static ACell resolveValue(RexNode node, DataContext root) {
+		if (node instanceof RexLiteral lit) {
+			return ConvexExpressionEvaluator.literalToCell(lit);
+		}
+		if (node instanceof RexDynamicParam param && root != null) {
+			// Dynamic params are stored as "?0", "?1", etc. in DataContext
+			Object val = root.get("?" + param.getIndex());
+			if (val != null) {
+				return ConvexType.ANY.toCell(val);
+			}
+		}
+		return null;
 	}
 
 	@Override
@@ -130,7 +225,7 @@ public class ConvexTable extends AbstractQueryableTable
 		// Delegate to scan-based enumeration
 		@SuppressWarnings("unchecked")
 		Queryable<T> queryable = (Queryable<T>) Linq4j.asEnumerable(
-			scan(null).toList()).asQueryable();
+			scan(null, new java.util.ArrayList<>()).toList()).asQueryable();
 		return queryable;
 	}
 
