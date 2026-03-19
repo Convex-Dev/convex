@@ -61,12 +61,7 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 		// Convert Index entries to list of ACell[]
 		List<ACell[]> result = new ArrayList<>();
 		for (var entry : rows.entrySet()) {
-			AVector<ACell> rowVector = entry.getValue();
-			ACell[] row = new ACell[(int) rowVector.count()];
-			for (int i = 0; i < row.length; i++) {
-				row[i] = rowVector.get(i);
-			}
-			result.add(row);
+			result.add(entry.getValue().toCellArray());
 		}
 
 		return ConvexEnumerable.of(result);

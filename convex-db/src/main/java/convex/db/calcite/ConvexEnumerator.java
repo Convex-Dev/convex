@@ -1,81 +1,35 @@
 package convex.db.calcite;
 
-import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.apache.calcite.linq4j.Enumerator;
 
 import convex.core.data.ACell;
-import convex.core.data.AVector;
-import convex.db.lattice.SQLSchema;
 
 /**
- * Enumerator for iterating over rows in a Convex lattice table.
+ * Abstract base for enumerators over ACell[] rows in the ConvexConvention pipeline.
  *
- * <p>Converts CVM cell values to Java objects for Calcite consumption,
- * using the declared column types for proper type conversion.
+ * <p>Implements Calcite's {@code Enumerator} interface with CVM-native types.
+ * Concrete implementations provide different access strategies:
+ * <ul>
+ *   <li>{@link ConvexTableEnumerator} — full table scan from lattice Index
+ *   <li>Future: range scan, index lookup, streaming, etc.
+ * </ul>
  */
-public class ConvexEnumerator implements Enumerator<Object[]> {
+public abstract class ConvexEnumerator implements Enumerator<ACell[]> {
 
-	private final Iterator<AVector<ACell>> rowIterator;
-	private final int columnCount;
-	private final ConvexColumnType[] columnTypes;
-	private AVector<ACell> currentRow;
-
-	/**
-	 * Creates a new enumerator for the given table.
-	 *
-	 * @param tables SQLSchema instance
-	 * @param tableName Table to enumerate
-	 */
-	public ConvexEnumerator(SQLSchema tables, String tableName) {
-		var rows = tables.selectAll(tableName);
-		// Convert Index values to iterator
-		if (rows != null) {
-			java.util.List<AVector<ACell>> rowList = new java.util.ArrayList<>();
-			for (var entry : rows.entrySet()) {
-				rowList.add(entry.getValue());
-			}
-			this.rowIterator = rowList.iterator();
-		} else {
-			this.rowIterator = java.util.Collections.emptyIterator();
-		}
-
-		String[] columns = tables.getColumnNames(tableName);
-		this.columnCount = (columns != null) ? columns.length : 0;
-		this.columnTypes = tables.getColumnTypes(tableName);
-	}
+	protected ACell[] currentRow;
 
 	@Override
-	public Object[] current() {
+	public ACell[] current() {
 		if (currentRow == null) {
-			return null;
+			throw new NoSuchElementException();
 		}
-
-		Object[] result = new Object[columnCount];
-		for (int i = 0; i < columnCount && i < currentRow.count(); i++) {
-			ConvexColumnType type = (columnTypes != null && i < columnTypes.length) ? columnTypes[i] : ConvexColumnType.of(ConvexType.ANY);
-			result[i] = type.toJava(currentRow.get(i));
-		}
-		return result;
-	}
-
-	@Override
-	public boolean moveNext() {
-		if (rowIterator.hasNext()) {
-			currentRow = rowIterator.next();
-			return true;
-		}
-		currentRow = null;
-		return false;
-	}
-
-	@Override
-	public void reset() {
-		throw new UnsupportedOperationException("Reset not supported");
+		return currentRow;
 	}
 
 	@Override
 	public void close() {
-		// Nothing to close
+		// Default: nothing to close for in-memory lattice data
 	}
 }

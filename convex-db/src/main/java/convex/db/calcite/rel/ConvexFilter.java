@@ -132,11 +132,7 @@ public class ConvexFilter extends Filter implements ConvexRel {
 		AVector<ACell> row = schema.getTables().selectByKey(convexTable.getTableName(), pkValue);
 		if (row == null) return ConvexEnumerable.empty();
 
-		ACell[] cells = new ACell[(int) row.count()];
-		for (int i = 0; i < cells.length; i++) {
-			cells[i] = row.get(i);
-		}
-		return ConvexEnumerable.of(Collections.singletonList(cells));
+		return ConvexEnumerable.of(Collections.singletonList(row.toCellArray()));
 	}
 
 	/**
