@@ -17,7 +17,7 @@ import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 
 import convex.db.calcite.ConvexType;
-import convex.db.calcite.rel.ConvexRelExecutor;
+import convex.db.calcite.rel.ConvexResultConverter;
 import convex.db.lattice.SQLDatabase;
 
 /**

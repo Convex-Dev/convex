@@ -26,7 +26,7 @@ import convex.db.calcite.convention.ConvexRel;
  * Converter from ConvexConvention to EnumerableConvention.
  *
  * <p>Registers the ConvexRel tree once at compile time. At runtime,
- * generated code calls the appropriate ConvexRelExecutor method:
+ * generated code calls the appropriate ConvexResultConverter method:
  * <ul>
  *   <li>SCALAR format (1 column): {@code executeScalar(id, ctx)} → {@code Enumerable<Object>}</li>
  *   <li>ARRAY format (N columns): {@code execute(id, N, ctx)} → {@code Enumerable<Object[]>}</li>
@@ -63,9 +63,10 @@ public class ConvexToEnumerableConverter extends ConverterImpl implements Enumer
 			throw new IllegalStateException("Expected ConvexRel input but got: " + input.getClass());
 		}
 
-		final long id = ConvexRelExecutor.register(convexRel);
+		// Stash the ConvexRel tree in DataContext's internal parameters.
+		// Calcite resolves this at runtime — no static registry needed.
+		final Expression relExpr = implementor.stash(convexRel, ConvexRel.class);
 
-		// Calcite tells us the expected format via pref
 		final JavaRowFormat format = (fieldCount == 1)
 			? JavaRowFormat.SCALAR : JavaRowFormat.ARRAY;
 
@@ -74,16 +75,14 @@ public class ConvexToEnumerableConverter extends ConverterImpl implements Enumer
 
 		Expression executeExpr;
 		if (format == JavaRowFormat.SCALAR) {
-			// Single column: executeScalar returns Enumerable<Object>
 			executeExpr = Expressions.call(
-				ConvexRelExecutor.class, "executeScalar",
-				Expressions.constant(id),
+				ConvexResultConverter.class, "executeScalar",
+				relExpr,
 				implementor.getRootExpression());
 		} else {
-			// Multi-column: execute returns Enumerable<Object[]>
 			executeExpr = Expressions.call(
-				ConvexRelExecutor.class, "execute",
-				Expressions.constant(id),
+				ConvexResultConverter.class, "execute",
+				relExpr,
 				Expressions.constant(fieldCount),
 				implementor.getRootExpression());
 		}
