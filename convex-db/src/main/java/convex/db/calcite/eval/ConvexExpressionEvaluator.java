@@ -8,7 +8,9 @@ import com.google.common.collect.Range;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.util.NlsString;
+import org.apache.calcite.DataContext;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
@@ -45,6 +47,13 @@ public class ConvexExpressionEvaluator {
 	 * @return The result as an ACell
 	 */
 	public static ACell evaluate(RexNode expr, ACell[] row, RelDataType rowType) {
+		return evaluate(expr, row, rowType, null);
+	}
+
+	/**
+	 * Evaluates an expression with DataContext for resolving dynamic parameters.
+	 */
+	public static ACell evaluate(RexNode expr, ACell[] row, RelDataType rowType, DataContext ctx) {
 		if (expr instanceof RexInputRef ref) {
 			int index = ref.getIndex();
 			return (index >= 0 && index < row.length) ? row[index] : null;
@@ -54,8 +63,13 @@ public class ConvexExpressionEvaluator {
 			return literalToCell(lit);
 		}
 
+		if (expr instanceof RexDynamicParam param && ctx != null) {
+			Object val = ctx.get("?" + param.getIndex());
+			return val != null ? convex.db.calcite.ConvexType.ANY.toCell(val) : null;
+		}
+
 		if (expr instanceof RexCall call) {
-			return evaluateCall(call, row, rowType);
+			return evaluateCall(call, row, rowType, ctx);
 		}
 
 		throw new UnsupportedOperationException("Unsupported expression: " + expr.getClass().getSimpleName());
@@ -117,16 +131,20 @@ public class ConvexExpressionEvaluator {
 	 * Evaluates a function/operator call.
 	 */
 	private static ACell evaluateCall(RexCall call, ACell[] row, RelDataType rowType) {
+		return evaluateCall(call, row, rowType, null);
+	}
+
+	private static ACell evaluateCall(RexCall call, ACell[] row, RelDataType rowType, DataContext ctx) {
 		SqlKind kind = call.getKind();
 		List<RexNode> operands = call.getOperands();
 
 		// Handle IS NULL / IS NOT NULL specially (don't evaluate operand first)
 		if (kind == SqlKind.IS_NULL) {
-			ACell val = evaluate(operands.get(0), row, rowType);
+			ACell val = evaluate(operands.get(0), row, rowType, ctx);
 			return CVMBool.create(val == null);
 		}
 		if (kind == SqlKind.IS_NOT_NULL) {
-			ACell val = evaluate(operands.get(0), row, rowType);
+			ACell val = evaluate(operands.get(0), row, rowType, ctx);
 			return CVMBool.create(val != null);
 		}
 
@@ -138,7 +156,7 @@ public class ConvexExpressionEvaluator {
 		// Handle COALESCE (short-circuit evaluation)
 		if (kind == SqlKind.COALESCE) {
 			for (RexNode operand : operands) {
-				ACell val = evaluate(operand, row, rowType);
+				ACell val = evaluate(operand, row, rowType, ctx);
 				if (val != null) return val;
 			}
 			return null;
@@ -151,9 +169,9 @@ public class ConvexExpressionEvaluator {
 
 		// Handle IN (short-circuit evaluation)
 		if (kind == SqlKind.IN) {
-			ACell lhs = evaluate(operands.get(0), row, rowType);
+			ACell lhs = evaluate(operands.get(0), row, rowType, ctx);
 			for (int i = 1; i < operands.size(); i++) {
-				ACell rhs = evaluate(operands.get(i), row, rowType);
+				ACell rhs = evaluate(operands.get(i), row, rowType, ctx);
 				if (cellEquals(lhs, rhs) == CVMBool.TRUE) return CVMBool.TRUE;
 			}
 			return CVMBool.FALSE;
@@ -162,7 +180,7 @@ public class ConvexExpressionEvaluator {
 		// Evaluate operands
 		ACell[] args = new ACell[operands.size()];
 		for (int i = 0; i < operands.size(); i++) {
-			args[i] = evaluate(operands.get(i), row, rowType);
+			args[i] = evaluate(operands.get(i), row, rowType, ctx);
 		}
 
 		return switch (kind) {

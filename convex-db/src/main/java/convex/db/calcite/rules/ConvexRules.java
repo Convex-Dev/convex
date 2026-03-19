@@ -9,6 +9,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.convert.ConverterRule;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
@@ -17,6 +18,7 @@ import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.rel.ConvexAggregate;
 import convex.db.calcite.rel.ConvexFilter;
 import convex.db.calcite.rel.ConvexJoin;
+import convex.db.calcite.rel.ConvexMergeJoin;
 import convex.db.calcite.rel.ConvexProject;
 import convex.db.calcite.rel.ConvexSort;
 
@@ -42,8 +44,11 @@ public class ConvexRules {
 	/** Rule to convert LogicalAggregate to ConvexAggregate. */
 	public static final ConvexAggregateRule AGGREGATE = ConvexAggregateRule.INSTANCE;
 
-	/** Rule to convert LogicalJoin to ConvexJoin. */
+	/** Rule to convert LogicalJoin to ConvexJoin (nested loop, any condition). */
 	public static final ConvexJoinRule JOIN = ConvexJoinRule.INSTANCE;
+
+	/** Rule to convert LogicalJoin to ConvexMergeJoin (equi-joins only). */
+	public static final ConvexMergeJoinRule MERGE_JOIN = ConvexMergeJoinRule.INSTANCE;
 
 	/** Rule to convert ConvexConvention to EnumerableConvention. */
 	public static final ConvexToEnumerableConverterRule TO_ENUMERABLE =
@@ -53,7 +58,7 @@ public class ConvexRules {
 	 * TABLE_SCAN is not needed here — TranslatableTable.toRel() creates
 	 * ConvexTableScan directly. */
 	public static List<RelOptRule> rules() {
-		return List.of(FILTER, PROJECT, SORT, AGGREGATE, JOIN, TO_ENUMERABLE);
+		return List.of(FILTER, PROJECT, SORT, AGGREGATE, JOIN, MERGE_JOIN, TO_ENUMERABLE);
 	}
 
 	/** Alias for rules() - returns query rules. */
@@ -193,6 +198,44 @@ public class ConvexRules {
 			RelNode right = convert(join.getRight(),
 				join.getRight().getTraitSet().replace(ConvexConvention.INSTANCE));
 			return new ConvexJoin(join.getCluster(), traitSet, left, right,
+				join.getCondition(), join.getVariablesSet(), join.getJoinType());
+		}
+	}
+
+	// ========== Merge Join Rule ==========
+
+	/**
+	 * Rule that converts LogicalJoin to ConvexMergeJoin for equi-joins.
+	 * Only fires when the join condition has at least one equality pair.
+	 * The planner picks merge join over nested-loop due to lower cost.
+	 */
+	public static class ConvexMergeJoinRule extends ConverterRule {
+		public static final ConvexMergeJoinRule INSTANCE = new ConvexMergeJoinRule();
+
+		private ConvexMergeJoinRule() {
+			super(Config.INSTANCE
+				.withConversion(LogicalJoin.class, Convention.NONE,
+					ConvexConvention.INSTANCE, "ConvexMergeJoinRule")
+				.withRuleFactory(ConvexMergeJoinRule::new));
+		}
+
+		private ConvexMergeJoinRule(Config config) {
+			super(config);
+		}
+
+		@Override
+		public RelNode convert(RelNode rel) {
+			LogicalJoin join = (LogicalJoin) rel;
+			// Only use merge join for equi-joins
+			JoinInfo info = join.analyzeCondition();
+			if (info.leftKeys.isEmpty()) return null;
+
+			RelTraitSet traitSet = join.getTraitSet().replace(ConvexConvention.INSTANCE);
+			RelNode left = convert(join.getLeft(),
+				join.getLeft().getTraitSet().replace(ConvexConvention.INSTANCE));
+			RelNode right = convert(join.getRight(),
+				join.getRight().getTraitSet().replace(ConvexConvention.INSTANCE));
+			return new ConvexMergeJoin(join.getCluster(), traitSet, left, right,
 				join.getCondition(), join.getVariablesSet(), join.getJoinType());
 		}
 	}

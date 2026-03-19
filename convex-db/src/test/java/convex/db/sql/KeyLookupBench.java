@@ -34,6 +34,14 @@ public class KeyLookupBench {
 			benchJdbc(size);
 			System.out.println();
 		}
+
+		System.out.println("=== Join Benchmark ===\n");
+		for (int size : new int[]{10, 100, 1_000}) {
+			System.out.println("--- Table size: " + size + " rows ---");
+			benchJoin(size);
+			System.out.println();
+		}
+
 		System.exit(0);
 	}
 
@@ -127,6 +135,92 @@ public class KeyLookupBench {
 			}
 		}
 		cdb.unregister(DB_NAME);
+	}
+
+	static void benchJoin(int tableSize) throws Exception {
+		ConvexDB cdb = ConvexDB.create();
+		SQLDatabase db = cdb.database("joinbench");
+		db.tables().createTable("customers", new String[]{"id", "name", "city"},
+				new ConvexType[]{ConvexType.INTEGER, ConvexType.VARCHAR, ConvexType.VARCHAR});
+		db.tables().createTable("orders", new String[]{"id", "customer_id", "amount"},
+				new ConvexType[]{ConvexType.INTEGER, ConvexType.INTEGER, ConvexType.DOUBLE});
+		cdb.register("joinbench");
+
+		// Populate: each customer gets 2 orders
+		for (int i = 0; i < tableSize; i++) {
+			db.tables().insert("customers", Vectors.of(CVMLong.create(i),
+					convex.core.data.Strings.create("cust-" + i),
+					convex.core.data.Strings.create("city-" + (i % 10))));
+			db.tables().insert("orders", Vectors.of(CVMLong.create(i * 2),
+					CVMLong.create(i),
+					convex.core.data.prim.CVMDouble.create(i * 10.0)));
+			db.tables().insert("orders", Vectors.of(CVMLong.create(i * 2 + 1),
+					CVMLong.create(i),
+					convex.core.data.prim.CVMDouble.create(i * 10.0 + 5)));
+		}
+
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=joinbench")) {
+			int iters = Math.max(10, 1000 / tableSize); // more iters for small tables
+
+			// INNER JOIN via PreparedStatement (plan compiled once)
+			try (PreparedStatement ps = conn.prepareStatement(
+					"SELECT c.name, o.amount FROM customers c " +
+					"INNER JOIN orders o ON c.id = o.customer_id " +
+					"WHERE c.id < ?")) {
+				// Warm up
+				ps.setLong(1, tableSize);
+				ResultSet warm = ps.executeQuery();
+				while (warm.next()) {}
+				warm.close();
+
+				long start = System.nanoTime();
+				int rowCount = 0;
+				for (int i = 0; i < iters; i++) {
+					ps.setLong(1, tableSize);
+					ResultSet rs = ps.executeQuery();
+					while (rs.next()) rowCount++;
+					rs.close();
+				}
+				long elapsed = System.nanoTime() - start;
+				report("  INNER JOIN (" + (rowCount / iters) + " rows)", elapsed, iters);
+			}
+
+			// JOIN + AGG + SORT via PreparedStatement
+			try (PreparedStatement ps = conn.prepareStatement(
+					"SELECT c.name, SUM(o.amount) as total FROM customers c " +
+					"INNER JOIN orders o ON c.id = o.customer_id " +
+					"WHERE c.id < ? " +
+					"GROUP BY c.name ORDER BY total DESC")) {
+				long start = System.nanoTime();
+				int rowCount = 0;
+				for (int i = 0; i < iters; i++) {
+					ps.setLong(1, tableSize);
+					ResultSet rs = ps.executeQuery();
+					while (rs.next()) rowCount++;
+					rs.close();
+				}
+				long elapsed = System.nanoTime() - start;
+				report("  JOIN+AGG+SORT (" + (rowCount / iters) + " rows)", elapsed, iters);
+			}
+
+			// LEFT JOIN via PreparedStatement
+			try (PreparedStatement ps = conn.prepareStatement(
+					"SELECT c.name, o.amount FROM customers c " +
+					"LEFT JOIN orders o ON c.id = o.customer_id " +
+					"WHERE c.id < ?")) {
+				long start = System.nanoTime();
+				int rowCount = 0;
+				for (int i = 0; i < iters; i++) {
+					ps.setLong(1, tableSize);
+					ResultSet rs = ps.executeQuery();
+					while (rs.next()) rowCount++;
+					rs.close();
+				}
+				long elapsed = System.nanoTime() - start;
+				report("  LEFT JOIN (" + (rowCount / iters) + " rows)", elapsed, iters);
+			}
+		}
+		cdb.unregister("joinbench");
 	}
 
 	static void report(String label, long elapsedNs, int count) {

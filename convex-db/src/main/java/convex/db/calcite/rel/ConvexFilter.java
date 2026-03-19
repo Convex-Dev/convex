@@ -102,7 +102,7 @@ public class ConvexFilter extends Filter implements ConvexRel {
 
 		List<ACell[]> result = new ArrayList<>();
 		for (ACell[] row : input) {
-			ACell evaluated = ConvexExpressionEvaluator.evaluate(condition, row, getRowType());
+			ACell evaluated = ConvexExpressionEvaluator.evaluate(condition, row, getRowType(), ctx);
 			if (evaluated instanceof CVMBool b && b.booleanValue()) {
 				result.add(row);
 			}
