@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.linq4j.Linq4j;
 
@@ -18,19 +19,15 @@ import convex.db.calcite.convention.ConvexRel;
 /**
  * Runtime executor for ConvexRel query plans.
  *
- * <p>Uses a registry to store ConvexRel references that can be looked up
- * by generated code at runtime.
+ * <p>Plans are registered at compile time and reused across executions
+ * (e.g. PreparedStatement). The DataContext is passed at each execution
+ * to resolve dynamic parameters.
  *
- * <p>Type conversion follows SQL/JDBC conventions:
+ * <p>Two execution methods match Calcite's row format contracts:
  * <ul>
- *   <li>CVMLong → Long</li>
- *   <li>CVMDouble → Double</li>
- *   <li>CVMBool → Boolean</li>
- *   <li>AString → String</li>
- *   <li>AInteger (big) → java.math.BigInteger</li>
- *   <li>ABlob → byte[]</li>
- *   <li>null → null</li>
- *   <li>Other → toString()</li>
+ *   <li>{@link #execute} — ARRAY format, returns {@code Enumerable<Object[]>}</li>
+ *   <li>{@link #executeScalar} — SCALAR format, returns {@code Enumerable<Object>}
+ *       where each element is the column value directly</li>
  * </ul>
  */
 public class ConvexRelExecutor {
@@ -39,10 +36,8 @@ public class ConvexRelExecutor {
 	private static final Map<Long, ConvexRel> REGISTRY = new ConcurrentHashMap<>();
 
 	/**
-	 * Registers a ConvexRel for later execution.
-	 *
-	 * @param convexRel The ConvexRel to register
-	 * @return ID that can be used to retrieve and execute the rel
+	 * Registers a ConvexRel for execution. The plan remains registered
+	 * for reuse by subsequent executions (PreparedStatement reuse).
 	 */
 	public static long register(ConvexRel convexRel) {
 		long id = ID_GENERATOR.incrementAndGet();
@@ -51,24 +46,12 @@ public class ConvexRelExecutor {
 	}
 
 	/**
-	 * Executes a registered ConvexRel and returns results as Enumerable&lt;Object[]&gt;.
-	 *
-	 * <p>This method is called from Calcite-generated code.
-	 *
-	 * @param id The registered ConvexRel ID
-	 * @param fieldCount Number of fields in output rows
-	 * @return Enumerable of Object[] rows with Java types
+	 * Executes in ARRAY format — each row is {@code Object[]}.
+	 * Used for multi-column results.
 	 */
-	public static Enumerable<Object[]> execute(long id, int fieldCount) {
-		ConvexRel convexRel = REGISTRY.remove(id);
-		if (convexRel == null) {
-			throw new IllegalStateException("ConvexRel not found for id: " + id);
-		}
+	public static Enumerable<Object[]> execute(long id, int fieldCount, DataContext ctx) {
+		ConvexEnumerable convexResult = executeRel(id, ctx);
 
-		// Execute the ConvexRel tree
-		ConvexEnumerable convexResult = convexRel.execute();
-
-		// Convert ACell[] to Object[]
 		List<Object[]> results = new ArrayList<>();
 		for (ACell[] row : convexResult) {
 			Object[] javaRow = new Object[fieldCount];
@@ -77,30 +60,37 @@ public class ConvexRelExecutor {
 			}
 			results.add(javaRow);
 		}
-
 		return Linq4j.asEnumerable(results);
 	}
 
 	/**
+	 * Executes in SCALAR format — each element is the column value directly.
+	 * Used for single-column results.
+	 */
+	public static Enumerable<Object> executeScalar(long id, DataContext ctx) {
+		ConvexEnumerable convexResult = executeRel(id, ctx);
+
+		List<Object> results = new ArrayList<>();
+		for (ACell[] row : convexResult) {
+			results.add(row.length > 0 ? cellToJava(row[0]) : null);
+		}
+		return Linq4j.asEnumerable(results);
+	}
+
+	private static ConvexEnumerable executeRel(long id, DataContext ctx) {
+		ConvexRel convexRel = REGISTRY.get(id);
+		if (convexRel == null) {
+			throw new IllegalStateException("ConvexRel not found for id: " + id);
+		}
+		return convexRel.execute(ctx);
+	}
+
+	/**
 	 * Converts a CVM cell to a Java object for JDBC consumption.
-	 *
-	 * <p>Uses RT.jvm for standard conversions, with special handling for blobs.
-	 *
-	 * @param cell CVM cell
-	 * @return Java object
 	 */
 	public static Object cellToJava(ACell cell) {
-		if (cell == null) {
-			return null;
-		}
-
-		// Blob → byte[] (special case not handled by RT.jvm)
-		if (cell instanceof ABlob blob) {
-			return blob.getBytes();
-		}
-
-		// Use RT.jvm for standard CVM → JVM conversions
-		// (handles Long, Double, Boolean, String, BigInteger for big values, etc.)
+		if (cell == null) return null;
+		if (cell instanceof ABlob blob) return blob.getBytes();
 		return RT.jvm(cell);
 	}
 }

@@ -2,14 +2,19 @@ package convex.db.calcite.eval;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+
+import com.google.common.collect.Range;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.util.NlsString;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.Sarg;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -139,6 +144,11 @@ public class ConvexExpressionEvaluator {
 			return null;
 		}
 
+		// Handle SEARCH (Calcite generates this for AND/OR/IN range conditions)
+		if (kind == SqlKind.SEARCH) {
+			return evaluateSearch(call, row, rowType);
+		}
+
 		// Handle IN (short-circuit evaluation)
 		if (kind == SqlKind.IN) {
 			ACell lhs = evaluate(operands.get(0), row, rowType);
@@ -208,6 +218,52 @@ public class ConvexExpressionEvaluator {
 
 			default -> throw new UnsupportedOperationException("Operator not supported: " + kind);
 		};
+	}
+
+	/**
+	 * Evaluates SEARCH(column, Sarg) — Calcite's optimised form for
+	 * range/equality conditions like {@code x > 1 AND x < 3} or {@code x IN (1,2)}.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static ACell evaluateSearch(RexCall call, ACell[] row, RelDataType rowType) {
+		ACell value = evaluate(call.getOperands().get(0), row, rowType);
+		RexLiteral sargLiteral = (RexLiteral) call.getOperands().get(1);
+		Sarg sarg = sargLiteral.getValueAs(Sarg.class);
+
+		if (value == null) {
+			return CVMBool.FALSE;
+		}
+
+		// Determine what Comparable type the Sarg uses from its range bounds
+		Comparable comparable = cellToSargType(value, sarg);
+		return CVMBool.create(sarg.rangeSet.contains(comparable));
+	}
+
+	/**
+	 * Converts an ACell value to the same Comparable type used by a Sarg's ranges.
+	 */
+	/**
+	 * Converts an ACell value to the same Comparable type used by a Sarg's ranges.
+	 * Sarg uses BigDecimal for numeric types and NlsString for strings.
+	 */
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	private static Comparable cellToSargType(ACell cell, Sarg sarg) {
+		// Peek at the Sarg's range bounds to determine the expected type
+		Class<?> sargType = null;
+		for (Range range : (Set<Range>) sarg.rangeSet.asRanges()) {
+			if (range.hasLowerBound()) { sargType = range.lowerEndpoint().getClass(); break; }
+			if (range.hasUpperBound()) { sargType = range.upperEndpoint().getClass(); break; }
+		}
+
+		Object jvm = RT.jvm(cell);
+		if (sargType == BigDecimal.class && jvm instanceof Number n) {
+			return BigDecimal.valueOf(n.doubleValue());
+		}
+		if (jvm instanceof Long l) return BigDecimal.valueOf(l);
+		if (jvm instanceof Integer i) return BigDecimal.valueOf(i);
+		if (jvm instanceof String s) return new NlsString(s, null, null);
+		if (jvm instanceof Comparable c) return c;
+		return cell.toString();
 	}
 
 	/**

@@ -3,6 +3,7 @@ package convex.db.calcite.rel;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -11,7 +12,6 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.db.calcite.ConvexSchema;
@@ -42,7 +42,7 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 	}
 
 	@Override
-	public ConvexEnumerable execute() {
+	public ConvexEnumerable execute(DataContext ctx) {
 		ConvexTable convexTable = table.unwrap(ConvexTable.class);
 		if (convexTable == null) {
 			return ConvexEnumerable.empty();

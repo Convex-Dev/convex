@@ -11,7 +11,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
 import convex.db.ConvexDB;
-import convex.db.calcite.ConvexTable;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 import convex.etch.EtchStore;
@@ -112,7 +112,6 @@ public class InsertDemo {
 			// Warm up: trigger Calcite class loading / JIT
 			stmt.executeUpdate("INSERT INTO t VALUES (-1, 'warm', 'up')");
 
-			ConvexTable.resetScanCount();
 			long start = System.nanoTime();
 			for (int i = 0; i < ROW_COUNT; i++) {
 				stmt.executeUpdate("INSERT INTO t VALUES (" + i + ", 'LEID-" + i + "', 'Name-" + i + "')");
@@ -120,7 +119,6 @@ public class InsertDemo {
 			long elapsed = System.nanoTime() - start;
 
 			report("JDBC individual INSERT", elapsed, ROW_COUNT);
-			System.out.println("  Table scans: " + ConvexTable.getScanCount());
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC individual");
@@ -144,7 +142,6 @@ public class InsertDemo {
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
 
-			ConvexTable.resetScanCount();
 			long start = System.nanoTime();
 			for (int i = 0; i < ROW_COUNT; i++) {
 				ps.setInt(1, i);
@@ -155,7 +152,6 @@ public class InsertDemo {
 			long elapsed = System.nanoTime() - start;
 
 			report("JDBC PreparedStatement", elapsed, ROW_COUNT);
-			System.out.println("  Table scans: " + ConvexTable.getScanCount());
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStatement");
@@ -179,7 +175,6 @@ public class InsertDemo {
 		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=" + DB_NAME);
 			 PreparedStatement ps = conn.prepareStatement("INSERT INTO t VALUES (?, ?, ?)")) {
 
-			ConvexTable.resetScanCount();
 			long start = System.nanoTime();
 			for (int i = 0; i < ROW_COUNT; i++) {
 				ps.setInt(1, i);
@@ -191,7 +186,6 @@ public class InsertDemo {
 			long elapsed = System.nanoTime() - start;
 
 			report("JDBC PreparedStmt batch", elapsed, ROW_COUNT);
-			System.out.println("  Table scans: " + ConvexTable.getScanCount());
 			syncToStorage(server);
 		}
 		verify(db, ROW_COUNT, "JDBC PreparedStmt batch");
