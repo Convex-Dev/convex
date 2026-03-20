@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.8.4-SNAPSHOT] - Unreleased
 
+### Added
+
+- ConvexDB: Calcite convention pipeline with index pushdown and merge joins
+- ConvexDB: DDL support (CREATE TABLE, DROP TABLE via JDBC)
+- ConvexDB: Replication demo with Etch stores
+- DLFS CLI and DID authentication
+- Docker Hub automated push in CI workflows
+- Install scripts
+
+### Fixed
+
+- ConvexDB: ORDER BY with JOIN queries (#540)
+- MCP SSE race condition on connection setup
+- Flaky CI tests (EncodingTest, McpTest, DLFSBrowser)
+
 ## [0.8.3] - 2026-03-02
 
 ### Added
