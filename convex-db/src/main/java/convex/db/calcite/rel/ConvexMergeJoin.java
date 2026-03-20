@@ -21,10 +21,7 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
-import convex.core.data.Cells;
-import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBool;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
@@ -314,26 +311,7 @@ public class ConvexMergeJoin extends Join implements ConvexRel {
 		SqlTypeName sqlType = (leftKeys[0] < fields.size())
 			? fields.get(leftKeys[0]).getType().getSqlTypeName()
 			: SqlTypeName.ANY;
-		return comparatorFor(sqlType);
-	}
-
-	/**
-	 * Returns a comparator for non-null ACell values based on SQL type.
-	 * Same logic as ConvexSort.comparatorFor().
-	 */
-	private static Comparator<ACell> comparatorFor(SqlTypeName sqlType) {
-		return switch (sqlType) {
-			case BIGINT, INTEGER, SMALLINT, TINYINT,
-				 DECIMAL, DOUBLE, FLOAT, REAL,
-				 TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
-				(a, b) -> ((ANumeric) a).compareTo((ANumeric) b);
-			case CHAR, VARCHAR, BINARY, VARBINARY ->
-				(a, b) -> ((ABlobLike<?>) a).compareTo((ABlobLike<?>) b);
-			case BOOLEAN ->
-				(a, b) -> ((CVMBool) a).compareTo((CVMBool) b);
-			default ->
-				(a, b) -> a.getHash().compareTo(b.getHash());
-		};
+		return ConvexExpressionEvaluator.comparatorFor(sqlType);
 	}
 
 	/**

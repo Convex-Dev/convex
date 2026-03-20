@@ -19,10 +19,7 @@ import org.apache.calcite.DataContext;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
-import convex.core.data.prim.ANumeric;
-import convex.core.data.prim.CVMBool;
 import convex.core.lang.RT;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
@@ -129,12 +126,12 @@ public class ConvexSort extends Sort implements ConvexRel {
 				? fieldList.get(index).getType().getSqlTypeName()
 				: SqlTypeName.ANY;
 
-			Comparator<ACell> cmp = comparatorFor(sqlType);
+			Comparator<ACell> cmp = ConvexExpressionEvaluator.comparatorFor(sqlType);
 
 			// Wrap with direction and null handling
-			RelFieldCollation.NullDirection nullDir = field.nullDirection;
+			boolean nullsFirst = (field.nullDirection == RelFieldCollation.NullDirection.FIRST);
 			boolean desc = field.getDirection().isDescending();
-			comparators[i] = nullSafe(cmp, nullDir, desc);
+			comparators[i] = ConvexExpressionEvaluator.nullSafeComparator(cmp, nullsFirst, desc);
 		}
 
 		return (row1, row2) -> {
@@ -149,42 +146,4 @@ public class ConvexSort extends Sort implements ConvexRel {
 		};
 	}
 
-	/**
-	 * Returns a comparator for non-null ACell values based on SQL type.
-	 */
-	private static Comparator<ACell> comparatorFor(SqlTypeName sqlType) {
-		return switch (sqlType) {
-			case BIGINT, INTEGER, SMALLINT, TINYINT,
-				 DECIMAL, DOUBLE, FLOAT, REAL,
-				 TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
-				(a, b) -> ((ANumeric) a).compareTo((ANumeric) b);
-
-			case CHAR, VARCHAR, BINARY, VARBINARY ->
-				(a, b) -> ((ABlobLike<?>) a).compareTo((ABlobLike<?>) b);
-
-			case BOOLEAN ->
-				(a, b) -> ((CVMBool) a).compareTo((CVMBool) b);
-
-			default ->
-				// ANY or unknown: compare by encoding hash for deterministic order
-				(a, b) -> a.getHash().compareTo(b.getHash());
-		};
-	}
-
-	/**
-	 * Wraps a non-null comparator with null handling and sort direction.
-	 */
-	private static Comparator<ACell> nullSafe(
-			Comparator<ACell> inner,
-			RelFieldCollation.NullDirection nullDir,
-			boolean desc) {
-		boolean nullsFirst = (nullDir == RelFieldCollation.NullDirection.FIRST);
-		return (a, b) -> {
-			if (a == null && b == null) return 0;
-			if (a == null) return nullsFirst ? -1 : 1;
-			if (b == null) return nullsFirst ? 1 : -1;
-			int cmp = inner.compare(a, b);
-			return desc ? -cmp : cmp;
-		};
-	}
 }

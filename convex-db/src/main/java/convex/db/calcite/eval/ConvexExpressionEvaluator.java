@@ -18,6 +18,9 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.Sarg;
 
+import java.util.Comparator;
+
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Cells;
@@ -562,5 +565,46 @@ public class ConvexExpressionEvaluator {
 			.replace("%", ".*")
 			.replace("_", ".");
 		return CVMBool.create(str.matches(regex));
+	}
+
+	// ========== Comparator Utilities ==========
+
+	/**
+	 * Returns a comparator for non-null ACell values based on SQL type.
+	 * Used by ConvexSort and ConvexMergeJoin for type-specific ordering.
+	 */
+	public static Comparator<ACell> comparatorFor(SqlTypeName sqlType) {
+		return switch (sqlType) {
+			case BIGINT, INTEGER, SMALLINT, TINYINT,
+				 DECIMAL, DOUBLE, FLOAT, REAL,
+				 TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
+				(a, b) -> ((ANumeric) a).compareTo((ANumeric) b);
+
+			case CHAR, VARCHAR, BINARY, VARBINARY ->
+				(a, b) -> ((ABlobLike<?>) a).compareTo((ABlobLike<?>) b);
+
+			case BOOLEAN ->
+				(a, b) -> ((CVMBool) a).compareTo((CVMBool) b);
+
+			default ->
+				// ANY or unknown: compare by encoding hash for deterministic order
+				(a, b) -> a.getHash().compareTo(b.getHash());
+		};
+	}
+
+	/**
+	 * Wraps a non-null comparator with null handling and sort direction.
+	 */
+	public static Comparator<ACell> nullSafeComparator(
+			Comparator<ACell> inner,
+			boolean nullsFirst,
+			boolean desc) {
+		return (a, b) -> {
+			if (a == null && b == null) return 0;
+			if (a == null) return nullsFirst ? -1 : 1;
+			if (b == null) return nullsFirst ? 1 : -1;
+			int cmp = inner.compare(a, b);
+			return desc ? -cmp : cmp;
+		};
 	}
 }
