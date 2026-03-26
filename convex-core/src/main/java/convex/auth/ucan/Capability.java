@@ -85,8 +85,15 @@ public class Capability {
 	 */
 	public static boolean covers(String grantWith, String grantCan,
 			String requestWith, String requestCan) {
-		// Resource attenuation: grant path must be a prefix of request path
-		if (!requestWith.startsWith(grantWith)) return false;
+		// Resource attenuation: grant path must be a prefix of request path.
+		// Normalise: /w/ covers /w and /w/anything.
+		// Exact match always covers. Prefix match requires the grant to end
+		// with / or the request to have / at the boundary.
+		if (!requestWith.equals(grantWith)
+			&& !requestWith.startsWith(grantWith)
+			&& !(grantWith.endsWith("/") && (grantWith.substring(0, grantWith.length() - 1)).equals(requestWith))) {
+			return false;
+		}
 
 		// Ability attenuation: * covers all, exact match, or prefix match
 		if ("*".equals(grantCan)) return true;
