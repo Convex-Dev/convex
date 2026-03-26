@@ -13,11 +13,12 @@ import convex.lattice.cursor.ALatticeCursor;
 /**
  * A single SQL table within the lattice table store.
  *
- * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, utime]
+ * <p>Wraps a lattice cursor pointing at the table's state vector: [schema, rows, utime, liveCount]
  * <ul>
  *   <li>schema (AVector) - Column definitions: [[name, type, precision, scale], ...]</li>
  *   <li>rows (Index) - Row data: primary-key (ABlob) → row entry</li>
  *   <li>utime (CVMLong) - Schema update timestamp for LWW</li>
+ *   <li>liveCount (CVMLong) - Number of live (non-tombstone) rows</li>
  * </ul>
  *
  * <p>Schema is immutable after creation (for now). Row data merges independently.
@@ -33,6 +34,8 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	static final int POS_ROWS = 1;
 	/** Position of update timestamp */
 	static final int POS_UTIME = 2;
+	/** Position of live row count */
+	static final int POS_LIVE_COUNT = 3;
 
 	SQLTable(ALatticeCursor<AVector<ACell>> cursor) {
 		super(cursor);
@@ -45,11 +48,11 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 *
 	 * @param schema Column definitions
 	 * @param timestamp Creation timestamp
-	 * @return State vector [schema, empty-rows, timestamp]
+	 * @return State vector [schema, empty-rows, timestamp, liveCount=0]
 	 */
 	@SuppressWarnings("unchecked")
 	static AVector<ACell> createState(AVector<AVector<ACell>> schema, CVMLong timestamp) {
-		return Vectors.of(schema, (Index<ABlob, AVector<ACell>>) Index.EMPTY, timestamp);
+		return Vectors.of(schema, (Index<ABlob, AVector<ACell>>) Index.EMPTY, timestamp, CVMLong.ZERO);
 	}
 
 	/**
@@ -59,7 +62,7 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	 * @return Tombstone state vector [null, null, timestamp]
 	 */
 	static AVector<ACell> createTombstoneState(CVMLong timestamp) {
-		return Vectors.of(null, null, timestamp);
+		return Vectors.of(null, null, timestamp, CVMLong.ZERO);
 	}
 
 	// ========== Static Helpers (for raw state access) ==========
@@ -155,18 +158,18 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	}
 
 	/**
-	 * Gets the number of live rows.
+	 * Gets the number of live (non-tombstone) rows. O(1).
 	 */
 	public long getRowCount() {
-		Index<ABlob, AVector<ACell>> rows = getRows();
-		if (rows == null) return 0;
-		long count = 0;
-		for (var entry : rows.entrySet()) {
-			if (SQLRow.isLive(entry.getValue())) {
-				count++;
-			}
+		AVector<ACell> state = cursor.get();
+		if (state == null) return 0;
+		if (state.count() <= POS_LIVE_COUNT) {
+			// Legacy state vector without liveCount — fall back to Index.count()
+			Index<ABlob, AVector<ACell>> rows = getRows();
+			return (rows != null) ? rows.count() : 0;
 		}
-		return count;
+		CVMLong lc = (CVMLong) state.get(POS_LIVE_COUNT);
+		return (lc != null) ? lc.longValue() : 0;
 	}
 
 	// ========== Mutation Methods ==========
@@ -186,9 +189,13 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			if (state == null || state.get(POS_SCHEMA) == null) return state;
 			Index<ABlob, AVector<ACell>> rows = (Index<ABlob, AVector<ACell>>) state.get(POS_ROWS);
 			if (rows == null) rows = TableLattice.INSTANCE.zero();
+			// Check if this insert adds a new live row
+			AVector<ACell> existing = rows.get(pk);
+			boolean addsLive = (existing == null || !SQLRow.isLive(existing));
 			rows = rows.assoc(pk, SQLRow.create(values, timestamp));
+			long liveCount = getLiveCount(state) + (addsLive ? 1 : 0);
 			result[0] = true;
-			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp);
+			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp, CVMLong.create(liveCount));
 		});
 		return result[0];
 	}
@@ -210,10 +217,34 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 			AVector<ACell> row = rows.get(key);
 			if (row == null || !SQLRow.isLive(row)) return state;
 			rows = rows.assoc(key, SQLRow.createTombstone(timestamp));
+			long liveCount = getLiveCount(state) - 1;
 			result[0] = true;
-			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp);
+			return Vectors.of(state.get(POS_SCHEMA), rows, timestamp, CVMLong.create(liveCount));
 		});
 		return result[0];
+	}
+
+	// ========== Helpers ==========
+
+	/**
+	 * Extracts the live count from a state vector, handling legacy format.
+	 */
+	static long getLiveCount(AVector<ACell> state) {
+		if (state == null || state.count() <= POS_LIVE_COUNT) return 0;
+		CVMLong lc = (CVMLong) state.get(POS_LIVE_COUNT);
+		return (lc != null) ? lc.longValue() : 0;
+	}
+
+	/**
+	 * Computes live row count by scanning an Index. Used only during merge.
+	 */
+	static long computeLiveCount(Index<ABlob, AVector<ACell>> rows) {
+		if (rows == null) return 0;
+		long[] count = new long[1];
+		rows.forEach((k, v) -> {
+			if (SQLRow.isLive(v)) count[0]++;
+		});
+		return count[0];
 	}
 
 	// ========== Static Merge (used by lattice layer) ==========
@@ -255,7 +286,18 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 		Index<ABlob, AVector<ACell>> rowsB = (Index<ABlob, AVector<ACell>>) b.get(POS_ROWS);
 		Index<ABlob, AVector<ACell>> mergedRows = TableLattice.INSTANCE.merge(rowsA, rowsB);
 
+		// Compute live count for merged result
+		long liveCount;
+		if (mergedRows == rowsA) {
+			liveCount = getLiveCount(a);
+		} else if (mergedRows == rowsB) {
+			liveCount = getLiveCount(b);
+		} else {
+			// Rows actually merged — recompute
+			liveCount = computeLiveCount(mergedRows);
+		}
+
 		// Return merged table with schema winner's schema
-		return Vectors.of(schemaWinner.get(POS_SCHEMA), mergedRows, schemaWinner.get(POS_UTIME));
+		return Vectors.of(schemaWinner.get(POS_SCHEMA), mergedRows, schemaWinner.get(POS_UTIME), CVMLong.create(liveCount));
 	}
 }

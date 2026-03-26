@@ -12,14 +12,18 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Index;
 import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
+import convex.db.lattice.SQLRow;
 import convex.db.lattice.SQLSchema;
+import convex.db.lattice.SQLTable;
 
 /**
  * Table scan in CONVEX convention.
@@ -52,17 +56,19 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 		SQLSchema tables = schema.getTables();
 		String tableName = convexTable.getTableName();
 
-		// Get all rows directly as ACell[]
-		var rows = tables.selectAll(tableName);
-		if (rows == null) {
-			return ConvexEnumerable.empty();
-		}
+		SQLTable sqlTable = tables.getLiveTable(tableName);
+		if (sqlTable == null) return ConvexEnumerable.empty();
 
-		// Convert Index entries to list of ACell[]
-		List<ACell[]> result = new ArrayList<>();
-		for (var entry : rows.entrySet()) {
-			result.add(entry.getValue().toCellArray());
-		}
+		Index<ABlob, AVector<ACell>> rawRows = sqlTable.getRows();
+		if (rawRows == null) return ConvexEnumerable.empty();
+
+		// Single-pass tree traversal via forEach, skip tombstones, unwrap values
+		List<ACell[]> result = new ArrayList<>((int) Math.min(rawRows.count(), Integer.MAX_VALUE));
+		rawRows.forEach((k, v) -> {
+			if (SQLRow.isLive(v)) {
+				result.add(SQLRow.getValues(v).toCellArray());
+			}
+		});
 
 		return ConvexEnumerable.of(result);
 	}

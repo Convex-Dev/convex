@@ -361,15 +361,14 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		Index<ABlob, AVector<ACell>> rows = table.getRows();
 		if (rows == null) return Index.none();
 
-		// Filter to live rows and extract values
-		Index<ABlob, AVector<ACell>> result = Index.none();
-		for (var entry : rows.entrySet()) {
-			AVector<ACell> row = entry.getValue();
-			if (SQLRow.isLive(row)) {
-				result = result.assoc(entry.getKey(), SQLRow.getValues(row));
+		// Single-pass tree traversal: filter tombstones, unwrap values
+		Index<ABlob, AVector<ACell>>[] result = new Index[] { Index.none() };
+		rows.forEach((k, v) -> {
+			if (SQLRow.isLive(v)) {
+				result[0] = result[0].assoc(k, SQLRow.getValues(v));
 			}
-		}
-		return result;
+		});
+		return result[0];
 	}
 
 	/**

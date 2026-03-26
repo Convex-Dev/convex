@@ -102,13 +102,11 @@ public class ConvexTable extends AbstractQueryableTable
 	 */
 	@Override
 	public Statistic getStatistic() {
-		// Row count: O(1) from Index.count()
-		// TODO: track exact live row count to exclude tombstones after deletes
+		// Row count: O(1) from tracked live count
 		Double rowCount = null;
 		SQLTable table = schema.getTables().getLiveTable(tableName);
 		if (table != null) {
-			var rows = table.getRows();
-			rowCount = (rows != null) ? (double) rows.count() : 0.0;
+			rowCount = (double) table.getRowCount();
 		}
 
 		// PK is column 0
