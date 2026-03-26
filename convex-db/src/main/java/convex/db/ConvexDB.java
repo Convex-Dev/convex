@@ -1,5 +1,7 @@
 package convex.db;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.concurrent.ConcurrentHashMap;
 
 import convex.core.data.ACell;
@@ -8,6 +10,7 @@ import convex.core.data.AString;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.store.AStore;
+import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
@@ -196,5 +199,20 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 */
 	public void unregister(String dbName) {
 		registry.remove(dbName);
+	}
+
+	/**
+	 * Gets a JDBC Connection for a named database within this ConvexDB.
+	 * Bypasses DriverManager and the static registry entirely.
+	 *
+	 * <p>This is the preferred API when you already hold a ConvexDB instance
+	 * (e.g. from {@link #connect(ALatticeCursor)}).
+	 *
+	 * @param dbName Database name within this ConvexDB
+	 * @return JDBC Connection backed by this instance's cursor chain
+	 * @throws SQLException if connection creation fails
+	 */
+	public Connection getConnection(String dbName) throws SQLException {
+		return ConvexDriver.connect(this, dbName);
 	}
 }
