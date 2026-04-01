@@ -1,6 +1,6 @@
 {
   "name": "dlfs_list",
-  "description": "List the contents of a directory in a DLFS drive.",
+  "description": "List directory contents in a DLFS drive. Returns an array of entries, each with name, type ('file' or 'directory'), and size (for files). Omit path to list the drive root.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -10,7 +10,7 @@
       },
       "path": {
         "type": "string",
-        "description": "Directory path within the drive (default: root)"
+        "description": "Directory path within the drive (e.g. 'docs/specs'). Omit for root directory."
       }
     },
     "required": ["drive"]

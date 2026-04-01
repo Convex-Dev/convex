@@ -1,6 +1,6 @@
 {
   "name": "dlfs_delete",
-  "description": "Delete a file or empty directory from a DLFS drive.",
+  "description": "Delete a file or empty directory from a DLFS drive. Directories must be empty before deletion. The operation is irreversible at the API level (though the underlying lattice retains history via tombstones).",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -10,7 +10,7 @@
       },
       "path": {
         "type": "string",
-        "description": "Path of the file or directory to delete"
+        "description": "Path of the file or empty directory to delete"
       }
     },
     "required": ["drive", "path"]

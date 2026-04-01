@@ -1,12 +1,12 @@
 {
   "name": "dlfs_create_drive",
-  "description": "Create a new DLFS drive.",
+  "description": "Create a new named DLFS drive. Each drive is an independent filesystem with its own directory tree. Fails if a drive with the same name already exists.",
   "inputSchema": {
     "type": "object",
     "properties": {
       "name": {
         "type": "string",
-        "description": "Name for the new drive"
+        "description": "Name for the new drive (e.g. 'home', 'docs', 'projects')"
       }
     },
     "required": ["name"]

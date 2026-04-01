@@ -1,6 +1,6 @@
 {
   "name": "dlfs_delete_drive",
-  "description": "Delete a DLFS drive.",
+  "description": "Delete a DLFS drive and all its contents. This is irreversible — all files and directories in the drive are lost.",
   "inputSchema": {
     "type": "object",
     "properties": {
