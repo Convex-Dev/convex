@@ -12,25 +12,46 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Base64;
 import java.util.List;
 
+import convex.auth.ucan.Capability;
+import convex.auth.ucan.UCAN;
+import convex.auth.ucan.UCANValidator;
+import convex.core.data.ACell;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.core.data.AVector;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.mcp.McpProtocol;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.mcp.McpTool;
+import io.javalin.http.Context;
 
 /**
  * MCP tools for the Data Lattice File System (DLFS).
  *
  * <p>Registers DLFS file operations as tools on a {@link McpServer}, enabling
  * AI agents to manage drives, read/write files, and list directories via MCP.</p>
+ *
+ * <h3>UCAN Delegated Access</h3>
+ *
+ * <p>Tools that access drives support an optional {@code ucans} argument containing
+ * a vector of signed UCAN tokens. When a caller doesn't own the requested drive,
+ * the tokens are validated and checked for a capability covering the operation:</p>
+ *
+ * <ul>
+ *   <li>Resource: {@code dlfs://<owner-did>/drives/<name>[/<path>]}</li>
+ *   <li>Abilities: {@code dlfs/read} (list, read), {@code dlfs/write} (write, mkdir, delete),
+ *       {@code dlfs/*} (all)</li>
+ * </ul>
+ *
+ * <p>The UCAN's issuer must be the drive owner, and the audience must match the
+ * caller's DID. Signature, expiry, and chain integrity are verified.</p>
  */
 public class DlfsMcpTools {
 
@@ -40,6 +61,9 @@ public class DlfsMcpTools {
 	private static final AString FIELD_PATH = Strings.intern("path");
 	private static final AString FIELD_NAME = Strings.intern("name");
 	private static final AString FIELD_CONTENT = Strings.intern("content");
+	private static final AString FIELD_UCANS = Strings.intern("ucans");
+
+	private static final String DLFS_RESOURCE_PREFIX = "dlfs://";
 
 	private final DLFSDriveManager driveManager;
 
@@ -64,18 +88,14 @@ public class DlfsMcpTools {
 	// ==================== Identity ====================
 
 	/**
-	 * Gets the identity for drive resolution. Currently null (anonymous).
-	 * Can be extended to extract identity from the request context.
+	 * Gets the caller's identity from the current MCP request context.
+	 * Returns the DID string from the JWT bearer token, or null for anonymous.
 	 */
 	private String getIdentity() {
-		return null;
-	}
-
-	/**
-	 * Resolves a drive filesystem, or null if not found.
-	 */
-	private FileSystem getDrive(String driveName) {
-		return driveManager.getDrive(getIdentity(), driveName);
+		Context ctx = McpServer.getCurrentContext();
+		if (ctx == null) return null;
+		var id = AuthMiddleware.getIdentity(ctx);
+		return id != null ? id.toString() : null;
 	}
 
 	/**
@@ -86,6 +106,89 @@ public class DlfsMcpTools {
 			return fs.getRootDirectories().iterator().next();
 		}
 		return fs.getPath("/" + filePath);
+	}
+
+	// ==================== UCAN Drive Resolution ====================
+
+	/**
+	 * Result of resolving a drive, possibly via UCAN delegation.
+	 */
+	private record DriveAccess(FileSystem fs, String error) {
+		static DriveAccess ok(FileSystem fs) { return new DriveAccess(fs, null); }
+		static DriveAccess denied(String error) { return new DriveAccess(null, error); }
+	}
+
+	/**
+	 * Resolves a drive for the caller. First checks the caller's own drives;
+	 * if not found, checks UCAN proofs for delegated access.
+	 *
+	 * @param driveName Drive name
+	 * @param filePath  File path within drive (for resource matching), may be null
+	 * @param requiredAbility The ability required (dlfs/read or dlfs/write)
+	 * @param arguments Tool arguments (may contain ucans)
+	 * @return DriveAccess with the filesystem or an error message
+	 */
+	private DriveAccess resolveDrive(String driveName, String filePath,
+			AString requiredAbility, AMap<AString, ACell> arguments) {
+		String callerIdentity = getIdentity();
+
+		// Try caller's own drive first
+		FileSystem fs = driveManager.getDrive(callerIdentity, driveName);
+		if (fs != null) return DriveAccess.ok(fs);
+
+		// No own drive — check for UCAN delegation
+		AVector<ACell> ucans = RT.ensureVector(arguments.get(FIELD_UCANS));
+		if (ucans == null || ucans.isEmpty()) {
+			return DriveAccess.denied("Drive not found: " + driveName);
+		}
+
+		// Caller must be authenticated to present UCANs
+		if (callerIdentity == null) {
+			return DriveAccess.denied("Authentication required to present UCAN proofs");
+		}
+
+		long now = System.currentTimeMillis() / 1000;
+
+		// Build the required resource URI
+		// Resource format: dlfs://<owner-did>/drives/<name>[/<path>]
+		String resourceSuffix = "/drives/" + driveName;
+		if (filePath != null && !filePath.isEmpty()) {
+			resourceSuffix += "/" + filePath;
+		}
+
+		// Check each UCAN token (JWT strings)
+		for (long i = 0; i < ucans.count(); i++) {
+			AString jwtString = RT.ensureString(ucans.get(i));
+			if (jwtString == null) continue;
+
+			// Validate JWT signature, expiry, chain
+			UCAN ucan = UCANValidator.validateJWT(jwtString, now);
+			if (ucan == null) continue;
+
+			// Audience must match the caller
+			AString audience = ucan.getAudience();
+			if (audience == null || !audience.toString().equals(callerIdentity)) continue;
+
+			// Issuer must own the drive
+			String issuerDID = ucan.getIssuer().toString();
+			FileSystem ownerFs = driveManager.getDrive(issuerDID, driveName);
+			if (ownerFs == null) continue;
+
+			// Check capabilities cover the request
+			String requiredResource = DLFS_RESOURCE_PREFIX + issuerDID + resourceSuffix;
+			AString requiredWith = Strings.create(requiredResource);
+
+			AVector<ACell> capabilities = ucan.getCapabilities();
+			for (long j = 0; j < capabilities.count(); j++) {
+				AMap<AString, ACell> cap = RT.ensureMap(capabilities.get(j));
+				if (cap == null) continue;
+				if (Capability.covers(cap, requiredWith, requiredAbility)) {
+					return DriveAccess.ok(ownerFs);
+				}
+			}
+		}
+
+		return DriveAccess.denied("Drive not found: " + driveName);
 	}
 
 	// ==================== Tools ====================
@@ -133,6 +236,7 @@ public class DlfsMcpTools {
 			AString nameCell = RT.ensureString(arguments.get(FIELD_NAME));
 			if (nameCell == null) return McpProtocol.toolError("'name' is required");
 
+			// Drive deletion only for own drives — no UCAN delegation
 			boolean deleted = driveManager.deleteDrive(getIdentity(), nameCell.toString());
 			if (!deleted) return McpProtocol.toolError("Drive not found: " + nameCell);
 
@@ -150,12 +254,13 @@ public class DlfsMcpTools {
 			AString driveCell = RT.ensureString(arguments.get(FIELD_DRIVE));
 			if (driveCell == null) return McpProtocol.toolError("'drive' is required");
 
-			FileSystem fs = getDrive(driveCell.toString());
-			if (fs == null) return McpProtocol.toolError("Drive not found: " + driveCell);
-
 			AString pathCell = RT.ensureString(arguments.get(FIELD_PATH));
-			Path dir = resolvePath(fs, pathCell != null ? pathCell.toString() : null);
+			String filePath = pathCell != null ? pathCell.toString() : null;
 
+			DriveAccess access = resolveDrive(driveCell.toString(), filePath, Capability.CRUD_READ, arguments);
+			if (access.error() != null) return McpProtocol.toolError(access.error());
+
+			Path dir = resolvePath(access.fs(), filePath);
 			try {
 				BasicFileAttributes attrs = Files.readAttributes(dir, BasicFileAttributes.class);
 				if (!attrs.isDirectory()) {
@@ -200,14 +305,13 @@ public class DlfsMcpTools {
 			AString pathCell = RT.ensureString(arguments.get(FIELD_PATH));
 			if (pathCell == null) return McpProtocol.toolError("'path' is required");
 
-			FileSystem fs = getDrive(driveCell.toString());
-			if (fs == null) return McpProtocol.toolError("Drive not found: " + driveCell);
+			DriveAccess access = resolveDrive(driveCell.toString(), pathCell.toString(), Capability.CRUD_READ, arguments);
+			if (access.error() != null) return McpProtocol.toolError(access.error());
 
-			Path path = resolvePath(fs, pathCell.toString());
+			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
 				byte[] bytes = Files.readAllBytes(path);
 
-				// Try to return as text; fall back to base64
 				if (isLikelyText(bytes)) {
 					String text = new String(bytes, StandardCharsets.UTF_8);
 					return McpProtocol.toolSuccess(Maps.of(
@@ -254,10 +358,10 @@ public class DlfsMcpTools {
 			AString contentCell = RT.ensureString(arguments.get(FIELD_CONTENT));
 			if (contentCell == null) return McpProtocol.toolError("'content' is required");
 
-			FileSystem fs = getDrive(driveCell.toString());
-			if (fs == null) return McpProtocol.toolError("Drive not found: " + driveCell);
+			DriveAccess access = resolveDrive(driveCell.toString(), pathCell.toString(), Capability.CRUD_WRITE, arguments);
+			if (access.error() != null) return McpProtocol.toolError(access.error());
 
-			Path path = resolvePath(fs, pathCell.toString());
+			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
 				byte[] bytes = contentCell.toString().getBytes(StandardCharsets.UTF_8);
 				boolean isNew = !Files.exists(path);
@@ -288,10 +392,10 @@ public class DlfsMcpTools {
 			AString pathCell = RT.ensureString(arguments.get(FIELD_PATH));
 			if (pathCell == null) return McpProtocol.toolError("'path' is required");
 
-			FileSystem fs = getDrive(driveCell.toString());
-			if (fs == null) return McpProtocol.toolError("Drive not found: " + driveCell);
+			DriveAccess access = resolveDrive(driveCell.toString(), pathCell.toString(), Capability.CRUD_WRITE, arguments);
+			if (access.error() != null) return McpProtocol.toolError(access.error());
 
-			Path path = resolvePath(fs, pathCell.toString());
+			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
 				Files.createDirectory(path);
 				return McpProtocol.toolSuccess(Maps.of("created", CVMBool.TRUE));
@@ -314,10 +418,10 @@ public class DlfsMcpTools {
 			AString pathCell = RT.ensureString(arguments.get(FIELD_PATH));
 			if (pathCell == null) return McpProtocol.toolError("'path' is required");
 
-			FileSystem fs = getDrive(driveCell.toString());
-			if (fs == null) return McpProtocol.toolError("Drive not found: " + driveCell);
+			DriveAccess access = resolveDrive(driveCell.toString(), pathCell.toString(), Capability.CRUD_DELETE, arguments);
+			if (access.error() != null) return McpProtocol.toolError(access.error());
 
-			Path path = resolvePath(fs, pathCell.toString());
+			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
 				Files.delete(path);
 				return McpProtocol.toolSuccess(Maps.of("deleted", CVMBool.TRUE));

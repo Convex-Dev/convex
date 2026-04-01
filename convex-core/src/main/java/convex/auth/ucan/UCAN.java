@@ -2,6 +2,7 @@ package convex.auth.ucan;
 
 import java.security.SecureRandom;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -347,5 +348,91 @@ public class UCAN {
 			sb.append(String.format("%02x", b & 0xff));
 		}
 		return Strings.create(sb.toString());
+	}
+
+	// ==================== JWT Encoding ====================
+
+	/**
+	 * Encode this UCAN as a JWT string (EdDSA signed).
+	 *
+	 * <p>The JWT payload carries the UCAN payload fields (iss, aud, exp, att, prf, etc.)
+	 * directly as JWT claims. The header includes {@code "ucv"} to identify it as a
+	 * UCAN token. Proof tokens in {@code prf} are recursively encoded as JWT strings.</p>
+	 *
+	 * <p>Note: the JWT signature is over the base64url header+payload (standard JWT),
+	 * which differs from the CAD3 signature in {@link #toMap()}. This method re-signs
+	 * the payload using the provided key pair.</p>
+	 *
+	 * @param issuerKP Key pair of the issuer (must match this token's iss DID)
+	 * @return JWT-encoded UCAN string
+	 */
+	public AString toJWT(AKeyPair issuerKP) {
+		return JWT.signPublic(payload, issuerKP);
+	}
+
+	/**
+	 * Create a UCAN and return it as a JWT string in one step.
+	 *
+	 * @param issuerKP Issuer's key pair
+	 * @param audience Audience's public key
+	 * @param expiry Expiry time in unix seconds
+	 * @param capabilities Capabilities vector
+	 * @param proofs Proof JWT strings as a vector of AString (or null)
+	 * @return JWT-encoded UCAN string
+	 */
+	public static AString createJWT(AKeyPair issuerKP, AccountKey audience, long expiry,
+			AVector<ACell> capabilities, AVector<ACell> proofs) {
+		UCAN ucan = create(issuerKP, audience, expiry, capabilities, proofs);
+		return ucan.toJWT(issuerKP);
+	}
+
+	/**
+	 * Parse a JWT-encoded UCAN. Verifies the EdDSA signature using the public key
+	 * from the JWT {@code kid} header. Returns null if malformed or signature invalid.
+	 *
+	 * @param jwtString The JWT string
+	 * @return Parsed UCAN, or null if invalid
+	 */
+	public static UCAN fromJWT(AString jwtString) {
+		if (jwtString == null) return null;
+		JWT parsed = JWT.parse(jwtString);
+		if (parsed == null) return null;
+
+		// Verify signature via kid header
+		if (!parsed.verifyEdDSA()) return null;
+
+		AMap<AString, ACell> claims = parsed.getClaims();
+		if (claims == null) return null;
+
+		// Extract issuer key for internal use
+		AString issuerDID = RT.ensureString(claims.get(ISS));
+		AccountKey issuerKey = fromDIDKey(issuerDID);
+		if (issuerKey == null) return null;
+
+		// Build the signature from the JWT's raw bytes
+		// We store the JWT's signature but note: verifySignature() uses CAD3,
+		// so for JWT-parsed tokens use verifyJWT() instead
+		ASignature sig = ASignature.fromBlob(Blob.wrap(parsed.getSignatureBytes()));
+
+		return new UCAN(claims, sig);
+	}
+
+	/**
+	 * Parse a JWT-encoded UCAN without verifying the signature.
+	 * Use this when you will validate via {@link UCANValidator#validateJWT} separately.
+	 *
+	 * @param jwtString The JWT string
+	 * @return Parsed UCAN with claims extracted, or null if malformed
+	 */
+	public static UCAN parseJWT(AString jwtString) {
+		if (jwtString == null) return null;
+		JWT parsed = JWT.parse(jwtString);
+		if (parsed == null) return null;
+
+		AMap<AString, ACell> claims = parsed.getClaims();
+		if (claims == null) return null;
+
+		ASignature sig = ASignature.fromBlob(Blob.wrap(parsed.getSignatureBytes()));
+		return new UCAN(claims, sig);
 	}
 }

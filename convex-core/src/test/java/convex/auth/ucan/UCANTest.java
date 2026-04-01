@@ -353,4 +353,104 @@ public class UCANTest {
 		assertNull(UCAN.fromDIDKey(Strings.create("not-a-did")));
 		assertNull(UCAN.fromDIDKey(Strings.create("did:key:invalid")));
 	}
+
+	// ===== JWT Encoding Tests =====
+
+	@Test
+	public void testJWTRoundTrip() {
+		AVector<ACell> caps = Vectors.of(
+			Capability.create(Strings.create("dlfs://test/drives/home"), Strings.create("dlfs/read"))
+		);
+		UCAN original = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, caps, null);
+
+		// Encode as JWT
+		AString jwt = original.toJWT(ROOT_KP);
+		assertNotNull(jwt);
+		assertTrue(jwt.toString().contains("."), "JWT should have dot-separated parts");
+
+		// Decode from JWT
+		UCAN decoded = UCAN.fromJWT(jwt);
+		assertNotNull(decoded, "Should parse valid JWT UCAN");
+		assertEquals(original.getIssuer(), decoded.getIssuer());
+		assertEquals(original.getAudience(), decoded.getAudience());
+		assertEquals(original.getExpiry(), decoded.getExpiry());
+		assertEquals(1, decoded.getCapabilities().count());
+	}
+
+	@Test
+	public void testJWTCreateShortcut() {
+		AVector<ACell> caps = Vectors.of(
+			Capability.create(Strings.create("dlfs://test/drives/docs"), Strings.create("dlfs/write"))
+		);
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, caps, null);
+		assertNotNull(jwt);
+
+		UCAN parsed = UCAN.fromJWT(jwt);
+		assertNotNull(parsed);
+		assertEquals(UCAN.toDIDKey(ROOT_KP.getAccountKey()), parsed.getIssuer());
+	}
+
+	@Test
+	public void testJWTValidation() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, null);
+
+		UCAN validated = UCANValidator.validateJWT(jwt, NOW);
+		assertNotNull(validated, "Valid JWT UCAN should pass validation");
+	}
+
+	@Test
+	public void testJWTExpiredValidation() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), PAST_EXPIRY, null, null);
+
+		assertNull(UCANValidator.validateJWT(jwt, NOW), "Expired JWT UCAN should fail validation");
+	}
+
+	@Test
+	public void testJWTTamperedPayload() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, null);
+
+		// Tamper by changing a character in the payload section
+		String s = jwt.toString();
+		int dot1 = s.indexOf('.');
+		int dot2 = s.indexOf('.', dot1 + 1);
+		// Flip a character in the payload
+		char c = s.charAt(dot1 + 5);
+		char flipped = (c == 'A') ? 'B' : 'A';
+		String tampered = s.substring(0, dot1 + 5) + flipped + s.substring(dot1 + 6);
+
+		assertNull(UCAN.fromJWT(Strings.create(tampered)), "Tampered JWT should fail signature check");
+	}
+
+	@Test
+	public void testJWTChainValidation() {
+		// Root -> Agent A (JWT)
+		AString rootJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, null);
+
+		// Agent A -> Agent B, with rootJwt as proof (JWT string in prf)
+		AVector<ACell> proofs = Vectors.of(rootJwt);
+		AString childJwt = UCAN.createJWT(AGENT_A_KP, AGENT_B_KP.getAccountKey(), FUTURE_EXPIRY, null, proofs);
+
+		UCAN validated = UCANValidator.validateJWT(childJwt, NOW);
+		assertNotNull(validated, "Valid JWT chain should pass validation");
+	}
+
+	@Test
+	public void testJWTChainLinkMismatch() {
+		// Root -> Agent A
+		AString rootJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, null);
+
+		// Agent B (not A!) tries to use rootJwt as proof
+		AVector<ACell> proofs = Vectors.of(rootJwt);
+		AString badChild = UCAN.createJWT(AGENT_B_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, proofs);
+
+		assertNull(UCANValidator.validateJWT(badChild, NOW),
+			"JWT chain with mismatched link should fail");
+	}
+
+	@Test
+	public void testJWTFromMalformed() {
+		assertNull(UCAN.fromJWT(null));
+		assertNull(UCAN.fromJWT(Strings.create("not.a.jwt")));
+		assertNull(UCAN.fromJWT(Strings.create("")));
+	}
 }
