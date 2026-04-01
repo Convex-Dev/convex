@@ -45,7 +45,7 @@ import io.javalin.http.Context;
  * the tokens are validated and checked for a capability covering the operation:</p>
  *
  * <ul>
- *   <li>Resource: {@code dlfs://<owner-did>/drives/<name>[/<path>]}</li>
+ *   <li>Resource: DID URL {@code <owner-did>/dlfs/<drive>[/<path>]}</li>
  *   <li>Abilities: {@code dlfs/read} (list, read), {@code dlfs/write} (write, mkdir, delete),
  *       {@code dlfs/*} (all)</li>
  * </ul>
@@ -63,7 +63,8 @@ public class DlfsMcpTools {
 	private static final AString FIELD_CONTENT = Strings.intern("content");
 	private static final AString FIELD_UCANS = Strings.intern("ucans");
 
-	private static final String DLFS_RESOURCE_PREFIX = "dlfs://";
+	/** Resource path prefix appended to the owner's DID to form the DID URL */
+	private static final String DLFS_PATH_PREFIX = "/dlfs/";
 
 	private final DLFSDriveManager driveManager;
 
@@ -149,9 +150,9 @@ public class DlfsMcpTools {
 
 		long now = System.currentTimeMillis() / 1000;
 
-		// Build the required resource URI
-		// Resource format: dlfs://<owner-did>/drives/<name>[/<path>]
-		String resourceSuffix = "/drives/" + driveName;
+		// Build the required resource as a DID URL
+		// Format: <owner-did>/dlfs/<drive>[/<path>]
+		String resourceSuffix = DLFS_PATH_PREFIX + driveName;
 		if (filePath != null && !filePath.isEmpty()) {
 			resourceSuffix += "/" + filePath;
 		}
@@ -175,7 +176,7 @@ public class DlfsMcpTools {
 			if (ownerFs == null) continue;
 
 			// Check capabilities cover the request
-			String requiredResource = DLFS_RESOURCE_PREFIX + issuerDID + resourceSuffix;
+			String requiredResource = issuerDID + resourceSuffix;
 			AString requiredWith = Strings.create(requiredResource);
 
 			AVector<ACell> capabilities = ucan.getCapabilities();

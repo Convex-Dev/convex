@@ -409,7 +409,7 @@ public class AuthTest {
 	private static AString createDlfsUcanJWT(AKeyPair issuer, AKeyPair audience,
 			String driveName, String path, String ability, long lifetimeSeconds) {
 		String issuerDID = getDID(issuer);
-		String resource = "dlfs://" + issuerDID + "/drives/" + driveName;
+		String resource = issuerDID + "/dlfs/" + driveName;
 		if (path != null && !path.isEmpty()) {
 			resource += "/" + path;
 		}
