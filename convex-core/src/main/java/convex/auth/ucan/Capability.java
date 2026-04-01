@@ -8,10 +8,10 @@ import convex.core.data.Strings;
 import convex.core.lang.RT;
 
 /**
- * Minimal capability construction helpers for UCAN tokens.
+ * Capability construction and matching for UCAN tokens.
  *
- * <p>Provides constants and factory methods for building capability maps.
- * Attenuation matching logic is deferred to a later design phase.</p>
+ * <p>Provides constants, factory methods, and attenuation matching.
+ * The primary interface uses AString (CVM native strings) throughout.</p>
  *
  * <p>Capability structure:</p>
  * <pre>
@@ -65,6 +65,8 @@ public class Capability {
 		return Maps.of(WITH, resource, CAN, ability, NB, caveats);
 	}
 
+	// ========== Attenuation matching — primary AString interface ==========
+
 	/**
 	 * Checks whether a granted capability covers a requested capability.
 	 *
@@ -77,30 +79,93 @@ public class Capability {
 	 *       or the grant's ability is {@code *} (top — covers everything)</li>
 	 * </ul>
 	 *
-	 * @param grantWith Granted resource path (e.g. "/w/")
-	 * @param grantCan Granted ability (e.g. "crud/read" or "*")
-	 * @param requestWith Requested resource path (e.g. "/w/notes")
-	 * @param requestCan Requested ability (e.g. "crud/read")
+	 * <p>This is the primary implementation using CVM-native AString values.</p>
+	 *
+	 * @param grantWith Granted resource path
+	 * @param grantCan Granted ability
+	 * @param requestWith Requested resource path
+	 * @param requestCan Requested ability
 	 * @return true if the grant covers the request
 	 */
-	public static boolean covers(String grantWith, String grantCan,
-			String requestWith, String requestCan) {
-		// Resource attenuation: grant path must be a prefix of request path.
-		// Normalise: /w/ covers /w and /w/anything.
-		// Exact match always covers. Prefix match requires the grant to end
-		// with / or the request to have / at the boundary.
-		if (!requestWith.equals(grantWith)
-			&& !requestWith.startsWith(grantWith)
-			&& !(grantWith.endsWith("/") && (grantWith.substring(0, grantWith.length() - 1)).equals(requestWith))) {
-			return false;
+	public static boolean covers(AString grantWith, AString grantCan,
+			AString requestWith, AString requestCan) {
+		if (grantCan == null || requestCan == null) return false;
+
+		// Resource attenuation
+		if (grantWith != null && requestWith != null) {
+			if (!resourceCovers(grantWith, requestWith)) return false;
+		}
+		// null grantWith = any resource (wildcard)
+
+		// Ability attenuation
+		return abilityCovers(grantCan, requestCan);
+	}
+
+	/**
+	 * Checks whether a granted resource path covers a requested resource path.
+	 *
+	 * <p>Uses path prefix matching with boundary awareness:</p>
+	 * <ul>
+	 *   <li>Exact match: {@code "w/decisions"} covers {@code "w/decisions"}</li>
+	 *   <li>Prefix: {@code "w/decisions"} covers {@code "w/decisions/INV-123"}</li>
+	 *   <li>Trailing slash: {@code "w/decisions/"} covers {@code "w/decisions"} and children</li>
+	 *   <li>Empty grant covers any resource</li>
+	 * </ul>
+	 */
+	public static boolean resourceCovers(AString grant, AString request) {
+		if (grant == null) return true;
+		if (request == null) return true;
+
+		long gLen = grant.count();
+		long rLen = request.count();
+
+		// Empty grant covers everything
+		if (gLen == 0) return true;
+
+		// Exact match (interned strings may be identical objects)
+		if (grant.equals(request)) return true;
+
+		// Check if request starts with grant
+		if (rLen > gLen && request.startsWith(grant)) return true;
+
+		// Trailing slash: "w/records/" covers "w/records"
+		if (gLen > 0 && grant.charAt(gLen - 1) == '/' && rLen == gLen - 1) {
+			if (request.equals(grant.slice(0, gLen - 1))) return true;
 		}
 
-		// Ability attenuation: * covers all, exact match, or prefix match
-		if ("*".equals(grantCan)) return true;
-		if (requestCan.equals(grantCan)) return true;
-		if (requestCan.startsWith(grantCan + "/")) return true;
 		return false;
 	}
+
+	/**
+	 * Checks whether a granted ability covers a requested ability.
+	 *
+	 * <p>Uses UCAN prefix hierarchy:</p>
+	 * <ul>
+	 *   <li>{@code *} covers any ability</li>
+	 *   <li>Exact match</li>
+	 *   <li>Prefix with {@code /} boundary: {@code "crud"} covers {@code "crud/read"}</li>
+	 * </ul>
+	 */
+	public static boolean abilityCovers(AString grant, AString request) {
+		if (grant == null) return false;
+
+		// Top ability covers everything
+		if (TOP.equals(grant)) return true;
+
+		// Exact match
+		if (grant.equals(request)) return true;
+
+		// Prefix: grant must be followed by "/" in request
+		long gLen = grant.count();
+		long rLen = request.count();
+		if (rLen > gLen + 1 && request.charAt(gLen) == '/') {
+			if (request.startsWith(grant)) return true;
+		}
+
+		return false;
+	}
+
+	// ========== Convenience overloads ==========
 
 	/**
 	 * Checks whether a granted capability map covers a requested resource and ability.
@@ -110,11 +175,31 @@ public class Capability {
 	 * @param requestCan Requested ability
 	 * @return true if the grant covers the request
 	 */
-	public static boolean covers(AMap<AString, ACell> grant, String requestWith, String requestCan) {
+	public static boolean covers(AMap<AString, ACell> grant, AString requestWith, AString requestCan) {
 		AString withStr = RT.ensureString(grant.get(WITH));
 		AString canStr = RT.ensureString(grant.get(CAN));
-		if (withStr == null || canStr == null) return false;
-		return covers(withStr.toString(), canStr.toString(), requestWith, requestCan);
+		return covers(withStr, canStr, requestWith, requestCan);
+	}
+
+	/**
+	 * String convenience overload — delegates to AString primary implementation.
+	 */
+	public static boolean covers(String grantWith, String grantCan,
+			String requestWith, String requestCan) {
+		return covers(
+			grantWith != null ? Strings.create(grantWith) : null,
+			grantCan != null ? Strings.create(grantCan) : null,
+			requestWith != null ? Strings.create(requestWith) : null,
+			requestCan != null ? Strings.create(requestCan) : null);
+	}
+
+	/**
+	 * String convenience overload for map grant — delegates to AString primary.
+	 */
+	public static boolean covers(AMap<AString, ACell> grant, String requestWith, String requestCan) {
+		return covers(grant,
+			requestWith != null ? Strings.create(requestWith) : null,
+			requestCan != null ? Strings.create(requestCan) : null);
 	}
 
 	/**
