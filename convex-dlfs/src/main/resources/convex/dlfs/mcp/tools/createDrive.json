@@ -1,0 +1,14 @@
+{
+  "name": "dlfs_create_drive",
+  "description": "Create a new DLFS drive.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name for the new drive"
+      }
+    },
+    "required": ["name"]
+  }
+}

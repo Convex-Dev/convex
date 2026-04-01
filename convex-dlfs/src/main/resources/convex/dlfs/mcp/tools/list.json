@@ -1,0 +1,18 @@
+{
+  "name": "dlfs_list",
+  "description": "List the contents of a directory in a DLFS drive.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "drive": {
+        "type": "string",
+        "description": "Drive name"
+      },
+      "path": {
+        "type": "string",
+        "description": "Directory path within the drive (default: root)"
+      }
+    },
+    "required": ["drive"]
+  }
+}

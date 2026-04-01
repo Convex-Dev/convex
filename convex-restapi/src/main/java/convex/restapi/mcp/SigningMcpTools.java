@@ -124,7 +124,7 @@ class SigningMcpTools {
 		String token = confirmSvc.createConfirmation(identity, toolName, stripped, description);
 
 		// Build confirmUrl from request context
-		Context ctx = McpAPI.currentContext.get();
+		Context ctx = McpServer.getCurrentContext();
 		String baseUrl = (ctx != null) ? ABaseAPI.getExternalBaseUrl(ctx, "") : "http://localhost";
 		String confirmUrl = baseUrl + "/confirm?token=" + token;
 

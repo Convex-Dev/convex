@@ -19,9 +19,11 @@ class McpPrompts {
 	private static final String PROMPTS_PATH = "convex/restapi/mcp/prompts/";
 
 	private final McpAPI api;
+	private final McpServer mcpServer;
 
-	McpPrompts(McpAPI api) {
+	McpPrompts(McpAPI api, McpServer mcpServer) {
 		this.api = api;
+		this.mcpServer = mcpServer;
 	}
 
 	/**
@@ -43,6 +45,6 @@ class McpPrompts {
 	}
 
 	private void register(String jsonFile) {
-		api.registerPrompt(new McpPrompt(McpPrompt.loadMetadata(PROMPTS_PATH + jsonFile)));
+		mcpServer.registerPrompt(new McpPrompt(McpPrompt.loadMetadata(PROMPTS_PATH + jsonFile)));
 	}
 }

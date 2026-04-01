@@ -1,0 +1,9 @@
+{
+  "name": "dlfs_list_drives",
+  "description": "List available DLFS drives for the current user.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

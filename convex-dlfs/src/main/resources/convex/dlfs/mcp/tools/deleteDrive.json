@@ -1,0 +1,14 @@
+{
+  "name": "dlfs_delete_drive",
+  "description": "Delete a DLFS drive.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Name of the drive to delete"
+      }
+    },
+    "required": ["name"]
+  }
+}
