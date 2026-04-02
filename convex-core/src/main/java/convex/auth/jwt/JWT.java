@@ -123,6 +123,9 @@ public class JWT {
 	/** Get the original encoded JWT string */
 	public AString getRaw() { return raw; }
 
+	/** Get the raw signature bytes */
+	public byte[] getSignatureBytes() { return signatureBytes; }
+
 	/** Get the algorithm from the header (e.g. "EdDSA", "RS256", "HS256") */
 	public String getAlgorithm() {
 		AString alg = RT.ensureString(header.get(ALG));

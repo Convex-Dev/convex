@@ -5,15 +5,12 @@ import static convex.restapi.mcp.McpProtocol.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.SecureRandom;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.api.ContentTypes;
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -31,9 +28,9 @@ import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.AString;
-import convex.core.data.MapEntry;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -49,8 +46,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
-import convex.core.exceptions.ParseException;
-import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
@@ -59,17 +54,9 @@ import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.auth.AuthMiddleware;
-import convex.restapi.model.JsonRPCRequest;
-import convex.restapi.model.JsonRPCResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.OpenApi;
-import io.javalin.openapi.OpenApiContent;
-import io.javalin.openapi.OpenApiExampleProperty;
-import io.javalin.openapi.OpenApiRequestBody;
-import io.javalin.openapi.OpenApiResponse;
 
 /**
  * MCP (Model Context Protocol) implementation for Convex peers.
@@ -148,18 +135,13 @@ public class McpAPI extends ABaseAPI {
 	/** Maximum entries in a batch JSON-RPC request. */
 	public static final int MAX_BATCH_SIZE = 20;
 
-	/** ThreadLocal to make the current Javalin Context available to tool handlers */
-	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
-
 	public static final StringShort KEY_NETWORK_ID = Strings.intern("networkId");
 	public static final StringShort KEY_PEER_KEY = Strings.intern("peerKey");
 	public static final StringShort KEY_VALUE = Strings.intern("value");
 	public static final StringShort KEY_ERROR_CODE = Strings.intern("errorCode");
 	public static final StringShort KEY_INFO = Strings.intern("info");
 
-	private final AMap<AString, ACell> serverInfo;
-	private final Map<String, McpTool> tools = new LinkedHashMap<>();
-	private final Map<String, McpPrompt> prompts = new LinkedHashMap<>();
+	private final McpServer mcpServer;
 
 	/** Connection map: session ID → McpConnection (created on GET /mcp) */
 	private final ConcurrentHashMap<String, McpConnection> connections = new ConcurrentHashMap<>();
@@ -167,69 +149,41 @@ public class McpAPI extends ABaseAPI {
 	/** Convex-specific state watcher */
 	private final ConvexStateWatcher stateWatcher = new ConvexStateWatcher();
 
-	public McpAPI(RESTServer restServer) {
+	public McpAPI(RESTServer restServer, McpServer mcpServer) {
 		super(restServer);
-		AMap<AString, ACell> info = Maps.of(
-			"name", "convex-mcp",
-			"title", "Convex MCP",
-			"version", Utils.getVersion()
-		);
+		this.mcpServer = mcpServer;
+
+		// Enrich server info with peer details
+		AMap<AString, ACell> info = mcpServer.getServerInfo();
 		Peer peer = server.getPeer();
 		if (peer != null) {
 			info = info.assoc(KEY_NETWORK_ID, Strings.create(peer.getNetworkID().toHexString()));
 			info = info.assoc(KEY_PEER_KEY, Strings.create(peer.getPeerKey().toHexString()));
+			mcpServer.setServerInfo(info);
 		}
-		serverInfo = info;
+
 		registerTools();
-		new McpPrompts(this).registerAll();
+		new McpPrompts(this, mcpServer).registerAll();
+	}
+
+	public McpServer getMcpServer() {
+		return mcpServer;
 	}
 
 	public AMap<AString, ACell> getServerInfo() {
-		return serverInfo;
+		return mcpServer.getServerInfo();
 	}
 
 	public AVector<AMap<AString, ACell>> getToolMetadata() {
-		return listToolsVector();
+		return mcpServer.getToolMetadata();
 	}
 
 	@Override
 	public void addRoutes(Javalin app) {
-		app.before("/mcp", this::validateOrigin);
-		app.post("/mcp", this::handleMcpRequest);
+		// McpServer handles POST /mcp and GET /.well-known/mcp
+		// We add only the SSE session routes (Convex-specific watch support)
 		app.get("/mcp", this::handleMcpGet);
 		app.delete("/mcp", this::handleMcpDelete);
-		app.get("/.well-known/mcp", this::getMCPWellKnown);
-	}
-
-	/**
-	 * Validate the Origin header on all MCP requests.
-	 *
-	 * <p>Required by MCP spec 2025-11-25 to prevent DNS rebinding attacks. If the
-	 * {@code Origin} header is present and not allowed, responds with HTTP 403.</p>
-	 *
-	 * <p>Convex peers are public API servers, so all origins are allowed by default.
-	 * Localhost-only deployments should override or configure origin restrictions.</p>
-	 *
-	 * @see <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#security-warning">MCP Security Warning</a>
-	 */
-	private void validateOrigin(Context ctx) {
-		String origin = ctx.header("Origin");
-		if (origin != null && !isOriginAllowed(origin)) {
-			throw new io.javalin.http.ForbiddenResponse("Forbidden: invalid origin");
-		}
-	}
-
-	/**
-	 * Check if an Origin is allowed for MCP requests.
-	 *
-	 * <p>Public Convex peers allow all origins. Override for localhost-only deployments
-	 * that need DNS rebinding protection.</p>
-	 *
-	 * @param origin The Origin header value
-	 * @return true if the origin is allowed
-	 */
-	protected boolean isOriginAllowed(String origin) {
-		return true;
 	}
 
 	/**
@@ -309,206 +263,6 @@ public class McpAPI extends ABaseAPI {
 		}
 	}
 
-	@OpenApi(path = "/mcp", 
-			methods = HttpMethod.POST, 
-			versions="peer-v1",
-			tags = { "MCP"},
-			summary = "Handle MCP JSON-RPC requests", 
-			requestBody = @OpenApiRequestBody(
-					description = "JSON-RPC request",
-					content= @OpenApiContent(
-							type = "application/json" ,
-							from = JsonRPCRequest.class,
-							exampleObjects = {
-								@OpenApiExampleProperty(name = "jsonrpc", value = "2.0"),
-								@OpenApiExampleProperty(name = "method", value = "initialize"),
-								@OpenApiExampleProperty(name = "params", value="{}"),
-								@OpenApiExampleProperty(name = "id", value = "1")
-							}
-					)),
-			operationId = "mcpServer",
-			responses = {
-					@OpenApiResponse(
-							status = "200", 
-							description = "JSON-RPC response", 
-							content = {
-								@OpenApiContent(
-										type = "application/json", 
-										from = JsonRPCResponse.class,
-										exampleObjects = {
-											@OpenApiExampleProperty(name = "jsonrpc", value = "2.0"),
-											@OpenApiExampleProperty(name = "result", value="{}"),
-											@OpenApiExampleProperty(name = "id", value = "1")
-										}
-										) })
-					})	
-	private void handleMcpRequest(Context ctx) {
-		currentContext.set(ctx);
-		try {
-			boolean useSSE = acceptsEventStream(ctx);
-			ACell body = JSONReader.read(ctx.bodyInputStream());
-
-			if (body instanceof AMap<?, ?> map) {
-				if (isNotification(map)) {
-					processNotification(map);
-					ctx.status(202).contentType(ContentTypes.JSON);
-					return;
-				}
-
-				AMap<AString, ACell> response = createResponse(map);
-				sendResponse(ctx, response, useSSE);
-			} else if (body instanceof AVector<?> vector) {
-				long n = vector.count();
-				if (n == 0) {
-					sendResponse(ctx, protocolError(-32600, "Invalid batch request (empty)"), useSSE);
-					return;
-				}
-				if (n > MAX_BATCH_SIZE) {
-					sendResponse(ctx, protocolError(-32600, "Batch too large (max " + MAX_BATCH_SIZE + ")"), useSSE);
-					return;
-				}
-				AVector<AMap<AString, ACell>> responses = Vectors.empty();
-				for (long i = 0; i < n; i++) {
-					ACell entry = vector.get(i);
-					if (entry instanceof AMap<?, ?> batchMap) {
-						if (isNotification(batchMap)) {
-							processNotification(batchMap);
-						} else {
-							responses = responses.conj(createResponse(batchMap));
-						}
-					} else {
-						responses = responses.conj(protocolError(-32600, "Invalid Request"));
-					}
-				}
-				if (responses.isEmpty()) {
-					ctx.status(202).contentType(ContentTypes.JSON);
-				} else if (useSSE) {
-					// SSE: send each batch response as a separate event
-					sendSseBatchResponse(ctx, responses);
-				} else {
-					ctx.contentType(ContentTypes.JSON);
-					setContent(ctx, responses);
-				}
-			} else {
-				sendResponse(ctx, protocolError(-32600, "Request must be a JSON object or array"), useSSE);
-			}
-		} catch (ParseException | IOException e) {
-			ctx.contentType(ContentTypes.JSON);
-			setContent(ctx, protocolError(-32700, "Parse error"));
-		} catch (Exception e) {
-			log.warn("Unexpected error handling MCP request", e);
-			ctx.contentType(ContentTypes.JSON);
-			setContent(ctx, protocolError(-32603, "Internal error"));
-		} finally {
-			currentContext.remove();
-		}
-	}
-
-	/**
-	 * Process a notification message (no response expected).
-	 */
-	private void processNotification(AMap<?, ?> request) {
-		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
-		if (methodCell == null) return;
-		String method = methodCell.toString().trim();
-		// Handle known notifications silently
-		switch (method) {
-			case "notifications/initialized", "notifications/cancelled" -> { /* acknowledged */ }
-			default -> log.debug("Unrecognised MCP notification: {}", method);
-		}
-	}
-
-	/**
-	 * Create a response for a single MCP request
-	 * @param request
-	 * @return
-	 */
-	private AMap<AString, ACell> createResponse(AMap<?, ?> request) {
-		ACell idCell = request.get(FIELD_ID);
-		AString methodCell = RT.ensureString(request.get(FIELD_METHOD));
-
-		if (methodCell == null) {
-			return maybeAttachId(protocolError(-32600, "Missing method"), idCell);
-		}
-
-		String method = methodCell.toString().trim();
-
-		AMap<AString, ACell> result;
-		try {
-			switch (method) {
-				case "initialize" -> {
-					// Return session ID as correlation token — no state created
-					Context reqCtx = currentContext.get();
-					if (reqCtx != null) {
-						reqCtx.res().setHeader(HEADER_SESSION_ID, UUID.randomUUID().toString());
-					}
-					result = protocolResult(buildInitializeResult());
-				}
-				case "ping" -> result = protocolResult(EMPTY_MAP);
-				case "notifications/initialized" -> result = protocolResult(EMPTY_MAP);
-				case "tools/list" -> result = protocolResult(listTools());
-				case "tools/call" -> result = toolCall(request.get(FIELD_PARAMS));
-				case "prompts/list" -> result = protocolResult(listPrompts());
-				case "prompts/get" -> result = promptGet(request.get(FIELD_PARAMS));
-				default -> result = protocolError(-32601, "Method not found: " + method);
-			}
-		} catch (Exception ex) {
-			log.warn("Error handling MCP request for method {}", method, ex);
-			result = protocolError(-32603, "Internal error");
-		}
-
-		return maybeAttachId(result, idCell);
-	}
-
-	private AMap<AString, ACell> buildInitializeResult() {
-		AMap<AString, ACell> capabilities = Maps.of(
-			"tools", EMPTY_MAP,
-			"prompts", EMPTY_MAP
-		);
-		AMap<AString, ACell> result = Maps.of(
-			"protocolVersion", "2025-06-18",
-			"serverInfo", serverInfo,
-			"capabilities", capabilities
-		);
-		return result;
-	}
-
-	private AVector<AMap<AString, ACell>> listToolsVector() {
-		AVector<AMap<AString, ACell>> vec = Vectors.empty();
-		for (McpTool tool : tools.values()) {
-			vec = vec.conj(tool.getMetadata());
-		}
-		return vec;
-	}
-
-	private AMap<AString, ACell> listTools() {
-		return Maps.of("tools", listToolsVector());
-	}
-
-	private AMap<AString, ACell> toolCall(ACell paramsCell) {
-		if (!(paramsCell instanceof AMap<?, ?> params)) {
-			return protocolError(-32602, "params must be an object");
-		}
-
-		AString toolNameCell = RT.ensureString(params.get(FIELD_NAME));
-		if (toolNameCell == null) {
-			return protocolError(-32602, "Tool name required");
-		}
-		String toolName = toolNameCell.toString();
-		McpTool tool = tools.get(toolName);
-		if (tool == null) {
-			return protocolError(-32601, "Unknown tool: " + toolName);
-		}
-
-		AMap<AString,ACell> arguments=RT.ensureMap(params.get(FIELD_ARGUMENTS));
-		
-		if (arguments == null) {
-			return protocolError(-32602, toolName +" requires arguments");
-		}
-
-		return tool.handle(arguments);
-	}
-
 	// ===== Delegating methods for tool extensions (e.g. SigningMcpTools) =====
 
 	/* JSON-RPC protocol error — delegates to McpProtocol */
@@ -574,40 +328,11 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	void registerTool(McpTool tool) {
-		tools.put(tool.getName(), tool);
+		mcpServer.registerTool(tool);
 	}
 
 	void registerPrompt(McpPrompt prompt) {
-		prompts.put(prompt.getName(), prompt);
-	}
-
-	private AMap<AString, ACell> listPrompts() {
-		AVector<AMap<AString, ACell>> vec = Vectors.empty();
-		for (McpPrompt prompt : prompts.values()) {
-			vec = vec.conj(prompt.getMetadata());
-		}
-		return Maps.of("prompts", vec);
-	}
-
-	private AMap<AString, ACell> promptGet(ACell paramsCell) {
-		if (!(paramsCell instanceof AMap<?, ?> params)) {
-			return protocolError(-32602, "params must be an object");
-		}
-
-		AString nameCell = RT.ensureString(params.get(FIELD_NAME));
-		if (nameCell == null) return protocolError(-32602, "Prompt name required");
-
-		McpPrompt prompt = prompts.get(nameCell.toString());
-		if (prompt == null) return protocolError(-32601, "Unknown prompt: " + nameCell);
-
-		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
-		if (arguments == null) arguments = Maps.empty();
-
-		AVector<AMap<AString, ACell>> messages = prompt.render(arguments);
-		return protocolResult(Maps.of(
-			"description", prompt.getMetadata().get(Strings.create("description")),
-			"messages", messages
-		));
+		mcpServer.registerPrompt(prompt);
 	}
 
 	private ATransaction decodeTransaction(Blob encodedBlob) throws BadFormatException, MissingDataException {
@@ -1641,7 +1366,7 @@ public class McpAPI extends ABaseAPI {
 			}
 
 			// Require active McpConnection via session ID
-			Context ctx = currentContext.get();
+			Context ctx = McpServer.getCurrentContext();
 			String sessionId = (ctx != null) ? ctx.header(HEADER_SESSION_ID) : null;
 			McpConnection conn = (sessionId != null) ? connections.get(sessionId) : null;
 			if (conn == null) {
@@ -1687,7 +1412,7 @@ public class McpAPI extends ABaseAPI {
 			}
 
 			// Find connection via session ID
-			Context ctx = currentContext.get();
+			Context ctx = McpServer.getCurrentContext();
 			String sessionId = (ctx != null) ? ctx.header(HEADER_SESSION_ID) : null;
 			McpConnection conn = (sessionId != null) ? connections.get(sessionId) : null;
 			if (conn == null) {
@@ -1816,20 +1541,6 @@ public class McpAPI extends ABaseAPI {
 		}
 	}
 
-	// ===== Response helpers =====
-
-	/**
-	 * Send a JSON-RPC response as either SSE or JSON, depending on client preference.
-	 */
-	private void sendResponse(Context ctx, ACell response, boolean useSSE) {
-		if (useSSE) {
-			McpProtocol.sendResponse(ctx, response, true);
-		} else {
-			ctx.contentType(ContentTypes.JSON);
-			setContent(ctx, response);
-		}
-	}
-
 	/**
 	 * Gets the RESTServer instance. Package-private accessor for tool extensions.
 	 */
@@ -1841,31 +1552,9 @@ public class McpAPI extends ABaseAPI {
 	 * Gets the authenticated identity from the current request context, or null if unauthenticated.
 	 */
 	AString getRequestIdentity() {
-		Context ctx = currentContext.get();
+		Context ctx = McpServer.getCurrentContext();
 		if (ctx == null) return null;
 		return AuthMiddleware.getIdentity(ctx);
-	}
-
-	private AMap<AString,ACell> WELL_KNOWN=JSON.parse("""
-		{	
-			"mcp_version": "1.0",
-			"server_url": "http://localhost:8080/mcp",
-			"description": "Convex network MCP for decentralised economic systems",
-			"tools_endpoint": "/mcp",
-			"endpoint": {"path":"/mcp","transport":"streamable-http"}
-		}
-""");
-	
-	@OpenApi(path = "/.well-known/mcp", 
-			methods = HttpMethod.GET, 
-			tags = { "MCP"},
-			summary = "Get MCP server capabilities", 
-			operationId = "mcpWellKnown")	
-	protected void getMCPWellKnown(Context ctx) { 
-		AMap<AString,ACell> result=WELL_KNOWN;
-		AString mcpURL=Strings.create(getExternalBaseUrl(ctx, "mcp"));
-		result=result.assoc(SERVER_URL_FIELD,mcpURL);
-		setContent(ctx,result);
 	}
 
 }

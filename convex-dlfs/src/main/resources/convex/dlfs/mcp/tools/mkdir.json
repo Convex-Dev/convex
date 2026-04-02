@@ -1,0 +1,18 @@
+{
+  "name": "dlfs_mkdir",
+  "description": "Create a directory in a DLFS drive. The parent directory must already exist. To create nested paths, create each level in order (e.g. 'docs' then 'docs/specs').",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "drive": {
+        "type": "string",
+        "description": "Drive name"
+      },
+      "path": {
+        "type": "string",
+        "description": "Directory path to create (e.g. 'docs/specs')"
+      }
+    },
+    "required": ["drive", "path"]
+  }
+}

@@ -11,8 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.Maps;
+import convex.core.util.Utils;
 import convex.peer.auth.PeerAuth;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.mcp.McpServer;
 import io.javalin.Javalin;
 
 /**
@@ -31,6 +34,7 @@ public class DLFSServer implements Closeable {
 
 	private final DLFSDriveManager driveManager;
 	private final DLFSWebDAV webdav;
+	private final McpServer mcpServer;
 	private final AKeyPair keyPair;
 	private Javalin app;
 
@@ -38,6 +42,12 @@ public class DLFSServer implements Closeable {
 		this.driveManager = driveManager;
 		this.keyPair = keyPair;
 		this.webdav = new DLFSWebDAV(driveManager);
+		this.mcpServer = new McpServer(Maps.of(
+			"name", "dlfs-mcp",
+			"title", "DLFS MCP",
+			"version", Utils.getVersion()
+		));
+		new DlfsMcpTools(driveManager).registerAll(mcpServer);
 	}
 
 	/**
@@ -103,8 +113,9 @@ public class DLFSServer implements Closeable {
 			log.debug("<-- {} {} {}", ctx.status(), ctx.req().getMethod(), ctx.req().getRequestURI());
 		});
 
-		// Register WebDAV routes
+		// Register WebDAV and MCP routes
 		webdav.addRoutes(app);
+		mcpServer.addRoutes(app);
 
 		// Configure Jetty connector with minimal platform threads.
 		// Request handling uses virtual threads (useVirtualThreads=true above),
@@ -137,6 +148,13 @@ public class DLFSServer implements Closeable {
 	 */
 	public DLFSWebDAV getWebDAV() {
 		return webdav;
+	}
+
+	/**
+	 * Gets the MCP server. External modules can register additional tools.
+	 */
+	public McpServer getMcpServer() {
+		return mcpServer;
 	}
 
 	@Override

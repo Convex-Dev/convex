@@ -1,0 +1,9 @@
+{
+  "name": "dlfs_list_drives",
+  "description": "List all DLFS drives available to the current user. Each drive is an independent lattice-backed filesystem with its own root directory. Returns an array of drive names.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  }
+}

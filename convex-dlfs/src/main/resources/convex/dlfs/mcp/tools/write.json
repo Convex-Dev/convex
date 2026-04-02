@@ -1,0 +1,22 @@
+{
+  "name": "dlfs_write",
+  "description": "Write text content to a file in a DLFS drive. Creates the file if it does not exist; overwrites if it does. Parent directories must already exist — use dlfs_mkdir first if needed. Returns the number of bytes written and whether the file was newly created.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "drive": {
+        "type": "string",
+        "description": "Drive name"
+      },
+      "path": {
+        "type": "string",
+        "description": "File path within the drive (e.g. 'docs/notes.txt')"
+      },
+      "content": {
+        "type": "string",
+        "description": "Text content to write to the file"
+      }
+    },
+    "required": ["drive", "path", "content"]
+  }
+}

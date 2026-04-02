@@ -7,6 +7,7 @@ import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.ConvexDB;
+import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -46,18 +47,39 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 * Navigates the database's cursor tree each time, so it always
 	 * reflects the current lattice state.
 	 *
-	 * @param schemaName Schema name (maps to a registered database)
+	 * <p>Looks up the database from the legacy static registry first,
+	 * then falls back to the driver's managed instances map.
+	 *
+	 * @param schemaName Schema name (maps to a database)
 	 * @param tableName Table name
 	 * @return The ConvexTable
 	 */
 	public static ConvexTable getTable(String schemaName, String tableName) {
 		SQLDatabase db = ConvexDB.lookupDatabase(schemaName);
 		if (db == null) {
+			// Try managed instances (mem: and file: connections)
+			db = lookupManagedDatabase(schemaName);
+		}
+		if (db == null) {
 			throw new IllegalStateException(
-				"No database registered with name '" + schemaName +
-				"'. Register via ConvexDB.register(dbName) first.");
+				"No database found for '" + schemaName + "'.");
 		}
 		return new ConvexSchema(db, schemaName).getConvexTable(tableName);
+	}
+
+	/**
+	 * Searches the driver's managed instances for a database by name.
+	 */
+	private static SQLDatabase lookupManagedDatabase(String dbName) {
+		for (ConvexDriver.ManagedInstance inst : ConvexDriver.instances.values()) {
+			try {
+				SQLDatabase db = inst.cdb.database(dbName);
+				if (db != null) return db;
+			} catch (Exception e) {
+				// skip
+			}
+		}
+		return null;
 	}
 
 	@Override
