@@ -5,6 +5,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Vectors;
 import convex.core.lang.RT;
 
 /**
@@ -117,5 +118,29 @@ public class UCANValidator {
 		}
 
 		return token;
+	}
+
+	/**
+	 * Parse a transport-level {@code ucans} vector into validated UCAN maps.
+	 *
+	 * <p>Each element should be a JWT string. Invalid tokens (malformed, expired,
+	 * bad signature) are silently skipped. Returns a vector of validated UCAN
+	 * payload maps suitable for {@code RequestContext.withProofs()}.</p>
+	 *
+	 * @param ucans Vector of JWT strings from the transport layer, or null
+	 * @return Vector of validated UCAN payload maps (may be empty), or null if input is null
+	 */
+	public static AVector<ACell> parseTransportUCANs(AVector<ACell> ucans) {
+		if (ucans == null || ucans.isEmpty()) return null;
+		long now = System.currentTimeMillis() / 1000;
+		AVector<ACell> result = Vectors.empty();
+		for (long i = 0; i < ucans.count(); i++) {
+			AString jwt = RT.ensureString(ucans.get(i));
+			if (jwt == null) continue;
+			UCAN validated = validateJWT(jwt, now);
+			if (validated == null) continue;
+			result = result.conj(validated.toMap());
+		}
+		return result.isEmpty() ? null : result;
 	}
 }
