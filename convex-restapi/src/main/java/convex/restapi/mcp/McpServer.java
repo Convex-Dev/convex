@@ -148,7 +148,7 @@ public class McpServer {
 
 	// ==================== POST /mcp — JSON-RPC dispatch ====================
 
-	void handlePost(Context ctx) {
+	protected void handlePost(Context ctx) {
 		currentContext.set(ctx);
 		try {
 			boolean useSSE = acceptsEventStream(ctx);
@@ -211,7 +211,7 @@ public class McpServer {
 
 	// ==================== JSON-RPC dispatch ====================
 
-	AMap<AString, ACell> createResponse(AMap<?, ?> request) {
+	protected AMap<AString, ACell> createResponse(AMap<?, ?> request) {
 		ACell idCell = request.get(FIELD_ID);
 		String method = getMethodName(request);
 
