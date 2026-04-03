@@ -19,38 +19,79 @@ import convex.core.lang.RT;
 /**
  * Lightweight, ACell-native JSON Schema validation, inference, and coercion.
  *
- * <p>Supports the subset of JSON Schema draft 2020-12 used in Convex/Covia
- * operation metadata, plus CVM type extensions (blob, address, hash, accountKey).</p>
+ * <p>Implements a subset of JSON Schema draft 2020-12 validation, plus CVM type
+ * extensions ({@code blob}, {@code address}). Operates entirely on CVM data
+ * types with no external library dependencies.</p>
  *
- * <p>No external dependencies — operates entirely on CVM data types.</p>
+ * <h3>Spec conformance</h3>
+ * <ul>
+ *   <li>Validation keywords: {@code type}, {@code properties}, {@code required},
+ *       {@code additionalProperties}, {@code items}, {@code enum}, {@code const},
+ *       {@code minimum}, {@code maximum}, {@code minLength}, {@code maxLength},
+ *       {@code minItems}, {@code maxItems}, {@code pattern}</li>
+ *   <li>Empty schema {@code {}} accepts any value (spec §4.3.1: "true" schema)</li>
+ *   <li>Type-specific keywords only apply when the instance type matches
+ *       (spec §7.6.1: non-matching types pass silently)</li>
+ *   <li>Unknown keywords are ignored as annotations
+ *       (spec: "Unknown keywords SHOULD be treated as annotations")</li>
+ *   <li>Not yet supported: {@code $ref}, {@code $defs}, combinators
+ *       ({@code anyOf}, {@code oneOf}, {@code allOf}, {@code not}),
+ *       conditional ({@code if/then/else}), {@code format}</li>
+ * </ul>
  *
- * @see <a href="https://json-schema.org/draft/2020-12/json-schema-core">JSON Schema 2020-12</a>
+ * <h3>CVM extensions</h3>
+ * <p>The types {@code "blob"} and {@code "address"} are Convex extensions not
+ * part of JSON Schema. They are accepted by {@code validate}, {@code infer},
+ * and {@code coerce} but will be rejected by standard JSON Schema validators.
+ * Use {@link #sanitise} to convert them to {@code "string"} for external use.</p>
+ *
+ * @see <a href="https://json-schema.org/draft/2020-12/json-schema-core">JSON Schema Core 2020-12</a>
+ * @see <a href="https://json-schema.org/draft/2020-12/json-schema-validation">JSON Schema Validation 2020-12</a>
  */
 public class JsonSchema {
 
-	/** Safe map extraction — returns null for null cells (unlike RT.ensureMap which returns empty map) */
+	/**
+	 * Safe map extraction — returns null for null/non-map cells.
+	 * Note: unlike {@code RT.ensureMap()} which returns {@code Maps.empty()} for null,
+	 * this returns null. This distinction is critical to avoid infinite recursion
+	 * when checking for absent schema keywords.
+	 */
 	@SuppressWarnings("unchecked")
 	private static AMap<AString, ACell> getMap(ACell cell) {
 		return (cell instanceof AMap) ? (AMap<AString, ACell>) cell : null;
 	}
 
-	// Schema keyword constants
+	// ===== Schema keyword constants (JSON Schema draft 2020-12) =====
+
+	// Validation vocabulary — §6 of json-schema-validation
 	private static final AString K_TYPE = Strings.intern("type");
-	private static final AString K_PROPERTIES = Strings.intern("properties");
-	private static final AString K_REQUIRED = Strings.intern("required");
-	private static final AString K_ADDITIONAL_PROPERTIES = Strings.intern("additionalProperties");
-	private static final AString K_ITEMS = Strings.intern("items");
 	private static final AString K_ENUM = Strings.intern("enum");
 	private static final AString K_CONST = Strings.intern("const");
+
+	// Numeric validation — §6.2
 	private static final AString K_MINIMUM = Strings.intern("minimum");
 	private static final AString K_MAXIMUM = Strings.intern("maximum");
+
+	// String validation — §6.3
 	private static final AString K_MIN_LENGTH = Strings.intern("minLength");
 	private static final AString K_MAX_LENGTH = Strings.intern("maxLength");
-	private static final AString K_MIN_ITEMS = Strings.intern("minItems");
-	private static final AString K_MAX_ITEMS = Strings.intern("maxItems");
 	private static final AString K_PATTERN = Strings.intern("pattern");
 
-	// Type name constants
+	// Array validation — §6.4
+	private static final AString K_MIN_ITEMS = Strings.intern("minItems");
+	private static final AString K_MAX_ITEMS = Strings.intern("maxItems");
+
+	// Object validation — §6.5
+	private static final AString K_REQUIRED = Strings.intern("required");
+
+	// Applicator vocabulary — §9-10 of json-schema-core
+	private static final AString K_PROPERTIES = Strings.intern("properties");
+	private static final AString K_ADDITIONAL_PROPERTIES = Strings.intern("additionalProperties");
+	private static final AString K_ITEMS = Strings.intern("items");
+
+	// ===== Type name constants =====
+
+	// Standard JSON Schema types — §6.1.1
 	private static final AString T_OBJECT = Strings.intern("object");
 	private static final AString T_ARRAY = Strings.intern("array");
 	private static final AString T_STRING = Strings.intern("string");
@@ -58,6 +99,8 @@ public class JsonSchema {
 	private static final AString T_INTEGER = Strings.intern("integer");
 	private static final AString T_BOOLEAN = Strings.intern("boolean");
 	private static final AString T_NULL = Strings.intern("null");
+
+	// CVM extension types (not part of JSON Schema standard)
 	private static final AString T_BLOB = Strings.intern("blob");
 	private static final AString T_ADDRESS = Strings.intern("address");
 
@@ -66,6 +109,10 @@ public class JsonSchema {
 	/**
 	 * Validate a value against a schema. Returns null if valid, or a
 	 * human-readable error string describing the first violation found.
+	 *
+	 * <p>Conforms to JSON Schema draft 2020-12 validation semantics:
+	 * type-specific keywords only apply when the instance matches the
+	 * targeted type (§7.6.1).</p>
 	 */
 	public static String validate(AMap<AString, ACell> schema, ACell value) {
 		return validateAt(schema, value, "$");
@@ -81,15 +128,16 @@ public class JsonSchema {
 
 	@SuppressWarnings("unchecked")
 	private static String validateAt(AMap<AString, ACell> schema, ACell value, String path) {
-		if (schema == null || schema.isEmpty()) return null; // empty schema accepts anything
+		// §4.3.1: empty schema ({} or true) accepts any value
+		if (schema == null || schema.isEmpty()) return null;
 
-		// const check
+		// §6.1.3: const — value must equal the const value exactly
 		ACell constVal = schema.get(K_CONST);
 		if (constVal != null) {
 			if (!constVal.equals(value)) return path + ": expected const " + constVal + ", got " + value;
 		}
 
-		// enum check
+		// §6.1.2: enum — value must be one of the listed values
 		AVector<ACell> enumVals = RT.ensureVector(schema.get(K_ENUM));
 		if (enumVals != null) {
 			boolean found = false;
@@ -99,24 +147,20 @@ public class JsonSchema {
 			if (!found) return path + ": value not in enum";
 		}
 
-		// type check — if type is declared, value must match
+		// §6.1.1: type — if declared, the instance must match
 		AString type = RT.ensureString(schema.get(K_TYPE));
 		if (type != null) {
 			String err = checkType(type, value, path);
 			if (err != null) return err;
 		}
 
-		// Per JSON Schema spec §7.6.1: type-specific keywords only apply when
-		// the instance matches the targeted type. When the type doesn't match,
-		// the keyword is considered satisfied (passes silently).
+		// §7.6.1: "When the type of the instance is not of the type targeted
+		// by the keyword, the instance is considered to conform to the assertion."
+		// Therefore, type-specific keywords only fire when the instance matches.
 
-		// Object keywords: properties, required, additionalProperties
-		// Apply when the value IS an object (regardless of whether type is declared)
-		if (value instanceof AMap) {
-			@SuppressWarnings("unchecked")
-			AMap<AString, ACell> map = (AMap<AString, ACell>) value;
-
-			// required
+		// §6.5 + §10.3.2: Object keywords — apply only when value is an object
+		if (value instanceof AMap map) {
+			// §6.5.3: required — each listed key must be present
 			AVector<ACell> required = RT.ensureVector(schema.get(K_REQUIRED));
 			if (required != null) {
 				for (long i = 0; i < required.count(); i++) {
@@ -127,7 +171,7 @@ public class JsonSchema {
 				}
 			}
 
-			// properties
+			// §10.3.2.1: properties — validate each present property against its sub-schema
 			AMap<AString, ACell> properties = getMap(schema.get(K_PROPERTIES));
 			if (properties != null) {
 				long n = properties.count();
@@ -145,7 +189,7 @@ public class JsonSchema {
 				}
 			}
 
-			// additionalProperties
+			// §10.3.2.3: additionalProperties — when false, no keys beyond properties allowed
 			ACell addlProps = schema.get(K_ADDITIONAL_PROPERTIES);
 			if (CVMBool.FALSE.equals(addlProps) && properties != null) {
 				long n = map.count();
@@ -158,14 +202,13 @@ public class JsonSchema {
 			}
 		}
 
-		// Array keywords: items, minItems, maxItems
-		if (value instanceof AVector) {
-			@SuppressWarnings("unchecked")
-			AVector<ACell> vec = (AVector<ACell>) value;
-
+		// §6.4 + §10.3.1: Array keywords — apply only when value is an array
+		if (value instanceof AVector vec) {
+			// §6.4.2/§6.4.3: minItems/maxItems
 			String err = checkArrayBounds(schema, vec, path);
 			if (err != null) return err;
 
+			// §10.3.1.2: items — validate each element against the items sub-schema
 			AMap<AString, ACell> itemsSchema = getMap(schema.get(K_ITEMS));
 			if (itemsSchema != null) {
 				for (long i = 0; i < vec.count(); i++) {
@@ -175,16 +218,19 @@ public class JsonSchema {
 			}
 		}
 
-		// String keywords: minLength, maxLength, pattern
+		// §6.3: String keywords — apply only when value is a string
 		if (value instanceof AString str) {
+			// §6.3.1/§6.3.2: minLength/maxLength
 			String err = checkStringBounds(schema, str, path);
 			if (err != null) return err;
+			// §6.3.3: pattern
 			err = checkPattern(schema, str, path);
 			if (err != null) return err;
 		}
 
-		// Numeric keywords: minimum, maximum
+		// §6.2: Numeric keywords — apply only when value is a number
 		if (value instanceof CVMLong || value instanceof CVMDouble) {
+			// §6.2.4/§6.2.2: minimum/maximum
 			String err = checkNumericBounds(schema, value, path);
 			if (err != null) return err;
 		}
@@ -192,8 +238,13 @@ public class JsonSchema {
 		return null;
 	}
 
+	/**
+	 * §6.1.1: type — maps schema type strings to CVM instance types.
+	 * Standard types per JSON Schema draft 2020-12, plus CVM extensions.
+	 */
 	private static String checkType(AString type, ACell value, String path) {
 		boolean ok = switch (type.toString()) {
+			// Standard JSON Schema types (§6.1.1)
 			case "object" -> value instanceof AMap;
 			case "array" -> value instanceof AVector;
 			case "string" -> value instanceof AString;
@@ -201,9 +252,11 @@ public class JsonSchema {
 			case "integer" -> value instanceof CVMLong;
 			case "boolean" -> value instanceof CVMBool;
 			case "null" -> value == null;
+			// CVM extensions (not part of JSON Schema standard)
 			case "blob" -> value instanceof ABlob;
 			case "address" -> value instanceof Address;
-			default -> true; // unknown type — accept
+			// Unknown types: per spec, unknown keywords are annotations — accept
+			default -> true;
 		};
 		if (!ok) {
 			String actual = (value == null) ? "null" : value.getClass().getSimpleName();
@@ -212,6 +265,7 @@ public class JsonSchema {
 		return null;
 	}
 
+	/** §6.2.4/§6.2.2: minimum/maximum — only applies to numeric instances */
 	private static String checkNumericBounds(AMap<AString, ACell> schema, ACell value, String path) {
 		double v;
 		if (value instanceof CVMLong l) v = l.longValue();
@@ -229,6 +283,7 @@ public class JsonSchema {
 		return null;
 	}
 
+	/** §6.3.1/§6.3.2: minLength/maxLength — only applies to string instances */
 	private static String checkStringBounds(AMap<AString, ACell> schema, AString str, String path) {
 		long len = str.count();
 		CVMLong minLen = RT.ensureLong(schema.get(K_MIN_LENGTH));
@@ -242,6 +297,7 @@ public class JsonSchema {
 		return null;
 	}
 
+	/** §6.3.3: pattern — ECMA-262 regex, only applies to string instances */
 	private static String checkPattern(AMap<AString, ACell> schema, AString str, String path) {
 		AString pattern = RT.ensureString(schema.get(K_PATTERN));
 		if (pattern == null) return null;
@@ -255,6 +311,7 @@ public class JsonSchema {
 		return null;
 	}
 
+	/** §6.4.2/§6.4.3: minItems/maxItems — only applies to array instances */
 	private static String checkArrayBounds(AMap<AString, ACell> schema, AVector<ACell> vec, String path) {
 		long count = vec.count();
 		CVMLong minItems = RT.ensureLong(schema.get(K_MIN_ITEMS));
@@ -276,18 +333,19 @@ public class JsonSchema {
 
 	// ==================== validateAll ====================
 
+	/** Same semantics as {@link #validate} but collects all errors instead of short-circuiting. */
 	@SuppressWarnings("unchecked")
 	private static AVector<AString> collectErrors(AMap<AString, ACell> schema, ACell value,
 			String path, AVector<AString> errors) {
 		if (schema == null || schema.isEmpty()) return errors;
 
-		// const
+		// §6.1.3: const
 		ACell constVal = schema.get(K_CONST);
 		if (constVal != null && !constVal.equals(value)) {
 			errors = errors.conj(Strings.create(path + ": expected const " + constVal + ", got " + value));
 		}
 
-		// enum
+		// §6.1.2: enum
 		AVector<ACell> enumVals = RT.ensureVector(schema.get(K_ENUM));
 		if (enumVals != null) {
 			boolean found = false;
@@ -297,7 +355,7 @@ public class JsonSchema {
 			if (!found) errors = errors.conj(Strings.create(path + ": value not in enum"));
 		}
 
-		// type check
+		// §6.1.1: type
 		AString type = RT.ensureString(schema.get(K_TYPE));
 		if (type != null) {
 			String typeErr = checkType(type, value, path);
@@ -306,11 +364,10 @@ public class JsonSchema {
 			}
 		}
 
-		// Object keywords (apply when value is an object)
-		if (value instanceof AMap) {
-			@SuppressWarnings("unchecked")
-			AMap<AString, ACell> map = (AMap<AString, ACell>) value;
+		// §7.6.1: type-specific keywords pass silently for non-matching types
 
+		// §6.5 + §10.3.2: Object keywords
+		if (value instanceof AMap map) {
 			AVector<ACell> required = RT.ensureVector(schema.get(K_REQUIRED));
 			if (required != null) {
 				for (long i = 0; i < required.count(); i++) {
@@ -349,10 +406,8 @@ public class JsonSchema {
 			}
 		}
 
-		// Array keywords
-		if (value instanceof AVector) {
-			@SuppressWarnings("unchecked")
-			AVector<ACell> vec = (AVector<ACell>) value;
+		// §6.4 + §10.3.1: Array keywords
+		if (value instanceof AVector vec) {
 			String boundsErr = checkArrayBounds(schema, vec, path);
 			if (boundsErr != null) errors = errors.conj(Strings.create(boundsErr));
 			AMap<AString, ACell> itemsSchema = getMap(schema.get(K_ITEMS));
@@ -363,7 +418,7 @@ public class JsonSchema {
 			}
 		}
 
-		// String keywords
+		// §6.3: String keywords
 		if (value instanceof AString str) {
 			String boundsErr = checkStringBounds(schema, str, path);
 			if (boundsErr != null) errors = errors.conj(Strings.create(boundsErr));
@@ -371,7 +426,7 @@ public class JsonSchema {
 			if (patErr != null) errors = errors.conj(Strings.create(patErr));
 		}
 
-		// Numeric keywords
+		// §6.2: Numeric keywords
 		if (value instanceof CVMLong || value instanceof CVMDouble) {
 			String numErr = checkNumericBounds(schema, value, path);
 			if (numErr != null) errors = errors.conj(Strings.create(numErr));
@@ -383,7 +438,11 @@ public class JsonSchema {
 	// ==================== infer ====================
 
 	/**
-	 * Infer a JSON Schema from a CVM value.
+	 * Infer a JSON Schema from a CVM value. Produces the tightest schema that
+	 * accepts the given value. Not part of the JSON Schema spec — a Convex utility.
+	 *
+	 * <p>For objects: all observed keys become required, each with an inferred property schema.
+	 * For arrays: items schema inferred from first element (simple heuristic).</p>
 	 */
 	@SuppressWarnings("unchecked")
 	public static AMap<AString, ACell> infer(ACell value) {
@@ -404,7 +463,6 @@ public class JsonSchema {
 		if (value instanceof AVector) {
 			AVector<ACell> vec = (AVector<ACell>) value;
 			if (vec.isEmpty()) return Maps.of(K_TYPE, T_ARRAY);
-			// Infer items schema from first element (simple heuristic)
 			AMap<AString, ACell> itemSchema = infer(vec.get(0));
 			return Maps.of(K_TYPE, T_ARRAY, K_ITEMS, itemSchema);
 		}
@@ -414,7 +472,7 @@ public class JsonSchema {
 		if (value instanceof CVMBool) return Maps.of(K_TYPE, T_BOOLEAN);
 		if (value instanceof Address) return Maps.of(K_TYPE, T_ADDRESS);
 		if (value instanceof ABlob) return Maps.of(K_TYPE, T_BLOB);
-		return Maps.empty(); // unknown type — empty schema
+		return Maps.empty();
 	}
 
 	// ==================== checkSchema ====================
@@ -422,10 +480,15 @@ public class JsonSchema {
 	/**
 	 * Check whether a schema is structurally valid (well-formed).
 	 * Returns null if valid, error message if malformed.
+	 *
+	 * <p>Validates: type values are recognised, properties values are maps,
+	 * items value is a map. Does not reject unknown keywords (per spec,
+	 * unknown keywords are valid annotations).</p>
 	 */
 	public static String checkSchema(AMap<AString, ACell> schema) {
 		if (schema == null) return "schema is null";
 
+		// §6.1.1: type must be one of the standard values (or CVM extensions)
 		AString type = RT.ensureString(schema.get(K_TYPE));
 		if (type != null) {
 			String t = type.toString();
@@ -437,6 +500,7 @@ public class JsonSchema {
 			if (!valid) return "invalid type: " + t;
 		}
 
+		// §10.3.2.1: properties values must be valid schemas (maps)
 		AMap<AString, ACell> properties = getMap(schema.get(K_PROPERTIES));
 		if (properties != null) {
 			long n = properties.count();
@@ -449,6 +513,7 @@ public class JsonSchema {
 			}
 		}
 
+		// §10.3.1.2: items value must be a valid schema (map)
 		AMap<AString, ACell> itemsSchema = getMap(schema.get(K_ITEMS));
 		if (itemsSchema != null) {
 			String err = checkSchema(itemsSchema);
@@ -460,35 +525,25 @@ public class JsonSchema {
 
 	// ==================== sanitise ====================
 
-	/** Standard JSON Schema draft 2020-12 type values */
+	/** Standard JSON Schema draft 2020-12 type values (for sanitise) */
 	private static final java.util.Set<String> STANDARD_TYPES = java.util.Set.of(
 		"null", "boolean", "object", "array", "number", "string", "integer"
 	);
 
-	/** Schema keywords that are valid in JSON Schema draft 2020-12 */
-	private static final java.util.Set<String> STANDARD_KEYWORDS = java.util.Set.of(
-		"type", "properties", "required", "additionalProperties", "items",
-		"enum", "const", "minimum", "maximum", "minLength", "maxLength",
-		"minItems", "maxItems", "pattern", "description", "title", "default",
-		"examples", "$schema", "$id", "$ref", "$defs", "definitions",
-		"oneOf", "anyOf", "allOf", "not", "if", "then", "else",
-		"format", "readOnly", "writeOnly", "deprecated"
-	);
-
 	/**
-	 * Sanitise a schema to be compliant with standard JSON Schema draft 2020-12.
-	 * Strips CVM type extensions, non-standard keywords, and invalid values.
-	 * Use before exposing schemas to external systems (MCP clients, OpenAPI, etc.).
+	 * Sanitise a schema for external consumption (MCP clients, OpenAPI, etc.).
+	 * Not part of JSON Schema spec — a Convex utility for interoperability.
 	 *
-	 * <ul>
-	 *   <li>CVM types ({@code blob}, {@code address}) replaced with {@code string}</li>
-	 *   <li>Invalid type values (e.g. {@code any}) removed</li>
-	 *   <li>Non-standard keywords stripped (configurable via {@code stripKeys})</li>
-	 *   <li>Recursively sanitises properties and items</li>
-	 * </ul>
+	 * <p>Converts CVM extension types to standard equivalents and optionally
+	 * strips application-specific annotation keys. When an invalid type is
+	 * removed, infers the correct standard type from keywords present
+	 * (e.g. {@code properties} implies {@code "type": "object"}).</p>
+	 *
+	 * <p>This is a lossy, best-effort transformation. Prefer fixing schemas
+	 * at source rather than relying on sanitise in core code paths.</p>
 	 *
 	 * @param schema Schema to sanitise
-	 * @param stripKeys Additional non-standard keys to remove (e.g. "secret", "secretFields")
+	 * @param stripKeys Application-specific annotation keys to remove
 	 * @return Sanitised schema (may be the same object if no changes needed)
 	 */
 	@SuppressWarnings("unchecked")
@@ -497,25 +552,25 @@ public class JsonSchema {
 
 		AMap<AString, ACell> result = schema;
 
-		// Fix non-standard type values; map CVM types to string
+		// Map CVM extension types to standard JSON Schema equivalents
 		ACell typeVal = result.get(K_TYPE);
 		if (typeVal instanceof AString ts) {
 			String t = ts.toString();
 			if ("blob".equals(t) || "address".equals(t) || "hash".equals(t) || "accountKey".equals(t)) {
 				result = result.assoc(K_TYPE, T_STRING);
 			} else if (!STANDARD_TYPES.contains(t)) {
-				// Invalid type — infer correct type from keywords present
+				// Invalid/unknown type — remove and infer from keywords
 				result = result.dissoc(K_TYPE);
 				result = inferTypeFromKeywords(result);
 			}
 		}
 
-		// If no type but has type-implying keywords, add the inferred type
+		// If no type but keywords imply one, add it for clarity
 		if (!result.containsKey(K_TYPE)) {
 			result = inferTypeFromKeywords(result);
 		}
 
-		// Strip caller-specified non-standard keys
+		// Strip caller-specified annotation keys (e.g. "secret", "secretFields")
 		for (AString key : stripKeys) {
 			if (result.containsKey(key)) {
 				result = result.dissoc(key);
@@ -554,9 +609,8 @@ public class JsonSchema {
 	}
 
 	/**
-	 * Infer a type from the keywords present in a schema. If properties/required/
-	 * additionalProperties are present, the schema must be for an object. If items/
-	 * minItems/maxItems are present, it must be for an array.
+	 * Infer a standard type from keywords present in a schema.
+	 * Used by sanitise when an invalid type is removed.
 	 */
 	private static AMap<AString, ACell> inferTypeFromKeywords(AMap<AString, ACell> schema) {
 		if (schema.containsKey(K_PROPERTIES) || schema.containsKey(K_REQUIRED)
@@ -580,8 +634,12 @@ public class JsonSchema {
 	// ==================== coerce ====================
 
 	/**
-	 * Coerce a value to match a schema where possible.
-	 * Returns the coerced value, or the original if no coercion needed/possible.
+	 * Coerce a value to match a schema where possible. Not part of the JSON
+	 * Schema spec — a utility for handling type mismatches at system
+	 * boundaries (LLM outputs, API inputs, cross-system data exchange).
+	 *
+	 * <p>Returns the original value unchanged if no coercion is possible or needed.
+	 * Coercion is explicit and opt-in — never called implicitly by validate.</p>
 	 */
 	@SuppressWarnings("unchecked")
 	public static ACell coerce(AMap<AString, ACell> schema, ACell value) {
@@ -601,7 +659,7 @@ public class JsonSchema {
 			return value;
 		}
 
-		// Attempt coercion
+		// Attempt type coercion
 		return switch (type.toString()) {
 			case "string" -> coerceToString(value);
 			case "number" -> coerceToNumber(value);
@@ -632,7 +690,6 @@ public class JsonSchema {
 		return map;
 	}
 
-	@SuppressWarnings("unchecked")
 	private static ACell coerceArray(AMap<AString, ACell> schema, AVector<ACell> vec) {
 		AMap<AString, ACell> itemsSchema = getMap(schema.get(K_ITEMS));
 		if (itemsSchema == null) return vec;
