@@ -227,7 +227,7 @@ public class McpServer {
 					if (reqCtx != null) {
 						reqCtx.res().setHeader(HEADER_SESSION_ID, UUID.randomUUID().toString());
 					}
-					yield protocolResult(buildInitializeResult());
+					yield protocolResult(buildInitializeResult(request.get(FIELD_PARAMS)));
 				}
 				case "ping" -> protocolResult(EMPTY_MAP);
 				case "notifications/initialized" -> protocolResult(EMPTY_MAP);
@@ -245,7 +245,11 @@ public class McpServer {
 		return maybeAttachId(result, idCell);
 	}
 
-	private AMap<AString, ACell> buildInitializeResult() {
+	/**
+	 * Builds the initialize result. Override to customise capabilities or
+	 * protocol version negotiation.
+	 */
+	protected AMap<AString, ACell> buildInitializeResult(ACell params) {
 		AMap<AString, ACell> capabilities = Maps.of(
 			"tools", EMPTY_MAP
 		);
@@ -259,11 +263,24 @@ public class McpServer {
 		);
 	}
 
-	private AMap<AString, ACell> listTools() {
+	/**
+	 * Lists tools. Override to provide dynamic tool discovery (e.g. from adapters).
+	 * Default implementation returns the static tool registry.
+	 */
+	protected AMap<AString, ACell> listTools() {
 		return Maps.of("tools", getToolMetadata());
 	}
 
-	private AMap<AString, ACell> toolCall(ACell paramsCell) {
+	/**
+	 * Handles a tools/call request. Override to provide custom dispatch
+	 * (e.g. job-based execution with timeouts).
+	 *
+	 * <p>Called on a virtual thread — implementations may block.</p>
+	 *
+	 * @param paramsCell The JSON-RPC params (contains "name" and "arguments")
+	 * @return JSON-RPC result (use {@link McpProtocol#toolSuccess} / {@link McpProtocol#toolError})
+	 */
+	protected AMap<AString, ACell> toolCall(ACell paramsCell) {
 		if (!(paramsCell instanceof AMap<?, ?> params)) {
 			return protocolError(-32602, "params must be an object");
 		}
