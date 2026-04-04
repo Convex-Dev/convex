@@ -25,3 +25,4 @@ target/
 /pom.xml.versionsBackup
 .lsp
 .clj-kondo
+/.claude/
