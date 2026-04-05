@@ -20,7 +20,8 @@ Output is designed to be:
 - Parseable as JSON5
 - Unambiguous — real data versus structural annotation
 - Progressively explorable via path-based drill-down
-- Efficient: O(n) in output size, space-bounded by the budget
+- Efficient: work proportional to rendered output, never to input size — a
+  billion-cell lattice with budget=1KB costs the same as a 1KB cell with budget=1KB
 
 ---
 
@@ -39,8 +40,9 @@ cost, and wire size.
 1. Never invent data. Output only values present in the cell.
 2. Annotations live in `/* */` comments only — they cannot be mistaken for values.
 3. Empty containers signal truly empty. `{/* ... */}` signals truncation.
-4. Budget flows downward. Parent allocates budget to children; children never exceed it.
-5. Keys before values. For maps, showing all visible keys with truncated values is more
+4. Budget flows downward. A parent allocates a sub-budget to each child; the child's
+   budget consumption never exceeds its allocation.
+5. Keys before values. For maps, showing more entries with truncated values is more
    useful than showing fewer fully-expanded entries.
 
 ---
@@ -232,12 +234,12 @@ for delimiters, separators, and annotations rather than actual cell storage.
 
 **Structural overhead allowance (examples, in budget units):**
 
-| Container | Overhead shape |
-|-----------|---------|
-| Map (pretty) | `{\n` + `}` + annotation + `(n−1) × `,\n`` + `indent × 2` per entry |
-| Map (compact) | `{` + `}` + annotation + `(n−1) × `,`` |
-| Vector/List | `[` + `]` + overflow annotation + separators |
-| Set | `[` + `/* Set */` + `]` + overflow annotation + separators |
+| Container | Overhead components |
+|-----------|---------------------|
+| Map (pretty) | opening `{\n` and closing `}`; per-entry `,\n` separator plus `2 × indent` whitespace; overflow / size annotation |
+| Map (compact) | opening `{` and closing `}`; per-entry `,` separator; overflow / size annotation |
+| Vector / List | opening `[` and closing `]`; per-entry separator; overflow / size annotation |
+| Set | opening `[` and closing `]`; inline `/* Set */` marker; per-entry separator; overflow / size annotation |
 
 **Minimum budgets (below which annotation-only form is emitted):**
 
@@ -302,17 +304,17 @@ CellExplorer does its own formatting before delegating to the escape primitive.
 | `Address` | `"#42"` | — | `/* Address */` |
 | `Keyword` | `":active"` | — | `/* Keyword */` |
 | `Symbol` | `"foo/bar"` | — | `/* Symbol */` |
-| `AVector` | `[1, 2, 3]` | `[1, 2, /* +99 more */ /* 390KB */]` | `[/* Vec, 7204 items, 1.1MB */]` |
-| `AList` | `[1, 2, 3]` | `[1, 2, /* +N more */ /* List, SZ */]` | `[/* List, N items, SZ */]` |
-| `AMap` | `{a: 1}` | `{a: 1, /* +7 more */ /* 47.5MB */}` | `{/* Map, 5 keys, 47.5MB */}` |
-| `ASet` | `[1, 2 /* Set */]` | `[1, /* +N more */ /* Set, 48KB */]` | `[/* Set, 5000 items, 48KB */]` |
+| `AVector` | `[1, 2, 3]` | `[1, 2, /* +99 more, 390KB */]` | `[/* Vec, 7204 items, 1.1MB */]` |
+| `AList` | `[1, 2, 3]` | `[1, 2, /* +N more, SZ */]` | `[/* List, N items, SZ */]` |
+| `AMap` | `{a: 1}` | `{a: 1, /* +7 more, 47.5MB */}` | `{/* Map, 5 keys, 47.5MB */}` |
+| `ASet` | `[1, 2 /* Set */]` | `[1, /* +N more, Set, 48KB */]` | `[/* Set, 5000 items, 48KB */]` |
 
 **Size annotation format:** derived from `Cells.storageSize(cell)`.
 `< 1024` → `{n}B` · `< 1MB` → `{n.1f}KB` · `< 1GB` → `{n.1f}MB` · else `{n.1f}GB`.
 
 For strings and blobs, the partial form inserts `...` before the closing quote and appends a
-size comment. For containers, the overflow annotation `/* +N more */` precedes the size
-comment if both are needed.
+size comment. For containers with both overflow and size, the two are merged into a
+single comment of the form `/* +N more, SZ */` (see OQ-3).
 
 ---
 
@@ -388,6 +390,12 @@ public class CellExplorer {
 All methods create a single `BlobBuilder`, call internal `void explore(...)` helpers, and
 return `Strings.create(bb.toBlob())`.
 
+The compact/pretty choice is threaded to the internal `explore(...)` helpers as an
+immutable context object (or a `boolean compact` parameter alongside `indent`). The
+pseudocode elsewhere in this document shows only `indent` for brevity; implementers
+should assume both are in scope wherever `containerOverhead` or `renderFull` need to
+know which form to emit.
+
 ---
 
 ## Test Plan
@@ -395,19 +403,19 @@ return `Strings.create(bb.toBlob())`.
 **Location:** `convex-core/src/test/java/convex/core/data/util/CellExplorerTest.java`
 **Framework:** JUnit 5 (`@Test`, `org.junit.jupiter.api.Assertions`)
 
-Spec examples:
+Core test cases:
 
-| Example | Scenario | Assertion |
-|---------|----------|-----------|
+| # | Scenario | Assertion |
+|---|----------|-----------|
 | 1 | Small map, budget=200 | Exact output, no annotations |
-| 3 | ~50KB map | Partial entries; overflow + size annotations present |
-| 4 | budget=80, large map | Two fully-truncated vector values; `/* +3 more */` |
-| 5 | budget=40, large map | `{/* Map, 5 keys, 47.5MB */}` |
-| 8 | 100K-integer vector, budget=100 | First items + `/* +N more */` + size annotation |
-| 11 | 50KB string, budget=60 | Partial `"...` form with size annotation |
-| 13 | Empty containers and nil | `null`, `{}`, `[]`, `[/* Set */]` — no annotations |
-| 6, 7 | Path drill-down `/bids/0`, `/bids` | Correct cell resolved; budget applied |
-| — | Invalid path | `/* path not found: ... */` |
+| 2 | ~50KB map | Partial entries; overflow + size annotations present |
+| 3 | budget=80, large map | Two fully-truncated vector values; `/* +3 more, SZ */` |
+| 4 | budget=40, large map | `{/* Map, 5 keys, 47.5MB */}` |
+| 5 | 100K-integer vector, budget=100 | First items + `/* +N more, SZ */` |
+| 6 | 50KB string, budget=60 | Partial `"...` form with size annotation |
+| 7 | Empty containers and nil | `null`, `{}`, `[]`, `[/* Set */]` — no annotations |
+| 8 | Path drill-down `/bids/0` and `/bids` | Correct cell resolved; budget applied |
+| 9 | Invalid path | `/* path not found: ... */` |
 
 Additional cases:
 - All primitive types: fits / partial / fully-truncated per table above
@@ -427,33 +435,35 @@ before implementation begins.
 
 ---
 
-### OQ-1 · Keyword key rendering — contradiction between spec examples
+### OQ-1 · Keyword key rendering — suppress `:` prefix or keep it?
 
-**Question:** When a keyword (e.g. `:name`) is used as a map key, should the `:` prefix
-be suppressed so it renders as an unquoted JSON5 identifier (`name`), or should it be
-retained and quoted (`":name"`)?
+**Question:** When a keyword (e.g. `:name`) is used as a map key, should the `:`
+prefix be suppressed so it renders as an unquoted JSON5 identifier (`name`), or
+should it be retained and quoted (`":name"`)?
 
-**Why it's open:** The spec is self-contradictory. Example 1 shows
-`{name: "Alice", age: 30, active: true}`, implying keyword keys `:name`, `:age`, `:active`
-render as bare unquoted identifiers with no prefix. But Example 14 says explicitly:
-"integer keys unquoted, keywords/addresses quoted with prefix" — which implies `":name":`.
+**Why it matters:** Keywords are the conventional CVM map key type, so almost every
+map has keyword keys. This decision affects most output.
+
+**Trade-off:** Suppressing the prefix costs information (a rendered `name` could have
+come from either the keyword `:name` or the string `"name"`), but it's shorter, more
+LLM-readable, and the colon-separator already marks the position as a key. Keeping
+the prefix is unambiguous but noisy.
 
 **Options:**
 
-- **A. Suppress prefix, unquoted when valid identifier** (matches Example 1).
-  `:name` → `name`, `:"hello world"` → `"hello world"`. Cleanest for LLM readability.
-  A keyword in key position doesn't need the `:` to be understood as a key.
-- **B. Always include `:` prefix, always quoted** (matches Example 14 text).
-  `:name` → `":name"`. Unambiguously identifies the key as a Convex keyword, at the
-  cost of visual noise.
-- **C. Hybrid: include `:` when key set is mixed-type, suppress when all-keyword**.
-  Complex, stateful, surprising.
+- **A. Suppress prefix, unquoted when valid identifier.** `:name` → `name`,
+  `:hello-world` → `"hello-world"`. Cleanest for LLM readability.
+- **B. Always include `:` prefix, always quoted.** `:name` → `":name"`.
+  Unambiguously marks the key as a Convex keyword, at the cost of visual noise.
+- **C. Hybrid: include `:` when key set is mixed-type, suppress when all-keyword.**
+  Stateful and surprising.
 
-**Tentative recommendation: Option A** (suppress prefix, unquoted when valid identifier).
-Example 1 is the primary illustrative case and the cleaner output. The `:` prefix matters
-most when distinguishing keyword VALUES from string values in a mixed context; for map
-keys the colon-separator is already present. If Example 14 was intended to be
-authoritative, clarify and we'll switch.
+**Tentative recommendation: Option A.** The `:` prefix matters most when
+distinguishing keyword values from string values in a mixed context; for map keys
+the colon-separator is already present and the position itself marks "this is a
+key". The lossy round-trip (keyword vs string key with same rendered form) is an
+acceptable trade-off for a summary tool — CellExplorer is a one-way projection, not
+a faithful serialisation.
 
 ---
 
