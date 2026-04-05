@@ -4,8 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import convex.core.data.ACell;
+import convex.core.data.ACollection;
+import convex.core.data.AList;
 import convex.core.data.AMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
@@ -36,44 +40,58 @@ import convex.core.util.JSON;
  * {@code convex.lattice.cursor} infrastructure, then pass the resolved cell
  * to {@link #explore(ACell)}.
  *
- * <h2>v1 scope (this commit)</h2>
+ * <h2>Rendering coverage</h2>
  * <ul>
- *   <li>Fast path for leaf cells and non-map containers that fit in budget —
- *       delegates to {@link JSON#appendJSON}.</li>
- *   <li>CellExplorer-specific map rendering: unquoted keyword keys per OQ-1,
- *       partial rendering with overflow annotation per OQ-3, fully-truncated
- *       {@code {/* Map, N keys, SZ *}{@code /}} form when budget is too small.</li>
+ *   <li>Maps: CellExplorer-specific renderer with unquoted keyword keys (OQ-1),
+ *       partial rendering with merged overflow+size annotation (OQ-3), and
+ *       fully-truncated form.</li>
+ *   <li>Vectors, Lists, Sets: CellExplorer-specific renderer with a running-
+ *       remainder budget (design doc §Sequence Rendering), inline
+ *       {@code /* Set *}{@code /} marker for sets, and fully-truncated form.</li>
+ *   <li>Leaf cells: fast path delegates to {@link JSON#appendJSON} when the
+ *       cell fits budget.</li>
  * </ul>
  *
  * <h2>Not yet implemented</h2>
  * <ul>
- *   <li>Container truncation for vectors, lists, and sets (step 6).</li>
  *   <li>Partial forms for large strings and blobs.</li>
- *   <li>CellExplorer-specific renderings for Sets ({@code /* Set *}{@code /}
- *       marker), Addresses ({@code "#42"}), and Keywords / Symbols as values —
- *       the fast path currently inherits JSON's renderings for these.</li>
- *   <li>Pretty-printing with indentation (compact and pretty produce the
- *       same output for now).</li>
- *   <li>NaN / Infinity special-case for {@code CVMDouble} (OQ-8).</li>
+ *   <li>CellExplorer-specific renderings for Addresses ({@code "#42"}),
+ *       Keywords / Symbols as values, and non-finite {@code CVMDouble} (OQ-8)
+ *       — the fast path currently inherits JSON's renderings for these leaf
+ *       types.</li>
+ *   <li>Pretty-printing with indentation (compact and pretty produce the same
+ *       output for now).</li>
  * </ul>
- *
- * <h2>Known v1 limitation: nested-map-inside-non-map</h2>
- *
- * When a fitting vector or list contains a map, the outer container is rendered
- * via JSON's path which produces JSON's (quoted-key) map form, bypassing the
- * CellExplorer renderer. This resolves in step 6 when sequences get their own
- * renderer that recurses through {@link #explore} for each element.
  */
 public class CellExplorer {
 
-	/** Reserve for the {@code {/* Map, N keys, SZ *}{@code /}} annotation. */
+	/** Reserve for the {@code {/* Map, N keys, SZ *}{@code /}}-style annotation. */
 	private static final long ANNOTATION_RESERVE = 30;
 
 	/** Per-entry structural cost for maps ({@code ": "}, {@code ", "}, slack). */
 	private static final long ENTRY_OVERHEAD = 10;
 
-	/** Minimum budget to render a value meaningfully. */
+	/** Minimum budget to render a map value meaningfully. */
 	private static final long MIN_VALUE_BUDGET = 10;
+
+	/** Minimum budget to render a sequence item meaningfully. */
+	private static final long MIN_ITEM_BUDGET = 10;
+
+	/** Kind marker for sequence-shaped collections. Controls label + inline marker. */
+	private enum CollectionKind {
+		VECTOR("Vec", false),
+		LIST("List", false),
+		SET("Set", true);
+
+		final String label;
+		/** true if this kind needs an inline {@code /* Set *}{@code /} marker when rendered fully. */
+		final boolean needsMarker;
+
+		CollectionKind(String label, boolean needsMarker) {
+			this.label = label;
+			this.needsMarker = needsMarker;
+		}
+	}
 
 	/** Budget in {@link Cells#storageSize} units. */
 	private final int budget;
@@ -117,29 +135,42 @@ public class CellExplorer {
 
 	@SuppressWarnings("unchecked")
 	private void explore(ACell cell, BlobBuilder bb, long remaining, int indent) {
-		// Maps always go through the custom renderer — JSON's map path quotes
-		// all keys, which conflicts with OQ-1's unquoted-keyword form.
+		// Maps use the custom renderer (OQ-1 unquoted keyword keys).
 		if (cell instanceof AMap) {
 			exploreMap((AMap<ACell, ACell>) cell, bb, remaining, indent);
 			return;
 		}
+		// Vectors, lists, sets use the custom sequence renderer.
+		if (cell instanceof AVector) {
+			exploreCollection((ACollection<ACell>) cell, bb, remaining, indent, CollectionKind.VECTOR);
+			return;
+		}
+		if (cell instanceof AList) {
+			exploreCollection((ACollection<ACell>) cell, bb, remaining, indent, CollectionKind.LIST);
+			return;
+		}
+		if (cell instanceof ASet) {
+			exploreCollection((ACollection<ACell>) cell, bb, remaining, indent, CollectionKind.SET);
+			return;
+		}
 
+		// Leaf cells: fast path via JSON.appendJSON when fitting.
 		long cellSize = Cells.storageSize(cell);
 		if (cellSize <= remaining) {
-			// Fast path: delegate to JSON.appendJSON for everything non-map.
-			// NOTE: Sets, addresses, keywords-as-values, symbols, and
-			// non-finite doubles still inherit JSON's divergent rendering —
-			// corrected in later commits.
+			// NOTE: Addresses, keywords-as-values, symbols, and non-finite
+			// doubles still inherit JSON's divergent rendering. Resolved in
+			// a later commit (leaf type overrides + OQ-8).
 			JSON.appendJSON(bb, cell);
 			return;
 		}
 
-		// Non-map cell too large — placeholder until step 6.
-		bb.append("/* TRUNCATED: storageSize=");
+		// Leaf too large — partial forms (strings, blobs) land in a later
+		// commit. For now, emit an annotation-only form.
+		bb.append("/* truncated leaf, storageSize=");
 		bb.append(Long.toString(cellSize));
 		bb.append(" > budget=");
 		bb.append(Long.toString(remaining));
-		bb.append(" (non-map truncation not yet implemented) */");
+		bb.append(" */");
 	}
 
 	// ---- Map rendering ----
@@ -153,19 +184,16 @@ public class CellExplorer {
 
 		long mapSize = Cells.storageSize(map);
 
-		// Fast path: whole map fits — render fully with OQ-1 key formatting.
 		if (mapSize <= remaining) {
 			renderMapFull(map, bb, remaining, indent);
 			return;
 		}
 
-		// Budget too small even for the annotation — fully-truncated form.
 		if (ANNOTATION_RESERVE >= remaining) {
 			appendFullyTruncatedMap(bb, count, mapSize);
 			return;
 		}
 
-		// Partial rendering with key-first scan.
 		long contentBudget = remaining - ANNOTATION_RESERVE;
 		renderMapTruncated(map, bb, contentBudget, mapSize, indent);
 	}
@@ -178,7 +206,6 @@ public class CellExplorer {
 			MapEntry<ACell, ACell> e = map.entryAt(i);
 			renderKey(bb, e.getKey());
 			bb.append(": ");
-			// Whole map fits remaining, so each value trivially fits too.
 			explore(e.getValue(), bb, remaining, indent + 1);
 		}
 		bb.append('}');
@@ -189,7 +216,6 @@ public class CellExplorer {
 		long keyCost = 0;
 		List<MapEntry<ACell, ACell>> visible = new ArrayList<>();
 
-		// Phase 1: scan keys to decide how many entries we can show.
 		for (long i = 0; i < totalEntries; i++) {
 			MapEntry<ACell, ACell> e = map.entryAt(i);
 			long kCost = Cells.storageSize(e.getKey()) + ENTRY_OVERHEAD;
@@ -198,8 +224,6 @@ public class CellExplorer {
 			keyCost += kCost;
 		}
 
-		// If we can't show any entries, fall back to fully-truncated form
-		// (cleaner than an empty partial form with only an overflow comment).
 		if (visible.isEmpty()) {
 			appendFullyTruncatedMap(bb, totalEntries, mapSize);
 			return;
@@ -208,7 +232,6 @@ public class CellExplorer {
 		long overflow = totalEntries - visible.size();
 		long valueBudget = Math.max(MIN_VALUE_BUDGET, (contentBudget - keyCost) / visible.size());
 
-		// Phase 2: render visible entries.
 		bb.append('{');
 		for (int i = 0; i < visible.size(); i++) {
 			if (i > 0) bb.append(", ");
@@ -229,14 +252,88 @@ public class CellExplorer {
 		bb.append('}');
 	}
 
+	// ---- Sequence / Set rendering ----
+
+	private void exploreCollection(ACollection<ACell> coll, BlobBuilder bb, long remaining, int indent, CollectionKind kind) {
+		long count = coll.count();
+		if (count == 0) {
+			bb.append(kind.needsMarker ? "[/* Set */]" : "[]");
+			return;
+		}
+
+		long size = Cells.storageSize(coll);
+
+		if (size <= remaining) {
+			renderCollectionFull(coll, bb, remaining, indent, kind);
+			return;
+		}
+
+		if (ANNOTATION_RESERVE >= remaining) {
+			appendFullyTruncatedCollection(bb, count, size, kind);
+			return;
+		}
+
+		long contentBudget = remaining - ANNOTATION_RESERVE;
+		renderCollectionTruncated(coll, bb, contentBudget, size, indent, kind);
+	}
+
+	private void renderCollectionFull(ACollection<ACell> coll, BlobBuilder bb, long remaining, int indent, CollectionKind kind) {
+		bb.append('[');
+		boolean first = true;
+		for (ACell item : coll) {
+			if (!first) bb.append(", ");
+			explore(item, bb, remaining, indent + 1);
+			first = false;
+		}
+		if (kind.needsMarker) {
+			bb.append(" /* Set */");
+		}
+		bb.append(']');
+	}
+
+	private void renderCollectionTruncated(ACollection<ACell> coll, BlobBuilder bb, long contentBudget, long collSize, int indent, CollectionKind kind) {
+		long totalItems = coll.count();
+		long consumed = 0;
+		long shown = 0;
+
+		bb.append('[');
+		for (ACell item : coll) {
+			long itemRemaining = contentBudget - consumed;
+			if (itemRemaining < MIN_ITEM_BUDGET) break;
+			if (shown > 0) bb.append(", ");
+			long itemCost = Math.min(Cells.storageSize(item), itemRemaining);
+			explore(item, bb, itemRemaining, indent + 1);
+			consumed += itemCost;
+			shown++;
+		}
+
+		long overflow = totalItems - shown;
+		if (overflow > 0) {
+			if (shown > 0) bb.append(", ");
+			bb.append("/* +");
+			bb.append(Long.toString(overflow));
+			bb.append(" more, ");
+			if (kind.needsMarker) {
+				bb.append("Set, ");
+			}
+			appendSizeAnnotation(bb, collSize);
+			bb.append(" */");
+		} else if (kind.needsMarker) {
+			// Rare: all items visible despite truncated path (overhead undercounted).
+			// Still need the inline /* Set */ marker.
+			bb.append(" /* Set */");
+		}
+
+		bb.append(']');
+	}
+
 	// ---- Key formatting (OQ-1) ----
 
 	/**
-	 * Render a map key to the output buffer. Keywords and strings become
-	 * unquoted JSON5 identifiers when their name matches
-	 * {@code [a-zA-Z_$][a-zA-Z0-9_$]*}; otherwise they are quoted and escaped.
-	 * All other key types ({@code Integer}, {@code Address}, {@code Blob}, ...)
-	 * go through {@link JSON#jsonKey} for string coercion and are always
+	 * Render a map key. Keywords and strings become unquoted JSON5 identifiers
+	 * when their name matches {@code [a-zA-Z_$][a-zA-Z0-9_$]*}; otherwise
+	 * quoted and escaped. All other types ({@code Integer}, {@code Address},
+	 * {@code Blob}, ...) go through {@link JSON#jsonKey} and are always
 	 * quoted (JSON5 forbids bare numeric literals as object keys).
 	 */
 	private static void renderKey(BlobBuilder bb, ACell key) {
@@ -250,7 +347,6 @@ public class CellExplorer {
 			appendIdentifierOrQuoted(bb, str);
 			return;
 		}
-		// Integer, Address, Blob, Symbol (unusual as key), etc. — always quoted.
 		String coerced = JSON.jsonKey(key);
 		bb.append('"');
 		JSON.appendCVMStringQuoted(bb, coerced);
@@ -286,6 +382,16 @@ public class CellExplorer {
 		bb.append(count == 1 ? " key, " : " keys, ");
 		appendSizeAnnotation(bb, mapSize);
 		bb.append(" */}");
+	}
+
+	private static void appendFullyTruncatedCollection(BlobBuilder bb, long count, long size, CollectionKind kind) {
+		bb.append("[/* ");
+		bb.append(kind.label);
+		bb.append(", ");
+		bb.append(Long.toString(count));
+		bb.append(count == 1 ? " item, " : " items, ");
+		appendSizeAnnotation(bb, size);
+		bb.append(" */]");
 	}
 
 	/**
