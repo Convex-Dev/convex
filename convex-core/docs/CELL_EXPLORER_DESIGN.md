@@ -344,57 +344,51 @@ form.
 
 ## Path Drill-Down
 
-```java
-CellExplorer.explore(cell, "/bids", 500)
-CellExplorer.explore(cell, "/bids/0", 200)
-CellExplorer.explore(cell, "/config/max-orders", 100)
-```
-
-Path is split on `/`. Each segment navigates:
-- String or keyword segment → `AMap.get(key)` — tried first as `Keyword`, then as `AString`
-- Numeric segment → `ASequence.get(n)` index access
-
-Navigation completes before any rendering. The resolved cell is rendered with the full
-budget; no parent context is included. On failure (missing key, out-of-bounds index, or
-wrong container type), the output is:
-
-```
-/* path not found: /bids/99999 */
-```
-
-An empty path `""` or `"/"` is equivalent to no path — the root cell is rendered.
+**Out of scope.** CellExplorer operates on a single resolved cell. Callers needing
+path-based navigation should resolve the target cell first using the existing
+`convex.lattice.cursor` infrastructure (`PathCursor` and friends), then pass the
+resolved cell to `CellExplorer.explore()`. CellExplorer does not re-implement path
+navigation.
 
 ---
 
 ## Java API
+
+CellExplorer is an instance class. Configuration (budget, compact/pretty) is held
+on the instance; rendering is a method. Instances are immutable and reusable.
 
 ```java
 package convex.core.data.util;
 
 public class CellExplorer {
 
-    /** Explore cell with default pretty-printed output. */
-    public static AString explore(ACell cell, int budget);
+    private final int budget;
+    private final boolean compact;
 
-    /** Explore cell; compact=true suppresses indentation and newlines. */
-    public static AString explore(ACell cell, int budget, boolean compact);
+    /** Create with default (pretty) formatting. */
+    public CellExplorer(int budget);
 
-    /** Navigate to path within cell, then explore with full budget. */
-    public static AString explore(ACell cell, String path, int budget);
+    /** Create with explicit compact flag. */
+    public CellExplorer(int budget, boolean compact);
 
-    /** Navigate to path, then explore in compact or pretty mode. */
-    public static AString explore(ACell cell, String path, int budget, boolean compact);
+    /** Render a cell. */
+    public AString explore(ACell cell);
 }
 ```
 
-All methods create a single `BlobBuilder`, call internal `void explore(...)` helpers, and
-return `Strings.create(bb.toBlob())`.
+**Usage:**
 
-The compact/pretty choice is threaded to the internal `explore(...)` helpers as an
-immutable context object (or a `boolean compact` parameter alongside `indent`). The
-pseudocode elsewhere in this document shows only `indent` for brevity; implementers
-should assume both are in scope wherever `containerOverhead` or `renderFull` need to
-know which form to emit.
+```java
+CellExplorer explorer = new CellExplorer(2048);
+AString out = explorer.explore(cell);
+```
+
+`explore` creates a fresh `BlobBuilder` per call, drives internal recursion, and
+returns `Strings.create(bb.toBlob())`. The instance carries configuration
+(`budget`, `compact`, plus any future additions like depth limits or annotation
+style) so the public API stays simple as options accrue; per-call mutable state
+(`BlobBuilder`, remaining budget, current indent) flows through internal method
+parameters.
 
 ---
 
@@ -414,8 +408,7 @@ Core test cases:
 | 5 | 100K-integer vector, budget=100 | First items + `/* +N more, SZ */` |
 | 6 | 50KB string, budget=60 | Partial `"...` form with size annotation |
 | 7 | Empty containers and nil | `null`, `{}`, `[]`, `[/* Set */]` — no annotations |
-| 8 | Path drill-down `/bids/0` and `/bids` | Correct cell resolved; budget applied |
-| 9 | Invalid path | `/* path not found: ... */` |
+| 8 | Constructor with compact=true | Explore same cell twice, once per flag; different formatting |
 
 Additional cases:
 - All primitive types: fits / partial / fully-truncated per table above
@@ -633,24 +626,9 @@ radius on other JSON callers.
 
 ---
 
-### OQ-9 · Path segment matching — ACCEPTED (Option A)
+### OQ-9 · ~~Path segment matching: keyword vs string lookup order~~ — MOOT
 
-**Decision (2026-04-05):** Option A — keyword first, then AString. Matches CVM
-convention for structured-data map keys. Typed path syntax (Option C) deferred to
-v2 if ambiguity proves a problem in practice.
-
-**Question:** When navigating a path segment like `config`, should the implementation
-first try looking up a `Keyword` `:config`, then fall back to an `AString` `"config"`,
-or vice versa?
-
-**Options:**
-
-- **A. Keyword first, then AString** (current plan).
-- **B. AString first, then Keyword**.
-- **C. Exact-type hint in path syntax** — e.g. `:config` means keyword, `config` means
-  string. Requires more complex path parsing.
-
-**Tentative recommendation: Option A** — keyword first. Keywords are the conventional
-CVM map key type for structured data. A path of `/config` almost always means `:config`.
-If a map happens to have both `:config` and `"config"` as keys (unusual), keyword wins.
-Defer Option C (typed path segments) to v2 if ambiguity proves a problem in practice.
+**Resolution (2026-04-05):** Path drill-down has been removed from CellExplorer's
+scope entirely. Callers navigate to the target cell using the existing
+`convex.lattice.cursor` infrastructure before calling `explore()`. CellExplorer
+never sees a path, so the lookup-order question no longer applies.

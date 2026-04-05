@@ -26,58 +26,68 @@ import convex.core.data.prim.CVMLong;
  */
 public class CellExplorerTest {
 
+	/** Shared explorer with generous budget for fast-path tests. */
+	private static final CellExplorer BIG = new CellExplorer(100);
+
 	// ---- Primitives that fit ----
 
 	@Test public void testNil() {
-		assertEquals("null", CellExplorer.explore(null, 100).toString());
+		assertEquals("null", BIG.explore(null).toString());
 	}
 
 	@Test public void testBool() {
-		assertEquals("true", CellExplorer.explore(CVMBool.TRUE, 100).toString());
-		assertEquals("false", CellExplorer.explore(CVMBool.FALSE, 100).toString());
+		assertEquals("true", BIG.explore(CVMBool.TRUE).toString());
+		assertEquals("false", BIG.explore(CVMBool.FALSE).toString());
 	}
 
 	@Test public void testLong() {
-		assertEquals("42", CellExplorer.explore(CVMLong.create(42), 100).toString());
-		assertEquals("0", CellExplorer.explore(CVMLong.create(0), 100).toString());
-		assertEquals("-1", CellExplorer.explore(CVMLong.create(-1), 100).toString());
+		assertEquals("42", BIG.explore(CVMLong.create(42)).toString());
+		assertEquals("0", BIG.explore(CVMLong.create(0)).toString());
+		assertEquals("-1", BIG.explore(CVMLong.create(-1)).toString());
 	}
 
 	@Test public void testString() {
-		assertEquals("\"hello\"", CellExplorer.explore(Strings.create("hello"), 100).toString());
-		assertEquals("\"\"", CellExplorer.explore(Strings.create(""), 100).toString());
+		assertEquals("\"hello\"", BIG.explore(Strings.create("hello")).toString());
+		assertEquals("\"\"", BIG.explore(Strings.create("")).toString());
 	}
 
 	// ---- Empty containers ----
 
 	@Test public void testEmptyMap() {
-		assertEquals("{}", CellExplorer.explore(Maps.empty(), 100).toString());
+		assertEquals("{}", BIG.explore(Maps.empty()).toString());
 	}
 
 	@Test public void testEmptyVector() {
-		assertEquals("[]", CellExplorer.explore(Vectors.empty(), 100).toString());
+		assertEquals("[]", BIG.explore(Vectors.empty()).toString());
 	}
 
 	@Test public void testEmptyList() {
-		assertEquals("[]", CellExplorer.explore(Lists.empty(), 100).toString());
+		assertEquals("[]", BIG.explore(Lists.empty()).toString());
 	}
 
 	// ---- Small containers that fit in budget ----
 
 	@Test public void testSmallVector() {
 		ACell v = Vectors.of(1, 2, 3);
-		assertEquals("[1,2,3]", CellExplorer.explore(v, 100).toString());
+		assertEquals("[1,2,3]", BIG.explore(v).toString());
 	}
 
 	@Test public void testNestedVector() {
 		ACell v = Vectors.of(Vectors.of(1, 2), Vectors.of(3, 4));
-		assertEquals("[[1,2],[3,4]]", CellExplorer.explore(v, 100).toString());
+		assertEquals("[[1,2],[3,4]]", BIG.explore(v).toString());
 	}
 
 	@Test public void testStringKeyedMap() {
 		// String keys avoid the keyword-vs-unquoted-identifier divergence.
 		ACell m = Maps.of(Strings.create("a"), CVMLong.create(1));
-		assertEquals("{\"a\":1}", CellExplorer.explore(m, 100).toString());
+		assertEquals("{\"a\":1}", BIG.explore(m).toString());
+	}
+
+	// ---- Constructor + configuration ----
+
+	@Test public void testCompactConstructor() {
+		CellExplorer explorer = new CellExplorer(100, true);
+		assertEquals("42", explorer.explore(CVMLong.create(42)).toString());
 	}
 
 	// ---- Truncation placeholder (skeleton only) ----
@@ -85,64 +95,10 @@ public class CellExplorerTest {
 	@Test public void testBudgetExceededPlaceholder() {
 		// A vector that exceeds a tiny budget should hit the truncation
 		// placeholder. Actual truncated rendering comes in later commits.
+		CellExplorer tiny = new CellExplorer(1);
 		ACell v = Vectors.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-		AString out = CellExplorer.explore(v, 1);
+		AString out = tiny.explore(v);
 		assertTrue(out.toString().contains("TRUNCATED"),
 			"Expected TRUNCATED placeholder, got: " + out);
-	}
-
-	// ---- Path drill-down ----
-
-	@Test public void testPathEmptyReturnsRoot() {
-		ACell v = Vectors.of(10, 20, 30);
-		assertEquals("[10,20,30]", CellExplorer.explore(v, "", 100).toString());
-		assertEquals("[10,20,30]", CellExplorer.explore(v, "/", 100).toString());
-	}
-
-	@Test public void testPathSequenceIndex() {
-		ACell v = Vectors.of(10, 20, 30);
-		assertEquals("10", CellExplorer.explore(v, "/0", 100).toString());
-		assertEquals("20", CellExplorer.explore(v, "/1", 100).toString());
-		assertEquals("30", CellExplorer.explore(v, "/2", 100).toString());
-	}
-
-	@Test public void testPathStringKey() {
-		ACell m = Maps.of(Strings.create("value"), CVMLong.create(42));
-		assertEquals("42", CellExplorer.explore(m, "/value", 100).toString());
-	}
-
-	@Test public void testPathNested() {
-		ACell inner = Vectors.of(10, 20, 30);
-		ACell m = Maps.of(Strings.create("items"), inner);
-		assertEquals("[10,20,30]", CellExplorer.explore(m, "/items", 100).toString());
-		assertEquals("20", CellExplorer.explore(m, "/items/1", 100).toString());
-	}
-
-	@Test public void testPathNotFoundMissingKey() {
-		ACell m = Maps.of(Strings.create("a"), CVMLong.create(1));
-		String out = CellExplorer.explore(m, "/missing", 100).toString();
-		assertTrue(out.startsWith("/* path not found:"), "Got: " + out);
-		assertTrue(out.contains("/missing"), "Got: " + out);
-	}
-
-	@Test public void testPathNotFoundIndexOutOfBounds() {
-		ACell v = Vectors.of(1, 2, 3);
-		String out = CellExplorer.explore(v, "/99", 100).toString();
-		assertTrue(out.startsWith("/* path not found:"), "Got: " + out);
-	}
-
-	@Test public void testPathNotFoundNumericOnMap() {
-		// A non-numeric map key lookup via path is fine; here we probe that a
-		// numeric segment on a map tries keyword/string lookup rather than
-		// index semantics. "1" has no matching key → path not found.
-		ACell m = Maps.of(Strings.create("a"), CVMLong.create(1));
-		String out = CellExplorer.explore(m, "/1", 100).toString();
-		assertTrue(out.startsWith("/* path not found:"), "Got: " + out);
-	}
-
-	@Test public void testPathIntoLeafFails() {
-		// Navigating into a primitive should fail cleanly.
-		String out = CellExplorer.explore(CVMLong.create(42), "/foo", 100).toString();
-		assertTrue(out.startsWith("/* path not found:"), "Got: " + out);
 	}
 }
