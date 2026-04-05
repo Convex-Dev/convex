@@ -1,6 +1,6 @@
 # CellExplorer Design
 
-**Status:** Draft — April 2026
+**Status:** Ready for implementation — 2026-04-05 (all open questions resolved)
 
 ---
 
@@ -429,13 +429,17 @@ Additional cases:
 
 ## Open Questions
 
-Each item below states the question, the options considered, a tentative recommendation,
-and the reasoning. Mike should review and mark each as accepted, rejected, or deferred
-before implementation begins.
+Each item below states the question, the options considered, and the decision taken.
+All items are resolved as of 2026-04-05; implementation should follow the decisions
+recorded here.
 
 ---
 
-### OQ-1 · Keyword key rendering — suppress `:` prefix or keep it?
+### OQ-1 · Keyword key rendering — ACCEPTED (Option A)
+
+**Decision (2026-04-05):** Option A — suppress the `:` prefix, emit unquoted when
+the keyword's name is a valid JSON5 identifier, quoted otherwise. Confirmed that
+LLMs handle unquoted object keys fluently (standard JavaScript / JSON5 syntax).
 
 **Question:** When a keyword (e.g. `:name`) is used as a map key, should the `:`
 prefix be suppressed so it renders as an unquoted JSON5 identifier (`name`), or
@@ -467,7 +471,11 @@ a faithful serialisation.
 
 ---
 
-### OQ-2 · Exposing JSON internals for reuse
+### OQ-2 · Exposing JSON internals for reuse — ACCEPTED
+
+**Decision (2026-04-05):** Promote `JSON.appendJSON(BlobBuilder, ACell)` and
+`JSON.appendCVMStringQuoted(BlobBuilder, CharSequence)` to public. `JSON.jsonKey`
+is already public.
 
 **Question:** CellExplorer wants to reuse `JSON.java`'s existing leaf rendering
 (`appendJSON(BlobBuilder, ACell)`) and string escaping (`appendCVMStringQuoted`)
@@ -486,7 +494,10 @@ handling, and `JSON` is the natural home for JSON/CVM text primitives.
 
 ---
 
-### OQ-3 · Overflow annotation format: two comments vs one merged comment
+### OQ-3 · Overflow annotation format — ACCEPTED (Option B)
+
+**Decision (2026-04-05):** Option B — single merged comment `/* +99 more, 390KB */`.
+Already threaded through the Truncation Forms table and test-case column.
 
 **Question:** When a container is partially shown and has both an overflow count and a
 size, should these appear as two separate `/* */` comments or merged into one?
@@ -505,7 +516,10 @@ if Mike prefers visual separation.
 
 ---
 
-### OQ-4 · Surplus redistribution in map value rendering
+### OQ-4 · Surplus redistribution in map value rendering — ACCEPTED (Option A for v1)
+
+**Decision (2026-04-05):** Option A for v1 — discard surplus, equal-split per value
+slot. Options B/C deferred to v2 backlog.
 
 **Question:** When a map value renders smaller than its equal-share budget allocation,
 the leftover bytes are currently discarded (v1 equal-split). Should surplus be
@@ -528,7 +542,11 @@ map tend to be similar in size, so equal-split works well. Add to v2 backlog.
 
 ---
 
-### OQ-5 · Sequence item sampling strategy (head/tail/both)
+### OQ-5 · Sequence item sampling strategy — ACCEPTED (Option C)
+
+**Decision (2026-04-05):** Option C — head-only rendering in v1, with an extensible
+internal signature so `strategy=head|tail|both` can be added later without changing
+the public API.
 
 **Question:** The spec notes a future option `strategy=head|tail|both`. Should this be
 implemented in v1 or deferred?
@@ -549,7 +567,11 @@ O(skipped) iteration of tail mode until it's actually needed.
 
 ---
 
-### OQ-6 · Depth limits
+### OQ-6 · Depth limits — ACCEPTED (Option A)
+
+**Decision (2026-04-05):** Option A — no hard depth limit. Budget constrains depth
+naturally; stack depth is bounded by `budget / MIN_CONTAINER_OVERHEAD`, which for
+any realistic budget stays well within JVM defaults.
 
 **Question:** Should there be a hard maximum recursion depth, or is budget-natural
 depth limiting sufficient?
@@ -582,29 +604,40 @@ Callers needing a strict output-byte ceiling should pass a smaller budget
 
 ---
 
-### OQ-8 · `NaN` and `Infinity` rendering for `CVMDouble`
+### OQ-8 · `NaN` and `Infinity` rendering for `CVMDouble` — ACCEPTED (narrowed v1)
 
-**Question:** JSON5 supports `NaN`, `Infinity`, and `-Infinity` as unquoted literals.
-Standard JSON does not. `JSON.java` currently renders `NaN` as the literal `NaN` but
-renders positive/negative Infinity as `null` (with the Infinity path commented out).
-What should CellExplorer emit?
+**Decision (2026-04-05):** CellExplorer special-cases `CVMDouble` before delegating
+to `JSON.appendJSON`. Non-finite values render as JSON5 literals: `NaN`, `Infinity`,
+`-Infinity`. Finite values fall through to the existing `JSON.appendJSON` path.
 
-**Options:**
+**Why narrowed from the original Option A:** The original plan was for CellExplorer
+to delegate all leaf rendering to `JSON.appendJSON` (OQ-2) and rely on `JSON.java`
+to emit JSON5 literals for non-finite doubles. Investigation showed `JSON.java` has
+**no JSON5 writer path at all** — only a single `appendJSON` method with inconsistent
+behaviour (renders `NaN` as the literal `NaN`, but renders `±Infinity` as `null` with
+the literal form commented out at lines 213-216). Fixing `JSON.java` would affect
+every existing caller and is out of scope for CellExplorer v1. The narrow
+CellExplorer-internal special-case keeps the JSON5 claim honest with zero blast
+radius on other JSON callers.
 
-- **A. Follow JSON5: emit unquoted `NaN`, `Infinity`, `-Infinity`** — consistent with
-  the spec's claim that output is JSON5-compatible.
-- **B. Emit quoted strings: `"NaN"`, `"Infinity"`** — valid JSON, but misleading
-  (strings, not numbers).
-- **C. Emit annotation-only: `/* Double, NaN */`** — loses the value but avoids the
-  JSON vs JSON5 ambiguity.
+**Follow-up issues:**
 
-**Tentative recommendation: Option A** — JSON5 unquoted form. The spec explicitly states
-output is JSON5-compatible and names these values. Quoted strings would be parsed as
-strings by a JSON5 parser, which is wrong. Option A is correct for JSON5.
+- Add a proper `JSON.appendJSON5(BlobBuilder, ACell)` writer as a peer to the
+  existing `JSON5Reader`. Once it lands, CellExplorer's `CVMDouble` special-case
+  can migrate to delegate to the new method.
+- Audit `JSON.appendJSON` for strict JSON compliance. Emitting `NaN` as a literal
+  is non-standard JSON; `null` is the conventional substitute. Fix requires
+  understanding the existing caller set — separate decision from this design.
+- Add test coverage for `JSON5Reader` round-tripping `NaN`, `Infinity`, `-Infinity`
+  literals.
 
 ---
 
-### OQ-9 · Path segment matching: keyword vs string lookup order
+### OQ-9 · Path segment matching — ACCEPTED (Option A)
+
+**Decision (2026-04-05):** Option A — keyword first, then AString. Matches CVM
+convention for structured-data map keys. Typed path syntax (Option C) deferred to
+v2 if ambiguity proves a problem in practice.
 
 **Question:** When navigating a path segment like `config`, should the implementation
 first try looking up a `Keyword` `:config`, then fall back to an `AString` `"config"`,
