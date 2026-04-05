@@ -7,9 +7,13 @@
 ## Overview
 
 CellExplorer produces a JSON5-compatible text representation of any CVM `ACell` value,
-truncated to fit within a caller-specified byte budget. It enables LLMs and tools to
-progressively explore arbitrarily large lattice structures without overwhelming context
-windows.
+truncated to fit within a caller-specified storage-size budget. It enables LLMs and
+tools to progressively explore arbitrarily large lattice structures without overwhelming
+context windows.
+
+**Scope note:** CellExplorer assumes the cell is fully materialised. If the caller
+passes a partial lattice with unresolved refs, `MissingDataException` propagates to
+the caller — it is the caller's responsibility to load what they need first.
 
 Output is designed to be:
 - Readable by any LLM without Convex-specific training
@@ -22,12 +26,14 @@ Output is designed to be:
 
 ## Goals
 
-**Budget unit:** bytes of CAD3 storage as reported by `cell.getMemorySize()`. This
-value is cached in etch, incrementally recomputed as structures mutate, and covers
-both the cell's own bytes and its referenced children — making it a natural
-hierarchical measure with no rendering required. It is a good proxy for size in
-bytes including overhead, and correlates with LLM token consumption, memory cost,
-and wire size.
+**Budget unit:** bytes of CAD3 storage as reported by `Cells.storageSize(cell)`.
+This helper (in `convex.core.data.Cells`) returns `getMemorySize()` for non-embedded
+cells and `getMemorySize() + getEncodingLength()` for embedded cells — so every cell,
+including small primitives like `CVMLong` that have `getMemorySize() == 0`, carries
+a meaningful non-zero cost. `getMemorySize()` itself is cached in etch and
+incrementally maintained; `storageSize` wraps it in O(1). It is a good proxy for
+size in bytes including overhead, and correlates with LLM token consumption, memory
+cost, and wire size.
 
 **Core rules:**
 1. Never invent data. Output only values present in the cell.
@@ -43,40 +49,43 @@ and wire size.
 
 ### Core Invariant
 
-CellExplorer never inspects more cell material than the budget permits. Every decision
-to render (or not render) a subtree is made before recursing into children. The
-mechanism is:
+CellExplorer never inspects more cell material than the budget permits. Budget is
+checked before every recursive call; each child's allocation never exceeds the
+caller's remaining budget. The mechanism is:
 
-> Before recursing into any cell, read its `getMemorySize()` in O(1). If it fits within
-> the remaining budget, render in full. Otherwise, truncate and recurse only as far as
-> the budget allows.
+> Before descending into any cell, read `Cells.storageSize(cell)` in O(1). If it fits
+> within the remaining budget, render in full. Otherwise, truncate: for primitives,
+> emit an annotation or partial form; for containers, subtract a small structural
+> reserve and divide the remainder among children.
 
-`cell.getMemorySize()` is the single source of truth for budget consumption. It is
-cached in etch and inherently hierarchical — a parent's memory size already includes
-its children — so budget accounting requires no speculative writes and no rollback.
+`Cells.storageSize(cell)` is the single source of truth for budget consumption.
+Non-embedded parents already sum the storage cost of their non-embedded children in
+`getMemorySize()`; embedded cells contribute their own encoding length instead. The
+budget counter is independent of `BlobBuilder.count()` — output bytes and budget
+units are not the same quantity.
 
 ### Top-Level Algorithm
 
 ```
 explore(cell, bb, budget, indent):
-  cellSize = cell.getMemorySize()            // O(1), cached in etch
+  cellSize = Cells.storageSize(cell)         // O(1), uses etch-cached memorySize
 
   if cellSize <= budget:
-    renderFull(cell, bb, indent)             // fast path — whole subtree fits
+    renderFull(cell, bb, indent)             // fast path — whole subtree fits; delegates to JSON.appendJSON
     return
 
   // Cell is too large — truncate
-  if isPrimitive(cell):
-    renderPrimitiveTruncated(cell, bb, budget)
+  if isLeaf(cell):                           // primitives, strings, blobs
+    renderLeafTruncated(cell, bb, budget)
     return
 
   // Container truncation
-  overhead = containerOverhead(cell)         // structural cells: {, }, commas, annotation
-  if overhead >= budget:
+  reserve = ANNOTATION_RESERVE               // small constant for /* Map, N keys, SZ */
+  if reserve >= budget:
     renderFullyTruncated(cell, bb)           // e.g. {/* Map, 5 keys, 47.5MB */}
     return
 
-  contentBudget = budget - overhead
+  contentBudget = budget - reserve
 
   if isMap(cell):
     renderMapTruncated(cell, bb, contentBudget, indent)
@@ -86,23 +95,43 @@ explore(cell, bb, budget, indent):
 
 ### Budget Accounting
 
-Every cell type — primitive or container — exposes `getMemorySize()` in O(1), served
-from an etch-cached field. There is no per-type estimate table: the same call is the
-budget cost of rendering any `ACell`.
+Every cell type — primitive or container — exposes `Cells.storageSize(cell)` in O(1).
+There is no per-type estimate table: the same call is the budget cost of rendering
+any `ACell`.
 
-- **Primitives:** `cell.getMemorySize()` is the cell's own storage cost. A `CVMLong`
-  costs roughly the same as a short `CVMKeyword`, regardless of the number of decimal
-  digits it will render to. Output bytes may be larger or smaller than budget units
-  for an individual primitive; this is expected.
-- **Containers:** `cell.getMemorySize()` already includes the aggregate cost of all
-  reachable children. A container whose total memory size fits within budget can be
-  rendered in full with no further gating.
-- **Sharing:** structurally shared subtrees are counted once in the storage layer, so
-  budget accounting naturally rewards sharing.
+- **Embedded primitives** (`CVMLong`, `CVMBool`, short `Keyword`/`Symbol`/`Address`/
+  `String`, `null`): `getMemorySize()` is zero, but `Cells.storageSize` adds the
+  cell's `encodingLength`, so the value rendered always has a non-zero cost. This
+  prevents the pathological case where a container of embedded values has near-zero
+  budget cost but produces unbounded output.
+- **Non-embedded primitives and containers:** `getMemorySize()` includes own encoding
+  plus recursive sum of child ref memory sizes. A container whose storage size fits
+  within budget renders in full.
+- **Sharing:** `getMemorySize()` sums per-ref, so a subtree reachable via multiple
+  refs contributes once per ref. Budget accounting does not deduplicate sharing.
 
-The budget unit is deliberately not output-bytes. Callers who need a strict output-byte
+The budget unit is deliberately not output-bytes. Callers needing a strict output-byte
 ceiling should pick a budget proportionate to their output target (roughly 1:1 for
 structured data, ~0.5:1 for blob-heavy data where hex expansion doubles size).
+
+### Leaf Rendering Reuse
+
+For any cell that fits the remaining budget, `renderFull` delegates to the existing
+`JSON.appendJSON(BlobBuilder, ACell)` (exposed as public for this purpose). That
+method already handles every leaf type correctly — `CVMLong`, `CVMDouble` (NaN /
+Infinity), `CVMBigInteger`, `CVMBool`, `CVMChar`, `ABlob` (hex), `AString`
+(escaping), `Address`, `ASymbolic`, plus containers via recursive descent.
+CellExplorer's own logic exists only for:
+
+- budget gating at each recursion,
+- container truncation (partial key/item rendering),
+- partial forms for large strings and blobs,
+- size and overflow annotations (`/* ... */`).
+
+For map keys, CellExplorer calls `JSON.jsonKey(ACell)` (already public) to coerce
+any CVM value to a String, then decides whether that String can be rendered as an
+unquoted JSON5 identifier or must be quoted. This means integer keys are
+automatically quoted (`"42"`) as JSON5 requires — no special-case code.
 
 ### Map Rendering (truncated path)
 
@@ -118,7 +147,7 @@ renderMapTruncated(map, bb, contentBudget, indent):
   // Scan entries to determine how many we can show.
   // Phase 1 is bounded by visible entries, not total entries — O(output).
   for entry in map:
-    kCost = entry.key.getMemorySize() + ENTRY_OVERHEAD  // colon, separator, indent
+    kCost = Cells.storageSize(entry.key) + ENTRY_OVERHEAD  // colon, separator, indent
     if keyCost + kCost + MIN_VALUE_BUDGET > contentBudget: break
     visible.add(entry)
     keyCost += kCost
@@ -140,18 +169,37 @@ renderMapTruncated(map, bb, contentBudget, indent):
 Value budget is split equally among visible entries (v1). Surplus from small values is
 not redistributed.
 
+### Leaf Truncation
+
+`renderLeafTruncated(cell, bb, budget)` handles the cases where an individual leaf
+cell's `storageSize` exceeds the remaining budget. The only leaf types that have a
+useful partial form are `AString` and `ABlob`; all other leaves fall back to the
+annotation-only form.
+
+- **`AString`:** emit `"` + prefix (as many characters as fit in roughly
+  `budget * 4` bytes, respecting UTF-8 code-point boundaries — never truncate
+  mid-surrogate) + `..."` + size annotation. Escaping of the prefix reuses
+  `JSON.appendCVMStringQuoted`.
+- **`ABlob`:** emit `"0x` + hex of the first `N` bytes (where `N ≈ budget * 2`,
+  since each byte produces 2 hex characters) + `..."` + size annotation. Uses
+  `BlobBuilder.appendHexByte(byte)` per byte.
+- **All other primitives (`CVMBigInteger`, `CVMLong`, `CVMDouble`, `Address`,
+  `Keyword`, `Symbol`):** emit annotation-only form (e.g. `/* BigInt, 847 digits */`).
+  These types are either small enough to always fit, or have no partial form that
+  preserves meaningful information.
+
 ### Sequence Rendering (truncated path)
 
 ```
 renderSequenceTruncated(seq, bb, contentBudget, indent):
   totalItems = seq.count()
-  consumed = 0                                   // in getMemorySize units
+  consumed = 0                                    // in storageSize units
   shown = 0
 
   for item in seq:
     remaining = contentBudget - consumed
     if remaining < MIN_ITEM_BUDGET: break
-    itemCost = min(item.getMemorySize(), remaining)
+    itemCost = min(Cells.storageSize(item), remaining)
     explore(item, bb, remaining, indent + 1)    // child gets what's left
     consumed += itemCost
     shown++
@@ -165,15 +213,22 @@ renderSequenceTruncated(seq, bb, contentBudget, indent):
 Each item receives the remaining budget at the point it is rendered. Items rendered early
 that use less than expected leave more for later items. No look-ahead required.
 
+**TODO (v2):** The running-remainder strategy means an early large item can consume
+the full remaining budget and cause all later items to be skipped. For sequences
+this may produce worse summaries than equal-splitting: seeing the first few bytes
+of every item is often more informative than seeing one item in full. Reconsider
+falling back to equal-split (as used for maps) if the first item would otherwise
+absorb more than its proportional share.
+
 ---
 
 ## Budget Flow
 
-Budget passes from caller down through containers in `getMemorySize()` units. Each
-layer subtracts a structural-overhead allowance before dividing the remainder among
-children. The structural-overhead figures below are rough constants expressed in the
-same unit as the budget — they represent how much of the budget to reserve for
-delimiters, separators, and annotations rather than actual cell memory.
+Budget passes from caller down through containers in `Cells.storageSize()` units.
+Each layer subtracts a structural-overhead allowance before dividing the remainder
+among children. The structural-overhead figures below are rough constants expressed
+in the same unit as the budget — they represent how much of the budget to reserve
+for delimiters, separators, and annotations rather than actual cell storage.
 
 **Structural overhead allowance (examples, in budget units):**
 
@@ -206,29 +261,30 @@ No intermediate Java `String` or `StringBuilder` is created.
 
 Public API methods create one `BlobBuilder` per call, pass it through internal
 `void explore(...)` methods, and convert once at the end. Budget tracking is
-independent of `BlobBuilder.count()` — the budget parameter is in `getMemorySize()`
-units and flows down as a recursive argument.
+independent of `BlobBuilder.count()` — the budget parameter is in
+`Cells.storageSize()` units and flows down as a recursive argument.
 
 ---
 
 ## JSON Reuse
 
-CellExplorer layers on top of existing infrastructure in `convex.core.util.JSON` and
-`convex.core.data.util.BlobBuilder`. We do not reimplement what already exists:
+CellExplorer layers on top of `convex.core.util.JSON` rather than reimplementing
+leaf rendering. Two methods need to be exposed as public (both currently package or
+`private`):
 
-| Capability | Reused from |
-|------------|------------|
-| String JSON escaping | `JSON.escape(String)` or expose `appendCVMStringQuoted` as package-private in `JSON` |
-| Long formatting | `BlobBuilder.appendLongString(long)` |
-| Blob hex encoding | `ABlob.toHexString()` or `BlobBuilder.appendHexByte(byte)` |
-| Double formatting | `Double.toString(double)`, with special-case for `NaN` / `Infinity` |
+| Capability | Reused from | Current visibility |
+|------------|------------|---------------------|
+| Full leaf rendering (all CVM primitive types, escape handling, NaN/Infinity, hex blobs, etc.) | `JSON.appendJSON(BlobBuilder, ACell)` | private — needs to be made public |
+| String escaping for partial-form strings (`"hello wo..."`) | `JSON.appendCVMStringQuoted(BlobBuilder, CharSequence)` | private — needs to be made public |
+| Map key coercion (any `ACell` → `String` suitable as JSON key) | `JSON.jsonKey(ACell)` | already public |
 
-We do **not** reuse JSON's map and collection rendering methods — they are unbounded and
-have no budget awareness.
+We do **not** reuse `JSON.appendJSON`'s map and sequence handling — those paths are
+unbounded and have no budget awareness, so CellExplorer provides its own truncating
+container rendering that recursively calls back into `appendJSON` for leaves only.
 
-We do **not** reuse JSON's `Address` rendering (`longValue()` → bare number) or its
-`ASymbolic` rendering (bare name string). CellExplorer uses `"#42"` for addresses and
-`":active"` for keywords, which differ from JSON's output.
+CellExplorer's `Address` rendering (`"#42"`) and keyword rendering (`":active"`) differ
+from `JSON.appendJSON`'s renderings (bare number / bare name). For these two types
+CellExplorer does its own formatting before delegating to the escape primitive.
 
 ---
 
@@ -251,7 +307,7 @@ We do **not** reuse JSON's `Address` rendering (`longValue()` → bare number) o
 | `AMap` | `{a: 1}` | `{a: 1, /* +7 more */ /* 47.5MB */}` | `{/* Map, 5 keys, 47.5MB */}` |
 | `ASet` | `[1, 2 /* Set */]` | `[1, /* +N more */ /* Set, 48KB */]` | `[/* Set, 5000 items, 48KB */]` |
 
-**Size annotation format:** derived from `cell.getMemorySize()`.
+**Size annotation format:** derived from `Cells.storageSize(cell)`.
 `< 1024` → `{n}B` · `< 1MB` → `{n.1f}KB` · `< 1GB` → `{n.1f}MB` · else `{n.1f}GB`.
 
 For strings and blobs, the partial form inserts `...` before the closing quote and appends a
@@ -262,19 +318,25 @@ comment if both are needed.
 
 ## Key Formatting
 
-Map keys use JSON5 unquoted identifiers when the rendered key name matches the pattern
-`[a-zA-Z_$][a-zA-Z0-9_$]*`. Otherwise quoted.
+Any `ACell` can be a map key. CellExplorer calls `JSON.jsonKey(ACell)` to coerce the
+key to a `String`, then decides whether it can be emitted as an unquoted JSON5
+identifier (matches `[a-zA-Z_$][a-zA-Z0-9_$]*`) or must be quoted and escaped.
 
-| Key type | Example cell | Rendered key |
-|----------|-------------|--------------|
-| Keyword — valid identifier name | `:name` | `name` (unquoted) |
-| Keyword — non-identifier name | `:"hello world"` | `":hello world"` (quoted with `:`) |
-| String — valid identifier | `"active"` | `active` (unquoted) |
-| String — non-identifier | `"hello world"` | `"hello world"` (quoted) |
-| Integer | `42` | `42` (unquoted) |
-| Address | `#1337` | `"#1337"` (quoted with `#`) |
+| Key type | Example cell | `jsonKey` result | Rendered key |
+|----------|-------------|------------------|--------------|
+| Keyword — valid identifier name | `:name` | `"name"` | `name` (unquoted) |
+| Keyword — non-identifier name | `:hello-world` | `"hello-world"` | `"hello-world"` (quoted) |
+| String — valid identifier | `"active"` | `"active"` | `active` (unquoted) |
+| String — non-identifier | `"hello world"` | `"hello world"` | `"hello world"` (quoted, escaped) |
+| Integer | `42` | `"42"` | `"42"` (quoted — JSON5 requires it) |
+| Address | `#1337` | `"#1337"` | `"#1337"` (quoted — `#` not identifier) |
 
-Keys exceeding ~100 bytes are truncated with `...` inside the appropriate quoting form.
+Note: JSON5's `MemberName` grammar is `IdentifierName | StringLiteral` — numeric
+literals are **not** valid object keys, so integer keys must always be quoted. The
+unquoted-identifier test naturally excludes digit-leading strings.
+
+Keys exceeding ~100 bytes are truncated with `...` inside the appropriate quoting
+form.
 
 ---
 
@@ -395,29 +457,22 @@ authoritative, clarify and we'll switch.
 
 ---
 
-### OQ-2 · String escaping reuse: how to access `appendCVMStringQuoted`
+### OQ-2 · Exposing JSON internals for reuse
 
-**Question:** `JSON.java` contains a private `appendCVMStringQuoted(BlobBuilder, String)`
-method with correct JSON string escaping. CellExplorer needs the same logic.
-`CellExplorer` will be in `convex.core.data.util`; `JSON` is in `convex.core.util` —
-different packages, so package-private won't bridge them.
+**Question:** CellExplorer wants to reuse `JSON.java`'s existing leaf rendering
+(`appendJSON(BlobBuilder, ACell)`) and string escaping (`appendCVMStringQuoted`)
+rather than reimplementing them. Both are currently private. How do we expose them?
 
-**Options:**
+**Tentative recommendation:** Promote both to public:
 
-- **A. Add `public static void appendEscapedString(BlobBuilder bb, AString s)` to
-  `JSON.java`**. A new, well-named public method that exposes the escaping primitive
-  cleanly. No duplication, no intermediate allocation.
-- **B. Use existing `JSON.escape(String)`** which returns an `AString`. Call
-  `bb.append(JSON.escape(s.toString()))`. Clean caller-side, but allocates an
-  intermediate `String` + `AString` per string cell rendered.
-- **C. Duplicate the escaping logic in CellExplorer**. No dependency, but two copies
-  of the same escaping table to maintain.
-- **D. Move `appendCVMStringQuoted` to `BlobBuilder` or a new `JSONUtils` helper**
-  accessible to both. More involved refactor.
+- `public static void appendJSON(BlobBuilder bb, ACell value)` — the full CVM leaf
+  renderer, used by CellExplorer for any cell that fits budget.
+- `public static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs)` —
+  the string-escape primitive, used by CellExplorer for partial-form strings.
 
-**Tentative recommendation: Option A** — add one public method to `JSON.java`. Minimal
-change, zero allocations, no duplication, natural place for it. Option B is acceptable
-if allocation is not a concern and Mike prefers no changes to `JSON.java`.
+`JSON.jsonKey(ACell)` is already public and needs no change. Rationale: minimal
+surface-area change, zero allocations in the hot path, no duplication of leaf-type
+handling, and `JSON` is the natural home for JSON/CVM text primitives.
 
 ---
 
