@@ -22,8 +22,12 @@ Output is designed to be:
 
 ## Goals
 
-**Budget unit:** bytes of UTF-8 output, matching `BlobBuilder.count()` exactly. This
-correlates with LLM token consumption (~4 bytes ≈ 1 token), memory cost, and wire size.
+**Budget unit:** bytes of CAD3 storage as reported by `cell.getMemorySize()`. This
+value is cached in etch, incrementally recomputed as structures mutate, and covers
+both the cell's own bytes and its referenced children — making it a natural
+hierarchical measure with no rendering required. It is a good proxy for size in
+bytes including overhead, and correlates with LLM token consumption, memory cost,
+and wire size.
 
 **Core rules:**
 1. Never invent data. Output only values present in the cell.
@@ -39,24 +43,26 @@ correlates with LLM token consumption (~4 bytes ≈ 1 token), memory cost, and w
 
 ### Core Invariant
 
-CellExplorer never inspects more data than it outputs. Every decision to render (or not
-render) a subtree is made before writing a single byte. The mechanism is:
+CellExplorer never inspects more cell material than the budget permits. Every decision
+to render (or not render) a subtree is made before recursing into children. The
+mechanism is:
 
-> Before recursing into any cell, estimate its JSON output size in O(1). If the estimate
-> fits within the remaining budget, render in full. Otherwise, truncate without recursing
-> into children.
+> Before recursing into any cell, read its `getMemorySize()` in O(1). If it fits within
+> the remaining budget, render in full. Otherwise, truncate and recurse only as far as
+> the budget allows.
 
-`BlobBuilder.count()` is the single source of truth for bytes consumed. No rollback,
-no speculative writes — truncation decisions are made before ink hits paper.
+`cell.getMemorySize()` is the single source of truth for budget consumption. It is
+cached in etch and inherently hierarchical — a parent's memory size already includes
+its children — so budget accounting requires no speculative writes and no rollback.
 
 ### Top-Level Algorithm
 
 ```
 explore(cell, bb, budget, indent):
-  estimate = jsonSizeEstimate(cell)          // O(1), type-specific (see table below)
+  cellSize = cell.getMemorySize()            // O(1), cached in etch
 
-  if estimate <= budget:
-    renderFull(cell, bb, indent)             // fast path — will fit
+  if cellSize <= budget:
+    renderFull(cell, bb, indent)             // fast path — whole subtree fits
     return
 
   // Cell is too large — truncate
@@ -65,7 +71,7 @@ explore(cell, bb, budget, indent):
     return
 
   // Container truncation
-  overhead = containerOverhead(cell, indent) // {, }, commas, annotation comment
+  overhead = containerOverhead(cell)         // structural cells: {, }, commas, annotation
   if overhead >= budget:
     renderFullyTruncated(cell, bb)           // e.g. {/* Map, 5 keys, 47.5MB */}
     return
@@ -78,29 +84,25 @@ explore(cell, bb, budget, indent):
     renderSequenceTruncated(cell, bb, contentBudget, indent)
 ```
 
-### Size Estimation
+### Budget Accounting
 
-`jsonSizeEstimate` is computed in O(1) without rendering, using a type-specific formula
-that provides an upper bound on JSON output bytes:
+Every cell type — primitive or container — exposes `getMemorySize()` in O(1), served
+from an etch-cached field. There is no per-type estimate table: the same call is the
+budget cost of rendering any `ACell`.
 
-| Type | Estimate formula |
-|------|-----------------|
-| `null` | 4 |
-| `CVMBool` | 5 |
-| `CVMLong` | `Utils.longStringSize(v.longValue())` |
-| `CVMDouble` | 30 (conservative bound including `Infinity`, `NaN`) |
-| `CVMBigInteger` | `bi.bigIntegerValue().abs().bitLength() / 3 + 5` (decimal digit count + sign) |
-| `AString` | `cs.count() + 12` (quotes + JSON escape expansion slack) |
-| `ABlob` | `blob.count() * 2 + 6` (`"0x"` prefix + hex + quotes) |
-| `Address` | 10 (e.g. `"#1337"`) |
-| `Keyword` | `kw.getName().count() + 4` (`:` prefix + quotes) |
-| `Symbol` | `sym.getName().count() + 3` |
-| `AMap / AVector / ASet / AList` | `cell.getMemorySize()` |
+- **Primitives:** `cell.getMemorySize()` is the cell's own storage cost. A `CVMLong`
+  costs roughly the same as a short `CVMKeyword`, regardless of the number of decimal
+  digits it will render to. Output bytes may be larger or smaller than budget units
+  for an individual primitive; this is expected.
+- **Containers:** `cell.getMemorySize()` already includes the aggregate cost of all
+  reachable children. A container whose total memory size fits within budget can be
+  rendered in full with no further gating.
+- **Sharing:** structurally shared subtrees are counted once in the storage layer, so
+  budget accounting naturally rewards sharing.
 
-For collections, `getMemorySize()` (the CAD3 storage size) serves as a proxy. It is not
-an exact upper bound for JSON output, but is a reliable gate for the fast path: if the
-CAD3 encoding fits in the budget, the JSON rendering is unlikely to be significantly
-larger for typical structured data. For primitives, the exact formulas above are tight.
+The budget unit is deliberately not output-bytes. Callers who need a strict output-byte
+ceiling should pick a budget proportionate to their output target (roughly 1:1 for
+structured data, ~0.5:1 for blob-heavy data where hex expansion doubles size).
 
 ### Map Rendering (truncated path)
 
@@ -110,19 +112,19 @@ rendering any value. This is done in a single forward scan:
 ```
 renderMapTruncated(map, bb, contentBudget, indent):
   totalEntries = map.count()
-  keyBytes = 0
+  keyCost = 0
   visible = []
 
   // Scan entries to determine how many we can show.
   // Phase 1 is bounded by visible entries, not total entries — O(output).
   for entry in map:
-    kEst = jsonSizeEstimate(entry.key) + COLON_SPACE + SEPARATOR
-    if keyBytes + kEst + MIN_VALUE_BYTES > contentBudget: break
+    kCost = entry.key.getMemorySize() + ENTRY_OVERHEAD  // colon, separator, indent
+    if keyCost + kCost + MIN_VALUE_BUDGET > contentBudget: break
     visible.add(entry)
-    keyBytes += kEst
+    keyCost += kCost
 
   overflow = totalEntries - visible.size()
-  valueBudget = (contentBudget - keyBytes) / max(1, visible.size())
+  valueBudget = (contentBudget - keyCost) / max(1, visible.size())
 
   // Render visible entries
   for i, entry in enumerate(visible):
@@ -143,13 +145,15 @@ not redistributed.
 ```
 renderSequenceTruncated(seq, bb, contentBudget, indent):
   totalItems = seq.count()
-  start = bb.count()
+  consumed = 0                                   // in getMemorySize units
   shown = 0
 
   for item in seq:
-    remaining = contentBudget - (bb.count() - start)
+    remaining = contentBudget - consumed
     if remaining < MIN_ITEM_BUDGET: break
+    itemCost = min(item.getMemorySize(), remaining)
     explore(item, bb, remaining, indent + 1)    // child gets what's left
+    consumed += itemCost
     shown++
     if shown < totalItems: bb.append(separator)
 
@@ -165,12 +169,15 @@ that use less than expected leave more for later items. No look-ahead required.
 
 ## Budget Flow
 
-Budget passes from caller down through containers. Each layer subtracts its own structural
-overhead before dividing among children.
+Budget passes from caller down through containers in `getMemorySize()` units. Each
+layer subtracts a structural-overhead allowance before dividing the remainder among
+children. The structural-overhead figures below are rough constants expressed in the
+same unit as the budget — they represent how much of the budget to reserve for
+delimiters, separators, and annotations rather than actual cell memory.
 
-**Structural overhead (examples):**
+**Structural overhead allowance (examples, in budget units):**
 
-| Container | Overhead |
+| Container | Overhead shape |
 |-----------|---------|
 | Map (pretty) | `{\n` + `}` + annotation + `(n−1) × `,\n`` + `indent × 2` per entry |
 | Map (compact) | `{` + `}` + annotation + `(n−1) × `,`` |
@@ -179,10 +186,10 @@ overhead before dividing among children.
 
 **Minimum budgets (below which annotation-only form is emitted):**
 
-| Form | Min bytes |
+| Form | Min (budget units) |
 |------|-----------|
 | Fully truncated container | ~30 |
-| Single primitive | ~5 |
+| Single primitive | ~10 |
 | Map entry (key + truncated value) | ~40 |
 | Annotation-only | ~20 |
 
@@ -193,13 +200,14 @@ overhead before dividing among children.
 All output is written directly to a **`BlobBuilder`** (`convex.core.data.util.BlobBuilder`).
 No intermediate Java `String` or `StringBuilder` is created.
 
-- `BlobBuilder.count()` — O(1) check of bytes written so far
 - `BlobBuilder.append(String)` / `append(AString)` / `append(byte)` / `appendLongString(long)` —
   the primary write operations
 - `Strings.create(bb.toBlob())` — final conversion at the top level only
 
 Public API methods create one `BlobBuilder` per call, pass it through internal
-`void explore(...)` methods, and convert once at the end.
+`void explore(...)` methods, and convert once at the end. Budget tracking is
+independent of `BlobBuilder.count()` — the budget parameter is in `getMemorySize()`
+units and flows down as a recursive argument.
 
 ---
 
@@ -496,37 +504,16 @@ within JVM defaults. No additional guard needed.
 
 ---
 
-### OQ-7 · `getMemorySize()` fast-path reliability for blob-heavy containers
+### OQ-7 · ~~`getMemorySize()` fast-path reliability for blob-heavy containers~~ — RESOLVED
 
-**Question:** For containers, `getMemorySize()` is used as a proxy to decide whether
-full render fits in the budget. But hex-encoding a blob doubles its size: a 500-byte
-blob has `getMemorySize()` ≈ 500 yet JSON output ≈ 1010 bytes. A container whose
-`getMemorySize()` fits in the budget may still overflow if it contains large blobs.
+**Resolution:** The budget unit has been clarified as bytes of CAD3 storage per
+`getMemorySize()`, not bytes of JSON output. Hex expansion when rendering blobs no
+longer creates a correctness issue — the budget measures source cell material, not
+output bytes. A 500-byte blob consumes 500 budget units and produces ~1010 output
+bytes; this is expected and documented.
 
-**Why this matters:** If the fast path calls a "render everything" routine that bypasses
-per-child budget checks, the output can exceed the budget. This would be a correctness
-bug.
-
-**Options:**
-
-- **A. Fast path still recurses with budget** — the "fast path" means "expect no
-  truncation" but per-child budget accounting still runs. If a child overruns, it is
-  still truncated. This means `getMemorySize() <= budget` is an optimisation hint, not
-  a bypass. Output never exceeds budget, but may occasionally be truncated even when
-  `getMemorySize()` said it would fit.
-- **B. Use a conservative multiplier for the container fast-path check** — e.g.
-  `getMemorySize() * 2 <= budget` before attempting full render of a container. Reduces
-  false positives but is still not a guarantee.
-- **C. Abandon `getMemorySize()` as a container fast-path gate** — always go through
-  the overhead-accounting truncation path for containers; only use type-specific
-  estimates for leaves.
-
-**Tentative recommendation: Option A.** The fast path for containers is not a true
-bypass — it skips overhead computation but still passes budget down to every child. The
-invariant "output never exceeds budget" is maintained by the recursive budget parameter,
-not by the estimate alone. The estimate is an optimisation that avoids the overhead
-accounting work when everything will clearly fit. This is safe and preserves O(n)
-behaviour.
+Callers needing a strict output-byte ceiling should pass a smaller budget
+(approximately half the desired output ceiling for blob-heavy data) or post-truncate.
 
 ---
 
