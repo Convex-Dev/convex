@@ -401,16 +401,15 @@ public class JSON {
     }
 
 	/**
-	 * Appends a CharSequence to a BlobBuilder with JSON string escaping
-	 * applied. Does not append the surrounding double-quote characters —
+	 * Appends a `CharSequence` to a `BlobBuilder` with JSON string escaping
+	 * applied. Does **not** append the surrounding double-quote characters —
 	 * the caller is responsible for emitting those.
 	 *
-	 * Handles standard backslash escapes for backslash, double-quote, newline,
-	 * carriage return, and tab; emits four-hex-digit unicode escapes for other
-	 * control characters; and handles UTF-16 surrogate pairs via CVMChar.
+	 * Handles standard escapes (`\\`, `\"`, `\n`, `\r`, `\t`), control characters
+	 * via `u00XX`, and UTF-16 surrogate pairs via `CVMChar`.
 	 *
-	 * @param bb BlobBuilder to append to
-	 * @param cs CharSequence to escape and append
+	 * @param bb `BlobBuilder` to append to
+	 * @param cs `CharSequence` to escape and append
 	 */
 	public static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
 		int n = cs.length();
