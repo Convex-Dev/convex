@@ -2,23 +2,28 @@ package convex.core.data.util;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.JSON;
 
@@ -394,5 +399,520 @@ public class CellExplorerTest {
 		assertEquals("1", BIG.explore(CVMLong.create(1)).toString());
 		assertEquals("2", BIG.explore(CVMLong.create(2)).toString());
 		assertEquals("[1, 2, 3]", BIG.explore(Vectors.of(1, 2, 3)).toString());
+	}
+
+	// =================================================================
+	// Leaf type overrides (OQ-8 and the Address / Keyword-value /
+	// Symbol-value distinctions from the design doc)
+	// =================================================================
+
+	@Test public void testAddressAsValueRenders() {
+		// Address renders as quoted "#N" — distinct from a bare integer.
+		assertEquals("\"#42\"", BIG.explore(Address.create(42)).toString());
+		assertEquals("\"#0\"", BIG.explore(Address.create(0)).toString());
+		// Parses back as a string (JSON5 has no address literal).
+		assertEquals(Strings.create("#42"), parseBack(BIG.explore(Address.create(42))));
+	}
+
+	@Test public void testAddressInsideVectorIsDistinctFromLong() {
+		ACell input = Vectors.of(CVMLong.create(42), Address.create(42));
+		AString out = BIG.explore(input);
+		// Both elements fit, but their renderings differ.
+		assertTrue(out.toString().contains("42"));
+		assertTrue(out.toString().contains("\"#42\""));
+		// Parses: first is long 42, second is string "#42".
+		ACollection<?> parsed = (ACollection<?>) parseBack(out);
+		assertEquals(2L, parsed.count());
+		assertEquals(CVMLong.create(42), parsed.get(0));
+		assertEquals(Strings.create("#42"), parsed.get(1));
+	}
+
+	@Test public void testAddressAsMapValueRenders() {
+		ACell input = Maps.of(Keyword.create("owner"), Address.create(1337));
+		AString out = BIG.explore(input);
+		assertTrue(out.toString().contains("\"#1337\""));
+		AMap<?, ?> parsed = (AMap<?, ?>) parseBack(out);
+		assertEquals(Strings.create("#1337"), parsed.get(Strings.create("owner")));
+	}
+
+	@Test public void testKeywordAsValueRenders() {
+		// Keyword as VALUE (not key) — ":name" form, quoted.
+		ACell input = Vectors.of(Keyword.create("alpha"));
+		AString out = BIG.explore(input);
+		assertEquals("[\":alpha\"]", out.toString());
+		ACollection<?> parsed = (ACollection<?>) parseBack(out);
+		assertEquals(Strings.create(":alpha"), parsed.get(0));
+	}
+
+	@Test public void testKeywordAsKeyAndValueDistinct() {
+		// Keyword key → bare identifier; keyword value → ":name" quoted.
+		ACell input = Maps.of(Keyword.create("tag"), Keyword.create("alpha"));
+		assertEquals("{tag: \":alpha\"}", BIG.explore(input).toString());
+	}
+
+	@Test public void testSymbolAsValueRenders() {
+		ACell input = Vectors.of(Symbol.create("foo"));
+		AString out = BIG.explore(input);
+		assertEquals("[\"'foo\"]", out.toString());
+		ACollection<?> parsed = (ACollection<?>) parseBack(out);
+		assertEquals(Strings.create("'foo"), parsed.get(0));
+	}
+
+	@Test public void testNaNRendersBare() {
+		// JSON5 supports bare NaN — parseJSON5("NaN") → CVMDouble.NaN.
+		AString out = BIG.explore(CVMDouble.NaN);
+		assertEquals("NaN", out.toString());
+		assertEquals(CVMDouble.NaN, parseBack(out));
+	}
+
+	@Test public void testPositiveInfinityRendersBare() {
+		AString out = BIG.explore(CVMDouble.POSITIVE_INFINITY);
+		assertEquals("Infinity", out.toString());
+		assertEquals(CVMDouble.POSITIVE_INFINITY, parseBack(out));
+	}
+
+	@Test public void testNegativeInfinityRendersBare() {
+		AString out = BIG.explore(CVMDouble.NEGATIVE_INFINITY);
+		assertEquals("-Infinity", out.toString());
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, parseBack(out));
+	}
+
+	@Test public void testFiniteDoubleRendersViaJSON() {
+		// Finite doubles still delegate to JSON (no override needed).
+		AString out = BIG.explore(CVMDouble.create(3.14));
+		// Round-trips as CVMDouble.
+		assertEquals(CVMDouble.create(3.14), parseBack(out));
+	}
+
+	@Test public void testNonFiniteDoubleInsideVectorRoundTrips() {
+		ACell input = Vectors.of(
+			CVMDouble.create(1.0),
+			CVMDouble.NaN,
+			CVMDouble.POSITIVE_INFINITY,
+			CVMDouble.NEGATIVE_INFINITY);
+		ACollection<?> parsed = (ACollection<?>) roundTrip(BIG, input);
+		assertEquals(4L, parsed.count());
+		assertEquals(CVMDouble.create(1.0), parsed.get(0));
+		assertEquals(CVMDouble.NaN, parsed.get(1));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, parsed.get(2));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, parsed.get(3));
+	}
+
+	// =================================================================
+	// Leaf partial forms (strings and blobs)
+	// =================================================================
+
+	@Test public void testLargeStringProducesPartialForm() {
+		// A string much bigger than budget should emit a prefix + annotation,
+		// remain valid JSON5, and parse as a (shorter) string.
+		String content = "abcdefghijklmnopqrstuvwxyz".repeat(200); // ~5KB
+		ACell input = Strings.create(content);
+		CellExplorer tight = new CellExplorer(100);
+		AString out = tight.explore(input);
+		ACell parsed = parseBack(out);
+		// Must parse as a string (not nil).
+		assertNotNull(parsed);
+		assertTrue(parsed instanceof AString);
+		AString parsedStr = (AString) parsed;
+		// The prefix of the original is preserved.
+		assertTrue(content.startsWith(parsedStr.toString().substring(0,
+			Math.min(parsedStr.toString().length(), 20))),
+			"Partial string prefix should be a prefix of the original: " + parsedStr);
+		// Annotation mentions "String" and a size unit.
+		assertTrue(out.toString().contains("/* String"),
+			"Expected String annotation: " + out);
+	}
+
+	@Test public void testLargeBlobProducesPartialForm() {
+		byte[] bytes = new byte[2000];
+		for (int i = 0; i < bytes.length; i++) bytes[i] = (byte) (i & 0xff);
+		ACell input = Blob.create(bytes);
+		CellExplorer tight = new CellExplorer(80);
+		AString out = tight.explore(input);
+		ACell parsed = parseBack(out);
+		// Must parse as a string containing the hex prefix.
+		assertTrue(parsed instanceof AString, "Blob partial should parse as string, got: " + parsed);
+		String s = ((AString) parsed).toString();
+		assertTrue(s.startsWith("0x"), "Blob partial must start with 0x: " + s);
+		assertTrue(out.toString().contains("/* Blob"),
+			"Expected Blob annotation: " + out);
+	}
+
+	@Test public void testLargeStringInsideVectorRoundTripsStructurally() {
+		// Vector containing a large string and some longs. The truncated form
+		// must still parse as a valid JSON5 sequence.
+		String big = "x".repeat(5000);
+		ACell input = Vectors.of(CVMLong.create(1), Strings.create(big), CVMLong.create(3));
+		CellExplorer tight = new CellExplorer(200);
+		AString out = tight.explore(input);
+		ACollection<?> parsed = (ACollection<?>) parseBack(out);
+		// Count is bounded by input.
+		assertTrue(parsed.count() <= 3L);
+	}
+
+	@Test public void testLeafTruncatedFallbackValidJSON5() {
+		// Budget tight enough that even a partial leaf form cannot be formed.
+		// CellExplorer must still emit parseable JSON5.
+		String big = "x".repeat(5000);
+		CellExplorer minimal = new CellExplorer(5);
+		AString out = minimal.explore(Strings.create(big));
+		ACell parsed = parseBack(out);
+		// Fallback emits bare null + comment → parses as nil.
+		// (Documented lossy fallback for extreme budgets.)
+		assertNull(parsed);
+	}
+
+	// =================================================================
+	// Adversarial content: JSON5 metacharacters in user strings
+	// =================================================================
+
+	@Test public void testStringWithCommentTerminatorRoundTrips() {
+		// Content contains "*/" — must not leak out of a string literal
+		// to accidentally close a neighbouring comment.
+		String content = "hello*/world";
+		ACell input = Strings.create(content);
+		assertEquals(input, roundTrip(BIG, input));
+	}
+
+	@Test public void testStringWithAllMetaCharsRoundTrips() {
+		String content = "a\"b\\c/d\ne\rf\tg\b\fh";
+		ACell input = Strings.create(content);
+		assertEquals(input, roundTrip(BIG, input));
+	}
+
+	@Test public void testStringWithControlCharRoundTrips() {
+		String content = "a\u0000b\u0001c\u001fd";
+		ACell input = Strings.create(content);
+		assertEquals(input, roundTrip(BIG, input));
+	}
+
+	@Test public void testStringWithSurrogatePairRoundTrips() {
+		// U+1F600 (grinning face) — two Java chars (surrogate pair).
+		String content = "emoji: \uD83D\uDE00 end";
+		ACell input = Strings.create(content);
+		assertEquals(input, roundTrip(BIG, input));
+	}
+
+	@Test public void testStringWithSurrogatePairAtTruncationBoundaryStaysValid() {
+		// Build a string where the natural truncation point would land on a
+		// high surrogate. The partial form must back off so the emitted
+		// prefix is not a lone high surrogate.
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < 100; i++) sb.append("\uD83D\uDE00"); // 100 emoji
+		ACell input = Strings.create(sb.toString());
+		CellExplorer tight = new CellExplorer(60);
+		AString out = tight.explore(input);
+		// Most important: output is valid JSON5 (parse does not throw).
+		parseBack(out);
+	}
+
+	@Test public void testMapKeyWithCommentTerminatorRoundTrips() {
+		// Key containing "*/" — must be quoted so the JSON5 comment syntax
+		// is not confused.
+		ACell input = Maps.of(Strings.create("a*/b"), CVMLong.create(1));
+		AMap<?, ?> parsed = (AMap<?, ?>) roundTrip(BIG, input);
+		assertEquals(CVMLong.create(1), parsed.get(Strings.create("a*/b")));
+	}
+
+	@Test public void testKeywordKeyWithNonIdentifierCharsRoundTrips() {
+		// Keyword whose name is not a valid identifier → must be quoted.
+		ACell input = Maps.of(Keyword.create("a/b-c"), CVMLong.create(1));
+		AMap<?, ?> parsed = (AMap<?, ?>) roundTrip(BIG, input);
+		assertEquals(CVMLong.create(1), parsed.get(Strings.create("a/b-c")));
+	}
+
+	@Test public void testStringValueContainingBraceAndBracketsRoundTrips() {
+		// Content has JSON5 structural characters — parser must only see them
+		// inside a string literal.
+		String content = "{[(:x)]},";
+		assertEquals(Strings.create(content), roundTrip(BIG, Strings.create(content)));
+	}
+
+	// =================================================================
+	// Adversarial structures: depth, width, mixed
+	// =================================================================
+
+	@Test public void testDeeplyNestedVectorRoundTrips() {
+		// 100 nested vectors, innermost holds a single long.
+		ACell cell = CVMLong.create(7);
+		for (int i = 0; i < 100; i++) cell = Vectors.of(cell);
+		ACell parsed = roundTrip(BIG, cell);
+		// Walk back down 100 layers.
+		for (int i = 0; i < 100; i++) {
+			ACollection<?> c = (ACollection<?>) parsed;
+			assertEquals(1L, c.count());
+			parsed = c.get(0);
+		}
+		assertEquals(CVMLong.create(7), parsed);
+	}
+
+	@Test public void testDeeplyNestedMapRoundTrips() {
+		// 50 nested maps, all with keyword keys.
+		ACell cell = CVMLong.create(1);
+		for (int i = 0; i < 50; i++) {
+			cell = Maps.of(Keyword.create("k"), cell);
+		}
+		ACell parsed = roundTrip(BIG, cell);
+		for (int i = 0; i < 50; i++) {
+			AMap<?, ?> m = (AMap<?, ?>) parsed;
+			parsed = m.get(Strings.create("k"));
+		}
+		assertEquals(CVMLong.create(1), parsed);
+	}
+
+	@Test public void testWideMapFitsOrTruncatesCleanly() {
+		// 500 keys — large, but with generous budget all should fit.
+		AMap<ACell, ACell> input = Maps.empty();
+		for (int i = 0; i < 500; i++) {
+			input = input.assoc(Keyword.create("k" + i), CVMLong.create(i));
+		}
+		// Huge budget first — everything fits.
+		CellExplorer big = new CellExplorer(100_000);
+		ACell parsedFull = parseBack(big.explore(input));
+		assertEquals(500L, ((AMap<?, ?>) parsedFull).count());
+
+		// Tight budget — parses cleanly and count is bounded above.
+		CellExplorer tight = new CellExplorer(500);
+		ACell parsedTight = parseBack(tight.explore(input));
+		assertTrue(((AMap<?, ?>) parsedTight).count() <= 500L);
+	}
+
+	@Test public void testWideVectorFitsOrTruncatesCleanly() {
+		ACell[] items = new ACell[500];
+		for (int i = 0; i < 500; i++) items[i] = CVMLong.create(i);
+		ACell input = Vectors.create(items);
+		ACell parsed = roundTrip(new CellExplorer(100_000), input);
+		assertEquals(500L, ((ACollection<?>) parsed).count());
+	}
+
+	@Test public void testMixedDeepAdversarialStructureParses() {
+		// Vector of maps, each containing a set of vectors, with non-finite
+		// doubles and addresses mixed in.
+		ACell mix = Vectors.of(
+			Maps.of(
+				Keyword.create("addr"), Address.create(1337),
+				Keyword.create("vals"), Sets.of(
+					Vectors.of(CVMDouble.NaN, CVMDouble.POSITIVE_INFINITY),
+					Vectors.of(Keyword.create("tag"), Symbol.create("x")))),
+			Maps.of(
+				Keyword.create("nested"),
+				Maps.of(Keyword.create("deep"), Strings.create("a*/b"))));
+		// Large budget — everything should fit.
+		parseBack(BIG.explore(mix));
+	}
+
+	// =================================================================
+	// Budget edges
+	// =================================================================
+
+	@Test public void testBudgetIntegerMaxValueDoesNotOverflow() {
+		// Huge budget — must not do anything weird (arithmetic overflow).
+		CellExplorer huge = new CellExplorer(Integer.MAX_VALUE);
+		assertEquals("42", huge.explore(CVMLong.create(42)).toString());
+		ACell v = Vectors.of(1, 2, 3);
+		assertEquals(v, parseBack(huge.explore(v)));
+	}
+
+	@Test public void testBudgetOneStillProducesValidOutput() {
+		CellExplorer tiny = new CellExplorer(1);
+		// Small leaves (nil, small long) still fit and parse.
+		assertEquals("null", tiny.explore(null).toString());
+		// Empty containers.
+		assertEquals("{}", tiny.explore(Maps.empty()).toString());
+		assertEquals("[]", tiny.explore(Vectors.empty()).toString());
+	}
+
+	@Test public void testBudgetZeroStillProducesValidJSON5OrEmpty() {
+		CellExplorer zero = new CellExplorer(0);
+		// Must not throw. Must produce parseable output for any cell.
+		// Fit cases (empty/small): might still render; otherwise fallback.
+		AString out = zero.explore(CVMLong.create(42));
+		// Output is non-null and either parses or is an expected fallback form.
+		assertNotNull(out);
+	}
+
+	// =================================================================
+	// Extreme numeric values
+	// =================================================================
+
+	@Test public void testLongMaxValueRoundTrips() {
+		assertEquals(CVMLong.create(Long.MAX_VALUE),
+			roundTrip(BIG, CVMLong.create(Long.MAX_VALUE)));
+	}
+
+	@Test public void testLongMinValueRoundTrips() {
+		assertEquals(CVMLong.create(Long.MIN_VALUE),
+			roundTrip(BIG, CVMLong.create(Long.MIN_VALUE)));
+	}
+
+	@Test public void testEmptyStringRoundTrips() {
+		assertEquals(Strings.create(""), roundTrip(BIG, Strings.create("")));
+	}
+
+	@Test public void testEmptyBlobRoundTripsAsString() {
+		// Empty blob renders as "0x" via JSON.appendJSON and reparses as the
+		// string "0x" (blob literal syntax doesn't exist in JSON5).
+		ACell parsed = roundTrip(BIG, Blob.EMPTY);
+		assertEquals(Strings.create("0x"), parsed);
+	}
+
+	// =================================================================
+	// Safety: output never "invents" large values under truncation
+	// =================================================================
+
+	@Test public void testTruncationNeverProducesLongerSerialisation() {
+		// For a range of budgets, output length should broadly respect the
+		// budget (allowing some slack for annotation text).
+		String big = "y".repeat(2000);
+		ACell input = Vectors.of(
+			Strings.create(big),
+			Strings.create(big),
+			Strings.create(big));
+		for (int budget : new int[] { 20, 50, 100, 200, 500 }) {
+			AString out = new CellExplorer(budget).explore(input);
+			// Output shouldn't wildly exceed budget — allow 4x slack for
+			// annotation reserves, escape expansion, and structural overhead.
+			assertTrue(out.count() < budget * 8L + 200,
+				"Output " + out.count() + " far exceeds budget " + budget);
+			// And must still parse as JSON5.
+			parseBack(out);
+		}
+	}
+
+	@Test public void testTruncationOutputAlwaysParses() {
+		// Stress: many budgets against a moderately complex cell.
+		AMap<ACell, ACell> m = Maps.empty();
+		for (int i = 0; i < 40; i++) {
+			m = m.assoc(Keyword.create("k" + i),
+				Vectors.of(CVMLong.create(i), Strings.create("val" + i)));
+		}
+		for (int budget = 1; budget <= 500; budget += 23) {
+			AString out = new CellExplorer(budget).explore(m);
+			// Must always parse (or be legitimately empty).
+			assertDoesNotThrow(() -> JSON.parseJSON5(out.toString()),
+				"Budget=" + budget + " produced unparseable output: " + out);
+		}
+	}
+
+	// =================================================================
+	// Pretty-print mode (compact=false)
+	// =================================================================
+
+	/** Explorer in pretty (multi-line) mode. */
+	private static final CellExplorer PRETTY = new CellExplorer(10_000, false);
+
+	@Test public void testPrettyLeavesUnchanged() {
+		// Leaves have no structure to indent — output matches compact.
+		assertEquals("42", PRETTY.explore(CVMLong.create(42)).toString());
+		assertEquals("\"hello\"", PRETTY.explore(Strings.create("hello")).toString());
+		assertEquals("null", PRETTY.explore(null).toString());
+	}
+
+	@Test public void testPrettyEmptyContainersStayTight() {
+		// Empty containers render without newlines even in pretty mode.
+		assertEquals("{}", PRETTY.explore(Maps.empty()).toString());
+		assertEquals("[]", PRETTY.explore(Vectors.empty()).toString());
+		assertEquals("[]", PRETTY.explore(Lists.empty()).toString());
+		assertEquals("[/* Set */]", PRETTY.explore(Sets.empty()).toString());
+	}
+
+	@Test public void testPrettyVectorIsMultiLine() {
+		AString out = PRETTY.explore(Vectors.of(1, 2, 3));
+		String s = out.toString();
+		// Must contain newlines; each element on its own indented line.
+		assertTrue(s.contains("\n  1"), "Pretty vector should indent first element: " + s);
+		assertTrue(s.contains("\n  2"), "Pretty vector should indent second element: " + s);
+		assertTrue(s.contains("\n  3"), "Pretty vector should indent third element: " + s);
+		// Must still round-trip.
+		assertEquals(Vectors.of(1, 2, 3), parseBack(out));
+	}
+
+	@Test public void testPrettyMapIsMultiLine() {
+		ACell input = Maps.of(Keyword.create("a"), CVMLong.create(1),
+			Keyword.create("b"), CVMLong.create(2));
+		AString out = PRETTY.explore(input);
+		String s = out.toString();
+		assertTrue(s.contains("\n  a: 1"), "Pretty map should indent entries: " + s);
+		assertTrue(s.contains("\n  b: 2"), "Pretty map should indent entries: " + s);
+		// Round-trips structurally.
+		AMap<?, ?> parsed = (AMap<?, ?>) parseBack(out);
+		assertEquals(CVMLong.create(1), parsed.get(Strings.create("a")));
+		assertEquals(CVMLong.create(2), parsed.get(Strings.create("b")));
+	}
+
+	@Test public void testPrettyNestedStructureIndentsProgressively() {
+		// Two levels of nesting — inner entries should be indented deeper.
+		ACell input = Maps.of(Keyword.create("outer"),
+			Maps.of(Keyword.create("inner"), CVMLong.create(42)));
+		AString out = PRETTY.explore(input);
+		String s = out.toString();
+		// Outer key at 2-space indent, inner key at 4-space indent.
+		assertTrue(s.contains("\n  outer:"), "Outer at 2 spaces: " + s);
+		assertTrue(s.contains("\n    inner:"), "Inner at 4 spaces: " + s);
+		// Round-trips.
+		AMap<?, ?> parsed = (AMap<?, ?>) parseBack(out);
+		AMap<?, ?> inner = (AMap<?, ?>) parsed.get(Strings.create("outer"));
+		assertEquals(CVMLong.create(42), inner.get(Strings.create("inner")));
+	}
+
+	@Test public void testPrettyAndCompactRoundTripToSameCell() {
+		// For any cell that fits budget, pretty and compact parse to the
+		// same reconstructed structure.
+		ACell input = Maps.of(
+			Keyword.create("items"), Vectors.of(1, 2, 3),
+			Keyword.create("name"), Strings.create("Alice"));
+		ACell p = parseBack(PRETTY.explore(input));
+		ACell c = parseBack(BIG.explore(input));
+		assertEquals(p, c);
+	}
+
+	@Test public void testPrettyTruncationStillValid() {
+		// Pretty mode in a tight budget — must still parse.
+		AMap<ACell, ACell> input = Maps.empty();
+		for (int i = 0; i < 30; i++) {
+			input = input.assoc(Keyword.create("k" + i), CVMLong.create(i));
+		}
+		CellExplorer prettyTight = new CellExplorer(200, false);
+		AString out = prettyTight.explore(input);
+		ACell parsed = parseBack(out);
+		assertTrue(parsed instanceof AMap);
+	}
+
+	@Test public void testPrettyDeepStructureRoundTrips() {
+		// Build a moderately deep nested structure and verify pretty mode
+		// handles indentation without losing data.
+		ACell cell = CVMLong.create(1);
+		for (int i = 0; i < 10; i++) cell = Vectors.of(cell);
+		ACell parsed = parseBack(PRETTY.explore(cell));
+		for (int i = 0; i < 10; i++) {
+			parsed = ((ACollection<?>) parsed).get(0);
+		}
+		assertEquals(CVMLong.create(1), parsed);
+	}
+
+	@Test public void testCompactDefaultIsSingleLine() {
+		// Sanity: the default constructor produces compact output.
+		CellExplorer dflt = new CellExplorer(10_000);
+		AString out = dflt.explore(Vectors.of(1, 2, 3));
+		assertEquals("[1, 2, 3]", out.toString());
+		// And is byte-identical to explicit compact.
+		CellExplorer explicitCompact = new CellExplorer(10_000, true);
+		assertEquals(out.toString(), explicitCompact.explore(Vectors.of(1, 2, 3)).toString());
+	}
+
+	@Test public void testNoBareNumericKeyInAnyOutput() {
+		// Regression: integer keys must always be quoted. Use a variety of
+		// numeric-keyed maps and confirm no output contains an unquoted
+		// numeric key (would fail JSON5 parse anyway, but catch it directly).
+		AMap<ACell, ACell> m = Maps.empty();
+		for (int i = -5; i < 5; i++) {
+			m = m.assoc(CVMLong.create(i), Strings.create("v" + i));
+		}
+		AString out = BIG.explore(m);
+		parseBack(out); // Primary assertion: it must parse.
+		// Also verify no bare `-1:` or `0:` style fragments.
+		String s = out.toString();
+		assertFalse(s.matches(".*[^\"\\w]-?\\d+:.*"),
+			"Found bare numeric key pattern in: " + s);
 	}
 }

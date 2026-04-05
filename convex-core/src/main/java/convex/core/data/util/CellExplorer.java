@@ -3,6 +3,8 @@ package convex.core.data.util;
 import java.util.ArrayList;
 import java.util.List;
 
+import convex.core.cvm.Address;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.AList;
@@ -14,6 +16,8 @@ import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
+import convex.core.data.prim.CVMDouble;
 import convex.core.util.JSON;
 
 /**
@@ -48,17 +52,19 @@ import convex.core.util.JSON;
  *   <li>Vectors, Lists, Sets: CellExplorer-specific renderer with a running-
  *       remainder budget (design doc §Sequence Rendering), inline
  *       {@code /* Set *}{@code /} marker for sets, and fully-truncated form.</li>
- *   <li>Leaf cells: fast path delegates to {@link JSON#appendJSON} when the
- *       cell fits budget.</li>
+ *   <li>Leaf cells: CellExplorer-specific overrides for {@link Address}
+ *       ({@code "#42"}), {@link Keyword}/{@link Symbol} as values
+ *       ({@code ":name"} / {@code "'name"}), and non-finite {@link CVMDouble}
+ *       (bare {@code NaN} / {@code Infinity} / {@code -Infinity}, OQ-8).
+ *       Other leaves delegate to {@link JSON#appendJSON} on the fast path.</li>
+ *   <li>String and blob partial forms: when a leaf exceeds budget, strings
+ *       render as {@code "prefix..." /* String, NKB *}{@code /} and blobs as
+ *       {@code "0xBYTES..." /* Blob, NKB *}{@code /}; smaller than that still,
+ *       any leaf falls back to a bare {@code null} with a truncation comment.</li>
  * </ul>
  *
  * <h2>Not yet implemented</h2>
  * <ul>
- *   <li>Partial forms for large strings and blobs.</li>
- *   <li>CellExplorer-specific renderings for Addresses ({@code "#42"}),
- *       Keywords / Symbols as values, and non-finite {@code CVMDouble} (OQ-8)
- *       — the fast path currently inherits JSON's renderings for these leaf
- *       types.</li>
  *   <li>Pretty-printing with indentation (compact and pretty produce the same
  *       output for now).</li>
  * </ul>
@@ -76,6 +82,15 @@ public class CellExplorer {
 
 	/** Minimum budget to render a sequence item meaningfully. */
 	private static final long MIN_ITEM_BUDGET = 10;
+
+	/** Reserve for leaf partial-form annotations ({@code " /* String, 99.9GB *}{@code /"}). */
+	private static final long LEAF_ANNOTATION_RESERVE = 30;
+
+	/** Minimum content budget before we fall back to annotation-only leaf truncation. */
+	private static final long MIN_LEAF_CONTENT_BUDGET = 6;
+
+	/** Number of spaces per indent level in pretty mode. */
+	private static final int INDENT_WIDTH = 2;
 
 	/** Kind marker for sequence-shaped collections. Controls label + inline marker. */
 	private enum CollectionKind {
@@ -100,19 +115,21 @@ public class CellExplorer {
 	private final boolean compact;
 
 	/**
-	 * Create a CellExplorer with default (pretty) formatting.
+	 * Create a CellExplorer with default (compact) formatting — single-line
+	 * output, optimised for token efficiency when feeding LLMs.
 	 *
 	 * @param budget Budget in {@link Cells#storageSize} units
 	 */
 	public CellExplorer(int budget) {
-		this(budget, false);
+		this(budget, true);
 	}
 
 	/**
 	 * Create a CellExplorer with explicit compact flag.
 	 *
 	 * @param budget Budget in {@link Cells#storageSize} units
-	 * @param compact true to suppress indentation and newlines
+	 * @param compact {@code true} for single-line output; {@code false} for
+	 *                pretty-printed output with indentation and newlines
 	 */
 	public CellExplorer(int budget, boolean compact) {
 		this.budget = budget;
@@ -154,23 +171,167 @@ public class CellExplorer {
 			return;
 		}
 
-		// Leaf cells: fast path via JSON.appendJSON when fitting.
+		// Leaf cells: type-aware rendering with budget-aware partial forms.
+		exploreLeaf(cell, bb, remaining);
+	}
+
+	// ---- Leaf rendering ----
+
+	private void exploreLeaf(ACell cell, BlobBuilder bb, long remaining) {
 		long cellSize = Cells.storageSize(cell);
 		if (cellSize <= remaining) {
-			// NOTE: Addresses, keywords-as-values, symbols, and non-finite
-			// doubles still inherit JSON's divergent rendering. Resolved in
-			// a later commit (leaf type overrides + OQ-8).
-			JSON.appendJSON(bb, cell);
+			renderLeafFull(cell, bb);
 			return;
 		}
 
-		// Leaf too large — partial forms (strings, blobs) land in a later
-		// commit. For now, emit an annotation-only form.
-		bb.append("/* truncated leaf, storageSize=");
-		bb.append(Long.toString(cellSize));
-		bb.append(" > budget=");
-		bb.append(Long.toString(remaining));
+		// Over budget: attempt a partial form for strings and blobs, else
+		// fall through to an annotation-only placeholder that is still valid
+		// JSON5 (bare `null` + trailing comment).
+		if (cell instanceof AString) {
+			renderStringPartial((AString) cell, bb, remaining, cellSize);
+			return;
+		}
+		if (cell instanceof ABlob) {
+			renderBlobPartial((ABlob) cell, bb, remaining, cellSize);
+			return;
+		}
+		appendLeafTruncatedAnnotation(bb, cell, cellSize);
+	}
+
+	/**
+	 * Render a leaf cell that fits the budget. CellExplorer overrides
+	 * {@link JSON#appendJSON}'s divergent renderings for:
+	 * <ul>
+	 *   <li>{@link Address} — rendered as {@code "#42"} (quoted) so the
+	 *       round-tripped JSON5 preserves the distinction from plain longs.</li>
+	 *   <li>{@link Keyword} as value — rendered as {@code ":name"} (quoted).</li>
+	 *   <li>{@link Symbol} as value — rendered as {@code "'name"} (quoted).</li>
+	 *   <li>Non-finite {@link CVMDouble} — bare {@code NaN},
+	 *       {@code Infinity}, or {@code -Infinity} (all JSON5-valid).</li>
+	 * </ul>
+	 * Any other leaf type falls through to {@link JSON#appendJSON}.
+	 */
+	private static void renderLeafFull(ACell cell, BlobBuilder bb) {
+		if (cell instanceof Address) {
+			bb.append('"');
+			bb.append('#');
+			bb.append(Long.toString(((Address) cell).longValue()));
+			bb.append('"');
+			return;
+		}
+		if (cell instanceof Keyword) {
+			bb.append('"');
+			bb.append(':');
+			JSON.appendCVMStringQuoted(bb, ((Keyword) cell).getName().toString());
+			bb.append('"');
+			return;
+		}
+		if (cell instanceof Symbol) {
+			bb.append('"');
+			bb.append('\'');
+			JSON.appendCVMStringQuoted(bb, ((Symbol) cell).getName().toString());
+			bb.append('"');
+			return;
+		}
+		if (cell instanceof CVMDouble) {
+			double v = ((CVMDouble) cell).doubleValue();
+			if (Double.isNaN(v)) {
+				bb.append("NaN");
+				return;
+			}
+			if (v == Double.POSITIVE_INFINITY) {
+				bb.append("Infinity");
+				return;
+			}
+			if (v == Double.NEGATIVE_INFINITY) {
+				bb.append("-Infinity");
+				return;
+			}
+			// Finite: fall through to JSON delegation for canonical number form.
+		}
+		JSON.appendJSON(bb, cell);
+	}
+
+	/**
+	 * Render an over-budget {@link AString} as a truncated prefix plus
+	 * annotation, e.g. {@code "hello wor..." /* String, 4.2KB *}{@code /}.
+	 * Never splits a UTF-16 surrogate pair. Uses {@link JSON#appendCVMStringQuoted}
+	 * for consistent escaping of quotes, backslashes, and control characters.
+	 */
+	private static void renderStringPartial(AString s, BlobBuilder bb, long remaining, long sSize) {
+		long contentBudget = remaining - LEAF_ANNOTATION_RESERVE - 2; // reserve for surrounding quotes
+		if (contentBudget < MIN_LEAF_CONTENT_BUDGET) {
+			appendLeafTruncatedAnnotation(bb, s, sSize);
+			return;
+		}
+		String java = s.toString();
+		int n = java.length();
+		int charCap = (int) Math.min((long) n, contentBudget);
+		// Back off one position if the cut point would split a surrogate pair.
+		if (charCap > 0 && charCap < n && Character.isHighSurrogate(java.charAt(charCap - 1))) {
+			charCap--;
+		}
+		bb.append('"');
+		JSON.appendCVMStringQuoted(bb, java.substring(0, charCap));
+		bb.append('"');
+		bb.append(" /* String, ");
+		appendSizeAnnotation(bb, sSize);
 		bb.append(" */");
+	}
+
+	/**
+	 * Render an over-budget {@link ABlob} as a hex prefix plus annotation,
+	 * e.g. {@code "0x4865..." /* Blob, 12.0KB *}{@code /}. Always emits
+	 * {@code "0x"} prefix + an even number of hex characters so the prefix is
+	 * a valid blob literal (modulo the trailing ellipsis inside the string).
+	 */
+	private static void renderBlobPartial(ABlob b, BlobBuilder bb, long remaining, long bSize) {
+		// Reserve: 2 (quotes) + 2 ("0x") + 3 ("...") = 7, plus annotation reserve.
+		long contentBudget = remaining - LEAF_ANNOTATION_RESERVE - 7;
+		if (contentBudget < 2) {
+			appendLeafTruncatedAnnotation(bb, b, bSize);
+			return;
+		}
+		long bytesAvail = contentBudget / 2;
+		long bytesToShow = Math.min(b.count(), bytesAvail);
+		bb.append('"');
+		bb.append('0');
+		bb.append('x');
+		for (long i = 0; i < bytesToShow; i++) {
+			bb.appendHexByte(b.byteAt(i));
+		}
+		if (bytesToShow < b.count()) {
+			bb.append("...");
+		}
+		bb.append('"');
+		bb.append(" /* Blob, ");
+		appendSizeAnnotation(bb, bSize);
+		bb.append(" */");
+	}
+
+	/**
+	 * Fallback truncated-leaf form. Emits a bare {@code null} followed by a
+	 * descriptive comment — together valid JSON5 that reloads as nil (a
+	 * deliberate, documented lossy fallback for extreme budgets).
+	 */
+	private static void appendLeafTruncatedAnnotation(BlobBuilder bb, ACell cell, long cellSize) {
+		bb.append("null /* truncated ");
+		bb.append(leafTypeLabel(cell));
+		bb.append(", ");
+		appendSizeAnnotation(bb, cellSize);
+		bb.append(" */");
+	}
+
+	/** Short type label for leaf truncation annotations. */
+	private static String leafTypeLabel(ACell cell) {
+		if (cell == null) return "nil";
+		if (cell instanceof AString) return "String";
+		if (cell instanceof ABlob) return "Blob";
+		if (cell instanceof Keyword) return "Keyword";
+		if (cell instanceof Symbol) return "Symbol";
+		if (cell instanceof Address) return "Address";
+		if (cell instanceof CVMDouble) return "Double";
+		return "leaf";
 	}
 
 	// ---- Map rendering ----
@@ -202,12 +363,13 @@ public class CellExplorer {
 		long n = map.count();
 		bb.append('{');
 		for (long i = 0; i < n; i++) {
-			if (i > 0) bb.append(", ");
+			appendEntrySeparator(bb, i, indent + 1);
 			MapEntry<ACell, ACell> e = map.entryAt(i);
 			renderKey(bb, e.getKey());
 			bb.append(": ");
 			explore(e.getValue(), bb, remaining, indent + 1);
 		}
+		appendClose(bb, indent, n > 0);
 		bb.append('}');
 	}
 
@@ -234,7 +396,7 @@ public class CellExplorer {
 
 		bb.append('{');
 		for (int i = 0; i < visible.size(); i++) {
-			if (i > 0) bb.append(", ");
+			appendEntrySeparator(bb, i, indent + 1);
 			MapEntry<ACell, ACell> e = visible.get(i);
 			renderKey(bb, e.getKey());
 			bb.append(": ");
@@ -242,13 +404,15 @@ public class CellExplorer {
 		}
 
 		if (overflow > 0) {
-			bb.append(", /* +");
+			appendEntrySeparator(bb, visible.size(), indent + 1);
+			bb.append("/* +");
 			bb.append(Long.toString(overflow));
 			bb.append(" more, ");
 			appendSizeAnnotation(bb, mapSize);
 			bb.append(" */");
 		}
 
+		appendClose(bb, indent, !visible.isEmpty());
 		bb.append('}');
 	}
 
@@ -279,15 +443,17 @@ public class CellExplorer {
 
 	private void renderCollectionFull(ACollection<ACell> coll, BlobBuilder bb, long remaining, int indent, CollectionKind kind) {
 		bb.append('[');
-		boolean first = true;
+		long n = coll.count();
+		long i = 0;
 		for (ACell item : coll) {
-			if (!first) bb.append(", ");
+			appendEntrySeparator(bb, i, indent + 1);
 			explore(item, bb, remaining, indent + 1);
-			first = false;
+			i++;
 		}
 		if (kind.needsMarker) {
 			bb.append(" /* Set */");
 		}
+		appendClose(bb, indent, n > 0);
 		bb.append(']');
 	}
 
@@ -300,7 +466,7 @@ public class CellExplorer {
 		for (ACell item : coll) {
 			long itemRemaining = contentBudget - consumed;
 			if (itemRemaining < MIN_ITEM_BUDGET) break;
-			if (shown > 0) bb.append(", ");
+			appendEntrySeparator(bb, shown, indent + 1);
 			long itemCost = Math.min(Cells.storageSize(item), itemRemaining);
 			explore(item, bb, itemRemaining, indent + 1);
 			consumed += itemCost;
@@ -309,7 +475,7 @@ public class CellExplorer {
 
 		long overflow = totalItems - shown;
 		if (overflow > 0) {
-			if (shown > 0) bb.append(", ");
+			appendEntrySeparator(bb, shown, indent + 1);
 			bb.append("/* +");
 			bb.append(Long.toString(overflow));
 			bb.append(" more, ");
@@ -324,7 +490,44 @@ public class CellExplorer {
 			bb.append(" /* Set */");
 		}
 
+		appendClose(bb, indent, shown > 0 || overflow > 0);
 		bb.append(']');
+	}
+
+	// ---- Pretty-print helpers ----
+
+	/**
+	 * Emit the separator before an entry at the given index. For index 0
+	 * there is no comma; from 1 onward a comma is prepended. In compact mode
+	 * entries are separated by {@code ", "}; in pretty mode each entry sits
+	 * on its own line at the given indent level.
+	 */
+	private void appendEntrySeparator(BlobBuilder bb, long entryIndex, int indent) {
+		if (entryIndex > 0) bb.append(',');
+		if (compact) {
+			if (entryIndex > 0) bb.append(' ');
+		} else {
+			appendNewlineIndent(bb, indent);
+		}
+	}
+
+	/**
+	 * Emit the close separator: either nothing (compact) or a newline and
+	 * indent to sit the closing bracket on its own line (pretty). Only emits
+	 * the newline when the container is non-empty — empty containers stay
+	 * tight ({@code {}}, {@code []}).
+	 */
+	private void appendClose(BlobBuilder bb, int indent, boolean nonEmpty) {
+		if (!compact && nonEmpty) {
+			appendNewlineIndent(bb, indent);
+		}
+	}
+
+	/** Append a newline followed by indentation to the given depth level. */
+	private static void appendNewlineIndent(BlobBuilder bb, int indent) {
+		bb.append('\n');
+		int spaces = indent * INDENT_WIDTH;
+		for (int i = 0; i < spaces; i++) bb.append(' ');
 	}
 
 	// ---- Key formatting (OQ-1) ----
