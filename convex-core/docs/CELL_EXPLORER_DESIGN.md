@@ -620,16 +620,16 @@ every existing caller and is out of scope for CellExplorer v1. The narrow
 CellExplorer-internal special-case keeps the JSON5 claim honest with zero blast
 radius on other JSON callers.
 
-**Follow-up issues:**
+**Follow-up issues filed:**
 
-- Add a proper `JSON.appendJSON5(BlobBuilder, ACell)` writer as a peer to the
-  existing `JSON5Reader`. Once it lands, CellExplorer's `CVMDouble` special-case
+- #546 — Add a proper `JSON.appendJSON5(BlobBuilder, ACell)` writer as a peer to
+  the existing `JSON5Reader`. Once it lands, CellExplorer's `CVMDouble` special-case
   can migrate to delegate to the new method.
-- Audit `JSON.appendJSON` for strict JSON compliance. Emitting `NaN` as a literal
-  is non-standard JSON; `null` is the conventional substitute. Fix requires
+- #547 — Audit `JSON.appendJSON` for strict JSON compliance. Emitting `NaN` as a
+  literal is non-standard JSON; `null` is the conventional substitute. Fix requires
   understanding the existing caller set — separate decision from this design.
-- Add test coverage for `JSON5Reader` round-tripping `NaN`, `Infinity`, `-Infinity`
-  literals.
+- #548 — Add test coverage for `JSON5Reader` round-tripping `NaN`, `Infinity`,
+  `-Infinity` literals.
 
 ---
 
