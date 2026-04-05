@@ -44,6 +44,12 @@ import convex.core.util.JSON;
  * {@code convex.lattice.cursor} infrastructure, then pass the resolved cell
  * to {@link #explore(ACell)}.
  *
+ * <h2>Map entry order</h2>
+ *
+ * Map entries are rendered in the order returned by the underlying
+ * {@link AMap#entryAt(long)} — for {@code AHashMap} this is hash order, not
+ * insertion order. LLM consumers should treat ordering as non-semantic.
+ *
  * <h2>Rendering coverage</h2>
  * <ul>
  *   <li>Maps: CellExplorer-specific renderer with unquoted keyword keys (OQ-1),
@@ -476,12 +482,11 @@ public class CellExplorer {
 		long overflow = totalItems - shown;
 		if (overflow > 0) {
 			appendEntrySeparator(bb, shown, indent + 1);
-			bb.append("/* +");
+			// Set overflow leads with the type tag so the LLM sees it first:
+			// {@code /* Set: +N more, SIZE *}{@code /}.
+			bb.append(kind.needsMarker ? "/* Set: +" : "/* +");
 			bb.append(Long.toString(overflow));
 			bb.append(" more, ");
-			if (kind.needsMarker) {
-				bb.append("Set, ");
-			}
 			appendSizeAnnotation(bb, collSize);
 			bb.append(" */");
 		} else if (kind.needsMarker) {
