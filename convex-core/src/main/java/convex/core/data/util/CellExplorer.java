@@ -83,8 +83,14 @@ public class CellExplorer {
 	/** Per-entry structural cost for maps ({@code ": "}, {@code ", "}, slack). */
 	private static final long ENTRY_OVERHEAD = 10;
 
-	/** Minimum budget to render a map value meaningfully. */
+	/** Minimum budget to render a map value at all (for key scan threshold). */
 	private static final long MIN_VALUE_BUDGET = 10;
+
+	/**
+	 * Minimum per-value budget for the geometric decay map renderer.
+	 * When remaining budget per entry drops below this, stop adding entries.
+	 */
+	private static final long MIN_MAP_VALUE_BUDGET = 20;
 
 	/** Minimum budget to render a sequence item meaningfully. */
 	private static final long MIN_ITEM_BUDGET = 10;
@@ -94,6 +100,9 @@ public class CellExplorer {
 
 	/** Minimum content budget before we fall back to annotation-only leaf truncation. */
 	private static final long MIN_LEAF_CONTENT_BUDGET = 6;
+
+	/** Size threshold below which size annotations are suppressed (count alone suffices). */
+	private static final long SIZE_ANNOTATION_THRESHOLD = 1024;
 
 	/** Number of spaces per indent level in pretty mode. */
 	private static final int INDENT_WIDTH = 2;
@@ -381,44 +390,50 @@ public class CellExplorer {
 
 	private void renderMapTruncated(AMap<ACell, ACell> map, BlobBuilder bb, long contentBudget, long mapSize, int indent) {
 		long totalEntries = map.count();
-		long keyCost = 0;
-		List<MapEntry<ACell, ACell>> visible = new ArrayList<>();
 
-		for (long i = 0; i < totalEntries; i++) {
-			MapEntry<ACell, ACell> e = map.entryAt(i);
-			long kCost = Cells.storageSize(e.getKey()) + ENTRY_OVERHEAD;
-			if (keyCost + kCost + MIN_VALUE_BUDGET > contentBudget) break;
-			visible.add(e);
-			keyCost += kCost;
-		}
-
-		if (visible.isEmpty()) {
+		if (contentBudget < MIN_VALUE_BUDGET) {
 			appendFullyTruncatedMap(bb, totalEntries, mapSize);
 			return;
 		}
 
-		long overflow = totalEntries - visible.size();
-		long valueBudget = Math.max(MIN_VALUE_BUDGET, (contentBudget - keyCost) / visible.size());
-
+		// Geometric decay: each entry gets half of remaining budget. First entry
+		// gets the most detail (shows schema), subsequent entries get progressively
+		// less. Naturally stops when budget runs out.
 		bb.append('{');
-		for (int i = 0; i < visible.size(); i++) {
-			appendEntrySeparator(bb, i, indent + 1);
-			MapEntry<ACell, ACell> e = visible.get(i);
+		long remaining = contentBudget;
+		long shown = 0;
+
+		for (long i = 0; i < totalEntries; i++) {
+			MapEntry<ACell, ACell> e = map.entryAt(i);
+			long kCost = Cells.storageSize(e.getKey()) + ENTRY_OVERHEAD;
+			long valueSize = Cells.storageSize(e.getValue());
+			long afterKey = remaining - kCost;
+			// If value fits, give full remaining budget. If too big, geometric decay.
+			long valueBudget = (valueSize <= afterKey) ? afterKey : afterKey / 2;
+			if (valueBudget < MIN_MAP_VALUE_BUDGET) break;
+
+			appendEntrySeparator(bb, shown, indent + 1);
 			renderKey(bb, e.getKey());
 			bb.append(": ");
 			explore(e.getValue(), bb, valueBudget, indent + 1);
+			remaining -= kCost + Math.min(valueSize, valueBudget);
+			shown++;
 		}
 
+		long overflow = totalEntries - shown;
 		if (overflow > 0) {
-			appendEntrySeparator(bb, visible.size(), indent + 1);
+			appendEntrySeparator(bb, shown, indent + 1);
 			bb.append("/* +");
 			bb.append(Long.toString(overflow));
-			bb.append(" more, ");
-			appendSizeAnnotation(bb, mapSize);
+			bb.append(" more");
+			if (mapSize >= SIZE_ANNOTATION_THRESHOLD) {
+				bb.append(", ");
+				appendSizeAnnotation(bb, mapSize);
+			}
 			bb.append(" */");
 		}
 
-		appendClose(bb, indent, !visible.isEmpty());
+		appendClose(bb, indent, shown > 0);
 		bb.append('}');
 	}
 
@@ -465,29 +480,32 @@ public class CellExplorer {
 
 	private void renderCollectionTruncated(ACollection<ACell> coll, BlobBuilder bb, long contentBudget, long collSize, int indent, CollectionKind kind) {
 		long totalItems = coll.count();
-		long consumed = 0;
+		long remaining = contentBudget;
 		long shown = 0;
 
 		bb.append('[');
 		for (ACell item : coll) {
-			long itemRemaining = contentBudget - consumed;
-			if (itemRemaining < MIN_ITEM_BUDGET) break;
+			long itemSize = Cells.storageSize(item);
+			// If item fits, give it full remaining budget (renders fully, costs actual size).
+			// If too big, geometric decay: half budget, so first items get most detail.
+			long itemBudget = (itemSize <= remaining) ? remaining : remaining / 2;
+			if (itemBudget < MIN_ITEM_BUDGET) break;
 			appendEntrySeparator(bb, shown, indent + 1);
-			long itemCost = Math.min(Cells.storageSize(item), itemRemaining);
-			explore(item, bb, itemRemaining, indent + 1);
-			consumed += itemCost;
+			explore(item, bb, itemBudget, indent + 1);
+			remaining -= Math.min(itemSize, itemBudget);
 			shown++;
 		}
 
 		long overflow = totalItems - shown;
 		if (overflow > 0) {
 			appendEntrySeparator(bb, shown, indent + 1);
-			// Set overflow leads with the type tag so the LLM sees it first:
-			// {@code /* Set: +N more, SIZE *}{@code /}.
 			bb.append(kind.needsMarker ? "/* Set: +" : "/* +");
 			bb.append(Long.toString(overflow));
-			bb.append(" more, ");
-			appendSizeAnnotation(bb, collSize);
+			bb.append(" more");
+			if (collSize >= SIZE_ANNOTATION_THRESHOLD) {
+				bb.append(", ");
+				appendSizeAnnotation(bb, collSize);
+			}
 			bb.append(" */");
 		} else if (kind.needsMarker) {
 			// Rare: all items visible despite truncated path (overhead undercounted).
@@ -585,38 +603,56 @@ public class CellExplorer {
 	// ---- Annotations ----
 
 	private static void appendFullyTruncatedMap(BlobBuilder bb, long count, long mapSize) {
-		bb.append("{/* Map, ");
+		bb.append("{/* ");
 		bb.append(Long.toString(count));
-		bb.append(count == 1 ? " key, " : " keys, ");
-		appendSizeAnnotation(bb, mapSize);
+		bb.append(count == 1 ? " key" : " keys");
+		if (mapSize >= SIZE_ANNOTATION_THRESHOLD) {
+			bb.append(", ");
+			appendSizeAnnotation(bb, mapSize);
+		}
 		bb.append(" */}");
 	}
 
 	private static void appendFullyTruncatedCollection(BlobBuilder bb, long count, long size, CollectionKind kind) {
 		bb.append("[/* ");
-		bb.append(kind.label);
-		bb.append(", ");
+		if (kind != CollectionKind.VECTOR) {
+			bb.append(kind.label);
+			bb.append(", ");
+		}
 		bb.append(Long.toString(count));
-		bb.append(count == 1 ? " item, " : " items, ");
-		appendSizeAnnotation(bb, size);
+		bb.append(count == 1 ? " item" : " items");
+		if (size >= SIZE_ANNOTATION_THRESHOLD) {
+			bb.append(", ");
+			appendSizeAnnotation(bb, size);
+		}
 		bb.append(" */]");
 	}
 
 	/**
-	 * Appends a human-readable size annotation per the design doc:
-	 * {@code <1024 → {n}B}; {@code <1MB → {n.1f}KB}; {@code <1GB → {n.1f}MB};
-	 * else {@code {n.1f}GB}.
+	 * Appends a human-readable size annotation with 2 significant figures.
+	 * {@code <1KB → {n}B}; {@code <1MB → KB}; {@code <1GB → MB}; else {@code GB}.
+	 * Values < 10 in their unit get one decimal; >= 10 are integers.
 	 */
-	private static void appendSizeAnnotation(BlobBuilder bb, long bytes) {
+	static void appendSizeAnnotation(BlobBuilder bb, long bytes) {
 		if (bytes < 1024L) {
 			bb.append(Long.toString(bytes));
 			bb.append('B');
 		} else if (bytes < 1024L * 1024) {
-			bb.append(String.format("%.1fKB", bytes / 1024.0));
+			appendTwoSigFigs(bb, bytes / 1024.0, "KB");
 		} else if (bytes < 1024L * 1024 * 1024) {
-			bb.append(String.format("%.1fMB", bytes / (1024.0 * 1024)));
+			appendTwoSigFigs(bb, bytes / (1024.0 * 1024), "MB");
 		} else {
-			bb.append(String.format("%.1fGB", bytes / (1024.0 * 1024 * 1024)));
+			appendTwoSigFigs(bb, bytes / (1024.0 * 1024 * 1024), "GB");
 		}
+	}
+
+	/** Format a value with 2 significant figures: < 10 → one decimal, >= 10 → integer. */
+	private static void appendTwoSigFigs(BlobBuilder bb, double value, String unit) {
+		if (value < 10) {
+			bb.append(String.format("%.1f", value));
+		} else {
+			bb.append(Long.toString(Math.round(value)));
+		}
+		bb.append(unit);
 	}
 }

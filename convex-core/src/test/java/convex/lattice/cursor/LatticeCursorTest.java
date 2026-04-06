@@ -221,6 +221,88 @@ public class LatticeCursorTest {
 	}
 
 	@Test
+	public void testSyncPreservesConcurrentWrites() throws InterruptedException {
+		// Regression for a race where sync() was unconditionally overwriting the
+		// local cursor with its own (possibly stale) snapshot, clobbering writes
+		// made by other threads during sync. The fix uses CAS-first-then-merge.
+		//
+		// Reproduction strategy: N writer threads continuously add unique values
+		// while M syncer threads continuously sync. With the buggy code, writes
+		// landing between sync's read and sync's set are clobbered. The larger
+		// the thread count and iteration count, the higher the probability a
+		// write falls in the vulnerable window.
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
+		ALatticeCursor<ASet<CVMLong>> fork = root.fork();
+
+		final int writerCount = 4;
+		final int perWriter = 2000;
+		final int syncerCount = 2;
+		final java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+		final java.util.concurrent.atomic.AtomicReference<Throwable> error =
+			new java.util.concurrent.atomic.AtomicReference<>();
+		final java.util.concurrent.atomic.AtomicBoolean writersDone =
+			new java.util.concurrent.atomic.AtomicBoolean(false);
+		java.util.List<Thread> threads = new java.util.ArrayList<>();
+
+		// Writers: each adds [writerId*perWriter, writerId*perWriter+perWriter)
+		for (int w = 0; w < writerCount; w++) {
+			final int writerId = w;
+			Thread t = new Thread(() -> {
+				try {
+					start.await();
+					for (int i = 0; i < perWriter; i++) {
+						final long v = writerId * perWriter + i;
+						fork.updateAndGet(set -> set.include(CVMLong.create(v)));
+					}
+				} catch (Throwable ex) { error.set(ex); }
+			});
+			threads.add(t);
+		}
+
+		// Syncers: call sync() in a tight loop until writers finish
+		for (int s = 0; s < syncerCount; s++) {
+			Thread t = new Thread(() -> {
+				try {
+					start.await();
+					while (!writersDone.get()) {
+						fork.sync();
+					}
+				} catch (Throwable ex) { error.set(ex); }
+			});
+			threads.add(t);
+		}
+
+		for (Thread t : threads) t.start();
+		start.countDown();
+
+		// Wait for writers only
+		for (int i = 0; i < writerCount; i++) threads.get(i).join();
+		writersDone.set(true);
+
+		// Wait for syncers
+		for (int i = writerCount; i < threads.size(); i++) threads.get(i).join();
+
+		// Final sync to propagate anything still in-flight
+		fork.sync();
+
+		if (error.get() != null) throw new AssertionError("Thread failure", error.get());
+
+		// Every value any writer added must be present
+		ASet<CVMLong> finalFork = fork.get();
+		ASet<CVMLong> finalRoot = root.get();
+		int totalValues = writerCount * perWriter;
+		int forkMissing = 0, rootMissing = 0;
+		for (int i = 0; i < totalValues; i++) {
+			CVMLong v = CVMLong.create(i);
+			if (!finalFork.contains(v)) forkMissing++;
+			if (!finalRoot.contains(v)) rootMissing++;
+		}
+		assertEquals(0, forkMissing, "Fork lost " + forkMissing + "/" + totalValues + " writes");
+		assertEquals(0, rootMissing, "Root lost " + rootMissing + "/" + totalValues + " writes");
+	}
+
+	@Test
 	public void testFastPathOptimization() {
 		// When parent hasn't changed, sync should use fast path
 		SetLattice<CVMLong> lattice = SetLattice.create();
