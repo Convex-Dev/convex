@@ -227,8 +227,19 @@ public class JSON {
 		throw new IllegalArgumentException("Can't print type as JSON: "+Utils.getClassName(value));
 	}
 	
-	// Specialised writing for CVM types
-	private static void appendJSON(BlobBuilder bb, ACell value) {
+	/**
+	 * Appends a JSON rendering of any CVM `ACell` value to a `BlobBuilder`.
+	 *
+	 * Handles all CVM primitive and container types: nil, booleans, integers,
+	 * doubles, big integers, strings (with JSON escaping), blobs (as `"0x..."` hex),
+	 * addresses, symbolic types (keywords / symbols), maps, and collections.
+	 * Non-finite doubles follow the current JSON writer behaviour — see issues
+	 * #546 and #547 for the JSON5 writer follow-up and JSON compliance audit.
+	 *
+	 * @param bb `BlobBuilder` to append to
+	 * @param value CVM value to render (may be null)
+	 */
+	public static void appendJSON(BlobBuilder bb, ACell value) {
 		if (value == null) {
 			bb.append(Strings.NULL);
 			return;
@@ -389,7 +400,18 @@ public class JSON {
     	return sb.appendRepeatedByte((byte)' ', count);
     }
 
-	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
+	/**
+	 * Appends a `CharSequence` to a `BlobBuilder` with JSON string escaping
+	 * applied. Does **not** append the surrounding double-quote characters —
+	 * the caller is responsible for emitting those.
+	 *
+	 * Handles standard escapes (`\\`, `\"`, `\n`, `\r`, `\t`), control characters
+	 * via `u00XX`, and UTF-16 surrogate pairs via `CVMChar`.
+	 *
+	 * @param bb `BlobBuilder` to append to
+	 * @param cs `CharSequence` to escape and append
+	 */
+	public static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
 		int n = cs.length();
 		
 		for (int i = 0; i < n; i++) {
