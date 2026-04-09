@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import convex.lattice.fs.DLFileSystem;
 import convex.restapi.auth.AuthMiddleware;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -187,6 +188,17 @@ public class DLFSWebDAV {
 		return fs.getPath("/" + dp.filePath());
 	}
 
+	/**
+	 * Syncs the DLFS drive after a mutating operation to ensure lattice persistence.
+	 */
+	private void syncDrive(Context ctx, DrivePath dp) {
+		if (dp.driveName() == null) return;
+		FileSystem fs = driveManager.getDrive(getIdentity(ctx), dp.driveName());
+		if (fs instanceof DLFileSystem dlfs) {
+			dlfs.sync();
+		}
+	}
+
 	// ==================== Handlers ====================
 
 	/**
@@ -279,6 +291,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.TRUNCATE_EXISTING,
 				StandardOpenOption.WRITE);
 
+		syncDrive(ctx, dp);
 		ctx.status(isNew ? 201 : 204);
 	}
 
@@ -310,6 +323,7 @@ public class DLFSWebDAV {
 
 		try {
 			Files.delete(path);
+			syncDrive(ctx, dp);
 			ctx.status(204);
 		} catch (NoSuchFileException e) {
 			ctx.status(404).result("Not Found");
@@ -429,6 +443,7 @@ public class DLFSWebDAV {
 
 		try {
 			Files.createDirectory(path);
+			syncDrive(ctx, dp);
 			ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
 			ctx.status(201);
 		} catch (FileAlreadyExistsException e) {
@@ -492,6 +507,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.WRITE);
 		Files.delete(source);
 
+		syncDrive(ctx, dp);
 		ctx.status(destExists ? 204 : 201);
 	}
 
@@ -528,6 +544,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.TRUNCATE_EXISTING,
 				StandardOpenOption.WRITE);
 
+		syncDrive(ctx, dp);
 		ctx.status(destExists ? 204 : 201);
 	}
 

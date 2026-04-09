@@ -2,12 +2,16 @@ package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -16,6 +20,7 @@ import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.RootLatticeCursor;
 import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.generic.MapLattice;
 
@@ -104,6 +109,38 @@ public class DLFSCursorTest {
 
 		// Original file should still exist
 		assertEquals("Original", Files.readString(dlfs.getPath("/data/original.txt")));
+	}
+
+	@Test
+	public void testSyncReachesRootCallback() throws Exception {
+		// Simulates what NodeServer does: root cursor with onSync callback
+		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> root =
+			(RootLatticeCursor<AHashMap<AString, AVector<ACell>>>) Cursors.createLattice(drivesLattice);
+
+		// Track sync callbacks (like NodeServer's propagator trigger)
+		AtomicReference<ACell> synced = new AtomicReference<>();
+		root.onSync(value -> { synced.set(value); return value; });
+
+		// Connect a drive and write
+		AString driveName = Strings.create("vault");
+		DLFSLocal dlfs = DLFS.connect(root, driveName);
+		Files.writeString(dlfs.getPath("/test.txt"), "sync me!");
+
+		// Before sync: callback should not have been triggered
+		assertNull(synced.get(), "onSync should not fire until sync() is called");
+
+		// Sync from the drive level
+		dlfs.sync();
+
+		// After sync: callback should have the full root value including file content
+		assertNotNull(synced.get(), "onSync should fire after sync()");
+
+		// Verify content survives a round-trip through the synced value
+		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
+		DLFSLocal restored = DLFS.connect(Cursors.createLattice(drivesLattice, syncedMap), driveName);
+		assertEquals("sync me!", Files.readString(restored.getPath("/test.txt")),
+			"File content should survive sync round-trip");
 	}
 
 	@Test

@@ -351,4 +351,67 @@ public class NodeServerPersistenceTest {
 		assertEquals(CVMLong.create(12345), readBack,
 			"Store root data should contain the persisted value");
 	}
+
+	/**
+	 * Test that cursor.sync() triggers propagator persist (without relying on close).
+	 * This is the pattern the venue uses: write → sync → propagator persists.
+	 */
+	@Test
+	public void testSyncTriggersPersist() throws Exception {
+		primaryStore = EtchStore.createTemp("primary");
+
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary.launch();
+
+		writeDataValue(primary, 42);
+
+		// Sync cursor (triggers propagator via onSync callback)
+		primary.getCursor().sync();
+
+		// Give propagator thread time to process
+		Thread.sleep(200);
+
+		// Store should have the data without needing close()
+		ACell rootData = primaryStore.getRootData();
+		assertNotNull(rootData, "Store should have root data after sync");
+
+		ACell readBack = RT.getIn(rootData,
+			Keyword.intern("data"), Hash.get(CVMLong.create(42)));
+		assertEquals(CVMLong.create(42), readBack,
+			"Store root data should contain the value after sync (no close needed)");
+	}
+
+	/**
+	 * Test sync+persist with local-only config (port=-1), matching venue setup.
+	 */
+	@Test
+	public void testSyncPersistLocalOnly() throws Exception {
+		primaryStore = EtchStore.createTemp("primary");
+
+		// Local-only mode, same as venue: NodeConfig.port(-1)
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
+		writeDataValue(primary, 77);
+		primary.getCursor().sync();
+		Thread.sleep(200);
+
+		// Verify persisted
+		ACell rootData = primaryStore.getRootData();
+		assertNotNull(rootData, "Local-only node should persist after sync");
+
+		ACell readBack = RT.getIn(rootData,
+			Keyword.intern("data"), Hash.get(CVMLong.create(77)));
+		assertEquals(CVMLong.create(77), readBack,
+			"Local-only node should persist data after sync");
+
+		// Close and restore
+		primary.close();
+		primary = null;
+
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		assertEquals(CVMLong.create(77), readDataValue(primary, 77),
+			"Local-only node should restore data from store");
+	}
 }
