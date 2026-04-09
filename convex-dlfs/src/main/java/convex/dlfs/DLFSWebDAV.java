@@ -79,6 +79,16 @@ public class DLFSWebDAV {
 		app.options(ROUTE, this::handleOptions);
 		app.options(ROUTE_BARE, this::handleOptions);
 
+		// Root-level DAV discovery (Windows WebClient sends OPTIONS / then PROPFIND /)
+		app.options("/", this::handleOptions);
+		app.before(ctx -> {
+			if ("PROPFIND".equals(ctx.req().getMethod()) && "/".equals(ctx.path())) {
+				handleRootPropfind(ctx);
+				ctx.skipRemainingHandlers();
+				return;
+			}
+		});
+
 		// Custom WebDAV methods — Javalin has no built-in handler type for these
 		app.before(ctx -> {
 			String method = ctx.req().getMethod();
@@ -359,6 +369,27 @@ public class DLFSWebDAV {
 		}
 
 		ctx.status(200);
+	}
+
+	/**
+	 * Handles PROPFIND on root (/), listing /dlfs/ as a child collection.
+	 * Required for Windows WebDAV client discovery.
+	 */
+	void handleRootPropfind(Context ctx) {
+		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+			+ "<D:multistatus xmlns:D=\"DAV:\">"
+			+ "<D:response><D:href>/</D:href><D:propstat><D:prop>"
+			+ "<D:displayname>/</D:displayname>"
+			+ "<D:resourcetype><D:collection/></D:resourcetype>"
+			+ "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"
+			+ "<D:response><D:href>/dlfs/</D:href><D:propstat><D:prop>"
+			+ "<D:displayname>dlfs</D:displayname>"
+			+ "<D:resourcetype><D:collection/></D:resourcetype>"
+			+ "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"
+			+ "</D:multistatus>";
+		ctx.contentType("application/xml; charset=utf-8");
+		ctx.status(207);
+		ctx.result(xml);
 	}
 
 	void handleOptions(Context ctx) {
