@@ -200,6 +200,65 @@ public class DLFSCursorTest {
 		assertTrue(aliceSigned.checkSignature(), "Signature must be valid");
 	}
 
+	/**
+	 * Concurrent writes at disjoint top-level paths through a Covia-style
+	 * cursor chain. With rsync-like merge semantics, ALL three sibling
+	 * directories should survive — none should be lost to merge collision.
+	 *
+	 * <p>This isolates a bug found in Covia's VaultAdapter where parallel
+	 * test methods sharing a cached DLFSLocal lost siblings.</p>
+	 */
+	@Test
+	public void testConcurrentDisjointWrites() throws Exception {
+		AKeyPair kp = AKeyPair.createSeeded(2002);
+		AccountKey ak = kp.getAccountKey();
+		AString driveName = Strings.create("vault");
+		Keyword DLFS_KW = Keyword.intern("dlfs");
+
+		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+			MapLattice.create(DLFSLattice.INSTANCE));
+		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
+
+		LatticeContext ctx = LatticeContext.create(null, kp);
+		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
+			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+
+		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		dlfsCursor.withContext(ctx);
+		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+
+		String[] dirs = { "alpha", "beta", "gamma" };
+		java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+		java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(dirs.length);
+		java.util.List<Throwable> errors = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+		for (String d : dirs) {
+			new Thread(() -> {
+				try {
+					start.await();
+					Files.createDirectory(dlfs.getPath("/" + d));
+				} catch (Throwable t) {
+					errors.add(t);
+				} finally {
+					done.countDown();
+				}
+			}, "writer-" + d).start();
+		}
+		start.countDown();
+		assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+
+		java.util.Set<String> survivors = new java.util.HashSet<>();
+		try (java.nio.file.DirectoryStream<Path> s =
+				Files.newDirectoryStream(dlfs.getPath("/"))) {
+			for (Path p : s) survivors.add(p.getFileName().toString());
+		}
+
+		assertTrue(errors.isEmpty(), "writer errors: " + errors);
+		assertEquals(java.util.Set.of("alpha", "beta", "gamma"), survivors,
+			"all disjoint sibling dirs should survive concurrent writes");
+	}
+
 	@Test
 	public void testCloneIsSnapshot() throws Exception {
 		// Create a drive with content

@@ -48,9 +48,10 @@ public class DLFS {
 	 */
 	public static DLFSLocal connect(ALatticeCursor<?> parent, AString driveName) {
 		ALatticeCursor<AVector<ACell>> cursor = parent.path(driveName);
-		if (cursor.get() == null) {
-			cursor.set(DLFSLattice.INSTANCE.zero());
-		}
+		// Atomic init: read-then-set is racy under concurrent connect()s — a late
+		// reader could observe null and set(zero), clobbering an earlier writer's
+		// committed contents. updateAndGet is a single CAS and is idempotent.
+		cursor.updateAndGet(current -> current != null ? current : DLFSLattice.INSTANCE.zero());
 		return new DLFSLocal(PROVIDER, driveName.toString(), cursor);
 	}
 
