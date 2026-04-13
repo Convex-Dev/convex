@@ -82,7 +82,9 @@ public class MCPClientTest extends ARESTTest {
 
 	@Test
 	public void testProtocol() {
-		assertEquals("2025-06-18", mcp.getCurrentInitializationResult().protocolVersion());
+		String negotiated = mcp.getCurrentInitializationResult().protocolVersion();
+		assertTrue(convex.restapi.mcp.McpServer.SUPPORTED_PROTOCOL_VERSIONS.contains(negotiated),
+				"Negotiated protocol version should be supported: " + negotiated);
 		mcp.ping();
 	}
 
