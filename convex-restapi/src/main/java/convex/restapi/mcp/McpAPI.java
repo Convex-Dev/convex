@@ -86,7 +86,7 @@ import io.javalin.http.Context;
  * dedicated API/gateway peers rather than core validators.</p>
  *
  * @see <a href="https://www.jsonrpc.org/specification">JSON-RPC 2.0</a>
- * @see <a href="https://modelcontextprotocol.io/specification/2025-06-18">MCP Specification</a>
+ * @see <a href="https://modelcontextprotocol.io/specification/2025-11-25">MCP Specification</a>
  */
 public class McpAPI extends ABaseAPI {
 

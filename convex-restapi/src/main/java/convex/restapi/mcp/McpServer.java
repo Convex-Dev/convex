@@ -4,6 +4,7 @@ import static convex.restapi.mcp.McpProtocol.*;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,7 +40,7 @@ import io.javalin.http.Context;
  * — typically by registering additional routes on the same Javalin app.</p>
  *
  * @see <a href="https://www.jsonrpc.org/specification">JSON-RPC 2.0</a>
- * @see <a href="https://modelcontextprotocol.io/specification/2025-06-18">MCP Specification</a>
+ * @see <a href="https://modelcontextprotocol.io/specification/2025-11-25">MCP Specification</a>
  */
 public class McpServer {
 
@@ -47,6 +48,20 @@ public class McpServer {
 
 	/** Maximum entries in a batch JSON-RPC request. */
 	public static final int MAX_BATCH_SIZE = 20;
+
+	/** Latest MCP protocol version this server implements. */
+	public static final String LATEST_PROTOCOL_VERSION = "2025-11-25";
+
+	/**
+	 * Protocol versions we can serve, newest first. If a client requests one of
+	 * these in {@code initialize}, the server echoes it back; otherwise it
+	 * responds with {@link #LATEST_PROTOCOL_VERSION} and lets the client decide.
+	 */
+	public static final List<String> SUPPORTED_PROTOCOL_VERSIONS = List.of(
+		"2025-11-25",
+		"2025-06-18",
+		"2025-03-26"
+	);
 
 	/** ThreadLocal to make the current Javalin Context available to tool handlers */
 	static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
@@ -248,6 +263,12 @@ public class McpServer {
 	/**
 	 * Builds the initialize result. Override to customise capabilities or
 	 * protocol version negotiation.
+	 *
+	 * <p>Version negotiation: if the client's {@code protocolVersion} is one we
+	 * support, echo it back; otherwise respond with our latest supported version
+	 * and let the client decide whether to continue.</p>
+	 *
+	 * @see <a href="https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#version-negotiation">MCP version negotiation</a>
 	 */
 	protected AMap<AString, ACell> buildInitializeResult(ACell params) {
 		AMap<AString, ACell> capabilities = Maps.of(
@@ -257,10 +278,25 @@ public class McpServer {
 			capabilities = capabilities.assoc(Strings.create("prompts"), EMPTY_MAP);
 		}
 		return Maps.of(
-			"protocolVersion", "2025-06-18",
+			"protocolVersion", negotiateProtocolVersion(params),
 			"serverInfo", serverInfo,
 			"capabilities", capabilities
 		);
+	}
+
+	/**
+	 * Negotiates a protocol version from the client's {@code initialize} params.
+	 * Returns the client's requested version if supported, otherwise the latest
+	 * version supported by this server.
+	 */
+	protected String negotiateProtocolVersion(ACell params) {
+		if (params instanceof AMap<?, ?> map) {
+			AString requested = RT.ensureString(map.get(Strings.create("protocolVersion")));
+			if (requested != null && SUPPORTED_PROTOCOL_VERSIONS.contains(requested.toString())) {
+				return requested.toString();
+			}
+		}
+		return LATEST_PROTOCOL_VERSION;
 	}
 
 	/**
