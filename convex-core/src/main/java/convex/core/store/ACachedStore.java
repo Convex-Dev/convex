@@ -13,7 +13,7 @@ import convex.core.exceptions.BadFormatException;
  */
 public abstract class ACachedStore extends AStore {
 
-	protected final RefCache refCache=RefCache.create(10000);
+	protected final RefCache refCache=RefCache.create(Integer.getInteger("convex.cache.size", 10000));
 
 	/**
 	 * Store-bound encoder. Manages thread-local store context during decode.
