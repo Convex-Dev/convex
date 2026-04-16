@@ -31,6 +31,7 @@ import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
 import convex.db.calcite.eval.ConvexExpressionEvaluator;
+import convex.db.lattice.RowBlock;
 import convex.db.lattice.SQLRow;
 import convex.db.lattice.SQLTable;
 
@@ -155,7 +156,7 @@ public class ConvexSort extends Sort implements ConvexRel {
 		ConvexSchema schema = convexTable.getSchema();
 		SQLTable sqlTable = schema.getTables().getLiveTable(convexTable.getTableName());
 		if (sqlTable == null) return ConvexEnumerable.empty();
-		Index<ABlob, AVector<ACell>> rawRows = sqlTable.getRows();
+		Index<ABlob, ACell> rawRows = sqlTable.getRows();
 		if (rawRows == null) return ConvexEnumerable.empty();
 
 		long total = rawRows.count();
@@ -165,19 +166,31 @@ public class ConvexSort extends Sort implements ConvexRel {
 		List<ACell[]> result = new ArrayList<>(Math.min(fetchVal, (int) Math.min(total, Integer.MAX_VALUE)));
 
 		if (desc) {
-			// Walk backwards: entryAt(total-1), entryAt(total-2), ...
+			// Walk backwards through blocks, then rows within each block
 			for (long i = total - 1; i >= 0 && result.size() < fetchVal; i--) {
-				AVector<ACell> row = rawRows.entryAt(i).getValue();
-				if (SQLRow.isLive(row)) {
-					result.add(SQLRow.getValues(row).toCellArray());
+				ACell entry = rawRows.entryAt(i).getValue();
+				if (RowBlock.isBlock(entry)) {
+					int blockSize = RowBlock.count(entry);
+					for (int j = blockSize - 1; j >= 0 && result.size() < fetchVal; j--) {
+						AVector<ACell> row = RowBlock.getRow(entry, j);
+						if (SQLRow.isLive(row)) result.add(SQLRow.getValues(row).toCellArray());
+					}
+				} else if (SQLRow.isLive((AVector<ACell>)entry)) {
+					result.add(SQLRow.getValues((AVector<ACell>)entry).toCellArray());
 				}
 			}
 		} else {
-			// Walk forwards: entryAt(0), entryAt(1), ...
+			// Walk forwards through blocks, then rows within each block
 			for (long i = 0; i < total && result.size() < fetchVal; i++) {
-				AVector<ACell> row = rawRows.entryAt(i).getValue();
-				if (SQLRow.isLive(row)) {
-					result.add(SQLRow.getValues(row).toCellArray());
+				ACell entry = rawRows.entryAt(i).getValue();
+				if (RowBlock.isBlock(entry)) {
+					int blockSize = RowBlock.count(entry);
+					for (int j = 0; j < blockSize && result.size() < fetchVal; j++) {
+						AVector<ACell> row = RowBlock.getRow(entry, j);
+						if (SQLRow.isLive(row)) result.add(SQLRow.getValues(row).toCellArray());
+					}
+				} else if (SQLRow.isLive((AVector<ACell>)entry)) {
+					result.add(SQLRow.getValues((AVector<ACell>)entry).toCellArray());
 				}
 			}
 		}

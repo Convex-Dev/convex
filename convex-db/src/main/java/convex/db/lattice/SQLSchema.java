@@ -1,5 +1,10 @@
 package convex.db.lattice;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -46,6 +51,16 @@ import convex.lattice.cursor.Cursors;
  */
 public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>> {
 
+	/**
+	 * JVM-global monotonic write-sequence counter. Initialised from
+	 * {@code System.currentTimeMillis()} so that v4 sequence numbers always sort
+	 * after v3 compact-timestamp rows (~1.7e12) in LWW comparisons.
+	 * Being static means every write in any schema instance within this process gets
+	 * a unique version — no ties are possible even when multiple forks write
+	 * concurrently within the same millisecond.
+	 */
+	private static final AtomicLong WRITE_SEQ = new AtomicLong(System.currentTimeMillis());
+
 	public SQLSchema(ALatticeCursor<Index<AString, AVector<ACell>>> cursor) {
 		super(cursor);
 	}
@@ -82,8 +97,9 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 
 	// ========== Internal Helpers ==========
 
+	/** Returns the next unique write-sequence number for LWW ordering. */
 	private CVMLong now() {
-		return CVMLong.create(System.currentTimeMillis());
+		return CVMLong.create(WRITE_SEQ.incrementAndGet());
 	}
 
 	/**
@@ -122,7 +138,7 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 	 * @return ABlob representation
 	 * @throws IllegalArgumentException if key type not supported
 	 */
-	private ABlob toKey(ACell key) {
+	protected ABlob toKey(ACell key) {
 		if (key instanceof ABlob blob) return blob;
 		if (key instanceof CVMLong n) {
 			// Encode as 8-byte big-endian
@@ -182,21 +198,36 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 			throw new IllegalArgumentException("Columns and types must have same length");
 		}
 
-		if (getLiveTable(name) != null) return false;
-
-		// Build schema: [[name, typeName, precision, scale], ...]
-		AVector schema = Vectors.empty();
+		// Build full desired schema: [[name, typeName, precision, scale], ...]
+		AVector newSchema = Vectors.empty();
 		for (int i = 0; i < columns.length; i++) {
 			ConvexColumnType ct = types[i];
 			AString typeName = (ct.getBaseType() == ConvexType.ANY) ? null : Strings.create(ct.getBaseType().name());
 			CVMLong precision = ct.hasPrecision() ? CVMLong.create(ct.getPrecision()) : null;
 			CVMLong scale = ct.hasScale() ? CVMLong.create(ct.getScale()) : null;
-			schema = schema.append(Vectors.of(Strings.create(columns[i]), typeName, precision, scale));
+			newSchema = newSchema.append(Vectors.of(Strings.create(columns[i]), typeName, precision, scale));
 		}
 
-		// Set state on the table's cursor path
+		SQLTable existing = getLiveTable(name);
+		if (existing == null) {
+			// Table does not exist yet: create fresh
+			ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
+			tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) newSchema, now()));
+			return true;
+		}
+
+		// Table already exists: append any new columns not present in stored schema
+		AVector<AVector<ACell>> existingSchema = existing.getSchema();
+		long existingCount = existingSchema != null ? existingSchema.count() : 0;
+		if (newSchema.count() <= existingCount) return false; // no new columns to add
+
+		AVector combinedSchema = existingSchema;
+		for (long i = existingCount; i < newSchema.count(); i++) {
+			combinedSchema = combinedSchema.append(newSchema.get(i));
+		}
+		final AVector<AVector<ACell>> finalSchema = (AVector<AVector<ACell>>) combinedSchema;
 		ALatticeCursor<AVector<ACell>> tableCursor = cursor.path(name);
-		tableCursor.set(SQLTable.createState((AVector<AVector<ACell>>) schema, now()));
+		tableCursor.updateAndGet(state -> state.assoc(SQLTable.POS_SCHEMA, finalSchema));
 		return true;
 	}
 
@@ -318,6 +349,34 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		return insert(Strings.create(tableName), Vectors.of(values));
 	}
 
+	/**
+	 * Batch-inserts rows into a table in a single atomic lattice update.
+	 *
+	 * <p>Rows are sorted by primary key, grouped by block-key prefix, and written
+	 * with one {@code Index.assoc()} per block rather than one per row. This
+	 * reduces intermediate allocation from O(N × trie-depth) to O(blocks × trie-depth).
+	 *
+	 * @param tableName Target table (must exist and be live)
+	 * @param rows      Rows to insert; first element of each row is the primary key
+	 * @return number of newly-live rows added
+	 */
+	public int insertAll(String tableName, List<AVector<ACell>> rows) {
+		return insertAll(Strings.create(tableName), rows);
+	}
+
+	public int insertAll(AString tableName, List<AVector<ACell>> rows) {
+		if (rows == null || rows.isEmpty()) return 0;
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return 0;
+		CVMLong ts = now();
+		List<Map.Entry<ABlob, AVector<ACell>>> sorted = new ArrayList<>(rows.size());
+		for (AVector<ACell> row : rows) {
+			sorted.add(Map.entry(toKey(row.get(0)), row));
+		}
+		sorted.sort(Map.Entry.comparingByKey());
+		return table.insertRows(sorted, ts);
+	}
+
 	/** Selects a row by primary key. */
 	public AVector<ACell> selectByKey(String tableName, ACell primaryKey) {
 		return selectByKey(Strings.create(tableName), primaryKey);
@@ -327,11 +386,13 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return null;
 
-		Index<ABlob, AVector<ACell>> rows = table.getRows();
+		Index<ABlob, ACell> rows = table.getRows();
 		if (rows == null) return null;
 
-		ABlob key = toKey(primaryKey);
-		AVector<ACell> row = rows.get(key);
+		ABlob pk = toKey(primaryKey);
+		ABlob bk = RowBlock.blockKey(pk);
+		ACell block = rows.get(bk);
+		AVector<ACell> row = RowBlock.get(block, pk);
 		if (row == null || !SQLRow.isLive(row)) return null;
 		return SQLRow.getValues(row);
 	}
@@ -358,14 +419,19 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(tableName);
 		if (table == null) return Index.none();
 
-		Index<ABlob, AVector<ACell>> rows = table.getRows();
+		Index<ABlob, ACell> rows = table.getRows();
 		if (rows == null) return Index.none();
 
-		// Single-pass tree traversal: filter tombstones, unwrap values
+		// Iterate blocks, expand live rows keyed by full pk
 		Index<ABlob, AVector<ACell>>[] result = new Index[] { Index.none() };
-		rows.forEach((k, v) -> {
-			if (SQLRow.isLive(v)) {
-				result[0] = result[0].assoc(k, SQLRow.getValues(v));
+		rows.forEach((bk, block) -> {
+			if (RowBlock.isBlock(block)) {
+				RowBlock.forEach(block, (pk, row) -> {
+					if (SQLRow.isLive(row)) result[0] = result[0].assoc(pk, SQLRow.getValues(row));
+				});
+			} else if (block instanceof AVector && SQLRow.isLive((AVector<ACell>)block)) {
+				// Legacy single-row entry (backward compat)
+				result[0] = result[0].assoc(bk, SQLRow.getValues((AVector<ACell>)block));
 			}
 		});
 		return result[0];
@@ -398,5 +464,209 @@ public class SQLSchema extends ALatticeComponent<Index<AString, AVector<ACell>>>
 		SQLTable table = getLiveTable(name);
 		if (table == null) return 0;
 		return (int) table.getColumnCount();
+	}
+
+	// ========== Secondary Index Operations ==========
+
+	/**
+	 * Creates a secondary index on a column.
+	 * Scans existing rows to build the initial index, then maintains it on
+	 * subsequent inserts and deletes.
+	 *
+	 * @param tableName  Target table (must exist and be live)
+	 * @param columnName Column to index (must exist in the table schema)
+	 * @return true if the index was created; false if it already exists,
+	 *         the table doesn't exist, or the column doesn't exist
+	 */
+	public boolean createIndex(String tableName, String columnName) {
+		return createIndex(Strings.create(tableName), Strings.create(columnName));
+	}
+
+	public boolean createIndex(AString tableName, AString columnName) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return false;
+		return table.createColumnIndex(columnName);
+	}
+
+	/**
+	 * Returns true if a secondary index exists on the named column.
+	 */
+	public boolean hasIndex(String tableName, String columnName) {
+		return hasIndex(Strings.create(tableName), Strings.create(columnName));
+	}
+
+	public boolean hasIndex(AString tableName, AString columnName) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return false;
+		return table.hasColumnIndex(columnName);
+	}
+
+	/**
+	 * Drops a secondary index on a column.
+	 *
+	 * @return true if the index was dropped; false if it didn't exist
+	 */
+	public boolean dropIndex(String tableName, String columnName) {
+		return dropIndex(Strings.create(tableName), Strings.create(columnName));
+	}
+
+	public boolean dropIndex(AString tableName, AString columnName) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return false;
+		return table.dropColumnIndex(columnName);
+	}
+
+	/**
+	 * Returns all live rows where the named column equals {@code value}.
+	 *
+	 * <p>If a secondary index exists on the column, uses the index to avoid a
+	 * full-table scan.  Otherwise falls back to scanning all rows.
+	 *
+	 * <p>Results are always re-validated against the row store, so stale index
+	 * entries (possible after distributed merge) are silently filtered out.
+	 *
+	 * @param tableName  Target table
+	 * @param columnName Column to filter on
+	 * @param value      Value to match (must be the same ACell type as stored)
+	 * @return Index of matching rows keyed by primary-key blob, or empty if none
+	 */
+	public Index<ABlob, AVector<ACell>> selectByColumn(
+			String tableName, String columnName, ACell value) {
+		return selectByColumn(Strings.create(tableName), Strings.create(columnName), value);
+	}
+
+	@SuppressWarnings("unchecked")
+	public Index<ABlob, AVector<ACell>> selectByColumn(
+			AString tableName, AString columnName, ACell value) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return Index.none();
+
+		// Try index-backed lookup first
+		Index<AString, Index<ABlob, ABlob>> allIndices =
+			SQLTable.getIndicesFromState(table.getState());
+		if (allIndices != null) {
+			ACell rawColIdx = allIndices.get(columnName);
+			if (rawColIdx instanceof Index) {
+				Index<ABlob, ABlob> colIdx = (Index<ABlob, ABlob>) rawColIdx;
+				Index<ABlob, AVector<ACell>>[] result = new Index[]{Index.none()};
+				colIdx.forEach((indexKey, pk) -> {
+					if (!ColumnIndex.matchesValue(indexKey, value)) return;
+					ABlob pkBlob = ColumnIndex.extractPk(indexKey);
+					AVector<ACell> row = table.selectByKeyBlob(pkBlob);
+					if (row == null) return; // tombstoned or missing
+					// Re-validate column value (guards against stale index entries)
+					AVector<AVector<ACell>> schema = table.getSchema();
+					int ci = (schema != null)
+						? SQLTable.findColIdxInSchema(schema, columnName) : -1;
+					if (ci >= 0 && ci < (int) row.count() && value.equals(row.get(ci))) {
+						result[0] = result[0].assoc(pkBlob, row);
+					}
+				});
+				return result[0];
+			}
+		}
+
+		// Fallback: full-scan with in-memory filter
+		AVector<AVector<ACell>> schema = table.getSchema();
+		int colIdx = (schema != null)
+			? SQLTable.findColIdxInSchema(schema, columnName) : -1;
+		if (colIdx < 0) return Index.none();
+		Index<ABlob, AVector<ACell>> all = selectAll(tableName);
+		Index<ABlob, AVector<ACell>>[] result = new Index[]{Index.none()};
+		all.forEach((pk, row) -> {
+			if (colIdx < (int) row.count() && value.equals(row.get(colIdx))) {
+				result[0] = result[0].assoc(pk, row);
+			}
+		});
+		return result[0];
+	}
+
+	/**
+	 * Returns all live rows where the named column is in the inclusive range [from, to].
+	 *
+	 * <p>Uses the secondary index if present (iterates index entries filtering by range).
+	 * Falls back to a full-table scan otherwise.
+	 *
+	 * <p>Range comparison uses sortable encoding: CVMLong values compare numerically;
+	 * AString values compare lexicographically by UTF-8 bytes.
+	 *
+	 * @param tableName  Target table
+	 * @param columnName Column to filter on
+	 * @param from       Lower bound (inclusive)
+	 * @param to         Upper bound (inclusive)
+	 * @return Index of matching rows keyed by primary-key blob, or empty if none
+	 */
+	public Index<ABlob, AVector<ACell>> selectByColumnRange(
+			String tableName, String columnName, ACell from, ACell to) {
+		return selectByColumnRange(
+			Strings.create(tableName), Strings.create(columnName), from, to);
+	}
+
+	@SuppressWarnings("unchecked")
+	public Index<ABlob, AVector<ACell>> selectByColumnRange(
+			AString tableName, AString columnName, ACell from, ACell to) {
+		SQLTable table = getLiveTable(tableName);
+		if (table == null) return Index.none();
+
+		// Try index-backed lookup
+		Index<AString, Index<ABlob, ABlob>> allIndices =
+			SQLTable.getIndicesFromState(table.getState());
+		if (allIndices != null) {
+			ACell rawColIdx = allIndices.get(columnName);
+			if (rawColIdx instanceof Index) {
+				Index<ABlob, ABlob> colIdx = (Index<ABlob, ABlob>) rawColIdx;
+				Index<ABlob, AVector<ACell>>[] result = new Index[]{Index.none()};
+				AVector<AVector<ACell>> schema = table.getSchema();
+				int ci = (schema != null)
+					? SQLTable.findColIdxInSchema(schema, columnName) : -1;
+				colIdx.forEach((indexKey, pk) -> {
+					if (!ColumnIndex.matchesRange(indexKey, from, to)) return;
+					ABlob pkBlob = ColumnIndex.extractPk(indexKey);
+					AVector<ACell> row = table.selectByKeyBlob(pkBlob);
+					if (row == null) return;
+					// Re-validate (guards against stale index entries)
+					if (ci >= 0 && ci < (int) row.count()) {
+						ACell colVal = row.get(ci);
+						if (ColumnIndex.matchesRange(
+								ColumnIndex.indexKey(colVal, pkBlob), from, to)) {
+							result[0] = result[0].assoc(pkBlob, row);
+						}
+					}
+				});
+				return result[0];
+			}
+		}
+
+		// Fallback: full-scan with in-memory filter
+		AVector<AVector<ACell>> schema = table.getSchema();
+		int colIdx = (schema != null)
+			? SQLTable.findColIdxInSchema(schema, columnName) : -1;
+		if (colIdx < 0) return Index.none();
+		byte[] fromBytes = ColumnIndex.encodeValue(from);
+		byte[] toBytes   = ColumnIndex.encodeValue(to);
+		Index<ABlob, AVector<ACell>> all = selectAll(tableName);
+		Index<ABlob, AVector<ACell>>[] result = new Index[]{Index.none()};
+		all.forEach((pk, row) -> {
+			if (colIdx >= (int) row.count()) return;
+			ACell colVal = row.get(colIdx);
+			if (colVal == null) return;
+			byte[] valBytes = ColumnIndex.encodeValue(colVal);
+			if (valBytes.length != fromBytes.length) return;
+			// Lexicographic comparison
+			int cmpFrom = 0, cmpTo = 0;
+			for (int i = 0; i < valBytes.length; i++) {
+				int b = valBytes[i] & 0xFF;
+				if (cmpFrom == 0) {
+					if      (b > (fromBytes[i] & 0xFF)) cmpFrom = 1;
+					else if (b < (fromBytes[i] & 0xFF)) cmpFrom = -1;
+				}
+				if (cmpTo == 0) {
+					if      (b < (toBytes[i] & 0xFF)) cmpTo = -1;
+					else if (b > (toBytes[i] & 0xFF)) cmpTo = 1;
+				}
+			}
+			if (cmpFrom >= 0 && cmpTo <= 0) result[0] = result[0].assoc(pk, row);
+		});
+		return result[0];
 	}
 }

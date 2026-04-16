@@ -37,7 +37,7 @@ public class SQLTableLattice extends ALattice<AVector<ACell>> {
 		// Table vector: [0]=schema, [1]=rows, [2]=utime
 		// Only rows (position 1) has a sub-lattice
 		if (childKey instanceof CVMLong idx && idx.longValue() == SQLTable.POS_ROWS) {
-			return (ALattice<T>) TableLattice.INSTANCE;
+			return (ALattice<T>) BlockTableLattice.INSTANCE;
 		}
 		return null;
 	}
