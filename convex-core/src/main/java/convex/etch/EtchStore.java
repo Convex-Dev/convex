@@ -39,6 +39,11 @@ public class EtchStore extends ACachedStore {
 
 
 	public EtchStore(Etch etch) {
+		this(etch, true);
+	}
+
+	public EtchStore(Etch etch, boolean enableL2) {
+		super(enableL2);
 		this.etch = etch;
 		this.target = null;
 		etch.setStore(this);
@@ -127,8 +132,7 @@ public class EtchStore extends ACachedStore {
 
 	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
 		Ref<T> ref = etch.read(hash);
-		if (ref != null)
-			refCache.putCell(ref);
+		if (ref != null) cacheRetrievedRef(hash, ref);
 		return ref;
 	}
 

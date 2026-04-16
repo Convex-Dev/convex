@@ -742,7 +742,10 @@ public class Etch {
 		Blob encoding= Blob.wrap(bs);
 		try {
 			Hash hash=Hash.wrap(key);
-			T cell=store.decode(encoding);
+			// Pure parse — we just hit disk so cache lookup would always miss.
+			// Caller (e.g. EtchStore.readStoreRef) is responsible for cache population.
+			@SuppressWarnings("unchecked")
+			T cell=(T) store.getEncoder().decode(encoding);
 			encoding.attachContentHash(hash);
 
 			if (memorySize>0) {
