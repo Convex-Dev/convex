@@ -110,28 +110,6 @@ public abstract class ACachedStore extends AStore {
 	}
 
 	/**
-	 * Records a cell retrieved directly from backing storage (bypassing decode cache lookup)
-	 * and populates both L1 and L2. Increments the decode counter — semantically this was
-	 * a cache miss that required reconstructing the cell from its encoding.
-	 *
-	 * @param hash Content hash of the retrieved cell
-	 * @param ref Ref wrapping the freshly-decoded cell
-	 */
-	protected void cacheRetrievedRef(Hash hash, Ref<?> ref) {
-		decodes.increment();
-		refCache.putCell(ref);
-		if (softCache != null) {
-			// Only populate L2 if absent — preserves instance stability for any
-			// cell already in the cache. Cross-store users may rely on cell.cachedRef
-			// pointing to the originally-attaching store.
-			if (softCache.get(hash) == null) {
-				ACell cell = ref.getValue();
-				if (cell != null) softCache.put(hash, cell);
-			}
-		}
-	}
-
-	/**
 	 * Returns whether this store has the L2 SoftCache enabled.
 	 * @return true if L2 cache is in use
 	 */

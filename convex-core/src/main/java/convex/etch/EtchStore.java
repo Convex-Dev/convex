@@ -132,7 +132,8 @@ public class EtchStore extends ACachedStore {
 
 	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
 		Ref<T> ref = etch.read(hash);
-		if (ref != null) cacheRetrievedRef(hash, ref);
+		if (ref != null)
+			refCache.putCell(ref);
 		return ref;
 	}
 
