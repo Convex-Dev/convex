@@ -90,5 +90,13 @@
 			<version>42.7.7</version>
 			<scope>test</scope>
 		</dependency>
+		
+		<!-- MariaDB JDBC driver for comparison benchmarks -->
+		<dependency>
+			<groupId>org.mariadb.jdbc</groupId>
+			<artifactId>mariadb-java-client</artifactId>
+			<version>3.4.1</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 </project>
