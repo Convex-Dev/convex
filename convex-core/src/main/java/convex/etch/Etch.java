@@ -292,14 +292,9 @@ public class Etch {
 		long pos=((long)regionIndex)*MAX_REGION_SIZE;
 
 		// Expand region size until big enough for current database plus appropriate margin
-		int length;
-		if (regionIndex==0) {
-			length=1<<16;
-			while((length<MAX_REGION_SIZE)&&((pos+length)<(dataLength+REGION_MARGIN))) {
-				length*=2;
-			}
-		} else {
-			length=(int)MAX_REGION_SIZE;
+		int length=1<<16;
+		while((length<MAX_REGION_SIZE)&&((pos+length)<(dataLength+REGION_MARGIN))) {
+			length*=2;
 		}
 
 		length+=REGION_MARGIN; // include margin in buffer length
