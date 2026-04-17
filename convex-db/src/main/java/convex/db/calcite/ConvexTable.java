@@ -47,6 +47,12 @@ public class ConvexTable extends AbstractQueryableTable
 	private final ConvexSchema schema;
 	private final String tableName;
 
+	// Lazily cached column metadata — column names and types are stable for a
+	// given table definition and expensive to re-derive from the lattice on every
+	// getRowType() / getStatistic() call during query planning.
+	private volatile String[] cachedColumnNames;
+	private volatile ConvexColumnType[] cachedColumnTypes;
+
 	public ConvexTable(ConvexSchema schema, String tableName) {
 		super(Object[].class);
 		this.schema = schema;
@@ -57,9 +63,8 @@ public class ConvexTable extends AbstractQueryableTable
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
 
-		SQLSchema tables = schema.getTables();
-		String[] columnNames = tables.getColumnNames(tableName);
-		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
+		String[] columnNames = getColumnNames();
+		ConvexColumnType[] columnTypes = getColumnTypes();
 
 		if (columnNames != null && columnTypes != null) {
 			for (int i = 0; i < columnNames.length; i++) {
@@ -69,6 +74,13 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 
 		return builder.build();
+	}
+
+	private String[] getColumnNames() {
+		if (cachedColumnNames == null) {
+			cachedColumnNames = schema.getTables().getColumnNames(tableName);
+		}
+		return cachedColumnNames;
 	}
 
 	/**
@@ -87,7 +99,10 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	public ConvexColumnType[] getColumnTypes() {
-		return schema.getTables().getColumnTypes(tableName);
+		if (cachedColumnTypes == null) {
+			cachedColumnTypes = schema.getTables().getColumnTypes(tableName);
+		}
+		return cachedColumnTypes;
 	}
 
 	/**

@@ -1,6 +1,5 @@
 package convex.db.calcite.rel;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.calcite.DataContext;
@@ -12,18 +11,13 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AVector;
-import convex.core.data.Index;
 import convex.db.calcite.ConvexSchema;
 import convex.db.calcite.ConvexTable;
 import convex.db.calcite.convention.ConvexConvention;
 import convex.db.calcite.convention.ConvexEnumerable;
 import convex.db.calcite.convention.ConvexRel;
-import convex.db.lattice.SQLRow;
 import convex.db.lattice.SQLSchema;
-import convex.db.lattice.SQLTable;
 
 /**
  * Table scan in CONVEX convention.
@@ -56,20 +50,34 @@ public class ConvexTableScan extends TableScan implements ConvexRel {
 		SQLSchema tables = schema.getTables();
 		String tableName = convexTable.getTableName();
 
-		SQLTable sqlTable = tables.getLiveTable(tableName);
-		if (sqlTable == null) return ConvexEnumerable.empty();
+		// Lazy streaming scan: no full materialisation of ACell[] rows.
+		// ConvexTableEnumerator decodes one block at a time, avoiding a
+		// full-result-set heap spike at query-open time.
+		return () -> {
+			convex.db.calcite.ConvexTableEnumerator e =
+				new convex.db.calcite.ConvexTableEnumerator(tables, tableName);
+			return new java.util.Iterator<ACell[]>() {
+				private boolean primed = false;
+				private boolean hasNext = false;
 
-		Index<ABlob, AVector<ACell>> rawRows = sqlTable.getRows();
-		if (rawRows == null) return ConvexEnumerable.empty();
+				private void prime() {
+					if (!primed) {
+						hasNext = e.moveNext();
+						primed = true;
+					}
+				}
 
-		// Single-pass tree traversal via forEach, skip tombstones, unwrap values
-		List<ACell[]> result = new ArrayList<>((int) Math.min(rawRows.count(), Integer.MAX_VALUE));
-		rawRows.forEach((k, v) -> {
-			if (SQLRow.isLive(v)) {
-				result.add(SQLRow.getValues(v).toCellArray());
-			}
-		});
+				@Override public boolean hasNext() { prime(); return hasNext; }
 
-		return ConvexEnumerable.of(result);
+				@Override public ACell[] next() {
+					prime();
+					if (!hasNext) throw new java.util.NoSuchElementException();
+					ACell[] row = e.current();
+					hasNext = e.moveNext();
+					primed = true;
+					return row;
+				}
+			};
+		};
 	}
 }

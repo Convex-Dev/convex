@@ -28,7 +28,7 @@ import convex.core.util.SoftCache;
  */
 public abstract class ACachedStore extends AStore {
 
-	protected final RefCache refCache=RefCache.create(10000);
+	protected final RefCache refCache=RefCache.create(Integer.getInteger("convex.cache.size", 10000));
 
 	/**
 	 * Optional L2 cache. May be null (disabled). Maps content hash to the decoded cell;

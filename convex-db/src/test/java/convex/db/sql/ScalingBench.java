@@ -18,7 +18,7 @@ import convex.db.lattice.SQLSchema;
  */
 public class ScalingBench {
 
-	static final int[] SIZES = {1_000, 10_000, 100_000};
+	static final int[] SIZES = {1_000, 10_000, 100_000, 200_000,400_000};
 
 	public static void main(String[] args) {
 		System.out.println("=== Convex DB Scaling Benchmark (issue #541) ===\n");
