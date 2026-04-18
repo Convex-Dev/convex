@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -269,7 +271,90 @@ public class JSONTest {
 		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSON.parseJSON5(" -Infinity"));
 		assertEquals(CVMDouble.NaN,JSON.parseJSON5(" NaN"));
 
-		
+
+	}
+
+	/**
+	 * Strict JSON has no representation for non-finite doubles.
+	 * JSON.appendJSON must emit null for NaN and ±Infinity so output is
+	 * parseable by strict parsers. Regression for #547.
+	 */
+	@Test
+	public void testAppendJSONNonFiniteDoubles() {
+		assertEquals("null", JSON.toString(Double.NaN));
+		assertEquals("null", JSON.toString(Double.POSITIVE_INFINITY));
+		assertEquals("null", JSON.toString(Double.NEGATIVE_INFINITY));
+
+		assertEquals("null", JSON.toString(CVMDouble.NaN));
+		assertEquals("null", JSON.toString(CVMDouble.POSITIVE_INFINITY));
+		assertEquals("null", JSON.toString(CVMDouble.NEGATIVE_INFINITY));
+
+		// Output must round-trip as strict JSON (back to nil)
+		assertNull(JSON.parse(JSON.toString(CVMDouble.NaN)));
+		assertNull(JSON.parse(JSON.toString(CVMDouble.POSITIVE_INFINITY)));
+		assertNull(JSON.parse(JSON.toString(CVMDouble.NEGATIVE_INFINITY)));
+	}
+
+	/**
+	 * JSON5 writer path (#546) — non-finite doubles round-trip through
+	 * JSON5Reader as JSON5 literals, all other types render identically to
+	 * appendJSON, and nested non-finite doubles are preserved.
+	 */
+	@Test
+	public void testAppendJSON5() {
+		// Non-finite CVMDouble literals
+		assertEquals("NaN", JSON.printJSON5(CVMDouble.NaN).toString());
+		assertEquals("Infinity", JSON.printJSON5(CVMDouble.POSITIVE_INFINITY).toString());
+		assertEquals("-Infinity", JSON.printJSON5(CVMDouble.NEGATIVE_INFINITY).toString());
+
+		// Round-trip via JSON5Reader preserves non-finite values
+		assertEquals(CVMDouble.NaN, JSON.parseJSON5(JSON.printJSON5(CVMDouble.NaN)));
+		assertEquals(CVMDouble.POSITIVE_INFINITY,
+			JSON.parseJSON5(JSON.printJSON5(CVMDouble.POSITIVE_INFINITY)));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY,
+			JSON.parseJSON5(JSON.printJSON5(CVMDouble.NEGATIVE_INFINITY)));
+
+		// Finite doubles render the same as strict JSON
+		assertEquals(JSON.toString(CVMDouble.ONE), JSON.printJSON5(CVMDouble.ONE).toString());
+
+		// Non-double types render identically in JSON and JSON5
+		assertEquals(JSON.toString(Maps.of("a", 1)),
+			JSON.printJSON5(Maps.of("a", 1)).toString());
+		assertEquals(JSON.toString(Vectors.of(1, 2, 3)),
+			JSON.printJSON5(Vectors.of(1, 2, 3)).toString());
+
+		// Nested non-finite doubles propagate through containers
+		ACell nested = Maps.of("x", Vectors.of(CVMDouble.NaN, CVMDouble.POSITIVE_INFINITY));
+		assertEquals(nested, JSON.parseJSON5(JSON.printJSON5(nested)));
+
+		// nil remains null in JSON5
+		assertEquals("null", JSON.printJSON5(null).toString());
+	}
+
+	/**
+	 * Direct coverage for JSON5Reader non-finite double literals via both
+	 * String and InputStream entry points (JSON5 spec compliance).
+	 */
+	@Test
+	public void testJSON5ReaderNonFiniteDoubles() throws IOException {
+		// String entry point
+		assertEquals(CVMDouble.NaN, JSON5Reader.read("NaN"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, JSON5Reader.read("Infinity"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, JSON5Reader.read("-Infinity"));
+
+		// Verify underlying IEEE 754 values
+		assertEquals(Double.POSITIVE_INFINITY, ((CVMDouble)JSON5Reader.read("Infinity")).doubleValue());
+		assertEquals(Double.NEGATIVE_INFINITY, ((CVMDouble)JSON5Reader.read("-Infinity")).doubleValue());
+		assertEquals(true, Double.isNaN(((CVMDouble)JSON5Reader.read("NaN")).doubleValue()));
+
+		// InputStream entry point
+		assertEquals(CVMDouble.NaN, JSON5Reader.read(utf8Stream("NaN")));
+		assertEquals(CVMDouble.POSITIVE_INFINITY, JSON5Reader.read(utf8Stream("Infinity")));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY, JSON5Reader.read(utf8Stream("-Infinity")));
+	}
+
+	private static ByteArrayInputStream utf8Stream(String s) {
+		return new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8));
 	}
 	
 	/**
@@ -279,6 +364,38 @@ public class JSONTest {
 		checkJSON5Only("[1,2,]");
 		checkJSON5Only("[1,2] /*bar*/");
 
+	}
+
+	/**
+	 * JSON5 string escape sequences beyond standard JSON: \v, \xHH, line continuation,
+	 * single-quoted strings, and lenient escapes (any non-special char as literal).
+	 */
+	@Test public void testJSON5StringEscapes() {
+		// Single-quoted strings
+		assertEquals(Strings.create("hello"),JSON.parseJSON5("'hello'"));
+		assertEquals(Strings.create("a\"b"),JSON.parseJSON5("'a\"b'"));
+		assertEquals(Strings.create("a'b"),JSON.parseJSON5("\"a'b\""));
+
+		// \v vertical tab
+		assertEquals(Strings.create("\u000B"),JSON.parseJSON5("\"\\v\""));
+
+		// \xHH hex byte escape
+		assertEquals(Strings.create(":"),JSON.parseJSON5("\"\\x3a\""));
+		assertEquals(Strings.create("A"),JSON.parseJSON5("\"\\x41\""));
+
+		// Line continuation: backslash + newline produces empty
+		assertEquals(Strings.create("ab"),JSON.parseJSON5("\"a\\\nb\""));
+		assertEquals(Strings.create("ab"),JSON.parseJSON5("\"a\\\r\nb\""));
+
+		// Lenient escapes: \z is literal z (any char that's not a recognised escape)
+		assertEquals(Strings.create("z"),JSON.parseJSON5("\"\\z\""));
+		assertEquals(Strings.create("?"),JSON.parseJSON5("\"\\?\""));
+
+		// \0 null character
+		assertEquals(Strings.create("\0"),JSON.parseJSON5("\"\\0\""));
+
+		// unicode escape still works
+		assertEquals(Strings.create("A"),JSON.parseJSON5("\"\\u0041\""));
 	}
 	
 	@Test

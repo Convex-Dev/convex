@@ -136,14 +136,14 @@ public class JSON5Reader {
 		public void exitString(StringContext ctx) {
 			String text=ctx.getText();
 			String content=text.substring(1, text.length()-1);
-			push(JSON.unescape(content));
+			push(JSON.unescape5(content));
 		}
 
 		@Override
 		public void exitIdentifier(IdentifierContext ctx) {
 			String text=ctx.getText();
 			// no need to take substring, should be full identifier name
-			push(JSON.unescape(text));
+			push(JSON.unescape5(text));
 		}
 
 		@Override
