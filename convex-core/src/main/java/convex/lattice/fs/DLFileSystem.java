@@ -63,10 +63,12 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	}
 	
 	/**
-	 * Gets the timestamp of this DLFS drive
+	 * Gets the timestamp of this DLFS drive, used to mark new writes.
+	 * Subclasses may override to consult a cursor's {@link convex.lattice.LatticeContext}.
+	 *
 	 * @return Current timestamp as a CVM integer
 	 */
-	public final CVMLong getTimestamp() {
+	public CVMLong getTimestamp() {
 		return timestamp;
 	}
 	

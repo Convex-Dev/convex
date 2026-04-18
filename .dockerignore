@@ -1,0 +1,22 @@
+# Git
+.git
+.gitignore
+
+# Build output
+**/target
+
+# IDE
+.idea
+.vscode
+*.iml
+.project
+.classpath
+.settings
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Docs and metadata
+*.md
+LICENSE

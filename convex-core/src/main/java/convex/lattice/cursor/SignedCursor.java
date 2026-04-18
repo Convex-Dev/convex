@@ -67,6 +67,10 @@ public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
 	public V sync() {
 		if (base instanceof ALatticeCursor<?> lc) {
 			lc.sync();
+		} else {
+			throw new IllegalStateException(
+				"SignedCursor.sync(): base cursor is not an ALatticeCursor (got " +
+				base.getClass().getSimpleName() + "). Sync cannot propagate.");
 		}
 		return get();
 	}

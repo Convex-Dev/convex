@@ -13,11 +13,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
-import convex.db.calcite.rel.ConvexRelExecutor;
+import convex.db.calcite.rel.ConvexResultConverter;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -29,14 +29,16 @@ import convex.db.lattice.SQLDatabase;
  */
 class ConvexConventionIntegrationTest {
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 
 	@BeforeEach
 	void setUp() throws Exception {
 		// Create test database
-		db = SQLDatabase.create("convex_conv_test", AKeyPair.generate());
-		ConvexSchemaFactory.register("convex_conv_test", db);
+		cdb = ConvexDB.create();
+		db = cdb.database("convex_conv_test");
+		cdb.register("convex_conv_test");
 
 		// Create table with typed columns
 		ConvexColumnType[] types = {
@@ -58,7 +60,7 @@ class ConvexConventionIntegrationTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister("convex_conv_test");
+		if (cdb != null) cdb.unregister("convex_conv_test");
 	}
 
 	@Test

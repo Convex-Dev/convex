@@ -125,7 +125,7 @@ public class NettyServer extends AServer {
         	try {
         		f = b.bind(bindAddress).sync();
          	} catch (java.nio.channels.UnsupportedAddressTypeException e) {
-        		f= b.bind("0.0.0.0", port);
+        		f= b.bind("0.0.0.0", port).sync();
         		log.warn("Unable to bind IPv6 address, falling back to IPv4");
         	}
         } catch (Exception e) {
@@ -139,7 +139,7 @@ public class NettyServer extends AServer {
         	try {
         		f = b.bind(bindAddress).sync();
         	} catch (java.nio.channels.UnsupportedAddressTypeException e) {
-        		f= b.bind("0.0.0.0", port);
+        		f= b.bind("0.0.0.0", port).sync();
         		log.warn("Unable to bind IPv6 address, falling back to IPv4");
         	}
         }

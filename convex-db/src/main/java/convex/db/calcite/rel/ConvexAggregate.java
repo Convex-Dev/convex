@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -15,6 +16,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.ImmutableBitSet;
 
 import convex.core.data.ACell;
@@ -60,9 +62,9 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 	}
 
 	@Override
-	public ConvexEnumerable execute() {
+	public ConvexEnumerable execute(DataContext ctx) {
 		ConvexRel inputRel = (ConvexRel) getInput();
-		ConvexEnumerable input = inputRel.execute();
+		ConvexEnumerable input = inputRel.execute(ctx);
 		RelDataType inputRowType = getInput().getRowType();
 
 		List<Integer> groupKeys = groupSet.toList();
@@ -122,7 +124,7 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 			case SUM, SUM0 -> computeSum(rows, colIndex);
 			case MIN -> computeMin(rows, colIndex);
 			case MAX -> computeMax(rows, colIndex);
-			case AVG -> computeAvg(rows, colIndex);
+			case AVG -> computeAvg(rows, colIndex, aggCall.getType());
 			default -> throw new UnsupportedOperationException("Aggregate not supported: " + kind);
 		};
 	}
@@ -216,9 +218,10 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 	}
 
 	/**
-	 * AVG as SUM/COUNT with double precision.
+	 * AVG — returns type matching the declared return type.
+	 * Calcite declares AVG(BIGINT) as BIGINT, AVG(DOUBLE) as DOUBLE.
 	 */
-	private ACell computeAvg(List<ACell[]> rows, int colIndex) {
+	private ACell computeAvg(List<ACell[]> rows, int colIndex, RelDataType returnType) {
 		if (rows.isEmpty()) return null;
 
 		double sum = 0;
@@ -235,7 +238,14 @@ public class ConvexAggregate extends Aggregate implements ConvexRel {
 		}
 
 		if (count == 0) return null;
-		return CVMDouble.create(sum / count);
+		double avg = sum / count;
+
+		// Match Calcite's declared return type (AVG(BIGINT) → BIGINT)
+		if (returnType.getSqlTypeName() == SqlTypeName.BIGINT
+				|| returnType.getSqlTypeName() == SqlTypeName.INTEGER) {
+			return CVMLong.create((long) avg);
+		}
+		return CVMDouble.create(avg);
 	}
 
 	/**

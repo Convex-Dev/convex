@@ -1,6 +1,9 @@
 package convex.lattice;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,8 +11,8 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.lattice.generic.IndexLattice;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -23,6 +26,7 @@ public class LatticeOpsTest {
 	static final Keyword KEY_A = Keyword.intern("a");
 	static final Keyword KEY_B = Keyword.intern("b");
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testNullRootWithKeyedLattice() {
 		// KeyedLattice.zero() -> Index.EMPTY
@@ -36,6 +40,7 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(42), idx.get(KEY_A));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testNullRootWithMapLattice() {
 		// MapLattice.zero() -> Maps.empty()
@@ -49,6 +54,7 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(7), map.get(KEY_A));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testDeepPathWithMultipleNullIntermediates() {
 		// KeyedLattice(:a -> KeyedLattice(:b -> LWW))
@@ -60,7 +66,7 @@ public class LatticeOpsTest {
 		assertTrue(result instanceof Index);
 		Index<Keyword, ACell> outerIdx = (Index<Keyword, ACell>) result;
 		ACell innerVal = outerIdx.get(KEY_A);
-		assertTrue(innerVal instanceof Index, "Inner should be Index, got " + (innerVal == null ? "null" : innerVal.getClass().getSimpleName()));
+		assertTrue(innerVal instanceof Index, ()->"Inner should be Index, got " + Utils.getClassName(innerVal));
 		Index<Keyword, ACell> innerIdx = (Index<Keyword, ACell>) innerVal;
 		assertEquals(CVMLong.create(99), innerIdx.get(KEY_B));
 	}
@@ -73,6 +79,7 @@ public class LatticeOpsTest {
 		});
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testNullLatticeWithNonNullDataSucceeds() {
 		// Existing non-null structure -> no lattice needed
@@ -84,6 +91,7 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(2), ((Index<Keyword, ACell>) result).get(KEY_A));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testExistingDataNotChangedByLattice() {
 		// Even with a MapLattice, existing Index data stays Index
@@ -122,6 +130,7 @@ public class LatticeOpsTest {
 		assertEquals(CVMLong.create(2), result);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testIndexLatticeCreatesIndex() {
 		IndexLattice<Keyword, ACell> il = IndexLattice.create(LWWLattice.INSTANCE);

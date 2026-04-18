@@ -8,6 +8,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.Timer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,9 +43,12 @@ public class AccountChooserPanel extends JPanel {
 	public final KeyPairCombo keyCombo;
 
 	private BalanceLabel balanceLabel;
-	
+
 	protected Convex convex;
-	
+
+	private static final int BALANCE_REFRESH_MS = 5000;
+	private Timer balanceRefreshTimer;
+
     AWalletEntry previousSelection = null;
 
 
@@ -90,6 +94,10 @@ public class AccountChooserPanel extends JPanel {
 			balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 			mp.add(balanceLabel);
 			updateBalance(getAddress());
+
+			// Periodic refresh so balance stays current when updated outside this panel
+			balanceRefreshTimer = new Timer(BALANCE_REFRESH_MS, e -> updateBalance());
+			balanceRefreshTimer.start();
 
 			add(mp,"dock west");
 		}
@@ -227,6 +235,12 @@ public class AccountChooserPanel extends JPanel {
 	
 	public void updateBalance() {
 		updateBalance(getAddress());
+	}
+
+	@Override
+	public void removeNotify() {
+		if (balanceRefreshTimer != null) balanceRefreshTimer.stop();
+		super.removeNotify();
 	}
 
 	private void updateBalance(Address a) {

@@ -1,5 +1,6 @@
 package convex.db.calcite.convention;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.rel.RelNode;
 
 /**
@@ -14,7 +15,8 @@ public interface ConvexRel extends RelNode {
 	/**
 	 * Executes this relational expression.
 	 *
+	 * @param ctx DataContext for resolving dynamic parameters (may be null)
 	 * @return ConvexEnumerable yielding ACell[] rows
 	 */
-	ConvexEnumerable execute();
+	ConvexEnumerable execute(DataContext ctx);
 }

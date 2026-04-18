@@ -16,6 +16,13 @@ import convex.lattice.LatticeContext;
  * <p>Modifications to a forked cursor don't affect the parent until {@link #sync()}
  * is called. The sync operation uses lattice merge semantics and always succeeds.</p>
  *
+ * <h3>Concurrent writes during sync</h3>
+ * <p>{@link #sync()} is safe to call while other threads are writing to the fork.
+ * Sync atomically propagates local changes to the parent, then optimistically
+ * updates the local cursor via CAS. If concurrent writes landed between the
+ * read and the CAS, the CAS fails and sync falls back to a lattice merge,
+ * preserving both the synced value and the concurrent writes.</p>
+ *
  * @param <V> Type of cursor values
  */
 public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
@@ -57,9 +64,30 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 			}
 		});
 
-		// Update local state for subsequent syncs
 		forkPoint = synced;
-		localCursor.set(synced);
+
+		// Optimistically CAS local to the synced value. If no concurrent writes
+		// happened on the fork since we read localVal, the CAS succeeds.
+		// If it fails, another thread wrote to the fork during our sync — those
+		// writes must be preserved, so we merge via an atomic updateAndGet.
+		//
+		// Argument order is critical: for LWW-style lattices that prefer the
+		// first (own) argument on timestamp ties, we must pass the fork's
+		// current state as own, because concurrent writes are semantically
+		// newer than our sync snapshot (they happened after we read localVal).
+		// Using current as own ensures: (a) ties resolve in favour of the
+		// recent write, (b) strictly newer writes still win via timestamp
+		// comparison, (c) strictly older writes cannot clobber the fork.
+		if (!localCursor.compareAndSet(localVal, synced)) {
+			if (lattice != null) {
+				localCursor.updateAndGet(current ->
+					lattice.merge(context, current, synced));
+			}
+			// Null lattice with concurrent writers: no well-defined merge.
+			// Leave concurrent writes in place — they will propagate to parent
+			// on the next sync. This preserves caller data at the cost of a
+			// brief local/parent divergence.
+		}
 
 		return synced;
 	}

@@ -4,16 +4,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.util.Multikey;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 
 /**
  * Tests for PeerAuth — bearer token verification and peer token issuance.
@@ -33,7 +32,7 @@ public class PeerAuthTest {
 		AString identity = AUTH.verifyBearerToken(jwt);
 		assertNotNull(identity, "Valid self-issued JWT should authenticate");
 
-		AString expectedDID = Strings.create("did:key:").append(Multikey.encodePublicKey(clientKP.getAccountKey()));
+		AString expectedDID = DID.forKey(clientKP.getAccountKey());
 		assertEquals(expectedDID, identity);
 	}
 
@@ -68,15 +67,14 @@ public class PeerAuthTest {
 		AKeyPair signerKP = AKeyPair.generate();
 		AKeyPair otherKP = AKeyPair.generate();
 
-		AString wrongKid = Multikey.encodePublicKey(otherKP.getAccountKey());
-		AString correctDID = Strings.create("did:key:").append(wrongKid);
+		AString correctDID = DID.forKey(otherKP.getAccountKey());
 
 		long now = System.currentTimeMillis() / 1000;
 		AMap<AString, ACell> claims = Maps.of(
-			Strings.create("sub"), correctDID,
-			Strings.create("iss"), correctDID,
-			Strings.create("iat"), CVMLong.create(now),
-			Strings.create("exp"), CVMLong.create(now + 300)
+			JWT.SUB, correctDID,
+			JWT.ISS, correctDID,
+			JWT.IAT, now,
+			JWT.EXP, now + 300
 		);
 
 		// Sign with signerKP but kid header will be set by signPublic to signerKP's key
@@ -150,10 +148,10 @@ public class PeerAuthTest {
 		assertNotNull(claims);
 
 		assertEquals(identity.toString(),
-				claims.get(Strings.create("sub")).toString());
+				claims.get(JWT.SUB).toString());
 
 		// exp should be in the future
-		long exp = Long.parseLong(claims.get(Strings.create("exp")).toString());
+		long exp = Long.parseLong(claims.get(JWT.EXP).toString());
 		long now = System.currentTimeMillis() / 1000;
 		assertTrue(exp > now);
 		assertTrue(exp <= now + 7200);
@@ -164,19 +162,126 @@ public class PeerAuthTest {
 		assertEquals(PEER_KP.getAccountKey(), AUTH.getPeerKey());
 	}
 
+	// ===== Audience Checking =====
+
+	@Test
+	public void testSelfIssuedJWTWithCorrectAudience() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AKeyPair clientKP = AKeyPair.generate();
+		AString jwt = createSelfIssuedJWT(clientKP, 300, audAuth.getExpectedAudience());
+
+		AString identity = audAuth.verifyBearerToken(jwt);
+		assertNotNull(identity, "Self-issued JWT with correct aud should authenticate");
+	}
+
+	@Test
+	public void testSelfIssuedJWTWithWrongAudience() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AKeyPair clientKP = AKeyPair.generate();
+		AString jwt = createSelfIssuedJWT(clientKP, 300, "did:key:zWRONGAUDIENCE");
+
+		assertNull(audAuth.verifyBearerToken(jwt),
+				"Self-issued JWT with wrong aud should be rejected");
+	}
+
+	@Test
+	public void testSelfIssuedJWTMissingAudienceWhenRequired() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AKeyPair clientKP = AKeyPair.generate();
+		// No aud claim at all
+		AString jwt = createSelfIssuedJWT(clientKP, 300);
+
+		assertNull(audAuth.verifyBearerToken(jwt),
+				"Self-issued JWT without aud should be rejected when audience is required");
+	}
+
+	@Test
+	public void testSelfIssuedJWTAudienceNotRequiredAcceptsNoAud() {
+		// Default AUTH has no expectedAudience
+		AKeyPair clientKP = AKeyPair.generate();
+		AString jwt = createSelfIssuedJWT(clientKP, 300);
+
+		assertNotNull(AUTH.verifyBearerToken(jwt),
+				"Self-issued JWT without aud should be accepted when audience is not required");
+	}
+
+	@Test
+	public void testPeerSignedJWTWithCorrectAudience() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AString identity = Strings.create("did:web:example.com:user:42");
+		AString jwt = audAuth.issuePeerToken(identity, 3600);
+
+		AString result = audAuth.verifyBearerToken(jwt);
+		assertNotNull(result, "Peer-signed JWT with correct aud should authenticate");
+		assertEquals(identity, result);
+	}
+
+	@Test
+	public void testPeerSignedJWTWithWrongAudience() {
+		// Issue token from a peer without aud checking
+		AString identity = Strings.create("did:web:example.com:user:42");
+		AString jwt = AUTH.issuePeerToken(identity, 3600);
+
+		// Verify on a peer that requires aud — token has no aud claim
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		assertNull(audAuth.verifyBearerToken(jwt),
+				"Peer-signed JWT without aud should be rejected when audience is required");
+	}
+
+	@Test
+	public void testBadlySignedJWTWithCorrectAudience() {
+		// Attacker creates a JWT with the correct aud but signs with wrong key
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AKeyPair attackerKP = AKeyPair.generate();
+
+		// Craft claims that look like a peer-signed token with correct aud
+		long now = System.currentTimeMillis() / 1000;
+		AMap<AString, ACell> claims = Maps.of(
+			JWT.SUB, "did:web:attacker.com:evil",
+			JWT.ISS, DID.forKey(attackerKP.getAccountKey()),
+			JWT.AUD, audAuth.getExpectedAudience(),
+			JWT.IAT, now,
+			JWT.EXP, now + 3600
+		);
+		AString jwt = JWT.signPublic(claims, attackerKP);
+
+		assertNull(audAuth.verifyBearerToken(jwt),
+				"JWT signed by attacker should be rejected even with correct aud");
+	}
+
+	@Test
+	public void testCreateWithDIDAudience() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		assertNotNull(audAuth.getExpectedAudience());
+		assertTrue(audAuth.getExpectedAudience().toString().startsWith("did:key:"));
+		assertEquals(PEER_KP.getAccountKey(), audAuth.getPeerKey());
+	}
+
 	// ===== Helpers =====
 
 	private static AString createSelfIssuedJWT(AKeyPair kp, long lifetimeSeconds) {
+		return createSelfIssuedJWT(kp, lifetimeSeconds, (AString) null);
+	}
+
+	private static AString createSelfIssuedJWT(AKeyPair kp, long lifetimeSeconds, String audience) {
+		return createSelfIssuedJWT(kp, lifetimeSeconds, audience != null ? Strings.create(audience) : null);
+	}
+
+	private static AString createSelfIssuedJWT(AKeyPair kp, long lifetimeSeconds, AString audience) {
 		AccountKey pk = kp.getAccountKey();
-		AString didKey = Strings.create("did:key:").append(Multikey.encodePublicKey(pk));
+		AString didKey = DID.forKey(pk);
 
 		long now = System.currentTimeMillis() / 1000;
 		AMap<AString, ACell> claims = Maps.of(
-			Strings.create("sub"), didKey,
-			Strings.create("iss"), didKey,
-			Strings.create("iat"), CVMLong.create(now),
-			Strings.create("exp"), CVMLong.create(now + lifetimeSeconds)
+			JWT.SUB, didKey,
+			JWT.ISS, didKey,
+			JWT.IAT, now,
+			JWT.EXP, now + lifetimeSeconds
 		);
+
+		if (audience != null) {
+			claims = claims.assoc(JWT.AUD, audience);
+		}
 
 		return JWT.signPublic(claims, kp);
 	}

@@ -17,6 +17,7 @@ import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 
 /**
  * Defines the mapping between SQL types and Convex CVM types.
@@ -195,23 +196,35 @@ public enum ConvexType {
 		return Strings.create(json);
 	}
 
-	/** Converts any CVM cell to a Java value (for ANY type). */
+	/** Converts any CVM cell to a Java value (for ANY type).
+	 * Uses the same conversion as {@link convex.db.calcite.rel.ConvexResultConverter#cellToJava}. */
 	private static Object convertAnyToJava(ACell cell) {
 		if (cell == null) return null;
-		if (cell instanceof CVMLong l) {
-			long v = l.longValue();
-			// Return Integer for small values to match SQL literal types
-			if (v >= Integer.MIN_VALUE && v <= Integer.MAX_VALUE) {
-				return (int) v;
-			}
-			return v;
-		}
-		if (cell instanceof CVMDouble d) return d.doubleValue();
-		if (cell instanceof AString s) return s.toString();
-		if (cell instanceof CVMBool b) return b.booleanValue();
 		if (cell instanceof ABlob b) return b.getBytes();
-		if (cell instanceof AMap<?,?> m) return m.toString();
-		return cell.toString();
+		return RT.jvm(cell);
+	}
+
+	/**
+	 * Maps a Calcite SqlTypeName to a ConvexType.
+	 *
+	 * @param sqlTypeName The Calcite type
+	 * @return The ConvexType
+	 */
+	public static ConvexType fromSqlTypeName(SqlTypeName sqlTypeName) {
+		return switch (sqlTypeName) {
+			case BIGINT -> BIGINT;
+			case INTEGER, SMALLINT, TINYINT -> INTEGER;
+			case DECIMAL -> DECIMAL;
+			case DOUBLE, FLOAT, REAL -> DOUBLE;
+			case CHAR -> CHAR;
+			case VARCHAR -> VARCHAR;
+			case BOOLEAN -> BOOLEAN;
+			case VARBINARY -> VARBINARY;
+			case BINARY -> BLOB;
+			case TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE -> TIMESTAMP;
+			case ANY -> ANY;
+			default -> ANY;
+		};
 	}
 
 	/**

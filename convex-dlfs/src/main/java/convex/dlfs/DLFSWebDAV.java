@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import convex.lattice.fs.DLFileSystem;
 import convex.restapi.auth.AuthMiddleware;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -77,6 +78,16 @@ public class DLFSWebDAV {
 		app.options(ROUTE_PATH, this::handleOptions);
 		app.options(ROUTE, this::handleOptions);
 		app.options(ROUTE_BARE, this::handleOptions);
+
+		// Root-level DAV discovery (Windows WebClient sends OPTIONS / then PROPFIND /)
+		app.options("/", this::handleOptions);
+		app.before(ctx -> {
+			if ("PROPFIND".equals(ctx.req().getMethod()) && "/".equals(ctx.path())) {
+				handleRootPropfind(ctx);
+				ctx.skipRemainingHandlers();
+				return;
+			}
+		});
 
 		// Custom WebDAV methods — Javalin has no built-in handler type for these
 		app.before(ctx -> {
@@ -187,6 +198,17 @@ public class DLFSWebDAV {
 		return fs.getPath("/" + dp.filePath());
 	}
 
+	/**
+	 * Syncs the DLFS drive after a mutating operation to ensure lattice persistence.
+	 */
+	private void syncDrive(Context ctx, DrivePath dp) {
+		if (dp.driveName() == null) return;
+		FileSystem fs = driveManager.getDrive(getIdentity(ctx), dp.driveName());
+		if (fs instanceof DLFileSystem dlfs) {
+			dlfs.sync();
+		}
+	}
+
 	// ==================== Handlers ====================
 
 	/**
@@ -279,6 +301,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.TRUNCATE_EXISTING,
 				StandardOpenOption.WRITE);
 
+		syncDrive(ctx, dp);
 		ctx.status(isNew ? 201 : 204);
 	}
 
@@ -310,6 +333,7 @@ public class DLFSWebDAV {
 
 		try {
 			Files.delete(path);
+			syncDrive(ctx, dp);
 			ctx.status(204);
 		} catch (NoSuchFileException e) {
 			ctx.status(404).result("Not Found");
@@ -345,6 +369,27 @@ public class DLFSWebDAV {
 		}
 
 		ctx.status(200);
+	}
+
+	/**
+	 * Handles PROPFIND on root (/), listing /dlfs/ as a child collection.
+	 * Required for Windows WebDAV client discovery.
+	 */
+	void handleRootPropfind(Context ctx) {
+		String xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+			+ "<D:multistatus xmlns:D=\"DAV:\">"
+			+ "<D:response><D:href>/</D:href><D:propstat><D:prop>"
+			+ "<D:displayname>/</D:displayname>"
+			+ "<D:resourcetype><D:collection/></D:resourcetype>"
+			+ "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"
+			+ "<D:response><D:href>/dlfs/</D:href><D:propstat><D:prop>"
+			+ "<D:displayname>dlfs</D:displayname>"
+			+ "<D:resourcetype><D:collection/></D:resourcetype>"
+			+ "</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>"
+			+ "</D:multistatus>";
+		ctx.contentType("application/xml; charset=utf-8");
+		ctx.status(207);
+		ctx.result(xml);
 	}
 
 	void handleOptions(Context ctx) {
@@ -429,6 +474,7 @@ public class DLFSWebDAV {
 
 		try {
 			Files.createDirectory(path);
+			syncDrive(ctx, dp);
 			ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
 			ctx.status(201);
 		} catch (FileAlreadyExistsException e) {
@@ -492,6 +538,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.WRITE);
 		Files.delete(source);
 
+		syncDrive(ctx, dp);
 		ctx.status(destExists ? 204 : 201);
 	}
 
@@ -528,6 +575,7 @@ public class DLFSWebDAV {
 				StandardOpenOption.TRUNCATE_EXISTING,
 				StandardOpenOption.WRITE);
 
+		syncDrive(ctx, dp);
 		ctx.status(destExists ? 204 : 201);
 	}
 

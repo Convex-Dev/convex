@@ -39,6 +39,11 @@ public class EtchStore extends ACachedStore {
 
 
 	public EtchStore(Etch etch) {
+		this(etch, true);
+	}
+
+	public EtchStore(Etch etch, boolean enableL2) {
+		super(enableL2);
 		this.etch = etch;
 		this.target = null;
 		etch.setStore(this);

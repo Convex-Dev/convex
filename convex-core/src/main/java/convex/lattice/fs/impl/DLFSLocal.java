@@ -64,6 +64,12 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
+	public CVMLong getTimestamp() {
+		CVMLong ctxTs = rootCursor.getContext().getTimestamp();
+		return (ctxTs != null) ? ctxTs : super.getTimestamp();
+	}
+
+	@Override
 	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> result=DLFSNode.navigate(rootNode,dir);

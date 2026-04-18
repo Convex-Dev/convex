@@ -1,22 +1,35 @@
-# Docker for Convex 
+# Docker for Convex
 
 #######################################
 # Build stage
 FROM maven:3.9.9-eclipse-temurin-22-jammy AS build
 WORKDIR /build
+
+# Copy POMs first for dependency caching
+COPY pom.xml .
+COPY convex-core/pom.xml convex-core/
+COPY convex-peer/pom.xml convex-peer/
+COPY convex-cli/pom.xml convex-cli/
+COPY convex-gui/pom.xml convex-gui/
+COPY convex-restapi/pom.xml convex-restapi/
+COPY convex-java/pom.xml convex-java/
+COPY convex-benchmarks/pom.xml convex-benchmarks/
+COPY convex-observer/pom.xml convex-observer/
+COPY convex-integration/pom.xml convex-integration/
+RUN mvn dependency:go-offline -B || true
+
+# Copy source and build
 COPY . .
-RUN mvn clean install
+RUN mvn -B clean install
 
 #######################################
 # Run stage
-FROM eclipse-temurin:22-jre-alpine AS run
+FROM eclipse-temurin:25-jre-alpine
 
-# Add labels
-LABEL
-org.opencontainers.image.title="Convex" \
-org.opencontainers.image.description="Convex Peer Node" \
-org.opencontainers.image.source="https://github.com/Convex-Dev/convex" \
-org.opencontainers.image.source="https://convex.world" 
+LABEL org.opencontainers.image.title="Convex" \
+      org.opencontainers.image.description="Convex Peer Node" \
+      org.opencontainers.image.source="https://github.com/Convex-Dev/convex" \
+      org.opencontainers.image.url="https://convex.world"
 
 # Create non-root user
 RUN addgroup -S convex && adduser -S convex -G convex
@@ -24,8 +37,7 @@ RUN addgroup -S convex && adduser -S convex -G convex
 # Set environment variables
 ENV HOME=/home/convex \
     CONVEX_HTTP_PORT=8080 \
-    CONVEX_BINARY_PORT=18888 \
-    CONVEX_HTTPS_PORT=443
+    CONVEX_BINARY_PORT=18888
 
 WORKDIR $HOME
 
@@ -46,7 +58,6 @@ USER convex
 # Expose ports
 EXPOSE $CONVEX_BINARY_PORT
 EXPOSE $CONVEX_HTTP_PORT
-EXPOSE $CONVEX_HTTPS_PORT
 
 # Define volumes
 VOLUME ["/etc/convex/keystore"]
@@ -56,4 +67,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:${CONVEX_HTTP_PORT}/api/v1/status || exit 1
 
 ENTRYPOINT ["java", "-jar", "convex.jar", "peer", "start"]
-

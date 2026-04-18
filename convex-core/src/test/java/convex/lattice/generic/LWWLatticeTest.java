@@ -20,7 +20,7 @@ import convex.lattice.LatticeTest;
  */
 public class LWWLatticeTest {
 
-	private static final LWWLattice LWW = LWWLattice.INSTANCE;
+	private static final LWWLattice<ACell> LWW = LWWLattice.INSTANCE;
 	private static final Keyword KEY_TS = LWWLattice.KEY_TIMESTAMP;
 	private static final Keyword KEY_DATA = Keyword.intern("data");
 

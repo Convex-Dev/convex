@@ -2,6 +2,8 @@ package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -9,15 +11,27 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.atomic.AtomicReference;
+
+import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.RootLatticeCursor;
 import convex.lattice.fs.impl.DLFSLocal;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
+import convex.lattice.generic.OwnerLattice;
 
 /**
  * Tests for DLFS integration with lattice cursors.
@@ -104,6 +118,145 @@ public class DLFSCursorTest {
 
 		// Original file should still exist
 		assertEquals("Original", Files.readString(dlfs.getPath("/data/original.txt")));
+	}
+
+	@Test
+	public void testSyncReachesRootCallback() throws Exception {
+		// Simulates what NodeServer does: root cursor with onSync callback
+		MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattice.INSTANCE);
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> root =
+			(RootLatticeCursor<AHashMap<AString, AVector<ACell>>>) Cursors.createLattice(drivesLattice);
+
+		// Track sync callbacks (like NodeServer's propagator trigger)
+		AtomicReference<ACell> synced = new AtomicReference<>();
+		root.onSync(value -> { synced.set(value); return value; });
+
+		// Connect a drive and write
+		AString driveName = Strings.create("vault");
+		DLFSLocal dlfs = DLFS.connect(root, driveName);
+		Files.writeString(dlfs.getPath("/test.txt"), "sync me!");
+
+		// Before sync: callback should not have been triggered
+		assertNull(synced.get(), "onSync should not fire until sync() is called");
+
+		// Sync from the drive level
+		dlfs.sync();
+
+		// After sync: callback should have the full root value including file content
+		assertNotNull(synced.get(), "onSync should fire after sync()");
+
+		// Verify content survives a round-trip through the synced value
+		AHashMap<AString, AVector<ACell>> syncedMap = (AHashMap<AString, AVector<ACell>>) synced.get();
+		DLFSLocal restored = DLFS.connect(Cursors.createLattice(drivesLattice, syncedMap), driveName);
+		assertEquals("sync me!", Files.readString(restored.getPath("/test.txt")),
+			"File content should survive sync round-trip");
+	}
+
+	/**
+	 * Exercises a full DLFS file-operation sequence through a Covia-style cursor
+	 * chain: {@code root (KeyedLattice :dlfs)} → {@link OwnerLattice} keyed by
+	 * {@link AccountKey} → signed value → drives {@link MapLattice} → named drive.
+	 *
+	 * <p>Verifies that mkdir/write/delete/mkdir/write all flow correctly through
+	 * the signing boundary and that a single cached {@link DLFSLocal} survives
+	 * intermediate state transitions (delete leaving a tombstone, then a fresh
+	 * mkdir at the root).</p>
+	 */
+	@Test
+	public void testCoviaChainSequence() throws Exception {
+		AKeyPair kp = AKeyPair.createSeeded(2001);
+		AccountKey ak = kp.getAccountKey();
+		AString driveName = Strings.create("health-vault");
+		Keyword DLFS_KW = Keyword.intern("dlfs");
+
+		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+			MapLattice.create(DLFSLattice.INSTANCE));
+		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
+
+		LatticeContext ctx = LatticeContext.create(null, kp);
+		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
+			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+
+		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		dlfsCursor.withContext(ctx);
+		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+
+		Files.createDirectory(dlfs.getPath("/tmp"));
+		Files.writeString(dlfs.getPath("/tmp/deleteme.txt"), "delete me");
+		Files.delete(dlfs.getPath("/tmp/deleteme.txt"));
+		Files.createDirectory(dlfs.getPath("/lab-results"));
+		Files.writeString(dlfs.getPath("/lab-results/panel-q4.json"), "{\"tsh\": 2.8}");
+
+		assertTrue(Files.isDirectory(dlfs.getPath("/lab-results")));
+		assertTrue(Files.exists(dlfs.getPath("/lab-results/panel-q4.json")));
+		assertEquals("{\"tsh\": 2.8}", Files.readString(dlfs.getPath("/lab-results/panel-q4.json")));
+
+		AHashMap<ACell, SignedData<?>> dlfsSlot =
+			(AHashMap<ACell, SignedData<?>>) rootCursor.get().get(DLFS_KW);
+		assertNotNull(dlfsSlot, "DLFS slot should exist on root after writes");
+		SignedData<?> aliceSigned = dlfsSlot.get(ak);
+		assertNotNull(aliceSigned, "Owner's signed slot should exist");
+		assertTrue(aliceSigned.checkSignature(), "Signature must be valid");
+	}
+
+	/**
+	 * Concurrent writes at disjoint top-level paths through a Covia-style
+	 * cursor chain. With rsync-like merge semantics, ALL three sibling
+	 * directories should survive — none should be lost to merge collision.
+	 *
+	 * <p>This isolates a bug found in Covia's VaultAdapter where parallel
+	 * test methods sharing a cached DLFSLocal lost siblings.</p>
+	 */
+	@Test
+	public void testConcurrentDisjointWrites() throws Exception {
+		AKeyPair kp = AKeyPair.createSeeded(2002);
+		AccountKey ak = kp.getAccountKey();
+		AString driveName = Strings.create("vault");
+		Keyword DLFS_KW = Keyword.intern("dlfs");
+
+		OwnerLattice<?> dlfsUsersLattice = OwnerLattice.create(
+			MapLattice.create(DLFSLattice.INSTANCE));
+		KeyedLattice rootLattice = KeyedLattice.create(DLFS_KW, dlfsUsersLattice);
+
+		LatticeContext ctx = LatticeContext.create(null, kp);
+		RootLatticeCursor<Index<Keyword, ACell>> rootCursor =
+			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
+
+		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
+		dlfsCursor.withContext(ctx);
+		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
+		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
+
+		String[] dirs = { "alpha", "beta", "gamma" };
+		java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+		java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(dirs.length);
+		java.util.List<Throwable> errors = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+		for (String d : dirs) {
+			new Thread(() -> {
+				try {
+					start.await();
+					Files.createDirectory(dlfs.getPath("/" + d));
+				} catch (Throwable t) {
+					errors.add(t);
+				} finally {
+					done.countDown();
+				}
+			}, "writer-" + d).start();
+		}
+		start.countDown();
+		assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+
+		java.util.Set<String> survivors = new java.util.HashSet<>();
+		try (java.nio.file.DirectoryStream<Path> s =
+				Files.newDirectoryStream(dlfs.getPath("/"))) {
+			for (Path p : s) survivors.add(p.getFileName().toString());
+		}
+
+		assertTrue(errors.isEmpty(), "writer errors: " + errors);
+		assertEquals(java.util.Set.of("alpha", "beta", "gamma"), survivors,
+			"all disjoint sibling dirs should survive concurrent writes");
 	}
 
 	@Test

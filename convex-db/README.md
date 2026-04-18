@@ -13,12 +13,12 @@ Convex DB provides SQL query capabilities over lattice data structures, built on
 ## Quick Start
 
 ```java
-// 1. Create a database
-AKeyPair keyPair = AKeyPair.generate();
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
+// 1. Create a ConvexDB and a named database
+ConvexDB cdb = ConvexDB.create();
+SQLDatabase db = cdb.database("mydb");
 
-// 2. Register it for JDBC/PostgreSQL access
-ConvexSchemaFactory.register("mydb", db);
+// 2. Register for JDBC/PostgreSQL access
+cdb.register("mydb");
 
 // 3. Connect via JDBC
 Connection conn = DriverManager.getConnection("jdbc:convex:database=mydb");
@@ -84,6 +84,22 @@ Convex DB supports standard SQL via Apache Calcite:
 - **Aggregations**: `GROUP BY`, `HAVING`, `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`
 - **Expressions**: Arithmetic, string functions, `CASE`, `COALESCE`, `CAST`
 
+### Transactions
+
+JDBC transaction support uses Convex's lattice cursor fork/sync model:
+
+```java
+conn.setAutoCommit(false);
+
+stmt.execute("INSERT INTO users VALUES (2, 'Bob', 'bob@example.com')");
+// Changes isolated to this connection until commit
+
+conn.commit();   // Syncs fork back to parent — now visible to other connections
+// conn.rollback() would discard the fork instead
+```
+
+At the lattice level, `SQLDatabase.fork()` creates an isolated copy. `sync()` merges changes back; discarding the fork is a rollback.
+
 ## PostgreSQL Protocol Server
 
 Connect to Convex DB using any PostgreSQL client.
@@ -92,8 +108,9 @@ Connect to Convex DB using any PostgreSQL client.
 
 ```java
 // Create and register database
-SQLDatabase db = SQLDatabase.create("mydb", keyPair);
-ConvexSchemaFactory.register("mydb", db);
+ConvexDB cdb = ConvexDB.create();
+cdb.database("mydb");
+cdb.register("mydb");
 
 // Start PostgreSQL server
 PgServer server = PgServer.builder()
@@ -145,7 +162,7 @@ Some PostgreSQL-specific features are not yet supported:
 - Regex operators (`~`, `!~`, `~*`)
 - Some system catalog tables (pg_proc, pg_index, pg_constraint)
 - PostgreSQL-specific functions
-- Transactions (all operations auto-commit)
+- Transaction isolation across connections (read-committed level via lattice fork/sync)
 
 ## Lattice Tables API
 
@@ -276,10 +293,11 @@ Index<ABlob, AVector>
 ### Module Structure
 
 ```
-convex.db.lattice    - Lattice-backed table storage
-convex.db.calcite    - Apache Calcite integration
-convex.db.jdbc       - JDBC driver
-convex.db.psql       - PostgreSQL wire protocol server
+convex.db             - ConvexDB root lattice component
+convex.db.lattice     - SQLDatabase, SQLSchema, SQLTable, SQLRow
+convex.db.calcite     - Apache Calcite integration
+convex.db.jdbc        - JDBC driver
+convex.db.psql        - PostgreSQL wire protocol server
 ```
 
 ## Dependencies

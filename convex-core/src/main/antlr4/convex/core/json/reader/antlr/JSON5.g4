@@ -74,7 +74,14 @@ fragment SINGLE_QUOTE_CHAR
     ;
 
 fragment ESC
-    : '\\' (['"\\/bfnrtv0] | UNICODE)
+    : '\\' (
+        NEWLINE                  // line continuation
+        | UNICODE                // \u1234
+        | ['"\\/bfnrtv]          // single escape char
+        | '0'                    // \0
+        | 'x' HEX HEX            // \x3a
+        | ~['"\\bfnrtv0-9xu\r\n] // any other char (literal)
+    )
     ;
 
 fragment UNICODE
@@ -83,10 +90,6 @@ fragment UNICODE
 
 fragment HEX
     : [0-9a-fA-F]
-    ;
-
-fragment SAFECODEPOINT
-    : ~["\\]
     ;
 
 NUMBER

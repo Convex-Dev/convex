@@ -6,8 +6,8 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 
-import convex.core.crypto.AKeyPair;
-import convex.db.calcite.ConvexSchemaFactory;
+import convex.db.ConvexDB;
+
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -19,9 +19,9 @@ public class SQLDemo {
 		System.out.println("=== Convex SQL Demo ===\n");
 
 		// 1. Create and register database
-		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create("demo", kp);
-		ConvexSchemaFactory.register("demo", db);
+		ConvexDB cdb = ConvexDB.create();
+		SQLDatabase db = cdb.database("demo");
+		cdb.register("demo");
 		System.out.println("Database: " + db.getName());
 
 		// 2. Create table via database API

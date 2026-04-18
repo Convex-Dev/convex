@@ -1,5 +1,6 @@
 package convex.peer.auth;
 
+import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.util.Multikey;
@@ -8,8 +9,6 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Maps;
-import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 /**
@@ -26,9 +25,10 @@ import convex.core.lang.RT;
  * </ol>
  */
 public class PeerAuth {
-	
+
 	private final AKeyPair peerKeyPair;
 	private final AccountKey peerKey;
+	private final AString expectedAudience;
 
 	/**
 	 * Creates a PeerAuth instance for the given peer.
@@ -36,9 +36,24 @@ public class PeerAuth {
 	 * @param peerKeyPair The peer's Ed25519 key pair (for signing peer tokens)
 	 */
 	public PeerAuth(AKeyPair peerKeyPair) {
+		this(peerKeyPair, (AString) null);
+	}
+
+	/**
+	 * Creates a PeerAuth instance with audience checking.
+	 *
+	 * <p>When {@code expectedAudience} is non-null, all verified tokens must
+	 * contain a matching {@code aud} claim. A natural audience value is the
+	 * server's DID: {@code did:key:<multikey>}.
+	 *
+	 * @param peerKeyPair The peer's Ed25519 key pair (for signing peer tokens)
+	 * @param expectedAudience Expected {@code aud} claim, or null to skip audience checking
+	 */
+	public PeerAuth(AKeyPair peerKeyPair, AString expectedAudience) {
 		if (peerKeyPair == null) throw new IllegalArgumentException("Peer key pair required");
 		this.peerKeyPair = peerKeyPair;
 		this.peerKey = peerKeyPair.getAccountKey();
+		this.expectedAudience = expectedAudience;
 	}
 
 	/**
@@ -76,14 +91,16 @@ public class PeerAuth {
 	 */
 	public AString issuePeerToken(AString identity, long lifetimeSeconds) {
 		long now = System.currentTimeMillis() / 1000;
-		AString peerMultikey = Multikey.encodePublicKey(peerKey);
-
 		AMap<AString, ACell> claims = Maps.of(
-			Strings.create("sub"), identity,
-			Strings.create("iss"), Strings.create("did:key:").append(peerMultikey),
-			Strings.create("iat"), CVMLong.create(now),
-			Strings.create("exp"), CVMLong.create(now + lifetimeSeconds)
+			JWT.SUB, identity,
+			JWT.ISS, DID.forKey(peerKey),
+			JWT.IAT, now,
+			JWT.EXP, now + lifetimeSeconds
 		);
+
+		if (expectedAudience != null) {
+			claims = claims.assoc(JWT.AUD, expectedAudience);
+		}
 
 		return JWT.signPublic(claims, peerKeyPair);
 	}
@@ -93,6 +110,24 @@ public class PeerAuth {
 	 */
 	public AccountKey getPeerKey() {
 		return peerKey;
+	}
+
+	/**
+	 * Gets the expected audience, or null if audience checking is disabled.
+	 */
+	public AString getExpectedAudience() {
+		return expectedAudience;
+	}
+
+	/**
+	 * Creates a PeerAuth with audience set to this peer's DID ({@code did:key:<multikey>}).
+	 *
+	 * @param peerKeyPair The peer's Ed25519 key pair
+	 * @return PeerAuth instance with audience checking enabled
+	 */
+	public static PeerAuth createWithDIDAudience(AKeyPair peerKeyPair) {
+		AString aud = DID.forKey(peerKeyPair.getAccountKey());
+		return new PeerAuth(peerKeyPair, aud);
 	}
 
 	// ==================== Internal ====================
@@ -106,14 +141,14 @@ public class PeerAuth {
 			if (signerKey == null) return null;
 
 			if (!parsed.verifyEdDSA(signerKey)) return null;
-			if (!parsed.validateClaims(null, null)) return null;
+			if (!parsed.validateClaims(null, expectedAudience)) return null;
 
 			// Identity is the sub claim
-			AString sub = RT.ensureString(parsed.getClaims().get(Strings.create("sub")));
+			AString sub = RT.ensureString(parsed.getClaims().get(JWT.SUB));
 			if (sub == null) return null;
 
 			// Self-issued sub must match did:key for the signing key
-			AString expectedDID = Strings.create("did:key:").append(Multikey.encodePublicKey(signerKey));
+			AString expectedDID = DID.forKey(signerKey);
 			if (!expectedDID.equals(sub)) return null;
 
 			return sub;
@@ -125,10 +160,10 @@ public class PeerAuth {
 	private AString verifyPeerSigned(JWT parsed) {
 		try {
 			if (!parsed.verifyEdDSA(peerKey)) return null;
-			if (!parsed.validateClaims(null, null)) return null;
+			if (!parsed.validateClaims(null, expectedAudience)) return null;
 
 			// Identity is the sub claim
-			AString sub = RT.ensureString(parsed.getClaims().get(Strings.create("sub")));
+			AString sub = RT.ensureString(parsed.getClaims().get(JWT.SUB));
 			return sub;
 		} catch (Exception e) {
 			return null;

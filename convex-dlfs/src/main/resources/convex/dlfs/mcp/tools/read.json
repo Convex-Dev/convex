@@ -1,0 +1,18 @@
+{
+  "name": "dlfs_read",
+  "description": "Read file contents from a DLFS drive. Returns text content with UTF-8 encoding for text files, or base64-encoded content for binary files. Also returns the file size in bytes.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "drive": {
+        "type": "string",
+        "description": "Drive name"
+      },
+      "path": {
+        "type": "string",
+        "description": "File path within the drive (e.g. 'docs/readme.txt')"
+      }
+    },
+    "required": ["drive", "path"]
+  }
+}

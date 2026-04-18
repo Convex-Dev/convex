@@ -8,7 +8,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.AccountKey;
-import convex.core.data.Cells;
 import convex.core.data.EncodingTest;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;

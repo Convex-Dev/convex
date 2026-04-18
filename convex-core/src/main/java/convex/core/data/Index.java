@@ -683,7 +683,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @return Empty Index instance (singleton)
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> none() {
+	public static final <K extends ABlobLike<?>, V extends ACell> Index<K, V> none() {
 		return (Index<K, V>) EMPTY;
 	}
 

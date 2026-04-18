@@ -23,8 +23,9 @@ import java.util.function.Supplier;
  * <p>Usage:
  * <pre>
  * // Create and register a Convex database
- * SQLDatabase db = SQLDatabase.create("mydb", keyPair);
- * ConvexSchemaFactory.register("mydb", db);
+ * ConvexDB cdb = ConvexDB.create();
+ * cdb.database("mydb");
+ * cdb.register("mydb");
  *
  * // Start the PostgreSQL server
  * PgServer server = PgServer.builder()

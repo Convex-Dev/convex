@@ -129,8 +129,24 @@ public class JSON {
 	}
 	
 	/**
+	 * Print a CVM value as a JSON5 string.
+	 *
+	 * JSON5 is a superset of strict JSON — in particular, non-finite
+	 * {@link CVMDouble} values render as the unquoted literals {@code NaN},
+	 * {@code Infinity} and {@code -Infinity} rather than {@code null}.
+	 *
+	 * @param value CVM value to render
+	 * @return CVM String containing valid JSON5
+	 */
+	public static AString printJSON5(ACell value) {
+		BlobBuilder bb = new BlobBuilder();
+		appendJSON5(bb, value);
+		return Strings.create(bb.toBlob());
+	}
+
+	/**
 	 * Pretty-print any object as a JSON string
-	 * 
+	 *
 	 * @param value Value to convert to JSON, may be Java or CVM structure
 	 * @return CVM String containing valid JSON
 	 */
@@ -205,30 +221,34 @@ public class JSON {
 			if (value instanceof Double dv) {
 				if (Double.isFinite(dv)) {
 					bb.append(nv.toString());
-					return;
 				} else {
-					if (Double.isNaN(dv)) {
-						bb.append(JS_NAN);
-					} else {
-//						if (dv<0) {
-//							bb.append('-');
-//						}
-//						bb.append("Infinity");
-						bb.append(Strings.NULL);
-					}
+					// Strict JSON has no NaN / Infinity literals — emit null
+					// (callers needing the literal forms should use the JSON5 writer)
+					bb.append(Strings.NULL);
 				}
 				return;
 			}
-			
+
 			bb.append(nv.toString());
-			return;			
+			return;
 		}
 		
 		throw new IllegalArgumentException("Can't print type as JSON: "+Utils.getClassName(value));
 	}
 	
-	// Specialised writing for CVM types
-	private static void appendJSON(BlobBuilder bb, ACell value) {
+	/**
+	 * Appends a JSON rendering of any CVM `ACell` value to a `BlobBuilder`.
+	 *
+	 * Handles all CVM primitive and container types: nil, booleans, integers,
+	 * doubles, big integers, strings (with JSON escaping), blobs (as `"0x..."` hex),
+	 * addresses, symbolic types (keywords / symbols), maps, and collections.
+	 * Non-finite doubles follow the current JSON writer behaviour — see issues
+	 * #546 and #547 for the JSON5 writer follow-up and JSON compliance audit.
+	 *
+	 * @param bb `BlobBuilder` to append to
+	 * @param value CVM value to render (may be null)
+	 */
+	public static void appendJSON(BlobBuilder bb, ACell value) {
 		if (value == null) {
 			bb.append(Strings.NULL);
 			return;
@@ -316,7 +336,87 @@ public class JSON {
 		// Catches stuff like functions etc. which don't have sensible JSON renderings
 		appendJSON(bb,RT.print(value));
 	}
-	
+
+	/**
+	 * Appends a JSON5 rendering of any CVM `ACell` value to a `BlobBuilder`.
+	 *
+	 * JSON5 is a superset of strict JSON that supports unquoted non-finite
+	 * double literals. Differs from {@link #appendJSON(BlobBuilder, ACell)}
+	 * only in its treatment of non-finite {@link CVMDouble}: emits unquoted
+	 * {@code NaN}, {@code Infinity} or {@code -Infinity} rather than
+	 * {@code null}. All other types render identically.
+	 *
+	 * @param bb `BlobBuilder` to append to
+	 * @param value CVM value to render (may be null)
+	 */
+	public static void appendJSON5(BlobBuilder bb, ACell value) {
+		if (value == null) {
+			bb.append(Strings.NULL);
+			return;
+		}
+
+		if (value instanceof AString cs) {
+			bb.append('\"');
+			appendCVMStringQuoted(bb, cs.toString());
+			bb.append('\"');
+			return;
+		}
+
+		if (value instanceof ASymbolic cs) {
+			appendJSON5(bb, cs.getName());
+			return;
+		}
+
+		if (value instanceof AMap mv) {
+			bb.append('{');
+			long n = mv.size();
+			for (long i = 0; i < n; i++) {
+				if (i>0) bb.append(',');
+				MapEntry<?,?> me=mv.entryAt(i);
+				bb.append('"');
+				appendCVMStringQuoted(bb, jsonKey(me.getKey()));
+				bb.append('"');
+				bb.append(':');
+				appendJSON5(bb, me.getValue());
+			}
+			bb.append('}');
+			return;
+		}
+
+		if (value instanceof ACollection lv) {
+			bb.append('[');
+			long n = lv.count();
+			for (long i = 0; i < n; i++) {
+				if (i>0) bb.append(',');
+				appendJSON5(bb, lv.get(i));
+			}
+			bb.append(']');
+			return;
+		}
+
+		if (value instanceof CVMDouble nv) {
+			double d = nv.doubleValue();
+			if (Double.isFinite(d)) {
+				bb.append(Double.toString(d));
+			} else if (Double.isNaN(d)) {
+				bb.append(JSON5_NAN);
+			} else if (d > 0) {
+				bb.append(JSON5_INFINITY);
+			} else {
+				bb.append(JSON5_NEG_INFINITY);
+			}
+			return;
+		}
+
+		// All remaining leaf types render identically in JSON and JSON5 —
+		// delegate to avoid duplicating leaf handling.
+		appendJSON(bb, value);
+	}
+
+	private static final StringShort JSON5_NAN = StringShort.create("NaN");
+	private static final StringShort JSON5_INFINITY = StringShort.create("Infinity");
+	private static final StringShort JSON5_NEG_INFINITY = StringShort.create("-Infinity");
+
 	private static final int INDENT=2;
 	
     private static BlobBuilder appendPrettyJSON(BlobBuilder sb, ACell o, int indent) {
@@ -389,7 +489,18 @@ public class JSON {
     	return sb.appendRepeatedByte((byte)' ', count);
     }
 
-	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
+	/**
+	 * Appends a `CharSequence` to a `BlobBuilder` with JSON string escaping
+	 * applied. Does **not** append the surrounding double-quote characters —
+	 * the caller is responsible for emitting those.
+	 *
+	 * Handles standard escapes (`\\`, `\"`, `\n`, `\r`, `\t`), control characters
+	 * via `u00XX`, and UTF-16 surrogate pairs via `CVMChar`.
+	 *
+	 * @param bb `BlobBuilder` to append to
+	 * @param cs `CharSequence` to escape and append
+	 */
+	public static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
 		int n = cs.length();
 		
 		for (int i = 0; i < n; i++) {
@@ -414,9 +525,7 @@ public class JSON {
 	private static final StringShort QUOTED_NEWLINE = StringShort.create("\\n");
 	private static final StringShort QUOTED_RETURN = StringShort.create("\\r");
 	private static final StringShort QUOTED_TAB = StringShort.create("\\t");
-	
-	private static final StringShort JS_NAN = StringShort.create("NaN");
-	
+
 	private static final char CONTROL_CHARS_END = 0x001f; // Highest ASCII control character
 
 
@@ -467,6 +576,79 @@ public class JSON {
 		// This this works as JSON is subset of Java escaped Strings?
 		String unes=Text.unescapeJava(content);
 		return Strings.create(unes);
+	}
+
+	/**
+	 * Unescapes JSON5 string content. JSON5 adds line continuation, hex byte
+	 * escapes (\xHH), \v, and lenient escapes where \&lt;char&gt; is treated as
+	 * the literal char.
+	 * @param content JSON5 String content to unescape
+	 * @return CVM String containing JSON5 unescaped content
+	 */
+	public static AString unescape5(String content) {
+		int n=content.length();
+		StringBuilder sb=new StringBuilder(n);
+		int i=0;
+		while (i<n) {
+			char c=content.charAt(i);
+			if (c!='\\') {
+				sb.append(c);
+				i++;
+				continue;
+			}
+			if (i+1>=n) {
+				sb.append(c);
+				i++;
+				continue;
+			}
+			char nc=content.charAt(i+1);
+			switch (nc) {
+				case 'b': sb.append('\b'); i+=2; continue;
+				case 'f': sb.append('\f'); i+=2; continue;
+				case 'n': sb.append('\n'); i+=2; continue;
+				case 'r': sb.append('\r'); i+=2; continue;
+				case 't': sb.append('\t'); i+=2; continue;
+				case 'v': sb.append('\u000B'); i+=2; continue;
+				case '0': sb.append('\0'); i+=2; continue;
+				case 'u': {
+					if (i+6>n) { sb.append(nc); i+=2; continue; }
+					int cp=0;
+					boolean ok=true;
+					for (int j=0; j<4; j++) {
+						int v=Utils.hexVal(content.charAt(i+2+j));
+						if (v<0) { ok=false; break; }
+						cp=cp*16+v;
+					}
+					if (!ok) { sb.append(nc); i+=2; continue; }
+					sb.append(Character.toChars(cp));
+					i+=6;
+					continue;
+				}
+				case 'x': {
+					if (i+4>n) { sb.append(nc); i+=2; continue; }
+					int hi=Utils.hexVal(content.charAt(i+2));
+					int lo=Utils.hexVal(content.charAt(i+3));
+					if (hi<0||lo<0) { sb.append(nc); i+=2; continue; }
+					sb.append((char)(hi*16+lo));
+					i+=4;
+					continue;
+				}
+				case '\r':
+					// CRLF line continuation consumes both
+					if (i+2<n && content.charAt(i+2)=='\n') { i+=3; continue; }
+					i+=2; continue;
+				case '\n':
+				case '\u2028':
+				case '\u2029':
+					// Line continuation: backslash + newline produces nothing
+					i+=2; continue;
+				default:
+					// Any other escaped char is the literal character
+					sb.append(nc);
+					i+=2;
+			}
+		}
+		return Strings.create(sb.toString());
 	}
 
 	/**

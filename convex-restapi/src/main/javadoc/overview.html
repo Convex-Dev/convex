@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex REST API</title>
+</head>
+<body>
+
+<h1>Convex REST API</h1>
+
+<p>HTTP REST server exposing Convex peer functionality over a conventional web API.
+Suitable for browser clients, language bindings without a native binary client,
+and integration with standard web tooling.</p>
+
+<p>Endpoints include transaction submission, query execution, account lookups,
+and block / state inspection. The REST surface is public by default and designed
+to be robust against malicious messages.</p>
+
+<p>Depends on <code>convex-peer</code> (and transitively <code>convex-core</code>).</p>
+
+<h2>Key Entry Points</h2>
+
+<ul>
+  <li><code>convex.restapi.RESTServer</code> — embeddable REST server</li>
+  <li><code>convex.restapi.api</code> — endpoint handlers</li>
+</ul>
+
+<p>See the <a href="https://docs.convex.world/">Convex documentation</a> for the
+full REST API reference.</p>
+
+</body>
+</html>

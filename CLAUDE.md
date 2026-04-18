@@ -17,7 +17,7 @@ mvn clean install          # Full build with local install
 
 ## Module Structure
 
-9 Maven modules with clear separation of concerns:
+12 Maven modules with clear separation of concerns:
 
 | Module | Purpose |
 |--------|---------|
@@ -27,6 +27,9 @@ mvn clean install          # Full build with local install
 | `convex-gui` | Swing desktop application |
 | `convex-restapi` | HTTP REST API server |
 | `convex-java` | Java client library |
+| `convex-db` | SQL database with JDBC and PostgreSQL protocol |
+| `convex-dlfs` | Distributed Lattice File System (WebDAV server) |
+| `convex-social` | Social network primitives on Convex |
 | `convex-benchmarks` | JMH performance benchmarks |
 | `convex-observer` | Network monitoring tools |
 | `convex-integration` | Build assembly (produces convex.jar) |

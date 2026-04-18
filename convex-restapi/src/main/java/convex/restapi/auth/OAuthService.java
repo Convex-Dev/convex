@@ -401,7 +401,7 @@ public class OAuthService {
 		if (!idToken.verifyRS256(key)) return null;
 
 		// Validate claims (check expiry)
-		if (!idToken.validateClaims(null, null)) return null;
+		if (!idToken.validateClaims((String) null, null)) return null;
 
 		// Extract sub
 		AString sub = RT.ensureString(idToken.getClaims().get(Strings.create("sub")));

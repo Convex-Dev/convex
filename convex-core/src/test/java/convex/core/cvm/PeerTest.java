@@ -17,6 +17,9 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
@@ -30,12 +33,8 @@ import convex.core.data.SignedData;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.store.Stores;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
-import convex.core.cpos.Block;
-import convex.core.cpos.BlockResult;
-import convex.core.cpos.CPoSConstants;
 import convex.test.Samples;
 
 @TestInstance(Lifecycle.PER_CLASS)

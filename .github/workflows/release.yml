@@ -1,23 +1,24 @@
 # .github/workflows/release.yml
+# Creates a GitHub Release with convex.jar when a version tag is pushed
 name: Release
 
 on:
   push:
     tags:
-      - '*.*.*'          # matches 1.0.0, 2.3.4, etc.
+      - '*.*.*'
 
 permissions:
-  contents: write       # Needed to create the GitHub Release + upload assets
+  contents: write
 
 jobs:
-  build-and-release:
+  release:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0    # Required for changelog generation
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -26,13 +27,6 @@ jobs:
           java-version: 21
           cache: maven
 
-      - name: Cache Maven dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-
-
       - name: Build with tests
         run: mvn -B clean install
 
@@ -40,24 +34,18 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ github.ref_name }}"
-          echo "Extracting changelog for version $VERSION"
-
-          # Extract section between this version and previous version/unreleased
           CHANGELOG=$(awk "/## \[$VERSION\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
-
-          # If extraction failed, use a default message
           if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="Release $VERSION. See CHANGELOG.md for details."
+            echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date before tagging."
+            exit 1
           fi
-
-          # Set output using heredoc to handle multiline
           {
             echo 'changelog<<EOF'
             echo "$CHANGELOG"
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release and Upload Assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}

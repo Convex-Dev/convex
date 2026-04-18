@@ -136,14 +136,14 @@ public class JSON5Reader {
 		public void exitString(StringContext ctx) {
 			String text=ctx.getText();
 			String content=text.substring(1, text.length()-1);
-			push(JSON.unescape(content));
+			push(JSON.unescape5(content));
 		}
 
 		@Override
 		public void exitIdentifier(IdentifierContext ctx) {
 			String text=ctx.getText();
 			// no need to take substring, should be full identifier name
-			push(JSON.unescape(text));
+			push(JSON.unescape5(text));
 		}
 
 		@Override
@@ -160,15 +160,15 @@ public class JSON5Reader {
 	}
 
 	public static ACell read(String s) {
-		return read(CharStreams.fromString(s));
+		return readInternal(CharStreams.fromString(s));
 	}
 
 	public static ACell read(java.io.Reader r) throws IOException {
-		return read(CharStreams.fromReader(r));
+		return readInternal(CharStreams.fromReader(r));
 	}
 
 	public static ACell read(InputStream is) throws IOException {
-		return read(CharStreams.fromStream(is));
+		return readInternal(CharStreams.fromStream(is));
 	}
 
 	public static class ThrowingErrorListener extends BaseErrorListener {
@@ -209,8 +209,13 @@ public class JSON5Reader {
 	 * on the parse listener, which can corrupt the listener's stack and throw
 	 * NoSuchElementException. Both exception types indicate a parse error and are
 	 * converted to ParseException with position information where available.
+	 *
+	 * Named distinctly from the public read() overloads so callers in other
+	 * modules don't need ANTLR's CharStream class on their compile classpath
+	 * for overload resolution — important because ANTLR is an automatic JPMS
+	 * module and its visibility during test-compile can be intermittent.
 	 */
-	static ACell read(CharStream cs) {
+	static ACell readInternal(CharStream cs) {
 		JSONListener listener=new JSONListener();
 		JSON5Parser parser=getParser(cs,listener);
 

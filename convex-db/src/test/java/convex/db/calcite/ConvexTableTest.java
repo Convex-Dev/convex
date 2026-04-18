@@ -12,7 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
@@ -28,6 +28,7 @@ public class ConvexTableTest {
 
 	private static int testCounter = 0;
 
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private Connection conn;
 	private String dbName;
@@ -36,9 +37,9 @@ public class ConvexTableTest {
 	void setUp() throws Exception {
 		// Use unique database name for each test to avoid schema cache conflicts
 		dbName = "testdb_" + (++testCounter) + "_" + System.currentTimeMillis();
-		AKeyPair kp = AKeyPair.generate();
-		db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		cdb = ConvexDB.create();
+		db = cdb.database(dbName);
+		cdb.register(dbName);
 		// Create typed table: id (INTEGER), name (VARCHAR), amount (INTEGER)
 		db.tables().createTable("test_table",
 			new String[]{"id", "name", "amount"},
@@ -49,7 +50,7 @@ public class ConvexTableTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		if (conn != null) conn.close();
-		ConvexSchemaFactory.unregister(dbName);
+		if (cdb != null) cdb.unregister(dbName);
 	}
 
 	@Test
@@ -346,6 +347,133 @@ public class ConvexTableTest {
 				assertEquals("Test item", rs.getString("description"));
 			}
 		}
+	}
+
+	// ========== Transaction Tests (Stage 1: verify Meta hooks work) ==========
+
+	/**
+	 * Tests that setAutoCommit, commit, and rollback don't throw.
+	 * Stage 1: ConvexMeta overrides CalciteMetaImpl's UnsupportedOperationException.
+	 */
+	@Test
+	void testTransactionMethodsDontThrow() throws SQLException {
+		// These would throw UnsupportedOperationException without ConvexMeta
+		assertDoesNotThrow(() -> conn.setAutoCommit(false));
+		assertDoesNotThrow(() -> conn.commit());
+		assertDoesNotThrow(() -> conn.rollback());
+		assertDoesNotThrow(() -> conn.setAutoCommit(true));
+	}
+
+	/**
+	 * Tests that DML works within a transaction block (auto-commit off).
+	 */
+	@Test
+	void testDMLWithAutoCommitOff() throws SQLException {
+		conn.setAutoCommit(false);
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
+			conn.commit();
+
+			try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM test_table")) {
+				assertTrue(rs.next());
+				assertEquals(1, rs.getInt(1));
+			}
+		}
+		conn.setAutoCommit(true);
+	}
+
+	/**
+	 * Tests that uncommitted transaction data is not visible outside the transaction.
+	 * Inserts into the forked schema via the lattice API (SQL DML path fixed in Stage 4),
+	 * then verifies a second connection cannot see the uncommitted data.
+	 */
+	@Test
+	void testTransactionNotVisibleUntilCommitted() throws SQLException {
+		// Insert initial data in auto-commit mode
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
+		}
+
+		// Open a second connection — reads from the parent (non-forked) DB
+		try (Connection conn2 = java.sql.DriverManager.getConnection("jdbc:convex:database=" + dbName)) {
+			// Start a transaction on conn — forks the DB
+			conn.setAutoCommit(false);
+
+			// Insert into the fork via the connection's (now forked) schema
+			getConnectionSchema().getTables().insert("test_table", 2, "Bob", 200);
+
+			// Transaction connection sees its own write (reads from fork)
+			try (Statement stmt = conn.createStatement();
+				 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM test_table")) {
+				assertTrue(rs.next());
+				assertEquals(2, rs.getInt(1), "Transaction should see its own writes");
+			}
+
+			// Second connection does NOT see uncommitted data
+			try (Statement stmt2 = conn2.createStatement();
+				 ResultSet rs = stmt2.executeQuery("SELECT COUNT(*) FROM test_table")) {
+				assertTrue(rs.next());
+				assertEquals(1, rs.getInt(1), "Uncommitted data should not be visible outside transaction");
+			}
+
+			// Commit
+			conn.commit();
+
+			// Now second connection sees the committed data
+			try (Statement stmt2 = conn2.createStatement();
+				 ResultSet rs = stmt2.executeQuery("SELECT COUNT(*) FROM test_table")) {
+				assertTrue(rs.next());
+				assertEquals(2, rs.getInt(1), "Committed data should be visible after commit");
+			}
+		}
+
+		conn.setAutoCommit(true);
+	}
+
+	/**
+	 * Tests that rollback discards transaction changes.
+	 */
+	@Test
+	void testRollbackDiscardsChanges() throws SQLException {
+		// Insert initial data
+		try (Statement stmt = conn.createStatement()) {
+			stmt.executeUpdate("INSERT INTO test_table VALUES (1, 'Alice', 100)");
+		}
+
+		// Start transaction
+		conn.setAutoCommit(false);
+
+		// Insert into the fork via the connection's schema
+		getConnectionSchema().getTables().insert("test_table", 2, "Bob", 200);
+
+		// Transaction sees it
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM test_table")) {
+			assertTrue(rs.next());
+			assertEquals(2, rs.getInt(1));
+		}
+
+		// Rollback
+		conn.rollback();
+
+		// Data should be gone — back to parent state
+		try (Statement stmt = conn.createStatement();
+			 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM test_table")) {
+			assertTrue(rs.next());
+			assertEquals(1, rs.getInt(1), "Rollback should discard transaction changes");
+		}
+
+		conn.setAutoCommit(true);
+	}
+
+	/**
+	 * Gets the ConvexSchema currently registered on the connection.
+	 * During a transaction, this is the forked schema.
+	 */
+	private ConvexSchema getConnectionSchema() throws SQLException {
+		var calciteConn = conn.unwrap(org.apache.calcite.jdbc.CalciteConnection.class);
+		var sub = calciteConn.getRootSchema().getSubSchema(dbName);
+		return sub.unwrap(ConvexSchema.class);
 	}
 
 	/**

@@ -10,21 +10,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
-import convex.core.data.SignedData;
-import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.RT;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
@@ -221,6 +220,80 @@ public class LatticeCursorTest {
 		assertTrue(forkValue.contains(CVMLong.create(2)), "Fork should have B after sync");
 	}
 
+	/**
+	 * Root cursor with a one-shot hook that runs synchronously at the start of
+	 * {@link #updateAndGet}, before the actual update. Used to deterministically
+	 * inject a concurrent write into the exact window inside
+	 * {@code ForkedLatticeCursor.sync()} between its read of {@code localVal}
+	 * and the final set/CAS on the local cursor.
+	 */
+	private static class HookedRootCursor<V extends ACell> extends RootLatticeCursor<V> {
+		private Runnable oneShotHook;
+
+		HookedRootCursor(ALattice<V> lattice, V initialValue) {
+			super(lattice, initialValue);
+		}
+
+		void armHook(Runnable hook) {
+			this.oneShotHook = hook;
+		}
+
+		@Override
+		public V updateAndGet(java.util.function.UnaryOperator<V> updateFunction) {
+			Runnable hook = oneShotHook;
+			oneShotHook = null;
+			if (hook != null) hook.run();
+			return super.updateAndGet(updateFunction);
+		}
+	}
+
+	@Test
+	public void testSyncPreservesConcurrentWrites() {
+		// Deterministic regression for the sync-clobbers-concurrent-writes race.
+		//
+		// sync() has a window between (a) reading the fork's local value and
+		// (b) writing the synced value back to the local cursor. A write that
+		// lands in that window was being clobbered by the unconditional
+		// localCursor.set(synced) in the original code.
+		//
+		// We reproduce the race deterministically by inserting a hook into the
+		// parent cursor's updateAndGet. That hook runs synchronously inside
+		// sync() — on the same thread, after localVal has been read but before
+		// sync's final set/CAS — and performs the concurrent write. No
+		// multi-threading, no timing assumptions.
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		HookedRootCursor<ASet<CVMLong>> root = new HookedRootCursor<>(lattice, Sets.empty());
+		ALatticeCursor<ASet<CVMLong>> fork = root.fork();
+
+		// Prime the fork with value A
+		CVMLong A = CVMLong.ONE;
+		CVMLong B = CVMLong.create(2);
+		fork.updateAndGet(set -> set.include(A));
+
+		// Arm the hook: when sync() calls parent.updateAndGet, inject a
+		// concurrent write of B into the fork's local cursor. This write
+		// happens *after* sync has read localVal (which had only A) but
+		// *before* sync writes back — precisely the race window.
+		root.armHook(() -> fork.updateAndGet(set -> set.include(B)));
+
+		// Sync. Under the buggy code, this would overwrite the fork's local
+		// state with sync's stale snapshot (containing only A), losing B.
+		// Under the fix, the CAS-then-merge path preserves B.
+		fork.sync();
+
+		ASet<CVMLong> localAfter = fork.get();
+		ASet<CVMLong> rootAfter = root.get();
+
+		assertTrue(localAfter.contains(A), "Fork should still have A after sync");
+		assertTrue(localAfter.contains(B),
+			"Fork should preserve B — the concurrent write inserted during sync "
+			+ "(was clobbered by the buggy unconditional localCursor.set)");
+		assertTrue(rootAfter.contains(A), "Root should have A after sync");
+		// Note: root won't have B yet — B was injected after sync's parent
+		// update had already captured the pre-hook localVal. The next sync
+		// would propagate B. The fix guarantees B is safely in the fork.
+	}
+
 	@Test
 	public void testFastPathOptimization() {
 		// When parent hasn't changed, sync should use fast path
@@ -264,6 +337,163 @@ public class LatticeCursorTest {
 		// Sync on root should be no-op, just return current value
 		ASet<CVMLong> synced = root.sync();
 		assertSame(initial, synced);
+	}
+
+	// ===== Sync callback / persistence layering tests =====
+	//
+	// These tests lock in the contract that downstream persistence layers
+	// (e.g. covia.venue.Engine, NodeServer) depend on. The key invariant
+	// being verified: ForkedLatticeCursor.sync() is implemented as
+	// `parent.updateAndGet(...)` and deliberately does NOT propagate sync
+	// notifications up the chain. Persistence consumers must therefore
+	// register their sync hook on the root cursor AND ensure the root's
+	// sync() is called explicitly (the fork's sync alone is not enough).
+	//
+	// See covia/venue/docs/PERSISTENCE.md §5.0 for the design that depends
+	// on this contract.
+
+	@Test
+	public void testRootSyncFiresOnSyncCallback() {
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
+
+		java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
+		java.util.concurrent.atomic.AtomicReference<ASet<CVMLong>> received = new java.util.concurrent.atomic.AtomicReference<>();
+		root.onSync(value -> {
+			callCount.incrementAndGet();
+			received.set(value);
+			return value;
+		});
+
+		// Make a write directly on the root
+		root.updateAndGet(set -> set.include(CVMLong.ONE));
+
+		// onSync must NOT fire on writes — only on sync()
+		assertEquals(0, callCount.get(), "onSync must not fire on cursor writes");
+
+		// Now call sync explicitly — onSync should fire exactly once with the current value
+		root.sync();
+		assertEquals(1, callCount.get(), "onSync should fire once on root.sync()");
+		assertNotNull(received.get());
+		assertTrue(received.get().contains(CVMLong.ONE));
+	}
+
+	@Test
+	public void testForkedSyncDoesNotFireRootOnSyncCallback() {
+		// CRITICAL CONTRACT: ForkedLatticeCursor.sync() uses parent.updateAndGet
+		// (not parent.sync), so it deliberately does NOT propagate the sync
+		// signal up to the root's onSync callback. Persistence layers
+		// (covia.venue.Engine) rely on this — they need to call root.sync()
+		// EXPLICITLY after fork.sync() to fire persistence triggers.
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
+
+		java.util.concurrent.atomic.AtomicInteger rootSyncCount = new java.util.concurrent.atomic.AtomicInteger();
+		root.onSync(value -> {
+			rootSyncCount.incrementAndGet();
+			return value;
+		});
+
+		// Fork, write to fork, sync the fork
+		ALatticeCursor<ASet<CVMLong>> fork = root.fork();
+		fork.updateAndGet(set -> set.include(CVMLong.ONE));
+		fork.sync();
+
+		// Fork's sync must NOT have fired the root's onSync callback
+		assertEquals(0, rootSyncCount.get(),
+			"fork.sync() must NOT propagate to root.onSync — see ForkedLatticeCursor.sync() at line 54");
+
+		// But the write IS visible at the root after fork.sync()
+		assertTrue(root.get().contains(CVMLong.ONE),
+			"fork.sync() must make writes visible at root via parent.updateAndGet");
+
+		// Calling root.sync() explicitly DOES fire the callback
+		root.sync();
+		assertEquals(1, rootSyncCount.get(),
+			"root.sync() called explicitly fires the callback — this is the persistence trigger");
+	}
+
+	@Test
+	public void testPathDerivedCursorWritesPropagateToParentRoot() {
+		// CONTRACT: cursor.path(...) returns a view, not a fork. Writes through
+		// the path-derived cursor go directly to the parent's storage.
+		// Persistence layers rely on this: a single onSync registration on the
+		// root captures all path-derived writes (e.g. DLFS subtree writes).
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
+
+		// path() with empty keys returns this — that's already covered by testPathEmptyReturnsThis.
+		// What we want to test is that a non-trivial path-derived cursor's writes
+		// land at the root. SetLattice doesn't have nested paths, so we use
+		// a MapLattice for this test.
+		MapLattice<AString, ASet<CVMLong>> mapLattice =
+			MapLattice.create(SetLattice.create());
+		RootLatticeCursor<AHashMap<AString, ASet<CVMLong>>> mapRoot =
+			Cursors.createLattice(mapLattice, Maps.empty());
+
+		// Derive a path cursor for key "users"
+		AString key = Strings.create("users");
+		ALatticeCursor<ASet<CVMLong>> userCursor = mapRoot.path(key);
+
+		// Write through the path cursor
+		userCursor.updateAndGet(set -> set.include(CVMLong.ONE));
+
+		// The write must be visible at the root via the same key
+		AHashMap<AString, ASet<CVMLong>> rootMap = mapRoot.get();
+		assertNotNull(rootMap);
+		ASet<CVMLong> users = rootMap.get(key);
+		assertNotNull(users, "path-derived write must land at the parent root");
+		assertTrue(users.contains(CVMLong.ONE));
+	}
+
+	@Test
+	public void testPathDerivedCursorAlsoFiresRootOnSyncOnExplicitSync() {
+		// Combination test: path-derived write, then explicit root.sync() — onSync fires.
+		// This is the actual flow covia.venue.Engine.sweep() uses.
+		MapLattice<AString, ASet<CVMLong>> lattice =
+			MapLattice.create(SetLattice.create());
+		RootLatticeCursor<AHashMap<AString, ASet<CVMLong>>> root =
+			Cursors.createLattice(lattice, Maps.empty());
+
+		java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger();
+		root.onSync(value -> { callCount.incrementAndGet(); return value; });
+
+		// Write through a path-derived view
+		ALatticeCursor<ASet<CVMLong>> pathCursor = root.path(Strings.create("k"));
+		pathCursor.updateAndGet(set -> set.include(CVMLong.ONE));
+
+		// Path write should not fire onSync (writes never do)
+		assertEquals(0, callCount.get());
+
+		// Explicit root.sync() fires onSync
+		root.sync();
+		assertEquals(1, callCount.get());
+
+		// And the write is in the value the callback would have seen
+		assertTrue(root.get().get(Strings.create("k")).contains(CVMLong.ONE));
+	}
+
+	@Test
+	public void testForkIsIndependentOfParentUntilSynced() {
+		// CONTRACT: writes to a fork are invisible at the parent until fork.sync().
+		// Persistence layers rely on this asymmetry — a fork can accumulate writes
+		// without triggering persistence on every individual write.
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, Sets.empty());
+
+		ALatticeCursor<ASet<CVMLong>> fork = root.fork();
+
+		// Write to fork
+		fork.updateAndGet(set -> set.include(CVMLong.ONE));
+
+		// Parent must NOT see the write yet
+		assertFalse(root.get().contains(CVMLong.ONE),
+			"fork writes must be invisible at parent until sync");
+
+		// After sync, parent sees it
+		fork.sync();
+		assertTrue(root.get().contains(CVMLong.ONE),
+			"after fork.sync(), parent sees the write");
 	}
 
 	@Test

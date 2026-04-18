@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -40,7 +39,7 @@ import convex.test.Samples;
 /**
  * Parameterised tests for a representative range of valid CVM values
  *
- * Mainly focused on checking generic properties and consistency with core predicate expecations
+ * Mainly focused on checking generic properties and consistency with core predicate expectations
  */
 @RunWith(Parameterized.class)
 public class ParamTestValues extends ACVMTest {

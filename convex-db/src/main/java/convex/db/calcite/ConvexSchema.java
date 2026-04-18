@@ -8,32 +8,44 @@ import org.apache.calcite.schema.Table;
 import org.apache.calcite.schema.impl.AbstractSchema;
 
 import convex.db.calcite.pgcatalog.PgCatalogSchema;
-import convex.db.lattice.LatticeTables;
+import convex.db.lattice.SQLDatabase;
+import convex.db.lattice.SQLSchema;
 
 /**
- * Calcite Schema backed by Convex lattice tables.
+ * Calcite Schema backed by a Convex {@link SQLDatabase}.
  *
  * <p>Provides the bridge between Calcite's SQL query engine and Convex's
  * lattice-based table storage. Tables created via DDL are persisted to
- * the underlying LatticeTables instance.
+ * the underlying lattice cursor tree.
  *
  * <p>This schema is mutable - tables can be added and removed via SQL DDL
  * statements when used with Calcite's DDL executor.
  */
 public class ConvexSchema extends AbstractSchema {
 
-	private final LatticeTables tables;
+	private final SQLDatabase database;
+	private final SQLSchema tables;
 	private final String name;
 
 	/**
-	 * Creates a new ConvexSchema wrapping the given lattice tables.
+	 * Creates a new ConvexSchema backed by the given database.
 	 *
-	 * @param tables The LatticeTables backing store
+	 * @param database The SQLDatabase instance
 	 * @param name Schema name
 	 */
-	public ConvexSchema(LatticeTables tables, String name) {
-		this.tables = tables;
+	public ConvexSchema(SQLDatabase database, String name) {
+		this.database = database;
+		this.tables = database.tables();
 		this.name = name;
+	}
+
+	/**
+	 * Gets the underlying SQLDatabase.
+	 *
+	 * @return The SQLDatabase backing this schema
+	 */
+	public SQLDatabase getDatabase() {
+		return database;
 	}
 
 	@Override
@@ -59,11 +71,11 @@ public class ConvexSchema extends AbstractSchema {
 	}
 
 	/**
-	 * Gets the underlying LatticeTables instance.
+	 * Gets the underlying SQLSchema instance.
 	 *
-	 * @return LatticeTables backing store
+	 * @return SQLSchema backing store
 	 */
-	public LatticeTables getTables() {
+	public SQLSchema getTables() {
 		return tables;
 	}
 

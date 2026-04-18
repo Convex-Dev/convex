@@ -10,10 +10,10 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 
 /**
- * Represents a W3C Decentralized Identifier URL (DID URL).
+ * Represents a W3C Decentralised Identifier URL (DID URL).
  * 
  * <p>A DID URL extends a basic DID with additional path, query, and fragment components,
- * following the format: {@code did:method:method_specific_id/path/to/something?q=blah#abc}</p>
+ * following the format: {@code did:method:method_specific_id/path/to/something?q=blah#frag}</p>
  * 
  * <p>This class provides immutable access to the components of a DID URL and supports
  * parsing from string representations and URI objects.</p>
@@ -24,16 +24,16 @@ import convex.core.data.Strings;
 public class DIDURL {
 
 
-    /** The base DID component of this DID URL */
+    /** The base DID component of this DID URL e.g. "did:method:method_specific_id" */
     final DID did;
     
-    /** The path component of this DID URL, or null if not present */
+    /** The path component of this DID URL e.g. "/path/to/something", or null if not present */
 	final String path;
 	
-	/** The query component of this DID URL, or null if not present */
+	/** The query component of this DID URL e.g. "q=blah", or null if not present */
 	final String query;
 	
-	/** The fragment component of this DID URL, or null if not present */
+	/** The fragment component of this DID URL e.g. "frag" , or null if not present */
 	final String fragment;
 	
 	/** Cached AString representation of this DID URL */
@@ -194,18 +194,35 @@ public class DIDURL {
 	 */
 	@Override
 	public String toString() {
-
 		String result=did.toString();
-		if (path!=null) { 
+		if (path!=null) {
 			result+=path;
 		}
 		if (query!=null) {
-			result+="?"+URLEncoder.encode(query, StandardCharsets.UTF_8);
+			result+="?"+encodeComponent(query);
 		}
 		if (fragment!=null) {
-			result+="#"+URLEncoder.encode(fragment, StandardCharsets.UTF_8);;
+			result+="#"+encodeComponent(fragment);
 		}
 		return result;
+	}
+
+	/**
+	 * Encode a query or fragment component, preserving characters that are
+	 * valid raw in URI query/fragment strings (=, &amp;, :, @, /, ?, etc.)
+	 * while encoding characters that require percent-encoding.
+	 */
+	private static String encodeComponent(String s) {
+		// Use URI to get correct RFC 3986 encoding for query/fragment components.
+		// URI(null, null, null, query, fragment) produces "?query#fragment".
+		try {
+			// Encode as fragment — URI preserves =, &, :, @, /, ? in fragments
+			URI uri = new URI(null, null, null, null, s);
+			String encoded = uri.toASCIIString(); // produces "#encoded"
+			return encoded.substring(1); // strip leading '#'
+		} catch (Exception e) {
+			return URLEncoder.encode(s, StandardCharsets.UTF_8);
+		}
 	}
 
 	/**

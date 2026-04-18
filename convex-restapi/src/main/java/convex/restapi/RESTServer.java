@@ -39,6 +39,7 @@ import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.auth.ConfirmationService;
 import convex.restapi.auth.OAuthService;
 import convex.restapi.mcp.McpAPI;
+import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
@@ -107,6 +108,7 @@ public class RESTServer implements Closeable {
 	protected WebApp webApp;
 	protected PeerAdminAPI peerAPI;
 	protected ExplorerAPI explorerAPI;
+	protected McpServer mcpServer;
 	protected McpAPI mcpAPI;
 	protected X402 x402API;
 	protected DIDAPI didAPI;
@@ -120,6 +122,10 @@ public class RESTServer implements Closeable {
 
 	public long getFaucetMax() {
 		return faucetMax;
+	}
+
+	public McpServer getMcpServer() {
+		return mcpServer;
 	}
 
 	public McpAPI getMcpAPI() {
@@ -169,7 +175,13 @@ public class RESTServer implements Closeable {
 		explorerAPI = new ExplorerAPI(this);
 		explorerAPI.addRoutes(app);
 
-		mcpAPI = new McpAPI(this);
+		mcpServer = new McpServer(Maps.of(
+			"name", "convex-mcp",
+			"title", "Convex MCP",
+			"version", Utils.getVersion()
+		));
+		mcpAPI = new McpAPI(this, mcpServer);
+		mcpServer.addRoutes(app);
 		mcpAPI.addRoutes(app);
 
 		x402API = new X402(this);

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex Peer API</title>
+</head>
+<body>
+
+<h1>Convex Peer</h1>
+
+<p>Peer-side implementation of the Convex network: the long-running server process
+that participates in Convergent Proof of Stake consensus, maintains global state,
+and exposes the binary Convex protocol to clients and other peers.</p>
+
+<p>This artifact depends on <code>convex-core</code> and adds the networking,
+belief propagation, and block production layer required to run a node.</p>
+
+<h2>Key Entry Points</h2>
+
+<ul>
+  <li><code>convex.peer.Server</code> — the main peer server</li>
+  <li><code>convex.peer.Peer</code> — in-process peer state and consensus loop</li>
+  <li><code>convex.net</code> — Netty-based binary protocol</li>
+</ul>
+
+<p>See the <a href="https://docs.convex.world/">Convex documentation</a> for operating
+peers and connecting clients.</p>
+
+</body>
+</html>

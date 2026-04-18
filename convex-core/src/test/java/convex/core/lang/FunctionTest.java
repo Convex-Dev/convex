@@ -1,6 +1,8 @@
 package convex.core.lang;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -10,12 +12,10 @@ import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Local;
 import convex.core.data.ACell;
-import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
 import convex.test.Samples;

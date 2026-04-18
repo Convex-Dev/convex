@@ -4,7 +4,7 @@
 
 Convex MCP exposes on-chain state via tools over the MCP Streamable HTTP transport. We want clients to **watch** paths in the CVM global state and receive notifications when values change.
 
-This document describes how state watches work with MCP Streamable HTTP on Convex peers, following the [MCP specification (2025-06-18)](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http).
+This document describes how state watches work with MCP Streamable HTTP on Convex peers, following the [MCP specification (2025-11-25)](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#streamable-http).
 
 ## Relevant MCP Spec Rules
 

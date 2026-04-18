@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.3</version>
+		<version>0.8.4-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -58,7 +58,7 @@
 		<dependency>
 			<groupId>com.miglayout</groupId>
 			<artifactId>miglayout-swing</artifactId>
-			<version>11.4.2</version>
+			<version>11.4.3</version>
 		</dependency>
 
 		<dependency>

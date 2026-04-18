@@ -37,8 +37,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.test.Samples;
 
 public class MessageTest {

@@ -156,7 +156,6 @@ public class MemoryStoreTest {
 			"Missing ref should not claim PERSISTED status");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testIncrementalAcquisitionPattern() throws IOException {
 		// Simulates the Acquiror pattern: store parent first, then children
@@ -184,18 +183,20 @@ public class MemoryStoreTest {
 
 	@Test
 	public void testGetRootHashNull() throws IOException {
-		MemoryStore ms = new MemoryStore();
-		assertNull(ms.getRootHash());
-		assertNull(ms.getRootData());
+		try (MemoryStore ms = new MemoryStore()) {
+			assertNull(ms.getRootHash());
+			assertNull(ms.getRootData());
+		}
 	}
 
 	@Test
 	public void testSetAndGetRootData() throws IOException {
-		MemoryStore ms = new MemoryStore();
-		CVMLong data = CVMLong.create(42);
-		ms.setRootData(data);
+		try (MemoryStore ms = new MemoryStore()) {
+			CVMLong data = CVMLong.create(42);
+			ms.setRootData(data);
 
-		assertEquals(data, ms.getRootData());
-		assertEquals(data.getHash(), ms.getRootHash());
+			assertEquals(data, ms.getRootData());
+			assertEquals(data.getHash(), ms.getRootHash());
+		}
 	}
 }

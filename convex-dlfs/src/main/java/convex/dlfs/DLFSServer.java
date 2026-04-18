@@ -2,15 +2,20 @@ package convex.dlfs;
 
 import java.io.Closeable;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
-import convex.lattice.fs.DLFS;
+import convex.core.data.Maps;
+import convex.core.util.Utils;
 import convex.peer.auth.PeerAuth;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.mcp.McpServer;
 import io.javalin.Javalin;
 
 /**
@@ -29,6 +34,7 @@ public class DLFSServer implements Closeable {
 
 	private final DLFSDriveManager driveManager;
 	private final DLFSWebDAV webdav;
+	private final McpServer mcpServer;
 	private final AKeyPair keyPair;
 	private Javalin app;
 
@@ -36,6 +42,12 @@ public class DLFSServer implements Closeable {
 		this.driveManager = driveManager;
 		this.keyPair = keyPair;
 		this.webdav = new DLFSWebDAV(driveManager);
+		this.mcpServer = new McpServer(Maps.of(
+			"name", "dlfs-mcp",
+			"title", "DLFS MCP",
+			"version", Utils.getVersion()
+		));
+		new DlfsMcpTools(driveManager).registerAll(mcpServer);
 	}
 
 	/**
@@ -77,9 +89,9 @@ public class DLFSServer implements Closeable {
 			config.useVirtualThreads = true;
 		});
 
-		// Wire auth middleware if key pair provided
+		// Wire auth middleware if key pair provided (with audience checking)
 		if (keyPair != null) {
-			PeerAuth peerAuth = new PeerAuth(keyPair);
+			PeerAuth peerAuth = PeerAuth.createWithDIDAudience(keyPair);
 			AuthMiddleware auth = new AuthMiddleware(peerAuth);
 			app.before(auth.handler());
 		}
@@ -101,8 +113,9 @@ public class DLFSServer implements Closeable {
 			log.debug("<-- {} {} {}", ctx.status(), ctx.req().getMethod(), ctx.req().getRequestURI());
 		});
 
-		// Register WebDAV routes
+		// Register WebDAV and MCP routes
 		webdav.addRoutes(app);
+		mcpServer.addRoutes(app);
 
 		// Configure Jetty connector with minimal platform threads.
 		// Request handling uses virtual threads (useVirtualThreads=true above),
@@ -135,6 +148,13 @@ public class DLFSServer implements Closeable {
 	 */
 	public DLFSWebDAV getWebDAV() {
 		return webdav;
+	}
+
+	/**
+	 * Gets the MCP server. External modules can register additional tools.
+	 */
+	public McpServer getMcpServer() {
+		return mcpServer;
 	}
 
 	@Override
@@ -170,10 +190,10 @@ public class DLFSServer implements Closeable {
 		dm.createDrive(null, "home");
 		FileSystem homeFs = dm.getDrive(null, "home");
 		try {
-			java.nio.file.Path testFile = homeFs.getPath("/test.txt");
-			java.nio.file.Files.write(testFile, "Hello from DLFS!\n".getBytes(),
-					java.nio.file.StandardOpenOption.CREATE,
-					java.nio.file.StandardOpenOption.WRITE);
+			Path testFile = homeFs.getPath("/test.txt");
+			Files.write(testFile, "Hello from DLFS!\n".getBytes(),
+					StandardOpenOption.CREATE,
+					StandardOpenOption.WRITE);
 		} catch (Exception e) {
 			System.err.println("Warning: could not seed demo file: " + e.getMessage());
 		}

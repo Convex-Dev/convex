@@ -3,16 +3,14 @@ package convex.db.calcite;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.calcite.DataContext;
 import org.apache.calcite.adapter.java.AbstractQueryableTable;
-import org.apache.calcite.linq4j.AbstractEnumerable;
 import org.apache.calcite.linq4j.Enumerable;
-import org.apache.calcite.linq4j.Enumerator;
 import org.apache.calcite.linq4j.Linq4j;
 import org.apache.calcite.linq4j.QueryProvider;
 import org.apache.calcite.linq4j.Queryable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.TableModify;
@@ -20,40 +18,35 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.schema.ModifiableTable;
-import org.apache.calcite.schema.ScannableTable;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.schema.Statistic;
+import org.apache.calcite.schema.Statistics;
+import org.apache.calcite.schema.TranslatableTable;
+import org.apache.calcite.util.ImmutableBitSet;
 
 import convex.core.data.ACell;
-import convex.core.data.AVector;
-import convex.core.data.Blob;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
-import convex.db.lattice.LatticeTables;
+import convex.db.calcite.convention.ConvexConvention;
+import convex.db.calcite.rel.ConvexTableScan;
+import convex.db.lattice.SQLSchema;
+import convex.db.lattice.SQLTable;
 
 /**
  * Calcite Table backed by Convex lattice storage.
  *
- * <p>Implements both ScannableTable (for SELECT queries) and ModifiableTable
- * (for INSERT, UPDATE, DELETE operations).
+ * <p>Implements TranslatableTable so Calcite uses our ConvexTableScan
+ * directly — all queries go through the ConvexConvention pipeline
+ * (ConvexFilter, ConvexSort, etc.) rather than Calcite's Enumerable
+ * table scan. This ensures PK lookups use the index, not full scans.
  *
- * <p>All values in the lattice are dynamically typed, so this table maps
- * them to Calcite's ANY type for maximum flexibility.
+ * <p>Implements ModifiableTable for INSERT, UPDATE, DELETE operations.
  */
 public class ConvexTable extends AbstractQueryableTable
-		implements ScannableTable, ModifiableTable {
+		implements TranslatableTable, ModifiableTable {
 
 	private final ConvexSchema schema;
 	private final String tableName;
 
-	/**
-	 * Creates a new ConvexTable.
-	 *
-	 * @param schema Parent schema
-	 * @param tableName Table name
-	 */
 	public ConvexTable(ConvexSchema schema, String tableName) {
 		super(Object[].class);
 		this.schema = schema;
@@ -64,7 +57,7 @@ public class ConvexTable extends AbstractQueryableTable
 	public RelDataType getRowType(RelDataTypeFactory typeFactory) {
 		RelDataTypeFactory.Builder builder = typeFactory.builder();
 
-		LatticeTables tables = schema.getTables();
+		SQLSchema tables = schema.getTables();
 		String[] columnNames = tables.getColumnNames(tableName);
 		ConvexColumnType[] columnTypes = tables.getColumnTypes(tableName);
 
@@ -79,27 +72,53 @@ public class ConvexTable extends AbstractQueryableTable
 	}
 
 	/**
-	 * Gets the column types for this table.
-	 *
-	 * @return Array of ConvexColumnType for each column
+	 * Returns a ConvexTableScan in CONVEX convention. This is Calcite's
+	 * standard extension point for custom adapters — bypasses EnumerableTableScan
+	 * entirely.
 	 */
+	@Override
+	public RelNode toRel(RelOptTable.ToRelContext context, RelOptTable relOptTable) {
+		RelOptCluster cluster = context.getCluster();
+		// TODO: declare PK collation on trait set once ConvexConvention
+		// operators properly propagate collation traits through the plan.
+		// Currently the planner elides sorts at the Enumerable boundary.
+		RelTraitSet traitSet = cluster.traitSetOf(ConvexConvention.INSTANCE);
+		return new ConvexTableScan(cluster, traitSet, relOptTable);
+	}
+
 	public ConvexColumnType[] getColumnTypes() {
 		return schema.getTables().getColumnTypes(tableName);
 	}
 
+	/**
+	 * Returns table statistics for the Calcite cost-based optimiser.
+	 *
+	 * <p>Provides:
+	 * <ul>
+	 *   <li>Row count from the Index (O(1), may include tombstones)
+	 *   <li>Primary key declaration (column 0 is unique)
+	 *   <li>Sort order (rows are sorted by PK via the radix tree Index)
+	 * </ul>
+	 */
 	@Override
-	public Enumerable<Object[]> scan(DataContext root) {
-		return new AbstractEnumerable<Object[]>() {
-			@Override
-			public Enumerator<Object[]> enumerator() {
-				return new ConvexEnumerator(schema.getTables(), tableName);
-			}
-		};
+	public Statistic getStatistic() {
+		// Row count: O(1) from tracked live count
+		Double rowCount = null;
+		SQLTable table = schema.getTables().getLiveTable(tableName);
+		if (table != null) {
+			rowCount = (double) table.getRowCount();
+		}
+
+		// PK is column 0
+		List<ImmutableBitSet> keys = List.of(ImmutableBitSet.of(0));
+
+		// TODO: declare PK collation once trait propagation is implemented
+		// TODO: add column cardinality for selectivity estimation
+		return Statistics.of(rowCount, keys);
 	}
 
 	@Override
 	public Collection<Object[]> getModifiableCollection() {
-		// Not used - we use direct methods instead
 		throw new UnsupportedOperationException("Use executeInsert/Update/Delete instead");
 	}
 
@@ -113,8 +132,6 @@ public class ConvexTable extends AbstractQueryableTable
 			List<String> updateColumnList,
 			List<RexNode> sourceExpressionList,
 			boolean flattened) {
-		// Return a logical modify node - ConvexTableModifyRule will convert
-		// it to the physical ConvexTableModify in ENUMERABLE convention
 		return ConvexLogicalTableModify.create(
 			table,
 			catalogReader,
@@ -127,36 +144,21 @@ public class ConvexTable extends AbstractQueryableTable
 
 	@Override
 	public <T> Queryable<T> asQueryable(QueryProvider queryProvider, SchemaPlus schema, String tableName) {
-		// Delegate to scan-based enumeration
 		@SuppressWarnings("unchecked")
-		Queryable<T> queryable = (Queryable<T>) Linq4j.asEnumerable(
-			scan(null).toList()).asQueryable();
+		Queryable<T> queryable = (Queryable<T>) Linq4j.emptyEnumerable().asQueryable();
 		return queryable;
 	}
 
-	/**
-	 * Gets the table name.
-	 *
-	 * @return Table name
-	 */
 	public String getTableName() {
 		return tableName;
 	}
 
-	/**
-	 * Gets the parent schema.
-	 *
-	 * @return ConvexSchema
-	 */
 	public ConvexSchema getSchema() {
 		return schema;
 	}
 
 	// ========== DML Operations (called from generated code) ==========
 
-	/**
-	 * Execute INSERT - called from ConvexTableModify generated code.
-	 */
 	public long executeInsert(Enumerable<Object[]> input) {
 		try {
 			long count = 0;
@@ -171,18 +173,8 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 	}
 
-	/**
-	 * Execute UPDATE - called from ConvexTableModify generated code.
-	 *
-	 * <p>Follows PostgreSQL semantics: PK updates are allowed but uniqueness
-	 * is enforced. If the new PK already exists (and is different from the
-	 * current row's PK), throws a unique constraint violation.
-	 *
-	 * <p>Type validation is performed on updated columns.
-	 */
 	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
 		try {
-			// Check if PK column (index 0) is being updated
 			boolean pkBeingUpdated = false;
 			for (int idx : updateIndices) {
 				if (idx == 0) {
@@ -197,8 +189,6 @@ public class ConvexTable extends AbstractQueryableTable
 			for (Object[] row : input) {
 				if (row == null) continue;
 
-				// Reconstruct updated row from Calcite's format:
-				// [original columns..., new values for updated columns...]
 				Object[] updatedRow = new Object[columnCount];
 				for (int i = 0; i < columnCount; i++) {
 					updatedRow[i] = row[i];
@@ -206,10 +196,9 @@ public class ConvexTable extends AbstractQueryableTable
 				for (int i = 0; i < updateIndices.length; i++) {
 					int targetIdx = updateIndices[i];
 					if (targetIdx >= 0 && targetIdx < columnCount) {
-						// Validate type before assignment
 						Object newValue = row[columnCount + i];
 						ConvexColumnType type = (types != null && targetIdx < types.length) ? types[targetIdx] : ConvexColumnType.of(ConvexType.ANY);
-						type.toCell(newValue); // Validates type, throws if invalid
+						type.toCell(newValue);
 						updatedRow[targetIdx] = newValue;
 					}
 				}
@@ -217,16 +206,13 @@ public class ConvexTable extends AbstractQueryableTable
 				ACell oldPk = toCell(row[0], 0);
 				ACell newPk = toCell(updatedRow[0], 0);
 
-				// If PK is being changed, check for uniqueness violation
 				if (pkBeingUpdated && !oldPk.equals(newPk)) {
-					// Check if new PK already exists
 					if (schema.getTables().selectByKey(tableName, newPk) != null) {
 						throw new RuntimeException("Unique constraint violation: primary key '" +
 							newPk + "' already exists in table '" + tableName + "'");
 					}
 				}
 
-				// Delete old row by ORIGINAL PK, then insert with new values
 				schema.getTables().deleteByKey(tableName, oldPk);
 				if (insertRow(updatedRow)) {
 					count++;
@@ -238,9 +224,6 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 	}
 
-	/**
-	 * Execute DELETE - called from ConvexTableModify generated code.
-	 */
 	public long executeDelete(Enumerable<Object[]> input) {
 		try {
 			long count = 0;
@@ -258,10 +241,6 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 	}
 
-	/**
-	 * Wraps type conversion errors from Calcite's generated code into a RuntimeException
-	 * with a clear SQL error message. Avatica will convert this to SQLException.
-	 */
 	private RuntimeException wrapTypeError(ExceptionInInitializerError e, String operation) {
 		Throwable cause = e.getCause();
 		String message = "Type conversion error in " + operation + " on table '" + tableName + "'";
@@ -284,24 +263,9 @@ public class ConvexTable extends AbstractQueryableTable
 		return schema.getTables().insert(tableName, Vectors.of(cells));
 	}
 
-	/**
-	 * Converts a value to a CVM cell using the specified column type.
-	 *
-	 * @param v Value to convert
-	 * @param columnIndex Column index for type lookup
-	 * @return CVM cell
-	 */
 	private ACell toCell(Object v, int columnIndex) {
 		ConvexColumnType[] types = getColumnTypes();
 		ConvexColumnType type = (types != null && columnIndex < types.length) ? types[columnIndex] : ConvexColumnType.of(ConvexType.ANY);
 		return type.toCell(v);
-	}
-
-	/**
-	 * Converts a value to a CVM cell (untyped - uses ANY).
-	 * Use toCell(v, columnIndex) for type-validated conversion.
-	 */
-	private ACell toCell(Object v) {
-		return ConvexType.ANY.toCell(v);
 	}
 }

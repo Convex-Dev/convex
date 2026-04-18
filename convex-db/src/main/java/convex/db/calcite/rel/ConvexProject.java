@@ -3,6 +3,7 @@ package convex.db.calcite.rel;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -45,9 +46,9 @@ public class ConvexProject extends Project implements ConvexRel {
 	}
 
 	@Override
-	public ConvexEnumerable execute() {
+	public ConvexEnumerable execute(DataContext ctx) {
 		ConvexRel inputRel = (ConvexRel) getInput();
-		ConvexEnumerable input = inputRel.execute();
+		ConvexEnumerable input = inputRel.execute(ctx);
 		List<RexNode> projects = getProjects();
 		RelDataType inputRowType = getInput().getRowType();
 

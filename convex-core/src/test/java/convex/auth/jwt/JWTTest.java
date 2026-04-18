@@ -143,7 +143,6 @@ public class JWTTest {
 		// Tamper with the claims (change a character in the middle)
 		String s = jwt.toString();
 		int dot1 = s.indexOf('.');
-		int dot2 = s.indexOf('.', dot1 + 1);
 		String tampered = s.substring(0, dot1 + 2) + "X" + s.substring(dot1 + 3);
 		assertNull(JWT.verifyPublic(Strings.create(tampered)), "Tampered JWT should fail verification");
 	}
@@ -336,7 +335,7 @@ public class JWTTest {
 		JWT parsed = JWT.parse(jwtString);
 		assertNotNull(parsed);
 		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
-		assertFalse(parsed.validateClaims(null, null), "Expired token should fail validation");
+		assertFalse(parsed.validateClaims((String) null, null), "Expired token should fail validation");
 	}
 
 	@Test public void testValidateClaimsWrongIssuer() throws Exception {
@@ -378,8 +377,8 @@ public class JWTTest {
 		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
 		assertTrue(parsed.validateClaims("https://accounts.google.com", "my-client-id"));
 		// Null params skip checks
-		assertTrue(parsed.validateClaims(null, null));
+		assertTrue(parsed.validateClaims((String) null, null));
 		assertTrue(parsed.validateClaims("https://accounts.google.com", null));
-		assertTrue(parsed.validateClaims(null, "my-client-id"));
+		assertTrue(parsed.validateClaims((String) null, "my-client-id"));
 	}
 }

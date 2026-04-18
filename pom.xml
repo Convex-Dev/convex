@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.3</version>
+	<version>0.8.4-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -31,7 +31,7 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<logback.version>1.5.25</logback.version>
+		<logback.version>1.5.32</logback.version>
 		<jmh.version>1.37</jmh.version>
 		<junit.version>6.0.1</junit.version>
 		<slf4j.version>2.0.16</slf4j.version>
@@ -39,7 +39,7 @@
 		<netty.version>4.2.7.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2026-03-02T12:01:31Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-03-02T12:02:33Z</project.build.outputTimestamp>
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
 		</argLine>
@@ -240,6 +240,11 @@
 					<configuration>
 						<doclint>syntax</doclint>
 						<quiet />
+						<doctitle>${project.name} ${project.version} API</doctitle>
+						<windowtitle>${project.name} ${project.version} API</windowtitle>
+						<header><![CDATA[<b>Convex</b> ${project.version}]]></header>
+						<bottom><![CDATA[Copyright &copy; Convex Foundation. Licensed under the <a href="https://github.com/Convex-Dev/convex/blob/master/LICENSE.md">Convex Public License</a>. See <a href="https://docs.convex.world/">docs.convex.world</a> for user documentation.]]></bottom>
+						<notimestamp>true</notimestamp>
 					</configuration>
 					<executions>
 						<execution>

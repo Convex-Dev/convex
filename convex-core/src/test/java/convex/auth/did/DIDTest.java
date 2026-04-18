@@ -4,14 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.auth.did.DID;
-import convex.auth.did.DIDURL;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.AString;
 
 public class DIDTest {
     
@@ -160,18 +161,18 @@ public class DIDTest {
 	        doDIDTest(did1);
         }
         
-    	{   // + used for space in query
+    	{   // + used for space in query (URLDecoder interprets + as space)
     		DIDURL durl= DIDURL.create("did:foo:20?a+b");
 	        assertEquals("a b",durl.getQuery());
-	        doDIDURLTest("did:foo:20?a+b");
+	        // Round-trip uses RFC 3986 encoding: space becomes %20 not +
+	        assertEquals("did:foo:20?a%20b", durl.toString());
     	}
-    	
-    	// TODO
-//    	{   // + used for space in fragment
-//    		DIDURL durl= DIDURL.create("did:foo:20#a+b");
-//	        assertEquals("a b",durl.getFragment());
-//	        doDIDURLTest("did:foo:20#a+b");
-//    	}
+
+    	{   // + is literal in fragment (RFC 3986 — only query has + as space in form encoding)
+    		DIDURL durl= DIDURL.create("did:foo:20#a+b");
+	        assertEquals("a+b",durl.getFragment());
+	        assertEquals("did:foo:20#a+b", durl.toString());
+    	}
 
     }
     
@@ -210,6 +211,52 @@ public class DIDTest {
     	assertEquals(didUrl,durl.toString());
     	
     	doDIDTest(durl.getDID());
+    }
+
+    @Test
+    void testForKeyCompoundDIDURL() {
+    	AKeyPair kp = AKeyPair.generate();
+    	AString did = DID.forKey(kp.getAccountKey());
+
+    	// Build a full DID URL with path, query (with = and &), and fragment
+    	String full = did.toString() + "/some/path?service=files&version=2#key-1";
+    	DIDURL durl = DIDURL.create(full);
+
+    	assertEquals("key", durl.getDID().getMethod());
+    	assertEquals("/some/path", durl.getPath());
+    	assertEquals("service=files&version=2", durl.getQuery());
+    	assertEquals("key-1", durl.getFragment());
+
+    	// DID base should match the did:key we generated
+    	assertEquals(did.toString(), durl.getDID().toString());
+
+    	// Round-trip: string representation should match input
+    	assertEquals(full, durl.toString());
+
+    	// Verify withPath/withQuery/withFragment produce new DIDURLs
+    	DIDURL modified = durl.withFragment("alt-frag");
+    	assertEquals("alt-frag", modified.getFragment());
+    	assertEquals(durl.getPath(), modified.getPath());
+    }
+
+    @Test
+    void testForKey() {
+    	AKeyPair kp = AKeyPair.generate();
+    	AString did = DID.forKey(kp.getAccountKey());
+
+    	assertNotNull(did);
+    	assertTrue(did.toString().startsWith("did:key:z"));
+
+    	// Same key should produce same DID
+    	assertEquals(did, DID.forKey(kp.getAccountKey()));
+
+    	// Different key should produce different DID
+    	AKeyPair kp2 = AKeyPair.generate();
+    	assertNotEquals(did, DID.forKey(kp2.getAccountKey()));
+
+    	// Should be parseable as a DID
+    	DID parsed = DID.fromString(did.toString());
+    	assertEquals("key", parsed.getMethod());
     }
 
 	private void doDIDTest(DID did) {

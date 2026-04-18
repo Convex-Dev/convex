@@ -1,11 +1,11 @@
 package convex.lattice.queue;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Keywords;
-import convex.core.data.ACell;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.lattice.ALattice;

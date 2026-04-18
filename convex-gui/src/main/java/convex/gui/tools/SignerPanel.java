@@ -77,7 +77,7 @@ public class SignerPanel extends JPanel {
 		// Instructions panel
 		JPanel instructionsPanel = new JPanel();
 		add(instructionsPanel, BorderLayout.NORTH);
-		JLabel lblNewLabel = new JLabel("Construct and sign a Convex transaction");
+		JLabel lblNewLabel = new JLabel("Construct, sign, and encode a Convex transaction for network submission");
 		instructionsPanel.add(lblNewLabel);
 
 		// Main split pane
@@ -455,7 +455,7 @@ public class SignerPanel extends JPanel {
 		if (transaction == null || signedTransaction == null) {
 			sb.append("No transaction");
 		} else {
-			sb.append("TX Hash:     ").append(signedTransaction.getHash());
+			sb.append("TX Hash:     ").append(signedTransaction.getHash()).append("\n");
 			sb.append("Signed By:   ").append(signedTransaction.getAccountKey().toChecksumHex()).append("\n");
 			sb.append("Size:        ").append(Cells.storageSize(signedTransaction));
 		}

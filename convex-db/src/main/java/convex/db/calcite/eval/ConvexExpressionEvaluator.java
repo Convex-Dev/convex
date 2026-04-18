@@ -2,15 +2,25 @@ package convex.db.calcite.eval;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+
+import com.google.common.collect.Range;
 
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.util.NlsString;
+import org.apache.calcite.DataContext;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexDynamicParam;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.Sarg;
 
+import java.util.Comparator;
+
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Cells;
@@ -40,6 +50,13 @@ public class ConvexExpressionEvaluator {
 	 * @return The result as an ACell
 	 */
 	public static ACell evaluate(RexNode expr, ACell[] row, RelDataType rowType) {
+		return evaluate(expr, row, rowType, null);
+	}
+
+	/**
+	 * Evaluates an expression with DataContext for resolving dynamic parameters.
+	 */
+	public static ACell evaluate(RexNode expr, ACell[] row, RelDataType rowType, DataContext ctx) {
 		if (expr instanceof RexInputRef ref) {
 			int index = ref.getIndex();
 			return (index >= 0 && index < row.length) ? row[index] : null;
@@ -49,8 +66,13 @@ public class ConvexExpressionEvaluator {
 			return literalToCell(lit);
 		}
 
+		if (expr instanceof RexDynamicParam param && ctx != null) {
+			Object val = ctx.get("?" + param.getIndex());
+			return val != null ? convex.db.calcite.ConvexType.ANY.toCell(val) : null;
+		}
+
 		if (expr instanceof RexCall call) {
-			return evaluateCall(call, row, rowType);
+			return evaluateCall(call, row, rowType, ctx);
 		}
 
 		throw new UnsupportedOperationException("Unsupported expression: " + expr.getClass().getSimpleName());
@@ -112,16 +134,20 @@ public class ConvexExpressionEvaluator {
 	 * Evaluates a function/operator call.
 	 */
 	private static ACell evaluateCall(RexCall call, ACell[] row, RelDataType rowType) {
+		return evaluateCall(call, row, rowType, null);
+	}
+
+	private static ACell evaluateCall(RexCall call, ACell[] row, RelDataType rowType, DataContext ctx) {
 		SqlKind kind = call.getKind();
 		List<RexNode> operands = call.getOperands();
 
 		// Handle IS NULL / IS NOT NULL specially (don't evaluate operand first)
 		if (kind == SqlKind.IS_NULL) {
-			ACell val = evaluate(operands.get(0), row, rowType);
+			ACell val = evaluate(operands.get(0), row, rowType, ctx);
 			return CVMBool.create(val == null);
 		}
 		if (kind == SqlKind.IS_NOT_NULL) {
-			ACell val = evaluate(operands.get(0), row, rowType);
+			ACell val = evaluate(operands.get(0), row, rowType, ctx);
 			return CVMBool.create(val != null);
 		}
 
@@ -133,17 +159,22 @@ public class ConvexExpressionEvaluator {
 		// Handle COALESCE (short-circuit evaluation)
 		if (kind == SqlKind.COALESCE) {
 			for (RexNode operand : operands) {
-				ACell val = evaluate(operand, row, rowType);
+				ACell val = evaluate(operand, row, rowType, ctx);
 				if (val != null) return val;
 			}
 			return null;
 		}
 
+		// Handle SEARCH (Calcite generates this for AND/OR/IN range conditions)
+		if (kind == SqlKind.SEARCH) {
+			return evaluateSearch(call, row, rowType);
+		}
+
 		// Handle IN (short-circuit evaluation)
 		if (kind == SqlKind.IN) {
-			ACell lhs = evaluate(operands.get(0), row, rowType);
+			ACell lhs = evaluate(operands.get(0), row, rowType, ctx);
 			for (int i = 1; i < operands.size(); i++) {
-				ACell rhs = evaluate(operands.get(i), row, rowType);
+				ACell rhs = evaluate(operands.get(i), row, rowType, ctx);
 				if (cellEquals(lhs, rhs) == CVMBool.TRUE) return CVMBool.TRUE;
 			}
 			return CVMBool.FALSE;
@@ -152,7 +183,7 @@ public class ConvexExpressionEvaluator {
 		// Evaluate operands
 		ACell[] args = new ACell[operands.size()];
 		for (int i = 0; i < operands.size(); i++) {
-			args[i] = evaluate(operands.get(i), row, rowType);
+			args[i] = evaluate(operands.get(i), row, rowType, ctx);
 		}
 
 		return switch (kind) {
@@ -208,6 +239,52 @@ public class ConvexExpressionEvaluator {
 
 			default -> throw new UnsupportedOperationException("Operator not supported: " + kind);
 		};
+	}
+
+	/**
+	 * Evaluates SEARCH(column, Sarg) — Calcite's optimised form for
+	 * range/equality conditions like {@code x > 1 AND x < 3} or {@code x IN (1,2)}.
+	 */
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static ACell evaluateSearch(RexCall call, ACell[] row, RelDataType rowType) {
+		ACell value = evaluate(call.getOperands().get(0), row, rowType);
+		RexLiteral sargLiteral = (RexLiteral) call.getOperands().get(1);
+		Sarg sarg = sargLiteral.getValueAs(Sarg.class);
+
+		if (value == null) {
+			return CVMBool.FALSE;
+		}
+
+		// Determine what Comparable type the Sarg uses from its range bounds
+		Comparable comparable = cellToSargType(value, sarg);
+		return CVMBool.create(sarg.rangeSet.contains(comparable));
+	}
+
+	/**
+	 * Converts an ACell value to the same Comparable type used by a Sarg's ranges.
+	 */
+	/**
+	 * Converts an ACell value to the same Comparable type used by a Sarg's ranges.
+	 * Sarg uses BigDecimal for numeric types and NlsString for strings.
+	 */
+	@SuppressWarnings({"rawtypes", "unchecked"})
+	private static Comparable cellToSargType(ACell cell, Sarg sarg) {
+		// Peek at the Sarg's range bounds to determine the expected type
+		Class<?> sargType = null;
+		for (Range range : (Set<Range>) sarg.rangeSet.asRanges()) {
+			if (range.hasLowerBound()) { sargType = range.lowerEndpoint().getClass(); break; }
+			if (range.hasUpperBound()) { sargType = range.upperEndpoint().getClass(); break; }
+		}
+
+		Object jvm = RT.jvm(cell);
+		if (sargType == BigDecimal.class && jvm instanceof Number n) {
+			return BigDecimal.valueOf(n.doubleValue());
+		}
+		if (jvm instanceof Long l) return BigDecimal.valueOf(l);
+		if (jvm instanceof Integer i) return BigDecimal.valueOf(i);
+		if (jvm instanceof String s) return new NlsString(s, null, null);
+		if (jvm instanceof Comparable c) return c;
+		return cell.toString();
 	}
 
 	/**
@@ -488,5 +565,46 @@ public class ConvexExpressionEvaluator {
 			.replace("%", ".*")
 			.replace("_", ".");
 		return CVMBool.create(str.matches(regex));
+	}
+
+	// ========== Comparator Utilities ==========
+
+	/**
+	 * Returns a comparator for non-null ACell values based on SQL type.
+	 * Used by ConvexSort and ConvexMergeJoin for type-specific ordering.
+	 */
+	public static Comparator<ACell> comparatorFor(SqlTypeName sqlType) {
+		return switch (sqlType) {
+			case BIGINT, INTEGER, SMALLINT, TINYINT,
+				 DECIMAL, DOUBLE, FLOAT, REAL,
+				 TIMESTAMP, TIMESTAMP_WITH_LOCAL_TIME_ZONE ->
+				(a, b) -> ((ANumeric) a).compareTo((ANumeric) b);
+
+			case CHAR, VARCHAR, BINARY, VARBINARY ->
+				(a, b) -> ((ABlobLike<?>) a).compareTo((ABlobLike<?>) b);
+
+			case BOOLEAN ->
+				(a, b) -> ((CVMBool) a).compareTo((CVMBool) b);
+
+			default ->
+				// ANY or unknown: compare by encoding hash for deterministic order
+				(a, b) -> a.getHash().compareTo(b.getHash());
+		};
+	}
+
+	/**
+	 * Wraps a non-null comparator with null handling and sort direction.
+	 */
+	public static Comparator<ACell> nullSafeComparator(
+			Comparator<ACell> inner,
+			boolean nullsFirst,
+			boolean desc) {
+		return (a, b) -> {
+			if (a == null && b == null) return 0;
+			if (a == null) return nullsFirst ? -1 : 1;
+			if (b == null) return nullsFirst ? 1 : -1;
+			int cmp = inner.compare(a, b);
+			return desc ? -cmp : cmp;
+		};
 	}
 }

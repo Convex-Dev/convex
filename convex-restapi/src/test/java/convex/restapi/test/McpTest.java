@@ -32,8 +32,8 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpProtocol;
+import convex.restapi.mcp.McpServer;
 import convex.restapi.mcp.McpTool;
 
 /**
@@ -84,9 +84,56 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> result = RT.ensureMap(resultCell);
 		ACell protocol = RT.getIn(result,"protocolVersion");
 		assertNotNull(protocol, "initialize should include protocol version");
-		
+
 		// Should be a faucet configured for testing
 		assertNotNull(server.getFaucet());
+	}
+
+	/**
+	 * Protocol version negotiation: the server echoes a supported version when
+	 * the client requests one, falls back to the latest otherwise, and tolerates
+	 * missing or malformed {@code protocolVersion} fields.
+	 */
+	@Test
+	public void testProtocolVersionNegotiation() throws IOException, InterruptedException {
+		// Each supported version should be echoed back
+		for (String v : McpServer.SUPPORTED_PROTOCOL_VERSIONS) {
+			assertEquals(v, negotiatedVersion("\"" + v + "\""),
+					"Server should echo supported version " + v);
+		}
+
+		// Unsupported version → server returns its latest
+		assertEquals(McpServer.LATEST_PROTOCOL_VERSION,
+				negotiatedVersion("\"1999-01-01\""),
+				"Unsupported version should negotiate down to latest");
+
+		// Missing protocolVersion field → server returns its latest
+		assertEquals(McpServer.LATEST_PROTOCOL_VERSION,
+				initializeAndGetVersion("{}"),
+				"Missing protocolVersion should return latest");
+
+		// Non-string protocolVersion → server returns its latest (malformed input tolerated)
+		assertEquals(McpServer.LATEST_PROTOCOL_VERSION,
+				negotiatedVersion("42"),
+				"Non-string protocolVersion should return latest");
+	}
+
+	/** Issues initialize with the given protocolVersion JSON literal and returns the negotiated version. */
+	private String negotiatedVersion(String versionLiteral) throws IOException, InterruptedException {
+		return initializeAndGetVersion("{\"protocolVersion\":" + versionLiteral + "}");
+	}
+
+	/** Issues initialize with the given params JSON object and returns the negotiated version. */
+	private String initializeAndGetVersion(String paramsJson) throws IOException, InterruptedException {
+		String request = "{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":"
+				+ paramsJson + ",\"id\":\"neg\"}";
+		HttpResponse<String> response = post(MCP_PATH, request);
+		assertEquals(200, response.statusCode());
+		AMap<AString, ACell> responseMap = RT.ensureMap(JSON.parse(response.body()));
+		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AString version = RT.ensureString(RT.getIn(result, "protocolVersion"));
+		assertNotNull(version, "initialize must include protocolVersion");
+		return version.toString();
 	}
 
 	/**

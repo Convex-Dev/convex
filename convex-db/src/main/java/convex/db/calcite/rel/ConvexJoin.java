@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
@@ -56,12 +57,12 @@ public class ConvexJoin extends Join implements ConvexRel {
 	}
 
 	@Override
-	public ConvexEnumerable execute() {
+	public ConvexEnumerable execute(DataContext ctx) {
 		ConvexRel leftRel = (ConvexRel) getLeft();
 		ConvexRel rightRel = (ConvexRel) getRight();
 
-		ConvexEnumerable leftInput = leftRel.execute();
-		ConvexEnumerable rightInput = rightRel.execute();
+		ConvexEnumerable leftInput = leftRel.execute(ctx);
+		ConvexEnumerable rightInput = rightRel.execute(ctx);
 
 		// Collect inputs into lists for nested loop join
 		List<ACell[]> leftRows = new ArrayList<>();

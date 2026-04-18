@@ -53,11 +53,13 @@ public class JWT {
 		Strings.create("typ"), Strings.create("JWT"));
 
 	// Common claim keys
-	private static final AString ALG = Strings.create("alg");
-	private static final AString KID = Strings.create("kid");
-	private static final AString EXP = Strings.create("exp");
-	private static final AString ISS = Strings.create("iss");
-	private static final AString AUD = Strings.create("aud");
+	public static final AString ALG = Strings.intern("alg");
+	public static final AString KID = Strings.intern("kid");
+	public static final AString SUB = Strings.intern("sub");
+	public static final AString EXP = Strings.intern("exp");
+	public static final AString ISS = Strings.intern("iss");
+	public static final AString IAT = Strings.intern("iat");
+	public static final AString AUD = Strings.intern("aud");
 
 	// ========== Instance fields (parsed and cached) ==========
 
@@ -120,6 +122,9 @@ public class JWT {
 
 	/** Get the original encoded JWT string */
 	public AString getRaw() { return raw; }
+
+	/** Get the raw signature bytes */
+	public byte[] getSignatureBytes() { return signatureBytes; }
 
 	/** Get the algorithm from the header (e.g. "EdDSA", "RS256", "HS256") */
 	public String getAlgorithm() {
@@ -208,11 +213,24 @@ public class JWT {
 	/**
 	 * Validate standard JWT claims: exp, iss, aud.
 	 *
-	 * @param expectedIssuer Expected issuer string, or null to skip issuer check
-	 * @param expectedAudience Expected audience (e.g. OAuth client ID), or null to skip
+	 * @param expectedIssuer Expected issuer, or null to skip issuer check
+	 * @param expectedAudience Expected audience (e.g. server DID), or null to skip
 	 * @return true if all checked claims are valid
 	 */
 	public boolean validateClaims(String expectedIssuer, String expectedAudience) {
+		return validateClaims(
+			expectedIssuer != null ? Strings.create(expectedIssuer) : null,
+			expectedAudience != null ? Strings.create(expectedAudience) : null);
+	}
+
+	/**
+	 * Validate standard JWT claims: exp, iss, aud.
+	 *
+	 * @param expectedIssuer Expected issuer, or null to skip issuer check
+	 * @param expectedAudience Expected audience (e.g. server DID), or null to skip
+	 * @return true if all checked claims are valid
+	 */
+	public boolean validateClaims(AString expectedIssuer, AString expectedAudience) {
 		if (claims == null) return false;
 
 		// Check expiry
@@ -230,15 +248,13 @@ public class JWT {
 		// Check issuer
 		if (expectedIssuer != null) {
 			AString iss = RT.ensureString(claims.get(ISS));
-			if (iss == null || !expectedIssuer.equals(iss.toString())) return false;
+			if (iss == null || !expectedIssuer.equals(iss)) return false;
 		}
 
 		// Check audience
 		if (expectedAudience != null) {
-			ACell audCell = claims.get(AUD);
-			if (audCell == null) return false;
-			AString aud = RT.ensureString(audCell);
-			if (aud == null || !expectedAudience.equals(aud.toString())) return false;
+			AString aud = RT.ensureString(claims.get(AUD));
+			if (aud == null || !expectedAudience.equals(aud)) return false;
 		}
 
 		return true;

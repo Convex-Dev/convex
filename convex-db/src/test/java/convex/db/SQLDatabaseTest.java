@@ -13,22 +13,23 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
-import convex.db.lattice.LatticeTables;
+import convex.db.ConvexDB;
+import convex.db.lattice.SQLSchema;
 import convex.db.lattice.SQLDatabase;
-import convex.db.lattice.TableStoreLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
-import convex.lattice.generic.MapLattice;
 
 /**
- * Tests for SQLDatabase and LatticeTables.
+ * Tests for SQLDatabase and SQLSchema.
  */
 public class SQLDatabaseTest {
 
@@ -47,7 +48,7 @@ public class SQLDatabaseTest {
 	public void testCreateTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		// Create table
 		boolean created = tables.createTable("users", new String[]{"id", "name", "email"});
@@ -67,7 +68,7 @@ public class SQLDatabaseTest {
 	public void testDropTable() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("temp", new String[]{"data"});
 		assertTrue(tables.tableExists("temp"));
@@ -85,7 +86,7 @@ public class SQLDatabaseTest {
 	public void testInsertAndSelect() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("users", new String[]{"id", "name", "email"});
 
@@ -110,7 +111,7 @@ public class SQLDatabaseTest {
 	public void testDelete() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("items", new String[]{"id", "name"});
 		tables.insert("items", 1, "Item");
@@ -130,7 +131,7 @@ public class SQLDatabaseTest {
 	public void testSelectAll() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("products", new String[]{"id", "name"});
 		tables.insert("products", 1, "Apple");
@@ -145,7 +146,7 @@ public class SQLDatabaseTest {
 	public void testTableNames() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("alpha", new String[]{"a"});
 		tables.createTable("beta", new String[]{"b"});
@@ -159,13 +160,13 @@ public class SQLDatabaseTest {
 	public void testForkAndSync() {
 		AKeyPair kp = AKeyPair.generate();
 		SQLDatabase db = SQLDatabase.create("testdb", kp);
-		LatticeTables tables = db.tables();
+		SQLSchema tables = db.tables();
 
 		tables.createTable("data", new String[]{"id", "value"});
 		tables.insert("data", 1, "original");
 
 		// Fork
-		LatticeTables forked = tables.fork();
+		SQLSchema forked = tables.fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged
@@ -223,7 +224,7 @@ public class SQLDatabaseTest {
 
 		// Create tampered export - must match expected generic type
 		@SuppressWarnings({"unchecked", "rawtypes"})
-		AHashMap<ACell, SignedData<AHashMap<AString, Index<AString, AVector<ACell>>>>> tamperedExport =
+		AHashMap<ACell, SignedData<AHashMap<AString, Index<Keyword, ACell>>>> tamperedExport =
 			(AHashMap) convex.core.data.Maps.of(kp2.getAccountKey(), tamperedSigned);
 
 		// Should reject - signature doesn't match owner key
@@ -234,11 +235,8 @@ public class SQLDatabaseTest {
 
 	@Test
 	public void testConnectedDatabase() throws Exception {
-		// Set up a cursor chain: MapLattice<dbName → TableStore>
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		// Set up a cursor chain using DATABASE_MAP_LATTICE
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 
 		// Connect a named database
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -251,7 +249,7 @@ public class SQLDatabaseTest {
 		assertEquals(1, db.tables().getRowCount("users"));
 
 		// Verify the root cursor received the update
-		AHashMap<AString, Index<AString, AVector<ACell>>> rootMap = root.get();
+		AHashMap<?, ?> rootMap = (AHashMap<?, ?>) root.get();
 		assertTrue(rootMap.containsKey(Strings.create("mydb")));
 
 		// Connect a second database to the same root
@@ -288,10 +286,7 @@ public class SQLDatabaseTest {
 	@Test
 	public void testForkAndSyncConnected() throws Exception {
 		// Set up cursor chain
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 
 		// Connect and populate
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
@@ -299,7 +294,7 @@ public class SQLDatabaseTest {
 		db.tables().insert("data", 1, "original");
 
 		// Fork the tables
-		LatticeTables forked = db.tables().fork();
+		SQLSchema forked = db.tables().fork();
 		forked.insert("data", 2, "forked");
 
 		// Original unchanged
@@ -311,13 +306,132 @@ public class SQLDatabaseTest {
 		assertEquals(2, db.tables().getRowCount("data"));
 	}
 
+	// ========== Transaction Tests (SQLDatabase.fork/sync) ==========
+
+	@Test
+	public void testDatabaseForkNotVisibleUntilCommitted() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork for transaction
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+
+		// Transaction sees its own write
+		assertEquals(2, tx.tables().getRowCount("users"));
+
+		// Parent does NOT see uncommitted data
+		assertEquals(1, db.tables().getRowCount("users"));
+		assertNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkVisibleAfterCommit() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork, insert, commit
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+		tx.sync(); // commit
+
+		// Parent now sees committed data
+		assertEquals(2, db.tables().getRowCount("users"));
+		assertNotNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkRollbackDiscardsChanges() {
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("users", new String[]{"id", "name"});
+		db.tables().insert("users", 1, "Alice");
+
+		// Fork, insert, don't sync (rollback)
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("users", 2, "Bob");
+		// tx is discarded — no sync()
+
+		// Parent unchanged
+		assertEquals(1, db.tables().getRowCount("users"));
+		assertNull(db.tables().selectByKey("users", CVMLong.create(2)));
+	}
+
+	@Test
+	public void testDatabaseForkAcrossSchemas() {
+		// Transaction should be ACID across all sections of the database
+		AKeyPair kp = AKeyPair.generate();
+		SQLDatabase db = SQLDatabase.create("testdb", kp);
+		db.tables().createTable("orders", new String[]{"id", "item"});
+		db.tables().createTable("items", new String[]{"id", "name"});
+
+		// Fork at database level — encompasses all tables
+		SQLDatabase tx = db.fork();
+		tx.tables().insert("orders", 1, "widget");
+		tx.tables().insert("items", 1, "Widget");
+
+		// Neither table shows uncommitted data in parent
+		assertEquals(0, db.tables().getRowCount("orders"));
+		assertEquals(0, db.tables().getRowCount("items"));
+
+		// Commit — both tables updated atomically
+		tx.sync();
+		assertEquals(1, db.tables().getRowCount("orders"));
+		assertEquals(1, db.tables().getRowCount("items"));
+	}
+
+	@Test
+	public void testMultipleDatabaseRegistry() throws Exception {
+		// Create and register two databases via ConvexDB
+		ConvexDB cdb = ConvexDB.create();
+		SQLDatabase db1 = cdb.database("db_alpha");
+		SQLDatabase db2 = cdb.database("db_beta");
+		db1.tables().createTable("t1", new String[]{"id", "val"});
+		db2.tables().createTable("t2", new String[]{"id", "val"});
+		db1.tables().insert("t1", 1, "alpha");
+		db2.tables().insert("t2", 1, "beta");
+
+		cdb.register("db_alpha");
+		cdb.register("db_beta");
+
+		try {
+			// Connect to each database independently
+			try (java.sql.Connection conn1 = java.sql.DriverManager.getConnection("jdbc:convex:database=db_alpha");
+				 java.sql.Connection conn2 = java.sql.DriverManager.getConnection("jdbc:convex:database=db_beta")) {
+
+				// Each connection sees only its own tables
+				try (java.sql.Statement stmt1 = conn1.createStatement();
+					 java.sql.ResultSet rs1 = stmt1.executeQuery("SELECT val FROM t1 WHERE id = 1")) {
+					assertTrue(rs1.next());
+					assertEquals("alpha", rs1.getObject(1));
+				}
+				try (java.sql.Statement stmt2 = conn2.createStatement();
+					 java.sql.ResultSet rs2 = stmt2.executeQuery("SELECT val FROM t2 WHERE id = 1")) {
+					assertTrue(rs2.next());
+					assertEquals("beta", rs2.getObject(1));
+				}
+			}
+
+			// Verify lookup returns databases with the correct data
+			assertNotNull(ConvexDB.lookupDatabase("db_alpha"));
+			assertNotNull(ConvexDB.lookupDatabase("db_beta"));
+			assertNull(ConvexDB.lookupDatabase("nonexistent"));
+			assertEquals(1, ConvexDB.lookupDatabase("db_alpha").tables().getRowCount("t1"));
+			assertEquals(1, ConvexDB.lookupDatabase("db_beta").tables().getRowCount("t2"));
+		} finally {
+			cdb.unregister("db_alpha");
+			cdb.unregister("db_beta");
+		}
+	}
+
 	@Test
 	public void testConnectedModeRejectsStandaloneOps() {
 		// Connected databases should not have signing capability
-		MapLattice<AString, Index<AString, AVector<ACell>>> dbMapLattice =
-			MapLattice.create(TableStoreLattice.INSTANCE);
-		ALatticeCursor<AHashMap<AString, Index<AString, AVector<ACell>>>> root =
-			Cursors.createLattice(dbMapLattice);
+		ALatticeCursor<?> root = Cursors.createLattice(ConvexDB.DATABASE_MAP_LATTICE);
 		SQLDatabase db = SQLDatabase.connect(root, "mydb");
 
 		assertNull(db.getKeyPair());

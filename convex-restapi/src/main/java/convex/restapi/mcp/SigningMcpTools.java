@@ -124,7 +124,7 @@ class SigningMcpTools {
 		String token = confirmSvc.createConfirmation(identity, toolName, stripped, description);
 
 		// Build confirmUrl from request context
-		Context ctx = McpAPI.currentContext.get();
+		Context ctx = McpServer.getCurrentContext();
 		String baseUrl = (ctx != null) ? ABaseAPI.getExternalBaseUrl(ctx, "") : "http://localhost";
 		String confirmUrl = baseUrl + "/confirm?token=" + token;
 
@@ -499,7 +499,6 @@ class SigningMcpTools {
 			if (publicKey == null) return api.toolError("Invalid public key format");
 
 			// Extract nested ucan object
-			@SuppressWarnings("unchecked")
 			AMap<AString, ACell> ucanArgs = RT.ensureMap(arguments.get(ARG_UCAN));
 			if (ucanArgs == null) return api.toolError("signingDelegate requires 'ucan' object");
 
@@ -526,9 +525,7 @@ class SigningMcpTools {
 			CVMLong nbfCell = RT.ensureLong(ucanArgs.get(UCAN.NBF));
 			if (nbfCell != null) notBefore = nbfCell.longValue();
 
-			@SuppressWarnings("unchecked")
 			AVector<ACell> att = RT.ensureVector(ucanArgs.get(UCAN.ATT));
-			@SuppressWarnings("unchecked")
 			AVector<ACell> prf = RT.ensureVector(ucanArgs.get(UCAN.PRF));
 			ACell fct = ucanArgs.get(UCAN.FCT);
 

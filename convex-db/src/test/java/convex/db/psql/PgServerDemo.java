@@ -1,8 +1,8 @@
 package convex.db.psql;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -39,9 +39,9 @@ public class PgServerDemo {
 
 		// Create and register a demo database
 		System.out.println("Creating demo database: " + dbName);
-		AKeyPair kp = AKeyPair.generate();
-		SQLDatabase db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		ConvexDB cdb = ConvexDB.create();
+		SQLDatabase db = cdb.database(dbName);
+		cdb.register(dbName);
 
 		// Create sample tables
 		createSampleData(db);

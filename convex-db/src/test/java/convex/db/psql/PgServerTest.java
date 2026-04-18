@@ -17,9 +17,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
+import convex.db.ConvexDB;
 import convex.db.calcite.ConvexColumnType;
-import convex.db.calcite.ConvexSchemaFactory;
+
 import convex.db.calcite.ConvexType;
 import convex.db.lattice.SQLDatabase;
 
@@ -30,6 +30,7 @@ public class PgServerTest {
 
 	private static final AtomicInteger DB_COUNTER = new AtomicInteger(0);
 	private PgServer server;
+	private ConvexDB cdb;
 	private SQLDatabase db;
 	private String dbName;
 
@@ -39,11 +40,11 @@ public class PgServerTest {
 		dbName = "pgtest_" + DB_COUNTER.getAndIncrement();
 
 		// Create and register a test database
-		AKeyPair kp = AKeyPair.generate();
-		db = SQLDatabase.create(dbName, kp);
-		ConvexSchemaFactory.register(dbName, db);
+		cdb = ConvexDB.create();
+		db = cdb.database(dbName);
+		cdb.register(dbName);
 
-		// Create users table using LatticeTables API
+		// Create users table using SQLSchema API
 		ConvexColumnType[] userTypes = {
 			ConvexColumnType.of(ConvexType.INTEGER),   // id
 			ConvexColumnType.varchar(50),              // name
@@ -66,8 +67,8 @@ public class PgServerTest {
 		if (server != null && server.isRunning()) {
 			server.stop();
 		}
-		if (dbName != null) {
-			ConvexSchemaFactory.unregister(dbName);
+		if (cdb != null) {
+			cdb.unregister(dbName);
 		}
 	}
 

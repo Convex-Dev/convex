@@ -13,7 +13,11 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.DataContext;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.type.SqlTypeName;
 
 import convex.core.data.ACell;
 import convex.core.lang.RT;
@@ -25,7 +29,8 @@ import convex.db.calcite.eval.ConvexExpressionEvaluator;
 /**
  * Sort in CONVEX convention.
  *
- * <p>Sorts ACell[] rows using RT.compare() for CVM-native ordering.
+ * <p>Sorts ACell[] rows using type-specific comparators selected from
+ * the column's SQL type at plan time.
  */
 public class ConvexSort extends Sort implements ConvexRel {
 
@@ -50,9 +55,9 @@ public class ConvexSort extends Sort implements ConvexRel {
 	}
 
 	@Override
-	public ConvexEnumerable execute() {
+	public ConvexEnumerable execute(DataContext ctx) {
 		ConvexRel inputRel = (ConvexRel) getInput();
-		ConvexEnumerable input = inputRel.execute();
+		ConvexEnumerable input = inputRel.execute(ctx);
 
 		// Collect all rows
 		List<ACell[]> rows = new ArrayList<>();
@@ -99,56 +104,46 @@ public class ConvexSort extends Sort implements ConvexRel {
 	}
 
 	/**
-	 * Creates a comparator based on the collation using RT.compare().
+	 * Creates a row comparator by selecting a type-specific cell comparator
+	 * for each sort field based on the column's SQL type.
 	 */
 	private Comparator<ACell[]> createComparator() {
 		List<RelFieldCollation> fields = collation.getFieldCollations();
+		RelDataType inputRowType = getInput().getRowType();
+		List<RelDataTypeField> fieldList = inputRowType.getFieldList();
+
+		// Pre-select a comparator per sort field
+		int n = fields.size();
+		int[] indices = new int[n];
+		Comparator<ACell>[] comparators = new Comparator[n];
+
+		for (int i = 0; i < n; i++) {
+			RelFieldCollation field = fields.get(i);
+			int index = field.getFieldIndex();
+			indices[i] = index;
+
+			SqlTypeName sqlType = (index < fieldList.size())
+				? fieldList.get(index).getType().getSqlTypeName()
+				: SqlTypeName.ANY;
+
+			Comparator<ACell> cmp = ConvexExpressionEvaluator.comparatorFor(sqlType);
+
+			// Wrap with direction and null handling
+			boolean nullsFirst = (field.nullDirection == RelFieldCollation.NullDirection.FIRST);
+			boolean desc = field.getDirection().isDescending();
+			comparators[i] = ConvexExpressionEvaluator.nullSafeComparator(cmp, nullsFirst, desc);
+		}
 
 		return (row1, row2) -> {
-			for (RelFieldCollation field : fields) {
-				int index = field.getFieldIndex();
-				ACell a = index < row1.length ? row1[index] : null;
-				ACell b = index < row2.length ? row2[index] : null;
-
-				int cmp = compareValues(a, b);
-
-				// Handle direction
-				if (field.getDirection().isDescending()) {
-					cmp = -cmp;
-				}
-
-				// Handle nulls
-				if (cmp == 0 && a == null && b == null) {
-					continue; // Both null, equal
-				}
-				if (a == null) {
-					// NULLS FIRST or NULLS LAST
-					return field.nullDirection == RelFieldCollation.NullDirection.FIRST ? -1 : 1;
-				}
-				if (b == null) {
-					return field.nullDirection == RelFieldCollation.NullDirection.FIRST ? 1 : -1;
-				}
-
+			for (int i = 0; i < n; i++) {
+				int idx = indices[i];
+				ACell a = idx < row1.length ? row1[idx] : null;
+				ACell b = idx < row2.length ? row2[idx] : null;
+				int cmp = comparators[i].compare(a, b);
 				if (cmp != 0) return cmp;
 			}
 			return 0;
 		};
 	}
 
-	/**
-	 * Compares two ACell values using RT.compare().
-	 */
-	private int compareValues(ACell a, ACell b) {
-		if (a == null && b == null) return 0;
-		if (a == null) return -1;
-		if (b == null) return 1;
-
-		// Use RT.compare for CVM-native comparison
-		Long cmp = RT.compare(a, b, 0L);
-		if (cmp == null) {
-			// NaN comparison - treat as equal
-			return 0;
-		}
-		return cmp.intValue();
-	}
 }
