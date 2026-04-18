@@ -56,9 +56,20 @@ public class KeyRingPanel extends JPanel {
 	private static DefaultListModel<AWalletEntry> listModel = new DefaultListModel<>();;
 	ScrollyList<AWalletEntry> walletList;
 
-	public static void addWalletEntry(AWalletEntry we) {
+	/**
+	 * Add a wallet entry to the key ring, unless an entry with the same public key
+	 * already exists.
+	 * @param we Wallet entry to add
+	 * @return true if added, false if a duplicate was already present
+	 */
+	public static boolean addWalletEntry(AWalletEntry we) {
+		if (getKeyRingEntry(we.getPublicKey())!=null) {
+			log.debug("Skipping duplicate wallet entry for key: {}",we.getPublicKey());
+			return false;
+		}
 		listModel.addElement(we);
-		log.debug("Wallet entry added to KeyRing: ",we.getPublicKey());
+		log.debug("Wallet entry added to KeyRing: {}",we.getPublicKey());
+		return true;
 	}
 	
 	static {
@@ -87,7 +98,7 @@ public class KeyRingPanel extends JPanel {
 		JButton btnNew = new ActionButton("New Keypair",0xe145,e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
-				listModel.addElement(HotWalletEntry.create(newKP,"Generated key (in memory)"));
+				addWalletEntry(HotWalletEntry.create(newKP,"Generated key (in memory)"));
 				Toolkit.scrollToBottom(walletList);
 			} catch (Exception  t) {
 				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
@@ -106,7 +117,10 @@ public class KeyRingPanel extends JPanel {
 			
 			try {
 				AKeyPair newKP=AKeyPair.create(seed);
-				listModel.addElement(HotWalletEntry.create(newKP, "Imported from Ed25519 seed"));
+				boolean added=addWalletEntry(HotWalletEntry.create(newKP, "Imported from Ed25519 seed"));
+				if (!added) {
+					Toast.display(this,"Key already present in key ring",Color.ORANGE);
+				}
 			} catch (Exception  t) {
 				Toast.display(this,"Exception importing seed: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
@@ -189,11 +203,7 @@ public class KeyRingPanel extends JPanel {
 			String alias = aliases.nextElement();
 			AWalletEntry we=KeystoreWalletEntry.create(keyStore, alias, source);
 			we.tryUnlock(null); // if empty password, unlock by default
-			AWalletEntry existing=getKeyRingEntry(we.getPublicKey());
-			if (existing==null) {
-				listModel.addElement(we);
-				numImports++;
-			}
+			if (addWalletEntry(we)) numImports++;
 		}
 		return numImports;
 	}
