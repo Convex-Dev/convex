@@ -11,6 +11,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -71,8 +72,21 @@ public class NIOServer extends AServer {
 	}
 
 	/**
+	 * Bind ssc to the requested address, falling back to IPv4 0.0.0.0 if the
+	 * JDK/OS does not support the IPv6 address family.
+	 */
+	private void bindWithIPv4Fallback(String bindAddress, int port) throws IOException {
+		try {
+			ssc.bind(new InetSocketAddress(bindAddress, port));
+		} catch (UnsupportedAddressTypeException e) {
+			log.warn("Unable to bind IPv6 address, falling back to IPv4");
+			ssc.bind(new InetSocketAddress("0.0.0.0", port));
+		}
+	}
+
+	/**
 	 * Launch NIO Server, binding to a given socket address
-	 * 
+	 *
 	 * @throws IOException in case of IO problem
 	 */
 	public void launch() throws IOException {
@@ -83,28 +97,25 @@ public class NIOServer extends AServer {
 		ssc.socket().setReuseAddress(true);
 
 		String bindAddress = "::";
-		
+
 		// Bind to a port
 		{
-			InetSocketAddress bindSA;	
+			InetSocketAddress bindSA;
 			Integer port=getPort();
 			if (port == null) {
 				port = 0;
 			}
 			if (port<=0) {
 				try {
-					bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
-					ssc.bind(bindSA);
+					bindWithIPv4Fallback(bindAddress, Constants.DEFAULT_PEER_PORT);
 				} catch (IOException e) {
 					// try again with random port
-					bindSA = new InetSocketAddress(bindAddress, 0);
-					ssc.bind(bindSA);
+					bindWithIPv4Fallback(bindAddress, 0);
 				}
 			} else {
-				bindSA = new InetSocketAddress(bindAddress, port);
-				ssc.bind(bindSA);
+				bindWithIPv4Fallback(bindAddress, port);
 			}
-			
+
 			// Find out which port we actually bound to
 			bindSA = (InetSocketAddress) ssc.getLocalAddress();
 			setPort(ssc.socket().getLocalPort());
