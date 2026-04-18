@@ -9,17 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ConvexDB: Calcite convention pipeline with index pushdown and merge joins
-- ConvexDB: DDL support (CREATE TABLE, DROP TABLE via JDBC)
-- ConvexDB: Replication demo with Etch stores
-- DLFS CLI and DID authentication
+- CellExplorer: budgeted JSON5 pretty-printer for lattice data with truncation and partial-form rendering
+- JSON5 writer (`JSON.appendJSON5`, `JSON.printJSON5`) with extended escape handling — \v, \xHH, line continuation, lenient fallback (#546)
+- UCAN capabilities, JWT validation, and DID-based authentication flows
+- MCP spec 2025-11-25 target with backward-compatible version negotiation and server extensibility hooks
+- ConvexDB: Calcite convention pipeline with index pushdown, merge joins, and table statistics
+- ConvexDB: DDL support (CREATE TABLE, DROP TABLE via JDBC) and SQL transaction support
+- ConvexDB: replication demo with Etch stores
+- DLFS: CLI, DID authentication, MCP tools, and WebDAV sync after mutations
+- L2 lattice caching
+- Javadoc overview pages and package descriptions across all published modules
 - Docker Hub automated push in CI workflows
 - Install scripts
+
+### Changed
+
+- `JSON.appendJSON` strictly JSON-compliant: non-finite doubles emit `null` instead of the non-standard `NaN` literal (#547)
 
 ### Fixed
 
 - ConvexDB: ORDER BY with JOIN queries (#540)
 - MCP SSE race condition on connection setup
+- NettyServer IPv4 fallback missing `sync()`; NIOServer gained matching IPv4 fallback for IPv6-unavailable hosts
+- Flaky test compile: `JSONTest` `cannot access CharStream` under JPMS with ANTLR as automatic module
 - Flaky CI tests (EncodingTest, McpTest, DLFSBrowser)
 
 ## [0.8.3] - 2026-03-02
