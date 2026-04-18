@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- TransactionHandler: reject faulty or incompletely-referenced transactions at intake; block production no longer stalls on MissingDataException (#531)
+
 ## [0.8.4] - 2026-04-18
 
 ### Added
