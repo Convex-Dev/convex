@@ -40,35 +40,48 @@ All tests must pass, including headless (no GUI) — the CI server runs on headl
 
 ### 2. Update CHANGELOG
 
-- Finalise the `CHANGELOG.md` section for the current version
-- Annotate with the release date
-- Commit to `develop`
+- Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
+- Finalise the `### Added` / `### Changed` / `### Fixed` bullets for this version.
+- Commit to `develop`.
 
 ### 3. Merge to master
 
 ```bash
-git checkout master
+git checkout develop && git pull --ff-only
+git checkout master && git pull --ff-only
 git merge develop --no-ff
 ```
+
+The `pull --ff-only` on both branches ensures you're not merging a stale local develop or pushing a stale master.
 
 ### 4. Set version
 
 ```bash
-mvn versions:set -DnewVersion='0.8.3'
-git add -A && git commit -m "Prepare for Release 0.8.3"
+mvn versions:set -DnewVersion='0.8.4'
+git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 ```
 
-### 5. Tag and push
+`mvn versions:set` only rewrites `pom.xml` files — stage those explicitly rather than `git add -A`, which would sweep in any unrelated working-tree changes (stray `.env` files, editor scratch files, partial WIP).
+
+### 5. Smoke test the built jar
 
 ```bash
-git tag 0.8.3
+java -jar convex-integration/target/convex.jar --version
+```
+
+Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
+
+### 6. Tag and push
+
+```bash
+git tag 0.8.4
 git push origin master
-git push origin 0.8.3
+git push origin 0.8.4
 ```
 
 This triggers the release workflow which builds, tests, and creates a GitHub Release with `convex.jar` attached.
 
-### 6. Confirm GitHub Release is live
+### 7. Confirm GitHub Release is live
 
 **Wait for the release workflow to complete successfully** before proceeding. Check at:
 
@@ -77,11 +90,27 @@ https://github.com/Convex-Dev/convex/releases
 Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset
-- Changelog content is correct
+- Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
 
-If the workflow fails, fix the issue, re-tag, and re-push. Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
+Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
-### 7. Deploy to Maven Central
+#### If the release workflow fails
+
+Fix the underlying issue on master, then delete and re-push the tag:
+
+```bash
+# Delete locally and on remote
+git tag -d 0.8.4
+git push origin :refs/tags/0.8.4
+
+# Re-tag on the fixed commit and push
+git tag 0.8.4
+git push origin 0.8.4
+```
+
+A stray GitHub Release created by a failed workflow run also needs to be deleted from the Releases page — `softprops/action-gh-release` will refuse to overwrite a release with the same tag name.
+
+### 8. Deploy to Maven Central
 
 Only after confirming the GitHub Release is live:
 
@@ -92,16 +121,17 @@ mvn deploy -Prelease
 
 This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. Requires GPG signing key and Maven Central credentials configured locally.
 
-### 8. Prepare next development version
+### 9. Prepare next development version
 
 ```bash
 git checkout develop
 git merge master --no-ff
-mvn versions:set -DnewVersion='0.8.4-SNAPSHOT'
+mvn versions:set -DnewVersion='0.8.5-SNAPSHOT'
+git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycle (0.8.5-SNAPSHOT)"
 ```
 
-- Add new "Unreleased" section to `CHANGELOG.md`
-- Commit and push `develop`
+- Add new `## [0.8.5-SNAPSHOT] - Unreleased` section to `CHANGELOG.md` with empty `### Added` / `### Changed` / `### Fixed` subsections.
+- Commit and push `develop`.
 
 ## Docker
 

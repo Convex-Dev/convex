@@ -36,7 +36,8 @@ jobs:
           VERSION="${{ github.ref_name }}"
           CHANGELOG=$(awk "/## \[$VERSION\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
           if [ -z "$CHANGELOG" ]; then
-            CHANGELOG="Release $VERSION. See CHANGELOG.md for details."
+            echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date before tagging."
+            exit 1
           fi
           {
             echo 'changelog<<EOF'
