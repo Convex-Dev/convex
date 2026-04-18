@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex DB API</title>
+</head>
+<body>
+
+<h1>Convex DB</h1>
+
+<p>SQL database layer over Convex lattice data. Provides SQL query capabilities
+through Apache Calcite, a JDBC driver, and a PostgreSQL wire-protocol server —
+so standard clients such as <code>psql</code>, DBeaver, DataGrip, and Metabase
+can query lattice-backed tables directly.</p>
+
+<h2>Key Entry Points</h2>
+
+<ul>
+  <li><code>convex.db.ConvexDB</code> — root container for named SQL databases</li>
+  <li><code>convex.db.SQLDatabase</code> — lattice-backed SQL database</li>
+  <li><code>convex.db.jdbc</code> — JDBC driver</li>
+  <li><code>convex.db.pg</code> — PostgreSQL wire-protocol server</li>
+</ul>
+
+<p>Data is stored as convergent lattice structures, so replicas can be merged
+deterministically without coordination. See
+<a href="https://docs.convex.world/">docs.convex.world</a> for the full guide.</p>
+
+</body>
+</html>

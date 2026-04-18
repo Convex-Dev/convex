@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex Java Client API</title>
+</head>
+<body>
+
+<h1>Convex Java Client</h1>
+
+<p>Java client library for connecting to Convex peers. Provides a synchronous and
+asynchronous API for submitting signed transactions, running read-only queries,
+and observing network state over the binary Convex protocol.</p>
+
+<p>Depends on <code>convex-core</code> for the shared CVM data model.</p>
+
+<h2>Typical Usage</h2>
+
+<ul>
+  <li><code>convex.java.Convex</code> — high-level client facade</li>
+  <li>Sign transactions with an <code>AKeyPair</code> and an <code>Address</code>
+      (both from <code>convex-core</code>)</li>
+  <li>Read results as immutable <code>ACell</code> values</li>
+</ul>
+
+<p>See also: <a href="https://docs.convex.world/docs/tutorial/client-sdks/java">Java Client SDK guide</a>.</p>
+
+</body>
+</html>

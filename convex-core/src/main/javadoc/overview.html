@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex API Overview</title>
+</head>
+<body>
+
+<h1>Convex</h1>
+
+<p>Convex is a decentralised lattice network and execution platform. It realises the vision
+of a <strong>Stateful Internet</strong> — a global, public network that securely hosts,
+executes, and persists both code and data, powered by lattice technology and Convergent
+Proof of Stake (CPoS) consensus.</p>
+
+<p>These Javadocs cover the reference Java implementation of the Convex protocol,
+published as artifacts under the <code>world.convex</code> group on Maven Central.</p>
+
+<h2>Module Map</h2>
+
+<p>Convex is a multi-module Maven project. The most commonly referenced artifacts are:</p>
+
+<ul>
+  <li><code>convex-core</code> — CVM, CAD3 data structures, CPoS consensus, Etch storage
+      <ul>
+        <li>{@link convex.core} — core package and module entry point</li>
+        <li>{@link convex.core.data} — immutable persistent data structures (ACell hierarchy)</li>
+        <li>{@link convex.core.cvm} — Convex Virtual Machine and state transition function</li>
+        <li>{@link convex.core.lang} — Convex Lisp compiler, reader, and runtime</li>
+        <li>{@link convex.core.cpos} — Convergent Proof of Stake consensus</li>
+        <li>{@link convex.core.crypto} — Ed25519 signatures and SHA-256 hashing</li>
+        <li>{@link convex.core.store} — pluggable content-addressed storage</li>
+        <li>{@link convex.etch} — high-performance persistent Etch storage engine</li>
+        <li>{@link convex.lattice} — lattice abstractions underpinning DLFS, KV stores, and more</li>
+        <li><code>convex.auth</code> — DID, JWT, and UCAN authorisation primitives</li>
+      </ul>
+  </li>
+  <li><code>convex-peer</code> — peer server, binary protocol, P2P networking</li>
+  <li><code>convex-restapi</code> — HTTP REST API server</li>
+  <li><code>convex-java</code> — Java client library for connecting to Convex peers</li>
+  <li><code>convex-cli</code> — command-line tooling and scripting</li>
+  <li><code>convex-gui</code> — Swing desktop application</li>
+</ul>
+
+<h2>Design Principles</h2>
+
+<ul>
+  <li><strong>Immutable data</strong> — every CVM value is an immutable {@link convex.core.data.ACell}
+      with a canonical CAD3 encoding and content-addressed hash.</li>
+  <li><strong>Deterministic execution</strong> — the CVM is a pure, deterministic state
+      transition function; every peer computes identical results given the same inputs.</li>
+  <li><strong>Lattice technology</strong> — state converges through commutative, associative,
+      idempotent merges rather than a linear chain, enabling high throughput and flexible
+      replication topologies.</li>
+  <li><strong>Global state model</strong> — a single public state tree hosts
+      self-sovereign accounts (e.g. <code>#1337</code>), on-chain actors, coins, and
+      arbitrary application data.</li>
+  <li><strong>Security by default</strong> — peer and REST surfaces are hardened against
+      malicious messages; lattice nodes are private unless explicitly shared.</li>
+</ul>
+
+<h2>Further Reading</h2>
+
+<ul>
+  <li><a href="https://docs.convex.world/">docs.convex.world</a> — user guides, tutorials,
+      and Convex Architecture Documents (CADs)</li>
+  <li><a href="https://docs.convex.world/docs/overview/convex-whitepaper">Convex Whitepaper</a></li>
+  <li><a href="https://docs.convex.world/docs/cad/encoding">CAD3 Encoding Specification</a></li>
+  <li><a href="https://github.com/Convex-Dev/convex">GitHub: Convex-Dev/convex</a></li>
+  <li><a href="https://discord.com/invite/xfYGq4CT7v">Community Discord</a></li>
+</ul>
+
+<p><em>Convex is open source under the
+<a href="https://github.com/Convex-Dev/convex/blob/master/LICENSE.md">Convex Public License</a>.</em></p>
+
+</body>
+</html>

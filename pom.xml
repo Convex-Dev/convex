@@ -240,6 +240,11 @@
 					<configuration>
 						<doclint>syntax</doclint>
 						<quiet />
+						<doctitle>${project.name} ${project.version} API</doctitle>
+						<windowtitle>${project.name} ${project.version} API</windowtitle>
+						<header><![CDATA[<b>Convex</b> ${project.version}]]></header>
+						<bottom><![CDATA[Copyright &copy; Convex Foundation. Licensed under the <a href="https://github.com/Convex-Dev/convex/blob/master/LICENSE.md">Convex Public License</a>. See <a href="https://docs.convex.world/">docs.convex.world</a> for user documentation.]]></bottom>
+						<notimestamp>true</notimestamp>
 					</configuration>
 					<executions>
 						<execution>
