@@ -34,7 +34,11 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ github.ref_name }}"
-          CHANGELOG=$(awk "/## \[$VERSION\]/,/## \[/" CHANGELOG.md | sed '$d' | tail -n +2)
+          CHANGELOG=$(awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 {flag=1; next}
+            flag && /^## \[/ {exit}
+            flag {print}
+          ' CHANGELOG.md)
           if [ -z "$CHANGELOG" ]; then
             echo "::error::No CHANGELOG.md section found for [$VERSION]. Rename the [X.Y.Z-SNAPSHOT] heading to [$VERSION] with a release date before tagging."
             exit 1
