@@ -215,16 +215,16 @@ public class CellExplorer {
 
 	/**
 	 * Render a leaf cell that fits the budget. CellExplorer overrides
-	 * {@link JSON#appendJSON}'s divergent renderings for:
+	 * {@link JSON#appendJSON5}'s renderings for:
 	 * <ul>
 	 *   <li>{@link Address} — rendered as {@code "#42"} (quoted) so the
 	 *       round-tripped JSON5 preserves the distinction from plain longs.</li>
 	 *   <li>{@link Keyword} as value — rendered as {@code ":name"} (quoted).</li>
 	 *   <li>{@link Symbol} as value — rendered as {@code "'name"} (quoted).</li>
-	 *   <li>Non-finite {@link CVMDouble} — bare {@code NaN},
-	 *       {@code Infinity}, or {@code -Infinity} (all JSON5-valid).</li>
 	 * </ul>
-	 * Any other leaf type falls through to {@link JSON#appendJSON}.
+	 * Any other leaf type (including non-finite {@link CVMDouble}) delegates
+	 * to {@link JSON#appendJSON5}, which emits JSON5 literals for non-finite
+	 * values as required.
 	 */
 	private static void renderLeafFull(ACell cell, BlobBuilder bb) {
 		if (cell instanceof Address) {
@@ -248,23 +248,7 @@ public class CellExplorer {
 			bb.append('"');
 			return;
 		}
-		if (cell instanceof CVMDouble) {
-			double v = ((CVMDouble) cell).doubleValue();
-			if (Double.isNaN(v)) {
-				bb.append("NaN");
-				return;
-			}
-			if (v == Double.POSITIVE_INFINITY) {
-				bb.append("Infinity");
-				return;
-			}
-			if (v == Double.NEGATIVE_INFINITY) {
-				bb.append("-Infinity");
-				return;
-			}
-			// Finite: fall through to JSON delegation for canonical number form.
-		}
-		JSON.appendJSON(bb, cell);
+		JSON.appendJSON5(bb, cell);
 	}
 
 	/**

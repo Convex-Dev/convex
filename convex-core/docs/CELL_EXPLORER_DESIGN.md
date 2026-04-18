@@ -597,32 +597,21 @@ Callers needing a strict output-byte ceiling should pass a smaller budget
 
 ---
 
-### OQ-8 · `NaN` and `Infinity` rendering for `CVMDouble` — ACCEPTED (narrowed v1)
+### OQ-8 · `NaN` and `Infinity` rendering for `CVMDouble` — RESOLVED
 
-**Decision (2026-04-05):** CellExplorer special-cases `CVMDouble` before delegating
-to `JSON.appendJSON`. Non-finite values render as JSON5 literals: `NaN`, `Infinity`,
-`-Infinity`. Finite values fall through to the existing `JSON.appendJSON` path.
+**Decision (2026-04-16):** CellExplorer delegates `CVMDouble` rendering to
+`JSON.appendJSON5`, which emits JSON5 literals `NaN`, `Infinity`, `-Infinity`
+for non-finite values and canonical number form for finite values.
 
-**Why narrowed from the original Option A:** The original plan was for CellExplorer
-to delegate all leaf rendering to `JSON.appendJSON` (OQ-2) and rely on `JSON.java`
-to emit JSON5 literals for non-finite doubles. Investigation showed `JSON.java` has
-**no JSON5 writer path at all** — only a single `appendJSON` method with inconsistent
-behaviour (renders `NaN` as the literal `NaN`, but renders `±Infinity` as `null` with
-the literal form commented out at lines 213-216). Fixing `JSON.java` would affect
-every existing caller and is out of scope for CellExplorer v1. The narrow
-CellExplorer-internal special-case keeps the JSON5 claim honest with zero blast
-radius on other JSON callers.
+**Resolution trail:**
 
-**Follow-up issues filed:**
-
-- #546 — Add a proper `JSON.appendJSON5(BlobBuilder, ACell)` writer as a peer to
-  the existing `JSON5Reader`. Once it lands, CellExplorer's `CVMDouble` special-case
-  can migrate to delegate to the new method.
-- #547 — Audit `JSON.appendJSON` for strict JSON compliance. Emitting `NaN` as a
-  literal is non-standard JSON; `null` is the conventional substitute. Fix requires
-  understanding the existing caller set — separate decision from this design.
-- #548 — Add test coverage for `JSON5Reader` round-tripping `NaN`, `Infinity`,
-  `-Infinity` literals.
+- #548 (closed) — `JSON5Reader` test coverage for non-finite literals added.
+- #547 (closed) — `JSON.appendJSON` is now strictly JSON-compliant; all
+  non-finite doubles emit `null`, matching the existing Infinity path and
+  JavaScript `JSON.stringify` convention.
+- #546 (closed) — `JSON.appendJSON5(BlobBuilder, ACell)` and `JSON.printJSON5`
+  added as a proper JSON5 writer path; CellExplorer's `CVMDouble` special-case
+  has been removed and the leaf fallback now delegates to `appendJSON5`.
 
 ---
 
