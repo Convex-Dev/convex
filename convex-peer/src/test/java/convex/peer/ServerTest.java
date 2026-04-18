@@ -34,8 +34,10 @@ import convex.core.data.AMap;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
+import convex.core.data.SignedData;
 import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
@@ -382,6 +384,77 @@ public class ServerTest {
 		// The server should be live and processing beliefs
 		assertTrue(server.isLive());
 		assertTrue(server.getBeliefPropagator().getBeliefBroadcastCount() >= 0);
+	}
+
+	/**
+	 * A SignedData whose value Ref points to data the server does not have must
+	 * not cause the peer to hang. The client should get a prompt error Result.
+	 *
+	 * Regression test for #531: a missing/faulty transaction would reach block
+	 * production and throw MissingDataException there, leaving the client
+	 * waiting forever. Now rejected at intake (or earlier) with a clean error.
+	 */
+	@Test
+	public void testTransactionWithMissingData() throws Exception {
+		Server server = network.SERVER;
+		AStore store = server.getStore();
+
+		// Build a Ref to a hash that is definitely not in the store
+		Hash missingHash = Hash.fromHex("DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF");
+		assertNull(store.refForHash(missingHash), "Precondition: hash must not be in store");
+		Ref<ATransaction> badRef = Ref.forHash(missingHash, store);
+
+		// Construct a SignedData whose value is unresolvable. Signature contents are
+		// irrelevant — the peer must reject before attempting any verification that
+		// would require the missing cell.
+		SignedData<ATransaction> badSigned = SignedData.create(
+				network.HERO_KEYPAIR.getAccountKey(),
+				Ed25519Signature.ZERO,
+				badRef);
+
+		Convex convex = Convex.connect(server, network.HERO, network.HERO_KEYPAIR);
+		try {
+			// 3 second timeout is generous — a correct peer responds in milliseconds.
+			// If the peer is broken in the old way, this test times out rather than
+			// hanging the build.
+			Future<Result> cf = convex.transact(badSigned);
+			Result r = cf.get(3, TimeUnit.SECONDS);
+			assertTrue(r.isError(), () -> "Expected error result but got: " + r);
+		} finally {
+			convex.close();
+		}
+
+		// Peer must remain live after handling a faulty transaction
+		assertTrue(server.isLive());
+	}
+
+	/**
+	 * After a valid client transaction is accepted, the SignedData must be
+	 * persisted in the peer's store by intake time. This enforces the invariant
+	 * that block production can never fail on missing data.
+	 *
+	 * Uses the shared HERO connection so sequence caching stays in sync with
+	 * other tests.
+	 */
+	@Test
+	public void testTransactionPersistedAtIntake() throws Exception {
+		Server server = network.SERVER;
+		synchronized (network.SERVER) {
+			Convex convex = network.CONVEX;
+			// Use a non-trivial command to ensure the signed cell has child refs
+			ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
+					Reader.read("(do (def x 1) (def y 2) (+ x y))"));
+			SignedData<ATransaction> signed = network.HERO_KEYPAIR.signData(tx);
+
+			Result r = convex.transactSync(signed, 5000);
+			assertFalse(r.isError(), () -> "Valid tx should succeed: " + r);
+
+			// After successful response, the SignedData must be in the peer's store
+			Ref<?> ref = server.getStore().refForHash(signed.getHash());
+			assertNotNull(ref, "SignedData must be persisted in peer store after intake");
+			assertTrue(ref.getStatus() >= Ref.PERSISTED,
+				"SignedData ref must be at PERSISTED status or higher");
+		}
 	}
 
 	@Test
