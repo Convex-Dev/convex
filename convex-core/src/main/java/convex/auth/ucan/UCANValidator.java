@@ -177,4 +177,31 @@ public class UCANValidator {
 		}
 		return result.isEmpty() ? null : result;
 	}
+
+	/**
+	 * Parse transport UCANs from two sources — an HTTP {@code Authorization:
+	 * Bearer <jwt>} header and the request envelope's {@code ucans} array —
+	 * through the same trust boundary as {@link #parseTransportUCANs}.
+	 *
+	 * <p>The bearer token, if non-null, is prepended to the body vector and the
+	 * combined vector is validated by a single call to
+	 * {@link #parseTransportUCANs}. This preserves the invariant that UCAN
+	 * signatures and chains are verified at exactly one place regardless of
+	 * transport.</p>
+	 *
+	 * <p>Matches the IETF UCAN-HTTP bearer convention: a single invocation UCAN
+	 * may be sent via the {@code Authorization} header, with additional
+	 * delegation tokens accompanying it in the request body.</p>
+	 *
+	 * @param bearer Bearer JWT from the Authorization header, or null
+	 * @param bodyUcans Vector of JWT strings from the request body, or null
+	 * @return Vector of cryptographically-verified UCAN payload maps, or null
+	 *         if no tokens verified
+	 */
+	public static AVector<ACell> parseTransportUCANsWithBearer(AString bearer, AVector<ACell> bodyUcans) {
+		if (bearer == null) return parseTransportUCANs(bodyUcans);
+		AVector<ACell> combined = Vectors.of(bearer);
+		if (bodyUcans != null && !bodyUcans.isEmpty()) combined = combined.concat(bodyUcans);
+		return parseTransportUCANs(combined);
+	}
 }

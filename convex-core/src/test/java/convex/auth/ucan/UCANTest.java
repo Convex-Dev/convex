@@ -605,4 +605,62 @@ public class UCANTest {
 		assertNull(UCANValidator.parseTransportUCANs(Vectors.of(badChild)),
 			"Broken chain link must be rejected at the trust boundary");
 	}
+
+	// parseTransportUCANsWithBearer — tests
+
+	@Test
+	public void testParseTransportUCANsWithBearerBothNull() {
+		assertNull(UCANValidator.parseTransportUCANsWithBearer(null, null));
+	}
+
+	@Test
+	public void testParseTransportUCANsWithBearerOnly() {
+		AString bearer = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AVector<ACell> result = UCANValidator.parseTransportUCANsWithBearer(bearer, null);
+		assertNotNull(result);
+		assertEquals(1L, result.count());
+	}
+
+	@Test
+	public void testParseTransportUCANsWithBearerBodyOnly() {
+		AString bodyJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AVector<ACell> result = UCANValidator.parseTransportUCANsWithBearer(
+			null, Vectors.of(bodyJwt));
+		assertNotNull(result);
+		assertEquals(1L, result.count());
+	}
+
+	@Test
+	public void testParseTransportUCANsWithBearerMerged() {
+		AString bearer = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AString bodyJwt = UCAN.createJWT(ROOT_KP, AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AVector<ACell> result = UCANValidator.parseTransportUCANsWithBearer(
+			bearer, Vectors.of(bodyJwt));
+		assertNotNull(result);
+		assertEquals(2L, result.count(),
+			"Both the bearer and the body UCAN should pass the trust boundary");
+	}
+
+	@Test
+	public void testParseTransportUCANsWithBearerInvalidDropped() {
+		// A malformed bearer is silently dropped; a valid body UCAN survives.
+		AString bodyJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AVector<ACell> result = UCANValidator.parseTransportUCANsWithBearer(
+			Strings.create("not.a.jwt"), Vectors.of(bodyJwt));
+		assertNotNull(result);
+		assertEquals(1L, result.count());
+	}
+
+	@Test
+	public void testParseTransportUCANsWithBearerAllInvalid() {
+		AVector<ACell> result = UCANValidator.parseTransportUCANsWithBearer(
+			Strings.create("not.a.jwt"),
+			Vectors.of(Strings.create("also.not.a.jwt")));
+		assertNull(result, "No valid tokens means null return (trust boundary empty)");
+	}
 }
