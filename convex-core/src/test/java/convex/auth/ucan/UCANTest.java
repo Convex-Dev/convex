@@ -453,4 +453,156 @@ public class UCANTest {
 		assertNull(UCAN.fromJWT(Strings.create("not.a.jwt")));
 		assertNull(UCAN.fromJWT(Strings.create("")));
 	}
+
+	// ===== checkTemporalBounds =====
+	//
+	// Post-ingress helper used by callers that have already verified the
+	// signature and chain and only need to re-guard against expiry between
+	// verification and use.
+
+	@Test
+	public void testCheckTemporalBoundsNull() {
+		assertFalse(UCANValidator.checkTemporalBounds(null, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsValid() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), Vectors.empty());
+		assertTrue(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsExpired() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			PAST_EXPIRY, Vectors.empty(), Vectors.empty());
+		assertFalse(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsExpiryAtBoundary() {
+		// exp == now must be treated as expired (strict <=)
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			NOW, Vectors.empty(), Vectors.empty());
+		assertFalse(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsNotBeforeInFuture() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, NOW + 600, Vectors.empty(), Vectors.empty());
+		assertFalse(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsNotBeforeInPast() {
+		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, NOW - 600, Vectors.empty(), Vectors.empty());
+		assertTrue(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	// ===== parseTransportUCANs =====
+	//
+	// This is the single trust boundary for inbound transport proofs.
+	// Every token in the returned vector must be cryptographically verified.
+	// Tokens that fail any check must be silently dropped.
+
+	@Test
+	public void testParseTransportUCANsNull() {
+		assertNull(UCANValidator.parseTransportUCANs(null));
+	}
+
+	@Test
+	public void testParseTransportUCANsEmpty() {
+		assertNull(UCANValidator.parseTransportUCANs(Vectors.empty()));
+	}
+
+	@Test
+	public void testParseTransportUCANsValid() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AVector<ACell> result = UCANValidator.parseTransportUCANs(Vectors.of(jwt));
+		assertNotNull(result);
+		assertEquals(1L, result.count());
+	}
+
+	@Test
+	public void testParseTransportUCANsMalformedDropped() {
+		AVector<ACell> result = UCANValidator.parseTransportUCANs(
+			Vectors.of(Strings.create("not.a.jwt")));
+		assertNull(result, "Malformed JWT must be silently dropped");
+	}
+
+	@Test
+	public void testParseTransportUCANsExpiredDropped() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			PAST_EXPIRY, Vectors.empty(), null);
+		assertNull(UCANValidator.parseTransportUCANs(Vectors.of(jwt)),
+			"Expired JWT must not pass the trust boundary");
+	}
+
+	@Test
+	public void testParseTransportUCANsTamperedSignatureDropped() {
+		AString jwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+
+		// Flip a character in the signature section
+		String s = jwt.toString();
+		int lastDot = s.lastIndexOf('.');
+		char c = s.charAt(lastDot + 1);
+		char flipped = (c == 'A') ? 'B' : 'A';
+		String tampered = s.substring(0, lastDot + 1) + flipped + s.substring(lastDot + 2);
+
+		assertNull(UCANValidator.parseTransportUCANs(
+			Vectors.of(Strings.create(tampered))),
+			"Tampered JWT signature must never cross the trust boundary");
+	}
+
+	@Test
+	public void testParseTransportUCANsMixedValidAndInvalid() {
+		AString good = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AString expired = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			PAST_EXPIRY, Vectors.empty(), null);
+		AString malformed = Strings.create("not.a.jwt");
+
+		AVector<ACell> result = UCANValidator.parseTransportUCANs(
+			Vectors.of(good, expired, malformed));
+		assertNotNull(result);
+		assertEquals(1L, result.count(),
+			"Only the valid token should survive; invalid tokens dropped without error");
+	}
+
+	@Test
+	public void testParseTransportUCANsNonStringEntryDropped() {
+		// Transport should silently drop non-string entries (e.g. accidental map)
+		AVector<ACell> result = UCANValidator.parseTransportUCANs(
+			Vectors.of(CVMLong.create(42)));
+		assertNull(result);
+	}
+
+	@Test
+	public void testParseTransportUCANsChainValidated() {
+		// Valid chain: Root -> A (with root as proof)
+		AString rootJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AString childJwt = UCAN.createJWT(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), Vectors.of(rootJwt));
+
+		AVector<ACell> result = UCANValidator.parseTransportUCANs(Vectors.of(childJwt));
+		assertNotNull(result, "Valid chained JWT should verify");
+		assertEquals(1L, result.count());
+	}
+
+	@Test
+	public void testParseTransportUCANsBrokenChainDropped() {
+		// Agent B (wrong subject) tries to use root JWT as proof
+		AString rootJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), null);
+		AString badChild = UCAN.createJWT(AGENT_B_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, Vectors.empty(), Vectors.of(rootJwt));
+
+		assertNull(UCANValidator.parseTransportUCANs(Vectors.of(badChild)),
+			"Broken chain link must be rejected at the trust boundary");
+	}
 }
