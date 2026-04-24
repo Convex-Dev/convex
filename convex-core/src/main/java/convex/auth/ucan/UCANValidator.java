@@ -121,14 +121,48 @@ public class UCANValidator {
 	}
 
 	/**
+	 * Re-check only the temporal bounds ({@code exp}, {@code nbf}) of a UCAN
+	 * whose signature and chain have already been verified.
+	 *
+	 * <p>This is intended for use at dispatch time, after the token has been
+	 * cryptographically verified at transport ingress (see
+	 * {@link #parseTransportUCANs}). It guards against the narrow window in
+	 * which a token may have expired between ingress and use, without
+	 * redoing the (expensive) signature check — which in any case cannot be
+	 * repeated for JWT-origin tokens because their stored signature covers
+	 * JWT-encoded bytes, not CVM-encoded bytes.</p>
+	 *
+	 * @param token Already-verified UCAN
+	 * @param nowSeconds Current time in unix seconds
+	 * @return true if the token is still within its temporal bounds
+	 */
+	public static boolean checkTemporalBounds(UCAN token, long nowSeconds) {
+		if (token == null) return false;
+		if (token.getExpiry() <= nowSeconds) return false;
+		Long nbf = token.getNotBefore();
+		if (nbf != null && nbf > nowSeconds) return false;
+		return true;
+	}
+
+	/**
 	 * Parse a transport-level {@code ucans} vector into validated UCAN maps.
 	 *
-	 * <p>Each element should be a JWT string. Invalid tokens (malformed, expired,
-	 * bad signature) are silently skipped. Returns a vector of validated UCAN
-	 * payload maps suitable for {@code RequestContext.withProofs()}.</p>
+	 * <p>Each element must be a JWT string. Every returned token has had its
+	 * EdDSA signature verified (via the JWT {@code kid} header), its temporal
+	 * bounds checked, and its proof chain recursively validated. Tokens that
+	 * fail any check are silently dropped — invalid tokens never appear in
+	 * the returned vector.</p>
+	 *
+	 * <p><b>Trust boundary:</b> this is the single point at which UCAN
+	 * signatures are verified for inbound requests. Downstream code that
+	 * consumes the returned vector (typically via
+	 * {@code RequestContext.withProofs()}) may rely on signature and chain
+	 * integrity without re-checking. Only temporal bounds and policy
+	 * (audience, issuer, attenuation) need to be re-evaluated at use time.</p>
 	 *
 	 * @param ucans Vector of JWT strings from the transport layer, or null
-	 * @return Vector of validated UCAN payload maps (may be empty), or null if input is null
+	 * @return Vector of cryptographically-verified UCAN payload maps, or null
+	 *         if the input was null or no tokens verified
 	 */
 	public static AVector<ACell> parseTransportUCANs(AVector<ACell> ucans) {
 		if (ucans == null || ucans.isEmpty()) return null;
