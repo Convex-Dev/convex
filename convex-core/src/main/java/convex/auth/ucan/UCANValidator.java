@@ -11,12 +11,29 @@ import convex.core.lang.RT;
 /**
  * Validates UCAN tokens: signature, temporal bounds, and chain integrity.
  *
- * <p>Does not yet check capability attenuation (the contents of "att").
- * That requires further design and will be added in a later phase.</p>
- *
  * <p>Validation is recursive: each proof in the chain is validated, and
  * chain linkage (proof.aud == token.iss) and temporal narrowing
  * (token.exp ≤ proof.exp) are enforced at every link.</p>
+ *
+ * <p><b>Not checked here — by design.</b> convex-core provides primitives
+ * that every UCAN consumer needs identically; stateful or application-
+ * specific policy is left to callers. The following are deliberately out
+ * of scope:</p>
+ * <ul>
+ *   <li><b>Replay protection ({@code nnc}).</b> Requires a nonce store;
+ *       the correct scope (per-user, per-session, per-resource) and
+ *       retention window depend on the application.</li>
+ *   <li><b>Revocation.</b> Requires a revocation list; transport and
+ *       durability are application concerns.</li>
+ *   <li><b>Audience policy.</b> Whether {@code aud} must equal the
+ *       receiving party's DID, or some other rule, is a caller decision.</li>
+ *   <li><b>Issuer policy.</b> E.g. "only accept venue-issued top-level
+ *       tokens" — application-specific trust model.</li>
+ *   <li><b>Capability attenuation matching.</b> Lives in
+ *       {@link Capability#covers} as a separate primitive; not invoked here.</li>
+ *   <li><b>{@code ucv} version negotiation</b> and {@code fct} (facts)
+ *       handling — not required for transport validity.</li>
+ * </ul>
  */
 public class UCANValidator {
 
