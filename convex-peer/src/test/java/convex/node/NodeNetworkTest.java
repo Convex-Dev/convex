@@ -198,9 +198,9 @@ public class NodeNetworkTest {
 		// Update the :data path with the updated Index
 		server0.getCursor().assoc(dataKeyword, updatedDataIndex);
 
-		// Sync so the propagator has the value for LATTICE_QUERY responses
+		// Sync so the propagator has the value for LATTICE_QUERY responses.
+		// Synchronous commit: announce completes on this thread before return.
 		server0.getCursor().sync();
-		Thread.sleep(100);
 
 		// Create the query path [:data valueHash] for reuse
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);

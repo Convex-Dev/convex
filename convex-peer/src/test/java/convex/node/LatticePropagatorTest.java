@@ -128,8 +128,8 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
+		// Synchronous commit: sync() returns after primary announce + setRootData
 		server2.getCursor().sync();
-		Thread.sleep(100); // Let propagator process the sync
 
 		// Pull from server2 into server1
 		assertTrue(server1.pull(), "Pull should complete successfully");
@@ -160,8 +160,8 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
+			// Synchronous commit: sync() returns after primary announce + setRootData
 			server1.getCursor().sync();
-			Thread.sleep(100); // Let propagator process the sync
 
 			// Pull from server1 into server2
 			assertTrue(server2.pull(), "Pull should complete successfully for update " + (i + 1));
