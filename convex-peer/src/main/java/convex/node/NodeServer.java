@@ -38,6 +38,7 @@ import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.Root;
 import convex.lattice.cursor.RootLatticeCursor;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
@@ -393,14 +394,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell id = payload.get(1);
 		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
 
-		// Use the last announced value — already persisted in the store, so
-		// DATA_REQUEST can resolve any child cells the requester needs
-		ACell announced = propagators.isEmpty() ? null : propagators.get(0).getLastAnnouncedValue();
+		// Read from the propagator's announced cursor — its cells are already
+		// in the propagator's store, so DATA_REQUEST can resolve any child
+		// cells the requester needs. Each propagator owns its announced cursor;
+		// this is the security boundary for cross-propagator data segregation.
 		ACell valueAtPath;
-		if (pathVector != null && pathVector.count() > 0) {
-			valueAtPath = RT.getIn(announced, pathVector.toCellArray());
+		if (propagators.isEmpty()) {
+			valueAtPath = null;
 		} else {
-			valueAtPath = announced;
+			Root<ACell> announced = propagators.get(0).getAnnouncedCursor();
+			valueAtPath = (pathVector != null && pathVector.count() > 0)
+				? announced.get(pathVector.toCellArray())
+				: announced.get();
 		}
 
 		Result result = Result.create(id, valueAtPath);
