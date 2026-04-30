@@ -144,24 +144,29 @@ public class LatticePropagator implements Closeable {
 	private final Root<ACell> announcedCursor = new Root<>();
 
 	/**
-	 * Last value that was triggered (used for periodic root sync)
+	 * Last value that was triggered (used for periodic root sync). Volatile
+	 * because it may be written by the caller's thread (synchronous commit
+	 * path) and read by the background propagation thread.
 	 */
 	private volatile ACell lastTriggeredValue;
 
 	/**
-	 * Timestamp of last broadcast
+	 * Timestamp of last broadcast. Volatile for cross-thread visibility — the
+	 * caller's thread (synchronous commit path) and the background propagation
+	 * thread may both read and write this.
 	 */
-	private long lastBroadcastTime = 0L;
+	private volatile long lastBroadcastTime = 0L;
 
 	/**
-	 * Timestamp of last root sync broadcast
+	 * Timestamp of last root sync broadcast (background thread only).
 	 */
 	private long lastRootSyncTime = 0L;
 
 	/**
-	 * Count of broadcasts sent
+	 * Count of broadcasts sent. Atomic because both the caller's thread and
+	 * the background thread may increment.
 	 */
-	private long broadcastCount = 0L;
+	private final java.util.concurrent.atomic.AtomicLong broadcastCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
 	 * Count of root sync broadcasts sent
@@ -288,7 +293,7 @@ public class LatticePropagator implements Closeable {
 	}
 
 	public boolean isRunning() { return running; }
-	public long getBroadcastCount() { return broadcastCount; }
+	public long getBroadcastCount() { return broadcastCount.get(); }
 	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
 	/**
 	 * Cursor holding the last value announced by this propagator. See
@@ -315,6 +320,7 @@ public class LatticePropagator implements Closeable {
 		lastTriggeredValue = null;
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
+		broadcastCount.set(0L);
 
 		propagationThread = new Thread(this::propagationLoop, "Lattice propagator thread");
 		propagationThread.setDaemon(true);
@@ -469,6 +475,9 @@ public class LatticePropagator implements Closeable {
 	 * @throws IOException If announce or setRootData fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
+		// Track latest snapshot for periodic root sync (used by background thread)
+		lastTriggeredValue = value;
+
 		// 1. Announce to store (writes cells, collects novelty for delta)
 		ArrayList<ACell> novelty = new ArrayList<>();
 		Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
@@ -498,7 +507,7 @@ public class LatticePropagator implements Closeable {
 			Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
 			connectionManager.broadcast(message);
 			lastBroadcastTime = currentTime;
-			broadcastCount++;
+			broadcastCount.incrementAndGet();
 		}
 
 		announcedCursor.set(value);
