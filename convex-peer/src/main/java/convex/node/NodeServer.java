@@ -135,12 +135,35 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
 
-		// Hook sync callback: cursor.sync() triggers all propagators
+		// Hook sync callback: synchronous commit on the primary propagator,
+		// async fan-out to secondaries.
+		//
+		// The primary's full pipeline (announce + setRootData + broadcast) runs
+		// on the caller's thread, so cursor.sync() is a real durability barrier:
+		// returning successfully means the value has reached the primary store.
+		// IOException from announce or setRootData is wrapped and propagated to
+		// the caller — sync failures are visible, not silently dropped.
+		//
+		// Secondary propagators use the existing async path; their broadcast
+		// latency is independent of caller durability.
+		//
+		// The returned (announced/store-backed) value is CASed back into the
+		// cursor by RootLatticeCursor.sync(), with lattice-merge fallback if a
+		// concurrent app write changed the cursor during the announce.
 		this.cursor.onSync(value -> {
-			for (LatticePropagator p : propagators) {
-				p.triggerBroadcast(value);
+			if (propagators.isEmpty()) return value;
+			ACell announced;
+			try {
+				announced = propagators.get(0).processSnapshot(value);
+			} catch (IOException e) {
+				throw new RuntimeException("NodeServer sync failed: persistence error", e);
 			}
-			return value;
+			for (int i = 1; i < propagators.size(); i++) {
+				propagators.get(i).triggerBroadcast(value);
+			}
+			@SuppressWarnings("unchecked")
+			V typed = (V) announced;
+			return typed;
 		});
 
 		// Initialize receive action for handling incoming messages
