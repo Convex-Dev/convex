@@ -661,33 +661,113 @@ completes, store-backed refs arrive asynchronously, and tests need `Thread.sleep
 
 ### Design: Synchronous Commit via Sync Callback
 
-The sync callback (already hooked on `RootLatticeCursor`) would perform the full commit
-pipeline synchronously on the caller's thread: announce, persist, and merge store-backed
-refs back into the cursor — all before `sync()` returns.
+The existing `RootLatticeCursor.onSync` hook already supports synchronous commit:
+the callback runs on the caller's thread and the returned value is CASed back into
+the cursor (with lattice-merge fallback on concurrent write). No second cursor is
+needed — the single-cursor design plus CAS-or-merge gives the required guarantee.
 
-Two cursors:
-- **truthCursor** (internal) — committed state with store-backed refs
-- **appCursor** (returned by `getCursor()`) — application working copy
+#### Scope: Primary Synchronous, Secondaries Async
 
-Sync flow:
-1. `truthCursor.merge(appCursor.get())` — push app changes to truth
-2. `Cells.announce()` + `store.setRootData()` on caller's thread — persist and collect novelty
-3. Enqueue novelty for propagator's background thread — async broadcast
-4. `appCursor.merge(truthCursor.get())` — pull store-backed refs back
+Only the **primary propagator** runs synchronously on the caller's thread. Secondary
+propagators (public, backup) keep their existing async broadcast loop.
 
-**Key constraint:** `Cells.announce()` tags cells as persisted — cannot re-announce to
-collect novelty. Announce + novelty collection must happen in the sync callback, with
-novelty handed to the propagator for async broadcast.
+Rationale:
+- Primary is the durability anchor — `sync()` returning means the value reached disk.
+- Secondaries are best-effort broadcast; their latency does not affect durability.
+- Caller's thread does **one** store write (primary), not N. Bounded cost.
 
-Both `appCursor.sync()` and `processLatticeValue` use the same `mergeAndCommit` method
-— no duplicate code paths.
+#### Sync Flow
+
+Caller's thread (inside the `onSync` callback) runs the primary's full pipeline:
+1. `value = filter.apply(cursor value)` — primary has no filter; identity
+2. `announced, novelty = Cells.announce(value, primaryStore)` — primary store, primary novelty
+3. `store.setRootData(announced)` — durability barrier
+4. Encode delta from novelty and broadcast to primary's peers (Netty fire-and-forget)
+5. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
+6. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
+
+Steps 1-4 are the same pipeline today executed by the propagator's background
+thread. The change is to expose it as a method (`processSnapshot`) callable on
+any thread, and call it directly from the sync callback for the primary.
+
+The primary's background thread still exists for non-sync triggers:
+- Periodic root sync (Tier 2 divergence detection)
+- `pull()` callbacks
+- Any other async `triggerBroadcast` invocations
+
+Secondary propagators' background threads (unchanged behaviour):
+- Apply their own filter
+- `Cells.announce(filtered, ownStore)` — produces filtered novelty against own store
+- `setRootData(filtered)`, `broadcast(delta)`
+
+#### Per-Propagator Novelty is a Security Boundary
+
+**Novelty MUST be computed per-propagator, against that propagator's store, after
+that propagator's filter.** Sharing novelty across propagators would broadcast cells
+that were never tracked in the public propagator's store, bypassing its filter and
+leaking private data.
+
+```
+Primary (no filter, primary store):
+  announce(value, primaryStore) → primaryNovelty
+  → broadcast primaryNovelty (only if primary has peers)
+
+Public propagator (public filter, public store):
+  announce(filter(value), publicStore) → publicNovelty   ← independent
+  → broadcast publicNovelty
+```
+
+Each propagator's announce IS its security boundary. Cross-propagator novelty
+sharing is forbidden.
+
+#### Concurrency
+
+`Cells.announce()` tags cells as persisted — once a cell is announced to a store,
+re-announcing returns no novelty. The pipeline is therefore single-pass: the
+thread that announces also encodes and broadcasts, with novelty held in a local
+variable. No cross-thread novelty handoff.
+
+EtchStore today serialises all writes on a class-level `synchronized` (`Etch.java:321`).
+Multiple caller threads syncing concurrently will contend on this monitor. Acceptable
+for v1; see "Follow-ups" below for narrowing the lock to per-region writes.
+
+Concurrent app writes during sync are handled by `RootLatticeCursor.sync()`: it
+CASes the announced value back into the cursor, falling back to lattice merge if
+the CAS fails. The merge combines the store-backed announced value with any
+in-memory writes that landed during the announce — no data loss, store-backed refs
+preserved for cells that overlap.
+
+#### Error Propagation
+
+If announce or setRootData throws, the exception propagates to the `sync()` caller.
+Today these errors are logged on the background thread and silently dropped from the
+caller's view. Synchronous commit makes durability failures visible — a `sync()` that
+returns successfully means the value reached disk; a `sync()` that throws means it
+did not.
+
+#### Pull Path Unchanged (For Now)
+
+`LatticePropagator.pull()` remains async and continues to use its own `mergeCallback`
+to feed acquired values into the cursor. Unifying pull with the sync path is deferred
+(see Follow-ups).
 
 ### Benefits
 
-- `sync()` guarantees persistence before returning
-- Store-backed refs are immediate — no OOM from lingering strong refs
+- `sync()` guarantees primary persistence before returning
+- Store-backed refs immediate — no OOM from lingering strong refs
 - No `Thread.sleep` in tests
-- No locking — caller's thread does announce; background thread only broadcasts
+- Caller-visible durability errors
+- Per-propagator novelty preserves filter security boundaries
+
+### Follow-ups (deferred)
+
+- **Etch lock granularity** — narrow the class-level `synchronized` on Etch writes
+  to a smaller per-region or per-write critical section. Current coarse lock will
+  serialise concurrent caller-thread syncs.
+- **Pull path unification** — rewrite `LatticePropagator.pull()` to drive
+  `cursor.merge(acquired)` directly and retire the `mergeCallback` API.
+- **`mergeCallback` retirement** — once pull is migrated, delete the callback
+  mechanism entirely.
 
 ## Testing Strategy
 
