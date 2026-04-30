@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- UCANValidator: `checkTemporalBounds` for post-ingress re-validation of `nbf`/`exp` outside the parse path
+- UCANValidator: `parseTransportUCANsWithBearer` helper merging proof chain and bearer token in a single call
+
 ### Changed
+
+- Bump Bouncy Castle 1.83 → 1.84
+- Bump GitHub Actions runners to Node 24
 
 ### Fixed
 
 - TransactionHandler: reject faulty or incompletely-referenced transactions at intake; block production no longer stalls on MissingDataException (#531)
+- pom.xml: corrected https schema URL
 
 ## [0.8.4] - 2026-04-18
 
