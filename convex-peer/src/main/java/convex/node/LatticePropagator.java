@@ -393,7 +393,7 @@ public class LatticePropagator implements Closeable {
 				}
 
 				if (value != null) {
-					processValue(value);
+					processSnapshotSafe(value);
 				}
 
 				// Periodic root sync only while running
@@ -405,7 +405,7 @@ public class LatticePropagator implements Closeable {
 				// Drain remaining items before exiting
 				ACell remaining;
 				while ((remaining = triggerQueue.poll()) != null) {
-					processValue(remaining);
+					processSnapshotSafe(remaining);
 				}
 				break;
 			} catch (Exception e) {
@@ -414,6 +414,20 @@ public class LatticePropagator implements Closeable {
 			}
 		}
 		log.debug("LatticePropagator loop ended");
+	}
+
+	/**
+	 * Background-thread wrapper around {@link #processSnapshot}. IOException
+	 * is logged rather than propagated — the background path is best-effort
+	 * (callers who need durability errors should call {@link #processSnapshot}
+	 * directly).
+	 */
+	private void processSnapshotSafe(ACell value) {
+		try {
+			processSnapshot(value);
+		} catch (IOException e) {
+			log.warn("Error processing lattice value", e);
+		}
 	}
 
 	/**
@@ -429,46 +443,50 @@ public class LatticePropagator implements Closeable {
 	 * setRootData is gated by {@link #persistInterval}. The merge callback
 	 * is gated by whether it was set (primary propagator only). Broadcast
 	 * is gated by peer existence and minimum delay.
+	 *
+	 * <p>Callable from any thread. The background propagation loop calls this
+	 * for queued triggers; for synchronous commit, NodeServer's sync callback
+	 * calls this directly on the caller's thread for the primary propagator.
+	 *
+	 * @param value Snapshot to process (must not be null)
+	 * @return The announced (store-backed) value
+	 * @throws IOException If announce or setRootData fails
 	 */
-	private void processValue(ACell value) {
-		try {
-			// 1. Announce to store (writes cells, collects novelty for delta)
-			ArrayList<ACell> novelty = new ArrayList<>();
-			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
-			value = Cells.announce(value, noveltyHandler, store);
+	public ACell processSnapshot(ACell value) throws IOException {
+		// 1. Announce to store (writes cells, collects novelty for delta)
+		ArrayList<ACell> novelty = new ArrayList<>();
+		Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
+		value = Cells.announce(value, noveltyHandler, store);
 
-			// 2. Set root data for restore (if persist enabled)
-			if (persistInterval > 0) {
-				store.setRootData(value);
-			}
-
-			// 3. Merge callback (feed store-backed value back to cursor)
-			if (mergeCallback != null) {
-				mergeCallback.accept(value);
-			}
-
-			// 4. Broadcast to peers (only if peers exist and delay elapsed)
-			long currentTime = Utils.getCurrentTimestamp();
-			if (!connectionManager.getPeers().isEmpty()
-					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
-				// Ensure root value is in the novelty list
-				if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
-					novelty.add(value);
-				}
-				Blob deltaData = Format.encodeDelta(novelty);
-				AVector<ACell> emptyPath = Vectors.empty();
-				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
-				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
-				connectionManager.broadcast(message);
-				lastBroadcastTime = currentTime;
-				broadcastCount++;
-			}
-
-			lastAnnouncedValue = value;
-
-		} catch (IOException e) {
-			log.warn("Error processing lattice value", e);
+		// 2. Set root data for restore (if persist enabled)
+		if (persistInterval > 0) {
+			store.setRootData(value);
 		}
+
+		// 3. Merge callback (feed store-backed value back to cursor)
+		if (mergeCallback != null) {
+			mergeCallback.accept(value);
+		}
+
+		// 4. Broadcast to peers (only if peers exist and delay elapsed)
+		long currentTime = Utils.getCurrentTimestamp();
+		if (!connectionManager.getPeers().isEmpty()
+				&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
+			// Ensure root value is in the novelty list
+			if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
+				novelty.add(value);
+			}
+			Blob deltaData = Format.encodeDelta(novelty);
+			AVector<ACell> emptyPath = Vectors.empty();
+			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+			Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
+			connectionManager.broadcast(message);
+			lastBroadcastTime = currentTime;
+			broadcastCount++;
+		}
+
+		lastAnnouncedValue = value;
+		return value;
 	}
 
 	// ========== Root Sync ==========
