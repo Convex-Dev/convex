@@ -31,6 +31,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
+import convex.lattice.cursor.Root;
 
 /**
  * Self-contained component for propagating lattice values.
@@ -128,9 +129,19 @@ public class LatticePropagator implements Closeable {
 	private long persistInterval = 30_000L;
 
 	/**
-	 * Last value that was announced to the store
+	 * Cursor holding the last value announced to this propagator's store.
+	 *
+	 * <p>This is the propagator's cached view of what it has published — the
+	 * filtered, store-backed snapshot it most recently announced. LATTICE_QUERY
+	 * responses are served from this cursor, so peers only see data this
+	 * propagator has actually committed (and whose cells the store can resolve
+	 * via DATA_REQUEST).
+	 *
+	 * <p>Each propagator owns its own announced cursor; secondary propagators
+	 * with filters publish a different (filtered) view from the primary, which
+	 * is the security boundary for cross-propagator data segregation.
 	 */
-	private ACell lastAnnouncedValue;
+	private final Root<ACell> announcedCursor = new Root<>();
 
 	/**
 	 * Last value that was triggered (used for periodic root sync)
@@ -278,7 +289,12 @@ public class LatticePropagator implements Closeable {
 
 	public boolean isRunning() { return running; }
 	public long getBroadcastCount() { return broadcastCount; }
-	public ACell getLastAnnouncedValue() { return lastAnnouncedValue; }
+	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
+	/**
+	 * Cursor holding the last value announced by this propagator. See
+	 * {@link #announcedCursor} for ownership and security semantics.
+	 */
+	public Root<ACell> getAnnouncedCursor() { return announcedCursor; }
 	public long getLastBroadcastTime() { return lastBroadcastTime; }
 	public long getLastRootSyncTime() { return lastRootSyncTime; }
 	public long getRootSyncCount() { return rootSyncCount; }
@@ -295,7 +311,7 @@ public class LatticePropagator implements Closeable {
 		}
 
 		running = true;
-		lastAnnouncedValue = null;
+		announcedCursor.set(null);
 		lastTriggeredValue = null;
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
@@ -485,7 +501,7 @@ public class LatticePropagator implements Closeable {
 			broadcastCount++;
 		}
 
-		lastAnnouncedValue = value;
+		announcedCursor.set(value);
 		return value;
 	}
 
@@ -631,6 +647,6 @@ public class LatticePropagator implements Closeable {
 		}
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenApply(v -> lastAnnouncedValue);
+			.thenApply(v -> announcedCursor.get());
 	}
 }
