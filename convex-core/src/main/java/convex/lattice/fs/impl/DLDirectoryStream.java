@@ -15,16 +15,29 @@ import convex.lattice.fs.DLPath;
 
 public class DLDirectoryStream implements DirectoryStream<Path> {
 
+	/**
+	 * Iterator that walks the raw entries map, skipping tombstones so callers
+	 * see only live children. Tombstones are CRDT plumbing and shouldn't leak
+	 * into the filesystem view.
+	 */
 	public class DIterator implements Iterator<Path> {
 		long pos=0;
-		
+
+		private void advanceToLive() {
+			while (pos<dirs.count() && DLFSNode.isTombstone(dirs.entryAt(pos).getValue())) {
+				pos++;
+			}
+		}
+
 		@Override
 		public boolean hasNext() {
+			advanceToLive();
 			return pos<dirs.count();
 		}
 
 		@Override
 		public DLPath next() {
+			advanceToLive();
 			if (pos>=dirs.count()) throw new NoSuchElementException();
 			return base.resolve(dirs.entryAt(pos++).getKey());
 		}

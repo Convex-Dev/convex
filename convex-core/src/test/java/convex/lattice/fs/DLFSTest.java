@@ -199,6 +199,67 @@ public class DLFSTest {
 		assertThrows(IOException.class,()->Files.delete(fs.getRoot()));
 		assertThrows(NoSuchFileException.class,()->Files.delete(fs.getRoot().resolve("not-found")));
 	}
+
+	@Test
+	public void testDeleteAfterChildrenTombstoned() throws IOException {
+		// Regression: previously a directory whose children had been deleted
+		// could not itself be deleted, because the entries map kept tombstones
+		// and entries.isEmpty() returned false. Now uses DLFSNode.isEmpty
+		// which filters tombstones.
+		DLFileSystem fs = DLFS.createLocal();
+		Path root = fs.getRoot();
+		Path tree = Files.createDirectory(root.resolve("tree"));
+		Path a = root.resolve("tree/a.txt");
+		Path b = root.resolve("tree/b.txt");
+		Files.write(a, new byte[]{1,2,3});
+		Files.write(b, new byte[]{4,5,6});
+
+		Files.delete(a);
+		Files.delete(b);
+
+		// All children gone — directory is logically empty even though the
+		// entries map still has tombstones. Delete must succeed.
+		Files.delete(tree);
+		assertFalse(Files.exists(tree));
+
+		// Iteration view skips tombstones too — root no longer shows tree.
+		try (DirectoryStream<Path> ds = Files.newDirectoryStream(root)) {
+			assertFalse(ds.iterator().hasNext());
+		}
+	}
+
+	@Test
+	public void testRecreateOverTombstone() throws IOException {
+		// After deleting a directory, mkdir at the same path should succeed
+		// (tombstones don't reserve the name).
+		DLFileSystem fs = DLFS.createLocal();
+		Path root = fs.getRoot();
+		Path foo = Files.createDirectory(root.resolve("foo"));
+		Files.delete(foo);
+
+		Path foo2 = Files.createDirectory(root.resolve("foo"));
+		assertTrue(Files.exists(foo2));
+		assertTrue(Files.isDirectory(foo2));
+	}
+
+	@Test
+	public void testDirectoryStreamSkipsTombstones() throws IOException {
+		DLFileSystem fs = DLFS.createLocal();
+		Path root = fs.getRoot();
+		Path keep = root.resolve("keep.txt");
+		Path drop = root.resolve("drop.txt");
+		Files.write(keep, new byte[]{1});
+		Files.write(drop, new byte[]{2});
+		Files.delete(drop);
+
+		// Only the surviving entry should appear.
+		try (DirectoryStream<Path> ds = Files.newDirectoryStream(root)) {
+			Iterator<Path> it = ds.iterator();
+			assertTrue(it.hasNext());
+			assertEquals(keep, it.next());
+			assertFalse(it.hasNext());
+		}
+	}
 	
 	@Test 
 	public void testDataFiles() throws IOException {

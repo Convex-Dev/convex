@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - TransactionHandler: reject faulty or incompletely-referenced transactions at intake; block production no longer stalls on MissingDataException (#531)
 - pom.xml: corrected https schema URL
+- DLFS: directories with tombstoned-only entries now correctly delete; iteration via `Files.newDirectoryStream` skips tombstones; `mkdir` over a tombstoned name succeeds (#571)
 
 ## [0.8.4] - 2026-04-18
 

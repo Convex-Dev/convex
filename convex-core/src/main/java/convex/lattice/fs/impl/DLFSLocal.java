@@ -93,7 +93,9 @@ public class DLFSLocal extends DLFileSystem {
 		if (parentNode==null) {
 			throw new NoSuchFileException(parent.toString());
 		}
-		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
+		// Replacing a tombstone is fine — the path is logically free.
+		AVector<ACell> existing = DLFSNode.getDirectoryEntries(parentNode).get(name);
+		if (existing != null && !DLFSNode.isTombstone(existing)) {
 			throw new FileAlreadyExistsException(dir.toString());
 		}
 		updateNode(dir,DLFSNode.createDirectory(getTimestamp()));
@@ -134,9 +136,12 @@ public class DLFSLocal extends DLFileSystem {
 		AVector<ACell> node=getNode(path);
 		if (node==null) throw new NoSuchFileException(path.toString());
 		
-		// Check it it empty, if a directory
-		Index<AString, AVector<ACell>> entries = DLFSNode.getDirectoryEntries(node);
-		if ((entries!=null)&&(!entries.isEmpty())) throw new DirectoryNotEmptyException(path.toString());
+		// Check it is empty, if a directory. Tombstones don't count: the raw
+		// entries map keeps them for CRDT merge, but the filesystem view of
+		// "empty" only cares about live children.
+		if (DLFSNode.isDirectory(node) && !DLFSNode.isEmpty(node)) {
+			throw new DirectoryNotEmptyException(path.toString());
+		}
 		
 		updateNode(path,DLFSNode.createTombstone(getTimestamp()));
 	}
