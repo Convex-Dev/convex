@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -489,5 +491,68 @@ public class NodeServerPersistenceTest {
 			assertEquals(CVMLong.create(1), primary.getCursor().get(stable),
 				"Pre-existing :stable must survive concurrent sync at iteration " + i);
 		}
+	}
+
+	/**
+	 * Sole-writer invariant: pipelines through the propagator must not
+	 * interleave. Two threads calling {@code processSnapshot} concurrently
+	 * (caller's sync hook plus background pull/drain) must run their full
+	 * announce + setRootData + broadcast sequences sequentially, so an older
+	 * snapshot's setRootData cannot land after a newer snapshot's and demote
+	 * the root pointer.
+	 *
+	 * <p>The test instruments the merge callback to dwell inside the pipeline
+	 * and count concurrent pipeline activity. With the propagator's writeLock,
+	 * max-in-flight is exactly 1; without it, the dwell would let a second
+	 * pipeline enter while the first is still executing.
+	 */
+	@Test
+	public void testProcessSnapshotPipelinesAreSerialised() throws Exception {
+		primaryStore = EtchStore.createTemp("primary-serialise");
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
+		LatticePropagator prop = primary.getPropagator();
+
+		AtomicInteger inFlight = new AtomicInteger();
+		AtomicInteger maxInFlight = new AtomicInteger();
+		AtomicReference<Throwable> failure = new AtomicReference<>();
+
+		// Replace merge callback with one that dwells inside the pipeline.
+		// This widens the window so two pipelines could overlap if not serialised.
+		prop.setMergeCallback(v -> {
+			int n = inFlight.incrementAndGet();
+			maxInFlight.updateAndGet(m -> Math.max(m, n));
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			inFlight.decrementAndGet();
+		});
+
+		// Two distinct snapshots (lattice-ordered) for the two threads.
+		primary.getCursor().assoc(Keyword.intern("a"), CVMLong.create(1));
+		final ACell v1 = primary.getCursor().get();
+		primary.getCursor().assoc(Keyword.intern("b"), CVMLong.create(2));
+		final ACell v2 = primary.getCursor().get();
+
+		Thread t1 = new Thread(() -> {
+			try { prop.processSnapshot(v1); }
+			catch (Throwable e) { failure.compareAndSet(null, e); }
+		}, "snapshot-A");
+		Thread t2 = new Thread(() -> {
+			try { prop.processSnapshot(v2); }
+			catch (Throwable e) { failure.compareAndSet(null, e); }
+		}, "snapshot-B");
+
+		t1.start();
+		t2.start();
+		t1.join();
+		t2.join();
+
+		assertNull(failure.get(), "processSnapshot must not throw");
+		assertEquals(1, maxInFlight.get(),
+			"processSnapshot pipelines must not overlap (writeLock invariant)");
 	}
 }

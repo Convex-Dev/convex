@@ -174,6 +174,20 @@ public class LatticePropagator implements Closeable {
 	private long rootSyncCount = 0L;
 
 	/**
+	 * Serialises all store-writing pipelines through this propagator. The
+	 * propagator is the sole live writer of {@code setRootData} on its store
+	 * (see {@code PERSISTENCE.md} — sole-writer invariant), and pipelines
+	 * must not interleave: an older snapshot's {@code setRootData} landing
+	 * after a newer snapshot's would silently demote the root pointer and
+	 * break the durability promise of {@code cursor.sync()}. {@link
+	 * #processSnapshot} and {@link #persist} both acquire this lock so the
+	 * caller's thread (sync hook), the background propagation thread (pull,
+	 * drain), and explicit persistence calls run their full pipelines
+	 * sequentially.
+	 */
+	private final Object writeLock = new Object();
+
+	/**
 	 * Creates a new LatticePropagator with the given store and connection manager.
 	 *
 	 * @param store Store for delta tracking and persistence
@@ -469,49 +483,53 @@ public class LatticePropagator implements Closeable {
 	 * <p>Callable from any thread. The background propagation loop calls this
 	 * for queued triggers; for synchronous commit, NodeServer's sync callback
 	 * calls this directly on the caller's thread for the primary propagator.
+	 * Pipelines are serialised by {@link #writeLock} — see field javadoc for
+	 * the sole-writer invariant.
 	 *
 	 * @param value Snapshot to process (must not be null)
 	 * @return The announced (store-backed) value
 	 * @throws IOException If announce or setRootData fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
-		// Track latest snapshot for periodic root sync (used by background thread)
-		lastTriggeredValue = value;
+		synchronized (writeLock) {
+			// Track latest snapshot for periodic root sync (used by background thread)
+			lastTriggeredValue = value;
 
-		// 1. Announce to store (writes cells, collects novelty for delta)
-		ArrayList<ACell> novelty = new ArrayList<>();
-		Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
-		value = Cells.announce(value, noveltyHandler, store);
+			// 1. Announce to store (writes cells, collects novelty for delta)
+			ArrayList<ACell> novelty = new ArrayList<>();
+			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
+			value = Cells.announce(value, noveltyHandler, store);
 
-		// 2. Set root data for restore (if persist enabled)
-		if (persistInterval > 0) {
-			store.setRootData(value);
-		}
-
-		// 3. Merge callback (feed store-backed value back to cursor)
-		if (mergeCallback != null) {
-			mergeCallback.accept(value);
-		}
-
-		// 4. Broadcast to peers (only if peers exist and delay elapsed)
-		long currentTime = Utils.getCurrentTimestamp();
-		if (!connectionManager.getPeers().isEmpty()
-				&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
-			// Ensure root value is in the novelty list
-			if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
-				novelty.add(value);
+			// 2. Set root data for restore (if persist enabled)
+			if (persistInterval > 0) {
+				store.setRootData(value);
 			}
-			Blob deltaData = Format.encodeDelta(novelty);
-			AVector<ACell> emptyPath = Vectors.empty();
-			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
-			Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
-			connectionManager.broadcast(message);
-			lastBroadcastTime = currentTime;
-			broadcastCount.incrementAndGet();
-		}
 
-		announcedCursor.set(value);
-		return value;
+			// 3. Merge callback (feed store-backed value back to cursor)
+			if (mergeCallback != null) {
+				mergeCallback.accept(value);
+			}
+
+			// 4. Broadcast to peers (only if peers exist and delay elapsed)
+			long currentTime = Utils.getCurrentTimestamp();
+			if (!connectionManager.getPeers().isEmpty()
+					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
+				// Ensure root value is in the novelty list
+				if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
+					novelty.add(value);
+				}
+				Blob deltaData = Format.encodeDelta(novelty);
+				AVector<ACell> emptyPath = Vectors.empty();
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
+				connectionManager.broadcast(message);
+				lastBroadcastTime = currentTime;
+				broadcastCount.incrementAndGet();
+			}
+
+			announcedCursor.set(value);
+			return value;
+		}
 	}
 
 	// ========== Root Sync ==========
@@ -549,12 +567,14 @@ public class LatticePropagator implements Closeable {
 	void persist(ACell value) {
 		if (value == null) return;
 		if (!store.isPersistent()) return;
-		try {
-			value = Cells.announce(value, r -> {}, store);
-			store.setRootData(value);
-			log.debug("Persisted lattice snapshot to store");
-		} catch (IOException e) {
-			log.warn("Error persisting lattice snapshot", e);
+		synchronized (writeLock) {
+			try {
+				value = Cells.announce(value, r -> {}, store);
+				store.setRootData(value);
+				log.debug("Persisted lattice snapshot to store");
+			} catch (IOException e) {
+				log.warn("Error persisting lattice snapshot", e);
+			}
 		}
 	}
 

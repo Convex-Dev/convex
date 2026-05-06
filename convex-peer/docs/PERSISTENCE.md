@@ -727,9 +727,21 @@ re-announcing returns no novelty. The pipeline is therefore single-pass: the
 thread that announces also encodes and broadcasts, with novelty held in a local
 variable. No cross-thread novelty handoff.
 
+**Sole-writer invariant.** The propagator is the only live writer of `setRootData`
+on its store, and pipelines through the propagator must not interleave.
+`processSnapshot` and `persist` both acquire a propagator-internal `writeLock` so
+the caller's thread (sync hook), the background propagation thread (pull, drain),
+and explicit `NodeServer.persistSnapshot` calls run their full announce +
+setRootData + broadcast sequences sequentially. Without this, an older snapshot's
+setRootData could land *after* a newer snapshot's — Etch's class-level
+`synchronized` only orders the individual root-pointer write, not the surrounding
+pipeline — silently demoting the root pointer and breaking the durability promise
+of `sync()`.
+
 EtchStore today serialises all writes on a class-level `synchronized` (`Etch.java:321`).
-Multiple caller threads syncing concurrently will contend on this monitor. Acceptable
-for v1; see "Follow-ups" below for narrowing the lock to per-region writes.
+Multiple caller threads syncing concurrently will contend on the propagator's
+`writeLock` first, then on the Etch monitor. Acceptable for v1; see "Follow-ups"
+below for narrowing the Etch lock to per-region writes.
 
 Concurrent app writes during sync are handled by `RootLatticeCursor.sync()`: it
 CASes the announced value back into the cursor, falling back to lattice merge if

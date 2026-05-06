@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - UCANValidator: `checkTemporalBounds` for post-ingress re-validation of `nbf`/`exp` outside the parse path
 - UCANValidator: `parseTransportUCANsWithBearer` helper merging proof chain and bearer token in a single call
+- NodeServer: synchronous commit on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning only after primary durability; secondaries remain async; persistence errors propagate to the caller (#569)
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TransactionHandler: reject faulty or incompletely-referenced transactions at intake; block production no longer stalls on MissingDataException (#531)
 - pom.xml: corrected https schema URL
 - DLFS: directories with tombstoned-only entries now correctly delete; iteration via `Files.newDirectoryStream` skips tombstones; `mkdir` over a tombstoned name succeeds (#571)
+- LatticePropagator: serialise `processSnapshot` and `persist` pipelines so the propagator is the sole writer of `setRootData` per store and an older snapshot cannot demote the root pointer after a newer snapshot's sync returned (sole-writer invariant)
 
 ## [0.8.4] - 2026-04-18
 
