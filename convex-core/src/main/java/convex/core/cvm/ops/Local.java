@@ -33,14 +33,27 @@ public class Local<T extends ACell> extends AOp<T> {
 	
 
 	/**
+	 * Cached instances for common stack positions. Local ops are immutable and
+	 * are created frequently during compilation and execution; most references
+	 * target small positions, so a bounded cache eliminates most allocations.
+	 */
+	private static final Local<?>[] CACHE = new Local<?>[64];
+	static {
+		for (int i = 0; i < CACHE.length; i++) {
+			CACHE[i] = new Local<>(i);
+		}
+	}
+
+	/**
 	 * Creates Local to look up a lexical value in the given position
-	 * 
+	 *
 	 * @param position Position in lexical value vector
 	 * @return Special instance, or null if not found
 	 */
+	@SuppressWarnings("unchecked")
 	public static final <R extends ACell> Local<R> create(long position) {
 		if (position<0) return null;
-		// TODO: we can probably cache these?
+		if (position<CACHE.length) return (Local<R>) CACHE[(int)position];
 		return new Local<R>(position);
 	}
 	
