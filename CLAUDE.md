@@ -95,7 +95,16 @@ See BUILD.md for complete release workflow.
 - **Lattice technology** - data merges like CRDTs, not linear blockchain
 - **Global state model** with atomic transactions on Convex with self-sovereign accounts like #1337
 - **Peer / REST API Security** these are public by default and should be robust to malicious messages
-- **Lattice Node security** These are private by default. Operators chooses who to share / merge with 
+- **Lattice Node security** These are private by default. Operators chooses who to share / merge with
+
+## Terminology
+
+Canonical glossary: `../design/docs/tutorial/glossary.md` (rendered at https://docs.convex.world/tutorial/glossary). Use canonical terms — never substitute "gas", "fees", "blockchain", "chain", "miner", "validator", "block", "wei", "satoshi", or "mainnet". Key terms: CVM coin, Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, Protonet.
+
+## Network Defaults
+
+- **Protonet** (production): `peer.convex.live`
+- **Testnet** (default for tooling/MCP): `https://mikera1337-convex-testnet.hf.space`
 
 ## Resources
 
