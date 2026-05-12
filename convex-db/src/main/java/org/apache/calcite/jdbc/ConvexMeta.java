@@ -1,6 +1,15 @@
 package org.apache.calcite.jdbc;
 
+import java.util.Collections;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.calcite.avatica.AvaticaConnection;
+import org.apache.calcite.avatica.Meta.ExecuteResult;
+import org.apache.calcite.avatica.Meta.MetaResultSet;
+import org.apache.calcite.avatica.Meta.PrepareCallback;
+import org.apache.calcite.avatica.Meta.StatementHandle;
+import org.apache.calcite.avatica.NoSuchStatementException;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.calcite.ConvexSchema;
@@ -53,6 +62,47 @@ public class ConvexMeta extends CalciteMetaImpl {
 	/** Factory method called by {@link convex.db.jdbc.ConvexDriver#createMeta}. */
 	public static ConvexMeta create(AvaticaConnection connection) {
 		return new ConvexMeta((CalciteConnectionImpl) connection);
+	}
+
+	// ── Secondary index DDL interception ─────────────────────────────────────
+
+	private static final Pattern CREATE_INDEX = Pattern.compile(
+		"(?i)CREATE\\s+INDEX\\s+(IF\\s+NOT\\s+EXISTS\\s+)?(\\w+)\\s+ON\\s+(\\w+)\\s*\\(\\s*(\\w+)[^)]*\\)\\s*");
+
+	private static final Pattern DROP_INDEX = Pattern.compile(
+		"(?i)DROP\\s+INDEX\\s+(IF\\s+EXISTS\\s+)?(\\w+)(?:\\s+ON\\s+(\\w+))?\\s*");
+
+	@Override
+	public ExecuteResult prepareAndExecute(StatementHandle h, String sql,
+			long maxRowCount, int maxRowsInFirstFrame, PrepareCallback callback)
+			throws NoSuchStatementException {
+		Matcher m = CREATE_INDEX.matcher(sql.trim());
+		if (m.matches()) {
+			boolean ifNotExists = m.group(1) != null;
+			String indexName  = m.group(2);
+			String tableName  = m.group(3);
+			String columnName = m.group(4);
+			ConvexSchema schema = findConvexSchema(getSchemaName());
+			if (schema != null) {
+				schema.createIndex(indexName, tableName, columnName, ifNotExists);
+			}
+			return new ExecuteResult(Collections.singletonList(
+					MetaResultSet.count(h.connectionId, h.id, 0L)));
+		}
+
+		m = DROP_INDEX.matcher(sql.trim());
+		if (m.matches()) {
+			boolean ifExists = m.group(1) != null;
+			String indexName = m.group(2);
+			ConvexSchema schema = findConvexSchema(getSchemaName());
+			if (schema != null) {
+				schema.dropIndex(indexName, ifExists);
+			}
+			return new ExecuteResult(Collections.singletonList(
+					MetaResultSet.count(h.connectionId, h.id, 0L)));
+		}
+
+		return super.prepareAndExecute(h, sql, maxRowCount, maxRowsInFirstFrame, callback);
 	}
 
 	/** Syncs fork to parent, then starts a new fork if still in manual-commit mode. */

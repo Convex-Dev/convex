@@ -1,5 +1,11 @@
 package convex.db.sql;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.Arrays;
 import java.util.Random;
 
 import convex.core.data.AVector;
@@ -67,26 +73,74 @@ public class EtchPKLookupBench {
 
 		// Random PK lookups
 		Random rng = new Random(42);
-		long totalNs = 0;
+		long[] timings = new long[LOOKUPS];
 		long maxNs = 0;
+		int maxIter = 0;
 		for (int i = 0; i < LOOKUPS; i++) {
 			int key = rng.nextInt(rowCount);
 			long start = System.nanoTime();
 			AVector<ACell> row = tables.selectByKey("t", CVMLong.create(key));
 			long elapsed = System.nanoTime() - start;
 			if (row == null) throw new AssertionError("Missing row for key=" + key);
-			totalNs += elapsed;
-			if (elapsed > maxNs) maxNs = elapsed;
+			timings[i] = elapsed;
+			if (elapsed > maxNs) { maxNs = elapsed; maxIter = i; }
 		}
-
-		double avgUs = (totalNs / (double) LOOKUPS) / 1_000.0;
-		double maxUs = maxNs / 1_000.0;
-		System.out.printf("  PK lookups (%d)         avg %,.1f us, max %,.1f us%n", LOOKUPS, avgUs, maxUs);
+		reportLookups("PK lookups", timings, maxIter);
 
 		// Row count (should be O(1) with liveCount)
 		t0 = System.nanoTime();
 		long count = tables.getRowCount("t");
 		report("getRowCount() = " + count, System.nanoTime() - t0);
+
+		// SQL queries via JDBC
+		cdb.register("bench");
+		try (Connection conn = DriverManager.getConnection("jdbc:convex:database=bench")) {
+
+			// Warmup SQL
+			try (Statement ws = conn.createStatement()) {
+				ws.executeQuery("SELECT * FROM t WHERE ID = 0").close();
+			}
+
+			// Random PK lookups: SELECT * FROM t WHERE ID = ?
+			rng = new Random(42);
+			timings = new long[LOOKUPS];
+			maxNs = 0;
+			maxIter = 0;
+			try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM t WHERE ID = ?")) {
+				for (int i = 0; i < LOOKUPS; i++) {
+					long key = rng.nextInt(rowCount);
+					ps.setLong(1, key);
+					long start = System.nanoTime();
+					try (ResultSet rs = ps.executeQuery()) {
+						if (!rs.next()) throw new AssertionError("Missing row for key=" + key);
+					}
+					long elapsed = System.nanoTime() - start;
+					timings[i] = elapsed;
+					if (elapsed > maxNs) { maxNs = elapsed; maxIter = i; }
+				}
+			}
+			reportLookups("SQL WHERE ID=x", timings, maxIter);
+
+			// Top-10 by ID descending: SELECT * FROM t ORDER BY ID DESC LIMIT 10
+			timings = new long[LOOKUPS];
+			maxNs = 0;
+			maxIter = 0;
+			try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM t ORDER BY ID DESC LIMIT 10")) {
+				for (int i = 0; i < LOOKUPS; i++) {
+					long start = System.nanoTime();
+					try (ResultSet rs = ps.executeQuery()) {
+						int rows = 0;
+						while (rs.next()) rows++;
+						if (rows != 10) throw new AssertionError("Expected 10 rows, got " + rows);
+					}
+					long elapsed = System.nanoTime() - start;
+					timings[i] = elapsed;
+					if (elapsed > maxNs) { maxNs = elapsed; maxIter = i; }
+				}
+			}
+			reportLookups("SQL ORDER BY ID DESC LIMIT 10", timings, maxIter);
+		}
+		cdb.unregister("bench");
 
 		server.close();
 		store.close();
@@ -95,5 +149,19 @@ public class EtchPKLookupBench {
 	static void report(String label, long elapsedNs) {
 		double ms = elapsedNs / 1_000_000.0;
 		System.out.printf("  %-25s %,.1f ms%n", label, ms);
+	}
+
+	static void reportLookups(String label, long[] timings, int maxIter) {
+		long totalNs = 0;
+		long maxNs = 0;
+		for (long t : timings) { totalNs += t; if (t > maxNs) maxNs = t; }
+		long[] sorted = timings.clone();
+		Arrays.sort(sorted);
+		long medianNs = sorted[sorted.length / 2];
+		double avgUs    = (totalNs / (double) timings.length) / 1_000.0;
+		double medianUs = medianNs / 1_000.0;
+		double maxUs    = maxNs    / 1_000.0;
+		System.out.printf("  %-32s avg %,.1f us, median %,.1f us, max %,.1f us (iter %d)%n",
+				label + " (" + timings.length + ")", avgUs, medianUs, maxUs, maxIter);
 	}
 }

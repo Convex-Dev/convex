@@ -2,6 +2,7 @@ package convex.db.calcite;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Table;
@@ -26,6 +27,12 @@ public class ConvexSchema extends AbstractSchema {
 	private final SQLDatabase database;
 	private final SQLSchema tables;
 	private final String name;
+
+	/**
+	 * Registry of SQL index names to (tableName, columnName) pairs.
+	 * Populated by CREATE INDEX DDL; used to resolve DROP INDEX by name.
+	 */
+	final ConcurrentHashMap<String, String[]> indexRegistry = new ConcurrentHashMap<>();
 
 	/**
 	 * Creates a new ConvexSchema backed by the given database.
@@ -129,5 +136,44 @@ public class ConvexSchema extends AbstractSchema {
 	 */
 	public ConvexTable getConvexTable(String tableName) {
 		return new ConvexTable(this, tableName);
+	}
+
+	/**
+	 * Creates a secondary index via DDL.
+	 *
+	 * @param indexName  SQL index name (for later DROP INDEX lookup)
+	 * @param tableName  Table to index
+	 * @param columnName Column to index
+	 * @param ifNotExists if true, silently succeed if already exists
+	 * @return true if index was created
+	 */
+	public boolean createIndex(String indexName, String tableName, String columnName,
+			boolean ifNotExists) {
+		if (tables.hasIndex(tableName, columnName)) {
+			if (ifNotExists) return false;
+			throw new IllegalStateException(
+					"Index on " + tableName + "(" + columnName + ") already exists");
+		}
+		boolean created = tables.createIndex(tableName, columnName);
+		if (created) {
+			indexRegistry.put(indexName.toUpperCase(), new String[]{tableName, columnName});
+		}
+		return created;
+	}
+
+	/**
+	 * Drops a secondary index by its SQL name.
+	 *
+	 * @param indexName SQL index name
+	 * @param ifExists  if true, silently succeed if not found
+	 * @return true if index was dropped
+	 */
+	public boolean dropIndex(String indexName, boolean ifExists) {
+		String[] pair = indexRegistry.remove(indexName.toUpperCase());
+		if (pair == null) {
+			if (ifExists) return false;
+			throw new IllegalStateException("Index not found: " + indexName);
+		}
+		return tables.dropIndex(pair[0], pair[1]);
 	}
 }

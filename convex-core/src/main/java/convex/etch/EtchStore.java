@@ -293,8 +293,36 @@ public class EtchStore extends ACachedStore {
 	}
 
 	/**
+	 * Compacts this store into a new Etch file containing only the cells reachable
+	 * from the current root. Dead cells accumulated through updates are discarded.
+	 *
+	 * <p>The source store must have its root data set (via {@link #setRootData}).
+	 * The target file must not exist or be empty.
+	 *
+	 * <p>Compaction ratio depends on write history: a store that has had many updates
+	 * to the same rows may see 10× or more reduction because every Index node touched
+	 * during an insert is written as a new cell in the append-only file.
+	 *
+	 * <p>Thread safety: the caller is responsible for ensuring no concurrent writes
+	 * to this store during compaction.
+	 *
+	 * @param targetFile Destination file for the compacted store (must be writable)
+	 * @return New EtchStore backed by the compacted file
+	 * @throws IOException If an IO error occurs during read or write
+	 */
+	public EtchStore compact(File targetFile) throws IOException {
+		Ref<?> rootRef = getRootRef();
+		if (rootRef == null) throw new IOException("Source store has no root data — call setRootData first");
+		// Load the full reachable cell tree into memory/cache in the source store context
+		rootRef = storeTopRef(rootRef, Ref.PERSISTED, null);
+		EtchStore target = EtchStore.create(targetFile);
+		target.setRootData(rootRef.getValue());
+		return target;
+	}
+
+	/**
 	 * Gets the underlying Etch instance
-	 * 
+	 *
 	 * @return Etch instance
 	 */
 	public Etch getEtch() {
