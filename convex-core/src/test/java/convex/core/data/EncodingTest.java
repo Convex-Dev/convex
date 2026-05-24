@@ -560,6 +560,35 @@ public class EncodingTest {
 		testFullencoding(Samples.INT_LIST_300);
 	}
 
+	@Test public void testNonCanonicalNaNRejected() throws BadFormatException {
+		// CAD3 spec requires NaN to be encoded as 0x1d7ff8000000000000
+		// Non-canonical NaN encodings must be rejected to preserve unique encoding invariant
+		
+		// Canonical NaN encoding should work fine
+		byte[] canonicalNaN = new byte[]{0x1d, 0x7f, (byte)0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+		ACell canonicalCell = Format.read(canonicalNaN);
+		assertNotNull(canonicalCell);
+		assertTrue(canonicalCell instanceof CVMDouble);
+		assertTrue(Double.isNaN(((CVMDouble)canonicalCell).doubleValue()));
+		
+		// Non-canonical NaN encodings must be rejected
+		long[] nonCanonicalNaNBits = {
+			0x7ff0000000000001L,  // signaling NaN
+			0x7ff80000ff000000L,  // NaN with payload
+			0x7fffffffffffffffL,  // all-ones NaN
+		};
+		
+		for (long bits : nonCanonicalNaNBits) {
+			byte[] encoding = new byte[9];
+			encoding[0] = Tag.DOUBLE;
+			for (int i = 0; i < 8; i++) {
+				encoding[i+1] = (byte)(bits >>> (56 - 8*i));
+			}
+			assertThrows(BadFormatException.class, () -> Format.read(encoding));
+		}
+	}
+
+
 	public static void testFullencoding(ACell s) throws BadFormatException {
 		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
 		Blob b=Format.encodeMultiCell(s,true);
