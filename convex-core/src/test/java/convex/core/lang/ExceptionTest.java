@@ -68,3 +68,15 @@ public class ExceptionTest extends ACVMTest {
 		assertEquals(CVMLong.ONE,eval("((fn [] (try (fail :never) (return 1) 2)))"));
 	}
 }
+
+	/**
+	 * Test that invoking a non-function value produces a CAST error, not a NullPointerException.
+	 * This was a bug where ctx.getError() was called instead of rctx.getError().
+	 */
+	@Test public void testInvokeNonFunctionNPE() {
+		// Invoking a non-function should produce a CAST error, not NPE
+		assertCastError(step("(1 :foo)"));
+		assertCastError(step("(1 2 3)"));
+		assertCastError(step("(:foo :bar)"));
+	}
+
