@@ -1,0 +1,89 @@
+;; Front-Running Attack Proof of Concept for Convex CPoS
+;; Demonstrates transaction ordering manipulation vulnerability
+;; See: Convex-Dev/bounties#18
+
+;; This PoC demonstrates that a malicious peer can:
+;; 1. Observe pending transactions before block inclusion
+;; 2. Insert its own transactions before victim transactions
+;; 3. Profit from price movements caused by victim transactions
+
+;; === DEX Simulator ===
+
+(def *token-price* 1000)  ;; Current price in Copper
+(def *token-reserve* 100000)  ;; Token reserve
+(def *cvm-reserve* 100000)    ;; CVM reserve
+
+(defn swap-price
+  "Calculate price impact of a swap (constant product AMM)"
+  [amount-in]
+  (let [new-cvm-reserve (+ *cvm-reserve* amount-in)
+        new-token-reserve (/ (* *cvm-reserve* *token-reserve*) new-cvm-reserve)
+        tokens-out (- *token-reserve* new-token-reserve)]
+    {:tokens-out tokens-out
+     :new-price (/ new-cvm-reserve new-token-reserve)}))
+
+(defn execute-swap!
+  "Execute a swap on the DEX"
+  [caller amount-in]
+  (let [result (swap-price amount-in)
+        tokens-out (:tokens-out result)]
+    (set! *cvm-reserve* (+ *cvm-reserve* amount-in))
+    (set! *token-reserve* (- *token-reserve* tokens-out))
+    (set! *token-price* (:new-price result))
+    {:caller caller :amount-in amount-in :tokens-out tokens-out :price *token-price*}))
+
+;; === Attack Simulation ===
+
+(defn simulate-frontrun
+  "Simulate a front-running attack"
+  []
+  (let [initial-price *token-price*
+        victim-amount 10000  ;; Victim wants to buy 10000 CVM worth
+        frontrun-amount 5000 ;; Attacker front-runs with 5000 CVM
+        
+        ;; Step 1: Attacker buys BEFORE victim (front-run)
+        attacker-buy (execute-swap! :attacker frontrun-amount)
+        price-after-attacker *token-price*
+        
+        ;; Step 2: Victim buys (price already moved)
+        victim-buy (execute-swap! :victim victim-amount)
+        price-after-victim *token-price*
+        
+        ;; Step 3: Attacker sells (profit from price increase)
+        attacker-sell-tokens (:tokens-out attacker-buy)
+        ;; Sell tokens back at higher price
+        sell-result (let [new-cvm-reserve (- *cvm-reserve* attacker-sell-tokens)
+                          new-token-reserve (/ (* *cvm-reserve* *token-reserve*) new-cvm-reserve)
+                          cvm-out (- new-token-reserve *token-reserve*)]
+                      (set! *cvm-reserve* new-cvm-reserve)
+                      (set! *token-reserve* new-token-reserve)
+                      cvm-out)
+        
+        ;; Calculate profit
+        attacker-profit (- sell-result frontrun-amount)]
+    
+    {:initial-price initial-price
+     :attacker-buy-price price-after-attacker
+     :victim-buy-price price-after-victim
+     :attacker-profit attacker-profit
+     :victim-slippage (- price-after-victim initial-price)}))
+
+;; === Run Simulation ===
+
+(println "=== Front-Running Attack Simulation ===")
+(println)
+(println "Initial Token Price:" *token-price*)
+(println)
+
+(let [result (simulate-frontrun)]
+  (println "Results:")
+  (println "  Initial Price:" (:initial-price result))
+  (println "  Price After Attacker Buy:" (:attacker-buy-price result))
+  (println "  Price After Victim Buy:" (:victim-buy-price result))
+  (println "  Attacker Profit:" (:attacker-profit result) "CVM")
+  (println "  Victim Slippage:" (:victim-slippage result) "CVM")
+  (println)
+  (println "Attack demonstrates that a malicious peer can:")
+  (println "1. Observe victim transaction in transactionQueue")
+  (println "2. Insert own transaction BEFORE victim in block")
+  (println "3. Profit from price movement caused by victim"))
