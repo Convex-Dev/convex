@@ -47,6 +47,7 @@ import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.prim.CVMBigDecimal;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
@@ -606,6 +607,20 @@ public class RT {
 			ANumeric ap = (ANumeric) a;
 			return ap.toDouble();
 		}
+		return null;
+	}
+
+	/**
+	 * Converts a numerical value to a CVM BigDecimal.
+	 * 
+	 * @param a Value to cast
+	 * @return CVMBigDecimal value, or null if not convertible
+	 */
+	public static CVMBigDecimal ensureBigDecimal(ACell a) {
+		if (a instanceof CVMBigDecimal) return (CVMBigDecimal) a;
+		if (a instanceof CVMLong l) return CVMBigDecimal.fromLong(l.longValue());
+		if (a instanceof AInteger ai) return CVMBigDecimal.fromBigInteger(ai.big());
+		if (a instanceof CVMDouble d) return CVMBigDecimal.fromDouble(d.doubleValue());
 		return null;
 	}
 

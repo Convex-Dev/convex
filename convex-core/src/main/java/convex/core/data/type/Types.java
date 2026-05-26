@@ -23,6 +23,7 @@ public class Types {
 	public static final Long LONG=Long.INSTANCE;
 	public static final Integer INTEGER=Integer.INSTANCE;
 	public static final Double DOUBLE = Double.INSTANCE;
+	public static final Decimal DECIMAL = Decimal.INSTANCE;
 	public static final Number NUMBER = Number.INSTANCE;
 	
 	// Atomic types
@@ -75,6 +76,7 @@ public class Types {
 		LONG,
 		INTEGER,
 		DOUBLE,
+		DECIMAL,
 		
 		BOOLEAN,
 		CHARACTER,

@@ -258,6 +258,9 @@ public class Symbols {
 	public static final Symbol ACTOR_Q = intern("actor?");
 
 	public static final Symbol ZERO_Q = intern("zero?");
+	
+	public static final Symbol BIGDECIMAL = intern("bigdecimal");
+	public static final Symbol BIGDECIMAL_Q = intern("bigdecimal?");
 
 	public static final Symbol CONTAINS_KEY_Q = intern("contains-key?");
 

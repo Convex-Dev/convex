@@ -58,6 +58,7 @@ import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.prim.CVMBigDecimal;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
@@ -2866,6 +2867,24 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isNumber(val);
+		}
+	});
+
+	public static final CoreFn<CVMBool> BIGDECIMAL_Q = reg(new CorePred(Symbols.BIGDECIMAL_Q,261) {
+		@Override
+		public boolean test(ACell val) {
+			return val instanceof CVMBigDecimal;
+		}
+	});
+
+	public static final CoreFn<CVMBigDecimal> BIGDECIMAL = reg(new CoreFn<>(Symbols.BIGDECIMAL,260) {
+		@Override
+		public <I> Context invoke(Context ctx, ACell[] args) {
+			if (args.length != 1) return ctx.withArityError(exactArityMessage(1, args.length));
+			ACell a = args[0];
+			CVMBigDecimal result = RT.ensureBigDecimal(a);
+			if (result == null) return ctx.withCastError(Types.DECIMAL, a);
+			return ctx.withResult(Juice.SPECIAL, result);
 		}
 	});
 

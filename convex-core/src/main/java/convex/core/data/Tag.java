@@ -23,6 +23,7 @@ public class Tag {
 	
 	public static final byte INTEGER = (byte) 0x10; // Arbitrary length integer base
 	public static final byte BIG_INTEGER = (byte) 0x19; // Big integer (greater than long range)
+	public static final byte BIG_DECIMAL = (byte) 0x1a; // Arbitrary precision decimal
 	public static final byte DOUBLE = (byte) 0x1d;
 
     // =========================================
