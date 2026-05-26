@@ -54,6 +54,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
@@ -1757,7 +1758,8 @@ public class Core {
 			if (result == null) return context.withCastError(0,args, Types.LONG);
 			result=result.inc();
 			
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1772,7 +1774,8 @@ public class Core {
 			if (result == null) return context.withCastError(0,args, Types.LONG);
 			result=result.dec();
 			
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1825,7 +1828,8 @@ public class Core {
 				return context.withCastError(0, args,Types.LONG);
 			}
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -1841,10 +1845,31 @@ public class Core {
 				if (a instanceof ANumeric) return context.withArgumentError("Out of range");
 				return context.withCastError(0, args,Types.INTEGER);
 			}
-			// TODO: bigint construction cost?
-			return context.withResult(Juice.ARITHMETIC, result);
+			// BigInteger construction cost proportional to byte length
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
+
+
+	public static final CoreFn<AInteger> BIGINT = reg(new CoreFn<>(Symbols.BIGINT,259) {
+		
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			ACell a = args[0];
+			AInteger result = RT.castInteger(a);
+			if (result == null) {
+				if (a instanceof ANumeric) return context.withArgumentError("Out of range");
+				return context.withCastError(0, args, Types.INTEGER);
+			}
+			// Cost proportional to byte length for BigInteger
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost > 0 ? cost : Juice.ARITHMETIC, result);
+		}
+	});
+
 
 	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE,139) {
 		
@@ -1856,7 +1881,8 @@ public class Core {
 			CVMDouble result = RT.castDouble(a);
 			if (result == null) return context.withCastError(0, args,Types.DOUBLE);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1884,7 +1910,8 @@ public class Core {
 				if (result == null) 
 					return context.withArgumentError("Invalid code point: "+cp);
 			}
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1897,7 +1924,8 @@ public class Core {
 			ACell a = args[0];
 			CVMLong result = RT.castByte(a);
 			if (result == null) return context.withCastError(0,args, Types.LONG);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1915,7 +1943,8 @@ public class Core {
 			
 			ANumeric result = RT.plus(args);
 			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1933,7 +1962,8 @@ public class Core {
 			}
 			ANumeric result = RT.minus(args);
 			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1951,7 +1981,8 @@ public class Core {
 
 			ANumeric result = RT.multiply(args);
 			if (result == null) return context.withError(ErrorMessages.INVALID_NUMERIC);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1963,7 +1994,8 @@ public class Core {
 
 			CVMDouble result = RT.divide(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1974,7 +2006,8 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.floor(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1986,7 +2019,8 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.ceil(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -1998,7 +2032,8 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.sqrt(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2016,7 +2051,8 @@ public class Core {
 				}
 				return context.withCastError(badVal,args, Types.NUMBER);
 			}
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2027,7 +2063,8 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell result = RT.signum(args[0]);
 			if (result == null) return context.withCastError(args[0], Types.NUMBER);
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2044,7 +2081,8 @@ public class Core {
 
 			AInteger result=la.mod(lb);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2061,7 +2099,8 @@ public class Core {
 
 			AInteger result=la.div(lb);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2078,7 +2117,8 @@ public class Core {
 
 			AInteger result=la.rem(lb);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2095,7 +2135,8 @@ public class Core {
 
 			AInteger result=la.quot(lb);
 	
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2127,7 +2168,8 @@ public class Core {
 			CVMDouble result = RT.pow(args);
 			if (result==null) return context.withCastError(Types.DOUBLE);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2140,7 +2182,8 @@ public class Core {
 			CVMDouble result = RT.exp(args[0]);
 			if (result==null) return context.withCastError(0,Types.DOUBLE);
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2170,7 +2213,8 @@ public class Core {
 //				return context.withResult(juice, result);
 //			} else {
 //				result=CVMDouble.create(Math.pow(base.doubleValue(), power.doubleValue()));
-//				return context.withResult(Juice.ARITHMETIC, result);
+//				long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 //			}
 //		}
 //	});
@@ -2200,7 +2244,8 @@ public class Core {
 			
 			CVMLong result=CVMLong.create(a.longValue()&b.longValue());
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2218,7 +2263,8 @@ public class Core {
 			
 			CVMLong result=CVMLong.create(a.longValue()^b.longValue());
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2236,7 +2282,8 @@ public class Core {
 			
 			CVMLong result=CVMLong.create(a.longValue()|b.longValue());
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 	
@@ -2251,7 +2298,8 @@ public class Core {
 			
 			CVMLong result=CVMLong.create(~a.longValue());
 
-			return context.withResult(Juice.ARITHMETIC, result);
+			long cost = Juice.costNumeric(result);
+			return context.withResult(cost>0?cost:Juice.ARITHMETIC, result);
 		}
 	});
 
@@ -2852,6 +2900,12 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof CVMDouble;
+		}
+	});
+	public static final CoreFn<CVMBool> BIGINT_Q = reg(new CorePred(Symbols.BIGINT_Q,260) {
+		@Override
+		public boolean test(ACell val) {
+			return val instanceof CVMBigInteger;
 		}
 	});
 

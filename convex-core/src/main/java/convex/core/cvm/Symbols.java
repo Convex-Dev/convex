@@ -136,6 +136,7 @@ public class Symbols {
 
 
 	public static final Symbol DOUBLE = intern("double");
+	public static final Symbol BIGINT = intern("bigint");
 
 	public static final Symbol BOOLEAN = intern("boolean");
 	public static final Symbol BOOLEAN_Q = intern("boolean?");
@@ -249,6 +250,7 @@ public class Symbols {
 	public static final Symbol ADDRESS_Q = intern("address?");
 	public static final Symbol LONG_Q = intern("long?");
 	public static final Symbol DOUBLE_Q = intern("double?");
+	public static final Symbol BIGINT_Q = intern("bigint?");
 	public static final Symbol STR_Q = intern("str?");
 	public static final Symbol NUMBER_Q = intern("number?");
 	public static final Symbol HASH_Q = intern("hash?");

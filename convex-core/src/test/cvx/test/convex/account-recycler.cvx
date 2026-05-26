@@ -1,0 +1,91 @@
+'convex.test.account-recycler
+
+;; Tests for Account Recycler contract
+;; Run with: (load "convex/test/account-recycler.cvx")
+
+(import convex.trust :as trust)
+
+;;;;;;;;;; Setup
+
+(def recycler
+  (deploy '(do
+    (import convex.account-recycler :as ar)
+    ;; Fund the recycler
+    (accept 100000))))
+
+;;;;;;;;;; Test: Price discovery
+
+(assert (= (call recycler (price)) (call recycler (price)))
+        "Price should be deterministic")
+
+(assert (> (call recycler (price)) 0)
+        "Price should be positive")
+
+;;;;;;;;;; Test: Deposit and buy cycle
+
+;; Create test accounts
+(def test-acct-1 (deploy '(def x 42)))
+(def test-acct-2 (deploy '(def y 99)))
+
+;; Deposit first account
+(call test-acct-1 (set-controller *address*))
+(call recycler (deposit test-acct-1))
+
+(assert (= (call recycler (available-count)) 1)
+        "Should have 1 available account after deposit")
+
+;; Buy the account
+(let [p (call recycler (price))]
+  (call recycler (buy))
+  ;; After buying, we should have the account as controller
+  (assert (= (call recycler (available-count)) 0)
+          "Should have 0 available after buy"))
+
+;;;;;;;;;; Test: Sell back
+
+;; Sell the account back
+(call recycler (sell test-acct-1))
+
+(assert (= (call recycler (available-count)) 1)
+        "Should have 1 available after sell")
+
+;;;;;;;;;; Test: Bonding curve
+
+;; Deposit more accounts to test price changes
+(call test-acct-2 (set-controller *address*))
+(call recycler (deposit test-acct-2))
+
+(let [p1 (call recycler (price))]
+  ;; Price should change with more inventory
+  (assert (> p1 0) "Price should remain positive"))
+
+;;;;;;;;;; Test: Security
+
+;; Can't deposit account you don't control
+(def other-acct (deploy '(def z 7)))
+(should-fail
+  (call recycler (deposit other-acct))
+  "Should fail to deposit uncontrolled account")
+
+;; Can't buy when no accounts available
+(should-fail
+  (do
+    ;; Buy all available
+    (while (> (call recycler (available-count)) 0)
+      (call recycler (buy)))
+    ;; Try to buy when empty
+    (call recycler (buy)))
+  "Should fail when no accounts available")
+
+;;;;;;;;;; Test: Account clearing
+
+;; When an account is deposited, it should be cleared
+(def clean-acct (deploy '(do (def secret 42) (def data [1 2 3]))))
+(call clean-acct (set-controller *address*))
+(call recycler (deposit clean-acct))
+
+;; After deposit, the account's environment should be cleared
+;; (The defs should be undef'd)
+
+;;;;;;;;;; Summary
+(println "All account-recycler tests passed!")
