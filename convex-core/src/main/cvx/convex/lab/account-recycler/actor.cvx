@@ -1,0 +1,174 @@
+'convex.account-recycler
+
+;; Account Recycling Contract for Convex
+;; Enables buying and selling of accounts with bonding curve pricing
+;;
+;; Addresses can be recycled: cleared of old state and made available for new owners.
+;; Uses a bonding curve to price accounts based on availability.
+
+;;;;;;;;;; State
+
+(def *inventory* {})
+;; Map of Address -> {:status :available/:reserved/:sold, :price <long>}
+
+(def *available-count* 0)
+(def *total-recycled* 0)
+
+;; Bonding curve parameters
+(def BASE-PRICE 1000)       ;; Base price in Copper (smallest unit)
+(def PRICE-ELASTICITY 500)  ;; Price increase per account (basis points)
+(def MIN-PRICE 100)         ;; Minimum account price
+(def MAX-PRICE 1000000)     ;; Maximum account price
+
+;;;;;;;;;; Internal helpers
+
+(defn -self
+  ^{:private? true}
+  []
+  *address*)
+
+(defn -price-for-available
+  "Calculate current buy price based on available accounts (bonding curve).
+   Fewer available = higher price."
+  []
+  (let [available (count (filter (fn [[_ v]] (= (:status v) :available)) *inventory*))]
+    (if (<= available 0)
+      MAX-PRICE
+      (let [ratio (/ (* PRICE-ELASTICITY 1000) (max available 1))
+            price (+ BASE-PRICE ratio)]
+        (min MAX-PRICE (max MIN-PRICE price))))))
+
+(defn -sell-price
+  "Calculate sell price (typically 80-90% of buy price to create spread)"
+  [buy-price]
+  (max MIN-PRICE (int (* buy-price 85) 100)))
+
+(defn -clear-account!
+  "Clear an account for recycling: undef all defs, reset controller and key"
+  [addr]
+  (let [env (call addr *env*)]
+    ;; Undef all user-defined symbols
+    (for [sym (keys env)]
+      (when-not (= (namespace sym) "convex.core")
+        (eval-as addr `(undef ~sym)))))
+  ;; Reset controller to nil (no controller = open for new owner)
+  (eval-as addr '(set-controller nil))
+  ;; Note: set-key requires transaction signing, handled by new owner
+  :cleared)
+
+;;;;;;;;;; Public API
+
+(defn price
+  ^{:callable true
+    :doc {:description "Get current buy price for an account from the recycling market"}}
+  []
+  (-price-for-available))
+
+(defn sell-price
+  ^{:callable true
+    :doc {:description "Get the price the market will pay to buy back an account"}}
+  []
+  (-sell-price (-price-for-available)))
+
+(defn inventory
+  ^{:callable true
+    :doc {:description "Get full inventory map"}}
+  []
+  *inventory*)
+
+(defn available-count
+  ^{:callable true
+    :doc {:description "Count of available accounts"}}
+  []
+  (count (filter (fn [[_ v]] (= (:status v) :available)) *inventory*)))
+
+(defn deposit
+  ^{:callable true
+    :doc {:description "Deposit an account to the recycling market. 
+          Caller must control the account being deposited.
+          Account will be cleared and made available for purchase."}}
+  [addr]
+  (let [addr (address addr)]
+    ;; Verify caller controls the account
+    (or (= *caller* addr)
+        (fail :TRUST "You can only deposit accounts you control"))
+    ;; Clear the account
+    (-clear-account! addr)
+    ;; Add to inventory
+    (set! *inventory* (assoc *inventory* addr {:status :available :deposited-by *caller*}))
+    (set! *available-count* (inc *available-count*))
+    (set! *total-recycled* (inc *total-recycled*))
+    (log "DEPOSIT" addr *caller*)
+    addr))
+
+(defn buy
+  ^{:callable true
+    :doc {:description "Buy an available account from the recycling market.
+          Payment is taken from caller. Account is transferred to caller."}}
+  []
+  (let [current-price (-price-for-available)
+        available (filter (fn [[_ v]] (= (:status v) :available)) *inventory*)]
+    (or (not (empty? available)) (fail :STATE "No accounts available for purchase"))
+    (or (>= (balance *caller*) current-price) (fail :FUNDS "Insufficient funds"))
+    
+    ;; Take first available account
+    (let [[addr info] (first available)]
+      ;; Transfer payment to contract
+      (transfer *address* current-price)
+      
+      ;; Clear account and set new owner as controller
+      (eval-as addr `(set-controller ~*caller*))
+      
+      ;; Update inventory
+      (set! *inventory* (assoc *inventory* addr {:status :sold :sold-to *caller* :price current-price}))
+      (set! *available-count* (dec *available-count*))
+      
+      (log "BUY" addr *caller* current-price)
+      addr)))
+
+(defn sell
+  ^{:callable true
+    :doc {:description "Sell an account back to the recycling market.
+          Caller must control the account. Receives payment at sell price."}}
+  [addr]
+  (let [addr (address addr)
+        buy-price (-price-for-available)
+        sell-p (-sell-price buy-price)]
+    ;; Verify caller controls the account
+    (or (= *caller* addr)
+        (fail :TRUST "You can only sell accounts you control"))
+    ;; Verify contract has funds to buy back
+    (or (>= (balance *address*) sell-p) (fail :FUNDS "Market insufficient funds"))
+    
+    ;; Clear the account
+    (-clear-account! addr)
+    
+    ;; Transfer payment to seller
+    (transfer *caller* sell-p)
+    
+    ;; Update inventory
+    (set! *inventory* (assoc *inventory* addr {:status :available :returned-by *caller*}))
+    (set! *available-count* (inc *available-count*))
+    
+    (log "SELL" addr *caller* sell-p)
+    sell-p))
+
+(defn withdraw-funds
+  ^{:callable true
+    :doc {:description "Withdraw accumulated funds. Only callable by contract controller."}}
+  [amount]
+  (or (trust/trusted? *address* *caller* :withdraw) (fail :TRUST "Not authorized"))
+  (let [amount (int amount)]
+    (or (> amount 0) (fail :ARGUMENT "Amount must be positive"))
+    (or (>= (balance *address*) amount) (fail :FUNDS "Insufficient contract balance"))
+    (transfer *caller* amount)
+    amount))
+
+;;;;;;;;;; Initialization
+
+;; Register in registry
+(call *registry*
+      (register {:description ["Account recycling market with bonding curve pricing."
+                               "Allows accounts to be bought and sold with automatic price discovery."]
+                 :name "Account Recycler"
+                 :type :actor}))
