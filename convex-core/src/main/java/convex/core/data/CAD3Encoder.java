@@ -270,6 +270,21 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			ds.pos+=8;
 			return CVMDouble.unsafeCreate(Double.longBitsToDouble(bits));
 		}
+		// CVMBigDecimal: tag 0x1a, VLQ signed scale + VLQ byte count + raw unscaled bytes
+		if (tag == Tag.BIG_DECIMAL) {
+			long scale=Format.readVLQLong(ds.data, ds.pos);
+			ds.pos+=Format.getVLQLongLength(scale);
+			long bc=Format.readVLQCount(ds.data, ds.pos);
+			ds.pos+=Format.getVLQCountLength(bc);
+			if (bc>Constants.MAX_BIG_INTEGER_LENGTH) throw new BadFormatException("Encoding exceeds max big decimal unscaled length");
+			Blob blobData=Blob.wrap(ds.data, ds.pos, (int)bc);
+			ds.pos+=(int)bc;
+			java.math.BigInteger unscaled=new java.math.BigInteger(blobData.toByteArray());
+			java.math.BigDecimal bd=new java.math.BigDecimal(unscaled, (int)scale);
+			CVMBigDecimal result=CVMBigDecimal.create(bd);
+			if (result==null) throw new BadFormatException("Illegal creation of BigDecimal");
+			return result;
+		}
 		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 

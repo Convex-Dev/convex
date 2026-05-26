@@ -7,6 +7,7 @@ import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
 import convex.core.data.Cells;
 import convex.core.data.prim.ANumeric;
+import convex.core.data.prim.CVMBigDecimal;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 
@@ -515,6 +516,10 @@ public class Juice {
 		if (!(a instanceof ANumeric)) return -1;
 		if (a instanceof CVMBigInteger) {
 			long bl=((CVMBigInteger)a).byteLength();
+			return Math.max(MIN_NUMERIC_COST,bl);
+		}
+		if (a instanceof CVMBigDecimal) {
+			long bl=((CVMBigDecimal)a).getDecimal().unscaledValue().bitLength()/8+1;
 			return Math.max(MIN_NUMERIC_COST,bl);
 		}
 		return MIN_NUMERIC_COST;
