@@ -1,8 +1,13 @@
 # .github/workflows/build.yml
-# Runs on every push — builds and tests the project
+# Runs on pushes and pull requests (including from forks) — builds and tests the project
 name: Build
 
-on: [push]
+on: [push, pull_request]
+
+# Cancel superseded in-progress runs for the same ref (saves CI minutes on rapid re-pushes)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
