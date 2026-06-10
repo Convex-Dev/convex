@@ -99,7 +99,7 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		AFn<T> fn = RT.castFunction(rf);
 		if (fn == null) {
 			Context rctx=context.withCastError(rf, Types.FUNCTION);
-			ctx.getError().addTrace("Trying to get function for expression: "+RT.print(this));
+			rctx.getError().addTrace("Trying to get function for expression: "+RT.print(this));
 			return rctx;
 		}
 

@@ -268,6 +268,13 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		if (tag == Tag.DOUBLE) {
 			long bits=Utils.readLong(ds.data, ds.pos, 8);
 			ds.pos+=8;
+			// Enforce canonical NaN encoding per CAD3 spec
+			if (Double.isNaN(Double.longBitsToDouble(bits))) {
+				if (bits!=0x7ff8000000000000L) {
+					throw new BadFormatException("Non-canonical NaN encoding: must use 0x7ff8000000000000");
+				}
+				return CVMDouble.NaN;
+			}
 			return CVMDouble.unsafeCreate(Double.longBitsToDouble(bits));
 		}
 		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
