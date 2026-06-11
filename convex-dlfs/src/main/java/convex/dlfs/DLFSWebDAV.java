@@ -134,11 +134,11 @@ public class DLFSWebDAV {
 	DrivePath parseDrivePath(Context ctx) {
 		String pathParam = null;
 
-		// Try Javalin path param first (standard routes, already URL-decoded)
+		// Try Javalin path param first (routes registered on ROUTE_PATH, already URL-decoded)
 		try {
 			pathParam = ctx.pathParam("path");
 		} catch (Exception e) {
-			// not available (custom methods in before handler)
+			// not available (bare /dlfs routes have no path param)
 		}
 
 		// Fall back to URI extraction

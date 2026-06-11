@@ -55,7 +55,7 @@ import io.javalin.openapi.JsonSchemaResource;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
-import io.javalin.util.JavalinException;
+import io.javalin.util.JavalinBindException;
 
 /**
  * Operates a REST API server and web application connected to a local peer server
@@ -362,9 +362,9 @@ public class RESTServer implements Closeable {
 		try {
 			javalin=buildApp(port);
 			javalin.start();
-		} catch (JavalinException e) {
+		} catch (JavalinBindException e) {
 			if (port!=null) throw e; // only try again if port unspecified
-			log.warn("Default port "+DEFAULT_PORT+" already in use, chosing another at random");
+			log.warn("Default port "+DEFAULT_PORT+" already in use ("+e.getMessage()+"), choosing another at random");
 			close();
 
 			javalin=buildApp(0); // use random port
