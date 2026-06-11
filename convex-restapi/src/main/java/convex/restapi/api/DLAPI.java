@@ -15,7 +15,7 @@ import convex.lattice.fs.DLFSProvider;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
 import convex.restapi.RESTServer;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.NotFoundResponse;
@@ -36,10 +36,10 @@ public class DLAPI extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		String prefix=ROUTE;
 
-		app.get(prefix+"<path>", this::getFile);
+		routes.get(prefix+"<path>", this::getFile);
 	}
 	
 	public void getFile(Context ctx) {

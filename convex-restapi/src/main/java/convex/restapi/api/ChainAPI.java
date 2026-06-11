@@ -71,7 +71,7 @@ import convex.restapi.model.TransactRequest;
 import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
 import convex.restapi.model.TransactionSubmitRequest;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.ForbiddenResponse;
@@ -101,38 +101,38 @@ public class ChainAPI extends ABaseAPI {
 	private ConcurrentLimit transactLimit=new ConcurrentLimit(2);
 	
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		String prefix = ROUTE;
 
-		app.post(prefix + "query", this::query);
+		routes.post(prefix + "query", this::query);
 
-		app.post(prefix + "transaction/prepare", this::transactionPrepare);
-		app.post(prefix + "transaction/submit", this::transactionSubmit);
-		app.post(prefix + "transact", transactLimit.handler(this::transact));
+		routes.post(prefix + "transaction/prepare", this::transactionPrepare);
+		routes.post(prefix + "transaction/submit", this::transactionSubmit);
+		routes.post(prefix + "transact", transactLimit.handler(this::transact));
 
-		app.post(prefix + "createAccount", faucetLimit.handler(this::createAccount));
-		app.post(prefix + "faucet",  faucetLimit.handler(this::faucetRequest));
+		routes.post(prefix + "createAccount", faucetLimit.handler(this::createAccount));
+		routes.post(prefix + "faucet",  faucetLimit.handler(this::faucetRequest));
 
 
-		app.get(prefix + "accounts/{addr}", this::queryAccount);
-		app.get(prefix + "peers/{addr}", this::queryPeer);
+		routes.get(prefix + "accounts/{addr}", this::queryAccount);
+		routes.get(prefix + "peers/{addr}", this::queryPeer);
 
 	
-		app.get(prefix + "data/{hash}", this::getData);
-		app.post(prefix + "data/encode", this::encodeData);
-		app.post(prefix + "data/decode", this::decodeData);
+		routes.get(prefix + "data/{hash}", this::getData);
+		routes.post(prefix + "data/encode", this::encodeData);
+		routes.post(prefix + "data/decode", this::decodeData);
 		
 		
-		app.get(prefix + "tx", this::getTransaction);
+		routes.get(prefix + "tx", this::getTransaction);
 		
-		app.get(prefix + "blocks", this::getBlocks);
-		app.get(prefix + "blocks/{blockNum}", this::getBlock);
+		routes.get(prefix + "blocks", this::getBlocks);
+		routes.get(prefix + "blocks/{blockNum}", this::getBlock);
 		
-		app.get(prefix + "status", this::getStatus);
+		routes.get(prefix + "status", this::getStatus);
 
-		app.post(prefix + "message", this::handleMessage);
+		routes.post(prefix + "message", this::handleMessage);
 
-		app.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
+		routes.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 

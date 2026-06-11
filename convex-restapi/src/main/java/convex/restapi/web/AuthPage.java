@@ -18,7 +18,7 @@ import convex.restapi.RESTServer;
 import convex.restapi.auth.OAuthService;
 import convex.restapi.auth.OAuthService.PendingAuth;
 import convex.restapi.auth.OAuthService.Provider;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
 
@@ -39,9 +39,9 @@ public class AuthPage extends AWebSite {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
-		app.get("/auth", this::showLoginPage);
-		app.get("/auth/callback", this::handleCallback);
+	public void addRoutes(RoutesConfig routes) {
+		routes.get("/auth", this::showLoginPage);
+		routes.get("/auth/callback", this::handleCallback);
 	}
 
 	/**

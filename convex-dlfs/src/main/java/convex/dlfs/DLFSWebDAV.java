@@ -17,8 +17,10 @@ import java.util.List;
 
 import convex.lattice.fs.DLFileSystem;
 import convex.restapi.auth.AuthMiddleware;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
+import io.javalin.http.Handler;
+import io.javalin.http.HandlerType;
 
 /**
  * WebDAV-compatible HTTP handler with multi-drive support.
@@ -64,60 +66,51 @@ public class DLFSWebDAV {
 		return this;
 	}
 
+	// Custom WebDAV HTTP methods, supported natively by Javalin 7+
+	private static final HandlerType PROPFIND = HandlerType.findOrCreate("PROPFIND");
+	private static final HandlerType PROPPATCH = HandlerType.findOrCreate("PROPPATCH");
+	private static final HandlerType MKCOL = HandlerType.findOrCreate("MKCOL");
+	private static final HandlerType MOVE = HandlerType.findOrCreate("MOVE");
+	private static final HandlerType COPY = HandlerType.findOrCreate("COPY");
+	private static final HandlerType LOCK = HandlerType.findOrCreate("LOCK");
+	private static final HandlerType UNLOCK = HandlerType.findOrCreate("UNLOCK");
+
 	/**
-	 * Registers WebDAV routes on the given Javalin app.
+	 * Registers WebDAV routes on the given routes configuration.
 	 */
-	public void addRoutes(Javalin app) {
-		app.get(ROUTE_PATH, this::handleGet);
-		app.get(ROUTE, this::handleGet);
-		app.put(ROUTE_PATH, this::handlePut);
-		app.delete(ROUTE_PATH, this::handleDelete);
-		app.head(ROUTE_PATH, this::handleHead);
-		app.head(ROUTE, this::handleHead);
-		app.head(ROUTE_BARE, this::handleHead);
-		app.options(ROUTE_PATH, this::handleOptions);
-		app.options(ROUTE, this::handleOptions);
-		app.options(ROUTE_BARE, this::handleOptions);
+	public void addRoutes(RoutesConfig routes) {
+		routes.get(ROUTE_PATH, this::handleGet);
+		routes.get(ROUTE, this::handleGet);
+		routes.put(ROUTE_PATH, this::handlePut);
+		routes.delete(ROUTE_PATH, this::handleDelete);
+		routes.head(ROUTE_PATH, this::handleHead);
+		routes.head(ROUTE, this::handleHead);
+		routes.head(ROUTE_BARE, this::handleHead);
+		routes.options(ROUTE_PATH, this::handleOptions);
+		routes.options(ROUTE, this::handleOptions);
+		routes.options(ROUTE_BARE, this::handleOptions);
 
 		// Root-level DAV discovery (Windows WebClient sends OPTIONS / then PROPFIND /)
-		app.options("/", this::handleOptions);
-		app.before(ctx -> {
-			if ("PROPFIND".equals(ctx.req().getMethod()) && "/".equals(ctx.path())) {
-				handleRootPropfind(ctx);
-				ctx.skipRemainingHandlers();
-				return;
-			}
-		});
+		routes.options("/", this::handleOptions);
+		routes.addHttpHandler(PROPFIND, "/", this::handleRootPropfind);
 
-		// Custom WebDAV methods — Javalin has no built-in handler type for these
-		app.before(ctx -> {
-			String method = ctx.req().getMethod();
-			String uri = ctx.req().getRequestURI();
-			if (!uri.startsWith(ROUTE_BARE)) return;
+		// Custom WebDAV methods on the DLFS paths
+		addDLFSMethod(routes, PROPFIND, this::handlePropfind);
+		addDLFSMethod(routes, MKCOL, this::handleMkcol);
+		addDLFSMethod(routes, MOVE, this::handleMove);
+		addDLFSMethod(routes, COPY, this::handleCopy);
+		addDLFSMethod(routes, PROPPATCH, this::handleProppatch);
+		addDLFSMethod(routes, LOCK, this::handleLock);
+		addDLFSMethod(routes, UNLOCK, ctx -> ctx.status(204));
+	}
 
-			if ("PROPFIND".equals(method)) {
-				handlePropfind(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("MKCOL".equals(method)) {
-				handleMkcol(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("MOVE".equals(method)) {
-				handleMove(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("COPY".equals(method)) {
-				handleCopy(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("PROPPATCH".equals(method)) {
-				handleProppatch(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("LOCK".equals(method)) {
-				handleLock(ctx);
-				ctx.skipRemainingHandlers();
-			} else if ("UNLOCK".equals(method)) {
-				ctx.status(204);
-				ctx.skipRemainingHandlers();
-			}
-		});
+	/**
+	 * Registers a handler for a WebDAV method on all DLFS path forms.
+	 */
+	private static void addDLFSMethod(RoutesConfig routes, HandlerType method, Handler handler) {
+		routes.addHttpHandler(method, ROUTE_BARE, handler);
+		routes.addHttpHandler(method, ROUTE, handler);
+		routes.addHttpHandler(method, ROUTE_PATH, handler);
 	}
 
 	// ==================== Path Resolution ====================

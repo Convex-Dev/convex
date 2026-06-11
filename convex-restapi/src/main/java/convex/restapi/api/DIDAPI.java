@@ -6,7 +6,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 import convex.core.util.JSON;
 import convex.restapi.RESTServer;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
 
@@ -33,10 +33,10 @@ public class DIDAPI extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
-		app.get("/.well-known/did.json", this::handlePeerDID);
-		app.get("/did/{identifier}/did.json", this::handleAccountDID);
-		app.get("/{identifier}/did.json", this::handleAccountDID);
+	public void addRoutes(RoutesConfig routes) {
+		routes.get("/.well-known/did.json", this::handlePeerDID);
+		routes.get("/did/{identifier}/did.json", this::handleAccountDID);
+		routes.get("/{identifier}/did.json", this::handleAccountDID);
 	}
 
 	/**

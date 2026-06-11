@@ -10,7 +10,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.restapi.RESTServer;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
@@ -33,8 +33,8 @@ public class X402 extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
-		app.post(ROUTE, this::handleVerify);
+	public void addRoutes(RoutesConfig routes) {
+		routes.post(ROUTE, this::handleVerify);
 	}
 
 	public void respondPaymentRequired(Context ctx, AMap<AString, ACell> baseFields) {

@@ -9,7 +9,7 @@ import static j2html.TagCreator.text;
 import convex.restapi.RESTServer;
 import convex.restapi.auth.ConfirmationService;
 import convex.restapi.web.AWebSite;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 
 /**
@@ -31,9 +31,9 @@ public class ConfirmAPI extends AWebSite {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
-		app.get("/confirm", this::handleConfirmGet);
-		app.post("/confirm", this::handleConfirmPost);
+	public void addRoutes(RoutesConfig routes) {
+		routes.get("/confirm", this::handleConfirmGet);
+		routes.post("/confirm", this::handleConfirmPost);
 	}
 
 	/**

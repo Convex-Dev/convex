@@ -10,7 +10,7 @@ import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.model.CreateAccountResponse;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
@@ -31,10 +31,10 @@ public class PeerAdminAPI extends ABaseAPI {
 	private static final String ROUTE = "/api/v1/";
 
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		String prefix = ROUTE;
 
-		app.post(prefix + "peer/shutdown", this::shutDown);
+		routes.post(prefix + "peer/shutdown", this::shutDown);
 	
 	}
 
