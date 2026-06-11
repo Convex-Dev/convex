@@ -20,14 +20,14 @@ Peer server implementation and networking layer for the [Convex](https://convex.
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-peer</artifactId>
-    <version>0.8.4</version>
+    <version>0.8.5</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-peer:0.8.4'
+implementation 'world.convex:convex-peer:0.8.5'
 ```
 
 ## Usage

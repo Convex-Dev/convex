@@ -28,14 +28,14 @@ ships two implementations:
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-observer</artifactId>
-    <version>0.8.4</version>
+    <version>0.8.5</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-observer:0.8.4'
+implementation 'world.convex:convex-observer:0.8.5'
 ```
 
 ## Usage
