@@ -15,26 +15,24 @@ A typical actor deployment:
 ```clojure
 (deploy
   '(do
-     ;; Internal state
+     ;; Internal state (private to the actor)
      (def counter 0)
 
-     ;; Exported functions (callable by others)
-     (defn increment []
-       (def counter (+ counter 1))
+     ;; Callable functions: mark each with ^:callable so it can be
+     ;; invoked from outside the actor via (call ...)
+     (defn ^:callable increment []
+       (set! counter (+ counter 1))
        counter)
 
-     (defn get-count []
-       counter)
-
-     ;; Export public API
-     (export increment get-count)))
+     (defn ^:callable get-count []
+       counter)))
 ```
 
 ## Key Rules
 
 - `deploy` returns the new actor's address (e.g. `#12345`)
-- Only `export`ed functions are callable from outside
-- Internal `def`s are private state
+- Only functions tagged with `^:callable` metadata can be called from outside (there is no `export` form). The equivalent map form is `^{:callable true}`
+- Use `set!` to update an existing `def` from inside a function; plain `def`s declared in the actor body are private state
 - Actors have their own `*address*` and `*balance*`
 - Use `(set-controller #ADDR)` inside the actor to set who can upgrade it
 
@@ -42,7 +40,7 @@ A typical actor deployment:
 
 1. Note the returned address for the user
 2. Optionally register a CNS name: `(call #9 (cns-update 'my.actor.name *address*))`
-3. Test by calling an exported function: `(call #NEW-ADDR (get-count))`
+3. Test by calling a `^:callable` function: `(call #NEW-ADDR (get-count))`
 
 ## Workflow
 
