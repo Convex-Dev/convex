@@ -3,10 +3,14 @@ package convex.node;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -95,9 +99,10 @@ public class NodeServerPersistenceTest {
 	 * the cursor but not yet announced.
 	 */
 	private void syncBackupFromPrimary() throws Exception {
-		// Sync primary so propagator has the latest value for query responses
+		// Sync primary so propagator has the latest value for query responses.
+		// Synchronous commit guarantees announce + setRootData complete before
+		// sync() returns — the announced cursor is up to date.
 		primary.getCursor().sync();
-		Thread.sleep(100); // Let propagator process the sync
 
 		InetSocketAddress primaryAddr = primary.getHostAddress();
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
@@ -365,11 +370,9 @@ public class NodeServerPersistenceTest {
 
 		writeDataValue(primary, 42);
 
-		// Sync cursor (triggers propagator via onSync callback)
+		// Sync cursor — synchronous commit on the primary completes announce
+		// + setRootData on this thread before returning.
 		primary.getCursor().sync();
-
-		// Give propagator thread time to process
-		Thread.sleep(200);
 
 		// Store should have the data without needing close()
 		ACell rootData = primaryStore.getRootData();
@@ -394,7 +397,6 @@ public class NodeServerPersistenceTest {
 
 		writeDataValue(primary, 77);
 		primary.getCursor().sync();
-		Thread.sleep(200);
 
 		// Verify persisted
 		ACell rootData = primaryStore.getRootData();
@@ -413,5 +415,144 @@ public class NodeServerPersistenceTest {
 		primary.launch();
 		assertEquals(CVMLong.create(77), readDataValue(primary, 77),
 			"Local-only node should restore data from store");
+	}
+
+	/**
+	 * Synchronous commit must surface persistence errors to the caller. If
+	 * setRootData throws, cursor.sync() must throw — silent loss of durability
+	 * is the failure mode this design rules out.
+	 */
+	@Test
+	public void testSyncSurfacesPersistenceFailure() throws Exception {
+		// EtchStore subclass that throws on setRootData to simulate a disk error
+		EtchStore failingStore = new EtchStore(EtchStore.createTemp("failing").getEtch()) {
+			@Override
+			public <T extends ACell> convex.core.data.Ref<T> setRootData(T data) throws IOException {
+				throw new IOException("simulated disk failure");
+			}
+		};
+		primaryStore = failingStore;
+
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		writeDataValue(primary, 99);
+
+		// sync() must propagate, not swallow
+		RuntimeException ex = assertThrows(RuntimeException.class,
+			() -> primary.getCursor().sync(),
+			"sync() must throw when setRootData fails");
+		assertTrue(ex.getCause() instanceof IOException,
+			"Cause must be the original IOException, was: " + ex.getCause());
+		assertEquals("simulated disk failure", ex.getCause().getMessage());
+	}
+
+	/**
+	 * Concurrent app writes during sync must not be lost. Thread A calls
+	 * {@code sync()} (announce + setRootData on caller's thread); thread B
+	 * writes a new key to the cursor mid-sync. After both, both writes must
+	 * be visible — the {@code RootLatticeCursor.sync()} CAS-or-merge fallback
+	 * is what guarantees this.
+	 *
+	 * <p>Thread B writes at a fresh top-level key per iteration via the
+	 * cursor's atomic {@code assoc}, so the only relevant race is the one
+	 * inside sync (B's write landing between A's snapshot capture and A's CAS).
+	 * The iteration count is high enough to make the race likely to be hit.
+	 */
+	@Test
+	public void testConcurrentWriteDuringSync() throws Exception {
+		primaryStore = EtchStore.createTemp("primary-concurrent");
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
+		Keyword stable = Keyword.intern("stable");
+		primary.getCursor().assoc(stable, CVMLong.create(1));
+
+		for (int i = 0; i < 50; i++) {
+			final Keyword bKey = Keyword.intern("b-" + i);
+			final ACell bValue = CVMLong.create(i);
+
+			CountDownLatch ready = new CountDownLatch(1);
+			Thread b = new Thread(() -> {
+				try {
+					ready.await();
+					primary.getCursor().assoc(bKey, bValue);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+				}
+			});
+			b.start();
+			ready.countDown();
+			primary.getCursor().sync();
+			b.join();
+
+			// B's write must survive the CAS-or-merge fallback inside sync()
+			assertEquals(bValue, primary.getCursor().get(bKey),
+				"Concurrent write at " + bKey + " must not be lost by sync at iteration " + i);
+			assertEquals(CVMLong.create(1), primary.getCursor().get(stable),
+				"Pre-existing :stable must survive concurrent sync at iteration " + i);
+		}
+	}
+
+	/**
+	 * Sole-writer invariant: pipelines through the propagator must not
+	 * interleave. Two threads calling {@code processSnapshot} concurrently
+	 * (caller's sync hook plus background pull/drain) must run their full
+	 * announce + setRootData + broadcast sequences sequentially, so an older
+	 * snapshot's setRootData cannot land after a newer snapshot's and demote
+	 * the root pointer.
+	 *
+	 * <p>The test instruments the merge callback to dwell inside the pipeline
+	 * and count concurrent pipeline activity. With the propagator's writeLock,
+	 * max-in-flight is exactly 1; without it, the dwell would let a second
+	 * pipeline enter while the first is still executing.
+	 */
+	@Test
+	public void testProcessSnapshotPipelinesAreSerialised() throws Exception {
+		primaryStore = EtchStore.createTemp("primary-serialise");
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
+		LatticePropagator prop = primary.getPropagator();
+
+		AtomicInteger inFlight = new AtomicInteger();
+		AtomicInteger maxInFlight = new AtomicInteger();
+		AtomicReference<Throwable> failure = new AtomicReference<>();
+
+		// Replace merge callback with one that dwells inside the pipeline.
+		// This widens the window so two pipelines could overlap if not serialised.
+		prop.setMergeCallback(v -> {
+			int n = inFlight.incrementAndGet();
+			maxInFlight.updateAndGet(m -> Math.max(m, n));
+			try {
+				Thread.sleep(50);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			inFlight.decrementAndGet();
+		});
+
+		// Two distinct snapshots (lattice-ordered) for the two threads.
+		primary.getCursor().assoc(Keyword.intern("a"), CVMLong.create(1));
+		final ACell v1 = primary.getCursor().get();
+		primary.getCursor().assoc(Keyword.intern("b"), CVMLong.create(2));
+		final ACell v2 = primary.getCursor().get();
+
+		Thread t1 = new Thread(() -> {
+			try { prop.processSnapshot(v1); }
+			catch (Throwable e) { failure.compareAndSet(null, e); }
+		}, "snapshot-A");
+		Thread t2 = new Thread(() -> {
+			try { prop.processSnapshot(v2); }
+			catch (Throwable e) { failure.compareAndSet(null, e); }
+		}, "snapshot-B");
+
+		t1.start();
+		t2.start();
+		t1.join();
+		t2.join();
+
+		assertNull(failure.get(), "processSnapshot must not throw");
+		assertEquals(1, maxInFlight.get(),
+			"processSnapshot pipelines must not overlap (writeLock invariant)");
 	}
 }

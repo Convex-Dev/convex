@@ -3,13 +3,13 @@
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-core.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-core/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-core)
 
-The foundational library for the [Convex](https://convex.world) decentralized network, providing the virtual machine, consensus algorithm, and core data structures.
+The foundational library for the [Convex](https://convex.world) decentralised network, providing the virtual machine, consensus algorithm, and core data structures.
 
 ## Features
 
 - **Convex Virtual Machine (CVM)** - Lambda calculus-based execution environment for smart contracts
 - **Convergent Proof of Stake (CPoS)** - Energy-efficient consensus algorithm
-- **Immutable Data Structures** - Lattice-based structures optimized for decentralized systems
+- **Immutable Data Structures** - Lattice-based structures optimised for decentralised systems
 - **Etch Database** - High-performance persistent storage layer
 - **Cryptography** - Ed25519 signatures and secure hashing utilities
 
@@ -21,14 +21,14 @@ The foundational library for the [Convex](https://convex.world) decentralized ne
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-core</artifactId>
-    <version>0.8.2</version>
+    <version>0.8.4</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-core:0.8.2'
+implementation 'world.convex:convex-core:0.8.4'
 ```
 
 ## Usage

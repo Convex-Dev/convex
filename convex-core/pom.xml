@@ -5,12 +5,12 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.4</version>
+		<version>0.8.5-SNAPSHOT</version>
 	</parent>
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
-		<bc.version>1.83</bc.version>
+		<bc.version>1.84</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 

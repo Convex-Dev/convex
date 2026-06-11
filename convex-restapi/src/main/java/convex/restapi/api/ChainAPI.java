@@ -781,7 +781,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST,
 			operationId = "transactionPrepare",
 			tags= {"Transactions"},
-			summary="Prepare a Convex transaction. If sucessful, will return an encoding to be signed.",
+			summary="Prepare a Convex transaction. If successful, will return an encoding to be signed.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction preparation request",
 					content= {

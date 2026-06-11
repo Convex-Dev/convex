@@ -451,11 +451,10 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning());
 
-		// Set a value and sync so it flows through the propagator pipeline
+		// Set a value and sync so it flows through the propagator pipeline.
+		// Synchronous commit: announce + setRootData run on this thread.
 		maxNodeServer.getCursor().set(CVMLong.create(42));
 		maxNodeServer.getCursor().sync();
-		// Wait for propagator to process (async)
-		Thread.sleep(100);
 		
 		// Get the server address
 		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
@@ -696,12 +695,16 @@ public class NodeServerTest {
 				// Fire-and-forget: LATTICE_VALUE has no request ID, no response expected
 				convex.message(msg);
 
-				// Wait for the chain: message delivery → merge → internal sync → propagator
-				// Keep connection open during wait — closing too early can drop unsent data
+				// Wait for network delivery. With synchronous commit, once
+				// processLatticeValue runs on the netty thread, the merge and
+				// the resulting sync (including primary announce) all complete
+				// before the netty handler returns — so we just wait for the
+				// message to arrive. Keep connection open: closing too early
+				// can drop unsent data.
 				long deadline = System.currentTimeMillis() + 3000;
 				while (System.currentTimeMillis() < deadline) {
 					if (propagator.getLastAnnouncedValue() != null) break;
-					Thread.sleep(50);
+					Thread.sleep(10);
 				}
 			} finally {
 				convex.close();
@@ -747,15 +750,9 @@ public class NodeServerTest {
 			// Local write path: set value directly on cursor, then sync explicitly.
 			// This is how application code drives the node — sync() is the caller's
 			// responsibility (unlike the incoming message path which syncs internally).
+			// Synchronous commit: sync() returns after the primary's announce.
 			node.getCursor().set(CVMLong.create(42));
 			node.getCursor().sync();
-
-			// Wait for propagator to process
-			long deadline = System.currentTimeMillis() + 3000;
-			while (System.currentTimeMillis() < deadline) {
-				if (propagator.getLastAnnouncedValue() != null) break;
-				Thread.sleep(50);
-			}
 
 			// Explicit sync should always work — this is the control
 			assertNotNull(propagator.getLastAnnouncedValue(),

@@ -921,8 +921,17 @@ public class Server implements Closeable {
 		}
 	}
 
+	/**
+	 * Waits for the Server to shut down (i.e. {@link #isRunning()} becoming false).
+	 *
+	 * @throws InterruptedException if the calling thread is interrupted, including if the
+	 *         interrupt flag is already set on entry. This guarantees callers see an
+	 *         interrupt as an exception rather than a silent return, so an interrupt
+	 *         cannot be mistaken for a completed shutdown.
+	 */
 	public void waitForShutdown() throws InterruptedException {
-		while (isRunning()&&!Thread.currentThread().isInterrupted()) {
+		while (isRunning()) {
+			// Note: throws immediately if the interrupt flag is already set
 			Thread.sleep(1000);
 		}
 	}

@@ -244,6 +244,7 @@ These options work with most commands:
 | `--key` | `CONVEX_KEY` | Public key (prefix) in keystore |
 | `--keypass` | `CONVEX_KEY_PASSWORD` | Key encryption password |
 | `--keystore` | `CONVEX_KEYSTORE` | Keystore file path |
+| `--storepass` | `CONVEX_KEYSTORE_PASSWORD` | Keystore integrity password |
 | `-n, --noninteractive` | - | Disable interactive prompts |
 | `-S, --strict-security` | - | Require explicit passwords |
 | `-v, --verbose` | `CONVEX_VERBOSE_LEVEL` | Verbosity (0-5) |

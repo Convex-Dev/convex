@@ -160,6 +160,29 @@ public class DLFSNode {
 		return (!isDirectory(node)&&!isRegularFile(node));
 	}
 
+	/**
+	 * Returns true iff the directory node has no live (non-tombstone) entries.
+	 *
+	 * <p>The raw entries map preserves tombstones for deleted children so they
+	 * can be merged across replicas (CRDT semantics). From the filesystem's
+	 * point of view those entries are gone, so emptiness must be measured
+	 * over live entries only.</p>
+	 *
+	 * @param dirNode Node assumed to be a directory
+	 * @return true if {@code dirNode} is a directory with no live children
+	 *         (or not a directory at all — caller decides whether to treat
+	 *         that as a precondition)
+	 */
+	public static boolean isEmpty(AVector<ACell> dirNode) {
+		Index<AString, AVector<ACell>> entries = getDirectoryEntries(dirNode);
+		if (entries == null || entries.isEmpty()) return true;
+		long n = entries.count();
+		for (long i = 0; i < n; i++) {
+			if (!isTombstone(entries.entryAt(i).getValue())) return false;
+		}
+		return true;
+	}
+
 	private static AVector<ACell> lastTombstone=TOMBSTONE;
 	public static AVector<ACell> createTombstone(CVMLong timestamp) {
 		AVector<ACell> last=lastTombstone;

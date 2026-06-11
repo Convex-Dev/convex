@@ -5,6 +5,8 @@
 
 The official Java SDK for building applications on the [Convex](https://convex.world) decentralised lattice network.
 
+This module provides `ConvexJSON`, a lightweight client that talks to any Convex peer exposing the REST API (for example a local peer, or a public testnet). It speaks JSON over HTTPS, so it works through firewalls and proxies and is the recommended starting point for most applications.
+
 ## 📚 Documentation
 
 **Official documentation is available at [docs.convex.world/docs/tutorial/client-sdks/java](https://docs.convex.world/docs/tutorial/client-sdks/java)**
@@ -22,57 +24,92 @@ The official Java SDK for building applications on the [Convex](https://convex.w
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-java</artifactId>
-    <version>0.8.2</version>
+    <version>0.8.4</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-java:0.8.2'
+implementation 'world.convex:convex-java:0.8.4'
 ```
 
 ## Quick Start
 
 ### Connect to the Network
 
+`ConvexJSON.connect(url)` opens a REST client against a peer. No account is set up
+until you provide one (or create a new one).
+
 ```java
-import convex.api.Convex;
+import convex.java.ConvexJSON;
 
 // Connect to a public testnet (or run a local peer for development)
-Convex convex = Convex.connect("https://mikera1337-convex-testnet.hf.space");
+ConvexJSON convex = ConvexJSON.connect("https://mikera1337-convex-testnet.hf.space");
 ```
 
 ### Create an Account
 
 ```java
-// Request a new account with test funds (up to 10,000,000 copper coins)
-convex.useNewAccount(10_000_000);
+import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 
-// Access your key pair (required for signing transactions)
+// Request a new account funded from the test faucet (up to 10,000,000 copper).
+// The connection is set to use this account for subsequent transactions.
+Address address = convex.useNewAccount(10_000_000);
+
+// Access the generated key pair (required for signing transactions)
 AKeyPair keyPair = convex.getKeyPair();
 ```
 
 ### Execute Queries
 
-Queries are read-only operations that don't modify state:
+Queries are read-only operations that don't modify state and are free to run. The
+result is returned as a JSON map; the computed value is under the `"value"` key (an
+`"errorCode"` key is present if the query failed).
 
 ```java
-// Query the current balance
-ACell result = convex.query("*balance*");
+import java.util.Map;
+
+// Query the current account's balance
+Map<String, Object> result = convex.query("*balance*");
+System.out.println("Balance: " + result.get("value"));
 ```
 
 ### Submit Transactions
 
-Transactions modify on-chain state and require a funded account:
+Transactions modify on-chain state and require a funded account with a key pair set
+(see "Create an Account" above). They are signed locally and return the same JSON
+map shape as queries.
 
 ```java
-// Transfer funds to another account
-ACell result = convex.transact("(transfer #42 1000000)");
+// Transfer coins to another account
+Map<String, Object> result = convex.transact("(transfer #11 1000000)");
+System.out.println("Result: " + result.get("value"));
 
-// Deploy a smart contract
-ACell result = convex.transact("(deploy '(do (defn greet [name] (str \"Hello, \" name))))");
+// Deploy a smart contract (only ^:callable functions are reachable from outside)
+Map<String, Object> deployed =
+    convex.transact("(deploy '(do (defn ^:callable greet [name] (str \"Hello, \" name))))");
+System.out.println("Actor address: " + deployed.get("value"));
 ```
+
+### Asynchronous use
+
+Every blocking call has a non-blocking counterpart returning a
+`CompletableFuture<Map<String, Object>>`:
+
+```java
+convex.queryAsync("*balance*")
+      .thenAccept(r -> System.out.println("Balance: " + r.get("value")));
+
+convex.transactAsync("(def my-value 42)")
+      .thenAccept(r -> System.out.println("Result: " + r.get("value")));
+```
+
+> **Thread-safety:** `ConvexJSON` may be shared across threads, but avoid submitting
+> transactions for the *same account* concurrently — each transaction increments a
+> sequence number that can become mismatched under concurrent submission. Queries
+> have no such restriction.
 
 ## Key Concepts
 
@@ -81,8 +118,17 @@ ACell result = convex.transact("(deploy '(do (defn greet [name] (str \"Hello, \"
 | **Account** | Self-sovereign identity on Convex, identified by address (e.g., `#42`) |
 | **Key Pair** | Ed25519 cryptographic keys for signing transactions |
 | **Query** | Read-only operation, free to execute |
-| **Transaction** | State-changing operation, consumes juice (gas) |
+| **Transaction** | State-changing operation, consumes juice |
 | **Convex Lisp** | On-chain programming language for smart contracts |
+
+## Lower-level peer client
+
+For applications that need the binary peer protocol (lower latency, streaming,
+running an embedded peer), `convex-java` also pulls in [`convex-peer`](../convex-peer/),
+whose `convex.api.Convex` client connects directly to a peer and returns
+`CompletableFuture<convex.core.Result>` from its `query` / `transact` methods. Most
+applications should prefer `ConvexJSON` above; reach for `convex.api.Convex` only when
+you specifically need the binary transport.
 
 ## Building from Source
 
@@ -90,30 +136,6 @@ ACell result = convex.transact("(deploy '(do (defn greet [name] (str \"Hello, \"
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
 mvn install -pl convex-java -am
-```
-
-## Quick Example
-
-```java
-import convex.api.Convex;
-import convex.core.Result;
-import convex.core.crypto.AKeyPair;
-import convex.core.lang.Reader;
-
-// Connect to a public testnet
-Convex convex = Convex.connect("https://mikera1337-convex-testnet.hf.space");
-
-// Execute a query
-Result result = convex.query(Reader.read("(balance #13)")).get();
-System.out.println("Balance: " + result.getValue());
-
-// Use your account
-AKeyPair keyPair = AKeyPair.generate();
-convex.setKeyPair(keyPair);
-
-// Submit a transaction
-Result txResult = convex.transact(Reader.read("(def my-value 42)")).get();
-System.out.println("Result: " + txResult.getValue());
 ```
 
 ## Resources

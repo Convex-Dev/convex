@@ -105,7 +105,7 @@ public class KeyGenerate extends AKeyCommand {
 			}
 			return AKeyPair.create(h.toFlatBlob());
 		} else {
-			throw new CLIError(ExitCodes.USAGE,"Unsupprted key generation type: "+type);
+			throw new CLIError(ExitCodes.USAGE,"Unsupported key generation type: "+type);
 		}
 	}
 	

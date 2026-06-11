@@ -25,7 +25,7 @@ Unlike traditional blockchains, Convex is built on **Lattice Technology**, which
 - **Developer-friendly**: Write smart contracts in a powerful, functional Lisp that compiles and executes directly on-chain.
 - **Instant finality**: Transactions confirm in milliseconds with cryptographic guarantees.
 - **Truly scalable**: Lattice agreement eliminates the bottlenecks of linear blockchains.
-- **Sustainable by design**: Minimal energy footprint while maintaining full decentralization and security.
+- **Sustainable by design**: Minimal energy footprint while maintaining full decentralisation and security.
 
 Convex is the high-performance, eco-friendly backbone for the next generation of decentralised finance, agentic economies, self-sovereign ownership, and beyond.
 

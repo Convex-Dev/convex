@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -37,8 +38,10 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
+import convex.core.store.AStore;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 
@@ -199,22 +202,52 @@ public class TransactionHandler extends AThreadedComponent {
 			}
 		}
 
-		// Phase 2: Parallel signature verification — results cached on each SignedData
-		Peer.preValidateSignatures(toVerify);
+		// Phase 2: Parallel signature verification — results cached on each SignedData.
+		// Wrapped defensively: a MissingDataException from one tx's verification must not
+		// abort the whole batch. Any tx whose signature wasn't verified here will be
+		// re-checked individually in Phase 3 under per-tx exception handling.
+		try {
+			Peer.preValidateSignatures(toVerify);
+		} catch (Exception e) {
+			// Ignore — per-tx handling in Phase 3 produces correct per-client errors
+		}
 
-		// Phase 3: Check cached signature results and queue valid transactions.
+		// Phase 3: Check cached signature results, persist fully, queue valid transactions.
+		//
+		// Persisting each SignedData into the store at intake enforces the invariant that
+		// everything placed on transactionQueue is fully resolved in the local store.
+		// Block production can then never throw MissingDataException — faulty/incomplete
+		// transactions are rejected here with an immediate error to the client rather than
+		// stalling the peer when the block proposer walks the cell tree.
+		//
 		// Interest is registered BEFORE queuing so that result reporting can never
 		// race ahead of registration (the transaction becomes visible to
 		// BeliefPropagator as soon as it enters the queue).
 		// put() blocks if transactionQueue is full — this propagates backpressure:
 		// TransactionHandler blocks → stops draining txMessageQueue → txMessageQueue
 		// fills → connection-level backpressure kicks in → senders slow down.
+		AStore store=server.getStore();
 		for (int i=0; i<n; i++) {
 			SignedData<ATransaction> sd=sigs[i];
 			if (sd==null) continue; // already rejected in Phase 1
 			Message m=messages.get(i);
-			if (!sd.checkSignature()) {
-				m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+			try {
+				if (!sd.checkSignature()) {
+					m.returnResult(Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE).withSource(SourceCodes.PEER));
+					continue;
+				}
+				// Force full persistence of the SignedData cell tree. If any referenced
+				// cell is not present in the store (dangling Ref from a faulty or partial
+				// message) this throws MissingDataException before we queue the tx.
+				sd=Cells.persist(sd, store);
+			} catch (MissingDataException e) {
+				m.returnResult(Result.error(ErrorCodes.MISSING, Strings.create("Transaction data not available: "+e.getMissingHash())).withSource(SourceCodes.PEER));
+				continue;
+			} catch (IOException e) {
+				m.returnResult(Result.error(ErrorCodes.IO, Strings.create("IO error persisting transaction: "+e.getMessage())).withSource(SourceCodes.PEER));
+				continue;
+			} catch (Exception e) {
+				m.returnResult(Result.error(ErrorCodes.FORMAT, Strings.BAD_FORMAT).withSource(SourceCodes.PEER));
 				continue;
 			}
 			registerInterest(sd.getHash(), m);
@@ -369,9 +402,20 @@ public class TransactionHandler extends AThreadedComponent {
 			log.warn("Exception preparing new block",e);
 			return null;
 		} finally {
-			// clear in case of faulty transactions. 
+			// Defence in depth: if anything in block production threw, transactions may
+			// still be in newTransactions with registered interests. Clients must never
+			// hang — notify each interested client of the failure and clear interests
+			// before discarding. Phase 3 intake persistence is the primary guard that
+			// stops faulty transactions ever reaching here; this is a safety net.
 			if (!newTransactions.isEmpty()) {
-				log.warn("Discarded "+newTransactions.size()+ "potentially faulty / malicious transactions");
+				log.warn("Discarded "+newTransactions.size()+" potentially faulty / malicious transactions");
+				for (SignedData<ATransaction> sd : newTransactions) {
+					Hash h=sd.getHash();
+					Message m=interests.remove(h);
+					if (m!=null) {
+						m.returnResult(Result.error(ErrorCodes.PEER, Strings.create("Block production failed")).withSource(SourceCodes.PEER));
+					}
+				}
 				newTransactions.clear();
 			}
 		}

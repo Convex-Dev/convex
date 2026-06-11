@@ -2,7 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-gui.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-A full-featured desktop application for developers and power users working with the [Convex](https://convex.world) decentralized network.
+A full-featured desktop application for developers and power users working with the [Convex](https://convex.world) decentralised network.
 
 ![Screenshot](docs/images/convex-desktop.png)
 
@@ -11,7 +11,7 @@ A full-featured desktop application for developers and power users working with 
 - **Transaction Execution** - Submit transactions and queries to Convex networks
 - **Wallet Management** - Secure key generation and account management
 - **Local Network** - Run a local Convex peer cluster for development
-- **Network Visualization** - Real-time view of CPoS consensus and messaging
+- **Network Visualisation** - Real-time view of CPoS consensus and messaging
 - **Testing Tools** - Simulations and stress testing capabilities
 
 ## Quick Start

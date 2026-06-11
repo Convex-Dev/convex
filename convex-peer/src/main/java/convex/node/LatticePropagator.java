@@ -31,6 +31,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
+import convex.lattice.cursor.Root;
 
 /**
  * Self-contained component for propagating lattice values.
@@ -128,34 +129,63 @@ public class LatticePropagator implements Closeable {
 	private long persistInterval = 30_000L;
 
 	/**
-	 * Last value that was announced to the store
+	 * Cursor holding the last value announced to this propagator's store.
+	 *
+	 * <p>This is the propagator's cached view of what it has published — the
+	 * filtered, store-backed snapshot it most recently announced. LATTICE_QUERY
+	 * responses are served from this cursor, so peers only see data this
+	 * propagator has actually committed (and whose cells the store can resolve
+	 * via DATA_REQUEST).
+	 *
+	 * <p>Each propagator owns its own announced cursor; secondary propagators
+	 * with filters publish a different (filtered) view from the primary, which
+	 * is the security boundary for cross-propagator data segregation.
 	 */
-	private ACell lastAnnouncedValue;
+	private final Root<ACell> announcedCursor = new Root<>();
 
 	/**
-	 * Last value that was triggered (used for periodic root sync)
+	 * Last value that was triggered (used for periodic root sync). Volatile
+	 * because it may be written by the caller's thread (synchronous commit
+	 * path) and read by the background propagation thread.
 	 */
 	private volatile ACell lastTriggeredValue;
 
 	/**
-	 * Timestamp of last broadcast
+	 * Timestamp of last broadcast. Volatile for cross-thread visibility — the
+	 * caller's thread (synchronous commit path) and the background propagation
+	 * thread may both read and write this.
 	 */
-	private long lastBroadcastTime = 0L;
+	private volatile long lastBroadcastTime = 0L;
 
 	/**
-	 * Timestamp of last root sync broadcast
+	 * Timestamp of last root sync broadcast (background thread only).
 	 */
 	private long lastRootSyncTime = 0L;
 
 	/**
-	 * Count of broadcasts sent
+	 * Count of broadcasts sent. Atomic because both the caller's thread and
+	 * the background thread may increment.
 	 */
-	private long broadcastCount = 0L;
+	private final java.util.concurrent.atomic.AtomicLong broadcastCount = new java.util.concurrent.atomic.AtomicLong();
 
 	/**
 	 * Count of root sync broadcasts sent
 	 */
 	private long rootSyncCount = 0L;
+
+	/**
+	 * Serialises all store-writing pipelines through this propagator. The
+	 * propagator is the sole live writer of {@code setRootData} on its store
+	 * (see {@code PERSISTENCE.md} — sole-writer invariant), and pipelines
+	 * must not interleave: an older snapshot's {@code setRootData} landing
+	 * after a newer snapshot's would silently demote the root pointer and
+	 * break the durability promise of {@code cursor.sync()}. {@link
+	 * #processSnapshot} and {@link #persist} both acquire this lock so the
+	 * caller's thread (sync hook), the background propagation thread (pull,
+	 * drain), and explicit persistence calls run their full pipelines
+	 * sequentially.
+	 */
+	private final Object writeLock = new Object();
 
 	/**
 	 * Creates a new LatticePropagator with the given store and connection manager.
@@ -277,8 +307,13 @@ public class LatticePropagator implements Closeable {
 	}
 
 	public boolean isRunning() { return running; }
-	public long getBroadcastCount() { return broadcastCount; }
-	public ACell getLastAnnouncedValue() { return lastAnnouncedValue; }
+	public long getBroadcastCount() { return broadcastCount.get(); }
+	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
+	/**
+	 * Cursor holding the last value announced by this propagator. See
+	 * {@link #announcedCursor} for ownership and security semantics.
+	 */
+	public Root<ACell> getAnnouncedCursor() { return announcedCursor; }
 	public long getLastBroadcastTime() { return lastBroadcastTime; }
 	public long getLastRootSyncTime() { return lastRootSyncTime; }
 	public long getRootSyncCount() { return rootSyncCount; }
@@ -295,10 +330,11 @@ public class LatticePropagator implements Closeable {
 		}
 
 		running = true;
-		lastAnnouncedValue = null;
+		announcedCursor.set(null);
 		lastTriggeredValue = null;
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
+		broadcastCount.set(0L);
 
 		propagationThread = new Thread(this::propagationLoop, "Lattice propagator thread");
 		propagationThread.setDaemon(true);
@@ -393,7 +429,7 @@ public class LatticePropagator implements Closeable {
 				}
 
 				if (value != null) {
-					processValue(value);
+					processSnapshotSafe(value);
 				}
 
 				// Periodic root sync only while running
@@ -405,7 +441,7 @@ public class LatticePropagator implements Closeable {
 				// Drain remaining items before exiting
 				ACell remaining;
 				while ((remaining = triggerQueue.poll()) != null) {
-					processValue(remaining);
+					processSnapshotSafe(remaining);
 				}
 				break;
 			} catch (Exception e) {
@@ -414,6 +450,20 @@ public class LatticePropagator implements Closeable {
 			}
 		}
 		log.debug("LatticePropagator loop ended");
+	}
+
+	/**
+	 * Background-thread wrapper around {@link #processSnapshot}. IOException
+	 * is logged rather than propagated — the background path is best-effort
+	 * (callers who need durability errors should call {@link #processSnapshot}
+	 * directly).
+	 */
+	private void processSnapshotSafe(ACell value) {
+		try {
+			processSnapshot(value);
+		} catch (IOException e) {
+			log.warn("Error processing lattice value", e);
+		}
 	}
 
 	/**
@@ -429,9 +479,22 @@ public class LatticePropagator implements Closeable {
 	 * setRootData is gated by {@link #persistInterval}. The merge callback
 	 * is gated by whether it was set (primary propagator only). Broadcast
 	 * is gated by peer existence and minimum delay.
+	 *
+	 * <p>Callable from any thread. The background propagation loop calls this
+	 * for queued triggers; for synchronous commit, NodeServer's sync callback
+	 * calls this directly on the caller's thread for the primary propagator.
+	 * Pipelines are serialised by {@link #writeLock} — see field javadoc for
+	 * the sole-writer invariant.
+	 *
+	 * @param value Snapshot to process (must not be null)
+	 * @return The announced (store-backed) value
+	 * @throws IOException If announce or setRootData fails
 	 */
-	private void processValue(ACell value) {
-		try {
+	public ACell processSnapshot(ACell value) throws IOException {
+		synchronized (writeLock) {
+			// Track latest snapshot for periodic root sync (used by background thread)
+			lastTriggeredValue = value;
+
 			// 1. Announce to store (writes cells, collects novelty for delta)
 			ArrayList<ACell> novelty = new ArrayList<>();
 			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
@@ -461,13 +524,11 @@ public class LatticePropagator implements Closeable {
 				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
 				connectionManager.broadcast(message);
 				lastBroadcastTime = currentTime;
-				broadcastCount++;
+				broadcastCount.incrementAndGet();
 			}
 
-			lastAnnouncedValue = value;
-
-		} catch (IOException e) {
-			log.warn("Error processing lattice value", e);
+			announcedCursor.set(value);
+			return value;
 		}
 	}
 
@@ -506,12 +567,14 @@ public class LatticePropagator implements Closeable {
 	void persist(ACell value) {
 		if (value == null) return;
 		if (!store.isPersistent()) return;
-		try {
-			value = Cells.announce(value, r -> {}, store);
-			store.setRootData(value);
-			log.debug("Persisted lattice snapshot to store");
-		} catch (IOException e) {
-			log.warn("Error persisting lattice snapshot", e);
+		synchronized (writeLock) {
+			try {
+				value = Cells.announce(value, r -> {}, store);
+				store.setRootData(value);
+				log.debug("Persisted lattice snapshot to store");
+			} catch (IOException e) {
+				log.warn("Error persisting lattice snapshot", e);
+			}
 		}
 	}
 
@@ -613,6 +676,6 @@ public class LatticePropagator implements Closeable {
 		}
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenApply(v -> lastAnnouncedValue);
+			.thenApply(v -> announcedCursor.get());
 	}
 }

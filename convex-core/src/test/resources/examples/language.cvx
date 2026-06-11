@@ -5,7 +5,7 @@
 => [1 2 3 4]
 
 ;; Define a Function
-(def square [x]
+(defn square [x]
   (* x x))
 
 (square 10)

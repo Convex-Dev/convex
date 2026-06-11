@@ -68,7 +68,7 @@ public class PeerStart extends APeerCommand {
 	private String baseURL;
 
 	
-	@Option(names = { "--norest" }, description = "Disable REST srever.")
+	@Option(names = { "--norest" }, description = "Disable REST server.")
 	private boolean norest;
 	
 	@Option(names = { "--recalc" }, description = "Recalculate state from the specified block position onwards.")
@@ -106,7 +106,7 @@ public class PeerStart extends APeerCommand {
 		}
 		
 		// In strict mode, we insist on a peer key
-		paranoia("--peer-key not sepcified");
+		paranoia("--peer-key not specified");
 		
 		log.debug("--peer-key not available, attempting to infer from store");
 		try {
@@ -136,7 +136,7 @@ public class PeerStart extends APeerCommand {
 			AKeyPair genesisKey=null;
 			if (genesis!=null&&(!genesis.isEmpty())) {
 				// Using a genesis seed for testing
-				paranoia("Should't use Genesis Seed in strict security mode! Consider key compromised!");
+				paranoia("Shouldn't use Genesis Seed in strict security mode! Consider key compromised!");
 				Blob seed=Blob.parse(genesis);
 				if (seed==null) {
 					throw new CLIError("Genesis seed must be 32 byte hex blob");

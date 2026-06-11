@@ -260,7 +260,7 @@ public class Main extends ACommand {
 				commandLine.setOut(pw);
 			}
 		} catch (IOException e) {
-			throw new CLIError("Unavble to open output file: "+outFile);
+			throw new CLIError("Unable to open output file: "+outFile);
 		}
 	}
 
