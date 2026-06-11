@@ -39,7 +39,6 @@ public class PeerAdminAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "peer/shutdown", 
-			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			operationId = "shutdownPeer", 
 			tags = { "Admin"},

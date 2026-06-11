@@ -136,7 +136,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Data Lattice"},
 			summary = "Get data from the server with the specified hash", 
@@ -167,7 +166,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 	
 	@OpenApi(path = ROUTE + "data/encode", 
-			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			tags = { "Data Lattice"},
 			summary = "Encode data in CAD3 multi-cell format", 
@@ -226,7 +224,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 	
 	@OpenApi(path = ROUTE + "data/decode", 
-			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			tags = { "Data Lattice"},
 			summary = "Decode CAD3 data", 
@@ -277,7 +274,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "tx", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Transactions"},
 			summary = "Get transaction by hash", 
@@ -335,7 +331,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "blocks", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Blocks"},
 			summary = "Get blocks with pagination", 
@@ -440,7 +435,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "blocks/{blockNum}", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Blocks"},
 			summary = "Get a specific block by block number", 
@@ -504,7 +498,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "status", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Peer"},
 			summary = "Get the status map from the peer server. Can be used as a heartbeat check to ensure the peer is still running.", 
@@ -557,7 +550,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 
-			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			operationId = "createAccount", 
 			tags = { "Account"},
@@ -612,7 +604,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "accounts/{address}", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			operationId = "queryAccount", 
 			tags = { "Account"},
@@ -706,7 +697,6 @@ public class ChainAPI extends ABaseAPI {
 	public static final Keyword K_FAUCET=Keyword.intern("faucet");
 	
 	@OpenApi(path = ROUTE + "faucet", 
-			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			operationId = "faucetRequest", 
 			tags = { "Account"},
@@ -777,7 +767,6 @@ public class ChainAPI extends ABaseAPI {
 
 
 	@OpenApi(path = ROUTE+"transaction/prepare",
-			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transactionPrepare",
 			tags= {"Transactions"},
@@ -852,7 +841,6 @@ public class ChainAPI extends ABaseAPI {
 
 	@SuppressWarnings("unchecked")
 	@OpenApi(path = ROUTE+"transact",
-			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transact",
 			tags= {"Transactions"},
@@ -973,7 +961,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE+"transaction/submit",
-			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transactionSubmit",
 			tags= {"Transactions"},
@@ -1055,7 +1042,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE+"query",
-		versions="peer-v1",
 		methods = HttpMethod.POST,
 		operationId = "query",
 		tags= {"Transactions"},
@@ -1133,7 +1119,6 @@ public class ChainAPI extends ABaseAPI {
 	}
 	
 	@OpenApi(path = "/identicon/{hex}", 
-			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			tags = { "Utility"},
 			summary = "Get the identicon for a hash / public key", 
