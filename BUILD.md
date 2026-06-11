@@ -38,6 +38,13 @@ mvn -B clean install
 
 All tests must pass, including headless (no GUI) — the CI server runs on headless Linux.
 
+Also confirm the latest CI run on `develop` is green before proceeding (a local build
+does not exercise the headless-Linux environment the release workflow uses):
+
+```bash
+gh run list --branch develop --limit 1
+```
+
 ### 2. Update CHANGELOG
 
 - Rename the `## [X.Y.Z-SNAPSHOT] - Unreleased` heading to `## [X.Y.Z] - YYYY-MM-DD` (exact format — the release workflow parses the section header by `## [<version>]`, so the tag and heading must match).
@@ -57,7 +64,7 @@ The `pull --ff-only` on both branches ensures you're not merging a stale local d
 ### 4. Set version
 
 ```bash
-mvn versions:set -DnewVersion='0.8.4'
+mvn versions:set -DnewVersion='0.8.4' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 ```
 
@@ -77,11 +84,17 @@ As part of the same version-bump commit, also update:
   grep -rl --include=README.md "<previous-version>" . | xargs sed -i 's/<previous-version>/<new-version>/g'
   ```
 
-### 5. Smoke test the built jar
+### 5. Rebuild and smoke test the built jar
+
+**Rebuild first** — the jar from step 1 was built *before* `versions:set`, so it still
+carries the snapshot version. Smoke-testing it would validate the wrong artifact:
 
 ```bash
+mvn -B clean install
 java -jar convex-integration/target/convex.jar --version
 ```
+
+Verify the reported version is the release version (e.g. `0.8.4`, not `-SNAPSHOT`).
 
 Quick last-line-of-defence check: the uberjar launches, main class resolves, CLI wiring is intact. Maven Central publishes are irrevocable, so catch uberjar class-path regressions now.
 
@@ -140,7 +153,7 @@ This signs all artifacts with GPG and uploads to Maven Central via the Sonatype 
 ```bash
 git checkout develop
 git merge master --no-ff
-mvn versions:set -DnewVersion='0.8.5-SNAPSHOT'
+mvn versions:set -DnewVersion='0.8.5-SNAPSHOT' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycle (0.8.5-SNAPSHOT)"
 ```
 
