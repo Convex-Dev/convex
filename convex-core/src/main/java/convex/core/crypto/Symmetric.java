@@ -153,7 +153,7 @@ public class Symmetric {
 			kgen = KeyGenerator.getInstance(SYMMETRIC_KEY_ALGORITHM);
 			kgen.init(KEY_LENGTH);
 		} catch (NoSuchAlgorithmException e) {
-			throw new Panic("Key generator not initialised sucessfully", e);
+			throw new Panic("Key generator not initialised successfully", e);
 		}
 		SecretKey key = kgen.generateKey();
 		return key;

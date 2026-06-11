@@ -36,10 +36,13 @@ implementation 'world.convex:convex-restapi:0.8.4'
 
 ```java
 import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
+import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 
-// Connect to a peer
+// Launch a local peer and connect to it
+AKeyPair keyPair = AKeyPair.generate();
 Server peerServer = API.launchPeer();
 Convex convex = Convex.connect(peerServer, peerServer.getPeerController(), keyPair);
 

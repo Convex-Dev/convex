@@ -3,14 +3,14 @@
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-peer.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-peer/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-peer)
 
-Peer server implementation and networking layer for the [Convex](https://convex.world) decentralized network.
+Peer server implementation and networking layer for the [Convex](https://convex.world) decentralised network.
 
 ## Features
 
 - **Peer Server** - Full peer node implementation for participating in Convex consensus
 - **Binary Protocol** - Efficient binary messaging protocol for peer-to-peer communication
 - **Netty Networking** - High-performance async I/O for network operations
-- **State Synchronization** - Automatic state sync and belief propagation
+- **State Synchronisation** - Automatic state sync and belief propagation
 
 ## Installation
 
