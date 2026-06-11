@@ -46,8 +46,10 @@ public class LatticePropagatorTest {
 		store1 = new MemoryStore();
 		store2 = new MemoryStore();
 
-		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(19600));
-		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(19601));
+		// Port 0 = OS-assigned free ports, avoiding bind collisions on busy CI runners.
+		// Peer connections below use getHostAddress(), which reflects the actual ports.
+		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(0));
+		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(0));
 
 		// Launch both servers
 		server1.launch();

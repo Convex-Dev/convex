@@ -123,7 +123,15 @@ Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 
 #### If the release workflow fails
 
-Fix the underlying issue on master, then delete and re-push the tag:
+First check whether the failure is transient (e.g. a flaky test, runner hiccup) or a
+real problem with the commit. For a transient failure, re-run the failed jobs on the
+same tag — no tag surgery needed:
+
+```bash
+gh run rerun <run-id> --failed
+```
+
+For a real problem, fix the underlying issue on master, then delete and re-push the tag:
 
 ```bash
 # Delete locally and on remote
