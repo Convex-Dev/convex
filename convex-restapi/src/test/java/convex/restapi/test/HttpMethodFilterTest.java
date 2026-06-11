@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Javalin 7 resolves methods via HandlerType.findOrCreate, which throws
  * for any token containing characters outside A-Z. The HttpMethodFilter
- * must convert these to a clean 400 rather than a 500 with a logged
+ * must convert these to a clean 501 rather than a 500 with a logged
  * exception, while well-formed unknown methods fall through to routing.</p>
  */
 public class HttpMethodFilterTest extends ARESTTest {
@@ -33,10 +33,10 @@ public class HttpMethodFilterTest extends ARESTTest {
 	}
 
 	@Test
-	public void testMalformedMethodsReturn400() throws Exception {
-		assertEquals(400, statusOf("M-SEARCH", HOST_PATH + "/"));
-		assertEquals(400, statusOf("VERSION-CONTROL", API_PATH + "/status"));
-		assertEquals(400, statusOf("propfind", HOST_PATH + "/"));
+	public void testMalformedMethodsReturn501() throws Exception {
+		assertEquals(501, statusOf("M-SEARCH", HOST_PATH + "/"));
+		assertEquals(501, statusOf("VERSION-CONTROL", API_PATH + "/status"));
+		assertEquals(501, statusOf("propfind", HOST_PATH + "/"));
 	}
 
 	@Test

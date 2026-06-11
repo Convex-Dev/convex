@@ -23,7 +23,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * which throws for any name containing characters outside A-Z. Without this
  * guard, such requests (e.g. M-SEARCH probes or lowercase method tokens
  * from scanners) produce a 500 response and a logged exception per request
- * on a public endpoint. With it they get a clean 400 Bad Request before
+ * on a public endpoint. With it they get a clean 501 Not Implemented —
+ * the RFC 9110 response for an unrecognised request method — before
  * reaching Javalin. Well-formed but unknown methods (e.g. FOOBAR) pass
  * through to normal routing and 404 if nothing matches.</p>
  */
@@ -46,7 +47,7 @@ public class HttpMethodFilter implements Filter {
 	public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
 			throws IOException, ServletException {
 		if (request instanceof HttpServletRequest req && !isValidMethod(req.getMethod())) {
-			((HttpServletResponse) response).setStatus(400);
+			((HttpServletResponse) response).setStatus(501);
 			return;
 		}
 		chain.doFilter(request, response);
