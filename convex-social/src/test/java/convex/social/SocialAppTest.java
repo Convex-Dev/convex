@@ -51,10 +51,10 @@ public class SocialAppTest {
 		Social social = Social.create(kp);
 		Feed feed = social.user(kp.getAccountKey()).feed();
 
+		// No delay between posts: same-millisecond posts must still get
+		// distinct keys (Feed bumps the timestamp on collision)
 		Blob k1 = feed.post("First");
-		Thread.sleep(1); // ensure distinct timestamp keys
 		Blob k2 = feed.post("Second");
-		Thread.sleep(1);
 		Blob k3 = feed.post("Third");
 
 		assertEquals(3, feed.count());
@@ -145,9 +145,9 @@ public class SocialAppTest {
 
 		// Post in the original
 		social.user(key).feed().post("Before fork");
-		Thread.sleep(1); // ensure distinct timestamp key
 
-		// Fork, post in fork
+		// Fork, post in fork (fork copies the feed, so a same-millisecond post
+		// gets a bumped key rather than colliding with "Before fork")
 		Social forked = social.fork();
 		Blob forkedKey = forked.user(key).feed().post("In fork");
 

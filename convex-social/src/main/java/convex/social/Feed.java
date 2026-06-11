@@ -1,5 +1,7 @@
 package convex.social;
 
+import java.util.function.LongFunction;
+
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
@@ -40,11 +42,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 * @return The 8-byte timestamp key assigned to the post
 	 */
 	public Blob post(String text) {
-		long ts = System.currentTimeMillis();
-		Blob key = SocialPost.createKey(ts);
-		AHashMap<Keyword, ACell> post = SocialPost.createPost(text, ts);
-		cursor.updateAndGet(feed -> feed.assoc(key, post));
-		return key;
+		return addEntry(ts -> SocialPost.createPost(text, ts));
 	}
 
 	/**
@@ -56,11 +54,36 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 * @return The 8-byte timestamp key assigned to this reply
 	 */
 	public Blob reply(String text, Blob parentKey, AccountKey parentAuthor) {
-		long ts = System.currentTimeMillis();
-		Blob key = SocialPost.createKey(ts);
-		AHashMap<Keyword, ACell> post = SocialPost.createReply(text, ts, parentKey, parentAuthor);
-		cursor.updateAndGet(feed -> feed.assoc(key, post));
-		return key;
+		return addEntry(ts -> SocialPost.createReply(text, ts, parentKey, parentAuthor));
+	}
+
+	/**
+	 * Adds a new entry to the feed under a unique timestamp key.
+	 *
+	 * <p>Keys are millisecond timestamps, so two entries created in the same
+	 * millisecond would otherwise collide and the later one silently overwrite
+	 * the earlier (LWW data loss). On collision the timestamp is bumped until a
+	 * free key is found — a new entry never replaces an existing one. The check
+	 * runs inside the atomic cursor update, so it holds across Feed instances
+	 * and concurrent posts on the same cursor.
+	 *
+	 * @param entryFn Creates the entry record for the (possibly bumped) timestamp
+	 * @return The 8-byte timestamp key assigned to the entry
+	 */
+	private Blob addEntry(LongFunction<AHashMap<Keyword, ACell>> entryFn) {
+		Blob[] keyHolder = new Blob[1];
+		cursor.updateAndGet(feed -> {
+			long ts = System.currentTimeMillis();
+			Blob key = SocialPost.createKey(ts);
+			while (feed != null && feed.get(key) != null) {
+				ts++;
+				key = SocialPost.createKey(ts);
+			}
+			keyHolder[0] = key;
+			AHashMap<Keyword, ACell> entry = entryFn.apply(ts);
+			return feed.assoc(key, entry);
+		});
+		return keyHolder[0];
 	}
 
 	/**

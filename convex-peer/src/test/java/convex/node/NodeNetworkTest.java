@@ -68,10 +68,6 @@ public class NodeNetworkTest {
 	 */
 	private static final int NETWORK_SIZE = 3;
 	
-	/**
-	 * Base port for the first NodeServer (others will use sequential ports)
-	 */
-	private static final int BASE_PORT = 19000;
 
 	/**
 	 * Sets up the network of NodeServers before all tests run.
@@ -96,9 +92,10 @@ public class NodeNetworkTest {
 			AStore store = new MemoryStore();
 			stores.add(store);
 			
-			// Create NodeServer with the common lattice
-			Integer port = BASE_PORT + i;
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(port));
+			// Create NodeServer with the common lattice. Port 0 = OS-assigned free
+			// port, avoiding bind collisions on busy CI runners; peer wiring below
+			// uses getHostAddress() which reflects the actual port.
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
 			nodeServers.add(server);
 			
 			// Launch the server

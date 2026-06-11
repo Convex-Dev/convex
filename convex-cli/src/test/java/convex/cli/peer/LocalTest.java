@@ -16,6 +16,8 @@ import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,7 +51,12 @@ public class LocalTest {
 	static final File TEMP_FILE;
 	private static final String KEYSTORE_FILENAME;
 
-	private static final int TEST_PORT = 28888; // avoid clash with something on 18888
+	/**
+	 * Actual port of the local test network peer, parsed from the "Peer ports:"
+	 * line printed by `local start`. Ports are auto-assigned (no fixed port) to
+	 * avoid bind collisions on busy CI runners.
+	 */
+	private static volatile int actualPort = -1;
 
 	private static final String bip39 = "miracle source lizard gun neutral year dust recycle drama nephew infant enforce";
 	private static final String bipPassphrase = "thisIsNotSecure";
@@ -107,7 +114,7 @@ public class LocalTest {
 		cmd.add("start");
 		cmd.add("--count=1");
 		cmd.add("--key=09a5");
-		cmd.add("--ports=" + TEST_PORT);
+		// No --ports: peers take auto-assigned ports, reported via "Peer ports:"
 
 		ProcessBuilder builder = new ProcessBuilder(cmd);
 		process = builder.start();
@@ -132,20 +139,32 @@ public class LocalTest {
 		checker.setDaemon(true);
 		checker.start();
 		checker.join(10000);
-		if (process.isAlive()) {
-			
-		} else {
-			fail("Local network did note start, with output:\n"+Strings.join("\n", outputList));
+		if (!process.isAlive()) {
+			fail("Local network did not start, with output:\n"+Strings.join("\n", outputList));
+		}
+
+		// Parse the actual auto-assigned port from the "Peer ports:" line
+		// (printed before "Started: 1", so already collected by the checker)
+		for (String line : outputList) {
+			Matcher m = PEER_PORTS_PATTERN.matcher(line);
+			if (m.find()) {
+				actualPort = Integer.parseInt(m.group(1));
+				break;
+			}
+		}
+		if (actualPort < 0) {
+			fail("Could not parse peer port from output:\n"+Strings.join("\n", outputList));
 		}
 	}
+
+	private static final Pattern PEER_PORTS_PATTERN = Pattern.compile("Peer ports: (\\d+)");
 
 	
 	@Test
 	public void testSync() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		Blob seed=Blobs.createRandom(32);
 		AKeyPair nkp=AKeyPair.create(seed);
-		int SYNCED_PORT=TEST_PORT+1;
-		
+
 		CLTester newKeyTester = CLTester.run("key", "import", "--type", "seed", "--storepass",
 				new String(KEYSTORE_PASSWORD), "--keystore", KEYSTORE_FILENAME, "--keypass", new String(KEY_PASSWORD),
 				"--text", seed.toString(), "--passphrase", bipPassphrase,"-v0");
@@ -161,8 +180,8 @@ public class LocalTest {
 				"--norest",
 				"--peer-keypass",new String(KEY_PASSWORD),
 				"--host", "localhost",
-				"--port",Integer.toString(TEST_PORT),
-				"--peer-port",Integer.toString(SYNCED_PORT)
+				"--port",Integer.toString(actualPort)
+				// no --peer-port: the syncing peer takes a random port (default 0)
 			);
 		syncTester.waitForStart(5000);
 		syncTester.interrupt();
@@ -173,7 +192,7 @@ public class LocalTest {
 	public void testProcess() throws IOException, TimeoutException, InterruptedException {
 		assertTrue(process.isAlive());
 
-		InetSocketAddress sa=new InetSocketAddress("localhost",TEST_PORT);
+		InetSocketAddress sa=new InetSocketAddress("localhost",actualPort);
 		Convex convex = ConvexRemote.connect(sa);
 		Result r=convex.requestStatusSync();
 		assertFalse(r.isError());

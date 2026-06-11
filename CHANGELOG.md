@@ -9,9 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- LatticePropagator: `nextAnnounce()` future for awaiting the next announced value, replacing the need to poll `getLastAnnouncedValue()`
+- CLI: `local start` now reports the actual peer ports in use (`Peer ports: ...`) — previously auto-assigned ports were not discoverable from the output
+
 ### Changed
 
 ### Fixed
+
+- Social: posts created in the same millisecond no longer collide on timestamp keys — previously the later post silently overwrote the earlier one
 
 ## [0.8.5] - 2026-06-11
 

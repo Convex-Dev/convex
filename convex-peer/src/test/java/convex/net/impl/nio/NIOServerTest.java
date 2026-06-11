@@ -2,12 +2,14 @@ package convex.net.impl.nio;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
@@ -24,10 +26,10 @@ public class NIOServerTest {
 
 	@SuppressWarnings("deprecation")
 	@Test public void testNIOServer() throws IOException, TimeoutException, InterruptedException {
-		ArrayList<Message> recd=new ArrayList<Message>();
-		Consumer<Message> rec=m->{
-			recd.add(m);
-		};
+		// Thread-safe queue: messages arrive on server threads, and poll(timeout)
+		// gives us something to wait on rather than sleep-polling a plain list
+		LinkedBlockingQueue<Message> recd=new LinkedBlockingQueue<>();
+		Consumer<Message> rec=recd::offer;
 		
 		try (NIOServer s = new NIOServer(rec)) {
 			s.launch();
@@ -44,10 +46,11 @@ public class NIOServerTest {
 			c.query(Keywords.BAR);
 			
 			int EXP=3;
-			while(recd.size()<EXP) {
-				Thread.sleep(10);
-			};
-			assertEquals(EXP,recd.size());
+			for (int i=0; i<EXP; i++) {
+				Message m=recd.poll(10, TimeUnit.SECONDS);
+				assertNotNull(m,"Timed out waiting for message "+(i+1)+" of "+EXP);
+			}
+			assertEquals(0,recd.size());
 		}
 	}
 }

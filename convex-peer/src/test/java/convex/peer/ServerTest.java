@@ -272,7 +272,6 @@ public class ServerTest {
 		
 		// Can query for initial foundation account, it has no environment
 		assertEquals(Maps.empty(),convex.querySync(Symbols.STAR_ENV,Init.RESERVE_ADDRESS).getValue());
-		// Thread.sleep(1000000000);
 	}
 
 	@Test

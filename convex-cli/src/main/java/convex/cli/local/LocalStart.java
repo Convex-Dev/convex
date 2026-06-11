@@ -127,12 +127,16 @@ public class LocalStart extends ALocalCommand {
 		inform("Starting local test network with "+count+" peer(s)");
 		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
 		int n=servers.size();
-		
+
+		// Report the actual ports in use: with auto-assigned ports this is the
+		// only way for users (and tests) to discover where the peers are listening
+		String portList=servers.stream().map(s->Integer.toString(s.getPort())).collect(Collectors.joining(","));
+		inform("Peer ports: "+portList);
 
 		launchRestAPI(servers.get(0));
-		
+
 		// informWarning("Failed to start REST server: "+t);
-		
+
 		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		cli().notifyStartup();
 		servers.get(0).waitForShutdown();
