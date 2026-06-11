@@ -2,7 +2,6 @@ package convex.restapi;
 
 import java.io.Closeable;
 import java.util.HashMap;
-import java.util.function.Consumer;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -38,6 +37,7 @@ import convex.restapi.api.X402;
 import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.auth.ConfirmationService;
 import convex.restapi.auth.OAuthService;
+import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
@@ -48,16 +48,15 @@ import convex.api.ContentTypes;
 import convex.core.util.JSON;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.HttpResponseException;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
-import io.javalin.openapi.OpenApiInfo;
-import io.javalin.openapi.plugin.DefinitionConfiguration;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
-import io.javalin.util.JavalinException;
+import io.javalin.util.JavalinBindException;
 
 /**
  * Operates a REST API server and web application connected to a local peer server
@@ -148,32 +147,32 @@ public class RESTServer implements Closeable {
 		return oauthService;
 	}
 
-	private void addAPIRoutes(Javalin app) {
+	private void addAPIRoutes(RoutesConfig routes) {
 		// Auth middleware — extracts identity from bearer token if present
 		AKeyPair peerKP = server.getKeyPair();
 		if (peerKP != null) {
 			PeerAuth peerAuth = new PeerAuth(peerKP);
 			authMiddleware = new AuthMiddleware(peerAuth);
-			app.before(authMiddleware.handler());
+			routes.before(authMiddleware.handler());
 		}
 
 		chainAPI = new ChainAPI(this);
-		chainAPI.addRoutes(app);
+		chainAPI.addRoutes(routes);
 
 		depAPI = new DepAPI(this);
-		depAPI.addRoutes(app);
+		depAPI.addRoutes(routes);
 		
 		peerAPI = new PeerAdminAPI(this);
-		peerAPI.addRoutes(app);
+		peerAPI.addRoutes(routes);
 
 		webApp = new WebApp(this);
-		webApp.addRoutes(app);
+		webApp.addRoutes(routes);
 
 		dlAPI = new DLAPI(this);
-		dlAPI.addRoutes(app);
+		dlAPI.addRoutes(routes);
 
 		explorerAPI = new ExplorerAPI(this);
-		explorerAPI.addRoutes(app);
+		explorerAPI.addRoutes(routes);
 
 		mcpServer = new McpServer(Maps.of(
 			"name", "convex-mcp",
@@ -181,56 +180,67 @@ public class RESTServer implements Closeable {
 			"version", Utils.getVersion()
 		));
 		mcpAPI = new McpAPI(this, mcpServer);
-		mcpServer.addRoutes(app);
-		mcpAPI.addRoutes(app);
+		mcpServer.addRoutes(routes);
+		mcpAPI.addRoutes(routes);
 
 		x402API = new X402(this);
-		x402API.addRoutes(app);
+		x402API.addRoutes(routes);
 
 		didAPI = new DIDAPI(this);
-		didAPI.addRoutes(app);
+		didAPI.addRoutes(routes);
 
 		confirmAPI = new ConfirmAPI(this);
-		confirmAPI.addRoutes(app);
+		confirmAPI.addRoutes(routes);
 
 		authPage = new AuthPage(this);
-		authPage.addRoutes(app);
+		authPage.addRoutes(routes);
 	}
 	
-	private Javalin buildApp(boolean useSSL) {
+	private Javalin buildApp(Integer port) {
+		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
 					// ?? corsConfig.allowCredentials=true;
-					
+
 					// replacement for enableCorsForAllOrigins()
 					corsConfig.anyHost();
 				});
 			});
-			
-			
+
+
 			addOpenApiPlugins(config);
 
 			config.staticFiles.add(staticFiles -> {
 				staticFiles.hostedPath = "/";
 				staticFiles.location = Location.CLASSPATH; // Specify resources from classpath
 				staticFiles.directory = "/convex/restapi/pub"; // Resource location in classpath
-				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory
-													// (optimization)
 				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (=
 												// ContextHandler.ApproveAliases())
 				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based
 																// on the HttpServletRequest
 			});
-			
-			config.useVirtualThreads=true;
+
+			config.concurrency.useVirtualThreads=true;
+
+			HttpMethodFilter.install(config);
+
+			config.jetty.addConnector((jettyServer, httpConfig) -> {
+				// 1 acceptor + 1 selector: request handling uses virtual threads
+				ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
+				connector.setPort(bindPort);
+				return connector;
+			});
+
+			addHandlers(config.routes);
 		});
-		
+		return app;
+	}
 
-
+	private void addHandlers(RoutesConfig routes) {
 		// Custom handler for HTTP error responses (BadRequestResponse, NotFoundResponse, etc.)
 		// Produces consistent output in the requested content type: {:error "message"} or {"error":"message"}
-		app.exception(HttpResponseException.class, (e, ctx) -> {
+		routes.exception(HttpResponseException.class, (e, ctx) -> {
 			ctx.status(e.getStatus());
 			String msg=e.getMessage();
 			if (msg==null) msg="Error";
@@ -254,15 +264,15 @@ public class RESTServer implements Closeable {
 			}
 		});
 
-		app.exception(Exception.class, (e, ctx) -> {
+		routes.exception(Exception.class, (e, ctx) -> {
 			e.printStackTrace();
 			String message = "Unexpected error: " + e;
 			ctx.result(message);
 			ctx.status(500);
 		});
-		
-		
-		app.options("/*", ctx-> {
+
+
+		routes.options("/*", ctx-> {
 			ctx.status(204); // No context#
 			ctx.removeHeader("Content-type");
 			ctx.header("access-control-allow-headers", "content-type");
@@ -272,7 +282,7 @@ public class RESTServer implements Closeable {
 		});
 		
 		// Header to every response
-		app.afterMatched(ctx->{
+		routes.afterMatched(ctx->{
 			// Reflect CORS origin
 			String origin = ctx.req().getHeader("Origin");
 			if (origin!=null) {
@@ -282,8 +292,7 @@ public class RESTServer implements Closeable {
 			}
 		});
 
-		addAPIRoutes(app);	
-		return app;
+		addAPIRoutes(routes);
 	}
 
 
@@ -294,26 +303,26 @@ public class RESTServer implements Closeable {
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
             pluginConfig
             .withDocumentationPath(docsPath)
-            .withDefinitionConfiguration((version, definition) -> {
-            	DefinitionConfiguration def=definition;
-                def=def.withInfo((Consumer <OpenApiInfo>)
-                		info -> {
-							info.setTitle("Convex REST API");
-							info.setVersion(Utils.getVersion());
-		                });
+            .withDefinitionConfiguration((version, schema) -> {
+                schema.info(info -> {
+					info.title("Convex REST API");
+					info.version(Utils.getVersion());
+                });
             });
 		}));
 
 		config.registerPlugin(new SwaggerPlugin(swaggerConfiguration->{
-			swaggerConfiguration.setDocumentationPath(docsPath);
+			swaggerConfiguration.documentationPath = docsPath;
 		}));
 		config.registerPlugin(new ReDocPlugin(reDocConfiguration -> {
-	        reDocConfiguration.setDocumentationPath(docsPath);
+	        reDocConfiguration.documentationPath = docsPath;
 	    }));
 		
-		for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
-	        System.out.println(generatedJsonSchema.getName());
-	    }
+		if (log.isDebugEnabled()) {
+			for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
+				log.debug("Loaded JSON schema: {}", generatedJsonSchema.getName());
+			}
+		}
 	}
 
 
@@ -341,14 +350,6 @@ public class RESTServer implements Closeable {
 		return create(convex.getLocalServer());
 	}
 	
-	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer, Integer port) {
-		if (port==null) port=DEFAULT_PORT;
-		// 1 acceptor + 1 selector: request handling uses virtual threads
-		ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
-		connector.setPort(port);
-		jettyServer.addConnector(connector);
-	}
-
 	/**
 	 * Start app with default port
 	 */
@@ -362,23 +363,16 @@ public class RESTServer implements Closeable {
 	public synchronized void start(Integer port) {
 		close();
 		try {
-			javalin=buildApp(true);
-			start(javalin,port);
-		} catch (JavalinException e) {
+			javalin=buildApp(port);
+			javalin.start();
+		} catch (JavalinBindException e) {
 			if (port!=null) throw e; // only try again if port unspecified
-			log.warn("Specified port "+port+"already in use, chosing another at random");
+			log.warn("Default port "+DEFAULT_PORT+" already in use ("+e.getMessage()+"), choosing another at random");
 			close();
-			
-			port=0; // use random port
-			javalin=buildApp(false);
-			start(javalin,port);
+
+			javalin=buildApp(0); // use random port
+			javalin.start();
 		}
-	}
-	
-	protected void start(Javalin app, Integer port) {
-		org.eclipse.jetty.server.Server jettyServer=app.jettyServer().server();
-		setupJettyServer(jettyServer,port);
-		app.start();
 	}
 
 	public synchronized void close() {

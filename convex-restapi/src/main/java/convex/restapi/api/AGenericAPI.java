@@ -25,7 +25,7 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
@@ -37,9 +37,9 @@ public abstract class AGenericAPI {
 
 	/**
 	 * Add routes to the service
-	 * @param app Javalin instance to add routes to
+	 * @param routes Routes configuration to add routes to
 	 */
-	public abstract void addRoutes(Javalin app);
+	public abstract void addRoutes(RoutesConfig routes);
 	
 	public static String calcResponseContentType(Context ctx) {
 		Enumeration<String> accepts=ctx.req().getHeaders("Accept");

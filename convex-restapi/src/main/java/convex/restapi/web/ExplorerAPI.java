@@ -71,7 +71,7 @@ import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.mcp.McpAPI;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.NotFoundResponse;
@@ -100,23 +100,23 @@ public class ExplorerAPI extends AWebSite {
 	
 
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		String prefix = ROUTE;
-		app.get(prefix, this::showExplorer);
-		app.get(prefix+"blocks", this::showBlocks);
-		app.get(prefix+"blocks/{blockNum}", this::showBlock);
-		app.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
-		app.get(prefix+"states", this::showStates);
-		app.get(prefix+"states/{position}", this::showStatePage);
-		app.get(prefix+"accounts", this::showAccounts);
-		app.get(prefix+"accounts/{accountNum}", this::showAccount);
-		app.get(prefix+"peers", this::showPeers);
-		app.get(prefix+"peers/{peerKey}", this::showPeerDetail);
-		app.get(prefix+"connections", this::showConnections);
-		app.get(prefix+"mcp", this::showMcp);
-		app.get(prefix+"mcp/tools/{toolName}", this::showMcpTool);
-		app.get(prefix+"repl", this::showRepl);
-		app.post(prefix+"search", this::handleSearch);
+		routes.get(prefix, this::showExplorer);
+		routes.get(prefix+"blocks", this::showBlocks);
+		routes.get(prefix+"blocks/{blockNum}", this::showBlock);
+		routes.get(prefix+"blocks/{blockNum}/txs/{txNum}", this::showTransaction);
+		routes.get(prefix+"states", this::showStates);
+		routes.get(prefix+"states/{position}", this::showStatePage);
+		routes.get(prefix+"accounts", this::showAccounts);
+		routes.get(prefix+"accounts/{accountNum}", this::showAccount);
+		routes.get(prefix+"peers", this::showPeers);
+		routes.get(prefix+"peers/{peerKey}", this::showPeerDetail);
+		routes.get(prefix+"connections", this::showConnections);
+		routes.get(prefix+"mcp", this::showMcp);
+		routes.get(prefix+"mcp/tools/{toolName}", this::showMcpTool);
+		routes.get(prefix+"repl", this::showRepl);
+		routes.post(prefix+"search", this::handleSearch);
 	}
 	
 
