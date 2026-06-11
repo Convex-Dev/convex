@@ -2,7 +2,6 @@ package convex.restapi;
 
 import java.io.Closeable;
 import java.util.HashMap;
-import java.util.function.Consumer;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -53,7 +52,6 @@ import io.javalin.http.HttpResponseException;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
-import io.javalin.openapi.OpenApiInfo;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
@@ -197,7 +195,7 @@ public class RESTServer implements Closeable {
 		authPage.addRoutes(routes);
 	}
 	
-	private Javalin buildApp(boolean useSSL, Integer port) {
+	private Javalin buildApp(Integer port) {
 		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
 			config.bundledPlugins.enableCors(cors -> {
@@ -303,11 +301,10 @@ public class RESTServer implements Closeable {
             pluginConfig
             .withDocumentationPath(docsPath)
             .withDefinitionConfiguration((version, schema) -> {
-                schema.info((Consumer <OpenApiInfo>)
-                		info -> {
-							info.title("Convex REST API");
-							info.version(Utils.getVersion());
-		                });
+                schema.info(info -> {
+					info.title("Convex REST API");
+					info.version(Utils.getVersion());
+                });
             });
 		}));
 
@@ -318,9 +315,11 @@ public class RESTServer implements Closeable {
 	        reDocConfiguration.documentationPath = docsPath;
 	    }));
 		
-		for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
-	        System.out.println(generatedJsonSchema.getName());
-	    }
+		if (log.isDebugEnabled()) {
+			for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
+				log.debug("Loaded JSON schema: {}", generatedJsonSchema.getName());
+			}
+		}
 	}
 
 
@@ -361,14 +360,14 @@ public class RESTServer implements Closeable {
 	public synchronized void start(Integer port) {
 		close();
 		try {
-			javalin=buildApp(true,port);
+			javalin=buildApp(port);
 			javalin.start();
 		} catch (JavalinException e) {
 			if (port!=null) throw e; // only try again if port unspecified
 			log.warn("Default port "+DEFAULT_PORT+" already in use, chosing another at random");
 			close();
 
-			javalin=buildApp(false,0); // use random port
+			javalin=buildApp(0); // use random port
 			javalin.start();
 		}
 	}
