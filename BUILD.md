@@ -14,14 +14,16 @@ Runs on every push to any branch, and on pull requests (including from forks). B
 
 ### Release (`release.yml`)
 
-Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached.
+Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached. A follow-on `docker` job then builds and pushes `convexlive/convex:<version>` and `convexlive/convex:latest` to Docker Hub.
+
+(The Docker build must be a job inside this workflow: releases created with the workflow `GITHUB_TOKEN` do not fire `release: [published]` events, so a separate workflow triggered on release publication would never run.)
 
 ### Docker (`docker.yml`)
 
-Builds a Docker image and pushes to Docker Hub. Triggered automatically when a GitHub Release is published, or manually via workflow dispatch for snapshot builds.
+Manual-dispatch only: builds a Docker image and pushes a single tag to Docker Hub. Use for snapshot builds or ad-hoc re-publishing.
 
-- Release: pushes `convexlive/convex:<version>` and `convexlive/convex:latest`
 - Snapshot: go to Actions > Docker > Run workflow, set tag to `snapshot`
+- Or via CLI: `gh workflow run docker.yml --ref <branch-or-tag> -f tag=<tag>`
 
 Requires two secrets configured in the GitHub repository:
 
@@ -118,6 +120,7 @@ Verify:
 - Release status is not draft/pre-release
 - `convex.jar` is attached as an asset
 - Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
+- Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
 
 Do **not** proceed to Maven Central until the GitHub Release is confirmed live.
 

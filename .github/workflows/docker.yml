@@ -1,13 +1,13 @@
 # .github/workflows/docker.yml
-# Builds and pushes Docker image to Docker Hub
+# Manually builds and pushes a Docker image to Docker Hub (e.g. snapshot builds,
+# or re-publishing a release tag ad hoc).
+#
+# Release images are built automatically by the `docker` job in release.yml.
+# Do NOT add a `release: [published]` trigger here: releases created with the
+# workflow GITHUB_TOKEN do not fire workflow events, so it would never run.
 name: Docker
 
 on:
-  # Automatically after a GitHub Release is published
-  release:
-    types: [published]
-
-  # Manually for snapshot builds
   workflow_dispatch:
     inputs:
       tag:
@@ -29,28 +29,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Determine tags
-        id: tags
-        run: |
-          if [ "${{ github.event_name }}" = "release" ]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            echo "tags=convexlive/convex:${VERSION},convexlive/convex:latest" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=convexlive/convex:${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build Docker image
-        run: |
-          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
-          TAG_ARGS=""
-          for TAG in "${TAGS[@]}"; do
-            TAG_ARGS="$TAG_ARGS -t $TAG"
-          done
-          docker build $TAG_ARGS .
+        run: docker build -t "convexlive/convex:${{ github.event.inputs.tag }}" .
 
       - name: Push Docker image
-        run: |
-          IFS=',' read -ra TAGS <<< "${{ steps.tags.outputs.tags }}"
-          for TAG in "${TAGS[@]}"; do
-            docker push "$TAG"
-          done
+        run: docker push "convexlive/convex:${{ github.event.inputs.tag }}"
