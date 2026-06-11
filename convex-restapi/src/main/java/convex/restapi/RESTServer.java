@@ -37,6 +37,7 @@ import convex.restapi.api.X402;
 import convex.restapi.auth.AuthMiddleware;
 import convex.restapi.auth.ConfirmationService;
 import convex.restapi.auth.OAuthService;
+import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
@@ -221,6 +222,8 @@ public class RESTServer implements Closeable {
 			});
 
 			config.concurrency.useVirtualThreads=true;
+
+			HttpMethodFilter.install(config);
 
 			config.jetty.addConnector((jettyServer, httpConfig) -> {
 				// 1 acceptor + 1 selector: request handling uses virtual threads
