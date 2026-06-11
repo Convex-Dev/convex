@@ -10,7 +10,7 @@ Three GitHub Actions workflows handle continuous integration:
 
 ### Build (`build.yml`)
 
-Runs on every push to any branch. Builds the project and runs all tests.
+Runs on every push to any branch, and on pull requests (including from forks). Builds the project and runs all tests. Superseded runs on the same branch/PR are cancelled automatically.
 
 ### Release (`release.yml`)
 
@@ -62,6 +62,20 @@ git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 ```
 
 `mvn versions:set` only rewrites `pom.xml` files — stage those explicitly rather than `git add -A`, which would sweep in any unrelated working-tree changes (stray `.env` files, editor scratch files, partial WIP).
+
+As part of the same version-bump commit, also update:
+
+- **`project.build.outputTimestamp`** in the parent `pom.xml` — set to the current UTC
+  time (e.g. `2026-04-18T16:08:52Z`). This is frozen for reproducible builds and must
+  be refreshed each release, otherwise the new artifacts carry the previous release's
+  timestamp.
+- **Module README install snippets** — the Maven/Gradle `<version>` examples in the
+  module `README.md` files should reference the new release version:
+
+  ```bash
+  # from the repo root (Git Bash / Linux / macOS)
+  grep -rl --include=README.md "<previous-version>" . | xargs sed -i 's/<previous-version>/<new-version>/g'
+  ```
 
 ### 5. Smoke test the built jar
 

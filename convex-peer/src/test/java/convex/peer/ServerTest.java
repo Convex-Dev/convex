@@ -64,6 +64,22 @@ public class ServerTest {
 	}
 
 	@Test
+	public void testWaitForShutdownPreInterrupt() {
+		Server server = network.SERVER;
+		assertTrue(server.isRunning());
+		try {
+			// Pre-set the interrupt flag BEFORE waiting: waitForShutdown must surface
+			// this as InterruptedException, not return silently as if shut down.
+			// Regression test for the race where `convex peer start` exited 0 instead
+			// of 130 when interrupted between startup notification and the wait loop.
+			Thread.currentThread().interrupt();
+			assertThrows(InterruptedException.class, () -> server.waitForShutdown());
+		} finally {
+			Thread.interrupted(); // ensure flag is cleared whatever happened
+		}
+	}
+
+	@Test
 	public void testHostnameNormalisation() {
 		Server server = network.SERVER;
 		String original = server.getHostname();
