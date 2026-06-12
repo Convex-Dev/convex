@@ -221,6 +221,41 @@ public class LatticeCursorTest {
 	}
 
 	/**
+	 * LWW merge positions are not equivalent: "own" is the value being
+	 * applied by a local edit, and ties prefer it. When a fork syncs, its
+	 * local edits must take the own position against a concurrent parent
+	 * advance — otherwise an edit re-stamped in the same millisecond as the
+	 * value it replaces (e.g. a deletion under a whole-value LWW wrapper)
+	 * loses the tie to a stale snapshot and silently reverts.
+	 */
+	@Test
+	public void testForkSyncLocalEditWinsTimestampTie() {
+		Keyword TS = Keyword.intern("timestamp");
+		Keyword V = Keyword.intern("v");
+		ALattice<ACell> lattice = convex.lattice.generic.LWWLattice.INSTANCE;
+
+		AHashMap<Keyword, ACell> original = Maps.of(TS, CVMLong.create(100), V, Strings.create("original"));
+		RootLatticeCursor<ACell> root = Cursors.createLattice(lattice, original);
+
+		ALatticeCursor<ACell> fork = root.fork();
+
+		// Parent advances concurrently to a DIFFERENT value with the SAME
+		// timestamp — e.g. a propagator merge-back re-applying a snapshot.
+		// (A distinct object, so sync cannot take its fast path.)
+		AHashMap<Keyword, ACell> stale = Maps.of(TS, CVMLong.create(100), V, Strings.create("stale"));
+		root.set(stale);
+
+		// The fork applies a local edit at the same (tying) timestamp
+		AHashMap<Keyword, ACell> edited = Maps.of(TS, CVMLong.create(100), V, Strings.create("edited"));
+		fork.set(edited);
+
+		fork.sync();
+
+		assertSame(edited, root.get(),
+			"the fork's local edit must win a timestamp tie against a concurrent parent advance");
+	}
+
+	/**
 	 * Root cursor with a one-shot hook that runs synchronously at the start of
 	 * {@link #updateAndGet}, before the actual update. Used to deterministically
 	 * inject a concurrent write into the exact window inside
