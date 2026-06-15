@@ -142,7 +142,7 @@ The Convex Foundation may award Convex Coins to contributors for significant eco
 
 ## Community
 
-We use Discord as for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
+We use Discord as for discussing Convex - you can join the public server at [https://discord.com/invite/xfYGq4CT7v](https://discord.com/invite/xfYGq4CT7v)
 
 Alternatively, email: info(at)convex.world
 
