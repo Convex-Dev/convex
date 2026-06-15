@@ -263,23 +263,29 @@ single strongest onboarding artefact). Three of four SDKs have full, parallel pa
 - **[P1] Convex Lisp landing page dead-ends.** `convex-lisp/index.md` never links to its own
   "Gentle Lisp Introduction" or child pages (only external clojure/racket links). Add a "start
   here" block like `actors/index.md` has. (`convex-lisp/index.md`)
-- **[P1] Four broken relative links** in `actors/index.md` — `./actors/concepts` etc. resolve to
-  `tutorial/actors/actors/…` (should be `./concepts`). A `pnpm build` link-check would catch
-  these. (`actors/index.md:14-17`)
+- **[P1] ~~Four broken relative links in `actors/index.md`~~ — MISDIAGNOSIS (withdrawn).** With
+  `trailingSlash: false`, relative links from the `/docs/tutorial/actors` index resolve against
+  `/docs/tutorial/`, so the original `./actors/concepts` was **correct**. `pnpm build` confirmed
+  it; an earlier "fix" to `./concepts` actually broke them and has been reverted. Lesson: verify
+  doc links with a build, not by reasoning about file paths.
 - **[P1] Stale `convex-java:0.8.2`** pinned across quickstart/index/java pages (released is 0.8.5);
   peer-ops download URLs hardcode `v0.8.2`/`v0.8.3`.
 - **[P2] JavaScript SDK structural parity gap** — a single page, sidebar `items: []`, silently
   redirecting to the TypeScript sub-pages, while badged "production ready" like the full SDKs.
-  (`client-sdks/javascript/index.md`, `sidebars.ts`) — **DECIDED 2026-06-15**: fold JS into TS.
-  Present one "TypeScript / JavaScript" SDK (same `@convex-world/convex-ts` client); drop the
-  separate JS category/pages; redirect old `/javascript` URLs to the TS section.
+  (`client-sdks/javascript/index.md`, `sidebars.ts`) — **DONE 2026-06-15**: relabelled the TS
+  category "TypeScript / JavaScript"; the JS page (which turned out to be a full plain-JS guide,
+  not a stub) is re-parented as a sub-page under it and the separate top-level JS category removed.
+  URL unchanged → no redirect needed; the blog / SDK-index / tutorial-index inbound links still resolve.
 - **[P2] "Production" mislabeled with the testnet URL** in `client-sdks/java/quickstart.md:21`.
 - **[P2] README omits local docs build** (pnpm) — only in `AGENTS.md`.
 
-**Fixed 2026-06-15:** four broken `actors/` links, Convex-Lisp landing-page dead-end ("Where to
-start" block added), `convex-java` versions → 0.8.5, peer-ops download URLs (dropped bad `v`
-prefix), "Production" URL → `peer.convex.live`, docs README local-build section. Still open: the
-non-runnable testnet quickstart (P0, pending §7.3 impl) and JS SDK parity (P2, pending decision).
+**Fixed 2026-06-15 (verified via `pnpm build`):** Convex-Lisp landing-page dead-end ("Where to
+start" block added, using `.md` links — the child pages have custom slugs), `convex-java` versions
+→ 0.8.5, peer-ops download URLs (dropped bad `v` prefix), "Production" URL → `peer.convex.live`,
+docs README local-build section, and the JS→TS SDK fold. (The `actors/` links were a misdiagnosis —
+see above.) **Newly found, pre-existing & out of scope:** 3 broken `overview/* → cad/*/README.md`
+links (`faq.md`, `lattice.md`, `use-cases.md`) — candidates for a future link-check in CI. Still
+open: the non-runnable testnet quickstart (P0, pending §7.3 impl).
 
 ### 7.3 The golden path — DECIDED (REPL headline, then options)
 
