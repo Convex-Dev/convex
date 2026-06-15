@@ -199,9 +199,8 @@ DX is hard to measure, but these are observable proxies:
 
 ## 6. Open questions for the team
 
-1. ~~Which front door is canonical — hosted testnet, local peer, or GUI?~~ **Recommendation
-   formed** (see §7.3): lead with the **web Sandbox/REPL** (convex.world) or the Desktop
-   Client Terminal — the only genuinely zero-install first win. Needs sign-off.
+1. ~~Which front door is canonical?~~ **DECIDED (§7.3)**: the Web REPL is the headline quick start
+   on every surface; SDK / own-peer / Lisp are secondary options below it. Testnet for onboarding.
 2. ~~Does the web server rewrite `/install.sh`, or is `/public/` the real path?~~ **Resolved**:
    `/install.sh` and `/install.ps1` are served directly (200); `/public/...` 404s. Scripts fixed.
 3. Is a notarized native build in scope for the next release, or deferred? (3.12.)
@@ -239,6 +238,11 @@ one-liner matches the convex repo exactly.
 - **[P3] Discord invite mismatch** — site uses `xfYGq4CT7v`; the convex repo README uses
   `discord.gg/5j2mPsk`. Reconcile to one.
 
+**Fixed 2026-06-15:** broken Tools-page jar download, stale footer version (→ v0.8.5), README
+`app/`→`src/app/` path, Discord invite (→ canonical). Hero CTA + testnet/Protonet default now
+resolved by §7.3 (implementation pending). The `convex.ts` "build prerequisite" was a non-issue —
+the dependency is npm `^0.3.0`, not a `file:` ref, so `pnpm install` works without it.
+
 ### 7.2 design (Docusaurus docs, docs.convex.world)
 
 **Strengths:** clear role-based learning paths; a genuinely beginner-friendly "Gentle Lisp
@@ -266,16 +270,33 @@ single strongest onboarding artefact). Three of four SDKs have full, parallel pa
 - **[P2] "Production" mislabeled with the testnet URL** in `client-sdks/java/quickstart.md:21`.
 - **[P2] README omits local docs build** (pnpm) — only in `AGENTS.md`.
 
-### 7.3 The canonical front door (answers Open Question #1)
+**Fixed 2026-06-15:** four broken `actors/` links, Convex-Lisp landing-page dead-end ("Where to
+start" block added), `convex-java` versions → 0.8.5, peer-ops download URLs (dropped bad `v`
+prefix), "Production" URL → `peer.convex.live`, docs README local-build section. Still open: the
+non-runnable testnet quickstart (P0, pending §7.3 impl) and JS SDK parity (P2, pending decision).
 
-Triangulating all three repos: the only genuinely **zero-install first win** is the **web
-Sandbox/REPL on convex.world** (live, real peer) or the **Desktop Client Terminal** — yet the
-docs quickstart leads with paths that need Java+Maven or a faucet call that is commented out, and
-the website hides the Sandbox behind a non-developer hero. Recommendation:
+### 7.3 The golden path — DECIDED (REPL headline, then options)
 
-> Make the canonical golden path *"open the Sandbox, type `(+ 1 2 3)`, then run a transfer/deploy"*.
-> Have the convex README, the docs quickstart, and the website hero all lead with that one path.
-> Keep the Java embedded-peer quickstart as a second "embed a peer" track, not the first touch.
+Resolved 2026-06-15 (mike). The README, docs quickstart, and website hero all open the same way:
+
+**Headline quick start — the Web REPL (Sandbox) on convex.world.** Zero-install, universal first
+win: paste `(+ 1 2 3)`, see a result, then deploy a one-line actor. This is the hook everyone hits
+first — no choice required up front.
+
+**Then secondary "go further" options** below the headline (cards/links):
+- **Try an SDK** — TS / Java / Python against the hosted testnet (faucet account) → build an app.
+- **Run your own peer** — `convex.jar` via CLI (`convex local start`) or Convex Desktop → full control / offline.
+- **Write Convex Lisp** — language guide + actor development.
+- **Operate a peer** — peer-operations.
+
+Testnet endpoint stays `mikera1337-convex-testnet.hf.space` for now (a **proper branded testnet is
+planned**); keep the value in one place per surface so the eventual swap is a one-line change, not
+another scattered find-replace. This also settles testnet-vs-Protonet: **testnet for onboarding**,
+Protonet referenced as production.
+
+This decision drives the still-open implementation of 3.3–3.6 (README first-5-min + REPL + first
+actor), the 7.2 quickstart restructure, and the 7.1 hero CTA (hero leads with the REPL "try it"
+plus the secondary options + a Docs/GitHub link).
 
 ### 7.4 Recurring cross-repo theme: version drift
 
