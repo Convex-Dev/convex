@@ -75,7 +75,7 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 
 ### Prerequisites
 
-- Java 21+ ([Download](https://www.oracle.com/java/technologies/downloads/))
+- Java 21+ ([Download Temurin](https://adoptium.net/temurin/releases/?version=21))
 
 ### Quick Install
 
