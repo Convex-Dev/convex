@@ -199,8 +199,87 @@ DX is hard to measure, but these are observable proxies:
 
 ## 6. Open questions for the team
 
-1. Which front door is canonical — hosted testnet, local peer, or GUI? (Drives 3.3/3.4.)
+1. ~~Which front door is canonical — hosted testnet, local peer, or GUI?~~ **Recommendation
+   formed** (see §7.3): lead with the **web Sandbox/REPL** (convex.world) or the Desktop
+   Client Terminal — the only genuinely zero-install first win. Needs sign-off.
 2. ~~Does the web server rewrite `/install.sh`, or is `/public/` the real path?~~ **Resolved**:
    `/install.sh` and `/install.ps1` are served directly (200); `/public/...` 404s. Scripts fixed.
 3. Is a notarized native build in scope for the next release, or deferred? (3.12.)
 4. Should examples live in-repo (`examples/`) or only in the docs `recipes` section? (3.11.)
+
+---
+
+## 7. Cross-repo findings — convex.world (website) and design (docs)
+
+The onboarding journey spans three repos. Reviewed 2026-06-15. Same P0–P3 lensing.
+None of these are fixed yet — they live in other repos (and `convex.world` currently has
+uncommitted WIP, so I left it untouched).
+
+### 7.1 convex.world (Next.js marketing site)
+
+**Strengths:** a *real* live Sandbox/REPL against an actual peer (not just marketing); a strong
+Developers dropdown deep-linking SDKs/CLI/Desktop/CADs; and a Downloads page whose install
+one-liner matches the convex repo exactly.
+
+**Issues:**
+- **[P0] Broken jar download on the Tools page.** `curl -O https://convex.world/convex.jar`
+  resolves to an HTML meta-refresh stub (`public/convex.jar/index.html`), not a jar — `curl -O`
+  saves the HTML. Contradicts the correct install.sh/releases path on the Downloads page.
+  (`src/app/(developers)/tools/page.tsx`)
+- **[P1] No developer CTA above the fold.** The hero offers only "Vision" and "Sandbox" — no
+  Get Started / Docs / Install / GitHub. (`src/components/Hero.tsx`)
+- **[P1] Stale "Protocol v0.7.14"** hardcoded in the sitewide footer (actual 0.8.x).
+  (`src/components/Footer.tsx`)
+- **[P2] Testnet vs Protonet mixed signals.** Default interactive peer is the personal
+  `mikera1337-…hf.space` testnet, while comments/footer/nav say `peer.convex.live`.
+  (`src/lib/convex-api.ts`, `Footer.tsx`)
+- **[P2] Local-dev README inaccurate** — wrong page path (`app/` vs `src/app/`) and silent on the
+  sibling `convex.ts` build prerequisite that actually blocks `pnpm install`; accurate steps are
+  only in `AGENTS.md`. (`README.md`)
+- **[P3] Discord invite mismatch** — site uses `xfYGq4CT7v`; the convex repo README uses
+  `discord.gg/5j2mPsk`. Reconcile to one.
+
+### 7.2 design (Docusaurus docs, docs.convex.world)
+
+**Strengths:** clear role-based learning paths; a genuinely beginner-friendly "Gentle Lisp
+Introduction"; and a self-contained Java local-peer quickstart that produces real output (the
+single strongest onboarding artefact). Three of four SDKs have full, parallel page sets.
+
+**Issues:**
+- **[P0] The flagship "zero-install testnet, 1 min" quickstart can't run end-to-end.** Account
+  creation / funding is commented out (`quickstart.md:134,155`), so the promised first win never
+  lands — a copy-paste newcomer hits a no-account/FUNDS wall. (`tutorial/quickstart.md`)
+- **[P1] No GUI / web-REPL front door in the quickstart.** The actual fastest path (Desktop
+  terminal or web sandbox) is omitted; the sandbox setup in the Lisp guide is commented out.
+  (`quickstart.md`, `convex-lisp/lisp-guide.md:22-30`)
+- **[P1] Convex Lisp landing page dead-ends.** `convex-lisp/index.md` never links to its own
+  "Gentle Lisp Introduction" or child pages (only external clojure/racket links). Add a "start
+  here" block like `actors/index.md` has. (`convex-lisp/index.md`)
+- **[P1] Four broken relative links** in `actors/index.md` — `./actors/concepts` etc. resolve to
+  `tutorial/actors/actors/…` (should be `./concepts`). A `pnpm build` link-check would catch
+  these. (`actors/index.md:14-17`)
+- **[P1] Stale `convex-java:0.8.2`** pinned across quickstart/index/java pages (released is 0.8.5);
+  peer-ops download URLs hardcode `v0.8.2`/`v0.8.3`.
+- **[P2] JavaScript SDK structural parity gap** — a single page, sidebar `items: []`, silently
+  redirecting to the TypeScript sub-pages, while badged "production ready" like the full SDKs.
+  (`client-sdks/javascript/index.md`, `sidebars.ts`)
+- **[P2] "Production" mislabeled with the testnet URL** in `client-sdks/java/quickstart.md:21`.
+- **[P2] README omits local docs build** (pnpm) — only in `AGENTS.md`.
+
+### 7.3 The canonical front door (answers Open Question #1)
+
+Triangulating all three repos: the only genuinely **zero-install first win** is the **web
+Sandbox/REPL on convex.world** (live, real peer) or the **Desktop Client Terminal** — yet the
+docs quickstart leads with paths that need Java+Maven or a faucet call that is commented out, and
+the website hides the Sandbox behind a non-developer hero. Recommendation:
+
+> Make the canonical golden path *"open the Sandbox, type `(+ 1 2 3)`, then run a transfer/deploy"*.
+> Have the convex README, the docs quickstart, and the website hero all lead with that one path.
+> Keep the Java embedded-peer quickstart as a second "embed a peer" track, not the first touch.
+
+### 7.4 Recurring cross-repo theme: version drift
+
+Stale version/identity strings appear in **all three** repos (convex READMEs `0.8.5` by hand;
+docs `0.8.2`; website footer `v0.7.14`; two different Discord invites). This argues for a single
+source of truth plus a CI check that fails when published surfaces disagree with the released
+`pom.xml` version (ties to item 3.9).
