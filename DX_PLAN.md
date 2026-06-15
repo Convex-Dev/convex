@@ -203,7 +203,10 @@ DX is hard to measure, but these are observable proxies:
    on every surface; SDK / own-peer / Lisp are secondary options below it. Testnet for onboarding.
 2. ~~Does the web server rewrite `/install.sh`, or is `/public/` the real path?~~ **Resolved**:
    `/install.sh` and `/install.ps1` are served directly (200); `/public/...` 404s. Scripts fixed.
-3. Is a notarized native build in scope for the next release, or deferred? (3.12.)
+3. ~~Is a notarized native build in scope?~~ **DECIDED (2026-06-15)**: no — the audience can run
+   a jar, so just *document* the OS first-run prompt (done: first-run notes on the convex-gui
+   README and the convex.world Downloads page). Revisit signed/notarised installers only when the
+   Desktop app becomes a featured distribution.
 4. Should examples live in-repo (`examples/`) or only in the docs `recipes` section? (3.11.)
 
 ---
@@ -266,7 +269,9 @@ single strongest onboarding artefact). Three of four SDKs have full, parallel pa
   peer-ops download URLs hardcode `v0.8.2`/`v0.8.3`.
 - **[P2] JavaScript SDK structural parity gap** — a single page, sidebar `items: []`, silently
   redirecting to the TypeScript sub-pages, while badged "production ready" like the full SDKs.
-  (`client-sdks/javascript/index.md`, `sidebars.ts`)
+  (`client-sdks/javascript/index.md`, `sidebars.ts`) — **DECIDED 2026-06-15**: fold JS into TS.
+  Present one "TypeScript / JavaScript" SDK (same `@convex-world/convex-ts` client); drop the
+  separate JS category/pages; redirect old `/javascript` URLs to the TS section.
 - **[P2] "Production" mislabeled with the testnet URL** in `client-sdks/java/quickstart.md:21`.
 - **[P2] README omits local docs build** (pnpm) — only in `AGENTS.md`.
 
