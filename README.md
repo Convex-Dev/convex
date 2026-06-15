@@ -134,6 +134,12 @@ See all available commands:
 convex --help
 ```
 
+## Examples
+
+- **Convex Lisp** — runnable `.cvx` demos in [`convex-core/src/test/resources/examples`](convex-core/src/test/resources/examples): fungible tokens, assets, trust monitors, the Torus DEX, and `language.cvx` for the language itself.
+- **Java** — using the CVM and data structures directly in [`convex-core/src/test/java/convex/core/examples`](convex-core/src/test/java/convex/core/examples) (start with `RawCVM.java`).
+- **Recipes & SDK quickstarts** — task-oriented guides at [docs.convex.world/docs/tutorial/recipes](https://docs.convex.world/docs/tutorial/recipes) and the per-language [client SDK quickstarts](https://docs.convex.world/docs/tutorial/client-sdks).
+
 ## Contributing
 
 Contributions are welcome under the Convex Public License. Contributors retain copyright but must accept the license terms. A Contributors Agreement is required for all submissions to the core repository.

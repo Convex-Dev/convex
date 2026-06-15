@@ -86,6 +86,12 @@ As part of the same version-bump commit, also update:
   grep -rl --include=README.md "<previous-version>" . | xargs sed -i 's/<previous-version>/<new-version>/g'
   ```
 
+- **Downstream docs and website** (separate repos) also hardcode the version and must be bumped in
+  lockstep, otherwise onboarding goes stale:
+  - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
+    URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
+  - **`convex.world`** — the protocol version in `src/components/Footer.tsx`.
+
 ### 5. Rebuild and smoke test the built jar
 
 **Rebuild first** — the jar from step 1 was built *before* `versions:set`, so it still

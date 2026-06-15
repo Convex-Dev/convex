@@ -207,7 +207,8 @@ DX is hard to measure, but these are observable proxies:
    a jar, so just *document* the OS first-run prompt (done: first-run notes on the convex-gui
    README and the convex.world Downloads page). Revisit signed/notarised installers only when the
    Desktop app becomes a featured distribution.
-4. Should examples live in-repo (`examples/`) or only in the docs `recipes` section? (3.11.)
+4. ~~Should examples live in-repo or only in docs `recipes`?~~ **DECIDED (§8)**: docs recipes is
+   canonical; `.cvx` stays in test resources, now indexed from an "Examples" section in the README.
 
 ---
 
@@ -309,3 +310,20 @@ Stale version/identity strings appear in **all three** repos (convex READMEs `0.
 docs `0.8.2`; website footer `v0.7.14`; two different Discord invites). This argues for a single
 source of truth plus a CI check that fails when published surfaces disagree with the released
 `pom.xml` version (ties to item 3.9).
+
+**Resolved 2026-06-15 (light version):** `BUILD.md`'s release checklist now lists the downstream
+version references (design docs + convex.world footer) to bump in lockstep — no new CI. A
+grep-based CI guard remains a possible future add-on, not built now.
+
+---
+
+## 8. Smaller decisions (2026-06-15)
+
+- **Examples (3.11, Q4) — DECIDED:** docs `recipes` is the canonical home; the runnable `.cvx`
+  stays in `convex-core` test resources and is now indexed from a new "Examples" section in the
+  convex README. No new top-level `examples/` dir.
+- **CLI reference generation (3.8) — DEFERRED:** generate from picocli later, only if the
+  hand-maintained command table becomes a maintenance pain.
+- **CONTRIBUTING quickstart (3.10) — DEFERRED:** worth a short `CONTRIBUTING.md`; not created yet
+  (new surface — draft on request).
+- **Docs versioning (3.13) — DEFERRED:** revisit when the public API starts moving.
