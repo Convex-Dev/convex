@@ -1,335 +1,135 @@
 # Convex Developer Experience (DX) Plan
 
-A review of how a new developer discovers, understands, and gets started with Convex —
-and a prioritised plan to improve that journey.
+How a new developer discovers, understands, and gets started with Convex — and what is left
+to improve. Covers the three onboarding repos: `convex`, `design` (docs.convex.world), and
+`convex.world` (website).
 
-Scope: this repository (`Convex-Dev/convex`) and its direct touch-points with the
-documentation site (`docs.convex.world`, source in the `design` repo). It does **not**
-re-review the docs site content in depth, only where in-repo onboarding hands off to it.
+Reviewed 2026-06-15 · last updated 2026-06-15.
 
-Last reviewed: 2026-06-15.
+## Status
 
----
-
-## 1. The journey we are optimising
-
-Onboarding is not one path. We have four distinct first-time personas, and each follows
-a different route through the repo:
-
-| Persona | Goal | Primary surface today | Current state |
-|---------|------|-----------------------|---------------|
-| **Evaluator** | "What is Convex, should I care?" | Top-level `README.md` | **Strong** |
-| **App developer** | Read/write network state from my app | `convex-java` README + docs SDK pages, REST API | **Strong** |
-| **Smart-contract developer** | Write & deploy a Convex Lisp actor | (no clear in-repo path) | **Weak** |
-| **Peer operator** | Run a peer / local net | `convex-cli` README, docs peer-operations | **Good** |
-
-The biggest DX gap is the **smart-contract developer** — the persona our own README sells
-hardest ("Write smart contracts in a powerful, functional Lisp") yet supports least once
-they clone the repo.
+A full onboarding review is done and **almost all quick wins are shipped** (committed and
+pushed across the three repos — see §3). The major design decision — the **golden path** — is
+settled (§1). The one substantial piece of work still outstanding is **implementing** that
+golden path across the README, docs quickstart, and website hero (§2). A handful of items are
+deliberately deferred (§4).
 
 ---
 
-## 2. What is already good (keep / protect)
+## 1. The golden path (decided — drives the remaining work)
 
-These are genuine strengths. The plan below must not regress them.
+The README, docs quickstart, and website hero should all open the same way:
 
-- **Top-level `README.md`** — clear value proposition, an honest comparison table, a one-line
-  install, and *multiple* install options (curl/irm, direct jar, Docker, build-from-source).
-  This is above the bar for the category.
-- **`convex-cli/README.md`** — task-oriented ("Use Case 1…4"), with copy-pasteable commands,
-  a global-options table, env-var equivalents, and documented **exit codes**. Excellent.
-- **`convex-java/README.md`** — connect → create account → query → transact → async, plus a
-  thread-safety caveat and correct links into the docs SDK pages (all four resolve).
-- **Install scripts** (`scripts/install.sh`, `scripts/install.ps1`) — check Java version,
-  pick a writable PATH dir, warn when PATH needs editing, support `CONVEX_VERSION`/`CONVEX_HOME`.
-- **Docs learning path** — `design/docs/tutorial/` has a coherent, role-based ordering
-  (Quick Start → Networks → SDK → Lisp → Actors → Recipes → Peer Ops) and a real glossary.
-
----
-
-## 3. Issues found (with evidence)
-
-### P0 — Blocks or breaks first contact
-
-**3.1 [VERIFIED — README is correct; script comments were wrong. FIXED.]**
-Hypothesis was that the install one-liner 404s. Verified live (2026-06-15):
-- `https://convex.world/install.sh` → **200, valid script** ✓ (the URL the README uses)
-- `https://convex.world/install.ps1` → **200, valid script** ✓
-- `https://convex.world/public/install.sh` → **404** ✗ (the path the *scripts'* SYNC
-  comments cited)
-
-So the README never broke. The actual defect was the misleading SYNC comment in
-`scripts/install.sh` and `scripts/install.ps1`, which pointed at a 404 URL. **Fixed** —
-both comments now cite the verified live `https://convex.world/install.{sh,ps1}`.
-
-**3.2 "Java Examples" link was misleading. [FIXED.]**
-`convex-core/README.md` linked "Java Examples" to `convex-core/src/test/java/examples`,
-which contains only `generators/BadListGen.java` and `BadListTest.java` — test-data
-generators, not illustrative examples. **Fixed** — repointed to
-`src/test/java/convex/core/examples` (8 files, incl. the well-commented `RawCVM.java`
-"run CVM code directly" example, plus the CPoS/belief simulations).
-(The adjacent **Convex Lisp examples** link to `src/test/resources/examples` was already good —
-`adventure.cvx`, `token-demo.cvx`, `language.cvx`, `smart-contract-shop-demo.cvx`, etc.)
-
-### P1 — High-friction, high-impact
-
-**3.3 Three different "front doors", no single golden path.**
-- `README.md` Getting Started → `convex desktop` / `convex local gui` (GUI first).
-- `convex-cli/README.md` → `convex local start` (CLI first).
-- `docs … /tutorial/quickstart` → "first transaction in 5 minutes" on a hosted testnet.
-
-A newcomer cannot tell which is *the* way to start, and the README's chosen first action
-(open the GUI) does not deliver a concrete win — there is no "and now run *this* to see it
-work". We need one canonical, copy-pasteable "first 5 minutes" that ends in a visible result,
-with the other surfaces pointing back to it.
-
-**3.4 README never links to the 5-minute quickstart.**
-The headline onboarding section hands off to the GUI but does not say "now follow
-docs.convex.world/docs/tutorial/quickstart". The best getting-started asset we have is
-effectively undiscoverable from the repo front page.
-
-**3.5 Convex Lisp / first-actor has no in-repo path.**
-Nothing in the README or a top-level tutorial shows a "hello world" actor or a single
-Convex Lisp expression. The `.cvx` examples are buried in `convex-core/src/test/resources/`
-and referenced only from a deep module README. For the persona we market to most, the repo
-offers no on-ramp.
-
-**3.6 The REPL — our best learning tool — is hidden.**
-`convex local gui` and the docs `tools/convex-repl` exist, but the README never says "open
-the REPL and type `(+ 1 2 3)`". Interactive REPL exploration is the fastest way to learn
-Convex Lisp and we don't surface it.
-
-**3.7 Prerequisite points at Oracle JDK.**
-`README.md:78` links Java downloads to oracle.com (login wall, licensing friction). Adoptium
-Temurin is the friendlier, no-account default and matches what the install scripts accept.
-
-### P2 — Structural / drift risks
-
-**3.8 Hand-maintained CLI command reference drifts.**
-`convex-cli/README.md` has a hand-written command tree and options tables. These will diverge
-from the actual picocli command set over time. There is an asciidoc docs source under
-`convex-cli/src/docs/` — we should generate the reference (or at least test it) rather than
-maintain it by hand.
-
-**3.9 Hardcoded version strings across READMEs.**
-`0.8.5` appears literally in `convex-core`, `convex-java`, `convex-restapi` install snippets.
-BUILD.md documents a release-time `sed` sweep, so it is *managed* — but it is still a
-drift/forget risk and a poor signal if one slips.
-
-**3.10 No "first contribution" on-ramp.**
-`BUILD.md` is release-focused; the README "Contributing" section is about licensing/CLA. There
-is no short "clone → build → run tests → where the interesting code is" guide for a developer
-who wants to *change* Convex, not just use it.
-
-**3.11 Examples are fragmented.**
-`.cvx` samples live in test resources; Java "examples" are generator fixtures; the GUI ships
-demos; the docs have recipes. There is no single discoverable `examples/` story.
-
-### P3 — Polish / longer-term
-
-**3.12 No signed/notarized native app.**
-macOS/Windows users who download the jar get OS security prompts (the trigger for this
-review was exactly such a prompt on macOS). `BUILD.md` mentions `jpackage` but we ship no
-notarized `.dmg`/signed installer. For non-CLI users this is the first impression.
-
-**3.13 Docs are unversioned relative to the jar.**
-A user on an older jar reads HEAD docs. Not urgent, but worth noting for when the API moves.
-
----
-
-## 4. Plan
-
-Ordered by impact-per-effort. Each item is independently shippable.
-
-### Phase 0 — Stop the bleeding (hours) — DONE 2026-06-15
-
-- [x] **Verify the install URLs resolve** (3.1). Verified live: README's `/install.sh` and
-      `/install.ps1` both 200; the scripts' `/public/...` SYNC comments 404'd. Corrected both
-      script comments to cite the live URL.
-- [x] **Fix the "Java Examples" link** (3.2). Repointed `convex-core/README.md` to
-      `src/test/java/convex/core/examples` (incl. `RawCVM.java`).
-- [x] **Switch the Java prerequisite link to Adoptium Temurin** (3.7). `README.md` now links
-      Temurin 21 instead of the Oracle JDK download (no login wall).
-
-### Phase 1 — One golden path (days)
-
-- [ ] **Define the canonical "first 5 minutes"** (3.3, 3.4). Pick one front door — recommendation:
-      *hosted testnet + REPL/CLI*, because it needs no local peer and produces a visible result
-      fastest. Write it once (ideally in the docs `quickstart`), then have the README,
-      `convex-cli` README, and GUI README all link to that one page instead of inventing their own.
-- [ ] **Add a "Your first transaction" block to the README** that ends in an observable result,
-      then links to the full quickstart. Make the GUI a *second* step, not the first.
-- [ ] **Surface the REPL** (3.6). One line in the README: open the REPL, type `(+ 1 2 3)`,
-      then a `(deploy …)` one-liner.
-- [ ] **Add an in-repo "Hello, actor" snippet** (3.5) — a minimal `^:callable` actor a reader
-      can paste into the REPL or `convex transact`, with a pointer to the `.cvx` examples and the
-      docs Lisp guide.
-
-### Phase 2 — Make it durable (weeks)
-
-- [ ] **Generate the CLI command reference** from picocli (or assert it in a test) (3.8).
-- [ ] **Add a `CONTRIBUTING.md` quickstart** (3.10): clone → `mvn install` → `mvn test` →
-      module map → "good first issue" pointer. Keep BUILD.md for release mechanics.
-- [ ] **Consolidate examples** (3.11): a top-level `examples/` (or a single docs page) that
-      indexes the `.cvx` samples, the SDK snippets, and the GUI demos. One place to point people.
-- [ ] **Version-string hygiene** (3.9): consider a docs build-time token, or a CI check that the
-      README versions match the released `pom.xml` version, so a missed bump fails loudly.
-
-### Phase 3 — Reduce first-impression friction (later)
-
-- [ ] **Notarized macOS `.dmg` / signed Windows installer** via `jpackage` in the release
-      workflow (3.12), so GUI users do not hit OS security warnings.
-- [ ] **Consider doc versioning** once the public API surface starts moving (3.13).
-
----
-
-## 5. How we will know it worked
-
-DX is hard to measure, but these are observable proxies:
-
-- **Time-to-first-result**: a new developer goes from the README to a visible transaction/query
-  result with zero detours. Target: < 5 minutes, one page, no dead links.
-- **Zero broken links** from any in-repo README into the docs or the filesystem (add a
-  link-check to CI).
-- **Smart-contract on-ramp exists**: a reader can deploy a trivial actor without leaving the
-  repo's recommended path.
-- **Single front door**: every "getting started" surface routes to the same canonical quickstart.
-
----
-
-## 6. Open questions for the team
-
-1. ~~Which front door is canonical?~~ **DECIDED (§7.3)**: the Web REPL is the headline quick start
-   on every surface; SDK / own-peer / Lisp are secondary options below it. Testnet for onboarding.
-2. ~~Does the web server rewrite `/install.sh`, or is `/public/` the real path?~~ **Resolved**:
-   `/install.sh` and `/install.ps1` are served directly (200); `/public/...` 404s. Scripts fixed.
-3. ~~Is a notarized native build in scope?~~ **DECIDED (2026-06-15)**: no — the audience can run
-   a jar, so just *document* the OS first-run prompt (done: first-run notes on the convex-gui
-   README and the convex.world Downloads page). Revisit signed/notarised installers only when the
-   Desktop app becomes a featured distribution.
-4. ~~Should examples live in-repo or only in docs `recipes`?~~ **DECIDED (§8)**: docs recipes is
-   canonical; `.cvx` stays in test resources, now indexed from an "Examples" section in the README.
-
----
-
-## 7. Cross-repo findings — convex.world (website) and design (docs)
-
-The onboarding journey spans three repos. Reviewed 2026-06-15. Same P0–P3 lensing.
-None of these are fixed yet — they live in other repos (and `convex.world` currently has
-uncommitted WIP, so I left it untouched).
-
-### 7.1 convex.world (Next.js marketing site)
-
-**Strengths:** a *real* live Sandbox/REPL against an actual peer (not just marketing); a strong
-Developers dropdown deep-linking SDKs/CLI/Desktop/CADs; and a Downloads page whose install
-one-liner matches the convex repo exactly.
-
-**Issues:**
-- **[P0] Broken jar download on the Tools page.** `curl -O https://convex.world/convex.jar`
-  resolves to an HTML meta-refresh stub (`public/convex.jar/index.html`), not a jar — `curl -O`
-  saves the HTML. Contradicts the correct install.sh/releases path on the Downloads page.
-  (`src/app/(developers)/tools/page.tsx`)
-- **[P1] No developer CTA above the fold.** The hero offers only "Vision" and "Sandbox" — no
-  Get Started / Docs / Install / GitHub. (`src/components/Hero.tsx`)
-- **[P1] Stale "Protocol v0.7.14"** hardcoded in the sitewide footer (actual 0.8.x).
-  (`src/components/Footer.tsx`)
-- **[P2] Testnet vs Protonet mixed signals.** Default interactive peer is the personal
-  `mikera1337-…hf.space` testnet, while comments/footer/nav say `peer.convex.live`.
-  (`src/lib/convex-api.ts`, `Footer.tsx`)
-- **[P2] Local-dev README inaccurate** — wrong page path (`app/` vs `src/app/`) and silent on the
-  sibling `convex.ts` build prerequisite that actually blocks `pnpm install`; accurate steps are
-  only in `AGENTS.md`. (`README.md`)
-- **[P3] Discord invite mismatch** — site uses `xfYGq4CT7v`; the convex repo README uses
-  `discord.gg/5j2mPsk`. Reconcile to one.
-
-**Fixed 2026-06-15:** broken Tools-page jar download, stale footer version (→ v0.8.5), README
-`app/`→`src/app/` path, Discord invite (→ canonical). Hero CTA + testnet/Protonet default now
-resolved by §7.3 (implementation pending). The `convex.ts` "build prerequisite" was a non-issue —
-the dependency is npm `^0.3.0`, not a `file:` ref, so `pnpm install` works without it.
-
-### 7.2 design (Docusaurus docs, docs.convex.world)
-
-**Strengths:** clear role-based learning paths; a genuinely beginner-friendly "Gentle Lisp
-Introduction"; and a self-contained Java local-peer quickstart that produces real output (the
-single strongest onboarding artefact). Three of four SDKs have full, parallel page sets.
-
-**Issues:**
-- **[P0] The flagship "zero-install testnet, 1 min" quickstart can't run end-to-end.** Account
-  creation / funding is commented out (`quickstart.md:134,155`), so the promised first win never
-  lands — a copy-paste newcomer hits a no-account/FUNDS wall. (`tutorial/quickstart.md`)
-- **[P1] No GUI / web-REPL front door in the quickstart.** The actual fastest path (Desktop
-  terminal or web sandbox) is omitted; the sandbox setup in the Lisp guide is commented out.
-  (`quickstart.md`, `convex-lisp/lisp-guide.md:22-30`)
-- **[P1] Convex Lisp landing page dead-ends.** `convex-lisp/index.md` never links to its own
-  "Gentle Lisp Introduction" or child pages (only external clojure/racket links). Add a "start
-  here" block like `actors/index.md` has. (`convex-lisp/index.md`)
-- **[P1] ~~Four broken relative links in `actors/index.md`~~ — MISDIAGNOSIS (withdrawn).** With
-  `trailingSlash: false`, relative links from the `/docs/tutorial/actors` index resolve against
-  `/docs/tutorial/`, so the original `./actors/concepts` was **correct**. `pnpm build` confirmed
-  it; an earlier "fix" to `./concepts` actually broke them and has been reverted. Lesson: verify
-  doc links with a build, not by reasoning about file paths.
-- **[P1] Stale `convex-java:0.8.2`** pinned across quickstart/index/java pages (released is 0.8.5);
-  peer-ops download URLs hardcode `v0.8.2`/`v0.8.3`.
-- **[P2] JavaScript SDK structural parity gap** — a single page, sidebar `items: []`, silently
-  redirecting to the TypeScript sub-pages, while badged "production ready" like the full SDKs.
-  (`client-sdks/javascript/index.md`, `sidebars.ts`) — **DONE 2026-06-15**: relabelled the TS
-  category "TypeScript / JavaScript"; the JS page (which turned out to be a full plain-JS guide,
-  not a stub) is re-parented as a sub-page under it and the separate top-level JS category removed.
-  URL unchanged → no redirect needed; the blog / SDK-index / tutorial-index inbound links still resolve.
-- **[P2] "Production" mislabeled with the testnet URL** in `client-sdks/java/quickstart.md:21`.
-- **[P2] README omits local docs build** (pnpm) — only in `AGENTS.md`.
-
-**Fixed 2026-06-15 (verified via `pnpm build`):** Convex-Lisp landing-page dead-end ("Where to
-start" block added, using `.md` links — the child pages have custom slugs), `convex-java` versions
-→ 0.8.5, peer-ops download URLs (dropped bad `v` prefix), "Production" URL → `peer.convex.live`,
-docs README local-build section, and the JS→TS SDK fold. (The `actors/` links were a misdiagnosis —
-see above.) **Newly found, pre-existing & out of scope:** 3 broken `overview/* → cad/*/README.md`
-links (`faq.md`, `lattice.md`, `use-cases.md`) — candidates for a future link-check in CI. Still
-open: the non-runnable testnet quickstart (P0, pending §7.3 impl).
-
-### 7.3 The golden path — DECIDED (REPL headline, then options)
-
-Resolved 2026-06-15 (mike). The README, docs quickstart, and website hero all open the same way:
-
-**Headline quick start — the Web REPL (Sandbox) on convex.world.** Zero-install, universal first
-win: paste `(+ 1 2 3)`, see a result, then deploy a one-line actor. This is the hook everyone hits
-first — no choice required up front.
+**Headline quick start — the Web REPL (Sandbox) on convex.world.** Zero-install, universal
+first win: paste `(+ 1 2 3)`, see a result, then deploy a one-line actor. No persona choice
+required up front.
 
 **Then secondary "go further" options** below the headline (cards/links):
-- **Try an SDK** — TS / Java / Python against the hosted testnet (faucet account) → build an app.
-- **Run your own peer** — `convex.jar` via CLI (`convex local start`) or Convex Desktop → full control / offline.
+- **Try an SDK** — TypeScript/JavaScript, Java, or Python against the hosted testnet (faucet
+  account) → build an app.
+- **Run your own peer** — `convex.jar` via CLI (`convex local start`) or Convex Desktop →
+  full control / offline.
 - **Write Convex Lisp** — language guide + actor development.
 - **Operate a peer** — peer-operations.
 
-Testnet endpoint stays `mikera1337-convex-testnet.hf.space` for now (a **proper branded testnet is
-planned**); keep the value in one place per surface so the eventual swap is a one-line change, not
-another scattered find-replace. This also settles testnet-vs-Protonet: **testnet for onboarding**,
-Protonet referenced as production.
+**Network:** testnet for onboarding, Protonet referenced as production. The testnet endpoint
+stays `mikera1337-convex-testnet.hf.space` for now (a proper branded testnet is planned) — keep
+the value in **one place per surface** so the eventual swap is a one-line change.
 
-This decision drives the still-open implementation of 3.3–3.6 (README first-5-min + REPL + first
-actor), the 7.2 quickstart restructure, and the 7.1 hero CTA (hero leads with the REPL "try it"
-plus the secondary options + a Docs/GitHub link).
-
-### 7.4 Recurring cross-repo theme: version drift
-
-Stale version/identity strings appear in **all three** repos (convex READMEs `0.8.5` by hand;
-docs `0.8.2`; website footer `v0.7.14`; two different Discord invites). This argues for a single
-source of truth plus a CI check that fails when published surfaces disagree with the released
-`pom.xml` version (ties to item 3.9).
-
-**Resolved 2026-06-15 (light version):** `BUILD.md`'s release checklist now lists the downstream
-version references (design docs + convex.world footer) to bump in lockstep — no new CI. A
-grep-based CI guard remains a possible future add-on, not built now.
+This maps cleanly to the four personas: evaluators and smart-contract-curious devs land on the
+REPL; app developers branch to an SDK or their own jar; operators go to peer-ops.
 
 ---
 
-## 8. Smaller decisions (2026-06-15)
+## 2. Remaining work — implement the golden path
 
-- **Examples (3.11, Q4) — DECIDED:** docs `recipes` is the canonical home; the runnable `.cvx`
-  stays in `convex-core` test resources and is now indexed from a new "Examples" section in the
-  convex README. No new top-level `examples/` dir.
-- **CLI reference generation (3.8) — DEFERRED:** generate from picocli later, only if the
-  hand-maintained command table becomes a maintenance pain.
-- **CONTRIBUTING quickstart (3.10) — DEFERRED:** worth a short `CONTRIBUTING.md`; not created yet
-  (new surface — draft on request).
-- **Docs versioning (3.13) — DEFERRED:** revisit when the public API starts moving.
+One substantive task, best done **docs-first** (the quickstart is the canonical source the
+other surfaces link to), with a `pnpm build` check before each push.
+
+- [ ] **Docs `tutorial/quickstart.md`** — restructure to REPL-headline + options. Fix the
+      flagship "zero-install testnet" path, which currently **cannot run end-to-end**: account
+      creation/funding is commented out (`quickstart.md:134,155`), so a copy-paste newcomer hits
+      a no-account/FUNDS wall. Add the genuinely-fastest path (web Sandbox or Desktop Client
+      Terminal) — today the quickstart omits it and the Lisp-guide sandbox block is commented
+      out (`convex-lisp/lisp-guide.md:22-30`).
+- [ ] **convex `README.md`** — add a "Your first transaction" block that leads with the REPL and
+      ends in an observable result, plus a minimal `^:callable` "hello, actor" snippet; link to
+      the docs quickstart. Make the GUI a *second* step, not the first.
+- [ ] **convex.world hero** (`src/components/Hero.tsx`) — add a primary "Start building" CTA that
+      routes to the golden path (REPL try-it + the secondary options + a Docs/GitHub link). The
+      hero currently offers only "Vision" and "Sandbox".
+
+---
+
+## 3. Completed 2026-06-15 (committed + pushed)
+
+**convex**
+- Install-script SYNC comments corrected to the live `convex.world/install.{sh,ps1}` URLs
+  (verified: `/install.sh` 200, `/public/...` 404).
+- `convex-core` README "Java Examples" link → real examples (`convex/core/examples`, incl. `RawCVM.java`).
+- README Java prerequisite → Adoptium Temurin (no Oracle login wall).
+- README Discord link → canonical invite (`discord.com/invite/xfYGq4CT7v`).
+- README "Examples" section indexing the `.cvx` demos, the Java examples, and the docs recipes/SDK quickstarts.
+- Desktop (`convex-gui`) README: "First run on macOS / Windows" note (Gatekeeper/SmartScreen workaround for the unsigned jar).
+- `BUILD.md`: release checklist now lists downstream version references (docs + website footer) to bump in lockstep.
+
+**design (docs)**
+- `convex-java` version `0.8.2` → `0.8.5` across quickstart/index/SDK pages.
+- Peer-ops download URLs fixed (dropped the bad `v` prefix; tags have none) and bumped to `0.8.5`.
+- `java/quickstart` "Production" now points at `peer.convex.live` (was the testnet URL).
+- Convex-Lisp landing page: "Where to start" block linking the Lisp guides (slug-safe `.md` links).
+- docs README: "Running the docs locally" (pnpm) section.
+- **JS → TS SDK fold**: one "TypeScript / JavaScript" SDK; the (substantial) JS guide re-parented
+  under it, separate top-level JS category removed; URL unchanged so inbound links still resolve.
+- Verified clean with `pnpm build`.
+
+**convex.world**
+- Tools-page jar download now pulls the real release asset (was an HTML-stub `curl -O`).
+- README editable-page path `app/` → `src/app/`.
+- Footer: stale `v0.7.14` → `v0.8.5`, HTTPS swagger URL, internal links via `next/link`.
+- Downloads page: jar first-run OS-prompt note.
+- Installer hardening (atomic download, robust PATH/writability checks) + a CI workflow that
+  lint/typecheck/test/builds and smoke-tests the installers on Linux & Windows.
+
+---
+
+## 4. Deferred / parked (with rationale)
+
+- **CLI reference generation** — the `convex-cli` README command table is hand-maintained and will
+  drift; generate it from picocli *if/when* that becomes a maintenance pain.
+- **`CONTRIBUTING.md` quickstart** — a short "clone → `mvn install` → `mvn test` → module map →
+  good-first-issue" guide would help code contributors. New surface; draft on request.
+- **Docs versioning** — users on an old jar read HEAD docs. Revisit when the public API moves.
+- **Notarized native installers** — decided **no**: the audience can run a jar, so we *documented*
+  the OS first-run prompt instead. Revisit signing/notarisation only if Desktop becomes a featured
+  distribution (and gate any notarisation to release branches — it has been slow/expensive before).
+- **Version-drift CI guard** — the release checklist covers it now; a grep-based CI check that
+  fails when published surfaces disagree with the released `pom.xml` version is an optional add-on.
+- **Pre-existing broken docs links** (found via `pnpm build`, out of scope): `overview/* →
+  cad/*/README.md` in `faq.md`, `lattice.md`, `use-cases.md`. Good first targets for a docs
+  link-check in CI.
+
+---
+
+## 5. Strengths to protect (don't regress)
+
+- **`README.md`** — clear value prop, honest comparison table, one-line install + multiple options.
+- **`convex-cli/README.md`** — task-oriented use-cases, copy-pasteable commands, documented exit codes.
+- **`convex-java/README.md`** — connect → account → query → transact → async, with a thread-safety caveat.
+- **Install scripts** — Java-version check, writable-PATH handling, `CONVEX_VERSION`/`CONVEX_HOME`.
+- **Docs** — coherent role-based learning path, a genuinely beginner-friendly "Gentle Lisp
+  Introduction", and a self-contained Java local-peer quickstart that produces real output.
+- **convex.world** — a real live Sandbox/REPL against an actual peer, and a strong Developers menu.
+
+## 6. Success measures
+
+- **Time-to-first-result** < 5 minutes, one page, no dead links.
+- **Zero broken links** from any README/doc (add a CI link-check).
+- **Smart-contract on-ramp exists** — a reader can deploy a trivial actor without leaving the path.
+- **Single front door** — every "getting started" surface routes to the same golden path.
+
+---
+
+*Lesson logged: verify doc links with `pnpm build`, not by reasoning about paths — `design` uses
+`trailingSlash: false` (relative links resolve against the parent dir), custom page `slug`s, and
+`onBrokenLinks: 'warn'` (broken links don't fail the build).*
