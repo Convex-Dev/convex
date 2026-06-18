@@ -501,6 +501,88 @@ public class UCANTest {
 		assertTrue(UCANValidator.checkTemporalBounds(token, NOW));
 	}
 
+	// ===== capabilitiesFor =====
+	//
+	// Post-ingress: given already-verified proofs, collect the capabilities
+	// granted to a specific audience by a specific (trusted) issuer. The
+	// audience/issuer policy is supplied by the caller; selection is fail-closed.
+
+	private static final AString ROOT_DID = UCAN.toDIDKey(ROOT_KP.getAccountKey());
+	private static final AString AGENT_A_DID = UCAN.toDIDKey(AGENT_A_KP.getAccountKey());
+
+	/** A verified-shape proof token (as parseTransportUCANs would yield). */
+	private static ACell proofToken(AKeyPair iss, AccountKey aud, long exp, AVector<ACell> caps) {
+		return UCAN.create(iss, aud, exp, caps, Vectors.empty()).toMap();
+	}
+
+	private static AVector<ACell> oneCap(String with, AString can) {
+		return Vectors.of((ACell) Capability.create(Strings.create(with), can));
+	}
+
+	@Test
+	public void testCapabilitiesForNullArgsFailClosed() {
+		AVector<ACell> proofs = Vectors.of(proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)));
+		assertNull(UCANValidator.capabilitiesFor(null, AGENT_A_DID, ROOT_DID, NOW));
+		assertNull(UCANValidator.capabilitiesFor(proofs, null, ROOT_DID, NOW), "null audience fails closed");
+		assertNull(UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, null, NOW), "null issuer fails closed");
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testCapabilitiesForMatching() {
+		AVector<ACell> proofs = Vectors.of(proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)));
+		AVector<ACell> caps = UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW);
+		assertNotNull(caps);
+		assertEquals(1L, caps.count());
+		assertTrue(Capability.covers((AMap<AString, ACell>) caps.get(0), "w/health/bp", "crud/read"));
+	}
+
+	@Test
+	public void testCapabilitiesForWrongAudienceExcluded() {
+		AVector<ACell> proofs = Vectors.of(proofToken(ROOT_KP, AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)));
+		assertNull(UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW));
+	}
+
+	@Test
+	public void testCapabilitiesForWrongIssuerExcluded() {
+		AVector<ACell> proofs = Vectors.of(proofToken(ROGUE_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)));
+		assertNull(UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW));
+	}
+
+	@Test
+	public void testCapabilitiesForExpiredExcluded() {
+		AVector<ACell> proofs = Vectors.of(proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(),
+			PAST_EXPIRY, oneCap("w/health", Capability.CRUD_READ)));
+		assertNull(UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW));
+	}
+
+	@Test
+	public void testCapabilitiesForUnionsMatching() {
+		AVector<ACell> proofs = Vectors.of(
+			proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)),
+			proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, oneCap("w/notes", Capability.CRUD_WRITE)));
+		AVector<ACell> caps = UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW);
+		assertNotNull(caps);
+		assertEquals(2L, caps.count());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testCapabilitiesForMixedKeepsOnlyMatching() {
+		AVector<ACell> proofs = Vectors.of(
+			proofToken(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, oneCap("w/health", Capability.CRUD_READ)),
+			proofToken(ROGUE_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, oneCap("w/secret", Capability.TOP)));
+		AVector<ACell> caps = UCANValidator.capabilitiesFor(proofs, AGENT_A_DID, ROOT_DID, NOW);
+		assertNotNull(caps);
+		assertEquals(1L, caps.count(), "rogue-issued caps must be excluded");
+		assertFalse(Capability.covers((AMap<AString, ACell>) caps.get(0), "w/secret/x", "crud/write"),
+			"only the ROOT-issued w/health read survives");
+	}
+
 	// ===== parseTransportUCANs =====
 	//
 	// This is the single trust boundary for inbound transport proofs.
