@@ -111,6 +111,33 @@ convex.transactAsync("(def my-value 42)")
 > sequence number that can become mismatched under concurrent submission. Queries
 > have no such restriction.
 
+## Fungible tokens
+
+`convex-java` includes helpers for deploying and querying CAD29 fungible tokens
+without hand-writing Convex Lisp:
+
+```java
+import convex.core.cvm.Address;
+import convex.java.asset.Fungible;
+import convex.java.asset.TokenBuilder;
+
+// Deploy a new fungible token with a fixed supply (minted to the active account)
+Fungible token = new TokenBuilder()
+    .withSupply(1_000_000)
+    .deploy(convex);
+
+// Check balances
+long mine = token.getBalance();                       // active account
+long theirs = token.getBalance(Address.create(11));   // another holder
+
+// Wrap an already-deployed token by its address
+Fungible existing = Fungible.create(convex, Address.create(128));
+```
+
+These helpers call the on-chain `convex.fungible` library via its CNS path
+(`@convex.fungible/…`), so deployment requires a funded account with a key pair
+set (a transaction); balance checks are free queries.
+
 ## Key Concepts
 
 | Concept | Description |
