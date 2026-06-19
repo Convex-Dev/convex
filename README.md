@@ -73,6 +73,24 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 
 ## Getting Started
 
+### Your first transaction (no install)
+
+The fastest way to try Convex is the **[Web Sandbox](https://convex.world/sandbox)** — a live REPL on the public testnet. Evaluate an expression, then deploy and call a one-line smart contract:
+
+```clojure
+;; Free query — no account needed
+(+ 1 2 3)
+;; => 6
+
+;; With a faucet-funded account, deploy and call an actor (a smart contract)
+(deploy '(defn ^:callable greet [name] (str "Hello, " name "!")))
+;; => #1234   ;; your new actor's address
+(call #1234 (greet "world"))
+;; => "Hello, world!"
+```
+
+Want the full walkthrough — including the TypeScript, Python, and Java SDKs against the testnet? See the **[Quick Start guide](https://docs.convex.world/docs/tutorial/quickstart)**.
+
 ### Prerequisites
 
 - Java 21+ ([Download Temurin](https://adoptium.net/temurin/releases/?version=21))
