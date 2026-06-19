@@ -77,13 +77,16 @@ example (§3).
   already on `develop`; no deploy needed.)
 
 **Verify (before/after shipping):**
-- **Per-language SDK quickstarts** (`client-sdks/{java,python,typescript}/quickstart`) were
-  name-swept but not yet live-verified end-to-end the way the top-level quickstart was — the
-  "Try an SDK" buttons point straight at them, so they must run clean. (The top-level quickstart
-  caught real SDK bugs; these pages may too.)
-- **Java testnet example** — live spot-check the `ConvexJSON` + `useNewAccount` path (TS and
-  Python are verified end-to-end against the published packages).
-- **Lisp-guide sandbox block** — uncomment and verify it runs.
+- [x] **Per-language SDK quickstarts** — verified and fixed (2026-06-19). Each was broken or
+  inconsistent: the **Python** page connected to production then called the faucet (testnet-only)
+  → pointed at the testnet; the **Java** page used the binary `convex.api.Convex` client against
+  an HTTPS endpoint with fake `#1234` addresses → rewritten to `ConvexJSON` + `useNewAccount`;
+  the **TypeScript** page required a BYO production account → now leads with a testnet
+  create+faucet flow (production/BYO kept as a note). Python verified end-to-end on the published
+  package; Java live spot-checked on the testnet.
+- [x] **Java testnet example** — live spot-checked (`ConvexJSON` + `useNewAccount` → transact →
+  query → `JAVA_OK`); this also confirms the top-level quickstart's Java example.
+- [ ] **Lisp-guide sandbox block** — uncomment and verify it runs.
 
 **Keep one-line-swap items from scattering again:**
 - The **testnet endpoint** `mikera1337-convex-testnet.hf.space` is still a placeholder for a
