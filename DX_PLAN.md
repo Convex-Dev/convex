@@ -4,19 +4,23 @@ How a new developer discovers, understands, and gets started with Convex — and
 to improve. Covers the three onboarding repos: `convex`, `design` (docs.convex.world), and
 `convex.world` (website).
 
-Reviewed 2026-06-15 · last updated 2026-06-15.
+Reviewed 2026-06-15 · **golden path implemented 2026-06-19** · last updated 2026-06-19.
 
 ## Status
 
-A full onboarding review is done and **almost all quick wins are shipped** (committed and
-pushed across the three repos — see §3). The major design decision — the **golden path** — is
-settled (§1). The one substantial piece of work still outstanding is **implementing** that
-golden path across the README, docs quickstart, and website hero (§2). A handful of items are
-deliberately deferred (§4).
+The onboarding review, the quick wins, **and the golden path itself are now implemented**. The
+design decision (§1) is settled and built (§2, committed 2026-06-19): the docs quickstart,
+convex `README`, and convex.world hero all open with the zero-install Web Sandbox, and the
+previously-broken zero-install path now runs end-to-end. Along the way the Python SDK was
+renamed (`convex-sdk` / `import convex_sdk`) and re-released so its docs are accurate, and a
+naming sweep brought the docs in line (§4).
+
+What's left is **deploying** the docs/site changes and a short list of **verification
+follow-ups** — see **§3 Next steps**. A handful of items remain deliberately deferred (§5).
 
 ---
 
-## 1. The golden path (decided — drives the remaining work)
+## 1. The golden path (decided — now implemented)
 
 The README, docs quickstart, and website hero should all open the same way:
 
@@ -41,27 +45,82 @@ REPL; app developers branch to an SDK or their own jar; operators go to peer-ops
 
 ---
 
-## 2. Remaining work — implement the golden path
+## 2. Implement the golden path — DONE (2026-06-19)
 
-One substantive task, best done **docs-first** (the quickstart is the canonical source the
-other surfaces link to), with a `pnpm build` check before each push.
+Built docs-first (the quickstart is the canonical source the other surfaces link to), verified
+with `pnpm build` and a live testnet check of the headline snippet. Committed across the three
+repos; **deploy pending** (§3).
 
-- [ ] **Docs `tutorial/quickstart.md`** — restructure to REPL-headline + options. Fix the
-      flagship "zero-install testnet" path, which currently **cannot run end-to-end**: account
-      creation/funding is commented out (`quickstart.md:134,155`), so a copy-paste newcomer hits
-      a no-account/FUNDS wall. Add the genuinely-fastest path (web Sandbox or Desktop Client
-      Terminal) — today the quickstart omits it and the Lisp-guide sandbox block is commented
-      out (`convex-lisp/lisp-guide.md:22-30`).
-- [ ] **convex `README.md`** — add a "Your first transaction" block that leads with the REPL and
-      ends in an observable result, plus a minimal `^:callable` "hello, actor" snippet; link to
-      the docs quickstart. Make the GUI a *second* step, not the first.
-- [ ] **convex.world hero** (`src/components/Hero.tsx`) — add a primary "Start building" CTA that
-      routes to the golden path (REPL try-it + the secondary options + a Docs/GitHub link). The
-      hero currently offers only "Vision" and "Sandbox".
+- [x] **Docs `tutorial/quickstart.md`** — restructured to the Web-Sandbox headline (evaluate →
+      faucet-funded account → deploy + call a `^:callable` actor) with "Go further" cards (Try an
+      SDK with Java/Python/JS-TS buttons, run a peer, Convex Lisp, operate a peer). The broken
+      zero-install path is fixed: all three SDK examples now create + fund + wire an account
+      before transacting, and the actor deploy/call is verified live on the testnet. Stale
+      `(export …)` actor examples were updated to `^:callable`.
+- [x] **convex `README.md`** — added a "Your first transaction (no install)" block leading with
+      the Sandbox + a `^:callable` "hello, actor", linking to the docs quickstart; install/GUI is
+      now the step *after*.
+- [x] **convex.world hero** (`src/components/Hero.tsx`) — added a primary "Start building" CTA →
+      `/developers`; kept Sandbox; demoted Vision to secondary.
+
+Still open from the original scope: the **Lisp-guide sandbox block** (`convex-lisp/lisp-guide.md`,
+~lines 22-30) is still commented out — uncomment it so the language guide has a runnable first
+example (§3).
 
 ---
 
-## 3. Completed 2026-06-15 (committed + pushed)
+## 3. Next steps
+
+**Ship it (deploy the committed work):**
+- `design` → docs.convex.world deploys on **master** push: `git -C design push origin master`.
+- `convex.world` hero deploys on **master**: merge `develop` → `master`. (convex `README` is
+  already on `develop`; no deploy needed.)
+
+**Verify (before/after shipping):**
+- **Per-language SDK quickstarts** (`client-sdks/{java,python,typescript}/quickstart`) were
+  name-swept but not yet live-verified end-to-end the way the top-level quickstart was — the
+  "Try an SDK" buttons point straight at them, so they must run clean. (The top-level quickstart
+  caught real SDK bugs; these pages may too.)
+- **Java testnet example** — live spot-check the `ConvexJSON` + `useNewAccount` path (TS and
+  Python are verified end-to-end against the published packages).
+- **Lisp-guide sandbox block** — uncomment and verify it runs.
+
+**Keep one-line-swap items from scattering again:**
+- The **testnet endpoint** `mikera1337-convex-testnet.hf.space` is still a placeholder for a
+  proper branded testnet. It now appears in the quickstart, README, and SDK examples — keep each
+  surface's value in one place so the eventual swap stays cheap.
+
+**CI hygiene (cheap, high-leverage):**
+- Add a **docs link-check** to design CI — the build only warns on broken links
+  (`onBrokenLinks: 'warn'`), and three are still broken (`overview/* → cad/*/README.md` in
+  `faq.md`, `lattice.md`, `use-cases.md`). Good first cleanup plus a guard.
+- Optional **version-drift guard**: a grep check that fails when a published surface disagrees
+  with the released `pom.xml` / package version.
+
+---
+
+## 4. Completed
+
+### 2026-06-19 — golden path + SDK accuracy
+
+- **Golden-path restructure** across the three surfaces (§2): Sandbox headline, SDK/peer/Lisp
+  cards, fixed runnable testnet examples.
+- **Python SDK renamed and re-released.** PyPI distribution `convex-api-py` → **`convex-sdk`**,
+  import `convex_api` → **`convex_sdk`** (GitHub repo stays `convex-api-py`). Set up PyPI
+  trusted-publishing CI and released **0.3.3**, which also fixed two response-model bugs that
+  broke the faucet/transact flow against the testnet (found via live test). The quickstart's
+  Python path now works on the published package.
+- **Naming sweep** across 9 design doc pages (`convex-api`/`convex_api` → `convex-sdk`/
+  `convex_sdk`), preserving GitHub-repo URLs and the `ConvexAPIError` class.
+- **convex.ts**: fixed the publish workflow (build before test — every `@dev` snapshot had been
+  failing); documented the asset/CNS/account handles + `MemoryKeyStore`; removed an orphaned
+  `jest.config.js`.
+- **convex-java**: asset helpers (`Fungible`, `TokenBuilder`) now use the `@convex.fungible/…`
+  CNS path instead of the `import` anti-pattern (verified live); documented the helpers.
+- **convex.cljc**: flagged as requiring an update for the current Convex version (it targets
+  0.7.11) and excluded from the supported SDK set until revived.
+
+### 2026-06-15 — quick wins
 
 **convex**
 - Install-script SYNC comments corrected to the live `convex.world/install.{sh,ps1}` URLs
@@ -93,7 +152,7 @@ other surfaces link to), with a `pnpm build` check before each push.
 
 ---
 
-## 4. Deferred / parked (with rationale)
+## 5. Deferred / parked (with rationale)
 
 - **CLI reference generation** — the `convex-cli` README command table is hand-maintained and will
   drift; generate it from picocli *if/when* that becomes a maintenance pain.
@@ -103,15 +162,10 @@ other surfaces link to), with a `pnpm build` check before each push.
 - **Notarized native installers** — decided **no**: the audience can run a jar, so we *documented*
   the OS first-run prompt instead. Revisit signing/notarisation only if Desktop becomes a featured
   distribution (and gate any notarisation to release branches — it has been slow/expensive before).
-- **Version-drift CI guard** — the release checklist covers it now; a grep-based CI check that
-  fails when published surfaces disagree with the released `pom.xml` version is an optional add-on.
-- **Pre-existing broken docs links** (found via `pnpm build`, out of scope): `overview/* →
-  cad/*/README.md` in `faq.md`, `lattice.md`, `use-cases.md`. Good first targets for a docs
-  link-check in CI.
 
 ---
 
-## 5. Strengths to protect (don't regress)
+## 6. Strengths to protect (don't regress)
 
 - **`README.md`** — clear value prop, honest comparison table, one-line install + multiple options.
 - **`convex-cli/README.md`** — task-oriented use-cases, copy-pasteable commands, documented exit codes.
@@ -121,15 +175,23 @@ other surfaces link to), with a `pnpm build` check before each push.
   Introduction", and a self-contained Java local-peer quickstart that produces real output.
 - **convex.world** — a real live Sandbox/REPL against an actual peer, and a strong Developers menu.
 
-## 6. Success measures
+## 7. Success measures
 
-- **Time-to-first-result** < 5 minutes, one page, no dead links.
-- **Zero broken links** from any README/doc (add a CI link-check).
+- **Time-to-first-result** < 5 minutes, one page, no dead links. — *met: the Sandbox headline is a
+  sub-minute first result.*
 - **Smart-contract on-ramp exists** — a reader can deploy a trivial actor without leaving the path.
-- **Single front door** — every "getting started" surface routes to the same golden path.
+  — *met: the headline deploys and calls a `^:callable` actor.*
+- **Single front door** — every "getting started" surface routes to the same golden path. — *met:
+  quickstart, README, and hero all lead with the Sandbox.*
+- **Zero broken links** from any README/doc (add a CI link-check). — *partial: the quickstart is
+  clean; three pre-existing `overview/*` links remain (see §3).*
 
 ---
 
-*Lesson logged: verify doc links with `pnpm build`, not by reasoning about paths — `design` uses
-`trailingSlash: false` (relative links resolve against the parent dir), custom page `slug`s, and
-`onBrokenLinks: 'warn'` (broken links don't fail the build).*
+*Lessons logged:*
+- *Verify doc links with `pnpm build`, not by reasoning about paths — `design` uses
+  `trailingSlash: false` (relative links resolve against the parent dir), custom page `slug`s, and
+  `onBrokenLinks: 'warn'` (broken links don't fail the build).*
+- *Live-test SDKs against a real venue before documenting a flow — the public testnet caught
+  faucet and transaction-hash response-model bugs in the Python SDK that unit tests and reasoning
+  both missed.*
