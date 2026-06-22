@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -153,33 +154,81 @@ public class IndexMergeTest {
 		}
 	}
 
+	/**
+	 * Functions that preserve a single-side value: {@code func(v, null)} and {@code func(null, v)}
+	 * are equal to {@code v}. Merging with such a function is a no-op when nothing new is added.
+	 * (DROP_EVEN is excluded — it can drop a one-sided value.)
+	 */
+	static final List<MergeFunction<CVMLong>> SINGLE_SIDE_PRESERVING = List.of(PICK_A, PICK_B, MAX, SUM);
+
+	static Index<ABlob, CVMLong> copyOf(Index<ABlob, CVMLong> a) {
+		Index<ABlob, CVMLong> m = Index.none();
+		long n = a.count();
+		for (long i = 0; i < n; i++) {
+			MapEntry<ABlob, CVMLong> e = a.entryAt(i);
+			m = m.assoc(e.getKey(), e.getValue());
+		}
+		return m;
+	}
+
+	static Index<ABlob, CVMLong> subsetOf(Index<ABlob, CVMLong> a, Random r) {
+		Index<ABlob, CVMLong> m = Index.none();
+		long n = a.count();
+		for (long i = 0; i < n; i++) {
+			if (r.nextBoolean()) {
+				MapEntry<ABlob, CVMLong> e = a.entryAt(i);
+				m = m.assoc(e.getKey(), e.getValue());
+			}
+		}
+		return m;
+	}
+
+	/**
+	 * Identity contract: {@code mergeDifferences} MUST return the receiver by reference identity
+	 * whenever the merged result equals the receiver (no allocation on a no-op). Exercised across
+	 * random radix structures so the aligned, nested and empty cases all occur.
+	 */
 	@Test
 	public void testNoOpReturnsIdentity() {
-		Random r = new Random(42);
-		Index<ABlob, CVMLong> a = Index.none();
-		List<ABlob> keys = new ArrayList<>();
-		for (int i = 0; i < 60; i++) {
-			ABlob k = randomKey(r);
-			keys.add(k);
-			a = a.assoc(k, CVMLong.create(r.nextInt(1000)));
+		for (int seed = 2000; seed < 2200; seed++) {
+			Random r = new Random(seed);
+			Index<ABlob, CVMLong> a = Index.none();
+			int n = 1 + r.nextInt(40);
+			for (int i = 0; i < n; i++) a = a.assoc(randomKey(r), CVMLong.create(r.nextInt(1000)));
+			String ctx = "seed=" + seed;
+
+			// 1. Self-merge: no function is invoked, identity for every function
+			for (MergeFunction<CVMLong> f : FUNCS) assertSame(a, a.mergeDifferences(a, f), "self " + ctx);
+
+			// 2. Independently-built equal copy: still no function invoked, identity for every function
+			Index<ABlob, CVMLong> copy = copyOf(a);
+			assertNotSame(a, copy); // genuinely a different object with equal content
+			for (MergeFunction<CVMLong> f : FUNCS) assertSame(a, a.mergeDifferences(copy, f), "copy " + ctx);
+
+			// 3. Empty right operand, single-side-preserving function: identity
+			for (MergeFunction<CVMLong> f : SINGLE_SIDE_PRESERVING)
+				assertSame(a, a.mergeDifferences(Index.none(), f), "empty " + ctx);
+
+			// 4. Independently-built subset (covers aligned + nested no-ops), single-side-preserving: identity
+			Index<ABlob, CVMLong> subset = subsetOf(a, r);
+			for (MergeFunction<CVMLong> f : SINGLE_SIDE_PRESERVING)
+				assertSame(a, a.mergeDifferences(subset, f), "subset " + ctx);
 		}
+	}
 
-		// Merging with self short-circuits.
-		assertSame(a, a.mergeDifferences(a, PICK_A));
-
-		// Merging with empty, identity-on-single-side func: no allocation, returns the same object.
-		assertSame(a, a.mergeDifferences(Index.none(), MAX));
-		assertSame(a, a.mergeDifferences(Index.none(), PICK_A));
-
-		// Merging with an independently-built subset of itself (equal values), left-biased:
-		// every key is either equal-in-both or a-only, so the result is a with zero allocation.
-		Index<ABlob, CVMLong> subset = Index.none();
-		for (int i = 0; i < keys.size(); i += 2) {
-			ABlob k = keys.get(i);
-			subset = subset.assoc(k, a.get(k));
+	/** Directed no-op through the nested (path-compressed) case: a key that is a prefix of others. */
+	@Test
+	public void testNoOpNestedCase() {
+		Index<ABlob, CVMLong> a = Index.of(
+			Blob.fromHex("ab"), CVMLong.create(1),
+			Blob.fromHex("abcd"), CVMLong.create(2),
+			Blob.fromHex("abef"), CVMLong.create(3));
+		// b nests a single deeper key already present in a with the same value
+		Index<ABlob, CVMLong> b = Index.of(Blob.fromHex("abcd"), CVMLong.create(2));
+		assertNotSame(a, b);
+		for (MergeFunction<CVMLong> f : SINGLE_SIDE_PRESERVING) {
+			assertSame(a, a.mergeDifferences(b, f), "func=" + SINGLE_SIDE_PRESERVING.indexOf(f));
 		}
-		assertSame(a, a.mergeDifferences(subset, PICK_A));
-		assertSame(a, a.mergeDifferences(subset, MAX));
 	}
 
 	@Test

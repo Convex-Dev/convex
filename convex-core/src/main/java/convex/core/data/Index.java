@@ -838,7 +838,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * For every key present in either index, applies {@code func} as for
 	 * {@link AMap#mergeDifferences(AMap, MergeFunction)}: a key present on only one side is passed
 	 * with a {@code null} counterpart; a key present in both with equal values is kept unchanged
-	 * without calling {@code func}. Returns {@code this} by reference if the merge is a no-op.
+	 * without calling {@code func}.
+	 *
+	 * <p>Identity contract (see {@link AMap#mergeDifferences}): returns {@code this} (the exact
+	 * same object, no allocation) whenever the merged result equals {@code this}. The result is
+	 * built bottom-up so that any unchanged sub-trie — and hence the whole node — is returned by
+	 * reference identity, not rebuilt. This is verified by the {@code assertSame} cases in
+	 * {@code IndexMergeTest}.</p>
 	 *
 	 * <p>This is a structural radix merge: identical (or value-equal, detected via {@code Ref}
 	 * equality) sub-tries are skipped in O(1) and shared, so the cost and allocation are
@@ -846,7 +852,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 *
 	 * @param b Other index to merge with
 	 * @param func Merge function for Index values
-	 * @return Updated Index (possibly this);
+	 * @return Merged Index, or {@code this} by reference identity if the result is unchanged
 	 */
 	public Index<K, V> mergeDifferences(Index<K, V> b, MergeFunction<V> func) {
 		return mergeNode(this, b, func);
