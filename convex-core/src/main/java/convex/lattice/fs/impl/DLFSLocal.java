@@ -93,9 +93,9 @@ public class DLFSLocal extends DLFileSystem {
 		if (parentNode==null) {
 			throw new NoSuchFileException(parent.toString());
 		}
-		// Replacing a tombstone is fine — the path is logically free.
+		// A live entry blocks creation; a tombstoned name is absent from live entries, so it is free.
 		AVector<ACell> existing = DLFSNode.getDirectoryEntries(parentNode).get(name);
-		if (existing != null && !DLFSNode.isTombstone(existing)) {
+		if (existing != null) {
 			throw new FileAlreadyExistsException(dir.toString());
 		}
 		updateNode(dir,DLFSNode.createDirectory(getTimestamp()));
@@ -115,9 +115,7 @@ public class DLFSLocal extends DLFileSystem {
 		}
 		AVector<ACell> oldNode=DLFSNode.getDirectoryEntries(parentNode).get(name);
 		if (oldNode!=null) {
-			if (!DLFSNode.isTombstone(oldNode)) {
-				throw new FileAlreadyExistsException(name.toString());
-			}
+			throw new FileAlreadyExistsException(name.toString());
 		}
 		AVector<ACell> newNode=DLFSNode.createEmptyFile(getTimestamp());
 		updateNode(path,newNode);
@@ -127,23 +125,22 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized void delete(DLPath path) throws IOException {
-		path=path.toAbsolutePath();
-		if (path.getNameCount()==0) {
+		final DLPath p=path.toAbsolutePath();
+		if (p.getNameCount()==0) {
 			throw new IOException("Can't delete DLFS Root node");
 		}
-		
+
 		// Check file actually exists
-		AVector<ACell> node=getNode(path);
-		if (node==null) throw new NoSuchFileException(path.toString());
-		
-		// Check it is empty, if a directory. Tombstones don't count: the raw
-		// entries map keeps them for CRDT merge, but the filesystem view of
-		// "empty" only cares about live children.
+		AVector<ACell> node=getNode(p);
+		if (node==null) throw new NoSuchFileException(p.toString());
+
+		// A directory can only be deleted if it has no live children
 		if (DLFSNode.isDirectory(node) && !DLFSNode.isEmpty(node)) {
-			throw new DirectoryNotEmptyException(path.toString());
+			throw new DirectoryNotEmptyException(p.toString());
 		}
-		
-		updateNode(path,DLFSNode.createTombstone(getTimestamp()));
+
+		// Drop the live entry and record a tombstone in the parent directory
+		rootCursor.updateAndGet(rootNode->DLFSNode.deleteNode(rootNode,p,getTimestamp()));
 	}
 
 	@Override
@@ -156,7 +153,7 @@ public class DLFSLocal extends DLFileSystem {
 	protected void checkAccess(DLPath path) throws IOException {
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
-		if ((node==null)||(DLFSNode.isTombstone(node))) {
+		if (node==null) {
 			throw new NoSuchFileException(path.toString());
 		}
 	}

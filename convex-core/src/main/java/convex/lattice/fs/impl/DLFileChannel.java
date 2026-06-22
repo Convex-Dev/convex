@@ -45,10 +45,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			}
 			if (options.contains(StandardOpenOption.CREATE_NEW)) {
 				if (node!=null) {
-					// can create over a tombstone
-					if(!DLFSNode.isTombstone(node)) {
-						throw new FileAlreadyExistsException(path.toString());
-					}
+					throw new FileAlreadyExistsException(path.toString());
 				}
 			}
 			if (options.contains(StandardOpenOption.APPEND)) {
@@ -59,7 +56,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			}
 		}
 		
-		if ((node==null)||DLFSNode.isTombstone(node)) {
+		if (node==null) {
 			if (readOnly) throw new NoSuchFileException(path.toString());
 			node=fs.createFile(path);
 		} else {

@@ -1,5 +1,7 @@
 package convex.lattice.fs;
 
+import java.util.HashSet;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -18,11 +20,17 @@ import convex.core.util.Utils;
 public class DLFSNode {
 	
 	// node structure contents
+	/** Minimum node length. A directory node may carry an optional 5th element (POS_TOMBS). */
 	public static final long NODE_LENGTH = 4;
-	public static final int POS_DIR = 0; // Directory entries as index of nodes
+	public static final int POS_DIR = 0; // Directory entries as index of live child nodes
 	public static final int POS_DATA = 1; // File data as a Blob
 	public static final int POS_METADATA = 2; // arbitrary node metadata
 	public static final int POS_UTIME = 3;
+	/**
+	 * Optional directory tombstone index: maps deleted child name to deletion timestamp.
+	 * Present (node length 5) if and only if non-empty; absent (node length 4) otherwise.
+	 */
+	public static final int POS_TOMBS = 4;
 
 	static final Index<AString,AVector<ACell>> EMPTY_CONTENTS = Index.none();
 	static final Index<AString,AVector<ACell>> NIL_CONTENTS = null;
@@ -30,11 +38,25 @@ public class DLFSNode {
 	static final Blob EMPTY_DATA = Blob.EMPTY;
 	static final ACell EMPTY_METADATA = null;
 	static final CVMLong EMPTY_TIME = CVMLong.ZERO;
-	
+	static final Index<AString,CVMLong> EMPTY_TOMBS = Index.none();
+
 	private static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	private static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
-	private static final AVector<ACell> TOMBSTONE=Vectors.of(NIL_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
-	
+
+	/**
+	 * Recursive merge of two directory child nodes (live entries). A name present on only one
+	 * side is kept unchanged; names present on both are merged recursively. No instrumentation —
+	 * a purely-live change can never be a tombstone conflict, so the live merge needs none.
+	 */
+	private static final MergeFunction<AVector<ACell>> CHILD_MERGE = new MergeFunction<AVector<ACell>>() {
+		@Override
+		public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
+			if (cb==null) return ca;
+			if (ca==null) return cb;
+			return DLFSNode.merge(ca,cb);
+		}
+	};
+
 
 	
 	public static boolean isDirectory(AVector<ACell> node) {
@@ -90,29 +112,88 @@ public class DLFSNode {
 	public static AVector<ACell> updateNode(AVector<ACell> rootNode, DLPath path,AVector<ACell> newNode, CVMLong utime) {
 		int n=path.getNameCount();
 		if (n==0) return newNode;
-		
+
 		if (!isDirectory(rootNode)) return null;
-		
+
 		AString name=path.getCVMName(0);
 		Index<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
-		AVector<ACell> childNode=entries.get(name);
-		
-		childNode=updateNode(childNode,path.subpath(1),newNode,utime);
-		if (childNode==null) {
-			if (n==1) {
-				// deleting an entry at this position
-				entries=entries.dissoc(name);		
+		if (n==1) {
+			Index<AString, CVMLong> tombs = getTombstones(rootNode);
+			if (newNode==null) {
+				// Internal removal of a live entry (no tombstone recorded)
+				entries=entries.dissoc(name);
 			} else {
-				// we failed
-				return null;
+				// Create or modify: name becomes live, clearing any tombstone for it
+				entries=entries.assoc(name, newNode);
+				tombs=tombs.dissoc(name);
 			}
-		} else {
-			// we have an updated child
-			entries=entries.assoc(name, childNode);
+			return withDir(rootNode, entries, tombs, utime);
 		}
-		AVector<ACell> result=rootNode;
+
+		AVector<ACell> childNode=entries.get(name);
+		childNode=updateNode(childNode,path.subpath(1),newNode,utime);
+		if (childNode==null) return null; // failed: an ancestor on the path was not a directory
+		entries=entries.assoc(name, childNode);
+		return withDir(rootNode, entries, getTombstones(rootNode), utime);
+	}
+
+	/**
+	 * Delete the node at the given path, recording a tombstone (deleted child name to deletion
+	 * timestamp) in its parent directory. The deleted child becomes absent from the live entries.
+	 *
+	 * @param rootNode Root node of the (sub)filesystem
+	 * @param path Path of the node to delete, relative to rootNode
+	 * @param utime Deletion timestamp
+	 * @return Updated root node, or the original node unchanged if the path was not a live node
+	 */
+	public static AVector<ACell> deleteNode(AVector<ACell> rootNode, DLPath path, CVMLong utime) {
+		int n=path.getNameCount();
+		if (n==0) return rootNode; // cannot tombstone the root itself
+		if (!isDirectory(rootNode)) return rootNode;
+		AString name=path.getCVMName(0);
+		Index<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
+		if (n==1) {
+			if (entries.get(name)==null) return rootNode; // not a live child
+			entries=entries.dissoc(name);
+			Index<AString, CVMLong> tombs = getTombstones(rootNode).assoc(name, utime);
+			return withDir(rootNode, entries, tombs, utime);
+		}
+		AVector<ACell> childNode=entries.get(name);
+		if (childNode==null) return rootNode; // path does not exist
+		AVector<ACell> newChild=deleteNode(childNode, path.subpath(1), utime);
+		if (newChild==childNode) return rootNode; // nothing changed
+		entries=entries.assoc(name, newChild);
+		return withDir(rootNode, entries, getTombstones(rootNode), utime);
+	}
+
+	/**
+	 * Gets the tombstone index (deleted child name to deletion timestamp) for a directory node.
+	 * Returns the empty index if the node has no tombstones (length 4) or is null.
+	 * @param node Directory node
+	 * @return Tombstone index, never null
+	 */
+	@SuppressWarnings("unchecked")
+	public static Index<AString, CVMLong> getTombstones(AVector<ACell> node) {
+		if (node==null || node.count()<=POS_TOMBS) return EMPTY_TOMBS;
+		return (Index<AString, CVMLong>) node.get(POS_TOMBS);
+	}
+
+	/**
+	 * Rebuilds a directory node with the given live entries, tombstones and timestamp, maintaining
+	 * the canonical invariant that the POS_TOMBS element is present if and only if it is non-empty.
+	 */
+	static AVector<ACell> withDir(AVector<ACell> node, Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs, CVMLong utime) {
+		AVector<ACell> result=node;
 		result=result.assoc(POS_DIR, entries);
 		result=result.assoc(POS_UTIME, utime);
+		boolean has5 = node.count()>POS_TOMBS;
+		if (tombs==null || tombs.isEmpty()) {
+			if (has5) result=result.slice(0, POS_TOMBS); // drop empty tombstone field (5 -> 4)
+		} else if (has5) {
+			result=result.assoc(POS_TOMBS, tombs);
+		} else {
+			result=result.conj(tombs); // append tombstone field (4 -> 5)
+		}
 		return result;
 	}
 	
@@ -151,44 +232,18 @@ public class DLFSNode {
 	}
 
 	/**
-	 * Returns true iff the node is a DLFS tombstone
-	 * @param node Node to test
-	 * @return True if a tombstone, false if anything else (including null)
-	 */
-	public static boolean isTombstone(AVector<ACell> node) {
-		if (node==null) return false;
-		return (!isDirectory(node)&&!isRegularFile(node));
-	}
-
-	/**
-	 * Returns true iff the directory node has no live (non-tombstone) entries.
+	 * Returns true iff the directory node has no live entries.
 	 *
-	 * <p>The raw entries map preserves tombstones for deleted children so they
-	 * can be merged across replicas (CRDT semantics). From the filesystem's
-	 * point of view those entries are gone, so emptiness must be measured
-	 * over live entries only.</p>
+	 * <p>Deleted children are recorded as tombstones in the separate {@link #POS_TOMBS}
+	 * index rather than in the live entries, so emptiness is simply emptiness of the
+	 * live entries.</p>
 	 *
 	 * @param dirNode Node assumed to be a directory
-	 * @return true if {@code dirNode} is a directory with no live children
-	 *         (or not a directory at all — caller decides whether to treat
-	 *         that as a precondition)
+	 * @return true if {@code dirNode} is a directory with no live children (or not a directory)
 	 */
 	public static boolean isEmpty(AVector<ACell> dirNode) {
 		Index<AString, AVector<ACell>> entries = getDirectoryEntries(dirNode);
-		if (entries == null || entries.isEmpty()) return true;
-		long n = entries.count();
-		for (long i = 0; i < n; i++) {
-			if (!isTombstone(entries.entryAt(i).getValue())) return false;
-		}
-		return true;
-	}
-
-	private static AVector<ACell> lastTombstone=TOMBSTONE;
-	public static AVector<ACell> createTombstone(CVMLong timestamp) {
-		AVector<ACell> last=lastTombstone;
-		last= TOMBSTONE.assoc(POS_UTIME,timestamp);
-		lastTombstone=last;
-		return last;
+		return entries == null || entries.isEmpty();
 	}
 
 	private static AVector<ACell> lastDirectory=EMPTY_DIRECTORY;
@@ -227,39 +282,79 @@ public class DLFSNode {
 		Index<AString, AVector<ACell>> contA = getDirectoryEntries(a);
 		Index<AString, AVector<ACell>> contB = getDirectoryEntries(b);
 
-		// might be equal in all content except timestamp, if so take the most recent value.
-		if (Utils.equals(contA, contB)) {
-			if (Utils.equals(getData(a), getData(b))) {
+		if ((contA!=null)&&(contB!=null)) {
+			// Two directories. Merge live entries; reconcile against tombstones only if any exist.
+			Index<AString, CVMLong> tombA = getTombstones(a);
+			Index<AString, CVMLong> tombB = getTombstones(b);
+
+			// Fast path: identical content except timestamp, take the most recent value
+			if (Utils.equals(contA, contB) && Utils.equals(tombA, tombB)) {
 				return timeA.compareTo(timeB)>=0?a:b;
 			}
-		}
 
-		if ((contA!=null)&&(contB!=null)) {
-			// we have two directories, so need to merge by entry name
-			Index<AString, AVector<ACell>> mergedEntries=contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
+			// Live-entry merge needs no instrumentation: a purely-live change is never a conflict.
+			Index<AString, AVector<ACell>> mergedDir = contA.mergeDifferences(contB, CHILD_MERGE);
+
+			// Common case: no deletions anywhere, so no live-vs-dead conflict is possible.
+			if (tombA.isEmpty() && tombB.isEmpty()) {
+				if ((mergedDir==contA)&&(timeA.longValue()>=timeB.longValue())) return a;
+				return buildDirectory(mergeTime, mergedDir, EMPTY_TOMBS);
+			}
+
+			// Merge tombstones, collecting only the names whose tombstone changed. Every live-vs-dead
+			// conflict is necessarily among these (a name dead on both sides is not live in mergedDir),
+			// so reconciliation is proportional to tombstone churn, not to live-entry churn.
+			final HashSet<AString> tombTouched = new HashSet<>();
+			Index<AString, CVMLong> mergedTomb = tombA.mergeDifferences(tombB, new MergeFunction<CVMLong>() {
 				@Override
-				public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
-					// We know values are different at this point
-
-					// nulls mean other map has a missing value
-					if (cb==null) return ca;
-					if (ca==null) return cb;
-
-					return DLFSNode.merge(ca,cb);
+				public CVMLong merge(CVMLong ta, CVMLong tb) {
+					if (ta==null) return tb;
+					if (tb==null) return ta;
+					return ta.longValue()>=tb.longValue()?ta:tb;
+				}
+				@Override
+				public CVMLong merge(Object key, CVMLong ta, CVMLong tb) {
+					tombTouched.add((AString)key);
+					return merge(ta,tb);
 				}
 			});
 
-			// Helps performance a lot if we can return a directly with no changes
-			if ((contA==mergedEntries)&&(timeA.longValue()>=mergeTime.longValue())) return a;
+			// Reconcile: a name both live and tombstoned resolves by timestamp.
+			for (AString name : tombTouched) {
+				AVector<ACell> live = mergedDir.get(name);
+				if (live==null) continue;
+				CVMLong death = mergedTomb.get(name);
+				if (death==null) continue;
+				if (death.longValue() >= getUTime(live).longValue()) {
+					mergedDir = mergedDir.dissoc(name);   // deletion wins (tombstone preferred on tie)
+				} else {
+					mergedTomb = mergedTomb.dissoc(name);  // newer create/modify wins
+				}
+			}
 
-			AVector<ACell> result=createDirectory(mergeTime);
-			result=result.assoc(POS_DIR, mergedEntries);
-			return result;
-		} else {
-			// at least one in not a directory, so select based on more recent timestamp, or choose a if equal
-			AVector<ACell> result= timeA.longValue()>=timeB.longValue()?a:b;
-			return result;
+			// Return a unchanged if it already subsumes b (no allocation)
+			if ((mergedDir==contA)&&(mergedTomb==tombA)&&(timeA.longValue()>=timeB.longValue())) return a;
+			return buildDirectory(mergeTime, mergedDir, mergedTomb);
 		}
+
+		// At least one node is a file: equal content keeps the most recent; otherwise newer wins
+		if (Utils.equals(contA, contB) && Utils.equals(getData(a), getData(b))) {
+			return timeA.compareTo(timeB)>=0?a:b;
+		}
+		return timeA.longValue()>=timeB.longValue()?a:b;
+	}
+
+	/**
+	 * Builds a canonical directory node from merged live entries and tombstones, with the
+	 * POS_TOMBS element present if and only if the tombstone index is non-empty.
+	 */
+	static AVector<ACell> buildDirectory(CVMLong utime, Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs) {
+		AVector<ACell> result=createDirectory(utime);
+		result=result.assoc(POS_DIR, entries);
+		if (tombs!=null && !tombs.isEmpty()) {
+			result=result.conj(tombs);
+		}
+		return result;
 	}
 
 }

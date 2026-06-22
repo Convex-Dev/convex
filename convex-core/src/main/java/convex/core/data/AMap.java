@@ -391,17 +391,20 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	/**
 	 * Merge this map with another map, using the given function for each key that
 	 * is present in either map and has a different value
-	 * 
+	 *
 	 * The function is passed null for missing values in either map, and must return
 	 * type V.
-	 * 
+	 *
 	 * If the function returns null, the entry is removed.
-	 * 
-	 * Returns the same map if no changes occurred.
-	 * 
+	 *
+	 * <p>Identity contract: implementations MUST return {@code this} (the exact same
+	 * object, with no allocation) whenever the merged result is equal to {@code this}.
+	 * In particular a no-op merge returns the receiver by reference identity. Callers
+	 * may rely on a {@code result == this} reference check to detect "no change".</p>
+	 *
 	 * @param b    Other map to merge with
 	 * @param func Merge function, returning a new value for each key
-	 * @return A merged map, or this map if no changes occurred
+	 * @return A merged map, or this map (by reference identity) if no changes occurred
 	 */
 	public abstract AMap<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func);
 	
