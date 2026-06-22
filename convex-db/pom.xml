@@ -16,7 +16,7 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<calcite.version>1.41.0</calcite.version>
+		<calcite.version>1.42.0</calcite.version>
 	</properties>
 
 	<build>
