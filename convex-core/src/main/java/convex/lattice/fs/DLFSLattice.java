@@ -3,6 +3,7 @@ package convex.lattice.fs;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Index;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -117,7 +118,15 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		if (!(utime instanceof CVMLong)) {
 			return false;
 		}
-		
+
+		// A 5th element (tombstone index) must be a non-empty Index.
+		// Canonical invariant: POS_TOMBS is present if and only if it is non-empty.
+		if (value.count() > DLFSNode.POS_TOMBS) {
+			ACell tombs = value.get(DLFSNode.POS_TOMBS);
+			if (!(tombs instanceof Index)) return false;
+			if (((Index<?, ?>) tombs).isEmpty()) return false;
+		}
+
 		// Valid DLFS node structure
 		return true;
 	}

@@ -58,7 +58,7 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public boolean isOther() {
-		return DLFSNode.isTombstone(node);
+		return false;
 	}
 
 	@Override
