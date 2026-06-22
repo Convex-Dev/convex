@@ -63,18 +63,19 @@ repos; **deploy pending** (§3).
 - [x] **convex.world hero** (`src/components/Hero.tsx`) — added a primary "Start building" CTA →
       `/developers`; kept Sandbox; demoted Vision to secondary.
 
-Still open from the original scope: the **Lisp-guide sandbox block** (`convex-lisp/lisp-guide.md`,
-~lines 22-30) is still commented out — uncomment it so the language guide has a runnable first
-example (§3).
+The **Lisp-guide sandbox block** (`convex-lisp/lisp-guide.md`) has since been uncommented and now
+leads the guide, which was also corrected (see §4).
 
 ---
 
 ## 3. Next steps
 
-**Ship it (deploy the committed work):**
-- `design` → docs.convex.world deploys on **master** push: `git -C design push origin master`.
-- `convex.world` hero deploys on **master**: merge `develop` → `master`. (convex `README` is
-  already on `develop`; no deploy needed.)
+**Ship it — DONE (2026-06-22): all deployed and verified live.**
+- `design` → **docs.convex.world** live (golden-path quickstart, fixed SDK quickstarts, corrected
+  Lisp guide, naming sweep, link-check).
+- `convex.world` → **live** as a full `develop`→`master` release (the hero + ~10 accumulated team
+  commits). Fixed a `pnpm/action-setup` version-vs-`packageManager` conflict that had blocked
+  every convex.world deploy since March.
 
 **Verify (before/after shipping):**
 - [x] **Per-language SDK quickstarts** — verified and fixed (2026-06-19). Each was broken or
@@ -86,17 +87,20 @@ example (§3).
   package; Java live spot-checked on the testnet.
 - [x] **Java testnet example** — live spot-checked (`ConvexJSON` + `useNewAccount` → transact →
   query → `JAVA_OK`); this also confirms the top-level quickstart's Java example.
-- [ ] **Lisp-guide sandbox block** — uncomment and verify it runs.
+- [x] **Lisp-guide sandbox block** — uncommented (now leads the guide); also fixed several wrong
+  outputs (verified live), the quote/unquote → quasi-quote error, an unclosed paren and typos,
+  localised the screenshots, and added clojure syntax highlighting.
 
 **Keep one-line-swap items from scattering again:**
 - The **testnet endpoint** `mikera1337-convex-testnet.hf.space` is still a placeholder for a
   proper branded testnet. It now appears in the quickstart, README, and SDK examples — keep each
   surface's value in one place so the eventual swap stays cheap.
 
-**CI hygiene (cheap, high-leverage):**
-- Add a **docs link-check** to design CI — the build only warns on broken links
-  (`onBrokenLinks: 'warn'`), and three are still broken (`overview/* → cad/*/README.md` in
-  `faq.md`, `lattice.md`, `use-cases.md`). Good first cleanup plus a guard.
+**CI hygiene:**
+- [x] **Docs link-check — DONE (2026-06-22).** Fixed the 5 broken `overview/* → cad/*/README.md`
+  links (use absolute `/docs/cad/<name>`; Docusaurus strips the numeric dir prefix), set
+  `onBrokenLinks: 'throw'` so `pnpm build` fails on broken links, and added a `ci.yml` build-check
+  on PRs / branch pushes.
 - Optional **version-drift guard**: a grep check that fails when a published surface disagrees
   with the released `pom.xml` / package version.
 
