@@ -3,7 +3,7 @@
 # Convex installer for end users (macOS/Linux).
 # Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
-# SYNC: also hosted at convex.world/public/install.sh — keep in sync.
+# SYNC: a copy is served live at https://convex.world/install.sh — keep the two in sync.
 #
 # Usage:
 #   curl -fsSL https://convex.world/install.sh | bash

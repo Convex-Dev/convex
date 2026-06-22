@@ -40,12 +40,7 @@ public class TokenBuilder {
 
 
 	public String generateCode() {
-		StringBuilder sb=new StringBuilder();
-		sb.append("(do (import convex.fungible :as fungible) \n");
-		sb.append("  (deploy [(fungible/build-token "+config.toString()+")\n");
-				
-		sb.append("]))");
-		return sb.toString();
+		return "(deploy [(@convex.fungible/build-token "+config.toString()+")])";
 	}
 	
 	public Fungible deploy(ConvexJSON convex) {

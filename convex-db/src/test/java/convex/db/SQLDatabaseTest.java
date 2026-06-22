@@ -190,8 +190,9 @@ public class SQLDatabaseTest {
 		db1.tables().createTable("counter", new String[]{"id", "count"});
 		db2.tables().createTable("counter", new String[]{"id", "count"});
 
+		// No delay needed: rows merge per-key (keys 1 and 2 don't conflict) and
+		// both schemas are identical, so equal timestamps cannot change the result
 		db1.tables().insert("counter", 1, 100);
-		Thread.sleep(10); // Ensure different timestamps
 		db2.tables().insert("counter", 2, 200);
 
 		// Merge db2's replica into db1

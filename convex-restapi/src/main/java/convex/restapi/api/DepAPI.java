@@ -1,7 +1,7 @@
 package convex.restapi.api;
 
 import convex.restapi.RESTServer;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 
 /**
  * Class for Data Ecosystem services
@@ -16,7 +16,7 @@ public class DepAPI extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		// TODO Auto-generated method stub
 		
 	}

@@ -833,55 +833,236 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	/**
-	 * Merge two indexes with a merge function
+	 * Merge two indexes with a merge function.
+	 *
+	 * For every key present in either index, applies {@code func} as for
+	 * {@link AMap#mergeDifferences(AMap, MergeFunction)}: a key present on only one side is passed
+	 * with a {@code null} counterpart; a key present in both with equal values is kept unchanged
+	 * without calling {@code func}.
+	 *
+	 * <p>Identity contract (see {@link AMap#mergeDifferences}): returns {@code this} (the exact
+	 * same object, no allocation) whenever the merged result equals {@code this}. The result is
+	 * built bottom-up so that any unchanged sub-trie — and hence the whole node — is returned by
+	 * reference identity, not rebuilt. This is verified by the {@code assertSame} cases in
+	 * {@code IndexMergeTest}.</p>
+	 *
+	 * <p>This is a structural radix merge: identical (or value-equal, detected via {@code Ref}
+	 * equality) sub-tries are skipped in O(1) and shared, so the cost and allocation are
+	 * proportional to the divergence between the two indexes, not their total size.</p>
+	 *
 	 * @param b Other index to merge with
 	 * @param func Merge function for Index values
-	 * @return Updated Index (possibly this);
+	 * @return Merged Index, or {@code this} by reference identity if the result is unchanged
 	 */
 	public Index<K, V> mergeDifferences(Index<K, V> b, MergeFunction<V> func) {
-		// TODO: make this more efficient
-		if (this.equals(b)) return this;
-		Index<K, V> result=this;
-		long na=this.count;
-		long nb=b.count;
-		
-		// Scan keys in other Index for keys not in this
-		for (long i=0; i<nb; i++) {
-			MapEntry<K,V> me=b.entryAt(i);
-			K k=me.getKey();
-			V v=me.getValue();
-			MapEntry<K,V> mea=this.getEntry(k);
-			if (mea!=null) continue; // skip, will merge in second loop
-			if (!Utils.equals(null,v)) {
-				V nv=func.merge(k,null,v);
-				if (nv==null) {
-					// key already doewn't exist in this
-				} else {
-					// Add new entry
-					result=result.assoc(k, nv);
-				}
+		return mergeNode(this, b, func);
+	}
+
+	/**
+	 * Gets the child Ref for a specific digit, or null if not found.
+	 */
+	private Ref<Index<K, V>> getChildRef(int digit) {
+		int i = Bits.indexForDigit(digit, mask);
+		if (i < 0) return null;
+		return children[i];
+	}
+
+	/**
+	 * Structural recursive merge of two Index nodes. See {@link #mergeDifferences(Index, MergeFunction)}.
+	 */
+	static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeNode(Index<K, V> a, Index<K, V> b, MergeFunction<V> func) {
+		if (a == b) return a;                                // shared structure: O(1), no alloc, no hashing
+		if (a.count == 0) return applySide(b, func, false);  // a empty: all of b is right-side
+		if (b.count == 0) return applySide(a, func, true);   // b empty: all of a is left-side
+
+		long da = a.depth, db = b.depth;
+		long pmin = Math.min(da, db);
+		if (pmin > 0) {
+			ABlob pa = a.getPrefix(), pb = b.getPrefix();
+			long m = pa.hexMatch(pb, 0, pmin);
+			if (m < pmin) {
+				// prefixes diverge at digit m: disjoint keyspaces
+				return branchDisjoint(m, pa.getHexDigit(m), a, pb.getHexDigit(m), b, func);
 			}
 		}
-		
-		// Scan keys in this. May remove stuff
-		for (long i=0; i<na; i++) {
-			MapEntry<K,V> me=this.entryAt(i);
-			K k=me.getKey();
-			V v=me.getValue();
-			MapEntry<K,V> meb=b.getEntry(k);
-			V ov=(meb==null)?null:meb.getValue(); // value at same key in other index
-			if (!Utils.equals(v,ov)) {
-				V nv=func.merge(k,v,ov);
-				if (nv==null) {
-					// remove value
-					result=result.dissoc(k);
-				} else if (!Utils.equals(v, nv)){
-					// update value if any change
-					result=result.assoc(k, nv);
-				}
+		// common prefix matches down to the shallower depth: aligned or nested
+		if (da == db) return mergeAligned(a, b, func);
+		return (da < db) ? mergeNested(a, b, func, true)
+		                 : mergeNested(b, a, func, false);
+	}
+
+	/** Merge two nodes that share the same prefix and depth. */
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeAligned(Index<K, V> a, Index<K, V> b, MergeFunction<V> func) {
+		MapEntry<K, V> ne = mergeEntries(a.entry, b.entry, func);
+		Index<K, V>[] kids = null; // built lazily on first child change
+		int um = (a.mask | b.mask) & 0xFFFF;
+		for (int d = 0; d < 16; d++) {
+			if (((um >> d) & 1) == 0) continue;
+			Ref<Index<K, V>> aref = a.getChildRef(d);
+			Ref<Index<K, V>> bref = b.getChildRef(d);
+			Index<K, V> ac = (aref == null) ? null : aref.getValue();
+			Index<K, V> nc;
+			if (aref == null) {
+				nc = applySide(bref.getValue(), func, false);      // b-only child
+			} else if (bref == null) {
+				nc = applySide(ac, func, true);                    // a-only child
+			} else if (aref.equals(bref)) {
+				nc = ac;                                           // identical sub-trie: skip
+			} else {
+				nc = mergeNode(ac, bref.getValue(), func);
+			}
+			if (nc != null && nc.count == 0) nc = null;            // empty child => absent
+			if (nc != ac) {
+				if (kids == null) kids = collectKids(a);
+				kids[d] = nc;
 			}
 		}
-		return result;
+		if (kids == null) {
+			if (ne == a.entry) return a;                          // nothing changed
+			kids = collectKids(a);
+		}
+		return rebuild(a.depth, ne, kids);
+	}
+
+	/**
+	 * Merge a shallower node with a deeper node whose keys nest entirely under one of the
+	 * shallower node's child digits. {@code shallowIsLeft} preserves the (left,right) arg order
+	 * into {@code func} when the deeper node is the left ('own') argument.
+	 */
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeNested(Index<K, V> shallow, Index<K, V> deep, MergeFunction<V> func, boolean shallowIsLeft) {
+		int dig = deep.getPrefix().getHexDigit(shallow.depth);
+		MapEntry<K, V> ne = singleEntry(shallow.entry, func, shallowIsLeft); // shallow entry is single-side
+		Index<K, V>[] kids = null; // built lazily on first change
+		boolean changed = (ne != shallow.entry);
+		int sm = shallow.mask & 0xFFFF;
+		for (int d = 0; d < 16; d++) {
+			if (d == dig) continue;
+			if (((sm >> d) & 1) == 0) continue;
+			Index<K, V> sc = shallow.getChild(d);
+			Index<K, V> nc = applySide(sc, func, shallowIsLeft);
+			if (nc.count == 0) nc = null;
+			if (nc != sc) {
+				if (kids == null) kids = collectKids(shallow);
+				kids[d] = nc;
+				changed = true;
+			}
+		}
+		Index<K, V> scDig = shallow.getChild(dig); // may be null
+		Index<K, V> merged;
+		if (scDig == null) {
+			merged = applySide(deep, func, !shallowIsLeft);
+		} else {
+			merged = shallowIsLeft ? mergeNode(scDig, deep, func) : mergeNode(deep, scDig, func);
+		}
+		if (merged != null && merged.count == 0) merged = null;
+		if (merged != scDig) {
+			if (kids == null) kids = collectKids(shallow);
+			kids[dig] = merged;
+			changed = true;
+		}
+		if (!changed) return shallow; // no-op: deep added nothing, result equals shallow (no allocation)
+		if (kids == null) kids = collectKids(shallow);
+		return rebuild(shallow.depth, ne, kids);
+	}
+
+	/** Build a branch node at depth {@code m} for two disjoint sub-tries (digA != digB). */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> branchDisjoint(long m, int digA, Index<K, V> a, int digB, Index<K, V> b, MergeFunction<V> func) {
+		Index<K, V> A = applySide(a, func, true);
+		Index<K, V> B = applySide(b, func, false);
+		if (A.count == 0) return B; // if both empty, B is the empty singleton
+		if (B.count == 0) return A;
+		int mask = (1 << digA) | (1 << digB);
+		Ref[] refs = (digA < digB) ? new Ref[] { A.getRef(), B.getRef() }
+		                           : new Ref[] { B.getRef(), A.getRef() };
+		return new Index<K, V>(m, null, refs, (short) mask, A.count + B.count);
+	}
+
+	/** Apply {@code func} to every entry of a node as a single side (other side null). Returns the same node if unchanged. */
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> applySide(Index<K, V> node, MergeFunction<V> func, boolean left) {
+		if (node.count == 0) return node;
+		MapEntry<K, V> ne = singleEntry(node.entry, func, left);
+		Index<K, V>[] kids = null;
+		int m = node.mask & 0xFFFF;
+		for (int d = 0; d < 16; d++) {
+			if (((m >> d) & 1) == 0) continue;
+			Index<K, V> c = node.getChild(d);
+			Index<K, V> nc = applySide(c, func, left);
+			if (nc.count == 0) nc = null;
+			if (nc != c) {
+				if (kids == null) kids = collectKids(node);
+				kids[d] = nc;
+			}
+		}
+		if (kids == null) {
+			if (ne == node.entry) return node;
+			kids = collectKids(node);
+		}
+		return rebuild(node.depth, ne, kids);
+	}
+
+	/** Snapshot a node's children into a digit-indexed array of size 16 (absent digits are null). */
+	@SuppressWarnings("unchecked")
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V>[] collectKids(Index<K, V> node) {
+		Index<K, V>[] kids = (Index<K, V>[]) new Index[16];
+		int m = node.mask & 0xFFFF;
+		for (int d = 0; d < 16; d++) {
+			if (((m >> d) & 1) != 0) kids[d] = node.getChild(d);
+		}
+		return kids;
+	}
+
+	/**
+	 * Construct a canonical Index node from a depth, optional entry and a digit-indexed child array.
+	 * Handles the canonicalisation invariants (empty, single-entry, entry-less single-child promotion).
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> rebuild(long depth, MapEntry<K, V> entry, Index<K, V>[] kids) {
+		int mask = 0, nk = 0, lastDigit = -1;
+		long count = (entry == null) ? 0 : 1;
+		for (int d = 0; d < 16; d++) {
+			Index<K, V> c = kids[d];
+			if (c == null || c.count == 0) continue;
+			mask |= (1 << d);
+			nk++;
+			lastDigit = d;
+			count += c.count;
+		}
+		if (nk == 0) {
+			if (entry == null) return (Index<K, V>) EMPTY;
+			return new Index<K, V>(depth, entry, EMPTY_CHILDREN, (short) 0, 1);
+		}
+		if (entry == null && nk == 1) return kids[lastDigit]; // promote single child (depth > this depth)
+		Ref[] refs = new Ref[nk];
+		int i = 0;
+		for (int d = 0; d < 16; d++) {
+			Index<K, V> c = kids[d];
+			if (c == null || c.count == 0) continue;
+			refs[i++] = c.getRef();
+		}
+		return new Index<K, V>(depth, entry, refs, (short) mask, count);
+	}
+
+	/** Merge two entries at the same key (either may be null). Returns the surviving entry, or null if removed. */
+	private static <K extends ABlobLike<?>, V extends ACell> MapEntry<K, V> mergeEntries(MapEntry<K, V> ea, MapEntry<K, V> eb, MergeFunction<V> func) {
+		if (eb == null) return singleEntry(ea, func, true);
+		if (ea == null) return singleEntry(eb, func, false);
+		V va = ea.getValue(), vb = eb.getValue();
+		if (Utils.equals(va, vb)) return ea;                  // equal values: keep a's, no func call
+		V nv = func.merge(ea.getKey(), va, vb);
+		if (nv == null) return null;
+		if (Utils.equals(va, nv)) return ea;
+		return ea.withValue(nv);
+	}
+
+	/** Apply {@code func} to a single-side entry (other side null). Returns the entry, or null if removed. */
+	private static <K extends ABlobLike<?>, V extends ACell> MapEntry<K, V> singleEntry(MapEntry<K, V> e, MergeFunction<V> func, boolean left) {
+		if (e == null) return null;
+		V v = e.getValue();
+		V nv = left ? func.merge(e.getKey(), v, null) : func.merge(e.getKey(), null, v);
+		if (nv == null) return null;
+		if (Utils.equals(v, nv)) return e;
+		return e.withValue(nv);
 	}
 
 	@Override

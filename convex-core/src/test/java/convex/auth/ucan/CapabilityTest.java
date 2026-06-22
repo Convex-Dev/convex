@@ -109,18 +109,41 @@ public class CapabilityTest {
 	}
 
 	@Test
-	public void testResourceNullGrantCoversAll() {
-		assertTrue(Capability.resourceCovers(null, Strings.create("w/anything")));
+	public void testResourceNullGrantFailsClosed() {
+		// A grant with no resource pointer covers nothing — absence is not a wildcard (#585).
+		assertFalse(Capability.resourceCovers(null, Strings.create("w/anything")));
 	}
 
 	@Test
-	public void testResourceEmptyGrantCoversAll() {
-		assertTrue(Capability.resourceCovers(Strings.create(""), Strings.create("w/anything")));
+	public void testResourceEmptyGrantFailsClosed() {
+		assertFalse(Capability.resourceCovers(Strings.create(""), Strings.create("w/anything")));
 	}
 
 	@Test
-	public void testResourceNullRequestAllowed() {
-		assertTrue(Capability.resourceCovers(Strings.create("w/data"), null));
+	public void testResourceNullRequestFailsClosed() {
+		assertFalse(Capability.resourceCovers(Strings.create("w/data"), null));
+	}
+
+	@Test
+	public void testResourceEmptyRequestFailsClosed() {
+		assertFalse(Capability.resourceCovers(Strings.create("w/data"), Strings.create("")));
+	}
+
+	// ----- Adversarial: path-segment boundary (attenuation escape, #585) -----
+
+	@Test
+	public void testResourceSiblingNotCovered() {
+		// A grant on "w/notes" must NOT cover siblings that merely share the string prefix.
+		assertFalse(Capability.resourceCovers(Strings.create("w/notes"), Strings.create("w/notesSECRET")));
+		assertFalse(Capability.resourceCovers(Strings.create("w/report"), Strings.create("w/report-confidential")));
+		assertFalse(Capability.resourceCovers(Strings.create("w/report"), Strings.create("w/reports")));
+	}
+
+	@Test
+	public void testResourceChildStillCoveredAtBoundary() {
+		// But it MUST still cover genuine path children and the exact resource.
+		assertTrue(Capability.resourceCovers(Strings.create("w/report"), Strings.create("w/report/2024")));
+		assertTrue(Capability.resourceCovers(Strings.create("w/report"), Strings.create("w/report")));
 	}
 
 	// ========== Full covers (AString) ==========
@@ -177,13 +200,22 @@ public class CapabilityTest {
 	}
 
 	@Test
-	public void testCoversStringWildcard() {
-		assertTrue(Capability.covers("", "*", "w/anything", "crud/write"));
+	public void testCoversEmptyWithFailsClosed() {
+		// An empty grant resource must not become an all-resources grant, even with TOP ability (#585).
+		assertFalse(Capability.covers("", "*", "w/anything", "crud/write"));
 	}
 
 	@Test
-	public void testCoversStringNull() {
-		assertTrue(Capability.covers((String) null, "*", "w/anything", "crud/read"));
+	public void testCoversNullWithFailsClosed() {
+		assertFalse(Capability.covers((String) null, "*", "w/anything", "crud/read"));
+	}
+
+	@Test
+	public void testCoversSiblingResourceEscapeBlocked() {
+		// crud/read on "w/report" must not reach the sibling "w/report-confidential" (#585).
+		assertFalse(Capability.covers("w/report", "crud/read", "w/report-confidential", "crud/read"));
+		// but still covers the genuine child
+		assertTrue(Capability.covers("w/report", "crud/read", "w/report/q3", "crud/read"));
 	}
 
 	// ========== DID URL resources ==========

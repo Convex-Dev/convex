@@ -221,4 +221,47 @@ public class UCANValidator {
 		if (bodyUcans != null && !bodyUcans.isEmpty()) combined = combined.concat(bodyUcans);
 		return parseTransportUCANs(combined);
 	}
+
+	/**
+	 * Collect the capabilities a set of already-verified proof tokens grants to
+	 * a given audience under a given issuer.
+	 *
+	 * <p>Returns the union of the capabilities ({@code att}) of every proof whose
+	 * {@code aud} equals {@code audience}, whose {@code iss} equals {@code issuer},
+	 * and whose temporal bounds still hold at {@code nowSeconds}. This mechanises
+	 * the "what may this audience do, per the tokens it presented" decision; the
+	 * trust policy — which issuer is authoritative and which audience to match —
+	 * is supplied by the caller (see the class note: audience and issuer policy
+	 * are deliberately caller decisions).</p>
+	 *
+	 * <p><b>Assumes signatures and chains are already verified</b> at the transport
+	 * boundary ({@link #parseTransportUCANs}); only temporal bounds are re-checked
+	 * here. The returned capability maps are in the shape consumed by
+	 * {@link Capability#covers}. <b>Fail-closed:</b> a null {@code proofs},
+	 * {@code audience} or {@code issuer} yields {@code null} (no capabilities) —
+	 * never a wildcard.</p>
+	 *
+	 * @param proofs verified proof payload maps (as produced by
+	 *        {@link #parseTransportUCANs}), or null
+	 * @param audience the audience DID a token must name (e.g. the caller)
+	 * @param issuer the issuer DID a token must carry (e.g. the trusted authority)
+	 * @param nowSeconds current time in unix seconds
+	 * @return the union of matching capabilities, or null if none match
+	 */
+	public static AVector<ACell> capabilitiesFor(AVector<ACell> proofs,
+			AString audience, AString issuer, long nowSeconds) {
+		if (proofs == null || audience == null || issuer == null) return null;
+		AVector<ACell> result = Vectors.empty();
+		for (long i = 0; i < proofs.count(); i++) {
+			AMap<AString, ACell> tokenMap = RT.ensureMap(proofs.get(i));
+			if (tokenMap == null) continue;
+			UCAN token = UCAN.parse(tokenMap);
+			if (token == null) continue;
+			if (!checkTemporalBounds(token, nowSeconds)) continue;
+			if (!audience.equals(token.getAudience())) continue;
+			if (!issuer.equals(token.getIssuer())) continue;
+			result = result.concat(token.getCapabilities());
+		}
+		return result.isEmpty() ? null : result;
+	}
 }

@@ -3,10 +3,12 @@ package convex.lattice.fs;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Index;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 import convex.lattice.generic.IndexLattice;
 
 /**
@@ -45,10 +47,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	public AVector<ACell> merge(AVector<ACell> ownValue, AVector<ACell> otherValue) {
 		// Handle null cases
 		if (ownValue == null) {
-			if (checkForeign(otherValue)) {
-				return otherValue;
-			}
-			return zero();
+			return checkForeign(otherValue) ? otherValue : zero();
 		}
 		if (otherValue == null) {
 			return ownValue;
@@ -59,34 +58,39 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 			return ownValue;
 		}
 
-		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
-		// The merge is deterministic: timestamp is derived from the input nodes
-		return DLFSNode.merge(ownValue, otherValue);
+		return safeMerge(ownValue, otherValue);
 	}
 
 	@Override
-	public AVector<ACell> merge(convex.lattice.LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
-		// Handle null cases
+	public AVector<ACell> merge(LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
+		// Context timestamp is not used for DLFS merge — the merge is deterministic from
+		// the input nodes — so this behaves identically to the no-context overload.
 		if (ownValue == null) {
-			if (checkForeign(otherValue)) {
-				return otherValue;
-			}
-			return zero();
+			return checkForeign(otherValue) ? otherValue : zero();
 		}
 		if (otherValue == null) {
 			return ownValue;
 		}
-
-		// Fast path: if values are equal, return own value
 		if (Utils.equals(ownValue, otherValue)) {
 			return ownValue;
 		}
+		return safeMerge(ownValue, otherValue);
+	}
 
-		// Delegate to DLFSNode.merge which implements the rsync-like merge logic
-		// The merge is deterministic: timestamp is derived from the input nodes
-		// Note: Context timestamp is currently not used for DLFS merge.
-		// If timestamp override is needed, it should be handled at a higher level.
-		return DLFSNode.merge(ownValue, otherValue);
+	/**
+	 * Fail-safe merge of two non-null, unequal nodes. {@code other} may originate from an
+	 * untrusted peer; rather than pre-validating its structure, the merge is attempted and
+	 * falls closed to {@code own} if a malformed node makes it throw. A malformed value can
+	 * therefore neither crash the merge (DoS) nor corrupt the merged state — it is ignored.
+	 */
+	private AVector<ACell> safeMerge(AVector<ACell> own, AVector<ACell> other) {
+		try {
+			return DLFSNode.merge(own, other);
+		} catch (RuntimeException e) {
+			// Malformed / adversarial foreign node: fail closed and keep own, rather than
+			// letting a bad value from an untrusted peer crash or corrupt the merge.
+			return own;
+		}
 	}
 
 	@Override
@@ -117,7 +121,15 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		if (!(utime instanceof CVMLong)) {
 			return false;
 		}
-		
+
+		// A 5th element (tombstone index) must be a non-empty Index.
+		// Canonical invariant: POS_TOMBS is present if and only if it is non-empty.
+		if (value.count() > DLFSNode.POS_TOMBS) {
+			ACell tombs = value.get(DLFSNode.POS_TOMBS);
+			if (!(tombs instanceof Index)) return false;
+			if (((Index<?, ?>) tombs).isEmpty()) return false;
+		}
+
 		// Valid DLFS node structure
 		return true;
 	}

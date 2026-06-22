@@ -55,7 +55,7 @@ import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.auth.AuthMiddleware;
 import jakarta.servlet.http.HttpServletResponse;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 
 /**
@@ -179,11 +179,11 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app) {
+	public void addRoutes(RoutesConfig routes) {
 		// McpServer handles POST /mcp and GET /.well-known/mcp
 		// We add only the SSE session routes (Convex-specific watch support)
-		app.get("/mcp", this::handleMcpGet);
-		app.delete("/mcp", this::handleMcpDelete);
+		routes.get("/mcp", this::handleMcpGet);
+		routes.delete("/mcp", this::handleMcpDelete);
 	}
 
 	/**

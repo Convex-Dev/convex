@@ -15,8 +15,10 @@ import convex.core.data.Maps;
 import convex.core.util.Utils;
 import convex.peer.auth.PeerAuth;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpServer;
 import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 
 /**
  * Standalone DLFS WebDAV server with multi-drive support.
@@ -86,44 +88,49 @@ public class DLFSServer implements Closeable {
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> corsConfig.anyHost());
 			});
-			config.useVirtualThreads = true;
+			config.concurrency.useVirtualThreads = true;
+
+			HttpMethodFilter.install(config);
+
+			// Configure Jetty connector with minimal platform threads.
+			// Request handling uses virtual threads (useVirtualThreads=true above),
+			// so we only need 1 acceptor + 1 selector for the connector.
+			config.jetty.addConnector((jettyServer, httpConfig) -> {
+				ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
+				connector.setPort(port);
+				return connector;
+			});
+
+			RoutesConfig routes = config.routes;
+
+			// Wire auth middleware if key pair provided (with audience checking)
+			if (keyPair != null) {
+				PeerAuth peerAuth = PeerAuth.createWithDIDAudience(keyPair);
+				AuthMiddleware auth = new AuthMiddleware(peerAuth);
+				routes.before(auth.handler());
+			}
+
+			// Request/response logging
+			routes.before(ctx -> {
+				if (!log.isDebugEnabled()) return;
+				String method = ctx.req().getMethod();
+				String uri = ctx.req().getRequestURI();
+				String dest = ctx.header("Destination");
+				String depth = ctx.header("Depth");
+				StringBuilder sb = new StringBuilder();
+				sb.append("--> ").append(method).append(" ").append(uri);
+				if (dest != null) sb.append("  Destination: ").append(dest);
+				if (depth != null) sb.append("  Depth: ").append(depth);
+				log.debug(sb.toString());
+			});
+			routes.after(ctx -> {
+				log.debug("<-- {} {} {}", ctx.status(), ctx.req().getMethod(), ctx.req().getRequestURI());
+			});
+
+			// Register WebDAV and MCP routes
+			webdav.addRoutes(routes);
+			mcpServer.addRoutes(routes);
 		});
-
-		// Wire auth middleware if key pair provided (with audience checking)
-		if (keyPair != null) {
-			PeerAuth peerAuth = PeerAuth.createWithDIDAudience(keyPair);
-			AuthMiddleware auth = new AuthMiddleware(peerAuth);
-			app.before(auth.handler());
-		}
-
-		// Request/response logging
-		app.before(ctx -> {
-			if (!log.isDebugEnabled()) return;
-			String method = ctx.req().getMethod();
-			String uri = ctx.req().getRequestURI();
-			String dest = ctx.header("Destination");
-			String depth = ctx.header("Depth");
-			StringBuilder sb = new StringBuilder();
-			sb.append("--> ").append(method).append(" ").append(uri);
-			if (dest != null) sb.append("  Destination: ").append(dest);
-			if (depth != null) sb.append("  Depth: ").append(depth);
-			log.debug(sb.toString());
-		});
-		app.after(ctx -> {
-			log.debug("<-- {} {} {}", ctx.status(), ctx.req().getMethod(), ctx.req().getRequestURI());
-		});
-
-		// Register WebDAV and MCP routes
-		webdav.addRoutes(app);
-		mcpServer.addRoutes(app);
-
-		// Configure Jetty connector with minimal platform threads.
-		// Request handling uses virtual threads (useVirtualThreads=true above),
-		// so we only need 1 acceptor + 1 selector for the connector.
-		org.eclipse.jetty.server.Server jettyServer = app.jettyServer().server();
-		ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
-		connector.setPort(port);
-		jettyServer.addConnector(connector);
 
 		app.start();
 	}

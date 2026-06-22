@@ -1,7 +1,7 @@
 # Convex installer for end users (Windows PowerShell).
 # Downloads the latest convex.jar and creates a 'convex' command on PATH.
 #
-# SYNC: also hosted at convex.world/public/install.ps1 — keep in sync.
+# SYNC: a copy is served live at https://convex.world/install.ps1 — keep the two in sync.
 #
 # Usage:
 #   irm https://convex.world/install.ps1 | iex

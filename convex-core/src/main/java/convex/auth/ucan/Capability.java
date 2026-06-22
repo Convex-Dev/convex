@@ -91,11 +91,10 @@ public class Capability {
 			AString requestWith, AString requestCan) {
 		if (grantCan == null || requestCan == null) return false;
 
-		// Resource attenuation
-		if (grantWith != null && requestWith != null) {
-			if (!resourceCovers(grantWith, requestWith)) return false;
-		}
-		// null grantWith = any resource (wildcard)
+		// Resource attenuation. Fail-closed: a grant with no resource pointer (null/empty
+		// `with`) covers nothing — absence is NOT a resource wildcard. Resource wildcards
+		// must be explicit, never implied by a missing/truncated capability.
+		if (!resourceCovers(grantWith, requestWith)) return false;
 
 		// Ability attenuation
 		return abilityCovers(grantCan, requestCan);
@@ -104,33 +103,40 @@ public class Capability {
 	/**
 	 * Checks whether a granted resource path covers a requested resource path.
 	 *
-	 * <p>Uses path prefix matching with boundary awareness:</p>
+	 * <p>Uses path prefix matching with path-segment boundary awareness:</p>
 	 * <ul>
 	 *   <li>Exact match: {@code "w/decisions"} covers {@code "w/decisions"}</li>
-	 *   <li>Prefix: {@code "w/decisions"} covers {@code "w/decisions/INV-123"}</li>
+	 *   <li>Prefix at a segment boundary: {@code "w/decisions"} covers {@code "w/decisions/INV-123"},
+	 *       but NOT the sibling {@code "w/decisions-secret"}</li>
 	 *   <li>Trailing slash: {@code "w/decisions/"} covers {@code "w/decisions"} and children</li>
-	 *   <li>Empty grant covers any resource</li>
 	 * </ul>
+	 *
+	 * <p><b>Fail-closed:</b> a null or empty {@code grant} or {@code request} covers nothing.
+	 * An absent/empty resource pointer is never a wildcard.</p>
 	 */
 	public static boolean resourceCovers(AString grant, AString request) {
-		if (grant == null) return true;
-		if (request == null) return true;
+		// Fail-closed: a missing or empty resource pointer grants nothing (not a wildcard).
+		if (grant == null || request == null) return false;
 
 		long gLen = grant.count();
 		long rLen = request.count();
-
-		// Empty grant covers everything
-		if (gLen == 0) return true;
+		if (gLen == 0 || rLen == 0) return false;
 
 		// Exact match (interned strings may be identical objects)
 		if (grant.equals(request)) return true;
 
-		// Check if request starts with grant
-		if (rLen > gLen && request.startsWith(grant)) return true;
+		// Trailing-slash grant: "w/records/" also covers the bare parent "w/records"
+		if (grant.charAt(gLen - 1) == '/' && rLen == gLen - 1
+				&& request.equals(grant.slice(0, gLen - 1))) {
+			return true;
+		}
 
-		// Trailing slash: "w/records/" covers "w/records"
-		if (gLen > 0 && grant.charAt(gLen - 1) == '/' && rLen == gLen - 1) {
-			if (request.equals(grant.slice(0, gLen - 1))) return true;
+		// Prefix, but only at a path-segment boundary, so "w/notes" covers "w/notes/x" but NOT
+		// the sibling "w/notesSECRET". The boundary holds when the grant already ends with '/',
+		// or the next character in the request is '/'.
+		if (rLen > gLen && request.startsWith(grant)
+				&& (grant.charAt(gLen - 1) == '/' || request.charAt(gLen) == '/')) {
+			return true;
 		}
 
 		return false;

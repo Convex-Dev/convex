@@ -61,10 +61,6 @@ public class LatticeNetworkTest {
 	 */
 	private static final int NETWORK_SIZE = 3;
 
-	/**
-	 * Base port for the first NodeServer (others will use sequential ports).
-	 */
-	private static final int BASE_PORT = 19500;
 
 	/**
 	 * Sets up a network of NodeServers backed by {@link Lattice#ROOT} before all
@@ -89,8 +85,9 @@ public class LatticeNetworkTest {
 			AStore store = new MemoryStore();
 			stores.add(store);
 
-			Integer port = BASE_PORT + i;
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(port));
+			// Port 0 = OS-assigned free port, avoiding bind collisions on busy CI
+			// runners; peer wiring below uses getHostAddress() (actual port).
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
 			nodeServers.add(server);
 
 			server.launch();

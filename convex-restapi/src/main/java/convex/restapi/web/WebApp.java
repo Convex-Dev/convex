@@ -16,7 +16,7 @@ import convex.core.cvm.State;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.mcp.McpAPI;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 
 public class WebApp extends AWebSite {
@@ -25,13 +25,13 @@ public class WebApp extends AWebSite {
 		super(restServer);
 	}
 	
-	public void addRoutes(Javalin app) {
-		app.get("/index.html", this::indexPage);
-		app.get("/", this::indexPage);
-		app.get("/404.html", this::missingPage);
-		app.get("/llms.txt",this::llmsTxt);
+	public void addRoutes(RoutesConfig routes) {
+		routes.get("/index.html", this::indexPage);
+		routes.get("/", this::indexPage);
+		routes.get("/404.html", this::missingPage);
+		routes.get("/llms.txt",this::llmsTxt);
 		
-		app.error(404, this::missingPage);
+		routes.error(404, this::missingPage);
 	}
 	
 	private void indexPage(Context ctx) {

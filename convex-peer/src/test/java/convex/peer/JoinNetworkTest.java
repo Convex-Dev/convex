@@ -59,7 +59,6 @@ public class JoinNetworkTest {
 			Result cresult=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
 			assertFalse(cresult.isError(),()->"Failed to create peer: "+cresult.toString());
 			assertEquals(RT.cvm(STAKE),trans.getValue());
-			//Thread.sleep(1000); // sleep a bit to allow background stuff
 
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
@@ -76,8 +75,7 @@ public class JoinNetworkTest {
 			// TODO: should these be in consensus at this point since just synced
 			// note: shouldn't matter which is the current store
 			// assertEquals(newServer.getPeer().getConsensusState(),network.SERVER.getPeer().getConsensusState());
-			// Thread.sleep(100);
-			
+
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
 			client.setNextSequence(1); // avoids a potential stale query
 			

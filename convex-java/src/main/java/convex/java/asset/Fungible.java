@@ -24,7 +24,7 @@ public class Fungible extends BaseAsset<Long> {
 
 	@Override
 	public Long getBalance(Address holder) {
-		String code="(do (import convex.fungible :as fungible) (fungible/balance "+tokenAddress.toString()+" "+holder.toString()+"))";
+		String code="(@convex.fungible/balance "+tokenAddress.toString()+" "+holder.toString()+")";
 		Map<String,Object> result=convex.query(code);
 		
 		if (result.containsKey("errorCode")) throw new Error("Token balance query failed" + result);

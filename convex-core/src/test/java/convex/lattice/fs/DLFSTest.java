@@ -202,10 +202,9 @@ public class DLFSTest {
 
 	@Test
 	public void testDeleteAfterChildrenTombstoned() throws IOException {
-		// Regression: previously a directory whose children had been deleted
-		// could not itself be deleted, because the entries map kept tombstones
-		// and entries.isEmpty() returned false. Now uses DLFSNode.isEmpty
-		// which filters tombstones.
+		// A directory whose children have all been deleted is logically empty:
+		// deletions move children out of the live entries into the parent's
+		// POS_TOMBS index, so the directory itself can then be deleted.
 		DLFileSystem fs = DLFS.createLocal();
 		Path root = fs.getRoot();
 		Path tree = Files.createDirectory(root.resolve("tree"));
@@ -217,12 +216,12 @@ public class DLFSTest {
 		Files.delete(a);
 		Files.delete(b);
 
-		// All children gone — directory is logically empty even though the
-		// entries map still has tombstones. Delete must succeed.
+		// All children gone — the directory's live entries are empty (their
+		// tombstones live in the parent's POS_TOMBS index). Delete must succeed.
 		Files.delete(tree);
 		assertFalse(Files.exists(tree));
 
-		// Iteration view skips tombstones too — root no longer shows tree.
+		// Listing shows only live entries — root no longer shows tree.
 		try (DirectoryStream<Path> ds = Files.newDirectoryStream(root)) {
 			assertFalse(ds.iterator().hasNext());
 		}

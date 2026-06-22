@@ -41,6 +41,29 @@ public class DLFSServerTest {
 	}
 
 	@Test
+	void testMalformedMethodRejected() throws Exception {
+		// Method tokens Javalin cannot route (hyphenated/lowercase) → 501, not 500
+		HttpRequest hyphenated = HttpRequest.newBuilder()
+				.uri(URI.create(driveURL))
+				.method("M-SEARCH", HttpRequest.BodyPublishers.noBody())
+				.build();
+		assertEquals(501, client.send(hyphenated, HttpResponse.BodyHandlers.ofString()).statusCode());
+
+		HttpRequest lowercase = HttpRequest.newBuilder()
+				.uri(URI.create(driveURL))
+				.method("propfind", HttpRequest.BodyPublishers.noBody())
+				.build();
+		assertEquals(501, client.send(lowercase, HttpResponse.BodyHandlers.ofString()).statusCode());
+
+		// Well-formed but unknown method falls through to normal routing → 404
+		HttpRequest unknown = HttpRequest.newBuilder()
+				.uri(URI.create(baseURL + "no-such-place"))
+				.method("FOOBAR", HttpRequest.BodyPublishers.noBody())
+				.build();
+		assertEquals(404, client.send(unknown, HttpResponse.BodyHandlers.ofString()).statusCode());
+	}
+
+	@Test
 	void testPutAndGetRoundTrip() throws Exception {
 		String content = "Hello DLFS!";
 		String path = driveURL + "test.txt";

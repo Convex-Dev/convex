@@ -189,7 +189,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	DLFSFileAttributes getFileAttributes(DLPath path) throws java.nio.file.NoSuchFileException {
 		AVector<ACell> node=getNode(path);
-		if (node==null || DLFSNode.isTombstone(node)) {
+		if (node==null) {
 			throw new java.nio.file.NoSuchFileException(path.toString());
 		}
 		return DLFSFileAttributes.create(node);

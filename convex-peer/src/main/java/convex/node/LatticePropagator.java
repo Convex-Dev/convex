@@ -309,6 +309,26 @@ public class LatticePropagator implements Closeable {
 	public boolean isRunning() { return running; }
 	public long getBroadcastCount() { return broadcastCount.get(); }
 	public ACell getLastAnnouncedValue() { return announcedCursor.get(); }
+
+	/**
+	 * Future completing with the next value announced by this propagator.
+	 *
+	 * <p>Gives callers something to wait on for propagation: capture the future
+	 * <em>before</em> triggering the change, then {@code get(timeout)} — no
+	 * sleep-polling on {@link #getLastAnnouncedValue()} required. Each announce
+	 * completes the current future and installs a fresh one, so the returned
+	 * future always reflects an announce that happens after the call.
+	 *
+	 * @return Future for the next announced (store-backed) value
+	 */
+	public CompletableFuture<ACell> nextAnnounce() { return nextAnnounceFuture; }
+
+	/**
+	 * Future for the next announce. Swapped under {@link #writeLock} in
+	 * {@link #processSnapshot}, completed outside it (dependent actions must
+	 * not run while holding the pipeline lock).
+	 */
+	private volatile CompletableFuture<ACell> nextAnnounceFuture = new CompletableFuture<>();
 	/**
 	 * Cursor holding the last value announced by this propagator. See
 	 * {@link #announcedCursor} for ownership and security semantics.
@@ -491,6 +511,7 @@ public class LatticePropagator implements Closeable {
 	 * @throws IOException If announce or setRootData fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
+		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
 			// Track latest snapshot for periodic root sync (used by background thread)
 			lastTriggeredValue = value;
@@ -528,8 +549,13 @@ public class LatticePropagator implements Closeable {
 			}
 
 			announcedCursor.set(value);
-			return value;
+
+			// Swap the announce future under the lock; complete it outside
+			announceFuture = nextAnnounceFuture;
+			nextAnnounceFuture = new CompletableFuture<>();
 		}
+		announceFuture.complete(value);
+		return value;
 	}
 
 	// ========== Root Sync ==========

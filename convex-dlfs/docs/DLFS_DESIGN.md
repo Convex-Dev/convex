@@ -222,8 +222,12 @@ Child entries are included when `Depth: 1` is requested.
 deterministically as `max(getUTime(a), getUTime(b))` — no external timestamp needed.
 
 - **Files**: Newer timestamp wins. Equal timestamps: `a` preferred.
-- **Directories**: Entries merged recursively via `Index.mergeDifferences()`.
-- **Tombstones**: A tombstone with a newer timestamp than a file deletes it.
+- **Directories**: Live entries merged recursively via `Index.mergeDifferences()`.
+- **Tombstones**: A directory node keeps deletions in a separate tombstone index
+  (deleted child name → deletion timestamp), held as an optional 5th node element that
+  is present only when non-empty (the default node stays 4 elements). Live entries and
+  tombstones are merged independently, then reconciled: a tombstone whose timestamp is
+  newer than (or equal to) a live child deletes it; a newer creation resurrects the name.
 - **Commutativity**: `merge(a, b) == merge(b, a)` (same inputs → same output).
 - **Idempotency**: `merge(a, a) == a`.
 

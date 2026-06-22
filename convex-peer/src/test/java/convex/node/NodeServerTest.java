@@ -689,23 +689,19 @@ public class NodeServerTest {
 			// We do NOT call sync() here — processLatticeValue must do it.
 			ConvexRemote convex = ConvexRemote.connect(node.getHostAddress());
 			try {
+				// Capture the announce future BEFORE sending, so the announce
+				// triggered by the incoming message cannot be missed
+				CompletableFuture<ACell> announced = propagator.nextAnnounce();
+
 				AVector<ACell> emptyPath = Vectors.empty();
 				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, CVMLong.create(42));
 				Message msg = Message.create(MessageType.LATTICE_VALUE, payload);
 				// Fire-and-forget: LATTICE_VALUE has no request ID, no response expected
 				convex.message(msg);
 
-				// Wait for network delivery. With synchronous commit, once
-				// processLatticeValue runs on the netty thread, the merge and
-				// the resulting sync (including primary announce) all complete
-				// before the netty handler returns — so we just wait for the
-				// message to arrive. Keep connection open: closing too early
-				// can drop unsent data.
-				long deadline = System.currentTimeMillis() + 3000;
-				while (System.currentTimeMillis() < deadline) {
-					if (propagator.getLastAnnouncedValue() != null) break;
-					Thread.sleep(10);
-				}
+				// Wait on the propagator's announce signal (no sleep-polling).
+				// Keep connection open: closing too early can drop unsent data.
+				announced.get(10, TimeUnit.SECONDS);
 			} finally {
 				convex.close();
 			}

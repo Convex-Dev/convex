@@ -28,6 +28,18 @@ java -jar convex.jar desktop
 
 On Windows, you can also double-click `convex.jar` if Java is properly configured.
 
+### First run on macOS / Windows
+
+`convex.jar` is not code-signed, so the first time you **double-click** it macOS Gatekeeper
+("unidentified developer") or Windows SmartScreen may block it. Launching from a terminal with
+`java -jar convex.jar desktop` is not affected. To keep double-clicking:
+
+- **macOS** — right-click `convex.jar` and choose **Open** once, or clear the quarantine flag:
+  `xattr -dr com.apple.quarantine convex.jar`
+- **Windows** — on the SmartScreen dialog, choose **More info → Run anyway**
+
+This is expected for an unsigned build; signed/notarised installers are tracked as a future improvement.
+
 ## Building from Source
 
 **Requirements:** Java 21+, Maven 3.7+

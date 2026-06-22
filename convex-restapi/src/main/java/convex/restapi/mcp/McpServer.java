@@ -24,7 +24,7 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
-import io.javalin.Javalin;
+import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
 
 /**
@@ -37,7 +37,7 @@ import io.javalin.http.Context;
  *
  * <p>Does not depend on any Convex peer infrastructure. SSE session handling
  * and transport-specific extensions (e.g. state watches) are left to the caller
- * — typically by registering additional routes on the same Javalin app.</p>
+ * — typically by registering additional routes on the same routes configuration.</p>
  *
  * @see <a href="https://www.jsonrpc.org/specification">JSON-RPC 2.0</a>
  * @see <a href="https://modelcontextprotocol.io/specification/2025-11-25">MCP Specification</a>
@@ -151,14 +151,14 @@ public class McpServer {
 	// ==================== Route Registration ====================
 
 	/**
-	 * Registers MCP routes on the given Javalin app.
+	 * Registers MCP routes on the given routes configuration.
 	 * Registers POST and .well-known only. SSE (GET/DELETE) should be added
 	 * by the caller if needed.
 	 */
-	public void addRoutes(Javalin app) {
-		app.before(routePath, this::validateOrigin);
-		app.post(routePath, this::handlePost);
-		app.get("/.well-known/mcp", this::handleWellKnown);
+	public void addRoutes(RoutesConfig routes) {
+		routes.before(routePath, this::validateOrigin);
+		routes.post(routePath, this::handlePost);
+		routes.get("/.well-known/mcp", this::handleWellKnown);
 	}
 
 	// ==================== POST /mcp — JSON-RPC dispatch ====================

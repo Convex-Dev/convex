@@ -73,9 +73,27 @@ For local use of Convex data structures and CVM execution, `convex-core` is typi
 
 ## Getting Started
 
+### Your first transaction (no install)
+
+The fastest way to try Convex is the **[Web Sandbox](https://convex.world/sandbox)** — a live REPL on the public testnet. Evaluate an expression, then deploy and call a one-line smart contract:
+
+```clojure
+;; Free query — no account needed
+(+ 1 2 3)
+;; => 6
+
+;; With a faucet-funded account, deploy and call an actor (a smart contract)
+(deploy '(defn ^:callable greet [name] (str "Hello, " name "!")))
+;; => #1234   ;; your new actor's address
+(call #1234 (greet "world"))
+;; => "Hello, world!"
+```
+
+Want the full walkthrough — including the TypeScript, Python, and Java SDKs against the testnet? See the **[Quick Start guide](https://docs.convex.world/docs/tutorial/quickstart)**.
+
 ### Prerequisites
 
-- Java 21+ ([Download](https://www.oracle.com/java/technologies/downloads/))
+- Java 21+ ([Download Temurin](https://adoptium.net/temurin/releases/?version=21))
 
 ### Quick Install
 
@@ -134,6 +152,12 @@ See all available commands:
 convex --help
 ```
 
+## Examples
+
+- **Convex Lisp** — runnable `.cvx` demos in [`convex-core/src/test/resources/examples`](convex-core/src/test/resources/examples): fungible tokens, assets, trust monitors, the Torus DEX, and `language.cvx` for the language itself.
+- **Java** — using the CVM and data structures directly in [`convex-core/src/test/java/convex/core/examples`](convex-core/src/test/java/convex/core/examples) (start with `RawCVM.java`).
+- **Recipes & SDK quickstarts** — task-oriented guides at [docs.convex.world/docs/tutorial/recipes](https://docs.convex.world/docs/tutorial/recipes) and the per-language [client SDK quickstarts](https://docs.convex.world/docs/tutorial/client-sdks).
+
 ## Contributing
 
 Contributions are welcome under the Convex Public License. Contributors retain copyright but must accept the license terms. A Contributors Agreement is required for all submissions to the core repository.
@@ -142,7 +166,7 @@ The Convex Foundation may award Convex Coins to contributors for significant eco
 
 ## Community
 
-We use Discord as for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
+We use Discord as for discussing Convex - you can join the public server at [https://discord.com/invite/xfYGq4CT7v](https://discord.com/invite/xfYGq4CT7v)
 
 Alternatively, email: info(at)convex.world
 
