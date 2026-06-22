@@ -2,11 +2,13 @@ package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +17,9 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeContext;
 import convex.lattice.fs.impl.DLFSLocal;
 
 /**
@@ -132,5 +136,31 @@ public class DLFSTombstoneTest {
 		assertFalse(Files.exists(a.getPath("/gone")));
 		assertTrue(Files.exists(a.getPath("/d/keep")));
 		assertTrue(Files.exists(a.getPath("/d/added")));
+	}
+
+	/**
+	 * A malformed foreign node from an untrusted peer must not crash or corrupt the merge:
+	 * the merge fails closed to {@code own} rather than throwing.
+	 */
+	@Test
+	public void testMergeFailsSafeOnMalformedNode() {
+		DLFSLattice lat = DLFSLattice.INSTANCE;
+
+		// A valid own directory with one live child
+		Index<AString, AVector<ACell>> ownEntries =
+			Index.of(Strings.create("f"), DLFSNode.createEmptyFile(CVMLong.create(1)));
+		AVector<ACell> own = Vectors.of(ownEntries, null, null, CVMLong.create(1));
+
+		AVector<ACell> tooShort = Vectors.of(CVMLong.ZERO);                                        // missing slots
+		AVector<ACell> badUtime = Vectors.of(Index.none(), null, null, Strings.create("nope"));    // POS_UTIME not a long
+		AVector<ACell> badDir   = Vectors.of(Strings.create("x"), null, null, CVMLong.create(2));  // POS_DIR not an Index
+		Index<AString, AVector<ACell>> badEntries =
+			Index.of(Strings.create("f"), Vectors.of(Strings.create("x")));                        // malformed child node
+		AVector<ACell> deepBad  = Vectors.of(badEntries, null, null, CVMLong.create(2));
+
+		for (AVector<ACell> bad : List.of(tooShort, badUtime, badDir, deepBad)) {
+			assertSame(own, lat.merge(own, bad), "malformed foreign node must be rejected, keeping own");
+			assertSame(own, lat.merge((LatticeContext) null, own, bad), "context merge must also fail safe");
+		}
 	}
 }
