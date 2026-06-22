@@ -398,20 +398,23 @@ public class UCAN {
 		JWT parsed = JWT.parse(jwtString);
 		if (parsed == null) return null;
 
-		// Verify signature via kid header
-		if (!parsed.verifyEdDSA()) return null;
-
 		AMap<AString, ACell> claims = parsed.getClaims();
 		if (claims == null) return null;
 
-		// Extract issuer key for internal use
-		AString issuerDID = RT.ensureString(claims.get(ISS));
-		AccountKey issuerKey = fromDIDKey(issuerDID);
+		// Derive the verification key from the `iss` DID (did:key encodes the issuer's
+		// public key) and verify the signature against THAT key.
+		//
+		// SECURITY: the verification key MUST be bound to the claimed issuer. The JWT `kid`
+		// header is attacker-controlled and must not select the verification key — otherwise
+		// an attacker could sign with their own key, name it in `kid`, and forge any `iss`
+		// (issuer spoofing / authorization bypass). For a did:key UCAN the issuer IS the key,
+		// so we ignore `kid` and verify directly against the iss key.
+		AccountKey issuerKey = fromDIDKey(RT.ensureString(claims.get(ISS)));
 		if (issuerKey == null) return null;
+		if (!parsed.verifyEdDSA(issuerKey)) return null;
 
-		// Build the signature from the JWT's raw bytes
-		// We store the JWT's signature but note: verifySignature() uses CAD3,
-		// so for JWT-parsed tokens use verifyJWT() instead
+		// Build the signature from the JWT's raw bytes. Note: verifySignature() uses CAD3,
+		// so for JWT-parsed tokens use the JWT verification path, not verifySignature().
 		ASignature sig = ASignature.fromBlob(Blob.wrap(parsed.getSignatureBytes()));
 
 		return new UCAN(claims, sig);

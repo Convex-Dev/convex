@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -452,6 +453,83 @@ public class UCANTest {
 		assertNull(UCAN.fromJWT(null));
 		assertNull(UCAN.fromJWT(Strings.create("not.a.jwt")));
 		assertNull(UCAN.fromJWT(Strings.create("")));
+	}
+
+	// ===== Adversarial: issuer spoofing via mismatched kid =====
+	//
+	// A did:key UCAN's issuer IS its key, so verification must be bound to the `iss`
+	// claim — never to the attacker-controlled `kid` header. These tests forge a token
+	// that claims iss=ROOT but is actually signed by ROGUE (whose key lands in kid), and
+	// assert it is rejected at every layer. They fail against kid-based verification.
+
+	/** A JWT claiming {@code iss=spoofedIssuer} but actually signed by {@code signer} (kid = signer's key). */
+	private static AString forgeIssuer(AccountKey spoofedIssuer, AKeyPair signer, AccountKey aud,
+			long exp, AVector<ACell> caps) {
+		AMap<AString, ACell> claims = UCAN.buildPayload(spoofedIssuer, aud, exp, null, caps, null, null);
+		return JWT.signPublic(claims, signer); // signs with `signer`; kid header = signer's key
+	}
+
+	@Test
+	public void testJWTIssuerSpoofRejectedAtParse() {
+		AString forged = forgeIssuer(ROOT_KP.getAccountKey(), ROGUE_KP, ROGUE_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/secret", Capability.TOP));
+		assertNull(UCAN.fromJWT(forged),
+			"JWT claiming iss=ROOT but signed by another key (named in kid) must be rejected");
+	}
+
+	@Test
+	public void testJWTIssuerSpoofRejectedAtValidate() {
+		AString forged = forgeIssuer(ROOT_KP.getAccountKey(), ROGUE_KP, ROGUE_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/secret", Capability.TOP));
+		assertNull(UCANValidator.validateJWT(forged, NOW));
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testJWTIssuerSpoofDroppedAtTransportBoundary() {
+		AString forged = forgeIssuer(ROOT_KP.getAccountKey(), ROGUE_KP, ROGUE_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/secret", Capability.TOP));
+		// Forgery alone: nothing passes the trust boundary
+		assertNull(UCANValidator.parseTransportUCANs(Vectors.of(forged)),
+			"Spoofed-issuer token must not pass the transport trust boundary");
+
+		// Mixed with a genuine ROOT->ROGUE grant: only the genuine token survives, and the
+		// forged ROOT capability is never attributed to ROOT through the end-to-end path.
+		AString genuine = UCAN.createJWT(ROOT_KP, ROGUE_KP.getAccountKey(), FUTURE_EXPIRY,
+			oneCap("w/health", Capability.CRUD_READ), null);
+		AVector<ACell> verified = UCANValidator.parseTransportUCANs(Vectors.of(forged, genuine));
+		assertNotNull(verified);
+		assertEquals(1L, verified.count(), "only the genuinely-signed token survives");
+
+		AString rogueDID = UCAN.toDIDKey(ROGUE_KP.getAccountKey());
+		AVector<ACell> caps = UCANValidator.capabilitiesFor(verified, rogueDID, ROOT_DID, NOW);
+		assertNotNull(caps);
+		assertEquals(1L, caps.count());
+		assertFalse(Capability.covers((AMap<AString, ACell>) caps.get(0), "w/secret/x", "crud/write"),
+			"forged ROOT-issued capability must not appear");
+	}
+
+	@Test
+	public void testJWTSpoofedProofInChainRejected() {
+		// A genuine child (AGENT_A -> AGENT_B) whose proof is a forged ROOT token (claims
+		// iss=ROOT but actually signed by ROGUE). The chain must fail to validate.
+		AString forgedProof = forgeIssuer(ROOT_KP.getAccountKey(), ROGUE_KP, AGENT_A_KP.getAccountKey(),
+			FUTURE_EXPIRY, oneCap("w/secret", Capability.TOP));
+		AString child = UCAN.createJWT(AGENT_A_KP, AGENT_B_KP.getAccountKey(), FUTURE_EXPIRY,
+			null, Vectors.of(forgedProof));
+		assertNull(UCANValidator.validateJWT(child, NOW),
+			"A chain whose proof spoofs its issuer must be rejected");
+	}
+
+	@Test
+	public void testGenuineJWTStillVerifiesAfterFix() {
+		// Regression: the fix must not break legitimately-signed tokens (kid == iss key).
+		AString genuine = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY,
+			oneCap("w/health", Capability.CRUD_READ), null);
+		UCAN parsed = UCAN.fromJWT(genuine);
+		assertNotNull(parsed);
+		assertEquals(ROOT_DID, parsed.getIssuer());
+		assertNotNull(UCANValidator.validateJWT(genuine, NOW));
 	}
 
 	// ===== checkTemporalBounds =====
