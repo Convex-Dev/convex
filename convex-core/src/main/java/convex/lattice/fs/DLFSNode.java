@@ -1,5 +1,7 @@
 package convex.lattice.fs;
 
+import java.util.HashSet;
+
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -40,6 +42,20 @@ public class DLFSNode {
 
 	private static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	private static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
+
+	/**
+	 * Recursive merge of two directory child nodes (live entries). A name present on only one
+	 * side is kept unchanged; names present on both are merged recursively. No instrumentation —
+	 * a purely-live change can never be a tombstone conflict, so the live merge needs none.
+	 */
+	private static final MergeFunction<AVector<ACell>> CHILD_MERGE = new MergeFunction<AVector<ACell>>() {
+		@Override
+		public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
+			if (cb==null) return ca;
+			if (ca==null) return cb;
+			return DLFSNode.merge(ca,cb);
+		}
+	};
 
 
 	
@@ -267,7 +283,7 @@ public class DLFSNode {
 		Index<AString, AVector<ACell>> contB = getDirectoryEntries(b);
 
 		if ((contA!=null)&&(contB!=null)) {
-			// Two directories: merge live entries and tombstones, then reconcile conflicts
+			// Two directories. Merge live entries; reconcile against tombstones only if any exist.
 			Index<AString, CVMLong> tombA = getTombstones(a);
 			Index<AString, CVMLong> tombB = getTombstones(b);
 
@@ -276,20 +292,19 @@ public class DLFSNode {
 				return timeA.compareTo(timeB)>=0?a:b;
 			}
 
-			final java.util.HashSet<AString> touched = new java.util.HashSet<>();
-			Index<AString, AVector<ACell>> mergedDir = contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
-				@Override
-				public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
-					if (cb==null) return ca;
-					if (ca==null) return cb;
-					return DLFSNode.merge(ca,cb);
-				}
-				@Override
-				public AVector<ACell> merge(Object key, AVector<ACell> ca, AVector<ACell> cb) {
-					touched.add((AString)key);
-					return merge(ca,cb);
-				}
-			});
+			// Live-entry merge needs no instrumentation: a purely-live change is never a conflict.
+			Index<AString, AVector<ACell>> mergedDir = contA.mergeDifferences(contB, CHILD_MERGE);
+
+			// Common case: no deletions anywhere, so no live-vs-dead conflict is possible.
+			if (tombA.isEmpty() && tombB.isEmpty()) {
+				if ((mergedDir==contA)&&(timeA.longValue()>=timeB.longValue())) return a;
+				return buildDirectory(mergeTime, mergedDir, EMPTY_TOMBS);
+			}
+
+			// Merge tombstones, collecting only the names whose tombstone changed. Every live-vs-dead
+			// conflict is necessarily among these (a name dead on both sides is not live in mergedDir),
+			// so reconciliation is proportional to tombstone churn, not to live-entry churn.
+			final HashSet<AString> tombTouched = new HashSet<>();
 			Index<AString, CVMLong> mergedTomb = tombA.mergeDifferences(tombB, new MergeFunction<CVMLong>() {
 				@Override
 				public CVMLong merge(CVMLong ta, CVMLong tb) {
@@ -299,14 +314,13 @@ public class DLFSNode {
 				}
 				@Override
 				public CVMLong merge(Object key, CVMLong ta, CVMLong tb) {
-					touched.add((AString)key);
+					tombTouched.add((AString)key);
 					return merge(ta,tb);
 				}
 			});
 
-			// Reconcile names that ended up both live and tombstoned (create-vs-delete conflicts).
-			// Only names touched by the merges above can conflict, so this is divergence-proportional.
-			for (AString name : touched) {
+			// Reconcile: a name both live and tombstoned resolves by timestamp.
+			for (AString name : tombTouched) {
 				AVector<ACell> live = mergedDir.get(name);
 				if (live==null) continue;
 				CVMLong death = mergedTomb.get(name);
