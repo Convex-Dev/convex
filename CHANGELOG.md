@@ -14,9 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- DLFS: deletions are now tracked in a separate per-directory tombstone index (an optional 5th node element, present only when non-empty) instead of as tombstone nodes inside the live entries; existing drives load unchanged. Live directory operations (listing, emptiness, navigation) no longer scan tombstones (#587)
+
 ### Fixed
 
 - Social: posts created in the same millisecond no longer collide on timestamp keys — previously the later post silently overwrote the earlier one
+
+### Security
+
+- UCAN: JWT-encoded tokens are now verified against the public key bound in the `iss` DID, not the sender-controlled `kid` header — closes an issuer-spoofing authentication bypass that allowed forging any issuer (#586)
+- UCAN: `Capability` resource matching now enforces path-segment boundaries (a grant on `w/notes` no longer covers the sibling `w/notesSECRET`) and fails closed on an empty/absent resource — closes a capability attenuation escape and fail-open (#585)
+- DLFS: lattice merge fails closed on malformed nodes from untrusted peers instead of throwing, preventing a merge-path denial of service (#590)
 
 ## [0.8.5] - 2026-06-11
 
