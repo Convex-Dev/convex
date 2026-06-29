@@ -780,6 +780,50 @@ public class DLFSTest {
 	}
 
 	/**
+	 * Two updates in a row at the SAME timestamp must have last-write-wins
+	 * semantics: the second write survives even when an older snapshot of the
+	 * first write is merged back (e.g. the propagator re-applying an announced
+	 * pre-edit snapshot). LWW on a tie is delivered by the merge favouring the
+	 * "own" (first) argument, so the realistic write path — which passes the
+	 * local/latest value as own — keeps the later write. Reversing the argument
+	 * order reverts to the earlier write; asserting both directions guards
+	 * against an accidental swap that would silently lose the last write.
+	 */
+	@Test
+	public void testEqualTimestampUpdatesInARowAreLWW() throws IOException {
+		CVMLong t = CVMLong.create(1000);
+		DLFileSystem drive = DLFS.createLocal();
+		drive.setTimestamp(t);
+		DLPath path = drive.getPath("f.txt");
+
+		// Update 1: f.txt = {1}
+		try (OutputStream os = Files.newOutputStream(path)) { os.write(new byte[] { 1 }); }
+		AVector<ACell> older = drive.getNode(drive.getRoot());   // snapshot after the first write
+
+		// Update 2, in a row at the SAME timestamp: f.txt = {2}
+		try (OutputStream os = Files.newOutputStream(path)) { os.write(new byte[] { 2 }); }
+		AVector<ACell> latest = drive.getNode(drive.getRoot());
+
+		assertEquals(DLFSNode.getUTime(older), DLFSNode.getUTime(latest),
+			"precondition: both updates share a timestamp (a genuine tie, not newer-wins)");
+
+		Blob first = Blob.wrap(new byte[] { 1 });
+		Blob second = Blob.wrap(new byte[] { 2 });
+
+		// Realistic path: the latest write is "own", an older snapshot is merged
+		// back as "other" — the last write must survive (LWW).
+		AVector<ACell> merged = DLFSLattice.INSTANCE.merge(LatticeContext.EMPTY, latest, older);
+		assertEquals(second, DLFSNode.getData(DLFSNode.navigate(merged, path)),
+			"last of two equal-timestamp updates must survive a merge-back of the older snapshot (LWW)");
+
+		// Order is load-bearing: passing the older value as own would revert the
+		// last write, which is why the write/sync path keeps the latest as own.
+		AVector<ACell> reverted = DLFSLattice.INSTANCE.merge(LatticeContext.EMPTY, older, latest);
+		assertEquals(first, DLFSNode.getData(DLFSNode.navigate(reverted, path)),
+			"reversing the merge order reverts the tie — confirms the argument order is correct and load-bearing");
+	}
+
+	/**
 	 * Test that merge uses timestamps from the nodes being merged,
 	 * not the drive's current timestamp for new operations.
 	 */
