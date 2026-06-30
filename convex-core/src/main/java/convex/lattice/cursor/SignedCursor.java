@@ -1,8 +1,5 @@
 package convex.lattice.cursor;
 
-import java.util.function.BinaryOperator;
-import java.util.function.UnaryOperator;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
@@ -18,19 +15,19 @@ import convex.lattice.LatticeContext;
  * the {@link LatticeContext}. Throws {@link IllegalStateException} on write if
  * no signing key is available — this is the enforcement point.</p>
  *
- * <p>Created automatically by {@code SignedLattice.createPathCursor()} when
- * navigating through a signing boundary via {@code path()}.</p>
+ * <p>The sign/unsign transform pair is the {@link #encode}/{@link #decode}
+ * implementation of {@link ABoundaryCursor}; all atomic operations are inherited
+ * from there.</p>
+ *
+ * <p>Created automatically by {@code ALatticeCursor.path()} when navigating
+ * through a signing boundary.</p>
  *
  * @param <V> Type of the unsigned value
  */
-public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
+public class SignedCursor<V extends ACell> extends ABoundaryCursor<V, SignedData<V>> {
 
-	private final ACursor<SignedData<V>> base;
-
-	@SuppressWarnings("unchecked")
 	SignedCursor(ACursor<SignedData<V>> base, ALattice<V> subLattice, LatticeContext context) {
-		super(subLattice, context, null);
-		this.base = base;
+		super(base, subLattice, context);
 	}
 
 	/**
@@ -64,98 +61,14 @@ public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	@Override
-	public V sync() {
-		if (base instanceof ALatticeCursor<?> lc) {
-			lc.sync();
-		} else {
-			throw new IllegalStateException(
-				"SignedCursor.sync(): base cursor is not an ALatticeCursor (got " +
-				base.getClass().getSimpleName() + "). Sync cannot propagate.");
-		}
-		return get();
-	}
-
-	@Override
-	public V get() {
-		SignedData<V> sd = base.get();
-		return (sd != null) ? sd.getValue() : null;
-	}
-
-	@Override
-	public void set(V newValue) {
-		base.set(sign(newValue));
-	}
-
-	@Override
-	public V getAndSet(V newValue) {
-		SignedData<V> old = base.getAndSet(sign(newValue));
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		SignedData<V> old = base.getAndUpdate(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V updated = updateFunction.apply(current);
-			return sign(updated);
-		});
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		@SuppressWarnings("unchecked")
-		V[] result = (V[]) new ACell[1];
-		base.updateAndGet(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V updated = updateFunction.apply(current);
-			result[0] = updated;
-			return sign(updated);
-		});
-		return result[0];
-	}
-
-	@Override
-	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		SignedData<V> old = base.getAndUpdate(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V accumulated = accumulatorFunction.apply(x, current);
-			return sign(accumulated);
-		});
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		@SuppressWarnings("unchecked")
-		V[] result = (V[]) new ACell[1];
-		base.updateAndGet(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V accumulated = accumulatorFunction.apply(x, current);
-			result[0] = accumulated;
-			return sign(accumulated);
-		});
-		return result[0];
-	}
-
-	@Override
-	public boolean compareAndSet(V expected, V newValue) {
-		boolean[] updated = new boolean[1];
-		base.update(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			if (convex.core.util.Utils.equals(expected, current)) {
-				updated[0] = true;
-				return sign(newValue);
-			}
-			return sd;
-		});
-		return updated[0];
-	}
-
-	private SignedData<V> sign(V value) {
-		if (value == null) return null;
+	protected SignedData<V> encode(V value) {
 		AKeyPair kp = context.getSigningKey();
 		if (kp == null) throw new IllegalStateException("SignedCursor requires a signing key in context");
 		return kp.signData(value);
+	}
+
+	@Override
+	protected V decode(SignedData<V> stored) {
+		return stored.getValue();
 	}
 }

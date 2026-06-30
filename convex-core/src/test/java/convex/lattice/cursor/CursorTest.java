@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
+import convex.core.data.ACell;
 import convex.core.data.AIndex;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
@@ -84,6 +85,47 @@ public class CursorTest {
 		doIntCursorTest(pc);
 	}
 	
+	/**
+	 * A {@link Root} that fails its first {@code fails} {@code compareAndSet}
+	 * calls (returning false without writing), to deterministically simulate
+	 * losing a CAS race. All other operations behave normally.
+	 */
+	private static class FlakyCASRoot<V extends ACell> extends Root<V> {
+		private int fails;
+		FlakyCASRoot(V initial, int fails) { super(initial); this.fails=fails; }
+		@Override public boolean compareAndSet(V expected, V newValue) {
+			if (fails>0) { fails--; return false; }
+			return super.compareAndSet(expected, newValue);
+		}
+	}
+
+	/**
+	 * compareAndSet on a PathCursor is single-shot: if the base loses a CAS race
+	 * it returns false without retrying, so a true result always means the value
+	 * was written. Regression guard for the old base.update + boolean[] flag loop,
+	 * which could leave the flag stale across a retry and report success without
+	 * actually writing.
+	 */
+	@Test public void testPathCursorCompareAndSetSingleShot() {
+		CVMLong TWO=CVMLong.create(2);
+		// base = {foo 1}; fail the first base CAS to simulate a concurrent winner
+		FlakyCASRoot<AMap<Symbol,AInteger>> base=new FlakyCASRoot<>(Maps.of(Symbols.FOO,1),1);
+		ACursor<AInteger> pc=base.path(Symbols.FOO);
+
+		// Value matches expected, but base loses the race: must report false and
+		// must not have written. The old flag-loop wrongly returned true here.
+		assertFalse(pc.compareAndSet(CVMLong.ONE,TWO));
+		assertCVMEquals(1,pc.get());
+
+		// Retry succeeds once contention clears
+		assertTrue(pc.compareAndSet(CVMLong.ONE,TWO));
+		assertCVMEquals(2,pc.get());
+
+		// No-match returns false without writing
+		assertFalse(pc.compareAndSet(CVMLong.ONE,CVMLong.ZERO));
+		assertCVMEquals(2,pc.get());
+	}
+
 	private void doIntCursorTest(ACursor<AInteger> root) {
 		assertEquals("nil",root.toString());
 

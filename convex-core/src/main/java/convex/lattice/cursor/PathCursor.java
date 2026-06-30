@@ -155,18 +155,21 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 		return (V)nv[0];
 	}
 
+	/**
+	 * Compare-and-set on the value at the path.
+	 *
+	 * <p>Compares {@code expected} against the current value at the path by
+	 * {@link Utils#equals value equality}, then writes via a single
+	 * compare-and-set of the whole parent value against the parent that was
+	 * observed. Like any CAS this is single-shot: it returns {@code false}
+	 * without retrying if {@code base} changed concurrently, so a successful
+	 * ({@code true}) result always means {@code newValue} was written.</p>
+	 */
 	@Override
 	public boolean compareAndSet(V expected, V newValue) {
-		boolean[] updated=new boolean[1];
-		base.update(bv->{
-			V oldValue=RT.getIn(bv, path);
-			if(Utils.equals(expected,oldValue)) {
-				updated[0]=true;
-				return assocIn(bv, newValue);
-			} else {
-				return bv;
-			}
-		});
-		return updated[0];
+		ACell parent = base.get();
+		V oldValue = RT.getIn(parent, path);
+		if (!Utils.equals(expected, oldValue)) return false;
+		return base.compareAndSet(parent, assocIn(parent, newValue));
 	}
 }

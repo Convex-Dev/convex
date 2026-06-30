@@ -162,11 +162,7 @@ public class SignedCursorTest {
 
 	/**
 	 * Descending through :value crosses the signing boundary. Reads work;
-	 * writes should re-sign automatically and propagate to root.
-	 *
-	 * <p>Currently catches the expected failure: RT.assocIn cannot write
-	 * through SignedData. Will pass once the signing enforcement point
-	 * is wired into descend().</p>
+	 * writes re-sign automatically and propagate to root.
 	 */
 	@Test
 	public void testDescendThroughSignedLattice_WriteThrough() {
@@ -185,24 +181,17 @@ public class SignedCursorTest {
 		// Read through the boundary always works
 		assertEquals(CVMLong.create(10), innerCursor.get());
 
-		// Write should sign and propagate to root
-		try {
-			innerCursor.set(CVMLong.create(20));
-			assertEquals(CVMLong.create(20), innerCursor.get());
+		// Write signs at the boundary and propagates to root
+		innerCursor.set(CVMLong.create(20));
+		assertEquals(CVMLong.create(20), innerCursor.get());
 
-			SignedData<AInteger> updated = root.get().get(ALICE);
-			assertTrue(updated.checkSignature(), "Updated value should be properly signed");
-			assertEquals(CVMLong.create(20), updated.getValue());
-		} catch (Exception e) {
-			System.out.println("Expected failure (signing enforcement point not yet wired): " + e.getMessage());
-		}
+		SignedData<AInteger> updated = root.get().get(ALICE);
+		assertTrue(updated.checkSignature(), "Updated value should be properly signed");
+		assertEquals(CVMLong.create(20), updated.getValue());
 	}
 
 	/**
 	 * Without a signing key, reads work but writes must throw.
-	 *
-	 * <p>Currently fails: descent bypasses signing entirely so writes
-	 * don't throw. Will pass once the enforcement point is active.</p>
 	 */
 	@Test
 	public void testSignedCursor_NoKey_ReadOnlyMode() {
@@ -220,17 +209,13 @@ public class SignedCursorTest {
 		// Reads always work
 		assertEquals(CVMLong.create(42), signedCursor.get().getValue());
 
-		try {
-			ALatticeCursor<AInteger> innerCursor = signedCursor.path(Keywords.VALUE);
-			assertEquals(CVMLong.create(42), innerCursor.get());
+		ALatticeCursor<AInteger> innerCursor = signedCursor.path(Keywords.VALUE);
+		assertEquals(CVMLong.create(42), innerCursor.get());
 
-			// Writes must throw without a signing key
-			assertThrows(IllegalStateException.class, () -> {
-				innerCursor.set(CVMLong.create(999));
-			}, "Write through signed boundary without key should throw");
-		} catch (Exception e) {
-			System.out.println("Signing enforcement point not yet wired: " + e.getMessage());
-		}
+		// Writes must throw without a signing key
+		assertThrows(IllegalStateException.class,
+			() -> innerCursor.set(CVMLong.create(999)),
+			"Write through signed boundary without key should throw");
 	}
 
 	// =========================================================================
@@ -243,9 +228,6 @@ public class SignedCursorTest {
 	 *
 	 * <p>This is the intended DLFS pattern: fork for local file operations,
 	 * sync to commit signed state to the lattice.</p>
-	 *
-	 * <p>Currently catches expected failure — requires the signing
-	 * enforcement point in the descent chain.</p>
 	 */
 	@Test
 	public void testForkBelowSigningBoundary() {
@@ -268,45 +250,38 @@ public class SignedCursorTest {
 		ALatticeCursor<SignedData<AHashMap<Keyword, ASet<AInteger>>>> signedLevel =
 			root.path(ALICE);
 
-		try {
-			ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> innerCursor =
-				signedLevel.path(Keywords.VALUE);
+		ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> innerCursor =
+			signedLevel.path(Keywords.VALUE);
 
-			ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> fork = innerCursor.fork();
-			assertTrue(fork.get().get(Keywords.FOO).contains(CVMLong.ONE));
+		ALatticeCursor<AHashMap<Keyword, ASet<AInteger>>> fork = innerCursor.fork();
+		assertTrue(fork.get().get(Keywords.FOO).contains(CVMLong.ONE));
 
-			// Local writes — no signing
-			fork.updateAndGet(map -> map.assoc(Keywords.FOO,
-				map.get(Keywords.FOO).include(CVMLong.create(2))));
-			fork.updateAndGet(map -> map.assoc(Keywords.BAR,
-				Sets.of((AInteger) CVMLong.create(10))));
+		// Local writes — no signing
+		fork.updateAndGet(map -> map.assoc(Keywords.FOO,
+			map.get(Keywords.FOO).include(CVMLong.create(2))));
+		fork.updateAndGet(map -> map.assoc(Keywords.BAR,
+			Sets.of((AInteger) CVMLong.create(10))));
 
-			// Root unchanged while fork is isolated
-			assertEquals(aliceData, root.get().get(ALICE).getValue());
+		// Root unchanged while fork is isolated
+		assertEquals(aliceData, root.get().get(ALICE).getValue());
 
-			// Sync signs once and merges to root
-			fork.sync();
+		// Sync signs once and merges to root
+		fork.sync();
 
-			SignedData<?> updatedSigned = root.get().get(ALICE);
-			assertTrue(updatedSigned.checkSignature(), "Synced data should be properly signed");
+		SignedData<?> updatedSigned = root.get().get(ALICE);
+		assertTrue(updatedSigned.checkSignature(), "Synced data should be properly signed");
 
-			@SuppressWarnings("unchecked")
-			AHashMap<Keyword, ASet<AInteger>> updatedMap =
-				(AHashMap<Keyword, ASet<AInteger>>) updatedSigned.getValue();
-			assertTrue(updatedMap.get(Keywords.FOO).contains(CVMLong.ONE));
-			assertTrue(updatedMap.get(Keywords.FOO).contains(CVMLong.create(2)));
-			assertTrue(updatedMap.get(Keywords.BAR).contains(CVMLong.create(10)));
-
-		} catch (Exception e) {
-			System.out.println("Fork through signing boundary not yet working: " + e.getMessage());
-		}
+		@SuppressWarnings("unchecked")
+		AHashMap<Keyword, ASet<AInteger>> updatedMap =
+			(AHashMap<Keyword, ASet<AInteger>>) updatedSigned.getValue();
+		assertTrue(updatedMap.get(Keywords.FOO).contains(CVMLong.ONE));
+		assertTrue(updatedMap.get(Keywords.FOO).contains(CVMLong.create(2)));
+		assertTrue(updatedMap.get(Keywords.BAR).contains(CVMLong.create(10)));
 	}
 
 	/**
 	 * Without a signing key: fork and local writes succeed, but sync must
 	 * fail because it requires signing.
-	 *
-	 * <p>Currently fails: sync doesn't go through the enforcement point.</p>
 	 */
 	@Test
 	public void testForkBelowSigningBoundary_NoKey_SyncFails() {
@@ -319,23 +294,17 @@ public class SignedCursorTest {
 		RootLatticeCursor<AHashMap<ACell, SignedData<AInteger>>> root =
 			Cursors.createLattice(ownerLattice, initial, noKeyCtx);
 
-		try {
-			ALatticeCursor<SignedData<AInteger>> signedLevel = root.path(ALICE);
-			ALatticeCursor<AInteger> innerCursor = signedLevel.path(Keywords.VALUE);
+		ALatticeCursor<SignedData<AInteger>> signedLevel = root.path(ALICE);
+		ALatticeCursor<AInteger> innerCursor = signedLevel.path(Keywords.VALUE);
 
-			// Fork and local writes succeed without a key
-			ALatticeCursor<AInteger> fork = innerCursor.fork();
-			fork.set(CVMLong.create(100));
-			assertEquals(CVMLong.create(100), fork.get());
+		// Fork and local writes succeed without a key
+		ALatticeCursor<AInteger> fork = innerCursor.fork();
+		fork.set(CVMLong.create(100));
+		assertEquals(CVMLong.create(100), fork.get());
 
-			// Sync must throw — no key to sign with
-			assertThrows(IllegalStateException.class, () -> {
-				fork.sync();
-			}, "Sync through signed boundary without key should throw");
-
-		} catch (Exception e) {
-			System.out.println("Fork through signing boundary not yet working: " + e.getMessage());
-		}
+		// Sync must throw — no key to sign with
+		assertThrows(IllegalStateException.class, () -> fork.sync(),
+			"Sync through signed boundary without key should throw");
 	}
 
 	// =========================================================================
@@ -423,18 +392,13 @@ public class SignedCursorTest {
 		assertEquals(innerMap, aliceCursor.get().getValue());
 
 		// SignedLattice → descend(:value) → unsigned inner value
-		try {
-			ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> innerCursor =
-				aliceCursor.path(Keywords.VALUE);
-			assertEquals(innerMap, innerCursor.get());
+		ALatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> innerCursor =
+			aliceCursor.path(Keywords.VALUE);
+		assertEquals(innerMap, innerCursor.get());
 
-			// MapLattice → descend(:foo) → SetLattice level
-			ALatticeCursor<ASet<CVMLong>> fooCursor = innerCursor.path(Keywords.FOO);
-			assertTrue(fooCursor.get().contains(CVMLong.ONE));
-
-		} catch (Exception e) {
-			System.out.println("Full hierarchy descent not yet working: " + e.getMessage());
-		}
+		// MapLattice → descend(:foo) → SetLattice level
+		ALatticeCursor<ASet<CVMLong>> fooCursor = innerCursor.path(Keywords.FOO);
+		assertTrue(fooCursor.get().contains(CVMLong.ONE));
 	}
 
 	// =========================================================================
@@ -689,18 +653,14 @@ public class SignedCursorTest {
 		root.onSync(value -> { syncCount.incrementAndGet(); return value; });
 
 		// Navigate through OwnerLattice → SignedLattice → :value
-		try {
-			ALatticeCursor<AInteger> innerCursor = root.path(ALICE, Keywords.VALUE);
+		ALatticeCursor<AInteger> innerCursor = root.path(ALICE, Keywords.VALUE);
 
-			// Write and sync from inside the signing boundary
-			innerCursor.set(CVMLong.create(99));
-			innerCursor.sync();
+		// Write and sync from inside the signing boundary
+		innerCursor.set(CVMLong.create(99));
+		innerCursor.sync();
 
-			assertTrue(syncCount.get() > 0,
-				"sync() from inside signing boundary must reach root onSync callback");
-		} catch (Exception e) {
-			System.out.println("Write through signing boundary not yet working: " + e.getMessage());
-		}
+		assertTrue(syncCount.get() > 0,
+			"sync() from inside signing boundary must reach root onSync callback");
 	}
 
 	/**
