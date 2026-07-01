@@ -10,10 +10,14 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALattice;
 import convex.lattice.LatticeTest;
 
 /**
  * Tests for LWPLattice — Last-Write-Preferred lattice wrapper.
+ *
+ * <p>Exercised over a {@link MapLattice} inner (additive per-key merge with
+ * prefer-own leaves) so LWP's reorder-then-delegate behaviour is observable.</p>
  */
 public class LWPLatticeTest {
 
@@ -31,8 +35,19 @@ public class LWPLatticeTest {
 		return 0;
 	}
 
-	private static final LWPLattice<ACell> LWP =
-		LWPLattice.create(JSONValueLattice.INSTANCE, LWPLatticeTest::extractTS);
+	/** Prefer-own leaf: on a conflict keep the own (first) value. */
+	private static final ALattice<ACell> PREFER_OWN_LEAF = new AValueLattice<ACell>() {
+		@Override public ACell merge(ACell own, ACell other) { return (own != null) ? own : other; }
+		@Override public ACell zero() { return null; }
+		@Override public boolean checkForeign(ACell value) { return true; }
+	};
+
+	// Additive per-key map merge with prefer-own leaves — a real production lattice
+	// standing in for the former JSONValueLattice fixture.
+	private static final MapLattice<Keyword, ACell> INNER = MapLattice.create(PREFER_OWN_LEAF);
+
+	private static final LWPLattice<AHashMap<Keyword, ACell>> LWP =
+		LWPLattice.create(INNER, LWPLatticeTest::extractTS);
 
 	private static AHashMap<Keyword, ACell> rec(long ts, Keyword key, String val) {
 		return Maps.of(KEY_TS, CVMLong.create(ts), key, Strings.create(val));
@@ -42,8 +57,8 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testNewerWins() {
-		ACell old = rec(100, KEY_A, "old");
-		ACell newer = rec(200, KEY_A, "new");
+		AHashMap<Keyword, ACell> old = rec(100, KEY_A, "old");
+		AHashMap<Keyword, ACell> newer = rec(200, KEY_A, "new");
 
 		assertSame(newer, LWP.merge(old, newer), "Newer should win when other is newer");
 		assertSame(newer, LWP.merge(newer, old), "Newer should win when own is newer");
@@ -51,8 +66,8 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testEqualTimestampPrefersOwn() {
-		ACell a = rec(100, KEY_A, "alpha");
-		ACell b = rec(100, KEY_A, "beta");
+		AHashMap<Keyword, ACell> a = rec(100, KEY_A, "alpha");
+		AHashMap<Keyword, ACell> b = rec(100, KEY_A, "beta");
 
 		assertSame(a, LWP.merge(a, b));
 		assertSame(b, LWP.merge(b, a));
@@ -62,11 +77,10 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testDisjointKeysPreserved() {
-		ACell a = rec(100, KEY_A, "alpha");
-		ACell b = rec(200, KEY_B, "beta");
+		AHashMap<Keyword, ACell> a = rec(100, KEY_A, "alpha");
+		AHashMap<Keyword, ACell> b = rec(200, KEY_B, "beta");
 
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> merged = (AHashMap<Keyword, ACell>) LWP.merge(a, b);
+		AHashMap<Keyword, ACell> merged = LWP.merge(a, b);
 
 		// Both keys present (recursive map merge)
 		assertEquals(Strings.create("alpha"), merged.get(KEY_A));
@@ -77,11 +91,10 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testConflictingKeysNewerWins() {
-		ACell old = rec(100, KEY_A, "old-val");
-		ACell newer = rec(200, KEY_A, "new-val");
+		AHashMap<Keyword, ACell> old = rec(100, KEY_A, "old-val");
+		AHashMap<Keyword, ACell> newer = rec(200, KEY_A, "new-val");
 
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> merged = (AHashMap<Keyword, ACell>) LWP.merge(old, newer);
+		AHashMap<Keyword, ACell> merged = LWP.merge(old, newer);
 
 		assertEquals(Strings.create("new-val"), merged.get(KEY_A));
 	}
@@ -97,8 +110,7 @@ public class LWPLatticeTest {
 			KEY_A, Strings.create("a2"),
 			KEY_C, Strings.create("c"));
 
-		@SuppressWarnings("unchecked")
-		AHashMap<Keyword, ACell> merged = (AHashMap<Keyword, ACell>) LWP.merge(a, b);
+		AHashMap<Keyword, ACell> merged = LWP.merge(a, b);
 
 		assertEquals(Strings.create("a2"), merged.get(KEY_A), "Conflict: newer wins");
 		assertEquals(Strings.create("b"), merged.get(KEY_B), "Unique to old: preserved");
@@ -109,7 +121,7 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testNullHandling() {
-		ACell v = rec(100, KEY_A, "value");
+		AHashMap<Keyword, ACell> v = rec(100, KEY_A, "value");
 
 		assertSame(v, LWP.merge(v, null));
 		assertSame(v, LWP.merge(null, v));
@@ -120,7 +132,7 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testIdempotency() {
-		ACell v = rec(100, KEY_A, "value");
+		AHashMap<Keyword, ACell> v = rec(100, KEY_A, "value");
 		assertSame(v, LWP.merge(v, v));
 	}
 
@@ -128,9 +140,9 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testAssociativity() {
-		ACell a = rec(100, KEY_A, "a");
-		ACell b = rec(200, KEY_A, "b");
-		ACell c = rec(150, KEY_A, "c");
+		AHashMap<Keyword, ACell> a = rec(100, KEY_A, "a");
+		AHashMap<Keyword, ACell> b = rec(200, KEY_A, "b");
+		AHashMap<Keyword, ACell> c = rec(150, KEY_A, "c");
 
 		ACell left = LWP.merge(LWP.merge(a, b), c);
 		ACell right = LWP.merge(a, LWP.merge(b, c));
@@ -141,7 +153,7 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testZeroDelegates() {
-		assertEquals(JSONValueLattice.INSTANCE.zero(), LWP.zero());
+		assertEquals(INNER.zero(), LWP.zero());
 	}
 
 	@Test
@@ -158,8 +170,8 @@ public class LWPLatticeTest {
 
 	@Test
 	public void testGenericProperties() {
-		ACell v1 = rec(100, KEY_A, "v1");
-		ACell v2 = rec(200, KEY_A, "v2");
+		AHashMap<Keyword, ACell> v1 = rec(100, KEY_A, "v1");
+		AHashMap<Keyword, ACell> v2 = rec(200, KEY_A, "v2");
 		LatticeTest.doLatticeTest(LWP, v1, v2);
 	}
 }
