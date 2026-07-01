@@ -5,6 +5,7 @@ import convex.core.data.AVector;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * Fixed-size product lattice over AVector&lt;ACell&gt;.
@@ -48,6 +49,33 @@ public class TupleLattice extends ALattice<AVector<ACell>> {
 		}
 
 		// optimisation to avoid new structure if possible
+		if (sameAsOwn) return own;
+		if (sameAsOther) return other;
+		return result;
+	}
+
+	@Override
+	public AVector<ACell> merge(LatticeContext context, AVector<ACell> own, AVector<ACell> other) {
+		if (own == null) return other;
+		if (other == null) return own;
+
+		int n = children.length;
+		AVector<ACell> result = own;
+		boolean sameAsOwn = true;
+		boolean sameAsOther = true;
+
+		for (int i = 0; i < n; i++) {
+			ACell ov = own.get(i);
+			ACell tv = other.get(i);
+			// Thread context to the child merge so signing / owner verification is not dropped
+			ACell mv = children[i].merge(context, ov, tv);
+			if (mv != ov) {
+				result = result.assoc(i, mv);
+				sameAsOwn = false;
+			}
+			if (mv != tv) sameAsOther = false;
+		}
+
 		if (sameAsOwn) return own;
 		if (sameAsOther) return other;
 		return result;
