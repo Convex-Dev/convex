@@ -99,7 +99,9 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		AFn<T> fn = RT.castFunction(rf);
 		if (fn == null) {
 			Context rctx=context.withCastError(rf, Types.FUNCTION);
-			ctx.getError().addTrace("Trying to get function for expression: "+RT.print(this));
+			// add the trace to the error context (rctx), not ctx: rctx is guaranteed to
+			// carry the error, whereas relying on ctx here only works by Context mutation aliasing
+			rctx.getError().addTrace("Trying to get function for expression: "+RT.print(this));
 			return rctx;
 		}
 
