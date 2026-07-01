@@ -7,6 +7,8 @@ import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
+import convex.lattice.cursor.ABoundaryCursor;
+import convex.lattice.cursor.ALatticeCursor;
 
 /**
  * Abstract base class for lattice functions.
@@ -58,11 +60,73 @@ public abstract class ALattice<V extends ACell> {
 
 	/**
 	 * Check if a foreign value is legal. Subtypes must check validity as far as any child lattices.
-	 * 
+	 *
 	 * @param value Value received from foreign source
 	 * @return true if foreign value is an acceptable lattice value
 	 */
 	public abstract boolean checkForeign(V value);
+
+	/**
+	 * Returns true if this is a structural (navigable) region whose container
+	 * types are determined by navigation keys rather than by the lattice.
+	 *
+	 * <p>When true, the cursor write path ({@code LatticeOps.assocIn}) builds
+	 * missing intermediates from the key shape (see
+	 * {@code LatticeOps.containerForKey}) instead of using {@link #zero()}.
+	 * Default is {@code false}.</p>
+	 *
+	 * @return true if this region builds containers from navigation keys
+	 */
+	public boolean isStructural() {
+		return false;
+	}
+
+	/**
+	 * Whether navigating {@code key} crosses a write-interception boundary at this
+	 * lattice level (e.g. a signing boundary, or a stamp-on-write LWW leaf).
+	 *
+	 * <p>This is the cheap, allocation-free gate that {@code ALatticeCursor.path}
+	 * checks on <em>every</em> key. Only when it returns true is the (allocating)
+	 * {@link #createPathCursor} invoked. Default false, so ordinary deep navigation
+	 * pays only a boolean call per key and allocates nothing.</p>
+	 *
+	 * @param key key about to be navigated
+	 * @return true if a boundary cursor must be inserted here
+	 */
+	public boolean isWriteBoundary(ACell key) {
+		return false;
+	}
+
+	/**
+	 * Builds the boundary cursor wrapping {@code base}. Called by
+	 * {@code ALatticeCursor.path} <em>only</em> when {@link #isWriteBoundary} is
+	 * true for {@code key}, after the accumulated path segment has been flushed —
+	 * so {@code base} is already the correct cursor to wrap (no re-wrapping).
+	 *
+	 * @param base accumulated cursor at this lattice's level
+	 * @param key key being navigated
+	 * @param context lattice context (signing key, timestamp, etc.)
+	 * @return boundary cursor to insert
+	 */
+	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+		return null;
+	}
+
+	/**
+	 * At a boundary ({@link #isWriteBoundary} true), whether {@code key} is
+	 * consumed crossing it.
+	 *
+	 * <p>{@code true} (default) for a virtual boundary key (e.g. {@code :value}
+	 * crossing {@code SignedData<V> → V}); {@code false} for a transparent,
+	 * same-value boundary (e.g. stamp-on-write) where {@code key} keeps navigating
+	 * below the wrapper.</p>
+	 *
+	 * @param key key triggering the boundary
+	 * @return true if the key is consumed crossing the boundary
+	 */
+	public boolean consumesPathKey(ACell key) {
+		return true;
+	}
 	
 	/**
 	 * Resolves an external key (e.g. JSON string) to the canonical CVM key

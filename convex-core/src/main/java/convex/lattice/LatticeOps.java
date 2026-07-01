@@ -1,7 +1,13 @@
 package convex.lattice;
 
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
+import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Maps;
+import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -72,10 +78,16 @@ public class LatticeOps {
 				if (lat == null) throw new IllegalStateException(
 					"Cannot write through non-existent path at depth " + i +
 					": no lattice type information available");
-				data = lat.zero();
-				if (data == null) throw new IllegalStateException(
-					"Cannot write through non-existent path at depth " + i +
-					": lattice zero is null (leaf lattice)");
+				if (lat.isStructural()) {
+					// Structural region (e.g. JSON): build the container from the
+					// key that indexes into it, not from a fixed lattice zero().
+					data = containerForKey(keys[i]);
+				} else {
+					data = lat.zero();
+					if (data == null) throw new IllegalStateException(
+						"Cannot write through non-existent path at depth " + i +
+						": lattice zero is null (leaf lattice)");
+				}
 			}
 			if (!(data instanceof ADataStructure<?> struct)) {
 				throw new IllegalArgumentException(
@@ -93,5 +105,29 @@ public class LatticeOps {
 			value = RT.assoc(ass[i], ks[i], value);
 		}
 		return (T) value;
+	}
+
+	/**
+	 * Chooses an empty container for a missing intermediate in a structural
+	 * (e.g. JSON) region, based on the shape of the key that indexes into it:
+	 * <ul>
+	 *   <li>integer → {@link Vectors#empty() vector} (array index)</li>
+	 *   <li>string → {@link Maps#empty() hash map} (dynamic JSON object key)</li>
+	 *   <li>keyword / blob / address → {@link Index#EMPTY index} (short internal key)</li>
+	 *   <li>anything else → hash map</li>
+	 * </ul>
+	 *
+	 * <p><b>Vector caveat:</b> Convex vectors cannot be grown via {@code assoc}
+	 * (only existing indices can be replaced), so a freshly-created vector
+	 * intermediate supports navigation but not element creation through this path.</p>
+	 *
+	 * @param key Key that will index into the container
+	 * @return An empty container appropriate for the key shape
+	 */
+	public static ADataStructure<?> containerForKey(ACell key) {
+		if (key instanceof AInteger) return Vectors.empty();
+		if (key instanceof AString) return Maps.empty();      // dynamic JSON string key
+		if (key instanceof ABlobLike) return Index.EMPTY;     // keyword / blob / address
+		return Maps.empty();
 	}
 }

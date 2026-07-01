@@ -9,12 +9,15 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.cursor.ABoundaryCursor;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.SignedCursor;
 
 /**
  * Lattice node representing signed Data.
- * 
+ *
  * Merges that produce new values will fail if no keypair is set.
- * 
+ *
  * @param <V> Type of signed lattice value
  */
 public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
@@ -116,6 +119,25 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 			return (ALattice<T>) valueNode;
 		}
 		return null;
+	}
+
+	/**
+	 * The signing boundary is at {@code :value}: crossing it goes from
+	 * {@code SignedData<V>} to the unsigned {@code V}, so a {@link SignedCursor}
+	 * is inserted to handle sign/verify, consuming the {@code :value} key (the
+	 * default {@link #consumesPathKey}).
+	 */
+	@Override
+	public boolean isWriteBoundary(ACell key) {
+		return Keywords.VALUE.equals(key);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+		// Only called when isWriteBoundary(key) is true, i.e. key is :value.
+		ALattice<V> inner = path(key); // valueNode
+		return SignedCursor.create((ALatticeCursor<SignedData<V>>) base, inner, context);
 	}
 
 }
