@@ -69,7 +69,28 @@ public class KeyTest {
 				"--keystore", "foo.bar");
 		tester.assertExitCode(ExitCodes.NOINPUT);
 	}
-	
+
+	@Test
+	public void testKeyGenerateMnemonicShownAtV0() {
+		// #583: -v0 ("suppress user output") must NOT silently discard the BIP39 mnemonic —
+		// it is unrecoverable. It stays on stderr (stdout remains the public-key contract).
+		CLTester tester = CLTester.run(
+				"key",
+				"generate",
+				"-v0",
+				"-p", KEY_PASSWORD,
+				"--type", "bip39",
+				"--passphrase", "testBIP39pass",
+				"--storepass", KEYSTORE_PASSWORD,
+				"--keystore", KEYSTORE_FILENAME);
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		// stdout is still just the 64-char public key, even at -v0
+		assertEquals(64, tester.getOutput().trim().length());
+		// the mnemonic is still shown (on stderr) despite -v0
+		assertTrue(tester.getError().contains("BIP39 mnemonic"),
+				"mnemonic must be shown regardless of verbosity");
+	}
+
 	@Test
 	public void testKeyGenerateAndUse() throws IOException {
 		File f=TEMP_FILE;
