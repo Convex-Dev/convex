@@ -208,7 +208,7 @@ Rules for record design:
 - **Always include `:timestamp`** in LWW-merged records — it drives the merge tiebreaker
 - **Use `Keyword` keys** for record fields — compact, interned, fast comparison
 - **Use `Blob` keys** for collection entries that need ordering (feeds use 8-byte big-endian timestamp blobs for chronological order in `Index`)
-- **Tombstone, don't delete** — set a `:deleted` field rather than removing entries, since lattice merge is union-based and can't propagate removals
+- **Tombstone under union merges** — with additive merges (`IndexLattice`, `MapLattice`, `SetLattice`) a removed key resurrects when an older replica merges back, so set a `:deleted` field rather than removing entries. Under **whole-value LWW** (see [Durable deletes](#durable-deletes-with-whole-value-lww)) removals *are* durable and you can delete directly.
 
 ## Fork/Sync for Batch Operations
 
@@ -347,6 +347,23 @@ public void delete(Blob postKey) {
     });
 }
 ```
+
+### Durable deletes with whole-value LWW
+
+Additive merges (`IndexLattice`/`MapLattice`) union keys, so a removed key reappears when an older replica merges back — hence tombstones. When you need **real deletions** to survive merge-back, model the region as a single **whole-value LWW leaf**, composed from three single-concern lattice layers:
+
+```java
+// merge = whole-value LWW (deletions durable) · nav = JSON structure · write = stamp
+ALattice<ACell> state = StampingLattice.create(
+    LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
+    stampFn);                                        // re-stamp the whole leaf on every write
+```
+
+- `JSONLattice` — recursive structural navigation; `assocIn` builds containers by key shape, so sub-paths below the leaf stay navigable and writable.
+- `LWWLattice(inner)` — merges the *whole* value by `:timestamp` (never per-key), so a smaller map with a newer timestamp replaces the old one and the deleted key does not resurrect.
+- `StampingLattice(inner, stampFn)` — inserts a `StampedCursor` so every deep write re-stamps the whole leaf; whole-value LWW then picks it.
+
+Each layer adds exactly one concern (merge / navigation / stamping) and delegates the rest, so they compose freely — `StampingLattice` stamps over anything, `LWWLattice` merges over any navigable inner. To delete, read-modify-write the sub-path out — e.g. `cursor.updateAndGet(m -> m.dissoc(key))` — and whole-value LWW propagates the removal.
 
 ## Testing Patterns
 
