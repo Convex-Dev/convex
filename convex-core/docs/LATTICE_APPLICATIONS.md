@@ -268,14 +268,19 @@ public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
 
 ### LatticeContext
 
-The `LatticeContext` carries the signing key pair and verification policy. Set it on the cursor before any writes that cross a `SignedCursor` boundary:
+The `LatticeContext` carries the write/merge context: a **signing key pair** (+ verification policy) and a **timestamp** — the single write clock. Set it on the cursor before any writes that cross a `SignedCursor` boundary (which needs the key) or a `StampedCursor` / stamp-on-write region (which needs the timestamp):
 
 ```java
+// signing only
 LatticeContext ctx = LatticeContext.create(null, myKeyPair);
+
+// signing + write clock — needed for stamp-on-write regions; refresh per write
+// batch so LWW sees fresh timestamps (the pattern DLFSAdapter uses)
+LatticeContext ctx = LatticeContext.create(CVMLong.create(System.currentTimeMillis()), myKeyPair);
 cursor.withContext(ctx);
 ```
 
-Without a context (or with a context that has no key pair), writes through `SignedCursor` throw `IllegalStateException`.
+A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. (The same context timestamp is what `DLFSLocal` reads for node write times.)
 
 ## Security Model
 

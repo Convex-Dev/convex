@@ -74,7 +74,7 @@ ACursor<V>
 
 When `path(key)` is called on a lattice cursor:
 
-1. If at a `SignedLattice` boundary, insert a `SignedCursor` (`assocIn` cannot write through `SignedData`)
+1. If the lattice declares a write-interception boundary at this key (`isWriteBoundary`), insert the cursor it builds (`createPathCursor`) — e.g. `SignedLattice` → `SignedCursor` (`assocIn` cannot write through `SignedData`), or `StampingLattice` → `StampedCursor`
 2. Otherwise resolve `lattice.path(key)` for a sub-lattice and create a `DescendedCursor` (which may have null lattice)
 
 ### With sub-lattice (lattice-aware navigation)
@@ -112,7 +112,7 @@ RootLatticeCursor                                 [KeyedLattice]
 
 The collapsed cursor uses a single `RT.getIn`/`LatticeOps.assocIn` call for the full multi-key path instead of nested cursors at each level. The leaf's sub-lattice is used for `merge()`/`fork()`/`sync()`.
 
-The chain breaks only at `SignedLattice` boundaries, where `assocIn` cannot write through `SignedData` and a `SignedCursor` must be inserted.
+The chain breaks only at write-interception boundaries the lattice declares (`isWriteBoundary`): e.g. a `SignedLattice` (where `assocIn` cannot write through `SignedData`, so a `SignedCursor` is inserted) or a `StampingLattice` (a transparent `StampedCursor`).
 
 ### Lattice continuity
 
@@ -133,7 +133,7 @@ Note: `get()` still returns null for non-existent paths — the zero-substitutio
 
 `path(keys...)` navigates with **canonical** keys and is the hot primitive — no resolution, keys stored and used as-is. `resolve(keys...)` is the user-facing entry for **external/logical** keys (JSON strings, hex, decimal): it canonicalises each key against the cursor's own lattice via `resolveKey`, then delegates to `path`. Resolving against the cursor's own lattice makes it compose — `c.resolve(a).resolve(b)` reaches the same position as `c.resolve(a, b)`; with an identity resolver it reduces exactly to `path`, and it throws on an unresolvable key. Resolution is copy-on-change: already-canonical keys are returned unchanged, so `resolve` allocates nothing extra in that case.
 
-## Write Interception (boundary cursors)
+## Write Interception (update cursors)
 
 A lattice may need to **transform values on write** at a boundary — sign them, stamp them with a timestamp, etc. This is handled generically: the cursor knows nothing about specific lattice types; the lattice declares its own boundary.
 
@@ -157,7 +157,7 @@ Two instances — a same-type **update override** and a type-changing **view bou
 
 ### Lattice-declared boundaries
 
-`ALatticeCursor.path()` inserts a boundary cursor by asking the lattice, via three `ALattice` hooks (no `instanceof`, no lattice-specific knowledge in the cursor):
+`ALatticeCursor.path()` inserts an update cursor by asking the lattice, via three `ALattice` hooks (no `instanceof`, no lattice-specific knowledge in the cursor):
 
 | Hook | Meaning | Default |
 |------|---------|---------|
@@ -255,9 +255,9 @@ Some writes need work on the way through — a stamp injected, or a `SignedData`
 
 ### Multi-key collapsing
 
-Consecutive `path()` steps are collapsed into a single `DescendedCursor` to avoid unnecessary allocations and intermediate merges. The chain breaks only at **write-interception boundaries**, where a boundary cursor must be inserted (e.g. a `SignedCursor`, because `assocIn` cannot write through immutable `SignedData`). The collapsed cursor holds the full multi-key path and the leaf's sub-lattice.
+Consecutive `path()` steps are collapsed into a single `DescendedCursor` to avoid unnecessary allocations and intermediate merges. The chain breaks only at **write-interception boundaries**, where an update cursor must be inserted (e.g. a `SignedCursor`, because `assocIn` cannot write through immutable `SignedData`). The collapsed cursor holds the full multi-key path and the leaf's sub-lattice.
 
-The cursor's `path()` walks `lattice.path(key)` at each step and asks `lattice.isWriteBoundary(key)` — a cheap boolean gate — to decide whether to insert a boundary cursor. No `instanceof`, no knowledge of specific lattice types: each lattice declares its own boundary (see [Write Interception](#write-interception-boundary-cursors)).
+The cursor's `path()` walks `lattice.path(key)` at each step and asks `lattice.isWriteBoundary(key)` — a cheap boolean gate — to decide whether to insert an update cursor. No `instanceof`, no knowledge of specific lattice types: each lattice declares its own boundary (see [Write Interception](#write-interception-update-cursors)).
 
 ### `LatticeOps` as internal engine
 
