@@ -3,6 +3,7 @@ package convex.core.cvm;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.Maps;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -209,7 +210,9 @@ public class PeerStatus extends ARecordGeneric {
 	 */
 	public AHashMap<ACell, ACell> getMetadata() {
 		if (metadata==null) {
-			metadata=RT.ensureMap(values.get(IX_METADATA));
+			// Absent/foreign metadata is explicitly treated as an empty map (not null)
+			AHashMap<ACell, ACell> m=RT.asMap(values.get(IX_METADATA));
+			metadata=(m!=null)?m:Maps.empty();
 		}
 		return metadata;
 	}

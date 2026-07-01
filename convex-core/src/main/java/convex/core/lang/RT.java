@@ -1366,19 +1366,48 @@ public class RT {
 	}
 
 	/**
-	 * Converts the argument to a non-null Map. Nulls are implicitly converted to
-	 * the empty map.
-	 * 
+	 * Casts the argument to a Map with CVM map-cast semantics, coercing {@code null}
+	 * to the empty map.
+	 *
+	 * <p><b>Note:</b> unlike the rest of the {@code ensure*} family (and unlike
+	 * {@link #asMap}), a {@code null} argument returns an <em>empty map</em>, not
+	 * {@code null}. This supports CVM map casts (e.g. {@code (dissoc nil …)}) and is
+	 * relied upon by genesis, so it is <em>not</em> a plain type guard:
+	 * {@code ensureMap(x) == null} detects only a non-null non-map value, <b>not</b> a
+	 * null input. Use {@link #asMap} when {@code null} should be handled explicitly by
+	 * the caller.</p>
+	 *
 	 * @param <K> Type of map keys
 	 * @param <V> Type of map values
 	 * @param a   Value to cast
-	 * @return Map instance, or null if argument cannot be converted to a map
-	 * 
+	 * @return The map; an empty map if {@code a} is null; or null if {@code a} is a non-map value
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R ensureMap(ACell a) {
 		if (a == null)
 			return (R) Maps.empty();
+		if (a instanceof AMap)
+			return (R) a;
+		return null;
+	}
+
+	/**
+	 * Casts the argument to a Map, or returns {@code null} if it is not a map.
+	 *
+	 * <p>A plain type guard, consistent with the rest of the {@code ensure*} family
+	 * ({@link #ensureString}, {@link #ensureVector}, …): a {@code null} or non-map
+	 * argument returns {@code null}. Prefer this over {@link #ensureMap} whenever the
+	 * caller should decide explicitly what to do with a null/absent value, rather than
+	 * silently coercing it to an empty map.</p>
+	 *
+	 * @param <K> Type of map keys
+	 * @param <V> Type of map values
+	 * @param <R> Map return type
+	 * @param a   Value to cast
+	 * @return Map instance, or null if the argument is null or not a map
+	 */
+	@SuppressWarnings("unchecked")
+	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R asMap(ACell a) {
 		if (a instanceof AMap)
 			return (R) a;
 		return null;

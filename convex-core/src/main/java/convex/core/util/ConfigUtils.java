@@ -10,7 +10,7 @@ import java.net.URL;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
-import convex.core.lang.RT;
+import convex.core.data.Maps;
 
 public class ConfigUtils {
 
@@ -30,7 +30,8 @@ public class ConfigUtils {
 	public static AMap<AString,ACell> readConfig(InputStream resource) throws IOException {
 		String config=Utils.readString(resource);
 		AMap<AString,ACell> result=(AMap<AString, ACell>) JSON.parseJSON5(config);
-		return RT.ensureMap(result);
+		// A config that parses to nothing is explicitly an empty map (not null)
+		return (result!=null)?result:Maps.empty();
 	}
 	
 	/**
