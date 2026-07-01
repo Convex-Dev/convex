@@ -66,45 +66,41 @@ public class LatticeOps {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T assocIn(ACell a, ACell value, ALattice<?> baseLattice, ACell... keys) {
-		int n = keys.length;
-		ADataStructure<?>[] ass = new ADataStructure[n];
-		ACell[] ks = new ACell[n];
-		ACell data = a;
-		ALattice<?> lat = baseLattice;
+		return (T) assocIn(a, value, baseLattice, keys, 0);
+	}
 
-		// Forward pass: descend, using lattice.zero() for null intermediates
-		for (int i = 0; i < n; i++) {
-			if (data == null) {
-				if (lat == null) throw new IllegalStateException(
+	/**
+	 * Recursive core: descends to depth {@code i}, then rebuilds on the way back up.
+	 * Copy-on-change — each level's {@link RT#assoc} returns the existing structure
+	 * unchanged when the child below it didn't change, so a no-op write returns the
+	 * original {@code data} by reference and allocates nothing (no working arrays).
+	 */
+	private static ACell assocIn(ACell data, ACell value, ALattice<?> lat, ACell[] keys, int i) {
+		if (i >= keys.length) return value;
+
+		if (data == null) {
+			if (lat == null) throw new IllegalStateException(
+				"Cannot write through non-existent path at depth " + i +
+				": no lattice type information available");
+			if (lat.isStructural()) {
+				// Structural region (e.g. JSON): build the container from the key
+				// that indexes into it, not from a fixed lattice zero().
+				data = containerForKey(keys[i]);
+			} else {
+				data = lat.zero();
+				if (data == null) throw new IllegalStateException(
 					"Cannot write through non-existent path at depth " + i +
-					": no lattice type information available");
-				if (lat.isStructural()) {
-					// Structural region (e.g. JSON): build the container from the
-					// key that indexes into it, not from a fixed lattice zero().
-					data = containerForKey(keys[i]);
-				} else {
-					data = lat.zero();
-					if (data == null) throw new IllegalStateException(
-						"Cannot write through non-existent path at depth " + i +
-						": lattice zero is null (leaf lattice)");
-				}
+					": lattice zero is null (leaf lattice)");
 			}
-			if (!(data instanceof ADataStructure<?> struct)) {
-				throw new IllegalArgumentException(
-					"Not a data structure at depth " + i +
-					", found " + Utils.getClassName(data));
-			}
-			ass[i] = struct;
-			ks[i] = keys[i];
-			data = struct.get(keys[i]);
-			lat = (lat != null) ? lat.path(keys[i]) : null;
+		}
+		if (!(data instanceof ADataStructure<?> struct)) {
+			throw new IllegalArgumentException(
+				"Not a data structure at depth " + i + ", found " + Utils.getClassName(data));
 		}
 
-		// Backward pass: reconstruct immutably
-		for (int i = n - 1; i >= 0; i--) {
-			value = RT.assoc(ass[i], ks[i], value);
-		}
-		return (T) value;
+		ACell child = struct.get(keys[i]);
+		ACell newChild = assocIn(child, value, (lat != null) ? lat.path(keys[i]) : null, keys, i + 1);
+		return RT.assoc(struct, keys[i], newChild); // returns struct unchanged if newChild == child
 	}
 
 	/**
