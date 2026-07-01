@@ -2,145 +2,82 @@ package convex.lattice.generic;
 
 import java.util.ArrayList;
 
-import convex.core.data.ABlobLike;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.util.Utils;
 import convex.lattice.ALattice;
-import convex.lattice.LatticeContext;
 
 /**
- * Lattice implementation that handles a set of keyword-mapped child lattices.
+ * Lattice with a fixed set of {@link Keyword}-keyed child lattices, backed by an
+ * {@link Index}.
  *
  * <p>Uses {@link Index} as the value type, which provides blob-based key
- * comparison. This means both {@link Keyword} and {@code AString} keys
- * with the same text resolve to the same entry, enabling JSON path
- * compatibility (JSON strings map to the same blob as keywords).
- * 
- * Used for data structures using known sets of interned Keywords as keys
- * requiring different child lattices.
+ * comparison. This means both {@link Keyword} and {@code AString} keys with the
+ * same text resolve to the same entry, enabling JSON path compatibility (JSON
+ * strings map to the same blob as keywords).</p>
+ *
+ * <p>Used for data structures using known sets of interned Keywords as keys
+ * requiring different child lattices. The per-key merge, navigation and key
+ * resolution live in {@link AKeyedLattice}.</p>
  */
-public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
+public class KeyedLattice extends AKeyedLattice<Keyword, Index<Keyword, ACell>> {
 
-	private final ArrayList<ALattice<?>> lattices;
-	private final ArrayList<Keyword> keys;
+	/** Blob forms of the keys, for blob-based (Keyword/AString-compatible) matching. */
 	private final ArrayList<ABlob> keyBlobs;
 
 	private KeyedLattice(ArrayList<ALattice<?>> lattices, ArrayList<Keyword> keys) {
-		this.lattices=lattices;
-		this.keys=keys;
-		this.keyBlobs=new ArrayList<>(keys.size());
+		super(lattices, keys);
+		this.keyBlobs = new ArrayList<>(keys.size());
 		for (Keyword k : keys) {
 			keyBlobs.add(k.toBlob());
 		}
 	}
 
 	public static KeyedLattice create(Object... keysAndValues) {
-		int n2=keysAndValues.length;
-		int n=n2/2;
+		int n2 = keysAndValues.length;
+		int n = n2 / 2;
 
-		if (n*2!=n2) throw new IllegalArgumentException("Must have pairs of keys and values");
+		if (n * 2 != n2) throw new IllegalArgumentException("Must have pairs of keys and values");
 
-		ArrayList<ALattice<?>> lattices=new ArrayList<>(n);
-		ArrayList<Keyword> keys =new ArrayList<>(n);
+		ArrayList<ALattice<?>> lattices = new ArrayList<>(n);
+		ArrayList<Keyword> keys = new ArrayList<>(n);
 
-		for (int i=0; i<n; i++) {
-			Keyword k=Keyword.create(keysAndValues[2*i]);
-			if (k==null) throw new IllegalArgumentException("Invalid key name");
+		for (int i = 0; i < n; i++) {
+			Keyword k = Keyword.create(keysAndValues[2 * i]);
+			if (k == null) throw new IllegalArgumentException("Invalid key name");
 
-			ALattice<?> v=(ALattice<?>) (keysAndValues[2*i+1]);
-			if (v==null) throw new NullPointerException("null lattice");
+			ALattice<?> v = (ALattice<?>) (keysAndValues[2 * i + 1]);
+			if (v == null) throw new NullPointerException("null lattice");
 
 			lattices.add(v);
 			keys.add(k);
 		}
 
-		return new KeyedLattice(lattices,keys);
+		return new KeyedLattice(lattices, keys);
 	}
 
 	/**
 	 * Returns a new KeyedLattice with an additional key/lattice pair.
-	 * Enables extending an existing lattice definition with new sections.
 	 *
 	 * @param key Keyword for the new section
 	 * @param lattice Lattice for the new section's values
 	 * @return New KeyedLattice with the additional entry
 	 */
+	@Override
 	public KeyedLattice addLattice(Keyword key, ALattice<?> lattice) {
-		ArrayList<ALattice<?>> newLattices = new ArrayList<>(this.lattices);
-		ArrayList<Keyword> newKeys = new ArrayList<>(this.keys);
-		newLattices.add(lattice);
-		newKeys.add(key);
-		return new KeyedLattice(newLattices, newKeys);
+		return (KeyedLattice) super.addLattice(key, lattice);
 	}
 
 	@Override
-	public Index<Keyword, ACell> merge(Index<Keyword, ACell> ownValue, Index<Keyword, ACell> otherValue) {
-		if (ownValue==null) {
-			if (checkForeign(otherValue)) return otherValue;
-			return null;
-		}
-		if (otherValue==null) return ownValue;
-
-		Index<Keyword, ACell> result=ownValue;
-
-		int n=lattices.size();
-		for (int i=0; i<n; i++) {
-			@SuppressWarnings("unchecked")
-			ALattice<ACell> lattice=(ALattice<ACell>) lattices.get(i);
-			Keyword key=keys.get(i);
-
-			if (!otherValue.containsKey(key)) continue;
-
-			ACell a=ownValue.get(key);
-			ACell b=otherValue.get(key);
-
-			ACell m=lattice.merge(a, b); // child merge
-
-			if (!Utils.equals(m, a)) {
-				result=result.assoc(key, m);
-			}
-		}
-
-		return result;
-	}
-
-	@Override
-	public Index<Keyword, ACell> merge(LatticeContext context, Index<Keyword, ACell> ownValue, Index<Keyword, ACell> otherValue) {
-		if (ownValue==null) {
-			if (checkForeign(otherValue)) return otherValue;
-			return null;
-		}
-		if (otherValue==null) return ownValue;
-
-		Index<Keyword, ACell> result=ownValue;
-
-		int n=lattices.size();
-		for (int i=0; i<n; i++) {
-			@SuppressWarnings("unchecked")
-			ALattice<ACell> lattice=(ALattice<ACell>) lattices.get(i);
-			Keyword key=keys.get(i);
-
-			if (!otherValue.containsKey(key)) continue;
-
-			ACell a=ownValue.get(key);
-			ACell b=otherValue.get(key);
-
-			ACell m=lattice.merge(context, a, b); // child merge with context
-
-			if (!Utils.equals(m, a)) {
-				result=result.assoc(key, m);
-			}
-		}
-
-		return result;
+	protected AKeyedLattice<Keyword, Index<Keyword, ACell>> construct(ArrayList<ALattice<?>> lattices, ArrayList<Keyword> keys) {
+		return new KeyedLattice(lattices, keys);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Index<Keyword, ACell> zero() {
+	protected Index<Keyword, ACell> emptyMap() {
 		return (Index<Keyword, ACell>) Index.EMPTY;
 	}
 
@@ -150,41 +87,17 @@ public class KeyedLattice extends ALattice<Index<Keyword, ACell>> {
 	}
 
 	/**
-	 * Resolves an external key to the canonical Keyword for this lattice.
-	 * Both Keywords and AStrings with the same text resolve to the same
-	 * canonical Keyword (e.g. {@code "data"} resolves to {@code :data}).
-	 *
-	 * @return Canonical Keyword, or null if the key doesn't match any child
+	 * Matches by blob equality, so a {@link Keyword} and an {@code AString} with the
+	 * same text ({@code :data} and {@code "data"}) resolve to the same slot.
 	 */
 	@Override
-	public ACell resolveKey(ACell key) {
-		if (key instanceof ABlobLike<?> blobLike) {
-			ABlob childBlob=blobLike.toBlob();
-			for (int i=0; i<keyBlobs.size(); i++) {
-				if (keyBlobs.get(i).equals(childBlob)) {
-					return keys.get(i);
-				}
+	protected int indexOfKey(ACell externalKey) {
+		if (externalKey instanceof ABlobLike<?> blobLike) {
+			ABlob childBlob = blobLike.toBlob();
+			for (int i = 0; i < keyBlobs.size(); i++) {
+				if (keyBlobs.get(i).equals(childBlob)) return i;
 			}
 		}
-		return null;
-	}
-
-	/**
-	 * Resolves a child lattice by key. Uses blob-based comparison so that
-	 * both Keywords and AStrings with the same text resolve to the same
-	 * child lattice (e.g. {@code :data} and {@code "data"} are equivalent).
-	 */
-	@SuppressWarnings("unchecked")
-	@Override
-	public <T extends ACell> ALattice<T> path(ACell child) {
-		if (child instanceof ABlobLike<?> blobLike) {
-			ABlob childBlob=blobLike.toBlob();
-			for (int i=0; i<keyBlobs.size(); i++) {
-				if (keyBlobs.get(i).equals(childBlob)) {
-					return (ALattice<T>) lattices.get(i);
-				}
-			}
-		}
-		return null;
+		return -1;
 	}
 }
