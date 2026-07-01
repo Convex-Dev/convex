@@ -81,6 +81,25 @@ public class SignedCursorTest {
 		assertEquals(CVMLong.create(11), base.get().getValue());
 	}
 
+	/** A write of an equal value (different object) must not re-sign — the existing
+	 *  SignedData is kept, avoiding the expensive crypto op. Only a real change re-signs. */
+	@Test
+	public void testUnchangedWriteSkipsResign() {
+		Root<SignedData<CVMLong>> base = Root.create(KP_ALICE.signData(CVMLong.create(5)));
+		SignedData<CVMLong> before = base.get();
+		SignedCursor<CVMLong> sc = SignedCursor.create(base, KP_ALICE);
+
+		sc.updateAndGet(v -> CVMLong.create(5));   // equal value, new object
+		assertSame(before, base.get(), "no-op update must not re-sign");
+
+		sc.set(CVMLong.create(5));                 // set to equal value
+		assertSame(before, base.get(), "no-op set must not re-sign");
+
+		sc.updateAndGet(v -> CVMLong.create(6));   // real change
+		assertNotSame(before, base.get());
+		assertEquals(CVMLong.create(6), base.get().getValue());
+	}
+
 	/** getAndSet() returns previous unsigned value; new value is signed. */
 	@Test
 	public void testSignedCursorGetAndSet() {

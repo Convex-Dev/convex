@@ -101,6 +101,22 @@ public class StampedCursorTest {
 		assertNull(RT.getIn(state.merge(older, newer), B));
 	}
 
+	// ===== Merge must NOT re-stamp the LWW winner =====
+
+	@Test public void testCursorMergeDoesNotRestampWinner() {
+		ACell older = Maps.of(A, CVMLong.ONE, LWWLattice.KEY_TIMESTAMP, CVMLong.create(10));
+		ACell newer = Maps.of(B, CVMLong.create(2), LWWLattice.KEY_TIMESTAMP, CVMLong.create(20));
+		Root<ACell> base = Root.create(older);
+		ALattice<ACell> lww = LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
+		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
+		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY, v -> stampWith(v, 999));
+
+		sc.merge(newer); // newer (ts 20) is the LWW winner
+
+		assertEquals(20L, tsOf(sc.get()), "merge must not re-stamp the LWW winner");
+		assertSame(newer, base.get());   // the exact winner value, stored unstamped
+	}
+
 	// ===== Navigation delegates to the inner JSON lattice =====
 
 	@Test public void testNavigationDelegatesToInner() {

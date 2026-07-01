@@ -76,6 +76,16 @@ public abstract class ABoundaryCursor<V extends ACell, S extends ACell> extends 
 		return (stored != null) ? decode(stored) : null;
 	}
 
+	/**
+	 * Encodes {@code updated} for storage, but returns the existing stored value
+	 * {@code current} unchanged when the view value did not change — so an expensive
+	 * {@link #encode} (e.g. re-signing, re-stamping) is skipped when nothing actually
+	 * changed, even if the updated object's identity differs from the current one.
+	 */
+	private S encodeIfChanged(S current, V updated) {
+		return Utils.equals(updated, decodeNullable(current)) ? current : encodeNullable(updated);
+	}
+
 	@Override
 	public V sync() {
 		if (base instanceof ALatticeCursor<?> lc) {
@@ -95,44 +105,35 @@ public abstract class ABoundaryCursor<V extends ACell, S extends ACell> extends 
 
 	@Override
 	public void set(V newValue) {
-		base.set(encodeNullable(newValue));
+		// getAndUpdate (not set) so an unchanged write skips re-encoding
+		base.getAndUpdate(s -> encodeIfChanged(s, newValue));
 	}
 
 	@Override
 	public V getAndSet(V newValue) {
-		return decodeNullable(base.getAndSet(encodeNullable(newValue)));
+		return decodeNullable(base.getAndUpdate(s -> encodeIfChanged(s, newValue)));
 	}
 
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		S old = base.getAndUpdate(s -> {
-			V current = decodeNullable(s);
-			V updated = updateFunction.apply(current);
-			return encodeNullable(updated);
-		});
+		S old = base.getAndUpdate(s -> encodeIfChanged(s, updateFunction.apply(decodeNullable(s))));
 		return decodeNullable(old);
 	}
 
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		return decodeNullable(base.updateAndGet(s ->
-			encodeNullable(updateFunction.apply(decodeNullable(s)))));
+		return decodeNullable(base.updateAndGet(s -> encodeIfChanged(s, updateFunction.apply(decodeNullable(s)))));
 	}
 
 	@Override
 	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		S old = base.getAndUpdate(s -> {
-			V current = decodeNullable(s);
-			V accumulated = accumulatorFunction.apply(x, current);
-			return encodeNullable(accumulated);
-		});
+		S old = base.getAndUpdate(s -> encodeIfChanged(s, accumulatorFunction.apply(x, decodeNullable(s))));
 		return decodeNullable(old);
 	}
 
 	@Override
 	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		return decodeNullable(base.updateAndGet(s ->
-			encodeNullable(accumulatorFunction.apply(x, decodeNullable(s)))));
+		return decodeNullable(base.updateAndGet(s -> encodeIfChanged(s, accumulatorFunction.apply(x, decodeNullable(s)))));
 	}
 
 	/**
@@ -145,14 +146,14 @@ public abstract class ABoundaryCursor<V extends ACell, S extends ACell> extends 
 	 * identity-compared, and {@link #decode} mints a fresh view value on each read.</p>
 	 *
 	 * <p>On a value match, {@code newValue} is {@link #encode encoded} and written
-	 * via a single compare-and-set against the stored cell that was read. Like any
-	 * CAS this is single-shot: it returns {@code false} without retrying if
-	 * {@code base} changed concurrently.</p>
+	 * via a single compare-and-set against the stored cell that was read (skipping the
+	 * encode if the value is unchanged). Like any CAS this is single-shot: it returns
+	 * {@code false} without retrying if {@code base} changed concurrently.</p>
 	 */
 	@Override
 	public boolean compareAndSet(V expected, V newValue) {
 		S cur = base.get();
 		if (!Utils.equals(expected, decodeNullable(cur))) return false;
-		return base.compareAndSet(cur, encodeNullable(newValue));
+		return base.compareAndSet(cur, encodeIfChanged(cur, newValue));
 	}
 }

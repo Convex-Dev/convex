@@ -54,4 +54,18 @@ public class StampedCursor<V extends ACell> extends ABoundaryCursor<V, V> {
 	protected V decode(V stored) {
 		return stored; // identity on read
 	}
+
+	/**
+	 * Merge is convergence between values, not a new write: pick the winner via the
+	 * lattice and store it <b>without re-stamping</b> — a merged/chosen value keeps
+	 * its own timestamp, so a whole-value LWW winner is never bumped. (Contrast
+	 * {@link SignedCursor}, which re-signs a merged value: the default
+	 * {@link ABoundaryCursor} merge re-runs {@code encode}, which is right for
+	 * signing but wrong for stamping.)
+	 */
+	@Override
+	public V merge(V other) {
+		if (lattice == null) throw new UnsupportedOperationException("Cannot merge without a lattice");
+		return base.updateAndGet(current -> lattice.merge(context, current, other));
+	}
 }
