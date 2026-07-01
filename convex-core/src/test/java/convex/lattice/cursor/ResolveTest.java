@@ -98,4 +98,20 @@ public class ResolveTest {
 		RootLatticeCursor<ACell> root = mapRoot();
 		assertThrows(IllegalArgumentException.class, () -> root.resolve(Strings.create("nope")));
 	}
+
+	/** No reconstruction under an identity resolver: resolvePath returns the input array. */
+	@Test public void testResolvePathNoCopyWhenUnchanged() {
+		ACell[] keys = new ACell[]{A, B};
+		assertSame(keys, JSONLattice.INSTANCE.resolvePath(keys)); // identity resolver — no copy
+	}
+
+	/** But it does copy when a key actually resolves to a different canonical key. */
+	@Test public void testResolvePathCopiesOnChange() {
+		MapResolveLattice lat = new MapResolveLattice(Maps.of(A, X, B, Y));
+		ACell[] keys = new ACell[]{A, B};
+		ACell[] resolved = lat.resolvePath(keys);
+		org.junit.jupiter.api.Assertions.assertNotSame(keys, resolved); // changed → new array
+		assertEquals(X, resolved[0]);
+		assertEquals(Y, resolved[1]);
+	}
 }

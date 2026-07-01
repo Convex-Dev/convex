@@ -170,18 +170,24 @@ public abstract class ALattice<V extends ACell> {
 	 */
 	public ACell[] resolvePath(ACell... jsonPath) {
 		int n=jsonPath.length;
-		ACell[] result=new ACell[n];
+		// Copy-on-change: start with the input array and clone only when a key first
+		// resolves to a different canonical key. If resolution is the identity (keys
+		// already canonical), the input is returned unchanged — no reconstruction.
+		ACell[] out=jsonPath;
 		ALattice<?> current=this;
 		for (int i=0; i<n; i++) {
 			ACell resolved=current.resolveKey(jsonPath[i]);
 			if (resolved==null) return null;
-			result[i]=resolved;
+			if (resolved!=jsonPath[i]) {
+				if (out==jsonPath) out=jsonPath.clone();
+				out[i]=resolved;
+			}
 			if (i<n-1) {
 				current=current.path(resolved);
 				if (current==null) return null;
 			}
 		}
-		return result;
+		return out;
 	}
 
 	/**
