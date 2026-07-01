@@ -81,6 +81,20 @@ public class SignedCursorTest {
 		assertEquals(CVMLong.create(11), base.get().getValue());
 	}
 
+	/** Accumulator arg order must match the ACursor contract: apply(current, x). */
+	@Test
+	public void testSignedCursorAccumulateArgOrder() {
+		Root<SignedData<CVMLong>> base = Root.create(KP_ALICE.signData(CVMLong.create(10)));
+		SignedCursor<CVMLong> sc = SignedCursor.create(base, KP_ALICE);
+		java.util.function.BinaryOperator<CVMLong> minus =
+			(cur, x) -> CVMLong.create(cur.longValue() - x.longValue());
+
+		assertEquals(CVMLong.create(7), sc.accumulateAndGet(CVMLong.create(3), minus)); // 10 - 3
+		assertTrue(base.get().checkSignature());
+		assertEquals(CVMLong.create(7), sc.getAndAccumulate(CVMLong.create(2), minus)); // returns old 7; sets 5
+		assertEquals(CVMLong.create(5), sc.get());
+	}
+
 	/** A write of an equal value (different object) must not re-sign — the existing
 	 *  SignedData is kept, avoiding the expensive crypto op. Only a real change re-signs. */
 	@Test

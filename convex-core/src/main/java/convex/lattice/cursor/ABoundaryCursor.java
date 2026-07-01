@@ -127,13 +127,13 @@ public abstract class ABoundaryCursor<V extends ACell, S extends ACell> extends 
 
 	@Override
 	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		S old = base.getAndUpdate(s -> encodeIfChanged(s, accumulatorFunction.apply(x, decodeNullable(s))));
+		S old = base.getAndUpdate(s -> encodeIfChanged(s, accumulatorFunction.apply(decodeNullable(s), x)));
 		return decodeNullable(old);
 	}
 
 	@Override
 	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		return decodeNullable(base.updateAndGet(s -> encodeIfChanged(s, accumulatorFunction.apply(x, decodeNullable(s)))));
+		return decodeNullable(base.updateAndGet(s -> encodeIfChanged(s, accumulatorFunction.apply(decodeNullable(s), x))));
 	}
 
 	/**

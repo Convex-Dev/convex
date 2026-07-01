@@ -150,6 +150,19 @@ public class CursorTest {
 		assertEquals("7",root.toString());
 	}
 	
+	/** Accumulator arg order must match the ACursor contract: apply(current, x). */
+	@Test public void testPathCursorAccumulateArgOrder() {
+		Root<CVMLong> root = Cursors.of(Maps.of(Symbols.FOO, CVMLong.create(10)));
+		ACursor<CVMLong> pc = root.path(Symbols.FOO);
+		java.util.function.BinaryOperator<CVMLong> minus =
+			(cur, x) -> CVMLong.create(cur.longValue() - x.longValue());
+
+		assertCVMEquals(7, pc.accumulateAndGet(CVMLong.create(3), minus)); // current first: 10 - 3
+		assertCVMEquals(7, pc.get());
+		assertCVMEquals(7, pc.getAndAccumulate(CVMLong.create(2), minus)); // returns old 7; sets 7 - 2 = 5
+		assertCVMEquals(5, pc.get());
+	}
+
 	@Test public void testDetachedPath() {
 		AMap<Symbol,AInteger> INITIAL=Maps.of(Symbols.FOO,1);
 		Root<AInteger> root=Cursors.of(INITIAL);

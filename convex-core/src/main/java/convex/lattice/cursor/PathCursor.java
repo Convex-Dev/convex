@@ -136,7 +136,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
 		ACell oldBase=base.getAndUpdate(bv->{
 			V oldValue=getValueForUpdate(bv);
-			ACell newValue=accumulatorFunction.apply(x,oldValue);
+			ACell newValue=accumulatorFunction.apply(oldValue,x);
 			return assocIn(bv, newValue);
 		});
 		return (V) RT.getIn(oldBase, path);
@@ -148,7 +148,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 		ACell[] nv=new ACell[1];
 		base.updateAndGet(bv->{
 			V oldValue=getValueForUpdate(bv);
-			V newValue=accumulatorFunction.apply(x,oldValue);
+			V newValue=accumulatorFunction.apply(oldValue,x);
 			nv[0]=newValue;
 			return assocIn(bv, newValue);
 		});
