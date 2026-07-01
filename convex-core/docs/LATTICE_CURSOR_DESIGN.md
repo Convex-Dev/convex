@@ -27,9 +27,9 @@ ACursor<V>
         ├── RootLatticeCursor<V>             # Root of lattice tree
         ├── ForkedLatticeCursor<V>           # Independent working copy
         ├── DescendedCursor<V>               # Navigated into sub-path
-        └── ABoundaryCursor<V,S>             # Value-transforming boundary (encode/decode)
-            ├── SignedCursor<V>              # SignedData<V> ↔ V — sign on write, verify on read
-            └── StampedCursor<V>             # V ↔ V — stamp a timestamp on write (LWW)
+        └── AUpdateCursor<V,S>               # Overrides update-on-write (shared funnel)
+            ├── StampedCursor<V>             # V → V — update override: stamp on write (LWW)
+            └── SignedCursor<V>              # SignedData<V> → V — view boundary: sign on write
 ```
 
 `PathCursor` remains as the `ACursor.path()` implementation for non-lattice cursors. `ALatticeCursor.path()` overrides to return `ALatticeCursor` — a `DescendedCursor` with the sub-lattice from `ALattice.path(key)`, or `null` if no sub-lattice exists at that key.
@@ -137,23 +137,23 @@ Note: `get()` still returns null for non-existent paths — the zero-substitutio
 
 A lattice may need to **transform values on write** at a boundary — sign them, stamp them with a timestamp, etc. This is handled generically: the cursor knows nothing about specific lattice types; the lattice declares its own boundary.
 
-### `ABoundaryCursor<V, S>`
+### `AUpdateCursor<V, S>`
 
-`ABoundaryCursor` wraps a `base` cursor holding the *stored* type `S` and presents the *view* type `V`. Every operation is built from one transform pair:
+The shared concept is **update-on-write**: every write is funnelled through one function before it is stored. `AUpdateCursor` wraps a `base` cursor holding the *stored* type `S`, presents the *view* type `V`, and implements all eight atomic operations (`set`, `getAndSet`, `getAndUpdate`, `updateAndGet`, accumulate, `compareAndSet`) plus `sync()` in terms of two hooks:
 
-- `decode(S) → V` — on reads (null-safe)
-- `encode(V) → S` — on writes (may consult `context`, may throw to enforce a precondition)
+- `updateOnWrite(S current, V value) → S` — **the** write funnel. Sees `current`, so an unchanged write is a no-op (skips an expensive re-sign / re-stamp); may consult `context` and may throw to enforce a precondition.
+- `view(S) → V` — how a stored cell reads back. **Identity by default** — the stored type *is* the view type; only a type-changing boundary overrides it.
 
-All eight atomic operations (`set`, `getAndSet`, `getAndUpdate`, `updateAndGet`, accumulate, `compareAndSet`) plus `sync()` are implemented once here in terms of that pair, so a concrete boundary supplies only `encode`/`decode`. `compareAndSet` is single-shot value-equality (a reference CAS is impossible across the transform).
+`merge` is **abstract**: convergence either *selects* an existing value (store as-is) or *synthesises* a new one (re-apply `updateOnWrite`), so each cursor states which rather than inheriting a default that silently does the wrong thing. `compareAndSet` is single-shot value-equality (across a type-changing boundary a reference CAS is impossible).
 
-Two instances:
+Two instances — a same-type **update override** and a type-changing **view boundary**:
 
-| Cursor | `S → V` | encode / decode | boundary shape |
-|--------|---------|-----------------|----------------|
-| `SignedCursor<V>` | `SignedData<V>` | encode = **sign** (throws with no key), decode = `getValue` | type-changing, key-consuming (`:value`) |
-| `StampedCursor<V>` | `V` | encode = **stamp** (inject timestamp), decode = identity | same-type, transparent |
+| Cursor | `S` | `updateOnWrite` | `view` | `merge` | shape |
+|--------|-----|-----------------|--------|---------|-------|
+| `StampedCursor<V>` | `V` | **stamp** (inject timestamp) | identity (inherited) | select — no re-stamp | same-type, transparent |
+| `SignedCursor<V>` | `SignedData<V>` | **sign** (throws with no key) | `getValue` (`:value` child) | synthesise — re-sign | type-changing, key-consuming (`:value`) |
 
-`SignedCursor` is the signing **enforcement point**: reads always work; writes sign via the `LatticeContext` key and throw `IllegalStateException` if none is available.
+`StampedCursor` never changes the view: the cell keeps every field, timestamp included; it only changes how a write lands. `SignedCursor` is a genuine envelope boundary and the signing **enforcement point**: reads always work; writes sign via the `LatticeContext` key and throw `IllegalStateException` if none is available.
 
 ### Lattice-declared boundaries
 
@@ -162,10 +162,10 @@ Two instances:
 | Hook | Meaning | Default |
 |------|---------|---------|
 | `isWriteBoundary(key)` | cheap, allocation-free gate checked on every key | `false` |
-| `createPathCursor(base, key, ctx)` | build the boundary cursor (only when the gate fires) | `null` |
+| `createPathCursor(base, key, ctx)` | build the update cursor (only when the gate fires) | `null` |
 | `consumesPathKey(key)` | virtual key consumed (`:value`) vs transparent (stamp) | `true` |
 
-`SignedLattice` returns `true`/`SignedCursor` for `:value` (consuming); `StampingLattice` returns `true`/`StampedCursor` for any key (transparent). Forking below a boundary gives local storage of the *view* type; the boundary re-applies `encode` on `sync()`.
+`SignedLattice` returns `true`/`SignedCursor` for `:value` (consuming); `StampingLattice` returns `true`/`StampedCursor` for any key (transparent). Forking below a boundary gives local storage of the *view* type; the boundary re-applies `updateOnWrite` on `sync()`.
 
 ## Examples
 
@@ -249,9 +249,9 @@ Cursor writes use `assoc(key, value)` and `assocIn(value, keys...)` rather than 
 
 `AForkableCursor.merge(detached)` uses CAS and can fail if the parent changed. `ALatticeCursor.sync()` uses lattice merge and always succeeds — like filesystem sync, it pushes local changes to the parent. With null lattice, sync falls back to simple write-back (overwrite). After `sync()`, the fork's value equals the merged result, allowing continued use and incremental syncs.
 
-### Boundary cursors (`ABoundaryCursor`)
+### Update cursors (`AUpdateCursor`)
 
-`assocIn` cannot write through some values — `SignedData` is immutable and requires re-signing — so a specialised cursor sits at the boundary and transforms values on the way through. `ABoundaryCursor` factors this into an `encode`/`decode` pair, so every value-transforming boundary (signing, stamping) shares one implementation and only the transform differs. Code above and below the boundary is unaware of it. Forking below a boundary gives local storage of the unwrapped (view) value; `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent boundary re-applies `encode`.
+Some writes need work on the way through — a stamp injected, or a `SignedData` re-signed (it is immutable, so `assocIn` cannot write through it). `AUpdateCursor` factors this into one `updateOnWrite` funnel, so both an update override (stamping) and a view boundary (signing) share one implementation and only the funnel — and, for the type-changing case, the `view` projection — differ. Code above and below is unaware of it. Forking below gives local storage of the (view) value; `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent re-applies `updateOnWrite`.
 
 ### Multi-key collapsing
 

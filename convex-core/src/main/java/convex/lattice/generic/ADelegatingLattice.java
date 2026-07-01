@@ -3,8 +3,8 @@ package convex.lattice.generic;
 import convex.core.data.ACell;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ABoundaryCursor;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AUpdateCursor;
 
 /**
  * Base for lattice layers that wrap an inner lattice and add exactly <b>one</b>
@@ -76,7 +76,7 @@ public abstract class ADelegatingLattice<V extends ACell> extends ALattice<V> {
 	}
 
 	@Override
-	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		return (inner != null) ? inner.createPathCursor(base, key, context) : null;
 	}
 }

@@ -3,26 +3,36 @@ package convex.lattice.cursor;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
+import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 
 /**
- * A transparent boundary cursor that stamps values on write — the write-side
- * dual of a last-write-wins timestamp.
+ * A cursor that overrides <em>update semantics</em>: every value written through
+ * it is passed through a {@code stamp} function before being stored, while reads
+ * pass straight through unchanged.
  *
- * <p>Presents the underlying value unchanged on read ({@link #decode} = identity)
- * and applies a stamp function on every write ({@link #encode}), so a whole-value
- * LWW merge upstream picks the freshly-stamped value. It is the {@link ABoundaryCursor}
- * counterpart to {@link SignedCursor}: same-type ({@code V → V}) rather than
- * type-changing, and transparent rather than key-consuming.</p>
+ * <p>This is a same-type ({@code V → V}) <b>update override</b>, not a view
+ * boundary. Contrast {@link SignedCursor}, whose stored cell is a fundamentally
+ * different envelope type ({@code SignedData<V>}). A StampedCursor never changes
+ * the type or the view: it operates on the whole cell at its position — a cell that
+ * may carry other meaningful fields — and {@link #get} returns exactly what is
+ * stored, timestamp and all. It only changes <em>how writes land</em>: it stamps on
+ * the way in. It inherits the identity {@link #view} and adds no navigation or key
+ * consumption; any navigation below is ordinary and explicit, stacked on top.</p>
  *
- * <p>Inserted by {@code LWWLattice.createPathCursor} as a transparent
- * ({@code consumesPathKey == false}) write boundary, so a deep write below a
- * whole-value-LWW leaf re-stamps the whole leaf value on the way up.</p>
+ * <p><b>Update vs merge.</b> The stamp overrides update semantics only. A
+ * {@link #merge} is convergence, not a fresh write: it picks the winner via the
+ * lattice and stores it <em>without</em> stamping, so a whole-value LWW winner keeps
+ * its own timestamp and is never bumped.</p>
  *
- * @param <V> Type of the (same) stored and view value
+ * <p>Inserted by {@code StampingLattice.createPathCursor} as a transparent write
+ * boundary so that a deep write below a whole-value-LWW leaf re-stamps the whole
+ * leaf on the way up, letting a whole-value LWW merge pick the freshest.</p>
+ *
+ * @param <V> Type of the (unchanged) cell at this cursor position
  */
-public class StampedCursor<V extends ACell> extends ABoundaryCursor<V, V> {
+public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 
 	private final UnaryOperator<V> stamp;
 
@@ -35,7 +45,7 @@ public class StampedCursor<V extends ACell> extends ABoundaryCursor<V, V> {
 	 * Creates a StampedCursor wrapping a base cursor.
 	 *
 	 * @param <V> Value type
-	 * @param base Base cursor holding the value to stamp on write
+	 * @param base Base cursor holding the cell to stamp on write
 	 * @param lattice Lattice for navigation below this cursor (may be null)
 	 * @param context Lattice context
 	 * @param stamp Stamp function applied to values on write (injects a timestamp)
@@ -46,22 +56,17 @@ public class StampedCursor<V extends ACell> extends ABoundaryCursor<V, V> {
 	}
 
 	@Override
-	protected V encode(V view) {
-		return stamp.apply(view); // stamp on write
+	protected V updateOnWrite(V current, V value) {
+		// Unchanged write: keep the current cell so the stamp isn't bumped for no reason
+		if (Utils.equals(value, current)) return current;
+		return (value != null) ? stamp.apply(value) : null;
 	}
 
-	@Override
-	protected V decode(V stored) {
-		return stored; // identity on read
-	}
+	// view inherited (identity) — the read view is never changed
 
 	/**
-	 * Merge is convergence between values, not a new write: pick the winner via the
-	 * lattice and store it <b>without re-stamping</b> — a merged/chosen value keeps
-	 * its own timestamp, so a whole-value LWW winner is never bumped. (Contrast
-	 * {@link SignedCursor}, which re-signs a merged value: the default
-	 * {@link ABoundaryCursor} merge re-runs {@code encode}, which is right for
-	 * signing but wrong for stamping.)
+	 * Merge is convergence, not an update: pick the winner via the lattice and store
+	 * it <b>without stamping</b>, so a whole-value LWW winner keeps its own timestamp.
 	 */
 	@Override
 	public V merge(V other) {

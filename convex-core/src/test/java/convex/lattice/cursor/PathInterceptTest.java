@@ -36,11 +36,14 @@ public class PathInterceptTest {
 
 	static final AtomicInteger TAPS = new AtomicInteger();
 
-	/** Identity boundary cursor; counts writes that pass through it. */
-	static class IdCursor extends ABoundaryCursor<ACell, ACell> {
+	/** Identity update-override cursor; counts writes that pass through it. */
+	static class IdCursor extends AUpdateCursor<ACell, ACell> {
 		IdCursor(ACursor<ACell> base, ALattice<ACell> lattice, LatticeContext ctx) { super(base, lattice, ctx); }
-		@Override protected ACell encode(ACell view) { TAPS.incrementAndGet(); return view; }
-		@Override protected ACell decode(ACell stored) { return stored; }
+		@Override protected ACell updateOnWrite(ACell current, ACell value) { TAPS.incrementAndGet(); return value; }
+		// view inherited (identity)
+		@Override public ACell merge(ACell other) {
+			return base.updateAndGet(current -> lattice.merge(context, current, other));
+		}
 	}
 
 	/**
@@ -64,7 +67,7 @@ public class PathInterceptTest {
 		@Override public boolean isWriteBoundary(ACell key) { return Utils.equals(boundaryKey, key); }
 
 		@SuppressWarnings("unchecked")
-		@Override public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext ctx) {
+		@Override public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext ctx) {
 			builds++;
 			return new IdCursor((ACursor<ACell>) base, nav(), ctx);
 		}

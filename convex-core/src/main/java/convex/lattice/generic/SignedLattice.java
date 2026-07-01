@@ -9,8 +9,8 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ABoundaryCursor;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AUpdateCursor;
 import convex.lattice.cursor.SignedCursor;
 
 /**
@@ -134,7 +134,7 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		// Only called when isWriteBoundary(key) is true, i.e. key is :value.
 		ALattice<V> inner = path(key); // valueNode
 		return SignedCursor.create((ALatticeCursor<SignedData<V>>) base, inner, context);

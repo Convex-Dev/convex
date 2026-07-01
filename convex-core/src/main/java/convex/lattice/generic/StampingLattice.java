@@ -5,9 +5,9 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ABoundaryCursor;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AUpdateCursor;
 import convex.lattice.cursor.StampedCursor;
 
 /**
@@ -55,7 +55,7 @@ public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		// Present the same value, stamp it on write, navigate below via the inner lattice
 		// (so a merge at the stamped cursor uses the inner merge, e.g. whole-value LWW).
 		return StampedCursor.create((ACursor<V>) base, inner, context, stampFn);

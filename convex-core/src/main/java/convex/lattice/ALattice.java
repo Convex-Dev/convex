@@ -7,8 +7,8 @@ import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.lang.RT;
-import convex.lattice.cursor.ABoundaryCursor;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.AUpdateCursor;
 
 /**
  * Abstract base class for lattice functions.
@@ -108,7 +108,7 @@ public abstract class ALattice<V extends ACell> {
 	 * @param context lattice context (signing key, timestamp, etc.)
 	 * @return boundary cursor to insert
 	 */
-	public ABoundaryCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
+	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		return null;
 	}
 
@@ -191,27 +191,14 @@ public abstract class ALattice<V extends ACell> {
 	}
 
 	/**
-	 * Resolves a JSON path (sequence of external keys) to canonical CVM keys by
-	 * walking the lattice hierarchy. Each key is resolved via {@link #resolveKey}
-	 * at the appropriate lattice level.
+	 * Resolves a sequence of external keys to canonical CVM keys — the
+	 * {@link ASequence} form of {@link #resolvePath(ACell...)}, to which it delegates.
 	 *
 	 * @param jsonPath Sequence of external keys to resolve
 	 * @return Array of canonical CVM keys, or null if resolution fails at any level
 	 */
 	public ACell[] resolvePath(ASequence<ACell> jsonPath) {
-		int n=(int)jsonPath.count();
-		ACell[] result=new ACell[n];
-		ALattice<?> current=this;
-		for (int i=0; i<n; i++) {
-			ACell resolved=current.resolveKey(jsonPath.get(i));
-			if (resolved==null) return null;
-			result[i]=resolved;
-			if (i<n-1) {
-				current=current.path(resolved);
-				if (current==null) return null;
-			}
-		}
-		return result;
+		return resolvePath(jsonPath.toCellArray());
 	}
 
 	/**
