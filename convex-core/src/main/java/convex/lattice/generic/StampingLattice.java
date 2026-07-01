@@ -1,8 +1,9 @@
 package convex.lattice.generic;
 
-import java.util.function.UnaryOperator;
+import java.util.function.BiFunction;
 
 import convex.core.data.ACell;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ACursor;
@@ -15,7 +16,9 @@ import convex.lattice.cursor.StampedCursor;
  *
  * <p>Adds a single concern — <b>write interception</b> — over any inner lattice:
  * navigating below it inserts a transparent {@link StampedCursor} that re-stamps
- * values on write (via a caller-supplied stamp function, the write-side dual of a
+ * values on write. The timestamp is sourced from the {@link LatticeContext} (the
+ * single write clock); the caller-supplied stamp function only says <em>where</em>
+ * to inject a given timestamp into the value's shape (the write-side dual of a
  * timestamp extractor). Merge and navigation are delegated entirely to the inner
  * lattice, so this layer knows nothing about how values merge or what they contain.</p>
  *
@@ -28,9 +31,9 @@ import convex.lattice.cursor.StampedCursor;
  */
 public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
 
-	private final UnaryOperator<V> stampFn;
+	private final BiFunction<V, CVMLong, V> stampFn;
 
-	private StampingLattice(ALattice<V> inner, UnaryOperator<V> stampFn) {
+	private StampingLattice(ALattice<V> inner, BiFunction<V, CVMLong, V> stampFn) {
 		super(inner);
 		this.stampFn = stampFn;
 	}
@@ -40,10 +43,11 @@ public class StampingLattice<V extends ACell> extends ADelegatingLattice<V> {
 	 *
 	 * @param <V> Value type
 	 * @param inner Lattice providing merge and navigation
-	 * @param stampFn Injects a fresh timestamp into a value on write
+	 * @param stampFn Injects a given timestamp (sourced from the context at write time)
+	 *                into a value's shape
 	 * @return New StampingLattice instance
 	 */
-	public static <V extends ACell> StampingLattice<V> create(ALattice<V> inner, UnaryOperator<V> stampFn) {
+	public static <V extends ACell> StampingLattice<V> create(ALattice<V> inner, BiFunction<V, CVMLong, V> stampFn) {
 		return new StampingLattice<>(inner, stampFn);
 	}
 

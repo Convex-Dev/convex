@@ -5,8 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.UnaryOperator;
+import java.util.function.BiFunction;
 
 import org.junit.jupiter.api.Test;
 
@@ -61,7 +60,7 @@ public class StampedCursorTest {
 
 	// The Covia :state stack, composed from three single-concern layers:
 	//   stamping (write)  ->  whole-value LWW (merge)  ->  JSON (structure/nav)
-	static ALattice<ACell> stateLattice(UnaryOperator<ACell> stamp) {
+	static ALattice<ACell> stateLattice(BiFunction<ACell, CVMLong, ACell> stamp) {
 		return StampingLattice.create(
 			LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf),
 			stamp);
@@ -70,10 +69,11 @@ public class StampedCursorTest {
 	// ===== Deep write below the leaf: structural + re-stamped =====
 
 	@Test public void testDeepWriteStampsWholeLeaf() {
-		AtomicLong clock = new AtomicLong(100);
-		ALattice<ACell> state = stateLattice(v -> stampWith(v, clock.getAndIncrement()));
+		ALattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
 		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
-		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial, LatticeContext.EMPTY);
+		// the write clock lives in the context (ts = 100)
+		LatticeContext ctx = LatticeContext.create(CVMLong.create(100), null);
+		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial, ctx);
 
 		// navigate below the leaf — a StampedCursor is inserted transparently
 		ALatticeCursor<ACell> c = root.path(USERS, ALICE);
@@ -81,8 +81,8 @@ public class StampedCursorTest {
 
 		// deep value landed, structural intermediate ("users") auto-created
 		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
-		// the whole :state leaf was re-stamped (>= the first clock value)
-		assertTrue(tsOf(root.get()) >= 100, "deep write must re-stamp the whole :state leaf");
+		// the whole :state leaf was re-stamped from the context timestamp
+		assertEquals(100L, tsOf(root.get()), "deep write must re-stamp the whole :state leaf from context");
 		// the timestamp keyword still coexists with the data at the top level
 		assertNull(RT.getIn(root.get(), Strings.create("nope")));
 	}
@@ -90,7 +90,7 @@ public class StampedCursorTest {
 	// ===== Whole-value LWW merge: deletions are durable =====
 
 	@Test public void testWholeValueMergeDeletionDurable() {
-		ALattice<ACell> state = stateLattice(UnaryOperator.identity());
+		ALattice<ACell> state = stateLattice((v, ts) -> v);
 		ACell older = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(10), A, CVMLong.ONE, B, CVMLong.create(2));
 		ACell newer = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(20), A, CVMLong.ONE); // "b" deleted
 
@@ -109,7 +109,7 @@ public class StampedCursorTest {
 		Root<ACell> base = Root.create(older);
 		ALattice<ACell> lww = LWWLattice.create(JSONLattice.INSTANCE, StampedCursorTest::tsOf);
 		// stampFn would bump the timestamp to 999 if it were (wrongly) applied to a merge result
-		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY, v -> stampWith(v, 999));
+		StampedCursor<ACell> sc = StampedCursor.create(base, lww, LatticeContext.EMPTY, (v, ts) -> stampWith(v, 999));
 
 		sc.merge(newer); // newer (ts 20) is the LWW winner
 
@@ -120,7 +120,7 @@ public class StampedCursorTest {
 	// ===== Navigation delegates to the inner JSON lattice =====
 
 	@Test public void testNavigationDelegatesToInner() {
-		ALattice<ACell> state = stateLattice(UnaryOperator.identity());
+		ALattice<ACell> state = stateLattice((v, ts) -> v);
 		assertTrue(state.isStructural());
 		assertSame(JSONLattice.INSTANCE, state.path(USERS));
 		assertSame(JSONLattice.INSTANCE.zero(), state.zero()); // both null (structural)

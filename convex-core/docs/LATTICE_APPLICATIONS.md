@@ -356,12 +356,12 @@ Additive merges (`IndexLattice`/`MapLattice`) union keys, so a removed key reapp
 // merge = whole-value LWW (deletions durable) · nav = JSON structure · write = stamp
 ALattice<ACell> state = StampingLattice.create(
     LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
-    stampFn);                                        // re-stamp the whole leaf on every write
+    (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // inject the context timestamp on every write
 ```
 
 - `JSONLattice` — recursive structural navigation; `assocIn` builds containers by key shape, so sub-paths below the leaf stay navigable and writable.
 - `LWWLattice(inner)` — merges the *whole* value by `:timestamp` (never per-key), so a smaller map with a newer timestamp replaces the old one and the deleted key does not resurrect.
-- `StampingLattice(inner, stampFn)` — inserts a `StampedCursor` so every deep write re-stamps the whole leaf; whole-value LWW then picks it.
+- `StampingLattice(inner, stampFn)` — inserts a `StampedCursor` so every deep write re-stamps the whole leaf with the timestamp from the `LatticeContext` (the single write clock); the `stampFn` only says *where* to put it. Whole-value LWW then picks it.
 
 Each layer adds exactly one concern (merge / navigation / stamping) and delegates the rest, so they compose freely — `StampingLattice` stamps over anything, `LWWLattice` merges over any navigable inner. To delete, read-modify-write the sub-path out — e.g. `cursor.updateAndGet(m -> m.dissoc(key))` — and whole-value LWW propagates the removal.
 
