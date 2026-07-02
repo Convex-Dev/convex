@@ -23,6 +23,7 @@ import convex.core.data.RecordTest;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.data.Refs.RefTreeStats;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
@@ -62,6 +63,49 @@ public class StateTest {
 
 	public static void doStateTests(State s) {
 		RecordTest.doRecordTests(s);
+		doProtocolInvariantTests(s);
+	}
+
+	/**
+	 * Checks the protocol globals invariants that must hold in every valid State.
+	 * See UPGRADE.md "Invariants".
+	 * @param s State to check
+	 */
+	public static void doProtocolInvariantTests(State s) {
+		AVector<ACell> glbs = s.getGlobals();
+		long gc = glbs.count();
+
+		// Globals either predate the protocol globals entirely, or contain both
+		assertTrue((gc <= State.GLOBAL_PROTOCOL) || (gc > State.GLOBAL_UPGRADES),
+				"Globals must contain both protocol globals or neither: count=" + gc);
+
+		long version = s.getProtocolVersion();
+		AVector<CVMLong> upgrades = s.getUpgradeVector();
+		long n = upgrades.count();
+
+		// Watermark bounds: 0 <= version <= count(upgrades)
+		assertTrue(version >= 0, "Protocol version must be non-negative");
+		assertTrue(version <= n, "Protocol version " + version + " exceeds upgrade vector count " + n);
+
+		long ts = s.getTimestamp().longValue();
+		long prev = Long.MIN_VALUE;
+		for (long i = 0; i < n; i++) {
+			CVMLong entry = upgrades.get(i);
+			assertNotNull(entry, "Upgrade vector entry must be a Long at index " + i);
+			long activation = entry.longValue();
+
+			// Activations non-decreasing along the vector
+			assertTrue(activation >= prev, "Upgrade activations must be non-decreasing at index " + i);
+
+			if (i < version) {
+				// Applied entries fired at or before the current state timestamp
+				assertTrue(activation <= ts, "Applied activation at index " + i + " must not be after state timestamp");
+			} else {
+				// Pending entries are strictly in the future
+				assertTrue(activation > ts, "Pending activation at index " + i + " must be after state timestamp");
+			}
+			prev = activation;
+		}
 	}
 
 	@Test
