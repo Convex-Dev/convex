@@ -135,6 +135,18 @@ long cost = (state.getProtocolVersion() >= 3) ? Juice.NEW_COST : Juice.OLD_COST;
 
 This is **not** the "dual-mode CVM runtime" excluded in Non-goals. That exclusion means old *releases* don't keep participating after activation. Every current release implements all historical semantics for replay, but exactly one behaviour is live at any point in history — selected deterministically by the version in state.
 
+#### New core definitions: the pre-activation decode-skew window
+
+Adding a *new decodable executable value* (a core definition with a fresh `CORE_DEF` code) is a special tier-2 case. Decoding is stateless: a release carrying the code decodes the real function cell, while earlier releases decode the same bytes as an opaque extension value with an **identical re-encoding** — so state hashes agree while the value merely sits in state, but *executing* it diverges (cast-error-before-arguments vs real invocation), including juice consumed → fees → state. An attacker can inject such a constant by hand-crafting an encoding, opening a fork window between releases **before** the version gate activates.
+
+Handling, in layers:
+
+1. **Address-gating** the new definitions (< `#8`) means no attacker-originated invocation can *succeed* on any release; both sides fail. The gate runs first and charges nothing, keeping the residual skew to juice differences in attacker-paid failure paths.
+2. **Exact closure** requires *versioned materialisation*: a core definition carries the protocol version that introduces it, and every function-materialisation seam (Invoke, `apply`, `*lang*`, expanders, callable exports) treats a not-yet-active definition as a non-function — byte-identical behaviour to older releases, same juice point. This is required before scheduling upgrades on a value-bearing network.
+3. Until then the window is **accepted operationally**: effectively all peers are expected to run the mechanism release before such values can appear on-chain.
+
+Note this exposure class is not new — historical releases have added core codes without it, so mixed-release networks already carry it. The upgrade mechanism is what ends the era; it cannot retroactively protect its own introduction window.
+
 ### Tier 3 — encoding changes: decoders stay permissive
 
 Cell encodings are read outside any state context (Etch, network messages), so decoding **cannot** branch on the state version. Instead: decoders remain backwards-compatible with all historical forms permanently; what the version gates is what the CVM *writes and canonicalises*. Where existing cells must take the new form, the migration rewrites them. (This matches existing CAD3 practice: decoders accept non-canonical forms; canonicalisation is a CVM-layer concern.)
@@ -175,7 +187,12 @@ The applied prefix is **immutable forever**. Applying an upgrade changes nothing
 - Add `State.getProtocolVersion()` (the watermark; absent global → 0) and an upgrade-vector accessor (absent → empty), mirroring the existing `GLOBAL_*` accessors (`State.java:812`, `:901`).
 - This resolves the `// TODO: move to actor?` on `State.java:83`: the values stay in globals — consensus-critical, always present, native to read — rather than in any account's environment.
 
-**Genesis is never touched — on any network.** `Init` and `INITIAL_GLOBALS` remain exactly as they are (6 globals); every network, new or existing, starts at version `0` via the absent-reads-as-default rule. The protocol globals and the `schedule-upgrade` core binding are installed by **migration v1 (the bootstrap)**: migrations operate on the *evolving* state, so firing it extends the globals vector — version `1`, upgrade vector `[activation]` — and adds the core environment binding. Replay reproduces this from the recorded upgrade. What must precede activation is the **activation hook in peer code** — a software release, not a state change. The bootstrap upgrade is the one permitted exception to on-chain scheduling (there is nowhere to schedule it yet): its activation is hardcoded per-network in the peer release that carries it, and once the globals exist the watermark ensures it never refires. Bootstrap state changes need rigorous tests asserting the exact expected deltas.
+**Genesis is never touched — on any network.** `Init` and `INITIAL_GLOBALS` remain exactly as they are (6 globals); every network, new or existing, starts at version `0` via the absent-reads-as-default rule, and adopts the mechanism **fully on-chain**:
+
+1. A governance transaction schedules the bootstrap (v1) by **embedding the `schedule-upgrade` cell directly in compiled code** — no environment binding exists yet, and none is needed: the cell is decodable and validation is state-only. This scheduling transaction itself creates the protocol globals (the globals vector extends to 8 entries: version `0`, upgrade vector `[activation]`).
+2. At activation, **migration v1 (the bootstrap)** installs the `schedule-upgrade` / `unschedule-upgrade` bindings into the core environment, making them normally resolvable from version 1 onward; the watermark advances to `1`.
+
+Replay reproduces all of this from the recorded transactions and upgrade. What must precede the scheduling transaction is a **peer release carrying the mechanism** (decode registration, activation hook, migration) — peers on earlier releases can follow neither the scheduling transaction nor the boundary, and lack the withdraw behaviour: upgrading effectively all stake to the mechanism release first is an operational precondition. Bootstrap state changes need rigorous tests asserting the exact expected deltas.
 
 ### Scheduling: a native core function
 
@@ -243,7 +260,7 @@ private State prepareBlock(Block b) {
 
 `applyUpgrades(timestamp)` algorithm:
 
-1. Read the version and upgrade-vector globals (absent read as `0` / empty). On a network whose state predates them, the pending set is the release-hardcoded bootstrap activation, appended as it fires.
+1. Read the version and upgrade-vector globals (absent read as `0` / empty — such states have nothing pending and the step is a no-op).
 2. While the entry at the watermark — position `version` in the upgrade vector — has `activation ≤ timestamp`:
    - Take `Migrations.get(version)`. **Not present (release too old) → withdraw** (see failure modes).
    - `state = migration.apply(state)`.
@@ -348,7 +365,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 | Version semantics | Every upgrade increments the version by exactly 1 — the version *is* the watermark (the count of the applied prefix). Migrations are unnamed; identity is the version number, bound positionally in the `Migrations` class. |
 | CVM core changes | Three tiers: state-resident core (`core.cvx` bindings) → pure migration, no branching; native semantics (opcodes, juice, casts) → permanent version-keyed branches at narrow seams; encodings → permissive decoders, version-gated writing/canonicalisation. |
 | Etch interaction | Pure state migrations need none; store-format conversions are peer-local ops, not in-consensus. |
-| Bootstrap | Uniform for **all** networks: genesis never carries the protocol globals — migration v1 extends the globals and installs the core function binding (version `1`, vector `[activation]`). Coordinated by peer release (one-time exception to on-chain scheduling). Genesis hash never changes, anywhere. |
+| Bootstrap | Uniform for **all** networks and **fully on-chain**: a governance transaction embeds the `schedule-upgrade` cell directly (no binding exists yet), creating the protocol globals; migration v1 then installs the core environment bindings. No hardcoded activations, no exceptions. Genesis hash never changes, anywhere. |
 
 ## Remaining open questions
 
@@ -363,8 +380,9 @@ Ordered so each step is independently testable and the genesis-affecting change 
 2. **`Migrations` class + `Migration` interface**, with a trivial identity migration for tests.
 3. **`schedule-upgrade` / `unschedule-upgrade` core functions**, with the sub-`#8` address gate and activation validation.
 4. **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
-5. **Attestation**: status advertisement of the highest supported protocol version.
-6. **First real upgrade** as validation: fix one of the dependent issues ([#533](https://github.com/Convex-Dev/convex/issues/533), [#528](https://github.com/Convex-Dev/convex/issues/528), [#354](https://github.com/Convex-Dev/convex/issues/354), [#208](https://github.com/Convex-Dev/convex/issues/208)) as a scheduled upgrade rather than a naive code change.
+5. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
+6. **Attestation**: status advertisement of the highest supported protocol version.
+7. **First real upgrade** as validation: fix one of the dependent issues ([#533](https://github.com/Convex-Dev/convex/issues/533), [#528](https://github.com/Convex-Dev/convex/issues/528), [#354](https://github.com/Convex-Dev/convex/issues/354), [#208](https://github.com/Convex-Dev/convex/issues/208)) as a scheduled upgrade rather than a naive code change.
 
 ## Testing strategy
 
@@ -387,7 +405,7 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 - **Buggy migration = network stall.** A throwing migration stalls the network at the boundary until a corrected release ships, making migration quality a release-blocking concern. Mitigate with the boundary/determinism test suite and rehearsal on testnet before scheduling on Protonet.
 - **Governance key compromise.** An attacker controlling a sub-`#8` account can schedule or unschedule upgrades — but can only activate migrations that already exist in released peer code; code injection additionally requires compromising the release process. Mitigate with controller-based multi-signature policies on the governance accounts.
 - **Readiness at activation.** If insufficient stake holds the migration, the network stalls at the boundary. Mitigate with attestation, generous activation notice, operator communication — or `unschedule-upgrade` before the boundary.
-- **Bootstrap coordination.** The one release-coordinated (off-chain) upgrade per existing network is the riskiest, since scheduling is not yet consensus-visible. Keep the bootstrap migration minimal: core function binding + protocol globals, nothing else.
+- **Bootstrap coordination.** Peers not yet on a mechanism-carrying release can follow neither the bootstrap scheduling transaction nor the boundary, and lack the withdraw behaviour — they fork rather than withdraw. Mitigate by upgrading effectively all stake to the mechanism release before scheduling v1. Keep the v1 migration minimal: core environment bindings, nothing else.
 - **Migration list growth.** Historical migrations accumulate in every release forever; accepted cost, revisit only alongside a snapshot-trust sync policy.
 
 ## Status

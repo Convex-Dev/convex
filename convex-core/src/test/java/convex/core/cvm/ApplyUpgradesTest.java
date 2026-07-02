@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cpos.Block;
 import convex.core.cvm.Migrations.Migration;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -244,6 +245,23 @@ public class ApplyUpgradesTest {
 		UpgradeError e = assertThrows(UpgradeError.class, () -> pending.applyUpgrades(activation, missingData));
 		assertEquals(1L, e.getVersion());
 		assertInstanceOf(convex.core.exceptions.MissingDataException.class, e.getCause());
+	}
+
+	@Test
+	public void testScheduleViaNativeThenApply() {
+		// End to end bridge: schedule via the core function (as the bootstrap
+		// transaction does, embedding the cell directly), then fire the upgrade
+		long activation = TS + 1000;
+		Context ctx = convex.core.lang.Core.SCHEDULE_UPGRADE.invoke(
+				Context.create(INIT_STATE, convex.core.init.Init.GOVERNANCE_ADDRESS),
+				new ACell[] { CVMLong.create(activation) });
+		assertEquals(CVMLong.create(1), ctx.getResult());
+		State scheduled = ctx.getState();
+
+		State fired = scheduled.applyUpgrades(activation, ORDERED);
+		assertEquals(1L, fired.getProtocolVersion());
+		assertEquals(1L, fired.getGlobalFees().longValue());
+		StateTest.doStateTests(fired.applyTimeUpdate(activation));
 	}
 
 	@Test

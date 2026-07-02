@@ -132,19 +132,40 @@ public class Core {
 		o=Cells.intern(o);
 		if (tempReg.contains(o)) throw new Error("Duplicate core form! = "+o);
 		tempReg.add(o);
-		
+
 		if (o instanceof ICoreDef) {
 			ICoreDef cd=(ICoreDef)o;
 			Symbol stm=cd.getSymbol();
-			
-			
-			
+
+
+
 			Symbol implicitForm=Symbol.create("#%"+stm.getName().toString());
 			CORE_FORMS.put(implicitForm, o);
 		} else {
 			System.err.println("Not a core Def: "+o);
 		}
-		
+
+		return o;
+	}
+
+	/**
+	 * Register an intrinsic core value that is deliberately NOT part of the genesis
+	 * core environment. The value is encodable / decodable via its core code, but
+	 * carries no environment binding or implicit form: it is installed into the
+	 * core environment by a network upgrade migration, and until then is only
+	 * usable by embedding the cell directly in compiled code. See UPGRADE.md.
+	 *
+	 * @param <T> Type of core value
+	 * @param o Core value to register
+	 * @return Interned singleton instance
+	 */
+	private static <T extends ACell> T regNonGenesis(T o) {
+		o=Cells.intern(o);
+		if (o instanceof ICoreDef) {
+			registerCode((ICoreDef)o);
+		} else {
+			throw new Error("Not a core Def: "+o);
+		}
 		return o;
 	}
 
@@ -1010,6 +1031,94 @@ public class Core {
 			CVMLong stake=(ps==null)?null:CVMLong.create(ps.getPeerStake());
 			
 			return context.withResult(Juice.LOOKUP,stake);
+		}
+	});
+
+	/**
+	 * Schedules a network upgrade (see UPGRADE.md). NOT part of the genesis
+	 * environment: installed into the core environment by the v1 bootstrap
+	 * migration; until then callable only by embedding this cell directly in
+	 * compiled code (which is how the bootstrap itself is scheduled).
+	 *
+	 * <p>Validation is a pure function of state — it must never consult the local
+	 * {@link convex.core.cvm.Migrations} registry, or peers on different releases
+	 * would disagree on transaction validity and fork.</p>
+	 */
+	public static final CoreFn<CVMLong> SCHEDULE_UPGRADE = regNonGenesis(new CoreFn<>(Symbols.SCHEDULE_UPGRADE,501) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			// Governance gate first: no juice charged on failure paths, keeping fee
+			// skew against releases lacking this definition minimal (see UPGRADE.md)
+			if (context.getAddress().longValue() >= CORE_ADDRESS.longValue()) {
+				return context.withError(ErrorCodes.TRUST, "schedule-upgrade requires a governance account (address below " + CORE_ADDRESS + ")");
+			}
+
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			CVMLong activation = RT.ensureLong(args[0]);
+			if (activation == null) return context.withCastError(0, args, Types.LONG);
+			long act = activation.longValue();
+
+			State s = context.getState();
+			if (act <= s.getTimestamp().longValue()) {
+				return context.withArgumentError("Upgrade activation must be in the future");
+			}
+
+			AVector<CVMLong> ups = s.getUpgradeVector();
+			long n = ups.count();
+			if (n > 0) {
+				CVMLong last = RT.ensureLong(ups.get(n - 1));
+				if ((last == null) || (act < last.longValue())) {
+					return context.withArgumentError("Upgrade activation must not be before the last scheduled upgrade");
+				}
+			}
+
+			State ns = s.withProtocolGlobals(s.getProtocolVersion(), ups.conj(activation));
+			context = context.withState(ns);
+
+			// Result is the protocol version this upgrade will produce
+			return context.withResult(Juice.DEF, CVMLong.create(n + 1));
+		}
+	});
+
+	/**
+	 * Removes the last pending scheduled upgrade (see UPGRADE.md). Escape hatch if
+	 * a migration will not ship. Only the tail entry may be removed: migrations
+	 * bind to versions by position, so mid-vector edits would silently re-bind
+	 * later activations to different migrations. NOT part of the genesis
+	 * environment (see {@link #SCHEDULE_UPGRADE}).
+	 */
+	public static final CoreFn<CVMLong> UNSCHEDULE_UPGRADE = regNonGenesis(new CoreFn<>(Symbols.UNSCHEDULE_UPGRADE,502) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			// Governance gate first: no juice charged on failure paths
+			if (context.getAddress().longValue() >= CORE_ADDRESS.longValue()) {
+				return context.withError(ErrorCodes.TRUST, "unschedule-upgrade requires a governance account (address below " + CORE_ADDRESS + ")");
+			}
+
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			CVMLong version = RT.ensureLong(args[0]);
+			if (version == null) return context.withCastError(0, args, Types.LONG);
+
+			State s = context.getState();
+			AVector<CVMLong> ups = s.getUpgradeVector();
+			long n = ups.count();
+			if ((n == 0) || (version.longValue() != n)) {
+				return context.withArgumentError("unschedule-upgrade requires the last scheduled version" + ((n == 0) ? " (nothing scheduled)" : " (" + n + ")"));
+			}
+			if (s.getProtocolVersion() >= n) {
+				return context.withArgumentError("Cannot unschedule an applied upgrade");
+			}
+
+			CVMLong removed = RT.ensureLong(ups.get(n - 1));
+			State ns = s.withProtocolGlobals(s.getProtocolVersion(), ups.slice(0, n - 1));
+			context = context.withState(ns);
+
+			// Result is the activation timestamp of the removed upgrade
+			return context.withResult(Juice.DEF, removed);
 		}
 	});
 

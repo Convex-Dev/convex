@@ -46,7 +46,7 @@ public class Migrations {
 	 * {@code k+1}. Append-only — never reorder, remove or edit released entries.
 	 */
 	private static final List<Migration> ALL = List.of(
-			// v1: bootstrap — installs schedule-upgrade binding + protocol globals
+			// v1: bootstrap — installs schedule-upgrade / unschedule-upgrade core bindings
 	);
 
 	/**
