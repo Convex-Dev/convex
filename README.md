@@ -172,7 +172,7 @@ Alternatively, email: info(at)convex.world
 
 ## Copyright
 
-Copyright 2017-2025 The Convex Foundation and Contributors
+Copyright 2017-2026 The Convex Foundation and Contributors
 
 Unless otherwise specified, source code is available under the terms of the [Convex 
 Public License](LICENSE.md)

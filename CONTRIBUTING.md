@@ -79,7 +79,7 @@ external services.
   robust against malicious input.
 - **Terminology** — use the canonical Convex vocabulary. Don't substitute blockchain
   terms ("gas", "fees", "block", "miner", "validator", "mainnet", etc.). See the
-  [glossary](https://docs.convex.world/tutorial/glossary). Key terms include CVM coin,
+  [glossary](https://docs.convex.world/docs/tutorial/glossary). Key terms include CVM coin,
   Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, and Protonet.
 - Match the style of the surrounding code (naming, formatting, comment density).
 
@@ -104,7 +104,7 @@ the private disclosure process in [SECURITY.md](SECURITY.md).
 
 ## Community
 
-- **Discord:** https://discord.gg/5j2mPsk
+- **Discord:** https://discord.com/invite/xfYGq4CT7v
 - **Email:** info(at)convex.world
 
 We're happy to help you get started — don't hesitate to ask questions on Discord.
