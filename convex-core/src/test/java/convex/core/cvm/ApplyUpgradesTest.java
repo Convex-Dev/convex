@@ -144,8 +144,10 @@ public class ApplyUpgradesTest {
 		UpgradeError e = assertThrows(UpgradeError.class, () -> pending.applyUpgrades(activation, NONE));
 		assertEquals(1L, e.getVersion());
 
-		// Default registry is empty pre-bootstrap, so behaves the same
-		assertThrows(UpgradeError.class, () -> pending.applyUpgrades(activation));
+		// The real registry carries only v1: a due version 2 is a missing migration
+		State pendingV2 = INIT_STATE.withProtocolGlobals(1, upgrades(TS - 1000, activation));
+		UpgradeError e2 = assertThrows(UpgradeError.class, () -> pendingV2.applyUpgrades(activation));
+		assertEquals(2L, e2.getVersion());
 	}
 
 	@Test
@@ -163,21 +165,21 @@ public class ApplyUpgradesTest {
 		// The critical replay-consistency property: a due-but-unavailable upgrade
 		// must NOT become an invalid-block result via applyBlock's catch(Exception).
 		// It must propagate as an Error for the peer layer to handle (withdraw).
+		// The real registry carries only v1, so a due version 2 is missing.
 		long activation = TS + 1000;
-		State pending = INIT_STATE.withProtocolGlobals(0, upgrades(activation));
+		State pending = INIT_STATE.withProtocolGlobals(1, upgrades(TS - 1000, activation));
 
 		Block b = Block.of(activation); // empty block at the activation boundary
 		SignedData<Block> sb = InitTest.FIRST_PEER_KEYPAIR.signData(b);
 
-		// Registry is empty pre-bootstrap: missing migration
 		UpgradeError e = assertThrows(UpgradeError.class, () -> pending.applyBlock(sb));
-		assertEquals(1L, e.getVersion());
+		assertEquals(2L, e.getVersion());
 
 		// Before activation the same block machinery applies cleanly
 		Block early = Block.of(activation - 1);
 		SignedData<Block> sbEarly = InitTest.FIRST_PEER_KEYPAIR.signData(early);
 		State after = pending.applyBlock(sbEarly).getState();
-		assertEquals(0L, after.getProtocolVersion());
+		assertEquals(1L, after.getProtocolVersion());
 		StateTest.doStateTests(after);
 	}
 

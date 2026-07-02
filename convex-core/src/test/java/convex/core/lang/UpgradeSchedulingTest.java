@@ -162,11 +162,12 @@ public class UpgradeSchedulingTest {
 		// Scheduling must never consult the local Migrations registry: scheduling a
 		// version this release cannot apply is valid and expected (older peers
 		// schedule fine and stop at the transition block). See UPGRADE.md
-		assertEquals(0L, Migrations.MAX_VERSION);
-		assertNull(Migrations.get(0));
+		assertEquals(1L, Migrations.MAX_VERSION);
+		assertNull(Migrations.get(1)); // no migration for version 2 in this release
 
-		Context ctx = schedule(INIT_STATE, GOVERNANCE, TS + 1000);
-		assertEquals(CVMLong.create(1), ctx.getResult()); // scheduled despite no migration available
+		Context c1 = schedule(INIT_STATE, GOVERNANCE, TS + 1000);
+		Context c2 = schedule(c1.getState(), GOVERNANCE, TS + 2000);
+		assertEquals(CVMLong.create(2), c2.getResult()); // scheduled beyond supported version
 	}
 
 }

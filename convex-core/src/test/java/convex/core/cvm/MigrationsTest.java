@@ -1,6 +1,7 @@
 package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -15,10 +16,11 @@ import convex.core.init.InitTest;
 public class MigrationsTest {
 
 	@Test
-	public void testEmptyRegistry() {
-		// No migrations released yet: nothing before the bootstrap ships
-		assertEquals(0L, Migrations.MAX_VERSION);
-		assertNull(Migrations.get(0));
+	public void testRegistry() {
+		// This release carries the v1 bootstrap migration only
+		assertEquals(1L, Migrations.MAX_VERSION);
+		assertInstanceOf(Migrations.Bootstrap.class, Migrations.get(0));
+		assertNull(Migrations.get(1));
 	}
 
 	@Test

@@ -2,6 +2,13 @@ package convex.core.cvm;
 
 import java.util.List;
 
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.Maps;
+import convex.core.data.Symbol;
+import convex.core.data.prim.CVMBool;
+import convex.core.lang.Core;
+
 /**
  * Registry of network upgrade migrations.
  *
@@ -42,11 +49,40 @@ public class Migrations {
 	}
 
 	/**
+	 * v1 bootstrap migration: installs the schedule-upgrade / unschedule-upgrade
+	 * core function bindings into the core environment (account #8), marked
+	 * {@code :static} like other intrinsic core definitions.
+	 *
+	 * <p>The protocol globals already exist when this fires: they were created by
+	 * the governance transaction that scheduled this upgrade (which embedded the
+	 * schedule-upgrade cell directly in compiled code, since no binding existed
+	 * yet). From version 1 onward the functions resolve normally by symbol.
+	 * See UPGRADE.md.</p>
+	 */
+	static final class Bootstrap implements Migration {
+		@Override
+		public State apply(State preState) {
+			AccountStatus core = preState.getAccount(Core.CORE_ADDRESS);
+
+			AHashMap<Symbol, ACell> env = core.getEnvironment();
+			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
+			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
+
+			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
+			AHashMap<ACell, ACell> staticMeta = Maps.of(Keywords.STATIC, CVMBool.TRUE);
+			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
+			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
+
+			return preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
+		}
+	}
+
+	/**
 	 * The ordered migration list: entry {@code k} produces protocol version
 	 * {@code k+1}. Append-only — never reorder, remove or edit released entries.
 	 */
 	private static final List<Migration> ALL = List.of(
-			// v1: bootstrap — installs schedule-upgrade / unschedule-upgrade core bindings
+			new Bootstrap()	// v1: schedule-upgrade / unschedule-upgrade core bindings
 	);
 
 	/**
