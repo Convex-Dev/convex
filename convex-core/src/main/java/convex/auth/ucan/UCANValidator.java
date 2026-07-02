@@ -165,10 +165,10 @@ public class UCANValidator {
 	 * Parse a transport-level {@code ucans} vector into validated UCAN maps.
 	 *
 	 * <p>Each element must be a JWT string. Every returned token has had its
-	 * EdDSA signature verified (via the JWT {@code kid} header), its temporal
-	 * bounds checked, and its proof chain recursively validated. Tokens that
-	 * fail any check are silently dropped — invalid tokens never appear in
-	 * the returned vector.</p>
+	 * EdDSA signature verified against its {@code iss} DID key (not the JWT
+	 * {@code kid} header), its temporal bounds checked, and its proof chain
+	 * recursively validated. Tokens that fail any check are silently dropped —
+	 * invalid tokens never appear in the returned vector.</p>
 	 *
 	 * <p><b>Trust boundary:</b> this is the single point at which UCAN
 	 * signatures are verified for inbound requests. Downstream code that

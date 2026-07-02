@@ -387,8 +387,10 @@ public class UCAN {
 	}
 
 	/**
-	 * Parse a JWT-encoded UCAN. Verifies the EdDSA signature using the public key
-	 * from the JWT {@code kid} header. Returns null if malformed or signature invalid.
+	 * Parse a JWT-encoded UCAN. Verifies the EdDSA signature against the public key
+	 * bound in the {@code iss} DID (a {@code did:key} encodes the issuer's key); the
+	 * attacker-controlled {@code kid} header is ignored. Returns null if malformed or
+	 * signature invalid.
 	 *
 	 * @param jwtString The JWT string
 	 * @return Parsed UCAN, or null if invalid
