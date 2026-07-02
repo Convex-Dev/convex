@@ -211,7 +211,7 @@ public class PeerStatus extends ARecordGeneric {
 	public AHashMap<ACell, ACell> getMetadata() {
 		if (metadata==null) {
 			// Absent/foreign metadata is explicitly treated as an empty map (not null)
-			AHashMap<ACell, ACell> m=RT.asMap(values.get(IX_METADATA));
+			AHashMap<ACell, ACell> m=RT.ensureMap(values.get(IX_METADATA));
 			metadata=(m!=null)?m:Maps.empty();
 		}
 		return metadata;

@@ -196,7 +196,7 @@ public class UCAN {
 	public static UCAN parse(AMap<AString, ACell> tokenMap) {
 		if (tokenMap == null) return null;
 
-		AMap<AString, ACell> payload = RT.ensureMap(tokenMap.get(PAYLOAD));
+		AMap<AString, ACell> payload = RT.castMap(tokenMap.get(PAYLOAD));
 		if (payload == null) return null;
 
 		ACell sigCell = tokenMap.get(SIG);

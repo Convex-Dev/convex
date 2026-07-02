@@ -74,14 +74,14 @@ public class McpTest extends ARESTTest {
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
 
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 		assertEquals(Strings.create("init-1"), responseMap.get(McpProtocol.FIELD_ID));
 
 		ACell resultCell = responseMap.get(McpProtocol.FIELD_RESULT);
 		assertNotNull(resultCell, "initialize should return result");
 		assertTrue(resultCell instanceof AMap);
 
-		AMap<AString, ACell> result = RT.ensureMap(resultCell);
+		AMap<AString, ACell> result = RT.castMap(resultCell);
 		ACell protocol = RT.getIn(result,"protocolVersion");
 		assertNotNull(protocol, "initialize should include protocol version");
 
@@ -129,8 +129,8 @@ public class McpTest extends ARESTTest {
 				+ paramsJson + ",\"id\":\"neg\"}";
 		HttpResponse<String> response = post(MCP_PATH, request);
 		assertEquals(200, response.statusCode());
-		AMap<AString, ACell> responseMap = RT.ensureMap(JSON.parse(response.body()));
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> responseMap = RT.castMap(JSON.parse(response.body()));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		AString version = RT.ensureString(RT.getIn(result, "protocolVersion"));
 		assertNotNull(version, "initialize must include protocolVersion");
 		return version.toString();
@@ -154,14 +154,14 @@ public class McpTest extends ARESTTest {
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
 
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 		assertEquals(Strings.create("bad-1"), responseMap.get(McpProtocol.FIELD_ID));
 
 		ACell errorCell = responseMap.get(McpProtocol.FIELD_ERROR);
 		assertNotNull(errorCell, "Unknown method should return error object");
 		assertTrue(errorCell instanceof AMap);
 
-		AMap<AString, ACell> error = RT.ensureMap(errorCell);
+		AMap<AString, ACell> error = RT.castMap(errorCell);
 		ACell codeCell = RT.getIn(error, "code");
 		assertEquals(CVMLong.create(-32601), codeCell);
 	}
@@ -219,7 +219,7 @@ public class McpTest extends ARESTTest {
 		HttpResponse<String> restResponse = post(API_PATH + "/transaction/prepare", JSON.toString(requestMap));
 		assertEquals(200, restResponse.statusCode());
 		ACell restParsed = JSON.parse(restResponse.body());
-		AMap<AString, ACell> restMap = RT.ensureMap(restParsed);
+		AMap<AString, ACell> restMap = RT.castMap(restParsed);
 		assertNotNull(restMap);
 		AString restHash = RT.getIn(restMap, "hash");
 		assertNotNull(restHash);
@@ -373,7 +373,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
 
 		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Missing hash should return a tool error result");
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
@@ -387,7 +387,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
 
 		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Missing seed should return a tool error result");
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
@@ -470,7 +470,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> response = makeToolCall("getTransaction", Maps.empty());
 
 		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Missing hash should return a tool error result");
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
@@ -824,7 +824,7 @@ public class McpTest extends ARESTTest {
 		assertNotNull(errorCell, "Unknown tool should return a JSON-RPC error");
 		assertTrue(errorCell instanceof AMap);
 
-		AMap<AString, ACell> error = RT.ensureMap(errorCell);
+		AMap<AString, ACell> error = RT.castMap(errorCell);
 		ACell codeCell = RT.getIn(error, "code");
 		assertEquals(CVMLong.create(-32601), codeCell);
 	}
@@ -890,10 +890,10 @@ public class McpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, "Expected map response but got " + RT.getType(parsed));
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 
 		assertNull(responseMap.get(McpProtocol.FIELD_ID));
-		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(responseMap.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error);
 		assertEquals(CVMLong.create(-32600), error.get(McpProtocol.FIELD_CODE));
 	}
@@ -911,9 +911,9 @@ public class McpTest extends ARESTTest {
 		AVector<ACell> results = RT.ensureVector(parsed);
 		assertEquals(1, results.count());
 
-		AMap<AString, ACell> errorResponse = RT.ensureMap(results.get(0));
+		AMap<AString, ACell> errorResponse = RT.castMap(results.get(0));
 		assertNull(errorResponse.get(McpProtocol.FIELD_ID));
-		AMap<AString, ACell> error = RT.ensureMap(errorResponse.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(errorResponse.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error);
 		assertEquals(CVMLong.create(-32600), error.get(McpProtocol.FIELD_CODE));
 	}
@@ -944,7 +944,7 @@ public class McpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, ()->"Expected map response but got " + RT.getType(parsed));
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 		return responseMap;
 	}
 
@@ -958,17 +958,17 @@ public class McpTest extends ARESTTest {
 		String resourcePath = "convex/restapi/mcp/tools/" + toolName + ".json";
 		AMap<AString, ACell> metadata = McpTool.loadMetadata(resourcePath);
 
-		AMap<AString, ACell> outputSchema = RT.ensureMap(metadata.get(Strings.create("outputSchema")));
+		AMap<AString, ACell> outputSchema = RT.castMap(metadata.get(Strings.create("outputSchema")));
 		if (outputSchema == null) return; // no schema to validate
 
-		AMap<AString, ACell> properties = RT.ensureMap(outputSchema.get(Strings.create("properties")));
+		AMap<AString, ACell> properties = RT.castMap(outputSchema.get(Strings.create("properties")));
 		if (properties == null) return; // no properties declared
 
 		long n = properties.count();
 		for (long i = 0; i < n; i++) {
 			var entry = properties.entryAt(i);
 			String fieldName = entry.getKey().toString();
-			AMap<AString, ACell> fieldSchema = RT.ensureMap(entry.getValue());
+			AMap<AString, ACell> fieldSchema = RT.castMap(entry.getValue());
 			if (fieldSchema == null) continue;
 
 			AString typeCell = RT.ensureString(fieldSchema.get(Strings.create("type")));
@@ -1017,16 +1017,16 @@ public class McpTest extends ARESTTest {
 	 */
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR));
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, ()->"RPC result missing in:" + responseMap);
 		assertEquals(CVMBool.FALSE, result.get(McpProtocol.FIELD_IS_ERROR), ()->"Unexpcted failure in:" + responseMap);
 
 		AVector<ACell> content = RT.ensureVector(result.get(McpProtocol.FIELD_CONTENT));
 		assertNotNull(content);
 		assertTrue(content.count() > 0);
-		AMap<AString, ACell> textEntry = RT.ensureMap(content.get(0));
+		AMap<AString, ACell> textEntry = RT.castMap(content.get(0));
 		assertNotNull(textEntry.get(McpProtocol.FIELD_TEXT));
-		AMap<AString, ACell> structured =RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured =RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 
 		// Validate structured content against the tool's declared outputSchema
@@ -1043,10 +1043,10 @@ public class McpTest extends ARESTTest {
 	 */
 	private AMap<AString, ACell> expectError(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR));
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
@@ -1251,7 +1251,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> responseMap = makeToolCall("hash", args);
 
 		// Missing params → tool error (isError=true), not protocol error (per MCP 2025-11-25)
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Missing value should return a tool error result");
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
@@ -1461,9 +1461,9 @@ public class McpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, "Expected map response");
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 
-		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(responseMap.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Invalid JSON should return an error");
 		assertEquals(CVMLong.create(-32700), error.get(McpProtocol.FIELD_CODE), "Should be Parse Error (-32700)");
 	}
@@ -1479,7 +1479,7 @@ public class McpTest extends ARESTTest {
 		assertEquals(200, response.statusCode());
 
 		ACell parsed = JSON.parse(response.body());
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 
 		// Should still succeed with result (lenient parsing)
 		ACell result = responseMap.get(McpProtocol.FIELD_RESULT);
@@ -1497,7 +1497,7 @@ public class McpTest extends ARESTTest {
 		assertEquals(200, response.statusCode());
 
 		ACell parsed = JSON.parse(response.body());
-		AMap<AString, ACell> responseMap = RT.ensureMap(parsed);
+		AMap<AString, ACell> responseMap = RT.castMap(parsed);
 
 		// Should still succeed with result (lenient parsing)
 		ACell result = responseMap.get(McpProtocol.FIELD_RESULT);
@@ -1550,7 +1550,7 @@ public class McpTest extends ARESTTest {
 		// Should be valid JSON (not SSE)
 		ACell parsed = JSON.parse(response.body());
 		assertNotNull(parsed, "Response body should be valid JSON");
-		AMap<AString, ACell> map = RT.ensureMap(parsed);
+		AMap<AString, ACell> map = RT.castMap(parsed);
 		assertNotNull(map.get(McpProtocol.FIELD_RESULT), "Should have result");
 	}
 
@@ -1717,7 +1717,7 @@ public class McpTest extends ARESTTest {
 		HttpResponse<String> response = httpClient.send(httpReq, HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, response.statusCode());
 		ACell parsed = JSON.parse(response.body());
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	// ===== queryState tool =====
@@ -1747,18 +1747,18 @@ public class McpTest extends ARESTTest {
 		// Empty vector
 		AMap<AString, ACell> args = Maps.of("path", "[]");
 		AMap<AString, ACell> responseMap = makeToolCall("queryState", args);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 
 		// Not a vector
 		args = Maps.of("path", "42");
 		responseMap = makeToolCall("queryState", args);
-		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 
 		// Missing path
 		responseMap = makeToolCall("queryState", null);
-		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
@@ -1791,13 +1791,13 @@ public class McpTest extends ARESTTest {
 		// Malformed CVM expression
 		args = Maps.of("path", "[this is not valid {{{");
 		responseMap = makeToolCall("queryState", args);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 
 		// String instead of vector
 		args = Maps.of("path", "\"hello\"");
 		responseMap = makeToolCall("queryState", args);
-		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
@@ -1831,7 +1831,7 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> args = Maps.of("path", "[:accounts #0 :balance]");
 		AMap<AString, ACell> responseMap = makeToolCall("watchState", args);
 
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
@@ -1843,13 +1843,13 @@ public class McpTest extends ARESTTest {
 		// Empty vector
 		AMap<AString, ACell> args = Maps.of("path", "[]");
 		AMap<AString, ACell> responseMap = makeToolCallWithSession("watchState", args, sessionId);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 
 		// Not a vector
 		args = Maps.of("path", ":not-a-vector");
 		responseMap = makeToolCallWithSession("watchState", args, sessionId);
-		result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
 	}
 
@@ -1917,7 +1917,7 @@ public class McpTest extends ARESTTest {
 
 		// Neither watchId nor path — should be protocol error
 		AMap<AString, ACell> responseMap = makeToolCallWithSession("unwatchState", Maps.empty(), sessionId);
-		AMap<AString, ACell> error = RT.ensureMap(responseMap.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(responseMap.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Should return protocol error when neither param provided");
 	}
 

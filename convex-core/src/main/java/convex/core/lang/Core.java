@@ -1493,7 +1493,7 @@ public class Core {
 			int n = args.length;
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
-			AMap<ACell, ACell> result = RT.ensureMap(args[0]);
+			AMap<ACell, ACell> result = RT.castMap(args[0]);
 			if (result == null) return context.withCastError(args[0], Types.MAP);
 
 			for (int i = 1; i < n; i++) {
@@ -2589,13 +2589,13 @@ public class Core {
 			// TODO: handle indexes?
 
 			ACell arg0=args[0];
-			AMap<ACell,ACell> result=RT.ensureMap(arg0);
+			AMap<ACell,ACell> result=RT.castMap(arg0);
 			if (result == null) return context.withCastError(arg0, Types.MAP);
 
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
 				ACell argi=args[i];
-				AMap<ACell,ACell> argMap=RT.ensureMap(argi);
+				AMap<ACell,ACell> argMap=RT.castMap(argi);
 				if (argMap == null) return context.withCastError(argi, Types.MAP);
 
 				long size=argMap.count();

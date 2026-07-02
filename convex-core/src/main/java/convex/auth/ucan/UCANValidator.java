@@ -67,7 +67,7 @@ public class UCANValidator {
 				ACell proofCell = proofs.get(i);
 
 				// Parse proof as UCAN
-				AMap<AString, ACell> proofMap = RT.ensureMap(proofCell);
+				AMap<AString, ACell> proofMap = RT.castMap(proofCell);
 				if (proofMap == null) return null;
 
 				UCAN proof = UCAN.parse(proofMap);
@@ -253,7 +253,7 @@ public class UCANValidator {
 		if (proofs == null || audience == null || issuer == null) return null;
 		AVector<ACell> result = Vectors.empty();
 		for (long i = 0; i < proofs.count(); i++) {
-			AMap<AString, ACell> tokenMap = RT.ensureMap(proofs.get(i));
+			AMap<AString, ACell> tokenMap = RT.castMap(proofs.get(i));
 			if (tokenMap == null) continue;
 			UCAN token = UCAN.parse(tokenMap);
 			if (token == null) continue;

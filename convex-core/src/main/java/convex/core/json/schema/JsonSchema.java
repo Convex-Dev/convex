@@ -52,8 +52,8 @@ public class JsonSchema {
 
 	/**
 	 * Safe map extraction — returns null for null/non-map cells.
-	 * Note: unlike {@code RT.ensureMap()} which returns {@code Maps.empty()} for null,
-	 * this returns null. This distinction is critical to avoid infinite recursion
+	 * Note: {@code RT.castMap()} coerces null to {@code Maps.empty()}; this (like
+	 * {@code RT.ensureMap}) returns null, which is critical to avoid infinite recursion
 	 * when checking for absent schema keywords.
 	 */
 	@SuppressWarnings("unchecked")

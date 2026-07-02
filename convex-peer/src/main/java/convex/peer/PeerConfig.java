@@ -121,7 +121,7 @@ public class PeerConfig {
 	 * @return Section map, or empty map if not present
 	 */
 	public AMap<AString, ACell> getSection(AString key) {
-		AMap<AString, ACell> section = RT.ensureMap(config.get(key));
+		AMap<AString, ACell> section = RT.castMap(config.get(key));
 		return (section != null) ? section : Maps.empty();
 	}
 

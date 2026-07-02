@@ -160,7 +160,7 @@ public class RESTConfig extends PeerConfig {
 	 */
 	public AMap<AString, ACell> getToolsConfig() {
 		AMap<AString, ACell> mcpSection = getSection(MCP);
-		AMap<AString, ACell> tools = RT.ensureMap(mcpSection.get(TOOLS));
+		AMap<AString, ACell> tools = RT.castMap(mcpSection.get(TOOLS));
 		return (tools != null) ? tools : Maps.empty();
 	}
 
@@ -175,11 +175,11 @@ public class RESTConfig extends PeerConfig {
 		AMap<AString, ACell> authSection = getSection(AUTH);
 		ACell oauthCell = authSection.get(OAUTH);
 		if (oauthCell == null) return null;
-		AMap<AString, ACell> oauth = RT.ensureMap(oauthCell);
+		AMap<AString, ACell> oauth = RT.castMap(oauthCell);
 		if (oauth == null) return null;
 		ACell providerCell = oauth.get(Strings.create(provider));
 		if (providerCell == null) return null;
-		return RT.ensureMap(providerCell);
+		return RT.castMap(providerCell);
 	}
 
 	/**

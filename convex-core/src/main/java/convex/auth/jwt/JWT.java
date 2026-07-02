@@ -94,11 +94,11 @@ public class JWT {
 			if (dot2 < 0) return null;
 
 			String headerB64 = s.substring(0, dot1);
-			AMap<AString,ACell> header = RT.ensureMap(JSON.parse(Strings.wrap(decoder.decode(headerB64))));
+			AMap<AString,ACell> header = RT.castMap(JSON.parse(Strings.wrap(decoder.decode(headerB64))));
 			if (header == null) return null;
 
 			String claimsB64 = s.substring(dot1 + 1, dot2);
-			AMap<AString,ACell> claims = RT.ensureMap(JSON.parse(Strings.wrap(decoder.decode(claimsB64))));
+			AMap<AString,ACell> claims = RT.castMap(JSON.parse(Strings.wrap(decoder.decode(claimsB64))));
 			if (claims == null) return null;
 
 			String sigB64 = s.substring(dot2 + 1);

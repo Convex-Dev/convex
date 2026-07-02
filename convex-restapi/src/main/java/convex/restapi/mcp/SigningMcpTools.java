@@ -499,7 +499,7 @@ class SigningMcpTools {
 			if (publicKey == null) return api.toolError("Invalid public key format");
 
 			// Extract nested ucan object
-			AMap<AString, ACell> ucanArgs = RT.ensureMap(arguments.get(ARG_UCAN));
+			AMap<AString, ACell> ucanArgs = RT.castMap(arguments.get(ARG_UCAN));
 			if (ucanArgs == null) return api.toolError("signingDelegate requires 'ucan' object");
 
 			// Parse aud (required) — accept did:key or hex public key

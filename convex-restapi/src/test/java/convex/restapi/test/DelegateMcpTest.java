@@ -77,7 +77,7 @@ public class DelegateMcpTest extends ARESTTest {
 			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
 
 		// Verify response structure
-		AMap<AString, ACell> tokenMap = RT.ensureMap(result.get(Strings.create("token")));
+		AMap<AString, ACell> tokenMap = RT.castMap(result.get(Strings.create("token")));
 		assertNotNull(tokenMap, "Response should contain token map");
 
 		AString cad3 = RT.ensureString(result.get(Strings.create("cad3")));
@@ -113,7 +113,7 @@ public class DelegateMcpTest extends ARESTTest {
 		AMap<AString, ACell> result = expectResult(
 			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
 
-		AMap<AString, ACell> tokenMap = RT.ensureMap(result.get(Strings.create("token")));
+		AMap<AString, ACell> tokenMap = RT.castMap(result.get(Strings.create("token")));
 		UCAN ucan = UCAN.parse(tokenMap);
 		assertNotNull(ucan);
 		assertEquals(DELEGATE_KEY, ucan.getAudienceKey());
@@ -137,7 +137,7 @@ public class DelegateMcpTest extends ARESTTest {
 		AMap<AString, ACell> result = expectResult(
 			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
 
-		AMap<AString, ACell> tokenMap = RT.ensureMap(result.get(Strings.create("token")));
+		AMap<AString, ACell> tokenMap = RT.castMap(result.get(Strings.create("token")));
 		UCAN ucan = UCAN.parse(tokenMap);
 		assertNotNull(ucan);
 		assertEquals(DELEGATE_KEY, ucan.getAudienceKey());
@@ -166,7 +166,7 @@ public class DelegateMcpTest extends ARESTTest {
 		AMap<AString, ACell> result = expectResult(
 			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
 
-		AMap<AString, ACell> tokenMap = RT.ensureMap(result.get(Strings.create("token")));
+		AMap<AString, ACell> tokenMap = RT.castMap(result.get(Strings.create("token")));
 		UCAN ucan = UCAN.parse(tokenMap);
 		assertNotNull(ucan);
 		assertTrue(ucan.verifySignature());
@@ -191,7 +191,7 @@ public class DelegateMcpTest extends ARESTTest {
 		AMap<AString, ACell> result = expectResult(
 			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
 
-		AMap<AString, ACell> tokenMap = RT.ensureMap(result.get(Strings.create("token")));
+		AMap<AString, ACell> tokenMap = RT.castMap(result.get(Strings.create("token")));
 		UCAN ucan = UCAN.parse(tokenMap);
 		assertNotNull(ucan);
 		assertNotNull(ucan.getNotBefore());
@@ -275,7 +275,7 @@ public class DelegateMcpTest extends ARESTTest {
 		);
 		AMap<AString, ACell> rootResult = expectResult(
 			makeAuthToolCall("signingDelegate", rootArgs, ALICE_JWT));
-		AMap<AString, ACell> rootTokenMap = RT.ensureMap(rootResult.get(Strings.create("token")));
+		AMap<AString, ACell> rootTokenMap = RT.castMap(rootResult.get(Strings.create("token")));
 		assertNotNull(rootTokenMap);
 
 		// Bob sub-delegates to DELEGATE_KEY, with root token as proof
@@ -291,7 +291,7 @@ public class DelegateMcpTest extends ARESTTest {
 		);
 		AMap<AString, ACell> childResult = expectResult(
 			makeAuthToolCall("signingDelegate", childArgs, BOB_JWT));
-		AMap<AString, ACell> childTokenMap = RT.ensureMap(childResult.get(Strings.create("token")));
+		AMap<AString, ACell> childTokenMap = RT.castMap(childResult.get(Strings.create("token")));
 		assertNotNull(childTokenMap);
 
 		// Verify the chain validates
@@ -334,7 +334,7 @@ public class DelegateMcpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> makeAuthToolCall(String toolName, AMap<AString, ACell> arguments, String bearerToken)
@@ -362,25 +362,25 @@ public class DelegateMcpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, () -> "RPC result missing in: " + responseMap);
 		assertEquals(CVMBool.FALSE, result.get(McpProtocol.FIELD_IS_ERROR), () -> "Unexpected failure: " + responseMap);
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
 
 	private AMap<AString, ACell> expectError(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}

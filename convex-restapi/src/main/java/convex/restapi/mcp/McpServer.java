@@ -331,7 +331,7 @@ public class McpServer {
 			return protocolError(-32601, "Unknown tool: " + toolName);
 		}
 
-		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		AMap<AString, ACell> arguments = RT.castMap(params.get(FIELD_ARGUMENTS));
 		if (arguments == null) {
 			return protocolError(-32602, toolName + " requires arguments");
 		}
@@ -358,7 +358,7 @@ public class McpServer {
 		McpPrompt prompt = prompts.get(nameCell.toString());
 		if (prompt == null) return protocolError(-32601, "Unknown prompt: " + nameCell);
 
-		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		AMap<AString, ACell> arguments = RT.castMap(params.get(FIELD_ARGUMENTS));
 		if (arguments == null) arguments = Maps.empty();
 
 		AVector<AMap<AString, ACell>> messages = prompt.render(arguments);

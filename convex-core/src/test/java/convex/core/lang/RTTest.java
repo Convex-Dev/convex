@@ -42,19 +42,19 @@ import static convex.test.Assertions.*;
 public class RTTest {
 
 	@Test
-	public void testEnsureMapVsAsMap() {
+	public void testCastMapVsEnsureMap() {
 		AMap<?,?> m = Maps.of(Strings.create("a"), CVMLong.ONE);
 		ACell nonMap = CVMLong.ONE;
 
-		// asMap: a plain type guard — null for null and for non-maps (like the rest of ensure*)
-		assertNull(RT.asMap((ACell)null));
-		assertNull(RT.asMap(nonMap));
-		assertSame(m, RT.asMap(m));
-
-		// ensureMap: the CVM-cast oddball — a null argument coerces to the EMPTY map, not null
-		assertEquals(Maps.empty(), RT.ensureMap((ACell)null));
-		assertNull(RT.ensureMap(nonMap)); // a non-null non-map is still null
+		// ensureMap: a plain type guard — null for null and for non-maps (like the rest of ensure*)
+		assertNull(RT.ensureMap((ACell)null));
+		assertNull(RT.ensureMap(nonMap));
 		assertSame(m, RT.ensureMap(m));
+
+		// castMap: the CVM-cast coercion — a null argument coerces to the EMPTY map, not null
+		assertEquals(Maps.empty(), RT.castMap((ACell)null));
+		assertNull(RT.castMap(nonMap)); // a non-null non-map is still null
+		assertSame(m, RT.castMap(m));
 	}
 
 	@Test

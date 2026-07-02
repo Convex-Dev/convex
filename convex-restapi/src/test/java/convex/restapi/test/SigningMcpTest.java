@@ -298,7 +298,7 @@ public class SigningMcpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> makeAuthToolCall(String toolName, AMap<AString, ACell> arguments, String bearerToken)
@@ -326,25 +326,25 @@ public class SigningMcpTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, () -> "RPC result missing in: " + responseMap);
 		assertEquals(CVMBool.FALSE, result.get(McpProtocol.FIELD_IS_ERROR), () -> "Unexpected failure: " + responseMap);
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
 
 	private AMap<AString, ACell> expectError(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
