@@ -880,10 +880,43 @@ public class Server implements Closeable {
 	}
 
 	/**
+	 * The peer's time source, in milliseconds since epoch. All consensus-relevant
+	 * time reads (block timestamps, belief merge, block-rate throttling) go through
+	 * this single seam. Defaults to wall clock; overridable so that the passage of
+	 * time can be driven deterministically in tests.
+	 */
+	private volatile java.util.function.LongSupplier timeSource = Utils::getCurrentTimestamp;
+
+	/**
+	 * Gets the current peer timestamp in milliseconds since epoch.
+	 * @return Current peer timestamp
+	 */
+	public long getTimestamp() {
+		return timeSource.getAsLong();
+	}
+
+	/**
+	 * Overrides the peer's time source. Consensus-relevant time reads then observe
+	 * the supplied clock instead of the wall clock, so tests can drive the passage
+	 * of time deterministically. Package-visible: for test use only.
+	 * @param timeSource New time source (milliseconds since epoch)
+	 */
+	void setTimeSource(java.util.function.LongSupplier timeSource) {
+		this.timeSource = timeSource;
+	}
+
+	/**
 	 * Non-null if the peer has frozen consensus participation because a required
 	 * network upgrade cannot be applied by this release. See UPGRADE.md.
 	 */
 	private volatile UpgradeError consensusHalt = null;
+
+	/**
+	 * Completed with the halting UpgradeError the first time consensus freezes.
+	 * A real signal for operators/monitoring (and tests) to react to a freeze
+	 * rather than polling {@link #isConsensusHalted()}.
+	 */
+	private final java.util.concurrent.CompletableFuture<UpgradeError> consensusHaltFuture = new java.util.concurrent.CompletableFuture<>();
 
 	/**
 	 * Freezes this peer's consensus participation due to a required upgrade this
@@ -899,9 +932,20 @@ public class Server implements Closeable {
 	public void haltConsensus(UpgradeError error) {
 		if (consensusHalt == null) {
 			consensusHalt = error;
+			consensusHaltFuture.complete(error);
 			log.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
 					error.getVersion(), Migrations.MAX_VERSION);
 		}
+	}
+
+	/**
+	 * Gets a future that completes with the halting UpgradeError when this peer
+	 * freezes consensus pending a software upgrade. Never completes if the peer
+	 * does not halt.
+	 * @return Future of the halting UpgradeError
+	 */
+	public java.util.concurrent.CompletableFuture<UpgradeError> awaitConsensusHalt() {
+		return consensusHaltFuture;
 	}
 
 	/**

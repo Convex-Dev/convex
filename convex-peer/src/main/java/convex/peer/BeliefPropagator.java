@@ -194,7 +194,7 @@ public class BeliefPropagator extends AThreadedComponent {
 
 
 	protected boolean maybeBroadcast(boolean updated) throws InterruptedException {
-		long ts=Utils.getCurrentTimestamp();
+		long ts=server.getTimestamp();
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 			lastBroadcastTime=ts;
 			try {
@@ -290,7 +290,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
 		if ((newBeliefs==null)||(newBeliefs.length==0)) return false;
 		try {
-			long ts=Utils.getCurrentTimestamp();
+			long ts=server.getTimestamp();
 			AKeyPair kp=server.getKeyPair();
 			BeliefMerge mc = BeliefMerge.create(belief,kp, ts, server.getPeer().getConsensusState());
 			Belief newBelief = mc.merge(newBeliefs);

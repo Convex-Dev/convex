@@ -358,7 +358,7 @@ public class TransactionHandler extends AThreadedComponent {
 	 */
 	protected SignedData<Block>[] maybeGenerateBlocks() {
 		Peer peer=server.getPeer();
-		long timestamp=Utils.getCurrentTimestamp();
+		long timestamp=server.getTimestamp();
 
 		if (!peer.isReadyToPublish()) return null;
 
@@ -459,7 +459,7 @@ public class TransactionHandler extends AThreadedComponent {
 	 * Check if the Peer want to send any of its own transactions
 	 */
 	void maybeGetOwnTransactions(Peer p) {
-		long ts=Utils.getCurrentTimestamp();
+		long ts=server.getTimestamp();
 
 		// If we already posted own transaction recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
