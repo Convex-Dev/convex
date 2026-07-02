@@ -3,6 +3,7 @@ package convex.db.psql;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.handler.codec.CorruptedFrameException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -13,6 +14,9 @@ import java.util.Map;
  * Decodes PostgreSQL wire protocol messages from the client.
  */
 public class PgMessageDecoder extends ByteToMessageDecoder {
+
+	/** Maximum accepted length of a single Postgres protocol message. */
+	private static final int MAX_MESSAGE_LENGTH = 32 * 1024 * 1024; // 32 MB
 
 	private boolean startupComplete = false;
 
@@ -35,6 +39,9 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 		in.markReaderIndex();
 		int length = in.readInt();
+
+		if (length < 8 || length > MAX_MESSAGE_LENGTH)
+			throw new CorruptedFrameException("Invalid startup message length: " + length);
 
 		if (in.readableBytes() < length - 4) {
 			in.resetReaderIndex();
@@ -87,6 +94,9 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 		byte type = in.readByte();
 		int length = in.readInt();
 
+		if (length < 4 || length > MAX_MESSAGE_LENGTH)
+			throw new CorruptedFrameException("Invalid message length: " + length);
+
 		if (in.readableBytes() < length - 4) {
 			in.resetReaderIndex();
 			return; // Wait for full message
@@ -101,6 +111,7 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 				String name = readCString(in);
 				String query = readCString(in);
 				short paramCount = in.readShort();
+				if (paramCount < 0) throw new CorruptedFrameException("Negative paramCount: " + paramCount);
 				int[] paramTypes = new int[paramCount];
 				for (int i = 0; i < paramCount; i++) {
 					paramTypes[i] = in.readInt();
@@ -113,6 +124,7 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 				// Parameter format codes
 				short numParamFormats = in.readShort();
+				if (numParamFormats < 0) throw new CorruptedFrameException("Negative numParamFormats: " + numParamFormats);
 				short[] paramFormats = new short[numParamFormats];
 				for (int i = 0; i < numParamFormats; i++) {
 					paramFormats[i] = in.readShort();
@@ -120,12 +132,15 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 				// Parameter values
 				short numParams = in.readShort();
+				if (numParams < 0) throw new CorruptedFrameException("Negative numParams: " + numParams);
 				byte[][] paramValues = new byte[numParams][];
 				for (int i = 0; i < numParams; i++) {
 					int paramLen = in.readInt();
 					if (paramLen == -1) {
 						paramValues[i] = null; // NULL
 					} else {
+						if (paramLen < 0 || paramLen > MAX_MESSAGE_LENGTH)
+							throw new CorruptedFrameException("Invalid paramLen: " + paramLen);
 						paramValues[i] = new byte[paramLen];
 						in.readBytes(paramValues[i]);
 					}
@@ -133,6 +148,7 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 				// Result format codes
 				short numResultFormats = in.readShort();
+				if (numResultFormats < 0) throw new CorruptedFrameException("Negative numResultFormats: " + numResultFormats);
 				short[] resultFormats = new short[numResultFormats];
 				for (int i = 0; i < numResultFormats; i++) {
 					resultFormats[i] = in.readShort();
@@ -171,10 +187,12 @@ public class PgMessageDecoder extends ByteToMessageDecoder {
 
 	private String readCString(ByteBuf buf) {
 		int start = buf.readerIndex();
+		int limit = buf.writerIndex();
 		int end = start;
-		while (buf.getByte(end) != 0) {
+		while (end < limit && buf.getByte(end) != 0) {
 			end++;
 		}
+		if (end >= limit) throw new CorruptedFrameException("Unterminated C-string");
 		byte[] bytes = new byte[end - start];
 		buf.readBytes(bytes);
 		buf.readByte(); // consume null terminator
