@@ -3,6 +3,7 @@ package convex.core.cvm;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.function.LongFunction;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
@@ -32,6 +33,7 @@ import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.util.Counters;
@@ -251,12 +253,75 @@ public class State extends ARecordGeneric {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
+		// Network upgrades fire first, so the entire block (time update, scheduled
+		// and ordinary transactions) executes under the new protocol version
+		state = state.applyUpgrades(b.getTimeStamp());
 		AVector<ACell> globals=state.getGlobals();
-		long blockNum=getBlockNumber();
+		long blockNum=state.getBlockNumber();
 		state = state.withGlobals(globals.assoc(GLOBAL_BLOCK,CVMLong.create(blockNum+1)));
 		state = state.applyTimeUpdate(b.getTimeStamp());
 		state = state.applyScheduledTransactions();
 		return state;
+	}
+
+	/**
+	 * Applies any network upgrades due at the given block timestamp: pending
+	 * entries of the upgrade vector with {@code activation <= timestamp}, applied
+	 * in order, each advancing the protocol version watermark by one. This is a
+	 * no-op for states with no due upgrades (including all pre-upgrade states).
+	 * See UPGRADE.md.
+	 *
+	 * @param timestamp Timestamp of the Block being applied (consensus time)
+	 * @return Updated State, or this State if no upgrades are due
+	 * @throws UpgradeError if a due migration is missing from this release or
+	 *         fails. Deliberately an Error so it is never converted into an
+	 *         invalid-block result: it propagates to the peer layer, which
+	 *         withdraws from consensus until updated.
+	 */
+	public State applyUpgrades(long timestamp) {
+		return applyUpgrades(timestamp, Migrations::get);
+	}
+
+	/**
+	 * Applies due network upgrades from the given migration source. Testing seam:
+	 * normal execution uses the release's {@link Migrations} registry.
+	 *
+	 * @param timestamp Timestamp of the Block being applied
+	 * @param source Source of migrations by version index
+	 * @return Updated State, or this State if no upgrades are due
+	 */
+	State applyUpgrades(long timestamp, LongFunction<Migrations.Migration> source) {
+		// Version index being attempted, for error attribution
+		long version = 0;
+
+		// The ENTIRE upgrade machinery is guarded: no RuntimeException may escape as
+		// an Exception, or applyBlock's catch(Exception) would convert it into an
+		// invalid-block result — consensus history that a corrected release would
+		// replay differently. Any failure here (deterministic migration bug, malformed
+		// upgrade vector, or peer-local conditions such as MissingDataException)
+		// resolves to UpgradeError instead: produce no state, peer withdraws. True
+		// Errors (e.g. OutOfMemoryError) propagate unwrapped as fatal.
+		try {
+			State state = this;
+			while (true) {
+				// Re-read protocol globals each iteration: a migration may legitimately
+				// modify any part of the state, including the upgrade vector itself
+				version = state.getProtocolVersion();
+				AVector<CVMLong> upgrades = state.getUpgradeVector();
+				if (version >= upgrades.count()) return state; // nothing pending
+				long activation = ((CVMLong) upgrades.get(version)).longValue();
+				if (activation > timestamp) return state; // earliest pending upgrade not yet due
+
+				Migrations.Migration migration = source.apply(version);
+				if (migration == null) throw UpgradeError.missing(version + 1);
+				state = migration.apply(state);
+
+				// Advance the watermark: this is the protocol version increment
+				state = state.withProtocolGlobals(version + 1, state.getUpgradeVector());
+			}
+		} catch (RuntimeException e) {
+			throw UpgradeError.failed(version + 1, e);
+		}
 	}
 	
 	/**

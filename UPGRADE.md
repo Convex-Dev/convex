@@ -192,6 +192,8 @@ Upgrades are scheduled by a new **core function** (provisional name `schedule-up
 
 There is nothing to name or hash on-chain: migrations are selected purely by version number, bound positionally in JVM code. Trust derives from the governance-signed scheduling transaction and review of the release that ships the migration. The human-readable description of each upgrade lives in the release notes and `CHANGELOG.md`, keyed by version number; the on-chain record stays minimal.
 
+**Scheduling is deliberately decoupled from migration availability.** Validation is a pure function of *state* — it must never consult the local migration list, or transaction validity would depend on which release executes it and peers on different releases would fork. A peer supporting version N processes the scheduling of version N+1 like any other transaction, keeps operating normally while the entry is pending, and stops exactly at the transition block — which, by definition, it cannot run (missing migration → withdraw). Peers that updated in time apply it and continue.
+
 A useful defence-in-depth property: scheduling can only *time* migrations that exist in reviewed, released peer code. Compromise of a governance key alone cannot inject code into the network — it can only activate (or mis-time) something the release process already shipped.
 
 ### The `Migrations` class (JVM side)
@@ -252,18 +254,23 @@ Activations are non-decreasing, so "the entry at the watermark" is the entire se
 
 ### Failure modes
 
-Both ways application can fail resolve to the same behaviour: the peer **withdraws from consensus participation**.
+Every failure of upgrade application resolves to the same safe behaviour: **produce no state; the peer withdraws from consensus participation**. The governing rule: a failure must **never** become an invalid-block result. Invalid-block outcomes are consensus history, so a later release with a corrected migration would recompute those blocks differently on replay, splitting replay from the live network. By withdrawing, nothing is committed at the boundary; the corrected release then defines the single outcome — identical for rejoining peers and for replay from genesis.
 
-- **Missing migration.** The schedule is in state, so a peer *knows* an activation has arrived that its code version cannot apply. It produces no post-state, withdraws from the network, and logs a clear "update required" message. It rejoins automatically once running a release containing the migration — no divergence, only non-participation. It never guesses or skips.
-- **Failing migration.** A migration that throws also causes withdrawal. It must **not** become an invalid-block result: invalid-block outcomes are consensus history, so a later release with a corrected migration would recompute those blocks differently on replay, splitting replay from the live network. By withdrawing, nothing is committed at the boundary; the corrected release (carrying a fixed migration for the same version) then defines the single outcome — identical for rejoining peers and for replay from genesis. Implementation note: `applyBlock`'s catch-all (`State.java:203`) must not swallow upgrade failures; they surface to the peer layer, which withdraws.
+Failure classes (distinguished only for operator diagnostics — behaviour is identical):
 
-A deterministic migration bug therefore stalls the whole network at the boundary until a corrected release ships — deliberately: a stall is recoverable, divergence is not.
+- **Missing migration** (deterministic, network-relative). The schedule is in state, so a peer *knows* an activation has arrived that its code version cannot apply. It withdraws and logs "update required"; it rejoins automatically once running a release containing the migration. It never guesses or skips.
+- **Failing migration** (deterministic). A migration bug throws identically on every peer running that release: the whole network stalls at the boundary until a corrected release ships — deliberately, a stall is recoverable and divergence is not.
+- **Environmental failure** (peer-local). Conditions such as missing local store data fail only on the affected peer, which withdraws with the underlying cause preserved; resync-and-retry may succeed with no release change. Other peers proceed normally.
+
+Implementation contract: the **entire** upgrade machinery (vector reads, migration application, watermark advance) is guarded so that no exception escapes as a Java `Exception` — `applyBlock`'s catch-all (`State.java`) would convert it into exactly the forbidden invalid-block result. All failures surface as a dedicated `Error` (`UpgradeError`, carrying the version and cause) that passes through untouched to the peer layer. Fatal JVM conditions (e.g. out-of-memory) propagate unwrapped and use the peer's existing fatal handling.
 
 Scheduling-time validation (above) ensures the transition function never sees a mis-authored schedule — malformed activations and unauthorised calls are rejected before they reach it.
 
 ### Attestation (advisory)
 
 Peers advertise the highest protocol version their release supports — the length of the migration list — piggy-backed on status/handshake. This makes *readiness* visible before activation: operators can see what fraction of stake can apply a scheduled version and defer a planned activation if readiness is low. Attestation is advisory only — the binding signal is the on-chain schedule.
+
+A peer should also warn its own operator **as soon as** the on-chain schedule contains a version beyond its supported version — "upgrade to version N scheduled at T; this release supports N-1; update before T" — rather than waiting to withdraw at the boundary.
 
 ## Determinism and consistency
 
