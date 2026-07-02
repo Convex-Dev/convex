@@ -56,4 +56,21 @@ public class UpgradeError extends Error {
 	public long getVersion() {
 		return version;
 	}
+
+	/**
+	 * Is this a retryable, peer-local (environmental) failure rather than a
+	 * deterministic one?
+	 *
+	 * <p>A deterministic failure (missing migration, or a migration bug that throws
+	 * identically everywhere) requires a corrected release: retrying the same
+	 * release recomputes the same failure. A peer-local failure such as
+	 * {@link MissingDataException} — an incomplete store — may succeed on
+	 * resync-and-retry with no release change, and must not be treated as a
+	 * permanent freeze. See UPGRADE.md.</p>
+	 *
+	 * @return true if the peer may retry without a release change
+	 */
+	public boolean isRetryable() {
+		return getCause() instanceof MissingDataException;
+	}
 }

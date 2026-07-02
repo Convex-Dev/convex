@@ -148,11 +148,18 @@ public class BeliefPropagator extends AThreadedComponent {
 	private Consumer<Belief> beliefUpdateObserver;
 	
 	protected void loop() throws InterruptedException {
-		
+
 		// Wait for some new Beliefs to accumulate up to a given time
 		Belief incomingBelief = awaitBelief();
-		
-		// Try belief update. 
+
+		// If consensus is frozen pending a software upgrade, do no consensus work:
+		// no merge, no block proposal, no Order publication, no broadcast. Voting on
+		// order is independent of applying state, so a peer that froze only its state
+		// executor would keep rubber-stamping blocks past the boundary it cannot
+		// validate. Full freeze avoids that. See UPGRADE.md.
+		if (server.isConsensusHalted()) return;
+
+		// Try belief update.
 		// Might include new blocks published by the peer
 		// Returns true if peer's Order changed (and therefore needs immediate broadcast)
 		boolean updated= maybeUpdateBelief(incomingBelief);

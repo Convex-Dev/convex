@@ -24,6 +24,7 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
@@ -44,6 +45,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -875,6 +877,48 @@ public class Server implements Closeable {
 	 */
 	public boolean isRunning() {
 		return isRunning;
+	}
+
+	/**
+	 * Non-null if the peer has frozen consensus participation because a required
+	 * network upgrade cannot be applied by this release. See UPGRADE.md.
+	 */
+	private volatile UpgradeError consensusHalt = null;
+
+	/**
+	 * Freezes this peer's consensus participation due to a required upgrade this
+	 * release cannot apply. Both the CVM executor and the belief propagator check
+	 * {@link #isConsensusHalted()} and cease all consensus activity (state
+	 * application, belief merge, block proposal, Order publication) — a full
+	 * consensus freeze, so the peer never votes on or publishes anything past the
+	 * boundary it cannot validate. The server stays alive to serve queries and
+	 * report its condition. Idempotent: only the first halt is recorded.
+	 *
+	 * @param error The UpgradeError that triggered the freeze
+	 */
+	public void haltConsensus(UpgradeError error) {
+		if (consensusHalt == null) {
+			consensusHalt = error;
+			log.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
+					error.getVersion(), Migrations.MAX_VERSION);
+		}
+	}
+
+	/**
+	 * Checks whether this peer has frozen consensus participation pending a
+	 * software upgrade.
+	 * @return True if consensus is halted
+	 */
+	public boolean isConsensusHalted() {
+		return consensusHalt != null;
+	}
+
+	/**
+	 * Gets the UpgradeError that froze consensus, or null if not halted.
+	 * @return The halting UpgradeError, or null
+	 */
+	public UpgradeError getConsensusHalt() {
+		return consensusHalt;
 	}
 
 	public TransactionHandler getTransactionHandler() {
