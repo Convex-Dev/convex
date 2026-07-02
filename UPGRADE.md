@@ -283,11 +283,45 @@ Implementation contract: the **entire** upgrade machinery (vector reads, migrati
 
 Scheduling-time validation (above) ensures the transition function never sees a mis-authored schedule — malformed activations and unauthorised calls are rejected before they reach it.
 
+### What withdrawal means at the peer
+
+`UpgradeError` propagates out of block application to the peer's CVM executor. "Withdraw" is a **full consensus freeze**, and it must be full for a safety reason: a peer votes on block *order* (via belief merge/propagation) independently of applying *state*. A peer that stopped only state application while continuing to merge and publish its Order would keep voting to finalise blocks past the boundary it cannot state-validate — rubber-stamping. So withdrawal stops **both** the state executor **and** the belief propagator: the peer ceases to apply blocks, merge beliefs, propose blocks, and publish its Order. Its consensus state freezes at the last pre-boundary state.
+
+A withdrawn peer:
+
+- **Stops all consensus participation** (state + order). It never produces a post-boundary state and never signs or publishes anything asserting consensus past the boundary.
+- **Stays alive** for diagnostics: it continues to serve queries against its frozen state and reports its condition — "upgrade required: version N at T; this release supports M" — so operators see *why*, rather than finding a dead process. (Contrast the pre-upgrade behaviour, where any executor exception closed the whole server.)
+- **Withdraws its stake on a best-efforts basis.** A withdrawn peer's stake still counts toward the total that consensus thresholds are computed against, so a large withdrawn-but-still-staked cohort can prevent the *remaining* updated peers from reaching supermajority — turning one operator's missed update into a network-wide stall. To avoid this, a peer that detects it will withdraw should submit a transaction reducing its own peer stake below the effective threshold, so its weight leaves the active set. Details:
+  - **Timing — a randomised window before the activation.** Each withdrawing peer picks a random instant in a window (e.g. 5–10 minutes) *before* the activation timestamp and submits its unstake then. Before, so the transaction confirms while the peer can still transact (after the boundary it is frozen and too late); randomised, so a whole cohort does not unstake at one instant, which would itself jolt the consensus weighting. The offset is a peer-local operational choice (ordinary wall-clock scheduling of a normal transaction), not consensus state, so per-peer randomness is fine.
+  - **Never the last viable peer.** Unstaking must not drop the network below viable stake. The stake-reduction operation itself should error when it would remove the last effective peer, and best-efforts tolerates that error: the peer stays staked and freezes anyway (if it is the last peer and cannot upgrade, the network is already non-viable — shedding stake changes nothing for the better and destroying the last peer is strictly worse).
+  - **Conservative by design.** Auto-unstaking is economically significant (re-staking is a separate later action), so it is tied to the early, well-before-boundary signal and the randomised pre-window, never to a same-block trigger.
+
+### Recovery differs by cause
+
+- **Deterministic** (missing / failing migration): the cure is a corrected release. The peer freezes and does **not** auto-retry — retrying the same release recomputes the same failure. It rejoins after the operator updates and restarts; replay/sync then carries it past the boundary.
+- **Environmental** (peer-local, e.g. `MissingDataException` from an incomplete store): the cure may be resync-and-retry with **no release change**. This class must **not** be treated as a permanent freeze, or a transient local fault (or an induced one) becomes a permanent outage. The peer retries after acquiring the missing data, exactly as it would for missing data outside an upgrade.
+
+The cause is carried on the `UpgradeError`, so the peer layer selects freeze-until-update vs retryable without re-deriving it.
+
+### Early detection
+
+The schedule is consensus state and `MAX_VERSION` is a local constant, so the moment a scheduling transaction naming a version beyond this release lands, the peer already knows it will withdraw at that activation. It should act then, not at the boundary: warn the operator ("upgrade to version N scheduled at T; this release supports M; update before T"), and it is here — with lead time — that best-efforts stake withdrawal belongs.
+
 ### Attestation (advisory)
 
 Peers advertise the highest protocol version their release supports — the length of the migration list — piggy-backed on status/handshake. This makes *readiness* visible before activation: operators can see what fraction of stake can apply a scheduled version and defer a planned activation if readiness is low. Attestation is advisory only — the binding signal is the on-chain schedule.
 
 A peer should also warn its own operator **as soon as** the on-chain schedule contains a version beyond its supported version — "upgrade to version N scheduled at T; this release supports N-1; update before T" — rather than waiting to withdraw at the boundary.
+
+## Security: withdrawal as an attack surface
+
+Withdrawal is the primitive "make a peer stop participating in consensus", so it must not be an attacker's lever for a targeted denial of service or a network halt. The analysis:
+
+- **Not selectively targetable.** A deterministic `UpgradeError` (missing / failing migration) fires identically on every peer of a release, on an already-**finalised** block. An attacker cannot craft input that makes one honest peer withdraw while others continue — the trigger is a global, consensus-driven, deterministic event, not a function of any per-peer input.
+- **The schedule cannot be forged.** Withdrawal requires a scheduled upgrade, and scheduling requires a governance transaction (origin `< #8`). An attacker cannot inject a scheduled upgrade into a belief to induce withdrawal.
+- **Graceful freeze is not a new DoS.** The pre-upgrade behaviour on any executor exception was to close the whole server; a survivable, diagnosable freeze is no worse in severity and strictly better operationally.
+- **Environmental failures must stay retryable** (above). Treating a peer-local `MissingDataException` as a permanent freeze would let an induced transient fault become a permanent outage — a real amplification. This is why cause differentiation is a security requirement, not just ergonomics.
+- **Premature mass withdrawal via clock manipulation — deferred, tracked in [#595](https://github.com/Convex-Dev/convex/issues/595).** Block timestamps are proposer-set and `checkBlock` has no forward bound, so a staked peer proposing a far-future-dated block that reaches finality could jump the consensus clock past a scheduled activation, firing an upgrade before peers have updated → mass withdrawal. This is a **pre-existing** clock-manipulation weakness (it already wedges time-based schedules) that the upgrade mechanism amplifies; it is partly held by the trusted-well-staked-peer model and fully addressed by #595 (accept only near-future blocks into ordering, never confirm until the local clock is past, re-order earlier blocks ahead). Until then, governance must confirm attestation readiness and allow generous lead time before an activation window. Best-efforts stake withdrawal is deliberately tied to the *early* signal rather than the boundary, so a clock teleport — which collapses lead time — does not also trigger mass auto-unstaking.
 
 ## Determinism and consistency
 
@@ -369,7 +403,8 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 
 ## Remaining open questions
 
-- **Withdrawn-peer CPoS mechanics** — what a withdrawn peer does with its stake and belief signing while non-participating, and whether prolonged withdrawal interacts with any future slashing policy.
+- **Best-efforts stake withdrawal semantics** — the precise trigger point and transaction path for a withdrawing peer to shed its stake, and whether prolonged withdrawal interacts with any future slashing policy. (Full consensus freeze and cause-differentiated recovery are specified above; the automated unstaking path is the remaining detail.)
+- **Forward block-timestamp handling** — tracked separately in [#595](https://github.com/Convex-Dev/convex/issues/595); a prerequisite hardening for scheduling upgrades on a value-bearing network.
 - **Snapshot trust policy** — whether non-archival peers may sync from a snapshot without holding ancient migrations, and who blesses such snapshots.
 
 ## Implementation plan
@@ -404,7 +439,8 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 - **Migration purity.** A single impure migration forks the network. Mitigate with narrow, audited migrations, the purity contract, and the determinism tests.
 - **Buggy migration = network stall.** A throwing migration stalls the network at the boundary until a corrected release ships, making migration quality a release-blocking concern. Mitigate with the boundary/determinism test suite and rehearsal on testnet before scheduling on Protonet.
 - **Governance key compromise.** An attacker controlling a sub-`#8` account can schedule or unschedule upgrades — but can only activate migrations that already exist in released peer code; code injection additionally requires compromising the release process. Mitigate with controller-based multi-signature policies on the governance accounts.
-- **Readiness at activation.** If insufficient stake holds the migration, the network stalls at the boundary. Mitigate with attestation, generous activation notice, operator communication — or `unschedule-upgrade` before the boundary.
+- **Readiness at activation.** If insufficient stake holds the migration, the network stalls at the boundary — worsened if withdrawn peers keep their stake in the active set (see best-efforts stake withdrawal). Mitigate with attestation, generous activation notice, operator communication, best-efforts stake shedding — or `unschedule-upgrade` before the boundary.
+- **Premature activation via clock manipulation.** A future-dated block reaching finality can fire an upgrade before peers update (see Security). Pre-existing, amplified by upgrades; addressed by [#595](https://github.com/Convex-Dev/convex/issues/595). Until then, allow generous lead time and confirm attestation readiness.
 - **Bootstrap coordination.** Peers not yet on a mechanism-carrying release can follow neither the bootstrap scheduling transaction nor the boundary, and lack the withdraw behaviour — they fork rather than withdraw. Mitigate by upgrading effectively all stake to the mechanism release before scheduling v1. Keep the v1 migration minimal: core environment bindings, nothing else.
 - **Migration list growth.** Historical migrations accumulate in every release forever; accepted cost, revisit only alongside a snapshot-trust sync policy.
 
