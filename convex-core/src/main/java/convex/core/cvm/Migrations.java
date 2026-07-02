@@ -4,9 +4,11 @@ import java.util.List;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Core;
 
 /**
@@ -102,5 +104,44 @@ public class Migrations {
 	public static Migration get(long k) {
 		if ((k < 0) || (k >= MAX_VERSION)) return null;
 		return ALL.get((int) k);
+	}
+
+	/**
+	 * Describes a scheduled network upgrade that this release cannot apply. Unless
+	 * the peer software is upgraded first, the peer will withdraw from consensus at
+	 * the activation timestamp. See UPGRADE.md.
+	 */
+	public static final class UpgradeWarning {
+		/** Protocol version the scheduled upgrade will produce (exceeds MAX_VERSION). */
+		public final long version;
+		/** Consensus timestamp (ms) at which the upgrade activates. */
+		public final long activation;
+
+		UpgradeWarning(long version, long activation) {
+			this.version = version;
+			this.activation = activation;
+		}
+	}
+
+	/**
+	 * Detects the earliest scheduled upgrade beyond this release's supported version
+	 * ({@link #MAX_VERSION}). A pure function of the consensus State: the peer will
+	 * withdraw from consensus at the returned activation unless upgraded first.
+	 *
+	 * <p>The entry at index {@code MAX_VERSION} produces version {@code MAX_VERSION+1},
+	 * which {@link #get} cannot supply; it is the earliest unsupported entry and is
+	 * necessarily still pending, since a peer never advances its version beyond the
+	 * versions it supports.</p>
+	 *
+	 * @param state Consensus State to check
+	 * @return The earliest unsupported scheduled upgrade, or null if all are supported
+	 */
+	public static UpgradeWarning pendingBeyondSupport(State state) {
+		AVector<CVMLong> upgrades = state.getUpgradeVector();
+		if (MAX_VERSION < upgrades.count()) {
+			long activation = upgrades.get(MAX_VERSION).longValue();
+			return new UpgradeWarning(MAX_VERSION + 1, activation);
+		}
+		return null;
 	}
 }

@@ -949,6 +949,18 @@ public class Server implements Closeable {
 	}
 
 	/**
+	 * Gets the earliest scheduled network upgrade this release cannot apply, or null
+	 * if every scheduled upgrade is supported. If non-null, the peer will withdraw
+	 * from consensus at the returned activation timestamp unless the software is
+	 * upgraded first. A pure function of current consensus state, suitable for
+	 * health checks and operator tooling. See UPGRADE.md.
+	 * @return Pending unsupported upgrade warning, or null
+	 */
+	public Migrations.UpgradeWarning getUpgradeWarning() {
+		return Migrations.pendingBeyondSupport(getPeer().getConsensusState());
+	}
+
+	/**
 	 * Checks whether this peer has frozen consensus participation pending a
 	 * software upgrade.
 	 * @return True if consensus is halted

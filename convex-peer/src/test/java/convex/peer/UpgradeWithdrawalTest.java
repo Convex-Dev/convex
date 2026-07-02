@@ -83,6 +83,12 @@ public class UpgradeWithdrawalTest {
 
 			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
 
+			// Early detection: the peer already knows an unsupported upgrade is
+			// scheduled, well before the activation and before it withdraws.
+			convex.core.cvm.Migrations.UpgradeWarning warn = s.getUpgradeWarning();
+			assertEquals(2L, warn.version);
+			assertEquals(activation, warn.activation);
+
 			// Normal operation before the boundary: a transaction confirms, version stays 1
 			Result r = convex.transactSync("(def a 1)");
 			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
