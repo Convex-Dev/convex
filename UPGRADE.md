@@ -175,9 +175,7 @@ The applied prefix is **immutable forever**. Applying an upgrade changes nothing
 - Add `State.getProtocolVersion()` (the watermark; absent global → 0) and an upgrade-vector accessor (absent → empty), mirroring the existing `GLOBAL_*` accessors (`State.java:812`, `:901`).
 - This resolves the `// TODO: move to actor?` on `State.java:83`: the values stay in globals — consensus-critical, always present, native to read — rather than in any account's environment.
 
-**New networks** bake version `0` and an empty upgrade vector into `INITIAL_GLOBALS` (and the scheduling core function into core) at genesis. Changing `INITIAL_GLOBALS` changes the genesis hash, which is only permissible before a network exists.
-
-**Existing networks** (including Protonet) bootstrap via the mechanism itself: migrations operate on the *evolving* state, so the first migration installs the core function binding, and firing it extends the globals vector — version `1`, upgrade vector `[activation]`. The genesis hash is untouched, and replay reproduces the addition from the recorded upgrade. What must precede activation is the **activation hook in peer code** — a software release, not a state change. The bootstrap upgrade is the one permitted exception to on-chain scheduling (there is nowhere to schedule it yet): its activation is hardcoded per-network in the peer release that carries it, and once the globals exist the watermark ensures it never refires.
+**Genesis is never touched — on any network.** `Init` and `INITIAL_GLOBALS` remain exactly as they are (6 globals); every network, new or existing, starts at version `0` via the absent-reads-as-default rule. The protocol globals and the `schedule-upgrade` core binding are installed by **migration v1 (the bootstrap)**: migrations operate on the *evolving* state, so firing it extends the globals vector — version `1`, upgrade vector `[activation]` — and adds the core environment binding. Replay reproduces this from the recorded upgrade. What must precede activation is the **activation hook in peer code** — a software release, not a state change. The bootstrap upgrade is the one permitted exception to on-chain scheduling (there is nowhere to schedule it yet): its activation is hardcoded per-network in the peer release that carries it, and once the globals exist the watermark ensures it never refires. Bootstrap state changes need rigorous tests asserting the exact expected deltas.
 
 ### Scheduling: a native core function
 
@@ -343,7 +341,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 | Version semantics | Every upgrade increments the version by exactly 1 — the version *is* the watermark (the count of the applied prefix). Migrations are unnamed; identity is the version number, bound positionally in the `Migrations` class. |
 | CVM core changes | Three tiers: state-resident core (`core.cvx` bindings) → pure migration, no branching; native semantics (opcodes, juice, casts) → permanent version-keyed branches at narrow seams; encodings → permissive decoders, version-gated writing/canonicalisation. |
 | Etch interaction | Pure state migrations need none; store-format conversions are peer-local ops, not in-consensus. |
-| Bootstrap on existing networks | First migration installs the core function binding; firing it creates the globals (version `1`, vector `[activation]`). Coordinated by peer release (one-time exception to on-chain scheduling). |
+| Bootstrap | Uniform for **all** networks: genesis never carries the protocol globals — migration v1 extends the globals and installs the core function binding (version `1`, vector `[activation]`). Coordinated by peer release (one-time exception to on-chain scheduling). Genesis hash never changes, anywhere. |
 
 ## Remaining open questions
 
@@ -354,7 +352,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 
 Ordered so each step is independently testable and the genesis-affecting change lands once, early:
 
-1. **Protocol globals.** Wire `GLOBAL_PROTOCOL` (version, `Long`) and add the `upgrades` global (index 7): defaults `0` / `[]` in `INITIAL_GLOBALS`, `getProtocolVersion` (absent → 0), upgrade-vector accessor (absent → empty). Update genesis-hash-sensitive tests. *(Genesis-affecting for new networks — land before any new long-lived network is minted; existing networks take the bootstrap path.)*
+1. **Protocol global accessors.** `GLOBAL_UPGRADES=7` alongside `GLOBAL_PROTOCOL=6`; `getProtocolVersion` (absent → 0), upgrade-vector accessor (absent → empty). `INITIAL_GLOBALS` and genesis are **not** modified — every network starts at version 0 by default and is extended by migration v1.
 2. **`Migrations` class + `Migration` interface**, with a trivial identity migration for tests.
 3. **`schedule-upgrade` / `unschedule-upgrade` core functions**, with the sub-`#8` address gate and activation validation.
 4. **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
@@ -372,6 +370,7 @@ Ordered so each step is independently testable and the genesis-affecting change 
 - **Failing migration:** a migration that throws causes withdrawal (no post-state, no invalid-block result); after substituting a corrected migration for the same version, resumed execution and replay from genesis agree.
 - **Scheduling validation:** calls from addresses ≥ `#8` fail; non-future or decreasing activations are rejected; `unschedule-upgrade` removes the tail pending entry and the activation then passes without effect.
 - **Format invariants:** after arbitrary schedule/unschedule/apply sequences, the protocol globals satisfy the invariants (watermark bounds, non-decreasing activations, future-dated pending suffix, immutable applied prefix).
+- **Migration state deltas:** every migration (bootstrap included) has tests asserting the *exact* expected state changes — and that nothing else in the state changed (compare untouched subtrees by hash).
 
 Follow the project testing conventions: no `sleep`s and no fixed ports — wait on real signals (futures / sync APIs); a missing waitable is an API gap in the main code, not a reason to sleep.
 
@@ -386,4 +385,4 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 
 ## Status
 
-Design. Not yet implemented. The peer-code hook and (for new networks) the genesis protocol globals should be in place before launch, so the upgrade mechanism exists before it is first needed; existing networks adopt via the bootstrap path.
+Design. Not yet implemented. The peer-code hook should be in place before launch, so the upgrade mechanism exists before it is first needed; every network (new or existing) adopts via the uniform bootstrap path — genesis is never modified.
