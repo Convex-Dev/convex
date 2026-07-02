@@ -27,10 +27,11 @@ import convex.core.init.InitTest;
 @TestInstance(Lifecycle.PER_CLASS)
 public class ProtocolGlobalsTest {
 
-	State INIT_STATE = InitTest.createState();
+	// Shared static state: immutable, so safe to share across tests
+	static final State INIT_STATE = InitTest.STATE;
 
 	/** Timestamp of the initial test state */
-	final long TS = INIT_STATE.getTimestamp().longValue();
+	static final long TS = INIT_STATE.getTimestamp().longValue();
 
 	static AVector<CVMLong> upgrades(long... activations) {
 		AVector<CVMLong> v = Vectors.empty();
