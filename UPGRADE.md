@@ -403,7 +403,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 
 ## Remaining open questions
 
-- **Best-efforts stake withdrawal semantics** — the precise trigger point and transaction path for a withdrawing peer to shed its stake, and whether prolonged withdrawal interacts with any future slashing policy. (Full consensus freeze and cause-differentiated recovery are specified above; the automated unstaking path is the remaining detail.)
+- **Best-efforts stake withdrawal** — tracked in [#597](https://github.com/Convex-Dev/convex/issues/597). Full consensus freeze and cause-differentiated recovery are implemented; the automated unstaking path (randomised pre-window, never-last-peer) is the remaining detail. Until then, operators shed stake manually in response to the early warning.
 - **Forward block-timestamp handling** — tracked separately in [#595](https://github.com/Convex-Dev/convex/issues/595); a prerequisite hardening for scheduling upgrades on a value-bearing network.
 - **Snapshot trust policy** — whether non-archival peers may sync from a snapshot without holding ancient migrations, and who blesses such snapshots.
 
@@ -411,13 +411,15 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 
 Ordered so each step is independently testable and the genesis-affecting change lands once, early:
 
-1. **Protocol global accessors.** `GLOBAL_UPGRADES=7` alongside `GLOBAL_PROTOCOL=6`; `getProtocolVersion` (absent → 0), upgrade-vector accessor (absent → empty). `INITIAL_GLOBALS` and genesis are **not** modified — every network starts at version 0 by default and is extended by migration v1.
-2. **`Migrations` class + `Migration` interface**, with a trivial identity migration for tests.
-3. **`schedule-upgrade` / `unschedule-upgrade` core functions**, with the sub-`#8` address gate and activation validation.
-4. **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
-5. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
-6. **Attestation**: status advertisement of the highest supported protocol version.
-7. **First real upgrade** as validation: fix one of the dependent issues ([#533](https://github.com/Convex-Dev/convex/issues/533), [#528](https://github.com/Convex-Dev/convex/issues/528), [#354](https://github.com/Convex-Dev/convex/issues/354), [#208](https://github.com/Convex-Dev/convex/issues/208)) as a scheduled upgrade rather than a naive code change.
+1. ✅ **Protocol global accessors.** `GLOBAL_UPGRADES=7` alongside `GLOBAL_PROTOCOL=6`; `getProtocolVersion` (absent → 0), upgrade-vector accessor (absent → empty). `INITIAL_GLOBALS` and genesis are **not** modified — every network starts at version 0 by default and is extended by migration v1.
+2. ✅ **`Migrations` class + `Migration` interface**, with a trivial identity migration for tests.
+3. ✅ **`schedule-upgrade` / `unschedule-upgrade` core functions**, with the sub-`#8` address gate and activation validation.
+4. ✅ **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
+5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings; adopted fully on-chain.
+6. ✅ **Peer consensus freeze** (full freeze of executor + propagator) and **operator early-warning** on detection of an unsupported scheduled upgrade.
+7. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
+8. **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) and **forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)).
+9. **First real upgrade** as validation: fix one of the dependent issues ([#533](https://github.com/Convex-Dev/convex/issues/533), [#528](https://github.com/Convex-Dev/convex/issues/528), [#354](https://github.com/Convex-Dev/convex/issues/354), [#208](https://github.com/Convex-Dev/convex/issues/208)) as a scheduled upgrade rather than a naive code change.
 
 ## Testing strategy
 
@@ -446,4 +448,10 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 
 ## Status
 
-Design. Not yet implemented. The peer-code hook should be in place before launch, so the upgrade mechanism exists before it is first needed; every network (new or existing) adopts via the uniform bootstrap path — genesis is never modified.
+**Core mechanism implemented** on `develop` (convex-core + convex-peer): protocol globals, the `Migrations` registry, `applyUpgrades` in the transition function, the `schedule-upgrade` / `unschedule-upgrade` core functions, the v1 bootstrap migration, the peer consensus freeze, and operator early-warning — all with tests, including a deterministic end-to-end self-freeze. Genesis is never modified; every network adopts via the uniform on-chain bootstrap.
+
+Remaining before first production use:
+
+- **Versioned core-definition materialisation** (plan step 5) — closes the pre-activation decode-skew window; required before scheduling upgrades on a value-bearing network.
+- **Forward block-timestamp handling** — [#595](https://github.com/Convex-Dev/convex/issues/595).
+- **Best-efforts stake withdrawal** — [#597](https://github.com/Convex-Dev/convex/issues/597).

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Network upgrade mechanism (#413): protocol upgrades can be scheduled on-chain to activate at a consensus timestamp, applying a versioned state migration and incrementing the protocol version, without ever changing the genesis hash. New governance-gated core functions `schedule-upgrade` / `unschedule-upgrade` (callable only by system accounts below `#8`). A peer whose release cannot apply a scheduled upgrade warns its operator ahead of the activation, then cleanly withdraws from consensus at the boundary — staying available for queries rather than diverging — and rejoins after the software is updated. See `UPGRADE.md`.
+
 ### Changed
 
 ### Fixed
