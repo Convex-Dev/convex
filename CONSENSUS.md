@@ -21,12 +21,13 @@ ordering. Because every peer repeatedly adopts the majority view of others, orde
 converge exponentially fast; consensus is the fixed point of this merge.
 
 Confirmation proceeds through **consensus levels** (`CPoSConstants.CONSENSUS_LEVELS`
-= 4): level 0 is the raw Block vector; each higher level (proposal, consensus,
-finality) records the longest prefix on which peers holding at least
-`CONSENSUS_THRESHOLD` (2/3) of effective stake agree *at the previous level*
-(`BeliefMerge.updateLevel`). A Block prefix at the consensus level is executed against
-the State; finality follows one level later. The thresholds give classic BFT-style
-tolerance of up to 1/3 adversarial stake.
+= 4): level 0 is the raw Block vector, and each higher level records the longest
+prefix agreed by at least `CONSENSUS_THRESHOLD` (2/3) of effective stake *at the level
+below* (`BeliefMerge.updateLevel`) — **proposal** (1), **consensus** (2), **finality**
+(3), each necessarily a prefix of the one beneath it. The State is executed against the
+**finalised** prefix (`Peer.updateState` applies Blocks up to the finality point,
+Peer.java:499); consensus and proposal are the intermediate confirmations that precede
+it. The thresholds give classic BFT-style tolerance of up to 1/3 adversarial stake.
 
 **Effective stake** is not raw stake: `State.computeStakes()` (State.java:658) decays
 each peer's stake by time since it last produced a Block
@@ -95,45 +96,54 @@ rules because they compare Block time against *State* time — the same on every
 There is deliberately **no forward validity bound**: "too far in the future" is
 relative to the observer's clock, which differs between peers and between original
 execution and replay. A far-future Block cannot be *invalid* — but honest peers
-**decline to confirm it until their own clocks catch up**:
+**decline to advance consensus past it until their own clocks reach its timestamp**.
+The design is deliberately two-staged, separating the safety-critical core from the
+subtler liveness half.
 
-- In belief merge, `filterBlocks` (BeliefMerge.java:399, applied to the winning
-  ordering at :205) truncates the Block vector at the first Block whose timestamp
-  exceeds `wallClock + MAX_BLOCK_FORWARD`, never truncating below the current
-  consensus point (confirmed Blocks are immutable). Since `appendNewBlocks` keeps the
-  vector timestamp-sorted (stable sort, BeliefMerge.java:449), future Blocks are
-  always a suffix and truncation is clean.
-- The truncated ordering is what the peer both **proposes** and **votes** with
-  (`updateConsensus` runs on it), so a peer neither relays far-future Blocks in its
-  proposal nor contributes stake toward confirming them.
-- `appendNewBlocks` additionally drops far-future Blocks at admission (defence in
-  depth; a peer's own generated Blocks already carry its own clock).
+**Stage (i) — confirmation clamp (safety, minimal).** In belief merge, after
+`updateConsensus` computes this peer's consensus points (BeliefMerge.java:211), clamp
+each level's point so it never exceeds the length of the longest Block prefix all of
+whose timestamps lie within `wallClock + MAX_BLOCK_FORWARD` (the *horizon*), floored
+at the peer's current point so nothing is ever retracted. This is a small, monotone,
+purely local change: the peer publishes consensus points that never finalise — and so
+never execute — a future-dated Block.
 
-Why this is safe and live:
+Network confirmation at each level requires ≥2/3 effective stake to agree at the level
+below, and execution happens at finality, the top level. So if an honest supermajority
+clamps its points, **a future-dated Block cannot be finalised (hence cannot execute,
+hence cannot advance the consensus clock) before real time reaches its timestamp**, no
+matter who proposed it. The clock-teleport, and with it the #413-amplified mass
+withdrawal, is closed. Safety rests only on the 2/3 threshold and the standard
+honest-majority (< 1/3 adversarial stake) assumption. The clamp needs no global
+timestamp ordering of Blocks — the horizon is simply the first out-of-window Block
+scanned from the front, wherever it happens to sit.
 
-- **Safety.** Consensus requires a 2/3 stake supermajority on a common prefix. If
-  honest supermajority stake defers a future-dated Block, it cannot reach the
-  consensus level early, no matter who proposed it. The consensus clock therefore
-  advances **no faster than the wall clocks of a stake supermajority** (plus the skew
-  allowance) — the "clock teleport" degrades to ordinary real-time progression.
-- **Liveness.** The peer wall clock is forward-only, so each peer's truncation point
-  is monotonic: a Block deferred now is confirmed as soon as real time reaches its
-  timestamp. Nothing is retracted, no proposal flaps. Blocks within the skew
-  allowance are unaffected, so normal operation pays nothing.
-- **Convergence.** Peers with skewed clocks truncate at slightly different points,
-  but the merge already tolerates prefix disagreement at the unconfirmed tail;
-  agreement (and hence confirmation) happens on the intersection, which grows in real
-  time.
+Its accepted cost is a **liveness wedge under active attack**: because the
+out-of-window Block still occupies its position in the ordering, legitimate Blocks
+behind it also wait until the horizon advances past it. This is bounded (it clears as
+real time passes), attributable (the Block is signed by a staked peer) and punishable
+under governance. Safety is bought at the price of attack-time throughput behind the
+offending Block — an acceptable trade for the minimal, obviously-correct core.
+
+**Stage (ii) — ordering hygiene (liveness, subtle).** Removing out-of-window Blocks
+from the *unconfirmed tail* of the ordering (and re-admitting them once the clock
+catches up) so legitimate Blocks flow *around* a deferred one instead of queueing
+behind it. This is where `filterBlocks` (BeliefMerge.java:399, the reserved no-op
+stub) belongs. It rewrites the Block vector, so it interacts with proposal points,
+proposal-switching patience (`KEEP_PROPOSAL_TIME`), prefix scoring and re-admission
+ordering — none of it obvious. It is a follow-up, must ship with a belief-merge
+simulation suite, and is **not required for safety**.
 
 `MAX_BLOCK_FORWARD` is a small clock-skew allowance (order of seconds — generous for
 NTP-disciplined peers). Note the intentional asymmetry with the 15-minute backdate
-bound: the backward bound is state-relative and deterministic, the forward bound is
-wall-clock-relative and policy. They answer different questions and live on opposite
-sides of the determinism boundary.
+bound: the backward bound is state-relative and deterministic (a validity rule), the
+forward bound is wall-clock-relative and policy (a confirmation rule). They answer
+different questions and live on opposite sides of the determinism boundary.
 
-Status: design agreed; implementation tracked in
-[#595](https://github.com/Convex-Dev/convex/issues/595). Until it lands, the
-mitigation for upgrade scheduling is generous activation lead time (see UPGRADE.md).
+Status: design agreed; stage (i) tracked in
+[#595](https://github.com/Convex-Dev/convex/issues/595), stage (ii) as its liveness
+follow-up. Until stage (i) lands, the mitigation for upgrade scheduling is generous
+activation lead time (see UPGRADE.md).
 
 ## Security analysis
 
@@ -150,8 +160,9 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
 - **Clock teleport (future-dated Blocks).** A staked peer proposes a Block dated far
   in the future; if confirmed, `applyTimeUpdate` jumps consensus time, wedging
   schedules and — post-#413 — firing every scheduled network upgrade at once (mass
-  peer withdrawal). Mitigated by the confirmation-deferral policy above (#595). This
-  is the highest-priority open hardening before production upgrade scheduling.
+  peer withdrawal). Mitigated by the stage (i) confirmation clamp above (#595): an
+  honest 2/3 stake supermajority that refuses to finalise past its horizon prevents
+  the teleport. Highest-priority hardening before production upgrade scheduling.
 - **Backdated / replayed Blocks.** Bounded deterministically by `MAX_BLOCK_BACKDATE`
   and the per-peer monotonic Block timestamp rule (`checkBlock`). A Block cannot be
   resurrected outside the window or reordered within a peer's own sequence.
@@ -189,8 +200,10 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
 
 ### Known open items
 
-- **Forward-timestamp handling** — design above; implementation is
-  [#595](https://github.com/Convex-Dev/convex/issues/595).
+- **Forward-timestamp handling** — design above;
+  [#595](https://github.com/Convex-Dev/convex/issues/595). Stage (i) (confirmation
+  clamp) closes the safety hole; stage (ii) (ordering hygiene) is the liveness
+  follow-up.
 - **Best-efforts stake withdrawal before an unsupported upgrade** —
   [#597](https://github.com/Convex-Dev/convex/issues/597); prevents a
   withdrawn-but-still-staked cohort from stalling the remaining supermajority.
@@ -215,10 +228,11 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
 | Question | Decision |
 |---|---|
 | Forward bound: validity or confirmation policy? | **Confirmation policy** in belief merge. A wall-clock-dependent validity rule would break replay determinism — two honest peers could disagree on the same Block. |
-| Where does the forward bound live? | `filterBlocks` (the stub reserved for exactly this), applied to the winning ordering before proposal and voting; plus admission-time dropping in `appendNewBlocks`. |
+| Split into two stages? | **Yes.** Stage (i) is a monotone clamp on the peer's own consensus points after `updateConsensus` — minimal and obviously correct, and it alone closes the safety hole. Stage (ii) (ordering hygiene in `filterBlocks`) is the subtler liveness half and a separate follow-up, so fork-risky vector rewriting is not bundled with the safety fix. |
 | Symmetric with the backdate bound? | **No, deliberately.** Backdate is state-time-relative (deterministic, 15 min, lenient); forward is wall-clock-relative (policy, seconds, tight). |
-| Hard deterministic backstop (reject Blocks dated beyond state time + large constant)? | **No.** It reintroduces the determinism hazard for zero gain: the confirmation policy already prevents early confirmation, and a backstop could invalidate a legitimately-delayed Block on replay boundaries. |
-| Can deferral stall consensus? | No: truncation never goes below the consensus point, the bound grows monotonically with the forward-only peer clock, and in-allowance Blocks are unaffected. |
+| Hard deterministic backstop (reject Blocks dated beyond state time + large constant)? | **No.** It reintroduces the determinism hazard for zero gain: the confirmation clamp already prevents early execution, and a backstop could invalidate a legitimately-delayed Block on replay boundaries. |
+| Does stage (i) rely on Blocks being timestamp-sorted? | **No.** `appendNewBlocks` never globally re-sorts, so out-of-window Blocks are not necessarily a suffix. The horizon is the first out-of-window Block from the front; the clamp caps confirmation there regardless of position. |
+| Can the clamp stall consensus? | **Honest case, no** — it never retracts (monotone, floored at the current point) and in-window Blocks are unaffected. **Under active attack, yes, partially** — Blocks queued behind an out-of-window Block wait until the horizon advances. That wedge is bounded and attributable; stage (ii) removes even that. |
 
 ## Testing principles
 
