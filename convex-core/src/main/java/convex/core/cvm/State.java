@@ -777,13 +777,18 @@ public class State extends ARecordGeneric {
 	}
 	
 	/**
-	 * Compute the issued coin supply. This is the maximum supply cap minus the unissued coin balance.
+	 * Compute the issued coin supply. This is the maximum supply cap minus the unissued
+	 * coin balance held in the reserve governance accounts.
+	 *
+	 * Account #0 is the reward pool (issued coins in transit to peers via fees, see
+	 * {@link #distributeFees}), NOT unissued, so it is excluded — consistent with the
+	 * CVM `coin-supply` core function.
 	 *
 	 * @return The current Convex Coin Supply
 	 */
 	public long computeSupply() {
 		long supply=Constants.MAX_SUPPLY;
-		for (int i=0; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
+		for (int i=1; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
 			supply-=getAccounts().get(i).getBalance();
 		}
 		return supply;

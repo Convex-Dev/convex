@@ -33,7 +33,10 @@ import convex.core.util.Utils;
 public class Init {
 
 	/**
-	 *  Number of special "governance" accounts. These hold all unissued coins
+	 *  Number of special "governance" accounts (#0..#7). The reserve accounts (#2..#7)
+	 *  hold unissued coins; #0 is the reward pool (issued coins in transit to peers, see
+	 *  {@link convex.core.cvm.State#distributeFees}) and #1 is the zero-balance init
+	 *  account. Only the reserves count as unissued for supply purposes.
 	 */
 	public static final int NUM_GOVERNANCE_ACCOUNTS=8;
 	

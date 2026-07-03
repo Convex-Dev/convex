@@ -3402,14 +3402,21 @@ public abstract class CoreTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testTransferBurn() {
+	public void testTransferToRewardPool() {
+		// Account #0 is the reward pool, not a burn address: coins sent there are
+		// distributed to peers as rewards (see State.distributeFees), not destroyed.
+		// So a transfer to #0 moves coins user -> pool (both issued) and does NOT
+		// reduce issued supply. (#0 is excluded from both computeSupply and the CVM
+		// coin-supply.)
 		Context ctx=context();
 		long supply=ctx.getState().computeSupply();
 		long AMT=1000000;
-		
+
 		ctx=exec(ctx,"(transfer #0 "+AMT+")");
-		
-		assertEquals(supply-AMT,ctx.getState().computeSupply());
+
+		assertEquals(supply,ctx.getState().computeSupply());
+		// CVM coin-supply and Java computeSupply agree after the transfer (both exclude #0)
+		assertEquals(ctx.getState().computeSupply(),evalL(ctx,"(coin-supply)"));
 	}
 
 	@Test
