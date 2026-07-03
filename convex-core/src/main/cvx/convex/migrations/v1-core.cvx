@@ -8,6 +8,10 @@
 ;; Fixes #533: the variadic (5+ arg) arities of `update` and `update-in` dropped
 ;; the first extra argument `x`; `update-in`'s variadic arity additionally had a
 ;; parameter typo (`k` in the binding vector, `ks` in the body).
+;;
+;; Fixes #598 (1): quasiquote of a set/map containing an unquote produced a call-form
+;; list (e.g. `(hash-set ...)` as data) instead of the set/map. The set/map generator
+;; branches built `(list (quote hash-set) ...)` instead of a `(hash-set ...)` call.
 
 (defn update
   ^{:doc {:description "Update a value in a associative data structure by applying a function."
@@ -30,3 +34,48 @@
    (assoc-in m ks (f (get-in m ks) x)))
   ([m ks f x & more]
    (assoc-in m ks (apply f (get-in m ks) x more))))
+
+;; #598 (1): quasiquote set/map generators. Only the two collection branches change
+;; (set: `(cons 'hash-set es)`, map: `(cons 'hash-map es)`); the rest is verbatim from
+;; core.cvx so the migration redefines the whole binding.
+(def quasiquote* (fn [form depth]
+  (cond
+    (empty? form) (return nil)
+    (list? form)
+      (let [fst (first form)]
+        (cond
+          (= 'quasiquote fst)
+            (cond
+              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires 1 argument")
+              (let [snd (second form)
+                    ev (quasiquote* snd (inc depth))]
+                (cond
+                  (nil? ev) (return nil)
+                  (list 'list (quote 'quasiquote) ev))))
+          (= 'unquote fst)
+            (cond
+              (!= 2 (count form)) (fail :EXPAND "unquote requires 1 argument")
+              (let [snd (second form)]
+                (cond
+                  (> depth 1)
+                    (let [ev (quasiquote* snd (dec depth))]
+                      (cond (nil? ev) (return nil))
+                      (list 'list (quote 'unquote) ev))
+                  (nil? snd) (compile nil)
+                  snd)))
+          (let [es (qq-seq form depth)]
+            (cond (nil? es) (return nil))
+            (cons 'list es))))
+    (vector? form)
+      (let [es (qq-seq (vec form) depth)]
+        (cond (nil? es) (return nil))
+        (vec es))
+    (set? form)
+      (let [es (qq-seq (vec form) depth)]
+        (cond (nil? es) (return nil)
+              (cons 'hash-set es)))
+    (map? form)
+      (let [es (qq-seq (apply concat (vec form)) depth)]
+        (cond (nil? es) (return nil)
+              (cons 'hash-map es)))
+    nil)))

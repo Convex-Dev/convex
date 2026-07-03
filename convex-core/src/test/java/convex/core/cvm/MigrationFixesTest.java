@@ -47,6 +47,23 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testQuasiquoteSetMapFix() {
+		// #598 (1): quasiquote of a set/map containing an unquote must produce the
+		// set/map, not a call-form list. Buggy on genesis, fixed on the upgraded state.
+		assertFalse(eval(GENESIS, "(set? (quasiquote #{1 (unquote 2)}))").equals(convex.core.data.prim.CVMBool.TRUE));
+		assertEquals(convex.core.data.Sets.of(1L, 2L), eval(UPGRADED, "(quasiquote #{1 (unquote 2)})"));
+		assertEquals(convex.core.data.Maps.of(2L, 2L), eval(UPGRADED, "`{~(inc 1) 2}"));
+		// nested set with unquote
+		assertEquals(convex.core.data.Sets.of(1L, convex.core.data.Sets.of(2L)),
+				eval(UPGRADED, "(quasiquote #{1 #{(unquote 2)}})"));
+		// regressions: pure (no-unquote) and vector/list unchanged on both states
+		for (State s : new State[] { GENESIS, UPGRADED }) {
+			assertEquals(convex.core.data.Sets.of(1L, 2L), eval(s, "`#{1 2}"));
+			assertEquals(convex.core.data.Vectors.of(2L, 2L), eval(s, "`[~(inc 1) 2]"));
+		}
+	}
+
+	@Test
 	public void testUpdateVariadicFix() {
 		// #533: the 5+ arg arity dropped the first extra argument.
 		// (update {:a 0} :a + 1 2) => {:a (+ 0 1 2)} = {:a 3}, was {:a (+ 0 2)} = {:a 2}
