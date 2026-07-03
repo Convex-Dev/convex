@@ -12,6 +12,9 @@
 ;; Fixes #598 (1): quasiquote of a set/map containing an unquote produced a call-form
 ;; list (e.g. `(hash-set ...)` as data) instead of the set/map. The set/map generator
 ;; branches built `(list (quote hash-set) ...)` instead of a `(hash-set ...)` call.
+;;
+;; Fixes #598 (2): a top-level unquote of literal `false` (e.g. `~false) dropped to
+;; `(unquote false)` because qq* tested the generator for truthiness rather than nil.
 
 (defn update
   ^{:doc {:description "Update a value in a associative data structure by applying a function."
@@ -79,3 +82,11 @@
         (cond (nil? es) (return nil)
               (cons 'hash-map es)))
     nil)))
+
+;; #598 (2): qq* must test the generator for nil (the "no generator" sentinel), not
+;; truthiness — otherwise a literal `false` generator is dropped and the form is quoted.
+(def ^:private qq* (fn [form depth]
+  (let [qf (quasiquote* form depth)]
+    (cond
+      (nil? qf) (list 'quote form)
+      qf))))

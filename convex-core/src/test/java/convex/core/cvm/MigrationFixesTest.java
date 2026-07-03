@@ -2,6 +2,8 @@ package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,22 @@ public class MigrationFixesTest {
 		for (State s : new State[] { GENESIS, UPGRADED }) {
 			assertEquals(convex.core.data.Sets.of(1L, 2L), eval(s, "`#{1 2}"));
 			assertEquals(convex.core.data.Vectors.of(2L, 2L), eval(s, "`[~(inc 1) 2]"));
+		}
+	}
+
+	@Test
+	public void testQuasiquoteFalseFix() {
+		// #598 (2): top-level `~false dropped to (unquote false) instead of false.
+		// Buggy on genesis (returns the (unquote false) list), fixed on the upgraded state.
+		assertNotEquals(convex.core.data.prim.CVMBool.FALSE, eval(GENESIS, "`~false"));
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, "`~false"));
+		// false embedded in a list unquote resolves correctly on the upgraded state
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, "(nth `(a ~false b) 1)"));
+		// regressions on both states (only the literal-false top-level case was broken)
+		for (State s : new State[] { GENESIS, UPGRADED }) {
+			assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(s, "`~true"));
+			assertNull(eval(s, "`~nil"));
+			assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(s, "`~(= 1 2)"));
 		}
 	}
 
