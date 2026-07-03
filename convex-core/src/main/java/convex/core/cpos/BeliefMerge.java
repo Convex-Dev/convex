@@ -408,10 +408,60 @@ public class BeliefMerge {
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
 			long cp) {
-		// TODO (#595 stage (ii)): remove out-of-horizon Blocks from the unconfirmed tail
-		// so later valid Blocks are not wedged behind a deferred one. Stage (i) — the
-		// confirmation clamp in clampToTimeHorizon — already prevents confirming them.
-		return blks;
+		// #595 stage (ii): demote out-of-horizon Blocks to the back of the unconfirmed tail
+		// so a far-future Block does not wedge later in-horizon Blocks behind it (where the
+		// stage (i) clamp would otherwise stall confirmation at the future Block's position).
+		// Applied to the winning order before consensus is computed.
+		return demoteFutureBlocks(blks, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+	}
+
+	/**
+	 * #595 stage (ii): stably moves out-of-horizon Blocks to the back of the reorderable
+	 * region of a Block ordering.
+	 *
+	 * <p>Blocks in {@code [0, floor)} (the agreed prefix) are untouched. Within
+	 * {@code [floor, count)}, Blocks dated at or before {@code limit} keep their relative
+	 * order, and Blocks dated after {@code limit} are moved after them, also keeping their
+	 * relative order. This is a stable <em>partition</em>, not a sort: in-horizon Blocks
+	 * are never reordered by timestamp, so a peer cannot back-date a Block (within the
+	 * backdate window) to jump the queue — ordering position stays observation-based for
+	 * all but genuinely far-future Blocks, which are merely delayed. Because a peer's own
+	 * Blocks are timestamp-monotonic ({@code checkBlock}), this never reorders one peer's
+	 * Blocks relative to each other. See convex-core/docs/CONSENSUS.md.</p>
+	 *
+	 * @param blocks ordered Blocks
+	 * @param floor  first index eligible for reordering (the agreed prefix below is fixed)
+	 * @param limit  horizon timestamp; Blocks dated strictly after this are demoted
+	 * @return the reordered Blocks, or the same vector if nothing needs moving
+	 */
+	static AVector<SignedData<Block>> demoteFutureBlocks(AVector<SignedData<Block>> blocks, long floor, long limit) {
+		long n = blocks.count();
+
+		// First out-of-horizon Block in the reorderable region
+		long firstFuture = -1;
+		for (long i = Math.max(0, floor); i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() > limit) { firstFuture = i; break; }
+		}
+		if (firstFuture < 0) return blocks; // no future Blocks: nothing to do
+
+		// If no in-horizon Block follows it, the future Blocks already form a clean suffix
+		boolean needsReorder = false;
+		for (long i = firstFuture + 1; i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() <= limit) { needsReorder = true; break; }
+		}
+		if (!needsReorder) return blocks;
+
+		// Stable partition of [firstFuture, n): in-horizon Blocks first, then future Blocks
+		AVector<SignedData<Block>> result = blocks.slice(0, firstFuture);
+		for (long i = firstFuture; i < n; i++) {
+			SignedData<Block> b = blocks.get(i);
+			if (b.getValue().getTimeStamp() <= limit) result = result.conj(b);
+		}
+		for (long i = firstFuture; i < n; i++) {
+			SignedData<Block> b = blocks.get(i);
+			if (b.getValue().getTimeStamp() > limit) result = result.conj(b);
+		}
+		return result;
 	}
 
 	/**

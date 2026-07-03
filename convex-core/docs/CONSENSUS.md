@@ -125,14 +125,21 @@ real time passes), attributable (the Block is signed by a staked peer) and punis
 under governance. Safety is bought at the price of attack-time throughput behind the
 offending Block — an acceptable trade for the minimal, obviously-correct core.
 
-**Stage (ii) — ordering hygiene (liveness, subtle).** Removing out-of-window Blocks
-from the *unconfirmed tail* of the ordering (and re-admitting them once the clock
-catches up) so legitimate Blocks flow *around* a deferred one instead of queueing
-behind it. This is where `filterBlocks` (BeliefMerge.java:399, the reserved no-op
-stub) belongs. It rewrites the Block vector, so it interacts with proposal points,
-proposal-switching patience (`KEEP_PROPOSAL_TIME`), prefix scoring and re-admission
-ordering — none of it obvious. It is a follow-up, must ship with a belief-merge
-simulation suite, and is **not required for safety**.
+**Stage (ii) — ordering hygiene (liveness).** So a far-future Block does not wedge
+later in-horizon Blocks behind it, `filterBlocks` (BeliefMerge.java) **stably demotes
+out-of-window Blocks to the back of the unconfirmed tail** (`demoteFutureBlocks`),
+applied to the winning order before consensus is computed. It is a stable *partition*,
+deliberately **not a timestamp sort**: sorting by claimed timestamp would let a peer
+back-date a Block (within the 15-minute backdate window) to jump ahead of others — a
+timestamp-driven front-run. Instead, in-horizon Blocks keep their observation-based
+order and only genuinely far-future Blocks are moved (and merely delayed); because a
+peer's own Blocks are timestamp-monotonic, this never reorders one peer's own Blocks.
+Demoting overrides the adopted winning order for the future Blocks only, which is safe
+because stage (i)'s clamp guarantees such Blocks never gain proposal standing. The two
+stages compose: with the wedge gone, the clamp confirms up to the first *remaining*
+future Block — which now sits after the reordered in-horizon Blocks. Consider `[F, N]`
+with `F` far-future: stage (ii) reorders to `[N, F]`, then stage (i) finalises `N` and
+holds `F`.
 
 `MAX_BLOCK_FORWARD` is a small clock-skew allowance (order of seconds — generous for
 NTP-disciplined peers). Note the intentional asymmetry with the 15-minute backdate
@@ -140,10 +147,9 @@ bound: the backward bound is state-relative and deterministic (a validity rule),
 forward bound is wall-clock-relative and policy (a confirmation rule). They answer
 different questions and live on opposite sides of the determinism boundary.
 
-Status: design agreed; stage (i) tracked in
-[#595](https://github.com/Convex-Dev/convex/issues/595), stage (ii) as its liveness
-follow-up. Until stage (i) lands, the mitigation for upgrade scheduling is generous
-activation lead time (see UPGRADE.md).
+Status: both stages implemented ([#595](https://github.com/Convex-Dev/convex/issues/595)) —
+stage (i) the confirmation clamp (safety), stage (ii) the out-of-window demotion
+(liveness), each with belief-merge tests.
 
 ## Security analysis
 
@@ -200,10 +206,9 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
 
 ### Known open items
 
-- **Forward-timestamp handling** — design above;
-  [#595](https://github.com/Convex-Dev/convex/issues/595). Stage (i) (confirmation
-  clamp) closes the safety hole; stage (ii) (ordering hygiene) is the liveness
-  follow-up.
+- **Forward-timestamp handling** — implemented
+  ([#595](https://github.com/Convex-Dev/convex/issues/595)); stage (i) (confirmation
+  clamp, safety) and stage (ii) (out-of-window demotion, liveness). See the design above.
 - **Best-efforts stake withdrawal before an unsupported upgrade** — implemented
   ([#597](https://github.com/Convex-Dev/convex/issues/597)); a peer that cannot apply a
   scheduled upgrade sheds its own stake in a randomised pre-activation window, so a
@@ -230,11 +235,13 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
 | Question | Decision |
 |---|---|
 | Forward bound: validity or confirmation policy? | **Confirmation policy** in belief merge. A wall-clock-dependent validity rule would break replay determinism — two honest peers could disagree on the same Block. |
-| Split into two stages? | **Yes.** Stage (i) is a monotone clamp on the peer's own consensus points after `updateConsensus` — minimal and obviously correct, and it alone closes the safety hole. Stage (ii) (ordering hygiene in `filterBlocks`) is the subtler liveness half and a separate follow-up, so fork-risky vector rewriting is not bundled with the safety fix. |
+| Split into two stages? | **Yes.** Stage (i) is a monotone clamp on the peer's own consensus points after `updateConsensus` — minimal and obviously correct, and it alone closes the safety hole. Stage (ii) (out-of-window demotion in `filterBlocks`) is the subtler liveness half, developed and tested separately so fork-risky vector rewriting is not bundled with the safety fix. Both are now implemented. |
+| Stage (ii): sort the tail, or partition it? | **Stable partition, not a sort.** A timestamp sort makes claimed timestamp the ordering key, so a peer could back-date within the 15-min window to jump ahead of others (a timestamp-driven front-run). Demoting only out-of-window Blocks keeps in-horizon ordering observation-based (unchanged front-running properties) and merely delays the far-future Block — which is the intended penalty on its own proposer. |
+| Stage (ii): is overriding the adopted winning order safe? | **Yes, for out-of-window Blocks.** Stage (i)'s clamp guarantees a far-future Block never gains proposal/consensus standing, so it always sits in the raw reorderable tail; demoting it never disturbs an agreed prefix. The demotion is bounded below by the `floor` (the consensus point), which is never crossed. |
 | Symmetric with the backdate bound? | **No, deliberately.** Backdate is state-time-relative (deterministic, 15 min, lenient); forward is wall-clock-relative (policy, seconds, tight). |
 | Hard deterministic backstop (reject Blocks dated beyond state time + large constant)? | **No.** It reintroduces the determinism hazard for zero gain: the confirmation clamp already prevents early execution, and a backstop could invalidate a legitimately-delayed Block on replay boundaries. |
 | Does stage (i) rely on Blocks being timestamp-sorted? | **No.** `appendNewBlocks` never globally re-sorts, so out-of-window Blocks are not necessarily a suffix. The horizon is the first out-of-window Block from the front; the clamp caps confirmation there regardless of position. |
-| Can the clamp stall consensus? | **Honest case, no** — it never retracts (monotone, floored at the current point) and in-window Blocks are unaffected. **Under active attack, yes, partially** — Blocks queued behind an out-of-window Block wait until the horizon advances. That wedge is bounded and attributable; stage (ii) removes even that. |
+| Can the clamp stall consensus? | **Honest case, no** — it never retracts (monotone, floored at the current point) and in-window Blocks are unaffected. **Under active attack:** stage (i) alone would let Blocks queue behind an out-of-window Block until the horizon advances (bounded, attributable); stage (ii)'s demotion removes that wedge — in-horizon Blocks flow ahead of the far-future one and finalise normally. |
 
 ## Testing principles
 
