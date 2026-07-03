@@ -2151,6 +2151,14 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.mod(lb);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -2167,6 +2175,14 @@ public class Core {
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
+
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
 
 			AInteger result=la.div(lb);
 
@@ -2185,6 +2201,14 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.rem(lb);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -2202,8 +2226,16 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.quot(lb);
-	
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
