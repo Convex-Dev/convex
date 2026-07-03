@@ -3742,6 +3742,22 @@ public abstract class CoreTest extends ACVMTest {
 	}
 
 	@Test
+	public void testCannotEvictLastPeer() {
+		// Network-liveness guard: the sole remaining peer cannot be evicted, even by its
+		// controller (Context.evictPeer). Build a single-peer state and attempt eviction.
+		AccountKey pk = InitTest.FIRST_PEER_KEY;
+		State s = context().getState();
+		PeerStatus ps = s.getPeer(pk);
+		State single = s.withPeers(s.getPeers().empty().assoc(pk, ps));
+		assertEquals(1L, single.getPeers().count());
+
+		// As the peer's controller (so authorization passes), evicting the last peer fails
+		Context ctx = context().forkWithAddress(ps.getController()).withState(single);
+		assertStateError(step(ctx, "(evict-peer 0x"+pk.toHexString()+")"));
+		assertNotNull(ctx.getState().getPeer(pk)); // peer still present
+	}
+
+	@Test
 	public void testNumericComparisons() {
 		assertFalse(evalB("(== 1 2)"));
 		assertFalse(evalB("(== 1.0 2.0)"));
