@@ -1122,6 +1122,46 @@ public class Core {
 		}
 	});
 
+	/**
+	 * Returns a fresh Symbol, optionally given a name prefix (Symbol, Keyword or
+	 * String): {@code (gensym 'n)} yields e.g. {@code n__4821}. Intended for macros
+	 * that introduce bindings into expansion templates, guaranteeing freshness per
+	 * expansion so user symbols cannot be captured.
+	 *
+	 * <p>The uniqueness counter is the juice consumed so far in the current context:
+	 * deterministic (juice consumption is part of consensus execution), O(1), and
+	 * requiring no additional accounting. Juice for the call is charged <em>before</em>
+	 * the counter is read, so successive calls always observe strictly increasing
+	 * values — two gensyms in one transaction can never collide.</p>
+	 *
+	 * <p>NOT part of the genesis environment: installed into the core environment by
+	 * the v1 upgrade migration (see UPGRADE.md).</p>
+	 */
+	public static final CoreFn<Symbol> GENSYM = regNonGenesis(new CoreFn<>(Symbols.GENSYM,503) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length > 1) return context.withArityError(rangeArityMessage(0, 1, args.length));
+
+			AString prefix;
+			if (args.length == 1) {
+				prefix = RT.name(args[0]);
+				if (prefix == null) return context.withCastError(0, args, Types.SYMBOL);
+			} else {
+				prefix = Strings.create("g");
+			}
+
+			// Charge juice BEFORE reading the juice counter: a call is never free, so
+			// the observed value is strictly monotonic across calls within a transaction
+			context = context.consumeJuice(Juice.SIMPLE_FN);
+			if (context.isExceptional()) return context;
+
+			Symbol sym = Symbol.create(prefix.toString() + "__" + context.getJuiceUsed());
+			if (sym == null) return context.withArgumentError("gensym name too long, must be at most " + Constants.MAX_NAME_LENGTH + " characters");
+			return context.withResult(sym);
+		}
+	});
+
 	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER,65) {
 		
 		@Override

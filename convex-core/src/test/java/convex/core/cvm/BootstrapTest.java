@@ -69,15 +69,17 @@ public class BootstrapTest {
 		assertSame(scheduled.getSchedule(), migrated.getSchedule());
 		assertSame(scheduled.getGlobals(), migrated.getGlobals());
 
-		// Within #8: exactly the two bindings and their :static metadata added
+		// Within #8: exactly the three bindings and their :static metadata added
 		AccountStatus pre = scheduled.getAccount(Core.CORE_ADDRESS);
 		AccountStatus post = migrated.getAccount(Core.CORE_ADDRESS);
-		assertEquals(pre.getEnvironment().count() + 2, post.getEnvironment().count());
-		assertEquals(pre.getMetadata().count() + 2, post.getMetadata().count());
+		assertEquals(pre.getEnvironment().count() + 3, post.getEnvironment().count());
+		assertEquals(pre.getMetadata().count() + 3, post.getMetadata().count());
 		assertSame(Core.SCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.SCHEDULE_UPGRADE));
 		assertSame(Core.UNSCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.UNSCHEDULE_UPGRADE));
+		assertSame(Core.GENSYM, post.getEnvironmentValue(Symbols.GENSYM));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.SCHEDULE_UPGRADE).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.UNSCHEDULE_UPGRADE).get(Keywords.STATIC));
+		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.GENSYM).get(Keywords.STATIC));
 		assertEquals(pre.getBalance(), post.getBalance());
 		assertEquals(pre.getSequence(), post.getSequence());
 

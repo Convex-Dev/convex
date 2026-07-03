@@ -351,6 +351,7 @@ public class Symbols {
 	public static final Symbol UPGRADES = intern("upgrades");
 	public static final Symbol SCHEDULE_UPGRADE = intern("schedule-upgrade");
 	public static final Symbol UNSCHEDULE_UPGRADE = intern("unschedule-upgrade");
+	public static final Symbol GENSYM = intern("gensym");
 	public static final Symbol CREATE = intern("create");
 	public static final Symbol BLOCK = intern("block");
 

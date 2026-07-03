@@ -107,9 +107,10 @@ public class Migrations {
 	 * date without leaving known bugs for a later upgrade. Specifically it:
 	 *
 	 * <ol>
-	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} core
-	 * bindings (CoreFn singletons, marked {@code :static}; these cannot be defined
-	 * in Lisp), enabling future upgrades to be scheduled on-chain; and</li>
+	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} /
+	 * {@code gensym} core bindings (CoreFn singletons, marked {@code :static};
+	 * these cannot be defined in Lisp), enabling future upgrades to be scheduled
+	 * on-chain and macros to introduce hygienic bindings; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core)
 	 * and #528 ({@code add-mint} in the {@code convex.fungible} library).</li>
 	 * </ol>
@@ -133,11 +134,13 @@ public class Migrations {
 			AHashMap<Symbol, ACell> env = core.getEnvironment();
 			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
 			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
+			env = env.assoc(Symbols.GENSYM, Core.GENSYM);
 
 			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
 			AHashMap<ACell, ACell> staticMeta = Maps.of(Keywords.STATIC, CVMBool.TRUE);
 			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
+			meta = meta.assoc(Symbols.GENSYM, staticMeta);
 
 			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
 

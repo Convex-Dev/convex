@@ -171,6 +171,37 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testGensym() {
+		// gensym is NOT part of the genesis environment; the v1 upgrade installs it
+		assertTrue(evalErrors(GENESIS, "(gensym)"));
+
+		// Fresh Symbol with the default prefix, and with Symbol / Keyword / String prefixes
+		ACell g = eval(UPGRADED, "(gensym)");
+		assertTrue(g instanceof Symbol);
+		assertTrue(((Symbol) g).getName().toString().startsWith("g__"));
+		assertTrue(((Symbol) eval(UPGRADED, "(gensym 'n)")).getName().toString().startsWith("n__"));
+		assertTrue(((Symbol) eval(UPGRADED, "(gensym :k)")).getName().toString().startsWith("k__"));
+		assertTrue(((Symbol) eval(UPGRADED, "(gensym \"s\")")).getName().toString().startsWith("s__"));
+
+		// Successive gensyms are always distinct: juice is charged before the counter
+		// is read, so the observed value is strictly monotonic within a transaction
+		convex.core.data.AVector<?> pair = (convex.core.data.AVector<?>) eval(UPGRADED, "[(gensym) (gensym)]");
+		assertNotEquals(pair.get(0), pair.get(1));
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, "(not (= (gensym 'n) (gensym 'n)))"));
+
+		// Deterministic: identical code on the same state yields identical symbols
+		assertEquals(eval(UPGRADED, "[(gensym) (gensym 'x)]"), eval(UPGRADED, "[(gensym) (gensym 'x)]"));
+
+		// Usable as a hygienic binding introduced into a constructed form
+		assertEquals(CVMLong.create(7), eval(UPGRADED, "(let [v (gensym 'v)] (eval `(let [~v 7] ~v)))"));
+
+		// Error cases: bad arity, non-named prefix, prefix too long for a Symbol name
+		assertTrue(evalErrors(UPGRADED, "(gensym 'a 'b)"));
+		assertTrue(evalErrors(UPGRADED, "(gensym 42)"));
+		assertTrue(evalErrors(UPGRADED, "(gensym \"" + "a".repeat(128) + "\")"));
+	}
+
+	@Test
 	public void testDocsPreserved() {
 		// The migration redefines via defn with metadata, so docstrings survive
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update)))"));
