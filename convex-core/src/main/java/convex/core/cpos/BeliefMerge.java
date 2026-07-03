@@ -210,6 +210,16 @@ public class BeliefMerge {
 
 		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
+		// #595 stage (i): clamp our consensus points to our clock horizon, so we never
+		// confirm (and therefore never execute) a Block dated beyond our own clock plus
+		// the skew allowance. An honest 2/3 stake supermajority doing this prevents a
+		// future-dated Block from teleporting the consensus clock and firing scheduled
+		// upgrades early. The scan floor is our PREVIOUS finality point (updateConsensus
+		// may have just advanced finality past a future Block, so we must not trust the
+		// new finality). See convex-core/docs/CONSENSUS.md.
+		consensusOrder = clampToTimeHorizon(consensusOrder,
+				myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
 		Index<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
 			// We have a different Order to propose
@@ -398,8 +408,60 @@ public class BeliefMerge {
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
 			long cp) {
-		// TODO Filter from consensus point onwards
+		// TODO (#595 stage (ii)): remove out-of-horizon Blocks from the unconfirmed tail
+		// so later valid Blocks are not wedged behind a deferred one. Stage (i) — the
+		// confirmation clamp in clampToTimeHorizon — already prevents confirming them.
 		return blks;
+	}
+
+	/**
+	 * #595 stage (i): clamps an Order's consensus points (proposal / consensus /
+	 * finality) so that none exceeds the number of leading Blocks whose timestamps are
+	 * within this peer's wall clock plus {@link CPoSConstants#MAX_BLOCK_FORWARD}. Level
+	 * 0 (the Block count) is untouched — the Blocks remain in the ordering, they are
+	 * simply not confirmed.
+	 *
+	 * @param order the Order whose (freshly computed) consensus points are to be clamped
+	 * @param finalisedFloor the peer's PREVIOUS finality point, used as the scan floor.
+	 *        Blocks below it were finalised while within the horizon, and the peer clock
+	 *        only advances, so they remain within it — safe to skip. Crucially this must
+	 *        be the previous finality, not {@code order}'s: {@code updateConsensus} may
+	 *        have just advanced finality past a future-dated Block, which the scan must
+	 *        still catch.
+	 *
+	 * <p>Monotone: the horizon is always at least {@code finalisedFloor} (Blocks below it
+	 * are within the horizon), so clamping to it never lowers finality below the
+	 * previously finalised point — finality only ever advances, just no faster than the
+	 * clock. Needs no timestamp ordering of Blocks: the horizon is simply the first
+	 * out-of-window Block scanned forward from the floor, wherever it sits.</p>
+	 */
+	private Order clampToTimeHorizon(Order order, long finalisedFloor) {
+		long[] cps = order.getConsensusPoints(); // a mutable clone
+		AVector<SignedData<Block>> blocks = order.getBlocks();
+		long n = blocks.count();
+		long limit = getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD;
+
+		// Horizon: first Block index at or after the previously-finalised prefix that is
+		// dated beyond the clock allowance.
+		long horizon = n;
+		for (long i = finalisedFloor; i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() > limit) {
+				horizon = i;
+				break;
+			}
+		}
+		if (horizon >= n) return order; // nothing beyond the horizon: no clamp needed
+
+		// Clamp confirmation levels (proposal..finality) down to the horizon. Level 0
+		// (Block count) is preserved by withConsensusPoints.
+		boolean changed = false;
+		for (int level = 1; level < CPoSConstants.CONSENSUS_LEVELS; level++) {
+			if (cps[level] > horizon) {
+				cps[level] = horizon;
+				changed = true;
+			}
+		}
+		return changed ? order.withConsensusPoints(cps) : order;
 	}
 
 	/**

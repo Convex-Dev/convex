@@ -244,6 +244,39 @@ public class BeliefVotingTest {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Test public void testForwardBlockClamp() throws BadSignatureException, InvalidDataException {
+		// #595 stage (i): a peer must not finalise a Block dated beyond its own clock plus
+		// MAX_BLOCK_FORWARD, even when the stake vote would otherwise confirm it.
+		SignedData<Block> near = bl(1);          // timestamp 1 — within the clock horizon
+		SignedData<Block> far  = bl(1_000_000);  // timestamp 1_000_000 — far in the future
+
+		// All six equal-stake peers fully agree on [near, far] (proposal and consensus = 2)
+		SignedData<Order>[] os = new SignedData[6];
+		for (int i = 0; i < 6; i++) os[i] = or(i, TS, 2, 2, near, far);
+		Belief b = Belief.create(os);
+
+		// Control: with a peer clock past both timestamps, the vote finalises BOTH Blocks —
+		// so it is the clamp, not the vote, that holds finality back below.
+		Order full = BeliefMerge.create(b, kps[0], 2_000_000, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, full.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Peer clock at TS=0: the far Block is beyond wallClock + MAX_BLOCK_FORWARD, so
+		// finality is clamped to the near Block only, though both Blocks stay in the ordering.
+		Order clamped = BeliefMerge.create(b, kps[0], TS, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, clamped.getBlockCount());
+		assertEquals(1, clamped.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Just short of the far Block's timestamp: still clamped to the near Block.
+		Order still = BeliefMerge.create(b, kps[0], 1_000_000 - CPoSConstants.MAX_BLOCK_FORWARD - 1,
+				initialState).merge().getOrder(keys[0]);
+		assertEquals(1, still.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Once the clock reaches the far Block's timestamp, both Blocks finalise.
+		Order advanced = BeliefMerge.create(b, kps[0], 1_000_000, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, advanced.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+	}
+
+	@SuppressWarnings("unchecked")
 	private SignedData<Order> or(int peer, long ts, int pp, int cp, SignedData<Block>... blks) {
 		Order o=Order.create(pp, cp, blks).withTimestamp(TS);
 		return kps[peer].signData(o);
