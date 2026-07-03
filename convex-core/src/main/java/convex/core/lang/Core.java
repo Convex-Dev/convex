@@ -2087,12 +2087,20 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES,162) {
-		
+
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			// All arities OK
 			long cost=Juice.precostNumericLinear(args);
 			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			// Protocol v1+: also charge the O(n*m) multiplicative cost so big-integer
+			// multiplication is not a cheap juice DoS. Version-gated because juice cost is
+			// consensus-critical (tier-2 transition function): pre-v1 fee computation is
+			// unchanged, so existing v0 states replay identically. Args are numeric here
+			// (cost >= 0); doubles are O(1) and charged only linearly. (#603, cf #599)
+			if (context.getState().getProtocolVersion() >= 1) {
+				cost=Juice.add(cost, Juice.precostNumericMultiply(args));
+			}
 			if (cost>0) {
 				context=context.consumeJuice(cost);
 				if (context.isExceptional()) return context; // not not exceptional, might be something else
