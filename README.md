@@ -2,7 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 
-**Convex** is a decentralised network and execution platform that powers the Internet of Value. It realises the vision of a true **Stateful Internet**, where the network itself securely hosts, executes, and persists both code and data.
+**Convex** is a decentralised network and execution platform. It realises the vision of a true **Stateful Internet**, where the network itself securely hosts, executes, and persists both code and data on a self-sovereign-federated basis.
 
 Convex provides a full-stack platform for decentralised applications and programmable economic systems that manage digital assets. Ownership of accounts and assets is cryptographically enforced and can be governed (optionally) through smart contracts.
 
