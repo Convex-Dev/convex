@@ -268,6 +268,45 @@ public class MigrationFixesTest {
 		}
 	}
 
+	/** Core symbols whose docstrings are corrected by the v1 metadata migration (#600). */
+	static final String[] META_FIXED = {
+		"address", "apply", "bit-not", "call*", "comp", "concat", "create-peer", "empty",
+		"get-holding", "hash", "keccak256", "sha256", "inc", "map", "merge", "reduce",
+		"signum", "symbol", "get-peer-stake", "set-peer-stake"
+	};
+
+	@Test
+	public void testMetadataCorrections() {
+		// #600: docstring corrections applied via no-value `def` in the v1 migration.
+		for (String s : META_FIXED) {
+			// Invariant: ONLY :doc changed — every other metadata key (notably :static)
+			// is preserved exactly. This guards the no-value-def / full-replace mechanism.
+			assertEquals(eval(GENESIS,  "(dissoc (lookup-meta '" + s + ") :doc)"),
+			             eval(UPGRADED, "(dissoc (lookup-meta '" + s + ") :doc)"),
+			             () -> "non-:doc metadata changed for " + s);
+			// The :doc genuinely changed on the upgraded state
+			assertNotEquals(eval(GENESIS,  "(:doc (lookup-meta '" + s + "))"),
+			                eval(UPGRADED, "(:doc (lookup-meta '" + s + "))"),
+			                () -> ":doc not changed for " + s);
+		}
+
+		// Values are preserved (no-value def): the functions still work on the upgrade
+		assertEquals(CVMLong.create(6), eval(UPGRADED, "(bit-not (bit-not 6))"));
+		assertEquals(CVMLong.create(3), eval(UPGRADED, "(reduce + 0 [1 2])"));
+		assertEquals(Reader.read("(2 3)"), eval(UPGRADED, "(map inc '(1 2))"));
+
+		// Spot-check specific corrections landed on the upgraded state
+		assertEquals(1L, ((CVMLong) eval(UPGRADED,
+			"(count (:params (first (:signature (:doc (lookup-meta 'bit-not))))))")).longValue());
+		assertTrue(eval(UPGRADED, "(:description (:doc (lookup-meta 'symbol)))").toString().contains("128"));
+		assertFalse(eval(UPGRADED, "(str (:doc (lookup-meta 'merge)))").toString().contains("not Indexes"));
+
+		// Genesis retains the original (buggy) docs — proving genesis is unmodified
+		assertEquals(2L, ((CVMLong) eval(GENESIS,
+			"(count (:params (first (:signature (:doc (lookup-meta 'bit-not))))))")).longValue());
+		assertTrue(eval(GENESIS, "(:description (:doc (lookup-meta 'symbol)))").toString().contains("64"));
+	}
+
 	@Test
 	public void testDocsPreserved() {
 		// The migration redefines via defn with metadata, so docstrings survive

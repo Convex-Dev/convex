@@ -111,8 +111,9 @@ public class Migrations {
 	 * {@code gensym} core bindings (CoreFn singletons, marked {@code :static};
 	 * these cannot be defined in Lisp), enabling future upgrades to be scheduled
 	 * on-chain and macros to introduce hygienic bindings; and</li>
-	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core)
-	 * and #528 ({@code add-mint} in the {@code convex.fungible} library).</li>
+	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
+	 * #600 (core docstring corrections) and #528 ({@code add-mint} in the
+	 * {@code convex.fungible} library).</li>
 	 * </ol>
 	 *
 	 * <p>The protocol globals already exist when this fires: they were created by
@@ -123,6 +124,9 @@ public class Migrations {
 		/** Core function fixes applied as part of v1 (#533: update / update-in). */
 		private static final CodeMigration CORE_FIXES =
 				new CodeMigration(Core.CORE_ADDRESS, "/convex/migrations/v1-core.cvx");
+		/** Core docstring corrections applied as part of v1 (#600). */
+		private static final CodeMigration META_FIXES =
+				new CodeMigration(Core.CORE_ADDRESS, "/convex/migrations/v1-metadata.cvx");
 		/** convex.fungible library fixes applied as part of v1 (#528: add-mint). */
 		private static final AList<ACell> FUNGIBLE_FIXES =
 				readResource("/convex/migrations/v1-fungible.cvx");
@@ -144,8 +148,9 @@ public class Migrations {
 
 			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
 
-			// 2. Apply known core function fixes (#533)
+			// 2. Apply known core function fixes (#533) and docstring corrections (#600)
 			s = CORE_FIXES.apply(s);
+			s = META_FIXES.apply(s);
 
 			// 3. Apply known library fixes (#528). Resolve the library address via CNS so
 			// this works on any network that has it; skip if absent.
