@@ -9,11 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Network upgrade mechanism (#413): protocol upgrades can be scheduled on-chain to activate at a consensus timestamp, applying a versioned state migration and incrementing the protocol version, without ever changing the genesis hash. New governance-gated core functions `schedule-upgrade` / `unschedule-upgrade` (callable only by system accounts below `#8`). A peer whose release cannot apply a scheduled upgrade warns its operator ahead of the activation, then cleanly withdraws from consensus at the boundary — staying available for queries rather than diverging — and rejoins after the software is updated. The first (v1) upgrade additionally fixes `update` / `update-in` for 5+ arguments (#533) and `convex.fungible` `add-mint` to allow unlimited minting when `:max-supply` is unspecified (#528). See `UPGRADE.md`.
+- Network upgrade mechanism (#413): protocol upgrades can be scheduled on-chain to activate at a consensus timestamp, applying a versioned state migration and incrementing the protocol version, without ever changing the genesis hash. New governance-gated core functions `schedule-upgrade` / `unschedule-upgrade` (callable only by system accounts below `#8`). A peer whose release cannot apply a scheduled upgrade warns its operator ahead of the activation, then cleanly withdraws from consensus at the boundary — staying available for queries rather than diverging — and rejoins after the software is updated. The first (v1) upgrade also bundles every core bug fix known at this point, so activating the mechanism brings a network fully up to date rather than leaving known bugs for a later upgrade (see **Changed** and **Fixed** below). See `UPGRADE.md`.
+- `gensym` core function, installed at protocol v1: returns a fresh, unique symbol (optionally with a name prefix), so macros can introduce bindings that cannot capture user symbols (#598, #602).
 
 ### Changed
 
+- Multiply (`*`) now charges juice proportional to the O(n·m) cost of big-integer multiplication, from protocol v1 — closing a juice under-charge that let large multiplications run far more cheaply than the work they cost. `+` and `-` are unaffected (their cost is genuinely linear) (#603).
+
 ### Fixed
+
+- `update` / `update-in` now apply all arguments in their 5-or-more argument arities (previously the first extra argument was dropped, and `update-in`'s variadic arity errored). Activates at protocol v1 (#533).
+- `convex.fungible` `add-mint` allows unlimited minting when `:max-supply` is unspecified, instead of defaulting the cap to zero and blocking all mints. Activates at protocol v1 (#528).
+- Convex Lisp correctness fixes, activating at protocol v1: quasiquote of sets/maps containing unquotes now produces the set/map rather than a call-form list; a top-level `` `~false `` yields `false`; `define` no longer evaluates its value twice; `call` with the wrong number of arguments is an `:ARITY` error instead of silently expanding to `nil`; and `dotimes` accepts any count expression, not only a literal (#598).
+- `for`, `for-loop` and `switch` no longer capture user bindings that collide with their internal loop variables (macro hygiene). Activates at protocol v1 (#602).
+- Core function docstrings: around twenty corrections where the documented behaviour contradicted the implementation — including `bit-not` arity, `comp` composition order, `map` / `empty` return types, and the `symbol` name-length limit. Activates at protocol v1 (#600).
+- Integer `div`, `quot` and `rem` now return correct results for negative divisors and big-integer operands, with `div` applying Euclidean division consistently (#599).
+- `Shutdown.addHook` no longer races on its shared hook map under concurrent registration, which could throw or lose a hook when multiple servers or nodes launched in parallel (#604).
+- `set-peer-data` now updates the peer named by its key argument, which was previously ignored (the peer was derived from the caller's own key). A no-change `set-stake` / `set-peer-stake` returns `0` rather than a stale value; a wrong-length peer key is consistently an `:ARGUMENT` error rather than `:CAST`; and several arity error messages that reported the wrong argument count are corrected (#601).
 
 ## [0.8.6] - 2026-06-22
 
