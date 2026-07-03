@@ -574,7 +574,7 @@ public class Core {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
-			if (n != 2) return context.withArityError(this.exactArityMessage(3, n));
+			if (n != 2) return context.withArityError(this.exactArityMessage(2, n));
 
 			// get timestamp target
 			CVMLong tso = RT.ensureLong(args[0]);
@@ -662,7 +662,7 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n<1)||(n>3)) {
-				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
+				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 3)");
 			}
 
 			AFn<ACell> expander;
@@ -1168,8 +1168,10 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
@@ -1185,9 +1187,11 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			
-			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			// Security: Consume juice first, since eviction can potentially use arbitrary juice
 			// We still want juice to be paid in case of any error
 			context=context.consumeJuice(Juice.PEER_UPDATE);
@@ -1202,11 +1206,13 @@ public class Core {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(1, args.length));
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey peerKey=RT.ensureAccountKey(args[0]);
-			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey peerKey = AccountKey.create(b);
+			if (peerKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			AHashMap<ACell, ACell> data = RT.ensureHashMap(args[1]);
 			if (data == null) return context.withCastError(1,args, Types.MAP);
 			
@@ -1223,10 +1229,12 @@ public class Core {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
-			AccountKey peerKey=RT.ensureAccountKey(args[0]);
-			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey peerKey = AccountKey.create(b);
+			if (peerKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			CVMLong newStake = RT.ensureLong(args[1]);
 			if (newStake == null) return context.withCastError(1,args, Types.LONG);
 			long targetStake=newStake.longValue();
@@ -1435,7 +1443,7 @@ public class Core {
 			ACell result= args[1];
 
 			// we set the target account holdings for the currently executing account
-			// might return NOBODY if account does not exist
+			// the target account need not exist — setting a holding for any address is allowed (#601)
 			context=(Context) context.setHolding(address,result);
 			if (context.isExceptional()) return (Context) context;
 
@@ -2858,7 +2866,7 @@ public class Core {
 		@Override
 		public  Context invoke(Context ctx, ACell[] args) {
 			int ac=args.length;
-			if ((ac<2)||(ac > 3)) return ctx.withArityError(exactArityMessage(3, ac));
+			if ((ac<2)||(ac > 3)) return ctx.withArityError(rangeArityMessage(2, 3, ac));
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];

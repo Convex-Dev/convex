@@ -2011,7 +2011,7 @@ public class Context {
 		long currentStake=ps.getDelegatedStake(staker);
 		long delta=newStake-currentStake;
 
-		if (delta==0) return this; // no change
+		if (delta==0) return withResult(CVMLong.ZERO); // no change: nothing transferred (#601)
 		
 		// need to check sufficient balance if increasing stake
 		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Delegated Stake to "+newStake);
@@ -2054,8 +2054,8 @@ public class Context {
 		long balance=getBalance(controller);
 		long currentStake=ps.getPeerStake();
 		long delta=newStake-currentStake;
-		
-		if (delta==0) return this; // no change
+
+		if (delta==0) return withResult(CVMLong.ZERO); // no change: nothing transferred (#601)
 		
 		// need to check sufficient balance if increasing stake
 		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Peer Stake to "+newStake);
@@ -2158,15 +2158,13 @@ public class Context {
 	 */
 	public Context setPeerData(AccountKey peerKey, AHashMap<ACell, ACell> data) {
 		State s=getState();
-
-		// get the callers account and account status
 		Address address = getAddress();
-		AccountStatus as = getAccountStatus(address);
 
-		AccountKey ak = as.getAccountKey();
-		if (ak == null) return withError(ErrorCodes.STATE,"The account signing this transaction must have a public key");
-		PeerStatus ps=s.getPeer(ak);
-		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for this account and account key: "+ak.toChecksumHex());
+		// Resolve and controller-check the NAMED peer, consistent with setPeerStake.
+		// Previously the peerKey argument was ignored and the peer was derived from the
+		// caller's own account key, so the documented parameter had no effect (#601).
+		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
 		if (!ps.getController().equals(address)) return withError(ErrorCodes.STATE,"Current address "+address+" is not the controller of this peer account");
 
 		Hash lastStateHash = s.getHash();
@@ -2174,8 +2172,8 @@ public class Context {
 		// at the moment only :url is used in the data map
 		AHashMap<ACell,ACell> newMeta=data;
 		PeerStatus updatedPeer=ps.withPeerData(newMeta);
-		s=s.withPeer(ak, updatedPeer); // adjust peer
-		
+		s=s.withPeer(peerKey, updatedPeer); // adjust peer
+
 		// if no change just return the current context
 		if (lastStateHash.equals(s.getHash())){
 			return this;
@@ -2186,7 +2184,8 @@ public class Context {
 
 
 	/**
-	 * Sets the holding for a specified target account. Returns NOBODY exception if account does not exist.
+	 * Sets the holding for a specified target account. The target account need not
+	 * exist — a holding may be set for any address (this is deliberate).
 	 * @param targetAddress Account address at which to set the holding
 	 * @param value Value to set for the holding.
 	 * @return Updated context

@@ -3441,6 +3441,9 @@ public abstract class CoreTest extends ACVMTest {
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStakeShares());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
 			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalBalance());
+
+			// #601: a no-change update returns 0 (nothing transferred), not the stale argument
+			assertCVMEquals(0L, eval(rc,"(set-stake my-peer 1000000)"));
 		}
 
 		// staking on an account key that isn't a peer
@@ -3531,7 +3534,12 @@ public abstract class CoreTest extends ACVMTest {
 		assertEquals(STK*3,ps.getPeerStake());
 		assertEquals(STK*3,ps.getTotalStakeShares());
 		assertEquals(STK*3,ps.getBalance());
-		
+
+		// #601: a no-change update returns 0 (nothing transferred), not the stale argument
+		assertCVMEquals(0L, eval(ctx,"(set-peer-stake "+KEY+" "+STK*3+")"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(set-peer-stake 0x1234 0)"));
+
 		// Check we can't set nonsensical stakes
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" 999999999999999999)"));
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" (+ 1 "+STK*3+" *balance*))"));
@@ -3569,6 +3577,18 @@ public abstract class CoreTest extends ACVMTest {
 			assertNull(ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname());
         }
 
+		// #601: the peer-key argument is honoured regardless of the caller's own *key*.
+		// Change the controller's key so it differs from the peer key; updating the peer
+		// BY KEY still works (the old code derived the peer from the caller's key and failed).
+		{
+			Context ck = ctx.forkWithAddress(InitTest.FIRST_PEER_ADDRESS);
+			ck = step(ck, "(set-key 0x0000000000000000000000000000000000000000000000000000000000000001)");
+			assertNotError(ck);
+			ck = step(ck, "(set-peer-data peer-key {:url \"by-arg:1234\"})");
+			assertNotError(ck);
+			assertEquals("by-arg:1234", ck.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
+		}
+
 		assertNull(eval(ctx, "(set-peer-data peer-key nil)"));
 		
 		assertCastError(step(ctx, "(set-peer-data peer-key :fail)"));
@@ -3587,6 +3607,8 @@ public abstract class CoreTest extends ACVMTest {
 		assertCastError(step(ctx,"(set-peer-data peer-key :bad-key)"));
 		assertCastError(step(ctx,"(set-peer-data 12 {})"));
 		assertCastError(step(ctx,"(set-peer-data nil {})"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(set-peer-data 0x1234 {})"));
 		
 		assertArityError(step(ctx,"(set-peer-data)"));
 		assertArityError(step(ctx,"(set-peer-data peer-key)"));
@@ -3676,7 +3698,8 @@ public abstract class CoreTest extends ACVMTest {
 		}
 		
 		assertCastError(step("(evict-peer nil)"));
-		assertCastError(step("(evict-peer 0x)"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob); non-blobs remain :CAST
+		assertArgumentError(step("(evict-peer 0x)"));
 		assertCastError(step("(evict-peer [])"));
 		assertArityError(step("(evict-peer :foo :bar)"));
 		assertArityError(step("(evict-peer)"));
