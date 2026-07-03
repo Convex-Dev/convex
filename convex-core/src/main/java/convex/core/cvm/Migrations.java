@@ -1,15 +1,20 @@
 package convex.core.cvm;
 
+import java.io.IOException;
 import java.util.List;
 
+import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Core;
+import convex.core.lang.Reader;
+import convex.core.util.Utils;
 
 /**
  * Registry of network upgrade migrations.
@@ -80,11 +85,44 @@ public class Migrations {
 	}
 
 	/**
+	 * A migration that evaluates CVM forms from a classpath resource in the context
+	 * of a given account, mirroring how genesis loads {@code core.cvx}. Used to
+	 * redefine core (or actor) functions from a resource kept separate from the
+	 * genesis sources, so the genesis hash is unchanged. See UPGRADE.md.
+	 */
+	static final class CodeMigration implements Migration {
+		private final Address account;
+		private final AList<ACell> forms;
+
+		CodeMigration(Address account, String resource) {
+			this.account = account;
+			try {
+				this.forms = Reader.readAll(Utils.readResourceAsString(resource));
+			} catch (IOException e) {
+				throw new ExceptionInInitializerError("Missing migration resource: " + resource);
+			}
+		}
+
+		@Override
+		public State apply(State preState) {
+			Context ctx = Context.create(preState, account, Constants.MAX_TRANSACTION_JUICE);
+			for (ACell form : forms) {
+				ctx = ctx.expandCompile(form);
+				if (ctx.isExceptional()) throw new IllegalStateException("Migration compile failed for " + form + ": " + ctx.getValue());
+				ctx = ctx.exec((AOp<?>) ctx.getResult());
+				if (ctx.isExceptional()) throw new IllegalStateException("Migration exec failed for " + form + ": " + ctx.getValue());
+			}
+			return ctx.getState();
+		}
+	}
+
+	/**
 	 * The ordered migration list: entry {@code k} produces protocol version
 	 * {@code k+1}. Append-only — never reorder, remove or edit released entries.
 	 */
 	private static final List<Migration> ALL = List.of(
-			new Bootstrap()	// v1: schedule-upgrade / unschedule-upgrade core bindings
+			new Bootstrap(),                                              // v1: scheduling core bindings
+			new CodeMigration(Core.CORE_ADDRESS, "/convex/migrations/v2.cvx") // v2: update/update-in fixes (#533)
 	);
 
 	/**
@@ -104,6 +142,30 @@ public class Migrations {
 	public static Migration get(long k) {
 		if ((k < 0) || (k >= MAX_VERSION)) return null;
 		return ALL.get((int) k);
+	}
+
+	/**
+	 * Applies every migration this release carries, in order, returning the fully
+	 * upgraded State at protocol version {@link #MAX_VERSION}, with the protocol
+	 * globals set to record all upgrades as applied.
+	 *
+	 * <p>This builds a State at the latest protocol version <em>directly</em>,
+	 * without scheduling and activating each upgrade through consensus — intended
+	 * for tests and tooling that need the upgraded semantics (e.g. verifying a
+	 * migration's fixes). Production networks reach the same state via on-chain
+	 * scheduling; genesis itself is never modified. See UPGRADE.md.</p>
+	 *
+	 * @param state Starting State (typically genesis at version 0)
+	 * @return Fully upgraded State at version MAX_VERSION
+	 */
+	public static State applyAll(State state) {
+		long ts = state.getTimestamp().longValue();
+		AVector<CVMLong> upgrades = state.getUpgradeVector();
+		for (long k = state.getProtocolVersion(); k < MAX_VERSION; k++) {
+			state = get(k).apply(state);
+			upgrades = upgrades.conj(CVMLong.create(ts)); // recorded as applied at current time
+		}
+		return state.withProtocolGlobals(MAX_VERSION, upgrades);
 	}
 
 	/**

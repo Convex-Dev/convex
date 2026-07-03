@@ -41,6 +41,20 @@ public class ApplyUpgradesTest {
 	}
 
 	/**
+	 * A State at {@link Migrations#MAX_VERSION} (all supported upgrades applied) with
+	 * one further upgrade pending at the given activation. That pending upgrade
+	 * produces version {@code MAX_VERSION + 1}, which the real registry cannot supply
+	 * — i.e. a missing migration regardless of how many migrations this release adds.
+	 */
+	static State beyondSupportState(long activation) {
+		long m = Migrations.MAX_VERSION;
+		AVector<CVMLong> v = Vectors.empty();
+		for (long i = 0; i < m; i++) v = v.conj(CVMLong.create(TS - 1000)); // applied prefix
+		v = v.conj(CVMLong.create(activation)); // one pending beyond support
+		return INIT_STATE.withProtocolGlobals(m, v);
+	}
+
+	/**
 	 * Test migration source: migration for version k+1 encodes its order of
 	 * application into the global fees: fees = fees * 10 + (k+1)
 	 */
@@ -144,10 +158,10 @@ public class ApplyUpgradesTest {
 		UpgradeError e = assertThrows(UpgradeError.class, () -> pending.applyUpgrades(activation, NONE));
 		assertEquals(1L, e.getVersion());
 
-		// The real registry carries only v1: a due version 2 is a missing migration
-		State pendingV2 = INIT_STATE.withProtocolGlobals(1, upgrades(TS - 1000, activation));
-		UpgradeError e2 = assertThrows(UpgradeError.class, () -> pendingV2.applyUpgrades(activation));
-		assertEquals(2L, e2.getVersion());
+		// The real registry carries up to MAX_VERSION: version MAX_VERSION+1 is missing
+		State pendingBeyond = beyondSupportState(activation);
+		UpgradeError e2 = assertThrows(UpgradeError.class, () -> pendingBeyond.applyUpgrades(activation));
+		assertEquals(Migrations.MAX_VERSION + 1, e2.getVersion());
 	}
 
 	@Test
@@ -165,21 +179,21 @@ public class ApplyUpgradesTest {
 		// The critical replay-consistency property: a due-but-unavailable upgrade
 		// must NOT become an invalid-block result via applyBlock's catch(Exception).
 		// It must propagate as an Error for the peer layer to handle (withdraw).
-		// The real registry carries only v1, so a due version 2 is missing.
+		// A version beyond MAX_VERSION is a missing migration in the real registry.
 		long activation = TS + 1000;
-		State pending = INIT_STATE.withProtocolGlobals(1, upgrades(TS - 1000, activation));
+		State pending = beyondSupportState(activation);
 
 		Block b = Block.of(activation); // empty block at the activation boundary
 		SignedData<Block> sb = InitTest.FIRST_PEER_KEYPAIR.signData(b);
 
 		UpgradeError e = assertThrows(UpgradeError.class, () -> pending.applyBlock(sb));
-		assertEquals(2L, e.getVersion());
+		assertEquals(Migrations.MAX_VERSION + 1, e.getVersion());
 
 		// Before activation the same block machinery applies cleanly
 		Block early = Block.of(activation - 1);
 		SignedData<Block> sbEarly = InitTest.FIRST_PEER_KEYPAIR.signData(early);
 		State after = pending.applyBlock(sbEarly).getState();
-		assertEquals(1L, after.getProtocolVersion());
+		assertEquals(Migrations.MAX_VERSION, after.getProtocolVersion());
 		StateTest.doStateTests(after);
 	}
 

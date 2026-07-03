@@ -17,6 +17,7 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.UpgradeError;
@@ -63,15 +64,17 @@ public class UpgradeWithdrawalTest {
 	public void testSelfFreezeAtBoundaryDeterministic() throws Exception {
 		// End-to-end: a live peer freezes ITSELF when consensus crosses the activation
 		// of an upgrade this release cannot apply. Driven deterministically by an
-		// injected clock — no wall-clock waiting. The genesis is crafted post-bootstrap
-		// (version 1) with a version-2 upgrade pending in the future; version 2 has no
-		// migration in this release (MAX_VERSION == 1), so crossing it must freeze.
-		State base = Init.createState(List.of(PEER_KP.getAccountKey()));
-		long t0 = base.getTimestamp().longValue();
-		long applied = t0;            // v1, already applied at/before genesis time
-		long activation = t0 + 100_000; // v2, pending well in the future
-		State genesis = base.withProtocolGlobals(1,
-				convex.core.data.Vectors.of(CVMLong.create(applied), CVMLong.create(activation)));
+		// injected clock — no wall-clock waiting. The genesis is the fully upgraded
+		// state (all migrations applied, at MAX_VERSION) with one further upgrade
+		// pending in the future; that version (MAX_VERSION+1) has no migration in this
+		// release, so crossing it must freeze.
+		long supported = Migrations.MAX_VERSION;
+		long unsupported = supported + 1;
+		State upgraded = Migrations.applyAll(Init.createState(List.of(PEER_KP.getAccountKey())));
+		long t0 = upgraded.getTimestamp().longValue();
+		long activation = t0 + 100_000;
+		State genesis = upgraded.withProtocolGlobals(supported,
+				upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
 
 		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
 		Server s = servers.get(0);
@@ -85,29 +88,29 @@ public class UpgradeWithdrawalTest {
 
 			// Early detection: the peer already knows an unsupported upgrade is
 			// scheduled, well before the activation and before it withdraws.
-			convex.core.cvm.Migrations.UpgradeWarning warn = s.getUpgradeWarning();
-			assertEquals(2L, warn.version);
+			Migrations.UpgradeWarning warn = s.getUpgradeWarning();
+			assertEquals(unsupported, warn.version);
 			assertEquals(activation, warn.activation);
 
-			// Normal operation before the boundary: a transaction confirms, version stays 1
+			// Normal operation before the boundary: a transaction confirms, version unchanged
 			Result r = convex.transactSync("(def a 1)");
 			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
-			assertEquals(1L, s.getPeer().getConsensusState().getProtocolVersion());
+			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 			assertFalse(s.isConsensusHalted());
 
 			// Advance the clock past the activation. The next block is timestamped at
-			// or beyond the activation, so applying it fires the (missing) version-2
-			// upgrade first — deterministically, from the controlled timestamp.
+			// or beyond the activation, so applying it fires the (missing) upgrade
+			// first — deterministically, from the controlled timestamp.
 			clock.set(activation + 1);
 			convex.transact("(def b 2)"); // fire-and-forget: this block never commits
 
 			// Wait on the real halt signal (guaranteed to occur)
 			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
-			assertEquals(2L, halt.getVersion());
+			assertEquals(unsupported, halt.getVersion());
 			assertTrue(s.isConsensusHalted());
 
-			// The peer stayed at version 1 and never applied the version-2 boundary
-			assertEquals(1L, s.getPeer().getConsensusState().getProtocolVersion());
+			// The peer stayed at the supported version and never applied the boundary
+			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 
 			// Still alive for queries against the frozen state; b was never defined
 			assertFalse(convex.querySync("a").isError());

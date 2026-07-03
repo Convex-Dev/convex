@@ -57,7 +57,14 @@ public class InitTest extends ACVMTest {
 	 * Standard Genesis state used for testing
 	 */
 	public static final State STATE= createState();
-	
+
+	/**
+	 * Standard genesis state with all network upgrades applied, at the latest
+	 * protocol version ({@link convex.core.cvm.Migrations#MAX_VERSION}). Use this
+	 * to test behaviour introduced by migrations (e.g. bug fixes) that is not yet
+	 * present in genesis. See UPGRADE.md.
+	 */
+	public static final State UPGRADED = convex.core.cvm.Migrations.applyAll(STATE);
 
 
 	public static State createState() {

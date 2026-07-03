@@ -1,0 +1,32 @@
+;; Network upgrade migration v2 — core function fixes (see UPGRADE.md).
+;;
+;; Applied by the upgrade mechanism to the core environment (account #8),
+;; redefining the affected functions. Deliberately NOT part of core.cvx / genesis:
+;; existing networks keep their genesis hash and reach these fixes at protocol
+;; version 2 via a scheduled upgrade.
+;;
+;; Fixes #533: the variadic (5+ arg) arities of `update` and `update-in` dropped
+;; the first extra argument `x`; `update-in`'s variadic arity additionally had a
+;; parameter typo (`k` in the binding vector, `ks` in the body).
+
+(defn update
+  ^{:doc {:description "Update a value in a associative data structure by applying a function."
+          :examples    [{:code "(update {:count 1} :count inc)"}]
+          :signature   [{:params [m k f & args]}]}}
+  ([m k f]
+   (assoc m k (f (get m k))))
+  ([m k f x]
+   (assoc m k (f (get m k) x)))
+  ([m k f x & more]
+   (assoc m k (apply f (get m k) x more))))
+
+(defn update-in
+  ^{:doc {:description "Update a value in a nested associative data structure by applying a function."
+          :examples    [{:code "(update-in {:count 1} [:count] inc)"}]
+          :signature   [{:params [m ks f & args]}]}}
+  ([m ks f]
+   (assoc-in m ks (f (get-in m ks))))
+  ([m ks f x]
+   (assoc-in m ks (f (get-in m ks) x)))
+  ([m ks f x & more]
+   (assoc-in m ks (apply f (get-in m ks) x more))))
