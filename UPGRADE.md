@@ -415,11 +415,11 @@ Ordered so each step is independently testable and the genesis-affecting change 
 2. ✅ **`Migrations` class + `Migration` interface**, with a trivial identity migration for tests.
 3. ✅ **`schedule-upgrade` / `unschedule-upgrade` core functions**, with the sub-`#8` address gate and activation validation.
 4. ✅ **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
-5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings; adopted fully on-chain.
+5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings *and* fixes all bugs known at genesis (#533 `update`/`update-in`, #528 `add-mint`), so 0→1 brings a network fully up to date in one step; adopted fully on-chain. A single fix is never its own protocol version.
 6. ✅ **Peer consensus freeze** (full freeze of executor + propagator) and **operator early-warning** on detection of an unsupported scheduled upgrade.
 7. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
 8. **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) and **forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)).
-9. **First real upgrade** as validation: fix one of the dependent issues ([#533](https://github.com/Convex-Dev/convex/issues/533), [#528](https://github.com/Convex-Dev/convex/issues/528), [#354](https://github.com/Convex-Dev/convex/issues/354), [#208](https://github.com/Convex-Dev/convex/issues/208)) as a scheduled upgrade rather than a naive code change.
+9. ✅ **Real bug fixes carried by v1**: [#533](https://github.com/Convex-Dev/convex/issues/533) (`update`/`update-in`) and [#528](https://github.com/Convex-Dev/convex/issues/528) (`add-mint`) are fixed via the v1 migration rather than naive code changes, validated against the statically-built upgraded state. [#354](https://github.com/Convex-Dev/convex/issues/354) (a `schedule` design question) and [#208](https://github.com/Convex-Dev/convex/issues/208) (a macro-call compiler regression) are not clean migration fixes and remain open.
 
 ## Testing strategy
 
