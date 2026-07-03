@@ -22,17 +22,21 @@ import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.Index;
+import convex.core.data.MapEntry;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -59,6 +63,19 @@ public class TransactionHandler extends AThreadedComponent {
 	 * Default minimum delay between proposing own transactions as a peer
 	 */
 	private static final long OWN_BLOCK_DELAY=10000;
+
+	/** #597: earliest / latest lead time (ms before an upgrade activation) within which a
+	 * peer that cannot apply the upgrade sheds its own stake. Randomised per peer so a
+	 * whole cohort does not unstake at one instant. */
+	private static final long WITHDRAW_PREWINDOW_MIN = 5*60*1000;   // 5 minutes before
+	private static final long WITHDRAW_PREWINDOW_MAX = 10*60*1000;  // 10 minutes before
+
+	/** Activation timestamp we have computed a withdrawal instant for (-1 = none). */
+	private long withdrawalActivation = -1;
+	/** Randomised wall-clock instant at which to attempt withdrawal for {@link #withdrawalActivation}. */
+	private long withdrawalInstant = -1;
+	/** Whether we have already attempted (queued) the withdrawal for {@link #withdrawalActivation}. */
+	private boolean withdrawalQueued = false;
 
 	/**
 	 * Default minimum delay (ms) between proposing blocks as a peer.
@@ -475,6 +492,12 @@ public class TransactionHandler extends AThreadedComponent {
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return; // No peer record in consensus state?
 
+		// #597: best-efforts stake withdrawal ahead of an unsupported upgrade takes
+		// priority over routine self-management. If we queue one, do nothing else.
+		if (maybeWithdrawStakeBeforeUpgrade(p, s, peerKey, ps, ts)) {
+			lastOwnTransactionTimestamp = ts;
+			return;
+		}
 
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
@@ -499,6 +522,91 @@ public class TransactionHandler extends AThreadedComponent {
 			newTransactions.add(p.getKeyPair().signData(transaction));
 			lastOwnTransactionTimestamp=ts; // mark this timestamp
 		}
+	}
+
+	/**
+	 * #597: best-efforts stake withdrawal ahead of an unsupported network upgrade.
+	 *
+	 * <p>When the consensus schedule contains an upgrade this release cannot apply, this
+	 * peer will withdraw (freeze) at the activation. Until then its stake still counts
+	 * toward consensus thresholds, so a cohort of soon-to-freeze peers can prevent the
+	 * remaining upgraded peers from reaching supermajority. To avoid that, the peer sheds
+	 * its own stake in a randomised window shortly before the activation, while it can
+	 * still transact.</p>
+	 *
+	 * <p>Best-efforts and conservative:</p>
+	 * <ul>
+	 * <li>triggered from the early on-chain signal (not the boundary, where it is already
+	 *     frozen), at a randomised instant in the pre-window so a cohort does not all
+	 *     unstake at one instant and jolt the weighting;</li>
+	 * <li>never if it would leave no other viable peer — the network is already
+	 *     non-viable, and destroying the last stake is strictly worse, so we just freeze;</li>
+	 * <li>attempted once; a failed attempt is harmless, as the peer freezes at the
+	 *     boundary regardless.</li>
+	 * </ul>
+	 *
+	 * Gated (like all peer self-management here) on {@code :auto-manage}, default on.
+	 *
+	 * @return true if a withdrawal transaction was queued this round
+	 */
+	private boolean maybeWithdrawStakeBeforeUpgrade(Peer p, State s, AccountKey peerKey, PeerStatus ps, long ts) {
+		Migrations.UpgradeWarning w = server.getUpgradeWarning();
+		if (w == null) {
+			// No pending unsupported upgrade: clear any scheduled withdrawal
+			withdrawalActivation = -1;
+			withdrawalQueued = false;
+			return false;
+		}
+
+		// Compute a randomised withdrawal instant once per activation
+		if (w.activation != withdrawalActivation) {
+			withdrawalActivation = w.activation;
+			withdrawalQueued = false;
+			long window = WITHDRAW_PREWINDOW_MAX - WITHDRAW_PREWINDOW_MIN;
+			long offset = WITHDRAW_PREWINDOW_MIN + (long) (Math.random() * window);
+			withdrawalInstant = w.activation - offset;
+		}
+
+		if (withdrawalQueued) return false;          // already attempted for this activation
+		if (ts < withdrawalInstant) return false;    // not yet in the pre-window
+		if (ts >= w.activation) { withdrawalQueued = true; return false; } // too late; will freeze
+		if (ps.getPeerStake() <= 0) { withdrawalQueued = true; return false; } // nothing to withdraw
+
+		// Never the last viable peer
+		if (!leavesAnotherViablePeer(s, peerKey)) {
+			log.warn("Not auto-withdrawing stake before upgrade to version {}: no other viable peer, so the network is already non-viable. Freezing at the boundary instead.", w.version);
+			withdrawalQueued = true;
+			return false;
+		}
+
+		// Must hold the controller key to submit the self-transaction (as for hostname management)
+		Address controller = ps.getController();
+		if (controller == null) return false;
+		AccountStatus as = s.getAccount(controller);
+		if ((as == null) || !Cells.equals(peerKey, as.getAccountKey())) return false;
+
+		log.warn("Best-efforts: withdrawing peer stake ahead of unsupported upgrade to version {} scheduled at {}", w.version, w.activation);
+		ACell message = Reader.read(String.format("(set-peer-stake %s 0)", peerKey));
+		ATransaction transaction = Invoke.create(controller, as.getSequence()+1, message);
+		newTransactions.add(p.getKeyPair().signData(transaction));
+		withdrawalQueued = true;
+		return true;
+	}
+
+	/**
+	 * #597: true if some peer OTHER than {@code myKey} holds at least the minimum
+	 * effective stake, i.e. withdrawing {@code myKey}'s stake would not leave the network
+	 * with no viable peer.
+	 */
+	static boolean leavesAnotherViablePeer(State s, AccountKey myKey) {
+		Index<AArrayBlob, PeerStatus> peers = s.getPeers();
+		long n = peers.count();
+		for (long i = 0; i < n; i++) {
+			MapEntry<AArrayBlob, PeerStatus> e = peers.entryAt(i);
+			if (Cells.equals(e.getKey(), myKey)) continue;
+			if (e.getValue().getPeerStake() >= CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return true;
+		}
+		return false;
 	}
 
 	public void start() {

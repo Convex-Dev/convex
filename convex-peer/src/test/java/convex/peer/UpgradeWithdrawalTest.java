@@ -19,6 +19,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
+import convex.core.data.AccountKey;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
@@ -39,6 +40,25 @@ public class UpgradeWithdrawalTest {
 		State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
 		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
 		return servers.get(0);
+	}
+
+	@Test
+	public void testLeavesAnotherViablePeer() {
+		// #597 guard: the never-last-viable-peer check underpinning best-efforts withdrawal.
+		AccountKey k1 = PEER_KP.getAccountKey();
+		AccountKey k2 = AKeyPair.createSeeded(202).getAccountKey();
+
+		// Single peer: withdrawing it would leave no viable peer
+		State single = Init.createState(List.of(k1));
+		assertFalse(TransactionHandler.leavesAnotherViablePeer(single, k1));
+
+		// Two peers: withdrawing either still leaves the other viable
+		State two = Init.createState(List.of(k1, k2));
+		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k1));
+		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, k2));
+
+		// An unrelated key (controls no peer) sees both peers as "other viable"
+		assertTrue(TransactionHandler.leavesAnotherViablePeer(two, AKeyPair.createSeeded(303).getAccountKey()));
 	}
 
 	@Test
@@ -115,6 +135,51 @@ public class UpgradeWithdrawalTest {
 			// Still alive for queries against the frozen state; b was never defined
 			assertFalse(convex.querySync("a").isError());
 			assertTrue(convex.querySync("b").isError());
+		} finally {
+			s.close();
+		}
+	}
+
+	@Test
+	public void testLastPeerDoesNotWithdraw() throws Exception {
+		// #597: a single peer is the last viable peer, so the never-last-peer guard must
+		// prevent auto-withdrawal even in the pre-activation window with AUTO_MANAGE on.
+		// The peer keeps its stake (no self-destruction) and still freezes at the boundary.
+		// This drives the full withdrawal code path deterministically (single peer confirms
+		// alone); the guard's positive branch is covered by testLeavesAnotherViablePeer.
+		long supported = Migrations.MAX_VERSION;
+		long unsupported = supported + 1;
+		AccountKey myKey = PEER_KP.getAccountKey();
+		State upgraded = Migrations.applyAll(Init.createState(List.of(myKey)));
+		long t0 = upgraded.getTimestamp().longValue();
+		long activation = t0 + 60L*60*1000; // 60 min ahead, so the 5-10 min pre-window fits
+		State genesis = upgraded.withProtocolGlobals(supported, upgraded.getUpgradeVector().conj(CVMLong.create(activation)));
+
+		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
+		Server s = servers.get(0);
+		try {
+			java.util.concurrent.atomic.AtomicLong clock = new java.util.concurrent.atomic.AtomicLong(t0 + 1000);
+			s.setTimeSource(clock::get);
+			long stake0 = s.getPeer().getConsensusState().getPeer(myKey).getPeerStake();
+			assertTrue(stake0 > 0);
+
+			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
+			// Move deep into the withdrawal window (past any randomised instant, before the boundary)
+			clock.set(activation - 60*1000);
+			Result r = convex.transactSync("(def a 1)");
+			assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
+
+			// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
+			// zero the stake; peer rewards may only increase it), and still operating.
+			assertTrue(s.getPeer().getConsensusState().getPeer(myKey).getPeerStake() >= stake0,
+					"last viable peer must not have withdrawn its stake");
+			assertFalse(s.isConsensusHalted());
+
+			// It still freezes at the boundary
+			clock.set(activation + 1);
+			convex.transact("(def b 2)");
+			UpgradeError halt = s.awaitConsensusHalt().get(20, TimeUnit.SECONDS);
+			assertEquals(unsupported, halt.getVersion());
 		} finally {
 			s.close();
 		}

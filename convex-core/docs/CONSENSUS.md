@@ -204,9 +204,11 @@ must not depend on any peer-local trust decision; client trust in a *specific* p
   [#595](https://github.com/Convex-Dev/convex/issues/595). Stage (i) (confirmation
   clamp) closes the safety hole; stage (ii) (ordering hygiene) is the liveness
   follow-up.
-- **Best-efforts stake withdrawal before an unsupported upgrade** —
-  [#597](https://github.com/Convex-Dev/convex/issues/597); prevents a
-  withdrawn-but-still-staked cohort from stalling the remaining supermajority.
+- **Best-efforts stake withdrawal before an unsupported upgrade** — implemented
+  ([#597](https://github.com/Convex-Dev/convex/issues/597)); a peer that cannot apply a
+  scheduled upgrade sheds its own stake in a randomised pre-activation window, so a
+  withdrawn-but-still-staked cohort does not stall the remaining supermajority. Guarded
+  against removing the last viable peer; gated on `:auto-manage`.
 - **Fork recovery** is currently disabled (`ENABLE_FORK_RECOVERY = false`);
   enabling it is tracked in [#492](https://github.com/Convex-Dev/convex/issues/492).
   With it disabled, peers filter Orders inconsistent with their own consensus rather

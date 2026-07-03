@@ -403,7 +403,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 
 ## Remaining open questions
 
-- **Best-efforts stake withdrawal** — tracked in [#597](https://github.com/Convex-Dev/convex/issues/597). Full consensus freeze and cause-differentiated recovery are implemented; the automated unstaking path (randomised pre-window, never-last-peer) is the remaining detail. Until then, operators shed stake manually in response to the early warning.
+- **Best-efforts stake withdrawal** — implemented ([#597](https://github.com/Convex-Dev/convex/issues/597)). On the early on-chain signal, a peer that cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window (5–10 min before), gated on `:auto-manage` (default on), and never if it would leave no other viable peer. Best-efforts: a failed attempt is harmless, as the peer freezes at the boundary regardless.
 - **Forward block-timestamp handling** — tracked separately in [#595](https://github.com/Convex-Dev/convex/issues/595); a prerequisite hardening for scheduling upgrades on a value-bearing network. Design in `CONSENSUS.md` (confirmation-deferral in belief merge; deliberately not a validity rule).
 - **Snapshot trust policy** — whether non-archival peers may sync from a snapshot without holding ancient migrations, and who blesses such snapshots.
 
@@ -418,7 +418,7 @@ Ordered so each step is independently testable and the genesis-affecting change 
 5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings *and* fixes all bugs known at genesis (#533 `update`/`update-in`, #528 `add-mint`), so 0→1 brings a network fully up to date in one step; adopted fully on-chain. A single fix is never its own protocol version.
 6. ✅ **Peer consensus freeze** (full freeze of executor + propagator) and **operator early-warning** on detection of an unsupported scheduled upgrade.
 7. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
-8. **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) and **forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)).
+8. ✅ **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) — a peer that cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window, gated on `:auto-manage` and guarded against removing the last viable peer. **Forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)) stage (i) (confirmation clamp) is implemented; stage (ii) (ordering hygiene) is a liveness follow-up. See `CONSENSUS.md`.
 9. ✅ **Real bug fixes carried by v1**: [#533](https://github.com/Convex-Dev/convex/issues/533) (`update`/`update-in`) and [#528](https://github.com/Convex-Dev/convex/issues/528) (`add-mint`) are fixed via the v1 migration rather than naive code changes, validated against the statically-built upgraded state. [#354](https://github.com/Convex-Dev/convex/issues/354) (a `schedule` design question) and [#208](https://github.com/Convex-Dev/convex/issues/208) (a macro-call compiler regression) are not clean migration fixes and remain open.
 
 ## Testing strategy
@@ -453,5 +453,6 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 Remaining before first production use:
 
 - **Versioned core-definition materialisation** (plan step 5) — closes the pre-activation decode-skew window; required before scheduling upgrades on a value-bearing network.
-- **Forward block-timestamp handling** — [#595](https://github.com/Convex-Dev/convex/issues/595).
-- **Best-efforts stake withdrawal** — [#597](https://github.com/Convex-Dev/convex/issues/597).
+- **Forward block-timestamp handling** — [#595](https://github.com/Convex-Dev/convex/issues/595) stage (ii) (ordering hygiene / liveness); stage (i) (the safety-critical confirmation clamp) is implemented. See `CONSENSUS.md`.
+
+Best-efforts stake withdrawal ([#597](https://github.com/Convex-Dev/convex/issues/597)) is now implemented (randomised pre-activation window, never-last-peer guard, gated on `:auto-manage`).
