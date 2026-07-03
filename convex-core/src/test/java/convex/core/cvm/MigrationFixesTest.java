@@ -202,9 +202,39 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testDotimesFix() {
+		// #598 (6): dotimes cast the raw count form to int at EXPAND time, so only
+		// literal counts worked. Buggy (:CAST) on genesis, fixed on the upgraded state.
+		String exprCount = "(do (def a 0) (dotimes [i (+ 2 3)] (def a (+ a i))) a)";
+		assertTrue(evalErrors(GENESIS, exprCount));
+		assertEquals(CVMLong.create(10), eval(UPGRADED, exprCount));
+
+		// The count expression is evaluated exactly once, at runtime
+		assertEquals(CVMLong.create(1),
+				eval(UPGRADED, "(do (def c 0) (dotimes [i (do (def c (inc c)) 3)] nil) c)"));
+
+		// Hygiene: a user binding named `n` is untouched by the template's internal binding
+		assertEquals(CVMLong.create(200),
+				eval(UPGRADED, "(let [n 100] (do (def acc 0) (dotimes [i 2] (def acc (+ acc n))) acc))"));
+
+		// Non-interference: literal counts behave identically on both states
+		for (State s : new State[] { GENESIS, UPGRADED }) {
+			assertEquals(CVMLong.create(10), eval(s, "(do (def a 0) (dotimes [i 5] (def a (+ a i))) a)"));
+			// zero and negative counts execute the body zero times
+			assertEquals(CVMLong.create(0), eval(s, "(do (def z 0) (dotimes [i 0] (def z 1)) (dotimes [i -2] (def z 1)) z)"));
+			// nested dotimes
+			assertEquals(Reader.read("[[0 0] [0 1] [1 0] [1 1]]"),
+					eval(s, "(do (def v []) (dotimes [i 2] (dotimes [j 2] (def v (conj v [i j])))) v)"));
+			// non-symbol loop binding is still a :CAST error
+			assertTrue(evalErrors(s, "(dotimes [7 5] nil)"));
+		}
+	}
+
+	@Test
 	public void testDocsPreserved() {
 		// The migration redefines via defn with metadata, so docstrings survive
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update)))"));
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update-in)))"));
+		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'dotimes)))"));
 	}
 }

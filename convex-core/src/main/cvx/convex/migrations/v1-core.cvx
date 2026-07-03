@@ -25,6 +25,11 @@
 ;; no invocation, no offer, no error). Rewritten from `[addr & more]` + manual count
 ;; dispatch to explicit arities, so a wrong arity is an :ARITY error automatically.
 ;; Expansions for valid calls are unchanged.
+;;
+;; Fixes #598 (6): `dotimes` evaluated `(int count)` at expand time on the raw count
+;; form, so only literal counts worked. The count is now any expression, evaluated
+;; exactly once at runtime and bound via `gensym` (installed by this same upgrade),
+;; so the binding is fresh per expansion and cannot capture user symbols.
 
 (defn update
   ^{:doc {:description "Update a value in a associative data structure by applying a function."
@@ -134,3 +139,18 @@
             (unsyntax addr)
             offer
             (cons (list 'quote (unsyntax (first cf))) (next cf))))))
+
+;; #598 (6): dotimes with the count evaluated once at runtime, bound via gensym.
+(defmacro dotimes
+  ^{:doc {:description ["Repeats execution of the body `count` times, binding the specified symbol from 0 to `(- count 1)` on successive iterations."]
+          :examples    [{:code "(dotimes [i 10] (transfer *address* 10))"}]
+          :signature   [{:params [[sym count] & body]}]}}
+  [[sym count] & body]
+  (or (symbol? (unsyntax sym))
+      (fail :CAST "`dotimes` requires a symbol for loop binding"))
+  (let [n (gensym 'n)]
+    `(let [~n (int ~count)]
+       (loop [~sym 0]
+         (cond (< ~sym ~n)
+           (do ~(cons 'do body)
+               (recur (inc ~sym))))))))
