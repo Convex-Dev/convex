@@ -65,6 +65,7 @@ import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
@@ -660,8 +661,16 @@ public abstract class CoreTest extends ACVMTest {
 		assertNull(eval("(switch nil 2 3)"));
 		assertNull(eval("(switch :foo 2 (fail) 4 5)"));
 		
-		// basic expansions
-		assertEquals(Reader.read("(let [v# 1] (cond))"),expand("(switch 1)"));
+		// basic expansion: (let [<subject> 1] (cond)). The subject binding symbol is a
+		// literal v# at genesis but a fresh gensym at protocol v1+ (#602), so assert
+		// structurally rather than pinning the internal name.
+		AList<ACell> sw = (AList<ACell>) expand("(switch 1)");
+		assertEquals(Symbol.create("let"), sw.get(0));
+		AVector<ACell> bnd = (AVector<ACell>) sw.get(1);
+		assertEquals(2L, bnd.count());
+		assertTrue(bnd.get(0) instanceof Symbol);
+		assertEquals(CVMLong.create(1), bnd.get(1));
+		assertEquals(Reader.read("(cond)"), sw.get(2));
 		
 		// No expressions, fall through to null
 		assertArityError(step("(switch)"));

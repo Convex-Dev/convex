@@ -30,6 +30,14 @@
 ;; form, so only literal counts worked. The count is now any expression, evaluated
 ;; exactly once at runtime and bound via `gensym` (installed by this same upgrade),
 ;; so the binding is fresh per expansion and cannot capture user symbols.
+;;
+;; Fixes #602: `for`, `for-loop` and `switch` introduced their template bindings with
+;; fixed literal names (`s#`/`n#` plus the plain loop vars `a`/`i` in `for`, `value#`/
+;; `new-value#` in `for-loop`, `v#` in `switch`), all visible to the user's body — so a
+;; body referring to a colliding symbol captured the macro's internal binding. Each such
+;; binding is now a fresh `gensym`, fixing the capture. `switch` additionally referenced
+;; its binding from code constructed inside an unquote; the gensym is captured in an
+;; expand-time `let` and threaded to both the binding site and those constructed refs.
 
 (defn update
   ^{:doc {:description "Update a value in a associative data structure by applying a function."
@@ -154,3 +162,54 @@
          (cond (< ~sym ~n)
            (do ~(cons 'do body)
                (recur (inc ~sym))))))))
+
+;; #602: for — all template bindings (sequence, count, accumulator, index) are gensyms,
+;; so none can be captured by the user's body (which sees only its own `sym`).
+(defmacro for
+  ^{:doc {:description "Executes the body with the symbol `sym` bound to each value of the given sequence. Returns a vector of results."
+          :examples    [{:code "(for [x [1 2 3]] (inc x))"}]
+          :signature   [{:params [[sym sequence] & body]}]}}
+  [[sym sequence] & body]
+  (let [s (gensym 's)
+        n (gensym 'n)
+        a (gensym 'a)
+        i (gensym 'i)]
+    `(let [~s ~sequence
+           ~n (count ~s)]
+       (loop [~a []
+              ~i 0]
+         (cond (< ~i ~n)
+           (recur (conj ~a (let [~sym (nth ~s ~i)] ~(cons 'do body)))
+                  (inc ~i))
+           ~a)))))
+
+;; #602: for-loop — the accumulator and per-iteration result bindings are gensyms.
+(defmacro for-loop
+  ^{:doc {:description "Executes a code body repeatedy while a condition is true. At the first iteration, `sym` is locally bound to the `init` value. For each subsequent iteration, sym is bound to the result of `change`. The result it the result of the last execution of `body`, or `nil` if no iterations were made."
+          :examples    [{:code "(for-loop [i 0 (< i 10) (inc i)] i)"}]
+          :signature   [{:params [[sym init condition change] & body]}]}}
+  [[sym init condition change] & body]
+  (let [value (gensym 'value)
+        new-value (gensym 'new-value)]
+    `(loop [~sym ~init ~value nil]
+       (if ~condition
+          (let [~new-value ~(cons 'do body)]
+            (recur ~change ~new-value))
+         ~value))))
+
+;; #602: switch — the subject binding is a gensym. It is referenced both in the backtick
+;; (the `let` binding) and from the `cond` clauses built inside the unquote, so the gensym
+;; is bound once in an expand-time `let` and used in both places.
+(defmacro switch
+  ^{:doc {:description "Switches on the result of an expression. Tests are computed in turn, based on equality, with an option default value, like `cond`."
+          :examples    [{:code "(switch (+ 1 1) 0 :zero 1 :one 2 :two :default-value)"}]
+          :signature   [{:params [exp & cases]}]}}
+  [exp & cases]
+  (let [g (gensym 'v)]
+    `(let [~g ~exp]
+       ~(let [n (dec (count cases))]
+          (loop [v cases i 0]
+            (cond
+              (>= i n) (cons 'cond v)
+              (recur (assoc v i (list '= (get v i) g))
+                     (+ i 2))))))))

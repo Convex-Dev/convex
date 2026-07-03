@@ -231,10 +231,51 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testMacroHygieneFix() {
+		// #602: for / for-loop / switch introduced template bindings with fixed names
+		// visible to the user's body, so a colliding body symbol captured them. Fixed via
+		// gensym on the upgraded state; genesis keeps the capturing behaviour.
+
+		// for: the plain loop index `i` (and accumulator `a`) are the natural capture risk.
+		// Genesis body `i` captures the loop index; upgraded body `i` is the user's binding.
+		assertEquals(Reader.read("[0 1 2]"),       eval(GENESIS,  "(let [i 100] (for [x [1 2 3]] i))"));
+		assertEquals(Reader.read("[100 100 100]"), eval(UPGRADED, "(let [i 100] (for [x [1 2 3]] i))"));
+		// accumulator capture: genesis body `a` sees the (empty) accumulator, upgraded sees :x
+		assertEquals(Reader.read("[[]]"), eval(GENESIS,  "(let [a :x] (for [y [1]] a))"));
+		assertEquals(Reader.read("[:x]"), eval(UPGRADED, "(let [a :x] (for [y [1]] a))"));
+
+		// for-loop: internal `value#` binding. Genesis body captures it (nil), upgraded sees :outer
+		assertNull(eval(GENESIS, "(let [value# :outer] (for-loop [i 0 (< i 1) (inc i)] value#))"));
+		assertEquals(Reader.read(":outer"), eval(UPGRADED, "(let [value# :outer] (for-loop [i 0 (< i 1) (inc i)] value#))"));
+
+		// switch: internal subject binding `v#`, referenced from constructed cond clauses.
+		// Genesis body `v#` captures the subject (5), upgraded sees the user's :outer
+		assertEquals(CVMLong.create(5), eval(GENESIS,  "(let [v# :outer] (switch 5 5 v#))"));
+		assertEquals(Reader.read(":outer"), eval(UPGRADED, "(let [v# :outer] (switch 5 5 v#))"));
+
+		// Non-interference: normal (non-colliding) uses behave identically before and after
+		for (State s : new State[] { GENESIS, UPGRADED }) {
+			assertEquals(Reader.read("[2 3 4]"), eval(s, "(for [x [1 2 3]] (inc x))"));
+			assertEquals(CVMLong.create(2), eval(s, "(for-loop [i 0 (< i 3) (inc i)] i)"));
+			assertNull(eval(s, "(for-loop [i 0 (< i 0) (inc i)] i)")); // zero iterations -> nil
+			assertEquals(Reader.read(":two"), eval(s, "(switch (+ 1 1) 0 :zero 1 :one 2 :two :default-value)"));
+			assertEquals(Reader.read(":default-value"), eval(s, "(switch 9 0 :zero :default-value)"));
+			assertNull(eval(s, "(switch 9 0 :zero)")); // no match, no default -> nil
+			// nested for still works (inner internals shadow outer on v0, independently
+			// fresh on v1): (+ x y) over x in {1,2}, y in {1,2}
+			assertEquals(Reader.read("[[2 3] [3 4]]"),
+					eval(s, "(for [x [1 2]] (for [y [1 2]] (+ x y)))"));
+		}
+	}
+
+	@Test
 	public void testDocsPreserved() {
 		// The migration redefines via defn with metadata, so docstrings survive
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update)))"));
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update-in)))"));
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'dotimes)))"));
+		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'for)))"));
+		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'for-loop)))"));
+		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'switch)))"));
 	}
 }
