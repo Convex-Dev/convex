@@ -106,6 +106,22 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testCallArityFix() {
+		// #598 (4): call with too many args silently expanded to nil (no invocation,
+		// no error) on genesis; it is an :ARITY error on the upgraded state.
+		assertNull(eval(GENESIS, "(call #8 500 2 (foo))"));
+		assertTrue(evalErrors(UPGRADED, "(call #8 500 2 (foo))"));
+		// too-few already errored on both (unchanged)
+		assertTrue(evalErrors(GENESIS, "(call #8)"));
+		assertTrue(evalErrors(UPGRADED, "(call #8)"));
+		// Non-interference: valid call forms expand identically before and after upgrade
+		assertEquals(eval(GENESIS, "(expand '(call #8 (foo 1 2)))"),
+				eval(UPGRADED, "(expand '(call #8 (foo 1 2)))"));
+		assertEquals(eval(GENESIS, "(expand '(call #8 500 (foo 1 2)))"),
+				eval(UPGRADED, "(expand '(call #8 500 (foo 1 2)))"));
+	}
+
+	@Test
 	public void testUpdateVariadicFix() {
 		// #533: the 5+ arg arity dropped the first extra argument.
 		// (update {:a 0} :a + 1 2) => {:a (+ 0 1 2)} = {:a 3}, was {:a (+ 0 2)} = {:a 2}
