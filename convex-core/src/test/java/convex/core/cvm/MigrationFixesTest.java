@@ -13,14 +13,15 @@ import convex.core.init.InitTest;
 import convex.core.lang.Reader;
 
 /**
- * Tests for migration v2 (#533): the `update` / `update-in` variadic-arity fixes.
+ * Tests for the v1 upgrade fixes: the `update` / `update-in` variadic-arity fixes
+ * (#533) and the `convex.fungible` `add-mint` unlimited-supply default (#528).
  *
  * Gated on the statically-built upgraded state ({@link InitTest#UPGRADED}): the
  * fixes are present at the latest protocol version, while genesis retains the old
  * (buggy) behaviour — proving genesis is unmodified and the migration is what
  * applies the fix. See UPGRADE.md.
  */
-public class MigrationV2Test {
+public class MigrationFixesTest {
 
 	static final State GENESIS = InitTest.STATE;
 	static final State UPGRADED = InitTest.UPGRADED;
@@ -74,6 +75,24 @@ public class MigrationV2Test {
 			assertEquals(CVMLong.create(1), eval(s, "(get-in (update-in {:a 0} [:a] inc) [:a])"));  // 3-arg
 			assertEquals(CVMLong.create(1), eval(s, "(get-in (update-in {:a 0} [:a] + 1) [:a])"));  // 4-arg
 		}
+	}
+
+	@Test
+	public void testAddMintFix() {
+		// #528: add-mint with no :max-supply should allow unlimited minting. On genesis
+		// it defaulted max-supply to 0, blocking all mints; the upgraded state fixes it.
+		String code = "(do (import convex.fungible :as fungible)"
+				+ " (def token (deploy [(fungible/build-token {}) (fungible/add-mint {})]))"
+				+ " (fungible/mint token 1000)"
+				+ " (fungible/balance token *address*))";
+		assertTrue(evalErrors(GENESIS, code));                      // buggy: mint blocked (cap 0)
+		assertEquals(CVMLong.create(1000), eval(UPGRADED, code));   // fixed: unlimited
+
+		// An explicit :max-supply still caps, on both states (only the default changed)
+		String capped = "(do (import convex.fungible :as fungible)"
+				+ " (def token (deploy [(fungible/build-token {}) (fungible/add-mint {:max-supply 500})]))"
+				+ " (fungible/mint token 600))"; // exceeds cap
+		assertTrue(evalErrors(UPGRADED, capped));
 	}
 
 	@Test

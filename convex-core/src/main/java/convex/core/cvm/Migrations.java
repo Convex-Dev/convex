@@ -56,35 +56,6 @@ public class Migrations {
 	}
 
 	/**
-	 * v1 bootstrap migration: installs the schedule-upgrade / unschedule-upgrade
-	 * core function bindings into the core environment (account #8), marked
-	 * {@code :static} like other intrinsic core definitions.
-	 *
-	 * <p>The protocol globals already exist when this fires: they were created by
-	 * the governance transaction that scheduled this upgrade (which embedded the
-	 * schedule-upgrade cell directly in compiled code, since no binding existed
-	 * yet). From version 1 onward the functions resolve normally by symbol.
-	 * See UPGRADE.md.</p>
-	 */
-	static final class Bootstrap implements Migration {
-		@Override
-		public State apply(State preState) {
-			AccountStatus core = preState.getAccount(Core.CORE_ADDRESS);
-
-			AHashMap<Symbol, ACell> env = core.getEnvironment();
-			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
-			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
-
-			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
-			AHashMap<ACell, ACell> staticMeta = Maps.of(Keywords.STATIC, CVMBool.TRUE);
-			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
-			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
-
-			return preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
-		}
-	}
-
-	/**
 	 * A migration that evaluates CVM forms from a classpath resource in the context
 	 * of a given account, mirroring how genesis loads {@code core.cvx}. Used to
 	 * redefine core (or actor) functions from a resource kept separate from the
@@ -96,33 +67,102 @@ public class Migrations {
 
 		CodeMigration(Address account, String resource) {
 			this.account = account;
-			try {
-				this.forms = Reader.readAll(Utils.readResourceAsString(resource));
-			} catch (IOException e) {
-				throw new ExceptionInInitializerError("Missing migration resource: " + resource);
-			}
+			this.forms = readResource(resource);
 		}
 
 		@Override
 		public State apply(State preState) {
-			Context ctx = Context.create(preState, account, Constants.MAX_TRANSACTION_JUICE);
-			for (ACell form : forms) {
-				ctx = ctx.expandCompile(form);
-				if (ctx.isExceptional()) throw new IllegalStateException("Migration compile failed for " + form + ": " + ctx.getValue());
-				ctx = ctx.exec((AOp<?>) ctx.getResult());
-				if (ctx.isExceptional()) throw new IllegalStateException("Migration exec failed for " + form + ": " + ctx.getValue());
+			return evalForms(preState, account, forms);
+		}
+	}
+
+	/** Reads all CVM forms from a classpath resource (fails class init if missing). */
+	static AList<ACell> readResource(String resource) {
+		try {
+			return Reader.readAll(Utils.readResourceAsString(resource));
+		} catch (IOException e) {
+			throw new ExceptionInInitializerError("Missing migration resource: " + resource);
+		}
+	}
+
+	/**
+	 * Evaluates CVM forms in the context of an account, returning the updated State.
+	 * Not bound by juice (uses the maximum limit), mirroring how genesis loads code.
+	 */
+	static State evalForms(State preState, Address account, AList<ACell> forms) {
+		Context ctx = Context.create(preState, account, Constants.MAX_TRANSACTION_JUICE);
+		for (ACell form : forms) {
+			ctx = ctx.expandCompile(form);
+			if (ctx.isExceptional()) throw new IllegalStateException("Migration compile failed for " + form + ": " + ctx.getValue());
+			ctx = ctx.exec((AOp<?>) ctx.getResult());
+			if (ctx.isExceptional()) throw new IllegalStateException("Migration exec failed for " + form + ": " + ctx.getValue());
+		}
+		return ctx.getState();
+	}
+
+	/**
+	 * v1 — the genesis upgrade. A network at version 0 upgrades to version 1 in a
+	 * single step that both installs the mechanism and fixes every bug known at
+	 * this point, so activating the upgrade mechanism brings a network fully up to
+	 * date without leaving known bugs for a later upgrade. Specifically it:
+	 *
+	 * <ol>
+	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} core
+	 * bindings (CoreFn singletons, marked {@code :static}; these cannot be defined
+	 * in Lisp), enabling future upgrades to be scheduled on-chain; and</li>
+	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core)
+	 * and #528 ({@code add-mint} in the {@code convex.fungible} library).</li>
+	 * </ol>
+	 *
+	 * <p>The protocol globals already exist when this fires: they were created by
+	 * the governance transaction that scheduled this upgrade (which embedded the
+	 * schedule-upgrade cell directly, since no binding existed yet). See UPGRADE.md.</p>
+	 */
+	static final class Bootstrap implements Migration {
+		/** Core function fixes applied as part of v1 (#533: update / update-in). */
+		private static final CodeMigration CORE_FIXES =
+				new CodeMigration(Core.CORE_ADDRESS, "/convex/migrations/v1-core.cvx");
+		/** convex.fungible library fixes applied as part of v1 (#528: add-mint). */
+		private static final AList<ACell> FUNGIBLE_FIXES =
+				readResource("/convex/migrations/v1-fungible.cvx");
+
+		@Override
+		public State apply(State preState) {
+			// 1. Install the scheduling core bindings (CoreFn singletons, not Lisp-definable)
+			AccountStatus core = preState.getAccount(Core.CORE_ADDRESS);
+			AHashMap<Symbol, ACell> env = core.getEnvironment();
+			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
+			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
+
+			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
+			AHashMap<ACell, ACell> staticMeta = Maps.of(Keywords.STATIC, CVMBool.TRUE);
+			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
+			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
+
+			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
+
+			// 2. Apply known core function fixes (#533)
+			s = CORE_FIXES.apply(s);
+
+			// 3. Apply known library fixes (#528). Resolve the library address via CNS so
+			// this works on any network that has it; skip if absent.
+			ACell fungible = s.lookupCNS("convex.fungible");
+			if (fungible instanceof Address) {
+				s = evalForms(s, (Address) fungible, FUNGIBLE_FIXES);
 			}
-			return ctx.getState();
+
+			return s;
 		}
 	}
 
 	/**
 	 * The ordered migration list: entry {@code k} produces protocol version
 	 * {@code k+1}. Append-only — never reorder, remove or edit released entries.
+	 * A single fix is not its own migration: the v1 upgrade fixes all bugs known
+	 * at genesis; a later upgrade is added only for bugs discovered after v1.
 	 */
 	private static final List<Migration> ALL = List.of(
-			new Bootstrap(),                                              // v1: scheduling core bindings
-			new CodeMigration(Core.CORE_ADDRESS, "/convex/migrations/v2.cvx") // v2: update/update-in fixes (#533)
+			new Bootstrap()   // v1: mechanism bindings + all known bug fixes
 	);
 
 	/**

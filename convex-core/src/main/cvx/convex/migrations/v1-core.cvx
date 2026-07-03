@@ -1,9 +1,9 @@
-;; Network upgrade migration v2 — core function fixes (see UPGRADE.md).
+;; Network upgrade v1 — core function fixes (see UPGRADE.md).
 ;;
-;; Applied by the upgrade mechanism to the core environment (account #8),
+;; Applied as part of the v1 genesis upgrade to the core environment (account #8),
 ;; redefining the affected functions. Deliberately NOT part of core.cvx / genesis:
 ;; existing networks keep their genesis hash and reach these fixes at protocol
-;; version 2 via a scheduled upgrade.
+;; version 1 via the scheduled bootstrap upgrade.
 ;;
 ;; Fixes #533: the variadic (5+ arg) arities of `update` and `update-in` dropped
 ;; the first extra argument `x`; `update-in`'s variadic arity additionally had a

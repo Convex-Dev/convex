@@ -3,6 +3,8 @@ package convex.core.cvm;
 import static convex.test.Assertions.assertTrustError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
@@ -46,13 +48,20 @@ public class BootstrapTest {
 		State scheduled = scheduleBootstrap(INIT_STATE);
 		State migrated = Migrations.get(0).apply(scheduled);
 
-		// Only the core account (#8) changes: every other account is identical
+		// v1 touches exactly two accounts: the core account (#8) and the fungible
+		// library (add-mint fix). Every other account is identical.
+		Address fungible = (Address) scheduled.lookupCNS("convex.fungible");
+		assertNotNull(fungible);
 		long n = scheduled.getAccounts().count();
 		for (long i = 0; i < n; i++) {
 			Address a = Address.create(i);
-			if (a.equals(Core.CORE_ADDRESS)) continue;
+			if (a.equals(Core.CORE_ADDRESS) || a.equals(fungible)) continue;
 			assertSame(scheduled.getAccount(a), migrated.getAccount(a), "Account " + a + " must be untouched");
 		}
+
+		// The fungible library's add-mint was actually redefined (environment changed)
+		assertNotSame(scheduled.getAccount(fungible).getEnvironment(),
+				migrated.getAccount(fungible).getEnvironment());
 
 		// Peers, schedule and globals are untouched by the migration itself
 		// (the watermark advance is the mechanism's job, not the migration's)
