@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
@@ -78,6 +79,29 @@ public class MigrationFixesTest {
 			assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(s, "`~true"));
 			assertNull(eval(s, "`~nil"));
 			assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(s, "`~(= 1 2)"));
+		}
+	}
+
+	@Test
+	public void testDefineDoubleEvalFix() {
+		// #598 (3): define used its (eval (def ...)) return as the expansion, evaluating
+		// the value twice. Broke when the value evaluates to a symbol or list.
+		// A symbol value is UNDECLARED on genesis, correct on the upgraded state:
+		assertTrue(evalErrors(GENESIS, "(do (define dg 'hello) dg)"));
+		assertEquals(Symbol.create("hello"), eval(UPGRADED, "(do (define dg 'hello) dg)"));
+		// A list value is double-evaluated on genesis; fixed returns the value once:
+		assertTrue(evalErrors(GENESIS, "(do (define dl '(foo)) dl)"));
+		assertEquals(Reader.read("(foo)"), eval(UPGRADED, "(do (define dl '(foo)) dl)"));
+
+		// Non-interference: for self-evaluating values (all real genesis uses, e.g.
+		// basic.cvx / archon.cvx) the result is identical before and after the upgrade.
+		for (State s : new State[] { GENESIS, UPGRADED }) {
+			assertEquals(CVMLong.create(0), eval(s, "(define nc 0)"));
+			assertEquals(Reader.read("\"http\""), eval(s, "(define ns \"http\")"));
+			assertEquals(Address.create(13), eval(s, "(do (define na (or #13 #14)) na)"));
+			// 1-arity declares the symbol bound to nil on both states
+			assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(s, "(do (define dz) (defined? 'dz))"));
+			assertNull(eval(s, "(do (define dz) dz)"));
 		}
 	}
 
