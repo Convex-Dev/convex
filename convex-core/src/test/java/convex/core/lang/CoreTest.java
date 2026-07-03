@@ -3476,6 +3476,8 @@ public abstract class CoreTest extends ACVMTest {
 		
 		assertCastError(step(ctx,"(get-stake :foo *address*)"));
 		assertCastError(step(ctx,"(get-stake my-peer :foo)"));
+		// a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(get-stake 0x1234 *address*)"));
 
 		assertArityError(step(ctx,"(get-stake my-peer)"));
 		assertArityError(step(ctx,"(get-stake my-peer *address* :foo)"));
@@ -3492,6 +3494,8 @@ public abstract class CoreTest extends ACVMTest {
 		assertNull(eval(ctx,"(get-peer-stake 0x1234567812345678123456781234567812345678123456781234567812345678)")); 
 
 		assertCastError(step(ctx,"(get-peer-stake :foo)"));
+		// a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(get-peer-stake 0x1234)"));
 		
 		assertArityError(step(ctx,"(get-peer-stake)"));
 		assertArityError(step(ctx,"(get-peer-stake my-peer *address*)"));
@@ -3544,6 +3548,8 @@ public abstract class CoreTest extends ACVMTest {
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" 999999999999999999)"));
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" (+ 1 "+STK*3+" *balance*))"));
 		assertArgumentError(step(ctx,"(set-peer-stake "+KEY+" -1)"));
+		// adversarial: stake above the supply cap is rejected (out of range), before the funds check
+		assertArgumentError(step(ctx,"(set-peer-stake "+KEY+" "+(Coin.MAX_SUPPLY+1)+")"));
 		
 		assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 		
@@ -3616,6 +3622,32 @@ public abstract class CoreTest extends ACVMTest {
 	}
 
 	@Test
+	public void testPeerAuthorizationAttacks() {
+		// Security (#601): all peer mutation is gated to the peer's controller address.
+		// Now that set-peer-data honours its key argument, a caller must not be able to
+		// name another peer's key to modify a peer it does not control.
+		AccountKey firstPeer = InitTest.FIRST_PEER_KEY;
+		String fp = "0x"+firstPeer.toHexString();
+		long stake0 = context().getState().getPeer(firstPeer).getPeerStake();
+
+		// Attacker: an account that does NOT control the first peer
+		Context atk = context().forkWithAddress(HERO.offset(2));
+
+		// Cannot set peer data on a peer it does not control
+		assertStateError(step(atk, "(set-peer-data "+fp+" {:url \"hijack:6666\"})"));
+		// Cannot change the stake (raise or lower) of a peer it does not control. The
+		// controller check precedes the funds check, so even raising is :STATE, not :FUNDS.
+		assertStateError(step(atk, "(set-peer-stake "+fp+" 0)"));
+		assertStateError(step(atk, "(set-peer-stake "+fp+" "+(stake0+1000000)+")"));
+		// The old attack vector (adopting the peer key as one's own *key*) is still blocked,
+		// because authorization is by controller address, not by matching key.
+		assertStateError(step(atk, "(do (set-key "+fp+") (set-peer-data "+fp+" {:url \"hijack\"}))"));
+
+		// The victim peer is unchanged after the failed attacks
+		assertEquals(stake0, context().getState().getPeer(firstPeer).getPeerStake());
+	}
+
+	@Test
 	public void testCreatePeer() {
 		// Kep Pair for new Peer
 		AKeyPair kp=AKeyPair.createSeeded(4583763);
@@ -3644,6 +3676,10 @@ public abstract class CoreTest extends ACVMTest {
 		assertCastError(step(ctx,"(create-peer :foo 1234)"));
 		assertCastError(step(ctx,"(create-peer hero-peer :foo)"));
 		assertCastError(step(ctx,"(create-peer hero-peer nil)"));
+
+		// adversarial: negative stake and wrong-length key are :ARGUMENT (#601)
+		assertArgumentError(step(ctx,"(create-peer hero-peer -1)"));
+		assertArgumentError(step(ctx,"(create-peer 0x1234 1000)"));
 
 		assertArityError(step(ctx,"(create-peer hero-peer)"));
 		assertArityError(step(ctx,"(create-peer hero-peer 1000 :foo)"));
