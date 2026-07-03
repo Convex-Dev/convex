@@ -113,10 +113,16 @@ import convex.test.Samples;
  * consistent results so we need to do a lot of negative testing here.
  */
 @TestInstance(Lifecycle.PER_CLASS)
-public class CoreTest extends ACVMTest {
+/**
+ * Behavioural suite for the CVM core. Parameterized by the initial State so the
+ * same tests can run against genesis ({@link CoreGenesisTest}) and against the
+ * fully-upgraded state ({@link CoreUpgradedTest}) — the latter verifying that
+ * network migrations change no behaviour outside their intended fixes.
+ */
+public abstract class CoreTest extends ACVMTest {
 
-	protected CoreTest() throws IOException {
-		super(BaseTest.STATE);
+	protected CoreTest(State genesis) throws IOException {
+		super(genesis);
 	}
 
 	@Test
