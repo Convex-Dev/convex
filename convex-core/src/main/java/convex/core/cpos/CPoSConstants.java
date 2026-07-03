@@ -30,7 +30,7 @@ public class CPoSConstants {
 	public static final double PEER_DECAY_DELAY = 3*60*1000;
 	
 	/**
-	 * Time for peer stake to decay by factor 1/e (30 mins default)
+	 * Time for peer stake to decay by factor 1/e (5 mins default)
 	 */
 	public static final double PEER_DECAY_TIME = 5*60*1000;
 	

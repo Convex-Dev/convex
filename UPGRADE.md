@@ -404,7 +404,7 @@ The version still increments (it counts applied upgrades, not semantic changes) 
 ## Remaining open questions
 
 - **Best-efforts stake withdrawal** — tracked in [#597](https://github.com/Convex-Dev/convex/issues/597). Full consensus freeze and cause-differentiated recovery are implemented; the automated unstaking path (randomised pre-window, never-last-peer) is the remaining detail. Until then, operators shed stake manually in response to the early warning.
-- **Forward block-timestamp handling** — tracked separately in [#595](https://github.com/Convex-Dev/convex/issues/595); a prerequisite hardening for scheduling upgrades on a value-bearing network.
+- **Forward block-timestamp handling** — tracked separately in [#595](https://github.com/Convex-Dev/convex/issues/595); a prerequisite hardening for scheduling upgrades on a value-bearing network. Design in `CONSENSUS.md` (confirmation-deferral in belief merge; deliberately not a validity rule).
 - **Snapshot trust policy** — whether non-archival peers may sync from a snapshot without holding ancient migrations, and who blesses such snapshots.
 
 ## Implementation plan
