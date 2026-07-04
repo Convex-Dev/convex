@@ -39,6 +39,9 @@ public class NodeConfig {
 	 *  Must be publicly reachable on the internet — never localhost or private addresses. */
 	public static final AString URL = Strings.intern("url");
 
+	/** Maximum memory size (bytes) of an inbound LATTICE_VALUE accepted for merge (#564). */
+	public static final AString MAX_INBOUND_VALUE_SIZE = Strings.intern("maxInboundValueSize");
+
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
@@ -124,6 +127,20 @@ public class NodeConfig {
 	 */
 	public AString getURL() {
 		return RT.ensureString(config.get(URL));
+	}
+
+	/**
+	 * Maximum memory size (bytes) of an inbound LATTICE_VALUE this node will merge (#564).
+	 * Larger values are rejected before the merge runs, bounding merge cost from untrusted
+	 * peers. Defaults to the transport message cap
+	 * ({@link convex.core.cpos.CPoSConstants#MAX_MESSAGE_LENGTH}) — i.e. no restriction
+	 * beyond transport by default; set it lower when exposing the node to untrusted peers.
+	 *
+	 * @return maximum inbound value size in bytes
+	 */
+	public long getMaxInboundValueSize() {
+		CVMLong v = RT.ensureLong(config.get(MAX_INBOUND_VALUE_SIZE));
+		return (v != null) ? v.longValue() : convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
 	}
 
 	// ========== Helpers ==========

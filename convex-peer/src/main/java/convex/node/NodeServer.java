@@ -499,6 +499,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return;
 		}
 
+		// #564: bound merge cost from untrusted peers — reject an oversized value before
+		// the (synchronous, receive-thread) merge runs.
+		if (!withinInboundSizeLimit(value)) return;
+
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
 		ALatticeCursor<ACell> target = cursor.path(path);
@@ -553,6 +557,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})
 	 * @param value Value to merge
 	 */
+	/**
+	 * #564: whether an inbound LATTICE_VALUE is within the configured size limit for
+	 * merging. Values whose memory size exceeds
+	 * {@link NodeConfig#getMaxInboundValueSize()} are rejected before the merge runs on
+	 * the receive thread, bounding merge cost from untrusted peers. {@code getMemorySize}
+	 * is cached (computed at decode), so this is O(1). Package-visible for testing.
+	 *
+	 * @param value inbound value (may be null)
+	 * @return true if the value may be merged, false if it is too large
+	 */
+	boolean withinInboundSizeLimit(ACell value) {
+		long max = config.getMaxInboundValueSize();
+		long size = ACell.getMemorySize(value);
+		if (size > max) {
+			log.warn("Rejected oversized inbound LATTICE_VALUE: {} bytes exceeds limit of {}", size, max);
+			return false;
+		}
+		return true;
+	}
+
 	@SuppressWarnings("unchecked")
 	private <T extends ACell> void mergeIncoming(ALatticeCursor<T> target, ACell value) {
 		try {

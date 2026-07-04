@@ -187,6 +187,34 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * #564: inbound values over the configured size limit are rejected before merge.
+	 */
+	@Test
+	public void testInboundValueSizeLimit() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+
+		// A node configured with a tight inbound size limit (100 bytes)
+		NodeConfig tight = NodeConfig.create(Maps.of(NodeConfig.MAX_INBOUND_VALUE_SIZE, CVMLong.create(100)));
+		maxNodeServer = new NodeServer<>(lattice, store, tight);
+
+		// A small (embedded) value is within the limit
+		assertTrue(maxNodeServer.withinInboundSizeLimit(CVMLong.ONE));
+
+		// A large value exceeds the limit and is rejected
+		convex.core.data.ABlob big = convex.core.data.Blob.wrap(new byte[500]);
+		assertTrue(big.getMemorySize() > 100); // sanity: this value really is over the limit
+		assertFalse(maxNodeServer.withinInboundSizeLimit(big));
+
+		// Under the default (permissive) config, the same large value is accepted
+		NodeServer<AInteger> permissive = new NodeServer<>(lattice, store);
+		try {
+			assertTrue(permissive.withinInboundSizeLimit(big));
+		} finally {
+			try { permissive.close(); } catch (Exception e) { /* ignore */ }
+		}
+	}
+
+	/**
 	 * Test mergeValue with SetLattice
 	 */
 	@Test

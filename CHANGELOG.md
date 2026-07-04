@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Network upgrade mechanism (#413): protocol upgrades can be scheduled on-chain to activate at a consensus timestamp, applying a versioned state migration and incrementing the protocol version, without ever changing the genesis hash. New governance-gated core functions `schedule-upgrade` / `unschedule-upgrade` (callable only by system accounts below `#8`). A peer whose release cannot apply a scheduled upgrade warns its operator ahead of the activation, then cleanly withdraws from consensus at the boundary — staying available for queries rather than diverging — and rejoins after the software is updated. The first (v1) upgrade also bundles every core bug fix known at this point, so activating the mechanism brings a network fully up to date rather than leaving known bugs for a later upgrade (see **Changed** and **Fixed** below). See `convex-core/docs/UPGRADE.md`.
 - `gensym` core function, installed at protocol v1: returns a fresh, unique symbol (optionally with a name prefix), so macros can introduce bindings that cannot capture user symbols (#598, #602).
+- NodeServer: a configurable inbound value-size limit (`:maxInboundValueSize` in `NodeConfig`, default the transport message cap) — an oversized `LATTICE_VALUE` is rejected before its merge runs on the receive thread, bounding merge cost from untrusted peers. Set it below the transport cap when exposing a node to untrusted peers (#564).
 
 ### Changed
 
