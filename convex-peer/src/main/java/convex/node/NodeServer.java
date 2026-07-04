@@ -44,6 +44,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.cursor.RootLatticeCursor;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
+import convex.peer.Config;
 
 /**
  * A networked node server for Lattice networks.
@@ -130,8 +131,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private final ConcurrentHashMap<AConnection, ConnectionStats> connectionStats = new ConcurrentHashMap<>();
 
-	/** Upper bound on tracked connections before closed entries are swept, bounding memory (#566). */
-	private static final int MAX_TRACKED_CONNECTIONS = 4096;
+	/**
+	 * Tracked-connection count above which {@link #statsFor} sweeps closed entries (#566).
+	 * Sits just above the inbound channel cap ({@link Config#MAX_CLIENT_CONNECTIONS}): there
+	 * can be at most that many <em>live</em> connections, so exceeding this means stale
+	 * (closed) entries have accumulated and should be reclaimed. The small headroom avoids
+	 * sweeping on transient overlap between a closing connection and its replacement.
+	 */
+	private static final int MAX_TRACKED_CONNECTIONS = Config.MAX_CLIENT_CONNECTIONS + 64;
 
 	/** Interval (ms) between periodic sweeps of closed connections from the stats map (#566). */
 	private static final long CONNECTION_SWEEP_INTERVAL = 30_000L;
