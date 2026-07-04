@@ -133,6 +133,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/** Upper bound on tracked connections before closed entries are swept, bounding memory (#566). */
 	private static final int MAX_TRACKED_CONNECTIONS = 4096;
 
+	/** Interval (ms) between periodic sweeps of closed connections from the stats map (#566). */
+	private static final long CONNECTION_SWEEP_INTERVAL = 30_000L;
+
+	/** Virtual thread that periodically prunes closed connections from {@link #connectionStats}. */
+	private Thread maintenanceThread;
+
 	/**
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
 	 *
@@ -272,6 +278,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		running = true;
+
+		// #566: periodic sweep of closed connections from the inbound stats map, so an idle
+		// node drains dead entries without relying on inbound traffic or a network close hook.
+		maintenanceThread = Thread.ofVirtual()
+				.name("NodeServer connection-stats maintenance")
+				.start(this::maintenanceLoop);
 
 		// Register shutdown hook to persist before Etch closes its files
 		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
@@ -680,9 +692,51 @@ public class NodeServer<V extends ACell> implements Closeable {
 	ConnectionStats statsFor(AConnection conn) {
 		if (conn == null) return null;
 		if (connectionStats.size() > MAX_TRACKED_CONNECTIONS) {
-			connectionStats.keySet().removeIf(AConnection::isClosed);
+			sweepClosedConnections();
 		}
 		return connectionStats.computeIfAbsent(conn, k -> new ConnectionStats());
+	}
+
+	/**
+	 * Releases all inbound state held for a connection (#566). This is the single cleanup
+	 * sink for the inbound (untrusted) connection lifecycle: the circuit-breaker calls it
+	 * when it closes a connection, and it is where any future per-connection inbound state
+	 * (work queues, rate limiters) should be torn down. Distinct from
+	 * {@link #removePeer(AccountKey)}, which manages outbound, identity-keyed peer connections.
+	 *
+	 * @param conn connection to forget (may be null)
+	 */
+	void removeConnection(AConnection conn) {
+		if (conn == null) return;
+		connectionStats.remove(conn);
+	}
+
+	/**
+	 * Prunes closed connections from the stats map (#566). Called opportunistically from
+	 * {@link #statsFor} when the map grows past {@link #MAX_TRACKED_CONNECTIONS} (bounding
+	 * memory during connection churn) and periodically from {@link #maintenanceLoop} (so an
+	 * idle node still drains dead entries within {@link #CONNECTION_SWEEP_INTERVAL}, without
+	 * needing a per-connection close hook from the network layer).
+	 */
+	void sweepClosedConnections() {
+		connectionStats.keySet().removeIf(AConnection::isClosed);
+	}
+
+	/**
+	 * Periodic maintenance loop (#566): sweeps closed connections from the stats map so a
+	 * node with no inbound traffic still releases dead entries within one sweep interval.
+	 * Exits promptly on interrupt when the server closes.
+	 */
+	private void maintenanceLoop() {
+		while (running) {
+			try {
+				Thread.sleep(CONNECTION_SWEEP_INTERVAL);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+			sweepClosedConnections();
+		}
 	}
 
 	/**
@@ -709,7 +763,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			} catch (Exception e) {
 				// best effort — connection may already be failing
 			}
-			connectionStats.remove(conn);
+			removeConnection(conn);
 		}
 	}
 
@@ -1068,6 +1122,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		log.trace("Closing NodeServer");
 
 		running = false;
+
+		// #566: stop the connection-stats maintenance thread and drop tracked inbound state
+		if (maintenanceThread != null) {
+			maintenanceThread.interrupt();
+			maintenanceThread = null;
+		}
+		connectionStats.clear();
 
 		// Final sync: trigger all propagators with current value and wait for drain.
 		// This guarantees persistence on the primary propagator (announce + setRootData

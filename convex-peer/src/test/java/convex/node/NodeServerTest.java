@@ -854,6 +854,32 @@ public class NodeServerTest {
 		assertTrue(agg.mergesRejected >= 2);
 	}
 
+	/**
+	 * #566: closed connections drain from the stats map via the periodic sweep (so an idle
+	 * node cleans up without inbound traffic), and removeConnection is the explicit single-sink
+	 * teardown.
+	 */
+	@Test
+	public void testConnectionStatsSweep() {
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+
+		RecordingConnection open = new RecordingConnection();
+		RecordingConnection gone = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(1), open));
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(1), gone));
+		assertEquals(2, maxNodeServer.getInboundStats().connections);
+
+		// A closed connection is pruned by the sweep; the open one survives
+		gone.close();
+		maxNodeServer.sweepClosedConnections();
+		assertEquals(1, maxNodeServer.getInboundStats().connections);
+		assertNotNull(maxNodeServer.statsFor(open));
+
+		// removeConnection is the explicit single-sink teardown
+		maxNodeServer.removeConnection(open);
+		assertEquals(0, maxNodeServer.getInboundStats().connections);
+	}
+
 	// ===== Gossip relay tests =====
 	//
 	// These tests verify that incoming lattice values reach the propagator.
