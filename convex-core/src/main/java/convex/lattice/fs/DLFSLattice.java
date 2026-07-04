@@ -82,13 +82,19 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	 * untrusted peer; rather than pre-validating its structure, the merge is attempted and
 	 * falls closed to {@code own} if a malformed node makes it throw. A malformed value can
 	 * therefore neither crash the merge (DoS) nor corrupt the merged state — it is ignored.
+	 *
+	 * <p>#561: this also catches {@link StackOverflowError}. {@code DLFSNode.merge} recurses
+	 * through directory nesting, so a maliciously deep node could otherwise overflow the stack
+	 * with an {@code Error} that escapes a RuntimeException-only catch. The stack unwinds
+	 * cleanly and {@code own} is intact, so falling closed to it is safe.</p>
 	 */
 	private AVector<ACell> safeMerge(AVector<ACell> own, AVector<ACell> other) {
 		try {
 			return DLFSNode.merge(own, other);
-		} catch (RuntimeException e) {
-			// Malformed / adversarial foreign node: fail closed and keep own, rather than
-			// letting a bad value from an untrusted peer crash or corrupt the merge.
+		} catch (RuntimeException | StackOverflowError e) {
+			// Malformed / adversarial foreign node (including a maliciously deep one): fail
+			// closed and keep own, rather than letting a bad value from an untrusted peer
+			// crash or corrupt the merge.
 			return own;
 		}
 	}
