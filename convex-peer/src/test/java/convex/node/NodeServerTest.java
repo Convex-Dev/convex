@@ -215,6 +215,26 @@ public class NodeServerTest {
 	}
 
 	/**
+	 * #562: an inbound value of the wrong type for the target lattice is rejected cleanly
+	 * and leaves the cursor unchanged (the merge aborts atomically).
+	 */
+	@Test
+	public void testWrongTypeMergeRejected() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		var c = maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+
+		// A correct-type value merges (MaxLattice keeps the larger)
+		assertTrue(maxNodeServer.mergeIncoming(c, CVMLong.create(7)));
+		assertEquals(CVMLong.create(7), c.get());
+
+		// A wrong-type value is rejected; the cursor is unchanged
+		assertFalse(maxNodeServer.mergeIncoming(c, convex.core.data.Blob.wrap(new byte[8])));
+		assertEquals(CVMLong.create(7), c.get());
+	}
+
+	/**
 	 * Test mergeValue with SetLattice
 	 */
 	@Test

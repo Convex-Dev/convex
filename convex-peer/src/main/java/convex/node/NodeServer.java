@@ -506,7 +506,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
 		ALatticeCursor<ACell> target = cursor.path(path);
-		mergeIncoming(target, value);
+
+		// A rejected merge leaves the cursor unchanged (atomic abort), so there is
+		// nothing to sync or propagate.
+		if (!mergeIncoming(target, value)) return;
 
 		// Notify propagators that cursor state has changed. This is non-blocking:
 		// cursor.sync() offers the current snapshot to each propagator's LatestUpdateQueue,
@@ -547,17 +550,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an incoming value into a lattice cursor.
-	 *
-	 * <p>Does not notify propagators — the caller is responsible for calling
-	 * {@code cursor.sync()} after the merge if relay is needed. This keeps merge
-	 * and propagation as separate concerns.
-	 *
-	 * @param <T> Type of cursor value
-	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})
-	 * @param value Value to merge
-	 */
-	/**
 	 * #564: whether an inbound LATTICE_VALUE is within the configured size limit for
 	 * merging. Values whose memory size exceeds
 	 * {@link NodeConfig#getMaxInboundValueSize()} are rejected before the merge runs on
@@ -577,12 +569,37 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return true;
 	}
 
+	/**
+	 * Merges an incoming (untrusted) value into a lattice cursor at the target path.
+	 * Does not notify propagators — the caller syncs only if the merge is accepted.
+	 *
+	 * <p>Per the lattice contract, {@code merge} is the enforcement point and aborts
+	 * atomically on bad data (see {@link convex.lattice.ALattice}), so a rejected value
+	 * leaves the cursor unchanged. A value that is not this lattice's type surfaces as a
+	 * {@link ClassCastException} — the erased {@code (T)} cast cannot catch it earlier —
+	 * and is treated here as an explicit rejection rather than a generic merge error.</p>
+	 *
+	 * @param <T> Type of cursor value
+	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})
+	 * @param value Value to merge (untrusted; may be the wrong type for this lattice)
+	 * @return true if the value was merged, false if it was rejected
+	 */
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> void mergeIncoming(ALatticeCursor<T> target, ACell value) {
+	<T extends ACell> boolean mergeIncoming(ALatticeCursor<T> target, ACell value) {
 		try {
 			target.merge((T) value);
+			return true;
+		} catch (ClassCastException e) {
+			// Wrong type for this lattice: the (T) cast is erased, so the mismatch only
+			// surfaces inside merge. Reject cleanly rather than as a generic error.
+			log.warn("Rejected inbound lattice value of wrong type: {}",
+					(value == null) ? "null" : value.getClass().getSimpleName());
+			return false;
 		} catch (Exception e) {
-			log.warn("Error during lattice merge", e);
+			// Merge rejected the value (invalid / stale) or failed; the atomic abort
+			// leaves the cursor unchanged.
+			log.warn("Rejected inbound lattice value (merge failed)", e);
+			return false;
 		}
 	}
 
