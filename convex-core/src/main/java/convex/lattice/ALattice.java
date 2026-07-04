@@ -26,15 +26,40 @@ import convex.lattice.cursor.AUpdateCursor;
  * risk from malicious or spurious incoming values, retains existing
  * structure beneficial for caching, and avoids unnecessary state churn.</p>
  *
+ * <p><b>Untrusted data — {@code merge} is the enforcement point.</b> A lattice may be
+ * fed values by anonymous remote peers (see {@code NodeServer}), so {@link #merge} must
+ * be safe against an arbitrary {@code otherValue}: it is responsible for rejecting or
+ * ignoring invalid, malformed or stale incoming data rather than incorporating it.
+ * Validation performed <em>inside</em> the merge is the primary defence and is usually
+ * the optimal place for it — a merge that throws on bad data aborts the merge
+ * <em>atomically</em> (the cursor retains the prior value; nothing partial is
+ * committed), so there is no risk in validating inline. Typical merge-time defences are
+ * per-entry signature checks, LWW timestamp monotonicity, and structural validation of
+ * child values. A lattice type intended for exposure to untrusted peers MUST enforce
+ * these within {@code merge}.</p>
+ *
+ * <p>{@link #checkForeign} is by contrast an <em>optional</em> fast-fail pre-check:
+ * callers may skip it (the network merge path does), and {@code merge} must never rely
+ * on it having run.</p>
+ *
  * @param <V> Type of values in this lattice
  */
 public abstract class ALattice<V extends ACell> {
 	
 	/**
-	 * Implementation of merge function
+	 * The lattice merge function: combines an externally received value into the own
+	 * value, returning the merged result.
+	 *
+	 * <p>This is the enforcement point for untrusted data (see class docs). The
+	 * implementation must reject or ignore an invalid, stale or malformed
+	 * {@code otherValue} rather than incorporate it, and must not assume
+	 * {@link #checkForeign} has been called. Throwing on bad data is safe: the whole
+	 * merge is aborted atomically, so the prior value is retained and nothing partial is
+	 * committed.</p>
+	 *
 	 * @param ownValue Own lattice value
-	 * @param otherValue Externally received lattice value
-	 * @return Merged lattice root cell
+	 * @param otherValue Externally received (possibly untrusted) lattice value
+	 * @return Merged lattice value
 	 */
 	public abstract V merge(V ownValue, V otherValue);
 
@@ -59,10 +84,17 @@ public abstract class ALattice<V extends ACell> {
 	public abstract V zero();
 
 	/**
-	 * Check if a foreign value is legal. Subtypes must check validity as far as any child lattices.
+	 * Optional fast-fail pre-check for a foreign value. This is NOT the primary defence:
+	 * {@link #merge} is the enforcement point and must independently reject invalid data,
+	 * so a caller may skip this entirely (the network merge path does). A merge
+	 * implementation may call {@code checkForeign} if a cheap up-front reject is
+	 * worthwhile, but validating inline during the merge is usually optimal (a throwing
+	 * merge aborts atomically, so there is no risk in deferring the check to merge time).
+	 *
+	 * <p>Subtypes should check validity as far as any child lattices.</p>
 	 *
 	 * @param value Value received from foreign source
-	 * @return true if foreign value is an acceptable lattice value
+	 * @return true if the foreign value is an acceptable lattice value
 	 */
 	public abstract boolean checkForeign(V value);
 
