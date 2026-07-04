@@ -38,6 +38,25 @@ import convex.lattice.cursor.AUpdateCursor;
  * child values. A lattice type intended for exposure to untrusted peers MUST enforce
  * these within {@code merge}.</p>
  *
+ * <p><b>Robustness is mandatory; content-trust is not merge's job (#561).</b> The audit in
+ * #561 makes merge <em>robustness</em> a hard requirement: for <em>any</em> {@code otherValue}
+ * — wrong type, malformed, oversized, replayed — merge must never corrupt committed state,
+ * exhaust resources (unbounded allocation or recursion), or wedge a value into an
+ * un-updatable state. Throwing is an acceptable outcome (it aborts atomically). What merge
+ * must <em>not</em> do is second-guess the <em>content</em> of a validly-authenticated value:
+ * a lattice is a faithful recorder and convergence of signed claims, so an owner's chosen
+ * (even implausible) LWW timestamp is <em>recorded as their claim</em>, not rejected by the
+ * merge. Two separate boundaries handle trust: <em>authorization</em> — who may write a given
+ * entry — is enforced by the composition layer ({@code OwnerLattice}/{@code SignedLattice});
+ * and <em>adoption</em> — whether to merge a given remote's data into your view at all — is a
+ * node-level trust decision (see {@code NodeServer}/the propagator). Both are outside
+ * {@code merge}. A consequence of proper owner-keying is that a peer can only ever wedge its
+ * <em>own</em> slot (self-denial); cross-owner effects require a deliberately shared register
+ * or an explicit trust choice, which is the operator's to make, not the merge's to police.
+ * The {@link LatticeContext} timestamp is the writer's <em>stamp-on-write</em> clock — the
+ * "when" companion to the signing "who" — used when a node stamps its <em>own</em> new values;
+ * it is not a filter applied to the timestamps inside others' incoming values.</p>
+ *
  * <p>{@link #checkForeign} is by contrast an <em>optional</em> fast-fail pre-check:
  * callers may skip it (the network merge path does), and {@code merge} must never rely
  * on it having run.</p>
