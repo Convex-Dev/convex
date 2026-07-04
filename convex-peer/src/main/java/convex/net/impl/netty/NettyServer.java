@@ -111,6 +111,7 @@ public class NettyServer extends AServer {
             	 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound);
             	 inbound.setConnection(conn);
+            	 inbound.setDisconnectAction(getDisconnectAction()); // #566: eager per-connection cleanup
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
              }
          })

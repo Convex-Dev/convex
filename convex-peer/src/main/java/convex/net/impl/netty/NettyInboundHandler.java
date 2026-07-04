@@ -1,6 +1,7 @@
 package convex.net.impl.netty;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -52,6 +53,12 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	private AConnection connection;
 
 	/**
+	 * Action invoked when this channel goes inactive (closes), so the server can release
+	 * per-connection state eagerly (#566). Default no-op.
+	 */
+	private Consumer<AConnection> onDisconnect = c -> {};
+
+	/**
 	 * Count of complete messages decoded on this channel.
 	 */
 	private long receivedCount=0;
@@ -81,6 +88,24 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		ctx.close();
 	}
 
+	@Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+		// Deliver any final decoded messages / run decoder cleanup first, then fire the
+		// disconnect callback so the server can release per-connection state (#566).
+		try {
+			super.channelInactive(ctx);
+		} finally {
+			AConnection conn = connection;
+			if (conn != null) {
+				try {
+					onDisconnect.accept(conn);
+				} catch (Exception e) {
+					log.debug("Disconnect action failed: {}", e.getMessage());
+				}
+			}
+		}
+	}
+
 	public long getReceivedCount() {
 		return receivedCount;
 	}
@@ -92,6 +117,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	void setConnection(AConnection conn) {
 		this.connection = conn;
+	}
+
+	/**
+	 * Sets the action invoked when this channel closes (#566).
+	 * @param action Disconnect action (null resets to a no-op)
+	 */
+	void setDisconnectAction(Consumer<AConnection> action) {
+		this.onDisconnect = (action != null) ? action : c -> {};
 	}
 
 	@Override

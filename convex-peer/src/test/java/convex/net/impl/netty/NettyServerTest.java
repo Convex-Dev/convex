@@ -3,6 +3,7 @@ package convex.net.impl.netty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,9 +28,11 @@ import convex.core.data.Blobs;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.store.NullStore;
+import io.netty.channel.embedded.EmbeddedChannel;
 
 @Execution(ExecutionMode.CONCURRENT)
 @TestInstance(Lifecycle.PER_CLASS)
@@ -104,8 +107,28 @@ public class NettyServerTest {
 			
 			Message m=queue.poll(1000,TimeUnit.MILLISECONDS);
 			assertEquals(RT.cvm(10),m.getResultID());
-			
+
 
 		}
+	}
+
+	/**
+	 * #566: when an inbound channel closes, the handler fires the disconnect action with its
+	 * connection, letting the server release per-connection state eagerly. Uses an
+	 * EmbeddedChannel so the channelInactive lifecycle is driven deterministically.
+	 */
+	@Test public void testChannelInactiveFiresDisconnect() {
+		NettyInboundHandler handler = new NettyInboundHandler(msg -> null, null);
+		EmbeddedChannel ch = new EmbeddedChannel(handler);
+		NettyServerConnection conn = new NettyServerConnection(ch, handler);
+		handler.setConnection(conn);
+
+		CompletableFuture<AConnection> disconnected = new CompletableFuture<>();
+		handler.setDisconnectAction(disconnected::complete);
+
+		ch.close();
+
+		assertTrue(disconnected.isDone(), "channelInactive should fire the disconnect action");
+		assertEquals(conn, disconnected.getNow(null));
 	}
 }

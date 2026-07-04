@@ -268,6 +268,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				networkServer = new NettyServer(port);
 				// Set the receive action for handling incoming messages
 				networkServer.setReceiveAction(receiveAction);
+				// #566: release per-connection stats eagerly when a connection closes. The
+				// periodic sweep remains as a backstop for transports without a close signal.
+				networkServer.setDisconnectAction(this::removeConnection);
 			}
 
 			if (port != null) {
@@ -699,10 +702,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Releases all inbound state held for a connection (#566). This is the single cleanup
-	 * sink for the inbound (untrusted) connection lifecycle: the circuit-breaker calls it
-	 * when it closes a connection, and it is where any future per-connection inbound state
-	 * (work queues, rate limiters) should be torn down. Distinct from
-	 * {@link #removePeer(AccountKey)}, which manages outbound, identity-keyed peer connections.
+	 * sink for the inbound (untrusted) connection lifecycle, invoked from three places:
+	 * the network layer's disconnect hook when a connection closes (the eager path — see
+	 * {@code NettyServer}/{@code AServer#setDisconnectAction}), the circuit-breaker when it
+	 * closes an abusive connection, and the sweep backstops below. It is also where any
+	 * future per-connection inbound state (work queues, rate limiters) should be torn down.
+	 * Distinct from {@link #removePeer(AccountKey)}, which manages outbound, identity-keyed
+	 * peer connections.
 	 *
 	 * @param conn connection to forget (may be null)
 	 */
@@ -712,20 +718,20 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Prunes closed connections from the stats map (#566). Called opportunistically from
-	 * {@link #statsFor} when the map grows past {@link #MAX_TRACKED_CONNECTIONS} (bounding
-	 * memory during connection churn) and periodically from {@link #maintenanceLoop} (so an
-	 * idle node still drains dead entries within {@link #CONNECTION_SWEEP_INTERVAL}, without
-	 * needing a per-connection close hook from the network layer).
+	 * Prunes closed connections from the stats map (#566). A backstop to the eager disconnect
+	 * hook: called opportunistically from {@link #statsFor} when the map grows past
+	 * {@link #MAX_TRACKED_CONNECTIONS} (bounding memory during connection churn) and
+	 * periodically from {@link #maintenanceLoop} — so entries still drain if a disconnect
+	 * event is missed or a transport does not surface one.
 	 */
 	void sweepClosedConnections() {
 		connectionStats.keySet().removeIf(AConnection::isClosed);
 	}
 
 	/**
-	 * Periodic maintenance loop (#566): sweeps closed connections from the stats map so a
-	 * node with no inbound traffic still releases dead entries within one sweep interval.
-	 * Exits promptly on interrupt when the server closes.
+	 * Periodic maintenance loop (#566): a backstop that sweeps closed connections from the
+	 * stats map even if the eager disconnect hook is missed or unavailable, so entries drain
+	 * within one sweep interval. Exits promptly on interrupt when the server closes.
 	 */
 	private void maintenanceLoop() {
 		while (running) {
