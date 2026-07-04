@@ -17,6 +17,8 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.Cursors;
 
 /**
  * Tests for the LatticeKV key-value store.
@@ -36,6 +38,22 @@ public class LatticeKVTest {
 		assertTrue(KVEntry.isValid(entry));
 		assertFalse(KVEntry.isTombstone(entry));
 		assertEquals("value", KVEntry.typeName(entry));
+	}
+
+	/**
+	 * #561: time is injected via the LatticeContext, not read from the system clock — so a
+	 * write with a fixed-timestamp context stamps that exact time (deterministic).
+	 */
+	@Test
+	public void testInjectedTimestamp() {
+		CVMLong fixed = CVMLong.create(123456789L);
+		var cursor = Cursors.createLattice(KVStoreLattice.INSTANCE);
+		cursor.withContext(LatticeContext.create(fixed, null));
+		LatticeKV kv = LatticeKV.connect(cursor);
+
+		kv.set("a", Strings.create("v"));
+		AVector<ACell> entry = cursor.get().get(Strings.create("a"));
+		assertEquals(fixed, KVEntry.getUTime(entry), "utime should be the injected context timestamp");
 	}
 
 	/**

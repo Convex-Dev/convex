@@ -333,8 +333,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		String versionStr = Utils.getVersion();
 		AString version = Strings.create(versionStr != null ? versionStr : "unknown");
 
+		// #561: stamp the published NodeInfo from the merge context (driver-supplied time),
+		// not from a system-clock read inside the lattice builder.
 		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
-			Vectors.of(url), type, version, null);
+			Vectors.of(url), type, version, null, mergeContext.currentTimestampValue());
 
 		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
 

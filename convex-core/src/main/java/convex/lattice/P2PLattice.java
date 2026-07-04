@@ -60,21 +60,11 @@ public class P2PLattice {
 		KeyedLattice.create(Keywords.NODES, NODES_LATTICE);
 
 	/**
-	 * Creates a NodeInfo map with the given fields and current timestamp.
+	 * Creates a NodeInfo map with an explicit timestamp (#561).
 	 *
-	 * @param transports Public transport URIs (must be publicly reachable, never localhost)
-	 * @param type Node software type (e.g. "Convex Lattice Node")
-	 * @param version Software version string
-	 * @param regions Region/location tags (may be null or empty)
-	 * @return NodeInfo map suitable for signing and publishing
-	 */
-	public static AHashMap<Keyword, ACell> createNodeInfo(
-			AVector<AString> transports, AString type, AString version, AVector<AString> regions) {
-		return createNodeInfo(transports, type, version, regions, System.currentTimeMillis());
-	}
-
-	/**
-	 * Creates a NodeInfo map with explicit timestamp (for testing).
+	 * <p>The timestamp is supplied by the caller — the driving (merging or test) process —
+	 * rather than read from the system clock here; a node stamps its published NodeInfo from
+	 * its {@code LatticeContext} (see {@code NodeServer.publishNodeInfo}).</p>
 	 *
 	 * @param transports Public transport URIs (must be publicly reachable, never localhost)
 	 * @param type Node software type (e.g. "Convex Lattice Node")

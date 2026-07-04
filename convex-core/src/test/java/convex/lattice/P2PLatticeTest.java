@@ -75,20 +75,6 @@ public class P2PLatticeTest {
 		assertNotNull(info.get(Keywords.TIMESTAMP));
 	}
 
-	@Test
-	public void testNodeInfoTimestampDefault() {
-		long before = System.currentTimeMillis();
-		AHashMap<Keyword, ACell> info = P2PLattice.createNodeInfo(
-			Vectors.of(Strings.create("tcp://peer.example.com:18888")),
-			TEST_TYPE, Strings.create("0.8.3"),
-			null
-		);
-		long after = System.currentTimeMillis();
-
-		long ts = ((CVMLong) info.get(Keywords.TIMESTAMP)).longValue();
-		assertTrue(ts >= before && ts <= after, "Timestamp should be around now");
-	}
-
 	// ===== LWW merge =====
 
 	@Test

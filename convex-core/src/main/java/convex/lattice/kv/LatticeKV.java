@@ -94,8 +94,14 @@ public class LatticeKV {
 
 	// ========== Internal Helpers ==========
 
+	// #561: time comes from the cursor's LatticeContext (driver/test supplied), never from
+	// the system clock directly — so writes are deterministic when a timestamp is injected.
 	private CVMLong now() {
-		return CVMLong.create(System.currentTimeMillis());
+		return cursor.getContext().currentTimestamp();
+	}
+
+	private long nowMs() {
+		return cursor.getContext().currentTimestampValue();
 	}
 
 	private AString key(String key) {
@@ -111,7 +117,7 @@ public class LatticeKV {
 	private AVector<ACell> getLiveEntry(String key) {
 		AVector<ACell> entry = getEntry(key);
 		if (entry == null) return null;
-		if (!KVEntry.isLive(entry, System.currentTimeMillis())) return null;
+		if (!KVEntry.isLive(entry, nowMs())) return null;
 		return entry;
 	}
 
@@ -154,7 +160,7 @@ public class LatticeKV {
 	 * Sets a string value for a key with TTL in milliseconds
 	 */
 	public void set(String key, ACell value, long ttlMillis) {
-		long nowMs = System.currentTimeMillis();
+		long nowMs = nowMs();
 		CVMLong timestamp = CVMLong.create(nowMs);
 		CVMLong expire = CVMLong.create(nowMs + ttlMillis);
 		putEntry(key, KVEntry.createValue(value, timestamp, expire));
@@ -183,7 +189,7 @@ public class LatticeKV {
 	public ASet<AString> keys() {
 		Index<AString, AVector<ACell>> store = cursor.get();
 		if (store == null) return Sets.empty();
-		long now = System.currentTimeMillis();
+		long now = nowMs();
 		ASet<AString> result = Sets.empty();
 		for (var e : store.entrySet()) {
 			AVector<ACell> entry = e.getValue();
@@ -200,7 +206,7 @@ public class LatticeKV {
 	public long expire(String key, long ttlMillis) {
 		AVector<ACell> entry = getLiveEntry(key);
 		if (entry == null) return 0;
-		CVMLong expire = CVMLong.create(System.currentTimeMillis() + ttlMillis);
+		CVMLong expire = CVMLong.create(nowMs() + ttlMillis);
 		putEntry(key, KVEntry.withExpiry(entry, expire));
 		return 1;
 	}
@@ -213,7 +219,7 @@ public class LatticeKV {
 		if (entry == null) return -2;
 		CVMLong expire = KVEntry.getExpire(entry);
 		if (expire == null) return -1;
-		long remaining = expire.longValue() - System.currentTimeMillis();
+		long remaining = expire.longValue() - nowMs();
 		return Math.max(0, remaining);
 	}
 
@@ -485,7 +491,7 @@ public class LatticeKV {
 	 * Removes expired entries and old tombstones. Returns count of entries removed.
 	 */
 	public long gc() {
-		long now = System.currentTimeMillis();
+		long now = nowMs();
 		long[] removed = {0};
 		cursor.updateAndGet(store -> {
 			if (store == null) return store;
