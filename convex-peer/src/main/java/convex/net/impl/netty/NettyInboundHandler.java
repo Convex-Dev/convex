@@ -52,11 +52,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	private AConnection connection;
 
+	/** No-op disconnect action, used as the default and the null-reset value. */
+	private static final Consumer<AConnection> NO_DISCONNECT = c -> {};
+
 	/**
 	 * Action invoked when this channel goes inactive (closes), so the server can release
 	 * per-connection state eagerly (#566). Default no-op.
 	 */
-	private Consumer<AConnection> onDisconnect = c -> {};
+	private Consumer<AConnection> onDisconnect = NO_DISCONNECT;
 
 	/**
 	 * Count of complete messages decoded on this channel.
@@ -124,7 +127,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 * @param action Disconnect action (null resets to a no-op)
 	 */
 	void setDisconnectAction(Consumer<AConnection> action) {
-		this.onDisconnect = (action != null) ? action : c -> {};
+		this.onDisconnect = (action != null) ? action : NO_DISCONNECT;
 	}
 
 	@Override

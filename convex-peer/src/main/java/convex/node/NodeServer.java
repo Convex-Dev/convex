@@ -380,14 +380,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		AConnection conn = message.getConnection();
 		ConnectionStats stats = statsFor(conn);
-		if (stats != null) stats.messagesReceived++;
+		recordReceived(stats);
 
 		try {
 			// Decode message payload using node's store before processing
 			message.getPayload(store);
 		} catch (Exception e) {
 			// #566: an undecodable message counts against the connection and can trip the breaker.
-			recordReject(conn, stats, true);
+			recordDecodeError(conn, stats);
 			log.warn("Failed to decode incoming message: {}", e.getMessage());
 			try {
 				ACell id = message.getRequestID(); // safe: returns null if undecoded
@@ -542,7 +542,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_VALUE message format");
-			recordReject(conn, stats, false);
+			recordMergeReject(conn, stats);
 			return;
 		}
 
@@ -551,14 +551,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		if (value == null) {
 			log.warn("LATTICE_VALUE message missing value");
-			recordReject(conn, stats, false);
+			recordMergeReject(conn, stats);
 			return;
 		}
 
 		// #564: bound merge cost from untrusted peers — reject an oversized value before
 		// the (synchronous, receive-thread) merge runs.
 		if (!withinInboundSizeLimit(value)) {
-			recordReject(conn, stats, false);
+			recordMergeReject(conn, stats);
 			return;
 		}
 
@@ -569,7 +569,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// A rejected merge leaves the cursor unchanged (atomic abort), so there is
 		// nothing to sync or propagate.
 		if (!mergeIncoming(target, value)) {
-			recordReject(conn, stats, false);
+			recordMergeReject(conn, stats);
 			return;
 		}
 
@@ -753,17 +753,50 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Records a rejected or undecodable inbound message against a connection and, if the
-	 * configured consecutive-reject limit is reached, trips the circuit-breaker: the
-	 * connection is closed and its stats dropped. A no-op for connection-less messages.
+	 * Records an inbound message received on a connection (#566). Null-safe: a no-op for
+	 * connection-less (in-JVM) messages, so callers need not guard.
+	 *
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordReceived(ConnectionStats stats) {
+		if (stats != null) stats.messagesReceived++;
+	}
+
+	/**
+	 * Records an undecodable inbound message against a connection (#566), tripping the
+	 * circuit-breaker if the consecutive-reject limit is reached.
 	 *
 	 * @param conn originating connection (may be null)
 	 * @param stats the connection's stats (may be null)
-	 * @param decodeError true if the message could not be decoded, false for a rejected merge
 	 */
-	private void recordReject(AConnection conn, ConnectionStats stats, boolean decodeError) {
+	private void recordDecodeError(AConnection conn, ConnectionStats stats) {
 		if (stats == null) return;
-		if (decodeError) stats.decodeErrors++; else stats.mergesRejected++;
+		stats.decodeErrors++;
+		registerReject(conn, stats);
+	}
+
+	/**
+	 * Records a rejected merge — a malformed, oversized, wrong-type or invalid value — against
+	 * a connection (#566), tripping the circuit-breaker if the consecutive-reject limit is reached.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordMergeReject(AConnection conn, ConnectionStats stats) {
+		if (stats == null) return;
+		stats.mergesRejected++;
+		registerReject(conn, stats);
+	}
+
+	/**
+	 * Shared reject bookkeeping (#566): advances the consecutive-reject streak and, if the
+	 * configured limit is reached, trips the circuit-breaker — closing the connection and
+	 * dropping its stats. The caller has already bumped the specific reject counter.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (non-null)
+	 */
+	private void registerReject(AConnection conn, ConnectionStats stats) {
 		stats.consecutiveRejects++;
 		stats.lastErrorTimestamp = Utils.getCurrentTimestamp();
 

@@ -59,6 +59,9 @@ public abstract class AServer implements Closeable {
 	 */
 	public abstract void setReceiveAction(Consumer<Message> action);
 
+	/** No-op disconnect action, used as the default and the null-reset value. */
+	private static final Consumer<AConnection> NO_DISCONNECT = c -> {};
+
 	/**
 	 * Action invoked when an inbound connection closes, allowing the owner to release any
 	 * per-connection state eagerly (#566). Default is a no-op; transports that can detect
@@ -66,7 +69,7 @@ public abstract class AServer implements Closeable {
 	 * surface disconnects, so callers must not rely on it firing for every close — it is an
 	 * optimisation over periodic cleanup, not a guarantee.
 	 */
-	private Consumer<AConnection> disconnectAction = c -> {};
+	private Consumer<AConnection> disconnectAction = NO_DISCONNECT;
 
 	/**
 	 * Sets the action invoked when an inbound connection closes. Should be called before launch.
@@ -74,7 +77,7 @@ public abstract class AServer implements Closeable {
 	 * @param action Disconnect action (null resets to a no-op)
 	 */
 	public void setDisconnectAction(Consumer<AConnection> action) {
-		this.disconnectAction = (action != null) ? action : c -> {};
+		this.disconnectAction = (action != null) ? action : NO_DISCONNECT;
 	}
 
 	/**
