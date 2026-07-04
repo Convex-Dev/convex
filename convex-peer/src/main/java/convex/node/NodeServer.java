@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -120,6 +122,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Whether the server is currently running
 	 */
 	private boolean running = false;
+
+	/**
+	 * Per-connection inbound counters, keyed by the originating connection (#566). Used for
+	 * observability and to drive the circuit-breaker that closes a connection flooding us with
+	 * bad messages. Connection-less (in-JVM) messages are not tracked.
+	 */
+	private final ConcurrentHashMap<AConnection, ConnectionStats> connectionStats = new ConcurrentHashMap<>();
+
+	/** Upper bound on tracked connections before closed entries are swept, bounding memory (#566). */
+	private static final int MAX_TRACKED_CONNECTIONS = 4096;
 
 	/**
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
@@ -341,13 +353,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @param message The incoming message
 	 */
-	private void handleIncomingMessage(Message message) {
+	void handleIncomingMessage(Message message) {
 		log.debug("Received message from peer: {}", message);
+
+		AConnection conn = message.getConnection();
+		ConnectionStats stats = statsFor(conn);
+		if (stats != null) stats.messagesReceived++;
 
 		try {
 			// Decode message payload using node's store before processing
 			message.getPayload(store);
 		} catch (Exception e) {
+			// #566: an undecodable message counts against the connection and can trip the breaker.
+			recordReject(conn, stats, true);
 			log.warn("Failed to decode incoming message: {}", e.getMessage());
 			try {
 				ACell id = message.getRequestID(); // safe: returns null if undecoded
@@ -496,9 +514,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws BadFormatException If message format is invalid
 	 */
 	private void processLatticeValue(Message message) throws BadFormatException {
+		AConnection conn = message.getConnection();
+		ConnectionStats stats = statsFor(conn);
+
 		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_VALUE message format");
+			recordReject(conn, stats, false);
 			return;
 		}
 
@@ -507,12 +529,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		if (value == null) {
 			log.warn("LATTICE_VALUE message missing value");
+			recordReject(conn, stats, false);
 			return;
 		}
 
 		// #564: bound merge cost from untrusted peers — reject an oversized value before
 		// the (synchronous, receive-thread) merge runs.
-		if (!withinInboundSizeLimit(value)) return;
+		if (!withinInboundSizeLimit(value)) {
+			recordReject(conn, stats, false);
+			return;
+		}
 
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
@@ -520,7 +546,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		// A rejected merge leaves the cursor unchanged (atomic abort), so there is
 		// nothing to sync or propagate.
-		if (!mergeIncoming(target, value)) return;
+		if (!mergeIncoming(target, value)) {
+			recordReject(conn, stats, false);
+			return;
+		}
+
+		// #566: a successful merge resets the connection's consecutive-reject streak.
+		recordAccept(stats);
 
 		// Notify propagators that cursor state has changed. This is non-blocking:
 		// cursor.sync() offers the current snapshot to each propagator's LatestUpdateQueue,
@@ -612,6 +644,135 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.warn("Rejected inbound lattice value (merge failed)", e);
 			return false;
 		}
+	}
+
+	// ===== Per-connection inbound metrics & circuit-breaker (#566) =====
+
+	/**
+	 * Per-connection inbound counters. A connection's counters are written only from that
+	 * connection's Netty event-loop thread (a channel is bound to a single event loop), so
+	 * plain {@code volatile long}s are correct and cheap: exactly one writer per connection,
+	 * with volatile giving visibility to aggregate/operator reads on other threads.
+	 */
+	static final class ConnectionStats {
+		/** Total messages received on this connection. */
+		volatile long messagesReceived;
+		/** Merges accepted (value incorporated). */
+		volatile long mergesAccepted;
+		/** Merges rejected (bad/oversized/wrong-type value, malformed LATTICE_VALUE). */
+		volatile long mergesRejected;
+		/** Undecodable messages. */
+		volatile long decodeErrors;
+		/** Consecutive rejects/decode-errors since the last accepted merge (drives the breaker). */
+		volatile long consecutiveRejects;
+		/** Wall-clock timestamp of the last reject/decode-error. */
+		volatile long lastErrorTimestamp;
+	}
+
+	/**
+	 * Gets (creating if needed) the stats for a connection, or null for a connection-less
+	 * (in-JVM / local) message which is not rate-tracked. Opportunistically sweeps closed
+	 * connections when the map grows large, bounding memory from connection churn.
+	 *
+	 * @param conn originating connection, or null
+	 * @return the connection's stats, or null if {@code conn} is null
+	 */
+	ConnectionStats statsFor(AConnection conn) {
+		if (conn == null) return null;
+		if (connectionStats.size() > MAX_TRACKED_CONNECTIONS) {
+			connectionStats.keySet().removeIf(AConnection::isClosed);
+		}
+		return connectionStats.computeIfAbsent(conn, k -> new ConnectionStats());
+	}
+
+	/**
+	 * Records a rejected or undecodable inbound message against a connection and, if the
+	 * configured consecutive-reject limit is reached, trips the circuit-breaker: the
+	 * connection is closed and its stats dropped. A no-op for connection-less messages.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (may be null)
+	 * @param decodeError true if the message could not be decoded, false for a rejected merge
+	 */
+	private void recordReject(AConnection conn, ConnectionStats stats, boolean decodeError) {
+		if (stats == null) return;
+		if (decodeError) stats.decodeErrors++; else stats.mergesRejected++;
+		stats.consecutiveRejects++;
+		stats.lastErrorTimestamp = Utils.getCurrentTimestamp();
+
+		long limit = config.getMaxConsecutiveRejects();
+		if (limit > 0 && stats.consecutiveRejects >= limit && conn != null && !conn.isClosed()) {
+			log.warn("Circuit-breaker: closing connection {} after {} consecutive bad inbound messages",
+					conn, stats.consecutiveRejects);
+			try {
+				conn.close();
+			} catch (Exception e) {
+				// best effort — connection may already be failing
+			}
+			connectionStats.remove(conn);
+		}
+	}
+
+	/**
+	 * Records an accepted merge against a connection, resetting its consecutive-reject streak.
+	 *
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordAccept(ConnectionStats stats) {
+		if (stats == null) return;
+		stats.mergesAccepted++;
+		stats.consecutiveRejects = 0;
+	}
+
+	/**
+	 * Immutable aggregate snapshot of inbound counters across all currently-tracked
+	 * connections (#566). Intended for operator observability — logging, health endpoints,
+	 * or tests. Connections closed by the circuit-breaker are no longer counted.
+	 */
+	public static final class InboundStats {
+		/** Number of connections currently tracked. */
+		public final long connections;
+		/** Total inbound messages received. */
+		public final long messagesReceived;
+		/** Total merges accepted. */
+		public final long mergesAccepted;
+		/** Total merges rejected. */
+		public final long mergesRejected;
+		/** Total undecodable messages. */
+		public final long decodeErrors;
+
+		InboundStats(long connections, long messagesReceived, long mergesAccepted,
+				long mergesRejected, long decodeErrors) {
+			this.connections = connections;
+			this.messagesReceived = messagesReceived;
+			this.mergesAccepted = mergesAccepted;
+			this.mergesRejected = mergesRejected;
+			this.decodeErrors = decodeErrors;
+		}
+
+		@Override
+		public String toString() {
+			return "InboundStats[connections=" + connections + ", received=" + messagesReceived
+					+ ", accepted=" + mergesAccepted + ", rejected=" + mergesRejected
+					+ ", decodeErrors=" + decodeErrors + "]";
+		}
+	}
+
+	/**
+	 * Returns an aggregate snapshot of inbound metrics across all tracked connections (#566).
+	 *
+	 * @return immutable aggregate inbound stats snapshot
+	 */
+	public InboundStats getInboundStats() {
+		long conns = 0, recv = 0, acc = 0, rej = 0, dec = 0;
+		for (ConnectionStats s : connectionStats.values()) {
+			conns++;
+			recv += s.messagesReceived;
+			acc += s.mergesAccepted;
+			rej += s.mergesRejected;
+			dec += s.decodeErrors;
+		}
+		return new InboundStats(conns, recv, acc, rej, dec);
 	}
 
 	/**

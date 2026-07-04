@@ -39,6 +39,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -790,6 +791,67 @@ public class NodeServerTest {
 		// After launch: rejected
 		assertThrows(IllegalStateException.class,
 			() -> maxNodeServer.setMergeContext(LatticeContext.EMPTY));
+	}
+
+	// ===== #566: per-connection metrics & circuit-breaker =====
+
+	/** Minimal AConnection test double: records close(), never actually sends. */
+	static final class RecordingConnection extends AConnection {
+		volatile boolean closed = false;
+		@Override public boolean sendMessage(Message msg) { return true; }
+		@Override public boolean trySendMessage(Message msg) { return true; }
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.1", 30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed = true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
+	private static Message latticeValue(ACell value, AConnection conn) {
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, Vectors.empty(), value);
+		return Message.create(MessageType.LATTICE_VALUE, payload).withConnection(conn);
+	}
+
+	/**
+	 * #566: per-connection counters track accepts/rejects, and the circuit-breaker closes a
+	 * connection after the configured number of consecutive bad messages (an accepted merge
+	 * resets the streak).
+	 */
+	@Test
+	public void testCircuitBreakerAndInboundStats() {
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.PORT, CVMLong.create(-1),
+			NodeConfig.MAX_CONSECUTIVE_REJECTS, CVMLong.create(3)
+		));
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
+
+		// Wrong type for MaxLattice<AInteger> — mergeIncoming rejects it
+		ACell badValue = convex.core.data.Blob.wrap(new byte[8]);
+
+		// A connection that sends two bad then one good message stays open; the accept resets the streak
+		RecordingConnection tracked = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, tracked));            // reject 1
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, tracked));            // reject 2
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(42), tracked));  // accept
+
+		NodeServer.ConnectionStats s = maxNodeServer.statsFor(tracked);
+		assertEquals(3, s.messagesReceived);
+		assertEquals(2, s.mergesRejected);
+		assertEquals(1, s.mergesAccepted);
+		assertEquals(0, s.consecutiveRejects); // reset by the accept
+		assertFalse(tracked.isClosed(), "Accept reset the streak, so the breaker must not trip");
+
+		// A connection sending only bad messages trips the breaker at the limit
+		RecordingConnection abusive = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 1
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 2
+		assertFalse(abusive.isClosed(), "Below the threshold the connection stays open");
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 3 == limit -> trip
+		assertTrue(abusive.isClosed(), "Connection closed after reaching the consecutive-reject limit");
+
+		// Aggregate stats reflect the surviving tracked connection (the abusive one was pruned on trip)
+		NodeServer.InboundStats agg = maxNodeServer.getInboundStats();
+		assertTrue(agg.mergesAccepted >= 1);
+		assertTrue(agg.mergesRejected >= 2);
 	}
 
 	// ===== Gossip relay tests =====

@@ -50,6 +50,10 @@ public class NodeConfig {
 	/** Whether to permit a private/loopback {@link #URL} for dev networks (Boolean, default false). #567 */
 	public static final AString ALLOW_PRIVATE_URL = Strings.intern("allowPrivateURL");
 
+	/** Consecutive rejected/undecodable inbound messages from a single connection before the
+	 *  circuit-breaker closes it (Long, default 100; 0 disables). #566 */
+	public static final AString MAX_CONSECUTIVE_REJECTS = Strings.intern("maxConsecutiveRejects");
+
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
@@ -161,6 +165,19 @@ public class NodeConfig {
 	 */
 	public boolean isAllowPrivateURL() {
 		return getBool(ALLOW_PRIVATE_URL, false);
+	}
+
+	/**
+	 * Consecutive rejected or undecodable inbound messages from a single connection before
+	 * the circuit-breaker closes it (#566). A single accepted merge resets the streak.
+	 * Defaults to 100 — generous enough not to bite a trusted peer, tight enough to cut off
+	 * a peer streaming malformed values indefinitely. Set to 0 to disable the breaker.
+	 *
+	 * @return consecutive-reject limit, or 0 if the circuit-breaker is disabled
+	 */
+	public long getMaxConsecutiveRejects() {
+		CVMLong v = RT.ensureLong(config.get(MAX_CONSECUTIVE_REJECTS));
+		return (v != null) ? v.longValue() : 100L;
 	}
 
 	// ========== URL validation (#567) ==========
