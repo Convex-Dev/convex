@@ -103,8 +103,8 @@ public class LatticeMQTest {
 		topic.offer(Strings.create("key-B"), Strings.create("val-B"));
 		topic.offer(Strings.create("key-C"), Strings.create("val-C"));
 
-		// Verify: same key always goes to same partition
-		long partA1 = Math.abs(Strings.create("key-A").getHash().longValue()) % N;
+		// Verify: same key always goes to same partition (floorMod matches production, #561)
+		long partA1 = Math.floorMod(Strings.create("key-A").getHash().longValue(), (long) N);
 		topic.offer(Strings.create("key-A"), Strings.create("val-A2"));
 
 		LatticeQueue partQ = topic.partition(partA1);
