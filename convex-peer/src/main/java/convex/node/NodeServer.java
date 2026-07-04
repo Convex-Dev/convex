@@ -196,6 +196,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException("NodeServer is already running");
 		}
 
+		// #567: validate a configured public URL before advertising it. Fail fast on a
+		// misconfigured (private/loopback/malformed) URL rather than silently polluting the
+		// [:p2p :nodes] registry with an unreachable address that peers waste reconnects on.
+		AString urlCfg = config.getURL();
+		if (urlCfg != null) {
+			String reason = NodeConfig.validatePublicURL(urlCfg.toString(), config.isAllowPrivateURL());
+			if (reason != null) {
+				throw new IllegalStateException("Invalid node URL configuration: " + reason);
+			}
+		}
+
 		log.debug("Launching NodeServer on port {}", port);
 
 		// Create primary propagator if none have been added

@@ -694,6 +694,86 @@ public class NodeServerTest {
 		}
 	}
 
+	// ===== #567: public URL validation =====
+
+	/**
+	 * The URL validator accepts public hosts (hostnames it does not resolve, and public IP
+	 * literals) and rejects loopback / private / link-local / malformed URLs.
+	 */
+	@Test
+	public void testPublicURLValidation() {
+		// Acceptable: public hostname (never resolved) and a public IP literal
+		assertNull(NodeConfig.validatePublicURL("tcp://peer.example.com:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://93.184.216.34:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://[2001:db8::1]:18888", false));
+		// A public hostname that happens to boundary the 172.16/12 range on either side
+		assertNull(NodeConfig.validatePublicURL("tcp://172.15.0.1:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://172.32.0.1:18888", false));
+
+		// Rejected: localhost and loopback
+		assertNotNull(NodeConfig.validatePublicURL("tcp://localhost:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://127.0.0.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://[::1]:18888", false));
+		// Rejected: RFC1918 private ranges
+		assertNotNull(NodeConfig.validatePublicURL("tcp://10.1.2.3:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://172.20.0.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://192.168.1.1:18888", false));
+		// Rejected: link-local, wildcard, IPv6 ULA
+		assertNotNull(NodeConfig.validatePublicURL("tcp://169.254.1.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://0.0.0.0:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://[fc00::1]:18888", false));
+		// Rejected: missing scheme / host / port, malformed
+		assertNotNull(NodeConfig.validatePublicURL("peer.example.com", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", false));
+		assertNotNull(NodeConfig.validatePublicURL("ht tp://bad host", false));
+		assertNotNull(NodeConfig.validatePublicURL("", false));
+		assertNotNull(NodeConfig.validatePublicURL(null, false));
+
+		// allowPrivate override: private addresses become acceptable, malformed still rejected
+		assertNull(NodeConfig.validatePublicURL("tcp://localhost:18888", true));
+		assertNull(NodeConfig.validatePublicURL("tcp://192.168.1.1:18888", true));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", true)); // still missing port
+	}
+
+	/**
+	 * launch() fails fast when a private URL is configured without the allowPrivateURL opt-out,
+	 * and succeeds (publishing) once the opt-out is set.
+	 */
+	@Test
+	public void testLaunchRejectsPrivateURL() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+
+		NodeConfig badCfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+		NodeServer<Index<Keyword, ACell>> bad = new NodeServer<>(Lattice.ROOT, store, badCfg);
+		bad.setMergeContext(LatticeContext.create(null, kp));
+		try {
+			assertThrows(IllegalStateException.class, bad::launch);
+		} finally {
+			bad.close();
+		}
+
+		// With the opt-out, the same private URL launches and publishes
+		NodeConfig okCfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
+			NodeConfig.ALLOW_PRIVATE_URL, convex.core.data.prim.CVMBool.TRUE,
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+		NodeServer<Index<Keyword, ACell>> ok = new NodeServer<>(Lattice.ROOT, store, okCfg);
+		ok.setMergeContext(LatticeContext.create(null, kp));
+		try {
+			ok.launch();
+			ACell nodes = PathCursor.create(
+				ok.getCursor(),
+				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+			assertNotNull(nodes, ":p2p :nodes should be populated when allowPrivateURL is set");
+		} finally {
+			ok.close();
+		}
+	}
+
 	// ===== Gossip relay tests =====
 	//
 	// These tests verify that incoming lattice values reach the propagator.
