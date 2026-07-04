@@ -123,7 +123,8 @@ out-of-window Block still occupies its position in the ordering, legitimate Bloc
 behind it also wait until the horizon advances past it. This is bounded (it clears as
 real time passes), attributable (the Block is signed by a staked peer) and punishable
 under governance. Safety is bought at the price of attack-time throughput behind the
-offending Block — an acceptable trade for the minimal, obviously-correct core.
+offending Block — an acceptable trade for the minimal, obviously-correct core, and one
+that stage (ii) below then removes.
 
 **Stage (ii) — ordering hygiene (liveness).** So a far-future Block does not wedge
 later in-horizon Blocks behind it, `filterBlocks` (BeliefMerge.java) **stably demotes

@@ -401,17 +401,25 @@ public class BeliefMerge {
 	}
 	
 	/**
-	 * Filter blocks based on validity / timestamps
-	 * @param blks Blocks to filer
-	 * @param cp Point at which to start filtering (should be consensus point)
-	 * @return Updated blocks, or same blocks if no change
+	 * #595 stage (ii): reorders the winning Block vector so a far-future Block does not
+	 * wedge later in-horizon Blocks behind it (see {@link #demoteFutureBlocks}). Applied
+	 * to the winning order before consensus is computed, so the reordering feeds
+	 * {@code updateConsensus} and the stage (i) clamp: with the future Block moved to the
+	 * back, the clamp confirms up to it, and the in-horizon Blocks ahead of it finalise.
+	 *
+	 * <p>The floor {@code cp} is this peer's consensus point — the agreed prefix below it
+	 * is never reordered. Reordering everything above it is safe precisely because stage
+	 * (i)'s clamp guarantees a far-future Block never gains proposal (let alone consensus)
+	 * standing: such Blocks always sit in the raw, reorderable tail, so demoting them
+	 * cannot disturb an agreed prefix. If that clamp is ever removed or weakened, this
+	 * assumption breaks.</p>
+	 *
+	 * @param blks winning Block vector
+	 * @param cp   consensus point: floor below which Blocks are not reordered
+	 * @return reordered Blocks, or the same vector if unchanged
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
 			long cp) {
-		// #595 stage (ii): demote out-of-horizon Blocks to the back of the unconfirmed tail
-		// so a far-future Block does not wedge later in-horizon Blocks behind it (where the
-		// stage (i) clamp would otherwise stall confirmation at the future Block's position).
-		// Applied to the winning order before consensus is computed.
 		return demoteFutureBlocks(blks, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
 	}
 
