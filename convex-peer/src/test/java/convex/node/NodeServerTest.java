@@ -774,6 +774,24 @@ public class NodeServerTest {
 		}
 	}
 
+	/**
+	 * #568: the merge context is configuration-only — setMergeContext is allowed before
+	 * launch() but rejected once the node is running.
+	 */
+	@Test
+	public void testSetMergeContextConfigurationOnly() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+
+		// Before launch: permitted
+		maxNodeServer.setMergeContext(LatticeContext.create(null, kp));
+		maxNodeServer.launch();
+
+		// After launch: rejected
+		assertThrows(IllegalStateException.class,
+			() -> maxNodeServer.setMergeContext(LatticeContext.EMPTY));
+	}
+
 	// ===== Gossip relay tests =====
 	//
 	// These tests verify that incoming lattice values reach the propagator.

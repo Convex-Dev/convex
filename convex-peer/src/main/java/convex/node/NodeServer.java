@@ -740,10 +740,24 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * The context carries signing keys and owner verification through the
 	 * lattice hierarchy (e.g. OwnerLattice, SignedLattice).
 	 *
+	 * <p><b>Configuration-only (#568).</b> This must be called before {@link #launch()}.
+	 * The context is then read by the propagator and Netty receive threads
+	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, the merge callback),
+	 * and is safely published to them via the happens-before edge of thread start — so
+	 * the field is deliberately non-volatile. Setting it after launch is rejected: those
+	 * threads could otherwise observe a stale reference indefinitely, and any in-flight
+	 * merge would already have captured the old context, giving non-deterministic
+	 * signing-key behaviour.</p>
+	 *
 	 * @param context Merge context (must not be null — use LatticeContext.EMPTY for default)
+	 * @throws IllegalStateException if called after {@link #launch()}
 	 */
 	public void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
+		if (running) {
+			throw new IllegalStateException(
+				"setMergeContext must be called before launch(): the merge context is configuration-only");
+		}
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
 		cursor.withContext(context);
