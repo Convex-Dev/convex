@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Set;
 import java.util.function.BiPredicate;
@@ -44,6 +45,25 @@ public class GenericLatticeTest {
 		assertEquals(Maps.of(1,2,3,4), l.merge(Maps.of(1,2), Maps.of(3,4)));
 
 		assertEquals(Maps.of(1,6,2,10), l.merge(Maps.of(1,3,2,10), Maps.of(1,6,2,5)));
+	}
+
+	/**
+	 * #561: merging a foreign map into an absent (null) own must validate each child through
+	 * the value lattice, not accept the map wholesale. A wrong-typed grandchild is rejected
+	 * (the child merge throws) rather than being committed to wedge later merges.
+	 */
+	@SuppressWarnings({"unchecked","rawtypes"})
+	@Test public void testForeignChildValidatedOnNullOwnMerge() {
+		MapLattice<ACell, AInteger> l = MapLattice.create(MaxLattice.create());
+
+		// Well-typed foreign map merges into null own (value-equal to the input)
+		AHashMap good = Maps.of(Strings.create("a"), CVMLong.create(5));
+		assertEquals(good, l.merge(null, good));
+
+		// Wrong-typed value (AString where AInteger is required) is now validated and rejected
+		// via the child MaxLattice merge, instead of being accepted wholesale on first merge.
+		AHashMap hostile = Maps.of(Strings.create("a"), Strings.create("not-an-int"));
+		assertThrows(ClassCastException.class, () -> l.merge(null, hostile));
 	}
 	
 	

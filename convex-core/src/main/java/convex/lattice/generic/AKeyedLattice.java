@@ -84,11 +84,13 @@ public abstract class AKeyedLattice<K extends ACell, M extends AMap<K, ACell>> e
 
 	@SuppressWarnings("unchecked")
 	private M mergeImpl(LatticeContext context, M ownValue, M otherValue) {
-		if (ownValue == null) {
-			if (checkForeign(otherValue)) return otherValue;
-			return null;
-		}
 		if (otherValue == null) return ownValue;
+		// #561: never wholesale-accept a foreign map on the first (own==null) merge into an
+		// unpopulated region. Start from an empty own so every registered key's foreign value
+		// is validated through its child merge below, and unregistered keys are dropped.
+		if (ownValue == null) {
+			ownValue = zero();
+		}
 
 		M result = ownValue;
 		int n = lattices.size();
