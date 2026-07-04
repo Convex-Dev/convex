@@ -235,6 +235,32 @@ public class NodeServerTest {
 		assertEquals(CVMLong.create(7), c.get());
 	}
 
+	/** A lattice whose merge throws an Error (e.g. simulating deep-recursion StackOverflowError). */
+	static final class ThrowingLattice extends ALattice<AInteger> {
+		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
+			throw new StackOverflowError("simulated deep-recursion merge");
+		}
+		@Override public AInteger zero() { return null; }
+		@Override public boolean checkForeign(AInteger value) { return true; }
+		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
+	}
+
+	/**
+	 * #561: a merge that throws an Error (not just an Exception) — e.g. StackOverflowError from
+	 * a maliciously deep value — must be caught by mergeIncoming, not propagated to the receive
+	 * thread, and must leave the cursor unchanged.
+	 */
+	@Test
+	public void testMergeErrorRejectedNotPropagated() {
+		maxNodeServer = new NodeServer<>(new ThrowingLattice(), store, NodeConfig.port(-1));
+		var c = maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+
+		assertFalse(maxNodeServer.mergeIncoming(c, CVMLong.create(7)),
+			"an Error from merge must be caught and rejected");
+		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
+	}
+
 	/**
 	 * Test mergeValue with SetLattice
 	 */
