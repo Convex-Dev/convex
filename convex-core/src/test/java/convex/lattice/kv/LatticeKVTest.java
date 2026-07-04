@@ -14,6 +14,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -35,6 +36,29 @@ public class LatticeKVTest {
 		assertTrue(KVEntry.isValid(entry));
 		assertFalse(KVEntry.isTombstone(entry));
 		assertEquals("value", KVEntry.typeName(entry));
+	}
+
+	/**
+	 * #561: isValid must reject an entry whose positionally-cast fields (type / utime / expire)
+	 * are the wrong type, since every accessor blindly casts them to CVMLong and would
+	 * otherwise throw on later store-wide reads.
+	 */
+	@Test
+	public void testEntryValidation() {
+		CVMLong ts = CVMLong.create(1000);
+		AString bad = Strings.create("not-a-long");
+
+		// Valid value entry and valid tombstone (type nil, expire nil) pass
+		assertTrue(KVEntry.isValid(KVEntry.createValue(Strings.create("v"), ts)));
+		AVector<ACell> tombstone = Vectors.of(null, null, ts, null);
+		assertTrue(KVEntry.isValid(tombstone));
+
+		// Wrong-typed timestamp / type-tag / expiry are rejected
+		assertFalse(KVEntry.isValid(Vectors.of(Strings.create("v"), CVMLong.create(0), bad, null)));  // utime
+		assertFalse(KVEntry.isValid(Vectors.of(Strings.create("v"), bad, ts, null)));                 // type
+		assertFalse(KVEntry.isValid(Vectors.of(Strings.create("v"), CVMLong.create(0), ts, bad)));    // expire
+		// Too-short entry rejected
+		assertFalse(KVEntry.isValid(Vectors.of(Strings.create("v"), CVMLong.create(0), ts)));
 	}
 
 	@Test
