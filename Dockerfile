@@ -4,7 +4,7 @@
 # Build stage
 # JDK pinned to match CI (build.yml / release.yml test on JDK 21): the image must
 # ship the same bytecode the release pipeline tested. Bump together with CI.
-FROM maven:3.9.14-eclipse-temurin-21 AS build
+FROM maven:3.9.15-eclipse-temurin-26 AS build
 WORKDIR /build
 
 # Copy POMs first for dependency caching
