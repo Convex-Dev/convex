@@ -100,21 +100,24 @@ leads the guide, which was also corrected (see §4).
 
 ---
 
-## 3a. Testnet strategy (agreed 2026-07-07)
+## 3a. Testnet strategy (agreed 2026-07-07; revised same day: **exit HF ASAP**)
 
-The single HF Space currently serves two conflicting jobs. Split them:
+The single HF Space currently serves two conflicting jobs. Split them — and get off
+HuggingFace entirely rather than keeping the Space in any role:
 
 1. **Stable testnet** — the onboarding surface (docs, SDK quickstarts, faucet, agent/MCP use).
    Needs stability: **released** builds (0.8.7 as of Jul 2026), persistent Etch state, a stable
    genesis, a hostname that outlives the hosting.
-2. **Devnet** — develop-HEAD verification. Needs freshness, not stability; ephemeral is fine.
-   The current HF Space keeps this job (rebuild-on-push from develop) and drops out of the docs.
-   Move the Space from the personal account to an org account when convenient.
+2. **Devnet (develop-HEAD verification)** — does NOT get a hosted replacement by default.
+   Develop verification stays local (throwaway local peers / ACVMTest against a local develop
+   build — already the established practice, since the hosted testnet always lagged develop
+   anyway). If a *hosted* develop endpoint later proves genuinely needed, run it as a container
+   on owned infrastructure — not on HF.
 
-**Branded hostname first.** `testnet.convex.live` already resolves (wildcard → 35.234.154.68,
-the Protonet box). Route a vhost to the HF Space now, centralise the URL in the docs (design#83),
-and swap the docs to the branded name **once** — after that, hosting changes never touch the ~40
-documented references again.
+**Branded hostname.** `testnet.convex.live` already resolves (wildcard → 35.234.154.68, the
+Protonet box). Give it an explicit A record to the new testnet VM's static IP when that exists.
+Centralise the URL in the docs meanwhile (design#83) so the swap to the branded name is one
+change — after that, hosting changes never touch the ~40 documented references again.
 
 **Target hosting: a separate small GCP VM (e2-small/medium), not the Protonet box.**
 - Rationale: keeps the **standard peer port 18888** on its own IP (`testnet.convex.live:18888`) —
@@ -140,16 +143,25 @@ box on 18888** (the venue-3/-4 EC2/Azure pattern) rather than port arithmetic on
 network diversity, and single-peer `local start` never exercises CPoS propagation or the
 consensus-freeze-on-upgrade path.
 
-**Sequencing:**
-1. *Now (cheap, high leverage):* vhost `testnet.convex.live` → HF Space; centralise the URL
-   (design#83); swap docs to the branded name.
-2. *Next:* stand up the stable testnet VM (release jar + persistent Etch), flip the vhost/DNS
-   target; publish reset policy + genesis hash in `networks.md`.
-3. *With the upgrade mechanism released:* rehearse `schedule-upgrade` on testnet as part of every
-   release.
+**Sequencing (HF-exit-first):**
+1. *Now:* provision the testnet VM (static IP, release jar 0.8.7, persistent Etch volume,
+   faucet, Caddy on 443, tcp:18888 firewall rule); A record `testnet.convex.live` → the VM.
+   In parallel: centralise the URL in the docs (design#83).
+2. *The moment the endpoint verifies* (faucet + SDK quickstart snippets + `/mcp` live-checked):
+   swap all surfaces to `testnet.convex.live` — design docs (#83), `convex.world`
+   `src/lib/networks.ts` `TESTNET_PEER_URL`, convex `README`/`AGENTS.md` tooling default,
+   convex-plugin MCP default. Publish reset policy + genesis hash in `networks.md`.
+3. *Immediately after the swap:* decommission the HF Space — replace its README with a pointer
+   to `testnet.convex.live`, pause/delete the Space, archive the `Convex-Dev/spaces-testnet`
+   mirror. The personal-account hostname should stop appearing anywhere current. (It has been
+   baked into agent/MCP configs, so expect stragglers — keep a redirect note up rather than a
+   hard 404 for a while if HF allows.)
+4. *With the upgrade mechanism released:* rehearse `schedule-upgrade` on testnet as part of
+   every release.
 
-Explicit non-goal: hardening the HF Space itself (persistence hacks, paid tier) — its value is
-being a disposable devnet; the stable tier belongs on owned infrastructure behind an owned name.
+Explicit non-goals: any further investment in the HF Space (org-account move, persistence
+hacks, paid tier, vhost-fronting stopgap) — it is now exit-only. The stable tier belongs on
+owned infrastructure behind an owned name.
 
 **CI hygiene:**
 - [x] **Docs link-check — DONE (2026-06-22).** Fixed the 5 broken `overview/* → cad/*/README.md`
