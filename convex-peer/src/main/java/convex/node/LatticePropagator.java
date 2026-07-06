@@ -397,6 +397,18 @@ public class LatticePropagator implements Closeable {
 			propagationThread = null;
 		}
 
+		// Drain any values the loop did not consume. The loop's exit check
+		// (running || !queue.isEmpty()) can observe running==false before the
+		// final value above lands in the queue, and exit without processing it —
+		// which would silently lose the last writes on a clean shutdown.
+		// processSnapshot is callable from any thread (serialised by writeLock),
+		// so this drain is safe even if the thread had to be abandoned after the
+		// join timeout.
+		ACell remaining;
+		while ((remaining = triggerQueue.poll()) != null) {
+			processSnapshotSafe(remaining);
+		}
+
 		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
 			broadcastCount, rootSyncCount);
 	}
