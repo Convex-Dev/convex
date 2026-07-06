@@ -196,7 +196,7 @@ public class UCAN {
 	public static UCAN parse(AMap<AString, ACell> tokenMap) {
 		if (tokenMap == null) return null;
 
-		AMap<AString, ACell> payload = RT.ensureMap(tokenMap.get(PAYLOAD));
+		AMap<AString, ACell> payload = RT.castMap(tokenMap.get(PAYLOAD));
 		if (payload == null) return null;
 
 		ACell sigCell = tokenMap.get(SIG);
@@ -387,8 +387,10 @@ public class UCAN {
 	}
 
 	/**
-	 * Parse a JWT-encoded UCAN. Verifies the EdDSA signature using the public key
-	 * from the JWT {@code kid} header. Returns null if malformed or signature invalid.
+	 * Parse a JWT-encoded UCAN. Verifies the EdDSA signature against the public key
+	 * bound in the {@code iss} DID (a {@code did:key} encodes the issuer's key); the
+	 * attacker-controlled {@code kid} header is ignored. Returns null if malformed or
+	 * signature invalid.
 	 *
 	 * @param jwtString The JWT string
 	 * @return Parsed UCAN, or null if invalid

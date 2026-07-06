@@ -1,0 +1,63 @@
+;; Network upgrade v1 — convex.fungible library fixes (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the convex.fungible actor account,
+;; redefining `add-mint`. Deliberately NOT part of fungible.cvx / genesis: existing
+;; networks keep their genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #528: `add-mint` defaulted `:max-supply` to 0 when unspecified, which — via
+;; the `(if max-supply ...)` guards — installed a cap that blocked all minting. It
+;; should default to nil (unlimited). Only the default changes; an explicit
+;; `:max-supply` (including 0) behaves as before.
+
+(defn add-mint
+  ^{:doc {:description ["Creates deployable code that, when added to actor code from `build-token`, allows priviledged accounts to mint and burn tokens."
+                        "Configuration map contains:"
+                        "- `:max-supply`, a long designating the maximum mintable supply (defaults to unlimited)"
+                        "- `:minter`, Trust Monitor from `convex.trust` (defaults to *address*)"]
+          :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
+          :signature   [{:params [config]}]}}
+  [config]
+  (let [max-supply (let [ms (:max-supply config)] (if (nil? ms) nil (int ms)))
+        minter     (or (:minter config) *address*)]
+    (when max-supply (or (<= 0 max-supply) (fail "Max supply must be non-negative")))
+    `(do
+       (import convex.trust :as trust)
+       (declare balance transfer)
+
+       ;; Controller defining who is allowed to mint tokens
+       (def minter ~minter)
+
+       ;; Maximum supply (limit after minting)
+       ~(if max-supply `(def max-supply ~max-supply))
+
+       (defn burn
+         ^{:callable true}
+         [amount]
+         (when-not (trust/trusted? minter *caller* :burn) (fail :TRUST "No rights to burn"))
+         (let [amount (int amount)
+               bal    (balance *caller*)]
+           ;; Burn amount must be less than or equal to caller's balance.
+           (cond (< amount 0) (fail :ARGUMENT "Cannot burn negative quantity"))
+           (cond (> amount bal) (fail :FUNDS "Burn amount not available" ))
+
+           ;; do updates to balance and supply
+           (let [new-supply (- supply amount)]
+             (log "MINT" *caller* (- amount) new-supply)
+             (set-holding *caller* (- bal amount))
+             (set! supply new-supply))))
+
+       (defn mint
+         ^{:callable true}
+         [amount]
+         (when-not (trust/trusted? minter *caller* :mint amount) (fail :TRUST "No rights to mint"))
+         (let [amount     (int amount)
+               new-supply (+ supply amount) ;; note: might overflow, important check
+               bal        (balance *caller*)
+               new-bal    (+ bal amount)]
+
+           ;; New supply must be in valid range.
+           ~(if max-supply `(when-not (<= 0 new-supply max-supply) (fail :STATE "Mint exceeds max supply")))
+
+           (log "MINT" *caller* amount new-supply)
+           (set-holding *caller* new-bal)
+           (set! supply new-supply))))))

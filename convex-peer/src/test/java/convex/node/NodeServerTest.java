@@ -39,6 +39,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -184,6 +185,80 @@ public class NodeServerTest {
 		// Test merging null value (should return null)
 		AInteger nullResult = maxNodeServer.mergeValue(null);
 		assertEquals(null, nullResult);
+	}
+
+	/**
+	 * #564: inbound values over the configured size limit are rejected before merge.
+	 */
+	@Test
+	public void testInboundValueSizeLimit() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+
+		// A node configured with a tight inbound size limit (100 bytes)
+		NodeConfig tight = NodeConfig.create(Maps.of(NodeConfig.MAX_INBOUND_VALUE_SIZE, CVMLong.create(100)));
+		maxNodeServer = new NodeServer<>(lattice, store, tight);
+
+		// A small (embedded) value is within the limit
+		assertTrue(maxNodeServer.withinInboundSizeLimit(CVMLong.ONE));
+
+		// A large value exceeds the limit and is rejected
+		convex.core.data.ABlob big = convex.core.data.Blob.wrap(new byte[500]);
+		assertTrue(big.getMemorySize() > 100); // sanity: this value really is over the limit
+		assertFalse(maxNodeServer.withinInboundSizeLimit(big));
+
+		// Under the default (permissive) config, the same large value is accepted
+		NodeServer<AInteger> permissive = new NodeServer<>(lattice, store);
+		try {
+			assertTrue(permissive.withinInboundSizeLimit(big));
+		} finally {
+			try { permissive.close(); } catch (Exception e) { /* ignore */ }
+		}
+	}
+
+	/**
+	 * #562: an inbound value of the wrong type for the target lattice is rejected cleanly
+	 * and leaves the cursor unchanged (the merge aborts atomically).
+	 */
+	@Test
+	public void testWrongTypeMergeRejected() {
+		ALattice<AInteger> lattice = MaxLattice.create();
+		maxNodeServer = new NodeServer<>(lattice, store);
+		var c = maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+
+		// A correct-type value merges (MaxLattice keeps the larger)
+		assertTrue(maxNodeServer.mergeIncoming(c, CVMLong.create(7)));
+		assertEquals(CVMLong.create(7), c.get());
+
+		// A wrong-type value is rejected; the cursor is unchanged
+		assertFalse(maxNodeServer.mergeIncoming(c, convex.core.data.Blob.wrap(new byte[8])));
+		assertEquals(CVMLong.create(7), c.get());
+	}
+
+	/** A lattice whose merge throws an Error (e.g. simulating deep-recursion StackOverflowError). */
+	static final class ThrowingLattice extends ALattice<AInteger> {
+		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
+			throw new StackOverflowError("simulated deep-recursion merge");
+		}
+		@Override public AInteger zero() { return null; }
+		@Override public boolean checkForeign(AInteger value) { return true; }
+		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
+	}
+
+	/**
+	 * #561: a merge that throws an Error (not just an Exception) — e.g. StackOverflowError from
+	 * a maliciously deep value — must be caught by mergeIncoming, not propagated to the receive
+	 * thread, and must leave the cursor unchanged.
+	 */
+	@Test
+	public void testMergeErrorRejectedNotPropagated() {
+		maxNodeServer = new NodeServer<>(new ThrowingLattice(), store, NodeConfig.port(-1));
+		var c = maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+
+		assertFalse(maxNodeServer.mergeIncoming(c, CVMLong.create(7)),
+			"an Error from merge must be caught and rejected");
+		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
 	}
 
 	/**
@@ -644,6 +719,191 @@ public class NodeServerTest {
 		} finally {
 			server.close();
 		}
+	}
+
+	// ===== #567: public URL validation =====
+
+	/**
+	 * The URL validator accepts public hosts (hostnames it does not resolve, and public IP
+	 * literals) and rejects loopback / private / link-local / malformed URLs.
+	 */
+	@Test
+	public void testPublicURLValidation() {
+		// Acceptable: public hostname (never resolved) and a public IP literal
+		assertNull(NodeConfig.validatePublicURL("tcp://peer.example.com:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://93.184.216.34:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://[2001:db8::1]:18888", false));
+		// A public hostname that happens to boundary the 172.16/12 range on either side
+		assertNull(NodeConfig.validatePublicURL("tcp://172.15.0.1:18888", false));
+		assertNull(NodeConfig.validatePublicURL("tcp://172.32.0.1:18888", false));
+
+		// Rejected: localhost and loopback
+		assertNotNull(NodeConfig.validatePublicURL("tcp://localhost:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://127.0.0.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://[::1]:18888", false));
+		// Rejected: RFC1918 private ranges
+		assertNotNull(NodeConfig.validatePublicURL("tcp://10.1.2.3:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://172.20.0.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://192.168.1.1:18888", false));
+		// Rejected: link-local, wildcard, IPv6 ULA
+		assertNotNull(NodeConfig.validatePublicURL("tcp://169.254.1.1:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://0.0.0.0:18888", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://[fc00::1]:18888", false));
+		// Rejected: missing scheme / host / port, malformed
+		assertNotNull(NodeConfig.validatePublicURL("peer.example.com", false));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", false));
+		assertNotNull(NodeConfig.validatePublicURL("ht tp://bad host", false));
+		assertNotNull(NodeConfig.validatePublicURL("", false));
+		assertNotNull(NodeConfig.validatePublicURL(null, false));
+
+		// allowPrivate override: private addresses become acceptable, malformed still rejected
+		assertNull(NodeConfig.validatePublicURL("tcp://localhost:18888", true));
+		assertNull(NodeConfig.validatePublicURL("tcp://192.168.1.1:18888", true));
+		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", true)); // still missing port
+	}
+
+	/**
+	 * launch() fails fast when a private URL is configured without the allowPrivateURL opt-out,
+	 * and succeeds (publishing) once the opt-out is set.
+	 */
+	@Test
+	public void testLaunchRejectsPrivateURL() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+
+		NodeConfig badCfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+		NodeServer<Index<Keyword, ACell>> bad = new NodeServer<>(Lattice.ROOT, store, badCfg);
+		bad.setMergeContext(LatticeContext.create(null, kp));
+		try {
+			assertThrows(IllegalStateException.class, bad::launch);
+		} finally {
+			bad.close();
+		}
+
+		// With the opt-out, the same private URL launches and publishes
+		NodeConfig okCfg = NodeConfig.create(Maps.of(
+			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
+			NodeConfig.ALLOW_PRIVATE_URL, convex.core.data.prim.CVMBool.TRUE,
+			NodeConfig.PORT, CVMLong.create(-1)
+		));
+		NodeServer<Index<Keyword, ACell>> ok = new NodeServer<>(Lattice.ROOT, store, okCfg);
+		ok.setMergeContext(LatticeContext.create(null, kp));
+		try {
+			ok.launch();
+			ACell nodes = PathCursor.create(
+				ok.getCursor(),
+				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+			assertNotNull(nodes, ":p2p :nodes should be populated when allowPrivateURL is set");
+		} finally {
+			ok.close();
+		}
+	}
+
+	/**
+	 * #568: the merge context is configuration-only — setMergeContext is allowed before
+	 * launch() but rejected once the node is running.
+	 */
+	@Test
+	public void testSetMergeContextConfigurationOnly() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+
+		// Before launch: permitted
+		maxNodeServer.setMergeContext(LatticeContext.create(null, kp));
+		maxNodeServer.launch();
+
+		// After launch: rejected
+		assertThrows(IllegalStateException.class,
+			() -> maxNodeServer.setMergeContext(LatticeContext.EMPTY));
+	}
+
+	// ===== #566: per-connection metrics & circuit-breaker =====
+
+	/** Minimal AConnection test double: records close(), never actually sends. */
+	static final class RecordingConnection extends AConnection {
+		volatile boolean closed = false;
+		@Override public boolean sendMessage(Message msg) { return true; }
+		@Override public boolean trySendMessage(Message msg) { return true; }
+		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.1", 30000); }
+		@Override public boolean isClosed() { return closed; }
+		@Override public void close() { closed = true; }
+		@Override public long getReceivedCount() { return 0; }
+	}
+
+	private static Message latticeValue(ACell value, AConnection conn) {
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, Vectors.empty(), value);
+		return Message.create(MessageType.LATTICE_VALUE, payload).withConnection(conn);
+	}
+
+	/**
+	 * #566: per-connection counters track accepts/rejects, and the circuit-breaker closes a
+	 * connection after the configured number of consecutive bad messages (an accepted merge
+	 * resets the streak).
+	 */
+	@Test
+	public void testCircuitBreakerAndInboundStats() {
+		NodeConfig cfg = NodeConfig.create(Maps.of(
+			NodeConfig.PORT, CVMLong.create(-1),
+			NodeConfig.MAX_CONSECUTIVE_REJECTS, CVMLong.create(3)
+		));
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
+
+		// Wrong type for MaxLattice<AInteger> — mergeIncoming rejects it
+		ACell badValue = convex.core.data.Blob.wrap(new byte[8]);
+
+		// A connection that sends two bad then one good message stays open; the accept resets the streak
+		RecordingConnection tracked = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, tracked));            // reject 1
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, tracked));            // reject 2
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(42), tracked));  // accept
+
+		NodeServer.ConnectionStats s = maxNodeServer.statsFor(tracked);
+		assertEquals(3, s.messagesReceived);
+		assertEquals(2, s.mergesRejected);
+		assertEquals(1, s.mergesAccepted);
+		assertEquals(0, s.consecutiveRejects); // reset by the accept
+		assertFalse(tracked.isClosed(), "Accept reset the streak, so the breaker must not trip");
+
+		// A connection sending only bad messages trips the breaker at the limit
+		RecordingConnection abusive = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 1
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 2
+		assertFalse(abusive.isClosed(), "Below the threshold the connection stays open");
+		maxNodeServer.handleIncomingMessage(latticeValue(badValue, abusive)); // 3 == limit -> trip
+		assertTrue(abusive.isClosed(), "Connection closed after reaching the consecutive-reject limit");
+
+		// Aggregate stats reflect the surviving tracked connection (the abusive one was pruned on trip)
+		NodeServer.InboundStats agg = maxNodeServer.getInboundStats();
+		assertTrue(agg.mergesAccepted >= 1);
+		assertTrue(agg.mergesRejected >= 2);
+	}
+
+	/**
+	 * #566: closed connections drain from the stats map via the periodic sweep (so an idle
+	 * node cleans up without inbound traffic), and removeConnection is the explicit single-sink
+	 * teardown.
+	 */
+	@Test
+	public void testConnectionStatsSweep() {
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, NodeConfig.port(-1));
+
+		RecordingConnection open = new RecordingConnection();
+		RecordingConnection gone = new RecordingConnection();
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(1), open));
+		maxNodeServer.handleIncomingMessage(latticeValue(CVMLong.create(1), gone));
+		assertEquals(2, maxNodeServer.getInboundStats().connections);
+
+		// A closed connection is pruned by the sweep; the open one survives
+		gone.close();
+		maxNodeServer.sweepClosedConnections();
+		assertEquals(1, maxNodeServer.getInboundStats().connections);
+		assertNotNull(maxNodeServer.statsFor(open));
+
+		// removeConnection is the explicit single-sink teardown
+		maxNodeServer.removeConnection(open);
+		assertEquals(0, maxNodeServer.getInboundStats().connections);
 	}
 
 	// ===== Gossip relay tests =====

@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.6</version>
+	<version>0.8.7-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -31,17 +31,20 @@
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<logback.version>1.5.32</logback.version>
+		<logback.version>1.5.37</logback.version>
 		<jmh.version>1.37</jmh.version>
-		<junit.version>6.0.1</junit.version>
+		<junit.version>6.1.1</junit.version>
 		<slf4j.version>2.0.16</slf4j.version>
 		<hc.version>5.5</hc.version>
 		<netty.version>4.2.7.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2026-06-22T14:32:20Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-06-22T16:46:48Z</project.build.outputTimestamp>
+		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
+		     notice in test output (at the cost of hiding e.g. multiple-provider warnings) -->
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
+			-Dslf4j.internal.verbosity=ERROR
 		</argLine>
 	</properties>
 
@@ -105,6 +108,24 @@
 				</plugins>
 			</build>
 		</profile>
+
+		<profile>
+			<!-- JDK 24+ warns on first sun.misc.Unsafe memory access (JEP 498), triggered in
+			     test JVMs by protobuf-java (transitive via Calcite/Avatica in convex-db).
+			     Suppress the warning; the flag only exists on JDK 23+, so gate by JDK version
+			     (CI builds on JDK 21 and never sees the warning). -->
+			<id>jdk24-quiet-unsafe-warnings</id>
+			<activation>
+				<jdk>[24,)</jdk>
+			</activation>
+			<properties>
+				<argLine>
+					--add-opens=java.base/java.util=ALL-UNNAMED
+					--sun-misc-unsafe-memory-access=allow
+					-Dslf4j.internal.verbosity=ERROR
+				</argLine>
+			</properties>
+		</profile>
 	</profiles>
 
 	<build>
@@ -113,7 +134,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-enforcer-plugin</artifactId>
-				<version>3.6.2</version>
+				<version>3.6.3</version>
 				<executions>
 					<execution>
 						<id>enforce-maven</id>
@@ -157,7 +178,7 @@
 			<plugin>
 				<groupId>org.cyclonedx</groupId>
 				<artifactId>cyclonedx-maven-plugin</artifactId>
-				<version>2.9.1</version>
+				<version>2.9.2</version>
 				<executions>
 					<execution>
 						<phase>deploy</phase>
@@ -189,12 +210,12 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.4.2</version>
+					<version>3.5.0</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.14.1</version>
+					<version>3.15.0</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -207,7 +228,7 @@
 				<plugin>
                 	<groupId>org.apache.maven.plugins</groupId>
                 	<artifactId>maven-resources-plugin</artifactId>
-                	<version>3.3.1</version>
+                	<version>3.5.0</version>
                 	<configuration>
 				        <!-- Silence warnings with explicit encoding -->
 				        <encoding>UTF-8</encoding>
@@ -219,7 +240,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-source-plugin</artifactId>
-					<version>3.3.1</version>
+					<version>3.4.0</version>
 					<executions>
 						<execution>
 							<id>attach-sources</id>
@@ -236,7 +257,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-javadoc-plugin</artifactId>
-					<version>3.10.0</version>
+					<version>3.12.0</version>
 					<configuration>
 						<doclint>syntax</doclint>
 						<quiet />

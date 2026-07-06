@@ -58,7 +58,7 @@ import convex.test.Samples;
 public class CompilerTest extends ACVMTest {
 
 	protected CompilerTest() {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	@Test
@@ -195,6 +195,8 @@ public class CompilerTest extends ACVMTest {
 	public void testBadCode() {
 		assertCastError(step("(nil 1 2)"));
 		assertCastError(step("(3 1 2)"));
+		assertCastError(step("(1 2 3)"));            // issue #579: literal non-fn head
+		assertCastError(step("((identity 3) 1 2)")); // issue #579: computed non-fn head
 	}
 
 	@Test

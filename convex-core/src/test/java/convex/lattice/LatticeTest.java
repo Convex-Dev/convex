@@ -44,9 +44,13 @@ public class LatticeTest {
 		assertEquals(v1,lattice.merge(zero,v1));
 		assertSame(v1,lattice.merge(v1,zero));
 
-		// Null merge — all lattices return other by identity
+		// merge(x, null): other is null, so own is returned by identity (all lattices).
 		assertSame(v1,lattice.merge(v1,null));
-		assertSame(v1,lattice.merge(null,v1));
+		// merge(null, x): own is absent, so x is entirely foreign. Leaf lattices return x by
+		// identity, but container lattices (#561) route every foreign entry through the child
+		// merge for validation and may rebuild/filter the map — so only value-equality is
+		// guaranteed here, not reference identity.
+		assertEquals(v1,lattice.merge(null,v1));
 
 
 		assertEquals(v2,lattice.merge(zero,v2));

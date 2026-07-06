@@ -1,10 +1,15 @@
 # .github/workflows/release.yml
-# Creates a GitHub Release with convex.jar when a version tag is pushed,
-# then builds and pushes the Docker images for the release.
+# Creates a GitHub Release with convex.jar (plus SHA-256 checksum, SBOM and a
+# signed build-provenance attestation) when a version tag is pushed, then builds
+# and pushes the Docker images for the release.
 #
 # Docker must be a job here rather than a `release: [published]` trigger in
 # docker.yml: releases created with the workflow's GITHUB_TOKEN do not fire
 # workflow events (GitHub's recursion guard), so such a trigger never runs.
+#
+# Provenance attestations are verifiable with:
+#   gh attestation verify convex.jar -R Convex-Dev/convex
+#   gh attestation verify oci://docker.io/convexlive/convex:<version> -R Convex-Dev/convex
 name: Release
 
 on:
@@ -14,10 +19,13 @@ on:
 
 permissions:
   contents: write
+  id-token: write      # OIDC token for signing build-provenance attestations
+  attestations: write  # store attestations against the repository
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -32,8 +40,28 @@ jobs:
           java-version: 21
           cache: maven
 
+      # A tag on a commit where versions:set was not run would otherwise release
+      # a jar whose internal version is still -SNAPSHOT (BUILD.md step 4)
+      - name: Verify tag matches project version
+        run: |
+          VERSION=$(mvn -B -q -DforceStdout help:evaluate -Dexpression=project.version)
+          if [ "$VERSION" != "${{ github.ref_name }}" ]; then
+            echo "::error::Tag ${{ github.ref_name }} does not match project version ${VERSION}. Run the versions:set release step (BUILD.md step 4) before tagging."
+            exit 1
+          fi
+
       - name: Build with tests
         run: mvn -B clean install
+
+      # Aggregate SBOM (CycloneDX; plugin configuration in the parent pom) and a
+      # checksum for the uberjar operators download from the release page
+      - name: Generate SBOM and checksum
+        run: |
+          # skipNotDeployed=false: the plugin otherwise skips every module because
+          # deploy is skipped outside the Maven Central publishing profile
+          mvn -B -DskipTests -Dcyclonedx.skipNotDeployed=false org.cyclonedx:cyclonedx-maven-plugin:2.9.2:makeAggregateBom
+          cp target/CycloneDX-Sbom.json "convex-${{ github.ref_name }}-sbom.json"
+          (cd convex-integration/target && sha256sum convex.jar > convex.jar.sha256)
 
       - name: Extract changelog for this version
         id: changelog
@@ -54,6 +82,11 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: convex-integration/target/convex.jar
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -63,6 +96,8 @@ jobs:
           prerelease: false
           files: |
             convex-integration/target/convex.jar
+            convex-integration/target/convex.jar.sha256
+            convex-${{ github.ref_name }}-sbom.json
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,10 +105,14 @@ jobs:
   docker:
     needs: release
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -81,10 +120,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image
-        run: docker build -t "convexlive/convex:${{ github.ref_name }}" -t convexlive/convex:latest .
+      - name: Build and push Docker images
+        id: push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            convexlive/convex:${{ github.ref_name }}
+            convexlive/convex:latest
 
-      - name: Push Docker images
-        run: |
-          docker push "convexlive/convex:${{ github.ref_name }}"
-          docker push convexlive/convex:latest
+      - name: Attest Docker image provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: docker.io/convexlive/convex
+          subject-digest: ${{ steps.push.outputs.digest }}

@@ -373,11 +373,12 @@ public final class CVMLong extends AInteger {
 
 	@Override
 	public AInteger mod(AInteger base) {
-		if (base instanceof CVMLong) return mod((CVMLong)base);
+		// Fast long path, except denom == MIN_VALUE where Math.abs overflows
+		if ((base instanceof CVMLong)&&(((CVMLong)base).value!=Long.MIN_VALUE)) return mod((CVMLong)base);
 		if (base.isNegative()) base=base.negate();
 		return AInteger.create(big().mod(base.big()));
 	}
-	
+
 	public CVMLong mod(CVMLong base) {
 		long num=value;
 		long denom=base.value;
@@ -389,48 +390,57 @@ public final class CVMLong extends AInteger {
 
 	@Override
 	public AInteger div(AInteger base) {
-		if (base instanceof CVMLong) return div((CVMLong)base);
-		return null;
+		// Fast long path, except cases that overflow long: abs(MIN_VALUE) divisor, or MIN_VALUE / -1
+		if (base instanceof CVMLong) {
+			long denom=((CVMLong)base).value;
+			if ((denom!=Long.MIN_VALUE)&&!((denom==-1L)&&(value==Long.MIN_VALUE))) return div((CVMLong)base);
+		}
+		// Euclidean division via BigInteger: q = (a - (a euclid-mod |b|)) / b
+		BigInteger a=big(), b=base.big();
+		if (b.signum()==0) throw new IllegalArgumentException("div by zero");
+		return AInteger.create(a.subtract(a.mod(b.abs())).divide(b));
 	}
-	
+
 	public CVMLong div(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) throw new IllegalArgumentException("div by zero");;
-		if (num<0) num-=(denom-1); // Correct for Euclidean modular function
-		long d = num / denom;
-		
+		if (denom==0) throw new IllegalArgumentException("div by zero");
+		long m = num % denom;
+		if (m<0) m+=Math.abs(denom); // Euclidean non-negative remainder
+		long d = (num - m) / denom;  // num-m is exactly divisible by denom
 		return CVMLong.create(d);
 	}
-	
+
 	@Override
 	public AInteger rem(AInteger base) {
 		if (base instanceof CVMLong) return rem((CVMLong)base);
-		return null;
+		return AInteger.create(big().remainder(base.big())); // truncated remainder, sign of dividend
 	}
-	
+
 	public CVMLong rem(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) throw new IllegalArgumentException("rem by zero");;
+		if (denom==0) throw new IllegalArgumentException("rem by zero");
 
 		long r = num % denom;
-		
+
 		return CVMLong.create(r);
 	}
-	
+
 	@Override
 	public AInteger quot(AInteger base) {
-		if (base instanceof CVMLong) return quot((CVMLong)base);
-		return null;
+		// Fast long path, except MIN_VALUE / -1 which overflows long
+		if (base instanceof CVMLong) {
+			if (!((((CVMLong)base).value==-1L)&&(value==Long.MIN_VALUE))) return quot((CVMLong)base);
+		}
+		return AInteger.create(big().divide(base.big())); // truncated toward zero
 	}
-	
+
 	public CVMLong quot(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) throw new IllegalArgumentException("quot by zero");;
-		long d = num / denom;
-		// Correct for Euclidean modular function
+		if (denom==0) throw new IllegalArgumentException("quot by zero");
+		long d = num / denom; // Java integer division truncates toward zero
 		return CVMLong.create(d);
 	}
 

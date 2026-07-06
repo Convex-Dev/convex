@@ -371,7 +371,7 @@ public class ElevatedMcpTest extends ARESTTest {
 			"jsonrpc", "2.0", "method", "tools/call", "params", params, "id", "test-" + toolName);
 		HttpResponse<String> response = post(MCP_PATH, JSON.toString(request));
 		assertEquals(200, response.statusCode());
-		return RT.ensureMap(JSON.parse(response.body()));
+		return RT.castMap(JSON.parse(response.body()));
 	}
 
 	private AMap<AString, ACell> makeAuthToolCall(String toolName, AMap<AString, ACell> arguments, String bearerToken)
@@ -387,7 +387,7 @@ public class ElevatedMcpTest extends ARESTTest {
 				.build();
 		HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, response.statusCode());
-		return RT.ensureMap(JSON.parse(response.body()));
+		return RT.castMap(JSON.parse(response.body()));
 	}
 
 	private HttpResponse<String> postForm(String url) throws IOException, InterruptedException {
@@ -401,20 +401,20 @@ public class ElevatedMcpTest extends ARESTTest {
 
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, () -> "RPC result missing in: " + responseMap);
 		assertEquals(CVMBool.FALSE, result.get(McpProtocol.FIELD_IS_ERROR), () -> "Unexpected failure: " + responseMap);
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
 
 	private AMap<AString, ACell> expectError(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}

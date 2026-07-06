@@ -153,13 +153,26 @@ public class KVEntry {
 	}
 
 	/**
-	 * Checks if an entry is a valid KV entry structure
+	 * Checks if an entry is a valid KV entry structure (#561).
+	 *
+	 * <p>Validates the structural type of every positionally-cast field, not just the
+	 * timestamp: {@code getType}, {@code getExpire} and {@code getUTime} all blindly cast to
+	 * {@link CVMLong}, so a wrong-typed value at POS_TYPE / POS_UTIME / POS_EXPIRE would pass
+	 * an incoming entry only to throw later on {@code keys()}/{@code gc()}/reads, poisoning
+	 * store-wide operations. POS_VALUE stays opaque here — its shape (per the type tag) is
+	 * validated by the type-specific CRDT merge.</p>
 	 */
 	public static boolean isValid(AVector<ACell> entry) {
 		if (entry == null) return false;
 		if (entry.count() < ENTRY_LENGTH) return false;
-		ACell utime = entry.get(POS_UTIME);
-		return (utime instanceof CVMLong);
+		// POS_UTIME is a mandatory timestamp
+		if (!(entry.get(POS_UTIME) instanceof CVMLong)) return false;
+		// POS_TYPE and POS_EXPIRE are each nil (tombstone / no-expiry) or a CVMLong
+		ACell type = entry.get(POS_TYPE);
+		if (type != null && !(type instanceof CVMLong)) return false;
+		ACell expire = entry.get(POS_EXPIRE);
+		if (expire != null && !(expire instanceof CVMLong)) return false;
+		return true;
 	}
 
 	/**

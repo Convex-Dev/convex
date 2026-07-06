@@ -39,14 +39,14 @@ public class JWKSKeys {
 	public static Map<String, RSAPublicKey> parseKeys(String jwksJson) {
 		Map<String, RSAPublicKey> result = new HashMap<>();
 		try {
-			AMap<AString,ACell> jwks = RT.ensureMap(JSON.parse(jwksJson));
+			AMap<AString,ACell> jwks = RT.castMap(JSON.parse(jwksJson));
 			if (jwks == null) return result;
 
 			ASequence<ACell> keys = (ASequence<ACell>) RT.ensureSequence(jwks.get(Strings.create("keys")));
 			if (keys == null) return result;
 
 			for (long i = 0; i < keys.count(); i++) {
-				AMap<AString,ACell> key = RT.ensureMap(keys.get(i));
+				AMap<AString,ACell> key = RT.castMap(keys.get(i));
 				if (key == null) continue;
 
 				String kty = str(key, "kty");

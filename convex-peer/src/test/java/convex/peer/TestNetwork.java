@@ -16,6 +16,7 @@ import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.exceptions.ResultException;
@@ -62,8 +63,13 @@ public class TestNetwork {
 	private static TestNetwork instance = null;
 
 	private TestNetwork() {
-		// Use fresh State
-		GENESIS_STATE=Init.createState(PEER_KEYS);
+		// Fresh state at the LIVE protocol version (Migrations.LIVE_VERSION): the
+		// shared test network models the live network, so a release cannot break
+		// live servers that have not yet applied the latest upgrade. Follows the
+		// live network automatically when LIVE_VERSION is bumped. Target-version
+		// peer behaviour is covered by dedicated tests (e.g. UpgradeWithdrawalTest).
+		// See UPGRADE.md, "Default test state policy".
+		GENESIS_STATE=Migrations.applyTo(Init.createState(PEER_KEYS), Migrations.LIVE_VERSION);
 		HERO=Address.create(Init.GENESIS_ADDRESS);
 		VILLAIN=HERO.offset(2);
 	}

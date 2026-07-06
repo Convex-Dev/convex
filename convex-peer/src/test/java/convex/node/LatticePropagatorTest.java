@@ -1,10 +1,12 @@
 package convex.node;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +25,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 
@@ -139,6 +142,61 @@ public class LatticePropagatorTest {
 		// Verify server1 received the value from server2
 		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
 			"Server1 should have received the value broadcast from server2");
+	}
+
+	/**
+	 * Regression test for the shutdown durability race: triggerAndClose sets
+	 * running=false before offering the final value, so the propagation loop
+	 * can observe running==false with an empty queue and exit without ever
+	 * consuming the value — silently losing the last writes on a clean
+	 * shutdown (seen as an intermittent NodeServerPersistenceTest failure on
+	 * CI).
+	 *
+	 * <p>The window is a few instructions wide and cannot be hit reliably by
+	 * brute force, so this test constructs the post-race state directly (loop
+	 * already exited, final value offered afterwards) and asserts the contract:
+	 * the value must still be processed before triggerAndClose returns, via
+	 * the closing thread's post-join drain.
+	 */
+	@Test
+	public void testTriggerAndCloseDrainsAfterLoopExit() throws Exception {
+		LatticePropagator propagator = new LatticePropagator(new MemoryStore());
+		propagator.start();
+
+		// Force the propagation loop to terminate while triggerAndClose still
+		// sees a propagator to shut down (running false, thread field non-null)
+		Field runningField = LatticePropagator.class.getDeclaredField("running");
+		runningField.setAccessible(true);
+		runningField.setBoolean(propagator, false);
+		Field threadField = LatticePropagator.class.getDeclaredField("propagationThread");
+		threadField.setAccessible(true);
+		Thread worker = (Thread) threadField.get(propagator);
+		worker.interrupt(); // wake from poll; loop drains (empty queue) and exits
+		worker.join(10_000);
+		assertFalse(worker.isAlive(), "Propagation loop should have exited");
+
+		// The final value is offered to a queue no thread will ever read;
+		// only the closing thread's drain can process it
+		ACell finalValue = CVMLong.create(424242);
+		propagator.triggerAndClose(finalValue);
+		assertEquals(finalValue, propagator.getLastAnnouncedValue(),
+			"Final value must be announced even when the loop exited before the offer");
+	}
+
+	/**
+	 * As above, but with a persistent store: the final value must be durable
+	 * (readable as root data) once triggerAndClose returns.
+	 */
+	@Test
+	public void testTriggerAndClosePersistsFinalValue() throws IOException {
+		try (EtchStore store = EtchStore.createTemp("propagator-close")) {
+			LatticePropagator propagator = new LatticePropagator(store);
+			propagator.start();
+			ACell finalValue = CVMLong.create(12345);
+			propagator.triggerAndClose(finalValue);
+			assertEquals(finalValue, store.getRootData(),
+				"Final value must be persisted as root data before triggerAndClose returns");
+		}
 	}
 
 	/**

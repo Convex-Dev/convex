@@ -177,7 +177,7 @@ public class SigningConvenienceTest extends ARESTTest {
 		// Find our key in the list
 		boolean found = false;
 		for (long i = 0; i < accounts.count(); i++) {
-			AMap<AString, ACell> entry = RT.ensureMap(accounts.get(i));
+			AMap<AString, ACell> entry = RT.castMap(accounts.get(i));
 			AString entryKey = RT.ensureString(entry.get(Strings.create("publicKey")));
 			if (publicKey.equals(entryKey)) found = true;
 		}
@@ -188,6 +188,42 @@ public class SigningConvenienceTest extends ARESTTest {
 	public void testSigningListAccountsNoAuth() throws IOException, InterruptedException {
 		AMap<AString, ACell> error = expectError(makeToolCall("signingListAccounts", Maps.empty()));
 		assertNotNull(error, "No auth should return error");
+	}
+
+	/**
+	 * #551: resolve=true annotates each key with the on-chain addresses it
+	 * controls. The created account's address must appear under its key.
+	 */
+	@Test
+	public void testSigningListAccountsResolve() throws IOException, InterruptedException {
+		// Create a funded account so the key is bound on-chain
+		AMap<AString, ACell> createArgs = Maps.of(
+			"passphrase", PASS,
+			"faucet", CVMLong.create(1000000L)
+		);
+		AMap<AString, ACell> createResult = expectResult(
+			makeAuthToolCall("signingCreateAccount", createArgs, CAROL_JWT));
+		AString publicKey = RT.ensureString(createResult.get(Strings.create("publicKey")));
+		long address = ((CVMLong) createResult.get(Strings.create("address"))).longValue();
+
+		AMap<AString, ACell> listResult = expectResult(
+			makeAuthToolCall("signingListAccounts", Maps.of("resolve", CVMBool.TRUE), CAROL_JWT));
+		AVector<ACell> accounts = RT.ensureVector(listResult.get(Strings.create("accounts")));
+		assertNotNull(accounts, "Should return accounts array");
+
+		boolean found = false;
+		for (long i = 0; i < accounts.count(); i++) {
+			AMap<AString, ACell> entry = RT.castMap(accounts.get(i));
+			AString entryKey = RT.ensureString(entry.get(Strings.create("publicKey")));
+			if (!publicKey.equals(entryKey)) continue;
+			AVector<ACell> addrs = RT.ensureVector(entry.get(Strings.create("addresses")));
+			assertNotNull(addrs, "resolve=true should include addresses");
+			for (long j = 0; j < addrs.count(); j++) {
+				CVMLong a = RT.ensureLong(addrs.get(j));
+				if ((a != null) && (a.longValue() == address)) found = true;
+			}
+		}
+		assertTrue(found, "Created account address should resolve under its signing key");
 	}
 
 	// ===== Helpers =====
@@ -210,7 +246,7 @@ public class SigningConvenienceTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> makeAuthToolCall(String toolName, AMap<AString, ACell> arguments, String bearerToken)
@@ -237,25 +273,25 @@ public class SigningConvenienceTest extends ARESTTest {
 
 		ACell parsed = JSON.parse(response.body());
 		assertTrue(parsed instanceof AMap, () -> "Expected map response but got " + RT.getType(parsed));
-		return RT.ensureMap(parsed);
+		return RT.castMap(parsed);
 	}
 
 	private AMap<AString, ACell> expectResult(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, () -> "RPC result missing in: " + responseMap);
 		assertEquals(CVMBool.FALSE, result.get(McpProtocol.FIELD_IS_ERROR), () -> "Unexpected failure: " + responseMap);
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}
 
 	private AMap<AString, ACell> expectError(AMap<AString, ACell> responseMap) {
 		assertNull(responseMap.get(McpProtocol.FIELD_ERROR), () -> "Unexpected protocol error: " + responseMap);
-		AMap<AString, ACell> result = RT.ensureMap(responseMap.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(responseMap.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 		assertEquals(CVMBool.TRUE, result.get(McpProtocol.FIELD_IS_ERROR));
-		AMap<AString, ACell> structured = RT.ensureMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
+		AMap<AString, ACell> structured = RT.castMap(result.get(McpProtocol.FIELD_STRUCTURED_CONTENT));
 		assertNotNull(structured);
 		return structured;
 	}

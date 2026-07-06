@@ -102,25 +102,37 @@ public class PeerGUI extends AbstractGUI {
 		Server server=API.launchPeer(config);
 		ConvexLocal convex=ConvexLocal.connect(server);
 		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList);
+		PeerGUI manager =  new PeerGUI(peerList,null);
 		manager.run();
-		return manager;		
+		return manager;
 	}
-	
+
 	public static PeerGUI launchPeerGUI(Server server) throws InterruptedException, PeerException {
 		DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 
 		server.launch();
 		ConvexLocal convex=ConvexLocal.connect(server);
 		peerList.addElement(convex);
-		PeerGUI manager =  new PeerGUI(peerList);
+		PeerGUI manager =  new PeerGUI(peerList,null);
 		manager.run();
-		return manager;		
+		return manager;
 	}
 
 	public static PeerGUI create(int peerCount, AKeyPair genesisKey) throws PeerException {
+		return create(peerCount,genesisKey,null);
+	}
+
+	/**
+	 * Create the Peer GUI with a specific REST API port
+	 * @param peerCount Number of peers to launch
+	 * @param genesisKey Genesis key pair
+	 * @param restPort Port for REST API, 0 for a random port, null for the default port
+	 * @return PeerGUI instance
+	 * @throws PeerException If peer startup fails
+	 */
+	public static PeerGUI create(int peerCount, AKeyPair genesisKey, Integer restPort) throws PeerException {
 		DefaultListModel<ConvexLocal> peerList=launchAllPeers(peerCount,genesisKey);
-		return new PeerGUI(peerList);
+		return new PeerGUI(peerList,restPort);
 	}
 	
 
@@ -189,7 +201,7 @@ public class PeerGUI extends AbstractGUI {
 	 * @param peerCount number of peers to initialise in genesis
 	 * @throws PeerException If peer startup fails
 	 */
-	private PeerGUI(DefaultListModel<ConvexLocal> peerList) throws PeerException {
+	private PeerGUI(DefaultListModel<ConvexLocal> peerList, Integer restPort) throws PeerException {
 		super ("Peer Manager");
 		this.peerList=peerList;
 		
@@ -213,7 +225,7 @@ public class PeerGUI extends AbstractGUI {
 		
 		try {
 			restServer=RESTServer.create(first);
-			restServer.start();
+			restServer.start(restPort);
 			REST_PORT=restServer.getPort();
 		} catch (Exception t) {
 			log.warn("Unable to start REST Server: ",t);

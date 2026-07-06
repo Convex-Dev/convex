@@ -129,7 +129,7 @@ public class McpProtocol {
 	 * @return JSON-RPC response with MCP tool result
 	 */
 	public static AMap<AString, ACell> toolSuccess(ACell structuredResult) {
-		AMap<AString, ACell> payload = RT.ensureMap(structuredResult);
+		AMap<AString, ACell> payload = RT.castMap(structuredResult);
 		if (payload == null) payload = EMPTY_MAP;
 		return protocolResult(buildMcpResult(payload, false));
 	}

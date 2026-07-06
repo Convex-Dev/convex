@@ -5,6 +5,54 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.7] - 2026-07-06
+
+### Added
+
+- Network upgrade mechanism (#413): protocol upgrades can be scheduled on-chain to activate at a consensus timestamp, applying a versioned state migration and incrementing the protocol version, without ever changing the genesis hash. New governance-gated core functions `schedule-upgrade` / `unschedule-upgrade` (callable only by system accounts below `#8`). A peer whose release cannot apply a scheduled upgrade warns its operator ahead of the activation, then cleanly withdraws from consensus at the boundary — staying available for queries rather than diverging — and rejoins after the software is updated. The first upgrade (to protocol version 1) also bundles every core bug fix known at this point, so activating the mechanism brings a network fully up to date rather than leaving known bugs for a later upgrade (see **Changed** and **Fixed** below). See `convex-core/docs/UPGRADE.md`.
+- `gensym` core function, installed at protocol v1: returns a fresh, unique symbol (optionally with a name prefix), so macros can introduce bindings that cannot capture user symbols (#598, #602).
+- NodeServer: a configurable inbound value-size limit (`:maxInboundValueSize` in `NodeConfig`, default the transport message cap) — an oversized `LATTICE_VALUE` is rejected before its merge runs on the receive thread, bounding merge cost from untrusted peers. Set it below the transport cap when exposing a node to untrusted peers (#564).
+- NodeServer: per-connection inbound statistics (`getInboundStats()`) with a circuit-breaker — a connection is closed after a configurable number of consecutive rejected or undecodable messages (`:maxConsecutiveRejects`, default 100; 0 disables), so sustained abuse costs the sender its connection while a single accepted merge resets the streak (#566).
+- NodeServer: a configured public URL is validated at launch (scheme/host/port required; loopback, private-range and link-local IP literals rejected), so a misconfigured node fails fast instead of advertising an unreachable address into the signed node registry. `:allowPrivateURL` opts out for dev networks with intentional private addressing (#567).
+- Peer: the maximum number of inbound client connections is configurable (`:max-connections`, default 1024) — previously a fixed compile-time cap (#482).
+- MCP: `signingListAccounts` can resolve the on-chain addresses controlled by each signing key (pass `resolve=true`; opt-in because it scans the account table) (#551).
+- MCP: configurable Origin allow-list (`mcp.allowedOrigins`) — requests carrying a different Origin are rejected with 403, giving localhost and private deployments the DNS-rebinding protection the MCP spec requires. Public peers keep the allow-all default (#552).
+- Developer experience: Maven wrapper (`./mvnw`) and `.editorconfig`, so builds and editor settings work out of the box without a local Maven install (#581).
+
+### Changed
+
+- Multiply (`*`) now charges juice proportional to the O(n·m) cost of big-integer multiplication, from protocol v1 — closing a juice under-charge that let large multiplications run far more cheaply than the work they cost. `+` and `-` are unaffected (their cost is genuinely linear) (#603).
+- Consensus: a peer no longer confirms a block dated beyond its own clock plus a small skew allowance (`MAX_BLOCK_FORWARD`, 30s), so a future-dated block cannot teleport the consensus clock forward — closing a clock-manipulation weakness amplified by the upgrade mechanism (firing scheduled upgrades early). A far-future block is also stably demoted to the back of the unconfirmed ordering so it does not wedge later in-time blocks behind it (a partition, not a timestamp sort, so back-dating cannot be used to jump the ordering). Peer-local confirmation policy in belief merge, not a validity rule, so replay determinism is unchanged (#595, see `convex-core/docs/CONSENSUS.md`).
+- Peer: best-efforts stake withdrawal ahead of an unsupported network upgrade. A peer whose release cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window, so a withdrawn-but-still-staked cohort does not prevent the remaining upgraded peers from reaching supermajority. Guarded against removing the last viable peer; gated on `:auto-manage` (default on) (#597).
+- Lattice: write timestamps are injected through `LatticeContext` rather than read from the system clock inside lattice implementations (KV, Queue, P2P), so a driver- or test-supplied timestamp makes every write deterministic; the wall clock remains the fallback for standalone use (#561).
+- NodeServer: `setMergeContext` is configuration-time only and throws if called after launch — the context is published safely by thread start and can no longer change under an in-flight merge (#568).
+- Lattice: boundary cursors reworked onto a shared update-on-write base, adding structural JSON writes, generic write interception and `resolve()`; whole-value last-write-wins is decomposed into orthogonal lattice layers, and merges no longer re-encode unchanged values. The legacy `JSONValueLattice` (additive per-key JSON merge, superseded by `JSONLattice`) is removed.
+- CLI: a client command that connects to the production Protonet peer by default (`peer.convex.live`) now prints a one-line notice, so the default is never silent — override with `--host` or `CONVEX_HOST` (#582).
+
+### Fixed
+
+- `update` / `update-in` now apply all arguments in their 5-or-more argument arities (previously the first extra argument was dropped, and `update-in`'s variadic arity errored). Activates at protocol v1. Reported and first fixed by @jeroenvandijk (#533, #534).
+- `convex.fungible` `add-mint` allows unlimited minting when `:max-supply` is unspecified, instead of defaulting the cap to zero and blocking all mints. Activates at protocol v1 (#528).
+- Convex Lisp correctness fixes, activating at protocol v1: quasiquote of sets/maps containing unquotes now produces the set/map rather than a call-form list; a top-level `` `~false `` yields `false`; `define` no longer evaluates its value twice; `call` with the wrong number of arguments is an `:ARITY` error instead of silently expanding to `nil`; and `dotimes` accepts any count expression, not only a literal (#598).
+- `for`, `for-loop` and `switch` no longer capture user bindings that collide with their internal loop variables (macro hygiene). Activates at protocol v1 (#602).
+- Core function docstrings: around twenty corrections where the documented behaviour contradicted the implementation — including `bit-not` arity, `comp` composition order, `map` / `empty` return types, and the `symbol` name-length limit. Activates at protocol v1 (#600).
+- Integer `div`, `quot` and `rem` now return correct results for negative divisors and big-integer operands, with `div` applying Euclidean division consistently (#599).
+- `Shutdown.addHook` no longer races on its shared hook map under concurrent registration, which could throw or lose a hook when multiple servers or nodes launched in parallel (#604).
+- `set-peer-data` now updates the peer named by its key argument, which was previously ignored (the peer was derived from the caller's own key). A no-change `set-stake` / `set-peer-stake` returns `0` rather than a stale value; a wrong-length peer key is consistently an `:ARGUMENT` error rather than `:CAST`; and several arity error messages that reported the wrong argument count are corrected (#601).
+- LatticePropagator: a clean shutdown could silently lose the final lattice value — the propagation loop could observe the stop flag and exit in the instant before the value was queued, so `close()` returned without persisting the most recent writes. The closing thread now drains and processes anything left in the trigger queue after the loop exits, making shutdown a durability guarantee point in every interleaving.
+- `computeSupply` no longer subtracts the reward pool (account `#0` holds issued coins in transit to peers, not a burn or reserve), matching the CVM `coin-supply` definition of issued supply (#598).
+- Lattice queues/topics: partition index is computed with `floorMod`, so a key whose hash is `Long.MIN_VALUE` no longer produces a negative array index (#561).
+- `recur` outside a function or loop now reports its intended descriptive message ("attempt to recur or tail call outside of a function body") — a missing `else` had let the generic "Unhandled Exception" text overwrite it. Error code unchanged; replay hash unaffected (#115).
+- CLI: `key generate` always shows the BIP39 mnemonic (on stderr), even at verbosity `-v0` — previously it was silently discarded, and a lost mnemonic is unrecoverable (#583).
+
+### Security
+
+- NodeServer: inbound lattice values from untrusted peers are handled defensively. Wrong-type values are explicitly rejected leaving state unchanged (#562); merge failures — including engineered `StackOverflowError` from adversarially deep structures (DLFS nodes among them) — are contained rather than allowed to kill the receive thread (#561); and malformed KV entries are rejected at validation instead of poisoning later store-wide reads (#561).
+- Lattice: container lattices (Owner, Keyed, Map, Index, Topic) now route foreign entries through per-child validation even when merging into an empty region — previously a single message to a fresh node or unpopulated sub-path could commit a wrong-typed child (permanently blocking that slot) or, for owner-signed lattices, seed forged entries bypassing signature verification (#561).
+- Convex DB: the Postgres wire decoder validates frame lengths and count fields before allocation, closing a pre-authentication denial of service — a client could previously declare a near-2GB frame length and force unbounded buffering, or supply negative/oversized counts causing crashes on the receive path. Malformed frames now close the connection. Contributed by @PrazwalR (#596).
+- MCP: seed-carrying tools (`transact`, `sign`, `signAndSubmit`, `transfer`, `keyGen` with a supplied seed, `signingImportKey`) refuse cleartext HTTP from non-loopback clients, so a misconfigured peer can no longer silently accept Ed25519 seeds in transit. HTTPS (directly or via `X-Forwarded-Proto` from a TLS-terminating proxy) is required; `allowHttpSeeds` opts out for trusted private networks (#554).
+- Peer transport: malformed-frame rejections are logged at debug rather than WARN, so a hostile client cannot spam the operator log; oversized declared frame lengths are covered by a server-level test (#41).
+
 ## [0.8.6] - 2026-06-22
 
 ### Added

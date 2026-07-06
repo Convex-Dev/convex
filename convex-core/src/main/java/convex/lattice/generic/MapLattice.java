@@ -33,14 +33,18 @@ public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashM
 	@Override
 	public AHashMap<K,V> merge(AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
 		if (otherValue==null) return ownValue;
-		if (ownValue==null) return otherValue;
+		// #561: merge foreign values against an empty own rather than accepting the map
+		// wholesale, so each foreign value is validated through the child lattice merge.
+		if (ownValue==null) ownValue = zero();
 		return ownValue.mergeDifferences(otherValue, mergeFunction);
 	}
 
 	@Override
 	public AHashMap<K,V> merge(LatticeContext context, AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
 		if (otherValue==null) return ownValue;
-		if (ownValue==null) return otherValue;
+		// #561: merge foreign values against an empty own rather than accepting the map
+		// wholesale, so each foreign value is validated through the child lattice merge.
+		if (ownValue==null) ownValue = zero();
 		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
 		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}

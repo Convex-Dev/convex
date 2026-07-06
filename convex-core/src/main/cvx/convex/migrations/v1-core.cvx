@@ -1,0 +1,215 @@
+;; Network upgrade v1 — core function fixes (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the core environment (account #8),
+;; redefining the affected functions. Deliberately NOT part of core.cvx / genesis:
+;; existing networks keep their genesis hash and reach these fixes at protocol
+;; version 1 via the scheduled bootstrap upgrade.
+;;
+;; Fixes #533: the variadic (5+ arg) arities of `update` and `update-in` dropped
+;; the first extra argument `x`; `update-in`'s variadic arity additionally had a
+;; parameter typo (`k` in the binding vector, `ks` in the body).
+;;
+;; Fixes #598 (1): quasiquote of a set/map containing an unquote produced a call-form
+;; list (e.g. `(hash-set ...)` as data) instead of the set/map. The set/map generator
+;; branches built `(list (quote hash-set) ...)` instead of a `(hash-set ...)` call.
+;;
+;; Fixes #598 (2): a top-level unquote of literal `false` (e.g. `~false) dropped to
+;; `(unquote false)` because qq* tested the generator for truthiness rather than nil.
+;;
+;; Fixes #598 (3): `define` used its expand-time `(eval (def ...))` return value as the
+;; macro expansion, so the value was evaluated a second time — breaking when it evaluated
+;; to a symbol (-> lookup -> UNDECLARED) or a list. Now expands to the symbol `name`
+;; (a lookup returning the defined value), identical for self-evaluating values.
+;;
+;; Fixes #598 (4): `call` with too many arguments silently expanded to nil (a no-op:
+;; no invocation, no offer, no error). Rewritten from `[addr & more]` + manual count
+;; dispatch to explicit arities, so a wrong arity is an :ARITY error automatically.
+;; Expansions for valid calls are unchanged.
+;;
+;; Fixes #598 (6): `dotimes` evaluated `(int count)` at expand time on the raw count
+;; form, so only literal counts worked. The count is now any expression, evaluated
+;; exactly once at runtime and bound via `gensym` (installed by this same upgrade),
+;; so the binding is fresh per expansion and cannot capture user symbols.
+;;
+;; Fixes #602: `for`, `for-loop` and `switch` introduced their template bindings with
+;; fixed literal names (`s#`/`n#` plus the plain loop vars `a`/`i` in `for`, `value#`/
+;; `new-value#` in `for-loop`, `v#` in `switch`), all visible to the user's body — so a
+;; body referring to a colliding symbol captured the macro's internal binding. Each such
+;; binding is now a fresh `gensym`, fixing the capture. `switch` additionally referenced
+;; its binding from code constructed inside an unquote; the gensym is captured in an
+;; expand-time `let` and threaded to both the binding site and those constructed refs.
+
+(defn update
+  ^{:doc {:description "Update a value in a associative data structure by applying a function."
+          :examples    [{:code "(update {:count 1} :count inc)"}]
+          :signature   [{:params [m k f & args]}]}}
+  ([m k f]
+   (assoc m k (f (get m k))))
+  ([m k f x]
+   (assoc m k (f (get m k) x)))
+  ([m k f x & more]
+   (assoc m k (apply f (get m k) x more))))
+
+(defn update-in
+  ^{:doc {:description "Update a value in a nested associative data structure by applying a function."
+          :examples    [{:code "(update-in {:count 1} [:count] inc)"}]
+          :signature   [{:params [m ks f & args]}]}}
+  ([m ks f]
+   (assoc-in m ks (f (get-in m ks))))
+  ([m ks f x]
+   (assoc-in m ks (f (get-in m ks) x)))
+  ([m ks f x & more]
+   (assoc-in m ks (apply f (get-in m ks) x more))))
+
+;; #598 (1): quasiquote set/map generators. Only the two collection branches change
+;; (set: `(cons 'hash-set es)`, map: `(cons 'hash-map es)`); the rest is verbatim from
+;; core.cvx so the migration redefines the whole binding.
+(def quasiquote* (fn [form depth]
+  (cond
+    (empty? form) (return nil)
+    (list? form)
+      (let [fst (first form)]
+        (cond
+          (= 'quasiquote fst)
+            (cond
+              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires 1 argument")
+              (let [snd (second form)
+                    ev (quasiquote* snd (inc depth))]
+                (cond
+                  (nil? ev) (return nil)
+                  (list 'list (quote 'quasiquote) ev))))
+          (= 'unquote fst)
+            (cond
+              (!= 2 (count form)) (fail :EXPAND "unquote requires 1 argument")
+              (let [snd (second form)]
+                (cond
+                  (> depth 1)
+                    (let [ev (quasiquote* snd (dec depth))]
+                      (cond (nil? ev) (return nil))
+                      (list 'list (quote 'unquote) ev))
+                  (nil? snd) (compile nil)
+                  snd)))
+          (let [es (qq-seq form depth)]
+            (cond (nil? es) (return nil))
+            (cons 'list es))))
+    (vector? form)
+      (let [es (qq-seq (vec form) depth)]
+        (cond (nil? es) (return nil))
+        (vec es))
+    (set? form)
+      (let [es (qq-seq (vec form) depth)]
+        (cond (nil? es) (return nil)
+              (cons 'hash-set es)))
+    (map? form)
+      (let [es (qq-seq (apply concat (vec form)) depth)]
+        (cond (nil? es) (return nil)
+              (cons 'hash-map es)))
+    nil)))
+
+;; #598 (2): qq* must test the generator for nil (the "no generator" sentinel), not
+;; truthiness — otherwise a literal `false` generator is dropped and the form is quoted.
+(def ^:private qq* (fn [form depth]
+  (let [qf (quasiquote* form depth)]
+    (cond
+      (nil? qf) (list 'quote form)
+      qf))))
+
+;; #598 (3): define expands to the symbol `name` (a runtime lookup of the value just
+;; defined at expand time) instead of the eval return, avoiding the double evaluation.
+(defmacro define
+  ^{:doc {:description "Defines a value in the current environment, like def, but at expand time."
+          :examples    [{:code "(define cols [:red :green])"}]
+          :signature   [{:params [name]}
+                        {:params [name value]}]}}
+  ([name]       (eval `(def ~name)) name)
+  ([name value] (eval `(def ~name ~value)) name))
+
+;; #598 (4): call as explicit arities. The 2-arity (no offer) recurs into the 3-arity
+;; with offer 0; wrong arity is an automatic :ARITY error (no silent nil fall-through).
+(defmacro call
+  ^{:doc {:description ["Calls a function in another account, optionally offering coins which the account may receive using `accept`."
+                        "Must refer to a callable function defined in the actor, called with appropriate arguments."]
+          :errors      {:ARGUMENT "If the offer is negative."
+                        :ARITY    "If the supplied arguments are the wrong arity for the called function."
+                        :CAST     "If the address argument is an Address, the offer is not a Long, or the function name is not a Symbol."
+                        :STATE    "If the address does not refer to an Account with the callable function specified by fn-name."}
+          :examples    [{:code "(call some-contract 1000 (contract-fn arg1 arg2))"}]
+          :signature   [{:params [address call-form]
+                         :return Any}
+                        {:params [address offer call-form]
+                         :return Any}]}}
+  ([addr cf] (recur addr 0 cf))
+  ([addr offer cf]
+    (let [cf (unsyntax cf)]
+      (or (list? cf)
+          (fail :COMPILE "`call` must have function call list form as last argument."))
+      (cons 'call*
+            (unsyntax addr)
+            offer
+            (cons (list 'quote (unsyntax (first cf))) (next cf))))))
+
+;; #598 (6): dotimes with the count evaluated once at runtime, bound via gensym.
+(defmacro dotimes
+  ^{:doc {:description ["Repeats execution of the body `count` times, binding the specified symbol from 0 to `(- count 1)` on successive iterations."]
+          :examples    [{:code "(dotimes [i 10] (transfer *address* 10))"}]
+          :signature   [{:params [[sym count] & body]}]}}
+  [[sym count] & body]
+  (or (symbol? (unsyntax sym))
+      (fail :CAST "`dotimes` requires a symbol for loop binding"))
+  (let [n (gensym 'n)]
+    `(let [~n (int ~count)]
+       (loop [~sym 0]
+         (cond (< ~sym ~n)
+           (do ~(cons 'do body)
+               (recur (inc ~sym))))))))
+
+;; #602: for — all template bindings (sequence, count, accumulator, index) are gensyms,
+;; so none can be captured by the user's body (which sees only its own `sym`).
+(defmacro for
+  ^{:doc {:description "Executes the body with the symbol `sym` bound to each value of the given sequence. Returns a vector of results."
+          :examples    [{:code "(for [x [1 2 3]] (inc x))"}]
+          :signature   [{:params [[sym sequence] & body]}]}}
+  [[sym sequence] & body]
+  (let [s (gensym 's)
+        n (gensym 'n)
+        a (gensym 'a)
+        i (gensym 'i)]
+    `(let [~s ~sequence
+           ~n (count ~s)]
+       (loop [~a []
+              ~i 0]
+         (cond (< ~i ~n)
+           (recur (conj ~a (let [~sym (nth ~s ~i)] ~(cons 'do body)))
+                  (inc ~i))
+           ~a)))))
+
+;; #602: for-loop — the accumulator and per-iteration result bindings are gensyms.
+(defmacro for-loop
+  ^{:doc {:description "Executes a code body repeatedy while a condition is true. At the first iteration, `sym` is locally bound to the `init` value. For each subsequent iteration, sym is bound to the result of `change`. The result it the result of the last execution of `body`, or `nil` if no iterations were made."
+          :examples    [{:code "(for-loop [i 0 (< i 10) (inc i)] i)"}]
+          :signature   [{:params [[sym init condition change] & body]}]}}
+  [[sym init condition change] & body]
+  (let [value (gensym 'value)
+        new-value (gensym 'new-value)]
+    `(loop [~sym ~init ~value nil]
+       (if ~condition
+          (let [~new-value ~(cons 'do body)]
+            (recur ~change ~new-value))
+         ~value))))
+
+;; #602: switch — the subject binding is a gensym. It is referenced both in the backtick
+;; (the `let` binding) and from the `cond` clauses built inside the unquote, so the gensym
+;; is bound once in an expand-time `let` and used in both places.
+(defmacro switch
+  ^{:doc {:description "Switches on the result of an expression. Tests are computed in turn, based on equality, with an option default value, like `cond`."
+          :examples    [{:code "(switch (+ 1 1) 0 :zero 1 :one 2 :two :default-value)"}]
+          :signature   [{:params [exp & cases]}]}}
+  [exp & cases]
+  (let [g (gensym 'v)]
+    `(let [~g ~exp]
+       ~(let [n (dec (count cases))]
+          (loop [v cases i 0]
+            (cond
+              (>= i n) (cons 'cond v)
+              (recur (assoc v i (list '= (get v i) g))
+                     (+ i 2))))))))

@@ -181,7 +181,7 @@ public class DlfsMcpTools {
 
 			AVector<ACell> capabilities = ucan.getCapabilities();
 			for (long j = 0; j < capabilities.count(); j++) {
-				AMap<AString, ACell> cap = RT.ensureMap(capabilities.get(j));
+				AMap<AString, ACell> cap = RT.castMap(capabilities.get(j));
 				if (cap == null) continue;
 				if (Capability.covers(cap, requiredWith, requiredAbility)) {
 					return DriveAccess.ok(ownerFs);

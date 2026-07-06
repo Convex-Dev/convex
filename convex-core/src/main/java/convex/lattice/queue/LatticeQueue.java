@@ -323,7 +323,9 @@ public class LatticeQueue {
 
 	// ===== Internal =====
 
+	// #561: time comes from the cursor's LatticeContext (driver/test supplied), not the
+	// system clock directly, so writes are deterministic when a timestamp is injected.
 	private CVMLong now() {
-		return CVMLong.create(System.currentTimeMillis());
+		return cursor.getContext().currentTimestamp();
 	}
 }

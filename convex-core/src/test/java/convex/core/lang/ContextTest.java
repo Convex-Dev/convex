@@ -40,7 +40,7 @@ public class ContextTest extends ACVMTest {
 
 	// TODO: should probably make independent of base state init
 	protected ContextTest() {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	private final Address ADDR=context().getAddress();

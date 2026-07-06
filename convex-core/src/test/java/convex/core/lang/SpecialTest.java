@@ -32,7 +32,7 @@ public class SpecialTest extends ACVMTest {
 	
 
 	protected SpecialTest() throws IOException {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	@Test

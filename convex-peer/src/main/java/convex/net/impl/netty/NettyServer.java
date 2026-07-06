@@ -10,10 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.message.Message;
 import convex.core.store.NullStore;
 import convex.core.util.Shutdown;
+import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.peer.Config;
 import convex.peer.Server;
@@ -44,6 +46,12 @@ public class NettyServer extends AServer {
 	 */
 	private final ChannelGroup clientChannels =
 		new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+
+	/**
+	 * Maximum number of inbound client connections accepted (#482).
+	 * Configurable via Keywords.MAX_CONNECTIONS; defaults to Config.MAX_CLIENT_CONNECTIONS.
+	 */
+	private volatile int maxClientConnections = Config.MAX_CLIENT_CONNECTIONS;
 
 	/**
 	 * Delivery function for inbound messages. Returns null if accepted,
@@ -84,7 +92,29 @@ public class NettyServer extends AServer {
 		NettyServer ns=new NettyServer(null);
 		ns.receiveAction=server.getReceiveAction();
 		ns.deliver=server::deliverMessage;
+		Object maxConns=server.getConfig().get(Keywords.MAX_CONNECTIONS);
+		if (maxConns!=null) {
+			ns.setMaxClientConnections(Utils.toInt(maxConns));
+		}
 		return ns;
+	}
+
+	/**
+	 * Sets the maximum number of inbound client connections (#482). New
+	 * connections beyond this limit are rejected and closed. Takes effect for
+	 * connections accepted after the call; existing connections are unaffected.
+	 * @param limit Maximum connections (must be positive)
+	 */
+	public void setMaxClientConnections(int limit) {
+		if (limit<=0) throw new IllegalArgumentException("Connection limit must be positive: "+limit);
+		this.maxClientConnections=limit;
+	}
+
+	/**
+	 * @return Maximum number of inbound client connections currently configured
+	 */
+	public int getMaxClientConnections() {
+		return maxClientConnections;
 	}
 
 
@@ -98,9 +128,9 @@ public class NettyServer extends AServer {
              @Override
              public void initChannel(SocketChannel ch) throws Exception {
             	 // Enforce connection limit
-            	 if (clientChannels.size() >= Config.MAX_CLIENT_CONNECTIONS) {
+            	 if (clientChannels.size() >= maxClientConnections) {
             		 log.warn("Connection limit reached ({}), rejecting {}",
-            			 Config.MAX_CLIENT_CONNECTIONS, ch.remoteAddress());
+            			 maxClientConnections, ch.remoteAddress());
             		 ch.close();
             		 return;
             	 }
@@ -111,6 +141,7 @@ public class NettyServer extends AServer {
             	 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound);
             	 inbound.setConnection(conn);
+            	 inbound.setDisconnectAction(getDisconnectAction()); // #566: eager per-connection cleanup
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
              }
          })

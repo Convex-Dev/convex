@@ -1,6 +1,7 @@
 package convex.net.impl.netty;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -51,6 +52,15 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	private AConnection connection;
 
+	/** No-op disconnect action, used as the default and the null-reset value. */
+	private static final Consumer<AConnection> NO_DISCONNECT = c -> {};
+
+	/**
+	 * Action invoked when this channel goes inactive (closes), so the server can release
+	 * per-connection state eagerly (#566). Default no-op.
+	 */
+	private Consumer<AConnection> onDisconnect = NO_DISCONNECT;
+
 	/**
 	 * Count of complete messages decoded on this channel.
 	 */
@@ -81,6 +91,24 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 		ctx.close();
 	}
 
+	@Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+		// Deliver any final decoded messages / run decoder cleanup first, then fire the
+		// disconnect callback so the server can release per-connection state (#566).
+		try {
+			super.channelInactive(ctx);
+		} finally {
+			AConnection conn = connection;
+			if (conn != null) {
+				try {
+					onDisconnect.accept(conn);
+				} catch (Exception e) {
+					log.debug("Disconnect action failed: {}", e.getMessage());
+				}
+			}
+		}
+	}
+
 	public long getReceivedCount() {
 		return receivedCount;
 	}
@@ -92,6 +120,14 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	void setConnection(AConnection conn) {
 		this.connection = conn;
+	}
+
+	/**
+	 * Sets the action invoked when this channel closes (#566).
+	 * @param action Disconnect action (null resets to a no-op)
+	 */
+	void setDisconnectAction(Consumer<AConnection> action) {
+		this.onDisconnect = (action != null) ? action : NO_DISCONNECT;
 	}
 
 	@Override
@@ -195,7 +231,15 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				});
 			}
 		} catch (Throwable e) {
-			log.warn("Inbound message handling error: {}",e.getMessage());
+			if (e instanceof BadFormatException) {
+				// Malformed input from a remote client is an expected event on a
+				// public port (exceptionCaught closes the channel); debug level so
+				// hostile clients cannot spam the operator log. Sustained abuse is
+				// surfaced by the #566 circuit-breaker instead.
+				log.debug("Rejecting malformed inbound message: {}",e.getMessage());
+			} else {
+				log.warn("Inbound message handling error: {}",e.getMessage());
+			}
 			throw e;
 		}
 	}

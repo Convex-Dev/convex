@@ -14,6 +14,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
@@ -241,6 +242,95 @@ public class BeliefVotingTest {
 			assertEquals(1,order3.getConsensusPoint(1)); // Updated proposal 
 			assertEquals(1,order3.getConsensusPoint(2)); // New consensus
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test public void testForwardBlockClamp() throws BadSignatureException, InvalidDataException {
+		// #595 stage (i): a peer must not finalise a Block dated beyond its own clock plus
+		// MAX_BLOCK_FORWARD, even when the stake vote would otherwise confirm it.
+		SignedData<Block> near = bl(1);          // timestamp 1 — within the clock horizon
+		SignedData<Block> far  = bl(1_000_000);  // timestamp 1_000_000 — far in the future
+
+		// All six equal-stake peers fully agree on [near, far] (proposal and consensus = 2)
+		SignedData<Order>[] os = new SignedData[6];
+		for (int i = 0; i < 6; i++) os[i] = or(i, TS, 2, 2, near, far);
+		Belief b = Belief.create(os);
+
+		// Control: with a peer clock past both timestamps, the vote finalises BOTH Blocks —
+		// so it is the clamp, not the vote, that holds finality back below.
+		Order full = BeliefMerge.create(b, kps[0], 2_000_000, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, full.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Peer clock at TS=0: the far Block is beyond wallClock + MAX_BLOCK_FORWARD, so
+		// finality is clamped to the near Block only, though both Blocks stay in the ordering.
+		Order clamped = BeliefMerge.create(b, kps[0], TS, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, clamped.getBlockCount());
+		assertEquals(1, clamped.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Just short of the far Block's timestamp: still clamped to the near Block.
+		Order still = BeliefMerge.create(b, kps[0], 1_000_000 - CPoSConstants.MAX_BLOCK_FORWARD - 1,
+				initialState).merge().getOrder(keys[0]);
+		assertEquals(1, still.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Once the clock reaches the far Block's timestamp, both Blocks finalise.
+		Order advanced = BeliefMerge.create(b, kps[0], 1_000_000, initialState).merge().getOrder(keys[0]);
+		assertEquals(2, advanced.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+	}
+
+	@SuppressWarnings("unchecked")
+	@Test public void testForwardWedgeResolves() throws Exception {
+		// #595 stage (ii) end-to-end: a far-future Block F must not wedge a later in-horizon
+		// Block N. Peers start proposing [F, N]; through merge, F is demoted behind N so N
+		// finalises while F waits (at TS=0, F is out-of-horizon).
+		SignedData<Block> nBlk = bl(1);          // in-horizon
+		SignedData<Block> fBlk = bl(1_000_000);  // far future
+		SignedData<Order>[] os = new SignedData[6];
+		for (int i = 0; i < 6; i++) os[i] = or(i, TS, 0, 0, fBlk, nBlk);
+		Belief belief = Belief.create(os);
+
+		// Sequential merge rounds across all peers, clock fixed at TS (F stays out of horizon)
+		for (int round = 0; round < 8; round++) {
+			for (int i = 0; i < 6; i++) {
+				belief = BeliefMerge.create(belief, kps[i], TS, initialState).merge(belief);
+			}
+		}
+		Order o = belief.getOrder(keys[0]);
+		assertEquals(Vectors.of(nBlk, fBlk), o.getBlocks(), "N reordered ahead of F");
+		assertEquals(1, o.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY), "N finalised, F waits");
+	}
+
+	@Test public void testDemoteFutureBlocks() {
+		// #595 stage (ii): a stable partition — far-future Blocks moved to the back, the
+		// order of in-horizon Blocks preserved (never a timestamp sort).
+		SignedData<Block> a  = bl(10);
+		SignedData<Block> b2 = bl(20);
+		SignedData<Block> c  = bl(30);
+		SignedData<Block> f1 = bl(1_000_000);
+		SignedData<Block> f2 = bl(2_000_000);
+		long limit = 100;
+
+		// No future Blocks: the same vector is returned (no allocation)
+		AVector<SignedData<Block>> plain = Vectors.of(a, b2, c);
+		assertSame(plain, BeliefMerge.demoteFutureBlocks(plain, 0, limit));
+
+		// Future Blocks already a clean suffix: unchanged
+		AVector<SignedData<Block>> suffix = Vectors.of(a, b2, f1, f2);
+		assertSame(suffix, BeliefMerge.demoteFutureBlocks(suffix, 0, limit));
+
+		// The wedge case: [F, N] -> [N, F]
+		assertEquals(Vectors.of(a, f1), BeliefMerge.demoteFutureBlocks(Vectors.of(f1, a), 0, limit));
+
+		// Interleaved: in-horizon order (a,b2,c) and future order (f1,f2) each preserved
+		assertEquals(Vectors.of(a, b2, c, f1, f2),
+				BeliefMerge.demoteFutureBlocks(Vectors.of(a, f1, b2, f2, c), 0, limit));
+
+		// Floor fixes the agreed prefix: with floor 2, a and b2 stay; only [f1, c] reorders
+		assertEquals(Vectors.of(a, b2, c, f1),
+				BeliefMerge.demoteFutureBlocks(Vectors.of(a, b2, f1, c), 2, limit));
+
+		// A future Block below the floor is left in place (treated as agreed)
+		AVector<SignedData<Block>> belowFloor = Vectors.of(a, f1, b2);
+		assertSame(belowFloor, BeliefMerge.demoteFutureBlocks(belowFloor, 2, limit));
 	}
 
 	@SuppressWarnings("unchecked")

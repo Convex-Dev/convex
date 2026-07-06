@@ -392,8 +392,9 @@ public final class CVMBigInteger extends AInteger {
 		BigInteger divisor=base.big();
 		int signum=divisor.signum();
 		if (signum==0) throw new IllegalArgumentException("div by zero");;
-		// if (signum<0) divisor=divisor.negate();
-		BigInteger d=big().divide(divisor);
+		// Euclidean division: q = (a - (a euclid-mod |b|)) / b, giving a non-negative remainder
+		BigInteger a=big();
+		BigInteger d=a.subtract(a.mod(divisor.abs())).divide(divisor);
 		return AInteger.create(d);
 	}
 	

@@ -24,6 +24,7 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
@@ -44,6 +45,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -87,6 +89,14 @@ public class Server implements Closeable {
 	public static final int DEFAULT_PORT = Constants.DEFAULT_PEER_PORT;
 	
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
+
+	/**
+	 * Logger for protocol upgrade lifecycle events (scheduled upgrade warnings,
+	 * stake withdrawal, consensus halt). Kept separate from per-class loggers so
+	 * operators and test configurations can route or filter upgrade alerts
+	 * independently.
+	 */
+	static final Logger upgradeLog = LoggerFactory.getLogger("convex.peer.upgrade");
 
 	private Consumer<Message> messageReceiveObserver=null;
 
@@ -420,7 +430,7 @@ public class Server implements Closeable {
 	 *
 	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
 	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
-	 * the caller (typically {@link convex.net.impl.netty.NettyInboundHandler}) parks the
+	 * the caller (typically {@code NettyInboundHandler}) parks the
 	 * channel and lets the predicate block on a virtual thread until space is available.
 	 *
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
@@ -875,6 +885,104 @@ public class Server implements Closeable {
 	 */
 	public boolean isRunning() {
 		return isRunning;
+	}
+
+	/**
+	 * The peer's time source, in milliseconds since epoch. All consensus-relevant
+	 * time reads (block timestamps, belief merge, block-rate throttling) go through
+	 * this single seam. Defaults to wall clock; overridable so that the passage of
+	 * time can be driven deterministically in tests.
+	 */
+	private volatile java.util.function.LongSupplier timeSource = Utils::getCurrentTimestamp;
+
+	/**
+	 * Gets the current peer timestamp in milliseconds since epoch.
+	 * @return Current peer timestamp
+	 */
+	public long getTimestamp() {
+		return timeSource.getAsLong();
+	}
+
+	/**
+	 * Overrides the peer's time source. Consensus-relevant time reads then observe
+	 * the supplied clock instead of the wall clock, so tests can drive the passage
+	 * of time deterministically. Package-visible: for test use only.
+	 * @param timeSource New time source (milliseconds since epoch)
+	 */
+	void setTimeSource(java.util.function.LongSupplier timeSource) {
+		this.timeSource = timeSource;
+	}
+
+	/**
+	 * Non-null if the peer has frozen consensus participation because a required
+	 * network upgrade cannot be applied by this release. See UPGRADE.md.
+	 */
+	private volatile UpgradeError consensusHalt = null;
+
+	/**
+	 * Completed with the halting UpgradeError the first time consensus freezes.
+	 * A real signal for operators/monitoring (and tests) to react to a freeze
+	 * rather than polling {@link #isConsensusHalted()}.
+	 */
+	private final java.util.concurrent.CompletableFuture<UpgradeError> consensusHaltFuture = new java.util.concurrent.CompletableFuture<>();
+
+	/**
+	 * Freezes this peer's consensus participation due to a required upgrade this
+	 * release cannot apply. Both the CVM executor and the belief propagator check
+	 * {@link #isConsensusHalted()} and cease all consensus activity (state
+	 * application, belief merge, block proposal, Order publication) — a full
+	 * consensus freeze, so the peer never votes on or publishes anything past the
+	 * boundary it cannot validate. The server stays alive to serve queries and
+	 * report its condition. Idempotent: only the first halt is recorded.
+	 *
+	 * @param error The UpgradeError that triggered the freeze
+	 */
+	public void haltConsensus(UpgradeError error) {
+		if (consensusHalt == null) {
+			consensusHalt = error;
+			consensusHaltFuture.complete(error);
+			upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
+					error.getVersion(), Migrations.MAX_VERSION);
+		}
+	}
+
+	/**
+	 * Gets a future that completes with the halting UpgradeError when this peer
+	 * freezes consensus pending a software upgrade. Never completes if the peer
+	 * does not halt.
+	 * @return Future of the halting UpgradeError
+	 */
+	public java.util.concurrent.CompletableFuture<UpgradeError> awaitConsensusHalt() {
+		return consensusHaltFuture;
+	}
+
+	/**
+	 * Gets the earliest scheduled network upgrade this release cannot apply, or null
+	 * if every scheduled upgrade is supported. If non-null, the peer will withdraw
+	 * from consensus at the returned activation timestamp unless the software is
+	 * upgraded first. A pure function of current consensus state, suitable for
+	 * health checks and operator tooling. See UPGRADE.md.
+	 * @return Pending unsupported upgrade warning, or null
+	 */
+	public Migrations.UpgradeWarning getUpgradeWarning() {
+		return Migrations.pendingBeyondSupport(getPeer().getConsensusState());
+	}
+
+	/**
+	 * Checks whether this peer has frozen consensus participation pending a
+	 * software upgrade.
+	 * @return True if consensus is halted
+	 */
+	public boolean isConsensusHalted() {
+		return consensusHalt != null;
+	}
+
+	/**
+	 * Gets the UpgradeError that froze consensus, or null if not halted.
+	 * @return The halting UpgradeError, or null
+	 */
+	public UpgradeError getConsensusHalt() {
+		return consensusHalt;
 	}
 
 	public TransactionHandler getTransactionHandler() {

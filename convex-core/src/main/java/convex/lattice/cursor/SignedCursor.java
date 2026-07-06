@@ -1,11 +1,9 @@
 package convex.lattice.cursor;
 
-import java.util.function.BinaryOperator;
-import java.util.function.UnaryOperator;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.SignedData;
+import convex.core.util.Utils;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 
@@ -13,24 +11,24 @@ import convex.lattice.LatticeContext;
  * A lattice cursor that sits at the signing boundary, transparently handling
  * sign/verify of lattice values.
  *
- * <p>Wraps a parent cursor holding {@link SignedData} and presents the unsigned
- * inner value. Reads extract the value; writes re-sign using the key pair from
- * the {@link LatticeContext}. Throws {@link IllegalStateException} on write if
- * no signing key is available — this is the enforcement point.</p>
+ * <p>Unlike {@link StampedCursor} (a same-type update override), a SignedCursor is a
+ * genuine <b>view boundary</b>: the stored cell is a fundamentally different envelope
+ * type, {@link SignedData}, whose {@code :value} child is the unsigned value this
+ * cursor presents. So it overrides {@link #view} to project the value on read, and
+ * its {@link #updateOnWrite} re-signs on write using the key pair from the
+ * {@link LatticeContext} — throwing {@link IllegalStateException} if no signing key
+ * is available (the enforcement point). All atomic operations are inherited from
+ * {@link AUpdateCursor}.</p>
  *
- * <p>Created automatically by {@code SignedLattice.createPathCursor()} when
- * navigating through a signing boundary via {@code path()}.</p>
+ * <p>Created automatically by {@code ALatticeCursor.path()} when navigating through a
+ * signing boundary.</p>
  *
  * @param <V> Type of the unsigned value
  */
-public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
+public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V>> {
 
-	private final ACursor<SignedData<V>> base;
-
-	@SuppressWarnings("unchecked")
 	SignedCursor(ACursor<SignedData<V>> base, ALattice<V> subLattice, LatticeContext context) {
-		super(subLattice, context, null);
-		this.base = base;
+		super(base, subLattice, context);
 	}
 
 	/**
@@ -64,98 +62,28 @@ public class SignedCursor<V extends ACell> extends ALatticeCursor<V> {
 	}
 
 	@Override
-	public V sync() {
-		if (base instanceof ALatticeCursor<?> lc) {
-			lc.sync();
-		} else {
-			throw new IllegalStateException(
-				"SignedCursor.sync(): base cursor is not an ALatticeCursor (got " +
-				base.getClass().getSimpleName() + "). Sync cannot propagate.");
-		}
-		return get();
+	protected V view(SignedData<V> stored) {
+		return (stored != null) ? stored.getValue() : null;
 	}
 
 	@Override
-	public V get() {
-		SignedData<V> sd = base.get();
-		return (sd != null) ? sd.getValue() : null;
-	}
-
-	@Override
-	public void set(V newValue) {
-		base.set(sign(newValue));
-	}
-
-	@Override
-	public V getAndSet(V newValue) {
-		SignedData<V> old = base.getAndSet(sign(newValue));
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		SignedData<V> old = base.getAndUpdate(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V updated = updateFunction.apply(current);
-			return sign(updated);
-		});
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		@SuppressWarnings("unchecked")
-		V[] result = (V[]) new ACell[1];
-		base.updateAndGet(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V updated = updateFunction.apply(current);
-			result[0] = updated;
-			return sign(updated);
-		});
-		return result[0];
-	}
-
-	@Override
-	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		SignedData<V> old = base.getAndUpdate(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V accumulated = accumulatorFunction.apply(x, current);
-			return sign(accumulated);
-		});
-		return (old != null) ? old.getValue() : null;
-	}
-
-	@Override
-	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		@SuppressWarnings("unchecked")
-		V[] result = (V[]) new ACell[1];
-		base.updateAndGet(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			V accumulated = accumulatorFunction.apply(x, current);
-			result[0] = accumulated;
-			return sign(accumulated);
-		});
-		return result[0];
-	}
-
-	@Override
-	public boolean compareAndSet(V expected, V newValue) {
-		boolean[] updated = new boolean[1];
-		base.update(sd -> {
-			V current = (sd != null) ? sd.getValue() : null;
-			if (convex.core.util.Utils.equals(expected, current)) {
-				updated[0] = true;
-				return sign(newValue);
-			}
-			return sd;
-		});
-		return updated[0];
-	}
-
-	private SignedData<V> sign(V value) {
+	protected SignedData<V> updateOnWrite(SignedData<V> current, V value) {
 		if (value == null) return null;
+		// Unchanged value: keep the existing signature rather than re-signing
+		if (current != null && Utils.equals(value, current.getValue())) return current;
 		AKeyPair kp = context.getSigningKey();
 		if (kp == null) throw new IllegalStateException("SignedCursor requires a signing key in context");
 		return kp.signData(value);
+	}
+
+	/**
+	 * Merge synthesises a new value: merge the unsigned values via the lattice, then
+	 * re-sign the result (via {@link #updateOnWrite}). The signed envelope must always
+	 * carry a valid signature over its current value, so a merged value is re-signed.
+	 */
+	@Override
+	public V merge(V other) {
+		if (lattice == null) throw new UnsupportedOperationException("Cannot merge without a lattice");
+		return view(base.updateAndGet(cur -> updateOnWrite(cur, lattice.merge(context, view(cur), other))));
 	}
 }

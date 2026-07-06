@@ -67,11 +67,12 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 		if (otherValue == null) {
 			return ownValue;
 		}
+		// #561: never wholesale-accept a foreign map. Merge against an empty own so every
+		// foreign entry is routed through the per-owner merge (signature check) rather than
+		// being committed unvalidated. mergeDifferences visits only entries that differ, so
+		// trusted own state is not re-scanned.
 		if (ownValue == null) {
-			if (checkForeign(otherValue)) {
-				return otherValue;
-			}
-			return zero();
+			ownValue = zero();
 		}
 
 		// Merge the maps using the SignedLattice merge function for each owner
@@ -86,11 +87,12 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 		if (otherValue == null) {
 			return ownValue;
 		}
+		// #561: never wholesale-accept. Merge against an empty own so every foreign entry
+		// passes through verifyOwner + the signature check below, instead of bypassing them
+		// on the first (own==null) merge into an unpopulated region. mergeDifferences visits
+		// only entries that differ, so trusted own state is not re-scanned.
 		if (ownValue == null) {
-			if (checkForeign(otherValue)) {
-				return otherValue;
-			}
-			return zero();
+			ownValue = zero();
 		}
 
 		// Merge the maps using context-aware SignedLattice merge for each owner,

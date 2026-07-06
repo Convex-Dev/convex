@@ -6,6 +6,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * Variable-size lattice over AVector&lt;V&gt; with a uniform child lattice.
@@ -34,6 +35,15 @@ public class VectorLattice<V extends ACell> extends ALattice<AVector<V>> {
 		if (own == null) return other;
 		if (other == null) return own;
 		return own.mergeWith(other, mergeFunction);
+	}
+
+	@Override
+	public AVector<V> merge(LatticeContext context, AVector<V> own, AVector<V> other) {
+		if (own == null) return other;
+		if (other == null) return own;
+		// Thread context to element merges so signing / owner verification is not dropped
+		MergeFunction<V> contextMergeFunction = (a, b) -> elementLattice.merge(context, a, b);
+		return own.mergeWith(other, contextMergeFunction);
 	}
 
 	@Override

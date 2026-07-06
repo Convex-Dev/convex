@@ -103,15 +103,33 @@ public class NumericsTest extends ACVMTest {
 	
 	@Test
 	public void testDivisionConsistency() {
-		// Check consistency of quot and rem
-		assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (quot a b)) (rem a b) ) ) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+		// Cases spanning both signs of dividend and divisor, big integers, and the
+		// Long.MIN_VALUE / -1 overflow boundary (see #599).
+		String cases = "[[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]"
+				+ " [10 100000000000000000000] [-10 100000000000000000000]"
+				+ " [-100000000000000000000 3] [100000000000000000000 -3]"
+				+ " [-9223372036854775808 -1] [-9223372036854775808 2] [5 -9223372036854775808]]";
 
-	    // Check modular behaviour (mod a b) == (mod (mod a b) b)
-		assertNotError(step("(map (fn [[a b]] (or (== (mod a b) (mod (mod a b) b)) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+		// quot/rem consistency: a == b*(quot a b) + (rem a b)
+		assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (quot a b)) (rem a b))) (fail [a b]))) " + cases + ")"));
 
-		// TODO FIXME: Check consistency of mod and div
-		// assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (div a b)) (mod a b) ) ) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+		// modular behaviour: (mod a b) == (mod (mod a b) b)
+		assertNotError(step("(map (fn [[a b]] (or (== (mod a b) (mod (mod a b) b)) (fail [a b]))) " + cases + ")"));
 
+		// div/mod consistency: a == b*(div a b) + (mod a b), with a non-negative mod (#599)
+		assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (div a b)) (mod a b))) (fail [a b]))) " + cases + ")"));
+		assertNotError(step("(map (fn [[a b]] (or (<= 0 (mod a b)) (fail [a b]))) " + cases + ")"));
+
+		// Explicit repros from #599
+		assertEquals(2L, evalL("(div -4 -2)"));
+		assertEquals(4L, evalL("(div -7 -2)"));
+		assertEquals(-4L, evalL("(div -7 2)"));
+		assertEquals(0L, evalL("(div 10 100000000000000000000)"));
+		assertEquals(-1L, evalL("(div -10 100000000000000000000)"));
+		assertEquals(0L, evalL("(quot 5 100000000000000000000)"));
+		assertEquals(5L, evalL("(rem 5 100000000000000000000)"));
+		assertCVMEquals(AInteger.parse("9223372036854775808"), eval("(quot -9223372036854775808 -1)"));
+		assertCVMEquals(AInteger.parse("9223372036854775808"), eval("(div -9223372036854775808 -1)"));
 	}
 	
 	@Test

@@ -42,10 +42,11 @@ public class TopicLattice extends ALattice<Index<Keyword, ACell>> {
 	@Override
 	public Index<Keyword, ACell> merge(Index<Keyword, ACell> ownValue, Index<Keyword, ACell> otherValue) {
 		if (otherValue == null) return ownValue;
-		if (ownValue == null) {
-			if (checkForeign(otherValue)) return otherValue;
-			return zero();
-		}
+		// #561: never wholesale-accept a foreign topic Index. Start from an empty own so the
+		// partitions/metadata are rebuilt from validated components below (partition values
+		// routed through QueueLattice; a malformed :partitions is rejected by the cast there)
+		// rather than committing an unvalidated Index that would wedge later merges.
+		if (ownValue == null) ownValue = zero();
 		if (Utils.equals(ownValue, otherValue)) return ownValue;
 
 		// Merge partitions via MapLattice

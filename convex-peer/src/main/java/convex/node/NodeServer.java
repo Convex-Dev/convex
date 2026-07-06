@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
@@ -42,6 +44,7 @@ import convex.lattice.cursor.Root;
 import convex.lattice.cursor.RootLatticeCursor;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
+import convex.peer.Config;
 
 /**
  * A networked node server for Lattice networks.
@@ -122,6 +125,28 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private boolean running = false;
 
 	/**
+	 * Per-connection inbound counters, keyed by the originating connection (#566). Used for
+	 * observability and to drive the circuit-breaker that closes a connection flooding us with
+	 * bad messages. Connection-less (in-JVM) messages are not tracked.
+	 */
+	private final ConcurrentHashMap<AConnection, ConnectionStats> connectionStats = new ConcurrentHashMap<>();
+
+	/**
+	 * Tracked-connection count above which {@link #statsFor} sweeps closed entries (#566).
+	 * Sits just above the inbound channel cap ({@link Config#MAX_CLIENT_CONNECTIONS}): there
+	 * can be at most that many <em>live</em> connections, so exceeding this means stale
+	 * (closed) entries have accumulated and should be reclaimed. The small headroom avoids
+	 * sweeping on transient overlap between a closing connection and its replacement.
+	 */
+	private static final int MAX_TRACKED_CONNECTIONS = Config.MAX_CLIENT_CONNECTIONS + 64;
+
+	/** Interval (ms) between periodic sweeps of closed connections from the stats map (#566). */
+	private static final long CONNECTION_SWEEP_INTERVAL = 30_000L;
+
+	/** Virtual thread that periodically prunes closed connections from {@link #connectionStats}. */
+	private Thread maintenanceThread;
+
+	/**
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
 	 *
 	 * @param lattice The lattice instance defining merge semantics
@@ -196,6 +221,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException("NodeServer is already running");
 		}
 
+		// #567: validate a configured public URL before advertising it. Fail fast on a
+		// misconfigured (private/loopback/malformed) URL rather than silently polluting the
+		// [:p2p :nodes] registry with an unreachable address that peers waste reconnects on.
+		AString urlCfg = config.getURL();
+		if (urlCfg != null) {
+			String reason = NodeConfig.validatePublicURL(urlCfg.toString(), config.isAllowPrivateURL());
+			if (reason != null) {
+				throw new IllegalStateException("Invalid node URL configuration: " + reason);
+			}
+		}
+
 		log.debug("Launching NodeServer on port {}", port);
 
 		// Create primary propagator if none have been added
@@ -239,6 +275,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				networkServer = new NettyServer(port);
 				// Set the receive action for handling incoming messages
 				networkServer.setReceiveAction(receiveAction);
+				// #566: release per-connection stats eagerly when a connection closes. The
+				// periodic sweep remains as a backstop for transports without a close signal.
+				networkServer.setDisconnectAction(this::removeConnection);
 			}
 
 			if (port != null) {
@@ -249,6 +288,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		running = true;
+
+		// #566: periodic sweep of closed connections from the inbound stats map, so an idle
+		// node drains dead entries without relying on inbound traffic or a network close hook.
+		maintenanceThread = Thread.ofVirtual()
+				.name("NodeServer connection-stats maintenance")
+				.start(this::maintenanceLoop);
 
 		// Register shutdown hook to persist before Etch closes its files
 		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
@@ -288,8 +333,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		String versionStr = Utils.getVersion();
 		AString version = Strings.create(versionStr != null ? versionStr : "unknown");
 
+		// #561: stamp the published NodeInfo from the merge context (driver-supplied time),
+		// not from a system-clock read inside the lattice builder.
 		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
-			Vectors.of(url), type, version, null);
+			Vectors.of(url), type, version, null, mergeContext.currentTimestampValue());
 
 		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
 
@@ -330,13 +377,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @param message The incoming message
 	 */
-	private void handleIncomingMessage(Message message) {
+	void handleIncomingMessage(Message message) {
 		log.debug("Received message from peer: {}", message);
+
+		AConnection conn = message.getConnection();
+		ConnectionStats stats = statsFor(conn);
+		recordReceived(stats);
 
 		try {
 			// Decode message payload using node's store before processing
 			message.getPayload(store);
 		} catch (Exception e) {
+			// #566: an undecodable message counts against the connection and can trip the breaker.
+			recordDecodeError(conn, stats);
 			log.warn("Failed to decode incoming message: {}", e.getMessage());
 			try {
 				ACell id = message.getRequestID(); // safe: returns null if undecoded
@@ -485,9 +538,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws BadFormatException If message format is invalid
 	 */
 	private void processLatticeValue(Message message) throws BadFormatException {
+		AConnection conn = message.getConnection();
+		ConnectionStats stats = statsFor(conn);
+
 		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_VALUE message format");
+			recordMergeReject(conn, stats);
 			return;
 		}
 
@@ -496,13 +553,30 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		if (value == null) {
 			log.warn("LATTICE_VALUE message missing value");
+			recordMergeReject(conn, stats);
+			return;
+		}
+
+		// #564: bound merge cost from untrusted peers — reject an oversized value before
+		// the (synchronous, receive-thread) merge runs.
+		if (!withinInboundSizeLimit(value)) {
+			recordMergeReject(conn, stats);
 			return;
 		}
 
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
 		ALatticeCursor<ACell> target = cursor.path(path);
-		mergeIncoming(target, value);
+
+		// A rejected merge leaves the cursor unchanged (atomic abort), so there is
+		// nothing to sync or propagate.
+		if (!mergeIncoming(target, value)) {
+			recordMergeReject(conn, stats);
+			return;
+		}
+
+		// #566: a successful merge resets the connection's consecutive-reject streak.
+		recordAccept(stats);
 
 		// Notify propagators that cursor state has changed. This is non-blocking:
 		// cursor.sync() offers the current snapshot to each propagator's LatestUpdateQueue,
@@ -543,23 +617,268 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Merges an incoming value into a lattice cursor.
+	 * #564: whether an inbound LATTICE_VALUE is within the configured size limit for
+	 * merging. Values whose memory size exceeds
+	 * {@link NodeConfig#getMaxInboundValueSize()} are rejected before the merge runs on
+	 * the receive thread, bounding merge cost from untrusted peers. {@code getMemorySize}
+	 * is cached (computed at decode), so this is O(1). Package-visible for testing.
 	 *
-	 * <p>Does not notify propagators — the caller is responsible for calling
-	 * {@code cursor.sync()} after the merge if relay is needed. This keeps merge
-	 * and propagation as separate concerns.
+	 * @param value inbound value (may be null)
+	 * @return true if the value may be merged, false if it is too large
+	 */
+	boolean withinInboundSizeLimit(ACell value) {
+		long max = config.getMaxInboundValueSize();
+		long size = ACell.getMemorySize(value);
+		if (size > max) {
+			log.warn("Rejected oversized inbound LATTICE_VALUE: {} bytes exceeds limit of {}", size, max);
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Merges an incoming (untrusted) value into a lattice cursor at the target path.
+	 * Does not notify propagators — the caller syncs only if the merge is accepted.
+	 *
+	 * <p>Per the lattice contract, {@code merge} is the enforcement point and aborts
+	 * atomically on bad data (see {@link convex.lattice.ALattice}), so a rejected value
+	 * leaves the cursor unchanged. A value that is not this lattice's type surfaces as a
+	 * {@link ClassCastException} — the erased {@code (T)} cast cannot catch it earlier —
+	 * and is treated here as an explicit rejection rather than a generic merge error.</p>
 	 *
 	 * @param <T> Type of cursor value
 	 * @param target Lattice cursor at the merge target (from {@code cursor.path(...)})
-	 * @param value Value to merge
+	 * @param value Value to merge (untrusted; may be the wrong type for this lattice)
+	 * @return true if the value was merged, false if it was rejected
 	 */
 	@SuppressWarnings("unchecked")
-	private <T extends ACell> void mergeIncoming(ALatticeCursor<T> target, ACell value) {
+	<T extends ACell> boolean mergeIncoming(ALatticeCursor<T> target, ACell value) {
 		try {
 			target.merge((T) value);
-		} catch (Exception e) {
-			log.warn("Error during lattice merge", e);
+			return true;
+		} catch (ClassCastException e) {
+			// Wrong type for this lattice: the (T) cast is erased, so the mismatch only
+			// surfaces inside merge. Reject cleanly rather than as a generic error.
+			log.warn("Rejected inbound lattice value of wrong type: {}",
+					(value == null) ? "null" : value.getClass().getSimpleName());
+			return false;
+		} catch (Throwable e) {
+			// This is the robustness firewall between untrusted input and the receive thread:
+			// NO merge may propagate anything to the caller. We catch Throwable (not just
+			// Exception) deliberately — a maliciously deep value can make a recursive merge
+			// throw StackOverflowError, which is an Error and would otherwise escape and kill
+			// the receive thread. The cursor's updateAndGet never commits when the merge lambda
+			// throws, so the atomic abort holds for Errors too and the prior value is retained.
+			log.warn("Rejected inbound lattice value (merge failed: {})", e.toString());
+			return false;
 		}
+	}
+
+	// ===== Per-connection inbound metrics & circuit-breaker (#566) =====
+
+	/**
+	 * Per-connection inbound counters. A connection's counters are written only from that
+	 * connection's Netty event-loop thread (a channel is bound to a single event loop), so
+	 * plain {@code volatile long}s are correct and cheap: exactly one writer per connection,
+	 * with volatile giving visibility to aggregate/operator reads on other threads.
+	 */
+	static final class ConnectionStats {
+		/** Total messages received on this connection. */
+		volatile long messagesReceived;
+		/** Merges accepted (value incorporated). */
+		volatile long mergesAccepted;
+		/** Merges rejected (bad/oversized/wrong-type value, malformed LATTICE_VALUE). */
+		volatile long mergesRejected;
+		/** Undecodable messages. */
+		volatile long decodeErrors;
+		/** Consecutive rejects/decode-errors since the last accepted merge (drives the breaker). */
+		volatile long consecutiveRejects;
+		/** Wall-clock timestamp of the last reject/decode-error. */
+		volatile long lastErrorTimestamp;
+	}
+
+	/**
+	 * Gets (creating if needed) the stats for a connection, or null for a connection-less
+	 * (in-JVM / local) message which is not rate-tracked. Opportunistically sweeps closed
+	 * connections when the map grows large, bounding memory from connection churn.
+	 *
+	 * @param conn originating connection, or null
+	 * @return the connection's stats, or null if {@code conn} is null
+	 */
+	ConnectionStats statsFor(AConnection conn) {
+		if (conn == null) return null;
+		if (connectionStats.size() > MAX_TRACKED_CONNECTIONS) {
+			sweepClosedConnections();
+		}
+		return connectionStats.computeIfAbsent(conn, k -> new ConnectionStats());
+	}
+
+	/**
+	 * Releases all inbound state held for a connection (#566). This is the single cleanup
+	 * sink for the inbound (untrusted) connection lifecycle, invoked from three places:
+	 * the network layer's disconnect hook when a connection closes (the eager path — see
+	 * {@code NettyServer}/{@code AServer#setDisconnectAction}), the circuit-breaker when it
+	 * closes an abusive connection, and the sweep backstops below. It is also where any
+	 * future per-connection inbound state (work queues, rate limiters) should be torn down.
+	 * Distinct from {@link #removePeer(AccountKey)}, which manages outbound, identity-keyed
+	 * peer connections.
+	 *
+	 * @param conn connection to forget (may be null)
+	 */
+	void removeConnection(AConnection conn) {
+		if (conn == null) return;
+		connectionStats.remove(conn);
+	}
+
+	/**
+	 * Prunes closed connections from the stats map (#566). A backstop to the eager disconnect
+	 * hook: called opportunistically from {@link #statsFor} when the map grows past
+	 * {@link #MAX_TRACKED_CONNECTIONS} (bounding memory during connection churn) and
+	 * periodically from {@link #maintenanceLoop} — so entries still drain if a disconnect
+	 * event is missed or a transport does not surface one.
+	 */
+	void sweepClosedConnections() {
+		connectionStats.keySet().removeIf(AConnection::isClosed);
+	}
+
+	/**
+	 * Periodic maintenance loop (#566): a backstop that sweeps closed connections from the
+	 * stats map even if the eager disconnect hook is missed or unavailable, so entries drain
+	 * within one sweep interval. Exits promptly on interrupt when the server closes.
+	 */
+	private void maintenanceLoop() {
+		while (running) {
+			try {
+				Thread.sleep(CONNECTION_SWEEP_INTERVAL);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+			sweepClosedConnections();
+		}
+	}
+
+	/**
+	 * Records an inbound message received on a connection (#566). Null-safe: a no-op for
+	 * connection-less (in-JVM) messages, so callers need not guard.
+	 *
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordReceived(ConnectionStats stats) {
+		if (stats != null) stats.messagesReceived++;
+	}
+
+	/**
+	 * Records an undecodable inbound message against a connection (#566), tripping the
+	 * circuit-breaker if the consecutive-reject limit is reached.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordDecodeError(AConnection conn, ConnectionStats stats) {
+		if (stats == null) return;
+		stats.decodeErrors++;
+		registerReject(conn, stats);
+	}
+
+	/**
+	 * Records a rejected merge — a malformed, oversized, wrong-type or invalid value — against
+	 * a connection (#566), tripping the circuit-breaker if the consecutive-reject limit is reached.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordMergeReject(AConnection conn, ConnectionStats stats) {
+		if (stats == null) return;
+		stats.mergesRejected++;
+		registerReject(conn, stats);
+	}
+
+	/**
+	 * Shared reject bookkeeping (#566): advances the consecutive-reject streak and, if the
+	 * configured limit is reached, trips the circuit-breaker — closing the connection and
+	 * dropping its stats. The caller has already bumped the specific reject counter.
+	 *
+	 * @param conn originating connection (may be null)
+	 * @param stats the connection's stats (non-null)
+	 */
+	private void registerReject(AConnection conn, ConnectionStats stats) {
+		stats.consecutiveRejects++;
+		stats.lastErrorTimestamp = Utils.getCurrentTimestamp();
+
+		long limit = config.getMaxConsecutiveRejects();
+		if (limit > 0 && stats.consecutiveRejects >= limit && conn != null && !conn.isClosed()) {
+			log.warn("Circuit-breaker: closing connection {} after {} consecutive bad inbound messages",
+					conn, stats.consecutiveRejects);
+			try {
+				conn.close();
+			} catch (Exception e) {
+				// best effort — connection may already be failing
+			}
+			removeConnection(conn);
+		}
+	}
+
+	/**
+	 * Records an accepted merge against a connection, resetting its consecutive-reject streak.
+	 *
+	 * @param stats the connection's stats (may be null)
+	 */
+	private void recordAccept(ConnectionStats stats) {
+		if (stats == null) return;
+		stats.mergesAccepted++;
+		stats.consecutiveRejects = 0;
+	}
+
+	/**
+	 * Immutable aggregate snapshot of inbound counters across all currently-tracked
+	 * connections (#566). Intended for operator observability — logging, health endpoints,
+	 * or tests. Connections closed by the circuit-breaker are no longer counted.
+	 */
+	public static final class InboundStats {
+		/** Number of connections currently tracked. */
+		public final long connections;
+		/** Total inbound messages received. */
+		public final long messagesReceived;
+		/** Total merges accepted. */
+		public final long mergesAccepted;
+		/** Total merges rejected. */
+		public final long mergesRejected;
+		/** Total undecodable messages. */
+		public final long decodeErrors;
+
+		InboundStats(long connections, long messagesReceived, long mergesAccepted,
+				long mergesRejected, long decodeErrors) {
+			this.connections = connections;
+			this.messagesReceived = messagesReceived;
+			this.mergesAccepted = mergesAccepted;
+			this.mergesRejected = mergesRejected;
+			this.decodeErrors = decodeErrors;
+		}
+
+		@Override
+		public String toString() {
+			return "InboundStats[connections=" + connections + ", received=" + messagesReceived
+					+ ", accepted=" + mergesAccepted + ", rejected=" + mergesRejected
+					+ ", decodeErrors=" + decodeErrors + "]";
+		}
+	}
+
+	/**
+	 * Returns an aggregate snapshot of inbound metrics across all tracked connections (#566).
+	 *
+	 * @return immutable aggregate inbound stats snapshot
+	 */
+	public InboundStats getInboundStats() {
+		long conns = 0, recv = 0, acc = 0, rej = 0, dec = 0;
+		for (ConnectionStats s : connectionStats.values()) {
+			conns++;
+			recv += s.messagesReceived;
+			acc += s.mergesAccepted;
+			rej += s.mergesRejected;
+			dec += s.decodeErrors;
+		}
+		return new InboundStats(conns, recv, acc, rej, dec);
 	}
 
 	/**
@@ -688,10 +1007,24 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * The context carries signing keys and owner verification through the
 	 * lattice hierarchy (e.g. OwnerLattice, SignedLattice).
 	 *
+	 * <p><b>Configuration-only (#568).</b> This must be called before {@link #launch()}.
+	 * The context is then read by the propagator and Netty receive threads
+	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, the merge callback),
+	 * and is safely published to them via the happens-before edge of thread start — so
+	 * the field is deliberately non-volatile. Setting it after launch is rejected: those
+	 * threads could otherwise observe a stale reference indefinitely, and any in-flight
+	 * merge would already have captured the old context, giving non-deterministic
+	 * signing-key behaviour.</p>
+	 *
 	 * @param context Merge context (must not be null — use LatticeContext.EMPTY for default)
+	 * @throws IllegalStateException if called after {@link #launch()}
 	 */
 	public void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
+		if (running) {
+			throw new IllegalStateException(
+				"setMergeContext must be called before launch(): the merge context is configuration-only");
+		}
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
 		cursor.withContext(context);
@@ -841,6 +1174,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		log.trace("Closing NodeServer");
 
 		running = false;
+
+		// #566: stop the connection-stats maintenance thread and drop tracked inbound state
+		if (maintenanceThread != null) {
+			maintenanceThread.interrupt();
+			maintenanceThread = null;
+		}
+		connectionStats.clear();
 
 		// Final sync: trigger all propagators with current value and wait for drain.
 		// This guarantees persistence on the primary propagator (announce + setRootData

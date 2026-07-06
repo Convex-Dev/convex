@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.function.Consumer;
 
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 
 /**
@@ -57,6 +58,35 @@ public abstract class AServer implements Closeable {
 	 * @param action Receive action to handle incoming messages
 	 */
 	public abstract void setReceiveAction(Consumer<Message> action);
+
+	/** No-op disconnect action, used as the default and the null-reset value. */
+	private static final Consumer<AConnection> NO_DISCONNECT = c -> {};
+
+	/**
+	 * Action invoked when an inbound connection closes, allowing the owner to release any
+	 * per-connection state eagerly (#566). Default is a no-op; transports that can detect
+	 * disconnects (e.g. Netty via {@code channelInactive}) invoke it. Not all transports
+	 * surface disconnects, so callers must not rely on it firing for every close — it is an
+	 * optimisation over periodic cleanup, not a guarantee.
+	 */
+	private Consumer<AConnection> disconnectAction = NO_DISCONNECT;
+
+	/**
+	 * Sets the action invoked when an inbound connection closes. Should be called before launch.
+	 *
+	 * @param action Disconnect action (null resets to a no-op)
+	 */
+	public void setDisconnectAction(Consumer<AConnection> action) {
+		this.disconnectAction = (action != null) ? action : NO_DISCONNECT;
+	}
+
+	/**
+	 * Gets the current disconnect action (never null).
+	 * @return Disconnect action
+	 */
+	public Consumer<AConnection> getDisconnectAction() {
+		return disconnectAction;
+	}
 
 	/**
 	 * Returns the number of active inbound client connections.

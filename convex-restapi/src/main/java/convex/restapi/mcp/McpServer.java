@@ -331,7 +331,7 @@ public class McpServer {
 			return protocolError(-32601, "Unknown tool: " + toolName);
 		}
 
-		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		AMap<AString, ACell> arguments = RT.castMap(params.get(FIELD_ARGUMENTS));
 		if (arguments == null) {
 			return protocolError(-32602, toolName + " requires arguments");
 		}
@@ -358,7 +358,7 @@ public class McpServer {
 		McpPrompt prompt = prompts.get(nameCell.toString());
 		if (prompt == null) return protocolError(-32601, "Unknown prompt: " + nameCell);
 
-		AMap<AString, ACell> arguments = RT.ensureMap(params.get(FIELD_ARGUMENTS));
+		AMap<AString, ACell> arguments = RT.castMap(params.get(FIELD_ARGUMENTS));
 		if (arguments == null) arguments = Maps.empty();
 
 		AVector<AMap<AString, ACell>> messages = prompt.render(arguments);
@@ -381,6 +381,36 @@ public class McpServer {
 
 	// ==================== Origin validation ====================
 
+	/**
+	 * Allowed Origins for MCP requests (#552), or null to allow all.
+	 *
+	 * <p>Public Convex peers allow all origins by design. Localhost-only and
+	 * private deployments should restrict this set: the MCP spec requires
+	 * Origin validation to prevent DNS-rebinding attacks, where a hostile web
+	 * page resolves its own hostname to 127.0.0.1 and drives a local MCP
+	 * server from the victim's browser.
+	 */
+	private volatile java.util.Set<String> allowedOrigins = null;
+
+	/**
+	 * Restricts MCP requests to the given Origins (#552). Requests carrying an
+	 * Origin header not in this set are rejected with 403. Pass null to allow
+	 * all origins (public peer default). Requests without an Origin header
+	 * (non-browser clients) are always allowed.
+	 *
+	 * @param origins Exact Origin values to allow (e.g. "https://app.example.com"), or null for all
+	 */
+	public void setAllowedOrigins(java.util.Collection<String> origins) {
+		this.allowedOrigins = (origins == null) ? null : java.util.Set.copyOf(origins);
+	}
+
+	/**
+	 * @return The configured allowed Origins, or null if all origins are allowed
+	 */
+	public java.util.Set<String> getAllowedOrigins() {
+		return allowedOrigins;
+	}
+
 	private void validateOrigin(Context ctx) {
 		String origin = ctx.header("Origin");
 		if (origin != null && !isOriginAllowed(origin)) {
@@ -389,11 +419,13 @@ public class McpServer {
 	}
 
 	/**
-	 * Check if an Origin is allowed for MCP requests. Override to restrict.
-	 * Default: all origins allowed.
+	 * Check if an Origin is allowed for MCP requests. Consults the configured
+	 * allowed-origins set (#552); default (null set) allows all origins.
+	 * Override for custom policies.
 	 */
 	protected boolean isOriginAllowed(String origin) {
-		return true;
+		java.util.Set<String> allowed = allowedOrigins;
+		return (allowed == null) || allowed.contains(origin);
 	}
 
 	// ==================== .well-known/mcp ====================

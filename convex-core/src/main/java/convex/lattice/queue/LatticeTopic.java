@@ -142,7 +142,9 @@ public class LatticeTopic {
 			throw new IllegalStateException(
 				"Topic has no partitions configured. Call setNumPartitions() first.");
 		}
-		long partId = Math.abs(key.getHash().longValue()) % numPartitions;
+		// #561: floorMod, not abs()%: Math.abs(Long.MIN_VALUE) is negative, which would yield
+		// a negative partition id (out-of-range index). floorMod is always in [0, numPartitions).
+		long partId = Math.floorMod(key.getHash().longValue(), numPartitions);
 		return partition(partId).offer(key, value);
 	}
 

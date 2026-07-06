@@ -208,7 +208,7 @@ Rules for record design:
 - **Always include `:timestamp`** in LWW-merged records — it drives the merge tiebreaker
 - **Use `Keyword` keys** for record fields — compact, interned, fast comparison
 - **Use `Blob` keys** for collection entries that need ordering (feeds use 8-byte big-endian timestamp blobs for chronological order in `Index`)
-- **Tombstone, don't delete** — set a `:deleted` field rather than removing entries, since lattice merge is union-based and can't propagate removals
+- **Tombstone under union merges** — with additive merges (`IndexLattice`, `MapLattice`, `SetLattice`) a removed key resurrects when an older replica merges back, so set a `:deleted` field rather than removing entries. Under **whole-value LWW** (see [Durable deletes](#durable-deletes-with-whole-value-lww)) removals *are* durable and you can delete directly.
 
 ## Fork/Sync for Batch Operations
 
@@ -268,14 +268,19 @@ public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
 
 ### LatticeContext
 
-The `LatticeContext` carries the signing key pair and verification policy. Set it on the cursor before any writes that cross a `SignedCursor` boundary:
+The `LatticeContext` carries the write/merge context: a **signing key pair** (+ verification policy) and a **timestamp** — the single write clock. Set it on the cursor before any writes that cross a `SignedCursor` boundary (which needs the key) or a `StampedCursor` / stamp-on-write region (which needs the timestamp):
 
 ```java
+// signing only
 LatticeContext ctx = LatticeContext.create(null, myKeyPair);
+
+// signing + write clock — needed for stamp-on-write regions; refresh per write
+// batch so LWW sees fresh timestamps (the pattern DLFSAdapter uses)
+LatticeContext ctx = LatticeContext.create(CVMLong.create(System.currentTimeMillis()), myKeyPair);
 cursor.withContext(ctx);
 ```
 
-Without a context (or with a context that has no key pair), writes through `SignedCursor` throw `IllegalStateException`.
+A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. (The same context timestamp is what `DLFSLocal` reads for node write times.)
 
 ## Security Model
 
@@ -347,6 +352,23 @@ public void delete(Blob postKey) {
     });
 }
 ```
+
+### Durable deletes with whole-value LWW
+
+Additive merges (`IndexLattice`/`MapLattice`) union keys, so a removed key reappears when an older replica merges back — hence tombstones. When you need **real deletions** to survive merge-back, model the region as a single **whole-value LWW leaf**, composed from three single-concern lattice layers:
+
+```java
+// merge = whole-value LWW (deletions durable) · nav = JSON structure · write = stamp
+ALattice<ACell> state = StampingLattice.create(
+    LWWLattice.create(JSONLattice.INSTANCE, tsFn),   // whole-value merge over JSON navigation
+    (v, ts) -> v.assoc(KEY_TIMESTAMP, ts));          // inject the context timestamp on every write
+```
+
+- `JSONLattice` — recursive structural navigation; `assocIn` builds containers by key shape, so sub-paths below the leaf stay navigable and writable.
+- `LWWLattice(inner)` — merges the *whole* value by `:timestamp` (never per-key), so a smaller map with a newer timestamp replaces the old one and the deleted key does not resurrect.
+- `StampingLattice(inner, stampFn)` — inserts a `StampedCursor` so every deep write re-stamps the whole leaf with the timestamp from the `LatticeContext` (the single write clock); the `stampFn` only says *where* to put it. Whole-value LWW then picks it.
+
+Each layer adds exactly one concern (merge / navigation / stamping) and delegates the rest, so they compose freely — `StampingLattice` stamps over anything, `LWWLattice` merges over any navigable inner. To delete, read-modify-write the sub-path out — e.g. `cursor.updateAndGet(m -> m.dissoc(key))` — and whole-value LWW propagates the removal.
 
 ## Testing Patterns
 

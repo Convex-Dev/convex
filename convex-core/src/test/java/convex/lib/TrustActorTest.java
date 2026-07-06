@@ -23,7 +23,7 @@ public class TrustActorTest extends ACVMTest {
 	protected Address trusted;
 
 	protected TrustActorTest() throws IOException {
-		super(InitTest.STATE);
+		super(InitTest.UPGRADED);
 	}
 
 	@Override protected Context buildContext(Context ctx) {

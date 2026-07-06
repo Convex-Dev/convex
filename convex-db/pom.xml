@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.6</version>
+		<version>0.8.7-SNAPSHOT</version>
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -16,7 +16,7 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<calcite.version>1.41.0</calcite.version>
+		<calcite.version>1.42.0</calcite.version>
 	</properties>
 
 	<build>
@@ -87,7 +87,7 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
-			<version>42.7.11</version>
+			<version>42.7.12</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

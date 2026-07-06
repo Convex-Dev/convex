@@ -15,10 +15,13 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
+import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -37,6 +40,22 @@ import static convex.test.Assertions.*;
  */
 @TestInstance(Lifecycle.PER_CLASS)
 public class RTTest {
+
+	@Test
+	public void testCastMapVsEnsureMap() {
+		AMap<?,?> m = Maps.of(Strings.create("a"), CVMLong.ONE);
+		ACell nonMap = CVMLong.ONE;
+
+		// ensureMap: a plain type guard — null for null and for non-maps (like the rest of ensure*)
+		assertNull(RT.ensureMap((ACell)null));
+		assertNull(RT.ensureMap(nonMap));
+		assertSame(m, RT.ensureMap(m));
+
+		// castMap: the CVM-cast coercion — a null argument coerces to the EMPTY map, not null
+		assertEquals(Maps.empty(), RT.castMap((ACell)null));
+		assertNull(RT.castMap(nonMap)); // a non-null non-map is still null
+		assertSame(m, RT.castMap(m));
+	}
 
 	@Test
 	public void testName() {

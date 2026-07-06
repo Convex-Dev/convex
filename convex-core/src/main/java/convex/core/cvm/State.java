@@ -3,6 +3,7 @@ package convex.core.cvm;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.function.LongFunction;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
@@ -32,6 +33,7 @@ import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.UpgradeError;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.util.Counters;
@@ -66,12 +68,13 @@ public class State extends ARecordGeneric {
 	 */
 	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(
 			Symbols.TIMESTAMP,
-			Symbols.FEES, 
-			Symbols.JUICE_PRICE, 
-			Symbols.MEMORY, 
+			Symbols.FEES,
+			Symbols.JUICE_PRICE,
+			Symbols.MEMORY,
 			Symbols.MEMORY_VALUE,
 			Symbols.BLOCK,
-			Symbols.PROTOCOL);
+			Symbols.PROTOCOL,
+			Symbols.UPGRADES);
 
 	// Indexes for globals in :globals Vector
 	public static final int GLOBAL_TIMESTAMP=0;
@@ -79,8 +82,9 @@ public class State extends ARecordGeneric {
 	public static final int GLOBAL_JUICE_PRICE=2;
 	public static final int GLOBAL_MEMORY_MEM=3;
 	public static final int GLOBAL_MEMORY_CVX=4;
-	public static final int GLOBAL_BLOCK=5; 
-	public static final int GLOBAL_PROTOCOL=6; // TODO: move to actor?
+	public static final int GLOBAL_BLOCK=5;
+	public static final int GLOBAL_PROTOCOL=6; // protocol version watermark, see UPGRADE.md
+	public static final int GLOBAL_UPGRADES=7; // upgrade vector of activation timestamps, see UPGRADE.md
 
 	/**
 	 * An empty State
@@ -249,12 +253,75 @@ public class State extends ARecordGeneric {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
+		// Network upgrades fire first, so the entire block (time update, scheduled
+		// and ordinary transactions) executes under the new protocol version
+		state = state.applyUpgrades(b.getTimeStamp());
 		AVector<ACell> globals=state.getGlobals();
-		long blockNum=getBlockNumber();
+		long blockNum=state.getBlockNumber();
 		state = state.withGlobals(globals.assoc(GLOBAL_BLOCK,CVMLong.create(blockNum+1)));
 		state = state.applyTimeUpdate(b.getTimeStamp());
 		state = state.applyScheduledTransactions();
 		return state;
+	}
+
+	/**
+	 * Applies any network upgrades due at the given block timestamp: pending
+	 * entries of the upgrade vector with {@code activation <= timestamp}, applied
+	 * in order, each advancing the protocol version watermark by one. This is a
+	 * no-op for states with no due upgrades (including all pre-upgrade states).
+	 * See UPGRADE.md.
+	 *
+	 * @param timestamp Timestamp of the Block being applied (consensus time)
+	 * @return Updated State, or this State if no upgrades are due
+	 * @throws UpgradeError if a due migration is missing from this release or
+	 *         fails. Deliberately an Error so it is never converted into an
+	 *         invalid-block result: it propagates to the peer layer, which
+	 *         withdraws from consensus until updated.
+	 */
+	public State applyUpgrades(long timestamp) {
+		return applyUpgrades(timestamp, Migrations::get);
+	}
+
+	/**
+	 * Applies due network upgrades from the given migration source. Testing seam:
+	 * normal execution uses the release's {@link Migrations} registry.
+	 *
+	 * @param timestamp Timestamp of the Block being applied
+	 * @param source Source of migrations by version index
+	 * @return Updated State, or this State if no upgrades are due
+	 */
+	State applyUpgrades(long timestamp, LongFunction<Migrations.Migration> source) {
+		// Version index being attempted, for error attribution
+		long version = 0;
+
+		// The ENTIRE upgrade machinery is guarded: no RuntimeException may escape as
+		// an Exception, or applyBlock's catch(Exception) would convert it into an
+		// invalid-block result — consensus history that a corrected release would
+		// replay differently. Any failure here (deterministic migration bug, malformed
+		// upgrade vector, or peer-local conditions such as MissingDataException)
+		// resolves to UpgradeError instead: produce no state, peer withdraws. True
+		// Errors (e.g. OutOfMemoryError) propagate unwrapped as fatal.
+		try {
+			State state = this;
+			while (true) {
+				// Re-read protocol globals each iteration: a migration may legitimately
+				// modify any part of the state, including the upgrade vector itself
+				version = state.getProtocolVersion();
+				AVector<CVMLong> upgrades = state.getUpgradeVector();
+				if (version >= upgrades.count()) return state; // nothing pending
+				long activation = ((CVMLong) upgrades.get(version)).longValue();
+				if (activation > timestamp) return state; // earliest pending upgrade not yet due
+
+				Migrations.Migration migration = source.apply(version);
+				if (migration == null) throw UpgradeError.missing(version + 1);
+				state = migration.apply(state);
+
+				// Advance the watermark: this is the protocol version increment
+				state = state.withProtocolGlobals(version + 1, state.getUpgradeVector());
+			}
+		} catch (RuntimeException e) {
+			throw UpgradeError.failed(version + 1, e);
+		}
 	}
 	
 	/**
@@ -537,7 +604,7 @@ public class State extends ARecordGeneric {
 	 * @param tctx 
 	 * @return
 	 */
-	private Context prepareTransaction(ResultContext rc, TransactionContext tctx) {
+	protected Context prepareTransaction(ResultContext rc, TransactionContext tctx) {
 		ATransaction t=rc.tx;
 		long juicePrice=rc.juicePrice;
 		Address origin = t.getOrigin();
@@ -710,13 +777,18 @@ public class State extends ARecordGeneric {
 	}
 	
 	/**
-	 * Compute the issued coin supply. This is the maximum supply cap minus the unissued coin balance.
+	 * Compute the issued coin supply. This is the maximum supply cap minus the unissued
+	 * coin balance held in the reserve governance accounts.
+	 *
+	 * Account #0 is the reward pool (issued coins in transit to peers via fees, see
+	 * {@link #distributeFees}), NOT unissued, so it is excluded — consistent with the
+	 * CVM `coin-supply` core function.
 	 *
 	 * @return The current Convex Coin Supply
 	 */
 	public long computeSupply() {
 		long supply=Constants.MAX_SUPPLY;
-		for (int i=0; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
+		for (int i=1; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
 			supply-=getAccounts().get(i).getBalance();
 		}
 		return supply;
@@ -899,6 +971,54 @@ public class State extends ARecordGeneric {
 	 */
 	public State withTimestamp(long timestamp) {
 		return withGlobals(getGlobals().assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
+	}
+
+	/**
+	 * Gets the protocol version, i.e. the number of upgrades applied to this State.
+	 * Acts as a watermark into the upgrade vector: entries below this index are
+	 * applied, entries at or above it are pending. States without the protocol
+	 * global (including any genesis state) are version 0. See UPGRADE.md.
+	 *
+	 * @return Protocol version
+	 */
+	public long getProtocolVersion() {
+		AVector<ACell> glbs = getGlobals();
+		if (glbs.count() <= GLOBAL_PROTOCOL) return 0;
+		return ((CVMLong) glbs.get(GLOBAL_PROTOCOL)).longValue();
+	}
+
+	/**
+	 * Gets the upgrade vector: activation timestamps for network upgrades, where
+	 * entry k is the consensus timestamp at which the upgrade producing protocol
+	 * version k+1 fires (or fired). States without the upgrades global read as
+	 * the empty vector. See UPGRADE.md.
+	 *
+	 * @return Upgrade vector of activation timestamps
+	 */
+	@SuppressWarnings("unchecked")
+	public AVector<CVMLong> getUpgradeVector() {
+		AVector<ACell> glbs = getGlobals();
+		if (glbs.count() <= GLOBAL_UPGRADES) return Vectors.empty();
+		return (AVector<CVMLong>) glbs.get(GLOBAL_UPGRADES);
+	}
+
+	/**
+	 * Updates the protocol version and upgrade vector, extending the globals
+	 * vector if this State predates the protocol globals. Normally used only by
+	 * the upgrade mechanism: see UPGRADE.md.
+	 *
+	 * @param version New protocol version
+	 * @param upgrades New upgrade vector of activation timestamps
+	 * @return Updated State
+	 */
+	public State withProtocolGlobals(long version, AVector<CVMLong> upgrades) {
+		AVector<ACell> glbs = getGlobals();
+		while (glbs.count() <= GLOBAL_UPGRADES) {
+			glbs = glbs.conj(null); // extend with placeholders, both assoc'd below
+		}
+		glbs = glbs.assoc(GLOBAL_PROTOCOL, CVMLong.create(version));
+		glbs = glbs.assoc(GLOBAL_UPGRADES, upgrades);
+		return withGlobals(glbs);
 	}
 	
 	@Override 

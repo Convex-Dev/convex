@@ -195,7 +195,7 @@ public class GenTestCore {
 	@SuppressWarnings("exports")
 	@Property 
 	public void testCoreArgs(@From(VectorGen.class) AVector<@From(ValueGen.class) ACell> a) throws IOException {
-		Context ctx=new CoreTest().context();
+		Context ctx=new CoreGenesisTest().context();
 		long initialJuice=ctx.getJuiceUsed();
 		
 		for (Entry<Symbol, ACell> e: Core.CORE_FORMS.entrySet()) {

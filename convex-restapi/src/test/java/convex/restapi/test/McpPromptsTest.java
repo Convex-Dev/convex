@@ -30,12 +30,12 @@ public class McpPromptsTest extends ARESTTest {
 			+ "\"id\":\"test-1\"}";
 		HttpResponse<String> response = post(MCP_PATH, request);
 		assertEquals(200, response.statusCode());
-		return RT.ensureMap(JSON.parse(response.body()));
+		return RT.castMap(JSON.parse(response.body()));
 	}
 
 	/** Extract the messages vector from a prompts/get result */
 	private AVector<ACell> getMessages(AMap<AString, ACell> response) {
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Should have result");
 		AVector<ACell> messages = RT.ensureVector(result.get(Strings.create("messages")));
 		assertNotNull(messages, "Should have messages");
@@ -44,14 +44,14 @@ public class McpPromptsTest extends ARESTTest {
 
 	/** Extract text content from a message at given index */
 	private String getMessageText(AVector<ACell> messages, int index) {
-		AMap<AString, ACell> msg = RT.ensureMap(messages.get(index));
-		AMap<AString, ACell> content = RT.ensureMap(msg.get(Strings.create("content")));
+		AMap<AString, ACell> msg = RT.castMap(messages.get(index));
+		AMap<AString, ACell> content = RT.castMap(msg.get(Strings.create("content")));
 		return RT.ensureString(content.get(Strings.create("text"))).toString();
 	}
 
 	/** Get the role of a message at given index */
 	private String getMessageRole(AVector<ACell> messages, int index) {
-		AMap<AString, ACell> msg = RT.ensureMap(messages.get(index));
+		AMap<AString, ACell> msg = RT.castMap(messages.get(index));
 		return RT.ensureString(msg.get(Strings.create("role"))).toString();
 	}
 
@@ -69,7 +69,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testPromptsListReturnsPrompts() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result, "Should have result");
 
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
@@ -80,11 +80,11 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testPromptsMetadataHasRequiredFields() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		for (long i = 0; i < prompts.count(); i++) {
-			AMap<AString, ACell> prompt = RT.ensureMap(prompts.get(i));
+			AMap<AString, ACell> prompt = RT.castMap(prompts.get(i));
 			assertNotNull(RT.ensureString(prompt.get(Strings.create("name"))),
 				"Prompt " + i + " should have name");
 			assertNotNull(RT.ensureString(prompt.get(Strings.create("description"))),
@@ -97,11 +97,11 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testPromptsHaveTitles() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		for (long i = 0; i < prompts.count(); i++) {
-			AMap<AString, ACell> prompt = RT.ensureMap(prompts.get(i));
+			AMap<AString, ACell> prompt = RT.castMap(prompts.get(i));
 			AString title = RT.ensureString(prompt.get(Strings.create("title")));
 			assertNotNull(title, "Prompt '" + prompt.get(Strings.create("name")) + "' should have a title");
 		}
@@ -111,11 +111,11 @@ public class McpPromptsTest extends ARESTTest {
 	public void testListExcludesMessages() throws IOException, InterruptedException {
 		// prompts/list should NOT include message templates (those are only in prompts/get)
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		for (long i = 0; i < prompts.count(); i++) {
-			AMap<AString, ACell> prompt = RT.ensureMap(prompts.get(i));
+			AMap<AString, ACell> prompt = RT.castMap(prompts.get(i));
 			assertNull(prompt.get(Strings.create("messages")),
 				"prompts/list should not include messages array");
 		}
@@ -124,12 +124,12 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testAlwaysAvailablePrompts() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
 		boolean hasExploreAccount = false, hasNetworkStatus = false, hasConvexGuide = false;
 		for (long i = 0; i < prompts.count(); i++) {
-			String name = RT.ensureString(RT.ensureMap(prompts.get(i)).get(Strings.create("name"))).toString();
+			String name = RT.ensureString(RT.castMap(prompts.get(i)).get(Strings.create("name"))).toString();
 			if ("explore-account".equals(name)) hasExploreAccount = true;
 			if ("network-status".equals(name)) hasNetworkStatus = true;
 			if ("convex-guide".equals(name)) hasConvexGuide = true;
@@ -144,7 +144,7 @@ public class McpPromptsTest extends ARESTTest {
 		assertNotNull(server.getSigningService(), "Test server should have signing service");
 
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 		assertEquals(6, prompts.count(), "Should have exactly 6 prompts");
 	}
@@ -157,7 +157,7 @@ public class McpPromptsTest extends ARESTTest {
 			"{\"name\":\"explore-account\",\"arguments\":{\"address\":\"#42\"}}");
 
 		assertNotNull(RT.ensureString(
-			RT.ensureMap(response.get(McpProtocol.FIELD_RESULT)).get(Strings.create("description"))));
+			RT.castMap(response.get(McpProtocol.FIELD_RESULT)).get(Strings.create("description"))));
 
 		AVector<ACell> messages = getMessages(response);
 		assertTrue(messages.count() >= 3, "Should have persona + request + assistant messages");
@@ -342,7 +342,7 @@ public class McpPromptsTest extends ARESTTest {
 	public void testGetUnknownPrompt() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
 			"{\"name\":\"nonexistent-prompt\"}");
-		AMap<AString, ACell> error = RT.ensureMap(response.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(response.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Should return error for unknown prompt");
 		assertEquals(-32601L, RT.ensureLong(error.get(McpProtocol.FIELD_CODE)).longValue());
 	}
@@ -350,7 +350,7 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testGetMissingName() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get", "{}");
-		AMap<AString, ACell> error = RT.ensureMap(response.get(McpProtocol.FIELD_ERROR));
+		AMap<AString, ACell> error = RT.castMap(response.get(McpProtocol.FIELD_ERROR));
 		assertNotNull(error, "Should return error for missing name");
 		assertEquals(-32602L, RT.ensureLong(error.get(McpProtocol.FIELD_CODE)).longValue());
 	}
@@ -360,10 +360,10 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testInitializeIncludesPromptsCapability() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("initialize", null);
-		AMap<AString, ACell> result = RT.ensureMap(response.get(McpProtocol.FIELD_RESULT));
+		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		assertNotNull(result);
 
-		AMap<AString, ACell> capabilities = RT.ensureMap(result.get(Strings.create("capabilities")));
+		AMap<AString, ACell> capabilities = RT.castMap(result.get(Strings.create("capabilities")));
 		assertNotNull(capabilities, "Should have capabilities");
 		assertTrue(capabilities.containsKey(Strings.create("prompts")));
 		assertTrue(capabilities.containsKey(Strings.create("tools")));

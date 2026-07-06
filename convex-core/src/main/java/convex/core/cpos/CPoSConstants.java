@@ -30,7 +30,7 @@ public class CPoSConstants {
 	public static final double PEER_DECAY_DELAY = 3*60*1000;
 	
 	/**
-	 * Time for peer stake to decay by factor 1/e (30 mins default)
+	 * Time for peer stake to decay by factor 1/e (5 mins default)
 	 */
 	public static final double PEER_DECAY_TIME = 5*60*1000;
 	
@@ -43,6 +43,19 @@ public class CPoSConstants {
 	 * Maximum time a block can be resurrected from the past (15 min)
 	 */
 	public static final long MAX_BLOCK_BACKDATE = 15*60*1000;
+
+	/**
+	 * Clock-skew allowance for confirming forward-dated blocks (30 seconds).
+	 *
+	 * <p>A peer declines to advance consensus (and hence execution) past any block
+	 * dated further ahead than its own wall clock plus this allowance, until its clock
+	 * catches up (#595 stage (i), see convex-core/docs/CONSENSUS.md). This prevents a
+	 * future-dated block from teleporting the consensus clock forward and firing
+	 * scheduled network upgrades early. Deliberately much tighter than
+	 * {@link #MAX_BLOCK_BACKDATE}: forward-dating is the attack surface, backdating is
+	 * harmless.</p>
+	 */
+	public static final long MAX_BLOCK_FORWARD = 30*1000;
 	
 	/**
 	 * Initial timestamp for a Peer before it has any blocks

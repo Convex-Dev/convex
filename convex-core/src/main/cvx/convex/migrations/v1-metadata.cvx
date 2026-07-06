@@ -1,0 +1,245 @@
+;; Network upgrade v1 — core docstring corrections (#600, see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the core environment (account #8).
+;; Docstrings are metadata on the core account, so they are state and cannot be
+;; changed at genesis (frozen hash) — these corrections reach existing networks at
+;; protocol version 1 via the scheduled bootstrap upgrade.
+;;
+;; Mechanism: a no-value `def` with a metadata annotation. `(def ^{...} sym)` retains
+;; the symbol's existing value (Def.execute: "No op, so just retain current env value")
+;; and REPLACES its metadata with exactly what is written here. So each form below
+;; carries the symbol's COMPLETE metadata — corrected `:doc`, plus `:static true` for
+;; the intrinsic (Java) core functions, since an omitted key would be dropped. The
+;; accompanying test asserts only `:doc` changed for each symbol (see MigrationFixesTest).
+;;
+;; Scope: only genuine mistakes — docstrings whose claims are contradicted by the actual
+;; behaviour — not stylistic or completeness improvements. The final section is the one
+;; exception: it supplies the full metadata (including `:doc`) for the core bindings that
+;; v1 itself introduces, which cannot be documented in the genesis metadata source
+;; (metadata.cvx) because that is genesis state, frozen by hash.
+
+;; address: hex strings are NOT valid arguments ((address "1234") => :CAST).
+(def ^{:doc {:description "Casts the argument to an Address. Valid arguments are a Long, an Address, or a Blob with the correct length (8 bytes)."
+             :errors      {:CAST "If the argument is not castable to an Address."}
+             :examples    [{:code "(address 451)"}]
+             :signature   [{:params [x]
+                            :return Address}]}
+       :static true}
+  address)
+
+;; apply: the last argument may be any data structure, not only a sequential one
+;; ((apply vector {1 2}) => [[1 2]]).
+(def ^{:doc {:description ["Applies a function to the specified arguments, after flattening the last argument. The last argument must be a data structure, or `nil` which is considered an empty collection."
+                          "Only useful in particular cases when interacting with variadic functions."]
+             :errors      {:ARITY "If the additional arguments cause an arity error in the applied function."
+                           :CAST  "If the first argument is not castable to a valid function."}
+             :examples    [{:code "(apply + [1 2 3])"}
+                           {:code "(apply + 1 2 [3 4 5])"}]
+             :signature   [{:params [f & args more-args]
+                            :return Any}]}
+       :static true}
+  apply)
+
+;; bit-not: unary, not binary. Signature was [a b].
+(def ^{:doc {:description "Returns the bitwise NOT of a Long value."
+             :errors      {:CAST "If the argument is not implicitly castable to Long."}
+             :examples    [{:code "(bit-not (long 0xfffffffffffffff0))"}]
+             :signature   [{:params [a]
+                            :return Long}]}
+       :static true}
+  bit-not)
+
+;; call*: the :CAST condition was inverted ("is an Address" -> "is not an Address").
+(def ^{:doc {:description ["Behaves like `call` but implemented as a function. Instead of a form, takes a symbol referring to the function, and then arguments separately."
+                          "Same kind of errors may happen."]
+             :errors      {:ARITY    "If the supplied arguments are the wrong arity for the called function."
+                           :CAST     "If the address argument is not an Address, the offer is not a Long, or the function name is not a Symbol."
+                           :STATE    "If the address does not refer to an Account with the callable function specified by fn-name."
+                           :ARGUMENT "If the offer is negative."}
+             :examples    [{:code "(call* some-actor 1000 'contract-fn arg1 arg2)"}]
+             :signature   [{:params [address offer fn-name & args]
+                            :return Any}]}
+       :static true}
+  call*)
+
+;; comp: composition applies right to left, not left to right ((comp sqrt +) 4 5) => 3.0.
+(def ^{:doc {:description ["Returns a function that is the composition of the given functions."
+                          "Functions are applied right to left. The rightmost function may take a variable number of arguments, and the result of each function is passed to the one before it."]
+             :examples    [{:code "((comp inc inc) 1)"}]
+             :signature   [{:params [f & more]
+                            :return Function}]}}
+  comp)
+
+;; concat: Sets and Maps are coerced (not :CAST), and the result is a sequence, not a
+;; collection of the same type as a set/map first argument.
+(def ^{:doc {:description "Concatenates one or more data structures into a new sequential collection. When the first non-nil argument is a List or Vector, the result is of that type; Sets and Maps are coerced to their element sequences. `nil` is treated as an empty sequence."
+             :errors      {:CAST "If any of the arguments is neither a data structure nor nil."}
+             :examples    [{:code "(concat [1 2] [3 4])"}]
+             :signature   [{:params [& seqs]
+                            :return Sequence}]}
+       :static true}
+  concat)
+
+;; create-peer: the :return was a bogus non-type ("stake-amount").
+(def ^{:doc {:description "Creates a new peer record for the network. The peer must have an account number and sufficient balance to place a stake amount."
+             :errors      {:CAST "If the first argument is not a valid account-key."}
+             :examples    [{:code "(create-peer account-key 700000000)"}]
+             :signature   [{:params [account-key stake-amount]
+                            :return Long}]}
+       :static true}
+  create-peer)
+
+;; empty: also works on other countable values such as Strings and Blobs; the :CAST
+;; condition wrongly excluded them ((empty "abc") => "").
+(def ^{:doc {:description "Returns an empty value of the same type as the argument, such as an empty collection, String or Blob. `(empty nil)` returns nil."
+             :errors      {:CAST "If the argument is not countable."}
+             :examples    [{:code "(empty [1 2 3])"}]
+             :signature   [{:params [coll]
+                            :return Countable}]}
+       :static true}
+  empty)
+
+;; get-holding: there is no check that the owner account exists ((get-holding #999999) => nil).
+(def ^{:doc {:description "Gets the holding value for a specified owner account address. Holding will be null by default. See `*holdings*`, `set-holding`."
+             :errors      {:CAST "If the argument is not an address."}
+             :examples    [{:code "(get-holding *caller*)"}]
+             :signature   [{:params [owner]}]}
+       :static true}
+  get-holding)
+
+;; hash / keccak256 / sha256: addresses are NOT accepted ((hash #13) => :CAST).
+(def ^{:doc {:description "Calculates the 32-byte SHA3-256 cryptographic hash of a `blob`. Returns a 32-byte `blob`."
+             :examples    [{:code "(hash 0x1234)"}
+                           {:code "(hash (encoding :foo))"}]
+             :signature   [{:params [value]
+                            :return Blob}]}
+       :static true}
+  hash)
+
+(def ^{:doc {:description "Calculates the 32-byte Keccak-256 cryptographic hash of a `blob`. Returns a 32-byte `blob`."
+             :examples    [{:code "(keccak256 0x1234)"}]
+             :signature   [{:params [value]
+                            :return Blob}]}
+       :static true}
+  keccak256)
+
+(def ^{:doc {:description "Calculates the 32-byte SHA-256 cryptographic hash of a `blob`. Returns a 32-byte `blob`."
+             :examples    [{:code "(sha256 0x1234)"}]
+             :signature   [{:params [value]
+                            :return Blob}]}
+       :static true}
+  sha256)
+
+;; inc: accepts any Integer and promotes past Long range; not Long-only. Also fixes the
+;; "actor argument" typo in the :CAST message.
+(def ^{:doc {:description "Increments the given Integer by 1. Supports arbitrary-precision Integers, promoting the result beyond Long range if necessary."
+             :errors      {:CAST "If the argument is not an Integer."}
+             :examples    [{:code "(inc 10)"}]
+             :signature   [{:params [num]
+                            :return Integer}]}
+       :static true}
+  inc)
+
+;; map: returns a collection whose type follows the first collection, not always a vector
+;; ((map inc '(1 2)) => (2 3), a List; a Set yields a Set, a Map yields a Map).
+(def ^{:doc {:description "Applies a Function to each element of a data structure, returning a new collection of results of the same type as the first collection. Additional collections may be provided to call the function with higher arity."
+             :examples    [{:code "(map inc [1 2 3])"}]
+             :signature   [{:params [f coll]}
+                           {:params [f coll1 coll2 & more-colls]}]}
+       :static true}
+  map)
+
+;; merge: does work on Indexes (Index is a kind of Map).
+(def ^{:doc {:description "Merges zero or more Maps (including Indexes), with values in later Maps replacing those in earlier ones. `nil` is considered an empty Map."
+             :examples    [{:code "(merge {1 2 3 4} {3 5 7 9})"}]
+             :signature   [{:params [& maps]}]}
+       :static true}
+  merge)
+
+;; reduce: the final argument may be any data structure (Maps and Sets are accepted), not
+;; only a sequential collection.
+(def ^{:doc {:description ["Reduces over a collection, calling `f` with an accumulator value and, successively, each element of that collection."
+                          "Reduction can be finished early by calling `reduced`. Otherwise, all elements in the collection are processed."
+                          "If an accumulator is not initially supplied, the first element of the collection is used as the initial accumulator."]
+             :errors      {:CAST "If the first argument is not a function, or the final argument is not a data structure."}
+             :examples    [{:code "(reduce (fn [acc item] (+ acc item)) 0 [1 2 3 4 5])"}]
+             :signature   [{:params [f coll]}
+                           {:params [f init coll]}]}
+       :static true}
+  reduce)
+
+;; signum: returns a Double (including ##NaN) for floating-point inputs, not only Long
+;; -1/0/1; ##NaN passes through rather than causing a :CAST.
+(def ^{:doc {:description "Returns the signum of a numeric value: -1, 0 or 1. Returns a Long for integer inputs and a Double for floating-point inputs; `##NaN` is returned for `##NaN`."
+             :errors      {:CAST "If the argument is not a number."}
+             :examples    [{:code "(signum -1)"}]
+             :signature   [{:params [x]
+                            :return Number}]}
+       :static true}
+  signum)
+
+;; symbol: the maximum name length is 128 bytes, not 64.
+(def ^{:doc {:description "Creates a Symbol from a Keyword, a Symbol, or a String. The name must be between 1 and 128 UTF-8 bytes."
+             :examples    [{:code "(symbol :foo)"}]
+             :signature   [{:params [name]
+                            :return Symbol}]}
+       :static true}
+  symbol)
+
+;; get-peer-stake: the example called the wrong function (get-stake).
+(def ^{:doc {:description "Gets the peer stake for a specific peer."
+             :examples    [{:code "(get-peer-stake my-peer-key)"}]
+             :signature   [{:params [peer-key]}]}
+       :static true}
+  get-peer-stake)
+
+;; set-peer-stake: the example was a copy-paste of set-peer-data.
+(def ^{:doc {:description "Sets the peer stake. Stake must be a `long`. Peer must exist, with a public account key."
+             :errors      {:CAST "If the first argument is not a valid peer key, or the second argument is not a `long`."}
+             :examples    [{:code "(set-peer-stake peer-key 1000000000)"}]
+             :signature   [{:params [peer stake]}]}
+       :static true}
+  set-peer-stake)
+
+;; ---------------------------------------------------------------------------
+;; New v1 core bindings — full metadata, including :doc.
+;;
+;; schedule-upgrade / unschedule-upgrade / gensym are installed into the core
+;; environment by the v1 bootstrap (Java) step immediately before this file is
+;; evaluated, initially with :static metadata only. Their docstrings are applied
+;; here, by the same no-value-def mechanism as the corrections above.
+
+(def ^{:doc {:description ["Schedules a network upgrade: appends an activation timestamp (milliseconds, as per `*timestamp*`) to the network's upgrade vector. When the consensus timestamp reaches the activation, peers apply the corresponding protocol migration and increment the protocol version. Returns the protocol version the upgrade will produce."
+                          "Callable only by a governance account (an address below the core account #8). Activations must be in the future and in non-decreasing order. See UPGRADE.md in the peer distribution."]
+             :errors      {:TRUST    "If not called from a governance account."
+                           :CAST     "If the activation timestamp is not castable to a Long."
+                           :ARGUMENT "If the activation is not in the future, or is before the last scheduled upgrade."}
+             :examples    [{:code "(schedule-upgrade (+ *timestamp* 86400000))"}]
+             :signature   [{:params [activation]
+                            :return Long}]}
+       :static true}
+  schedule-upgrade)
+
+(def ^{:doc {:description ["Removes the last pending scheduled network upgrade, identified by the protocol version it would have produced — guarding against removing the wrong entry. Returns the activation timestamp of the removed upgrade."
+                          "An escape hatch for an upgrade that will not ship. Only the last scheduled upgrade may be removed, and only while it is still pending. Callable only by a governance account (an address below the core account #8)."]
+             :errors      {:TRUST    "If not called from a governance account."
+                           :CAST     "If the version is not castable to a Long."
+                           :ARGUMENT "If the version is not the last scheduled protocol version, or the upgrade has already been applied."}
+             :examples    [{:code "(unschedule-upgrade 2)"}]
+             :signature   [{:params [version]
+                            :return Long}]}
+       :static true}
+  unschedule-upgrade)
+
+(def ^{:doc {:description ["Returns a fresh Symbol, optionally with a name prefix (a Symbol, Keyword or String): `(gensym 'n)` yields e.g. `n__4821`. Intended for macros that introduce bindings into expansion templates, so generated bindings cannot capture user symbols."
+                          "Deterministic: the uniqueness counter is the juice consumed so far, so identical code on identical state yields identical symbols, while successive calls in a transaction always return distinct symbols."]
+             :errors      {:CAST     "If the prefix is not a Symbol, Keyword or String."
+                           :ARGUMENT "If the prefix is too long for a Symbol name."}
+             :examples    [{:code "(gensym)"}
+                           {:code "(gensym 'foo)"}]
+             :signature   [{:params []
+                            :return Symbol}
+                           {:params [prefix]
+                            :return Symbol}]}
+       :static true}
+  gensym)

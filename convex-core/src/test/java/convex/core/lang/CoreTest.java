@@ -63,8 +63,10 @@ import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Special;
+import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
@@ -113,10 +115,18 @@ import convex.test.Samples;
  * consistent results so we need to do a lot of negative testing here.
  */
 @TestInstance(Lifecycle.PER_CLASS)
-public class CoreTest extends ACVMTest {
+/**
+ * Behavioural suite for the CVM core. Parameterized by the initial State so the
+ * same tests can run against genesis ({@link CoreGenesisTest}, permanent
+ * from-inception coverage), the live network's protocol version
+ * ({@link CoreLiveTest}, active while live is an intermediate version) and the
+ * fully-upgraded target state ({@link CoreUpgradedTest}) — the latter verifying
+ * that network migrations change no behaviour outside their intended fixes.
+ */
+public abstract class CoreTest extends ACVMTest {
 
-	protected CoreTest() throws IOException {
-		super(BaseTest.STATE);
+	protected CoreTest(State genesis) throws IOException {
+		super(genesis);
 	}
 
 	@Test
@@ -654,8 +664,16 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(switch nil 2 3)"));
 		assertNull(eval("(switch :foo 2 (fail) 4 5)"));
 		
-		// basic expansions
-		assertEquals(Reader.read("(let [v# 1] (cond))"),expand("(switch 1)"));
+		// basic expansion: (let [<subject> 1] (cond)). The subject binding symbol is a
+		// literal v# at genesis but a fresh gensym at protocol v1+ (#602), so assert
+		// structurally rather than pinning the internal name.
+		AList<ACell> sw = (AList<ACell>) expand("(switch 1)");
+		assertEquals(Symbol.create("let"), sw.get(0));
+		AVector<ACell> bnd = (AVector<ACell>) sw.get(1);
+		assertEquals(2L, bnd.count());
+		assertTrue(bnd.get(0) instanceof Symbol);
+		assertEquals(CVMLong.create(1), bnd.get(1));
+		assertEquals(Reader.read("(cond)"), sw.get(2));
 		
 		// No expressions, fall through to null
 		assertArityError(step("(switch)"));
@@ -2367,8 +2385,14 @@ public class CoreTest extends ACVMTest {
 		// TODO: think about letrec?
 		assertDepthError(step("(do   (def f (fn [x] (recur (f x))))   (f 1))"));
 
-		// Recur on its own is an :EXCEPTION Error
-		assertError(ErrorCodes.EXCEPTION,step("(recur 1)"));
+		// Recur on its own is an :EXCEPTION Error with a descriptive message (#115)
+		{
+			Context ctx=step("(recur 1)");
+			assertError(ErrorCodes.EXCEPTION,ctx);
+			ErrorValue ev=(ErrorValue)ctx.getExceptional();
+			assertEquals("attempt to recur or tail call outside of a function body",
+					RT.jvm(ev.getMessage()));
+		}
 	}
 
 	@Test
@@ -3396,14 +3420,21 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testTransferBurn() {
+	public void testTransferToRewardPool() {
+		// Account #0 is the reward pool, not a burn address: coins sent there are
+		// distributed to peers as rewards (see State.distributeFees), not destroyed.
+		// So a transfer to #0 moves coins user -> pool (both issued) and does NOT
+		// reduce issued supply. (#0 is excluded from both computeSupply and the CVM
+		// coin-supply.)
 		Context ctx=context();
 		long supply=ctx.getState().computeSupply();
 		long AMT=1000000;
-		
+
 		ctx=exec(ctx,"(transfer #0 "+AMT+")");
-		
-		assertEquals(supply-AMT,ctx.getState().computeSupply());
+
+		assertEquals(supply,ctx.getState().computeSupply());
+		// CVM coin-supply and Java computeSupply agree after the transfer (both exclude #0)
+		assertEquals(ctx.getState().computeSupply(),evalL(ctx,"(coin-supply)"));
 	}
 
 	@Test
@@ -3419,6 +3450,9 @@ public class CoreTest extends ACVMTest {
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStakeShares());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
 			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalBalance());
+
+			// #601: a no-change update returns 0 (nothing transferred), not the stale argument
+			assertCVMEquals(0L, eval(rc,"(set-stake my-peer 1000000)"));
 		}
 
 		// staking on an account key that isn't a peer
@@ -3451,6 +3485,8 @@ public class CoreTest extends ACVMTest {
 		
 		assertCastError(step(ctx,"(get-stake :foo *address*)"));
 		assertCastError(step(ctx,"(get-stake my-peer :foo)"));
+		// a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(get-stake 0x1234 *address*)"));
 
 		assertArityError(step(ctx,"(get-stake my-peer)"));
 		assertArityError(step(ctx,"(get-stake my-peer *address* :foo)"));
@@ -3467,6 +3503,8 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval(ctx,"(get-peer-stake 0x1234567812345678123456781234567812345678123456781234567812345678)")); 
 
 		assertCastError(step(ctx,"(get-peer-stake :foo)"));
+		// a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(get-peer-stake 0x1234)"));
 		
 		assertArityError(step(ctx,"(get-peer-stake)"));
 		assertArityError(step(ctx,"(get-peer-stake my-peer *address*)"));
@@ -3509,11 +3547,18 @@ public class CoreTest extends ACVMTest {
 		assertEquals(STK*3,ps.getPeerStake());
 		assertEquals(STK*3,ps.getTotalStakeShares());
 		assertEquals(STK*3,ps.getBalance());
-		
+
+		// #601: a no-change update returns 0 (nothing transferred), not the stale argument
+		assertCVMEquals(0L, eval(ctx,"(set-peer-stake "+KEY+" "+STK*3+")"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(set-peer-stake 0x1234 0)"));
+
 		// Check we can't set nonsensical stakes
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" 999999999999999999)"));
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" (+ 1 "+STK*3+" *balance*))"));
 		assertArgumentError(step(ctx,"(set-peer-stake "+KEY+" -1)"));
+		// adversarial: stake above the supply cap is rejected (out of range), before the funds check
+		assertArgumentError(step(ctx,"(set-peer-stake "+KEY+" "+(Coin.MAX_SUPPLY+1)+")"));
 		
 		assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 		
@@ -3547,6 +3592,18 @@ public class CoreTest extends ACVMTest {
 			assertNull(ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname());
         }
 
+		// #601: the peer-key argument is honoured regardless of the caller's own *key*.
+		// Change the controller's key so it differs from the peer key; updating the peer
+		// BY KEY still works (the old code derived the peer from the caller's key and failed).
+		{
+			Context ck = ctx.forkWithAddress(InitTest.FIRST_PEER_ADDRESS);
+			ck = step(ck, "(set-key 0x0000000000000000000000000000000000000000000000000000000000000001)");
+			assertNotError(ck);
+			ck = step(ck, "(set-peer-data peer-key {:url \"by-arg:1234\"})");
+			assertNotError(ck);
+			assertEquals("by-arg:1234", ck.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
+		}
+
 		assertNull(eval(ctx, "(set-peer-data peer-key nil)"));
 		
 		assertCastError(step(ctx, "(set-peer-data peer-key :fail)"));
@@ -3565,10 +3622,38 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step(ctx,"(set-peer-data peer-key :bad-key)"));
 		assertCastError(step(ctx,"(set-peer-data 12 {})"));
 		assertCastError(step(ctx,"(set-peer-data nil {})"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob), not :CAST
+		assertArgumentError(step(ctx,"(set-peer-data 0x1234 {})"));
 		
 		assertArityError(step(ctx,"(set-peer-data)"));
 		assertArityError(step(ctx,"(set-peer-data peer-key)"));
 		assertArityError(step(ctx,"(set-peer-data peer-key {:url \"test\" :bad-key 1234} 2)"));
+	}
+
+	@Test
+	public void testPeerAuthorizationAttacks() {
+		// Security (#601): all peer mutation is gated to the peer's controller address.
+		// Now that set-peer-data honours its key argument, a caller must not be able to
+		// name another peer's key to modify a peer it does not control.
+		AccountKey firstPeer = InitTest.FIRST_PEER_KEY;
+		String fp = "0x"+firstPeer.toHexString();
+		long stake0 = context().getState().getPeer(firstPeer).getPeerStake();
+
+		// Attacker: an account that does NOT control the first peer
+		Context atk = context().forkWithAddress(HERO.offset(2));
+
+		// Cannot set peer data on a peer it does not control
+		assertStateError(step(atk, "(set-peer-data "+fp+" {:url \"hijack:6666\"})"));
+		// Cannot change the stake (raise or lower) of a peer it does not control. The
+		// controller check precedes the funds check, so even raising is :STATE, not :FUNDS.
+		assertStateError(step(atk, "(set-peer-stake "+fp+" 0)"));
+		assertStateError(step(atk, "(set-peer-stake "+fp+" "+(stake0+1000000)+")"));
+		// The old attack vector (adopting the peer key as one's own *key*) is still blocked,
+		// because authorization is by controller address, not by matching key.
+		assertStateError(step(atk, "(do (set-key "+fp+") (set-peer-data "+fp+" {:url \"hijack\"}))"));
+
+		// The victim peer is unchanged after the failed attacks
+		assertEquals(stake0, context().getState().getPeer(firstPeer).getPeerStake());
 	}
 
 	@Test
@@ -3600,6 +3685,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step(ctx,"(create-peer :foo 1234)"));
 		assertCastError(step(ctx,"(create-peer hero-peer :foo)"));
 		assertCastError(step(ctx,"(create-peer hero-peer nil)"));
+
+		// adversarial: negative stake and wrong-length key are :ARGUMENT (#601)
+		assertArgumentError(step(ctx,"(create-peer hero-peer -1)"));
+		assertArgumentError(step(ctx,"(create-peer 0x1234 1000)"));
 
 		assertArityError(step(ctx,"(create-peer hero-peer)"));
 		assertArityError(step(ctx,"(create-peer hero-peer 1000 :foo)"));
@@ -3654,10 +3743,27 @@ public class CoreTest extends ACVMTest {
 		}
 		
 		assertCastError(step("(evict-peer nil)"));
-		assertCastError(step("(evict-peer 0x)"));
+		// #601: a wrong-length blob key is :ARGUMENT (it is a Blob); non-blobs remain :CAST
+		assertArgumentError(step("(evict-peer 0x)"));
 		assertCastError(step("(evict-peer [])"));
 		assertArityError(step("(evict-peer :foo :bar)"));
 		assertArityError(step("(evict-peer)"));
+	}
+
+	@Test
+	public void testCannotEvictLastPeer() {
+		// Network-liveness guard: the sole remaining peer cannot be evicted, even by its
+		// controller (Context.evictPeer). Build a single-peer state and attempt eviction.
+		AccountKey pk = InitTest.FIRST_PEER_KEY;
+		State s = context().getState();
+		PeerStatus ps = s.getPeer(pk);
+		State single = s.withPeers(s.getPeers().empty().assoc(pk, ps));
+		assertEquals(1L, single.getPeers().count());
+
+		// As the peer's controller (so authorization passes), evicting the last peer fails
+		Context ctx = context().forkWithAddress(ps.getController()).withState(single);
+		assertStateError(step(ctx, "(evict-peer 0x"+pk.toHexString()+")"));
+		assertNotNull(ctx.getState().getPeer(pk)); // peer still present
 	}
 
 	@Test

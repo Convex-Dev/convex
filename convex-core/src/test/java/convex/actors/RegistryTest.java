@@ -25,7 +25,7 @@ import convex.test.Samples;
 public class RegistryTest extends ACVMTest {
 
 	protected RegistryTest() throws IOException {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	static final Address REG = Init.REGISTRY_ADDRESS;

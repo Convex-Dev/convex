@@ -67,7 +67,7 @@ public class UCANValidator {
 				ACell proofCell = proofs.get(i);
 
 				// Parse proof as UCAN
-				AMap<AString, ACell> proofMap = RT.ensureMap(proofCell);
+				AMap<AString, ACell> proofMap = RT.castMap(proofCell);
 				if (proofMap == null) return null;
 
 				UCAN proof = UCAN.parse(proofMap);
@@ -165,10 +165,10 @@ public class UCANValidator {
 	 * Parse a transport-level {@code ucans} vector into validated UCAN maps.
 	 *
 	 * <p>Each element must be a JWT string. Every returned token has had its
-	 * EdDSA signature verified (via the JWT {@code kid} header), its temporal
-	 * bounds checked, and its proof chain recursively validated. Tokens that
-	 * fail any check are silently dropped — invalid tokens never appear in
-	 * the returned vector.</p>
+	 * EdDSA signature verified against its {@code iss} DID key (not the JWT
+	 * {@code kid} header), its temporal bounds checked, and its proof chain
+	 * recursively validated. Tokens that fail any check are silently dropped —
+	 * invalid tokens never appear in the returned vector.</p>
 	 *
 	 * <p><b>Trust boundary:</b> this is the single point at which UCAN
 	 * signatures are verified for inbound requests. Downstream code that
@@ -253,7 +253,7 @@ public class UCANValidator {
 		if (proofs == null || audience == null || issuer == null) return null;
 		AVector<ACell> result = Vectors.empty();
 		for (long i = 0; i < proofs.count(); i++) {
-			AMap<AString, ACell> tokenMap = RT.ensureMap(proofs.get(i));
+			AMap<AString, ACell> tokenMap = RT.castMap(proofs.get(i));
 			if (tokenMap == null) continue;
 			UCAN token = UCAN.parse(tokenMap);
 			if (token == null) continue;

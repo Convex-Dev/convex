@@ -30,6 +30,12 @@ public class RemotePeerMixin extends AMixin {
 	 */
 	public Convex connect()  {
 		InetSocketAddress sa=getSocketAddress();
+		if (hostname==null) {
+			// No --host / CONVEX_HOST given, so we are defaulting to the production Protonet
+			// peer. Surface it so a client command never *silently* targets production (#582).
+			inform(1, "No --host specified; connecting to production Protonet peer "
+					+ Constants.DEFAULT_PEER_HOSTNAME + " (override with --host or CONVEX_HOST)");
+		}
 		try {
 			Convex c;
 			c=Convex.connect(sa);

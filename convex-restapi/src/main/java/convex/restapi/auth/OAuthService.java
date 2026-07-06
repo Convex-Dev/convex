@@ -176,9 +176,9 @@ public class OAuthService {
 		Map<?, ?> config = restServer.getConfig();
 		Object authObj = config.get(convex.core.data.Keyword.create("auth"));
 		if (authObj instanceof AMap<?,?> authMap) {
-			AMap<AString, ACell> oauth = RT.ensureMap(((AMap<?,?>)authMap).get(Strings.create("oauth")));
+			AMap<AString, ACell> oauth = RT.castMap(((AMap<?,?>)authMap).get(Strings.create("oauth")));
 			if (oauth != null) {
-				AMap<AString, ACell> providerMap = RT.ensureMap(oauth.get(Strings.create(providerId)));
+				AMap<AString, ACell> providerMap = RT.castMap(oauth.get(Strings.create(providerId)));
 				if (providerMap != null) {
 					AString v = RT.ensureString(providerMap.get(Strings.create(key)));
 					if (v != null) return v.toString();
@@ -359,7 +359,7 @@ public class OAuthService {
 				return null;
 			}
 
-			return RT.ensureMap(JSON.parse(response.body()));
+			return RT.castMap(JSON.parse(response.body()));
 		} catch (Exception e) {
 			log.warn("Token exchange error for {}: {}", provider.id, e.getMessage());
 			return null;
@@ -435,7 +435,7 @@ public class OAuthService {
 				return null;
 			}
 
-			AMap<AString, ACell> userInfo = RT.ensureMap(JSON.parse(response.body()));
+			AMap<AString, ACell> userInfo = RT.castMap(JSON.parse(response.body()));
 			if (userInfo == null) return null;
 
 			// GitHub uses "id" (numeric), Discord uses "id" (string)

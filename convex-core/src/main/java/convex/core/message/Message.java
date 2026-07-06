@@ -27,6 +27,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.PartialMessageException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
@@ -290,7 +291,7 @@ public class Message {
 			payload=store.decodeMultiCell(messageData);
 		} else {
 			// Storeless decode via CVMEncoder: produces RefDirect tree.
-			// Throws BadFormatException if any branch is unresolvable.
+			// Throws PartialMessageException if any branch is unresolvable.
 			payload=CVMEncoder.INSTANCE.decodeMultiCell(messageData);
 		}
 

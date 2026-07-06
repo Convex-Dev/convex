@@ -3,7 +3,7 @@ package convex.core.util;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * So the JVM doesn't give us a nice way to run shutdown hooks in a defined order.
@@ -62,7 +62,11 @@ public class Shutdown {
 
 	}
 
-	private static final TreeMap<Integer, Group> order=new TreeMap<>();
+	// Concurrent map: addHook may be called from multiple threads (e.g. parallel
+	// server / node launches). computeIfAbsent is atomic, so the get-or-create
+	// cannot lose an update or corrupt the map, and ordering is preserved for
+	// shutdownNow(). Group guards its own hookSet. (#604)
+	private static final ConcurrentSkipListMap<Integer, Group> order=new ConcurrentSkipListMap<>();
 
 	/**
 	 * Add a Runnable shutdown hook with the given priority. Lower priority numbers will
@@ -72,11 +76,7 @@ public class Shutdown {
 	 * @param shutdownTask Runnable instance to execute on shutdown
 	 */
 	public static void addHook(int priority,Runnable shutdownTask) {
-		Group g=order.get(priority);
-		if (g==null) {
-			g=new Group(priority);
-			order.put(priority, g);
-		}
+		Group g=order.computeIfAbsent(priority, Group::new);
 		g.addHook(shutdownTask);
 	}
 

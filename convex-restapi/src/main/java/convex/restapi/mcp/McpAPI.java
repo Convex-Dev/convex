@@ -107,6 +107,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_BYTES = Strings.intern("bytes");
 	public static final StringShort ARG_ACCOUNT_KEY = Strings.intern("accountKey");
 	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
+	public static final StringShort ARG_RESOLVE = Strings.intern("resolve");
 	public static final StringShort ARG_HASH = Strings.intern("hash");
 	public static final StringShort ARG_CAD3 = Strings.intern("cad3");
 	public static final StringShort ARG_GET_PATH = Strings.intern("getPath");
@@ -149,9 +150,25 @@ public class McpAPI extends ABaseAPI {
 	/** Convex-specific state watcher */
 	private final ConvexStateWatcher stateWatcher = new ConvexStateWatcher();
 
+	/**
+	 * When true, seed-carrying tools accept cleartext HTTP from any client (#554).
+	 * Default false: seeds require HTTPS or a loopback client. Configure via
+	 * {@code :allow-http-seeds} for trusted private networks only.
+	 */
+	private final boolean allowHttpSeeds;
+
 	public McpAPI(RESTServer restServer, McpServer mcpServer) {
 		super(restServer);
 		this.mcpServer = mcpServer;
+
+		// #552: restrict MCP Origins if configured (DNS rebinding protection)
+		Object origins = restServer.getConfig().get(convex.core.cvm.Keywords.ALLOWED_ORIGINS);
+		if (origins instanceof java.util.Collection<?> coll) {
+			mcpServer.setAllowedOrigins(coll.stream().map(Object::toString).toList());
+		}
+
+		// #554: HTTPS enforcement for seed-based tools, opt-out for private networks
+		this.allowHttpSeeds = RT.bool(restServer.getConfig().get(convex.core.cvm.Keywords.ALLOW_HTTP_SEEDS));
 
 		// Enrich server info with peer details
 		AMap<AString, ACell> info = mcpServer.getServerInfo();
@@ -168,6 +185,59 @@ public class McpAPI extends ABaseAPI {
 
 	public McpServer getMcpServer() {
 		return mcpServer;
+	}
+
+	/**
+	 * Transport-security check for tools that receive an Ed25519 seed (#554).
+	 * A seed sent over cleartext HTTP is fully compromised in transit, so
+	 * seed-carrying tools require HTTPS — either directly or via an
+	 * {@code X-Forwarded-Proto: https} header from a TLS-terminating proxy.
+	 * Loopback clients are exempt (local development), and the check can be
+	 * disabled entirely with the {@code :allow-http-seeds} config option for
+	 * trusted private networks.
+	 *
+	 * @return null if the transport is acceptable, otherwise a tool error result
+	 */
+	AMap<AString, ACell> checkSeedTransport() {
+		if (allowHttpSeeds) return null;
+		Context ctx = McpServer.getCurrentContext();
+		if (ctx == null) return null; // not an HTTP request (internal or test invocation)
+		if (isSecureSeedTransport(ctx.scheme(), ctx.header("X-Forwarded-Proto"), ctx.req().getRemoteAddr())) {
+			return null;
+		}
+		return toolError("Seed-based tools require HTTPS: refusing to accept an Ed25519 seed over cleartext HTTP. "
+				+ "Use an HTTPS endpoint, or set allow-http-seeds in the peer config for trusted private networks.");
+	}
+
+	/**
+	 * Pure transport-security decision for seed-carrying requests (#554).
+	 *
+	 * <p>Note {@code X-Forwarded-Proto} is client-forgeable when no proxy is
+	 * present; this check protects a well-meaning client from a misconfigured
+	 * cleartext deployment, not against a client that chooses to lie about its
+	 * own transport (which only defeats its own protection).
+	 *
+	 * @param scheme Request scheme ("http" or "https")
+	 * @param forwardedProto X-Forwarded-Proto header value, or null
+	 * @param remoteAddr Remote IP address of the client, or null
+	 * @return true if the transport is acceptable for seed material
+	 */
+	static boolean isSecureSeedTransport(String scheme, String forwardedProto, String remoteAddr) {
+		if ("https".equalsIgnoreCase(scheme)) return true;
+		if (forwardedProto != null) {
+			// May be a comma-separated list from chained proxies; first is the client-facing hop
+			String first = forwardedProto.split(",")[0].trim();
+			if ("https".equalsIgnoreCase(first)) return true;
+		}
+		if (remoteAddr != null) {
+			try {
+				// IP literal only — no DNS resolution happens for numeric addresses
+				if (java.net.InetAddress.getByName(remoteAddr).isLoopbackAddress()) return true;
+			} catch (java.net.UnknownHostException e) {
+				// Unknown remote address: not exempt
+			}
+		}
+		return false;
 	}
 
 	public AMap<AString, ACell> getServerInfo() {
@@ -388,6 +458,8 @@ public class McpAPI extends ABaseAPI {
 			if (seedCell == null) {
 				return toolError("Transact requires 'seed' string");
 			}
+			AMap<AString, ACell> transportError = checkSeedTransport();
+			if (transportError != null) return transportError;
 			AString addressCell = RT.ensureString(arguments.get(ARG_ADDRESS));
 			if (addressCell == null) {
 				return toolError("Transact requires 'address' string");
@@ -536,6 +608,8 @@ public class McpAPI extends ABaseAPI {
 			if (seedCell == null) {
 				return toolError("Sign tool requires Ed25519 'seed' string");
 			}
+			AMap<AString, ACell> transportError = checkSeedTransport();
+			if (transportError != null) return transportError;
 			String seedHex = seedCell.toString();
 			Blob seedBlob = Blob.parse(seedHex);
 			if ((seedBlob == null) || (seedBlob.count() != AKeyPair.SEED_LENGTH)) {
@@ -623,6 +697,8 @@ public class McpAPI extends ABaseAPI {
 			if (seedCell == null) {
 				return toolError("signAndSubmit requires 'seed' string");
 			}
+			AMap<AString, ACell> transportError = checkSeedTransport();
+			if (transportError != null) return transportError;
 			Blob seedBlob = Blob.parse(seedCell);
 			if (seedBlob == null || seedBlob.count() != AKeyPair.SEED_LENGTH) {
 				return toolError("seed must be a 32-byte hex string (64 hex characters)");
@@ -720,6 +796,9 @@ public class McpAPI extends ABaseAPI {
 			try {
 				AString seedCell = RT.ensureString(arguments != null ? arguments.get(ARG_SEED) : null);
 				if (seedCell != null) {
+					// A caller-provided seed crosses the network: enforce transport security
+					AMap<AString, ACell> transportError = checkSeedTransport();
+					if (transportError != null) return transportError;
 					// Use provided seed
 					String seedHex = seedCell.toString();
 					seedBlob = Blob.parse(seedHex);
@@ -967,6 +1046,8 @@ public class McpAPI extends ABaseAPI {
 			if (seedCell == null) {
 				return toolError("transfer requires 'seed' string");
 			}
+			AMap<AString, ACell> transportError = checkSeedTransport();
+			if (transportError != null) return transportError;
 			AString addressCell = RT.ensureString(arguments.get(ARG_ADDRESS));
 			if (addressCell == null) {
 				return toolError("transfer requires 'address' string");

@@ -7,32 +7,35 @@ import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 
 /**
- * Last-Write-Preferred lattice wrapper.
+ * Last-Write-Preferred lattice wrapper — a <b>merge</b> layer.
  *
- * <p>Wraps an inner lattice with timestamp-based preference. Before
- * delegating to the inner lattice's merge, reorders the arguments so
- * that the value with the higher timestamp becomes "own" (first argument).
- * The inner lattice then merges with its normal semantics, and the
- * prefer-own tiebreaker convention ensures the more recent write wins
- * any unresolved conflicts.</p>
+ * <p>Before delegating to the inner lattice's merge, reorders the arguments so
+ * that the value with the higher timestamp becomes "own" (first argument). The
+ * inner lattice then merges with its normal semantics, and the prefer-own
+ * tiebreaker convention ensures the more recent write wins any unresolved
+ * conflicts.</p>
  *
  * <p>This enables timestamped variants of any lattice. For example:</p>
  * <ul>
- *   <li>Wrapping a {@link MapLattice} gives per-key merge where the
- *       newer timestamp's entries win leaf conflicts, but both sides'
- *       unique keys are preserved.</li>
+ *   <li>Wrapping a {@link MapLattice} gives per-key merge where the newer
+ *       timestamp's entries win leaf conflicts, but both sides' unique keys are
+ *       preserved.</li>
  *   <li>Wrapping a value lattice (prefer-own) gives pure LWW semantics.</li>
  * </ul>
  *
+ * <p>As an {@link ADelegatingLattice} it owns only the merge concern (delegating
+ * navigation and write-interception to the inner lattice). It is the sibling of
+ * {@link LWWLattice}: LWP <em>delegates</em> merge to the inner, LWW merges
+ * whole-value — the only axis that differs is whether merge recurses.</p>
+ *
  * @param <V> Type of lattice values
  */
-public class LWPLattice<V extends ACell> extends ALattice<V> {
+public class LWPLattice<V extends ACell> extends ADelegatingLattice<V> {
 
-	private final ALattice<V> inner;
 	private final ToLongFunction<V> timestampFn;
 
 	private LWPLattice(ALattice<V> inner, ToLongFunction<V> timestampFn) {
-		this.inner = inner;
+		super(inner);
 		this.timestampFn = timestampFn;
 	}
 
@@ -76,25 +79,5 @@ public class LWPLattice<V extends ACell> extends ALattice<V> {
 			return inner.merge(context, other, own);
 		}
 		return inner.merge(context, own, other);
-	}
-
-	@Override
-	public V zero() {
-		return inner.zero();
-	}
-
-	@Override
-	public boolean checkForeign(V value) {
-		return inner.checkForeign(value);
-	}
-
-	@Override
-	public ACell resolveKey(ACell key) {
-		return inner.resolveKey(key);
-	}
-
-	@Override
-	public <T extends ACell> ALattice<T> path(ACell child) {
-		return inner.path(child);
 	}
 }

@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +9,7 @@ import convex.core.Constants;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.init.InitTest;
 
 import static convex.test.Assertions.*;
 
@@ -165,5 +167,82 @@ public class JuiceTest extends ACVMTest {
 		long j2 = juice("(loop [i 3] (cond (> i 0) (recur (dec i)) :end))");
 		assertEquals(Juice.COND_OP + (Juice.CORE * 3) + ((Juice.LOOKUP)*2) + Juice.CONSTANT * 1 + Juice.ARITHMETIC + Juice.NUMERIC_COMPARE
 				+ Juice.RECUR, j2 - j1);
+	}
+
+	@Test
+	public void testDivisionJuiceExact() {
+		// Exact juice for (op 10 3): CORE lookup + 2 constant args + precost + ARITHMETIC base.
+		// Both args are small integers costing MIN_NUMERIC_COST (=8) each. The div family
+		// pre-charges linear + multiply cost (see #599):
+		//   linear   = 8 + 8      = 16   (precostNumericLinear accumulates size per arg)
+		//   multiply = 0 + 8*8    = 64   (precostNumericMultiply: 0 for first, size*size for second)
+		long precost = (8 + 8) + (0 + 8 * 8); // = 80
+		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
+		assertEquals(expected, juice("(div 10 3)"));
+		assertEquals(expected, juice("(mod 10 3)"));
+		assertEquals(expected, juice("(quot 10 3)"));
+		assertEquals(expected, juice("(rem 10 3)"));
+	}
+
+	@Test
+	public void testDivisionScalesWithSize() {
+		// Integer division juice must scale with the size of BOTH operands (the O(n*m)
+		// multiply cost), so big-integer division cannot be a cheap DoS vector (#599).
+		String big = "70000000000000000000000000000000000000000000000000000000000000000000";
+		for (String op : new String[] {"div", "mod", "quot", "rem"}) {
+			long small     = juice("(" + op + " 10 3)");
+			long bigSmall  = juice("(" + op + " " + big + " 7)");
+			long bigBig    = juice("(" + op + " " + big + " " + big + ")");
+			// scales with argument size at all
+			assertTrue(bigSmall > small, op + ": should scale with size (bigSmall=" + bigSmall + " small=" + small + ")");
+			// and with the SECOND operand too — linear (max-size) cost would not distinguish these
+			assertTrue(bigBig > bigSmall, op + ": should scale with both operands (bigBig=" + bigBig + " bigSmall=" + bigSmall + ")");
+		}
+	}
+
+	@Test
+	public void testMultiplyJuiceExactV0() {
+		// Pre-v1 (genesis, pinned explicitly): multiply charges the linear cost only.
+		// Preserved unchanged for consensus replay determinism; the O(n*m) hardening
+		// activates at v1 (#603).
+		//   linear = 8 + 8 = 16   (both args are small integers costing MIN_NUMERIC_COST=8)
+		Context v0 = context().withState(InitTest.STATE);
+		long precost = 8 + 8; // = 16
+		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
+		assertEquals(expected, juice(v0, "(* 10 3)"));
+	}
+
+	@Test
+	public void testMultiplyJuiceExactV1() {
+		// v1+ (the class default state): multiply also pre-charges the O(n*m)
+		// multiplicative cost, mirroring the div family (#603, cf #599):
+		//   linear   = 8 + 8   = 16
+		//   multiply = 0 + 8*8 = 64
+		long precost = (8 + 8) + (0 + 8 * 8); // = 80
+		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
+		assertEquals(expected, juice("(* 10 3)"));
+	}
+
+	@Test
+	public void testMultiplyScalesWithSizeOnlyAtV1() {
+		// The DoS the version gate closes: on v0 (genesis, pinned explicitly), linear
+		// (max-size) cost cannot distinguish big*small from big*big, so big-integer
+		// multiplication is charged like a cheap one.
+		String big = "70000000000000000000000000000000000000000000000000000000000000000000";
+		Context v0 = context().withState(InitTest.STATE);
+		assertEquals(juice(v0, "(* " + big + " 7)"), juice(v0, "(* " + big + " " + big + ")"),
+				"v0 multiply cost must not scale with the second operand (linear only)");
+
+		// v1+ (the class default state): cost scales with BOTH operands (the O(n*m)
+		// term), closing the DoS.
+		long bigSmall = juice("(* " + big + " 7)");
+		long bigBig   = juice("(* " + big + " " + big + ")");
+		assertTrue(bigBig > bigSmall,
+				"v1 multiply should scale with both operands (bigBig=" + bigBig + " bigSmall=" + bigSmall + ")");
+
+		// +/- deliberately stay linear-only on both versions (their work genuinely is
+		// linear): adding two big integers is far cheaper than multiplying them at v1.
+		assertTrue(juice("(+ " + big + " " + big + ")") < bigBig,
+				"addition should be cheaper than multiplication for big integers at v1");
 	}
 }

@@ -132,19 +132,40 @@ public class Core {
 		o=Cells.intern(o);
 		if (tempReg.contains(o)) throw new Error("Duplicate core form! = "+o);
 		tempReg.add(o);
-		
+
 		if (o instanceof ICoreDef) {
 			ICoreDef cd=(ICoreDef)o;
 			Symbol stm=cd.getSymbol();
-			
-			
-			
+
+
+
 			Symbol implicitForm=Symbol.create("#%"+stm.getName().toString());
 			CORE_FORMS.put(implicitForm, o);
 		} else {
 			System.err.println("Not a core Def: "+o);
 		}
-		
+
+		return o;
+	}
+
+	/**
+	 * Register an intrinsic core value that is deliberately NOT part of the genesis
+	 * core environment. The value is encodable / decodable via its core code, but
+	 * carries no environment binding or implicit form: it is installed into the
+	 * core environment by a network upgrade migration, and until then is only
+	 * usable by embedding the cell directly in compiled code. See UPGRADE.md.
+	 *
+	 * @param <T> Type of core value
+	 * @param o Core value to register
+	 * @return Interned singleton instance
+	 */
+	private static <T extends ACell> T regNonGenesis(T o) {
+		o=Cells.intern(o);
+		if (o instanceof ICoreDef) {
+			registerCode((ICoreDef)o);
+		} else {
+			throw new Error("Not a core Def: "+o);
+		}
 		return o;
 	}
 
@@ -553,7 +574,7 @@ public class Core {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
-			if (n != 2) return context.withArityError(this.exactArityMessage(3, n));
+			if (n != 2) return context.withArityError(this.exactArityMessage(2, n));
 
 			// get timestamp target
 			CVMLong tso = RT.ensureLong(args[0]);
@@ -641,7 +662,7 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n<1)||(n>3)) {
-				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
+				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 3)");
 			}
 
 			AFn<ACell> expander;
@@ -1013,14 +1034,144 @@ public class Core {
 		}
 	});
 
+	/**
+	 * Schedules a network upgrade (see UPGRADE.md). NOT part of the genesis
+	 * environment: installed into the core environment by the v1 bootstrap
+	 * migration; until then callable only by embedding this cell directly in
+	 * compiled code (which is how the bootstrap itself is scheduled).
+	 *
+	 * <p>Validation is a pure function of state — it must never consult the local
+	 * {@link convex.core.cvm.Migrations} registry, or peers on different releases
+	 * would disagree on transaction validity and fork.</p>
+	 */
+	public static final CoreFn<CVMLong> SCHEDULE_UPGRADE = regNonGenesis(new CoreFn<>(Symbols.SCHEDULE_UPGRADE,501) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			// Governance gate first: no juice charged on failure paths, keeping fee
+			// skew against releases lacking this definition minimal (see UPGRADE.md)
+			if (context.getAddress().longValue() >= CORE_ADDRESS.longValue()) {
+				return context.withError(ErrorCodes.TRUST, "schedule-upgrade requires a governance account (address below " + CORE_ADDRESS + ")");
+			}
+
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			CVMLong activation = RT.ensureLong(args[0]);
+			if (activation == null) return context.withCastError(0, args, Types.LONG);
+			long act = activation.longValue();
+
+			State s = context.getState();
+			if (act <= s.getTimestamp().longValue()) {
+				return context.withArgumentError("Upgrade activation must be in the future");
+			}
+
+			AVector<CVMLong> ups = s.getUpgradeVector();
+			long n = ups.count();
+			if (n > 0) {
+				CVMLong last = RT.ensureLong(ups.get(n - 1));
+				if ((last == null) || (act < last.longValue())) {
+					return context.withArgumentError("Upgrade activation must not be before the last scheduled upgrade");
+				}
+			}
+
+			State ns = s.withProtocolGlobals(s.getProtocolVersion(), ups.conj(activation));
+			context = context.withState(ns);
+
+			// Result is the protocol version this upgrade will produce
+			return context.withResult(Juice.DEF, CVMLong.create(n + 1));
+		}
+	});
+
+	/**
+	 * Removes the last pending scheduled upgrade (see UPGRADE.md). Escape hatch if
+	 * a migration will not ship. Only the tail entry may be removed: migrations
+	 * bind to versions by position, so mid-vector edits would silently re-bind
+	 * later activations to different migrations. NOT part of the genesis
+	 * environment (see {@link #SCHEDULE_UPGRADE}).
+	 */
+	public static final CoreFn<CVMLong> UNSCHEDULE_UPGRADE = regNonGenesis(new CoreFn<>(Symbols.UNSCHEDULE_UPGRADE,502) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			// Governance gate first: no juice charged on failure paths
+			if (context.getAddress().longValue() >= CORE_ADDRESS.longValue()) {
+				return context.withError(ErrorCodes.TRUST, "unschedule-upgrade requires a governance account (address below " + CORE_ADDRESS + ")");
+			}
+
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			CVMLong version = RT.ensureLong(args[0]);
+			if (version == null) return context.withCastError(0, args, Types.LONG);
+
+			State s = context.getState();
+			AVector<CVMLong> ups = s.getUpgradeVector();
+			long n = ups.count();
+			if ((n == 0) || (version.longValue() != n)) {
+				return context.withArgumentError("unschedule-upgrade requires the last scheduled protocol version" + ((n == 0) ? " (nothing scheduled)" : " (" + n + ")"));
+			}
+			if (s.getProtocolVersion() >= n) {
+				return context.withArgumentError("Cannot unschedule an applied upgrade");
+			}
+
+			CVMLong removed = RT.ensureLong(ups.get(n - 1));
+			State ns = s.withProtocolGlobals(s.getProtocolVersion(), ups.slice(0, n - 1));
+			context = context.withState(ns);
+
+			// Result is the activation timestamp of the removed upgrade
+			return context.withResult(Juice.DEF, removed);
+		}
+	});
+
+	/**
+	 * Returns a fresh Symbol, optionally given a name prefix (Symbol, Keyword or
+	 * String): {@code (gensym 'n)} yields e.g. {@code n__4821}. Intended for macros
+	 * that introduce bindings into expansion templates, guaranteeing freshness per
+	 * expansion so user symbols cannot be captured.
+	 *
+	 * <p>The uniqueness counter is the juice consumed so far in the current context:
+	 * deterministic (juice consumption is part of consensus execution), O(1), and
+	 * requiring no additional accounting. Juice for the call is charged <em>before</em>
+	 * the counter is read, so successive calls always observe strictly increasing
+	 * values — two gensyms in one transaction can never collide.</p>
+	 *
+	 * <p>NOT part of the genesis environment: installed into the core environment by
+	 * the v1 upgrade migration (see UPGRADE.md).</p>
+	 */
+	public static final CoreFn<Symbol> GENSYM = regNonGenesis(new CoreFn<>(Symbols.GENSYM,503) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length > 1) return context.withArityError(rangeArityMessage(0, 1, args.length));
+
+			AString prefix;
+			if (args.length == 1) {
+				prefix = RT.name(args[0]);
+				if (prefix == null) return context.withCastError(0, args, Types.SYMBOL);
+			} else {
+				prefix = Strings.create("g");
+			}
+
+			// Charge juice BEFORE reading the juice counter: a call is never free, so
+			// the observed value is strictly monotonic across calls within a transaction
+			context = context.consumeJuice(Juice.SIMPLE_FN);
+			if (context.isExceptional()) return context;
+
+			Symbol sym = Symbol.create(prefix.toString() + "__" + context.getJuiceUsed());
+			if (sym == null) return context.withArgumentError("gensym name too long, must be at most " + Constants.MAX_NAME_LENGTH + " characters");
+			return context.withResult(sym);
+		}
+	});
+
 	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER,65) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
@@ -1036,9 +1187,11 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			
-			AccountKey accountKey = RT.ensureAccountKey(args[0]);
-			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			// Security: Consume juice first, since eviction can potentially use arbitrary juice
 			// We still want juice to be paid in case of any error
 			context=context.consumeJuice(Juice.PEER_UPDATE);
@@ -1053,11 +1206,13 @@ public class Core {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
-			if (args.length != 2) return context.withArityError(exactArityMessage(1, args.length));
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			AccountKey peerKey=RT.ensureAccountKey(args[0]);
-			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey peerKey = AccountKey.create(b);
+			if (peerKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			AHashMap<ACell, ACell> data = RT.ensureHashMap(args[1]);
 			if (data == null) return context.withCastError(1,args, Types.MAP);
 			
@@ -1074,10 +1229,12 @@ public class Core {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
-			
-			AccountKey peerKey=RT.ensureAccountKey(args[0]);
-			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
-			
+
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey peerKey = AccountKey.create(b);
+			if (peerKey == null) return context.withArgumentError("Peer Key must be 32 bytes");
+
 			CVMLong newStake = RT.ensureLong(args[1]);
 			if (newStake == null) return context.withCastError(1,args, Types.LONG);
 			long targetStake=newStake.longValue();
@@ -1286,7 +1443,7 @@ public class Core {
 			ACell result= args[1];
 
 			// we set the target account holdings for the currently executing account
-			// might return NOBODY if account does not exist
+			// the target account need not exist — setting a holding for any address is allowed (#601)
 			context=(Context) context.setHolding(address,result);
 			if (context.isExceptional()) return (Context) context;
 
@@ -1493,7 +1650,7 @@ public class Core {
 			int n = args.length;
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
-			AMap<ACell, ACell> result = RT.ensureMap(args[0]);
+			AMap<ACell, ACell> result = RT.castMap(args[0]);
 			if (result == null) return context.withCastError(args[0], Types.MAP);
 
 			for (int i = 1; i < n; i++) {
@@ -1938,12 +2095,20 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES,162) {
-		
+
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			// All arities OK
 			long cost=Juice.precostNumericLinear(args);
 			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			// Protocol v1+: also charge the O(n*m) multiplicative cost so big-integer
+			// multiplication is not a cheap juice DoS. Version-gated because juice cost is
+			// consensus-critical (tier-2 transition function): pre-v1 fee computation is
+			// unchanged, so existing v0 states replay identically. Args are numeric here
+			// (cost >= 0); doubles are O(1) and charged only linearly. (#603, cf #599)
+			if (context.getState().getProtocolVersion() >= 1) {
+				cost=Juice.add(cost, Juice.precostNumericMultiply(args));
+			}
 			if (cost>0) {
 				context=context.consumeJuice(cost);
 				if (context.isExceptional()) return context; // not not exceptional, might be something else
@@ -2042,6 +2207,14 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.mod(lb);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -2058,6 +2231,14 @@ public class Core {
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
+
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
 
 			AInteger result=la.div(lb);
 
@@ -2076,6 +2257,14 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.rem(lb);
 
 			return context.withResult(Juice.ARITHMETIC, result);
@@ -2093,8 +2282,16 @@ public class Core {
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
+			// Scale juice with argument size: linear per-argument handling cost, plus the
+			// O(n*m) multiplicative cost of big-integer division (DoS resistance, see #599)
+			long cost=Juice.add(Juice.precostNumericLinear(args),Juice.precostNumericMultiply(args));
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context;
+			}
+
 			AInteger result=la.quot(lb);
-	
+
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -2589,13 +2786,13 @@ public class Core {
 			// TODO: handle indexes?
 
 			ACell arg0=args[0];
-			AMap<ACell,ACell> result=RT.ensureMap(arg0);
+			AMap<ACell,ACell> result=RT.castMap(arg0);
 			if (result == null) return context.withCastError(arg0, Types.MAP);
 
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
 				ACell argi=args[i];
-				AMap<ACell,ACell> argMap=RT.ensureMap(argi);
+				AMap<ACell,ACell> argMap=RT.castMap(argi);
 				if (argMap == null) return context.withCastError(argi, Types.MAP);
 
 				long size=argMap.count();
@@ -2669,7 +2866,7 @@ public class Core {
 		@Override
 		public  Context invoke(Context ctx, ACell[] args) {
 			int ac=args.length;
-			if ((ac<2)||(ac > 3)) return ctx.withArityError(exactArityMessage(3, ac));
+			if ((ac<2)||(ac > 3)) return ctx.withArityError(rangeArityMessage(2, 3, ac));
 
 			// check and cast first argument to a function
 			ACell fnArg = args[0];

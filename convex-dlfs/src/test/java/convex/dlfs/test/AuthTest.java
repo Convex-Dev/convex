@@ -313,7 +313,7 @@ public class AuthTest {
 		}
 		HttpResponse<String> resp = client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 		assertEquals(200, resp.statusCode(), "MCP request should return 200");
-		return RT.ensureMap(JSON.parse(resp.body()));
+		return RT.castMap(JSON.parse(resp.body()));
 	}
 
 	@Test

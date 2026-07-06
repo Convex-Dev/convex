@@ -47,6 +47,29 @@ public class FileUtilsTest {
 		assertTrue(Files.isDirectory(path));
 	}
 	
+	/**
+	 * Regression test for #324: a leading "~" followed by a sub-path must expand to
+	 * that sub-path directly under the user home directory, with the home path left
+	 * intact. An earlier regex-based expansion ate the backslashes of a Windows home
+	 * (e.g. {@code C:\Users\Name} -> {@code C:UsersName}), producing a drive-relative
+	 * path that resolved against the working directory. String concatenation avoids
+	 * that; this test locks it so a regex replace can't creep back in.
+	 */
+	@Test public void testHomeSubPathExpansion() {
+		String home = System.getProperty("user.home");
+		File expected = new File(new File(home), ".convex/keystore.pfx");
+
+		File file = FileUtils.getFile("~/.convex/keystore.pfx");
+		assertTrue(file.isAbsolute());
+		assertEquals(expected.getPath(), file.getPath()); // home intact, no mangling
+		assertTrue(file.getPath().startsWith(new File(home).getPath()),
+				"expanded path must sit under the home directory: " + file);
+
+		// getPath() resolves identically to getFile()
+		Path path = FileUtils.getPath("~/.convex/keystore.pfx");
+		assertEquals(expected.getPath(), path.toFile().getPath());
+	}
+
 	@Test public void testFileOps() throws IOException {
 		Path DIR=FileUtils.ensureFilePath(TEMP.resolve("testOps/foo.bar")).getParent();
 		assertTrue(Files.exists(DIR));

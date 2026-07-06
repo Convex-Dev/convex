@@ -60,9 +60,26 @@ public class BaseTest extends ACVMTest {
 
 	
 	/**
-	 * Standard base state used for testing
+	 * Standard base state used for testing. Genesis (protocol version 0): use for
+	 * behaviour that must hold from inception; most tests should use
+	 * {@link #UPGRADED} (the ACVMTest default is the InitTest equivalent).
 	 */
 	public static final State STATE= Init.createBaseState(HERO_KEY,HERO_KEY,PEER_KEYS);
+
+	/**
+	 * Base state with all network upgrades applied, at the latest target protocol
+	 * version ({@link convex.core.cvm.Migrations#MAX_VERSION}). The standard state
+	 * for tests needing the minimal base environment (no test libraries).
+	 */
+	public static final State UPGRADED = convex.core.cvm.Migrations.applyAll(STATE);
+
+	/**
+	 * Base state at the live network's current protocol version
+	 * ({@link convex.core.cvm.Migrations#LIVE_VERSION}). Currently identical to
+	 * genesis {@link #STATE}; diverges once the live network upgrades. Live-side
+	 * suites pin this so a release cannot break semantics live peers still run.
+	 */
+	public static final State LIVE = convex.core.cvm.Migrations.applyTo(STATE, convex.core.cvm.Migrations.LIVE_VERSION);
 	
 	public static Address HERO=Init.getGenesisAddress();
 	public static Address VILLAIN=Init.getGenesisPeerAddress(1);

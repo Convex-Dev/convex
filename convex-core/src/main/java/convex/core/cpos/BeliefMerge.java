@@ -210,6 +210,16 @@ public class BeliefMerge {
 
 		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
+		// #595 stage (i): clamp our consensus points to our clock horizon, so we never
+		// confirm (and therefore never execute) a Block dated beyond our own clock plus
+		// the skew allowance. An honest 2/3 stake supermajority doing this prevents a
+		// future-dated Block from teleporting the consensus clock and firing scheduled
+		// upgrades early. The scan floor is our PREVIOUS finality point (updateConsensus
+		// may have just advanced finality past a future Block, so we must not trust the
+		// new finality). See convex-core/docs/CONSENSUS.md.
+		consensusOrder = clampToTimeHorizon(consensusOrder,
+				myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
 		Index<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
 			// We have a different Order to propose
@@ -391,15 +401,125 @@ public class BeliefMerge {
 	}
 	
 	/**
-	 * Filter blocks based on validity / timestamps
-	 * @param blks Blocks to filer
-	 * @param cp Point at which to start filtering (should be consensus point)
-	 * @return Updated blocks, or same blocks if no change
+	 * #595 stage (ii): reorders the winning Block vector so a far-future Block does not
+	 * wedge later in-horizon Blocks behind it (see {@link #demoteFutureBlocks}). Applied
+	 * to the winning order before consensus is computed, so the reordering feeds
+	 * {@code updateConsensus} and the stage (i) clamp: with the future Block moved to the
+	 * back, the clamp confirms up to it, and the in-horizon Blocks ahead of it finalise.
+	 *
+	 * <p>The floor {@code cp} is this peer's consensus point — the agreed prefix below it
+	 * is never reordered. Reordering everything above it is safe precisely because stage
+	 * (i)'s clamp guarantees a far-future Block never gains proposal (let alone consensus)
+	 * standing: such Blocks always sit in the raw, reorderable tail, so demoting them
+	 * cannot disturb an agreed prefix. If that clamp is ever removed or weakened, this
+	 * assumption breaks.</p>
+	 *
+	 * @param blks winning Block vector
+	 * @param cp   consensus point: floor below which Blocks are not reordered
+	 * @return reordered Blocks, or the same vector if unchanged
 	 */
 	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
 			long cp) {
-		// TODO Filter from consensus point onwards
-		return blks;
+		return demoteFutureBlocks(blks, cp, getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD);
+	}
+
+	/**
+	 * #595 stage (ii): stably moves out-of-horizon Blocks to the back of the reorderable
+	 * region of a Block ordering.
+	 *
+	 * <p>Blocks in {@code [0, floor)} (the agreed prefix) are untouched. Within
+	 * {@code [floor, count)}, Blocks dated at or before {@code limit} keep their relative
+	 * order, and Blocks dated after {@code limit} are moved after them, also keeping their
+	 * relative order. This is a stable <em>partition</em>, not a sort: in-horizon Blocks
+	 * are never reordered by timestamp, so a peer cannot back-date a Block (within the
+	 * backdate window) to jump the queue — ordering position stays observation-based for
+	 * all but genuinely far-future Blocks, which are merely delayed. Because a peer's own
+	 * Blocks are timestamp-monotonic ({@code checkBlock}), this never reorders one peer's
+	 * Blocks relative to each other. See convex-core/docs/CONSENSUS.md.</p>
+	 *
+	 * @param blocks ordered Blocks
+	 * @param floor  first index eligible for reordering (the agreed prefix below is fixed)
+	 * @param limit  horizon timestamp; Blocks dated strictly after this are demoted
+	 * @return the reordered Blocks, or the same vector if nothing needs moving
+	 */
+	static AVector<SignedData<Block>> demoteFutureBlocks(AVector<SignedData<Block>> blocks, long floor, long limit) {
+		long n = blocks.count();
+
+		// First out-of-horizon Block in the reorderable region
+		long firstFuture = -1;
+		for (long i = Math.max(0, floor); i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() > limit) { firstFuture = i; break; }
+		}
+		if (firstFuture < 0) return blocks; // no future Blocks: nothing to do
+
+		// If no in-horizon Block follows it, the future Blocks already form a clean suffix
+		boolean needsReorder = false;
+		for (long i = firstFuture + 1; i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() <= limit) { needsReorder = true; break; }
+		}
+		if (!needsReorder) return blocks;
+
+		// Stable partition of [firstFuture, n): in-horizon Blocks first, then future Blocks
+		AVector<SignedData<Block>> result = blocks.slice(0, firstFuture);
+		for (long i = firstFuture; i < n; i++) {
+			SignedData<Block> b = blocks.get(i);
+			if (b.getValue().getTimeStamp() <= limit) result = result.conj(b);
+		}
+		for (long i = firstFuture; i < n; i++) {
+			SignedData<Block> b = blocks.get(i);
+			if (b.getValue().getTimeStamp() > limit) result = result.conj(b);
+		}
+		return result;
+	}
+
+	/**
+	 * #595 stage (i): clamps an Order's consensus points (proposal / consensus /
+	 * finality) so that none exceeds the number of leading Blocks whose timestamps are
+	 * within this peer's wall clock plus {@link CPoSConstants#MAX_BLOCK_FORWARD}. Level
+	 * 0 (the Block count) is untouched — the Blocks remain in the ordering, they are
+	 * simply not confirmed.
+	 *
+	 * @param order the Order whose (freshly computed) consensus points are to be clamped
+	 * @param finalisedFloor the peer's PREVIOUS finality point, used as the scan floor.
+	 *        Blocks below it were finalised while within the horizon, and the peer clock
+	 *        only advances, so they remain within it — safe to skip. Crucially this must
+	 *        be the previous finality, not {@code order}'s: {@code updateConsensus} may
+	 *        have just advanced finality past a future-dated Block, which the scan must
+	 *        still catch.
+	 *
+	 * <p>Monotone: the horizon is always at least {@code finalisedFloor} (Blocks below it
+	 * are within the horizon), so clamping to it never lowers finality below the
+	 * previously finalised point — finality only ever advances, just no faster than the
+	 * clock. Needs no timestamp ordering of Blocks: the horizon is simply the first
+	 * out-of-window Block scanned forward from the floor, wherever it sits.</p>
+	 */
+	private Order clampToTimeHorizon(Order order, long finalisedFloor) {
+		long[] cps = order.getConsensusPoints(); // a mutable clone
+		AVector<SignedData<Block>> blocks = order.getBlocks();
+		long n = blocks.count();
+		long limit = getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD;
+
+		// Horizon: first Block index at or after the previously-finalised prefix that is
+		// dated beyond the clock allowance.
+		long horizon = n;
+		for (long i = finalisedFloor; i < n; i++) {
+			if (blocks.get(i).getValue().getTimeStamp() > limit) {
+				horizon = i;
+				break;
+			}
+		}
+		if (horizon >= n) return order; // nothing beyond the horizon: no clamp needed
+
+		// Clamp confirmation levels (proposal..finality) down to the horizon. Level 0
+		// (Block count) is preserved by withConsensusPoints.
+		boolean changed = false;
+		for (int level = 1; level < CPoSConstants.CONSENSUS_LEVELS; level++) {
+			if (cps[level] > horizon) {
+				cps[level] = horizon;
+				changed = true;
+			}
+		}
+		return changed ? order.withConsensusPoints(cps) : order;
 	}
 
 	/**

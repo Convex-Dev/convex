@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Convex is a lattice-based decentralised network and execution platform built as a multi-module Maven project. The codebase implements a full-stack blockchain alternative with custom virtual machine, consensus layer, peer networking, and developer tooling.
+Convex is a lattice-based decentralised network and execution platform built as a multi-module Maven project. The codebase implements a full-stack decentralised platform with custom virtual machine, consensus layer, peer networking, and developer tooling.
 
 ## Build System
 
@@ -99,7 +99,7 @@ See BUILD.md for complete release workflow.
 
 ## Terminology
 
-Canonical glossary: `../design/docs/tutorial/glossary.md` (rendered at https://docs.convex.world/tutorial/glossary). Use canonical terms — never substitute "gas", "fees", "blockchain", "chain", "miner", "validator", "block", "wei", "satoshi", or "mainnet". Key terms: CVM coin, Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, Protonet.
+Canonical glossary: `../design/docs/tutorial/glossary.md` (rendered at https://docs.convex.world/docs/tutorial/glossary). Use canonical terms — never substitute "gas", "fees", "blockchain", "chain", "miner", "validator", "block", "wei", "satoshi", or "mainnet". Key terms: CVM coin, Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, Protonet.
 
 ## Network Defaults
 

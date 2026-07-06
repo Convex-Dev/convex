@@ -57,6 +57,8 @@ public class RESTConfig extends PeerConfig {
 	public static final AString SIGNING = Strings.intern("signing");
 	public static final AString ELEVATED = Strings.intern("elevated");
 	public static final AString TOOLS = Strings.intern("tools");
+	public static final AString ALLOWED_ORIGINS = Strings.intern("allowedOrigins");
+	public static final AString ALLOW_HTTP_SEEDS = Strings.intern("allowHttpSeeds");
 
 	// ========== OAuth config keys ==========
 
@@ -155,12 +157,37 @@ public class RESTConfig extends PeerConfig {
 	}
 
 	/**
+	 * Get the allowed Origins for MCP requests (#552).
+	 * @return Set of allowed Origin strings, or null if all origins are allowed
+	 */
+	public java.util.Set<String> getAllowedOrigins() {
+		ACell v = getSection(MCP).get(ALLOWED_ORIGINS);
+		if (v == null) return null;
+		convex.core.data.AVector<ACell> vec = RT.ensureVector(v);
+		if (vec == null) return null;
+		java.util.HashSet<String> result = new java.util.HashSet<>();
+		for (long i = 0; i < vec.count(); i++) {
+			AString s = RT.ensureString(vec.get(i));
+			if (s != null) result.add(s.toString());
+		}
+		return result;
+	}
+
+	/**
+	 * Whether seed-based MCP tools may be used over cleartext HTTP (#554).
+	 * @return true if HTTP seeds are allowed (default: false — HTTPS or loopback required)
+	 */
+	public boolean isHttpSeedsAllowed() {
+		return getBool(getSection(MCP), ALLOW_HTTP_SEEDS, false);
+	}
+
+	/**
 	 * Get the MCP tools configuration section.
 	 * @return Tools config map, or empty map if not configured
 	 */
 	public AMap<AString, ACell> getToolsConfig() {
 		AMap<AString, ACell> mcpSection = getSection(MCP);
-		AMap<AString, ACell> tools = RT.ensureMap(mcpSection.get(TOOLS));
+		AMap<AString, ACell> tools = RT.castMap(mcpSection.get(TOOLS));
 		return (tools != null) ? tools : Maps.empty();
 	}
 
@@ -175,11 +202,11 @@ public class RESTConfig extends PeerConfig {
 		AMap<AString, ACell> authSection = getSection(AUTH);
 		ACell oauthCell = authSection.get(OAUTH);
 		if (oauthCell == null) return null;
-		AMap<AString, ACell> oauth = RT.ensureMap(oauthCell);
+		AMap<AString, ACell> oauth = RT.castMap(oauthCell);
 		if (oauth == null) return null;
 		ACell providerCell = oauth.get(Strings.create(provider));
 		if (providerCell == null) return null;
-		return RT.ensureMap(providerCell);
+		return RT.castMap(providerCell);
 	}
 
 	/**
@@ -224,6 +251,13 @@ public class RESTConfig extends PeerConfig {
 
 		if (getSection(REST).containsKey(FAUCET)) {
 			legacy.put(Keywords.FAUCET, isFaucetEnabled());
+		}
+
+		// MCP security options (#552, #554)
+		java.util.Set<String> origins = getAllowedOrigins();
+		if (origins != null) legacy.put(Keywords.ALLOWED_ORIGINS, origins);
+		if (getSection(MCP).containsKey(ALLOW_HTTP_SEEDS)) {
+			legacy.put(Keywords.ALLOW_HTTP_SEEDS, isHttpSeedsAllowed());
 		}
 
 		return legacy;

@@ -5,6 +5,7 @@ import convex.core.data.ACell;
 import convex.core.data.Index;
 import convex.core.util.MergeFunction;
 import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
 
 /**
  * A lattice representing an Index (sorted radix-tree map) that merges values
@@ -36,8 +37,21 @@ public class IndexLattice<K extends ABlobLike<?>, V extends ACell> extends ALatt
 	@Override
 	public Index<K,V> merge(Index<K, V> ownValue, Index<K, V> otherValue) {
 		if (otherValue==null) return ownValue;
-		if (ownValue==null) return otherValue;
+		// #561: merge foreign values against an empty own rather than accepting the Index
+		// wholesale, so each foreign value is validated through the child lattice merge.
+		if (ownValue==null) ownValue = zero();
 		return ownValue.mergeDifferences(otherValue, mergeFunction);
+	}
+
+	@Override
+	public Index<K,V> merge(LatticeContext context, Index<K, V> ownValue, Index<K, V> otherValue) {
+		if (otherValue==null) return ownValue;
+		// #561: merge foreign values against an empty own rather than accepting the Index
+		// wholesale, so each foreign value is validated through the child lattice merge.
+		if (ownValue==null) ownValue = zero();
+		// Thread context to child merges so signing / owner verification is not dropped
+		MergeFunction<V> contextMergeFunction = (a, b) -> valueNode.merge(context, a, b);
+		return ownValue.mergeDifferences(otherValue, contextMergeFunction);
 	}
 
 	@SuppressWarnings("unchecked")

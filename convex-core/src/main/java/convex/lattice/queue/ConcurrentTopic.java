@@ -151,7 +151,8 @@ public class ConcurrentTopic implements AutoCloseable {
 	 * Blocks if the target partition's inbox is full (backpressure).
 	 */
 	public void offer(ACell key, ACell value) throws InterruptedException {
-		int partition = (int)(Math.abs(key.getHash().longValue()) % numPartitions);
+		// #561: floorMod avoids the negative index Math.abs(Long.MIN_VALUE) would produce.
+		int partition = (int) Math.floorMod(key.getHash().longValue(), (long) numPartitions);
 		inboxes[partition].put(InboundRecord.data(key, value, null));
 	}
 
@@ -159,7 +160,8 @@ public class ConcurrentTopic implements AutoCloseable {
 	 * Offers a keyed record with headers, dispatched by key hash.
 	 */
 	public void offer(ACell key, ACell value, AHashMap<ACell, ACell> headers) throws InterruptedException {
-		int partition = (int)(Math.abs(key.getHash().longValue()) % numPartitions);
+		// #561: floorMod avoids the negative index Math.abs(Long.MIN_VALUE) would produce.
+		int partition = (int) Math.floorMod(key.getHash().longValue(), (long) numPartitions);
 		inboxes[partition].put(InboundRecord.data(key, value, headers));
 	}
 

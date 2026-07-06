@@ -7,6 +7,7 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 
 /**
  * Context for lattice merge operations.
@@ -81,11 +82,36 @@ public class LatticeContext {
 	}
 
 	/**
-	 * Gets the timestamp for this context.
+	 * Gets the explicit timestamp set on this context, or null if none was supplied.
 	 * @return Timestamp or null if not set
 	 */
 	public CVMLong getTimestamp() {
 		return timestamp;
+	}
+
+	/**
+	 * Resolves the current write/merge timestamp (#561). Lattice value and merge code must
+	 * obtain "now" from here rather than reading the system clock directly — time is the
+	 * responsibility of the driving (merging or test) process, injected via this context.
+	 *
+	 * <p>Returns the explicit timestamp when the driver supplied one (giving full determinism
+	 * — tests inject a fixed value); this boundary is the single place a wall-clock is read,
+	 * and only as the fallback when no timestamp was supplied (standalone use).</p>
+	 *
+	 * @return the write/merge timestamp to stamp new values with
+	 */
+	public CVMLong currentTimestamp() {
+		return (timestamp != null) ? timestamp : CVMLong.create(Utils.getCurrentTimestamp());
+	}
+
+	/**
+	 * The {@code long} form of {@link #currentTimestamp()} — the resolved write/merge time in
+	 * epoch millis. Used for expiry checks and arithmetic without boxing.
+	 *
+	 * @return resolved current timestamp in epoch milliseconds
+	 */
+	public long currentTimestampValue() {
+		return (timestamp != null) ? timestamp.longValue() : Utils.getCurrentTimestamp();
 	}
 
 	/**

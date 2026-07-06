@@ -70,8 +70,11 @@ public class KeyGenerate extends AKeyCommand {
 			}
 			
 			String mnemonic=BIP39.createSecureMnemonic(words);
-			inform("BIP39 mnemonic generated with "+words+" words:");
-			inform(mnemonic);
+			// A suppressed mnemonic is unrecoverable, so show it regardless of verbosity:
+			// level 0 is never gated, fixing -v0 silently discarding it. Kept on stderr so
+			// stdout stays the stable public-key contract; machine capture is #581 (--json). (#583)
+			inform(0, "BIP39 mnemonic generated with "+words+" words:");
+			inform(0, mnemonic);
 			if (passphrase==null) {
 				if (isInteractive()) {
 					passphrase=new String(readPassword("Enter BIP39 passphrase: "));

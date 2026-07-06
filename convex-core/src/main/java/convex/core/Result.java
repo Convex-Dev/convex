@@ -497,9 +497,9 @@ public final class Result extends ARecordGeneric {
 		if (data instanceof Result) {
 			return (Result) data;
 		} else if (data instanceof AMap) {
-			AMap<Keyword,ACell> m=RT.ensureMap(data);
+			AMap<Keyword,ACell> m=RT.castMap(data);
 			ACell info=m.get(Keywords.INFO);
-			return create(RT.ensureLong(m.get(Keywords.ID)),m.get(Keywords.RESULT),m.get(Keywords.ERROR),RT.ensureVector(m.get(Keywords.LOG)),(info==null)?null:RT.ensureMap(info));
+			return create(RT.ensureLong(m.get(Keywords.ID)),m.get(Keywords.RESULT),m.get(Keywords.ERROR),RT.ensureVector(m.get(Keywords.LOG)),(info==null)?null:RT.castMap(info));
 		}
 		throw new IllegalArgumentException("Unrecognised data of type: "+Utils.getClassName(data));
 	}

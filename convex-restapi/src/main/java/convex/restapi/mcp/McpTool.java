@@ -50,7 +50,7 @@ public abstract class McpTool {
 				throw new IllegalStateException("Tool metadata resource not found: " + resourcePath);
 			}
 			ACell cell = JSON5Reader.read(is);
-			AMap<AString, ACell> metadata = RT.ensureMap(cell);
+			AMap<AString, ACell> metadata = RT.castMap(cell);
 
 			if (metadata == null) {
 				throw new IllegalStateException("Tool metadata must be a JSON object: " + resourcePath);
