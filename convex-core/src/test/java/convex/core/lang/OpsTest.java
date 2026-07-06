@@ -63,7 +63,7 @@ import convex.test.Samples;
 public class OpsTest extends ACVMTest {
 
 	protected OpsTest() {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	private final long INITIAL_JUICE = context().getJuiceAvailable();

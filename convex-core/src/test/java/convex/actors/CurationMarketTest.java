@@ -9,7 +9,7 @@ import convex.core.lang.ACVMTest;
 public class CurationMarketTest extends ACVMTest {
 	
 	protected CurationMarketTest() {
-		super(InitTest.STATE);
+		super(InitTest.UPGRADED);
 	}
 	
 	@Override protected Context buildContext(Context ctx) {

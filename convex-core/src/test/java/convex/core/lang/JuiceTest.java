@@ -202,44 +202,47 @@ public class JuiceTest extends ACVMTest {
 
 	@Test
 	public void testMultiplyJuiceExactV0() {
-		// Pre-v1 (genesis): multiply charges the linear cost only. Preserved unchanged
-		// for consensus replay determinism; the O(n*m) hardening activates at v1 (#603).
+		// Pre-v1 (genesis, pinned explicitly): multiply charges the linear cost only.
+		// Preserved unchanged for consensus replay determinism; the O(n*m) hardening
+		// activates at v1 (#603).
 		//   linear = 8 + 8 = 16   (both args are small integers costing MIN_NUMERIC_COST=8)
+		Context v0 = context().withState(InitTest.STATE);
 		long precost = 8 + 8; // = 16
+		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
+		assertEquals(expected, juice(v0, "(* 10 3)"));
+	}
+
+	@Test
+	public void testMultiplyJuiceExactV1() {
+		// v1+ (the class default state): multiply also pre-charges the O(n*m)
+		// multiplicative cost, mirroring the div family (#603, cf #599):
+		//   linear   = 8 + 8   = 16
+		//   multiply = 0 + 8*8 = 64
+		long precost = (8 + 8) + (0 + 8 * 8); // = 80
 		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
 		assertEquals(expected, juice("(* 10 3)"));
 	}
 
 	@Test
-	public void testMultiplyJuiceExactV1() {
-		// v1+: multiply also pre-charges the O(n*m) multiplicative cost, mirroring the div
-		// family (#603, cf #599):
-		//   linear   = 8 + 8   = 16
-		//   multiply = 0 + 8*8 = 64
-		Context v1 = context().withState(InitTest.UPGRADED);
-		long precost = (8 + 8) + (0 + 8 * 8); // = 80
-		long expected = Juice.CORE + 2 * Juice.CONSTANT + precost + Juice.ARITHMETIC;
-		assertEquals(expected, juice(v1, "(* 10 3)"));
-	}
-
-	@Test
 	public void testMultiplyScalesWithSizeOnlyAtV1() {
-		// The DoS the version gate closes: on v0, linear (max-size) cost cannot distinguish
-		// big*small from big*big, so big-integer multiplication is charged like a cheap one.
+		// The DoS the version gate closes: on v0 (genesis, pinned explicitly), linear
+		// (max-size) cost cannot distinguish big*small from big*big, so big-integer
+		// multiplication is charged like a cheap one.
 		String big = "70000000000000000000000000000000000000000000000000000000000000000000";
-		assertEquals(juice("(* " + big + " 7)"), juice("(* " + big + " " + big + ")"),
+		Context v0 = context().withState(InitTest.STATE);
+		assertEquals(juice(v0, "(* " + big + " 7)"), juice(v0, "(* " + big + " " + big + ")"),
 				"v0 multiply cost must not scale with the second operand (linear only)");
 
-		// v1+: cost scales with BOTH operands (the O(n*m) term), closing the DoS.
-		Context v1 = context().withState(InitTest.UPGRADED);
-		long bigSmall = juice(v1, "(* " + big + " 7)");
-		long bigBig   = juice(v1, "(* " + big + " " + big + ")");
+		// v1+ (the class default state): cost scales with BOTH operands (the O(n*m)
+		// term), closing the DoS.
+		long bigSmall = juice("(* " + big + " 7)");
+		long bigBig   = juice("(* " + big + " " + big + ")");
 		assertTrue(bigBig > bigSmall,
 				"v1 multiply should scale with both operands (bigBig=" + bigBig + " bigSmall=" + bigSmall + ")");
 
 		// +/- deliberately stay linear-only on both versions (their work genuinely is
 		// linear): adding two big integers is far cheaper than multiplying them at v1.
-		assertTrue(juice(v1, "(+ " + big + " " + big + ")") < bigBig,
+		assertTrue(juice("(+ " + big + " " + big + ")") < bigBig,
 				"addition should be cheaper than multiplication for big integers at v1");
 	}
 }

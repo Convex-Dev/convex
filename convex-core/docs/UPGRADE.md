@@ -440,6 +440,22 @@ Ordered so each step is independently testable and the genesis-affecting change 
 
 Follow the project testing conventions: no `sleep`s and no fixed ports — wait on real signals (futures / sync APIs); a missing waitable is an API gap in the main code, not a reason to sleep.
 
+### Default test state policy
+
+Tests run against the **latest target migration state** by default — genesis with all
+migrations applied, at protocol version `MAX_VERSION` (`InitTest.UPGRADED` /
+`BaseTest.UPGRADED`; the `ACVMTest` default, and the state the shared peer test
+network launches on). These are the semantics every network will have once upgraded,
+so they are what libraries, actors and integration paths must be tested against.
+
+Genesis (protocol version 0) is pinned explicitly and only where genesis is the
+point: init/genesis-hash invariants, replay from genesis (`SnapshotStateTest`),
+behaviour that must hold from inception, and the intended-diff contrast tests
+(`MigrationFixesTest`). While the live network's protocol version differs from the
+latest target, the core behavioural suite runs on both (`CoreGenesisTest` /
+`CoreUpgradedTest`) as the non-interference check; full suites are **not** run
+against intermediate historical protocol versions.
+
 ## Risks
 
 - **Migration purity.** A single impure migration forks the network. Mitigate with narrow, audited migrations, the purity contract, and the determinism tests.

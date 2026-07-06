@@ -58,7 +58,7 @@ import convex.test.Samples;
 public class CompilerTest extends ACVMTest {
 
 	protected CompilerTest() {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	@Test

@@ -60,9 +60,11 @@ public class InitTest extends ACVMTest {
 
 	/**
 	 * Standard genesis state with all network upgrades applied, at the latest
-	 * protocol version ({@link convex.core.cvm.Migrations#MAX_VERSION}). Use this
-	 * to test behaviour introduced by migrations (e.g. bug fixes) that is not yet
-	 * present in genesis. See UPGRADE.md.
+	 * target protocol version ({@link convex.core.cvm.Migrations#MAX_VERSION}).
+	 * This is the default test state ({@link convex.core.lang.ACVMTest}): tests
+	 * run against the semantics every network will have once upgraded. Use
+	 * {@link #STATE} only for behaviour that must hold from inception. See
+	 * UPGRADE.md.
 	 */
 	public static final State UPGRADED = convex.core.cvm.Migrations.applyAll(STATE);
 

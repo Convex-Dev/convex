@@ -2,7 +2,6 @@ package convex.core.lang;
 
 import java.io.IOException;
 
-import convex.core.cvm.Migrations;
 import convex.core.init.BaseTest;
 
 /**
@@ -22,6 +21,6 @@ import convex.core.init.BaseTest;
 public class CoreUpgradedTest extends CoreTest {
 
 	public CoreUpgradedTest() throws IOException {
-		super(Migrations.applyAll(BaseTest.STATE));
+		super(BaseTest.UPGRADED);
 	}
 }

@@ -27,7 +27,7 @@ public class TrustTest extends ACVMTest {
 	private Address trusted;
 
 	protected TrustTest() throws IOException {
-		super(BaseTest.STATE);
+		super(BaseTest.UPGRADED);
 	}
 
 	@Override protected Context buildContext(Context ctx) {

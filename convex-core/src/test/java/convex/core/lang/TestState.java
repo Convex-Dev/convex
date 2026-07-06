@@ -43,7 +43,7 @@ public class TestState {
 
 
 	static {
-		State s = InitTest.STATE;
+		State s = InitTest.UPGRADED;
 		Context ctx = Context.create(s, InitTest.HERO);
 		for (int i = 0; i < NUM_CONTRACTS; i++) {
 			// Construct code for each contract

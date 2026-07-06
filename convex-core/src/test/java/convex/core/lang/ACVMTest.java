@@ -75,10 +75,20 @@ public abstract class ACVMTest {
 	}
 
 	/**
-	 * Default Constructor uses standard testing Genesis State
+	 * Default Constructor uses the standard upgraded test State: genesis with all
+	 * network migrations applied, at the latest target protocol version.
+	 *
+	 * <p>Policy: tests run against the latest target migration state by default —
+	 * the semantics every network will have once upgraded. Pass an explicit State
+	 * only with a reason: genesis ({@link InitTest#STATE} / {@code BaseTest.STATE})
+	 * for behaviour that must hold from inception (init invariants, replay,
+	 * migration contrast tests), or a custom state for specialised setups. Full
+	 * suites are not run against intermediate historical protocol versions; the
+	 * live-vs-target contrast for core behaviour is covered by CoreGenesisTest /
+	 * CoreUpgradedTest while they differ. See UPGRADE.md.</p>
 	 */
 	protected ACVMTest() {
-		this(InitTest.STATE);
+		this(InitTest.UPGRADED);
 	}
 
 	protected Context context() {
