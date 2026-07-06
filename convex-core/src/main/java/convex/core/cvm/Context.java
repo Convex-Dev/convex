@@ -1775,7 +1775,7 @@ public class Context {
 					String msg;
 					if (ex instanceof ATrampoline) {
 						msg="attempt to recur or tail call outside of a function body";
-					} if (ex instanceof ReducedValue) {
+					} else if (ex instanceof ReducedValue) {
 						msg="reduced used outside of a reduce operation";
 					} else {
 						msg="Unhandled Exception with Code:"+ex.getCode();

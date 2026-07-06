@@ -63,6 +63,7 @@ import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Special;
+import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
@@ -2382,8 +2383,14 @@ public abstract class CoreTest extends ACVMTest {
 		// TODO: think about letrec?
 		assertDepthError(step("(do   (def f (fn [x] (recur (f x))))   (f 1))"));
 
-		// Recur on its own is an :EXCEPTION Error
-		assertError(ErrorCodes.EXCEPTION,step("(recur 1)"));
+		// Recur on its own is an :EXCEPTION Error with a descriptive message (#115)
+		{
+			Context ctx=step("(recur 1)");
+			assertError(ErrorCodes.EXCEPTION,ctx);
+			ErrorValue ev=(ErrorValue)ctx.getExceptional();
+			assertEquals("attempt to recur or tail call outside of a function body",
+					RT.jvm(ev.getMessage()));
+		}
 	}
 
 	@Test
