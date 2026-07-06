@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  *
  * <p>The list is append-only, forever: replay from genesis requires every historical
  * migration, so old migrations remain compiled into every future release. A release
- * supports protocol versions up to {@link #supportedVersion()}; a due version beyond
+ * supports protocol versions up to {@link #MAX_VERSION}; a due version beyond
  * that is a missing migration and causes the peer to withdraw from consensus.</p>
  */
 public class Migrations {

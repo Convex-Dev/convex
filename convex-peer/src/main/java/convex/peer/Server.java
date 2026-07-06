@@ -430,7 +430,7 @@ public class Server implements Closeable {
 	 *
 	 * <p>Non-blocking on the fast path: a single {@code queue.offer()} and return. If the
 	 * target queue is full, returns a pre-allocated retry predicate instead of an error —
-	 * the caller (typically {@link convex.net.impl.netty.NettyInboundHandler}) parks the
+	 * the caller (typically {@code NettyInboundHandler}) parks the
 	 * channel and lets the predicate block on a virtual thread until space is available.
 	 *
 	 * <p>SECURITY: Must anticipate malicious or malformed messages.
