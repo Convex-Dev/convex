@@ -40,8 +40,11 @@
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2026-06-22T16:46:48Z</project.build.outputTimestamp>
+		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
+		     notice in test output (at the cost of hiding e.g. multiple-provider warnings) -->
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
+			-Dslf4j.internal.verbosity=ERROR
 		</argLine>
 	</properties>
 
@@ -104,6 +107,24 @@
 
 				</plugins>
 			</build>
+		</profile>
+
+		<profile>
+			<!-- JDK 24+ warns on first sun.misc.Unsafe memory access (JEP 498), triggered in
+			     test JVMs by protobuf-java (transitive via Calcite/Avatica in convex-db).
+			     Suppress the warning; the flag only exists on JDK 23+, so gate by JDK version
+			     (CI builds on JDK 21 and never sees the warning). -->
+			<id>jdk24-quiet-unsafe-warnings</id>
+			<activation>
+				<jdk>[24,)</jdk>
+			</activation>
+			<properties>
+				<argLine>
+					--add-opens=java.base/java.util=ALL-UNNAMED
+					--sun-misc-unsafe-memory-access=allow
+					-Dslf4j.internal.verbosity=ERROR
+				</argLine>
+			</properties>
 		</profile>
 	</profiles>
 

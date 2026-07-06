@@ -86,7 +86,7 @@ public class CVMExecutor extends AThreadedComponent {
 			if (e.isRetryable()) {
 				// Peer-local (e.g. missing store data): resync-and-retry may succeed with no
 				// release change, so do NOT freeze. The loop retries on subsequent iterations.
-				log.warn("Upgrade to protocol version {} could not be applied due to a local condition; will retry",
+				Server.upgradeLog.warn("Upgrade to protocol version {} could not be applied due to a local condition; will retry",
 						e.getVersion(), e);
 			} else {
 				// Deterministic: this release cannot proceed. Freeze consensus (executor and
@@ -121,7 +121,7 @@ public class CVMExecutor extends AThreadedComponent {
 		}
 		long now = Utils.getCurrentTimestamp();
 		if ((w.activation != lastWarnedActivation) || (now - lastWarnTime >= UPGRADE_WARN_INTERVAL)) {
-			log.warn("UPGRADE REQUIRED: protocol version {} is scheduled to activate at {} ({}), but this peer release supports version {}. Update the peer software before then, or this peer will withdraw from consensus at that time. See UPGRADE.md",
+			Server.upgradeLog.warn("UPGRADE REQUIRED: protocol version {} is scheduled to activate at {} ({}), but this peer release supports version {}. Update the peer software before then, or this peer will withdraw from consensus at that time. See UPGRADE.md",
 					w.version, w.activation, Instant.ofEpochMilli(w.activation), Migrations.MAX_VERSION);
 			lastWarnedActivation = w.activation;
 			lastWarnTime = now;

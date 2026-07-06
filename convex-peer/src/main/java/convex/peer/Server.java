@@ -90,6 +90,14 @@ public class Server implements Closeable {
 	
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
+	/**
+	 * Logger for protocol upgrade lifecycle events (scheduled upgrade warnings,
+	 * stake withdrawal, consensus halt). Kept separate from per-class loggers so
+	 * operators and test configurations can route or filter upgrade alerts
+	 * independently.
+	 */
+	static final Logger upgradeLog = LoggerFactory.getLogger("convex.peer.upgrade");
+
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
@@ -933,7 +941,7 @@ public class Server implements Closeable {
 		if (consensusHalt == null) {
 			consensusHalt = error;
 			consensusHaltFuture.complete(error);
-			log.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
+			upgradeLog.error("Peer consensus HALTED: upgrade to protocol version {} required but not supported by this release ({} supported). Update the peer software to rejoin. See UPGRADE.md",
 					error.getVersion(), Migrations.MAX_VERSION);
 		}
 	}
