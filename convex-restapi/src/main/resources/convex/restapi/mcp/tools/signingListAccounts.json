@@ -1,21 +1,26 @@
 {
   "name": "signingListAccounts",
   "title": "List Signing Accounts",
-  "description": "List signing keys and associated on-chain addresses for the authenticated identity.",
+  "description": "List signing keys for the authenticated identity. Pass resolve=true to also report the on-chain addresses controlled by each key (scans the account table, so opt-in).",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false
   },
   "inputSchema": {
     "type": "object",
-    "properties": {}
+    "properties": {
+      "resolve": {
+        "type": "boolean",
+        "description": "If true, resolve on-chain addresses whose account key matches each signing key (default false)"
+      }
+    }
   },
   "outputSchema": {
     "type": "object",
     "properties": {
       "accounts": {
         "type": "array",
-        "description": "Array of entries with publicKey and addresses[] for each signing key"
+        "description": "Array of entries with publicKey (and addresses[] when resolve=true) for each signing key"
       }
     }
   }
