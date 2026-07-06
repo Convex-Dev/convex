@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Peer: best-efforts stake withdrawal ahead of an unsupported network upgrade. A peer whose release cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window, so a withdrawn-but-still-staked cohort does not prevent the remaining upgraded peers from reaching supermajority. Guarded against removing the last viable peer; gated on `:auto-manage` (default on) (#597).
 - Lattice: write timestamps are injected through `LatticeContext` rather than read from the system clock inside lattice implementations (KV, Queue, P2P), so a driver- or test-supplied timestamp makes every write deterministic; the wall clock remains the fallback for standalone use (#561).
 - NodeServer: `setMergeContext` is configuration-time only and throws if called after launch — the context is published safely by thread start and can no longer change under an in-flight merge (#568).
+- Lattice: boundary cursors reworked onto a shared update-on-write base, adding structural JSON writes, generic write interception and `resolve()`; whole-value last-write-wins is decomposed into orthogonal lattice layers, and merges no longer re-encode unchanged values. The legacy `JSONValueLattice` (additive per-key JSON merge, superseded by `JSONLattice`) is removed.
+- CLI: a client command that connects to the production Protonet peer by default (`peer.convex.live`) now prints a one-line notice, so the default is never silent — override with `--host` or `CONVEX_HOST` (#582).
 
 ### Fixed
 
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `computeSupply` no longer subtracts the reward pool (account `#0` holds issued coins in transit to peers, not a burn or reserve), matching the CVM `coin-supply` definition of issued supply (#598).
 - Lattice queues/topics: partition index is computed with `floorMod`, so a key whose hash is `Long.MIN_VALUE` no longer produces a negative array index (#561).
 - `recur` outside a function or loop now reports its intended descriptive message ("attempt to recur or tail call outside of a function body") — a missing `else` had let the generic "Unhandled Exception" text overwrite it. Error code unchanged; replay hash unaffected (#115).
+- CLI: `key generate` always shows the BIP39 mnemonic (on stderr), even at verbosity `-v0` — previously it was silently discarded, and a lost mnemonic is unrecoverable (#583).
 
 ### Security
 
