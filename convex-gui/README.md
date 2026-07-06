@@ -42,7 +42,7 @@ This is expected for an unsigned build; signed/notarised installers are tracked 
 
 ## Building from Source
 
-**Requirements:** Java 21+, Maven 3.7+
+**Requirements:** Java 25+, Maven 3.7+
 
 ```bash
 git clone https://github.com/Convex-Dev/convex.git

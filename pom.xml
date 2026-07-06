@@ -27,9 +27,9 @@
 	</modules>
 
 	<properties>
-		<maven.compiler.release>21</maven.compiler.release>
-		<maven.compiler.source>21</maven.compiler.source>
-		<maven.compiler.target>21</maven.compiler.target>
+		<maven.compiler.release>25</maven.compiler.release>
+		<maven.compiler.source>25</maven.compiler.source>
+		<maven.compiler.target>25</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<logback.version>1.5.37</logback.version>
 		<jmh.version>1.37</jmh.version>
@@ -41,9 +41,14 @@
 		<!--Freeze this for reproducible builds. -->
 		<project.build.outputTimestamp>2026-07-06T17:26:36Z</project.build.outputTimestamp>
 		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
-		     notice in test output (at the cost of hiding e.g. multiple-provider warnings) -->
+		     notice in test output (at the cost of hiding e.g. multiple-provider warnings).
+		     sun-misc-unsafe-memory-access=allow suppresses the JEP 498 first-use warning
+		     for sun.misc.Unsafe memory access, triggered in test JVMs by protobuf-java
+		     (transitive via Calcite/Avatica in convex-db). Unconditional: the minimum JDK
+		     is 25, so the flag is always present and always understood. -->
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
+			--sun-misc-unsafe-memory-access=allow
 			-Dslf4j.internal.verbosity=ERROR
 		</argLine>
 	</properties>
@@ -109,23 +114,6 @@
 			</build>
 		</profile>
 
-		<profile>
-			<!-- JDK 24+ warns on first sun.misc.Unsafe memory access (JEP 498), triggered in
-			     test JVMs by protobuf-java (transitive via Calcite/Avatica in convex-db).
-			     Suppress the warning; the flag only exists on JDK 23+, so gate by JDK version
-			     (CI builds on JDK 21 and never sees the warning). -->
-			<id>jdk24-quiet-unsafe-warnings</id>
-			<activation>
-				<jdk>[24,)</jdk>
-			</activation>
-			<properties>
-				<argLine>
-					--add-opens=java.base/java.util=ALL-UNNAMED
-					--sun-misc-unsafe-memory-access=allow
-					-Dslf4j.internal.verbosity=ERROR
-				</argLine>
-			</properties>
-		</profile>
 	</profiles>
 
 	<build>

@@ -8,7 +8,7 @@ argument-hint: "[module] [--test]"
 
 # Build Convex
 
-Build the Convex Maven project. Requires Java 21+ and Maven 3.7+.
+Build the Convex Maven project. Requires Java 25+ and Maven 3.7+.
 
 ## Full build (skip tests)
 

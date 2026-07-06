@@ -21,7 +21,7 @@ convex local start
 
 ### Prerequisites
 
-Java 21+ is required. Download from [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or use your package manager.
+Java 25+ is required. Download from [Oracle JDK](https://www.oracle.com/java/technologies/downloads/) or use your package manager.
 
 ### Get the JAR
 
