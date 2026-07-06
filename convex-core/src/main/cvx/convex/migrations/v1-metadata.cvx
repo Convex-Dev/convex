@@ -13,7 +13,10 @@
 ;; accompanying test asserts only `:doc` changed for each symbol (see MigrationFixesTest).
 ;;
 ;; Scope: only genuine mistakes — docstrings whose claims are contradicted by the actual
-;; behaviour — not stylistic or completeness improvements.
+;; behaviour — not stylistic or completeness improvements. The final section is the one
+;; exception: it supplies the full metadata (including `:doc`) for the core bindings that
+;; v1 itself introduces, which cannot be documented in the genesis metadata source
+;; (metadata.cvx) because that is genesis state, frozen by hash.
 
 ;; address: hex strings are NOT valid arguments ((address "1234") => :CAST).
 (def ^{:doc {:description "Casts the argument to an Address. Valid arguments are a Long, an Address, or a Blob with the correct length (8 bytes)."
@@ -197,3 +200,46 @@
              :signature   [{:params [peer stake]}]}
        :static true}
   set-peer-stake)
+
+;; ---------------------------------------------------------------------------
+;; New v1 core bindings — full metadata, including :doc.
+;;
+;; schedule-upgrade / unschedule-upgrade / gensym are installed into the core
+;; environment by the v1 bootstrap (Java) step immediately before this file is
+;; evaluated, initially with :static metadata only. Their docstrings are applied
+;; here, by the same no-value-def mechanism as the corrections above.
+
+(def ^{:doc {:description ["Schedules a network upgrade: appends an activation timestamp (milliseconds, as per `*timestamp*`) to the network's upgrade vector. When the consensus timestamp reaches the activation, peers apply the corresponding protocol migration and increment the protocol version. Returns the protocol version the upgrade will produce."
+                          "Callable only by a governance account (an address below the core account #8). Activations must be in the future and in non-decreasing order. See UPGRADE.md in the peer distribution."]
+             :errors      {:TRUST    "If not called from a governance account."
+                           :CAST     "If the activation timestamp is not castable to a Long."
+                           :ARGUMENT "If the activation is not in the future, or is before the last scheduled upgrade."}
+             :examples    [{:code "(schedule-upgrade (+ *timestamp* 86400000))"}]
+             :signature   [{:params [activation]
+                            :return Long}]}
+       :static true}
+  schedule-upgrade)
+
+(def ^{:doc {:description ["Removes the last pending scheduled network upgrade, identified by the protocol version it would have produced — guarding against removing the wrong entry. Returns the activation timestamp of the removed upgrade."
+                          "An escape hatch for an upgrade that will not ship. Only the last scheduled upgrade may be removed, and only while it is still pending. Callable only by a governance account (an address below the core account #8)."]
+             :errors      {:TRUST    "If not called from a governance account."
+                           :CAST     "If the version is not castable to a Long."
+                           :ARGUMENT "If the version is not the last scheduled protocol version, or the upgrade has already been applied."}
+             :examples    [{:code "(unschedule-upgrade 2)"}]
+             :signature   [{:params [version]
+                            :return Long}]}
+       :static true}
+  unschedule-upgrade)
+
+(def ^{:doc {:description ["Returns a fresh Symbol, optionally with a name prefix (a Symbol, Keyword or String): `(gensym 'n)` yields e.g. `n__4821`. Intended for macros that introduce bindings into expansion templates, so generated bindings cannot capture user symbols."
+                          "Deterministic: the uniqueness counter is the juice consumed so far, so identical code on identical state yields identical symbols, while successive calls in a transaction always return distinct symbols."]
+             :errors      {:CAST     "If the prefix is not a Symbol, Keyword or String."
+                           :ARGUMENT "If the prefix is too long for a Symbol name."}
+             :examples    [{:code "(gensym)"}
+                           {:code "(gensym 'foo)"}]
+             :signature   [{:params []
+                            :return Symbol}
+                           {:params [prefix]
+                            :return Symbol}]}
+       :static true}
+  gensym)

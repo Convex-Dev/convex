@@ -308,6 +308,23 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testNewBindingMetadata() {
+		// The bindings v1 introduces carry full metadata: :doc applied by the metadata
+		// step, :static from the bootstrap step (wholesale-replaced, so both must hold)
+		for (String s : new String[] { "schedule-upgrade", "unschedule-upgrade", "gensym" }) {
+			assertNull(eval(GENESIS, "(lookup-meta '" + s + ")"), () -> s + " must not exist at genesis");
+			assertEquals(convex.core.data.prim.CVMBool.TRUE,
+					eval(UPGRADED, "(boolean (:description (:doc (lookup-meta '" + s + "))))"),
+					() -> "no :doc description for " + s);
+			assertEquals(convex.core.data.prim.CVMBool.TRUE,
+					eval(UPGRADED, "(:static (lookup-meta '" + s + "))"),
+					() -> ":static not preserved for " + s);
+		}
+		// `doc` works on the upgraded state as a user would call it
+		assertFalse(evalErrors(UPGRADED, "(assert (:description (doc gensym)))"));
+	}
+
+	@Test
 	public void testDocsPreserved() {
 		// The migration redefines via defn with metadata, so docstrings survive
 		assertFalse(evalErrors(UPGRADED, "(assert (:doc (lookup-meta 'update)))"));

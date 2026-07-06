@@ -110,7 +110,8 @@ public class Migrations {
 	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} /
 	 * {@code gensym} core bindings (CoreFn singletons, marked {@code :static};
 	 * these cannot be defined in Lisp), enabling future upgrades to be scheduled
-	 * on-chain and macros to introduce hygienic bindings; and</li>
+	 * on-chain and macros to introduce hygienic bindings — their {@code :doc}
+	 * metadata is applied by the metadata step below; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections) and #528 ({@code add-mint} in the
 	 * {@code convex.fungible} library).</li>
@@ -141,6 +142,8 @@ public class Migrations {
 			env = env.assoc(Symbols.GENSYM, Core.GENSYM);
 
 			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
+			// :static only here; full metadata including :doc is applied by META_FIXES,
+			// which needs these env values to exist before its no-value defs run
 			AHashMap<ACell, ACell> staticMeta = Maps.of(Keywords.STATIC, CVMBool.TRUE);
 			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
