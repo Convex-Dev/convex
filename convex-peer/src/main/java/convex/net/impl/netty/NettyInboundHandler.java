@@ -231,7 +231,15 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 				});
 			}
 		} catch (Throwable e) {
-			log.warn("Inbound message handling error: {}",e.getMessage());
+			if (e instanceof BadFormatException) {
+				// Malformed input from a remote client is an expected event on a
+				// public port (exceptionCaught closes the channel); debug level so
+				// hostile clients cannot spam the operator log. Sustained abuse is
+				// surfaced by the #566 circuit-breaker instead.
+				log.debug("Rejecting malformed inbound message: {}",e.getMessage());
+			} else {
+				log.warn("Inbound message handling error: {}",e.getMessage());
+			}
 			throw e;
 		}
 	}

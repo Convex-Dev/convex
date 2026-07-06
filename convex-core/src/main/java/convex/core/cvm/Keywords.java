@@ -108,6 +108,7 @@ public class Keywords {
 
 
 	public static final Keyword OUTGOING_CONNECTIONS = Keyword.intern("outgoing-connections");
+	public static final Keyword MAX_CONNECTIONS = Keyword.intern("max-connections");
 	public static final Keyword AUTO_MANAGE = Keyword.intern("auto-manage");
 	public static final Keyword TIMEOUT = Keyword.intern("timeout");
 	public static final Keyword EVENT_HOOK = Keyword.intern("event-hook");
