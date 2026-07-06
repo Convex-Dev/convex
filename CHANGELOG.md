@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `update` / `update-in` now apply all arguments in their 5-or-more argument arities (previously the first extra argument was dropped, and `update-in`'s variadic arity errored). Activates at protocol v1 (#533).
+- `update` / `update-in` now apply all arguments in their 5-or-more argument arities (previously the first extra argument was dropped, and `update-in`'s variadic arity errored). Activates at protocol v1. Reported and first fixed by @jeroenvandijk (#533, #534).
 - `convex.fungible` `add-mint` allows unlimited minting when `:max-supply` is unspecified, instead of defaulting the cap to zero and blocking all mints. Activates at protocol v1 (#528).
 - Convex Lisp correctness fixes, activating at protocol v1: quasiquote of sets/maps containing unquotes now produces the set/map rather than a call-form list; a top-level `` `~false `` yields `false`; `define` no longer evaluates its value twice; `call` with the wrong number of arguments is an `:ARITY` error instead of silently expanding to `nil`; and `dotimes` accepts any count expression, not only a literal (#598).
 - `for`, `for-loop` and `switch` no longer capture user bindings that collide with their internal loop variables (macro hygiene). Activates at protocol v1 (#602).
