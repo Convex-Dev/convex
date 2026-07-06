@@ -1,8 +1,12 @@
 # Convex Network Upgrades
 
-Design for applying version upgrades to a running Convex network without breaking chain identity or consensus. Covers both the governing principles and the concrete implementation design.
+Design for applying protocol upgrades to a running Convex network without breaking network identity or consensus. Covers both the governing principles and the concrete implementation design.
 
 **Tracking issue:** [#413 — Protocol upgrade vector](https://github.com/Convex-Dev/convex/issues/413)
+
+## Terminology
+
+Throughout this document and the codebase, **"version" means the on-chain protocol version** (`State.getProtocolVersion()`), counted from `0` at genesis. **"vN" names the migration producing protocol version N** — migrations are positional (`Migrations.get(k)` produces version `k+1`) and the version number is their identity. Protocol versions are independent of **software release versions** (e.g. `0.8.7`): a release *supports* protocol versions up to `Migrations.MAX_VERSION`, and several releases may support the same protocol version. Operator-facing messages always say "protocol version" explicitly.
 
 **Dependent issues** (cannot be fixed without this mechanism, because a naive fix changes the genesis hash):
 
@@ -13,7 +17,7 @@ Design for applying version upgrades to a running Convex network without breakin
 
 ## Motivation
 
-The Convex network must evolve. CVM semantics, core functions, encoding rules, juice costs, consensus parameters, and on-chain libraries all need room to improve after launch. A naive approach — simply change the code — breaks the network: peers running different versions compute different states, diverge from consensus, and the chain forks.
+The Convex network must evolve. CVM semantics, core functions, encoding rules, juice costs, consensus parameters, and on-chain libraries all need room to improve after launch. A naive approach — simply change the code — breaks the network: peers running different versions compute different states, diverge from consensus, and the network forks.
 
 We need a mechanism that:
 
@@ -305,13 +309,13 @@ The cause is carried on the `UpgradeError`, so the peer layer selects freeze-unt
 
 ### Early detection
 
-The schedule is consensus state and `MAX_VERSION` is a local constant, so the moment a scheduling transaction naming a version beyond this release lands, the peer already knows it will withdraw at that activation. It should act then, not at the boundary: warn the operator ("upgrade to version N scheduled at T; this release supports M; update before T"), and it is here — with lead time — that best-efforts stake withdrawal belongs.
+The schedule is consensus state and `MAX_VERSION` is a local constant, so the moment a scheduling transaction naming a version beyond this release lands, the peer already knows it will withdraw at that activation. It should act then, not at the boundary: warn the operator ("upgrade to protocol version N scheduled at T; this release supports M; update before T"), and it is here — with lead time — that best-efforts stake withdrawal belongs.
 
 ### Attestation (advisory)
 
 Peers advertise the highest protocol version their release supports — the length of the migration list — piggy-backed on status/handshake. This makes *readiness* visible before activation: operators can see what fraction of stake can apply a scheduled version and defer a planned activation if readiness is low. Attestation is advisory only — the binding signal is the on-chain schedule.
 
-A peer should also warn its own operator **as soon as** the on-chain schedule contains a version beyond its supported version — "upgrade to version N scheduled at T; this release supports N-1; update before T" — rather than waiting to withdraw at the boundary.
+A peer should also warn its own operator **as soon as** the on-chain schedule contains a version beyond its supported version — "upgrade to protocol version N scheduled at T; this release supports N-1; update before T" — rather than waiting to withdraw at the boundary.
 
 ## Security: withdrawal as an attack surface
 

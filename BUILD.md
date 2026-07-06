@@ -90,7 +90,7 @@ As part of the same version-bump commit, also update:
   lockstep, otherwise onboarding goes stale:
   - **`design`** — `convex-java` Maven/Gradle coordinates and `releases/download/<version>/convex.jar`
     URLs under `docs/tutorial/**` (note: release tags have **no** `v` prefix).
-  - **`convex.world`** — the protocol version in `src/components/Footer.tsx`.
+  - **`convex.world`** — the displayed release version in `src/components/Footer.tsx` (the software release, e.g. `v0.8.7` — not to be confused with the on-chain protocol version).
 
 ### 5. Rebuild and smoke test the built jar
 

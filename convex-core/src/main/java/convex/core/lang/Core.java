@@ -1107,7 +1107,7 @@ public class Core {
 			AVector<CVMLong> ups = s.getUpgradeVector();
 			long n = ups.count();
 			if ((n == 0) || (version.longValue() != n)) {
-				return context.withArgumentError("unschedule-upgrade requires the last scheduled version" + ((n == 0) ? " (nothing scheduled)" : " (" + n + ")"));
+				return context.withArgumentError("unschedule-upgrade requires the last scheduled protocol version" + ((n == 0) ? " (nothing scheduled)" : " (" + n + ")"));
 			}
 			if (s.getProtocolVersion() >= n) {
 				return context.withArgumentError("Cannot unschedule an applied upgrade");

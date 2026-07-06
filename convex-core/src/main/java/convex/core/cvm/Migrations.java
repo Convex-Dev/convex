@@ -101,7 +101,7 @@ public class Migrations {
 	}
 
 	/**
-	 * v1 — the genesis upgrade. A network at version 0 upgrades to version 1 in a
+	 * v1 — the genesis upgrade. A network at protocol version 0 upgrades to protocol version 1 in a
 	 * single step that both installs the mechanism and fixes every bug known at
 	 * this point, so activating the upgrade mechanism brings a network fully up to
 	 * date without leaving known bugs for a later upgrade. Specifically it:
@@ -203,8 +203,8 @@ public class Migrations {
 	 * migration's fixes). Production networks reach the same state via on-chain
 	 * scheduling; genesis itself is never modified. See UPGRADE.md.</p>
 	 *
-	 * @param state Starting State (typically genesis at version 0)
-	 * @return Fully upgraded State at version MAX_VERSION
+	 * @param state Starting State (typically genesis at protocol version 0)
+	 * @return Fully upgraded State at protocol version MAX_VERSION
 	 */
 	public static State applyAll(State state) {
 		long ts = state.getTimestamp().longValue();

@@ -574,7 +574,7 @@ public class TransactionHandler extends AThreadedComponent {
 
 		// Never the last viable peer
 		if (!leavesAnotherViablePeer(s, peerKey)) {
-			Server.upgradeLog.warn("Not auto-withdrawing stake before upgrade to version {}: no other viable peer, so the network is already non-viable. Freezing at the boundary instead.", w.version);
+			Server.upgradeLog.warn("Not auto-withdrawing stake before upgrade to protocol version {}: no other viable peer, so the network is already non-viable. Freezing at the boundary instead.", w.version);
 			withdrawalQueued = true;
 			return false;
 		}
@@ -585,7 +585,7 @@ public class TransactionHandler extends AThreadedComponent {
 		AccountStatus as = s.getAccount(controller);
 		if ((as == null) || !Cells.equals(peerKey, as.getAccountKey())) return false;
 
-		Server.upgradeLog.warn("Best-efforts: withdrawing peer stake ahead of unsupported upgrade to version {} scheduled at {}", w.version, w.activation);
+		Server.upgradeLog.warn("Best-efforts: withdrawing peer stake ahead of unsupported upgrade to protocol version {} scheduled at {}", w.version, w.activation);
 		ACell message = Reader.read(String.format("(set-peer-stake %s 0)", peerKey));
 		ATransaction transaction = Invoke.create(controller, as.getSequence()+1, message);
 		newTransactions.add(p.getKeyPair().signData(transaction));

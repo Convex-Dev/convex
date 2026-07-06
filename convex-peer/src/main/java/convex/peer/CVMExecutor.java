@@ -121,7 +121,7 @@ public class CVMExecutor extends AThreadedComponent {
 		}
 		long now = Utils.getCurrentTimestamp();
 		if ((w.activation != lastWarnedActivation) || (now - lastWarnTime >= UPGRADE_WARN_INTERVAL)) {
-			Server.upgradeLog.warn("UPGRADE REQUIRED: protocol version {} is scheduled to activate at {} ({}), but this peer release supports version {}. Update the peer software before then, or this peer will withdraw from consensus at that time. See UPGRADE.md",
+			Server.upgradeLog.warn("UPGRADE REQUIRED: protocol version {} is scheduled to activate at {} ({}), but this peer release supports protocol version {}. Update the peer software before then, or this peer will withdraw from consensus at that time. See UPGRADE.md",
 					w.version, w.activation, Instant.ofEpochMilli(w.activation), Migrations.MAX_VERSION);
 			lastWarnedActivation = w.activation;
 			lastWarnTime = now;
