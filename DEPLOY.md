@@ -8,7 +8,7 @@ This guide assumes you want to run a Convex peer on an internet-accessible Linux
 
 Install JDK according to your system instruction. 
 
-Requires Java 25 or later (the build targets Java 25 bytecode).
+JDK 25 is recommended (and used for CI and Docker images), but everything runs on Java 21+.
 
 
 ### Obtain convex.jar

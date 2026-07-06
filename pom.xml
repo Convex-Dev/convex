@@ -27,9 +27,13 @@
 	</modules>
 
 	<properties>
-		<maven.compiler.release>25</maven.compiler.release>
-		<maven.compiler.source>25</maven.compiler.source>
-		<maven.compiler.target>25</maven.compiler.target>
+		<!-- Bytecode target = the consumer floor: 21-targeted classes run on any JRE 21+,
+		     keeping convex-java and the other library modules usable by downstream apps on
+		     the current LTS. We build/test/ship (CI, Docker) on JDK 25; 21 bytecode runs
+		     forward-compatibly on 25. Independent knob from the build JDK. -->
+		<maven.compiler.release>21</maven.compiler.release>
+		<maven.compiler.source>21</maven.compiler.source>
+		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<logback.version>1.5.37</logback.version>
 		<jmh.version>1.37</jmh.version>
@@ -42,13 +46,10 @@
 		<project.build.outputTimestamp>2026-07-06T17:26:36Z</project.build.outputTimestamp>
 		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
 		     notice in test output (at the cost of hiding e.g. multiple-provider warnings).
-		     sun-misc-unsafe-memory-access=allow suppresses the JEP 498 first-use warning
-		     for sun.misc.Unsafe memory access, triggered in test JVMs by protobuf-java
-		     (transitive via Calcite/Avatica in convex-db). Unconditional: the minimum JDK
-		     is 25, so the flag is always present and always understood. -->
+		     The sun.misc.Unsafe suppression flag is JDK-version-gated in a profile below,
+		     since it does not exist on JDK 21 (a supported build JDK). -->
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
-			--sun-misc-unsafe-memory-access=allow
 			-Dslf4j.internal.verbosity=ERROR
 		</argLine>
 	</properties>
@@ -114,6 +115,24 @@
 			</build>
 		</profile>
 
+		<profile>
+			<!-- JDK 24+ warns on first sun.misc.Unsafe memory access (JEP 498), triggered in
+			     test JVMs by protobuf-java (transitive via Calcite/Avatica in convex-db).
+			     The suppression flag only exists on JDK 23+, so gate by JDK version: the
+			     build still works on JDK 21 (the bytecode target), while CI and Docker run
+			     on JDK 25 where this profile activates. -->
+			<id>jdk24-quiet-unsafe-warnings</id>
+			<activation>
+				<jdk>[24,)</jdk>
+			</activation>
+			<properties>
+				<argLine>
+					--add-opens=java.base/java.util=ALL-UNNAMED
+					--sun-misc-unsafe-memory-access=allow
+					-Dslf4j.internal.verbosity=ERROR
+				</argLine>
+			</properties>
+		</profile>
 	</profiles>
 
 	<build>

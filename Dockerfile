@@ -2,9 +2,10 @@
 
 #######################################
 # Build stage
-# JDK pinned to match CI (build.yml / release.yml test on JDK 25): the image must
-# run on the same JDK the release pipeline tested. Bump together with CI and the
-# maven.compiler.release in pom.xml.
+# JDK matches CI (build.yml / release.yml run on JDK 25), so the peer image runs
+# the exact JDK the pipeline tested. The project targets Java 21 bytecode
+# (maven.compiler.release=21) for library reach, which runs forward-compatibly on
+# this JDK 25. Bump together with CI.
 FROM maven:3.9.15-eclipse-temurin-25 AS build
 WORKDIR /build
 
