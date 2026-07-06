@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NodeServer: a configurable inbound value-size limit (`:maxInboundValueSize` in `NodeConfig`, default the transport message cap) — an oversized `LATTICE_VALUE` is rejected before its merge runs on the receive thread, bounding merge cost from untrusted peers. Set it below the transport cap when exposing a node to untrusted peers (#564).
 - NodeServer: per-connection inbound statistics (`getInboundStats()`) with a circuit-breaker — a connection is closed after a configurable number of consecutive rejected or undecodable messages (`:maxConsecutiveRejects`, default 100; 0 disables), so sustained abuse costs the sender its connection while a single accepted merge resets the streak (#566).
 - NodeServer: a configured public URL is validated at launch (scheme/host/port required; loopback, private-range and link-local IP literals rejected), so a misconfigured node fails fast instead of advertising an unreachable address into the signed node registry. `:allowPrivateURL` opts out for dev networks with intentional private addressing (#567).
+- Peer: the maximum number of inbound client connections is configurable (`:max-connections`, default 1024) — previously a fixed compile-time cap (#482).
+- MCP: `signingListAccounts` can resolve the on-chain addresses controlled by each signing key (pass `resolve=true`; opt-in because it scans the account table) (#551).
+- MCP: configurable Origin allow-list (`mcp.allowedOrigins`) — requests carrying a different Origin are rejected with 403, giving localhost and private deployments the DNS-rebinding protection the MCP spec requires. Public peers keep the allow-all default (#552).
+- Developer experience: Maven wrapper (`./mvnw`) and `.editorconfig`, so builds and editor settings work out of the box without a local Maven install (#581).
 
 ### Changed
 
@@ -36,12 +40,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - LatticePropagator: a clean shutdown could silently lose the final lattice value — the propagation loop could observe the stop flag and exit in the instant before the value was queued, so `close()` returned without persisting the most recent writes. The closing thread now drains and processes anything left in the trigger queue after the loop exits, making shutdown a durability guarantee point in every interleaving.
 - `computeSupply` no longer subtracts the reward pool (account `#0` holds issued coins in transit to peers, not a burn or reserve), matching the CVM `coin-supply` definition of issued supply (#598).
 - Lattice queues/topics: partition index is computed with `floorMod`, so a key whose hash is `Long.MIN_VALUE` no longer produces a negative array index (#561).
+- `recur` outside a function or loop now reports its intended descriptive message ("attempt to recur or tail call outside of a function body") — a missing `else` had let the generic "Unhandled Exception" text overwrite it. Error code unchanged; replay hash unaffected (#115).
 
 ### Security
 
 - NodeServer: inbound lattice values from untrusted peers are handled defensively. Wrong-type values are explicitly rejected leaving state unchanged (#562); merge failures — including engineered `StackOverflowError` from adversarially deep structures (DLFS nodes among them) — are contained rather than allowed to kill the receive thread (#561); and malformed KV entries are rejected at validation instead of poisoning later store-wide reads (#561).
 - Lattice: container lattices (Owner, Keyed, Map, Index, Topic) now route foreign entries through per-child validation even when merging into an empty region — previously a single message to a fresh node or unpopulated sub-path could commit a wrong-typed child (permanently blocking that slot) or, for owner-signed lattices, seed forged entries bypassing signature verification (#561).
 - Convex DB: the Postgres wire decoder validates frame lengths and count fields before allocation, closing a pre-authentication denial of service — a client could previously declare a near-2GB frame length and force unbounded buffering, or supply negative/oversized counts causing crashes on the receive path. Malformed frames now close the connection. Contributed by @PrazwalR (#596).
+- MCP: seed-carrying tools (`transact`, `sign`, `signAndSubmit`, `transfer`, `keyGen` with a supplied seed, `signingImportKey`) refuse cleartext HTTP from non-loopback clients, so a misconfigured peer can no longer silently accept Ed25519 seeds in transit. HTTPS (directly or via `X-Forwarded-Proto` from a TLS-terminating proxy) is required; `allowHttpSeeds` opts out for trusted private networks (#554).
+- Peer transport: malformed-frame rejections are logged at debug rather than WARN, so a hostile client cannot spam the operator log; oversized declared frame lengths are covered by a server-level test (#41).
 
 ## [0.8.6] - 2026-06-22
 
