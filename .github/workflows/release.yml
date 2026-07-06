@@ -59,7 +59,7 @@ jobs:
         run: |
           # skipNotDeployed=false: the plugin otherwise skips every module because
           # deploy is skipped outside the Maven Central publishing profile
-          mvn -B -DskipTests -Dcyclonedx.skipNotDeployed=false org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom
+          mvn -B -DskipTests -Dcyclonedx.skipNotDeployed=false org.cyclonedx:cyclonedx-maven-plugin:2.9.2:makeAggregateBom
           cp target/CycloneDX-Sbom.json "convex-${{ github.ref_name }}-sbom.json"
           (cd convex-integration/target && sha256sum convex.jar > convex.jar.sha256)
 
