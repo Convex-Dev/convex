@@ -82,10 +82,13 @@ public abstract class ACVMTest {
 	 * the semantics every network will have once upgraded. Pass an explicit State
 	 * only with a reason: genesis ({@link InitTest#STATE} / {@code BaseTest.STATE})
 	 * for behaviour that must hold from inception (init invariants, replay,
-	 * migration contrast tests), or a custom state for specialised setups. Full
-	 * suites are not run against intermediate historical protocol versions; the
-	 * live-vs-target contrast for core behaviour is covered by CoreGenesisTest /
-	 * CoreUpgradedTest while they differ. See UPGRADE.md.</p>
+	 * migration contrast tests); LIVE ({@code InitTest.LIVE} / {@code BaseTest.LIVE},
+	 * the live network's current protocol version) for behaviour that must match
+	 * what live peers run today; or a custom state for specialised setups. Full
+	 * suites are not run against historical protocol versions that are neither
+	 * live nor target. Core behavioural coverage: CoreGenesisTest (inception,
+	 * permanent), CoreLiveTest (live, self-enabled while intermediate),
+	 * CoreUpgradedTest (target). See UPGRADE.md.</p>
 	 */
 	protected ACVMTest() {
 		this(InitTest.UPGRADED);

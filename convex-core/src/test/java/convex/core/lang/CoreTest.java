@@ -117,9 +117,11 @@ import convex.test.Samples;
 @TestInstance(Lifecycle.PER_CLASS)
 /**
  * Behavioural suite for the CVM core. Parameterized by the initial State so the
- * same tests can run against genesis ({@link CoreGenesisTest}) and against the
- * fully-upgraded state ({@link CoreUpgradedTest}) — the latter verifying that
- * network migrations change no behaviour outside their intended fixes.
+ * same tests can run against genesis ({@link CoreGenesisTest}, permanent
+ * from-inception coverage), the live network's protocol version
+ * ({@link CoreLiveTest}, active while live is an intermediate version) and the
+ * fully-upgraded target state ({@link CoreUpgradedTest}) — the latter verifying
+ * that network migrations change no behaviour outside their intended fixes.
  */
 public abstract class CoreTest extends ACVMTest {
 

@@ -442,19 +442,29 @@ Follow the project testing conventions: no `sleep`s and no fixed ports — wait 
 
 ### Default test state policy
 
-Tests run against the **latest target migration state** by default — genesis with all
-migrations applied, at protocol version `MAX_VERSION` (`InitTest.UPGRADED` /
-`BaseTest.UPGRADED`; the `ACVMTest` default, and the state the shared peer test
-network launches on). These are the semantics every network will have once upgraded,
-so they are what libraries, actors and integration paths must be tested against.
+Three test-state roles, each answering a different question:
 
-Genesis (protocol version 0) is pinned explicitly and only where genesis is the
-point: init/genesis-hash invariants, replay from genesis (`SnapshotStateTest`),
-behaviour that must hold from inception, and the intended-diff contrast tests
-(`MigrationFixesTest`). While the live network's protocol version differs from the
-latest target, the core behavioural suite runs on both (`CoreGenesisTest` /
-`CoreUpgradedTest`) as the non-interference check; full suites are **not** run
-against intermediate historical protocol versions.
+- **Target** (`InitTest.UPGRADED` / `BaseTest.UPGRADED`, protocol version
+  `MAX_VERSION`) — the semantics every network will have once upgraded. The
+  `ACVMTest` **default**: libraries, actors and CVM behaviour are tested against
+  where the network is going.
+- **LIVE** (`InitTest.LIVE` / `BaseTest.LIVE`, protocol version
+  `Migrations.LIVE_VERSION`) — the semantics live peers are running **today**.
+  This is the release gate that stops a release breaking live servers before they
+  upgrade. The shared peer test network (`TestNetwork`) launches on it, and
+  `CoreLiveTest` runs the core behavioural suite on it while it is an intermediate
+  version. **Bump `Migrations.LIVE_VERSION` when — and only when — the live
+  network applies an upgrade**; everything pinned to LIVE follows automatically.
+- **Genesis** (`InitTest.STATE` / `BaseTest.STATE`, protocol version 0) — pinned
+  explicitly where genesis is the point: init/genesis-hash invariants, replay from
+  genesis (`SnapshotStateTest`), behaviour that must hold from inception
+  (`CoreGenesisTest`, permanent), and the intended-diff contrast tests
+  (`MigrationFixesTest`).
+
+Currently LIVE == genesis (the live network has not yet upgraded), so `CoreLiveTest`
+is self-disabled as a duplicate of `CoreGenesisTest`; it activates automatically if
+`LIVE_VERSION` is ever strictly between genesis and `MAX_VERSION`. Full suites are
+**not** run against historical protocol versions that are neither live nor target.
 
 ## Risks
 

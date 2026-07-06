@@ -68,6 +68,14 @@ public class InitTest extends ACVMTest {
 	 */
 	public static final State UPGRADED = convex.core.cvm.Migrations.applyAll(STATE);
 
+	/**
+	 * Standard test state at the live network's current protocol version
+	 * ({@link convex.core.cvm.Migrations#LIVE_VERSION}). Currently identical to
+	 * genesis {@link #STATE}; diverges once the live network upgrades. Use for
+	 * tests that must match what live peers are running today.
+	 */
+	public static final State LIVE = convex.core.cvm.Migrations.applyTo(STATE, convex.core.cvm.Migrations.LIVE_VERSION);
+
 
 	public static State createState() {
 		try {
@@ -86,6 +94,22 @@ public class InitTest extends ACVMTest {
 
 	protected InitTest() {
 		super(STATE);
+	}
+
+	@Test
+	public void testLiveState() {
+		// LIVE_VERSION is a release-maintained fact about the live network: it must
+		// be a version this release can build, and LIVE must actually be at it
+		assertTrue(convex.core.cvm.Migrations.LIVE_VERSION >= 0);
+		assertTrue(convex.core.cvm.Migrations.LIVE_VERSION <= convex.core.cvm.Migrations.MAX_VERSION);
+		assertEquals(convex.core.cvm.Migrations.LIVE_VERSION, LIVE.getProtocolVersion());
+		// While the live network is at genesis, LIVE is bit-identical to genesis
+		// (applyTo returns the same instance) — delete this assertion when bumping
+		if (convex.core.cvm.Migrations.LIVE_VERSION == 0) {
+			assertSame(STATE, LIVE);
+		}
+		// The target state is always at MAX_VERSION
+		assertEquals(convex.core.cvm.Migrations.MAX_VERSION, UPGRADED.getProtocolVersion());
 	}
 
 	@Test

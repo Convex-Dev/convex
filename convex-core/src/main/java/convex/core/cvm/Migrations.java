@@ -185,6 +185,18 @@ public class Migrations {
 	public static final long MAX_VERSION = ALL.size();
 
 	/**
+	 * Protocol version of the live Convex network (Protonet) as of this release.
+	 * Bump this when the live network applies an upgrade — and only then.
+	 *
+	 * <p>This drives the LIVE test states (see UPGRADE.md, "Default test state
+	 * policy"): while the live network trails {@link #MAX_VERSION}, releases must
+	 * not break the semantics live peers are still running, so the live-side test
+	 * suites (core behavioural suite, shared peer test network) are pinned to this
+	 * version rather than the latest target. Never exceeds {@link #MAX_VERSION}.</p>
+	 */
+	public static final long LIVE_VERSION = 0;
+
+	/**
 	 * Gets the migration producing protocol version {@code k+1}.
 	 *
 	 * @param k Index into the migration list (current protocol version at application)
@@ -210,13 +222,34 @@ public class Migrations {
 	 * @return Fully upgraded State at protocol version MAX_VERSION
 	 */
 	public static State applyAll(State state) {
+		return applyTo(state, MAX_VERSION);
+	}
+
+	/**
+	 * Applies migrations in order up to the given target protocol version,
+	 * recording each as applied. Returns the State unchanged (bit-identical) if it
+	 * is already at the target version — so {@code applyTo(genesis, 0)} is genesis.
+	 * See {@link #applyAll(State)} for intent and caveats.
+	 *
+	 * @param state Starting State
+	 * @param targetVersion Protocol version to migrate to (between the State's
+	 *        current version and {@link #MAX_VERSION})
+	 * @return State at the target protocol version
+	 */
+	public static State applyTo(State state, long targetVersion) {
+		long current = state.getProtocolVersion();
+		if (targetVersion == current) return state;
+		if ((targetVersion < current) || (targetVersion > MAX_VERSION)) {
+			throw new IllegalArgumentException(
+					"Target protocol version " + targetVersion + " outside [" + current + "," + MAX_VERSION + "]");
+		}
 		long ts = state.getTimestamp().longValue();
 		AVector<CVMLong> upgrades = state.getUpgradeVector();
-		for (long k = state.getProtocolVersion(); k < MAX_VERSION; k++) {
+		for (long k = current; k < targetVersion; k++) {
 			state = get(k).apply(state);
 			upgrades = upgrades.conj(CVMLong.create(ts)); // recorded as applied at current time
 		}
-		return state.withProtocolGlobals(MAX_VERSION, upgrades);
+		return state.withProtocolGlobals(targetVersion, upgrades);
 	}
 
 	/**

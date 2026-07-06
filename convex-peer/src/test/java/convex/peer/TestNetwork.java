@@ -63,11 +63,13 @@ public class TestNetwork {
 	private static TestNetwork instance = null;
 
 	private TestNetwork() {
-		// Fresh state at the latest target protocol version: the shared test network
-		// runs the semantics networks will have once upgraded (see UPGRADE.md,
-		// "Default test state policy"). Genesis-specific peer behaviour is covered
-		// by dedicated tests, not this shared network.
-		GENESIS_STATE=Migrations.applyAll(Init.createState(PEER_KEYS));
+		// Fresh state at the LIVE protocol version (Migrations.LIVE_VERSION): the
+		// shared test network models the live network, so a release cannot break
+		// live servers that have not yet applied the latest upgrade. Follows the
+		// live network automatically when LIVE_VERSION is bumped. Target-version
+		// peer behaviour is covered by dedicated tests (e.g. UpgradeWithdrawalTest).
+		// See UPGRADE.md, "Default test state policy".
+		GENESIS_STATE=Migrations.applyTo(Init.createState(PEER_KEYS), Migrations.LIVE_VERSION);
 		HERO=Address.create(Init.GENESIS_ADDRESS);
 		VILLAIN=HERO.offset(2);
 	}
