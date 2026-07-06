@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - NodeServer: inbound lattice values from untrusted peers are handled defensively. Wrong-type values are explicitly rejected leaving state unchanged (#562); merge failures — including engineered `StackOverflowError` from adversarially deep structures (DLFS nodes among them) — are contained rather than allowed to kill the receive thread (#561); and malformed KV entries are rejected at validation instead of poisoning later store-wide reads (#561).
 - Lattice: container lattices (Owner, Keyed, Map, Index, Topic) now route foreign entries through per-child validation even when merging into an empty region — previously a single message to a fresh node or unpopulated sub-path could commit a wrong-typed child (permanently blocking that slot) or, for owner-signed lattices, seed forged entries bypassing signature verification (#561).
+- Convex DB: the Postgres wire decoder validates frame lengths and count fields before allocation, closing a pre-authentication denial of service — a client could previously declare a near-2GB frame length and force unbounded buffering, or supply negative/oversized counts causing crashes on the receive path. Malformed frames now close the connection. Contributed by @PrazwalR (#596).
 
 ## [0.8.6] - 2026-06-22
 
