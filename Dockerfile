@@ -29,7 +29,7 @@ RUN mvn -B clean install -DskipTests
 #######################################
 # Run stage
 # JRE matches the JDK everything is built and tested on (see build stage note)
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL org.opencontainers.image.title="Convex" \
       org.opencontainers.image.description="Convex Peer Node" \
