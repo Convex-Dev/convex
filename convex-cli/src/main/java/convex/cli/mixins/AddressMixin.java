@@ -14,6 +14,23 @@ public class AddressMixin extends AMixin {
 
 	private Address address=null;
 
+	/**
+	 * Gets the address specified at the CLI, or null if not specified.
+	 * Throws a CLIError (DATAERR) if the specified value is not a valid address.
+	 * @return Address, or null if not specified
+	 */
+	public Address getSpecifiedAddress() {
+		if (address!=null) return address;
+		if (addressValue==null) return null;
+
+		address = Address.parse(addressValue);
+		if (address == null) {
+			throw new CLIError(ExitCodes.DATAERR, "Invalid address format: " + addressValue +
+				". Use format #1234 or plain number.");
+		}
+		return address;
+	}
+
 	/*
 	 * Get user address
 	 */

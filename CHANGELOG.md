@@ -9,9 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CLI: `peer -c/--config` now actually loads the specified JSON5 peer config file (previously the option was accepted but ignored); explicit command line options take precedence over config file values (#625).
+- CLI: `peer start --address` is passed to peer launch and verified after startup — the CLI warns when the specified controller does not match the authoritative on-chain controller (noting that an actor controller such as a trust monitor may still permit control) (#624).
+- CLI: the faucet commands (`account create --faucet`, `account fund`) accept a scheme and/or port in `--host`, e.g. `https://peer.example.com:8443` — previously the REST port was hardcoded to 8080 (#627).
+- CLI: `local start --norest` disables the REST API server, matching `peer start` (#630).
+
 ### Changed
 
+- CLI: all `account` subcommands share a consistent `-a/--address` option (with `CONVEX_ADDRESS`); `account info` accepts `-a` when the positional address is omitted (#630).
+- CLI: `convex help <command>` now shows the named subcommand's help everywhere (standard picocli help command, replacing a custom implementation that ignored its argument) (#630).
+
+- CLI: a failed query or transaction result now exits non-zero (previously `convex query` / `convex transact` / `convex account info` / `convex peer create` printed the error result but exited 0, so scripts could not detect failure). The result is still printed to stdout as before.
+- CLI: `convex transact --output-file` (offline transaction encoding) no longer opens a network connection to the default peer.
+- CLI: `key delete` and `key list` no longer create an empty keystore as a side effect when the specified keystore does not exist (exit code 66, NOINPUT).
+- CLI: an ambiguous `--key` hex prefix matching multiple keystore entries is now an error instead of silently using an arbitrary matching key.
+- CLI: `key import` auto-detection now recognises BIP39 mnemonic phrases and PEM text (previously only hex input was auto-detected, despite the documented behaviour), and gives a clear error when the type cannot be inferred.
+- CLI: `convex etch --help` and `convex desktop --help` now work like other command groups; group usage headers show the full command path (e.g. `convex peer` rather than `peer`).
+
 ### Fixed
+
+- CLI: `key generate --count N` stored keys 2..N under a corrupted password (the password buffer was wiped in-place after the first key), making them impossible to unlock. All generated keys are now encrypted with the supplied password.
+- CLI: `convex status` could hang indefinitely (unbounded `join()` on the status request); it now honours the connection timeout. Client commands also close their peer connections properly.
+- CLI: `account balance` with multiple addresses generated a query without separators between addresses; `peer start --peer-port` ignored its documented default of 18888 (always picking a random port); `local start --count 0` crashed with an internal error instead of a usage error; `peer create` stored the generated peer key under the controller key password rather than the peer key password.
+- CLI: numerous error messages now include the underlying cause and use appropriate exit codes; prompting for input without a console gives a clear error instead of a crash.
 
 ## [0.8.7] - 2026-07-06
 

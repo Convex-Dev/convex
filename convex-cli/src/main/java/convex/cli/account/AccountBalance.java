@@ -10,7 +10,6 @@ import convex.core.cvm.Address;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -28,15 +27,10 @@ public class AccountBalance extends AAccountCommand {
 		description="Address(es) to query balance for. If omitted, will look for --address argument.")
 	private String[] addresses;
 
-	@Option(names={"-a", "--address"},
-			defaultValue="${env:CONVEX_ADDRESS}",
-			description = "Account address to use for query. Can specify with CONVEX_ADDRESS environment variable.")
-	protected String addressValue = null;
-
 	@Override
 	public void execute() throws InterruptedException {
-		Address address = Address.parse(addressValue);
 		if (addresses == null) {
+			Address address = addressMixin.getSpecifiedAddress();
 			if (address != null) {
 				addresses = new String[] { address.toString() };
 			} else {
@@ -47,19 +41,20 @@ public class AccountBalance extends AAccountCommand {
 
 		int n = addresses.length;
 
-		Convex convex = peerMixin.connect();
-		try {
-			StringBuilder sb = new StringBuilder();
-			sb.append("(map balance [");
-			for (int i = 0; i < n; i++) {
-				String aString = addresses[i];
-				Address addr = Address.parse(aString);
-				if (addr == null) {
-					throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + aString);
-				}
-				sb.append(addr);
+		StringBuilder sb = new StringBuilder();
+		sb.append("(map balance [");
+		for (int i = 0; i < n; i++) {
+			String aString = addresses[i];
+			Address addr = Address.parse(aString);
+			if (addr == null) {
+				throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + aString);
 			}
-			sb.append("])");
+			sb.append(addr);
+			sb.append(' ');
+		}
+		sb.append("])");
+
+		try (Convex convex = connect()) {
 			ACell message = Reader.read(sb.toString());
 			Result result = convex.querySync(message);
 			if (result.isError()) {
@@ -71,8 +66,6 @@ public class AccountBalance extends AAccountCommand {
 					println(v.get(i));
 				}
 			}
-		} finally  {
-			convex.close();
 		}
 	}
 }
