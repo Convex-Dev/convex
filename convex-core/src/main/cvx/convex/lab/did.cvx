@@ -2,12 +2,15 @@
 
 ;; This is an implementation of the W3C DID specification for a Verifiable Data Registry on Convex
 ;;
-;; This registry can be used to implement a DID method such as "did:convex:101"
+;; This registry backs the `did:convex` DID method as specified in CAD043.
 ;;
 ;; Notes
-;; - IDs are sequentially allocated integers. mapping human readable names to ID is possible but outside of scope of this library
-;; - The required operations Create, Read, Update and Deactivate are implemeted on-chain
-;; - We regard a nil DDO as deactivated
+;; - IDs are sequentially allocated integers, internal to this registry. Human readable
+;;   naming is provided by CNS: a named DID (e.g. `did:convex:id.foo`) holds a scoped
+;;   reference to a registry record (e.g. [~*address* 101]) as its CNS record value.
+;; - The required operations Create, Read, Update and Deactivate are implemented on-chain
+;; - We regard a nil DDO as deactivated. Deactivation is terminal (per CAD043): a
+;;   deactivated DID cannot be updated, re-authorised or transferred.
 ;; - Records are internally stored as a Vector with the following elements:
 ;;     0: ddo-document = A string (or nil) containing the DDO
 ;;     1: controller = address (or trust monitor) to authorise DID updates
@@ -51,17 +54,35 @@
       (set! counter (inc counter))
       id)))
 
-(defn 
+;; Private helper: get an active (non-deactivated) record, failing appropriately
+(defn -active-record
+  [id]
+  (let [rec (get dids id)]
+    (or rec (fail :STATE "Invalid DID"))
+    (or (nth rec 0) (fail :STATE "DID is deactivated"))
+    rec))
+
+(defn
   ^{:callable true
-    :doc       {:description "Updates a DDO for a DID. DDO can be a String, or nil to deactivate"
+    :doc       {:description "Reads the full record for a DID as [ddo controller created updated accounts], or nil if the DID does not exist. A nil DDO indicates a deactivated DID."
+                :signature   [{:params []}
+                              {:params [id]}]}}
+  read-record
+  ([]
+    (recur *scope*))
+  ([id]
+    (get dids id)))
+
+(defn
+  ^{:callable true
+    :doc       {:description "Updates a DDO for a DID. DDO can be a String, or nil to deactivate (terminal)."
                 :signature   [{:params [id ddo]}]}}
   update
  ([ddo]
    (recur *scope* ddo))
  ([id ddo]
-   (assert (or (nil? ddo) (str? ddo)))
-   (let [rec (get dids id)
-         _ (or rec (fail :STATE "Invalid DID"))
+   (or (nil? ddo) (str? ddo) (fail :ARGUMENT "DDO must be a String or nil"))
+   (let [rec (-active-record id)
          cont (get rec 1)
          _ (or (trust/trusted? cont *caller* :update id) (fail :TRUST "Unauthorised"))
          rec (assoc rec 0 ddo)         ;; update DDO
@@ -74,13 +95,12 @@
   ^{:callable true
     :doc       {:description "Authorises a set of accounts for this DID. May be nil."
                 :signature   [{:params [id auth-set]}]}}
-  authorise 
+  authorise
   ([auth-set]
     (recur *scope* auth-set))
   ([id auth-set]
-    (or (nil? auth-set) (set? auth-set) (fail "auth-set must be nil or a set of addresses"))
-    (let [rec (get dids id)
-          _ (or rec (fail :TRUST "Invalid or missing DID"))
+    (or (nil? auth-set) (set? auth-set) (fail :ARGUMENT "auth-set must be nil or a set of addresses"))
+    (let [rec (-active-record id)
           cont (get rec 1)
           _ (or (trust/trusted? cont *caller* :update id) (fail :TRUST "Unauthorised"))
           rec (assoc rec 4 auth-set)    ;; update Authorised account set
@@ -89,18 +109,18 @@
       (set! dids (assoc dids id rec))
       rec)))
 
-(defn 
+(defn
   ^{:callable true
-    :doc       {:description "Sets the contoller for a DID."
-                :signature   [{:params [id auth-set]}]}}
-  change-control 
+    :doc       {:description "Sets the controller for a DID. Controller must be an existing account or scoped reference (a plausible trust monitor)."
+                :signature   [{:params [id controller]}]}}
+  change-control
   ([controller]
     (if (nil? *scope*)
       (fail :TRUST "Changing controller of DID registry not supported")
       (recur *scope* controller)))
   ([id controller]
-    (let [rec (get dids id)
-          _ (or rec (fail :TRUST "Invalid or missing DID"))
+    (or (callable? controller) (fail :ARGUMENT "Invalid controller"))
+    (let [rec (-active-record id)
           cont (get rec 1)
           _ (or (trust/trusted? cont *caller* :control id) (fail :TRUST "Unauthorised"))
           rec (assoc rec 1 controller)    ;; update Authorised account set

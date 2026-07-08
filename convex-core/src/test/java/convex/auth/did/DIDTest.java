@@ -160,6 +160,17 @@ public class DIDTest {
 	        assertEquals("did:foo:%C5%AD", did1.toString());
 	        doDIDTest(did1);
         }
+
+    	{   // ":" is a structural separator in method-specific-ids (W3C DID ABNF)
+    		// and must NOT be percent-encoded on output
+	        DID did1 = new DID("web","example.com:8080");
+	        assertEquals("did:web:example.com:8080", did1.toString());
+	        doDIDTest(did1);
+
+	        // space is not an idchar and must be percent-encoded (not form-encoded as "+")
+	        DID did2 = new DID("foo","a b");
+	        assertEquals("did:foo:a%20b", did2.toString());
+        }
         
     	{   // + used for space in query (URLDecoder interprets + as space)
     		DIDURL durl= DIDURL.create("did:foo:20?a+b");

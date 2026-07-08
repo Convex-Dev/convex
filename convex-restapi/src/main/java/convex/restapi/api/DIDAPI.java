@@ -1,5 +1,7 @@
 package convex.restapi.api;
 
+import convex.core.crypto.util.Base58;
+import convex.core.crypto.util.Multikey;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.data.AccountKey;
@@ -26,8 +28,6 @@ import java.util.Map;
  */
 public class DIDAPI extends ABaseAPI {
 
-	private static final String BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
 	public DIDAPI(RESTServer restServer) {
 		super(restServer);
 	}
@@ -43,7 +43,7 @@ public class DIDAPI extends ABaseAPI {
 	 * Serve the peer's own DID document at /.well-known/did.json
 	 */
 	protected void handlePeerDID(Context ctx) {
-		String hostname = getHostname(ctx);
+		String hostname = getWebHost(ctx);
 		String did = "did:web:" + hostname;
 
 		AccountKey peerKey = server.getPeer().getPeerKey();
@@ -79,7 +79,7 @@ public class DIDAPI extends ABaseAPI {
 
 		AccountKey key = as.getAccountKey();
 
-		String hostname = getHostname(ctx);
+		String hostname = getWebHost(ctx);
 		String did = "did:web:" + hostname + ":" + identifier;
 
 		// alsoKnownAs: did:convex always, did:key only if account has a key
@@ -145,11 +145,29 @@ public class DIDAPI extends ABaseAPI {
 	}
 
 	/**
+	 * Gets the host for did:web identifiers. Per the did:web method
+	 * specification, a non-default port is percent-encoded (host%3Aport)
+	 * since ":" is the path separator in did:web identifiers.
+	 */
+	static String getWebHost(Context ctx) {
+		String host = ctx.header("X-Forwarded-Host");
+		if (host == null) {
+			host = ctx.host(); // e.g. "localhost:8080" or "my-server.org"
+		}
+		int colon = host.indexOf(':');
+		if (colon >= 0) {
+			String port = host.substring(colon + 1);
+			String name = host.substring(0, colon);
+			host = ("80".equals(port) || "443".equals(port)) ? name : name + "%3A" + port;
+		}
+		return host;
+	}
+
+	/**
 	 * Encode an Ed25519 public key as multibase base58btc (z prefix).
 	 */
 	public static String multibaseEncode(AccountKey key) {
-		byte[] bytes = key.getBytes();
-		return "z" + encodeBase58(bytes);
+		return "z" + Base58.encode(key.getBytes());
 	}
 
 	/**
@@ -158,60 +176,6 @@ public class DIDAPI extends ABaseAPI {
 	 * The 0xed01 prefix is the multicodec for Ed25519 public keys.
 	 */
 	public static String multibaseEncodeEd25519DIDKey(AccountKey key) {
-		byte[] rawKey = key.getBytes();
-		byte[] prefixed = new byte[2 + rawKey.length];
-		prefixed[0] = (byte) 0xed;
-		prefixed[1] = (byte) 0x01;
-		System.arraycopy(rawKey, 0, prefixed, 2, rawKey.length);
-		return "z" + encodeBase58(prefixed);
-	}
-
-	/**
-	 * Base58btc encoding using the Bitcoin alphabet.
-	 */
-	static String encodeBase58(byte[] input) {
-		if (input.length == 0) return "";
-
-		// Count leading zeros
-		int zeros = 0;
-		while (zeros < input.length && input[zeros] == 0) {
-			zeros++;
-		}
-
-		// Convert to big integer and encode
-		// Work with unsigned bytes
-		int[] number = new int[input.length];
-		for (int i = 0; i < input.length; i++) {
-			number[i] = input[i] & 0xFF;
-		}
-
-		char[] encoded = new char[input.length * 2]; // upper bound
-		int outputStart = encoded.length;
-
-		int start = zeros;
-		while (start < number.length) {
-			int remainder = 0;
-			int newStart = start;
-			boolean started = false;
-			for (int i = start; i < number.length; i++) {
-				int digit = number[i] + remainder * 256;
-				number[i] = digit / 58;
-				remainder = digit % 58;
-				if (!started && number[i] != 0) {
-					newStart = i;
-					started = true;
-				}
-			}
-			if (!started) newStart = number.length;
-			encoded[--outputStart] = BASE58_ALPHABET.charAt(remainder);
-			start = newStart;
-		}
-
-		// Add leading '1's for each leading zero byte
-		for (int i = 0; i < zeros; i++) {
-			encoded[--outputStart] = '1';
-		}
-
-		return new String(encoded, outputStart, encoded.length - outputStart);
+		return Multikey.encodePublicKey(key).toString();
 	}
 }

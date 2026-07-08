@@ -157,6 +157,71 @@ public class DIDRegistryTest extends ACVMTest {
 
 	}
 	
+	@Test public void testErrorCodes() {
+		Context ctx=context();
+		ctx=exec(ctx,"(def id (call did (create)))");
+
+		// invalid argument types
+		Assertions.assertArgumentError(step(ctx,"(call did (update id :not-a-string))"));
+		Assertions.assertArgumentError(step(ctx,"(call did (authorise id [:not :a :set]))"));
+
+		// non-existent DID
+		Assertions.assertStateError(step(ctx,"(call did (update 999999999 \"{}\"))"));
+	}
+
+	@Test public void testChangeControlValidation() {
+		Context ctx=context();
+		ctx=exec(ctx,"(def id (call did (create)))");
+
+		// CAD043: controller must be a plausible trust monitor. In particular a
+		// non-existent account address must be rejected — addresses are allocated
+		// sequentially, so control would pass to whoever later creates the account.
+		Assertions.assertArgumentError(step(ctx,"(call did (change-control id #99999999))"));
+		Assertions.assertArgumentError(step(ctx,"(call did (change-control id :junk))"));
+
+		// valid controller transfer still works
+		ctx=exec(ctx,"(call did (change-control id "+VILLAIN+"))");
+		Assertions.assertTrustError(step(ctx,"(call did (update id \"{}\"))"));
+	}
+
+	@Test public void testReadRecord() {
+		Context ctx=context();
+		ctx=exec(ctx,"(def id (call did (create)))");
+
+		// full record: [ddo controller created updated accounts]
+		AVector<?> rec=eval(ctx,"(call did (read-record id))");
+		assertNotNull(rec);
+		assertEquals(5,rec.count());
+		assertEquals(Strings.EMPTY,rec.get(0));
+		assertNotNull(rec.get(2)); // created timestamp
+		assertNotNull(rec.get(3)); // updated timestamp
+
+		// scoped form
+		assertEquals(rec,eval(ctx,"(call [did id] (read-record))"));
+
+		// missing DID reads as nil
+		assertNull(eval(ctx,"(call did (read-record 999999999))"));
+	}
+
+	@Test public void testDeactivateTerminal() {
+		Context ctx=context();
+		ctx=exec(ctx,"(def id (call did (create)))");
+		ctx=exec(ctx,"(call did (update id \"{}\"))");
+		ctx=exec(ctx,"(call did (deactivate id))");
+		assertNull(eval(ctx,"(call did (read id))"));
+
+		// CAD043: deactivation is terminal, even for the controller
+		Assertions.assertStateError(step(ctx,"(call did (update id \"{}\"))"));
+		Assertions.assertStateError(step(ctx,"(call did (authorise id #{*address*}))"));
+		Assertions.assertStateError(step(ctx,"(call did (change-control id "+VILLAIN+"))"));
+		Assertions.assertStateError(step(ctx,"(call did (deactivate id))"));
+
+		// record still readable for resolver metadata, with nil DDO
+		AVector<?> rec=eval(ctx,"(call did (read-record id))");
+		assertNotNull(rec);
+		assertNull(rec.get(0));
+	}
+
 	@Test public void testDeactivate() {
 		Context ctx=step("(import convex.did :as did)");
 		ctx=exec(ctx,"(import convex.trust :as trust)");

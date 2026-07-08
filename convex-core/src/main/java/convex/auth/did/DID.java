@@ -2,7 +2,6 @@ package convex.auth.did;
 
 import java.net.URI;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.crypto.util.Multikey;
@@ -17,8 +16,9 @@ import convex.core.data.Strings;
  * 
  * Examples:
  * - did:web:example.com
- * - did:web:example.com:8080
- * - did:convex:user.mike
+ * - did:web:example.com%3A8080 (non-default port, percent-encoded per did:web)
+ * - did:convex:13
+ * - did:convex:id.foo
  */
 public class DID {
 
@@ -140,7 +140,30 @@ public class DID {
     
     @Override
     public String toString() {
-        return DID_START+method+":"+URLEncoder.encode(id, StandardCharsets.UTF_8);
+        return DID_START+method+":"+encodeID(id);
+    }
+
+    /**
+     * Encodes a method-specific id for string representation. Legal idchars
+     * (ALPHA / DIGIT / "." / "-" / "_") and the ":" segment separator are
+     * preserved per the W3C DID ABNF; all other characters are percent-encoded
+     * as UTF-8. Note URLEncoder is unsuitable here: it form-encodes (space as
+     * "+") and escapes the structural ":" separator.
+     */
+    private static String encodeID(String s) {
+        StringBuilder sb = new StringBuilder(s.length());
+        for (byte b : s.getBytes(StandardCharsets.UTF_8)) {
+            char c = (char) (b & 0xFF);
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '-' || c == '_' || c == ':') {
+                sb.append(c);
+            } else {
+                sb.append('%');
+                sb.append(Character.toUpperCase(Character.forDigit((b >> 4) & 0xF, 16)));
+                sb.append(Character.toUpperCase(Character.forDigit(b & 0xF, 16)));
+            }
+        }
+        return sb.toString();
     }
 
 	public static DID create(String method, String id) {
@@ -155,10 +178,5 @@ public class DID {
 	 */
 	public static AString forKey(AccountKey publicKey) {
 		return DID_KEY_PREFIX.append(Multikey.encodePublicKey(publicKey));
-	}
-
-	public DID withPath(String string) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 }
