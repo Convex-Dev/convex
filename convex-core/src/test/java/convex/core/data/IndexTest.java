@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -451,6 +452,162 @@ public class IndexTest {
 			assertEquals(me, m.getEntry(me.getKey()));
 		}
 		doIndexTests(m);
+	}
+
+	@Test
+	public void testDeepCombIndex() throws InvalidDataException {
+		// "Comb" structure: entry-less nodes all the way down the zero spine, each
+		// branching to a divergent leaf. Worst case for prefix computation and
+		// incremental prefix matching during assoc descent.
+		HashMap<ABlob, CVMLong> ref = new HashMap<>();
+		Index<ABlob, CVMLong> m = Index.none();
+		for (int i = 0; i < 32; i++) {
+			byte[] bs = new byte[i + 1];
+			bs[i] = (byte) 0xFF; // i zero bytes then a divergent byte
+			Blob k = Blob.create(bs);
+			m = m.assoc(k, CVMLong.create(i));
+			ref.put(k, CVMLong.create(i));
+		}
+		assertEquals(ref.size(), m.size());
+		m.validate();
+
+		// deep assoc descends the whole entry-less spine (max key length, all zeros)
+		Blob spine = Blob.create(new byte[32]);
+		m = m.assoc(spine, CVMLong.create(1000));
+		ref.put(spine, CVMLong.create(1000));
+		m.validate();
+
+		// add entries at every level of the spine itself
+		for (int i = 1; i < 32; i++) {
+			Blob k = Blob.create(new byte[i]);
+			m = m.assoc(k, CVMLong.create(2000 + i));
+			ref.put(k, CVMLong.create(2000 + i));
+		}
+		m.validate();
+		assertEquals(ref.size(), m.size());
+		for (java.util.Map.Entry<ABlob, CVMLong> me : ref.entrySet()) {
+			assertEquals(me.getValue(), m.get(me.getKey()));
+		}
+
+		// dissoc everything back out again
+		Index<ABlob, CVMLong> d = m;
+		for (ABlob k : ref.keySet()) {
+			d = d.dissoc(k);
+		}
+		assertSame(Index.none(), d);
+
+		doIndexTests(m);
+	}
+
+	/**
+	 * Malformed Index structures can reach operations without deep validation:
+	 * CAD3 decoding cannot check entry key types, child types or child depths,
+	 * because entry and child refs are lazy. Operations must behave
+	 * deterministically with no out-of-range reads, no unbounded recursion and
+	 * no unchecked exceptions; assoc may return null (as for invalid key types).
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMalformedDepthLongerThanPrefix() {
+		// Node declaring depth 40 whose entry key has only 4 hex digits
+		MapEntry shortEntry = MapEntry.create(Blob.fromHex("1234"), CVMLong.ONE);
+		Index child = Index.create(Blob.fromHex("00112233445566778899aabbccddeeff0011223344"), CVMLong.create(2));
+		Index bad = Index.unsafeCreate(40, shortEntry, new Ref[] { child.getRef() }, 0x0001, 2);
+		assertThrows(InvalidDataException.class, bad::validate);
+
+		// key diverging beyond the physical prefix: malformed detected, null result
+		Blob k1 = Blob.fromHex("12345678901234567890");
+		assertNull(bad.assoc(k1, CVMLong.ZERO));
+		assertNull(bad.assoc(k1, CVMLong.ZERO)); // deterministic
+
+		// key that is a strict subset of the physical prefix: split still works
+		Blob k2 = Blob.fromHex("12");
+		ACell r1 = bad.assoc(k2, CVMLong.ZERO);
+		ACell r2 = bad.assoc(k2, CVMLong.ZERO);
+		assertNotNull(r1);
+		assertEquals(r1, r2); // deterministic
+
+		// lookups miss cleanly, including key lengths straddling the declared depth
+		assertNull(bad.get(Blob.fromHex("12345678901234567890123456789012345678901234")));
+		assertNull(bad.get(Blob.fromHex("1234567890123456789012345678901234567890")));
+		assertNull(bad.get(Blob.fromHex("1234")));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMalformedChildDepthNotIncreasing() {
+		// child depth (2) <= parent depth (4): descent must terminate deterministically
+		Index shallowChild = Index.create(Blob.fromHex("12"), CVMLong.create(3));
+		Index bad = Index.unsafeCreate(4, MapEntry.create(Blob.fromHex("1234"), CVMLong.ONE),
+				new Ref[] { shallowChild.getRef() }, 0x0002, 2);
+		assertThrows(InvalidDataException.class, bad::validate);
+
+		Blob k = Blob.fromHex("123415"); // descends into digit 1 child
+		assertNull(bad.assoc(k, CVMLong.ZERO));
+		assertNull(bad.get(k));
+		assertSame(bad, bad.dissoc(k));
+
+		// same guard covers an EMPTY child (depth 0)
+		Index bad2 = Index.unsafeCreate(4, MapEntry.create(Blob.fromHex("1234"), CVMLong.ONE),
+				new Ref[] { Index.EMPTY.getRef() }, 0x0002, 2);
+		assertNull(bad2.assoc(k, CVMLong.ZERO));
+		assertNull(bad2.get(k));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMalformedNonIndexChild() {
+		// child ref resolving to a non-Index cell
+		Index bad = Index.unsafeCreate(4, MapEntry.create(Blob.fromHex("1234"), CVMLong.ONE),
+				new Ref[] { CVMLong.create(666).getRef() }, 0x0002, 2);
+		assertThrows(InvalidDataException.class, bad::validate);
+
+		Blob k = Blob.fromHex("123415");
+		assertNull(bad.get(k));
+		assertNull(bad.assoc(k, CVMLong.ZERO));
+		assertSame(bad, bad.dissoc(k));
+
+		// entryAt skips the malformed child, then reports bounds
+		assertEquals(Blob.fromHex("1234"), bad.entryAt(0).getKey());
+		assertThrows(IndexOutOfBoundsException.class, () -> bad.entryAt(1));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMalformedNonBlobEntryKey() {
+		// entry key that is not blob-like
+		MapEntry badEntry = MapEntry.create(CVMLong.create(7), CVMLong.ONE);
+		Index child = Index.create(Blob.fromHex("1234"), CVMLong.create(2));
+		Index bad = Index.unsafeCreate(2, badEntry, new Ref[] { child.getRef() }, 0x0002, 2);
+
+		Blob k = Blob.fromHex("12");
+		assertNull(bad.get(k));
+		assertNull(bad.assoc(Blob.fromHex("1299"), CVMLong.ZERO));
+		assertSame(bad, bad.dissoc(k));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testMalformedDeepChainNoStackOverflow() {
+		// A chain of entry-less single-child nodes with non-increasing depth is
+		// invalid, but decodable: its length is bounded only by encoding size.
+		// Prefix computation must not recurse and descent must be depth-bounded.
+		Index leaf = Index.create(Blob.fromHex("12345678"), CVMLong.ONE);
+		Index node = leaf;
+		for (int i = 0; i < 50000; i++) {
+			node = Index.unsafeCreate(2, null, new Ref[] { node.getRef() }, 0x0002, 2 + i);
+		}
+		final Index chain = node;
+
+		// assoc triggers getPrefix at the root: must walk iteratively
+		ACell r1 = chain.assoc(Blob.fromHex("1234"), CVMLong.ZERO);
+		ACell r2 = chain.assoc(Blob.fromHex("1234"), CVMLong.ZERO);
+		assertNotNull(r1);
+		assertEquals(((Index) r1).count(), ((Index) r2).count()); // deterministic
+
+		// getEntry and dissoc descend into the digit 1 child: bounded by the depth guard
+		assertNull(chain.getEntry(Blob.fromHex("12145678")));
+		assertSame(chain, chain.dissoc(Blob.fromHex("12145678")));
 	}
 
 	private <K extends ABlobLike<?>, V extends ACell> void doIndexTests(Index<K, V> m) {

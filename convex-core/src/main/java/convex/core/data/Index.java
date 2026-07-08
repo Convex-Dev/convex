@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +71,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 */
 	private final Ref<Index<K, V>>[] children;
 
+	/**
+	 * Cached prefix blob for entry-less nodes, lazily computed by getPrefix().
+	 * Not part of the encoding. Nodes with an entry use the entry key directly.
+	 */
+	private ABlob cachedPrefix;
+
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
 			short mask, long count) {
@@ -134,6 +141,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if ((entry == newEntry) && (children == newChildren)) return this;
 		Index<K,V> result= new Index<K, V>(depth, newEntry, (Ref[])newChildren, mask, count);
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		result.cachedPrefix=cachedPrefix; // ref update preserves cell values, so prefix is unchanged
 		return result;
 	}
 
@@ -152,19 +160,17 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (kl < pl) return null; // key is too short to start with current prefix
 
 		if (kl == pl) {
-			if (entry!=null) {
-				K ekey=entry.getKey();
-				if (keyMatch(key,ekey)) return entry; // we matched this key exactly!
-			}
+			if (entryKeyMatch(key,entry)) return entry; // we matched this key exactly!
 			if (pl<MAX_DEPTH) return null; // entry definitely does not exist
 		}
-		
+
 		// key length is longer than current prefix
 		// if we are max depth, return entry iff matches up to full depth
 		if (pl==MAX_DEPTH) {
-			if (entry==null) return null;
-			if (key.hexMatch(entry.getKey().toBlob(),0,MAX_DEPTH)==MAX_DEPTH) return entry;
-			return null; 
+			// entryKeyMatch is bounds-safe even if the entry key is shorter than MAX_DEPTH
+			// (possible in malformed encodings), unlike a raw hexMatch over MAX_DEPTH digits
+			if (entryKeyMatch(key,entry)) return entry;
+			return null;
 		}
 
 		// key exceeds current prefix, so need to go to next branch of tree
@@ -172,19 +178,26 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> cc = getChild(digit);
 
 		if (cc == null) return null;
+		if (cc.depth <= pl) return null; // malformed: child depth must increase, bounds descent
 		return cc.getEntry(key);
 	}
 
 	/**
-	 * Gets the child for a specific digit, or null if not found
-	 * 
+	 * Gets the child for a specific digit, or null if not found.
+	 *
+	 * Returns null for a non-Index child, which is possible in malformed
+	 * encodings: child refs are lazy so the type cannot be checked at decode time.
+	 *
 	 * @param digit
 	 * @return
 	 */
+	@SuppressWarnings("unchecked")
 	private Index<K, V> getChild(int digit) {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null;
-		return (Index<K, V>) children[i].getValue();
+		ACell c = children[i].getValue();
+		if (!(c instanceof Index)) return null;
+		return (Index<K, V>) c;
 	}
 
 	@Override
@@ -217,21 +230,20 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public Index<K, V> dissoc(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
-			if (keyMatch(k,entry.getKey())) {
+			if (entryKeyMatch(k,entry)) {
 				return empty();
 			}
 			return this; // leave existing entry in place
 		}
 		long pDepth = depth; // hex depth of this node including prefix
-		long kl = effectiveLength(k);; // hex length of key to dissoc
+		long kl = effectiveLength(k); // hex length of key to dissoc
 		if (kl < pDepth) {
 			// no match for sure, so no change
 			return this;
 		}
 		if (kl == pDepth) {
 			// need to check for match with current entry
-			if (entry == null) return this;
-			if (!keyMatch(k,entry.getKey())) return this;
+			if (!entryKeyMatch(k,entry)) return this;
 			// at this point have matched entry exactly. So need to remove it safely while
 			// preserving invariants
 			if (children.length == 1) {
@@ -244,10 +256,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		// dissoc beyond current prefix length, so need to check children
 		int digit = k.getHexDigit(pDepth);
-		int childIndex = Bits.indexForDigit(digit, mask);
-		if (childIndex < 0) return this; // key miss
-		// we know we need to replace a child
-		Index<K, V> oldChild = (Index<K, V>) children[childIndex].getValue();
+		Index<K, V> oldChild = getChild(digit);
+		if (oldChild == null) return this; // key miss (or malformed non-Index child)
+		if (oldChild.depth <= pDepth) return this; // malformed: child depth must increase, bounds recursion
 		Index<K, V> newChild = oldChild.dissoc(k);
 		Index<K,V> r=this.withChild(digit, oldChild, newChild);
 		
@@ -267,23 +278,73 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		if (b.count()<MAX_KEY_BYTES) return false;
 		return a.hexMatch(b.toBlob(), 0, MAX_DEPTH)==MAX_DEPTH;
-		
+
+	}
+
+	/**
+	 * Tests if a key matches an entry's key, tolerating malformed entries.
+	 *
+	 * Decoded entry keys cannot be type-checked (entry refs are lazy), and generic
+	 * erasure means any access via the K-typed getter would throw ClassCastException
+	 * on a non-blob-like key. This helper checks the type on an untyped reference
+	 * first, returning false (a deterministic miss) for malformed entries.
+	 *
+	 * @param key Key to look for (never null, correctly typed)
+	 * @param me Entry to check (may be null, key may be any cell type)
+	 * @return True if the entry is present with a matching blob-like key
+	 */
+	private static boolean entryKeyMatch(ABlobLike<?> key, MapEntry<?,?> me) {
+		if (me==null) return false;
+		ACell k=me.getKey();
+		if (!(k instanceof ABlobLike)) return false; // malformed entry key
+		return keyMatch(key,(ABlobLike<?>)k);
 	}
 
 	/**
 	 * Common Prefix blob, must contain hex digits in range [0,depth).
-	 * 
+	 *
 	 * May contain more hex digits, this is irrelevant from the
 	 * perspective of serialisation.
-	 * 
+	 *
 	 * Typically we populate with the key of the first entry added to avoid
-	 * unnecessary blob instances being created.
+	 * unnecessary blob instances being created. For entry-less nodes the result
+	 * is cached, so repeated calls (e.g. during assoc descent) are O(1).
+	 *
+	 * Iterative rather than recursive, and returns Blob.EMPTY on malformed
+	 * structure (non-Index child, missing entries): stack depth and hex digit
+	 * reads must not depend on untrusted encodings.
 	 */
+	@SuppressWarnings("unchecked")
 	private ABlob getPrefix() {
-		if (entry!=null) return entry.getKey().toBlob();
-		int n=children.length;
-		if (n==0) return Blob.EMPTY; // this is safe because the only valid Index of length 0
-		return children[0].getValue().getPrefix();
+		if (entry!=null) return keyBlob(entry);
+		ABlob result=cachedPrefix;
+		if (result!=null) return result;
+		// walk to the first descendant entry, remembering entry-less nodes passed
+		ArrayList<Index<K,V>> path=new ArrayList<>();
+		Index<K,V> node=this;
+		while (true) {
+			if (node.entry!=null) { result=keyBlob(node.entry); break; }
+			result=node.cachedPrefix;
+			if (result!=null) break;
+			if (node.children.length==0) { result=Blob.EMPTY; break; } // only valid for EMPTY
+			path.add(node);
+			ACell c=node.children[0].getValue();
+			if (!(c instanceof Index)) { result=Blob.EMPTY; break; } // malformed child
+			node=(Index<K,V>)c;
+		}
+		// benign race: all threads compute the same immutable result
+		for (Index<K,V> n : path) n.cachedPrefix=result;
+		return result;
+	}
+
+	/**
+	 * Gets an entry's key as a Blob, or Blob.EMPTY if the key is not blob-like
+	 * (possible in malformed encodings, since entry refs are lazy).
+	 */
+	private static ABlob keyBlob(MapEntry<?,?> me) {
+		ACell k=me.getKey();
+		if (!(k instanceof ABlobLike)) return Blob.EMPTY;
+		return ((ABlobLike<?>)k).toBlob();
 	}
 
 	@Override
@@ -324,6 +385,22 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return assocEntry(e,0);
 	}
 	
+	/**
+	 * Associates an entry, assuming the first {@code match} hex digits of the new key
+	 * are already known to match all keys in this subtree (i.e. this node's prefix).
+	 *
+	 * The caller establishes this invariant structurally: descent into a child at
+	 * digit position d implies the key matched the parent prefix up to depth d. This
+	 * makes prefix matching incremental — each digit of the key is compared at most
+	 * once over the whole descent, rather than re-matched from position 0 at every level.
+	 *
+	 * Robustness: encodings are not deep-validated on receipt, so a malformed Index
+	 * (declared depth longer than the physical prefix, non-increasing child depths,
+	 * non-blob keys, non-Index children) may reach this code. All hex digit reads are
+	 * clamped to physical blob lengths, and detected impossibilities return null
+	 * (deterministically), mirroring the invalid-key-type case. Results on malformed
+	 * input are unspecified but deterministic, with no out-of-bounds reads.
+	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
 
@@ -339,18 +416,26 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		ACell maybeValidKey=e.getKey();
 		if (!(maybeValidKey instanceof ABlobLike)) return null; // invalid key type!
 		ABlobLike<?> k = (ABlobLike)maybeValidKey;
-		
-		long newKeyLength = effectiveLength(k);; // hex length of new key, up to MAX_DEPTH
+
+		long newKeyLength = effectiveLength(k); // hex length of new key, up to MAX_DEPTH
+		ABlobLike prefix=getPrefix(); // prefix of current node (should be valid up to depth)
+		long plen = effectiveLength(prefix);
+		// Defensive clamps for malformed encodings: never read hex digits beyond the
+		// physical length of either blob. For valid structures plen >= depth >= match,
+		// so pDepth == depth and the clamps are no-ops.
+		long pDepth = Math.min(depth, plen);
+		if (match > pDepth) match = pDepth;
+		if (match > newKeyLength) match = newKeyLength;
 		long mkl; // matched key length
-		ABlobLike prefix=getPrefix(); // prefix of current node (valid up to pDepth)
-		if (newKeyLength >= depth) {
+		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
-			mkl = match + k.hexMatch(prefix, match, depth-match);
+			mkl = match + k.hexMatch(prefix, match, pDepth-match);
 		} else {
 			mkl = match + k.hexMatch(prefix, match, newKeyLength - match);
 		}
 		if (mkl < depth) {
 			// we collide at a point shorter than the current prefix length
+			if (mkl >= plen) return null; // malformed: prefix physically shorter than declared depth
 			if (mkl == newKeyLength) {
 				// new key is subset of the current prefix, so split prefix at key position mkl
 				// doesn't need to adjust child depths, since they are splitting at the same
@@ -360,7 +445,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				Index<K, V> result = new Index<K, V>(mkl, e, new Ref[] { this.getRef() }, splitMask, count + 1);
 				return result;
 			} else {
-				// we need to fork the current prefix in two at position mkl			
+				// we need to fork the current prefix in two at position mkl
 				Index<K, V> branch1 = this;
 				Index<K, V> branch2 = create(e);
 				int d1 = prefix.getHexDigit(mkl);
@@ -377,6 +462,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				return fork;
 			}
 		}
+		// past the collision branch we must have mkl == depth == pDepth, hence:
 		assert (newKeyLength >= depth);
 		if (newKeyLength == depth) {
 			// we must have matched the current entry exactly
@@ -395,11 +481,15 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> oldChild = getChild(childDigit);
 		Index<K, V> newChild;
 		if (oldChild == null) {
+			if (Bits.indexForDigit(childDigit, mask) >= 0) return null; // malformed: child ref is not an Index
 			newChild = create(e); // Must be at least 1 beyond current prefix. Safe because pDepth < MAX_DEPTH
 		} else {
-			newChild = oldChild.assocEntry(e);
+			if (oldChild.depth <= depth) return null; // malformed: child depth must increase, bounds recursion
+			// digits [0,depth) matched this node's prefix, so also match all child keys
+			newChild = oldChild.assocEntry(e, depth);
+			if (newChild == null) return null; // malformed structure detected in child
 		}
-		return withChild(childDigit, oldChild, newChild); // can't be null since associng
+		return withChild(childDigit, oldChild, newChild);
 	}
 
 	/**
@@ -609,7 +699,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 		if (entry != null) {
 			entry.validateCell();
-			long entryKeyLength=entry.getKey().hexLength();
+			ACell ek=entry.getKey();
+			if (!(ek instanceof ABlobLike)) throw new InvalidDataException("Entry key not blob-like: "+Utils.getClassName(ek),this);
+			long entryKeyLength=((ABlobLike<?>)ek).hexLength();
 			if (entryKeyLength<pDepth) throw new InvalidDataException("Key too short for prefix depth",this);
 			if (entryKeyLength>MAX_DEPTH) {
 				if (pDepth!=MAX_DEPTH) throw new InvalidDataException("Key too long at this prefix depth",this);
@@ -695,7 +787,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			Index<K, V> c = children[i].getValue();
+			ACell cell = children[i].getValue();
+			if (!(cell instanceof Index)) continue; // malformed child, treat as empty
+			Index<K, V> c = (Index<K, V>) cell;
 			long cc = c.count();
 			if (ix < cc) return c.entryAt(ix);
 			ix -= cc;
@@ -879,8 +973,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long pmin = Math.min(da, db);
 		if (pmin > 0) {
 			ABlob pa = a.getPrefix(), pb = b.getPrefix();
-			long m = pa.hexMatch(pb, 0, pmin);
+			// clamp digit reads to physical prefix lengths (untrusted encodings may
+			// declare depths longer than the actual prefix)
+			long pm = Math.min(pmin, Math.min(pa.hexLength(), pb.hexLength()));
+			long m = pa.hexMatch(pb, 0, pm);
 			if (m < pmin) {
+				if (m >= pm) throw new IllegalArgumentException("Malformed Index: declared depth exceeds physical prefix");
 				// prefixes diverge at digit m: disjoint keyspaces
 				return branchDisjoint(m, pa.getHexDigit(m), a, pb.getHexDigit(m), b, func);
 			}
@@ -930,7 +1028,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * into {@code func} when the deeper node is the left ('own') argument.
 	 */
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeNested(Index<K, V> shallow, Index<K, V> deep, MergeFunction<V> func, boolean shallowIsLeft) {
-		int dig = deep.getPrefix().getHexDigit(shallow.depth);
+		ABlob deepPrefix = deep.getPrefix();
+		if (shallow.depth >= deepPrefix.hexLength()) throw new IllegalArgumentException("Malformed Index: declared depth exceeds physical prefix");
+		int dig = deepPrefix.getHexDigit(shallow.depth);
 		MapEntry<K, V> ne = singleEntry(shallow.entry, func, shallowIsLeft); // shallow entry is single-side
 		Index<K, V>[] kids = null; // built lazily on first change
 		boolean changed = (ne != shallow.entry);
