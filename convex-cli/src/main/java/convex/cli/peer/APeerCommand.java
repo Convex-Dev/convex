@@ -28,10 +28,17 @@ public abstract class APeerCommand extends ACommand {
 
 	@ParentCommand
 	private ACommand parent;
-	
+
 	@Override
 	public Main cli() {
 		return parent.cli();
+	}
+
+	/**
+	 * Gets the parent `peer` command group, or null if not applicable
+	 */
+	protected Peer peerGroup() {
+		return (parent instanceof Peer)?((Peer)parent):null;
 	}
 
 	public EtchStore getEtchStore() {

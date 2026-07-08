@@ -10,8 +10,6 @@ import java.util.regex.Pattern;
 
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
-import picocli.CommandLine.Help.Ansi.Style;
-import picocli.CommandLine.Help.ColorScheme;
 
 /**
  *
@@ -21,15 +19,6 @@ import picocli.CommandLine.Help.ColorScheme;
  *
 */
 public class Helpers {
-	
-	public static final ColorScheme usageColourScheme = new ColorScheme.Builder()
-	        .commands    (Style.bold, Style.underline)    // combine multiple styles
-	        .options     (Style.fg_yellow)                // yellow foreground color
-	        .parameters  (Style.fg_yellow)
-	        .optionParams(Style.italic)
-	        .errors      (Style.fg_red, Style.bold)
-	        .stackTraces (Style.italic)
-	        .build();
 
 	/**
 	 * Split a parameter list by ','. 
@@ -42,8 +31,8 @@ public class Helpers {
 		List<String> result = new ArrayList<>(parameterValues.length);
 		for (int index = 0; index < parameterValues.length; index ++) {
 			String value = parameterValues[index];
-			
-			if (value.indexOf(",") > 0) {
+
+			if (value.indexOf(",") >= 0) {
 				String[] items  = value.split(",");
 				for (int itemIndex = 0; itemIndex < items.length; itemIndex ++ ) {
 					String newValue = items[itemIndex].trim();
@@ -87,7 +76,8 @@ public class Helpers {
 				Matcher matcher = rangePattern.matcher(item);
 				if (matcher.matches()) {
 					int portFrom = Integer.parseInt(matcher.group(1));
-					int portTo = portFrom  + count + 1;
+					// Open-ended range: allow up to `count` ports from the start of the range
+					int portTo = portFrom + count - 1;
 					if (!matcher.group(2).isEmpty()) {
 						portTo = Integer.parseInt(matcher.group(2));
 					}

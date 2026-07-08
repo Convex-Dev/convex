@@ -9,6 +9,7 @@ import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Help;
 import picocli.CommandLine.Help.Ansi;
+import picocli.CommandLine.ParseResult;
 
 /**
  * Base class for Convex CLI command components and mixins
@@ -22,8 +23,23 @@ public abstract class ACommand implements Runnable {
 	public abstract Main cli();
 	
 	public void showUsage() {
-		CommandLine cl=new CommandLine(this.getClass());
+		// Prefer the CommandLine from the parse tree, so usage shows the full
+		// command path (e.g. "convex peer" rather than just "peer")
+		CommandLine cl=findCommandLine();
+		if (cl==null) cl=new CommandLine(this.getClass());
 		showUsage(cl);
+	}
+
+	/**
+	 * Finds the parsed CommandLine for this command instance, or null if not found
+	 */
+	private CommandLine findCommandLine() {
+		ParseResult pr=cli().commandLine().getParseResult();
+		while (pr!=null) {
+			if (pr.commandSpec().userObject()==this) return pr.commandSpec().commandLine();
+			pr=pr.subcommand();
+		}
+		return null;
 	}
 	
 	protected void showUsage(CommandLine cl) {
@@ -112,10 +128,16 @@ public abstract class ACommand implements Runnable {
 	 */
 	public String prompt(String message) {
 		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+message);
-		
+
+		Console c = System.console();
+		if (c == null) {
+			throw new CLIError(ExitCodes.USAGE,
+					"Unable to prompt for input because console is unavailable. Consider passing required arguments explicitly, or running in interactive mode. Prompt was: "+message);
+		}
+
 		if (isColoured()) message=Coloured.blue(message);
 		inform(0,message);
-		return System.console().readLine();
+		return c.readLine();
 	}
 	
 	public char[] readPassword(String prompt) {

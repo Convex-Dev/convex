@@ -28,7 +28,7 @@ public class PeerBackup extends APeerCommand {
 	@Override
 	protected void execute() throws InterruptedException {
 
-		AccountKey k= peerKeyMixin.getAcountKey();
+		AccountKey k= peerKeyMixin.getAccountKey();
 		
 		if (k==null) {
 			List<AccountKey> peerList=etchMixin.getPeerList();
@@ -45,10 +45,8 @@ public class PeerBackup extends APeerCommand {
 			
 			if (n==0) {
 				throw new CLIError("No peer in store with prefix: "+s);
-			} if (n==1) {
+			} else if (n==1) {
 				k=peerList.get(0);
-			} else if (n==0) {
-				throw new CLIError("No peers available in store: "+etchMixin.getEtchStore());
 			} else {
 				informWarning("Need to select peer to backup, available peers are:");
 				for (AccountKey pk: peerList) {

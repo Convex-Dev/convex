@@ -3,7 +3,6 @@ package convex.cli.client;
 import convex.api.Convex;
 import convex.cli.ATopCommand;
 import convex.cli.CLIError;
-import convex.cli.Constants;
 import convex.cli.ExitCodes;
 import convex.cli.mixins.AddressMixin;
 import convex.cli.mixins.KeyMixin;
@@ -30,18 +29,12 @@ public abstract class AClientCommand extends ATopCommand {
 	protected AddressMixin addressMixin;
 	
 	@Option(names={"--timeout"},
-			description="Timeout in miliseconds.")
+			description="Timeout in milliseconds.")
 	private Long timeout;
 
-	protected long getClientTimeout() {
-		// Gets timeout specified at CLI, or default value
-		return timeout==null?Constants.DEFAULT_TIMEOUT_MILLIS : timeout;
-	}
-
-	
 	/**
 	 * Connect as a client to the convex network
-	 * @return
+	 * @return Convex client connection
 	 */
 	protected Convex clientConnect() {
 		Convex convex= peerMixin.connect();
@@ -50,25 +43,15 @@ public abstract class AClientCommand extends ATopCommand {
 		}
 		return convex;
 	}
-	
+
 	/**
-	 * Connect to Convex ready to query
-	 * @return
+	 * Connect to Convex with the user address set, ready to query or transact
+	 * @return Convex client connection
 	 */
 	protected Convex connectQuery() {
 		Convex convex=clientConnect();
 		Address a=getUserAddress();
 		convex.setAddress(a);
-		return convex;
-	}
-	
-	/**
-	 * Connect to Convex ready to transact
-	 * @return
-	 * @throws InterruptedException 
-	 */
-	protected Convex connectTransact() throws InterruptedException {
-		Convex convex=connectQuery();
 		return convex;
 	}
 	

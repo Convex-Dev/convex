@@ -6,9 +6,9 @@ import picocli.CommandLine.Command;
 
 /**
  *
- * Convex key sub commands
+ * Convex etch sub commands
  *
- *		convex.key
+ *		convex.etch
  *
  */
 @Command(name="etch",
@@ -21,7 +21,7 @@ import picocli.CommandLine.Command;
 		EtchValidate.class,
 		CommandLine.HelpCommand.class
 	},
-	mixinStandardHelpOptions=false,
+	mixinStandardHelpOptions=true,
 	description="Manage an etch database.")
 public class Etch extends ATopCommand {
 

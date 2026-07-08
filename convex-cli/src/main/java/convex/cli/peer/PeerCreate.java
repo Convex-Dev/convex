@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.mixins.RemotePeerMixin;
@@ -22,8 +19,6 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  *  peer create command
@@ -33,13 +28,9 @@ import picocli.CommandLine.Spec;
  *
  */
 @Command(name="create",
-	mixinStandardHelpOptions = true, 
-	description="Configures and creates a peer on a Convex network. Needs an esisting peer as --host and a valid peer controller account. Will generate a new peer key if not otherwise specified.")
+	mixinStandardHelpOptions = true,
+	description="Configures and creates a peer on a Convex network. Needs an existing peer as --host and a valid peer controller account. Will generate a new peer key if not otherwise specified.")
 public class PeerCreate extends APeerCommand {
-
-	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
-
-	@Spec CommandSpec spec;
 
 	@Mixin
 	RemotePeerMixin peerMixin;
@@ -49,25 +40,14 @@ public class PeerCreate extends APeerCommand {
 
 		long peerStake = convex.core.cpos.CPoSConstants.MINIMUM_EFFECTIVE_STAKE;
 
-		AKeyPair keyPair = null;
-		KeyStore keyStore;
+		// create a keystore if it does not exist
+		KeyStore keyStore = storeMixin.ensureKeyStore();
 
-		try {
-			// create a keystore if it does not exist
-			keyStore = storeMixin.ensureKeyStore();
-		} catch (Error e) {
-			log.info(e.getMessage());
-			return;
-		}
+		try (Convex convex = peerMixin.connect()) {
+			AKeyPair keyPair = AKeyPair.generate();
 
-		try {
-			// connect using the default first user
-			Convex convex = peerMixin.connect();
-			
-			keyPair = AKeyPair.generate();
-
-			// save the new keypair in the keystore
-			PFXTools.setKeyPair(keyStore, keyPair, keyMixin.getKeyPassword());
+			// save the new peer keypair in the keystore
+			PFXTools.setKeyPair(keyStore, keyPair, peerKeyMixin.getKeyPassword());
 			storeMixin.saveKeyStore();
 			inform("Created new peer key: "+keyPair.getAccountKey());
 
@@ -81,25 +61,21 @@ public class PeerCreate extends APeerCommand {
 
 			String transactionCommand = String.format("(create-peer 0x%s %d)", accountKeyString, stakeAmount);
 			ACell message = Reader.read(transactionCommand);
-			ATransaction transaction = Invoke.create(address, -1, message);
+			ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
 			Result result = convex.transactSync(transaction);
 			if (result.isError()) {
-                printResult(result);
-				return;
+				printResult(result);
+				throw new CLIError("Peer creation transaction failed with error code: "+result.getErrorCode());
 			}
 			long currentBalance = convex.getBalance(address);
 
 			String shortAccountKey = accountKeyString.substring(0, 6);
 
-			RecordOutput output=new RecordOutput();			
+			RecordOutput output=new RecordOutput();
 			output.addField("Public Peer Key", keyPair.getAccountKey().toString());
 			output.addField("Controller Address", address.longValue());
 			output.addField("Balance", currentBalance);
-			output.addField("Inital stake amount", stakeAmount);
-			// System.out.println("You can now start this peer by executing the following line:\n");
-
-			// WARNING not sure about showing the users password..
-			// to make the starting of peers easier, I have left it in for a simple copy/paste
+			output.addField("Initial stake amount", stakeAmount);
 
 			output.addField("Peer start line",
 				String.format(
@@ -108,7 +84,7 @@ public class PeerCreate extends APeerCommand {
 					shortAccountKey
 				)
 			);
-			output.writeToStream(cli().commandLine().getOut());
+			printRecord(output);
 		}  catch (IOException | GeneralSecurityException | ResultException t) {
 			throw new CLIError("Error creating Peer",t);
 		}

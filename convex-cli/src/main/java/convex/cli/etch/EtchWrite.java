@@ -3,6 +3,7 @@ package convex.cli.etch;
 import java.io.IOException;
 
 import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -28,19 +29,22 @@ public class EtchWrite extends AEtchCommand{
 			return;
 		}
 		
-		EtchStore store=store();
+		ACell cell;
 		try {
-			ACell cell=Reader.read(cvxData);
-			
-			store.storeTopRef(Ref.get(cell), Ref.PERSISTED, null);
-			
-			Hash h=Ref.get(cell).getHash();
+			cell=Reader.read(cvxData);
+		} catch (RuntimeException e) {
+			throw new CLIError(ExitCodes.DATAERR,"Unable to parse --cvx data: "+e.getMessage(),e);
+		}
+
+		try (EtchStore store=store()) {
+			Ref<ACell> ref=Ref.get(cell);
+			store.storeTopRef(ref, Ref.PERSISTED, null);
+
+			Hash h=ref.getHash();
 			println(h.toString());
 			informSuccess("Data saved with hash: "+h);
 		} catch (IOException e) {
 			throw new CLIError("Unable to write to store",e);
-		} finally {
-			store.close();
 		}
 	}
 }

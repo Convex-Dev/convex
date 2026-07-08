@@ -22,7 +22,6 @@ import convex.peer.Server;
 import convex.restapi.RESTServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /*
  * 		local start command
@@ -37,9 +36,6 @@ import picocli.CommandLine.ParentCommand;
 public class LocalStart extends ALocalCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(LocalStart.class);
-
-	@ParentCommand
-	private Local localParent;
 
 	@Option(names={"--count"},
 		defaultValue = "" + Constants.LOCAL_START_PEER_COUNT,
@@ -61,6 +57,10 @@ public class LocalStart extends ALocalCommand {
 	@Option(names={"--api-port"},
 		description="REST API port, enables REST API to the first peer in the local cluster. If unspecified, takes 8080 if available.")
 	private Integer apiPort;
+
+	@Option(names={"--norest"},
+		description="Disable the REST API server.")
+	private boolean norest;
 
     /**
      * Gets n public keys for local test cluster
@@ -121,9 +121,12 @@ public class LocalStart extends ALocalCommand {
     
 	@Override
 	public void execute() throws InterruptedException {
+		if (count < 1) {
+			throw new CLIError(ExitCodes.USAGE, "--count must be at least 1");
+		}
 		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
 		int peerPorts[] = getPeerPorts();
-		
+
 		inform("Starting local test network with "+count+" peer(s)");
 		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
 		int n=servers.size();
@@ -133,14 +136,12 @@ public class LocalStart extends ALocalCommand {
 		String portList=servers.stream().map(s->Integer.toString(s.getPort())).collect(Collectors.joining(","));
 		inform("Peer ports: "+portList);
 
-		launchRestAPI(servers.get(0));
-
-		// informWarning("Failed to start REST server: "+t);
+		if (!norest) launchRestAPI(servers.get(0));
 
 		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		cli().notifyStartup();
 		servers.get(0).waitForShutdown();
-		informWarning("Peer shutdown complete");
+		inform("Peer shutdown complete");
 	}
 
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {

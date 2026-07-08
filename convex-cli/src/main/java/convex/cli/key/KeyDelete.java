@@ -18,8 +18,8 @@ public class KeyDelete extends AKeyCommand {
 	static final String WILD="+";
 	
 	@Parameters(
-			paramLabel="keys", 
-			description="Key(s) to delete. Should be a hex prefix of a specific key, or trailing '"+WILD+"' as a wildcard")
+			paramLabel="keys",
+			description="Key(s) to delete. Should be a hex prefix of a specific key, or trailing '"+WILD+"' as a wildcard. A bare '"+WILD+"' deletes ALL keys in the store.")
 	private String[] keys;
 	
 	protected void deleteEntry(String alias) throws KeyStoreException {
@@ -35,8 +35,9 @@ public class KeyDelete extends AKeyCommand {
 			return;
 		}
 		
-		KeyStore keyStore = storeMixin.ensureKeyStore();
-		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
+		// Load without creating: deleting from a non-existent keystore should not create one
+		KeyStore keyStore = storeMixin.loadKeyStore();
+		if (keyStore==null) throw new CLIError(ExitCodes.NOINPUT,"Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
 		
 		HashSet<String> toDelete=new HashSet<>();
 		
@@ -90,8 +91,8 @@ public class KeyDelete extends AKeyCommand {
 					throw new CLIError("Unable to remove key: "+s,e);
 				}
 			}
+			storeMixin.saveKeyStore();
 		}
-		storeMixin.saveKeyStore();
 	}
 
 

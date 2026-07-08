@@ -27,29 +27,28 @@ public class Status extends AClientCommand {
 
 	protected static final Logger log = LoggerFactory.getLogger(Status.class);
 
-	@Override 
-	public void execute() {
-		Convex convex = clientConnect();
-		Result result;
-		result = convex.requestStatus().join();
+	@Override
+	public void execute() throws InterruptedException {
+		try (Convex convex = clientConnect()) {
+			Result result = convex.requestStatusSync();
+			if (result.isError()) {
+				throw new CLIError("Status request failed: "+result);
+			}
 
-		AMap<Keyword,ACell> status = API.ensureStatusMap(result.getValue());
-		
-		if (status==null) {
-			throw new CLIError(convex.toString()+" did not return a valid status, was : "+result);
+			AMap<Keyword,ACell> status = API.ensureStatusMap(result.getValue());
+
+			if (status==null) {
+				throw new CLIError(convex.toString()+" did not return a valid status, was : "+result);
+			}
+
+			RecordOutput output=new RecordOutput();
+			int n=API.STATUS_KEYS.size();
+			for (int i=0; i<n; i++) {
+				Keyword k=API.STATUS_KEYS.get(i);
+				output.addField(k, status.get(k));
+			}
+			mainParent.printRecord(output);
 		}
-		// Hash hash = Hash.wrap(stateHash.getBytes());
-
-		//AVector<AccountStatus> accountList = state.getAccounts();
-		//Index<AccountKey, PeerStatus> peerList = state.getPeers();
-
-		RecordOutput output=new RecordOutput();
-		int n=API.STATUS_KEYS.size();
-		for (int i=0; i<n; i++) {
-			Keyword k=API.STATUS_KEYS.get(i);
-			output.addField(k, status.get(k));
-		}
-		mainParent.printRecord(output);
 	}
 
 

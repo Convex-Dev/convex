@@ -1,10 +1,8 @@
 package convex.cli.local;
 
 import convex.cli.ATopCommand;
-import convex.cli.mixins.EtchMixin;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Mixin;
 
 
 /**
@@ -26,9 +24,6 @@ import picocli.CommandLine.Mixin;
 	description="Operate a local Convex network and related utilities. Primarily useful for development / testing.")
 public class Local extends ATopCommand {
 
-	@Mixin
-	protected EtchMixin etchMixin;
-	
 	@Override
 	public void execute() {
 		showUsage();

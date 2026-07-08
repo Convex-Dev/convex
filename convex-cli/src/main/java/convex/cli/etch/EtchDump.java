@@ -3,7 +3,6 @@ package convex.cli.etch;
 import java.io.IOException;
 
 import convex.cli.CLIError;
-import convex.cli.Main;
 import convex.core.data.ACell;
 import convex.core.data.type.AType;
 import convex.core.lang.RT;
@@ -22,12 +21,6 @@ public class EtchDump extends AEtchCommand{
 		private String outputFilename;
 	
 	public class DumpVisitor extends EtchCellVisitor {
-		protected Main cli;
-
-		public DumpVisitor(Main cli) {
-			this.cli=cli;
-		}
-
 		@Override
 		public void visitCell(ACell cell) {
 			String hash=cell.getHash().toHexString();
@@ -44,7 +37,7 @@ public class EtchDump extends AEtchCommand{
 		if (outputFilename!=null) cli().setOut(outputFilename);
 		
 		try (EtchStore store=store()) {
-			store.getEtch().visitIndex(new DumpVisitor(cli()));
+			store.getEtch().visitIndex(new DumpVisitor());
 		} catch (IOException e) {
 			throw new CLIError("IO Error traversing Etch store",e);
 		}

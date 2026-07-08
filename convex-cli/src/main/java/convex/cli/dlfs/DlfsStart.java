@@ -114,6 +114,7 @@ public class DlfsStart extends ACommand {
 		try {
 			nodeServer.launch();
 		} catch (Exception e) {
+			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to launch NodeServer: " + e.getMessage(), e);
 		}
 		inform("Lattice node started on port " + nodeServer.getPort());
@@ -138,7 +139,9 @@ public class DlfsStart extends ACommand {
 
 		dlfsServer.start(port);
 		informSuccess("DLFS WebDAV server running on http://localhost:" + dlfsServer.getPort() + "/dlfs/");
-		inform("Connect with: curl http://localhost:" + dlfsServer.getPort() + "/dlfs/" + driveNames[0] + "/");
+		if (driveNames.length > 0) {
+			inform("Connect with: curl http://localhost:" + dlfsServer.getPort() + "/dlfs/" + driveNames[0] + "/");
+		}
 
 		cli().notifyStartup();
 
@@ -150,6 +153,7 @@ public class DlfsStart extends ACommand {
 			} catch (Exception e) {
 				log.warn("Error closing NodeServer", e);
 			}
+			store.close();
 		}));
 
 		// Block until node server shuts down
@@ -197,14 +201,22 @@ public class DlfsStart extends ACommand {
 
 	private void connectPeers(NodeServer<?> nodeServer) {
 		if (peers == null) return;
-		for (String peer : peers) {
+		for (int i = 0; i < peers.length; i++) {
+			String peer = peers[i];
 			try {
 				String[] parts = peer.split(":");
+				if (parts.length != 2) {
+					informWarning("Invalid --peer address (expected host:port): " + peer);
+					continue;
+				}
 				String host = parts[0];
 				int peerPort = Integer.parseInt(parts[1]);
 				java.net.InetSocketAddress addr = new java.net.InetSocketAddress(host, peerPort);
 				convex.api.Convex connection = convex.api.ConvexRemote.connect(addr);
-				convex.core.data.AccountKey peerKey = convex.core.data.AccountKey.dummy("0000");
+				// Placeholder key, unique per peer so connections don't collide. Since we
+				// choose to trust these peers the exact key may not matter, but ideally
+				// this would be the peer's real key from a handshake. See #629
+				AccountKey peerKey = AccountKey.dummy(Integer.toHexString(i + 1));
 				nodeServer.getPropagator().addPeer(peerKey, connection);
 				inform("Connected to peer: " + peer);
 			} catch (Exception e) {
