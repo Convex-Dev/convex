@@ -114,8 +114,9 @@ public class Migrations {
 	 * raw concatenation and positional overwrite of BlobLike values — their
 	 * {@code :doc} metadata is applied by the metadata step below; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
-	 * #600 (core docstring corrections) and #528 ({@code add-mint} in the
-	 * {@code convex.fungible} library).</li>
+	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
+	 * #621 ({@code owns?} map form in {@code convex.asset}) and #620 ({@code offer} in
+	 * {@code asset.multi-token}).</li>
 	 * </ol>
 	 *
 	 * <p>The protocol globals already exist when this fires: they were created by
@@ -132,6 +133,12 @@ public class Migrations {
 		/** convex.fungible library fixes applied as part of v1 (#528: add-mint). */
 		private static final AList<ACell> FUNGIBLE_FIXES =
 				readResource("/convex/migrations/v1-fungible.cvx");
+		/** convex.asset library fix applied as part of v1 (#621: owns? map form). */
+		private static final AList<ACell> ASSET_FIXES =
+				readResource("/convex/migrations/v1-asset.cvx");
+		/** asset.multi-token library fix applied as part of v1 (#620: offer clobbers holdings). */
+		private static final AList<ACell> MULTITOKEN_FIXES =
+				readResource("/convex/migrations/v1-multi-token.cvx");
 
 		@Override
 		public State apply(State preState) {
@@ -160,13 +167,23 @@ public class Migrations {
 			s = CORE_FIXES.apply(s);
 			s = META_FIXES.apply(s);
 
-			// 3. Apply known library fixes (#528). Resolve the library address via CNS so
-			// this works on any network that has it; skip if absent.
-			ACell fungible = s.lookupCNS("convex.fungible");
-			if (fungible instanceof Address) {
-				s = evalForms(s, (Address) fungible, FUNGIBLE_FIXES);
-			}
+			// 3. Apply known library fixes, resolving each library address via CNS so this
+			// works on any network that has it (skipped if absent). Each redefinition is
+			// idempotent: re-applying the corrected definition — e.g. after an out-of-band
+			// governance patch installing the same fix — leaves the environment unchanged.
+			s = applyLibraryFix(s, "convex.fungible", FUNGIBLE_FIXES);   // #528: add-mint
+			s = applyLibraryFix(s, "convex.asset", ASSET_FIXES);         // #621: owns? map form
+			s = applyLibraryFix(s, "asset.multi-token", MULTITOKEN_FIXES); // #620: offer clobbers holdings
 
+			return s;
+		}
+
+		/** Applies a set of redefinition forms to the actor resolved from a CNS name, or no-op if absent. */
+		private static State applyLibraryFix(State s, String cnsName, AList<ACell> forms) {
+			ACell addr = s.lookupCNS(cnsName);
+			if (addr instanceof Address) {
+				return evalForms(s, (Address) addr, forms);
+			}
 			return s;
 		}
 	}

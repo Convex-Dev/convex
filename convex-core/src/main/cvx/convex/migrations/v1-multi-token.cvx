@@ -1,0 +1,33 @@
+;; Network upgrade v1 — asset.multi-token library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the asset.multi-token actor account,
+;; redefining `offer`. Deliberately NOT part of multi-token.cvx / genesis: existing
+;; networks keep their genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #620: when the caller had no existing holding record for the offered token
+;; (`rec` nil), `offer` replaced the caller's ENTIRE holdings map with a single-token
+;; map, destroying the balances and offers of every other token the caller held. It
+;; must `assoc` the new record into the existing holdings. Only that write changes.
+;;
+;; Idempotent: re-applying the corrected definition (e.g. after an out-of-band
+;; governance patch installing the same fix) is a no-op.
+
+(defn offer
+  ^{:callable true}
+  [receiver quantity]
+  (let [id *scope*
+        quantity (-qc quantity)
+        receiver (address receiver)
+        hs (get-holding *caller*)
+        rec (get hs id)]
+    (if rec
+      (let [os (nth rec 1) ;; offers map
+            nrec (if (<= quantity 0)
+                   (assoc rec 1 (dissoc os receiver))
+                   (assoc rec 1 (assoc os receiver quantity)))]
+        (set-holding *caller* (assoc hs id nrec)))
+      (do ;; create a new record with given offer, preserving other holdings
+        (or (get tokens id) (fail :STATE "token does not exist"))
+        (set-holding *caller* (assoc hs id [0 {receiver quantity}]))))
+    quantity ;; return value is quantity offered
+    ))

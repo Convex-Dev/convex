@@ -325,6 +325,36 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testAssetOwnsFix() {
+		// #621: (owns? owner <map>) always returned true (misplaced paren discarded the
+		// map branch). Set up a token the caller owns 1,000,000 of, then ask about a
+		// quantity it does NOT own — buggy on genesis (true), correct on the upgraded state.
+		String expr = "(do (import convex.asset :as asset) (import convex.fungible :as fungible) "
+				+ "(def token (deploy (fungible/build-token {:supply 1000000}))) "
+				+ "(asset/owns? *address* {token 2000000}))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(GENESIS, expr));   // buggy: always true
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, expr)); // fixed: owns 1M < 2M
+		// The vector form (unaffected by the fix) works on both
+		String vec = "(do (import convex.asset :as asset) (import convex.fungible :as fungible) "
+				+ "(def token (deploy (fungible/build-token {:supply 1000000}))) "
+				+ "(asset/owns? *address* [token 1000]))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, vec));
+	}
+
+	@Test
+	public void testMultiTokenOfferFix() {
+		// #620: offering a token for which the caller had no holding record replaced the
+		// caller's ENTIRE holdings map, destroying other tokens. Mint token AAA, then offer
+		// (unheld) token BBB, then check AAA balance — wiped on genesis, preserved upgraded.
+		String expr = "(do (import asset.multi-token :as mt) (import convex.asset :as asset) "
+				+ "(call mt (create :AAA)) (call [mt :AAA] (mint 1000)) "
+				+ "(call mt (create :BBB)) (asset/offer *address* [mt :BBB] 500) "
+				+ "(asset/balance [mt :AAA]))";
+		assertEquals(CVMLong.create(0), eval(GENESIS, expr));     // buggy: AAA holding clobbered
+		assertEquals(CVMLong.create(1000), eval(UPGRADED, expr)); // fixed: AAA preserved
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUpgradedCoreDocs() {
 		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by

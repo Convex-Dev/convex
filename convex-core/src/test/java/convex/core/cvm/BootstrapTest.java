@@ -48,20 +48,26 @@ public class BootstrapTest {
 		State scheduled = scheduleBootstrap(INIT_STATE);
 		State migrated = Migrations.get(0).apply(scheduled);
 
-		// v1 touches exactly two accounts: the core account (#8) and the fungible
-		// library (add-mint fix). Every other account is identical.
+		// v1 touches the core account (#8) and the fixed library accounts: fungible
+		// (add-mint), asset (owns?) and multi-token (offer). Every other account is identical.
 		Address fungible = (Address) scheduled.lookupCNS("convex.fungible");
+		Address asset = (Address) scheduled.lookupCNS("convex.asset");
+		Address multitoken = (Address) scheduled.lookupCNS("asset.multi-token");
 		assertNotNull(fungible);
+		assertNotNull(asset);
+		assertNotNull(multitoken);
+		java.util.Set<Address> changed = java.util.Set.of(Core.CORE_ADDRESS, fungible, asset, multitoken);
 		long n = scheduled.getAccounts().count();
 		for (long i = 0; i < n; i++) {
 			Address a = Address.create(i);
-			if (a.equals(Core.CORE_ADDRESS) || a.equals(fungible)) continue;
+			if (changed.contains(a)) continue;
 			assertSame(scheduled.getAccount(a), migrated.getAccount(a), "Account " + a + " must be untouched");
 		}
 
-		// The fungible library's add-mint was actually redefined (environment changed)
-		assertNotSame(scheduled.getAccount(fungible).getEnvironment(),
-				migrated.getAccount(fungible).getEnvironment());
+		// Each fixed library was actually redefined (environment changed)
+		assertNotSame(scheduled.getAccount(fungible).getEnvironment(), migrated.getAccount(fungible).getEnvironment());
+		assertNotSame(scheduled.getAccount(asset).getEnvironment(), migrated.getAccount(asset).getEnvironment());
+		assertNotSame(scheduled.getAccount(multitoken).getEnvironment(), migrated.getAccount(multitoken).getEnvironment());
 
 		// Peers, schedule and globals are untouched by the migration itself
 		// (the watermark advance is the mechanism's job, not the migration's)
