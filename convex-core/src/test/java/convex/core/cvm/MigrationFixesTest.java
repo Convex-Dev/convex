@@ -3,12 +3,16 @@ package convex.core.cvm;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
@@ -279,6 +283,51 @@ public class MigrationFixesTest {
 		// Arity is exactly 3
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0)"));
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 0xff 0xff)"));
+
+		// Logical consistency: splice is exactly the cat+slice composition
+		// (splice dst off src) == (cat (slice dst 0 off) src (slice dst (min (+ off (count src)) (count dst)) (count dst)))
+		String[][] cases = {
+				{"0x00112233445566", "3", "0xaabb"},   // interior overwrite
+				{"0x00112233", "2", "0xaabbccdd"},     // straddle end (extend)
+				{"0x1234", "2", "0xabcd"},             // append at end
+				{"\"hello world\"", "6", "\"there!\""},// String, extend
+				{"\"abcdef\"", "0", "0x58"},           // String, single-byte interior
+		};
+		for (String[] c : cases) {
+			String dst = c[0], off = c[1], src = c[2];
+			String viaCat = "(cat (slice " + dst + " 0 " + off + ") " + src
+					+ " (slice " + dst + " (min (+ " + off + " (count " + src + ")) (count " + dst + ")) (count " + dst + ")))";
+			assertEquals(eval(UPGRADED, viaCat), eval(UPGRADED, "(splice " + dst + " " + off + " " + src + ")"),
+					"splice/cat+slice divergence for " + java.util.Arrays.toString(c));
+		}
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testUpgradedCoreDocs() {
+		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by
+		// DocsTest/testCoreDefSymbols (both genesis-only). Validate them on the upgraded
+		// state: each has a :doc with :description, and its examples evaluate without error.
+		convex.core.cvm.AccountStatus core = UPGRADED.getAccount(convex.core.lang.Core.CORE_ADDRESS);
+		for (Symbol sym : new Symbol[] { convex.core.cvm.Symbols.CAT, convex.core.cvm.Symbols.SPLICE,
+				convex.core.cvm.Symbols.GENSYM }) {
+			AHashMap<ACell, ACell> meta = core.getMetadata().get(sym);
+			assertNotNull(meta, "no metadata for " + sym);
+			AHashMap<ACell, ACell> doc = (AHashMap<ACell, ACell>) meta.get(convex.core.cvm.Keywords.DOC_META);
+			assertNotNull(doc, "no :doc for " + sym);
+			assertNotNull(doc.get(convex.core.cvm.Keywords.DESCRIPTION), "no :description for " + sym);
+			AVector<AHashMap<ACell, ACell>> examples =
+					(AVector<AHashMap<ACell, ACell>>) doc.get(convex.core.cvm.Keywords.EXAMPLES);
+			if (examples != null) {
+				for (AHashMap<ACell, ACell> ex : examples) {
+					AString code = (AString) ex.get(convex.core.cvm.Keywords.CODE);
+					if (code != null) {
+						assertFalse(evalErrors(UPGRADED, code.toString()),
+								"doc example errors for " + sym + ": " + code);
+					}
+				}
+			}
+		}
 	}
 
 	@Test

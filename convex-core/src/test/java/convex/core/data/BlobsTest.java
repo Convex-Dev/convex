@@ -708,6 +708,19 @@ public class BlobsTest {
 		ABlob grown = small.replaceSlice(1, rep);
 		assertEquals(1 + rep.count(), grown.count());
 		assertEquals(small.slice(0, 1).append(rep), grown);
+
+		// Results must be canonical / valid across sizes and chunk boundaries (a >4096
+		// flat blob would be non-canonical and force an O(n) re-chunk on String wrap)
+		try {
+			for (ABlob res : new ABlob[] { modified, grown, big.replaceSlice(n, rep),
+					big.replaceSlice(4090, Blob.createRandom(new Random(99), 12)) }) {
+				assertTrue(res.isCanonical());
+				assertEquals(res, res.toCanonical());
+				res.validate();
+			}
+		} catch (InvalidDataException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	@Test
