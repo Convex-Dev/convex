@@ -2708,7 +2708,6 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
 			ACountable<?> result = counted.slice(start,end);
-			// TODO: probably needs to cost a lot more?
 			return context.withResult(juice, result);
 		}
 	});
