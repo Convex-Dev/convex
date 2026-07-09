@@ -46,6 +46,18 @@ public class StringsTest {
 	}
 
 	@Test
+	public void testIsBlank() {
+		assertTrue(StringShort.EMPTY.isBlank());
+		assertTrue(Strings.create(" ").isBlank());
+		assertTrue(Strings.create(" \t\r\n\f ").isBlank());
+		assertFalse(Strings.create("x").isBlank());
+		assertFalse(Strings.create("  x  ").isBlank());
+		assertFalse(Strings.create("ሴ").isBlank());     // multi-byte content is non-blank
+		assertFalse(Strings.create("\u00A0").isBlank());  // exotic Unicode whitespace (NBSP) counts as content
+		assertFalse(Samples.NON_EMBEDDED_STRING.isBlank());  // a large (tree) string works byte-wise
+	}
+
+	@Test
 	public void testEmbedding() {
 		assertEquals(Format.MAX_EMBEDDED_LENGTH, Samples.MAX_EMBEDDED_STRING.getEncodingLength());
 		assertTrue(Samples.MAX_EMBEDDED_STRING.isEmbedded());
