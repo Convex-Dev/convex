@@ -52,7 +52,8 @@ public class BootstrapTest {
 		// (add-mint), asset (owns?), multi-token (offer) and the nft/box asset actors
 		// (offer + get-offer). Every other account is identical.
 		String[] fixedLibs = { "convex.fungible", "convex.asset", "asset.multi-token",
-				"asset.nft.simple", "asset.nft.basic", "asset.box.actor" };
+				"asset.nft.simple", "asset.nft.basic", "asset.box.actor",
+				"convex.trust", "convex.trust.delegate" };
 		java.util.Set<Address> changed = new java.util.HashSet<>();
 		changed.add(Core.CORE_ADDRESS);
 		for (String lib : fixedLibs) {

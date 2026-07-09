@@ -373,6 +373,31 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testTrustedFailClosed() {
+		// #623: trust/trusted? must fail closed against a defective monitor. A monitor
+		// that throws makes trusted? propagate the error on genesis, but returns false on
+		// the upgraded state (error caught, result boolean-coerced).
+		String throwing = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] (fail :ASSERT \"boom\")))) "
+				+ "(trust/trusted? m *address*))";
+		assertTrue(evalErrors(GENESIS, throwing));                                   // error propagates
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, throwing)); // fails closed
+
+		// A well-behaved monitor still works on both versions
+		String ok = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] true))) "
+				+ "(trust/trusted? m *address*))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(GENESIS, ok));
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, ok));
+
+		// A non-boolean (defective) truthy result is coerced to true on the upgraded state
+		String nonbool = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] 42))) "
+				+ "(trust/trusted? m *address*))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, nonbool));
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUpgradedCoreDocs() {
 		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by

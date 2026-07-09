@@ -116,9 +116,11 @@ public class Migrations {
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
 	 * #621 ({@code owns?} map form in {@code convex.asset}), #620 ({@code offer} in
-	 * {@code asset.multi-token}) and #622 ({@code offer} receiver normalisation plus the
+	 * {@code asset.multi-token}), #622 ({@code offer} receiver normalisation plus the
 	 * {@code get-offer} SPI in the {@code nft.simple}, {@code nft.basic} and
-	 * {@code box.actor} asset actors).</li>
+	 * {@code box.actor} asset actors) and #623 ({@code trust/trusted?} fails closed
+	 * against defective monitors; {@code convex.trust.delegate} control action; and
+	 * {@code remove-upgradability!}).</li>
 	 * </ol>
 	 *
 	 * <p>The protocol globals already exist when this fires: they were created by
@@ -149,6 +151,12 @@ public class Migrations {
 				readResource("/convex/migrations/v1-nft-basic.cvx");
 		private static final AList<ACell> BOX_FIXES =
 				readResource("/convex/migrations/v1-box.cvx");
+		/** convex.trust fixes (#623: trusted? fail-closed against defective monitors,
+		 * remove-upgradability! undef change-control) and convex.trust.delegate (:control). */
+		private static final AList<ACell> TRUST_FIXES =
+				readResource("/convex/migrations/v1-trust.cvx");
+		private static final AList<ACell> DELEGATE_FIXES =
+				readResource("/convex/migrations/v1-delegate.cvx");
 
 		@Override
 		public State apply(State preState) {
@@ -187,6 +195,8 @@ public class Migrations {
 			s = applyLibraryFix(s, "asset.nft.simple", NFT_SIMPLE_FIXES); // #622: offer receiver + get-offer
 			s = applyLibraryFix(s, "asset.nft.basic", NFT_BASIC_FIXES);   // #622
 			s = applyLibraryFix(s, "asset.box.actor", BOX_FIXES);         // #622: + burn -qc
+			s = applyLibraryFix(s, "convex.trust", TRUST_FIXES);          // #623: trusted? fail-closed
+			s = applyLibraryFix(s, "convex.trust.delegate", DELEGATE_FIXES); // #623: :control action
 
 			return s;
 		}

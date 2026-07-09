@@ -74,8 +74,9 @@ public class TrustActorTest extends ACVMTest {
 		Context ctx=exec(context(),"(import convex.trust.delegate :as del)");
 		Address del=ctx.getResult();
 		
-		// Unscoped usage
-		assertArgumentError(step(ctx,"(trust/trusted? del *address*)"));
+		// Unscoped usage: the delegate monitor fails on a null scope, which trusted?
+		// now catches and fails closed to false (#623). Runs on the upgraded state.
+		assertFalse(evalB(ctx,"(trust/trusted? del *address*)"));
 		
 		// Missing ID
 		assertFalse(evalB(ctx,"(trust/trusted? [del -1] *address*)"));
@@ -105,8 +106,10 @@ public class TrustActorTest extends ACVMTest {
 		Context ctx=step(context(),"(import convex.trust.whitelist :as allow)");
 		assertNotError(ctx);
 		
-		assertArgumentError(step(ctx,"(trust/trusted? allow *address*)"));
-		assertArgumentError(step(ctx,"(trust/trusted? [allow nil] *address*)"));
+		// A malformed/missing scope makes the whitelist monitor fail; trusted? now
+		// fails closed to false rather than propagating the error (#623).
+		assertFalse(evalB(ctx,"(trust/trusted? allow *address*)"));
+		assertFalse(evalB(ctx,"(trust/trusted? [allow nil] *address*)"));
 		
 		assertTrue(evalB(ctx,"(trust/trusted? [allow #{*address*}] *address*)"));
 		assertFalse(evalB(ctx,"(trust/trusted? [allow #{*address*}] #0)"));

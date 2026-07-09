@@ -1,0 +1,25 @@
+;; Network upgrade v1 — convex.trust.delegate library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the convex.trust.delegate actor
+;; account, redefining `change-control`. Deliberately NOT part of trust/delegate.cvx
+;; / genesis: existing networks keep their genesis hash and reach this fix at
+;; protocol version 1.
+;;
+;; Fixes #623: `change-control` authorised control transfers against action
+;; `:change-control`, but the library convention (and the CVM controller checks, and
+;; the core trust `change-control`) uses `:control`. A monitor configured per the
+;; documented `:control` convention could not authorise a delegate control transfer.
+;; Aligns the action keyword to `:control`.
+;;
+;; Idempotent: re-applying the corrected definition is a no-op.
+
+(defn change-control
+  ^{:callable true}
+  [controller]
+   (let [rec (mons *scope*)]
+    (or rec (fail :ARGUMENT "Delegated trust monitor ID not valid"))
+    (or
+      (trust/trusted? (second rec) *caller* :control [*address* *scope*])
+      (fail :TRUST "Controller not valid"))
+    (set! mons (assoc mons *scope* (assoc rec 1 controller)))
+    controller))
