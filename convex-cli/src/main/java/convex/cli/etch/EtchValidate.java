@@ -38,9 +38,13 @@ public class EtchValidate extends AEtchCommand{
 		public void visitHash(convex.etch.Etch e, Hash h) {
 			try {
 				Ref<ACell> r=e.read(h);
-				ACell cell=r.getValue();
+				ACell cell=(r==null)?null:r.getValue();
+				if (cell==null) {
+					fail("Missing cell for hash "+h);
+					return;
+				}
 				cell.validate();
-				
+
 				Blob encoding =cell.getEncoding();
 				encoded+=encoding.count();
 			} catch (IOException | InvalidDataException e1) {
@@ -59,7 +63,7 @@ public class EtchValidate extends AEtchCommand{
 	@Override
 	public void execute() {
 		EtchStore store=store();
-		try {
+		try (store) {
 			ValidateVisitor visitor=new ValidateVisitor(cli());
 			convex.etch.Etch etch=store.getEtch();
 			etch.visitIndex(visitor);
@@ -75,8 +79,10 @@ public class EtchValidate extends AEtchCommand{
 			cli().println("Cells:                    "+Text.toFriendlyNumber(cellCount));
 			cli().println("Empty:                    "+Text.toFriendlyNumber(visitor.empty));
 			cli().println("Database size:            "+Text.toFriendlyNumber(len));
-			cli().println("Avg. Encoding Length:     "+Text.toFriendlyDecimal(((double)visitor.encoded)/cellCount));
-			cli().println("Storage per Cell (bytes): "+Text.toFriendlyDecimal(((double)len)/cellCount));
+			if (cellCount>0) {
+				cli().println("Avg. Encoding Length:     "+Text.toFriendlyDecimal(((double)visitor.encoded)/cellCount));
+				cli().println("Storage per Cell (bytes): "+Text.toFriendlyDecimal(((double)len)/cellCount));
+			}
 
 		} catch (EtchCorruptionError e) {
 			throw new CLIError("Etch file corrupt: "+store,e);

@@ -108,13 +108,19 @@ public class Migrations {
 	 *
 	 * <ol>
 	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} /
-	 * {@code gensym} core bindings (CoreFn singletons, marked {@code :static};
-	 * these cannot be defined in Lisp), enabling future upgrades to be scheduled
-	 * on-chain and macros to introduce hygienic bindings — their {@code :doc}
-	 * metadata is applied by the metadata step below; and</li>
+	 * {@code gensym} / {@code cat} / {@code splice} core bindings (CoreFn singletons,
+	 * marked {@code :static}; these cannot be defined in Lisp), enabling future
+	 * upgrades to be scheduled on-chain, macros to introduce hygienic bindings, and
+	 * raw concatenation and positional overwrite of BlobLike values — their
+	 * {@code :doc} metadata is applied by the metadata step below; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
-	 * #600 (core docstring corrections) and #528 ({@code add-mint} in the
-	 * {@code convex.fungible} library).</li>
+	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
+	 * #621 ({@code owns?} map form in {@code convex.asset}), #620 ({@code offer} in
+	 * {@code asset.multi-token}), #622 ({@code offer} receiver normalisation plus the
+	 * {@code get-offer} SPI in the {@code nft.simple}, {@code nft.basic} and
+	 * {@code box.actor} asset actors) and #623 ({@code trust/trusted?} fails closed
+	 * against defective monitors; {@code convex.trust.delegate} control action; and
+	 * {@code remove-upgradability!}).</li>
 	 * </ol>
 	 *
 	 * <p>The protocol globals already exist when this fires: they were created by
@@ -131,6 +137,26 @@ public class Migrations {
 		/** convex.fungible library fixes applied as part of v1 (#528: add-mint). */
 		private static final AList<ACell> FUNGIBLE_FIXES =
 				readResource("/convex/migrations/v1-fungible.cvx");
+		/** convex.asset library fix applied as part of v1 (#621: owns? map form). */
+		private static final AList<ACell> ASSET_FIXES =
+				readResource("/convex/migrations/v1-asset.cvx");
+		/** asset.multi-token library fix applied as part of v1 (#620: offer clobbers holdings). */
+		private static final AList<ACell> MULTITOKEN_FIXES =
+				readResource("/convex/migrations/v1-multi-token.cvx");
+		/** asset.nft.simple / asset.nft.basic / asset.box.actor fixes (#622: offer receiver
+		 * not normalised so assets could not be transferred into boxes; + get-offer SPI). */
+		private static final AList<ACell> NFT_SIMPLE_FIXES =
+				readResource("/convex/migrations/v1-nft-simple.cvx");
+		private static final AList<ACell> NFT_BASIC_FIXES =
+				readResource("/convex/migrations/v1-nft-basic.cvx");
+		private static final AList<ACell> BOX_FIXES =
+				readResource("/convex/migrations/v1-box.cvx");
+		/** convex.trust fixes (#623: trusted? fail-closed against defective monitors,
+		 * remove-upgradability! undef change-control) and convex.trust.delegate (:control). */
+		private static final AList<ACell> TRUST_FIXES =
+				readResource("/convex/migrations/v1-trust.cvx");
+		private static final AList<ACell> DELEGATE_FIXES =
+				readResource("/convex/migrations/v1-delegate.cvx");
 
 		@Override
 		public State apply(State preState) {
@@ -140,6 +166,8 @@ public class Migrations {
 			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
 			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
 			env = env.assoc(Symbols.GENSYM, Core.GENSYM);
+			env = env.assoc(Symbols.CAT, Core.CAT);
+			env = env.assoc(Symbols.SPLICE, Core.SPLICE);
 
 			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
 			// :static only here; full metadata including :doc is applied by META_FIXES,
@@ -148,6 +176,8 @@ public class Migrations {
 			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.GENSYM, staticMeta);
+			meta = meta.assoc(Symbols.CAT, staticMeta);
+			meta = meta.assoc(Symbols.SPLICE, staticMeta);
 
 			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
 
@@ -155,13 +185,28 @@ public class Migrations {
 			s = CORE_FIXES.apply(s);
 			s = META_FIXES.apply(s);
 
-			// 3. Apply known library fixes (#528). Resolve the library address via CNS so
-			// this works on any network that has it; skip if absent.
-			ACell fungible = s.lookupCNS("convex.fungible");
-			if (fungible instanceof Address) {
-				s = evalForms(s, (Address) fungible, FUNGIBLE_FIXES);
-			}
+			// 3. Apply known library fixes, resolving each library address via CNS so this
+			// works on any network that has it (skipped if absent). Each redefinition is
+			// idempotent: re-applying the corrected definition — e.g. after an out-of-band
+			// governance patch installing the same fix — leaves the environment unchanged.
+			s = applyLibraryFix(s, "convex.fungible", FUNGIBLE_FIXES);   // #528: add-mint
+			s = applyLibraryFix(s, "convex.asset", ASSET_FIXES);         // #621: owns? map form
+			s = applyLibraryFix(s, "asset.multi-token", MULTITOKEN_FIXES); // #620: offer clobbers holdings
+			s = applyLibraryFix(s, "asset.nft.simple", NFT_SIMPLE_FIXES); // #622: offer receiver + get-offer
+			s = applyLibraryFix(s, "asset.nft.basic", NFT_BASIC_FIXES);   // #622
+			s = applyLibraryFix(s, "asset.box.actor", BOX_FIXES);         // #622: + burn -qc
+			s = applyLibraryFix(s, "convex.trust", TRUST_FIXES);          // #623: trusted? fail-closed
+			s = applyLibraryFix(s, "convex.trust.delegate", DELEGATE_FIXES); // #623: :control action
 
+			return s;
+		}
+
+		/** Applies a set of redefinition forms to the actor resolved from a CNS name, or no-op if absent. */
+		private static State applyLibraryFix(State s, String cnsName, AList<ACell> forms) {
+			ACell addr = s.lookupCNS(cnsName);
+			if (addr instanceof Address) {
+				return evalForms(s, (Address) addr, forms);
+			}
 			return s;
 		}
 	}

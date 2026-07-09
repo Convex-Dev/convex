@@ -17,7 +17,7 @@ public class PeerKeyMixin extends AMixin {
 			defaultValue = "${env:CONVEX_PEER_KEY_PASSWORD}",
 			scope = ScopeType.INHERIT,
 			description = "Peer key password in keystore. Can also specify with CONVEX_PEER_KEY_PASSWORD.")
-	protected String keyPassword;
+	protected char[] keyPassword;
 
 	/**
 	 * Gets the specified public key alias for the Peer
@@ -36,11 +36,9 @@ public class PeerKeyMixin extends AMixin {
 	 * @return password (never null, may be empty array in non-strict mode)
 	 */
 	public char[] getKeyPassword() {
-		char[] keypass = null;
+		char[] keypass = this.keyPassword;
 
-		if (this.keyPassword != null) {
-			keypass = this.keyPassword.toCharArray();
-		} else {
+		if (keypass == null) {
 			if (isInteractive()) {
 				keypass = readPassword("Peer Key Encryption Password: ");
 			}
@@ -50,15 +48,15 @@ public class PeerKeyMixin extends AMixin {
 				keypass = new char[0];
 			}
 
-			this.keyPassword=new String(keypass);
+			this.keyPassword=keypass;
 		}
 		if (keypass.length == 0) {
 			paranoia("Cannot use an empty password in --strict-security mode");
 		}
 		return keypass;
 	}
-	
-	public AccountKey getAcountKey() {
+
+	public AccountKey getAccountKey() {
 		String ks=getPublicKey();
 		AccountKey result= AccountKey.parse(ks);
 		return result;

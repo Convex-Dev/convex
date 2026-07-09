@@ -13,12 +13,11 @@ public class EtchClear extends AEtchCommand{
 
 	@Override
 	public void execute() {
-		try {
-			EtchStore store=store();
+		try (EtchStore store=store()) {
 			store.setRootData(null);
 			informSuccess("Etch data cleared in: "+store);
 		} catch (IOException e) {
-			throw new CLIError("IO Error accessing Etch database: "+e.getMessage());
+			throw new CLIError("IO Error accessing Etch database",e);
 		}
 	}
 }

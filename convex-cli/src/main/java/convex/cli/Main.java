@@ -7,7 +7,6 @@ import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import convex.cli.account.Account;
 import convex.cli.client.Query;
@@ -36,9 +35,9 @@ import picocli.CommandLine.ScopeType;
  * 
  * This is the main `convex` command and root for child commands.
  */
-@Command(name = "convex", 
+@Command(name = "convex",
 		subcommands = { Account.class, Dlfs.class, Key.class, Local.class, Peer.class, Query.class, Status.class, Desktop.class,
-		Etch.class, Transact.class, Help.class }, 
+		Etch.class, Transact.class, CommandLine.HelpCommand.class },
 		usageHelpAutoWidth = true, 
 		sortOptions = true, 
 		mixinStandardHelpOptions = true,
@@ -77,10 +76,10 @@ public class Main extends ACommand {
 			description = "Suppress ANSI colour output. Can also suppress with NO_COLOR environment variable.")
 	private boolean noColour;
 
-	@Option(names = { "-v","--verbose" }, 
-			scope = ScopeType.INHERIT, 
-			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-"+Constants.DEFAULT_VERBOSE_LEVEL+"}", 
-			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}") 
+	@Option(names = { "-v","--verbose" },
+			scope = ScopeType.INHERIT,
+			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-"+Constants.DEFAULT_VERBOSE_LEVEL+"}",
+			description = "Specify verbosity level (0-5) for user output. Use -v0 to suppress user output. Default: ${DEFAULT-VALUE}")
 	private Integer verbose;
 
 	public final CompletableFuture<String> startupFuture=new CompletableFuture<>();
@@ -88,10 +87,13 @@ public class Main extends ACommand {
 	@Override
 	public void execute() {
 		String art=Helpers.getConvexArt();
-		if (isColoured()) art=Coloured.blue(art);
-		inform(2,art);
-		inform(2,Coloured.blue("Version: "+Utils.getVersion()));
-		
+		if (art!=null) {
+			if (isColoured()) art=Coloured.blue(art);
+			inform(2,art);
+		}
+		String version="Version: "+Utils.getVersion();
+		inform(2,isColoured()?Coloured.blue(version):version);
+
 		// no command provided - so show help
 		showUsage();
 	}
@@ -117,9 +119,8 @@ public class Main extends ACommand {
 	 */
 	public int mainExecute(String[] args) {
 		try {
-
-			// do a pre-parse to get the config filename. We need to load
-			// in the defaults before running the full execute
+			// Do a pre-parse so that global options (help / version / verbosity) can be
+			// checked before the full execute
 			try {
 				commandLine.parseArgs(args);
 			} catch (ParameterException t) {
@@ -136,7 +137,12 @@ public class Main extends ACommand {
 				return ExitCodes.SUCCESS;
 			}
 
-			setupVerbosity();
+			try {
+				checkVerbosity();
+			} catch (CLIError e) {
+				informError("ERROR: "+e.getMessage());
+				return e.getExitCode();
+			}
 
 			int result = commandLine.execute(args);
 			return result;
@@ -147,23 +153,12 @@ public class Main extends ACommand {
 		}
 	}
 
-	private void setupVerbosity() {
-		// Verbosity levels 0-5 map to SLF4J levels. Levels 4 and 5 both map to TRACE
-		// since SLF4J has no finer level than TRACE.
-		Level[] verboseLevels = { Level.ERROR, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.TRACE };
-
-		if (verbose == null)
-			verbose = 0;
-		if (verbose >= 0 && verbose < verboseLevels.length) {
-			// Set root logger level?
-//			try {
-//			ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-//			root.setLevel(verboseLevels[verbose]);
-//			} catch (XXException e) {
-//				informWarning("Failed to set verbosity level: "+e.getMessage());
-//			}
-		} else {
-			throw new CLIError(ExitCodes.USAGE,"Invalid verbosity level: " + verbose);
+	private void checkVerbosity() {
+		// Note: verbosity level currently controls user output via inform(...) only.
+		// Wiring it to the SLF4J backend log level is tracked as a separate enhancement.
+		int v = verbose();
+		if ((v < 0) || (v > 5)) {
+			throw new CLIError(ExitCodes.USAGE,"Invalid verbosity level: " + v + " (expected 0-5)");
 		}
 	}
 
@@ -194,7 +189,7 @@ public class Main extends ACommand {
 				String msg=ce.getMessage();
 				informError(msg);
 				Throwable cause = ce.getCause();
-				if ((verbose>=3) && (cause != null)) {
+				if ((verbose()>=3) && (cause != null)) {
 					err.println("Underlying cause: ");
 					cause.printStackTrace(err);
 				}
@@ -202,11 +197,11 @@ public class Main extends ACommand {
 				informError("Process interrupted");
 			} else if (ex.getClass().getSimpleName().equals("UserInterruptException")) {
 				informError("Operation cancelled by user");
-				if (verbose>=3) {
+				if (verbose()>=3) {
 					ex.printStackTrace(err);
 				}
 			} else {
-				if (verbose>=1) {
+				if (verbose()>=1) {
 					ex.printStackTrace(err);
 				}
 			}
@@ -260,7 +255,7 @@ public class Main extends ACommand {
 				commandLine.setOut(pw);
 			}
 		} catch (IOException e) {
-			throw new CLIError("Unable to open output file: "+outFile);
+			throw new CLIError(ExitCodes.IOERR,"Unable to open output file: "+outFile,e);
 		}
 	}
 

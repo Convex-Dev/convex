@@ -5,7 +5,7 @@ import convex.gui.MainGUI;
 import picocli.CommandLine.Command;
 
 @Command(name="desktop",
-mixinStandardHelpOptions=false,
+mixinStandardHelpOptions=true,
 description="Run the Convex Desktop GUI")
 public class Desktop extends ATopCommand {
 
@@ -13,6 +13,7 @@ public class Desktop extends ATopCommand {
 	public void execute() {
 		MainGUI gui = new MainGUI();
 		gui.run();
+		cli().notifyStartup();
 		gui.waitForClose();
 	}
 

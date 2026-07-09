@@ -4,7 +4,8 @@ How a new developer discovers, understands, and gets started with Convex — and
 to improve. Covers the three onboarding repos: `convex`, `design` (docs.convex.world), and
 `convex.world` (website).
 
-Reviewed 2026-06-15 · **golden path implemented 2026-06-19** · last updated 2026-06-19.
+Reviewed 2026-06-15 · **golden path implemented 2026-06-19** · last updated 2026-07-07
+(added §3a testnet strategy).
 
 ## Status
 
@@ -94,7 +95,73 @@ leads the guide, which was also corrected (see §4).
 **Keep one-line-swap items from scattering again:**
 - The **testnet endpoint** `mikera1337-convex-testnet.hf.space` is still a placeholder for a
   proper branded testnet. It now appears in the quickstart, README, and SDK examples — keep each
-  surface's value in one place so the eventual swap stays cheap.
+  surface's value in one place so the eventual swap stays cheap. Strategy for the proper testnet
+  is now agreed — see **§3a**; the docs-side centralisation is tracked as design#83.
+
+---
+
+## 3a. Testnet strategy (agreed 2026-07-07; revised same day: **exit HF ASAP**)
+
+The single HF Space currently serves two conflicting jobs. Split them — and get off
+HuggingFace entirely rather than keeping the Space in any role:
+
+1. **Stable testnet** — the onboarding surface (docs, SDK quickstarts, faucet, agent/MCP use).
+   Needs stability: **released** builds (0.8.7 as of Jul 2026), persistent Etch state, a stable
+   genesis, a hostname that outlives the hosting.
+2. **Devnet (develop-HEAD verification)** — does NOT get a hosted replacement by default.
+   Develop verification stays local (throwaway local peers / ACVMTest against a local develop
+   build — already the established practice, since the hosted testnet always lagged develop
+   anyway). If a *hosted* develop endpoint later proves genuinely needed, run it as a container
+   on owned infrastructure — not on HF.
+
+**Branded hostname.** `testnet.convex.live` already resolves (wildcard → 35.234.154.68, the
+Protonet box). Give it an explicit A record to the new testnet VM's static IP when that exists.
+Centralise the URL in the docs meanwhile (design#83) so the swap to the branded name is one
+change — after that, hosting changes never touch the ~40 documented references again.
+
+**Target hosting: a separate small GCP VM (e2-small/medium), not the Protonet box.**
+- Rationale: keeps the **standard peer port 18888** on its own IP (`testnet.convex.live:18888`) —
+  colocating would force a non-standard port (18889) into every binary example, peer config and
+  `--url` advertisement permanently. Also isolates faucet-fuelled load from the production peer
+  (worst failure mode becomes "testnet down", not "Protonet starved").
+- REST stays behind Caddy/nginx on 443 (vhost → local API port); raw API ports not exposed.
+- Peer runs the **latest release** jar with a persistent Etch volume and the faucet enabled.
+- **Network isolation is genesis, not ports**: the testnet's `--genesis` seed and published
+  genesis hash (pin it in `networks.md`) are the real network boundary. Set
+  `--url testnet.convex.live:18888` explicitly (GCP NAT — a peer advertising its internal
+  address poisons peer lists).
+- Bonus: the HF Space only exposes 7860/HTTP; the GCP peer upgrades testnet to full **binary
+  access** (currently "not available" in `networks.md`).
+
+**Reset/upgrade policy.** Resets only on a published cadence (announce in Discord + docs note);
+once the #413 upgrade mechanism is in a release, prefer **upgrading in place** via
+`schedule-upgrade` — every testnet upgrade then rehearses the exact mechanism Protonet depends
+on, making testnet the staging ring for protocol changes.
+
+**Later — multi-peer.** When upgrade rehearsals matter, grow to 2–3 peers: **one peer per small
+box on 18888** (the venue-3/-4 EC2/Azure pattern) rather than port arithmetic on one box — real
+network diversity, and single-peer `local start` never exercises CPoS propagation or the
+consensus-freeze-on-upgrade path.
+
+**Sequencing (HF-exit-first):**
+1. *Now:* provision the testnet VM (static IP, release jar 0.8.7, persistent Etch volume,
+   faucet, Caddy on 443, tcp:18888 firewall rule); A record `testnet.convex.live` → the VM.
+   In parallel: centralise the URL in the docs (design#83).
+2. *The moment the endpoint verifies* (faucet + SDK quickstart snippets + `/mcp` live-checked):
+   swap all surfaces to `testnet.convex.live` — design docs (#83), `convex.world`
+   `src/lib/networks.ts` `TESTNET_PEER_URL`, convex `README`/`AGENTS.md` tooling default,
+   convex-plugin MCP default. Publish reset policy + genesis hash in `networks.md`.
+3. *Immediately after the swap:* decommission the HF Space — replace its README with a pointer
+   to `testnet.convex.live`, pause/delete the Space, archive the `Convex-Dev/spaces-testnet`
+   mirror. The personal-account hostname should stop appearing anywhere current. (It has been
+   baked into agent/MCP configs, so expect stragglers — keep a redirect note up rather than a
+   hard 404 for a while if HF allows.)
+4. *With the upgrade mechanism released:* rehearse `schedule-upgrade` on testnet as part of
+   every release.
+
+Explicit non-goals: any further investment in the HF Space (org-account move, persistence
+hacks, paid tier, vhost-fronting stopgap) — it is now exit-only. The stable tier belongs on
+owned infrastructure behind an owned name.
 
 **CI hygiene:**
 - [x] **Docs link-check — DONE (2026-06-22).** Fixed the 5 broken `overview/* → cad/*/README.md`

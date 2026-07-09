@@ -2281,15 +2281,29 @@ public class Context {
 		return log;
 	}
 
+	/**
+	 * Resolves a CNS name to its value via the standard registry.
+	 * Runs on a fork, so this Context is not consumed or mutated by the lookup.
+	 *
+	 * @param name CNS name Symbol e.g. 'convex.asset
+	 * @return Forked Context with the resolved value as result (may be exceptional)
+	 */
 	public Context lookupCNS(Symbol name) {
 		Context ctx=this.fork();
-		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.RESOLVE, name);
+		ctx=ctx.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.RESOLVE, name);
 		return ctx;
 	}
 
+	/**
+	 * Reads a full CNS record via the standard registry.
+	 * Runs on a fork, so this Context is not consumed or mutated by the lookup.
+	 *
+	 * @param name CNS name Symbol e.g. 'convex.asset
+	 * @return Forked Context with the CNS record as result (may be exceptional)
+	 */
 	public Context lookupCNSRecord(Symbol name) {
 		Context ctx=this.fork();
-		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.READ, name);
+		ctx=ctx.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.READ, name);
 		return ctx;
 	}
 

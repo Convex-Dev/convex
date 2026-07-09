@@ -1,0 +1,54 @@
+;; Network upgrade v1 — asset.box.actor library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the asset.box.actor actor account.
+;; Deliberately NOT part of box/actor.cvx / genesis: existing networks keep their
+;; genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #622: `offer` keyed offers by the raw `receiver`, so a scoped-address
+;; receiver never matched the bare-address key `accept` looks up — assets could not
+;; be transferred into boxes and boxes could not be nested. Normalises with
+;; `(address receiver)`. Also adds the `get-offer` SPI function (required by
+;; `convex.asset`), and coerces `burn`'s argument with `-qc` so `(burn 5)` treats 5
+;; as `#{5}` rather than :CAST-erroring.
+;;
+;; Idempotent: re-applying the corrected definitions is a no-op.
+
+(defn offer
+  ^{:callable true}
+  [receiver quantity]
+  (let [q (-qc quantity)
+        receiver (address receiver)
+        caller-offers (get offers *caller* {})]
+    (set! offers
+         (assoc offers
+                *caller*
+                (assoc caller-offers
+                       receiver
+                       q)))))
+
+(defn get-offer
+  ^{:callable true}
+  [sender receiver]
+  (get-in offers [(address sender) (address receiver)] #{}))
+
+(defn burn
+  ^{:callable true}
+  [set-box-ids]
+  (let [set-box-ids (-qc set-box-ids)
+        owned-boxes (ownership *caller*)]
+    (when-not (subset? set-box-ids
+                       owned-boxes)
+      (fail :TRUST "Burning boxes requires ownership"))
+    (for [id set-box-ids]
+      (let [contents (boxes id)]
+        (if (empty? contents)
+          (def boxes
+               (dissoc boxes
+                       id))
+          (fail :STATE (str "Trying to delete non-empty box: " id)))))
+    (set! ownership
+      (assoc ownership
+             *caller*
+             (difference owned-boxes
+                         set-box-ids)))
+    nil))

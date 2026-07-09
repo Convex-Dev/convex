@@ -1,6 +1,7 @@
 package convex.cli.client;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
@@ -32,13 +33,14 @@ public class Query extends AClientCommand {
 			return;
 		}
 
-		Convex convex =  connectQuery();
-		for (int i=0; i<commands.length; i++) {
-			ACell message = Reader.read(commands[i]);
-			Result result = convex.querySync(message);
-			printResult(result);
-			if (result.isError()) {
-				break;
+		try (Convex convex = connectQuery()) {
+			for (int i=0; i<commands.length; i++) {
+				ACell message = Reader.read(commands[i]);
+				Result result = convex.querySync(message);
+				printResult(result);
+				if (result.isError()) {
+					throw new CLIError("Query failed with error code: "+result.getErrorCode());
+				}
 			}
 		}
 	}

@@ -16,7 +16,6 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ScopeType;
 
 
 /**
@@ -57,9 +56,8 @@ public class KeyGenerate extends AKeyCommand {
 			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")
 	private String passphrase;
 	
-	@Option(names = { "-p","--keypass" }, 
-			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
-			scope = ScopeType.INHERIT, 
+	@Option(names = { "-p","--keypass" },
+			defaultValue = "${env:CONVEX_KEY_PASSWORD}",
 			description = "Key pair password for generated key. Can specify with CONVEX_KEY_PASSWORD.")
 	protected char[] keyPassword;
 
@@ -120,30 +118,32 @@ public class KeyGenerate extends AKeyCommand {
 			return;
 		}
 		
+		storeMixin.ensureKeyStore();
+
+		if (keyPassword==null) {
+			if (isInteractive()) {
+				keyPassword=readPassword("Enter password for generated key(s): ");
+			} else if (isParanoid()) {
+				throw new CLIError(ExitCodes.USAGE,
+					"Password required in strict security mode. Use --keypass or CONVEX_KEY_PASSWORD environment variable.");
+			} else {
+				informWarning("No password provided - using empty password for key encryption.");
+				keyPassword = new char[0];
+			}
+		}
+
 		for ( int index = 0; index < count; index ++) {
 			AKeyPair kp=generateKeyPair();
-			
-            String publicKeyHexString =  kp.getAccountKey().toHexString();
-			storeMixin.ensureKeyStore();
-			
+
+			String publicKeyHexString =  kp.getAccountKey().toHexString();
 			inform("Generated key pair with public key: 0x"+kp.getAccountKey().toChecksumHex());
 
-			if (keyPassword==null) {
-				if (isInteractive()) {
-					keyPassword=readPassword("Enter password for generated key: ");
-				} else if (isParanoid()) {
-					throw new CLIError(ExitCodes.USAGE,
-						"Password required in strict security mode. Use --keypass or CONVEX_KEY_PASSWORD environment variable.");
-				} else {
-					informWarning("No password provided - using empty password for key encryption.");
-					keyPassword = new char[0];
-				}
-			}
-
-			storeMixin.addKeyPairToStore(kp, keyPassword); 
-			println(publicKeyHexString); // Output generated public key		
-			Arrays.fill(keyPassword, 'p');
+			storeMixin.addKeyPairToStore(kp, keyPassword);
+			println(publicKeyHexString); // Output generated public key
 		}
+		// Wipe the password only after ALL keys are stored, otherwise keys 2..n
+		// would be encrypted with the wiped buffer contents
+		Arrays.fill(keyPassword, 'p');
 		storeMixin.saveKeyStore();
 		informSuccess(count+ " key(s) generated and saved in store "+storeMixin.getStorePath());
 	}

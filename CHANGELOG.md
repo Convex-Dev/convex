@@ -5,6 +5,41 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-07-09
+
+### Added
+
+- CVM: `cat` core function — raw byte concatenation of BlobLike values and Characters (v1 protocol, #633).
+- CVM: `splice` core function — positional byte overwrite of a Blob or String (v1 protocol, #632).
+- UCAN: pluggable `DIDVerifier` / `RootAuthorityPolicy` — chain verification for any DID method, per-hop delegation attenuation, and self-sovereign root-authority checks (#635).
+- DLFS: delegated drive access supports delegation chains and DID-URL drive references (`did:key:zOwner.../drive`) (#635).
+- CLI: `peer -c/--config` actually loads the JSON5 config file; explicit options take precedence (#625).
+- CLI: `peer start --address` is applied at launch and verified against the on-chain controller (#624).
+- CLI: faucet commands accept scheme and port in `--host` (previously hardcoded to 8080) (#627).
+- CLI: `local start --norest` disables the REST API server (#630).
+
+### Changed
+
+- CLI: consistent `-a/--address` option across all `account` subcommands, with `CONVEX_ADDRESS` (#630).
+- CLI: `convex help <command>` shows the named subcommand's help everywhere (#630).
+- CLI: failed queries and transactions now exit non-zero, so scripts can detect failure.
+- CLI: `transact --output-file` no longer opens a network connection.
+- CLI: `key delete` and `key list` no longer create an empty keystore as a side effect.
+- CLI: an ambiguous `--key` hex prefix is now an error instead of silently picking a key.
+- CLI: `key import` auto-detects BIP39 phrases and PEM text, as documented.
+- CLI: `etch --help` and `desktop --help` work like other command groups; usage headers show the full command path.
+
+### Fixed
+
+- `convex.asset`: `owns?` on a map of assets always returned true (v1 protocol, #621).
+- `asset.multi-token`: `offer` of an unheld token wiped the caller's other holdings (v1 protocol, #620).
+- NFT and box actors: `offer` receiver now normalised so non-fungibles can be transferred into boxes; `get-offer` SPI added (v1 protocol, #622).
+- Trust: `trust/trusted?` fails closed on defective monitors; delegate control action aligned to `:control`; `remove-upgradability!` also removes `change-control` (v1 protocol, #623).
+- CLI: `key generate --count N` corrupted the password for keys after the first, making them impossible to unlock.
+- CLI: `convex status` could hang indefinitely; client connections now close properly.
+- CLI: multi-address `account balance` queries, the `--peer-port` default, `local start --count 0`, and `peer create` key passwords all fixed.
+- CLI: clearer error messages with causes and proper exit codes; prompting without a console errors instead of crashing.
+
 ## [0.8.7] - 2026-07-06
 
 ### Added

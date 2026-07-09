@@ -1,0 +1,52 @@
+;; Network upgrade v1 — convex.asset library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the convex.asset actor account,
+;; redefining `owns?`. Deliberately NOT part of asset.cvx / genesis: existing
+;; networks keep their genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #621: a misplaced closing paren closed the `cond` after the `(vector? asset)`
+;; clause, so the `(map? asset)` and `(nil? asset)` clauses were dangling body
+;; expressions and the arity always returned the trailing literal `true`. As a result
+;; `(owns? owner <map>)` was always true regardless of actual ownership. The vector and
+;; nil forms are unaffected.
+;;
+;; The buggy version happened to reject an unrecognised asset form with a :CAST error
+;; (the dangling `reduce` ran on a non-collection). That contract is preserved
+;; explicitly with a default `(fail :CAST ...)` clause, rather than silently returning
+;; nil (fail-safe but silent) for a malformed asset in a trust/ownership context.
+;;
+;; Idempotent: re-applying the corrected definition (e.g. after an out-of-band
+;; governance patch installing the same fix) is a no-op.
+
+(defn owns?
+  ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
+          :examples    [{:code "(owns? owner [fungible-token-address 1000])"}
+                        {:code "(owns? owner [non-fungible-token-address #{1 4 6}])"}]
+          :signature   [{:params [owner asset]}]}}
+
+  ([owner asset]
+    (cond
+      (vector? asset)
+      (let [[path quantity] asset]
+        (recur owner path quantity))
+
+      (map? asset)
+      (reduce (fn [result [asset-path quantity]]
+                (if (owns? owner asset-path quantity)
+                  true
+                  (reduced false)))
+              true
+              asset)
+
+      ;; Interpret nil as the 'zero' asset, which everybody owns
+      (nil? asset)
+      true
+
+      ;; Any other form is not a valid asset specification
+      (fail :CAST "Invalid asset")))
+
+  ([owner path quantity]
+    (query ;; query because this is an external call
+      (let [bal (balance path owner)]
+          (call path
+            (quantity-subset? quantity bal))))))

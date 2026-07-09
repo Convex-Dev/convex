@@ -45,26 +45,25 @@ public class Transact extends AClientCommand {
 
 	@Override
 	public void execute() throws InterruptedException {
-		Address a=getUserAddress();
-		if (a==null) throw new CLIError(ExitCodes.USAGE,"You must specify a valid origin address for the transaction.");
-		
-		Convex convex = connectTransact();
-		
-		Address address=convex.getAddress();
+		Address address=getUserAddress();
+		if (address==null) throw new CLIError(ExitCodes.USAGE,"You must specify a valid origin address for the transaction.");
+
 		log.trace("Executing transaction: '{}'\n", transactionCode);
-		
-//			if (transactionCode==null) {
-//				transactionCode=prompt("Enter transaction command: ");
-//			}
-		
+
 		ACell message = Reader.read(transactionCode);
 		ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
-		
+
 		if (outputFilename==null) {
-			ensureKeyPair(convex);
-			Result result = convex.transactSync(transaction);
-			mainParent.printResult(result);
+			try (Convex convex = connectQuery()) {
+				ensureKeyPair(convex);
+				Result result = convex.transactSync(transaction);
+				mainParent.printResult(result);
+				if (result.isError()) {
+					throw new CLIError("Transaction failed with error code: "+result.getErrorCode());
+				}
+			}
 		} else {
+			// Offline mode: encode the transaction to a file / STDOUT, no network connection needed
 			String output=Format.encodeMultiCell(transaction,true).toHexString();
 			if ("-".equals(outputFilename.trim())) {
 				println(output);
@@ -72,7 +71,7 @@ public class Transact extends AClientCommand {
 				try {
 					FileUtils.writeFileAsString(Paths.get(outputFilename),output);
 				} catch (IOException e) {
-					throw new CLIError("Failed to write output file: "+e.getMessage());
+					throw new CLIError("Failed to write output file: "+outputFilename, e);
 				}
 			}
 		}

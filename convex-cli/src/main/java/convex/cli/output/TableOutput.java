@@ -19,11 +19,14 @@ public class TableOutput {
 		this.fieldList=List.of(fields);
 	}
 
-	protected List<String> fieldList = new ArrayList<String>();
+	protected final List<String> fieldList;
 
 	protected List<List<String>> rowList = new ArrayList<List<String>>();
 
 	public void addRow(Object... values) {
+		if (values.length != fieldList.size()) {
+			throw new IllegalArgumentException("Expected "+fieldList.size()+" row values but got "+values.length);
+		}
 		rowList.add(Stream.of(values).map(v->Utils.toString(v)).collect(Collectors.toList()));
 	}
 
@@ -64,7 +67,9 @@ public class TableOutput {
 	}
 	
 	public void writeToStream(PrintStream out) {
-		writeToStream(new PrintWriter(out));
+		PrintWriter pw=new PrintWriter(out);
+		writeToStream(pw);
+		pw.flush();
 	}
 
 	public void writeToStream(PrintWriter out) {

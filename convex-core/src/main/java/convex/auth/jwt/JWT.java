@@ -126,6 +126,12 @@ public class JWT {
 	/** Get the raw signature bytes */
 	public byte[] getSignatureBytes() { return signatureBytes; }
 
+	/**
+	 * Get the signing input: the base64url {@code header.payload} portion of the JWT,
+	 * i.e. exactly the bytes (UTF-8) covered by the signature.
+	 */
+	public String getSigningInput() { return signingInput; }
+
 	/** Get the algorithm from the header (e.g. "EdDSA", "RS256", "HS256") */
 	public String getAlgorithm() {
 		AString alg = RT.ensureString(header.get(ALG));

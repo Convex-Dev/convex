@@ -2,7 +2,7 @@ package convex.cli.output;
 
 import java.io.PrintStream;
 import java.io.PrintWriter;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import convex.core.text.Text;
@@ -13,8 +13,9 @@ import convex.core.util.Utils;
  *
  */
 public class RecordOutput {
-	HashMap<String,String> results=new HashMap<>();
-	
+	// LinkedHashMap so that fields are output in insertion order
+	LinkedHashMap<String,String> results=new LinkedHashMap<>();
+
 	public RecordOutput() {
 	}
 
@@ -25,8 +26,7 @@ public class RecordOutput {
 
 
 	private void addFields(Map<Object, Object> values) {
-		
-		for (Map.Entry<String,String> e: results.entrySet()) {
+		for (Map.Entry<Object,Object> e: values.entrySet()) {
 			addField(e.getKey(),e.getValue());
 		}
 	}
@@ -34,9 +34,11 @@ public class RecordOutput {
 	public void addField(Object key, Object value) {
 		results.put(key.toString(), Utils.toString(value));
 	}
-	
+
 	public void writeToStream(PrintStream out) {
-		writeToStream(new PrintWriter(out));
+		PrintWriter pw=new PrintWriter(out);
+		writeToStream(pw);
+		pw.flush();
 	}
 
 	public void writeToStream(PrintWriter out) {

@@ -3,12 +3,16 @@ package convex.core.cvm;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
@@ -199,6 +203,256 @@ public class MigrationFixesTest {
 		assertTrue(evalErrors(UPGRADED, "(gensym 'a 'b)"));
 		assertTrue(evalErrors(UPGRADED, "(gensym 42)"));
 		assertTrue(evalErrors(UPGRADED, "(gensym \"" + "a".repeat(128) + "\")"));
+	}
+
+	@Test
+	public void testCat() {
+		// cat is NOT part of the genesis environment; the v1 upgrade installs it
+		assertTrue(evalErrors(GENESIS, "(cat 0x01 0x02)"));
+
+		// Blob concatenation (byte-family first arg -> Blob result)
+		assertEquals(eval(UPGRADED, "0x010203"), eval(UPGRADED, "(cat 0x01 0x0203)"));
+
+		// String concatenation (char-family first arg -> String result)
+		assertEquals(eval(UPGRADED, "\"foobar\""), eval(UPGRADED, "(cat \"foo\" \"bar\")"));
+
+		// First-arg family dispatch: Keyword/Symbol are char-family and contribute
+		// their NAME bytes only (no leading colon), producing a String — not a Keyword
+		assertEquals(eval(UPGRADED, "\"foobar\""), eval(UPGRADED, "(cat :foo :bar)"));
+		assertNotEquals(eval(UPGRADED, ":foobar"), eval(UPGRADED, "(cat :foo :bar)"));
+		assertEquals(eval(UPGRADED, "\"hello-world\""), eval(UPGRADED, "(cat :hello \"-\" :world)"));
+
+		// Raw bytes, never a cast: a String contributes UTF-8, unlike (blob "cafe")
+		// which hex-parses. This divergence from blob is deliberate.
+		assertEquals(eval(UPGRADED, "0x0063616665"), eval(UPGRADED, "(cat 0x00 \"cafe\")"));
+		assertEquals(eval(UPGRADED, "0x63616665"), eval(UPGRADED, "(cat 0x \"cafe\")"));
+		assertNotEquals(eval(UPGRADED, "(blob \"cafe\")"), eval(UPGRADED, "(cat 0x \"cafe\")"));
+
+		// Fixed-width BlobLike first arg (Address) widens to Blob
+		assertEquals(eval(UPGRADED, "0x000000000000000800"), eval(UPGRADED, "(cat #8 0x00)"));
+
+		// Arity 0 -> empty Blob; arity 1 -> arg in its family's growable form
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat)"));
+		assertEquals(eval(UPGRADED, "0x01"), eval(UPGRADED, "(cat 0x01)"));
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"ab\")"));
+		assertEquals(eval(UPGRADED, "\"foo\""), eval(UPGRADED, "(cat :foo)"));
+
+		// Characters contribute their UTF-8 bytes, in both char and blob context
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"a\" (char 98))"));   // char in String
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat (char 97) (char 98))")); // chars -> String
+		assertEquals(eval(UPGRADED, "0x0041"), eval(UPGRADED, "(cat 0x00 (char 65))"));     // char in Blob
+		assertEquals(eval(UPGRADED, "0xe282ac"), eval(UPGRADED, "(cat 0x (char 0xe282ac))")); // multi-byte UTF-8 (euro)
+
+		// nil arguments are skipped; family follows the first non-nil argument
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat)"));
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat nil nil)"));
+		assertEquals(eval(UPGRADED, "0x0011"), eval(UPGRADED, "(cat 0x00 nil 0x11)"));
+		assertEquals(eval(UPGRADED, "\"abc\""), eval(UPGRADED, "(cat nil \"abc\")")); // String family
+		assertEquals(eval(UPGRADED, "0xab"), eval(UPGRADED, "(cat nil 0xab)"));
+
+		// Non-nil, non-BlobLike arguments are a :CAST error — cat never casts (no Integers)
+		assertTrue(evalErrors(UPGRADED, "(cat 0x00 5)"));
+		assertTrue(evalErrors(UPGRADED, "(cat 123)"));
+		assertTrue(evalErrors(UPGRADED, "(cat 0x00 [1 2])"));
+	}
+
+	@Test
+	public void testSplice() {
+		// splice is NOT part of the genesis environment; the v1 upgrade installs it
+		assertTrue(evalErrors(GENESIS, "(splice 0x0000 0 0xff)"));
+
+		// In-place overwrite (result same length as dst)
+		assertEquals(eval(UPGRADED, "0x00ffff00"), eval(UPGRADED, "(splice 0x00000000 1 0xffff)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice 0x1234 0 0xabcd)"));
+
+		// Single-byte write
+		assertEquals(eval(UPGRADED, "0x00ff00"), eval(UPGRADED, "(splice 0x000000 1 0xff)"));
+
+		// Extension: the write may run past the end, growing the result
+		assertEquals(eval(UPGRADED, "0x0011223344"), eval(UPGRADED, "(splice 0x0000 1 0x11223344)"));
+		// offset == (count dst) is a pure append
+		assertEquals(eval(UPGRADED, "0x1234abcd"), eval(UPGRADED, "(splice 0x1234 2 0xabcd)"));
+		// empty src is a no-op; offset 0 into empty dst yields src
+		assertEquals(eval(UPGRADED, "0x1234"), eval(UPGRADED, "(splice 0x1234 1 0x)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice 0x 0 0xabcd)"));
+
+		// Result family follows dst: String dst -> String, raw bytes for src (no cast)
+		assertEquals(eval(UPGRADED, "\"hello there\""), eval(UPGRADED, "(splice \"hello world\" 6 \"there\")"));
+		assertEquals(eval(UPGRADED, "\"foXbar\""), eval(UPGRADED, "(splice \"foobar\" 2 0x58)")); // 0x58 = 'X'
+
+		// Byte offsets: an Address dst (byte-family) overwrites its raw bytes -> Blob
+		assertEquals(eval(UPGRADED, "0x0000000000000042"), eval(UPGRADED, "(splice #8 7 0x42)"));
+
+		// :BOUNDS when offset is negative or beyond the end of dst
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 5 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 -1 0xff)"));
+
+		// Characters contribute their UTF-8 bytes as src (byte offsets)
+		assertEquals(eval(UPGRADED, "\"aXc\""), eval(UPGRADED, "(splice \"abc\" 1 (char 88))")); // 88 = 'X'
+		assertEquals(eval(UPGRADED, "0x0041"), eval(UPGRADED, "(splice 0x0000 1 (char 65))"));
+
+		// nil is treated as empty: nil src is a no-op, nil dst is an empty Blob
+		assertEquals(eval(UPGRADED, "0x1234"), eval(UPGRADED, "(splice 0x1234 1 nil)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice nil 0 0xabcd)"));
+		assertTrue(evalErrors(UPGRADED, "(splice nil 1 0xff)")); // offset 1 beyond empty dst
+
+		// :CAST for non-nil non-BlobLike dst/src, or a non-Long offset (offset is not skipped)
+		assertTrue(evalErrors(UPGRADED, "(splice 123 0 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 5)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 :x 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 nil 0xff)"));
+
+		// Arity is exactly 3
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 0xff 0xff)"));
+
+		// Logical consistency: splice is exactly the cat+slice composition
+		// (splice dst off src) == (cat (slice dst 0 off) src (slice dst (min (+ off (count src)) (count dst)) (count dst)))
+		String[][] cases = {
+				{"0x00112233445566", "3", "0xaabb"},   // interior overwrite
+				{"0x00112233", "2", "0xaabbccdd"},     // straddle end (extend)
+				{"0x1234", "2", "0xabcd"},             // append at end
+				{"\"hello world\"", "6", "\"there!\""},// String, extend
+				{"\"abcdef\"", "0", "0x58"},           // String, single-byte interior
+		};
+		for (String[] c : cases) {
+			String dst = c[0], off = c[1], src = c[2];
+			String viaCat = "(cat (slice " + dst + " 0 " + off + ") " + src
+					+ " (slice " + dst + " (min (+ " + off + " (count " + src + ")) (count " + dst + ")) (count " + dst + ")))";
+			assertEquals(eval(UPGRADED, viaCat), eval(UPGRADED, "(splice " + dst + " " + off + " " + src + ")"),
+					"splice/cat+slice divergence for " + java.util.Arrays.toString(c));
+		}
+	}
+
+	@Test
+	public void testAssetOwnsFix() {
+		// #621: (owns? owner <map>) always returned true (misplaced paren discarded the
+		// map branch). Set up a token the caller owns 1,000,000 of, then ask about a
+		// quantity it does NOT own — buggy on genesis (true), correct on the upgraded state.
+		String expr = "(do (import convex.asset :as asset) (import convex.fungible :as fungible) "
+				+ "(def token (deploy (fungible/build-token {:supply 1000000}))) "
+				+ "(asset/owns? *address* {token 2000000}))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(GENESIS, expr));   // buggy: always true
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, expr)); // fixed: owns 1M < 2M
+		// The vector form (unaffected by the fix) works on both
+		String vec = "(do (import convex.asset :as asset) (import convex.fungible :as fungible) "
+				+ "(def token (deploy (fungible/build-token {:supply 1000000}))) "
+				+ "(asset/owns? *address* [token 1000]))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, vec));
+	}
+
+	@Test
+	public void testMultiTokenOfferFix() {
+		// #620: offering a token for which the caller had no holding record replaced the
+		// caller's ENTIRE holdings map, destroying other tokens. Mint token AAA, then offer
+		// (unheld) token BBB, then check AAA balance — wiped on genesis, preserved upgraded.
+		String expr = "(do (import asset.multi-token :as mt) (import convex.asset :as asset) "
+				+ "(call mt (create :AAA)) (call [mt :AAA] (mint 1000)) "
+				+ "(call mt (create :BBB)) (asset/offer *address* [mt :BBB] 500) "
+				+ "(asset/balance [mt :AAA]))";
+		assertEquals(CVMLong.create(0), eval(GENESIS, expr));     // buggy: AAA holding clobbered
+		assertEquals(CVMLong.create(1000), eval(UPGRADED, expr)); // fixed: AAA preserved
+	}
+
+	@Test
+	public void testBoxNonFungibleFix() {
+		// #622: transferring a non-fungible asset into a box failed because the asset
+		// actor's `offer` keyed by the raw (scoped) receiver, not the bare box address
+		// that accept looks up. Broken on genesis (:STATE), works on the upgraded state.
+		String insertNft = "(do (import asset.box :as box) (import asset.nft.simple :as nft) (import convex.asset :as asset) "
+				+ "(def b (box/create)) (def n (call nft (create))) (box/insert b [nft #{n}]))";
+		assertTrue(evalErrors(GENESIS, insertNft));   // NFT-into-box fails
+		assertFalse(evalErrors(UPGRADED, insertNft)); // fixed
+
+		// get-offer SPI was absent on these actors: asset/get-offer errored on genesis,
+		// returns the zero quantity on the upgraded state
+		String getOffer = "(do (import asset.nft.simple :as nft) (import convex.asset :as asset) "
+				+ "(asset/get-offer nft *address* *address*))";
+		assertTrue(evalErrors(GENESIS, getOffer));
+		assertFalse(evalErrors(UPGRADED, getOffer));
+	}
+
+	@Test
+	public void testTrustedFailClosed() {
+		// #623: trust/trusted? must fail closed against a defective monitor. A monitor
+		// that throws makes trusted? propagate the error on genesis, but returns false on
+		// the upgraded state (error caught, result boolean-coerced).
+		String throwing = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] (fail :ASSERT \"boom\")))) "
+				+ "(trust/trusted? m *address*))";
+		assertTrue(evalErrors(GENESIS, throwing));                                   // error propagates
+		assertEquals(convex.core.data.prim.CVMBool.FALSE, eval(UPGRADED, throwing)); // fails closed
+
+		// A well-behaved monitor still works on both versions
+		String ok = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] true))) "
+				+ "(trust/trusted? m *address*))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(GENESIS, ok));
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, ok));
+
+		// A non-boolean (defective) truthy result is coerced to true on the upgraded state
+		String nonbool = "(do (import convex.trust :as trust) "
+				+ "(def m (deploy '(defn ^:callable check-trusted? [s a o] 42))) "
+				+ "(trust/trusted? m *address*))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, nonbool));
+	}
+
+	@Test
+	public void testTrustDocFixes() {
+		// #623: docstring typos in the frozen trust actors are corrected by the v1
+		// redefinitions. Docstrings are on-chain metadata, so genesis keeps the old
+		// text; the upgraded state carries the corrections.
+		String trustMeta = "(do (import convex.trust :as trust) "
+				+ "(str (lookup-meta trust 'change-control) (lookup-meta trust 'add-controller)))";
+		assertTrue(eval(GENESIS, trustMeta).toString().contains("set-control"),
+				"genesis keeps the typo'd example");
+		String upgraded = eval(UPGRADED, trustMeta).toString();
+		assertFalse(upgraded.contains("set-control"), "nonexistent set-control example corrected");
+		assertTrue(upgraded.contains("(change-control my-asset *address*)"));
+		assertTrue(upgraded.contains("(deploy (add-controller *address*))"));
+
+		// delegate `update` docstring was copy-pasted from `create`
+		String delegateMeta = "(do (import convex.trust.delegate :as del) "
+				+ "(str (lookup-meta del 'update)))";
+		String updateDoc = eval(UPGRADED, delegateMeta).toString();
+		assertTrue(updateDoc.contains("Updates the delegated monitor"));
+		assertFalse(updateDoc.contains("Creates new delegated"));
+
+		// behaviour of the redefined functions is unchanged: create/update round-trip
+		String roundTrip = "(do (import convex.trust :as trust) "
+				+ "(import convex.trust.delegate :as del) "
+				+ "(def id (call del (create *address*))) "
+				+ "(call [del id] (update #1)) "
+				+ "(trust/trusted? [del id] #1))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, roundTrip));
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testUpgradedCoreDocs() {
+		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by
+		// DocsTest/testCoreDefSymbols (both genesis-only). Validate them on the upgraded
+		// state: each has a :doc with :description, and its examples evaluate without error.
+		convex.core.cvm.AccountStatus core = UPGRADED.getAccount(convex.core.lang.Core.CORE_ADDRESS);
+		for (Symbol sym : new Symbol[] { convex.core.cvm.Symbols.CAT, convex.core.cvm.Symbols.SPLICE,
+				convex.core.cvm.Symbols.GENSYM }) {
+			AHashMap<ACell, ACell> meta = core.getMetadata().get(sym);
+			assertNotNull(meta, "no metadata for " + sym);
+			AHashMap<ACell, ACell> doc = (AHashMap<ACell, ACell>) meta.get(convex.core.cvm.Keywords.DOC_META);
+			assertNotNull(doc, "no :doc for " + sym);
+			assertNotNull(doc.get(convex.core.cvm.Keywords.DESCRIPTION), "no :description for " + sym);
+			AVector<AHashMap<ACell, ACell>> examples =
+					(AVector<AHashMap<ACell, ACell>>) doc.get(convex.core.cvm.Keywords.EXAMPLES);
+			if (examples != null) {
+				for (AHashMap<ACell, ACell> ex : examples) {
+					AString code = (AString) ex.get(convex.core.cvm.Keywords.CODE);
+					if (code != null) {
+						assertFalse(evalErrors(UPGRADED, code.toString()),
+								"doc example errors for " + sym + ": " + code);
+					}
+				}
+			}
+		}
 	}
 
 	@Test

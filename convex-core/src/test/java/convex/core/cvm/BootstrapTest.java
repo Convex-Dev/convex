@@ -48,20 +48,28 @@ public class BootstrapTest {
 		State scheduled = scheduleBootstrap(INIT_STATE);
 		State migrated = Migrations.get(0).apply(scheduled);
 
-		// v1 touches exactly two accounts: the core account (#8) and the fungible
-		// library (add-mint fix). Every other account is identical.
-		Address fungible = (Address) scheduled.lookupCNS("convex.fungible");
-		assertNotNull(fungible);
+		// v1 touches the core account (#8) and the fixed library accounts: fungible
+		// (add-mint), asset (owns?), multi-token (offer) and the nft/box asset actors
+		// (offer + get-offer). Every other account is identical.
+		String[] fixedLibs = { "convex.fungible", "convex.asset", "asset.multi-token",
+				"asset.nft.simple", "asset.nft.basic", "asset.box.actor",
+				"convex.trust", "convex.trust.delegate" };
+		java.util.Set<Address> changed = new java.util.HashSet<>();
+		changed.add(Core.CORE_ADDRESS);
+		for (String lib : fixedLibs) {
+			Address a = (Address) scheduled.lookupCNS(lib);
+			assertNotNull(a, "missing library " + lib);
+			changed.add(a);
+			// Each fixed library was actually redefined (environment changed)
+			assertNotSame(scheduled.getAccount(a).getEnvironment(), migrated.getAccount(a).getEnvironment(),
+					"library not redefined: " + lib);
+		}
 		long n = scheduled.getAccounts().count();
 		for (long i = 0; i < n; i++) {
 			Address a = Address.create(i);
-			if (a.equals(Core.CORE_ADDRESS) || a.equals(fungible)) continue;
+			if (changed.contains(a)) continue;
 			assertSame(scheduled.getAccount(a), migrated.getAccount(a), "Account " + a + " must be untouched");
 		}
-
-		// The fungible library's add-mint was actually redefined (environment changed)
-		assertNotSame(scheduled.getAccount(fungible).getEnvironment(),
-				migrated.getAccount(fungible).getEnvironment());
 
 		// Peers, schedule and globals are untouched by the migration itself
 		// (the watermark advance is the mechanism's job, not the migration's)
@@ -69,17 +77,21 @@ public class BootstrapTest {
 		assertSame(scheduled.getSchedule(), migrated.getSchedule());
 		assertSame(scheduled.getGlobals(), migrated.getGlobals());
 
-		// Within #8: exactly the three bindings and their :static metadata added
+		// Within #8: exactly the five bindings and their :static metadata added
 		AccountStatus pre = scheduled.getAccount(Core.CORE_ADDRESS);
 		AccountStatus post = migrated.getAccount(Core.CORE_ADDRESS);
-		assertEquals(pre.getEnvironment().count() + 3, post.getEnvironment().count());
-		assertEquals(pre.getMetadata().count() + 3, post.getMetadata().count());
+		assertEquals(pre.getEnvironment().count() + 5, post.getEnvironment().count());
+		assertEquals(pre.getMetadata().count() + 5, post.getMetadata().count());
 		assertSame(Core.SCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.SCHEDULE_UPGRADE));
 		assertSame(Core.UNSCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.UNSCHEDULE_UPGRADE));
 		assertSame(Core.GENSYM, post.getEnvironmentValue(Symbols.GENSYM));
+		assertSame(Core.CAT, post.getEnvironmentValue(Symbols.CAT));
+		assertSame(Core.SPLICE, post.getEnvironmentValue(Symbols.SPLICE));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.SCHEDULE_UPGRADE).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.UNSCHEDULE_UPGRADE).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.GENSYM).get(Keywords.STATIC));
+		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.CAT).get(Keywords.STATIC));
+		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.SPLICE).get(Keywords.STATIC));
 		assertEquals(pre.getBalance(), post.getBalance());
 		assertEquals(pre.getSequence(), post.getSequence());
 

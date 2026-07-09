@@ -1,1 +1,8 @@
 'convex.governance
+
+;; Reserved genesis stub for network governance logic (see #414, governance trust
+;; monitor). Deployed at genesis and registered in CNS under the top-level name
+;; `convex.governance` (deliberately not `convex.trust.governance`, despite living
+;; in the trust source tree): governance is expected to outgrow the trust family.
+;; Genesis is frozen, so logic will be added via a protocol migration or a
+;; governance patching transaction when designed — decision recorded on #623.

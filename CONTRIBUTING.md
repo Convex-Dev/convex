@@ -15,7 +15,7 @@ confirm that you have the right to contribute the code and agree to these terms.
 
 ## Prerequisites
 
-- **Java 21+** (JDK)
+- **Java 21+** (JDK; 25 recommended, matching CI)
 - **Maven 3.7+**
 
 Maven is not vendored via a wrapper, so install a compatible version yourself.

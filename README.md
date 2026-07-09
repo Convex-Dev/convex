@@ -93,7 +93,7 @@ Want the full walkthrough — including the TypeScript, Python, and Java SDKs ag
 
 ### Prerequisites
 
-- Java 21+ ([Download Temurin](https://adoptium.net/temurin/releases/?version=21))
+- Java 21+ ([Download Temurin](https://adoptium.net/temurin/releases/?version=21)) — JDK 25 recommended
 
 ### Quick Install
 

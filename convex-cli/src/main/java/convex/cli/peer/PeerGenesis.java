@@ -17,7 +17,6 @@ import convex.peer.PeerException;
 import convex.peer.Server;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.ScopeType;
 
 /**
@@ -31,10 +30,7 @@ import picocli.CommandLine.ScopeType;
 	description = "Instantiate a Convex network.")
 public class PeerGenesis extends APeerCommand {
 
-	@ParentCommand
-	private Peer peerParent;
-	
-	@Option(names = { "--governance-key" }, 
+	@Option(names = { "--governance-key" },
 			defaultValue = "${env:CONVEX_GOVERNANCE_KEY}", 
 			scope = ScopeType.INHERIT, 
 			description = "Network Governance Key. Must be a valid Ed25519 public key. Genesis key will be used if not specified (unless security is strict).")
@@ -75,15 +71,13 @@ public class PeerGenesis extends APeerCommand {
 				}
 			}
 	
-			EtchStore store=getEtchStore();
-			
 			State genesisState=Init.createState(govKey,genesisKey.getAccountKey(),List.of(peerKey.getAccountKey()));
 			inform("Created genesis state with hash: "+genesisState.getHash());
-			
+
 			inform("Testing genesis state peer initialisation");
-			
+
 			HashMap<Keyword,Object> config=new HashMap<>();
-			config.put(Keywords.STORE, store);
+			config.put(Keywords.STORE, etch);
 			config.put(Keywords.STATE, genesisState);
 			config.put(Keywords.KEYPAIR, peerKey);
 			Server s=API.launchPeer(config); 

@@ -1,0 +1,30 @@
+;; Network upgrade v1 — asset.nft.basic library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the asset.nft.basic actor account.
+;; Deliberately NOT part of nft/basic.cvx / genesis: existing networks keep their
+;; genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #622 (same as nft.simple): `offer` keyed offers by the raw `receiver`, so a
+;; scoped-address receiver (e.g. a box) never matched the bare-address key `accept`
+;; looks up. Normalises with `(address receiver)`, and adds the `get-offer` SPI
+;; function required by `convex.asset`.
+;;
+;; Idempotent: re-applying the corrected definitions is a no-op.
+
+(defn offer
+  ^{:callable true}
+  [receiver quantity]
+  (let [q             (-qc quantity)
+        receiver      (address receiver)
+        caller-offers (get offers *caller* {})]
+    (set! offers
+         (assoc offers
+                *caller*
+                (assoc caller-offers
+                       receiver
+                       q)))))
+
+(defn get-offer
+  ^{:callable true}
+  [sender receiver]
+  (get-in offers [(address sender) (address receiver)] #{}))

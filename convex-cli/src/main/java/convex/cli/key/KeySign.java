@@ -14,7 +14,6 @@ import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 
 /**
@@ -30,9 +29,6 @@ import picocli.CommandLine.ParentCommand;
 	description="Sign some data using a key from the store.")
 public class KeySign extends AKeyCommand {
 
-	@ParentCommand
-	protected Key keyParent;
-	
 	@Mixin
 	protected KeyMixin keyMixin;
 
@@ -41,7 +37,7 @@ public class KeySign extends AKeyCommand {
 	private String outputFilename;
 	
 	@Option(names={"-i", "--input-file"},
-			description="Output file for the signature. Use '-' for STDIN.")
+			description="Input file containing hex data to sign. Use '-' for STDIN.")
 	private String inputFilename;
 	
 	@Option(names={"--hex"},
@@ -77,12 +73,12 @@ public class KeySign extends AKeyCommand {
 				try {
 					dataString=FileUtils.loadFileAsString(inputFilename);
 				} catch (IOException ex) {
-					throw new CLIError(ExitCodes.IOERR,ex.getMessage());
+					throw new CLIError(ExitCodes.IOERR,"Unable to read input file: "+inputFilename,ex);
 				}
 			} else if (isInteractive()) {
 				dataString=prompt("Enter hex data to sign: ");
 			} else {
-				throw new CLIError("No input file specified");
+				throw new CLIError(ExitCodes.USAGE,"No data to sign: specify --hex or --input-file");
 			}
 		}
 		
@@ -102,7 +98,7 @@ public class KeySign extends AKeyCommand {
 			try {
 				FileUtils.writeFileAsString(Paths.get(outputFilename),output);
 			} catch (IOException e) {
-				throw new CLIError("Failed to write output file: "+e.getMessage());
+				throw new CLIError("Failed to write output file: "+outputFilename, e);
 			}
 		}
 	}

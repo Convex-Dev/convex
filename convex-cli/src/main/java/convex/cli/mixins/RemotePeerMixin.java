@@ -8,6 +8,7 @@ import java.util.concurrent.TimeoutException;
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.net.IPUtils;
 import picocli.CommandLine.Option;
 
@@ -54,10 +55,22 @@ public class RemotePeerMixin extends AMixin {
 	}
 	
 	public InetSocketAddress getSocketAddress() {
+		if ((this.hostname!=null)&&this.hostname.trim().equalsIgnoreCase("none")) {
+			throw new CLIError(ExitCodes.USAGE,"Peer connection disabled with '--host none', but this command requires a peer connection");
+		}
 		int port= (this.port!=null) ?this.port:convex.core.Constants.DEFAULT_PEER_PORT;
 		String hostname=(this.hostname!=null)?this.hostname:convex.cli.Constants.DEFAULT_PEER_HOSTNAME;
 		InetSocketAddress sa=IPUtils.parseAddress(hostname,port);
 		return sa;
+	}
+
+	/**
+	 * Gets the hostname specified for the remote peer, or the default peer hostname.
+	 * May include a scheme and/or port, e.g. "https://peer.example.com:8443"
+	 * @return Hostname string
+	 */
+	public String getHostname() {
+		return (hostname!=null)?hostname.trim():Constants.DEFAULT_PEER_HOSTNAME;
 	}
 
 	/**

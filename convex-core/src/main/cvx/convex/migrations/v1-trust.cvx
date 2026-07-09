@@ -1,0 +1,86 @@
+;; Network upgrade v1 — convex.trust (core trust library) fixes (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the convex.trust actor account,
+;; redefining `trusted?` and `remove-upgradability!`. Deliberately NOT part of
+;; core/trust.cvx / genesis: existing networks keep their genesis hash and reach
+;; these fixes at protocol version 1.
+;;
+;; Fixes #623:
+;; - `trusted?` now fails closed against defective trust monitors. A monitor MUST
+;;   return true/false (CAD022), but external implementations may throw or return a
+;;   non-boolean. The dispatch now wraps the monitor call in `try` (any error -> false)
+;;   and `boolean`-coerces the result, so a defective/malicious monitor can never make
+;;   `trusted?` throw or grant on a non-true value. The `query` reentrancy guard is kept.
+;; - `remove-upgradability!` now also undefines the generated `change-control`, which
+;;   referenced the now-undefined `upgradable-root` (`(call actor (change-control x))`
+;;   would throw :UNDECLARED). Docstring signature corrected to `[actor]`.
+;; - `change-control` and `add-controller` docstring examples corrected (referenced a
+;;   nonexistent `set-control` and the wrong function respectively). Bodies unchanged.
+;;
+;; Idempotent: re-applying the corrected definitions is a no-op.
+
+(defn trusted?
+  ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
+                        "A trust monitor is an (optionally scoped) address, pointing to either:"
+                        "- A user account (that can only trust itself)"
+                        "- An actor implementing `(check-trusted? subject action object)` which returns true or false."
+                        "`action` and `object` are arbitrary values specific to the trust monitor."
+                        "`subject` should usually be an address, although this is specific to the trust monitor as well."]
+          :examples    [{:code "(trusted? my-blacklist *caller*)"}]
+          :signature   [{:params [trust-monitor subject]}
+                        {:params [trust-monitor subject action]}
+                        {:params [trust-monitor subject action object]}]}}
+  ([monitor subject]
+   (recur monitor subject nil nil))
+
+  ([monitor subject action]
+   (recur monitor subject action nil))
+
+  ([monitor subject action object]
+   (cond
+     ;; General case: call into check-trusted? function if it exists
+     (callable? monitor 'check-trusted?)
+       ;; SECURITY: query protects against reentrancy. A monitor MUST return true/false
+       ;; (CAD022), but a defective implementation may throw or return a non-boolean, so
+       ;; fail closed: any error or non-true result yields false rather than escaping.
+       (boolean (try (query (call monitor
+                                  (check-trusted? subject action object)))
+                     false))
+
+     ;; Basic case: check for callable equality
+     (address? monitor)
+       (= monitor subject)
+
+     false)))
+
+(defn change-control
+  ^{:doc {:description ["Sets a controller for an entity (possibly scoped). Controller may be any trust monitor. Typically requires trust from the existing controller, for an action of :control."]
+          :examples    [{:code "(change-control my-asset *address*)"}]
+          :signature   [{:params [path controller]}]}}
+  [path controller]
+  (call path (change-control controller))
+  :OK)
+
+(defn add-controller
+  ^{:doc {:description ["Creates deployable code to add a controller to an actor."]
+          :examples    [{:code "(deploy (add-controller *address*))"}]
+          :signature   [{:params []}
+                        {:params [controller]}]}}
+  ([] (recur *address*))
+  ([cont]
+   `(set-controller ~cont)))
+
+(defn remove-upgradability!
+  ^{:doc {:description ["Removes upgradability from an actor, previously added using `add-trusted-upgrade`."
+                        "Cannot be undone, meant to be used wisely after considering all implications."]
+          :examples    [{:code "(remove-upgradability! upgradable-actor)"}]
+          :signature   [{:params [actor]}]}}
+  [actor]
+  (call actor
+        (upgrade
+          '(do
+             ;; Undefine things used for upgradability
+             (undef upgrade)
+             (undef upgradable-root)
+             (undef change-control))))
+  nil)

@@ -1,18 +1,11 @@
 package convex.cli.account;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.ExitCodes;
-import convex.cli.Main;
-import convex.cli.mixins.AddressMixin;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
@@ -23,7 +16,6 @@ import convex.core.util.JSON;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * Convex account create command
@@ -49,17 +41,11 @@ import picocli.CommandLine.ParentCommand;
 		"Note: Faucet is typically disabled on production networks like Protonet.")
 public class AccountCreate extends AAccountCommand {
 
-	@ParentCommand
-	private Account accountParent;
-
 	@Mixin
 	protected KeyStoreMixin storeMixin;
 
 	@Mixin
 	protected KeyMixin keyMixin;
-
-	@Mixin
-	protected AddressMixin addressMixin;
 
 	@Option(names={"--new-key"},
 		description="Generate a new key for the new account.")
@@ -90,10 +76,11 @@ public class AccountCreate extends AAccountCommand {
 			try {
 				addressMixin.getAddress("Enter funding account address: ");
 			} catch (CLIError e) {
-				// Enhance error message for transaction mode
+				if (e.getExitCode() != ExitCodes.USAGE) throw e; // e.g. invalid address format
+				// Address was missing: enhance error message for transaction mode
 				throw new CLIError(ExitCodes.USAGE,
 					"Transaction mode requires -a/--address and --key for the funding account.\n" +
-					"Use --faucet to create account via faucet instead (if available).");
+					"Use --faucet to create account via faucet instead (if available).", e);
 			}
 
 			if (!hasKey) {
@@ -115,7 +102,7 @@ public class AccountCreate extends AAccountCommand {
 				throw new CLIError(ExitCodes.DATAERR, "Invalid new account key: " + newAccountKeySpec +
 					". Must be a valid 32-byte hex public key.");
 			}
-		} else if (generateNewKey || newAccountKeySpec == null) {
+		} else {
 			// Generate a new key pair for the new account
 			newKeyPair = AKeyPair.generate();
 			newAccountKey = newKeyPair.getAccountKey();
@@ -165,96 +152,62 @@ public class AccountCreate extends AAccountCommand {
 		}
 
 		// Connect and create account via transaction
-		Convex convex = connect();
-		convex.setAddress(fundingAddress);
-		convex.setKeyPair(fundingKeyPair);
-
-		try {
+		try (Convex convex = connect()) {
+			convex.setAddress(fundingAddress);
+			convex.setKeyPair(fundingKeyPair);
 			return convex.createAccountSync(newAccountKey);
 		} catch (ResultException e) {
 			throw new CLIError(ExitCodes.TEMPFAIL, "Failed to create account: " + e.getResult().getValue(), e);
-		} 
+		}
 	}
 
 	/**
 	 * Create account using peer's faucet REST API
 	 */
-	private Address createViaFaucet(AccountKey newAccountKey) {
-		String host = peerMixin.getSocketAddress().getHostString();
-		int port = peerMixin.getSocketAddress().getPort();
+	private Address createViaFaucet(AccountKey newAccountKey) throws InterruptedException {
+		String base = getRestAPIBase();
+		String apiUrl = base + "/api/v1/createAccount";
 
-		// Construct REST API URL (assumes HTTP, port 8080 for REST by convention)
-		// TODO: Make REST port configurable
-		int restPort = 8080; // Default REST API port
-		String apiUrl = "http://" + host + ":" + restPort + "/api/v1/createAccount";
+		inform("Requesting account creation via faucet at " + base);
 
-		inform("Requesting account creation via faucet at " + host + ":" + restPort);
+		// Build JSON request
+		StringBuilder json = new StringBuilder();
+		json.append("{\"accountKey\":\"").append(newAccountKey.toHexString()).append("\"");
+		if (faucetAmount > 0) {
+			json.append(",\"faucet\":").append(faucetAmount);
+		}
+		json.append("}");
 
-		try {
-			HttpClient client = HttpClient.newBuilder()
-				.connectTimeout(Duration.ofSeconds(30))
-				.build();
+		HttpResponse<String> response = postJSON(apiUrl, json.toString());
 
-			// Build JSON request
-			StringBuilder json = new StringBuilder();
-			json.append("{\"accountKey\":\"").append(newAccountKey.toHexString()).append("\"");
-			if (faucetAmount > 0) {
-				json.append(",\"faucet\":").append(faucetAmount);
-			}
-			json.append("}");
+		if (response.statusCode() == 403) {
+			throw new CLIError(ExitCodes.NOPERM,
+				"Faucet not available on this peer. Use transaction mode with --address and --key instead.");
+		}
 
-			HttpRequest request = HttpRequest.newBuilder()
-				.uri(URI.create(apiUrl))
-				.header("Content-Type", "application/json")
-				.header("Accept", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString(json.toString()))
-				.timeout(Duration.ofSeconds(30))
-				.build();
+		if (response.statusCode() != 200) {
+			throw new CLIError(ExitCodes.TEMPFAIL,
+				"Faucet request failed (HTTP " + response.statusCode() + "): " + response.body());
+		}
 
-			HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-			if (response.statusCode() == 403) {
-				throw new CLIError(ExitCodes.NOPERM,
-					"Faucet not available on this peer. Use transaction mode with --address and --key instead.");
-			}
-
-			if (response.statusCode() != 200) {
-				throw new CLIError(ExitCodes.TEMPFAIL,
-					"Faucet request failed (HTTP " + response.statusCode() + "): " + response.body());
-			}
-
-			// Parse response to get address
-			String body = response.body();
-			Object parsed = JSON.parse(body);
-			if (parsed instanceof java.util.Map) {
-				@SuppressWarnings("unchecked")
-				java.util.Map<String, Object> map = (java.util.Map<String, Object>) parsed;
-				Object addrObj = map.get("address");
-				if (addrObj != null) {
-					Address addr = Address.parse(addrObj);
-					if (addr != null) {
-						if (faucetAmount > 0) {
-							inform("Faucet funded account with " + faucetAmount + " coins");
-						}
-						return addr;
+		// Parse response to get address
+		String body = response.body();
+		Object parsed = JSON.parse(body);
+		if (parsed instanceof java.util.Map) {
+			@SuppressWarnings("unchecked")
+			java.util.Map<String, Object> map = (java.util.Map<String, Object>) parsed;
+			Object addrObj = map.get("address");
+			if (addrObj != null) {
+				Address addr = Address.parse(addrObj);
+				if (addr != null) {
+					if (faucetAmount > 0) {
+						inform("Faucet funded account with " + faucetAmount + " coins");
 					}
+					return addr;
 				}
 			}
-
-			throw new CLIError(ExitCodes.DATAERR, "Invalid faucet response: " + body);
-
-		} catch (CLIError e) {
-			throw e;
-		} catch (java.net.ConnectException e) {
-			throw new CLIError(ExitCodes.NOHOST,
-				"Cannot connect to REST API at " + apiUrl + ". Check if peer has REST API enabled on port " + restPort + ".");
-		} catch (Exception e) {
-			throw new CLIError(ExitCodes.TEMPFAIL, "Faucet request failed: " + e.getMessage(), e);
 		}
-	}
 
-	@Override
-	public Main cli() {
-		return accountParent.cli();
+		throw new CLIError(ExitCodes.DATAERR, "Invalid faucet response: " + body);
 	}
 }

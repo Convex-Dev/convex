@@ -22,21 +22,30 @@ import picocli.CommandLine.Parameters;
 public class AccountInformation extends AAccountCommand {
 
 	@Parameters(paramLabel="address",
-		arity="1",
-		description="Address of the account to get information (e.g. #1234 or 1234).")
+		arity="0..1",
+		description="Address of the account to get information (e.g. #1234 or 1234). If omitted, will look for --address argument.")
 	private String addressValue;
 
 	@Override
 	public void execute() throws InterruptedException {
-		Address address = Address.parse(addressValue);
-		if (address == null) {
-			throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + addressValue +
-				". Use format #1234 or plain number.");
+		Address address;
+		if (addressValue != null) {
+			address = Address.parse(addressValue);
+			if (address == null) {
+				throw new CLIError(ExitCodes.DATAERR, "Invalid address: " + addressValue +
+					". Use format #1234 or plain number.");
+			}
+		} else {
+			address = addressMixin.getAddress("Enter account address: ");
 		}
 
-		Convex convex = connect();
-		ACell queryCommand = List.of(Symbols.ACCOUNT, address);
-		Result result = convex.querySync(queryCommand);
-		printResult(result);
+		try (Convex convex = connect()) {
+			ACell queryCommand = List.of(Symbols.ACCOUNT, address);
+			Result result = convex.querySync(queryCommand);
+			printResult(result);
+			if (result.isError()) {
+				throw new CLIError("Account query failed with error code: "+result.getErrorCode());
+			}
+		}
 	}
 }

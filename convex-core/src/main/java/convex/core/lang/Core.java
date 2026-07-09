@@ -30,6 +30,8 @@ import convex.core.cvm.exception.RollbackValue;
 import convex.core.cvm.exception.TailcallValue;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.ASymbolic;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -53,6 +55,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.util.BlobBuilder;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
@@ -1159,6 +1162,118 @@ public class Core {
 			Symbol sym = Symbol.create(prefix.toString() + "__" + context.getJuiceUsed());
 			if (sym == null) return context.withArgumentError("gensym name too long, must be at most " + Constants.MAX_NAME_LENGTH + " characters");
 			return context.withResult(sym);
+		}
+	});
+
+	public static final CoreFn<ABlobLike<?>> CAT = regNonGenesis(new CoreFn<>(Symbols.CAT,504) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			int n = args.length;
+
+			// Each non-nil argument contributes its raw bytes: a BlobLike (Blob, String,
+			// Address, Hash, Keyword, Symbol) its toBlob(), a Character its UTF-8 encoding.
+			// nil arguments are skipped. The result family is decided by the first non-nil
+			// argument: char-like (String, Keyword, Symbol, Character) produces a String,
+			// any other BlobLike a Blob. No non-nil arguments produces an empty Blob. cat
+			// never casts (no Integers etc.): there is no hex-parsing or rendering.
+			ABlob[] parts = new ABlob[n];
+			boolean charFamily = false;
+			boolean familySet = false;
+			long total = 0;
+			for (int i = 0; i < n; i++) {
+				ACell a = args[i];
+				if (a == null) continue; // skip nils
+				ABlob b;
+				boolean ch;
+				if ((a instanceof AString) || (a instanceof ASymbolic)) {
+					b = ((ABlobLike<?>) a).toBlob(); ch = true;
+				} else if (a instanceof ABlobLike) {
+					b = ((ABlobLike<?>) a).toBlob(); ch = false;
+				} else if (a instanceof CVMChar) {
+					b = ((CVMChar) a).toUTFBlob(); ch = true;
+				} else {
+					return context.withCastError(i, args, Types.BLOB);
+				}
+				parts[i] = b;
+				if (!familySet) { charFamily = ch; familySet = true; }
+				total += b.count();
+			}
+
+			long juice = charFamily ? Juice.buildStringCost(total) : Juice.buildBlobCost(total);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			BlobBuilder bb = new BlobBuilder();
+			for (int i = 0; i < n; i++) {
+				if (parts[i] != null) bb.append(parts[i]);
+			}
+			ABlob bytes = bb.toBlob();
+
+			ACell result = charFamily ? Strings.create(bytes) : bytes;
+			return context.withResult(juice, result);
+		}
+	});
+
+	public static final CoreFn<ABlobLike<?>> SPLICE = regNonGenesis(new CoreFn<>(Symbols.SPLICE,505) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
+
+			// dst determines the result family (like cat's first argument); nil is an
+			// empty Blob, a Character its UTF-8 bytes. A char-like dst (String, Keyword,
+			// Symbol, Character) yields a String, any other BlobLike a Blob.
+			ACell d = args[0];
+			boolean charFamily;
+			ABlob dst;
+			if (d == null) {
+				charFamily = false;
+				dst = Blob.EMPTY;
+			} else if ((d instanceof AString) || (d instanceof ASymbolic)) {
+				charFamily = true;
+				dst = ((ABlobLike<?>) d).toBlob();
+			} else if (d instanceof ABlobLike) {
+				charFamily = false;
+				dst = ((ABlobLike<?>) d).toBlob();
+			} else if (d instanceof CVMChar) {
+				charFamily = true;
+				dst = ((CVMChar) d).toUTFBlob();
+			} else {
+				return context.withCastError(0, args, Types.BLOB);
+			}
+
+			CVMLong off = RT.ensureLong(args[1]);
+			if (off == null) return context.withCastError(1, args, Types.LONG);
+			long offset = off.longValue();
+
+			// src contributes raw bytes, like cat — no cast; nil contributes nothing, a
+			// Character its UTF-8 bytes
+			ACell s = args[2];
+			ABlob src;
+			if (s == null) {
+				src = Blob.EMPTY;
+			} else if (s instanceof ABlobLike) {
+				src = ((ABlobLike<?>) s).toBlob();
+			} else if (s instanceof CVMChar) {
+				src = ((CVMChar) s).toUTFBlob();
+			} else {
+				return context.withCastError(2, args, Types.BLOB);
+			}
+
+			long dcount = dst.count();
+			// offset must land within dst or exactly at its end; the write may extend
+			// past the end but may not start beyond it
+			if ((offset < 0) || (offset > dcount)) return context.withBoundsError(offset);
+
+			// Cost is O(src + one boundary chunk): the tree-aware replaceSlice shares all
+			// untouched chunks and rebuilds only the boundary, so juice must match
+			long touched = src.count() + Math.min(dcount, Blob.CHUNK_LENGTH);
+			long juice = charFamily ? Juice.buildStringCost(touched) : Juice.buildBlobCost(touched);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			ABlob result = dst.replaceSlice(offset, src);
+			ACell out = charFamily ? Strings.create(result) : result;
+			return context.withResult(juice, out);
 		}
 	});
 
@@ -2606,7 +2721,6 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
 			ACountable<?> result = counted.slice(start,end);
-			// TODO: probably needs to cost a lot more?
 			return context.withResult(juice, result);
 		}
 	});

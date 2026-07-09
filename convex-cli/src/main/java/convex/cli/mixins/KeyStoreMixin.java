@@ -154,7 +154,7 @@ public class KeyStoreMixin extends AMixin {
 		if (keyStore == null)
 			throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			if (keystorePassword==null) {
+			if (storePassword==null) {
 				paranoia("Trying to save keystore in strict mode with no integrity password");
 			}
 			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
@@ -209,17 +209,22 @@ public class KeyStoreMixin extends AMixin {
 
 		try {
 			KeyStore keyStore = ensureKeyStore();
-	
+
+			String found = null;
 			Enumeration<String> aliases = keyStore.aliases();
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
-					log.trace("found keypair " + alias);
-					char[] keyPassword=passFunction.get();
-					return PFXTools.getKeyPair(keyStore, alias, keyPassword);
+					if (found != null) {
+						throw new CLIError(ExitCodes.CONFIG, "Ambiguous key prefix '" + publicKey + "' matches multiple keys in store. Specify more hex digits.");
+					}
+					found = alias;
 				}
 			}
-			return null;
+			if (found == null) return null;
+			log.trace("found keypair " + found);
+			char[] keyPassword=passFunction.get();
+			return PFXTools.getKeyPair(keyStore, found, keyPassword);
 		} catch (UnrecoverableKeyException t) {
 			throw new CLIError(ExitCodes.CONFIG,"Cannot load key from key Store - possibly incorrect password?", t);
 		} catch (GeneralSecurityException t) {

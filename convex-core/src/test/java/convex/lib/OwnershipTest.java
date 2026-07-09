@@ -52,7 +52,9 @@ public class OwnershipTest extends ACVMTest {
 		assertTrue(evalB(ctx, "(trust/trusted? [monitor [USD 1000]] *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? [monitor [USD 1001]] *address*)"));
 
-		assertCastError(step(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
+		// #623: trusted? fails closed against a monitor that throws on a bad scope
+		// (owns? :CAST is caught and coerced to false) rather than propagating the error.
+		assertFalse(evalB(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
 	}
 
 	@Test
@@ -69,7 +71,9 @@ public class OwnershipTest extends ACVMTest {
 		assertFalse(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{NFT :bad-ID}]] *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{:bad-ID}]] *address*)"));
 
-		assertCastError(step(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
+		// #623: trusted? fails closed against a monitor that throws on a bad scope
+		// (owns? :CAST is caught and coerced to false) rather than propagating the error.
+		assertFalse(evalB(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
 	}
 
 }

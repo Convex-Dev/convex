@@ -204,8 +204,8 @@
 ;; ---------------------------------------------------------------------------
 ;; New v1 core bindings — full metadata, including :doc.
 ;;
-;; schedule-upgrade / unschedule-upgrade / gensym are installed into the core
-;; environment by the v1 bootstrap (Java) step immediately before this file is
+;; schedule-upgrade / unschedule-upgrade / gensym / cat / splice are installed into the
+;; core environment by the v1 bootstrap (Java) step immediately before this file is
 ;; evaluated, initially with :static metadata only. Their docstrings are applied
 ;; here, by the same no-value-def mechanism as the corrections above.
 
@@ -243,3 +243,29 @@
                             :return Symbol}]}
        :static true}
   gensym)
+
+(def ^{:doc {:description ["Concatenates the raw bytes of zero or more BlobLike values (Blobs, Strings, Addresses, Hashes, Keywords, Symbols) and Characters. Never casts: each argument contributes its raw byte content — a String its UTF-8 bytes, a Keyword or Symbol its name bytes, a Character its UTF-8 encoding — with no hex-parsing or rendering. `nil` arguments are skipped."
+                          "The result type follows the first non-nil argument: a String, Keyword, Symbol or Character yields a String; any other BlobLike yields a Blob. With no non-nil arguments, returns the empty Blob `0x`. Contrast `blob`, which is a cast (`(blob \"cafe\")` parses hex), whereas `(cat 0x \"cafe\")` appends the raw UTF-8 bytes. See also `slice` for the inverse."]
+             :errors      {:CAST "If any argument is not `nil`, a BlobLike value or a Character."}
+             :examples    [{:code "(cat 0x01 0x0203)"}
+                           {:code "(cat \"foo\" \"bar\")"}
+                           {:code "(cat :hello \"-\" :world)"}
+                           {:code "(cat \"a\" nil \"b\")"}
+                           {:code "(cat \"item-\" (char 65))"}]
+             :signature   [{:params [& xs]
+                            :return BlobLike}]}
+       :static true}
+  cat)
+
+(def ^{:doc {:description ["Overwrites the bytes of `dst` (a Blob or String) starting at byte `offset` with the raw bytes of `src` (any BlobLike or Character, never cast). The result type follows `dst`: a String or symbolic `dst` yields a String, any other BlobLike a Blob. `nil` is treated as empty: a `nil` `src` is a no-op, a `nil` `dst` is the empty Blob; a Character contributes its UTF-8 bytes."
+                          "`offset` must be between 0 and `(count dst)` inclusive. The write may extend past the end of `dst`, growing the result; writing exactly at `(count dst)` appends. Byte offsets throughout, so a write into a String may split a multi-byte character. Cost is proportional to `(count src)` plus one chunk, sharing untouched structure of large Blobs. See also `cat` and `slice`."]
+             :errors      {:CAST   "If `dst` or `src` is not `nil`, a BlobLike value or a Character, or `offset` is not a Long."
+                           :BOUNDS "If `offset` is negative or greater than `(count dst)`."}
+             :examples    [{:code "(splice 0x0000000000 2 0xffff)"}
+                           {:code "(splice \"hello world\" 6 \"there\")"}
+                           {:code "(splice 0x1234 2 0xabcd)"}
+                           {:code "(splice 0x1234 1 nil)"}]
+             :signature   [{:params [dst offset src]
+                            :return BlobLike}]}
+       :static true}
+  splice)

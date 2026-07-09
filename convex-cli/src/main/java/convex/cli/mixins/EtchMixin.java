@@ -58,12 +58,12 @@ public class EtchMixin extends AMixin {
 
 	public List<AccountKey> getPeerList() {
 		EtchStore etchStore=getEtchStore();
-		
+
 		try {
-			List<AccountKey> keys=API.listPeers(getEtchStore());
+			List<AccountKey> keys=API.listPeers(etchStore);
 			return keys;
 		} catch (IOException e) {
-			throw new CLIError("Unable to list peers in store: "+etchStore);
+			throw new CLIError("Unable to list peers in store: "+etchStore, e);
 		}
 	}
 }

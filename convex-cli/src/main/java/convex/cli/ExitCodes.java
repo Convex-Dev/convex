@@ -21,7 +21,7 @@ public class ExitCodes {
 	public static final int ERROR=1;
 	
 	/**
-	 * Usage error (64 as per )
+	 * Usage error (64 as per sysexits.h)
 	 */
 	public static final int USAGE = 64;
 	
@@ -73,7 +73,7 @@ public class ExitCodes {
 	public static final int CONFIG = 78;
 	
 	/**
-	 * Interrupt with graceful shutdown fromn interrupt
+	 * Graceful shutdown from interrupt
 	 * Posix standard exit code 128 + 2 (SIGINT)
 	 */
 	public static final int INTERRUPT = 130;

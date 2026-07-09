@@ -685,6 +685,45 @@ public class BlobsTest {
 	}
 
 	@Test
+	public void testReplaceSliceExtend() {
+		// Extension path: replacement runs past the end, growing the result. Verifies
+		// the optimised path (in-bounds tree replace + append overflow) against the
+		// slice+append reference for the same semantics.
+		BlobTree big = Samples.BIG_BLOB_TREE;
+		long n = big.count();
+		Blob rep = Blob.createRandom(new Random(1234), 5000);
+
+		// Straddling the end: part overwrites in-bounds, part extends
+		long pos = n - 2000;
+		ABlob modified = big.replaceSlice(pos, rep);
+		assertEquals(pos + rep.count(), modified.count());
+		assertEquals(big.slice(0, pos).append(rep), modified); // == dst[0:pos] ++ rep
+		assertEquals(big.slice(0, pos), modified.slice(0, pos)); // untouched prefix preserved
+
+		// offset == count is a pure append
+		assertEquals(big.append(rep), big.replaceSlice(n, rep));
+
+		// Extend a small flat Blob up into BlobTree territory
+		Blob small = Blob.fromHex("0011");
+		ABlob grown = small.replaceSlice(1, rep);
+		assertEquals(1 + rep.count(), grown.count());
+		assertEquals(small.slice(0, 1).append(rep), grown);
+
+		// Results must be canonical / valid across sizes and chunk boundaries (a >4096
+		// flat blob would be non-canonical and force an O(n) re-chunk on String wrap)
+		try {
+			for (ABlob res : new ABlob[] { modified, grown, big.replaceSlice(n, rep),
+					big.replaceSlice(4090, Blob.createRandom(new Random(99), 12)) }) {
+				assertTrue(res.isCanonical());
+				assertEquals(res, res.toCanonical());
+				res.validate();
+			}
+		} catch (InvalidDataException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Test
 	public void testBlobTreeOutOfRange() {
 		assertThrows(IndexOutOfBoundsException.class, () -> Samples.BIG_BLOB_TREE.byteAt(Samples.BIG_BLOB_LENGTH));
 		assertNull(Samples.BIG_BLOB_TREE.slice(-1));

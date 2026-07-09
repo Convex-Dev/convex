@@ -4,10 +4,9 @@ import java.util.List;
 
 import convex.core.data.AccountKey;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 /**
- * Peer genesis command
+ * Peer list command
  */
 @Command(
 	name = "list",
@@ -15,12 +14,8 @@ import picocli.CommandLine.ParentCommand;
 	description = "List peers in current store.")
 public class PeerList extends APeerCommand {
 
-	@ParentCommand
-	private Peer peerParent;
-
-
 	@Override
-	public void execute() {	
+	public void execute() {
 		List<AccountKey> keys=etchMixin.getPeerList();
 		for (AccountKey k: keys) {
 			println(k.toHexString());
