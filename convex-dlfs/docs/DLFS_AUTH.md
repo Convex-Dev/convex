@@ -126,15 +126,29 @@ store, no session-level capability state. Every request carries its own proofs.
 ### Verification
 
 When a caller requests a drive they don't own, `DlfsMcpTools.resolveDrive()`
-checks the UCAN proofs:
+verifies the presented proofs at the trust boundary
+(`UCANValidator.parseTransportUCANs`) and authorises the request via
+`UCANValidator.isAuthorised` — the shared convex-core authority check:
 
-1. **Parse** — each `ucans` entry is parsed as an EdDSA JWT
-2. **Signature** — verified using the `kid` header (issuer's public key)
-3. **Expiry** — `exp` must be in the future, `nbf` (if present) must be in the past
-4. **Audience** — `aud` must match the caller's DID (from their auth JWT)
-5. **Issuer owns drive** — the issuer's DID is used to look up the drive in the `DLFSDriveManager`
-6. **Capability** — at least one entry in `att` must cover the required resource and ability
-7. **Proof chain** — if `prf` contains parent tokens, they are recursively validated with chain link checks (`proof.aud == token.iss`)
+1. **Integrity (per token, at the boundary)** — each `ucans` entry is parsed as
+   an EdDSA JWT; the signature is verified against the key bound in the `iss`
+   DID (the attacker-controlled `kid` and `alg` headers are ignored); `exp`/`nbf`
+   are checked; `prf` chains are recursively verified with chain-link
+   (`proof.aud == token.iss`) and expiry-narrowing checks
+2. **Audience** — `aud` must match the caller's DID (from their auth JWT)
+3. **Capability coverage** — some entry in `att` must cover the required
+   resource and ability
+4. **Per-hop attenuation** — walking `prf` to the chain's root, every proof's
+   `att` must itself cover the request; a delegate can never pass on more than
+   it was granted
+5. **Root authority (self-sovereign)** — the chain's root issuer must be the
+   owner DID that prefixes the granted resource, and that owner must hold the
+   drive in the `DLFSDriveManager`
+
+The drive owner is taken from the grants (the DID prefixing the granted
+resource), or named explicitly with a DID-URL drive reference
+(`did:key:zOwner.../drive`) — the only way to reach a delegated drive shadowed
+by an own drive of the same name.
 
 If any token provides a valid chain, access is granted. Otherwise, the
 request is denied with a "Drive not found" error (uniform error — no
@@ -169,8 +183,9 @@ neither expired.
 |----------|-----------|
 | **No forged grants** | Ed25519 signature verification; tampered payloads fail |
 | **No audience confusion** | `aud` must match the presenting caller's DID |
-| **No non-owner grants** | Issuer's DID must resolve to an existing drive in the drive manager |
+| **No non-owner grants** | The chain's root issuer must be the resource's owner DID, and that owner must hold the drive |
 | **No ability escalation** | `crud/read` grant cannot be used for `crud/write` operations |
+| **No chain escalation** | Every hop's `att` must cover the request — a re-delegation broader than its proof grants nothing |
 | **No resource leakage** | Grant for drive A doesn't work on drive B (prefix matching) |
 | **No path escape** | Grant scoped to `/dlfs/docs/public` doesn't cover `/dlfs/docs/secret` |
 | **No anonymous abuse** | Unauthenticated callers cannot present UCANs (identity required) |

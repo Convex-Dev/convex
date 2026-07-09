@@ -6,7 +6,7 @@
     "properties": {
       "drive": {
         "type": "string",
-        "description": "Drive name"
+        "description": "Drive name, or a DID-URL reference to another user's drive (e.g. 'did:key:zOwner.../drive')"
       },
       "path": {
         "type": "string",
@@ -15,6 +15,11 @@
       "content": {
         "type": "string",
         "description": "Text content to write to the file"
+      },
+      "ucans": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Optional UCAN JWT proofs authorising delegated access to another user's drive"
       }
     },
     "required": ["drive", "path", "content"]
