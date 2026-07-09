@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DIDVerifier;
+import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.cvm.State;
@@ -223,7 +224,7 @@ public class UCANAuthorityTest {
 	public void testInjectedVerifierForNonDidKeyIssuer() {
 		// A did:web venue signs with a key known to the caller's verifier
 		AString webDID = Strings.create("did:web:venue.example.com");
-		UCAN grant = makeToken(webDID, Strings.create(AGENT_A_DID.toString()),
+		UCAN grant = makeToken(webDID, AGENT_A_DID,
 			caps(cap(webDID.append("/w/reports"), READ)), null, VENUE_KP);
 
 		// Default did:key verifier cannot verify a did:web issuer
@@ -231,8 +232,7 @@ public class UCANAuthorityTest {
 
 		// Composed with a caller-supplied did:web verifier, it verifies
 		DIDVerifier webVerifier = (did, message, signature) ->
-			webDID.equals(did) && VENUE_KP.getAccountKey() != null
-				&& ASignature.fromBlob(signature).verify(message, VENUE_KP.getAccountKey());
+			webDID.equals(did) && ASignature.fromBlob(signature).verify(message, VENUE_KP.getAccountKey());
 		DIDVerifier composed = DIDVerifier.CONVEX.or(webVerifier);
 		assertNotNull(UCANValidator.validate(grant, NOW, composed));
 
@@ -246,7 +246,7 @@ public class UCANAuthorityTest {
 		// ROOT -> did:web venue -> AGENT_A: the intermediate hop is not did:key
 		AString webDID = Strings.create("did:web:venue.example.com");
 		UCAN rootGrant = makeToken(ROOT_DID, webDID, caps(cap(NOTES, CRUD)), null, ROOT_KP);
-		UCAN delegated = makeToken(webDID, Strings.create(AGENT_A_DID.toString()),
+		UCAN delegated = makeToken(webDID, AGENT_A_DID,
 			caps(cap(NOTES, READ)), Vectors.of(rootGrant.toMap()), VENUE_KP);
 
 		DIDVerifier webVerifier = (did, message, signature) ->
@@ -273,7 +273,7 @@ public class UCANAuthorityTest {
 		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(),
 			state.getAccount(InitTest.HERO).getAccountKey());
 
-		UCAN grant = makeToken(heroDID, Strings.create(AGENT_A_DID.toString()),
+		UCAN grant = makeToken(heroDID, AGENT_A_DID,
 			caps(cap(heroDID.append("/w/notes"), READ)), null, InitTest.HERO_KEYPAIR);
 
 		// Stateless did:key verifier cannot resolve a did:convex issuer
@@ -289,7 +289,7 @@ public class UCANAuthorityTest {
 	public void testDidConvexRejectedAfterKeyRotation() {
 		State state = InitTest.STATE;
 		AString heroDID = Strings.create("did:convex:" + InitTest.HERO.longValue());
-		UCAN grant = makeToken(heroDID, Strings.create(AGENT_A_DID.toString()),
+		UCAN grant = makeToken(heroDID, AGENT_A_DID,
 			caps(cap(heroDID.append("/w/notes"), READ)), null, InitTest.HERO_KEYPAIR);
 		assertNotNull(UCANValidator.validate(grant, NOW, DIDVerifier.forState(state)));
 
@@ -343,7 +343,7 @@ public class UCANAuthorityTest {
 			UCAN.NNC, Strings.create("test-nonce"),
 			UCAN.ATT, caps(cap(heroDID.append("/w/notes"), READ)),
 			UCAN.PRF, Vectors.empty());
-		AString jwt = convex.auth.jwt.JWT.signPublic(claims, InitTest.HERO_KEYPAIR);
+		AString jwt = JWT.signPublic(claims, InitTest.HERO_KEYPAIR);
 
 		// did:key-only boundary drops it; state-backed verifier admits it
 		assertNull(UCANValidator.parseTransportUCANs(Vectors.of(jwt), DIDVerifier.CONVEX));

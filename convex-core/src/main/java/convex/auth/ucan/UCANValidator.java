@@ -205,7 +205,11 @@ public class UCANValidator {
 	 * @param jwtString JWT-encoded UCAN string
 	 * @param nowSeconds Current time in unix seconds
 	 * @return The validated UCAN on success, null on failure
+	 * @deprecated hardcodes {@code did:key} verification so any chain containing another
+	 *             DID method fails; use {@link #validateJWT(AString, long, DIDVerifier)}
+	 *             with an explicit verifier.
 	 */
+	@Deprecated
 	public static UCAN validateJWT(AString jwtString, long nowSeconds) {
 		return validateJWT(jwtString, nowSeconds, DIDVerifier.CONVEX);
 	}

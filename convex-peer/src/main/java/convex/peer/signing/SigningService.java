@@ -4,13 +4,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AESGCM;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.HKDF;
 import convex.core.crypto.Hashing;
-import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -237,7 +237,7 @@ public class SigningService {
 			AKeyPair kp = AKeyPair.create(seed);
 
 			// Build did:key identifier from public key
-			AString didKey = Strings.create("did:key:" + Multikey.encodePublicKey(publicKey));
+			AString didKey = DID.forKey(publicKey);
 
 			long now = System.currentTimeMillis() / 1000;
 			AMap<AString, ACell> claims = Maps.of(

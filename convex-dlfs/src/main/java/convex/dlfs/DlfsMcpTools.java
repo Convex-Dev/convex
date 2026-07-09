@@ -12,10 +12,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Base64;
 import java.util.List;
 
+import convex.auth.did.DIDVerifier;
 import convex.auth.ucan.Capability;
 import convex.auth.ucan.UCAN;
 import convex.auth.ucan.UCANValidator;
-import convex.core.data.ACell;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -162,8 +162,8 @@ public class DlfsMcpTools {
 			AString jwtString = RT.ensureString(ucans.get(i));
 			if (jwtString == null) continue;
 
-			// Validate JWT signature, expiry, chain
-			UCAN ucan = UCANValidator.validateJWT(jwtString, now);
+			// Validate JWT signature, expiry, chain (did:key issuers only)
+			UCAN ucan = UCANValidator.validateJWT(jwtString, now, DIDVerifier.CONVEX);
 			if (ucan == null) continue;
 
 			// Audience must match the caller

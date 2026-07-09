@@ -1,7 +1,6 @@
 package convex.auth.did;
 
 import convex.core.crypto.ASignature;
-import convex.core.crypto.util.Multikey;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.State;
@@ -45,7 +44,7 @@ public interface DIDVerifier {
 	 * key directly (multikey), so verification is pure computation. Any other DID method
 	 * yields {@code false}.
 	 */
-	DIDVerifier CONVEX = (did, message, signature) -> verifyWithKey(didKey(did), message, signature);
+	DIDVerifier CONVEX = (did, message, signature) -> verifyWithKey(DID.keyFromDID(did), message, signature);
 
 	/**
 	 * Verifier resolving {@code did:key} statelessly plus canonical numeric
@@ -61,7 +60,7 @@ public interface DIDVerifier {
 	static DIDVerifier forState(State state) {
 		if (state == null) return CONVEX;
 		return (did, message, signature) -> {
-			AccountKey key = didKey(did);
+			AccountKey key = DID.keyFromDID(did);
 			if (key == null) key = convexAccountKey(state, did);
 			return verifyWithKey(key, message, signature);
 		};
@@ -85,21 +84,6 @@ public interface DIDVerifier {
 			}
 			return first || other.verifies(did, message, signature);
 		};
-	}
-
-	/**
-	 * Decode the Ed25519 key from a {@code did:key} DID. Returns null for any other
-	 * method or a malformed multikey.
-	 */
-	private static AccountKey didKey(AString did) {
-		if (did == null) return null;
-		String s = did.toString();
-		if (!s.startsWith("did:key:")) return null;
-		try {
-			return Multikey.decodePublicKey(s.substring("did:key:".length()));
-		} catch (Exception e) {
-			return null;
-		}
 	}
 
 	/**

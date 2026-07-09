@@ -2,11 +2,11 @@ package convex.auth.ucan;
 
 import java.security.SecureRandom;
 
+import convex.auth.did.DID;
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
-import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -25,8 +25,10 @@ import convex.core.lang.RT;
  * UCAN (User Controlled Authorization Networks) token for Convex.
  *
  * <p>Tokens are native CVM values encoded via CAD3. Signatures are Ed25519
- * over the Ref encoding of the payload (matching the SignedData pattern).
- * No JWT, no JSON, no base64 — pure Convex data end-to-end.</p>
+ * over the Ref encoding of the payload (matching the SignedData pattern) —
+ * pure Convex data end-to-end. A standard JWT encoding is also supported for
+ * transport interoperability (see {@link #toJWT} / {@link #fromJWT}); note the
+ * JWT signature covers the base64url signing input, not the CAD3 encoding.</p>
  *
  * <p>Token structure:</p>
  * <pre>
@@ -62,7 +64,6 @@ public class UCAN {
 		UCV, Strings.create("0.10.0")
 	);
 
-	private static final String DID_KEY_PREFIX = "did:key:";
 	private static final SecureRandom RANDOM = new SecureRandom();
 
 	// Cached fields
@@ -329,35 +330,24 @@ public class UCAN {
 	}
 
 	/**
-	 * Convert an AccountKey to a did:key string.
+	 * Convert an AccountKey to a did:key string. See {@link DID#forKey}.
 	 */
 	public static AString toDIDKey(AccountKey key) {
-		AString multikey = Multikey.encodePublicKey(key);
-		return Strings.create(DID_KEY_PREFIX + multikey);
+		return DID.forKey(key);
 	}
 
 	/**
 	 * Extract an AccountKey from a did:key string. Returns null if malformed.
+	 * See {@link DID#keyFromDID}.
 	 */
 	public static AccountKey fromDIDKey(AString did) {
-		if (did == null) return null;
-		String s = did.toString();
-		if (!s.startsWith(DID_KEY_PREFIX)) return null;
-		try {
-			return Multikey.decodePublicKey(s.substring(DID_KEY_PREFIX.length()));
-		} catch (Exception e) {
-			return null;
-		}
+		return DID.keyFromDID(did);
 	}
 
 	private static AString generateNonce() {
 		byte[] bytes = new byte[12];
 		RANDOM.nextBytes(bytes);
-		StringBuilder sb = new StringBuilder(24);
-		for (byte b : bytes) {
-			sb.append(String.format("%02x", b & 0xff));
-		}
-		return Strings.create(sb.toString());
+		return Strings.create(Blob.wrap(bytes).toHexString());
 	}
 
 	// ==================== JWT Encoding ====================

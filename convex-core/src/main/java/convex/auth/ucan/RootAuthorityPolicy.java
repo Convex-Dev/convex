@@ -2,7 +2,6 @@ package convex.auth.ucan;
 
 import convex.auth.did.DID;
 import convex.core.data.AString;
-import convex.core.data.Strings;
 
 /**
  * Predicate answering: may {@code rootIssuer} root a delegation grant over resource
@@ -83,17 +82,5 @@ public interface RootAuthorityPolicy {
 		} catch (Exception e) {
 			return null;
 		}
-	}
-
-	/**
-	 * Canonical owner DID of a DID-scoped resource as an AString, for callers that
-	 * compare or index by owner. Null if no owner is derivable.
-	 *
-	 * @param with Resource URI, or null
-	 * @return Canonical owner DID string, or null
-	 */
-	static AString resourceOwner(AString with) {
-		DID d = ownerDID(with);
-		return (d == null) ? null : Strings.create(d.toString());
 	}
 }

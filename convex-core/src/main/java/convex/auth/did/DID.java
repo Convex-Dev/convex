@@ -24,7 +24,8 @@ public class DID {
 
 	private static final String URI_SCHEME = "did";
 	private static final String DID_START = URI_SCHEME+":";
-	private static final AString DID_KEY_PREFIX = Strings.intern("did:key:");
+	private static final String DID_KEY_START = "did:key:";
+	private static final AString DID_KEY_PREFIX = Strings.intern(DID_KEY_START);
     
     private final String method;
     private final String id;
@@ -178,5 +179,22 @@ public class DID {
 	 */
 	public static AString forKey(AccountKey publicKey) {
 		return DID_KEY_PREFIX.append(Multikey.encodePublicKey(publicKey));
+	}
+
+	/**
+	 * Extracts the Ed25519 public key from a {@code did:key:<multikey>} string.
+	 *
+	 * @param did The DID string, or null
+	 * @return The public key, or null if the DID is not a well-formed did:key
+	 */
+	public static AccountKey keyFromDID(AString did) {
+		if (did == null) return null;
+		String s = did.toString();
+		if (!s.startsWith(DID_KEY_START)) return null;
+		try {
+			return Multikey.decodePublicKey(s.substring(DID_KEY_START.length()));
+		} catch (Exception e) {
+			return null;
+		}
 	}
 }
