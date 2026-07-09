@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CVM: new `cat` core function — raw byte concatenation of BlobLike values and Characters (v1 protocol upgrade, #633).
 - CVM: new `splice` core function — positional byte overwrite of a Blob or String (v1 protocol upgrade, #632).
+- UCAN: root-authority verification with pluggable `DIDVerifier` / `RootAuthorityPolicy` — signature verification at every hop for any DID method, per-hop delegation attenuation, and root-authority checks per requested capability, with `did:key` / `did:convex` and self-sovereign defaults (#635).
 - CLI: `peer -c/--config` now actually loads the specified JSON5 peer config file (previously the option was accepted but ignored); explicit command line options take precedence over config file values (#625).
 - CLI: `peer start --address` is passed to peer launch and verified after startup — the CLI warns when the specified controller does not match the authoritative on-chain controller (noting that an actor controller such as a trust monitor may still permit control) (#624).
 - CLI: the faucet commands (`account create --faucet`, `account fund`) accept a scheme and/or port in `--host`, e.g. `https://peer.example.com:8443` — previously the REST port was hardcoded to 8080 (#627).

@@ -308,14 +308,24 @@ public class UCAN {
 	}
 
 	/**
+	 * Get the signing message for a native (CAD3) token: the Ref encoding of the payload,
+	 * i.e. exactly the bytes covered by the signature. Note this does NOT apply to
+	 * JWT-parsed tokens, whose signature covers the base64url JWT signing input instead.
+	 *
+	 * @return Signing message bytes
+	 */
+	public Blob getSigningMessage() {
+		return Ref.get(payload).getEncoding();
+	}
+
+	/**
 	 * Verify the token's signature against the issuer's public key.
 	 * @return true if signature is valid
 	 */
 	public boolean verifySignature() {
 		AccountKey issKey = getIssuerKey();
 		if (issKey == null) return false;
-		Blob message = Ref.get(payload).getEncoding();
-		return signature.verify(message, issKey);
+		return signature.verify(getSigningMessage(), issKey);
 	}
 
 	/**
