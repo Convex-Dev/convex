@@ -1171,24 +1171,33 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 
-			// nil arguments are skipped (contribute no bytes). The result family is
-			// decided by the first non-nil argument: char-like (String, Keyword, Symbol)
-			// produces a String, any other BlobLike a Blob. Fixed/constrained subtypes
-			// (Address, Hash, …) widen to Blob. No non-nil arguments produces an empty
-			// Blob. cat never casts: each argument contributes its raw toBlob() bytes (a
-			// String its UTF-8, a Keyword/Symbol its name), with no hex-parsing.
+			// Each non-nil argument contributes its raw bytes: a BlobLike (Blob, String,
+			// Address, Hash, Keyword, Symbol) its toBlob(), a Character its UTF-8 encoding.
+			// nil arguments are skipped. The result family is decided by the first non-nil
+			// argument: char-like (String, Keyword, Symbol, Character) produces a String,
+			// any other BlobLike a Blob. No non-nil arguments produces an empty Blob. cat
+			// never casts (no Integers etc.): there is no hex-parsing or rendering.
+			ABlob[] parts = new ABlob[n];
 			boolean charFamily = false;
 			boolean familySet = false;
 			long total = 0;
 			for (int i = 0; i < n; i++) {
 				ACell a = args[i];
 				if (a == null) continue; // skip nils
-				if (!(a instanceof ABlobLike)) return context.withCastError(i, args, Types.BLOB);
-				if (!familySet) {
-					charFamily = (a instanceof AString) || (a instanceof ASymbolic);
-					familySet = true;
+				ABlob b;
+				boolean ch;
+				if ((a instanceof AString) || (a instanceof ASymbolic)) {
+					b = ((ABlobLike<?>) a).toBlob(); ch = true;
+				} else if (a instanceof ABlobLike) {
+					b = ((ABlobLike<?>) a).toBlob(); ch = false;
+				} else if (a instanceof CVMChar) {
+					b = ((CVMChar) a).toUTFBlob(); ch = true;
+				} else {
+					return context.withCastError(i, args, Types.BLOB);
 				}
-				total += ((ABlobLike<?>) a).count();
+				parts[i] = b;
+				if (!familySet) { charFamily = ch; familySet = true; }
+				total += b.count();
 			}
 
 			long juice = charFamily ? Juice.buildStringCost(total) : Juice.buildBlobCost(total);
@@ -1196,9 +1205,7 @@ public class Core {
 
 			BlobBuilder bb = new BlobBuilder();
 			for (int i = 0; i < n; i++) {
-				ACell a = args[i];
-				if (a == null) continue;
-				bb.append(((ABlobLike<?>) a).toBlob());
+				if (parts[i] != null) bb.append(parts[i]);
 			}
 			ABlob bytes = bb.toBlob();
 
@@ -1213,9 +1220,9 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
 
-			// dst determines the result family (like cat's first argument); nil is
-			// treated as an empty Blob. A char-like dst (String, Keyword, Symbol) yields
-			// a String, any other BlobLike a Blob.
+			// dst determines the result family (like cat's first argument); nil is an
+			// empty Blob, a Character its UTF-8 bytes. A char-like dst (String, Keyword,
+			// Symbol, Character) yields a String, any other BlobLike a Blob.
 			ACell d = args[0];
 			boolean charFamily;
 			ABlob dst;
@@ -1228,6 +1235,9 @@ public class Core {
 			} else if (d instanceof ABlobLike) {
 				charFamily = false;
 				dst = ((ABlobLike<?>) d).toBlob();
+			} else if (d instanceof CVMChar) {
+				charFamily = true;
+				dst = ((CVMChar) d).toUTFBlob();
 			} else {
 				return context.withCastError(0, args, Types.BLOB);
 			}
@@ -1236,13 +1246,16 @@ public class Core {
 			if (off == null) return context.withCastError(1, args, Types.LONG);
 			long offset = off.longValue();
 
-			// src contributes raw bytes, like cat — no cast; nil contributes nothing
+			// src contributes raw bytes, like cat — no cast; nil contributes nothing, a
+			// Character its UTF-8 bytes
 			ACell s = args[2];
 			ABlob src;
 			if (s == null) {
 				src = Blob.EMPTY;
 			} else if (s instanceof ABlobLike) {
 				src = ((ABlobLike<?>) s).toBlob();
+			} else if (s instanceof CVMChar) {
+				src = ((CVMChar) s).toUTFBlob();
 			} else {
 				return context.withCastError(2, args, Types.BLOB);
 			}

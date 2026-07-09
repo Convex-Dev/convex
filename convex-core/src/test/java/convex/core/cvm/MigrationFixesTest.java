@@ -237,6 +237,12 @@ public class MigrationFixesTest {
 		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"ab\")"));
 		assertEquals(eval(UPGRADED, "\"foo\""), eval(UPGRADED, "(cat :foo)"));
 
+		// Characters contribute their UTF-8 bytes, in both char and blob context
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"a\" (char 98))"));   // char in String
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat (char 97) (char 98))")); // chars -> String
+		assertEquals(eval(UPGRADED, "0x0041"), eval(UPGRADED, "(cat 0x00 (char 65))"));     // char in Blob
+		assertEquals(eval(UPGRADED, "0xe282ac"), eval(UPGRADED, "(cat 0x (char 0xe282ac))")); // multi-byte UTF-8 (euro)
+
 		// nil arguments are skipped; family follows the first non-nil argument
 		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat)"));
 		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat nil nil)"));
@@ -280,6 +286,10 @@ public class MigrationFixesTest {
 		// :BOUNDS when offset is negative or beyond the end of dst
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 5 0xff)"));
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 -1 0xff)"));
+
+		// Characters contribute their UTF-8 bytes as src (byte offsets)
+		assertEquals(eval(UPGRADED, "\"aXc\""), eval(UPGRADED, "(splice \"abc\" 1 (char 88))")); // 88 = 'X'
+		assertEquals(eval(UPGRADED, "0x0041"), eval(UPGRADED, "(splice 0x0000 1 (char 65))"));
 
 		// nil is treated as empty: nil src is a no-op, nil dst is an empty Blob
 		assertEquals(eval(UPGRADED, "0x1234"), eval(UPGRADED, "(splice 0x1234 1 nil)"));
