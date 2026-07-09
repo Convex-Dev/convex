@@ -9,37 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- CVM: new `cat` core function — raw byte concatenation of BlobLike values and Characters (v1 protocol upgrade, #633).
-- CVM: new `splice` core function — positional byte overwrite of a Blob or String (v1 protocol upgrade, #632).
-- UCAN: root-authority verification with pluggable `DIDVerifier` / `RootAuthorityPolicy` — signature verification at every hop for any DID method, per-hop delegation attenuation, and root-authority checks per requested capability, with `did:key` / `did:convex` and self-sovereign defaults (#635).
-- DLFS: UCAN delegated drive access now supports delegation chains (per-hop attenuation enforced) and explicit DID-URL drive references (`did:key:zOwner.../drive`), authorised via the shared convex-core root-authority check (#635).
-- CLI: `peer -c/--config` now actually loads the specified JSON5 peer config file (previously the option was accepted but ignored); explicit command line options take precedence over config file values (#625).
-- CLI: `peer start --address` is passed to peer launch and verified after startup — the CLI warns when the specified controller does not match the authoritative on-chain controller (noting that an actor controller such as a trust monitor may still permit control) (#624).
-- CLI: the faucet commands (`account create --faucet`, `account fund`) accept a scheme and/or port in `--host`, e.g. `https://peer.example.com:8443` — previously the REST port was hardcoded to 8080 (#627).
-- CLI: `local start --norest` disables the REST API server, matching `peer start` (#630).
+- CVM: `cat` core function — raw byte concatenation of BlobLike values and Characters (v1 protocol, #633).
+- CVM: `splice` core function — positional byte overwrite of a Blob or String (v1 protocol, #632).
+- UCAN: pluggable `DIDVerifier` / `RootAuthorityPolicy` — chain verification for any DID method, per-hop delegation attenuation, and self-sovereign root-authority checks (#635).
+- DLFS: delegated drive access supports delegation chains and DID-URL drive references (`did:key:zOwner.../drive`) (#635).
+- CLI: `peer -c/--config` actually loads the JSON5 config file; explicit options take precedence (#625).
+- CLI: `peer start --address` is applied at launch and verified against the on-chain controller (#624).
+- CLI: faucet commands accept scheme and port in `--host` (previously hardcoded to 8080) (#627).
+- CLI: `local start --norest` disables the REST API server (#630).
 
 ### Changed
 
-- CLI: all `account` subcommands share a consistent `-a/--address` option (with `CONVEX_ADDRESS`); `account info` accepts `-a` when the positional address is omitted (#630).
-- CLI: `convex help <command>` now shows the named subcommand's help everywhere (standard picocli help command, replacing a custom implementation that ignored its argument) (#630).
-
-- CLI: a failed query or transaction result now exits non-zero (previously `convex query` / `convex transact` / `convex account info` / `convex peer create` printed the error result but exited 0, so scripts could not detect failure). The result is still printed to stdout as before.
-- CLI: `convex transact --output-file` (offline transaction encoding) no longer opens a network connection to the default peer.
-- CLI: `key delete` and `key list` no longer create an empty keystore as a side effect when the specified keystore does not exist (exit code 66, NOINPUT).
-- CLI: an ambiguous `--key` hex prefix matching multiple keystore entries is now an error instead of silently using an arbitrary matching key.
-- CLI: `key import` auto-detection now recognises BIP39 mnemonic phrases and PEM text (previously only hex input was auto-detected, despite the documented behaviour), and gives a clear error when the type cannot be inferred.
-- CLI: `convex etch --help` and `convex desktop --help` now work like other command groups; group usage headers show the full command path (e.g. `convex peer` rather than `peer`).
+- CLI: consistent `-a/--address` option across all `account` subcommands, with `CONVEX_ADDRESS` (#630).
+- CLI: `convex help <command>` shows the named subcommand's help everywhere (#630).
+- CLI: failed queries and transactions now exit non-zero, so scripts can detect failure.
+- CLI: `transact --output-file` no longer opens a network connection.
+- CLI: `key delete` and `key list` no longer create an empty keystore as a side effect.
+- CLI: an ambiguous `--key` hex prefix is now an error instead of silently picking a key.
+- CLI: `key import` auto-detects BIP39 phrases and PEM text, as documented.
+- CLI: `etch --help` and `desktop --help` work like other command groups; usage headers show the full command path.
 
 ### Fixed
 
-- `convex.asset`: `owns?` on a map-of-assets form always returned true (misplaced paren); now checks each entry correctly. Applied via the v1 protocol upgrade (#621).
-- `asset.multi-token`: `offer` for a token the caller did not yet hold wiped the caller's other token holdings; now preserved. Applied via the v1 protocol upgrade (#620).
-- Asset actors (`nft.simple`, `nft.basic`, `box.actor`): `offer` keyed by the raw receiver, so non-fungible assets could not be transferred into boxes; now normalised, with the `get-offer` SPI added and `box.actor/burn` input coerced. Applied via the v1 protocol upgrade (#622).
-- Trust library: `trust/trusted?` now fails closed against a defective trust monitor — it catches errors and boolean-coerces the result rather than propagating; `convex.trust.delegate` control action aligned to `:control`; `remove-upgradability!` undefines the generated `change-control`. Applied via the v1 protocol upgrade (#623).
-- CLI: `key generate --count N` stored keys 2..N under a corrupted password (the password buffer was wiped in-place after the first key), making them impossible to unlock. All generated keys are now encrypted with the supplied password.
-- CLI: `convex status` could hang indefinitely (unbounded `join()` on the status request); it now honours the connection timeout. Client commands also close their peer connections properly.
-- CLI: `account balance` with multiple addresses generated a query without separators between addresses; `peer start --peer-port` ignored its documented default of 18888 (always picking a random port); `local start --count 0` crashed with an internal error instead of a usage error; `peer create` stored the generated peer key under the controller key password rather than the peer key password.
-- CLI: numerous error messages now include the underlying cause and use appropriate exit codes; prompting for input without a console gives a clear error instead of a crash.
+- `convex.asset`: `owns?` on a map of assets always returned true (v1 protocol, #621).
+- `asset.multi-token`: `offer` of an unheld token wiped the caller's other holdings (v1 protocol, #620).
+- NFT and box actors: `offer` receiver now normalised so non-fungibles can be transferred into boxes; `get-offer` SPI added (v1 protocol, #622).
+- Trust: `trust/trusted?` fails closed on defective monitors; delegate control action aligned to `:control`; `remove-upgradability!` also removes `change-control` (v1 protocol, #623).
+- CLI: `key generate --count N` corrupted the password for keys after the first, making them impossible to unlock.
+- CLI: `convex status` could hang indefinitely; client connections now close properly.
+- CLI: multi-address `account balance` queries, the `--peer-port` default, `local start --count 0`, and `peer create` key passwords all fixed.
+- CLI: clearer error messages with causes and proper exit codes; prompting without a console errors instead of crashing.
 
 ## [0.8.7] - 2026-07-06
 
