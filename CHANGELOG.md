@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `AString.isBlank()` — allocation-free blank test on UTF-8 bytes.
+
 ### Changed
 
 ### Fixed
