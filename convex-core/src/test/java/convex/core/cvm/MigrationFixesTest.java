@@ -398,6 +398,36 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testTrustDocFixes() {
+		// #623: docstring typos in the frozen trust actors are corrected by the v1
+		// redefinitions. Docstrings are on-chain metadata, so genesis keeps the old
+		// text; the upgraded state carries the corrections.
+		String trustMeta = "(do (import convex.trust :as trust) "
+				+ "(str (lookup-meta trust 'change-control) (lookup-meta trust 'add-controller)))";
+		assertTrue(eval(GENESIS, trustMeta).toString().contains("set-control"),
+				"genesis keeps the typo'd example");
+		String upgraded = eval(UPGRADED, trustMeta).toString();
+		assertFalse(upgraded.contains("set-control"), "nonexistent set-control example corrected");
+		assertTrue(upgraded.contains("(change-control my-asset *address*)"));
+		assertTrue(upgraded.contains("(deploy (add-controller *address*))"));
+
+		// delegate `update` docstring was copy-pasted from `create`
+		String delegateMeta = "(do (import convex.trust.delegate :as del) "
+				+ "(str (lookup-meta del 'update)))";
+		String updateDoc = eval(UPGRADED, delegateMeta).toString();
+		assertTrue(updateDoc.contains("Updates the delegated monitor"));
+		assertFalse(updateDoc.contains("Creates new delegated"));
+
+		// behaviour of the redefined functions is unchanged: create/update round-trip
+		String roundTrip = "(do (import convex.trust :as trust) "
+				+ "(import convex.trust.delegate :as del) "
+				+ "(def id (call del (create *address*))) "
+				+ "(call [del id] (update #1)) "
+				+ "(trust/trusted? [del id] #1))";
+		assertEquals(convex.core.data.prim.CVMBool.TRUE, eval(UPGRADED, roundTrip));
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUpgradedCoreDocs() {
 		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by

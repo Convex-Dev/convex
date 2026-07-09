@@ -1,7 +1,7 @@
 'convex.trust.monitors
 
-;; This library implements some generic value based trust moniotors 
-;; These work inline, i.e. no actor code needs to be delpoyed
+;; This library implements some generic value based trust monitors
+;; These work inline, i.e. no actor code needs to be deployed
 ;;
 ;; These can be composed to implement more complex logic
 

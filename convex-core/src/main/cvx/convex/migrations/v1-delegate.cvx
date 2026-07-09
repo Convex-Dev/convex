@@ -11,7 +11,40 @@
 ;; documented `:control` convention could not authorise a delegate control transfer.
 ;; Aligns the action keyword to `:control`.
 ;;
-;; Idempotent: re-applying the corrected definition is a no-op.
+;; Also corrects the `create` / `update` docstrings: `update`'s was copy-pasted from
+;; `create` (wrong description and example) and both had malformed :signature
+;; metadata. Bodies unchanged.
+;;
+;; Idempotent: re-applying the corrected definitions is a no-op.
+
+(defn create
+  ^{:callable true
+    :doc {:description ["Creates a new delegated trust monitor, returning its scope id."]
+          :examples    [{:code "(call delegate-actor (create initial-monitor *address*))"}]
+          :signature   [{:params [monitor]}
+                        {:params [monitor controller]}]}}
+  ([monitor]
+    (recur monitor *caller*))
+  ([monitor controller]
+    (let [id next-id
+          rec [monitor controller]]
+      (set! mons (assoc mons id rec))
+      (set! next-id (inc id))
+      id)))
+
+(defn update
+  ^{:callable true
+    :doc {:description ["Updates the delegated monitor for the scoped id, subject to controller trust."]
+          :examples    [{:code "(call [delegate-actor id] (update new-monitor))"}]
+          :signature   [{:params [new-monitor]}]}}
+  [new-monitor]
+  (let [rec (mons *scope*)]
+    (or rec (fail :ARGUMENT "Delegated trust monitor ID not valid"))
+    (or
+      (trust/trusted? (second rec) *caller* :update [*address* *scope*])
+      (fail :TRUST "Controller not valid"))
+    (set! mons (assoc mons *scope* (assoc rec 0 new-monitor)))
+    new-monitor))
 
 (defn change-control
   ^{:callable true}

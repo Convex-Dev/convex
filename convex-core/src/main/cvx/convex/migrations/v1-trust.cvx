@@ -14,6 +14,8 @@
 ;; - `remove-upgradability!` now also undefines the generated `change-control`, which
 ;;   referenced the now-undefined `upgradable-root` (`(call actor (change-control x))`
 ;;   would throw :UNDECLARED). Docstring signature corrected to `[actor]`.
+;; - `change-control` and `add-controller` docstring examples corrected (referenced a
+;;   nonexistent `set-control` and the wrong function respectively). Bodies unchanged.
 ;;
 ;; Idempotent: re-applying the corrected definitions is a no-op.
 
@@ -50,6 +52,23 @@
        (= monitor subject)
 
      false)))
+
+(defn change-control
+  ^{:doc {:description ["Sets a controller for an entity (possibly scoped). Controller may be any trust monitor. Typically requires trust from the existing controller, for an action of :control."]
+          :examples    [{:code "(change-control my-asset *address*)"}]
+          :signature   [{:params [path controller]}]}}
+  [path controller]
+  (call path (change-control controller))
+  :OK)
+
+(defn add-controller
+  ^{:doc {:description ["Creates deployable code to add a controller to an actor."]
+          :examples    [{:code "(deploy (add-controller *address*))"}]
+          :signature   [{:params []}
+                        {:params [controller]}]}}
+  ([] (recur *address*))
+  ([cont]
+   `(set-controller ~cont)))
 
 (defn remove-upgradability!
   ^{:doc {:description ["Removes upgradability from an actor, previously added using `add-trusted-upgrade`."
