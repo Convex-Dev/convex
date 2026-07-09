@@ -23,6 +23,7 @@ public class Keywords {
 
 	// configuration parameters
 	public static final Keyword STORE = Keyword.intern("store");
+	public static final Keyword PROTOCOL_VERSION = Keyword.intern("protocol-version");
 	public static final Keyword RESTORE = Keyword.intern("restore");
 	public static final Keyword RECALC = Keyword.intern("recalc");
 

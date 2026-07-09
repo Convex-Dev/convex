@@ -62,6 +62,10 @@ public class LocalStart extends ALocalCommand {
 		description="Disable the REST API server.")
 	private boolean norest;
 
+	@Option(names={"--protocol-version"},
+		description="Protocol version for the new local network genesis. Default: latest version supported by this release.")
+	private Long protocolVersion;
+
     /**
      * Gets n public keys for local test cluster
      * @param count Number of public keys
@@ -147,7 +151,7 @@ public class LocalStart extends ALocalCommand {
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
-		State genesisState=Init.createState(keyList);
+		State genesisState=Helpers.applyGenesisProtocol(Init.createState(keyList),protocolVersion);
 		try {
 			return API.launchLocalPeers(keyPairList,genesisState, peerPorts);
 		} catch (PeerException e) {

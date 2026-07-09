@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -93,7 +94,8 @@ public class API {
 	 */
 	public static Server launchPeer() throws InterruptedException, ConfigException, LaunchException {
 		AKeyPair kp=AKeyPair.generate();
-		State genesis=Init.createState(Lists.of(kp.getAccountKey()));
+		// Fresh test network: latest protocol version (see Config.applyGenesisProtocol)
+		State genesis=Migrations.applyAll(Init.createState(Lists.of(kp.getAccountKey())));
 		HashMap<Keyword, Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, kp);
 		config.put(Keywords.STATE, genesis);

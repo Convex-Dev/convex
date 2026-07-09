@@ -9,6 +9,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import convex.core.crypto.PFXTools;
+import convex.core.cvm.Migrations;
+import convex.core.cvm.State;
 import convex.core.util.Utils;
 
 /**
@@ -21,7 +23,27 @@ import convex.core.util.Utils;
 public class Helpers {
 
 	/**
-	 * Split a parameter list by ','. 
+	 * Applies the requested protocol version to a freshly created genesis state for
+	 * a NEW network. Defaults to the latest supported version — a fresh network has
+	 * no history to preserve, so it should not launch with known-fixed bugs. Pin a
+	 * lower version with --protocol-version (e.g. 0 to match a network that has not
+	 * yet upgraded).
+	 *
+	 * @param genesis Freshly created genesis state
+	 * @param protocolVersion Requested protocol version, or null for latest
+	 * @return Genesis state at the requested protocol version
+	 */
+	public static State applyGenesisProtocol(State genesis, Long protocolVersion) {
+		long target = (protocolVersion == null) ? Migrations.MAX_VERSION : protocolVersion;
+		if ((target < 0) || (target > Migrations.MAX_VERSION)) {
+			throw new CLIError(ExitCodes.USAGE,
+					"--protocol-version must be in range 0.." + Migrations.MAX_VERSION);
+		}
+		return Migrations.applyTo(genesis, target);
+	}
+
+	/**
+	 * Split a parameter list by ','.
 	 * Handles internal separators (sublists in strings)
 	 * Trims resulting Strings of whitespace
 	 * @param parameterValues Array of parameter values

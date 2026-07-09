@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
+import convex.cli.Helpers;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
@@ -71,7 +72,11 @@ public class PeerStart extends APeerCommand {
 			description = "Governance seed for network genesis. For testing use only.")
 	private String genesis;
 
-	@Option(names = { "--api-port" }, 
+	@Option(names = { "--protocol-version" },
+			description = "Protocol version for a new network genesis (used with --genesis). Default: latest version supported by this release.")
+	private Long protocolVersion;
+
+	@Option(names = { "--api-port" },
 			description = "Port for REST API. If unspecified, prefers port 8080.")
 	private Integer apiport;
 
@@ -189,8 +194,8 @@ public class PeerStart extends APeerCommand {
 					}
 
 					AccountKey gpk=genesisKey.getAccountKey();
-					State state=Init.createState(gpk,gpk,List.of(gpk));
-					informWarning("Created genesis State: "+state.getHash());
+					State state=Helpers.applyGenesisProtocol(Init.createState(gpk,gpk,List.of(gpk)),protocolVersion);
+					informWarning("Created genesis State: "+state.getHash()+" at protocol version "+state.getProtocolVersion());
 					config.put(Keywords.STATE, state);
 				}
 				server=API.launchPeer(config);

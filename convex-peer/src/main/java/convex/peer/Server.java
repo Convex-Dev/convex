@@ -231,8 +231,11 @@ public class Server implements Closeable {
 				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 			} else {
 				AccountKey peerKey=keyPair.getAccountKey();
-				genesisState=Init.createState(List.of(peerKey));
-				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+				// Fresh network: default to the latest protocol version unless pinned
+				// lower with :protocol-version (a new network has no history to preserve)
+				genesisState=Config.applyGenesisProtocol(Init.createState(List.of(peerKey)),getConfig());
+				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey
+						+" at protocol version "+genesisState.getProtocolVersion());
 			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
 
