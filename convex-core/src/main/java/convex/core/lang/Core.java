@@ -1210,6 +1210,51 @@ public class Core {
 		}
 	});
 
+	public static final CoreFn<ABlobLike<?>> SPLICE = regNonGenesis(new CoreFn<>(Symbols.SPLICE,505) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
+
+			// dst determines the result family (like cat's first argument): a char-like
+			// dst (String, Keyword, Symbol) yields a String, any other BlobLike a Blob.
+			ACell d = args[0];
+			boolean charFamily;
+			if ((d instanceof AString) || (d instanceof ASymbolic)) {
+				charFamily = true;
+			} else if (d instanceof ABlobLike) {
+				charFamily = false;
+			} else {
+				return context.withCastError(0, args, Types.BLOB);
+			}
+			ABlob dst = ((ABlobLike<?>) d).toBlob();
+
+			CVMLong off = RT.ensureLong(args[1]);
+			if (off == null) return context.withCastError(1, args, Types.LONG);
+			long offset = off.longValue();
+
+			// src contributes raw bytes, like cat — no cast, no hex-parsing
+			ACell s = args[2];
+			if (!(s instanceof ABlobLike)) return context.withCastError(2, args, Types.BLOB);
+			ABlob src = ((ABlobLike<?>) s).toBlob();
+
+			long dcount = dst.count();
+			// offset must land within dst or exactly at its end; the write may extend
+			// past the end but may not start beyond it
+			if ((offset < 0) || (offset > dcount)) return context.withBoundsError(offset);
+
+			// Cost is O(src + one boundary chunk): the tree-aware replaceSlice shares all
+			// untouched chunks and rebuilds only the boundary, so juice must match
+			long touched = src.count() + Math.min(dcount, Blob.CHUNK_LENGTH);
+			long juice = charFamily ? Juice.buildStringCost(touched) : Juice.buildBlobCost(touched);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			ABlob result = dst.replaceSlice(offset, src);
+			ACell out = charFamily ? Strings.create(result) : result;
+			return context.withResult(juice, out);
+		}
+	});
+
 	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER,65) {
 		
 		@Override

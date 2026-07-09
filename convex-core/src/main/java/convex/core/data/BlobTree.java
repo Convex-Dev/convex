@@ -394,8 +394,15 @@ public class BlobTree extends ABlob {
 	public ABlob replaceSlice(long position, ABlob b) {
 		long blen = b.count();
 		if (blen == 0) return this;
-		// If replacement extends past end, fall back to base (which handles growth)
-		if (position + blen > count) return super.replaceSlice(position, b);
+		// If the replacement extends past the end, split into the in-bounds part
+		// (handled tree-aware below) plus the overflow appended structurally, so the
+		// cost stays O(b + boundary chunk) rather than the base's O(count) rebuild.
+		if (position + blen > count) {
+			long fit = count - position;
+			if (fit < 0) return super.replaceSlice(position, b); // position beyond end: base throws
+			if (fit == 0) return append(b);                      // pure append at the end
+			return replaceSlice(position, b.slice(0, fit)).append(b.slice(fit));
+		}
 		long end = position + blen;
 
 		long csize = childLength();

@@ -241,6 +241,47 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testSplice() {
+		// splice is NOT part of the genesis environment; the v1 upgrade installs it
+		assertTrue(evalErrors(GENESIS, "(splice 0x0000 0 0xff)"));
+
+		// In-place overwrite (result same length as dst)
+		assertEquals(eval(UPGRADED, "0x00ffff00"), eval(UPGRADED, "(splice 0x00000000 1 0xffff)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice 0x1234 0 0xabcd)"));
+
+		// Single-byte write
+		assertEquals(eval(UPGRADED, "0x00ff00"), eval(UPGRADED, "(splice 0x000000 1 0xff)"));
+
+		// Extension: the write may run past the end, growing the result
+		assertEquals(eval(UPGRADED, "0x0011223344"), eval(UPGRADED, "(splice 0x0000 1 0x11223344)"));
+		// offset == (count dst) is a pure append
+		assertEquals(eval(UPGRADED, "0x1234abcd"), eval(UPGRADED, "(splice 0x1234 2 0xabcd)"));
+		// empty src is a no-op; offset 0 into empty dst yields src
+		assertEquals(eval(UPGRADED, "0x1234"), eval(UPGRADED, "(splice 0x1234 1 0x)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice 0x 0 0xabcd)"));
+
+		// Result family follows dst: String dst -> String, raw bytes for src (no cast)
+		assertEquals(eval(UPGRADED, "\"hello there\""), eval(UPGRADED, "(splice \"hello world\" 6 \"there\")"));
+		assertEquals(eval(UPGRADED, "\"foXbar\""), eval(UPGRADED, "(splice \"foobar\" 2 0x58)")); // 0x58 = 'X'
+
+		// Byte offsets: an Address dst (byte-family) overwrites its raw bytes -> Blob
+		assertEquals(eval(UPGRADED, "0x0000000000000042"), eval(UPGRADED, "(splice #8 7 0x42)"));
+
+		// :BOUNDS when offset is negative or beyond the end of dst
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 5 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 -1 0xff)"));
+
+		// :CAST for non-BlobLike dst/src, or a non-Long offset
+		assertTrue(evalErrors(UPGRADED, "(splice 123 0 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 5)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 :x 0xff)"));
+
+		// Arity is exactly 3
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 0xff 0xff)"));
+	}
+
+	@Test
 	public void testDotimesFix() {
 		// #598 (6): dotimes cast the raw count form to int at EXPAND time, so only
 		// literal counts worked. Buggy (:CAST) on genesis, fixed on the upgraded state.
