@@ -237,10 +237,16 @@ public class MigrationFixesTest {
 		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"ab\")"));
 		assertEquals(eval(UPGRADED, "\"foo\""), eval(UPGRADED, "(cat :foo)"));
 
-		// Non-BlobLike arguments are a :CAST error — cat never casts (no Integers)
+		// nil arguments are skipped; family follows the first non-nil argument
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat)"));
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat nil nil)"));
+		assertEquals(eval(UPGRADED, "0x0011"), eval(UPGRADED, "(cat 0x00 nil 0x11)"));
+		assertEquals(eval(UPGRADED, "\"abc\""), eval(UPGRADED, "(cat nil \"abc\")")); // String family
+		assertEquals(eval(UPGRADED, "0xab"), eval(UPGRADED, "(cat nil 0xab)"));
+
+		// Non-nil, non-BlobLike arguments are a :CAST error — cat never casts (no Integers)
 		assertTrue(evalErrors(UPGRADED, "(cat 0x00 5)"));
 		assertTrue(evalErrors(UPGRADED, "(cat 123)"));
-		assertTrue(evalErrors(UPGRADED, "(cat nil)"));
 		assertTrue(evalErrors(UPGRADED, "(cat 0x00 [1 2])"));
 	}
 
@@ -275,10 +281,16 @@ public class MigrationFixesTest {
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 5 0xff)"));
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 -1 0xff)"));
 
-		// :CAST for non-BlobLike dst/src, or a non-Long offset
+		// nil is treated as empty: nil src is a no-op, nil dst is an empty Blob
+		assertEquals(eval(UPGRADED, "0x1234"), eval(UPGRADED, "(splice 0x1234 1 nil)"));
+		assertEquals(eval(UPGRADED, "0xabcd"), eval(UPGRADED, "(splice nil 0 0xabcd)"));
+		assertTrue(evalErrors(UPGRADED, "(splice nil 1 0xff)")); // offset 1 beyond empty dst
+
+		// :CAST for non-nil non-BlobLike dst/src, or a non-Long offset (offset is not skipped)
 		assertTrue(evalErrors(UPGRADED, "(splice 123 0 0xff)"));
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0 5)"));
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 :x 0xff)"));
+		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 nil 0xff)"));
 
 		// Arity is exactly 3
 		assertTrue(evalErrors(UPGRADED, "(splice 0x0000 0)"));

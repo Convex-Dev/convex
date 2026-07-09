@@ -1171,28 +1171,23 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 
-			// Result family is decided by the first argument: char-like (String,
-			// Keyword, Symbol) produces a String, anything else BlobLike produces a
-			// Blob. Fixed/constrained subtypes (Address, Hash, …) widen to Blob, since
-			// concatenation is not closed over them. Arity 0 produces an empty Blob.
+			// nil arguments are skipped (contribute no bytes). The result family is
+			// decided by the first non-nil argument: char-like (String, Keyword, Symbol)
+			// produces a String, any other BlobLike a Blob. Fixed/constrained subtypes
+			// (Address, Hash, …) widen to Blob. No non-nil arguments produces an empty
+			// Blob. cat never casts: each argument contributes its raw toBlob() bytes (a
+			// String its UTF-8, a Keyword/Symbol its name), with no hex-parsing.
 			boolean charFamily = false;
-			if (n > 0) {
-				ACell first = args[0];
-				if ((first instanceof AString) || (first instanceof ASymbolic)) {
-					charFamily = true;
-				} else if (!(first instanceof ABlobLike)) {
-					return context.withCastError(0, args, Types.BLOB);
-				}
-			}
-
-			// Validate all arguments are BlobLike and sum bytes, so juice is charged
-			// before building a potentially large result. cat never casts: each argument
-			// contributes its raw toBlob() bytes (a String its UTF-8, a Keyword/Symbol
-			// its name), with no hex-parsing or rendering.
+			boolean familySet = false;
 			long total = 0;
 			for (int i = 0; i < n; i++) {
 				ACell a = args[i];
+				if (a == null) continue; // skip nils
 				if (!(a instanceof ABlobLike)) return context.withCastError(i, args, Types.BLOB);
+				if (!familySet) {
+					charFamily = (a instanceof AString) || (a instanceof ASymbolic);
+					familySet = true;
+				}
 				total += ((ABlobLike<?>) a).count();
 			}
 
@@ -1201,7 +1196,9 @@ public class Core {
 
 			BlobBuilder bb = new BlobBuilder();
 			for (int i = 0; i < n; i++) {
-				bb.append(((ABlobLike<?>) args[i]).toBlob());
+				ACell a = args[i];
+				if (a == null) continue;
+				bb.append(((ABlobLike<?>) a).toBlob());
 			}
 			ABlob bytes = bb.toBlob();
 
@@ -1216,27 +1213,39 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
 
-			// dst determines the result family (like cat's first argument): a char-like
-			// dst (String, Keyword, Symbol) yields a String, any other BlobLike a Blob.
+			// dst determines the result family (like cat's first argument); nil is
+			// treated as an empty Blob. A char-like dst (String, Keyword, Symbol) yields
+			// a String, any other BlobLike a Blob.
 			ACell d = args[0];
 			boolean charFamily;
-			if ((d instanceof AString) || (d instanceof ASymbolic)) {
+			ABlob dst;
+			if (d == null) {
+				charFamily = false;
+				dst = Blob.EMPTY;
+			} else if ((d instanceof AString) || (d instanceof ASymbolic)) {
 				charFamily = true;
+				dst = ((ABlobLike<?>) d).toBlob();
 			} else if (d instanceof ABlobLike) {
 				charFamily = false;
+				dst = ((ABlobLike<?>) d).toBlob();
 			} else {
 				return context.withCastError(0, args, Types.BLOB);
 			}
-			ABlob dst = ((ABlobLike<?>) d).toBlob();
 
 			CVMLong off = RT.ensureLong(args[1]);
 			if (off == null) return context.withCastError(1, args, Types.LONG);
 			long offset = off.longValue();
 
-			// src contributes raw bytes, like cat — no cast, no hex-parsing
+			// src contributes raw bytes, like cat — no cast; nil contributes nothing
 			ACell s = args[2];
-			if (!(s instanceof ABlobLike)) return context.withCastError(2, args, Types.BLOB);
-			ABlob src = ((ABlobLike<?>) s).toBlob();
+			ABlob src;
+			if (s == null) {
+				src = Blob.EMPTY;
+			} else if (s instanceof ABlobLike) {
+				src = ((ABlobLike<?>) s).toBlob();
+			} else {
+				return context.withCastError(2, args, Types.BLOB);
+			}
 
 			long dcount = dst.count();
 			// offset must land within dst or exactly at its end; the write may extend
