@@ -20,14 +20,14 @@ HTTP REST API server for accessing the [Convex](https://convex.world) network vi
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-restapi</artifactId>
-    <version>0.8.7</version>
+    <version>0.8.8</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-restapi:0.8.7'
+implementation 'world.convex:convex-restapi:0.8.8'
 ```
 
 ## Usage
