@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CVM: new `cat` core function — raw byte concatenation of BlobLike values (Blobs, Strings, Addresses, Hashes, Keywords, Symbols). The result type follows the first argument (a String, Keyword or Symbol yields a String; any other BlobLike yields a Blob), and it never casts: each argument contributes its raw bytes — a String its UTF-8, a Keyword/Symbol its name — so `(cat 0x "cafe")` appends UTF-8 bytes where `(blob "cafe")` hex-parses. Pairs with `slice` for packed-blob state patterns. Installed by the protocol version 1 upgrade (#633).
 - CLI: `peer -c/--config` now actually loads the specified JSON5 peer config file (previously the option was accepted but ignored); explicit command line options take precedence over config file values (#625).
 - CLI: `peer start --address` is passed to peer launch and verified after startup — the CLI warns when the specified controller does not match the authoritative on-chain controller (noting that an actor controller such as a trust monitor may still permit control) (#624).
 - CLI: the faucet commands (`account create --faucet`, `account fund`) accept a scheme and/or port in `--host`, e.g. `https://peer.example.com:8443` — previously the REST port was hardcoded to 8080 (#627).

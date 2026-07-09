@@ -108,10 +108,11 @@ public class Migrations {
 	 *
 	 * <ol>
 	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} /
-	 * {@code gensym} core bindings (CoreFn singletons, marked {@code :static};
-	 * these cannot be defined in Lisp), enabling future upgrades to be scheduled
-	 * on-chain and macros to introduce hygienic bindings — their {@code :doc}
-	 * metadata is applied by the metadata step below; and</li>
+	 * {@code gensym} / {@code cat} core bindings (CoreFn singletons, marked
+	 * {@code :static}; these cannot be defined in Lisp), enabling future upgrades to
+	 * be scheduled on-chain, macros to introduce hygienic bindings, and raw
+	 * concatenation of BlobLike values — their {@code :doc} metadata is applied by
+	 * the metadata step below; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections) and #528 ({@code add-mint} in the
 	 * {@code convex.fungible} library).</li>
@@ -140,6 +141,7 @@ public class Migrations {
 			env = env.assoc(Symbols.SCHEDULE_UPGRADE, Core.SCHEDULE_UPGRADE);
 			env = env.assoc(Symbols.UNSCHEDULE_UPGRADE, Core.UNSCHEDULE_UPGRADE);
 			env = env.assoc(Symbols.GENSYM, Core.GENSYM);
+			env = env.assoc(Symbols.CAT, Core.CAT);
 
 			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
 			// :static only here; full metadata including :doc is applied by META_FIXES,
@@ -148,6 +150,7 @@ public class Migrations {
 			meta = meta.assoc(Symbols.SCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.UNSCHEDULE_UPGRADE, staticMeta);
 			meta = meta.assoc(Symbols.GENSYM, staticMeta);
+			meta = meta.assoc(Symbols.CAT, staticMeta);
 
 			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
 

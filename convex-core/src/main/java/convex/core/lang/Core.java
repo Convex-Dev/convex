@@ -30,6 +30,8 @@ import convex.core.cvm.exception.RollbackValue;
 import convex.core.cvm.exception.TailcallValue;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.ASymbolic;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -53,6 +55,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.util.BlobBuilder;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
@@ -1159,6 +1162,51 @@ public class Core {
 			Symbol sym = Symbol.create(prefix.toString() + "__" + context.getJuiceUsed());
 			if (sym == null) return context.withArgumentError("gensym name too long, must be at most " + Constants.MAX_NAME_LENGTH + " characters");
 			return context.withResult(sym);
+		}
+	});
+
+	public static final CoreFn<ABlobLike<?>> CAT = regNonGenesis(new CoreFn<>(Symbols.CAT,504) {
+
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			int n = args.length;
+
+			// Result family is decided by the first argument: char-like (String,
+			// Keyword, Symbol) produces a String, anything else BlobLike produces a
+			// Blob. Fixed/constrained subtypes (Address, Hash, …) widen to Blob, since
+			// concatenation is not closed over them. Arity 0 produces an empty Blob.
+			boolean charFamily = false;
+			if (n > 0) {
+				ACell first = args[0];
+				if ((first instanceof AString) || (first instanceof ASymbolic)) {
+					charFamily = true;
+				} else if (!(first instanceof ABlobLike)) {
+					return context.withCastError(0, args, Types.BLOB);
+				}
+			}
+
+			// Validate all arguments are BlobLike and sum bytes, so juice is charged
+			// before building a potentially large result. cat never casts: each argument
+			// contributes its raw toBlob() bytes (a String its UTF-8, a Keyword/Symbol
+			// its name), with no hex-parsing or rendering.
+			long total = 0;
+			for (int i = 0; i < n; i++) {
+				ACell a = args[i];
+				if (!(a instanceof ABlobLike)) return context.withCastError(i, args, Types.BLOB);
+				total += ((ABlobLike<?>) a).count();
+			}
+
+			long juice = charFamily ? Juice.buildStringCost(total) : Juice.buildBlobCost(total);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			BlobBuilder bb = new BlobBuilder();
+			for (int i = 0; i < n; i++) {
+				bb.append(((ABlobLike<?>) args[i]).toBlob());
+			}
+			ABlob bytes = bb.toBlob();
+
+			ACell result = charFamily ? Strings.create(bytes) : bytes;
+			return context.withResult(juice, result);
 		}
 	});
 

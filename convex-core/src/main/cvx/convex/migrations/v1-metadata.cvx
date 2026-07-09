@@ -204,7 +204,7 @@
 ;; ---------------------------------------------------------------------------
 ;; New v1 core bindings — full metadata, including :doc.
 ;;
-;; schedule-upgrade / unschedule-upgrade / gensym are installed into the core
+;; schedule-upgrade / unschedule-upgrade / gensym / cat are installed into the core
 ;; environment by the v1 bootstrap (Java) step immediately before this file is
 ;; evaluated, initially with :static metadata only. Their docstrings are applied
 ;; here, by the same no-value-def mechanism as the corrections above.
@@ -243,3 +243,14 @@
                             :return Symbol}]}
        :static true}
   gensym)
+
+(def ^{:doc {:description ["Concatenates the raw bytes of zero or more BlobLike values (Blobs, Strings, Addresses, Hashes, Keywords, Symbols). Never casts: each argument contributes its raw byte content — a String its UTF-8 bytes, a Keyword or Symbol its name bytes — with no hex-parsing or rendering."
+                          "The result type follows the first argument: a String, Keyword or Symbol first argument yields a String; any other BlobLike yields a Blob. With no arguments, returns the empty Blob `0x`. Contrast `blob`, which is a cast (`(blob \"cafe\")` parses hex), whereas `(cat 0x \"cafe\")` appends the raw UTF-8 bytes. See also `slice` for the inverse."]
+             :errors      {:CAST "If any argument is not a BlobLike value."}
+             :examples    [{:code "(cat 0x01 0x0203)"}
+                           {:code "(cat \"foo\" \"bar\")"}
+                           {:code "(cat :hello \"-\" :world)"}]
+             :signature   [{:params [& xs]
+                            :return BlobLike}]}
+       :static true}
+  cat)

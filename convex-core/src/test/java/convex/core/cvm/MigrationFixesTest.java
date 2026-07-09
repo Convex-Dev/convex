@@ -202,6 +202,45 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testCat() {
+		// cat is NOT part of the genesis environment; the v1 upgrade installs it
+		assertTrue(evalErrors(GENESIS, "(cat 0x01 0x02)"));
+
+		// Blob concatenation (byte-family first arg -> Blob result)
+		assertEquals(eval(UPGRADED, "0x010203"), eval(UPGRADED, "(cat 0x01 0x0203)"));
+
+		// String concatenation (char-family first arg -> String result)
+		assertEquals(eval(UPGRADED, "\"foobar\""), eval(UPGRADED, "(cat \"foo\" \"bar\")"));
+
+		// First-arg family dispatch: Keyword/Symbol are char-family and contribute
+		// their NAME bytes only (no leading colon), producing a String — not a Keyword
+		assertEquals(eval(UPGRADED, "\"foobar\""), eval(UPGRADED, "(cat :foo :bar)"));
+		assertNotEquals(eval(UPGRADED, ":foobar"), eval(UPGRADED, "(cat :foo :bar)"));
+		assertEquals(eval(UPGRADED, "\"hello-world\""), eval(UPGRADED, "(cat :hello \"-\" :world)"));
+
+		// Raw bytes, never a cast: a String contributes UTF-8, unlike (blob "cafe")
+		// which hex-parses. This divergence from blob is deliberate.
+		assertEquals(eval(UPGRADED, "0x0063616665"), eval(UPGRADED, "(cat 0x00 \"cafe\")"));
+		assertEquals(eval(UPGRADED, "0x63616665"), eval(UPGRADED, "(cat 0x \"cafe\")"));
+		assertNotEquals(eval(UPGRADED, "(blob \"cafe\")"), eval(UPGRADED, "(cat 0x \"cafe\")"));
+
+		// Fixed-width BlobLike first arg (Address) widens to Blob
+		assertEquals(eval(UPGRADED, "0x000000000000000800"), eval(UPGRADED, "(cat #8 0x00)"));
+
+		// Arity 0 -> empty Blob; arity 1 -> arg in its family's growable form
+		assertEquals(eval(UPGRADED, "0x"), eval(UPGRADED, "(cat)"));
+		assertEquals(eval(UPGRADED, "0x01"), eval(UPGRADED, "(cat 0x01)"));
+		assertEquals(eval(UPGRADED, "\"ab\""), eval(UPGRADED, "(cat \"ab\")"));
+		assertEquals(eval(UPGRADED, "\"foo\""), eval(UPGRADED, "(cat :foo)"));
+
+		// Non-BlobLike arguments are a :CAST error — cat never casts (no Integers)
+		assertTrue(evalErrors(UPGRADED, "(cat 0x00 5)"));
+		assertTrue(evalErrors(UPGRADED, "(cat 123)"));
+		assertTrue(evalErrors(UPGRADED, "(cat nil)"));
+		assertTrue(evalErrors(UPGRADED, "(cat 0x00 [1 2])"));
+	}
+
+	@Test
 	public void testDotimesFix() {
 		// #598 (6): dotimes cast the raw count form to int at EXPAND time, so only
 		// literal counts worked. Buggy (:CAST) on genesis, fixed on the upgraded state.
