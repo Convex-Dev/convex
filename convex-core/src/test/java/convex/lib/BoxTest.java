@@ -2,6 +2,7 @@ package convex.lib;
 
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,7 +44,10 @@ public class BoxTest extends ACVMTest {
 		assertEquals(BOX,t1.get(0));
 		assertTrue(t1.get(1) instanceof CVMLong);
 		
-		assertStateError(step(ctx,"(box/insert t1 t1)"));
+		// Self-insert is rejected by the ownership guard (:TRUST). Before the #622 fix
+		// this errored :STATE via the offer-key mismatch — the guard was never reached.
+		// Runs on the upgraded state (ACVMTest default), so it sees the corrected behaviour.
+		assertTrustError(step(ctx,"(box/insert t1 t1)"));
 	}
 	
 	@Test public void testAssetAPI() {

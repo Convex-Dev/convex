@@ -115,8 +115,10 @@ public class Migrations {
 	 * {@code :doc} metadata is applied by the metadata step below; and</li>
 	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
-	 * #621 ({@code owns?} map form in {@code convex.asset}) and #620 ({@code offer} in
-	 * {@code asset.multi-token}).</li>
+	 * #621 ({@code owns?} map form in {@code convex.asset}), #620 ({@code offer} in
+	 * {@code asset.multi-token}) and #622 ({@code offer} receiver normalisation plus the
+	 * {@code get-offer} SPI in the {@code nft.simple}, {@code nft.basic} and
+	 * {@code box.actor} asset actors).</li>
 	 * </ol>
 	 *
 	 * <p>The protocol globals already exist when this fires: they were created by
@@ -139,6 +141,14 @@ public class Migrations {
 		/** asset.multi-token library fix applied as part of v1 (#620: offer clobbers holdings). */
 		private static final AList<ACell> MULTITOKEN_FIXES =
 				readResource("/convex/migrations/v1-multi-token.cvx");
+		/** asset.nft.simple / asset.nft.basic / asset.box.actor fixes (#622: offer receiver
+		 * not normalised so assets could not be transferred into boxes; + get-offer SPI). */
+		private static final AList<ACell> NFT_SIMPLE_FIXES =
+				readResource("/convex/migrations/v1-nft-simple.cvx");
+		private static final AList<ACell> NFT_BASIC_FIXES =
+				readResource("/convex/migrations/v1-nft-basic.cvx");
+		private static final AList<ACell> BOX_FIXES =
+				readResource("/convex/migrations/v1-box.cvx");
 
 		@Override
 		public State apply(State preState) {
@@ -174,6 +184,9 @@ public class Migrations {
 			s = applyLibraryFix(s, "convex.fungible", FUNGIBLE_FIXES);   // #528: add-mint
 			s = applyLibraryFix(s, "convex.asset", ASSET_FIXES);         // #621: owns? map form
 			s = applyLibraryFix(s, "asset.multi-token", MULTITOKEN_FIXES); // #620: offer clobbers holdings
+			s = applyLibraryFix(s, "asset.nft.simple", NFT_SIMPLE_FIXES); // #622: offer receiver + get-offer
+			s = applyLibraryFix(s, "asset.nft.basic", NFT_BASIC_FIXES);   // #622
+			s = applyLibraryFix(s, "asset.box.actor", BOX_FIXES);         // #622: + burn -qc
 
 			return s;
 		}

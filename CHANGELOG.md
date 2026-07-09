@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `convex.asset`: `owns?` on a map-of-assets form always returned true (misplaced paren); now checks each entry correctly. Applied via the v1 protocol upgrade (#621).
 - `asset.multi-token`: `offer` for a token the caller did not yet hold wiped the caller's other token holdings; now preserved. Applied via the v1 protocol upgrade (#620).
+- Asset actors (`nft.simple`, `nft.basic`, `box.actor`): `offer` keyed by the raw receiver, so non-fungible assets could not be transferred into boxes; now normalised, with the `get-offer` SPI added and `box.actor/burn` input coerced. Applied via the v1 protocol upgrade (#622).
 - CLI: `key generate --count N` stored keys 2..N under a corrupted password (the password buffer was wiped in-place after the first key), making them impossible to unlock. All generated keys are now encrypted with the supplied password.
 - CLI: `convex status` could hang indefinitely (unbounded `join()` on the status request); it now honours the connection timeout. Client commands also close their peer connections properly.
 - CLI: `account balance` with multiple addresses generated a query without separators between addresses; `peer start --peer-port` ignored its documented default of 18888 (always picking a random port); `local start --count 0` crashed with an internal error instead of a usage error; `peer create` stored the generated peer key under the controller key password rather than the peer key password.

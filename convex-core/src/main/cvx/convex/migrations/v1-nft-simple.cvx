@@ -1,0 +1,30 @@
+;; Network upgrade v1 — asset.nft.simple library fix (see UPGRADE.md).
+;;
+;; Applied as part of the v1 genesis upgrade to the asset.nft.simple actor account.
+;; Deliberately NOT part of nft/simple.cvx / genesis: existing networks keep their
+;; genesis hash and reach this fix at protocol version 1.
+;;
+;; Fixes #622: `offer` keyed offers by the raw `receiver`, so a scoped-address
+;; receiver (e.g. a box `[box.actor id]`) never matched the bare-address key that
+;; `accept` looks up via `*caller*` — NFTs could not be transferred into boxes.
+;; Normalises the receiver with `(address receiver)`, mirroring `convex.fungible`.
+;; Also adds the `get-offer` SPI function (required by `convex.asset`, previously
+;; absent so `asset/get-offer` errored :STATE).
+;;
+;; Idempotent: re-applying the corrected definitions is a no-op.
+
+(defn offer
+  ^{:callable true}
+  [receiver quantity]
+  (let [q (-qc quantity)
+        receiver (address receiver)
+        caller-offers (get offers *caller* {})]
+    (set! offers
+         (assoc offers
+                *caller*
+                (assoc caller-offers receiver q)))))
+
+(defn get-offer
+  ^{:callable true}
+  [sender receiver]
+  (get-in offers [(address sender) (address receiver)] #{}))

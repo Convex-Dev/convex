@@ -49,25 +49,26 @@ public class BootstrapTest {
 		State migrated = Migrations.get(0).apply(scheduled);
 
 		// v1 touches the core account (#8) and the fixed library accounts: fungible
-		// (add-mint), asset (owns?) and multi-token (offer). Every other account is identical.
-		Address fungible = (Address) scheduled.lookupCNS("convex.fungible");
-		Address asset = (Address) scheduled.lookupCNS("convex.asset");
-		Address multitoken = (Address) scheduled.lookupCNS("asset.multi-token");
-		assertNotNull(fungible);
-		assertNotNull(asset);
-		assertNotNull(multitoken);
-		java.util.Set<Address> changed = java.util.Set.of(Core.CORE_ADDRESS, fungible, asset, multitoken);
+		// (add-mint), asset (owns?), multi-token (offer) and the nft/box asset actors
+		// (offer + get-offer). Every other account is identical.
+		String[] fixedLibs = { "convex.fungible", "convex.asset", "asset.multi-token",
+				"asset.nft.simple", "asset.nft.basic", "asset.box.actor" };
+		java.util.Set<Address> changed = new java.util.HashSet<>();
+		changed.add(Core.CORE_ADDRESS);
+		for (String lib : fixedLibs) {
+			Address a = (Address) scheduled.lookupCNS(lib);
+			assertNotNull(a, "missing library " + lib);
+			changed.add(a);
+			// Each fixed library was actually redefined (environment changed)
+			assertNotSame(scheduled.getAccount(a).getEnvironment(), migrated.getAccount(a).getEnvironment(),
+					"library not redefined: " + lib);
+		}
 		long n = scheduled.getAccounts().count();
 		for (long i = 0; i < n; i++) {
 			Address a = Address.create(i);
 			if (changed.contains(a)) continue;
 			assertSame(scheduled.getAccount(a), migrated.getAccount(a), "Account " + a + " must be untouched");
 		}
-
-		// Each fixed library was actually redefined (environment changed)
-		assertNotSame(scheduled.getAccount(fungible).getEnvironment(), migrated.getAccount(fungible).getEnvironment());
-		assertNotSame(scheduled.getAccount(asset).getEnvironment(), migrated.getAccount(asset).getEnvironment());
-		assertNotSame(scheduled.getAccount(multitoken).getEnvironment(), migrated.getAccount(multitoken).getEnvironment());
 
 		// Peers, schedule and globals are untouched by the migration itself
 		// (the watermark advance is the mechanism's job, not the migration's)

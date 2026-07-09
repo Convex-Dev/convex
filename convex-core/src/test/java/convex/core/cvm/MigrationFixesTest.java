@@ -355,6 +355,24 @@ public class MigrationFixesTest {
 	}
 
 	@Test
+	public void testBoxNonFungibleFix() {
+		// #622: transferring a non-fungible asset into a box failed because the asset
+		// actor's `offer` keyed by the raw (scoped) receiver, not the bare box address
+		// that accept looks up. Broken on genesis (:STATE), works on the upgraded state.
+		String insertNft = "(do (import asset.box :as box) (import asset.nft.simple :as nft) (import convex.asset :as asset) "
+				+ "(def b (box/create)) (def n (call nft (create))) (box/insert b [nft #{n}]))";
+		assertTrue(evalErrors(GENESIS, insertNft));   // NFT-into-box fails
+		assertFalse(evalErrors(UPGRADED, insertNft)); // fixed
+
+		// get-offer SPI was absent on these actors: asset/get-offer errored on genesis,
+		// returns the zero quantity on the upgraded state
+		String getOffer = "(do (import asset.nft.simple :as nft) (import convex.asset :as asset) "
+				+ "(asset/get-offer nft *address* *address*))";
+		assertTrue(evalErrors(GENESIS, getOffer));
+		assertFalse(evalErrors(UPGRADED, getOffer));
+	}
+
+	@Test
 	@SuppressWarnings("unchecked")
 	public void testUpgradedCoreDocs() {
 		// The v1-installed bindings' docs live in v1-metadata.cvx and are NOT covered by
