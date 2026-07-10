@@ -76,6 +76,16 @@ public class EtchStore extends ACachedStore {
 	 */
 	private final java.util.concurrent.atomic.AtomicBoolean sweepRunning = new java.util.concurrent.atomic.AtomicBoolean();
 
+	/**
+	 * True once completeGC() has cut over to a successor store. This store then
+	 * remains a fully functional view (reads fall back across both files, writes
+	 * route to the target — the successor's file), and the caller decides when
+	 * to stop using and close it. The flag guards the operations that would be
+	 * wrong afterwards: closing the successor's file, cancelling, or completing
+	 * again.
+	 */
+	private volatile boolean completed = false;
+
 
 	public EtchStore(Etch etch) {
 		this(etch, true);
@@ -97,6 +107,10 @@ public class EtchStore extends ACachedStore {
 	 * @throws IllegalStateException if a GC cycle is already in progress
 	 */
 	public synchronized void startGC() throws IOException {
+		if (completed)
+			// this store is a legacy view over the successor's file: a new cycle
+			// here would make no sense — GC the successor instead
+			throw new IllegalStateException("GC already completed for store: " + this);
 		if (target != null)
 			throw new IllegalStateException("GC already in progress for store: " + this);
 
@@ -135,7 +149,7 @@ public class EtchStore extends ACachedStore {
 	 */
 	public void transferGC() throws IOException {
 		Etch t = target;
-		if ((t == null) || cancelling)
+		if ((t == null) || cancelling || completed)
 			throw new IllegalStateException("No active GC cycle for store: " + this);
 		if (!sweepRunning.compareAndSet(false, true))
 			throw new IllegalStateException("GC transfer already running for store: " + this);
@@ -224,7 +238,7 @@ public class EtchStore extends ACachedStore {
 	 * @return true if a cycle is in progress and its sweep has completed
 	 */
 	public boolean isGCComplete() {
-		return (target != null) && !cancelling && sweepComplete;
+		return (target != null) && !cancelling && !completed && sweepComplete;
 	}
 
 	/**
@@ -239,7 +253,7 @@ public class EtchStore extends ACachedStore {
 	 */
 	public java.util.List<Hash> verifyGC() throws IOException {
 		Etch t = target;
-		if (t == null)
+		if ((t == null) || completed)
 			throw new IllegalStateException("No GC in progress for store: " + this);
 		return EtchUtils.verify(t, getRootHash());
 	}
@@ -258,6 +272,10 @@ public class EtchStore extends ACachedStore {
 	 */
 	public synchronized void cancelGC() throws IOException {
 		Etch t = target;
+		if (completed)
+			// the target is the successor's live file: reverse-migrating it would
+			// be catastrophic
+			throw new IllegalStateException("GC already completed for store: " + this);
 		if (t == null)
 			throw new IllegalStateException("No GC in progress for store: " + this);
 
@@ -305,11 +323,62 @@ public class EtchStore extends ACachedStore {
 	}
 
 	/**
+	 * Completes the GC cycle: cuts over to a new EtchStore wrapping the target
+	 * file, and returns it. Whether and when to stop using this (old) store is
+	 * the caller's decision: it remains a fully functional view — reads fall
+	 * back across both files, writes route to the successor's file — until
+	 * closed. All transferred values are retrievable by hash from the
+	 * successor; refs bound to this store stop resolving once it is closed.
+	 *
+	 * Hard requirement: the transfer sweep must have completed
+	 * (isGCComplete()) — the failure mode of an early cutover is silent data
+	 * loss, so there is no force override.
+	 *
+	 * @return the successor EtchStore, running on the (former) target file
+	 * @throws IOException in case of IO error
+	 * @throws IllegalStateException if no active cycle, cancelling, already
+	 *         completed, or the sweep has not completed
+	 */
+	public synchronized EtchStore completeGC() throws IOException {
+		Etch t = target;
+		if (completed)
+			throw new IllegalStateException("GC already completed for store: " + this);
+		if ((t == null) || cancelling)
+			throw new IllegalStateException("No active GC cycle for store: " + this);
+		if (!sweepComplete)
+			throw new IllegalStateException("GC transfer not complete for store: " + this);
+
+		// Everything must be durable in the target before we commit to it
+		t.flush();
+
+		// From here the target file belongs to the successor: this store must
+		// never close, cancel or re-complete over it. In-flight and future
+		// writes via this store still route to the target file — benign, the
+		// successor reads the same file
+		completed = true;
+
+		// The successor rebinds the target Etch to itself: refs decoded from
+		// that file (including via this store's reads) bind to the successor —
+		// deliberately, since they outlive this store's close
+		EtchStore newStore = new EtchStore(t);
+
+		// Completion marker: records which generational target file completed,
+		// for startup adoption/recovery. Written AFTER the cutover is durable;
+		// a crash before this point simply reads as an abandoned cycle (rolled
+		// back by recovery — nothing lost, cutover "didn't happen")
+		File marker = new File(etch.getFile().getCanonicalPath() + ".gc-complete");
+		java.nio.file.Files.writeString(marker.toPath(),
+				t.getFile().getName() + "\n" + t.getRootHash().toHexString() + "\n");
+
+		return newStore;
+	}
+
+	/**
 	 * Checks if a GC cycle is currently in progress
-	 * @return true if collecting
+	 * @return true if collecting (not after cutover)
 	 */
 	public boolean isGCInProgress() {
-		return target != null;
+		return (target != null) && !completed;
 	}
 
 	private Etch getWriteEtch() {
@@ -390,7 +459,10 @@ public class EtchStore extends ACachedStore {
 			try {
 				Ref<T> ref = t.read(hash);
 				if (ref != null) {
-					refCache.putCell(ref);
+					// After completeGC() the target belongs to the successor, so
+					// refs decode bound to it: serve them (they outlive this
+					// store's close) but never cache foreign-bound refs
+					if (!isForeign(ref)) refCache.putCell(ref);
 					return ref;
 				}
 			} catch (ClosedChannelException e) {
@@ -573,9 +645,10 @@ public class EtchStore extends ACachedStore {
 	public void close() {
 		// Close the GC target too if a cycle is in progress. This abandons the
 		// cycle: data written since startGC() remains in the target file for a
-		// later recovery step, and the old file is untouched
+		// later recovery step, and the old file is untouched. After completeGC()
+		// the target belongs to the successor store and must NOT be closed here
 		Etch t = target;
-		if (t != null)
+		if ((t != null) && !completed)
 			t.close();
 		etch.close();
 	}

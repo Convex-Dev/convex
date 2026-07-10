@@ -160,7 +160,7 @@ A GC cycle has four phases, driven through `EtchStore`:
 ```
         startGC()            transfer / sweep              completeGC()
 IDLE ─────────────▶ COLLECTING ───────────────▶ (complete) ─────▶ new EtchStore returned,
-                        │                                          old store RETIRED
+                        │                                          old store = legacy view
                         │
                         └── cancelGC() ──▶ roll back target→old ──▶ IDLE (original store,
                                                                      nothing lost)
@@ -171,7 +171,7 @@ IDLE ─────────────▶ COLLECTING ───────
 `RefSoft` binds to the store it belongs to. Two consequences shape the lifecycle:
 
 - **The result of GC is a new store.** `completeGC()` returns a fresh `EtchStore`
-  wrapping the target file; the old `EtchStore` object is retired, not mutated into the
+  wrapping the target file; the old `EtchStore` object becomes a functional legacy view, not mutated into the
   new one. Callers swap their handle (peer server store field, `Stores` context) to the
   returned store.
 - **During the cycle, all refs handed out by the collecting store stay bound to the old
@@ -179,7 +179,7 @@ IDLE ─────────────▶ COLLECTING ───────
   target is internal until cutover. This is what makes `cancelGC()` non-disruptive (no
   app-visible store ever disappears) and concentrates the entire swap at `completeGC()`.
 
-After cutover the retired store remains open and readable — refs bound to it keep
+After cutover the old store remains open and readable — refs bound to it keep
 resolving, against both files — until the user closes it. Once it is closed, refs bound
 to it throw `StoreException` on any uncached read, *even for values that were migrated*
 (the ref's store pointer is dead, not the data). Values still soft-reachable in memory
@@ -204,7 +204,7 @@ to re-persist the value into the new store — `Cells.persist(value, newStore)` 
 children are present and returns a ref correctly bound (and correctly flagged) to the
 new store. This must happen while the value is still resolvable: either during the cycle
 (a persist via the collecting store lands in the target — the explicit-keep path in the
-retention contract) or after cutover but before the retired store is closed.
+retention contract) or after cutover but before the old store is closed.
 
 `RefSoft.withStore` is internal plumbing, not application API: it is sound only where
 the data is known to be in the destination by construction (store implementations use it
@@ -464,22 +464,31 @@ and while the old file remains open; afterwards they get `MissingDataException` 
 open, value genuinely absent) or `StoreException` (store closed). This is the documented
 contract.
 
-### Phase 4: cutover — `completeGC()`
+### Phase 4: cutover — `completeGC()` — implemented (July 2026, phase 3d)
 
 Synchronised on the store, and the user's explicit call. Returns the **new store**:
 
-1. Check `isGCComplete()`; refuse otherwise (a `force` variant may override, accepting
-   possible data loss).
-2. `flush()` the target.
-3. Construct the result: a new `EtchStore` wrapping the target `Etch` (fresh caches;
-   `Etch.setStore(newStore)` repoints the target file so refs decoded from it bind to
-   the new store).
-4. Retire this store: writes now throw `IllegalStateException`; reads keep resolving
-   against both files so refs bound to the old store keep working.
-5. Write the `gc-complete` marker; return the new store.
+1. Check `isGCComplete()`; refuse otherwise — hard requirement, no force override (the
+   failure mode of an early cutover is silent data loss).
+2. `flush()` the target: everything must be durable before committing to it.
+3. Mark completion, then construct the result: a new `EtchStore` wrapping the target
+   `Etch` (fresh caches; the constructor repoints the target file's store binding, so
+   refs decoded from it — including via the old store's reads — bind to the new store,
+   deliberately: they outlive the old store's close).
+4. Write the `gc-complete` marker (recording which generational target file completed,
+   plus its root hash) and return the new store. A crash before the marker reads as an
+   abandoned cycle: recovery rolls the target back and the cutover simply "didn't
+   happen" — nothing lost either way.
 
-The caller then swaps its handle to the returned store and closes the retired store once
-it no longer depends on refs bound to it (see
+**The old store is NOT retired — whether and when to stop using it is the caller's
+decision.** After cutover it remains a fully functional view: reads fall back across
+both files, and writes route to the target — the successor's file — so code still
+holding the old handle keeps working correctly through a gradual handover, with nothing
+thrown and nothing lost. What the completed state forbids is only what would now be
+wrong: closing the successor's file (`close()` skips the target once completed),
+cancelling (reverse-migrating the successor's live file), re-completing (a second
+successor), or starting a new cycle on the legacy view. The caller swaps handles at its
+own pace and closes the old store when nothing depends on refs bound to it (see
 [Refs and store identity](#refs-and-store-identity)). Old-file disposal follows the file
 lifecycle below.
 
@@ -637,7 +646,7 @@ API) is a natural follow-up but out of scope for the first iteration.
 | `EtchStore.transferGC()` | sweep | **implemented (3c)**: iterative post-order sweep, per-entry status preservation, INV-1 pruning, cycle-end abort. |
 | `EtchStore.isGCComplete()` | sweep done | **implemented (3c)**: sweep finished; sticky (INV-1 + cycle write path); reset by start/cancel. |
 | `EtchStore.verifyGC()` / `EtchUtils.verify(Etch, Hash)` | pre-cutover | **implemented (3c)**: full walk against the target file ONLY (store reads fall back to the old file, so they cannot verify), no pruning. |
-| `EtchStore.completeGC()` | cutover | new; returns the **new `EtchStore`** on the target file; retires this store; writes marker. |
+| `EtchStore.completeGC()` | cutover | **implemented (3d)**: returns the **new `EtchStore`** on the target file; old store stays a functional view (caller decides retirement); writes marker. |
 | `EtchStore.cancelGC()` | any | **implemented (3b)**: flag flip + registered-writer drain + reverse `migrate` + root copy-back + target retirement; idempotent on retry. |
 | `Etch.copyEntry(Hash, Etch)` | sweep | later optimisation; raw entry copy preserving flags/memorySize. |
 | `convex etch gc` / `convex etch migrate` | CLI | new subcommands over the same primitives. |
@@ -670,7 +679,7 @@ Required fixes to existing code (bugs once GC is actually used):
 - **User cuts over early** (`completeGC(force)`, or closes old file out-of-band): reachable
   data may be missing from the target → `MissingDataException` at runtime. Documented
   contract; `verifyGC()` exists precisely so users can check first.
-- **Refs held across cutover**: any ref bound to the retired store fails with
+- **Refs held across cutover**: any ref bound to the old store fails with
   `StoreException` on uncached reads once that store is closed — even if its value was
   migrated (the binding is dead, not the data). Remedy: re-persist the value into the
   new store while it is still resolvable (recursive, ensures children), or re-fetch by
@@ -806,10 +815,11 @@ pure characterisation, protecting the "required fixes" refactors:
 - Cancel rollback: write novelty and update the root during a cycle, `cancelGC()`,
   assert every value and the latest root are present in the original store, the target
   file is gone, and refs issued during the cycle still resolve.
-- Cutover: `completeGC()` returns a store on the target file; retired store still reads;
-  retired store writes throw; refs bound to the retired store fail after close;
-  carry-across via `Cells.persist(value, newStore)` yields a working, correctly-flagged
-  ref whose whole tree reads back from the new store alone.
+- Cutover: `completeGC()` returns a store on the target file; the old store stays a
+  functional view (reads via both files, writes routed to the successor's file) until
+  the caller closes it; closing it must not affect the successor; refs bound to the old
+  store fail after its close; carry-across via `Cells.persist(value, newStore)` yields a
+  working, correctly-flagged ref whose whole tree reads back from the new store alone.
 - Concurrency: sweep racing live writes and root updates (futures and completion
   signals, no sleeps); assert INV-1 post-conditions.
 - Crash simulation: kill between each phase boundary (marker present/absent, torn target
@@ -830,7 +840,7 @@ pure characterisation, protecting the "required fixes" refactors:
   during the cycle or fold them into the main root before cutover; retention is exactly
   what they explicitly keep plus anything persisted after GC starts.
 - **The GC result is a new store.** Refs reference their store, so cutover must yield a
-  new `EtchStore`; the old store is retired and closed by the user, at which point refs
+  new `EtchStore`; the old store remains a functional view until closed by the user, at which point refs
   bound to it become invalid. In-cycle refs stay bound to the old store, keeping the
   target internal until cutover.
 - **Cancel rolls back, never discards.** Writes during a cycle exist only in the target,

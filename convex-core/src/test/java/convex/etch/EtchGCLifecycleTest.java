@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -323,6 +324,96 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3, reopened.getRootData());
 		assertNotNull(reopened.getEtch().read(v2.getHash()));
 		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
+		reopened.close();
+	}
+
+	/**
+	 * The completion path: cutover to a successor store; the old store remains
+	 * a fully functional view until the caller closes it; garbage is actually
+	 * collected.
+	 */
+	@Test
+	public void testGCCompleteLifecycle() throws IOException {
+		File f = File.createTempFile("gc3d-complete", ".etch");
+		f.deleteOnExit();
+
+		AVector<ACell> t1 = tree(210); // will become garbage
+		AVector<ACell> t0 = tree(201); // pre-cycle root, superseded during the cycle
+		{
+			EtchStore store = EtchStore.create(f);
+			Cells.persist(t1, store);
+			store.setRootData(t0);
+			store.flush();
+			store.close();
+		}
+		EtchStore store = EtchStore.create(f);
+		store.startGC();
+		Etch targetEtch = store.getTargetEtch();
+		targetEtch.getFile().deleteOnExit();
+
+		// Cutover is hard-gated on a completed sweep (no force override)
+		assertThrows(IllegalStateException.class, store::completeGC);
+
+		// Cycle activity, then a root update superseding t0
+		AString v2 = nonEmbedded(220);
+		Cells.persist(v2, store);
+		AVector<ACell> t3 = tree(230);
+		store.setRootData(t3);
+
+		store.transferGC();
+		assertTrue(store.isGCComplete());
+
+		// ----- Cutover -----
+		EtchStore newStore = store.completeGC();
+		assertFalse(store.isGCInProgress());
+		assertFalse(store.isGCComplete());
+		assertThrows(IllegalStateException.class, store::completeGC); // no second successor
+		assertThrows(IllegalStateException.class, store::cancelGC);   // successor's file is live
+		assertThrows(IllegalStateException.class, store::transferGC);
+		assertThrows(IllegalStateException.class, store::startGC);
+
+		// Successor runs on the target file with the cycle's final state
+		assertSame(targetEtch, newStore.getEtch());
+		assertEquals(t3.getHash(), newStore.getRootHash());
+		assertEquals(t3, newStore.getRootData());
+		assertEquals(v2, newStore.refForHash(v2.getHash()).getValue());
+
+		// GARBAGE IS COLLECTED: t1 was unreachable from the final root
+		assertNull(newStore.refForHash(t1.getHash()));
+
+		// Old store remains a full view: migrated data via the target file,
+		// garbage still readable via the old file
+		assertEquals(v2, store.refForHash(v2.getHash()).getValue());
+		assertEquals(t1, store.refForHash(t1.getHash()).getValue());
+
+		// Old store still accepts writes: they land in the successor's file
+		AString v4 = nonEmbedded(240);
+		Cells.persist(v4, store);
+		assertEquals(v4, newStore.refForHash(v4.getHash()).getValue());
+		assertNull(store.getEtch().read(v4.getHash())); // not in the old file
+
+		// Completion marker names the generational target file
+		File marker = new File(f.getCanonicalPath() + ".gc-complete");
+		marker.deleteOnExit();
+		assertTrue(marker.exists());
+		assertTrue(java.nio.file.Files.readString(marker.toPath())
+				.contains(targetEtch.getFile().getName()));
+
+		// ----- Caller decides retirement: closing the old store must not
+		// touch the successor -----
+		store.close();
+		AString v5 = nonEmbedded(250);
+		Cells.persist(v5, newStore);
+		assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
+		assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
+
+		// ----- Successor state is durable across reopen -----
+		newStore.close();
+		EtchStore reopened = EtchStore.create(targetEtch.getFile());
+		assertEquals(t3.getHash(), reopened.getRootHash());
+		assertNotNull(reopened.getEtch().read(v4.getHash()));
+		assertNotNull(reopened.getEtch().read(v5.getHash()));
+		assertNull(reopened.getEtch().read(t1.getHash()));
 		reopened.close();
 	}
 }

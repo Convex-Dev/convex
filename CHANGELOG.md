@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AString.isBlank()` — allocation-free blank test on UTF-8 bytes.
 - `StoreTransfer.transfer`/`verify` and `EtchUtils.migrate` — composable primitives for moving lattice data between stores and verifying completeness.
+- Etch online garbage collection: `EtchStore.startGC`/`transferGC`/`verifyGC`/`completeGC`/`cancelGC` rebuild a garbage-collected store while running, with explicit user-controlled cutover (see `convex-core/docs/ETCH_GC.md`).
 - `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network: sync, deterministic replay, migration application and a real boundary crossing, with classified state-diff diagnostics and coin-supply conservation checks.
 
 ### Changed
