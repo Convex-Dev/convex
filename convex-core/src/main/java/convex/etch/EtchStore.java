@@ -2,6 +2,7 @@ package convex.etch;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
@@ -39,6 +40,26 @@ public class EtchStore extends ACachedStore {
 	 */
 	private volatile Etch target;
 
+	/**
+	 * True while a GC cycle is being cancelled: writes are redirected back to
+	 * the old file while the target is drained and reverse-migrated. target
+	 * stays non-null (reads still fall back to it) until cancellation completes.
+	 */
+	private volatile boolean cancelling = false;
+
+	/**
+	 * Count of in-flight top-level persists writing to the GC target. cancelGC()
+	 * drains these to zero before the reverse migration: the index scan requires
+	 * a write-quiescent file. Only touched while a cycle is in progress.
+	 */
+	private final java.util.concurrent.atomic.AtomicInteger targetWriters = new java.util.concurrent.atomic.AtomicInteger();
+
+	/**
+	 * Monitor for drain signalling, separate from the store monitor so a persist
+	 * finishing during the (long) reverse migration never blocks on it.
+	 */
+	private final Object drainSignal = new Object();
+
 
 	public EtchStore(Etch etch) {
 		this(etch, true);
@@ -57,17 +78,21 @@ public class EtchStore extends ACachedStore {
 	 * to the old file. See convex-core/docs/ETCH_GC.md.
 	 *
 	 * @throws IOException If an IO exception occurs
-	 * @throws IllegalStateException if a GC cycle is already in progress, or a
-	 *         stale target file exists (crash recovery is the caller's concern)
+	 * @throws IllegalStateException if a GC cycle is already in progress
 	 */
 	public synchronized void startGC() throws IOException {
 		if (target != null)
 			throw new IllegalStateException("GC already in progress for store: " + this);
-		File temp = new File(etch.getFile().getCanonicalPath() + "~");
-		if (temp.exists()) {
-			// A stale target may hold data from an interrupted cycle: adopting or
-			// deleting it blindly would risk data loss. Recovery is a separate step
-			throw new IllegalStateException("Stale GC target file exists: " + temp);
+
+		// Generational target naming: an existing target file is either stale
+		// (interrupted cycle: may hold data, so it must be neither adopted nor
+		// deleted — recovery is a separate concern) or a cancelled target pinned
+		// by mapped buffers (Windows). Skip to the first free name
+		String base = etch.getFile().getCanonicalPath() + "~";
+		File temp = new File(base);
+		for (int i = 1; temp.exists(); i++) {
+			if (i >= 100) throw new IllegalStateException("Too many stale GC target files: " + base);
+			temp = new File(base + i);
 		}
 
 		// Fully initialise the target before publication: readers must never see
@@ -79,6 +104,65 @@ public class EtchStore extends ACachedStore {
 	}
 
 	/**
+	 * Cancels the GC cycle in progress. Writes are redirected back to the
+	 * original file, in-flight target writes are drained, and everything
+	 * written to the target (including root updates) is migrated back before
+	 * the target file is dropped. Nothing persisted during the cycle is lost.
+	 *
+	 * May be called again if a previous attempt failed part-way (e.g. an IO
+	 * error during migration): the reverse migration is idempotent.
+	 *
+	 * @throws IOException in case of IO error during the reverse migration
+	 * @throws IllegalStateException if no GC cycle is in progress
+	 */
+	public synchronized void cancelGC() throws IOException {
+		Etch t = target;
+		if (t == null)
+			throw new IllegalStateException("No GC in progress for store: " + this);
+
+		// 1: redirect writes back to the old file. Reads keep the target
+		// fallback until migration completes, so nothing becomes unreadable
+		cancelling = true;
+
+		// 2: drain in-flight persists still writing to the target — the reverse
+		// migration's index scan requires a write-quiescent file. Any persist
+		// that registered before seeing the cancelling flag re-checks after
+		// registering, so a zero count here is conclusive (Dekker-style)
+		synchronized (drainSignal) {
+			try {
+				while (targetWriters.get() > 0) {
+					drainSignal.wait(50); // timed: robust against missed notifies
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IOException("Interrupted while draining GC target writers", e);
+			}
+		}
+
+		// 3: migrate everything in the target back into the old file. The
+		// destination is this store, whose writes now route to the old file
+		EtchUtils.migrate(t, this);
+
+		// 4: carry back the root hash (its tree was just migrated). setRootData
+		// is synchronised on the store, so this cannot stomp a newer root
+		etch.setRootHash(t.getRootHash());
+		etch.writeDataLength();
+		etch.flush();
+
+		// 5: retire the target. Readers may still hold the target reference
+		// briefly: readStoreRef tolerates a closed target (everything it held is
+		// now in the old file). Deletion may fail while mapped buffers pin the
+		// file (Windows): the next startGC picks a fresh generational name
+		target = null;
+		cancelling = false;
+		t.close();
+		File tf = t.getFile();
+		if (!tf.delete()) {
+			tf.deleteOnExit();
+		}
+	}
+
+	/**
 	 * Checks if a GC cycle is currently in progress
 	 * @return true if collecting
 	 */
@@ -87,8 +171,9 @@ public class EtchStore extends ACachedStore {
 	}
 
 	private Etch getWriteEtch() {
+		// Note || short-circuit: the common idle case reads one volatile field
 		Etch t = target;
-		return (t == null) ? etch : t;
+		return (t == null || cancelling) ? etch : t;
 	}
 
 	/**
@@ -160,10 +245,16 @@ public class EtchStore extends ACachedStore {
 		// this costs a single volatile load and an untaken branch
 		Etch t = target;
 		if (t != null) {
-			Ref<T> ref = t.read(hash);
-			if (ref != null) {
-				refCache.putCell(ref);
-				return ref;
+			try {
+				Ref<T> ref = t.read(hash);
+				if (ref != null) {
+					refCache.putCell(ref);
+					return ref;
+				}
+			} catch (ClosedChannelException e) {
+				// The target was concurrently retired by a completing cancelGC():
+				// everything it held has been migrated to the old file, so falling
+				// through is correct (NOT a masked read failure)
 			}
 		}
 		Ref<T> ref = etch.read(hash);
@@ -190,7 +281,28 @@ public class EtchStore extends ACachedStore {
 		// persist across files would let a parent land in the GC target claiming
 		// PERSISTED while its children exist only in the old file, silently
 		// breaking the INV-1 pruning guarantee (see ETCH_GC.md)
-		return storeRef(ref, requiredStatus, noveltyHandler, topLevel, getWriteEtch());
+		Etch we = getWriteEtch();
+		if (we == etch) {
+			// fast path: not writing to a GC target
+			return storeRef(ref, requiredStatus, noveltyHandler, topLevel, we);
+		}
+
+		// Writing to the GC target: register so cancelGC() can drain in-flight
+		// persists to write-quiescence before its reverse migration
+		targetWriters.incrementAndGet();
+		try {
+			// Re-check AFTER registering (Dekker-style pairing with cancelGC's
+			// flag-then-drain): if cancellation started meanwhile, this persist
+			// must go to the old file
+			we = getWriteEtch();
+			return storeRef(ref, requiredStatus, noveltyHandler, topLevel, we);
+		} finally {
+			if ((targetWriters.decrementAndGet() == 0) && cancelling) {
+				synchronized (drainSignal) {
+					drainSignal.notifyAll();
+				}
+			}
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -210,12 +322,12 @@ public class EtchStore extends ACachedStore {
 		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
 			hash = ref.getHash();
-			// During a GC cycle, only an entry in the TARGET can satisfy a persist:
-			// the shared cache and the old file cannot prove target residency, and
-			// early-returning on an old-file hit would skip the copy that INV-1
-			// depends on. Outside a cycle (writeEtch == etch) the cached path is
-			// unchanged
-			Ref<T> existing = (writeEtch == etch) ? refForHash(hash) : writeEtch.read(hash);
+			// During a GC cycle, only an entry in the file being written can
+			// satisfy a persist: the shared cache cannot prove file residency, and
+			// early-returning on a hit in the OTHER file would skip a copy —
+			// breaking INV-1 while collecting, or losing data during a cancel's
+			// reverse migration. Outside a cycle the cached path is unchanged
+			Ref<T> existing = (target == null) ? refForHash(hash) : writeEtch.read(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
@@ -344,11 +456,26 @@ public class EtchStore extends ACachedStore {
 
 	@Override
 	public Hash getRootHash() throws IOException {
-		return getWriteEtch().getRootHash();
+		// The root lives in the target for the WHOLE cycle, including during a
+		// cancel (writes are already redirected, but the root is only copied back
+		// at the end of the reverse migration) — so this is target-aware rather
+		// than using getWriteEtch()
+		Etch t = target;
+		if (t != null) {
+			try {
+				return t.getRootHash();
+			} catch (ClosedChannelException e) {
+				// target concurrently retired by cancelGC(): root was copied back
+			}
+		}
+		return etch.getRootHash();
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> setRootData(T data) throws IOException {
+	public synchronized <T extends ACell> Ref<T> setRootData(T data) throws IOException {
+		// Synchronised on the store: excluded during cancelGC(), whose root
+		// copy-back could otherwise stomp a newer root set mid-cancellation.
+		// Root updates are infrequent, so the uncontended monitor is cheap.
 		// Snapshot the write target once so the root tree and the root hash land
 		// in the same file even if startGC() runs concurrently
 		Etch writeEtch = getWriteEtch();

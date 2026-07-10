@@ -2,6 +2,7 @@ package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -11,6 +12,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.Test;
 
@@ -99,17 +103,20 @@ public class EtchGCLifecycleTest {
 		EtchStore store = EtchStore.create(f);
 		assertFalse(store.isGCInProgress());
 
-		// ----- startGC guards: stale target file must not be adopted or deleted -----
+		// ----- A stale target file is neither adopted nor deleted: the cycle
+		// starts on the next generational name, preserving it for recovery -----
 		File stale = new File(f.getCanonicalPath() + "~");
 		assertTrue(stale.createNewFile());
-		assertThrows(IllegalStateException.class, store::startGC);
-		assertTrue(stale.delete());
+		stale.deleteOnExit();
 
 		// ----- Start the cycle -----
 		store.startGC();
 		assertTrue(store.isGCInProgress());
 		assertThrows(IllegalStateException.class, store::startGC); // double start rejected
 		Etch targetEtch = store.getTargetEtch();
+		targetEtch.getFile().deleteOnExit();
+		assertNotEquals(stale.getCanonicalPath(), targetEtch.getFile().getCanonicalPath());
+		assertEquals(0L, stale.length()); // stale file untouched
 
 		// Root hash carried into the target at cycle start
 		assertEquals(v0.getHash(), store.getRootHash());
@@ -165,18 +172,132 @@ public class EtchGCLifecycleTest {
 		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
 		assertNull(reopened.getEtch().read(v2.getHash()));
 
-		// The abandoned target blocks a new cycle until recovery deals with it
-		assertThrows(IllegalStateException.class, reopened::startGC);
+		// The abandoned target does not block a new cycle: generational naming
+		// skips it, preserving its contents for recovery
+		reopened.startGC();
+		Etch nextTarget = reopened.getTargetEtch();
+		nextTarget.getFile().deleteOnExit();
+		assertNotEquals(targetEtch.getFile().getCanonicalPath(),
+				nextTarget.getFile().getCanonicalPath());
 		reopened.close();
 
 		// Target file: everything written during the cycle is durably there —
 		// exactly what a recovery roll-back (phase 3e) needs
-		EtchStore targetStore = EtchStore.create(new File(f.getCanonicalPath() + "~"));
+		EtchStore targetStore = EtchStore.create(targetEtch.getFile());
 		assertEquals(t3.getHash(), targetStore.getRootHash());
 		assertEquals(t3, targetStore.getRootData());
 		assertEquals(v2, targetStore.refForHash(v2.getHash()).getValue());
 		assertAllInEtch(targetStore.getEtch(), treeHashes(t1), Ref.PERSISTED);
 		assertAllInEtch(targetStore.getEtch(), treeHashes(t3), Ref.PERSISTED);
 		targetStore.close();
+	}
+
+	/**
+	 * The cancel path: everything written during a cycle (novelty, root
+	 * updates, STORED-only entries) survives cancellation in the old file,
+	 * the store remains fully operational, and the result is durable.
+	 */
+	@Test
+	public void testGCCancelLifecycle() throws IOException {
+		File f = File.createTempFile("gc3b-cancel", ".etch");
+		f.deleteOnExit();
+
+		AString v0 = nonEmbedded(101);
+		AVector<ACell> t1 = tree(110);
+
+		// ----- Populate the old file, then reopen for cold caches -----
+		{
+			EtchStore store = EtchStore.create(f);
+			Cells.persist(t1, store);
+			store.setRootData(v0);
+			store.flush();
+			store.close();
+		}
+		EtchStore store = EtchStore.create(f);
+		assertThrows(IllegalStateException.class, store::cancelGC); // no cycle to cancel
+
+		store.startGC();
+		Etch targetEtch = store.getTargetEtch();
+		targetEtch.getFile().deleteOnExit(); // cancel's delete may fail while mapped
+
+		// ----- Cycle activity: novelty, a root update, a STORED-only entry -----
+		AString v2 = nonEmbedded(120);
+		Ref<ACell> v2ref = Cells.persist(v2, store).getRef();
+		AVector<ACell> t3 = tree(130);
+		store.setRootData(t3);
+		AVector<ACell> storedOnly = tree(140);
+		store.storeTopRef(storedOnly.getRef(), Ref.STORED, null);
+		assertNull(store.getEtch().read(v2.getHash())); // target-only so far
+
+		// ----- Cancel: reverse migration back into the old file -----
+		store.cancelGC();
+		assertFalse(store.isGCInProgress());
+		assertNull(store.getTargetEtch());
+		assertThrows(IllegalStateException.class, store::cancelGC); // cycle is over
+
+		Etch old = store.getEtch();
+		// Novelty and root tree fully in the old file at earned status
+		assertTrue(old.read(v2.getHash()).getStatus() >= Ref.PERSISTED);
+		assertAllInEtch(old, treeHashes(t3), Ref.PERSISTED);
+		// STORED-only entry migrated at exactly STORED: no subtree claim, and
+		// its children (never written anywhere) stay absent
+		RefSoft<?> so = old.read(storedOnly.getHash());
+		assertNotNull(so);
+		assertEquals(Ref.STORED, so.getStatus());
+		assertNull(old.read(nonEmbedded(140).getHash()));
+		// Root hash carried back
+		assertEquals(t3.getHash(), store.getRootHash());
+		assertEquals(t3.getHash(), old.getRootHash());
+		// Refs issued during the cycle still resolve
+		assertEquals(v2, v2ref.getValue());
+
+		// ----- Store fully operational: writes land in the old file again -----
+		AString v4 = nonEmbedded(150);
+		Cells.persist(v4, store);
+		assertNotNull(old.read(v4.getHash()));
+
+		// ----- A new cycle starts even if the cancelled target file is pinned
+		// (generational naming). Cancel races live persists: writers before the
+		// flip are drained and their values reverse-migrated; writers after go
+		// straight to the old file. Nothing may be lost -----
+		store.startGC();
+		store.getTargetEtch().getFile().deleteOnExit();
+		int NT = 4, PER = 50;
+		ExecutorService ex = Executors.newFixedThreadPool(NT);
+		List<Future<?>> futures = new ArrayList<>();
+		for (int w = 0; w < NT; w++) {
+			final int base = 200 + w * PER;
+			futures.add(ex.submit(() -> {
+				for (int i = 0; i < PER; i++) {
+					Cells.persist(nonEmbedded(base + i), store);
+				}
+				return null;
+			}));
+		}
+		store.cancelGC(); // concurrent with the writers
+		try {
+			for (Future<?> fut : futures) {
+				fut.get(); // propagate any writer failure
+			}
+		} catch (Exception e) {
+			throw new IOException("Writer failed during concurrent cancel", e);
+		} finally {
+			ex.shutdown();
+		}
+		assertFalse(store.isGCInProgress());
+		for (int i = 200; i < 200 + NT * PER; i++) {
+			assertNotNull(old.read(nonEmbedded(i).getHash()),
+					"Value lost during concurrent cancel: " + i);
+		}
+		assertEquals(t3.getHash(), store.getRootHash());
+		store.close();
+
+		// ----- Reopen: the cancelled state is durable -----
+		EtchStore reopened = EtchStore.create(f);
+		assertEquals(t3.getHash(), reopened.getRootHash());
+		assertEquals(t3, reopened.getRootData());
+		assertNotNull(reopened.getEtch().read(v2.getHash()));
+		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
+		reopened.close();
 	}
 }

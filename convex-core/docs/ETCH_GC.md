@@ -482,18 +482,27 @@ status upgrades, root updates — exists only in the target file. Cancel must ro
 target's contents back into the original store, which is exactly the reverse migration
 primitive:
 
-1. Under lock: redirect writes back to the old file (state `CANCELLING`); reads keep the
-   target fallback. Then drain in-flight target writes (a brief synchronisation on the
-   target `Etch`, whose `write` is synchronised) — the reverse migration's index scan
-   requires a **write-quiescent** source, since `visitIndex` is racy under concurrent
-   index restructuring and missed entries here would be silent data loss.
-2. `EtchUtils.migrate(target, original)` — everything in the target is persisted
-   into the old file, flags preserved (idempotent: `updateInPlace` merges flags for
-   entries the old file already has). Safe by step 1: the target receives no further
-   writes. (The crash-recovery variant runs offline, so quiescence is trivial there.)
-3. Copy the target's current root hash back to the old file (its tree is now guaranteed
-   present by step 2).
-4. Under lock: drop the target fallback; close and delete the target file. State `IDLE`.
+Implemented (July 2026, phase 3b):
+
+1. Under lock: redirect writes back to the old file (`cancelling` flag); reads keep the
+   target fallback, and **root reads keep coming from the target** (still authoritative
+   until copy-back — `getRootHash` is target-aware, not write-target-aware).
+2. Drain in-flight target writes: because each persist snapshots its write target for
+   its whole descent (3a), a brief lock on the target is NOT sufficient — persists
+   *register* in a counter while writing to the target and re-check the cancelling flag
+   after registering (Dekker-style), so a drained zero count is conclusive. The reverse
+   migration's index scan requires a **write-quiescent** source; a missed entry here
+   would be silent data loss.
+3. `EtchUtils.migrate(target, this)` — everything in the target is persisted back;
+   destination writes route to the old file by the cancelling state, and the persistence
+   existence check reads the old file only (the target could otherwise satisfy it and
+   skip the copy). Idempotent, so a failed cancel may simply be retried.
+4. Copy the target's root hash back (its tree is now present by step 3). `setRootData`
+   is synchronised on the store, so the copy-back cannot stomp a newer root.
+5. Under lock: drop the target, close it, delete the file. Readers that still hold the
+   target reference tolerate the closed target (documented exception to the three-state
+   read contract: by protocol everything it held is in the old file). Deletion may fail
+   while mapped buffers pin the file (Windows) — harmless, see file naming below.
 
 Because all application-visible refs were bound to the collecting store throughout the
 cycle, cancellation is invisible to the application beyond transient ≤2x reads while
@@ -505,7 +514,12 @@ below reconciles it.
 
 ### File lifecycle and naming
 
-Target file: `<file>~` (as currently in `startGC()`), e.g. `etch.db~`.
+Target files are named **generationally**: `<file>~`, `<file>~1`, `<file>~2`, … —
+`startGC()` picks the first name not in use. An existing target file is *neither adopted
+nor deleted*: it is either stale (interrupted cycle — may hold data recoverable by the
+roll-back) or a cancelled target still pinned by mapped buffers (Windows cannot delete a
+mapped file). Generational naming means neither case ever blocks a new cycle, and stale
+data is preserved for recovery, which scans `<file>~*`.
 
 Renaming is awkward on Windows: memory-mapped files cannot be renamed or deleted while
 mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer`. So:
@@ -615,7 +629,7 @@ API) is a natural follow-up but out of scope for the first iteration.
 | `EtchStore.transferGC()` | sweep | new; `transfer` over the store's own old/target split; blocking, call from background thread. |
 | `EtchStore.isGCComplete()` | sweep done | new; sweep finished (INV-1 makes this sticky). |
 | `EtchStore.completeGC()` | cutover | new; returns the **new `EtchStore`** on the target file; retires this store; writes marker. |
-| `EtchStore.cancelGC()` | any | new; rolls back target contents into the original file (reverse `migrate` + root copy-back), then deletes the target. |
+| `EtchStore.cancelGC()` | any | **implemented (3b)**: flag flip + registered-writer drain + reverse `migrate` + root copy-back + target retirement; idempotent on retry. |
 | `Etch.copyEntry(Hash, Etch)` | sweep | later optimisation; raw entry copy preserving flags/memorySize. |
 | `convex etch gc` / `convex etch migrate` | CLI | new subcommands over the same primitives. |
 

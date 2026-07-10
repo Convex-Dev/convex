@@ -28,8 +28,23 @@ public class EtchUtils {
 	 * @throws IOException in case of IO error during migration
 	 */
 	public static long migrate(EtchStore source, AStore dest) throws IOException {
+		return migrate(source.getEtch(), dest);
+	}
+
+	/**
+	 * Etch-level migrate variant: used where the source file is not a store's
+	 * main file (e.g. a GC target being reverse-migrated by cancelGC). The
+	 * source's store binding is used for decoding. Same write-quiescence
+	 * requirement as the store-level variant.
+	 *
+	 * @param source Source Etch file to migrate from (must be write-quiescent)
+	 * @param dest Destination store
+	 * @return Number of source entries processed
+	 * @throws IOException in case of IO error during migration
+	 */
+	public static long migrate(Etch source, AStore dest) throws IOException {
 		long[] count = {0};
-		source.getEtch().visitIndex(new EtchCellVisitor() {
+		source.visitIndex(new EtchCellVisitor() {
 			@Override
 			protected void visitCell(ACell cell) {
 				Ref<ACell> ref = cell.getRef();
