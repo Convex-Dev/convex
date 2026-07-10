@@ -407,14 +407,18 @@ public class EtchGCLifecycleTest {
 		assertEquals(f.getCanonicalPath() + "~1", target2.getFile().getCanonicalPath());
 		newStore.transferGC();
 		EtchStore finalStore = newStore.completeGC();
+		// The single base marker was REWRITTEN to name the new current file
+		assertTrue(java.nio.file.Files.readString(marker.toPath())
+				.contains(target2.getFile().getName()));
 		AString v6 = nonEmbedded(260);
 		Cells.persist(v6, finalStore);
-		newStore.close();
+		newStore.close(); // deletes f~ (or defers via its .gc-defunct tombstone)
 		finalStore.close();
-		new File(f.getCanonicalPath() + "~.gc-complete").deleteOnExit();
+		new File(f.getCanonicalPath() + ".gc-defunct").deleteOnExit();
+		new File(f.getCanonicalPath() + "~.gc-defunct").deleteOnExit();
 
-		// ----- Restart via EtchStore.create(f): recovery (phase 3e) follows
-		// the marker chain f -> f~ -> f~1 and adopts (or defers to) the tail -----
+		// ----- Restart via EtchStore.create(f): recovery (phase 3e) adopts
+		// (or defers to) the marker-named current file f~1 -----
 		EtchStore adopted = EtchStore.create(f);
 		assertEquals(t3.getHash(), adopted.getRootHash());
 		assertNotNull(adopted.getEtch().read(v6.getHash())); // post-second-cutover data retained

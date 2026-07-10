@@ -56,18 +56,21 @@ public class EtchUtils {
 	 * Reconciles on-disk state left by GC cycles that ended in a previous
 	 * process:
 	 * <ul>
-	 * <li><b>Completed cutovers</b> (a {@code .gc-complete} marker naming a
-	 * target file — possibly a chain of them across multiple successive GCs)
-	 * are ADOPTED: the final chain tail is installed under the original file
-	 * name, and the superseded original, intermediates and markers are
-	 * deleted — this deletion is the disk reclamation (each cutover was
-	 * hard-gated on a verifiably complete sweep, and everything else is
-	 * garbage by the retention contract).</li>
-	 * <li><b>Abandoned cycles</b> (target files with no marker) are ROLLED
-	 * BACK: their contents — which exist nowhere else — are migrated into
-	 * their base file, tolerating a torn tail from the crash; the root
-	 * advances only if its tree then verifies complete; the target is
-	 * deleted.</li>
+	 * <li><b>Completed cutovers</b>: the single {@code .gc-complete} marker —
+	 * rewritten by every completeGC, so multiple successive GCs never chain —
+	 * names the CURRENT store file. It is ADOPTED: installed under the base
+	 * file name, with the superseded original deleted. That deletion is the
+	 * disk reclamation (each cutover was hard-gated on a verifiably complete
+	 * sweep, and everything else is garbage by the retention contract).</li>
+	 * <li><b>Defunct files</b> ({@code .gc-defunct} tombstone: superseded
+	 * cutover originals not yet deleted, or cancelled targets pinned by
+	 * mappings) are deleted, never rolled back — their retained content is
+	 * verifiably elsewhere.</li>
+	 * <li><b>Abandoned cycles</b> (target files with neither marker reference
+	 * nor tombstone) are ROLLED BACK: their contents — which exist nowhere
+	 * else — are migrated into the live store file, tolerating a torn tail
+	 * from the crash; the root advances only if its tree then verifies
+	 * complete; the target is deleted.</li>
 	 * </ul>
 	 *
 	 * Every step is idempotent: a crash mid-recovery leaves a state this
@@ -75,7 +78,7 @@ public class EtchUtils {
 	 *
 	 * If files cannot be renamed/deleted (e.g. pinned by memory mappings from
 	 * this same process on Windows), adoption is DEFERRED: the returned file
-	 * is the chain tail, which holds the correct current data, and the
+	 * is the marker-named current file, which holds the correct data, and the
 	 * renames are retried on the next start. Recovery never silently opens
 	 * stale data.
 	 *
@@ -93,115 +96,102 @@ public class EtchUtils {
 		warn("Etch GC recovery started for {} (marker {}, target file(s) found: {})",
 				file, marker.exists() ? "present" : "absent", targets);
 
-		// ---- 1: resolve the completed-cutover chain via markers ----
-		List<File> chain = new ArrayList<>();
-		HashSet<String> chainPaths = new HashSet<>();
-		chain.add(file);
-		chainPaths.add(file.getPath());
-		File node = file;
-		while (chain.size() <= 64) {
-			File t = readMarkerTarget(node);
-			if (t == null) break;
-			if (!chainPaths.add(t.getPath())) {
-				throw new IOException("Etch GC recovery aborted for " + file
-						+ ": the .gc-complete marker chain contains a cycle at " + t
-						+ " (chain so far: " + chain + "). This should be impossible unless the store"
-						+ " directory was modified by hand. Inspect and remove the offending marker"
-						+ " files manually before reopening this store.");
+		// ---- 1: identify the CURRENT store file ----
+		// The single marker (rewritten by every completeGC) names it; no marker
+		// means the base file itself is current
+		File current = null;
+		if (marker.exists()) {
+			String name = readMarkerName(marker, file);
+			if (name != null) {
+				File named = new File(file.getParentFile(), name).getCanonicalFile();
+				if (named.equals(file)) {
+					warn("Etch GC recovery: marker {} names the base file itself - already adopted;"
+							+ " removing the leftover marker.", marker.getName());
+					deleteOrThrow(marker);
+				} else if (!named.exists()) {
+					if (file.exists()) {
+						warn("Etch GC recovery: marker {} names {} which no longer exists, while {} is"
+								+ " present - treating the marker as stale (cutover already adopted by a"
+								+ " previous run) and removing it.", marker.getName(), name, file.getName());
+						deleteOrThrow(marker);
+					} else {
+						throw new IOException("Etch GC recovery cannot proceed for " + file + ": marker "
+								+ marker.getName() + " names " + name + " as the current store file, but"
+								+ " neither that file nor " + file.getName() + " exists. Files have been"
+								+ " lost outside Convex's control (disk failure? manual deletion?)."
+								+ " Restore " + name + " or " + file.getName() + " from a backup, or delete"
+								+ " the marker to start a fresh empty store.");
+					}
+				} else {
+					current = named;
+					warn("Etch GC recovery: completed cutover found - current store file is {}",
+							current.getName());
+				}
 			}
-			chain.add(t);
-			node = t;
 		}
-		if (chain.size() > 64) {
-			throw new IOException("Etch GC recovery aborted for " + file
-					+ ": marker chain longer than 64 links - almost certainly corrupt marker files."
-					+ " Inspect the .gc-complete files in " + file.getParent() + " manually.");
-		}
-		File tail = chain.get(chain.size() - 1);
-		if (chain.size() > 1) {
-			warn("Etch GC recovery: completed cutover chain of {} file(s), tail {}: {}",
-					chain.size(), tail.getName(), chain);
-		}
+		// Where rolled-back data belongs: the live store file
+		File live = (current != null) ? current : file;
 
-		// ---- 2: dispose of or roll back non-chain targets ----
-		// All targets are named off the base file (bounded naming); an abandoned
-		// cycle's parent is whatever the cutover chain's tail was when it ran —
-		// i.e. the current tail. Tombstoned targets (.cancelled sidecar) were
-		// already rolled back by cancelGC and must only be deleted, never
-		// rolled back again (that would re-introduce superseded garbage)
+		// ---- 2: dispose of defunct targets, roll back abandoned ones ----
+		// Defunct files (.gc-defunct tombstone) are superseded cutover originals
+		// or cancelled targets: their retained content is verifiably elsewhere,
+		// so they are only ever deleted - rolling them back would re-introduce
+		// collected garbage. Markerless, non-defunct targets are abandoned
+		// cycles whose contents exist nowhere else: rolled back into the live
+		// file
 		for (File st : targets) {
-			if (chainPaths.contains(st.getPath())) continue; // chain member, adopted below
-			File tomb = new File(st.getCanonicalPath() + ".cancelled");
+			if (st.getCanonicalFile().equals(current)) continue; // the live file itself
+			File tomb = new File(st.getPath() + ".gc-defunct");
 			if (tomb.exists()) {
 				if (st.delete()) {
 					tomb.delete();
-					warn("Etch GC recovery: deleted cancelled GC target {} (its contents were already"
-							+ " rolled back by cancelGC)", st.getName());
+					warn("Etch GC recovery: deleted defunct GC file {} (fully superseded or rolled back)",
+							st.getName());
 				} else {
-					warn("Etch GC recovery: cancelled GC target {} still cannot be deleted (pinned by"
-							+ " memory mappings?). Harmless - it holds only rolled-back data - and deletion"
-							+ " will be retried on later starts.", st.getName());
+					warn("Etch GC recovery: defunct GC file {} still cannot be deleted (pinned by memory"
+							+ " mappings?). Harmless - its retained content lives elsewhere - and deletion"
+							+ " is retried on later starts.", st.getName());
 				}
 				continue;
 			}
-			if (!tail.exists()) {
-				error("Etch GC recovery: abandoned GC target {} cannot be rolled back because the"
-						+ " cutover-chain tail {} is missing (crash during a previous adoption?). Leaving"
-						+ " it in place; recovery will retry once the chain is restored on a later start."
-						+ " Inspect manually if data written during that cycle matters.", st, tail);
+			if (!live.exists()) {
+				error("Etch GC recovery: abandoned GC target {} cannot be rolled back because the live"
+						+ " store file {} is missing (crash during a previous adoption?). Leaving it in"
+						+ " place; recovery will retry on a later start. Inspect manually if data written"
+						+ " during that cycle matters.", st, live);
 				continue;
 			}
-			rollback(tail, st);
+			rollback(live, st);
 		}
 
-		// ---- 3: adopt the chain (if any) ----
-		if (chain.size() == 1) {
+		// ---- 3: adopt the current file under the base name ----
+		if (current == null) {
 			warn("Etch GC recovery finished for {}: roll-back only, no completed cutover to adopt", file);
 			return file;
 		}
 
-		// Breadcrumb first: point the base marker directly at the tail, so every
-		// subsequent step (and any crash between steps) remains resumable
-		writeMarker(file, tail);
-
-		// Remove superseded intermediates: each completed a full sweep before its
-		// own cutover, so everything it retained lives on in its successor
-		for (int i = 1; i < chain.size() - 1; i++) {
-			File mid = chain.get(i);
-			File midMarker = markerFile(mid);
-			if (midMarker.exists() && !midMarker.delete()) {
-				error("Etch GC recovery: could not delete superseded marker {}. Continuing, but delete"
-						+ " it manually to avoid confusing later recoveries.", midMarker);
+		// Delete the superseded original first. This deletion IS the disk
+		// reclamation: its retained content is verifiably in the current file
+		// (the cutover was hard-gated on a complete sweep) and everything else
+		// is garbage by the retention contract. Operators wanting an archive
+		// copy the file BEFORE invoking completeGC
+		if (file.exists()) {
+			if (!file.delete()) {
+				error("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
+						+ " from this same process, e.g. on Windows?). Adoption DEFERRED: opening the"
+						+ " current store file {} directly - it holds the correct data - and the deletion"
+						+ " and installation will be retried on the next start.", file, current.getName());
+				return current;
 			}
-			if (!mid.delete()) {
-				mid.deleteOnExit();
-				error("Etch GC recovery: could not delete superseded intermediate {} (pinned by memory"
-						+ " mappings from this process?). Deletion is retried on JVM exit; if it survives,"
-						+ " the next recovery will treat it as an abandoned cycle and roll it back - safe"
-						+ " but wasteful.", mid);
-			}
-		}
-
-		// Delete the superseded original, then install the tail in its place.
-		// This deletion IS the disk reclamation: the original's retained content
-		// is verifiably in the chain tail (each cutover was hard-gated on a
-		// complete sweep) and everything else in it is garbage by the retention
-		// contract. Operators wanting an archive should copy the file BEFORE
-		// invoking completeGC
-		if (file.exists() && !file.delete()) {
-			error("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
-					+ " from this same process, e.g. on Windows?). Adoption DEFERRED: opening the chain"
-					+ " tail {} directly - it holds the correct current data - and the deletion and"
-					+ " installation will be retried on the next start.", file, tail.getName());
-			return tail;
+			new File(file.getPath() + ".gc-defunct").delete();
 		}
 		try {
-			Files.move(tail.toPath(), file.toPath());
+			Files.move(current.toPath(), file.toPath());
 		} catch (IOException e) {
-			error("Etch GC recovery: archived the original but cannot install tail {} as {} ({})."
-					+ " Opening the tail directly; the marker breadcrumb is intact, so the next start"
-					+ " will complete the adoption.", tail.getName(), file.getName(), e);
-			return tail;
+			error("Etch GC recovery: deleted the superseded original but cannot install {} as {} ({})."
+					+ " Opening it directly; the marker is intact, so the next start will complete the"
+					+ " adoption.", current.getName(), file.getName(), e);
+			return current;
 		}
 		if (!marker.delete()) {
 			error("Etch GC recovery: adoption succeeded but marker {} could not be deleted. Delete it"
@@ -217,13 +207,10 @@ public class EtchUtils {
 	}
 
 	/**
-	 * Reads the GC completion marker for a base file, returning the (existing,
-	 * canonical) target file it names, or null if there is no usable marker.
-	 * Stale or malformed markers are deleted with a full explanation.
+	 * Reads the file name from a GC completion marker, or null (deleting the
+	 * marker with a full explanation) if it is malformed.
 	 */
-	static File readMarkerTarget(File base) throws IOException {
-		File marker = markerFile(base);
-		if (!marker.exists()) return null;
+	static String readMarkerName(File marker, File base) throws IOException {
 		List<String> lines = Files.readAllLines(marker.toPath());
 		String name = lines.isEmpty() ? "" : lines.get(0).trim();
 		if (name.isEmpty()) {
@@ -233,15 +220,7 @@ public class EtchUtils {
 			deleteOrThrow(marker);
 			return null;
 		}
-		File t = new File(base.getParentFile(), name).getCanonicalFile();
-		if (!t.exists()) {
-			warn("Etch GC recovery: marker {} names target {} which no longer exists - adoption was"
-					+ " already completed by a previous run. Removing the stale marker.",
-					marker.getName(), name);
-			deleteOrThrow(marker);
-			return null;
-		}
-		return t;
+		return name;
 	}
 
 	private static void deleteOrThrow(File f) throws IOException {

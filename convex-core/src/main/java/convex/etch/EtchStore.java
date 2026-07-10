@@ -337,7 +337,7 @@ public class EtchStore extends ACachedStore {
 			// recovery must retry the deletion but NEVER roll it back again
 			// (re-rolling superseded data into a later, collected store would
 			// re-introduce garbage)
-			File tomb = new File(tf.getCanonicalPath() + ".cancelled");
+			File tomb = new File(tf.getCanonicalPath() + ".gc-defunct");
 			java.nio.file.Files.writeString(tomb.toPath(), "rolled back by cancelGC\n");
 			tomb.deleteOnExit();
 		}
@@ -385,13 +385,22 @@ public class EtchStore extends ACachedStore {
 		EtchStore newStore = new EtchStore(t);
 		newStore.baseFile = this.baseFile;
 
-		// Completion marker: records which generational target file completed,
-		// for startup adoption/recovery. Written AFTER the cutover is durable;
-		// a crash before this point simply reads as an abandoned cycle (rolled
-		// back by recovery — nothing lost, cutover "didn't happen")
-		File marker = new File(etch.getFile().getCanonicalPath() + ".gc-complete");
-		java.nio.file.Files.writeString(marker.toPath(),
-				t.getFile().getName() + "\n" + t.getRootHash().toHexString() + "\n");
+		// Tombstone the superseded old file FIRST: its retained content is
+		// verifiably in the successor, so recovery may delete it but must never
+		// roll it back (that would re-introduce collected garbage). Written
+		// before the marker: a crash between the two reads as "cutover didn't
+		// happen" (marker still names this file; the target rolls back), which
+		// loses nothing
+		java.nio.file.Files.writeString(
+				new File(etch.getFile().getCanonicalPath() + ".gc-defunct").toPath(),
+				"superseded by " + t.getFile().getName() + "\n");
+
+		// Single completion marker, always on the BASE file, rewritten by every
+		// cutover: it names the CURRENT store file for startup adoption. No
+		// marker chains: sequences of in-process GCs (with old files deleted on
+		// close and their names reused) keep exactly one marker pointing at the
+		// live file
+		EtchUtils.writeMarker(baseFile, t.getFile());
 
 		return newStore;
 	}
@@ -701,9 +710,12 @@ public class EtchStore extends ACachedStore {
 			// hard-gated on a complete sweep) and everything else is garbage by
 			// the retention contract. Deleting it IS the disk reclamation. If
 			// mappings pin the file (Windows), deletion is retried on JVM exit
-			// and again by startup recovery
+			// and by startup recovery, guided by the .gc-defunct tombstone
+			// completeGC already wrote
 			File f = etch.getFile();
-			if (!f.delete()) {
+			if (f.delete()) {
+				new File(f.getPath() + ".gc-defunct").delete();
+			} else {
 				f.deleteOnExit();
 			}
 		}

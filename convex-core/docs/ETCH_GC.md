@@ -542,44 +542,59 @@ data is preserved for recovery, which scans `<file>~*`.
 base file* (`EtchStore.getBaseFile()`), which is inherited across cutovers and deferred
 adoptions — so successive in-process GC cycles produce `f~`, `f~1`, `f~2`, … with small
 numbers reused after cleanup, never nested `f~~~…` growing one character per cycle.
-Chain parentage is carried by the `.gc-complete` markers, not by name nesting.
+
+**One marker, no chains**: `<base>.gc-complete` always names the CURRENT store file and
+is *rewritten* by every `completeGC()`. (An earlier chain design — one marker per hop —
+broke under in-process file deletion and name reuse: deleted intermediates left dangling
+links, and reused names made the marker graph cyclic.) Superseded files carry a
+`<file>.gc-defunct` tombstone written *at cutover time*: it is the discriminator between
+"retained content verifiably elsewhere — delete, never roll back" and an abandoned cycle
+that must be rolled back. Tombstone-before-marker ordering makes the crash window safe:
+a crash between the two writes reads as "cutover didn't happen" and the target rolls
+back, losing nothing.
+
+The typical file-name sequence, GC-ing periodically:
+
+```
+running on f          cycle 1: target f~    cutover: marker→f~, f defunct
+close old view:       f deleted             (now running on f~)
+running on f~         cycle 2: target f~1   cutover: marker→f~1, f~ defunct
+close old view:       f~ deleted            (now running on f~1)
+running on f~1        cycle 3: target f~    (name reused — f~ is free again)
+...
+restart:              recovery installs the marker-named file as f; steady state = one file f
+```
 
 Renaming is awkward on Windows: memory-mapped files cannot be renamed or deleted while
-mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer`. So
-after cutover the store keeps running on the target file — no rename while live — and
-`completeGC()` writes a sidecar marker `<file>.gc-complete` recording which target
-completed (plus an informational root hash).
+mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer` — so
+in-process deletions may be deferred (tombstones make that safe) and the rename back to
+`f` happens at startup, before anything is mapped.
 
 **Automatic recovery — implemented (July 2026, phase 3e)**: `EtchStore.create(file)`
 calls `EtchUtils.recover(file)` before mapping anything. Recovery reconciles every
 GC-related on-disk state, with detailed operator-facing log messages, and is idempotent
 (a crash mid-recovery leaves a state the next run recognises and resumes):
 
-- **Completed cutovers are adopted.** The marker chain is followed to its tail —
-  *multiple successive GCs* leave a chain `f → f~ → f~1 → …`, each file's marker naming
-  its successor. The base marker is rewritten to point directly at the tail (the
-  breadcrumb that keeps every later step resumable), then the superseded original and
-  intermediates are **deleted** and the tail is installed as `<file>`. This deletion is
-  the disk reclamation: each cutover was hard-gated on a verifiably complete sweep, so
-  everything a superseded file held that was retained lives on in its successor, and
+- **Completed cutovers are adopted.** The marker-named current file is installed as
+  `<file>` after the superseded original is **deleted**. This deletion is the disk
+  reclamation: each cutover was hard-gated on a verifiably complete sweep, so everything
+  the superseded file held that was retained lives on in the current file, and
   everything else is garbage by the retention contract. (`close()` on a completed
   legacy-view store likewise deletes its old file in-process.) Operators wanting an
   archive copy the file *before* invoking `completeGC()`.
-- **Adoption may be deferred.** If renames fail (files pinned by mappings from this same
-  process on Windows), recovery opens the *chain tail* directly — which holds the
-  correct current data — and retries the renames on the next start. Recovery never
-  silently opens stale data.
-- **Abandoned cycles are rolled back.** A markerless target holds writes that exist
-  nowhere else: its entries are best-effort migrated into the chain tail (the abandoned
-  cycle's parent), tolerating a torn tail from the crash (unreadable entries are skipped
-  and counted, never abort recovery); the root advances only if its tree then verifies
-  fully present; the target is deleted. The migration binds refs to a store over the
-  *source* file so parents visited before their children (index order is hash order)
-  can resolve their descent.
-- **Cancelled-but-pinned targets are tombstoned, never re-rolled.** When `cancelGC()`
-  cannot delete its fully-rolled-back target, it writes a `.cancelled` sidecar; recovery
-  then only retries the deletion — rolling such a target back again would re-introduce
-  superseded garbage into a later, collected store.
+- **Adoption may be deferred.** If deletion/renaming fails (files pinned by mappings
+  from this same process on Windows), recovery opens the marker-named current file
+  directly — correct data, never stale — and retries on the next start.
+- **Defunct files are deleted, never rolled back.** The `.gc-defunct` tombstone marks
+  superseded cutover originals and cancelled targets: rolling them back would
+  re-introduce collected garbage.
+- **Abandoned cycles are rolled back.** A target with neither marker reference nor
+  tombstone holds writes that exist nowhere else: its entries are best-effort migrated
+  into the live store file, tolerating a torn tail from the crash (unreadable entries
+  are skipped and counted, never abort recovery); the root advances only if its tree
+  then verifies fully present; the target is deleted. The migration binds refs to a
+  store over the *source* file so parents visited before their children (index order is
+  hash order) can resolve their descent.
 
 Crash safety, therefore: the original file is never modified during a cycle except by
 roll-back (which only adds entries and monotonically merges flags), a completed cutover
