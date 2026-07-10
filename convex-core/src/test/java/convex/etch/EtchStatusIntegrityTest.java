@@ -1,14 +1,15 @@
 package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
@@ -46,6 +47,21 @@ import convex.core.data.prim.CVMLong;
 public class EtchStatusIntegrityTest {
 
 	/**
+	 * Shared test stores: each test uses values with distinct seeds, so tests
+	 * remain independent without creating stores per test.
+	 */
+	private static final EtchStore SOURCE;
+	private static final EtchStore DEST;
+	static {
+		try {
+			SOURCE = EtchStore.createTemp("etch-status-src");
+			DEST = EtchStore.createTemp("etch-status-dst");
+		} catch (IOException e) {
+			throw new Error(e);
+		}
+	}
+
+	/**
 	 * Creates a distinct non-embedded string for the given seed.
 	 */
 	static AString nonEmbedded(int seed) {
@@ -63,7 +79,7 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testForgedStatusNotRecorded() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = SOURCE;
 
 		AVector<ACell> parent = Vectors.of(nonEmbedded(101), CVMLong.create(1));
 		Hash ph = parent.getHash();
@@ -90,8 +106,8 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testForeignStatusCappedAtStoredLevel() throws IOException {
-		EtchStore a = EtchStore.createTemp();
-		EtchStore b = EtchStore.createTemp();
+		EtchStore a = SOURCE;
+		EtchStore b = DEST;
 
 		// Non-embedded parent with non-embedded children, fully persisted in A
 		AVector<ACell> parent = Vectors.of(
@@ -129,8 +145,8 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testAnnouncedNotAdoptedThroughPersist() throws IOException {
-		EtchStore a = EtchStore.createTemp();
-		EtchStore b = EtchStore.createTemp();
+		EtchStore a = SOURCE;
+		EtchStore b = DEST;
 
 		// Non-embedded parent with a non-embedded child, ANNOUNCED in A
 		AVector<ACell> parent = Vectors.of(
@@ -161,11 +177,10 @@ public class EtchStatusIntegrityTest {
 	 * an embedded top-level cell skips the rebind, leaking (and caching) a ref
 	 * bound to the source store.
 	 */
-	@Disabled("V1 outstanding: foreign-store ref binding on embedded top-level writes — see ETCH_GC.md Ref status invariants")
 	@Test
 	public void testForeignRefsRebindOnPersist() throws IOException {
-		EtchStore a = EtchStore.createTemp();
-		EtchStore b = EtchStore.createTemp();
+		EtchStore a = SOURCE;
+		EtchStore b = DEST;
 
 		// Embedded top-level cell with a non-embedded child
 		AVector<ACell> tree = Vectors.of(nonEmbedded(121), CVMLong.create(42));
@@ -195,11 +210,10 @@ public class EtchStatusIntegrityTest {
 	 * Sub-STORED requests perform no write, only caching. The cache must still
 	 * never be populated with a ref bound to a foreign store.
 	 */
-	@Disabled("V1 outstanding: foreign-store refs cached by sub-STORED requests — see ETCH_GC.md Ref status invariants")
 	@Test
 	public void testSubStoredRequestDoesNotCacheForeignRefs() throws IOException {
-		EtchStore a = EtchStore.createTemp();
-		EtchStore b = EtchStore.createTemp();
+		EtchStore a = SOURCE;
+		EtchStore b = DEST;
 
 		AString v = nonEmbedded(131);
 		Cells.persist(v, a);
@@ -219,6 +233,29 @@ public class EtchStatusIntegrityTest {
 		}
 	}
 
+	/**
+	 * The cache guarantee is enforced defensively: attempting to cache a
+	 * foreign-bound ref is a caller bug and throws.
+	 */
+	@Test
+	public void testCacheRejectsForeignRefs() throws IOException {
+		EtchStore a = SOURCE;
+		EtchStore b = DEST;
+
+		AString v = nonEmbedded(181);
+		Cells.persist(v, a);
+		Ref<ACell> fromA = v.getRef();
+
+		// isForeign helper semantics
+		assertTrue(fromA instanceof RefSoft);
+		assertFalse(a.isForeign(fromA));
+		assertTrue(b.isForeign(fromA));
+		assertFalse(b.isForeign(CVMLong.create(1).getRef())); // direct refs are store-neutral
+
+		// Defensive throw at the cache boundary
+		assertThrows(IllegalArgumentException.class, () -> b.addToCache(fromA));
+	}
+
 	// -----------------------------------------------------------------
 	// Positive controls: pass today, must STILL pass after the fix.
 	// Guard against the cap being applied too aggressively.
@@ -230,7 +267,7 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testEarnedPersistRecordsPersisted() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = SOURCE;
 
 		AVector<ACell> parent = Vectors.of(nonEmbedded(141), CVMLong.create(1));
 		Hash ph = parent.getHash();
@@ -252,7 +289,7 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testUpgradePathRecordsEarnedStatus() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = SOURCE;
 
 		AVector<ACell> parent = Vectors.of(nonEmbedded(151), CVMLong.create(1));
 		Hash ph = parent.getHash();
@@ -275,7 +312,7 @@ public class EtchStatusIntegrityTest {
 	 */
 	@Test
 	public void testEarnedStatusNeverDowngraded() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = SOURCE;
 
 		AString v = nonEmbedded(161);
 		Hash h = v.getHash();

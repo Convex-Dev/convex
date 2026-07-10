@@ -34,12 +34,22 @@ import convex.test.Samples;
  */
 public class ParamTestStores {
 
-	static Stream<AStore> storeProvider() {
+	/**
+	 * Shared store instances: tests use distinct values, so instances are safely
+	 * reused across all parameterised tests.
+	 */
+	private static final MemoryStore SHARED_MEMORY = new MemoryStore();
+	private static final EtchStore SHARED_ETCH;
+	static {
 		try {
-			return Stream.of(new MemoryStore(), EtchStore.createTemp());
+			SHARED_ETCH = EtchStore.createTemp("param-test-stores");
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
+	}
+
+	static Stream<AStore> storeProvider() {
+		return Stream.of(SHARED_MEMORY, SHARED_ETCH);
 	}
 
 	@ParameterizedTest
@@ -100,7 +110,7 @@ public class ParamTestStores {
 	@ParameterizedTest
 	@MethodSource("storeProvider")
 	public void testRootDataRoundTrip(AStore store) throws IOException {
-		// Fresh store has no root data
+		// Root data initially unset (only this test touches root data)
 		assertNull(store.getRootData());
 
 		AVector<ACell> v = Vectors.of(CVMLong.create(1), Samples.NON_EMBEDDED_STRING);

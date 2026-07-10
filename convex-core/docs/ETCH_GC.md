@@ -243,12 +243,15 @@ Enabled, deterministic regression tests in `convex.etch.EtchStatusIntegrityTest`
 each defect; the same class carries positive controls that guard against over-capping
 (earned persist, legitimate upgrade, no-downgrade):
 
-- **V1 — OUTSTANDING** (breaks S4 — `testForeignRefsRebindOnPersist`,
-  `testSubStoredRequestDoesNotCacheForeignRefs`, `@Disabled` pending the write-path
-  rebind fix; enable them to drive it): persisting a foreign
-  `RefSoft` whose top-level cell is embedded skips the `toSoft(this)` rebind, returning
-  — and caching in the destination's `refCache` — a ref still bound to the source store;
-  the sub-`STORED` cache-only path likewise caches foreign-bound refs.
+- **V1 — FIXED (July 2026)** (broke S4 — `testForeignRefsRebindOnPersist`,
+  `testSubStoredRequestDoesNotCacheForeignRefs`): persisting a foreign `RefSoft` whose
+  top-level cell is embedded skipped the `toSoft(this)` rebind, returning — and caching
+  in the destination's `refCache` — a ref still bound to the source store; the
+  sub-`STORED` cache-only path likewise cached foreign-bound refs. Fix: new
+  `AStore.isForeign(ref)` helper; the write boundary rebinds foreign refs after its own
+  write (sound by construction), callers never cache foreign refs, and
+  `EtchStore.addToCache` throws on any foreign ref as a defensive backstop —
+  guaranteeing every ref served from the cache is for the correct store.
 - **V2 — FIXED (July 2026)** (broke S2 — `testForgedStatusNotRecorded`,
   `testForeignStatusCappedAtStoredLevel`, `testAnnouncedNotAdoptedThroughPersist`):
   the write path recorded `max(carried, requiredStatus)` instead of exactly

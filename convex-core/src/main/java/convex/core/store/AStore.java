@@ -10,6 +10,7 @@ import convex.core.data.Blob;
 import convex.core.data.CAD3Encoder;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 
@@ -169,6 +170,21 @@ public abstract class AStore implements Closeable {
 	 */
 	public <T extends ACell> Ref<T> decodeRef(Blob encoding) throws BadFormatException {
 		return ((CAD3Encoder)getEncoder()).decodeRef(encoding);
+	}
+
+	/**
+	 * Checks if a Ref is bound to a store other than this one. Foreign refs must
+	 * never be returned, attached or cached by this store: Ref status and store
+	 * bindings are only meaningful relative to the store that produced them.
+	 *
+	 * @param ref Ref to check
+	 * @return true if the Ref is soft and bound to a different store (or to no store)
+	 */
+	public boolean isForeign(Ref<?> ref) {
+		if (ref instanceof RefSoft) {
+			return ((RefSoft<?>) ref).getStore() != this;
+		}
+		return false; // direct refs are store-neutral
 	}
 
 	/**

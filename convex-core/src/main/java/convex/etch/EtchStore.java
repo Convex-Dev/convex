@@ -174,7 +174,8 @@ public class EtchStore extends ACachedStore {
 		}
 
 		if (requiredStatus < Ref.STORED) {
-			if (topLevel || !embedded) {
+			// no write: only cache, and only refs belonging to this store
+			if ((topLevel || !embedded) && !isForeign(ref)) {
 				addToCache(ref);
 			}
 			return ref;
@@ -214,8 +215,10 @@ public class EtchStore extends ACachedStore {
 			ref = ref.withStatus(requiredStatus);
 			ref = etch.write(fHash, ref);
 
-			if (!embedded) {
-				// Ensure we have soft Ref pointing to this store
+			// Ensure we have a soft Ref pointing to this store. Embedded top-level
+			// cells normally keep their direct Ref, but a foreign-bound Ref must be
+			// rebound: sound because the entry was just written here
+			if (!embedded || isForeign(ref)) {
 				ref = ref.toSoft(this);
 			}
 
@@ -236,6 +239,11 @@ public class EtchStore extends ACachedStore {
 	}
 
 	protected <T extends ACell> void addToCache(Ref<T> ref) {
+		// Guarantee: refs served from the cache are always for this store.
+		// Defensive check: callers must enforce this before caching
+		if (isForeign(ref)) {
+			throw new IllegalArgumentException("Attempt to cache foreign Ref in store: " + this);
+		}
 		refCache.putCell(ref);
 	}
 

@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Etch: cross-store writes no longer record Ref status earned in a different store.
+- Etch: cross-store writes no longer record Ref status earned in a different store, and refs bound to a different store are never returned or cached.
 
 ## [0.8.8] - 2026-07-09
 

@@ -45,6 +45,22 @@ import convex.test.Samples;
 public class EtchRobustnessTest {
 
 	/**
+	 * Shared test stores: each test uses values with distinct seeds, so tests
+	 * remain independent without creating stores per test. Tests of file
+	 * lifecycle (reopen/close) necessarily use their own file-backed stores.
+	 */
+	private static final EtchStore STORE;
+	private static final EtchStore STORE2;
+	static {
+		try {
+			STORE = EtchStore.createTemp("etch-robustness");
+			STORE2 = EtchStore.createTemp("etch-robustness-2");
+		} catch (IOException e) {
+			throw new Error(e);
+		}
+	}
+
+	/**
 	 * Creates a distinct non-embedded string for the given seed.
 	 */
 	static AString nonEmbedded(int seed) {
@@ -64,7 +80,7 @@ public class EtchRobustnessTest {
 
 	@Test
 	public void testStatusMonotonicity() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = STORE;
 		AString v = nonEmbedded(1);
 		Hash h = v.getHash();
 
@@ -91,7 +107,7 @@ public class EtchRobustnessTest {
 
 	@Test
 	public void testStoredMakesNoSubtreeClaim() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = STORE;
 		AString child = nonEmbedded(7);
 		AVector<ACell> parent = Vectors.of(CVMLong.create(1), child);
 		Hash ph = parent.getHash();
@@ -111,8 +127,8 @@ public class EtchRobustnessTest {
 
 	@Test
 	public void testLazyCrossStorePersist() throws IOException {
-		EtchStore a = EtchStore.createTemp();
-		EtchStore b = EtchStore.createTemp();
+		EtchStore a = STORE;
+		EtchStore b = STORE2;
 
 		AVector<ACell> tree = Vectors.of(
 				nonEmbedded(21),
@@ -205,7 +221,7 @@ public class EtchRobustnessTest {
 
 	@Test
 	public void testConcurrentWriters() throws Exception {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = STORE;
 		int NTHREADS = 8;
 		int PER = 100;
 
@@ -240,7 +256,7 @@ public class EtchRobustnessTest {
 
 	@Test
 	public void testDeepStructurePersist() throws IOException {
-		EtchStore store = EtchStore.createTemp();
+		EtchStore store = STORE;
 
 		// Characterises the current recursion depth tolerance of storeRef.
 		// Scale up once persistence uses an iterative descent (see ETCH_GC.md).
