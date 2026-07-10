@@ -304,15 +304,27 @@ copies to the new store are always the result of an explicit persist. Peers want
 multiple roots (e.g. recent States for catch-up serving) reference them from the main
 root before cutover rather than relying on any store-level multi-root feature.
 
-### Phase 1: `startGC()`
+### Phase 1: `startGC()` — implemented (July 2026, phase 3a)
 
 Synchronised on the store:
 
-1. Create the target Etch file (fresh header, empty index).
-2. Copy the current root hash into the target.
-3. Publish `target` (volatile field) — from this point:
+1. Refuse if a cycle is in progress, or if a stale target file exists (a stale target
+   may hold data from an interrupted cycle — adopting or deleting it blindly risks data
+   loss; recovery is a separate step, phase 3e).
+2. Create the target Etch file (fresh header, empty index), bind it to this store, and
+   copy the current root hash into it — all **before** publishing the volatile `target`
+   field, so readers never observe a half-initialised target.
+3. From publication:
    - **Writes** go to the target (`getWriteEtch()`).
    - **Reads** check the target first, then fall back to the old file.
+
+**Cycle-boundary linearisation**: each top-level persist snapshots its write target
+once and threads it through the recursive descent. A persist in flight when `startGC()`
+runs therefore completes entirely against the old file and linearises as *before* the
+cycle (retained only per the retention contract). The alternative — reading the target
+per-write — could split one tree across the two files, leaving a parent in the target
+claiming `PERSISTED` whose children exist only in the old file: a silent INV-1
+violation that the sweep would then trust.
 
 ### Phase 2: read/write paths during collection
 
@@ -344,10 +356,13 @@ change to the existing logic:
 > persistence request.** The recursive persist must descend and copy such entries (children
 > first) into the target, rather than early-returning on `existing.getStatus() >= requiredStatus`.
 
-Concretely, `storeRef`'s "check store for existing ref" step distinguishes *where* the hit
-came from. A target hit with sufficient status early-returns as today. An old-file hit
-forces the normal recursive write path, which copies the cell (and, at `PERSISTED`+
-levels, its children) into the target.
+Concretely (implemented, phase 3a), during a cycle `storeRef`'s existence check reads
+the **target file only**: neither the old file nor the shared cache can prove target
+residency (cache entries don't record which file backs them). A target hit with
+sufficient status early-returns; anything else forces the normal recursive write path,
+which copies the cell (and, at `PERSISTED`+ levels, its children) into the target.
+Outside a cycle the cached check is unchanged — the hot path costs one volatile load
+and an untaken branch, and cache hits are entirely untouched.
 
 This establishes and maintains the central invariant:
 
@@ -592,12 +607,12 @@ API) is a natural follow-up but out of scope for the first iteration.
 
 | Method | Phase | Notes |
 |---|---|---|
-| `EtchStore.startGC()` | begin | exists; keep. Makes `etch`/`target` volatile. |
+| `EtchStore.startGC()` | begin | **implemented (3a)**: guarded, fully-initialised-before-publication target; `etch`/`target` volatile; write redirection + target-first read fallback + target-only persistence check live. |
+| `EtchStore.isGCInProgress()` | any | **implemented (3a)**. |
 | `StoreTransfer.transfer(dest, ref, status)` | sweep | **implemented**; post-order copy with INV-1 pruning, source implicit in ref binding. |
 | `EtchUtils.migrate(source, dest)` | migration | **implemented**; full index scan + per-entry transfer at recorded status into an existing store. |
 | `StoreTransfer.verify(store, rootHash)` | pre-cutover | **implemented**; store-only reachability walk, returns missing hashes (empty = complete). |
 | `EtchStore.transferGC()` | sweep | new; `transfer` over the store's own old/target split; blocking, call from background thread. |
-| `EtchStore.isGCInProgress()` | any | new; `target != null`. |
 | `EtchStore.isGCComplete()` | sweep done | new; sweep finished (INV-1 makes this sticky). |
 | `EtchStore.completeGC()` | cutover | new; returns the **new `EtchStore`** on the target file; retires this store; writes marker. |
 | `EtchStore.cancelGC()` | any | new; rolls back target contents into the original file (reverse `migrate` + root copy-back), then deletes the target. |

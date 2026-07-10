@@ -30,12 +30,14 @@ public class EtchStore extends ACachedStore {
 	/**
 	 * Etch file instance for the current store
 	 */
-	private Etch etch;
+	private volatile Etch etch;
 
 	/**
-	 * Etch file instance for GC destination
+	 * Etch file instance for GC destination, or null if no GC cycle is in
+	 * progress. Fully initialised before publication; volatile so lock-free
+	 * readers see a consistent instance.
 	 */
-	private Etch target;
+	private volatile Etch target;
 
 
 	public EtchStore(Etch etch) {
@@ -50,28 +52,51 @@ public class EtchStore extends ACachedStore {
 	}
 
 	/**
-	 * Starts a GC cycle. Creates a new Etch file for collection, and directs all
-	 * new writes to the new store
-	 * 
+	 * Starts a GC cycle. Creates a new target Etch file: subsequent writes are
+	 * directed to the target, while reads check the target first and fall back
+	 * to the old file. See convex-core/docs/ETCH_GC.md.
+	 *
 	 * @throws IOException If an IO exception occurs
+	 * @throws IllegalStateException if a GC cycle is already in progress, or a
+	 *         stale target file exists (crash recovery is the caller's concern)
 	 */
 	public synchronized void startGC() throws IOException {
 		if (target != null)
-			throw new Error("Already collecting!");
+			throw new IllegalStateException("GC already in progress for store: " + this);
 		File temp = new File(etch.getFile().getCanonicalPath() + "~");
-		target = Etch.create(temp);
+		if (temp.exists()) {
+			// A stale target may hold data from an interrupted cycle: adopting or
+			// deleting it blindly would risk data loss. Recovery is a separate step
+			throw new IllegalStateException("Stale GC target file exists: " + temp);
+		}
 
-		// copy across current root hash
-		target.setRootHash(etch.getRootHash());
+		// Fully initialise the target before publication: readers must never see
+		// a target without its store binding and root hash
+		Etch t = Etch.create(temp);
+		t.setStore(this);
+		t.setRootHash(etch.getRootHash());
+		target = t;
+	}
+
+	/**
+	 * Checks if a GC cycle is currently in progress
+	 * @return true if collecting
+	 */
+	public boolean isGCInProgress() {
+		return target != null;
 	}
 
 	private Etch getWriteEtch() {
-		if (target != null)
-			synchronized (this) {
-				if (target != null)
-					return target;
-			}
-		return etch;
+		Etch t = target;
+		return (t == null) ? etch : t;
+	}
+
+	/**
+	 * Gets the GC target Etch instance, or null if no cycle is in progress.
+	 * Internal / testing use.
+	 */
+	Etch getTargetEtch() {
+		return target;
 	}
 
 	/**
@@ -130,6 +155,17 @@ public class EtchStore extends ACachedStore {
 	}
 
 	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
+		// During a GC cycle, new writes land in the target: check it first, then
+		// fall back to the old file for data not yet migrated. Outside a cycle
+		// this costs a single volatile load and an untaken branch
+		Etch t = target;
+		if (t != null) {
+			Ref<T> ref = t.read(hash);
+			if (ref != null) {
+				refCache.putCell(ref);
+				return ref;
+			}
+		}
 		Ref<T> ref = etch.read(hash);
 		if (ref != null)
 			refCache.putCell(ref);
@@ -146,9 +182,20 @@ public class EtchStore extends ACachedStore {
 		return storeRef(ref, status, noveltyHandler, true);
 	}
 
-	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel) throws IOException {
+		// Snapshot the write target ONCE per top-level call and thread it through
+		// the recursion: a persist spanning startGC() then completes consistently
+		// against the old file (linearising as before the cycle). Splitting one
+		// persist across files would let a parent land in the GC target claiming
+		// PERSISTED while its children exist only in the old file, silently
+		// breaking the INV-1 pruning guarantee (see ETCH_GC.md)
+		return storeRef(ref, requiredStatus, noveltyHandler, topLevel, getWriteEtch());
+	}
+
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
+			boolean topLevel, Etch writeEtch) throws IOException {
 
 		// Get the value. If we are persisting, should be there!
 		ACell cell = ref.getValue();
@@ -163,7 +210,12 @@ public class EtchStore extends ACachedStore {
 		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
 			hash = ref.getHash();
-			Ref<T> existing = refForHash(hash);
+			// During a GC cycle, only an entry in the TARGET can satisfy a persist:
+			// the shared cache and the old file cannot prove target residency, and
+			// early-returning on an old-file hit would skip the copy that INV-1
+			// depends on. Outside a cycle (writeEtch == etch) the cached path is
+			// unchanged
+			Ref<T> existing = (writeEtch == etch) ? refForHash(hash) : writeEtch.read(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
@@ -185,7 +237,7 @@ public class EtchStore extends ACachedStore {
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
 				try {
-					return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
+					return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false, writeEtch);
 				} catch (IOException e) {
 					// OK because overall function throws IOException
 					throw Utils.sneakyThrow(e);
@@ -212,7 +264,7 @@ public class EtchStore extends ACachedStore {
 			// record exactly the status this write has proven for this store:
 			// carried status (possibly from another store) is not evidence here
 			ref = ref.withStatus(requiredStatus);
-			ref = etch.write(fHash, ref);
+			ref = writeEtch.write(fHash, ref);
 
 			// Ensure we have a soft Ref pointing to this store. Embedded top-level
 			// cells normally keep their direct Ref, but a foreign-bound Ref must be
@@ -265,6 +317,12 @@ public class EtchStore extends ACachedStore {
 	}
 
 	public void close() {
+		// Close the GC target too if a cycle is in progress. This abandons the
+		// cycle: data written since startGC() remains in the target file for a
+		// later recovery step, and the old file is untouched
+		Etch t = target;
+		if (t != null)
+			t.close();
 		etch.close();
 	}
 
@@ -291,12 +349,14 @@ public class EtchStore extends ACachedStore {
 
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) throws IOException {
-		// Ensure data if persisted at sufficient level
-		Ref<T> ref = storeTopRef(Ref.get(data), Ref.PERSISTED, null);
+		// Snapshot the write target once so the root tree and the root hash land
+		// in the same file even if startGC() runs concurrently
+		Etch writeEtch = getWriteEtch();
+		// Ensure data is persisted at sufficient level
+		Ref<T> ref = storeRef(Ref.get(data), Ref.PERSISTED, null, true, writeEtch);
 		Hash h = Hash.get(data);
-		Etch etch = getWriteEtch();
-		etch.setRootHash(h);
-		etch.writeDataLength(); // ensure data length updated for root data addition
+		writeEtch.setRootHash(h);
+		writeEtch.writeDataLength(); // ensure data length updated for root data addition
 		return ref;
 	}
 
