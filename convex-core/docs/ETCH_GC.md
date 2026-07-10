@@ -404,19 +404,27 @@ public void transferGC() throws IOException {
 the old/target split during a cycle; the ref's binding supplies the source, so the same
 `StoreTransfer.transfer(dest, ref, status)` form covers distinct stores.)
 
-Implementation notes:
+Implementation notes (implemented July 2026, phase 3c — `EtchStore.transferGC()`):
 
-- **Iteration, not recursion.** State trees can be deep; the v1 transfer rides the
-  recursive `storeRef`/`updateRefs` machinery (which carries a stack-overflow TODO) —
-  converting persistence to an explicit stack remains the shared fix, and benefits
-  everything at once.
+- **Iteration, not recursion.** The sweep is an explicit-stack post-order walk
+  (stack-safe for arbitrarily deep trees). Each per-entry persist then finds its
+  children already target-resident and recurses at most one level, so reusing the
+  recursive `storeRef` machinery per entry is safe. (Converting general persistence to
+  an iterative descent remains a separate TODO.)
 - **Ordering.** Post-order DFS, children immediately before parent — see
   [Copy ordering and locality](#copy-ordering-and-locality).
-- **Status preservation.** The sweep transfers at the status level the GC use-case
-  needs: `ANNOUNCED` for a peer's own store (a peer must not lose its announcement
-  commitments across GC — losing them would trigger a novelty re-broadcast storm),
-  `PERSISTED` otherwise. Per the status invariants, each level is earned in the target
-  by the descent itself.
+- **Per-entry status preservation.** Each entry is transferred at the status it holds
+  in the *old file* (floor `PERSISTED`, capped at `MAX_STATUS`). A uniform `PERSISTED`
+  sweep would demote `ANNOUNCED` entries (novelty re-broadcast storm after cutover); a
+  uniform `ANNOUNCED` sweep would forge peer commitments. Per the status invariants,
+  each preserved level is earned in the target by the post-order copy itself.
+- **INV-1 pruning doubles as dedup.** A subtree already target-resident at sufficient
+  status is skipped; shared subtrees need no visited-set because DFS completes one
+  occurrence before a sibling occurrence expands.
+- **Cycle-end abort.** The sweep checks per iteration that its cycle is still live and
+  aborts with `IllegalStateException` if cancelled mid-sweep — completion must never be
+  claimed for a dead cycle. A concurrent-sweep guard rejects overlapping sweeps (which
+  would also destroy DFS locality).
 - **Missing children.** The primitives are strict over Etch (missing source data
   propagates as `MissingDataException`); a GC cycle over a store with pre-existing holes
   fails rather than silently producing a smaller hole-free-looking store. Lenient
@@ -626,8 +634,9 @@ API) is a natural follow-up but out of scope for the first iteration.
 | `StoreTransfer.transfer(dest, ref, status)` | sweep | **implemented**; post-order copy with INV-1 pruning, source implicit in ref binding. |
 | `EtchUtils.migrate(source, dest)` | migration | **implemented**; full index scan + per-entry transfer at recorded status into an existing store. |
 | `StoreTransfer.verify(store, rootHash)` | pre-cutover | **implemented**; store-only reachability walk, returns missing hashes (empty = complete). |
-| `EtchStore.transferGC()` | sweep | new; `transfer` over the store's own old/target split; blocking, call from background thread. |
-| `EtchStore.isGCComplete()` | sweep done | new; sweep finished (INV-1 makes this sticky). |
+| `EtchStore.transferGC()` | sweep | **implemented (3c)**: iterative post-order sweep, per-entry status preservation, INV-1 pruning, cycle-end abort. |
+| `EtchStore.isGCComplete()` | sweep done | **implemented (3c)**: sweep finished; sticky (INV-1 + cycle write path); reset by start/cancel. |
+| `EtchStore.verifyGC()` / `EtchUtils.verify(Etch, Hash)` | pre-cutover | **implemented (3c)**: full walk against the target file ONLY (store reads fall back to the old file, so they cannot verify), no pruning. |
 | `EtchStore.completeGC()` | cutover | new; returns the **new `EtchStore`** on the target file; retires this store; writes marker. |
 | `EtchStore.cancelGC()` | any | **implemented (3b)**: flag flip + registered-writer drain + reverse `migrate` + root copy-back + target retirement; idempotent on retry. |
 | `Etch.copyEntry(Hash, Etch)` | sweep | later optimisation; raw entry copy preserving flags/memorySize. |

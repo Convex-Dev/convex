@@ -1,8 +1,13 @@
 package convex.etch;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.store.AStore;
@@ -62,6 +67,39 @@ public class EtchUtils {
 		return count[0];
 	}
 	
+	/**
+	 * Verifies that the entire tree reachable from the given hash is present in
+	 * a single Etch file: entry presence is checked against this file ONLY
+	 * (unlike store-level reads, which may fall back to caches or other files).
+	 * Iterative and duplicate-safe; no pruning — a full independent walk.
+	 *
+	 * @param e Etch file to verify against
+	 * @param rootHash Hash of the tree root (nil/empty roots are trivially complete)
+	 * @return List of missing hashes, empty if the tree is fully present
+	 * @throws IOException in case of IO error
+	 */
+	public static List<Hash> verify(Etch e, Hash rootHash) throws IOException {
+		List<Hash> missing = new ArrayList<>();
+		HashSet<Hash> seen = new HashSet<>();
+		ArrayDeque<Hash> stack = new ArrayDeque<>();
+		// nil / empty roots are recognised without a store entry (as in
+		// AStore.getRootRef), so there is nothing to verify
+		if (!(Hash.NULL_HASH.equals(rootHash) || Hash.EMPTY_HASH.equals(rootHash))) {
+			stack.push(rootHash);
+		}
+		while (!stack.isEmpty()) {
+			Hash h = stack.pop();
+			if (!seen.add(h)) continue;
+			Ref<ACell> r = e.read(h);
+			if (r == null) {
+				missing.add(h);
+				continue;
+			}
+			Cells.visitBranchRefs(r.getValue(), br -> stack.push(br.getHash()));
+		}
+		return missing;
+	}
+
 	public static FullValidator getFullValidator() {
 		return new FullValidator();
 	}

@@ -89,19 +89,23 @@ public class EtchGCLifecycleTest {
 		f.deleteOnExit();
 		new File(f.getCanonicalPath() + "~").deleteOnExit();
 
-		AString v0 = nonEmbedded(1); // pre-cycle root data
+		AVector<ACell> t0 = tree(1); // pre-cycle root tree, ANNOUNCED in the old file
 		AVector<ACell> t1 = tree(10); // pre-cycle tree, resolvable only via old file
 
 		// ----- Populate the old file, then reopen for cold caches -----
 		{
 			EtchStore store = EtchStore.create(f);
 			Cells.persist(t1, store);
-			store.setRootData(v0);
+			store.setRootData(t0);
+			Cells.announce(t0, null, store); // sweep must preserve ANNOUNCED
 			store.flush();
 			store.close();
 		}
 		EtchStore store = EtchStore.create(f);
 		assertFalse(store.isGCInProgress());
+		assertFalse(store.isGCComplete());
+		assertThrows(IllegalStateException.class, store::transferGC); // no cycle
+		assertThrows(IllegalStateException.class, store::verifyGC);
 
 		// ----- A stale target file is neither adopted nor deleted: the cycle
 		// starts on the next generational name, preserving it for recovery -----
@@ -119,8 +123,8 @@ public class EtchGCLifecycleTest {
 		assertEquals(0L, stale.length()); // stale file untouched
 
 		// Root hash carried into the target at cycle start
-		assertEquals(v0.getHash(), store.getRootHash());
-		assertEquals(v0.getHash(), targetEtch.getRootHash());
+		assertEquals(t0.getHash(), store.getRootHash());
+		assertEquals(t0.getHash(), targetEtch.getRootHash());
 
 		// ----- Read fallback: old data resolves (caches are cold), no copy-on-read -----
 		Ref<ACell> r1 = store.refForHash(t1.getHash());
@@ -134,6 +138,17 @@ public class EtchGCLifecycleTest {
 		assertNotNull(targetEtch.read(v2.getHash()));
 		assertNull(store.getEtch().read(v2.getHash()), "Old file must not receive writes");
 		assertEquals(v2, store.refForHash(v2.getHash()).getValue());
+
+		// ----- Transfer sweep: root tree is only in the old file, so the cycle
+		// is incomplete until the sweep copies it across -----
+		assertFalse(store.isGCComplete());
+		assertTrue(store.verifyGC().contains(t0.getHash()));
+
+		store.transferGC();
+		assertTrue(store.isGCComplete());
+		assertTrue(store.verifyGC().isEmpty());
+		// Status preserved from the old file: ANNOUNCED, not merely PERSISTED
+		assertAllInEtch(targetEtch, treeHashes(t0), Ref.ANNOUNCED);
 
 		// ----- INV-1 core: old-file entries must not satisfy a persist; the
 		// descent must copy the whole tree into the target -----
@@ -153,8 +168,13 @@ public class EtchGCLifecycleTest {
 		assertEquals(t3.getHash(), targetEtch.getRootHash());
 		assertAllInEtch(targetEtch, treeHashes(t3), Ref.PERSISTED);
 
+		// Completion is STICKY: the root update landed its full tree in the
+		// target via the cycle write path, so the earlier sweep still counts
+		assertTrue(store.isGCComplete());
+		assertTrue(store.verifyGC().isEmpty());
+
 		// The old file's root is never touched during a cycle
-		assertEquals(v0.getHash(), store.getEtch().getRootHash());
+		assertEquals(t0.getHash(), store.getEtch().getRootHash());
 
 		// ----- close() closes both files; idempotent -----
 		store.close();
@@ -165,10 +185,10 @@ public class EtchGCLifecycleTest {
 				() -> targetEtch.read(nonEmbedded(99).getHash()));
 
 		// ----- Reopen the same files: an abandoned cycle loses nothing -----
-		// Old file: exactly the pre-cycle state (root v0, t1 present, v2 absent)
+		// Old file: exactly the pre-cycle state (root t0, t1 present, v2 absent)
 		EtchStore reopened = EtchStore.create(f);
-		assertEquals(v0.getHash(), reopened.getRootHash());
-		assertEquals(v0, reopened.getRootData());
+		assertEquals(t0.getHash(), reopened.getRootHash());
+		assertEquals(t0, reopened.getRootData());
 		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
 		assertNull(reopened.getEtch().read(v2.getHash()));
 
@@ -229,9 +249,14 @@ public class EtchGCLifecycleTest {
 		store.storeTopRef(storedOnly.getRef(), Ref.STORED, null);
 		assertNull(store.getEtch().read(v2.getHash())); // target-only so far
 
+		// A completed sweep does not survive cancellation
+		store.transferGC();
+		assertTrue(store.isGCComplete());
+
 		// ----- Cancel: reverse migration back into the old file -----
 		store.cancelGC();
 		assertFalse(store.isGCInProgress());
+		assertFalse(store.isGCComplete());
 		assertNull(store.getTargetEtch());
 		assertThrows(IllegalStateException.class, store::cancelGC); // cycle is over
 

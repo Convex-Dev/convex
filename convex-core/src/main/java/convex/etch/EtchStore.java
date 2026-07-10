@@ -3,9 +3,11 @@ package convex.etch;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.ArrayDeque;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -60,6 +62,20 @@ public class EtchStore extends ACachedStore {
 	 */
 	private final Object drainSignal = new Object();
 
+	/**
+	 * True once the GC transfer sweep has completed for the current cycle.
+	 * Sticky by design: after the sweep, live writes and root updates maintain
+	 * full presence in the target (INV-1 plus the cycle write path), so the
+	 * flag never needs to be recomputed. Reset by startGC/cancelGC.
+	 */
+	private volatile boolean sweepComplete = false;
+
+	/**
+	 * Guards against concurrent transfer sweeps (which would be wasteful and
+	 * would interleave appends, destroying the DFS locality of the target).
+	 */
+	private final java.util.concurrent.atomic.AtomicBoolean sweepRunning = new java.util.concurrent.atomic.AtomicBoolean();
+
 
 	public EtchStore(Etch etch) {
 		this(etch, true);
@@ -100,7 +116,132 @@ public class EtchStore extends ACachedStore {
 		Etch t = Etch.create(temp);
 		t.setStore(this);
 		t.setRootHash(etch.getRootHash());
+		sweepComplete = false;
 		target = t;
+	}
+
+	/**
+	 * Runs the GC transfer sweep: copies the tree reachable from the current
+	 * root into the GC target, preserving each entry's status from the old
+	 * file. Blocking — call from a background thread; safe alongside live
+	 * writes (which land in the target independently).
+	 *
+	 * After successful completion isGCComplete() returns true, and stays true:
+	 * subsequent writes and root updates maintain full presence in the target.
+	 *
+	 * @throws IOException in case of IO error
+	 * @throws IllegalStateException if no cycle is active, the cycle is being
+	 *         cancelled (including mid-sweep), or a sweep is already running
+	 */
+	public void transferGC() throws IOException {
+		Etch t = target;
+		if ((t == null) || cancelling)
+			throw new IllegalStateException("No active GC cycle for store: " + this);
+		if (!sweepRunning.compareAndSet(false, true))
+			throw new IllegalStateException("GC transfer already running for store: " + this);
+		try {
+			Ref<ACell> rootRef = getRootRef();
+			if ((rootRef != null) && (rootRef.getValue() != null)) {
+				sweep(t, rootRef);
+			}
+			// Sticky completion: see sweepComplete field notes. Only claim it if
+			// the cycle we swept is still the live one
+			if ((target == t) && !cancelling) {
+				sweepComplete = true;
+			}
+		} finally {
+			sweepRunning.set(false);
+		}
+	}
+
+	/**
+	 * Iterative post-order sweep (stack-safe for arbitrarily deep trees).
+	 * Children are transferred before their parent, so each per-entry persist
+	 * finds its children already target-resident and recurses at most one
+	 * level: the recursive storeRef machinery is safe to reuse here.
+	 */
+	@SuppressWarnings("unchecked")
+	private void sweep(Etch t, Ref<ACell> rootRef) throws IOException {
+		ArrayDeque<SweepFrame> stack = new ArrayDeque<>();
+		stack.push(new SweepFrame((Ref<ACell>) rootRef));
+		while (!stack.isEmpty()) {
+			// The sweep must not outlive its cycle: writes would silently start
+			// going elsewhere (cancel) and completion would be a false claim
+			if (cancelling || (target != t))
+				throw new IllegalStateException("GC cycle ended during transfer for store: " + this);
+
+			SweepFrame f = stack.peek();
+			if (!f.expanded) {
+				f.expanded = true;
+				Hash h = f.ref.getHash();
+
+				// Preserve the status earned in the old file (e.g. ANNOUNCED —
+				// losing it would trigger novelty re-broadcast after cutover;
+				// raising it would forge peer commitments). PERSISTED is the floor
+				// for anything reachable from a persisted root; store-local levels
+				// above MAX_STATUS are capped
+				Ref<ACell> oldRef = etch.read(h);
+				f.status = (oldRef == null) ? Ref.PERSISTED
+						: Math.max(Ref.PERSISTED, Math.min(oldRef.getStatus(), Ref.MAX_STATUS));
+
+				// INV-1 prune: subtree already fully present in the target. This
+				// also dedups shared subtrees without a visited-set: DFS completes
+				// one occurrence before a sibling occurrence expands
+				Ref<ACell> tgtRef = t.read(h);
+				if ((tgtRef != null) && (tgtRef.getStatus() >= f.status)) {
+					stack.pop();
+					continue;
+				}
+
+				// Post-order: expand children first
+				Cells.visitBranchRefs(f.ref.getValue(),
+						br -> stack.push(new SweepFrame((Ref<ACell>) br)));
+			} else {
+				stack.pop();
+				// Children are in the target: this persist recurses one level at
+				// most (each child check prunes), so the write is cheap and the
+				// entry lands adjacent to its children (DFS locality)
+				storeTopRef(f.ref, f.status, null);
+			}
+		}
+	}
+
+	private static final class SweepFrame {
+		final Ref<ACell> ref;
+		int status;
+		boolean expanded;
+
+		SweepFrame(Ref<ACell> ref) {
+			this.ref = ref;
+		}
+	}
+
+	/**
+	 * Checks whether the current GC cycle's transfer sweep has completed. Once
+	 * true, everything reachable from the current root is in the target, and
+	 * stays that way (live writes maintain the guarantee).
+	 *
+	 * @return true if a cycle is in progress and its sweep has completed
+	 */
+	public boolean isGCComplete() {
+		return (target != null) && !cancelling && sweepComplete;
+	}
+
+	/**
+	 * Verifies GC transfer completeness against the target file ONLY (the
+	 * store's own reads fall back to the old file, so they cannot be used).
+	 * Belt-and-braces independent check: full walk, no INV-1 pruning.
+	 *
+	 * @return list of hashes reachable from the current root but missing from
+	 *         the GC target; empty means the transfer is complete
+	 * @throws IOException in case of IO error
+	 * @throws IllegalStateException if no GC cycle is in progress
+	 */
+	public java.util.List<Hash> verifyGC() throws IOException {
+		Etch t = target;
+		if (t == null)
+			throw new IllegalStateException("No GC in progress for store: " + this);
+		return EtchUtils.verify(t, getRootHash());
 	}
 
 	/**
@@ -155,6 +296,7 @@ public class EtchStore extends ACachedStore {
 		// file (Windows): the next startGC picks a fresh generational name
 		target = null;
 		cancelling = false;
+		sweepComplete = false;
 		t.close();
 		File tf = t.getFile();
 		if (!tf.delete()) {
