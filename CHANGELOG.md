@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Etch: cross-store writes no longer record Ref status earned in a different store.
+
 ## [0.8.8] - 2026-07-09
 
 ### Added

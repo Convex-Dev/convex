@@ -217,6 +217,24 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
+	 * Return a Ref with exactly the given status, preserving non-status flags.
+	 *
+	 * Unlike withMinimumStatus, this may lower the status claim: intended for store
+	 * write boundaries, which must record only the status an operation has actually
+	 * proven for that store.
+	 *
+	 * Assumes any necessary changes to storage will be made separately.
+	 * SECURITY: Dangerous if misused since may invalidate storage assumptions
+	 * @param newStatus New status to set (masked to valid status bits)
+	 * @return Updated Ref (may be same Ref if status unchanged)
+	 */
+	public Ref<T> withStatus(int newStatus) {
+		newStatus&=STATUS_MASK;
+		if (getStatus() == newStatus) return this;
+		return withFlags(flagsWithStatus(newStatus));
+	}
+
+	/**
 	 * Return a a similar Ref of the same type with updated flags. Creates a new Ref if lags have changed.
 	 * @param newFlags New flags to set
 	 * @return Updated Ref

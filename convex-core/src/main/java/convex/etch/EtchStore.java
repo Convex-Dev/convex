@@ -209,8 +209,9 @@ public class EtchStore extends ACachedStore {
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
 
-			// ensure status is set when we write to store
-			ref = ref.withMinimumStatus(requiredStatus);
+			// record exactly the status this write has proven for this store:
+			// carried status (possibly from another store) is not evidence here
+			ref = ref.withStatus(requiredStatus);
 			ref = etch.write(fHash, ref);
 
 			if (!embedded) {

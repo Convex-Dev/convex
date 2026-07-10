@@ -1,10 +1,14 @@
 package convex.store;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,6 +27,7 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
+import convex.test.Samples;
 
 /**
  * Parameterised store contract tests that run against both MemoryStore and EtchStore.
@@ -90,6 +95,57 @@ public class ParamTestStores {
 		// A random hash should not be in any fresh store
 		Hash unknown = Hash.fromHex("aaaa000011110000aaaa000011110000aaaa000011110000aaaa000011110000");
 		assertEquals(null, store.refForHash(unknown));
+	}
+
+	@ParameterizedTest
+	@MethodSource("storeProvider")
+	public void testRootDataRoundTrip(AStore store) throws IOException {
+		// Fresh store has no root data
+		assertNull(store.getRootData());
+
+		AVector<ACell> v = Vectors.of(CVMLong.create(1), Samples.NON_EMBEDDED_STRING);
+		store.setRootData(v);
+		assertEquals(v, store.getRootData());
+		assertEquals(Cells.getHash(v), store.getRootHash());
+
+		// Root can be reset to nil
+		store.setRootData(null);
+		assertNull(store.getRootData());
+	}
+
+	@ParameterizedTest
+	@MethodSource("storeProvider")
+	public void testPersistedSubtreeContract(AStore store) throws IOException {
+		// Branchy structure with non-embedded values at multiple depths.
+		// PERSISTED must guarantee every non-embedded descendant is individually
+		// retrievable at >= PERSISTED (the "full tree is stored" contract).
+		AVector<ACell> tree = Vectors.of(
+				Samples.NON_EMBEDDED_STRING,
+				Vectors.of(CVMLong.create(1), Samples.NON_EMBEDDED_BLOB),
+				Vectors.of(Vectors.of(Samples.MIN_TREE_STRING)));
+
+		AVector<ACell> persisted = Cells.persist(tree, store);
+
+		List<Hash> branches = new ArrayList<>();
+		collectBranchHashes(persisted, branches);
+		assertFalse(branches.isEmpty());
+
+		for (Hash h : branches) {
+			Ref<?> found = store.refForHash(h);
+			assertNotNull(found, "Branch missing after persist: " + h);
+			assertTrue(found.getStatus() >= Ref.PERSISTED,
+					"Branch below PERSISTED after persist: " + h + " status=" + found.getStatus());
+		}
+	}
+
+	/**
+	 * Recursively collects the hashes of all non-embedded branches below a cell.
+	 */
+	static void collectBranchHashes(ACell cell, List<Hash> acc) {
+		Cells.visitBranchRefs(cell, r -> {
+			acc.add(r.getHash());
+			collectBranchHashes(r.getValue(), acc);
+		});
 	}
 
 	@ParameterizedTest
