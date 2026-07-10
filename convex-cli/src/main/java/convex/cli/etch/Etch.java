@@ -19,6 +19,9 @@ import picocli.CommandLine.Command;
 		EtchWrite.class,
 		EtchClear.class,
 		EtchValidate.class,
+		EtchGC.class,
+		EtchMigrate.class,
+		EtchRecover.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,

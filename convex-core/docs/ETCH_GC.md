@@ -646,40 +646,41 @@ Use cases: consolidating an archived store into a live one, moving a peer's data
 shared store, seeding a fresh store from several sources, and (with a fresh destination)
 GC itself.
 
-## CLI: `convex etch gc`
+## CLI — implemented (July 2026, phase 4)
 
-New subcommand alongside `EtchInfo`, `EtchValidate` etc. in `convex-cli`
-(`convex.cli.etch.EtchGC`):
-
-```
-convex etch gc -e <store.etch> [--output <out.etch>] [--verify] [--strict] [--force]
-```
-
-Offline mode (the store must not be in use — Etch's exclusive file lock enforces this):
-
-1. Open source, open target (default `<store.etch>~`, or `--output`).
-2. Copy root hash; run the transfer sweep (no live writes, so this is a single pass).
-3. `--verify` (default on): target-only walk from root; report cell count and bytes
-   before/after.
-4. Close both; perform the marker + rename dance from the file lifecycle above so that,
-   where the platform allows, the user ends up with `<store.etch>` collected and
-   `<store.etch>.old` as the uncollected original. Where rename fails (Windows mappings),
-   print the manual swap instructions — the adoption-at-startup logic also covers it.
-5. `--strict` fails on any missing child; default skips with a warning and a non-zero
-   summary count.
-
-Output reports: entries copied, entries discarded (index scan count minus copied), bytes
-reclaimed.
-
-A sibling subcommand exposes migration:
+Three subcommands alongside `etch info`, `etch validate` etc. in `convex-cli`, all thin
+wrappers over the tested machinery. Offline operation is enforced by Etch's exclusive
+file lock.
 
 ```
-convex etch migrate -e <source.etch> --into <dest.etch> [--set-root] [--strict]
+convex etch gc -e <store.etch> [--output <out.etch>]
 ```
+(`convex.cli.etch.EtchGC`) In-place by default: runs the full lifecycle
+(`startGC → transferGC → verifyGC → completeGC`), then attempts adoption so the user
+ends up with `<store.etch>` collected; if the collected file cannot yet be renamed
+(mapped-file pinning), the command says so and the next open installs it automatically.
+Reports sizes before/after and percentage reclaimed. With `--output`, collects the root
+tree into a fresh file and leaves the source untouched (note: status levels above
+`PERSISTED`, e.g. `ANNOUNCED`, are preserved in-place but not via `--output`). Always
+verifies before cutover and fails — original untouched — if verification reports
+anything missing. Strict on missing source data (a corrupt/truncated source aborts with
+a pointer to `etch validate`); lenient skip-with-warning modes were considered and
+dropped — silently producing a smaller store from damaged input is the wrong default.
 
-which runs `StoreTransfer.migrate` into an existing destination (created if absent) and
-reports entries transferred / already present. Both subcommands are thin wrappers over
-the same primitives.
+```
+convex etch migrate -e <source.etch> --into <dest.etch> [--set-root]
+```
+(`convex.cli.etch.EtchMigrate`) Runs `EtchUtils.migrate` into the destination (created
+if absent, may be non-empty); every source entry arrives at its recorded status; the
+destination root is unchanged unless `--set-root`. Reports entries processed and
+destination size.
+
+```
+convex etch recover -e <store.etch>
+```
+(`convex.cli.etch.EtchRecover`) Runs GC recovery explicitly (it also runs automatically
+on every open) and reports the resulting store state, including whether adoption was
+deferred. Detailed recovery actions log via the `convex.etch.recovery` logger.
 
 Live mode for a running peer (trigger `startGC`/`transferGC`/`completeGC` over the peer admin
 API) is a natural follow-up but out of scope for the first iteration.
@@ -699,7 +700,7 @@ API) is a natural follow-up but out of scope for the first iteration.
 | `EtchStore.completeGC()` | cutover | **implemented (3d)**: returns the **new `EtchStore`** on the target file; old store stays a functional view (caller decides retirement); writes marker. |
 | `EtchStore.cancelGC()` | any | **implemented (3b)**: flag flip + registered-writer drain + reverse `migrate` + root copy-back + target retirement; idempotent on retry. |
 | `Etch.copyEntry(Hash, Etch)` | sweep | later optimisation; raw entry copy preserving flags/memorySize. |
-| `convex etch gc` / `convex etch migrate` | CLI | new subcommands over the same primitives. |
+| `convex etch gc` / `migrate` / `recover` | CLI | **implemented (phase 4)**: thin wrappers over the lifecycle, `EtchUtils.migrate` and `EtchUtils.recover`. |
 
 Required fixes to existing code (bugs once GC is actually used):
 
@@ -923,10 +924,11 @@ pure characterisation, protecting the "required fixes" refactors:
 
 ### Phase 4 — CLI and scale
 
-- CLI: round-trip a peer store fixture, check size reduction and `etch validate` passes
-  on the output.
-- Scale: sweep over a deep/large generated State (stack-safety of the iterative
-  descent); soak via `EtchStressTest` patterns.
+- CLI (implemented: `EtchCLITest.testEtchGCMigrateRecover`): in-place GC round-trip
+  (root intact, garbage absent), `--output` collection, migrate with `--set-root`, and
+  explicit recover.
+- Scale (future): sweep over a deep/large generated State; soak via `EtchStressTest`
+  patterns.
 
 ## Resolved design decisions
 
