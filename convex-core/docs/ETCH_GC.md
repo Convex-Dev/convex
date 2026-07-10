@@ -576,7 +576,9 @@ small — roughly the number of cycles that run before the JVM collects the prev
 store's buffers, not one per cycle — and pinned garbage is reclaimed in-process rather
 than only at restart. (A future migration of Etch's region management to the FFM API's
 `Arena`-scoped mapping would make unmapping deterministic and remove the deferral
-entirely.)
+entirely — and also removes the 2GB `MappedByteBuffer` region/margin scheme wholesale:
+see [#636](https://github.com/Convex-Dev/convex/issues/636), gated on a Java 25
+baseline.)
 
 **Automatic recovery — implemented (July 2026, phase 3e)**: `EtchStore.create(file)`
 calls `EtchUtils.recover(file)` before mapping anything. Recovery reconciles every
