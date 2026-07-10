@@ -16,8 +16,11 @@ public class EtchUtils {
 	 * its recorded status (STORED entries copy the top cell only; PERSISTED and
 	 * above descend, pruning on subtrees the destination already holds).
 	 *
-	 * The destination may be non-empty and in live use. The destination root is
-	 * not modified. See convex-core/docs/ETCH_GC.md.
+	 * The SOURCE must not be undergoing any writes for the duration of the
+	 * migration: the underlying index scan (Etch.visitIndex) is racy under
+	 * concurrent index restructuring and may miss entries. The destination may
+	 * be non-empty and in live use. The destination root is not modified.
+	 * See convex-core/docs/ETCH_GC.md.
 	 *
 	 * @param source Source Etch store to migrate from
 	 * @param dest Destination store (any AStore implementation)

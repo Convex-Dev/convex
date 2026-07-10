@@ -98,7 +98,7 @@ test coverage. New code should extend this table, not bypass it.
 |---|---|---|
 | `Etch.read` / `Etch.write` | `convex.etch.Etch` | entry-level IO; `write` is the single synchronised append point |
 | `Etch.updateInPlace` | `Etch` | monotonic flag/memorySize merge for already-present entries |
-| `Etch.visitIndex` + `EtchUtils.EtchCellVisitor` | `convex.etch` | full index scan — enumerates *every* entry (migrate-all mode, statistics, verification) |
+| `Etch.visitIndex` + `EtchUtils.EtchCellVisitor` | `convex.etch` | full index scan — enumerates *every* entry (migrate-all mode, statistics, verification). **Racy under concurrent writes**: only for write-quiescent stores |
 | `EtchUtils.FullValidator` | `convex.etch` | structural validation of a produced store |
 | `AStore.storeTopRef` / `storeRef` | `convex.core.store` | recursive persist with status semantics — the write half of the sweep |
 | `Cells.persist(cell, store)` | `convex.core.data.Cells` | "ensure this tree is `PERSISTED` in that store" — the sweep *is* this, given a store-aware read path |
@@ -112,7 +112,7 @@ test coverage. New code should extend this table, not bypass it.
 | Primitive | Role |
 |---|---|
 | `StoreTransfer.transfer(dest, ref, status)` | **implemented (July 2026)** — copy one reachable tree into `dest` at the given status; the source is implicit in the ref's store binding. Post-order descent via the standard persistence machinery, pruning on dest-resident entries at sufficient status (INV-1). Status policy is the caller's (`PERSISTED` for data movement, `ANNOUNCED` when migrating a peer's own store). Currently rides `storeRef` recursion — the iterative-descent fix remains a shared TODO. |
-| `EtchUtils.migrate(source, dest)` | **implemented (July 2026)** — ensure *everything* in an Etch `source` is persisted in `dest`: index scan (`visitIndex`) driving a transfer of each entry at its recorded status (capped at `MAX_STATUS`). Destination may be non-empty and live; destination root untouched. Lives in `convex.etch` because it needs index enumeration. |
+| `EtchUtils.migrate(source, dest)` | **implemented (July 2026)** — ensure *everything* in an Etch `source` is persisted in `dest`: index scan (`visitIndex`) driving a transfer of each entry at its recorded status (capped at `MAX_STATUS`). Source must be **write-quiescent** (`visitIndex` is racy under concurrent writes); destination may be non-empty and live; destination root untouched. Lives in `convex.etch` because it needs index enumeration. |
 | `StoreTransfer.verify(store, rootHash)` | **implemented (July 2026)** — iterative, duplicate-safe walk of the tree resolving from the given store only; returns missing hashes (empty = fully present). |
 | `Etch.copyEntry(hash, targetEtch)` | (optimisation, later) raw entry copy — `key|flags|memorySize|length|encoding` verbatim, no decode/re-encode |
 | `EtchStore.startGC/completeGC/cancelGC` | lifecycle: fresh target + read-fallback/write-redirect + cutover. GC = `startGC()` → `transfer(this, rootRef)` over the store's own old/target split → `completeGC()` (returns the new store). `cancelGC()` = reverse `migrate(target, original)` + root copy-back |
@@ -468,10 +468,14 @@ target's contents back into the original store, which is exactly the reverse mig
 primitive:
 
 1. Under lock: redirect writes back to the old file (state `CANCELLING`); reads keep the
-   target fallback.
-2. `StoreTransfer.migrate(target, original)` — everything in the target is persisted
+   target fallback. Then drain in-flight target writes (a brief synchronisation on the
+   target `Etch`, whose `write` is synchronised) — the reverse migration's index scan
+   requires a **write-quiescent** source, since `visitIndex` is racy under concurrent
+   index restructuring and missed entries here would be silent data loss.
+2. `EtchUtils.migrate(target, original)` — everything in the target is persisted
    into the old file, flags preserved (idempotent: `updateInPlace` merges flags for
-   entries the old file already has).
+   entries the old file already has). Safe by step 1: the target receives no further
+   writes. (The crash-recovery variant runs offline, so quiescence is trivial there.)
 3. Copy the target's current root hash back to the old file (its tree is now guaranteed
    present by step 2).
 4. Under lock: drop the target fallback; close and delete the target file. State `IDLE`.
@@ -529,6 +533,10 @@ Differences from GC:
   its flags. (Entries reachable from the source root get transferred anyway via the root
   pass; the index scan additionally carries over `STORED`-level and currently-unreachable
   data, which is the point of "everything".)
+- **Source must be write-quiescent.** The index scan (`Etch.visitIndex`) is inherently
+  racy under concurrent writes — index restructuring (chain collapses, slot repointing)
+  can cause entries to be missed — so migrate must only run against a source receiving
+  no writes. Reads on the source are fine.
 - **Destination may be live and non-empty.** Transfer uses the destination's normal
   `storeTopRef` path, so it composes with concurrent use, novelty handling and flag
   merging (`updateInPlace`) on the destination.

@@ -858,6 +858,17 @@ public class Etch {
 		mbb.putLong(slotValue);
 	}
 	
+	/**
+	 * Visits all index blocks in this Etch file.
+	 *
+	 * WARNING: inherently racy under concurrent writes. Writes restructure the
+	 * index in place (chain collapses, slot repointing, new index blocks), so a
+	 * concurrent visit may miss entries or visit them twice. Only use on a store
+	 * that is not undergoing any writes.
+	 *
+	 * @param v Visitor to apply to each index block
+	 * @throws IOException in case of IO error
+	 */
 	public void visitIndex(IEtchIndexVisitor v) throws IOException {
 		int[] bs=new int[32];
 		visitIndex(v,bs,0,INDEX_START);
