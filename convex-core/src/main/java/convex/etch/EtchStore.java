@@ -86,6 +86,18 @@ public class EtchStore extends ACachedStore {
 	 */
 	private volatile boolean completed = false;
 
+	/**
+	 * The logical base file of this store, used for naming GC target files
+	 * (base~, base~1, ...). Inherited across GC cutovers, and set to the
+	 * requested file when a store opens on a chain tail under deferred
+	 * adoption. Naming targets off the base (instead of the current physical
+	 * file) keeps names bounded on long-running servers: successive cycles
+	 * produce base~, base~1, base~2... rather than nesting base~~~...
+	 * Parentage of chained cutovers is carried by the .gc-complete markers,
+	 * not by name nesting.
+	 */
+	private volatile File baseFile;
+
 
 	public EtchStore(Etch etch) {
 		this(etch, true);
@@ -95,6 +107,7 @@ public class EtchStore extends ACachedStore {
 		super(enableL2);
 		this.etch = etch;
 		this.target = null;
+		this.baseFile = etch.getFile();
 		etch.setStore(this);
 	}
 
@@ -114,11 +127,12 @@ public class EtchStore extends ACachedStore {
 		if (target != null)
 			throw new IllegalStateException("GC already in progress for store: " + this);
 
-		// Generational target naming: an existing target file is either stale
-		// (interrupted cycle: may hold data, so it must be neither adopted nor
-		// deleted — recovery is a separate concern) or a cancelled target pinned
-		// by mapped buffers (Windows). Skip to the first free name
-		String base = etch.getFile().getCanonicalPath() + "~";
+		// Generational target naming OFF THE BASE FILE (bounded on long-running
+		// servers: base~, base~1, ... — never nested base~~). An existing target
+		// file is either stale (interrupted cycle: may hold data, so it must be
+		// neither adopted nor deleted — recovery's concern) or a cancelled
+		// target pinned by mapped buffers (Windows). Skip to the first free name
+		String base = baseFile.getCanonicalPath() + "~";
 		File temp = new File(base);
 		for (int i = 1; temp.exists(); i++) {
 			if (i >= 100) throw new IllegalStateException("Too many stale GC target files: " + base);
@@ -319,6 +333,13 @@ public class EtchStore extends ACachedStore {
 		File tf = t.getFile();
 		if (!tf.delete()) {
 			tf.deleteOnExit();
+			// Tombstone: the target's contents are fully rolled back, so startup
+			// recovery must retry the deletion but NEVER roll it back again
+			// (re-rolling superseded data into a later, collected store would
+			// re-introduce garbage)
+			File tomb = new File(tf.getCanonicalPath() + ".cancelled");
+			java.nio.file.Files.writeString(tomb.toPath(), "rolled back by cancelGC\n");
+			tomb.deleteOnExit();
 		}
 	}
 
@@ -359,8 +380,10 @@ public class EtchStore extends ACachedStore {
 
 		// The successor rebinds the target Etch to itself: refs decoded from
 		// that file (including via this store's reads) bind to the successor —
-		// deliberately, since they outlive this store's close
+		// deliberately, since they outlive this store's close. It inherits the
+		// logical base file so its own GC targets stay bounded (base~N)
 		EtchStore newStore = new EtchStore(t);
+		newStore.baseFile = this.baseFile;
 
 		// Completion marker: records which generational target file completed,
 		// for startup adoption/recovery. Written AFTER the cutover is durable;
@@ -405,8 +428,29 @@ public class EtchStore extends ACachedStore {
 	 */
 	public static EtchStore create(File file) throws IOException {
 		file = FileUtils.ensureFilePath(file);
-		Etch etch = Etch.create(file);
-		return new EtchStore(etch);
+		// Automatic GC adoption/recovery: reconcile any completed or abandoned
+		// GC cycle state before opening (see ETCH_GC.md "File lifecycle").
+		// Normally returns the same file; returns the cutover-chain tail when
+		// adoption had to be deferred (e.g. mapped-file pinning on Windows)
+		File open = EtchUtils.recover(file);
+		Etch etch = Etch.create(open);
+		EtchStore store = new EtchStore(etch);
+		// The logical base stays the REQUESTED file even under deferred
+		// adoption, so future GC targets are named off it (bounded names)
+		store.baseFile = file;
+		return store;
+	}
+
+	/**
+	 * Gets the logical base file for this store: the file name the store is
+	 * known by, used for naming GC target files. Usually the same as
+	 * getFile(), but differs when running on a cutover-chain tail under
+	 * deferred adoption.
+	 *
+	 * @return Logical base file
+	 */
+	public File getBaseFile() {
+		return baseFile;
 	}
 
 	/**

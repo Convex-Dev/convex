@@ -185,32 +185,24 @@ public class EtchGCLifecycleTest {
 		assertThrows(IOException.class,
 				() -> targetEtch.read(nonEmbedded(99).getHash()));
 
-		// ----- Reopen the same files: an abandoned cycle loses nothing -----
-		// Old file: exactly the pre-cycle state (root t0, t1 present, v2 absent)
+		// ----- Reopen via EtchStore.create: automatic recovery (phase 3e)
+		// rolls the abandoned cycle forward - nothing written during it is
+		// lost, and the root advances to the cycle's last root -----
+		assertTrue(targetEtch.getFile().exists()); // cycle data durably on disk
 		EtchStore reopened = EtchStore.create(f);
-		assertEquals(t0.getHash(), reopened.getRootHash());
-		assertEquals(t0, reopened.getRootData());
-		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
-		assertNull(reopened.getEtch().read(v2.getHash()));
-
-		// The abandoned target does not block a new cycle: generational naming
-		// skips it, preserving its contents for recovery
-		reopened.startGC();
-		Etch nextTarget = reopened.getTargetEtch();
-		nextTarget.getFile().deleteOnExit();
-		assertNotEquals(targetEtch.getFile().getCanonicalPath(),
-				nextTarget.getFile().getCanonicalPath());
+		assertEquals(t3.getHash(), reopened.getRootHash());
+		assertEquals(t3, reopened.getRootData());
+		assertNotNull(reopened.getEtch().read(v2.getHash())); // cycle novelty recovered
+		assertAllInEtch(reopened.getEtch(), treeHashes(t3), Ref.PERSISTED);
+		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED); // pre-cycle data intact
+		assertAllInEtch(reopened.getEtch(), treeHashes(t0), Ref.ANNOUNCED);
 		reopened.close();
 
-		// Target file: everything written during the cycle is durably there —
-		// exactly what a recovery roll-back (phase 3e) needs
-		EtchStore targetStore = EtchStore.create(targetEtch.getFile());
-		assertEquals(t3.getHash(), targetStore.getRootHash());
-		assertEquals(t3, targetStore.getRootData());
-		assertEquals(v2, targetStore.refForHash(v2.getHash()).getValue());
-		assertAllInEtch(targetStore.getEtch(), treeHashes(t1), Ref.PERSISTED);
-		assertAllInEtch(targetStore.getEtch(), treeHashes(t3), Ref.PERSISTED);
-		targetStore.close();
+		// Recovery is idempotent: a second open is clean (any target files
+		// still pinned by this process are re-rolled-back harmlessly)
+		EtchStore again = EtchStore.create(f);
+		assertEquals(t3.getHash(), again.getRootHash());
+		again.close();
 	}
 
 	/**
@@ -407,13 +399,46 @@ public class EtchGCLifecycleTest {
 		assertEquals(v5, newStore.refForHash(v5.getHash()).getValue());
 		assertNull(newStore.refForHash(t1.getHash())); // garbage now gone for good
 
-		// ----- Successor state is durable across reopen -----
+		// ----- Second GC on the successor: cutovers chain via markers, and
+		// target names stay bounded off the BASE file (f~, f~1 - never f~~) -----
+		newStore.startGC();
+		Etch target2 = newStore.getTargetEtch();
+		target2.getFile().deleteOnExit();
+		assertEquals(f.getCanonicalPath() + "~1", target2.getFile().getCanonicalPath());
+		newStore.transferGC();
+		EtchStore finalStore = newStore.completeGC();
+		AString v6 = nonEmbedded(260);
+		Cells.persist(v6, finalStore);
 		newStore.close();
-		EtchStore reopened = EtchStore.create(targetEtch.getFile());
-		assertEquals(t3.getHash(), reopened.getRootHash());
-		assertNotNull(reopened.getEtch().read(v4.getHash()));
-		assertNotNull(reopened.getEtch().read(v5.getHash()));
-		assertNull(reopened.getEtch().read(t1.getHash()));
-		reopened.close();
+		finalStore.close();
+		new File(f.getCanonicalPath() + "~.gc-complete").deleteOnExit();
+
+		// ----- Restart via EtchStore.create(f): recovery (phase 3e) follows
+		// the marker chain f -> f~ -> f~1 and adopts (or defers to) the tail -----
+		EtchStore adopted = EtchStore.create(f);
+		assertEquals(t3.getHash(), adopted.getRootHash());
+		assertNotNull(adopted.getEtch().read(v6.getHash())); // post-second-cutover data retained
+		assertNull(adopted.getEtch().read(t1.getHash()));    // garbage stays collected
+		assertNull(adopted.getEtch().read(v4.getHash()));    // never root-reachable: collected by cycle 2
+		assertNull(adopted.getEtch().read(v5.getHash()));    // ditto
+		assertAllInEtch(adopted.getEtch(), treeHashes(t3), Ref.PERSISTED);
+		// The logical base survives regardless of which physical file is open
+		assertEquals(f.getCanonicalFile(), adopted.getBaseFile().getCanonicalFile());
+
+		File adoptedFile = adopted.getFile().getCanonicalFile();
+		if (adoptedFile.equals(f.getCanonicalFile())) {
+			// Full adoption: marker consumed, original archived as .old
+			assertFalse(marker.exists());
+			File archive = new File(f.getCanonicalPath() + ".old");
+			assertTrue(archive.exists());
+			archive.deleteOnExit();
+		} else {
+			// Deferred adoption (files pinned by this same process, e.g. on
+			// Windows): running on the chain tail with the correct data; the
+			// renames are retried on the next start via the marker breadcrumb
+			assertEquals(target2.getFile().getCanonicalFile(), adoptedFile);
+			assertTrue(marker.exists());
+		}
+		adopted.close();
 	}
 }

@@ -538,32 +538,53 @@ roll-back) or a cancelled target still pinned by mapped buffers (Windows cannot 
 mapped file). Generational naming means neither case ever blocks a new cycle, and stale
 data is preserved for recovery, which scans `<file>~*`.
 
-Renaming is awkward on Windows: memory-mapped files cannot be renamed or deleted while
-mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer`. So:
+**Bounded naming (long-running servers)**: targets are named off the store's *logical
+base file* (`EtchStore.getBaseFile()`), which is inherited across cutovers and deferred
+adoptions — so successive in-process GC cycles produce `f~`, `f~1`, `f~2`, … with small
+numbers reused after cleanup, never nested `f~~~…` growing one character per cycle.
+Chain parentage is carried by the `.gc-complete` markers, not by name nesting.
 
-- **After cutover, the store keeps running on the `~` file.** No rename is attempted
-  while live.
-- Cutover writes a sidecar marker `<file>.gc-complete` (containing the new root hash)
-  and best-effort attempts to delete/rename the old file to `<file>.old` — this usually
-  succeeds on POSIX and may fail harmlessly on Windows.
-- **Adoption at startup**: `EtchStore.create(file)` checks, before mapping anything:
-  - If `<file>.gc-complete` and `<file>~` exist: rename `<file>` → `<file>.old`
-    (if still present), rename `<file>~` → `<file>`, delete the marker, open as normal.
-  - If `<file>~` exists *without* the marker: a GC cycle died mid-flight. The `~` file
-    may hold writes made after `startGC()` that exist nowhere else, so it is **not**
-    deleted blindly: startup performs an offline roll-back — the same
-    `migrate(target, original)` used by `cancelGC()`, best-effort over the target's
-    recorded data length (tolerating a torn tail from the crash), adopting the target's
-    root hash only if its tree verifies as fully present — then deletes the `~` file
-    and opens as normal.
+Renaming is awkward on Windows: memory-mapped files cannot be renamed or deleted while
+mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer`. So
+after cutover the store keeps running on the target file — no rename while live — and
+`completeGC()` writes a sidecar marker `<file>.gc-complete` recording which target
+completed (plus an informational root hash).
+
+**Automatic recovery — implemented (July 2026, phase 3e)**: `EtchStore.create(file)`
+calls `EtchUtils.recover(file)` before mapping anything. Recovery reconciles every
+GC-related on-disk state, with detailed operator-facing log messages, and is idempotent
+(a crash mid-recovery leaves a state the next run recognises and resumes):
+
+- **Completed cutovers are adopted.** The marker chain is followed to its tail —
+  *multiple successive GCs* leave a chain `f → f~ → f~1 → …`, each file's marker naming
+  its successor. The base marker is rewritten to point directly at the tail (the
+  breadcrumb that keeps every later step resumable), superseded intermediates are
+  deleted (each completed a full sweep before its own cutover, so its retained content
+  lives on in its successor), the original is archived under a free `.old` name, and the
+  tail is installed as `<file>`.
+- **Adoption may be deferred.** If renames fail (files pinned by mappings from this same
+  process on Windows), recovery opens the *chain tail* directly — which holds the
+  correct current data — and retries the renames on the next start. Recovery never
+  silently opens stale data.
+- **Abandoned cycles are rolled back.** A markerless target holds writes that exist
+  nowhere else: its entries are best-effort migrated into the chain tail (the abandoned
+  cycle's parent), tolerating a torn tail from the crash (unreadable entries are skipped
+  and counted, never abort recovery); the root advances only if its tree then verifies
+  fully present; the target is deleted. The migration binds refs to a store over the
+  *source* file so parents visited before their children (index order is hash order)
+  can resolve their descent.
+- **Cancelled-but-pinned targets are tombstoned, never re-rolled.** When `cancelGC()`
+  cannot delete its fully-rolled-back target, it writes a `.cancelled` sidecar; recovery
+  then only retries the deletion — rolling such a target back again would re-introduce
+  superseded garbage into a later, collected store.
 
 Crash safety, therefore: the original file is never modified during a cycle except by
 roll-back (which only adds entries and monotonically merges flags), a completed cutover
 is adopted idempotently, and an interrupted cycle is rolled back rather than discarded —
 writes made during the cycle survive a crash up to the usual unflushed-tail window.
 
-Operators wanting to reclaim disk immediately can delete `<file>.old` once they are
-satisfied; the design never deletes user data automatically except a `~` file whose
+Operators wanting to reclaim disk immediately can delete `<file>.old*` once they are
+satisfied; the design never deletes user data automatically except a target file whose
 contents have been rolled back or adopted.
 
 ## Store-to-store migration
