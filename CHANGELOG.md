@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AString.isBlank()` — allocation-free blank test on UTF-8 bytes.
+- `StoreTransfer.transfer`/`verify` and `EtchUtils.migrate` — composable primitives for moving lattice data between stores and verifying completeness.
 - `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network: sync, deterministic replay, migration application and a real boundary crossing, with classified state-diff diagnostics and coin-supply conservation checks.
 
 ### Changed

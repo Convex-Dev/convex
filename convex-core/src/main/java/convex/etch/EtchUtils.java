@@ -4,9 +4,45 @@ import java.io.IOException;
 
 import convex.core.data.ACell;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
+import convex.core.store.AStore;
 import convex.core.util.Utils;
 
 public class EtchUtils {
+
+	/**
+	 * Ensures everything in the source Etch store is persisted in the
+	 * destination store: a full index scan drives a transfer of each entry at
+	 * its recorded status (STORED entries copy the top cell only; PERSISTED and
+	 * above descend, pruning on subtrees the destination already holds).
+	 *
+	 * The destination may be non-empty and in live use. The destination root is
+	 * not modified. See convex-core/docs/ETCH_GC.md.
+	 *
+	 * @param source Source Etch store to migrate from
+	 * @param dest Destination store (any AStore implementation)
+	 * @return Number of source entries processed
+	 * @throws IOException in case of IO error during migration
+	 */
+	public static long migrate(EtchStore source, AStore dest) throws IOException {
+		long[] count = {0};
+		source.getEtch().visitIndex(new EtchCellVisitor() {
+			@Override
+			protected void visitCell(ACell cell) {
+				Ref<ACell> ref = cell.getRef();
+				// Cap at MAX_STATUS: internal/marked levels are store-local concerns
+				int status = Math.max(Ref.STORED, Math.min(ref.getStatus(), Ref.MAX_STATUS));
+				try {
+					dest.storeTopRef(ref, status, null);
+				} catch (IOException e) {
+					// OK: enclosing method declares IOException
+					throw Utils.sneakyThrow(e);
+				}
+				count[0]++;
+			}
+		});
+		return count[0];
+	}
 	
 	public static FullValidator getFullValidator() {
 		return new FullValidator();

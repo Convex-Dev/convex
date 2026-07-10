@@ -111,11 +111,17 @@ test coverage. New code should extend this table, not bypass it.
 
 | Primitive | Role |
 |---|---|
-| `StoreTransfer.transfer(source, dest, ref)` | copy one reachable tree from `source` into `dest`, depth-first, preserving flags, pruning on dest-resident `PERSISTED` entries (INV-1). Iterative (explicit stack), locality-ordered. The core of everything below. |
-| `StoreTransfer.migrate(source, dest)` | ensure *everything* in `source` is persisted in `dest`: index scan (`visitIndex`) driving `transfer` per top-level entry, then root transfer. Destination may be non-empty. |
-| `StoreTransfer.verify(dest, rootHash)` | walk the tree in `dest` **only** (no fallback); return missing hashes. |
+| `StoreTransfer.transfer(dest, ref, status)` | **implemented (July 2026)** — copy one reachable tree into `dest` at the given status; the source is implicit in the ref's store binding. Post-order descent via the standard persistence machinery, pruning on dest-resident entries at sufficient status (INV-1). Status policy is the caller's (`PERSISTED` for data movement, `ANNOUNCED` when migrating a peer's own store). Currently rides `storeRef` recursion — the iterative-descent fix remains a shared TODO. |
+| `EtchUtils.migrate(source, dest)` | **implemented (July 2026)** — ensure *everything* in an Etch `source` is persisted in `dest`: index scan (`visitIndex`) driving a transfer of each entry at its recorded status (capped at `MAX_STATUS`). Destination may be non-empty and live; destination root untouched. Lives in `convex.etch` because it needs index enumeration. |
+| `StoreTransfer.verify(store, rootHash)` | **implemented (July 2026)** — iterative, duplicate-safe walk of the tree resolving from the given store only; returns missing hashes (empty = fully present). |
 | `Etch.copyEntry(hash, targetEtch)` | (optimisation, later) raw entry copy — `key|flags|memorySize|length|encoding` verbatim, no decode/re-encode |
-| `EtchStore.startGC/completeGC/cancelGC` | lifecycle: fresh target + read-fallback/write-redirect + cutover. GC = `startGC()` → `transfer(old, target, root)` → `completeGC()` (returns the new store). `cancelGC()` = reverse `migrate(target, original)` + root copy-back |
+| `EtchStore.startGC/completeGC/cancelGC` | lifecycle: fresh target + read-fallback/write-redirect + cutover. GC = `startGC()` → `transfer(this, rootRef)` over the store's own old/target split → `completeGC()` (returns the new store). `cancelGC()` = reverse `migrate(target, original)` + root copy-back |
+
+**Strictness follows the destination store.** An Etch destination is strict: missing
+source data propagates as `MissingDataException`, source read failures as
+`StoreException`. `MemoryStore` is lenient by design (remote-acquisition semantics: it
+stores what it can and caps achieved status). Lenient behaviour over Etch (CLI tools
+skipping damaged subtrees) is the caller's per-subtree concern, not the primitive's.
 
 `StoreTransfer` (name TBD; `convex.core.store`) works at the `AStore` level so the same
 primitives serve Etch-to-Etch GC, Etch-to-Etch migration, and any future store backend.
@@ -374,29 +380,33 @@ target-then-old read path:
 
 ```java
 public void transferGC() throws IOException {
-    Ref<ACell> root = getRootRef();          // resolves via target-then-old read path
-    StoreTransfer.transfer(this, this, root); // descends, copies old→target, prunes on INV-1
+    Ref<ACell> root = getRootRef();       // resolves via target-then-old read path
+    StoreTransfer.transfer(this, root);   // descends, copies old→target, prunes on INV-1
 }
 ```
 
-(Source and destination are the same `EtchStore` here because the store's own read/write
-paths already implement the old/target split during a cycle; the standalone
-`StoreTransfer.transfer(source, dest, ref)` form covers distinct stores.)
+(Destination is this same `EtchStore` because the store's own read/write paths implement
+the old/target split during a cycle; the ref's binding supplies the source, so the same
+`StoreTransfer.transfer(dest, ref, status)` form covers distinct stores.)
 
 Implementation notes:
 
-- **Iteration, not recursion.** State trees can be deep; `transfer` must use an explicit
-  stack rather than the current recursive `updateRefs` pattern (which already carries a
-  stack-overflow TODO). This is worth fixing for `storeRef` generally.
+- **Iteration, not recursion.** State trees can be deep; the v1 transfer rides the
+  recursive `storeRef`/`updateRefs` machinery (which carries a stack-overflow TODO) —
+  converting persistence to an explicit stack remains the shared fix, and benefits
+  everything at once.
 - **Ordering.** Post-order DFS, children immediately before parent — see
   [Copy ordering and locality](#copy-ordering-and-locality).
-- **Flag preservation.** Copied entries carry their existing flags (status, e.g.
-  `ANNOUNCED`) and memory size from the old entry, merged via the normal
-  `Ref.mergeFlags` path. A peer must not lose `ANNOUNCED` status across GC.
-- **Missing children.** If a child is missing from the old store (pre-existing partial
-  data), the sweep skips that subtree with a warning by default; a `strict` mode fails
-  the cycle instead. The copied parent keeps its old flags — if the store previously
-  (incorrectly) claimed `PERSISTED` for it, GC neither fixes nor worsens that.
+- **Status preservation.** The sweep transfers at the status level the GC use-case
+  needs: `ANNOUNCED` for a peer's own store (a peer must not lose its announcement
+  commitments across GC — losing them would trigger a novelty re-broadcast storm),
+  `PERSISTED` otherwise. Per the status invariants, each level is earned in the target
+  by the descent itself.
+- **Missing children.** The primitives are strict over Etch (missing source data
+  propagates as `MissingDataException`); a GC cycle over a store with pre-existing holes
+  fails rather than silently producing a smaller hole-free-looking store. Lenient
+  skip-with-warning behaviour is a CLI-level policy for damaged stores, applied
+  per-subtree by the tool, not baked into the primitive.
 - **Raw-copy optimisation (later).** The sweep currently decodes each cell and re-encodes
   on write; since encodings are canonical this is byte-identical but costs CPU. A raw
   entry copy (`Etch.copyEntry(hash, targetEtch)`) that reads
@@ -508,7 +518,7 @@ contents have been rolled back or adopted.
 
 ## Store-to-store migration
 
-`StoreTransfer.migrate(source, dest)` ensures everything from the source store is
+`EtchUtils.migrate(source, dest)` ensures everything from the source store is
 persisted in an existing destination store. This is the general form; GC is the special
 case of a fresh destination plus root-only coverage plus cutover.
 
@@ -575,9 +585,9 @@ API) is a natural follow-up but out of scope for the first iteration.
 | Method | Phase | Notes |
 |---|---|---|
 | `EtchStore.startGC()` | begin | exists; keep. Makes `etch`/`target` volatile. |
-| `StoreTransfer.transfer(source, dest, ref)` | sweep | new core primitive; iterative post-order DFS copy with INV-1 pruning. |
-| `StoreTransfer.migrate(source, dest)` | migration | new; full index scan + transfer into an existing store. |
-| `StoreTransfer.verify(dest, rootHash)` | pre-cutover | new; dest-only reachability walk, returns missing hashes (empty = complete). |
+| `StoreTransfer.transfer(dest, ref, status)` | sweep | **implemented**; post-order copy with INV-1 pruning, source implicit in ref binding. |
+| `EtchUtils.migrate(source, dest)` | migration | **implemented**; full index scan + per-entry transfer at recorded status into an existing store. |
+| `StoreTransfer.verify(store, rootHash)` | pre-cutover | **implemented**; store-only reachability walk, returns missing hashes (empty = complete). |
 | `EtchStore.transferGC()` | sweep | new; `transfer` over the store's own old/target split; blocking, call from background thread. |
 | `EtchStore.isGCInProgress()` | any | new; `target != null`. |
 | `EtchStore.isGCComplete()` | sweep done | new; sweep finished (INV-1 makes this sticky). |
@@ -726,10 +736,13 @@ pure characterisation, protecting the "required fixes" refactors:
 - Tree generators: random cell trees with controlled depth, branching and
   embedded/non-embedded mix (extending `convex.test.Samples` and existing generators).
 
-### Phase 2 — new primitives (written alongside their implementation)
+### Phase 2 — new primitives (implemented July 2026: `StoreTransferTest`)
 
-- `StoreTransfer.transfer`/`migrate`/`verify` against `MemoryStore`↔`EtchStore` pairs in
-  both directions, before any GC lifecycle exists.
+- `StoreTransfer.transfer`/`verify` and `EtchUtils.migrate` against
+  `MemoryStore`↔`EtchStore` pairs in both directions, before any GC lifecycle exists —
+  including lazy-source transfer, repeat-transfer no-op (INV-1 pruning observed via
+  unchanged Etch data length), status preservation, missing-children strictness (Etch)
+  vs leniency (MemoryStore), and mixed-status migration.
 - Property: generate random cell trees, persist, add garbage, transfer to a fresh store,
   assert (a) destination contains exactly the reachable set, (b) root data equals
   original, (c) `verify` empty, (d) all flags preserved.
