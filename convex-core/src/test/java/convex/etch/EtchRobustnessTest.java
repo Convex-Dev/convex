@@ -262,6 +262,70 @@ public class EtchRobustnessTest {
 		assertTrue(vd.values >= NTHREADS * PER);
 	}
 
+	/**
+	 * Readers racing chain collapses: keys sharing a 3-byte prefix collide into
+	 * chains that repeatedly collapse into new index blocks as the writer
+	 * inserts. Concurrent readers must never observe a false miss for a key
+	 * already written (writer publishes progress via an AtomicInteger, which
+	 * provides the happens-before edge). Guards the chain-collapse publication
+	 * ordering that lock-free reads depend on.
+	 */
+	@Test
+	public void testConcurrentChainReadsDuringCollapse() throws Exception {
+		Etch etch = STORE.getEtch();
+		int N = 1024;
+		Hash[] keys = new Hash[N];
+		for (int i = 0; i < N; i++) {
+			// Shared 3-byte prefix: collide at index levels 0 and 1, forcing
+			// dense chains and collapses in the 16-way blocks below
+			keys[i] = Hash.fromHex("00e7aa" + String.format("%058x", i));
+		}
+
+		java.util.concurrent.atomic.AtomicInteger published = new java.util.concurrent.atomic.AtomicInteger(0);
+		java.util.concurrent.atomic.AtomicReference<String> failure = new java.util.concurrent.atomic.AtomicReference<>();
+
+		Callable<Void> writer = () -> {
+			for (int i = 0; i < N; i++) {
+				etch.write(keys[i], CVMLong.create(i).getRef());
+				published.set(i + 1);
+			}
+			return null;
+		};
+
+		int NREADERS = 4;
+		List<Callable<Void>> tasks = new ArrayList<>();
+		tasks.add(writer);
+		for (int r = 0; r < NREADERS; r++) {
+			tasks.add(() -> {
+				while (published.get() < N && failure.get() == null) {
+					int p = published.get();
+					for (int j = Math.max(0, p - 64); j < p; j++) {
+						if (etch.read(keys[j]) == null) {
+							failure.compareAndSet(null, "False miss for published key " + j);
+							return null;
+						}
+					}
+				}
+				return null;
+			});
+		}
+
+		ExecutorService ex = Executors.newFixedThreadPool(1 + NREADERS);
+		try {
+			for (Future<Void> f : ex.invokeAll(tasks)) {
+				f.get(); // propagate any worker exception
+			}
+		} finally {
+			ex.shutdown();
+		}
+		assertNull(failure.get(), failure.get());
+
+		// Final validation: all keys present, index structurally sound
+		for (int i = 0; i < N; i++) {
+			assertNotNull(etch.read(keys[i]));
+		}
+	}
+
 	@Test
 	public void testDeepStructurePersist() throws IOException {
 		EtchStore store = STORE;
