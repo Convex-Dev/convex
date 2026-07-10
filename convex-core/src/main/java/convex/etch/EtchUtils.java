@@ -59,8 +59,10 @@ public class EtchUtils {
 	 * <li><b>Completed cutovers</b> (a {@code .gc-complete} marker naming a
 	 * target file — possibly a chain of them across multiple successive GCs)
 	 * are ADOPTED: the final chain tail is installed under the original file
-	 * name, the original is archived as {@code .old}, and superseded
-	 * intermediates and markers are removed.</li>
+	 * name, and the superseded original, intermediates and markers are
+	 * deleted — this deletion is the disk reclamation (each cutover was
+	 * hard-gated on a verifiably complete sweep, and everything else is
+	 * garbage by the retention contract).</li>
 	 * <li><b>Abandoned cycles</b> (target files with no marker) are ROLLED
 	 * BACK: their contents — which exist nowhere else — are migrated into
 	 * their base file, tolerating a torn tail from the crash; the root
@@ -180,20 +182,18 @@ public class EtchUtils {
 			}
 		}
 
-		// Archive the original under a free .old name, then install the tail
-		if (file.exists()) {
-			File archive = firstFreeArchive(file);
-			try {
-				Files.move(file.toPath(), archive.toPath());
-				warn("Etch GC recovery: archived original {} as {} (delete when satisfied)",
-						file.getName(), archive.getName());
-			} catch (IOException e) {
-				error("Etch GC recovery: cannot archive {} ({}). Adoption DEFERRED: opening the chain"
-						+ " tail {} directly - it holds the correct current data - and the renames will be"
-						+ " retried on the next start. Typical cause: the file is pinned by memory mappings"
-						+ " from this same process (Windows).", file, e, tail.getName());
-				return tail;
-			}
+		// Delete the superseded original, then install the tail in its place.
+		// This deletion IS the disk reclamation: the original's retained content
+		// is verifiably in the chain tail (each cutover was hard-gated on a
+		// complete sweep) and everything else in it is garbage by the retention
+		// contract. Operators wanting an archive should copy the file BEFORE
+		// invoking completeGC
+		if (file.exists() && !file.delete()) {
+			error("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
+					+ " from this same process, e.g. on Windows?). Adoption DEFERRED: opening the chain"
+					+ " tail {} directly - it holds the correct current data - and the deletion and"
+					+ " installation will be retried on the next start.", file, tail.getName());
+			return tail;
 		}
 		try {
 			Files.move(tail.toPath(), file.toPath());
@@ -282,16 +282,6 @@ public class EtchUtils {
 			return s.isEmpty() ? 0L : Long.parseLong(s);
 		}));
 		return out;
-	}
-
-	static File firstFreeArchive(File base) throws IOException {
-		File a = new File(base.getCanonicalPath() + ".old");
-		for (int i = 1; a.exists(); i++) {
-			if (i >= 1000) throw new IOException("Etch GC recovery: over 1000 archive files like " + a
-					+ " - clean up old .old files before recovery can archive the original.");
-			a = new File(base.getCanonicalPath() + ".old" + i);
-		}
-		return a;
 	}
 
 	/**

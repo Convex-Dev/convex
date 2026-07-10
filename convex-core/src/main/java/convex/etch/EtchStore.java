@@ -695,6 +695,18 @@ public class EtchStore extends ACachedStore {
 		if ((t != null) && !completed)
 			t.close();
 		etch.close();
+		if (completed) {
+			// Cutover done and this legacy view is now closed: the old file's
+			// retained content is verifiably in the successor (completeGC is
+			// hard-gated on a complete sweep) and everything else is garbage by
+			// the retention contract. Deleting it IS the disk reclamation. If
+			// mappings pin the file (Windows), deletion is retried on JVM exit
+			// and again by startup recovery
+			File f = etch.getFile();
+			if (!f.delete()) {
+				f.deleteOnExit();
+			}
+		}
 	}
 
 	/**

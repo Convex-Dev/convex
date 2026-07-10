@@ -558,10 +558,13 @@ GC-related on-disk state, with detailed operator-facing log messages, and is ide
 - **Completed cutovers are adopted.** The marker chain is followed to its tail —
   *multiple successive GCs* leave a chain `f → f~ → f~1 → …`, each file's marker naming
   its successor. The base marker is rewritten to point directly at the tail (the
-  breadcrumb that keeps every later step resumable), superseded intermediates are
-  deleted (each completed a full sweep before its own cutover, so its retained content
-  lives on in its successor), the original is archived under a free `.old` name, and the
-  tail is installed as `<file>`.
+  breadcrumb that keeps every later step resumable), then the superseded original and
+  intermediates are **deleted** and the tail is installed as `<file>`. This deletion is
+  the disk reclamation: each cutover was hard-gated on a verifiably complete sweep, so
+  everything a superseded file held that was retained lives on in its successor, and
+  everything else is garbage by the retention contract. (`close()` on a completed
+  legacy-view store likewise deletes its old file in-process.) Operators wanting an
+  archive copy the file *before* invoking `completeGC()`.
 - **Adoption may be deferred.** If renames fail (files pinned by mappings from this same
   process on Windows), recovery opens the *chain tail* directly — which holds the
   correct current data — and retries the renames on the next start. Recovery never
@@ -583,9 +586,10 @@ roll-back (which only adds entries and monotonically merges flags), a completed 
 is adopted idempotently, and an interrupted cycle is rolled back rather than discarded —
 writes made during the cycle survive a crash up to the usual unflushed-tail window.
 
-Operators wanting to reclaim disk immediately can delete `<file>.old*` once they are
-satisfied; the design never deletes user data automatically except a target file whose
-contents have been rolled back or adopted.
+Automatic deletion is limited to files whose retained content is *verifiably* elsewhere:
+superseded originals and intermediates after a hard-gated cutover, and targets whose
+contents have been rolled back. That deletion is the point — without it, GC would merely
+rename garbage rather than reclaim it.
 
 ## Store-to-store migration
 

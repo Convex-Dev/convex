@@ -427,11 +427,9 @@ public class EtchGCLifecycleTest {
 
 		File adoptedFile = adopted.getFile().getCanonicalFile();
 		if (adoptedFile.equals(f.getCanonicalFile())) {
-			// Full adoption: marker consumed, original archived as .old
+			// Full adoption: marker consumed; superseded files are DELETED, not
+			// archived - the deletion is the disk reclamation
 			assertFalse(marker.exists());
-			File archive = new File(f.getCanonicalPath() + ".old");
-			assertTrue(archive.exists());
-			archive.deleteOnExit();
 		} else {
 			// Deferred adoption (files pinned by this same process, e.g. on
 			// Windows): running on the chain tail with the correct data; the
