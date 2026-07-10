@@ -30,8 +30,9 @@ import convex.core.exceptions.StoreException;
  * convex-core/docs/ETCH_GC.md): write redirection, read fallback, and the
  * target-only persistence check that establishes INV-1 during a live cycle.
  *
- * These tests use fresh file-backed stores: GC lifecycle is about exact file
- * contents, one of the rare justified exceptions to shared test stores.
+ * One long lifecycle walk over a single file-backed store (GC lifecycle is
+ * about exact file contents, so it cannot use the shared test stores — but it
+ * needs only this one file plus its GC target).
  */
 public class EtchGCLifecycleTest {
 
@@ -54,8 +55,15 @@ public class EtchGCLifecycleTest {
 	}
 
 	/**
-	 * Recursively collects the hashes of all non-embedded branches below a cell.
+	 * Collects the root hash and the hashes of all non-embedded branches.
 	 */
+	static List<Hash> treeHashes(ACell root) {
+		List<Hash> acc = new ArrayList<>();
+		acc.add(root.getHash());
+		collectBranchHashes(root, acc);
+		return acc;
+	}
+
 	static void collectBranchHashes(ACell cell, List<Hash> acc) {
 		Cells.visitBranchRefs(cell, r -> {
 			acc.add(r.getHash());
@@ -63,172 +71,112 @@ public class EtchGCLifecycleTest {
 		});
 	}
 
-	/**
-	 * Closes a store, registering its GC target file (if any) for deletion.
-	 */
-	static void cleanup(EtchStore store) {
-		Etch t = store.getTargetEtch();
-		if (t != null) t.getFile().deleteOnExit();
-		store.getEtch().getFile().deleteOnExit();
-		store.close();
+	static void assertAllInEtch(Etch e, List<Hash> hashes, int minStatus) throws IOException {
+		for (Hash h : hashes) {
+			RefSoft<?> r = e.read(h);
+			assertNotNull(r, "Entry missing: " + h);
+			assertTrue(r.getStatus() >= minStatus, "Status too low for: " + h);
+		}
 	}
 
 	@Test
-	public void testWritesRedirectToTarget() throws IOException {
-		EtchStore store = EtchStore.createTemp("gc3a-writes");
+	public void testGCCycleLifecycle() throws IOException {
+		File f = File.createTempFile("gc3a-lifecycle", ".etch");
+		f.deleteOnExit();
+		new File(f.getCanonicalPath() + "~").deleteOnExit();
+
+		AString v0 = nonEmbedded(1); // pre-cycle root data
+		AVector<ACell> t1 = tree(10); // pre-cycle tree, resolvable only via old file
+
+		// ----- Populate the old file, then reopen for cold caches -----
+		{
+			EtchStore store = EtchStore.create(f);
+			Cells.persist(t1, store);
+			store.setRootData(v0);
+			store.flush();
+			store.close();
+		}
+		EtchStore store = EtchStore.create(f);
 		assertFalse(store.isGCInProgress());
+
+		// ----- startGC guards: stale target file must not be adopted or deleted -----
+		File stale = new File(f.getCanonicalPath() + "~");
+		assertTrue(stale.createNewFile());
+		assertThrows(IllegalStateException.class, store::startGC);
+		assertTrue(stale.delete());
+
+		// ----- Start the cycle -----
 		store.startGC();
 		assertTrue(store.isGCInProgress());
-
-		AString v = nonEmbedded(1);
-		Cells.persist(v, store);
-		Hash h = v.getHash();
-
-		// Written to the target file only; old file untouched
-		assertNotNull(store.getTargetEtch().read(h));
-		assertNull(store.getEtch().read(h));
-
-		// Readable through the store (target-first read path)
-		assertEquals(v, store.refForHash(h).getValue());
-		cleanup(store);
-	}
-
-	@Test
-	public void testReadsFallBackToOldFile() throws IOException {
-		File f = File.createTempFile("gc3a-fallback", ".etch");
-		f.deleteOnExit();
-
-		AString v = nonEmbedded(11);
-		{
-			EtchStore store = EtchStore.create(f);
-			Cells.persist(v, store);
-			store.flush();
-			store.close();
-		}
-
-		EtchStore store = EtchStore.create(f); // cold caches
-		store.startGC();
-
-		// Old data resolves via fallback
-		Ref<ACell> r = store.refForHash(v.getHash());
-		assertNotNull(r);
-		assertEquals(v, r.getValue());
-
-		// No copy-on-read: the fallback must not populate the target
-		assertNull(store.getTargetEtch().read(v.getHash()));
-		cleanup(store);
-	}
-
-	/**
-	 * The INV-1 core: during a cycle, entries in the old file must not satisfy
-	 * a persist — the descent must copy the whole tree into the target.
-	 */
-	@Test
-	public void testPersistDuringCycleCopiesFromOldFile() throws IOException {
-		File f = File.createTempFile("gc3a-inv1", ".etch");
-		f.deleteOnExit();
-
-		AVector<ACell> t = tree(20);
-		Hash rootHash = t.getHash();
-		{
-			EtchStore store = EtchStore.create(f);
-			Cells.persist(t, store);
-			store.flush();
-			store.close();
-		}
-
-		EtchStore store = EtchStore.create(f); // cold caches: values resolvable only via old file
-		store.startGC();
-
-		// Persist via a lazy root ref: values load from the old file, but the
-		// old-file PERSISTED entries must not short-circuit the copy
-		Ref<ACell> lazy = RefSoft.createForHash(rootHash, store);
-		Ref<ACell> out = store.storeTopRef(lazy, Ref.PERSISTED, null);
-		assertTrue(out.getStatus() >= Ref.PERSISTED);
-
-		// Entire tree present in the TARGET file at PERSISTED
+		assertThrows(IllegalStateException.class, store::startGC); // double start rejected
 		Etch targetEtch = store.getTargetEtch();
-		List<Hash> hashes = new ArrayList<>();
-		hashes.add(rootHash);
-		collectBranchHashes(tree(20), hashes); // equal value, same hashes
-		for (Hash h : hashes) {
-			RefSoft<?> tr = targetEtch.read(h);
-			assertNotNull(tr, "Tree entry not copied to GC target: " + h);
-			assertTrue(tr.getStatus() >= Ref.PERSISTED);
-		}
-
-		// Repeat persist prunes on target-resident entries: no bytes written
-		long len = targetEtch.getDataLength();
-		store.storeTopRef(RefSoft.createForHash(rootHash, store), Ref.PERSISTED, null);
-		assertEquals(len, targetEtch.getDataLength());
-		cleanup(store);
-	}
-
-	@Test
-	public void testStartGCGuards() throws IOException {
-		EtchStore store = EtchStore.createTemp("gc3a-guards");
-		store.startGC();
-		assertThrows(IllegalStateException.class, store::startGC);
-		cleanup(store);
-
-		// A stale target file must not be silently adopted or deleted
-		EtchStore store2 = EtchStore.createTemp("gc3a-stale");
-		File stale = new File(store2.getFile().getCanonicalPath() + "~");
-		assertTrue(stale.createNewFile());
-		stale.deleteOnExit();
-		assertThrows(IllegalStateException.class, store2::startGC);
-		store2.close();
-	}
-
-	@Test
-	public void testRootDataDuringCycle() throws IOException {
-		EtchStore store = EtchStore.createTemp("gc3a-root");
-
-		AString v0 = nonEmbedded(31);
-		store.setRootData(v0);
-		store.startGC();
 
 		// Root hash carried into the target at cycle start
 		assertEquals(v0.getHash(), store.getRootHash());
-		assertEquals(v0.getHash(), store.getTargetEtch().getRootHash());
+		assertEquals(v0.getHash(), targetEtch.getRootHash());
 
-		// A root update during the cycle: hash and full tree land in the target
-		AVector<ACell> t = tree(40);
-		store.setRootData(t);
-		assertEquals(t.getHash(), store.getRootHash());
-		assertEquals(t.getHash(), store.getTargetEtch().getRootHash());
+		// ----- Read fallback: old data resolves (caches are cold), no copy-on-read -----
+		Ref<ACell> r1 = store.refForHash(t1.getHash());
+		assertNotNull(r1);
+		assertEquals(t1, r1.getValue());
+		assertNull(targetEtch.read(t1.getHash()), "Read fallback must not populate the target");
 
-		List<Hash> hashes = new ArrayList<>();
-		hashes.add(t.getHash());
-		collectBranchHashes(t, hashes);
-		for (Hash h : hashes) {
-			RefSoft<?> tr = store.getTargetEtch().read(h);
-			assertNotNull(tr, "Root tree entry not in GC target: " + h);
-			assertTrue(tr.getStatus() >= Ref.PERSISTED);
-		}
+		// ----- Write redirection: new data lands in the target only -----
+		AString v2 = nonEmbedded(20);
+		Cells.persist(v2, store);
+		assertNotNull(targetEtch.read(v2.getHash()));
+		assertNull(store.getEtch().read(v2.getHash()), "Old file must not receive writes");
+		assertEquals(v2, store.refForHash(v2.getHash()).getValue());
+
+		// ----- INV-1 core: old-file entries must not satisfy a persist; the
+		// descent must copy the whole tree into the target -----
+		Ref<ACell> out = store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
+		assertTrue(out.getStatus() >= Ref.PERSISTED);
+		assertAllInEtch(targetEtch, treeHashes(t1), Ref.PERSISTED);
+
+		// Repeat persist prunes on target-resident entries: no bytes written
+		long len = targetEtch.getDataLength();
+		store.storeTopRef(RefSoft.createForHash(t1.getHash(), store), Ref.PERSISTED, null);
+		assertEquals(len, targetEtch.getDataLength());
+
+		// ----- Root update during the cycle: hash and full tree land in the target -----
+		AVector<ACell> t3 = tree(30);
+		store.setRootData(t3);
+		assertEquals(t3.getHash(), store.getRootHash());
+		assertEquals(t3.getHash(), targetEtch.getRootHash());
+		assertAllInEtch(targetEtch, treeHashes(t3), Ref.PERSISTED);
 
 		// The old file's root is never touched during a cycle
 		assertEquals(v0.getHash(), store.getEtch().getRootHash());
-		cleanup(store);
-	}
 
-	@Test
-	public void testCloseDuringCycleClosesBoth() throws IOException {
-		EtchStore store = EtchStore.createTemp("gc3a-close");
-		store.startGC();
-		Cells.persist(nonEmbedded(51), store);
-		Etch targetEtch = store.getTargetEtch();
-		targetEtch.getFile().deleteOnExit();
-		store.getEtch().getFile().deleteOnExit();
-
+		// ----- close() closes both files; idempotent -----
 		store.close();
-		store.close(); // idempotent
-
-		// Uncached reads fail cleanly on the closed store...
+		store.close();
 		assertThrows(StoreException.class,
-				() -> store.refForHash(nonEmbedded(52).getHash()));
-		// ...and the target file is genuinely closed too
+				() -> store.refForHash(nonEmbedded(99).getHash()));
 		assertThrows(IOException.class,
-				() -> targetEtch.read(nonEmbedded(52).getHash()));
+				() -> targetEtch.read(nonEmbedded(99).getHash()));
+
+		// ----- Reopen the same files: an abandoned cycle loses nothing -----
+		// Old file: exactly the pre-cycle state (root v0, t1 present, v2 absent)
+		EtchStore reopened = EtchStore.create(f);
+		assertEquals(v0.getHash(), reopened.getRootHash());
+		assertEquals(v0, reopened.getRootData());
+		assertAllInEtch(reopened.getEtch(), treeHashes(t1), Ref.PERSISTED);
+		assertNull(reopened.getEtch().read(v2.getHash()));
+
+		// The abandoned target blocks a new cycle until recovery deals with it
+		assertThrows(IllegalStateException.class, reopened::startGC);
+		reopened.close();
+
+		// Target file: everything written during the cycle is durably there —
+		// exactly what a recovery roll-back (phase 3e) needs
+		EtchStore targetStore = EtchStore.create(new File(f.getCanonicalPath() + "~"));
+		assertEquals(t3.getHash(), targetStore.getRootHash());
+		assertEquals(t3, targetStore.getRootData());
+		assertEquals(v2, targetStore.refForHash(v2.getHash()).getValue());
+		assertAllInEtch(targetStore.getEtch(), treeHashes(t1), Ref.PERSISTED);
+		assertAllInEtch(targetStore.getEtch(), treeHashes(t3), Ref.PERSISTED);
+		targetStore.close();
 	}
 }
