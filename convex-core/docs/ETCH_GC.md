@@ -566,9 +566,17 @@ restart:              recovery installs the marker-named file as f; steady state
 ```
 
 Renaming is awkward on Windows: memory-mapped files cannot be renamed or deleted while
-mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer` — so
-in-process deletions may be deferred (tombstones make that safe) and the rename back to
-`f` happens at startup, before anything is mapped.
+mappings exist, and Java offers no reliable explicit unmap for `MappedByteBuffer` — the
+mapping dies only when the buffer is garbage collected. So in-process deletions may be
+deferred (tombstones make that safe) and the rename back to `f` happens at startup,
+before anything is mapped. Deferral is temporary even without a restart: `startGC()`'s
+name scan retries deletion of tombstoned files (whose buffers have typically been GC'd
+by the next cycle) and reuses their names, so on Windows the generation numbers stay
+small — roughly the number of cycles that run before the JVM collects the previous
+store's buffers, not one per cycle — and pinned garbage is reclaimed in-process rather
+than only at restart. (A future migration of Etch's region management to the FFM API's
+`Arena`-scoped mapping would make unmapping deterministic and remove the deferral
+entirely.)
 
 **Automatic recovery — implemented (July 2026, phase 3e)**: `EtchStore.create(file)`
 calls `EtchUtils.recover(file)` before mapping anything. Recovery reconciles every

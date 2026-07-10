@@ -129,12 +129,26 @@ public class EtchStore extends ACachedStore {
 
 		// Generational target naming OFF THE BASE FILE (bounded on long-running
 		// servers: base~, base~1, ... — never nested base~~). An existing target
-		// file is either stale (interrupted cycle: may hold data, so it must be
-		// neither adopted nor deleted — recovery's concern) or a cancelled
-		// target pinned by mapped buffers (Windows). Skip to the first free name
+		// file is either live/stale (must be neither adopted nor deleted —
+		// recovery's concern) or defunct (tombstoned: superseded or cancelled,
+		// contents verifiably elsewhere). Defunct files pinned by mappings
+		// (Windows) become deletable once their buffers are garbage collected,
+		// so retry their deletion here and reuse the name — this keeps
+		// generation numbers small and reclaims their disk without needing a
+		// process restart
 		String base = baseFile.getCanonicalPath() + "~";
 		File temp = new File(base);
-		for (int i = 1; temp.exists(); i++) {
+		for (int i = 1; ; i++) {
+			if (!temp.exists()) {
+				// clean up any orphaned tombstone left by a partially-deferred deletion
+				new File(temp.getPath() + ".gc-defunct").delete();
+				break;
+			}
+			File tomb = new File(temp.getPath() + ".gc-defunct");
+			if (tomb.exists() && temp.delete()) {
+				tomb.delete();
+				break; // reclaimed a defunct file's name (and its disk space)
+			}
 			if (i >= 100) throw new IllegalStateException("Too many stale GC target files: " + base);
 			temp = new File(base + i);
 		}
