@@ -10,21 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AString.isBlank()` — allocation-free blank test on UTF-8 bytes.
-- `StoreTransfer.transfer`/`verify` and `EtchUtils.migrate` — composable primitives for moving lattice data between stores and verifying completeness.
-- Etch online garbage collection: `EtchStore.startGC`/`transferGC`/`verifyGC`/`completeGC`/`cancelGC` rebuild a garbage-collected store while running, with explicit user-controlled cutover (see `convex-core/docs/ETCH_GC.md`).
-- Etch stores automatically recover GC state at startup: completed cutovers (including chains from multiple successive GCs) are adopted under the original file name, and abandoned cycles are rolled back so nothing written during them is lost.
-- CLI: `convex etch gc`, `convex etch migrate` and `convex etch recover` subcommands for offline store collection, store-to-store migration and explicit GC recovery.
-- `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network: sync, deterministic replay, migration application and a real boundary crossing, with classified state-diff diagnostics and coin-supply conservation checks.
+- Etch online garbage collection: reclaim unreachable store data while running, with crash-safe recovery (see `convex-core/docs/ETCH_GC.md`).
+- CLI: `convex etch gc`, `migrate` and `recover` subcommands for offline store collection, migration and recovery.
+- `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network with state-diff and coin-supply checks.
 
 ### Changed
 
 - Fresh local/test networks launch at the latest protocol version by default (all migrations applied at genesis); pin lower with `--protocol-version` (CLI) or `:protocol-version` (peer config).
-- Etch reads are now fully lock-free: chain scans use optimistic revalidation instead of a lock, with publication ordering and memory fences making index restructuring safe for concurrent readers on weakly-ordered hardware.
+- Etch reads are now fully lock-free.
 
 ### Fixed
 
-- Etch: cross-store writes no longer record Ref status earned in a different store, and refs bound to a different store are never returned or cached.
-- Etch: reads on a closed or failing store throw `StoreException` instead of silently reporting values as absent.
+- Etch: cross-store writes no longer copy Ref status earned in a different store.
+- Etch: reads on a closed or failing store throw `StoreException` instead of reporting values as absent.
 
 ## [0.8.8] - 2026-07-09
 
