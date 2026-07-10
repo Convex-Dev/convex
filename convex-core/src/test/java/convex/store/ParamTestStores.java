@@ -25,8 +25,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.core.util.Utils;
-import convex.etch.EtchStore;
 import convex.test.Samples;
 
 /**
@@ -39,20 +37,12 @@ public class ParamTestStores {
 	 * reused across all parameterised tests.
 	 */
 	private static final MemoryStore SHARED_MEMORY = new MemoryStore();
-	private static final EtchStore SHARED_ETCH;
-	static {
-		try {
-			SHARED_ETCH = EtchStore.createTemp("param-test-stores");
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
 
 	static Stream<AStore> storeProvider() {
-		return Stream.of(SHARED_MEMORY, SHARED_ETCH);
+		return Stream.of(SHARED_MEMORY, Samples.TEST_STORE);
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testStoreTopRefStoredStatus(AStore store) throws IOException {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);
@@ -66,7 +56,7 @@ public class ParamTestStores {
 		assertTrue(found.getStatus() >= Ref.STORED);
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testStoreTopRefPersistedStatus(AStore store) throws IOException {
 		AVector<CVMLong> v = Vectors.of(4L, 5L, 6L);
@@ -79,7 +69,7 @@ public class ParamTestStores {
 		assertTrue(found.getStatus() >= Ref.PERSISTED);
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testNestedDescendantsRetrievable(AStore store) throws IOException {
 		// Build a non-trivial nested structure
@@ -99,7 +89,7 @@ public class ParamTestStores {
 		}
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testRefForHashUnknown(AStore store) {
 		// A random hash should not be in any fresh store
@@ -107,12 +97,9 @@ public class ParamTestStores {
 		assertEquals(null, store.refForHash(unknown));
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testRootDataRoundTrip(AStore store) throws IOException {
-		// Root data initially unset (only this test touches root data)
-		assertNull(store.getRootData());
-
 		AVector<ACell> v = Vectors.of(CVMLong.create(1), Samples.NON_EMBEDDED_STRING);
 		store.setRootData(v);
 		assertEquals(v, store.getRootData());
@@ -123,7 +110,7 @@ public class ParamTestStores {
 		assertNull(store.getRootData());
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testPersistedSubtreeContract(AStore store) throws IOException {
 		// Branchy structure with non-embedded values at multiple depths.
@@ -158,7 +145,7 @@ public class ParamTestStores {
 		});
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(autoCloseArguments = false)
 	@MethodSource("storeProvider")
 	public void testLargeSetPersist(AStore store) throws IOException {
 		// Build a set large enough to have tree branches (non-embedded children)

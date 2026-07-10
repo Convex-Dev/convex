@@ -22,6 +22,7 @@ import convex.core.data.RefSoft;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.test.Samples;
 
 /**
  * Regression tests for the store status integrity invariant:
@@ -47,19 +48,11 @@ import convex.core.data.prim.CVMLong;
 public class EtchStatusIntegrityTest {
 
 	/**
-	 * Shared test stores: each test uses values with distinct seeds, so tests
-	 * remain independent without creating stores per test.
+	 * Global shared test stores: each test uses values with distinct seeds, so
+	 * tests remain independent without creating stores of their own.
 	 */
-	private static final EtchStore SOURCE;
-	private static final EtchStore DEST;
-	static {
-		try {
-			SOURCE = EtchStore.createTemp("etch-status-src");
-			DEST = EtchStore.createTemp("etch-status-dst");
-		} catch (IOException e) {
-			throw new Error(e);
-		}
-	}
+	private static final EtchStore SOURCE = Samples.TEST_STORE;
+	private static final EtchStore DEST = Samples.TEST_STORE2;
 
 	/**
 	 * Creates a distinct non-embedded string for the given seed.

@@ -50,15 +50,7 @@ import convex.test.Samples;
 public class EtchStoreTest {
 
 	private static final Hash BAD_HASH = Samples.BAD_HASH;
-	private static EtchStore store;
-	
-	static {
-		try {
-			store=EtchStore.createTemp();
-		} catch (IOException e) {
-			throw new Error(e);
-		}
-	}
+	private static EtchStore store = Samples.TEST_STORE;
 
 	@Test
 	public void testEmptyStore() throws IOException {

@@ -45,20 +45,12 @@ import convex.test.Samples;
 public class EtchRobustnessTest {
 
 	/**
-	 * Shared test stores: each test uses values with distinct seeds, so tests
-	 * remain independent without creating stores per test. Tests of file
-	 * lifecycle (reopen/close) necessarily use their own file-backed stores.
+	 * Global shared test stores: each test uses values with distinct seeds, so
+	 * tests remain independent without creating stores of their own. Tests of
+	 * file lifecycle (reopen/close) necessarily use their own file-backed stores.
 	 */
-	private static final EtchStore STORE;
-	private static final EtchStore STORE2;
-	static {
-		try {
-			STORE = EtchStore.createTemp("etch-robustness");
-			STORE2 = EtchStore.createTemp("etch-robustness-2");
-		} catch (IOException e) {
-			throw new Error(e);
-		}
-	}
+	private static final EtchStore STORE = Samples.TEST_STORE;
+	private static final EtchStore STORE2 = Samples.TEST_STORE2;
 
 	/**
 	 * Creates a distinct non-embedded string for the given seed.
