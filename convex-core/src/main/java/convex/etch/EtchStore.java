@@ -2,13 +2,13 @@ package convex.etch;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.ClosedChannelException;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.exceptions.StoreException;
 import convex.core.store.ACachedStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
@@ -114,19 +114,18 @@ public class EtchStore extends ACachedStore {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
-		try {
-			Ref<ACell> existing = checkCache(hash);
-			if (existing != null)
-				return (Ref<T>) existing;
-
-			if (hash == Hash.NULL_HASH)
-				return (Ref<T>) Ref.NULL_VALUE;
-			existing = readStoreRef(hash);
+		Ref<ACell> existing = checkCache(hash);
+		if (existing != null)
 			return (Ref<T>) existing;
-		} catch (ClosedChannelException e) {
-			return null;
+
+		if (hash == Hash.NULL_HASH)
+			return (Ref<T>) Ref.NULL_VALUE;
+		try {
+			return readStoreRef(hash);
 		} catch (IOException e) {
-			return null;
+			// Includes ClosedChannelException. A failed read is a fundamental store
+			// failure: it must never be reported as the value being absent
+			throw new StoreException("Store read failed: " + shortName(), e);
 		}
 	}
 

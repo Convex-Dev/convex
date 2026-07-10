@@ -36,7 +36,7 @@ implementations (see [Generalisation](#generalisation-to-other-lattice-stores)).
    - The live user (peer operator / embedding application) is responsible for ensuring
      transfer is complete before closing the old store.
    - `Ref`s to values persisted only in the old store *may* become invalid (throw
-     `MissingDataException`) once the old store is closed. Callers must not retain
+     `StoreException` on read) once the old store is closed. Callers must not retain
      references to unreachable ("old") values across cutover.
 
 ## Non-goals
@@ -175,9 +175,20 @@ IDLE ─────────────▶ COLLECTING ───────
 
 After cutover the retired store remains open and readable — refs bound to it keep
 resolving, against both files — until the user closes it. Once it is closed, refs bound
-to it throw `MissingDataException`, *even for values that were migrated* (the ref's
-store pointer is dead, not the data). All transferred values remain retrievable by hash
-from the new store. This is the "don't hang on to old things at cutover" contract.
+to it throw `StoreException` on any uncached read, *even for values that were migrated*
+(the ref's store pointer is dead, not the data). Values still soft-reachable in memory
+or in the closed store's cache may continue to resolve until reclaimed — immutable data
+cannot be stale. All transferred values remain retrievable by hash from the new store.
+This is the "don't hang on to old things at cutover" contract, and the error names the
+real cause (store closed) rather than masquerading as missing data.
+
+The three-state read contract (July 2026, `StoreException` + `EtchStore.refForHash`):
+`null` = proven absent; `MissingDataException` = the store looked and the value is not
+there; `StoreException` (unchecked) = the store cannot look (closed, or IO failure). A
+failed read is a fundamental failure of code or infrastructure assumptions — it is never
+evidence of absence, and application code should not attempt to handle it. `refForHash`
+stays lightweight: no pre-flight liveness check, the exception arises only when a read
+actually fails.
 
 **Carrying a ref across is a persist, not a pointer swap.** `RefSoft.withStore` only
 rebinds the store pointer; it moves no data, and the ref's status flags (`PERSISTED`
@@ -416,8 +427,9 @@ What is *not* transferred, by design:
   stale Belief fragments, orphaned message data.
 
 Callers holding `RefSoft`s to such values keep working while the soft reference is alive
-and while the old file remains open, and get `MissingDataException` afterwards. This is
-the documented contract.
+and while the old file remains open; afterwards they get `MissingDataException` (store
+open, value genuinely absent) or `StoreException` (store closed). This is the documented
+contract.
 
 ### Phase 4: cutover — `completeGC()`
 
@@ -603,10 +615,10 @@ Required fixes to existing code (bugs once GC is actually used):
   data may be missing from the target → `MissingDataException` at runtime. Documented
   contract; `verifyGC()` exists precisely so users can check first.
 - **Refs held across cutover**: any ref bound to the retired store fails with
-  `MissingDataException` once that store is closed — even if its value was migrated (the
-  binding is dead, not the data). Remedy: re-persist the value into the new store while
-  it is still resolvable (recursive, ensures children), or re-fetch by hash if it was
-  transferred. Documented contract (per requirements).
+  `StoreException` on uncached reads once that store is closed — even if its value was
+  migrated (the binding is dead, not the data). Remedy: re-persist the value into the
+  new store while it is still resolvable (recursive, ensures children), or re-fetch by
+  hash if it was transferred. Documented contract (per requirements).
 - **Naive `withStore` rebinding**: rebinding a ref to the new store without persisting
   its tree produces a ref whose flags claim data the store does not hold — a latent
   `MissingDataException` (or worse, a false `PERSISTED` claim propagated onwards).
@@ -691,9 +703,11 @@ pure characterisation, protecting the "required fixes" refactors:
 5. **Reopen durability** — write entries + root, `flush()`, `close()`, reopen the same
    file: entries, flags and root intact. Existing tests only ever use fresh temp files;
    the file lifecycle work (adoption, roll-back) needs reopen semantics pinned first.
-6. **Closed-store contract** — refs bound to a closed `EtchStore` throw
-   `MissingDataException` (today `readStoreRef` maps `ClosedChannelException` to a null
-   ref). This is the cutover failure mode; pin it explicitly.
+6. **Closed-store contract** — the three-state read contract: uncached reads on a
+   closed `EtchStore` throw `StoreException`, cache hits still serve, absence on a live
+   store gives null/`MissingDataException`. (Originally `readStoreRef` mapped
+   `ClosedChannelException` to a null ref, making a closed store indistinguishable from
+   an empty one — fixed July 2026.) This is the cutover failure mode; pinned explicitly.
 7. **Concurrent writers** — parallel `storeRef` from multiple threads into one store
    (executor + futures, no sleeps per repo conventions); all values readable,
    `FullValidator` clean. Pins the thread-safety the background sweep leans on.

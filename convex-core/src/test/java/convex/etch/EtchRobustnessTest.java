@@ -28,6 +28,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.StoreException;
 import convex.test.Samples;
 
 /**
@@ -183,6 +184,11 @@ public class EtchRobustnessTest {
 		reopened.close();
 	}
 
+	/**
+	 * Three-state read contract: null = proven absent, MissingDataException =
+	 * store looked and the value is not there, StoreException = the store cannot
+	 * look (closed / IO failure). A failed read must never masquerade as absence.
+	 */
 	@Test
 	public void testClosedStoreContract() throws IOException {
 		File f = File.createTempFile("etch-close", ".etch");
@@ -201,14 +207,24 @@ public class EtchRobustnessTest {
 		// Fresh store instance with cold caches
 		EtchStore reopened = EtchStore.create(f);
 		Ref<ACell> lazy1 = RefSoft.createForHash(v1.getHash(), reopened);
-		assertEquals(v1, lazy1.getValue());
+		assertEquals(v1, lazy1.getValue()); // populates the store cache
+
+		// Genuinely absent value on a live store: null / missing semantics
+		Hash absent = nonEmbedded(43).getHash();
+		assertNull(reopened.refForHash(absent));
+		assertThrows(MissingDataException.class,
+				() -> RefSoft.createForHash(absent, reopened).getValue());
+
 		reopened.close();
 
-		// After close: uncached lookups fail cleanly, refs report missing data
-		assertNull(reopened.refForHash(v2.getHash()));
+		// Cached values may still be served after close (no IO required)
+		assertNotNull(reopened.refForHash(v1.getHash()));
+
+		// Uncached lookups need IO: fundamental failure, never "absent"
+		assertThrows(StoreException.class, () -> reopened.refForHash(v2.getHash()));
 		Ref<ACell> lazy2 = RefSoft.createForHash(v2.getHash(), reopened);
-		assertTrue(lazy2.isMissing());
-		assertThrows(MissingDataException.class, lazy2::getValue);
+		assertThrows(StoreException.class, lazy2::getValue);
+		assertThrows(StoreException.class, lazy2::isMissing);
 	}
 
 	@Test
