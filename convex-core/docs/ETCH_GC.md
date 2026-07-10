@@ -727,6 +727,52 @@ The transfer/migrate primitives are likewise store-agnostic: anything implementi
 INV-1 is the portable core: it removes the need for a visited-set or mark bitmap, which
 is what makes online copying collection cheap enough for a live peer.
 
+## Runnable example
+
+`convex.core.examples.EtchGCExample` (test source tree, not part of the suite) exercises
+a full online GC cycle under concurrent load and verifies the result end-to-end. Run it
+with:
+
+```
+mvn -pl convex-core test-compile exec:java -Dexec.classpathScope=test \
+    -Dexec.mainClass=convex.core.examples.EtchGCExample
+```
+
+~20 seconds: 4 writers continuously update a shared lattice root (superseding their
+payloads — the garbage), 4 readers verify every store read against an in-memory model
+throughout, and the cycle (`startGC` → `transferGC` → `verifyGC` → `completeGC`) runs
+mid-stream, including a deliberate window where workers keep using the old handle after
+cutover (the legacy-view handover) and a second, quiescent cycle at the end. Everything
+unexpected throws noisily; verification covers new-file-only completeness, root ≡ model,
+deterministic payload recomputation, sampled pre-cycle garbage absence, and successors
+surviving their predecessors' close. Typical trace:
+
+```
+[  5025ms] Before GC: old file 6,772,215 bytes | 12,796 payload writes | 6,398 root updates
+[  5133ms] startGC(): writes now redirect to target
+[  7137ms] transferGC() swept root tree in 0 ms
+[ 10140ms] VERIFY completeness sticky under live traffic: OK
+[ 10150ms] completeGC(): successor store - workers still using the OLD handle (legacy view)
+[ 16154ms] Workers stopped: 41,644 payload writes | 34,975 reads (34,975 verified)
+[ 16159ms] VERIFY garbage collected - 12,792/12,792 sampled pre-cycle values absent: OK
+[ 16167ms] SPACE: quiescent GC 21,740,770 bytes -> 525,641 bytes (97.58% reclaimed)
+[ 16205ms] RESULT: PASS - final state correct and complete
+```
+
+Three instructive observations from the run, worth knowing before interpreting GC
+behaviour on a live system:
+
+- **The sweep can be near-instant.** Under a high root-update rate, the cycle write path
+  lands the entire live set in the target before the sweep even runs — `transferGC()`
+  then finds everything INV-1-pruned. The sweep is a completeness *guarantee*, not
+  necessarily where the copying work happens.
+- **The busy-cycle file is usually LARGER than the original — by design.** Everything
+  persisted after `startGC()` is retained (retention contract), which under sustained
+  write load dwarfs the collected pre-cycle garbage. The true reclamation figure comes
+  from a quiescent cycle (writers idle): the example's second cycle reclaims ~97%.
+- **~512 KiB is the floor for any Etch file** (the level-0 index block of 65,536 8-byte
+  slots); a "fully collected" store never shrinks below that.
+
 ## Testing plan
 
 Test-first: the phases below are ordered so that each lands *before* the code it
