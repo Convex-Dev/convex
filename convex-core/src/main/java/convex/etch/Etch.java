@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -139,7 +140,7 @@ public class Etch {
 	 */
 	private final ArrayList<MappedByteBuffer> regionMap=new ArrayList<>();
 
-	private long dataLength=0;
+	private volatile long dataLength=0;
 
 	private boolean BUILD_CHAINS=true;
 	private EtchStore store;
@@ -422,11 +423,14 @@ public class Etch {
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=rawPointer(movingSlotValue); // just the raw pointer
 				rewriteExistingData(newIndexPos,nextLevel,dp);
-				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
-			// finally update this index with the new index pointer
+			// publish the complete new index block BEFORE clearing the old chain:
+			// lock-free readers then see either the intact chain or the new block
 			writeSlot(indexPosition,digit,newIndexPos|PTR_INDEX);
+			for (int j=1; j<i; j++) {
+				writeSlot(indexPosition,(digit+j)&mask,0L); // clear the old chain
+			}
 			return ref;
 		} else if (type==PTR_CHAIN) {
 			// need to collapse existing chain
@@ -442,10 +446,14 @@ public class Etch {
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=rawPointer(movingSlotValue); // just the raw pointer
 				rewriteExistingData(newIndexPos,nextLevel,dp);
-				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
+			// publish the complete new index block BEFORE clearing the old chain:
+			// lock-free readers then see either the intact chain or the new block
 			writeSlot(indexPosition,chainStartDigit,newIndexPos|PTR_INDEX);
+			for (int j=1; j<n; j++) {
+				writeSlot(indexPosition,(chainStartDigit+j)&mask,0L); // clear the old chain
+			}
 
 			// write to the current slot
 			return writeNewData(indexPosition,digit,key,ref,PTR_PLAIN);
@@ -791,6 +799,9 @@ public class Etch {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
 		MappedByteBuffer mbb=seekMap(pointerIndex);
 		long pointer=mbb.getLong();
+		// Order subsequent reads after the slot load (pairs with writeSlot's release
+		// fence): anything a published pointer references is fully visible
+		VarHandle.acquireFence();
 		return pointer;
 	}
 
@@ -855,6 +866,9 @@ public class Etch {
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position=indexPosition+digit*POINTER_SIZE;
 		MappedByteBuffer mbb=seekMap(position);
+		// Publish all preceding writes (appended data, new index blocks) before the
+		// slot store becomes visible to lock-free readers (pairs with readSlot)
+		VarHandle.releaseFence();
 		mbb.putLong(slotValue);
 	}
 	
@@ -918,18 +932,24 @@ public class Etch {
 			// continuation of chain from some previous index, therefore key can't be present
 			return -1;
 		} else if (type==PTR_START) {
-			synchronized (this) {
-				// start of chain, so scan chain of entries
-				int i=0;
-				while (i<isize) {
-					long ptr=slotValue&(~TYPE_MASK);
-					if (checkMatchingKey(key,ptr)) return ptr;
+			// Optimistic lock-free chain scan. A concurrent collapse publishes its
+			// new index block into the start slot BEFORE clearing chain entries, so
+			// on a miss we revalidate the start slot and retry if it changed. Slot
+			// transitions are one-way (PLAIN -> START -> INDEX), bounding retries.
+			long startValue=slotValue;
+			int i=0;
+			while (i<isize) {
+				long ptr=slotValue&(~TYPE_MASK);
+				if (checkMatchingKey(key,ptr)) return ptr;
 
-					i++; // advance to next position
-					slotValue=readSlot(indexPosition,(digit+i)&mask);
-					type=(slotValue&TYPE_MASK);
-					if (!(type==PTR_CHAIN)) return -1; // reached end of chain
-				}
+				i++; // advance to next position
+				slotValue=readSlot(indexPosition,(digit+i)&mask);
+				type=(slotValue&TYPE_MASK);
+				if (!(type==PTR_CHAIN)) break; // reached end of chain
+			}
+			if (readSlot(indexPosition,digit)!=startValue) {
+				// chain restructured during our scan: retry at this position
+				return seekPosition(key,level,indexPosition);
 			}
 			return -1;
 		} else {

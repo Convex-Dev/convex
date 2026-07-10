@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Fresh local/test networks launch at the latest protocol version by default (all migrations applied at genesis); pin lower with `--protocol-version` (CLI) or `:protocol-version` (peer config).
+- Etch reads are now fully lock-free: chain scans use optimistic revalidation instead of a lock, with publication ordering and memory fences making index restructuring safe for concurrent readers on weakly-ordered hardware.
 
 ### Fixed
 
