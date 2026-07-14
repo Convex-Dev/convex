@@ -355,11 +355,11 @@ public class LatticeCursorTest {
 
 		// With context
 		LatticeContext ctx = LatticeContext.create(CVMLong.create(1000), null);
-		ALatticeCursor<ASet<CVMLong>> withCtx = root.withContext(ctx);
-		assertEquals(ctx, withCtx.getContext());
+		ALatticeCursor<ASet<CVMLong>> configured = root.setContext(ctx);
+		assertEquals(ctx, configured.getContext());
 
-		// Fork inherits context
-		ALatticeCursor<ASet<CVMLong>> fork = withCtx.fork();
+		// Fork snapshots context
+		ALatticeCursor<ASet<CVMLong>> fork = configured.fork();
 		assertEquals(ctx, fork.getContext());
 	}
 

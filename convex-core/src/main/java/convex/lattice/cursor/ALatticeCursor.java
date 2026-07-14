@@ -37,19 +37,23 @@ import convex.lattice.LatticeOps;
 public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V> {
 
 	protected final ALattice<V> lattice;
+	/**
+	 * Local context override. A {@code null} value means this cursor inherits its
+	 * context from its parent (or {@link LatticeContext#EMPTY} at the root).
+	 */
 	protected volatile LatticeContext context;
 
 	/**
 	 * Creates a lattice cursor with the given lattice and context.
 	 *
 	 * @param lattice The lattice defining merge semantics (may be null)
-	 * @param context The merge context (null defaults to EMPTY)
+	 * @param context Local merge-context override, or null to inherit
 	 * @param initialValue Initial value for the cursor (may be null)
 	 */
 	protected ALatticeCursor(ALattice<V> lattice, LatticeContext context, V initialValue) {
 		super(initialValue);
 		this.lattice = lattice;
-		this.context = (context != null) ? context : LatticeContext.EMPTY;
+		this.context = context;
 	}
 
 	/**
@@ -61,21 +65,41 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	}
 
 	/**
-	 * Gets the merge context for this cursor.
+	 * Gets the effective merge context for this cursor.
 	 * @return The current lattice context (never null)
 	 */
 	public LatticeContext getContext() {
-		return context;
+		LatticeContext local = context;
+		return (local != null) ? local : getInheritedContext();
 	}
 
 	/**
-	 * Sets a new context for this cursor and returns this cursor.
-	 * @param context New context to use (must not be null)
+	 * Gets the context inherited when this cursor has no local override.
+	 * Child cursors override this to resolve their parent's current context.
+	 *
+	 * @return Inherited context, never null
+	 */
+	protected LatticeContext getInheritedContext() {
+		return LatticeContext.EMPTY;
+	}
+
+	/**
+	 * Sets this cursor's local context override and returns this cursor.
+	 * Passing null clears the override, restoring inheritance from the parent.
+	 * @param context New local context override, or null to inherit
 	 * @return This cursor with updated context
 	 */
-	public ALatticeCursor<V> withContext(LatticeContext context) {
+	public ALatticeCursor<V> setContext(LatticeContext context) {
 		this.context = context;
 		return this;
+	}
+
+	/**
+	 * @deprecated This method mutates the cursor. Use {@link #setContext(LatticeContext)}.
+	 */
+	@Deprecated
+	public ALatticeCursor<V> withContext(LatticeContext context) {
+		return setContext(context);
 	}
 
 	/**
@@ -85,7 +109,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	 * @return A new forked cursor with local storage
 	 */
 	public ALatticeCursor<V> fork() {
-		return new ForkedLatticeCursor<>(this, lattice, get(), context);
+		return new ForkedLatticeCursor<>(this, lattice, get(), getContext());
 	}
 
 	/**
@@ -110,7 +134,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 		if (lattice == null) {
 			throw new UnsupportedOperationException("Cannot merge without a lattice");
 		}
-		return updateAndGet(current -> lattice.merge(context, current, other));
+		return updateAndGet(current -> lattice.merge(getContext(), current, other));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -190,9 +214,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 				// Close off accumulated keys first, so the boundary cursor wraps the
 				// correct base. Built exactly once — no re-wrap on the write path.
 				if (i > segStart) {
-					cursor = new DescendedCursor<>(cursor, keys, segStart, i, (ALattice) lat, context);
+					cursor = new DescendedCursor<>(cursor, keys, segStart, i, (ALattice) lat, null);
 				}
-				cursor = lat.createPathCursor(cursor, keys[i], context);
+				cursor = lat.createPathCursor(cursor, keys[i], null);
 				// A virtual boundary key (e.g. :value) is consumed; a transparent
 				// boundary leaves the key to navigate below the wrapper.
 				segStart = lat.consumesPathKey(keys[i]) ? i + 1 : i;
@@ -205,7 +229,7 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 
 		// Flush remaining collapsed keys
 		if (segStart < end) {
-			cursor = new DescendedCursor<>(cursor, keys, segStart, end, (ALattice) lat, context);
+			cursor = new DescendedCursor<>(cursor, keys, segStart, end, (ALattice) lat, null);
 		}
 
 		return (ALatticeCursor<T>) cursor;

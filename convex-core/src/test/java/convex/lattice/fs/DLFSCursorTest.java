@@ -178,7 +178,7 @@ public class DLFSCursorTest {
 			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
 
 		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		dlfsCursor.withContext(ctx);
+		dlfsCursor.setContext(ctx);
 		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
 		DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 
@@ -224,7 +224,7 @@ public class DLFSCursorTest {
 			Cursors.createLattice(rootLattice, (Index<Keyword, ACell>) Index.EMPTY, ctx);
 
 		ALatticeCursor<?> dlfsCursor = rootCursor.path(DLFS_KW);
-		dlfsCursor.withContext(ctx);
+		dlfsCursor.setContext(ctx);
 		ALatticeCursor<?> userCursor = dlfsCursor.path(ak, Keywords.VALUE);
 		final DLFSLocal dlfs = DLFS.connect(userCursor, driveName);
 

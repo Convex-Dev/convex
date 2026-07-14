@@ -29,7 +29,7 @@ import convex.lattice.LatticeContext;
  *   <li>{@link #updateOnWrite(ACell, ACell)} — <b>the</b> point every write funnels
  *       through. Sees the current stored cell, so an unchanged write can be a no-op
  *       (skipping an expensive re-sign / re-stamp). This is where write-time
- *       preconditions are enforced (it may consult {@link #context} and may throw).</li>
+ *       preconditions are enforced (it may consult {@link #getContext()} and may throw).</li>
  *   <li>{@link #view(ACell)} — how a stored cell reads back as a view value. Identity
  *       by default (the stored type <em>is</em> the view type); only a type-changing
  *       boundary overrides it.</li>
@@ -52,6 +52,12 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	protected AUpdateCursor(ACursor<S> base, ALattice<V> lattice, LatticeContext context) {
 		super(lattice, context, null);
 		this.base = base;
+	}
+
+	@Override
+	protected LatticeContext getInheritedContext() {
+		if (base instanceof ALatticeCursor<?> latticeCursor) return latticeCursor.getContext();
+		return LatticeContext.EMPTY;
 	}
 
 	/**

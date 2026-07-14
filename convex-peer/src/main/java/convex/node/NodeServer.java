@@ -1027,7 +1027,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
-		cursor.withContext(context);
+		cursor.setContext(context);
 	}
 
 	/**

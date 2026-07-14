@@ -54,7 +54,8 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 	 * @param <V> Value type
 	 * @param base Base cursor holding the cell to stamp on write
 	 * @param lattice Lattice for navigation below this cursor (may be null)
-	 * @param context Lattice context (supplies the write timestamp)
+	 * @param context Local context override, or null to inherit from the base cursor
+	 *                (the effective context supplies the write timestamp)
 	 * @param stamp Injects a given timestamp (from the context at write time) into a value
 	 * @return New StampedCursor
 	 */
@@ -67,7 +68,7 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 		// Unchanged write: keep the current cell so the stamp isn't bumped for no reason
 		if (Utils.equals(value, current)) return current;
 		if (value == null) return null;
-		CVMLong ts = context.getTimestamp();
+		CVMLong ts = getContext().getTimestamp();
 		if (ts == null) throw new IllegalStateException("StampedCursor requires a timestamp in the LatticeContext");
 		return stamp.apply(value, ts);
 	}
@@ -81,6 +82,6 @@ public class StampedCursor<V extends ACell> extends AUpdateCursor<V, V> {
 	@Override
 	public V merge(V other) {
 		if (lattice == null) throw new UnsupportedOperationException("Cannot merge without a lattice");
-		return base.updateAndGet(current -> lattice.merge(context, current, other));
+		return base.updateAndGet(current -> lattice.merge(getContext(), current, other));
 	}
 }

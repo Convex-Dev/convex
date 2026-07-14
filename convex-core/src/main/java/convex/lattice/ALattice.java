@@ -156,7 +156,8 @@ public abstract class ALattice<V extends ACell> {
 	 *
 	 * @param base accumulated cursor at this lattice's level
 	 * @param key key being navigated
-	 * @param context lattice context (signing key, timestamp, etc.)
+	 * @param context Local context override for the new boundary cursor, or null
+	 *                for live inheritance from {@code base}
 	 * @return boundary cursor to insert
 	 */
 	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {

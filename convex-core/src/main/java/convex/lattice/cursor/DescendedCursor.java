@@ -35,13 +35,18 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	 * @param start Start index (inclusive)
 	 * @param end End index (exclusive)
 	 * @param lattice Sub-lattice at this position (may be null)
-	 * @param context Merge context
+	 * @param context Local merge-context override, or null to inherit from parent
 	 */
 	DescendedCursor(ALatticeCursor<P> parent, ACell[] keys, int start, int end, ALattice<V> lattice, LatticeContext context) {
 		super(lattice, context, null);
 		this.parent = parent;
 		this.pathKeys = (start == 0 && end == keys.length) ? keys : copyRange(keys, start, end);
 		this.pathCursor = new PathCursor<>(parent, pathKeys, parent.getLattice());
+	}
+
+	@Override
+	protected LatticeContext getInheritedContext() {
+		return parent.getContext();
 	}
 
 	private static ACell[] copyRange(ACell[] keys, int start, int end) {
@@ -65,7 +70,7 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	@Override
 	public V merge(V other) {
 		if (lattice != null) {
-			return updateAndGet(current -> lattice.merge(context, current, other));
+			return updateAndGet(current -> lattice.merge(getContext(), current, other));
 		}
 		// Null lattice: construct parent-level value and bubble up
 		P parentLevel = LatticeOps.assocIn(parent.get(), other, parent.getLattice(), pathKeys);
