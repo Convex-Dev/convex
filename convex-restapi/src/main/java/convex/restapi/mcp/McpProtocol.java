@@ -110,12 +110,7 @@ public class McpProtocol {
 	 * @return MCP result map with content, structuredContent, and isError fields
 	 */
 	public static AMap<AString, ACell> buildMcpResult(AMap<AString, ACell> structured, boolean isError) {
-		AString jsonText = JSON.print(structured);
-		AMap<AString, ACell> textContent = Maps.of(
-			FIELD_TYPE, "text",
-			FIELD_TEXT, jsonText
-		);
-		AVector<AMap<AString, ACell>> content = Vectors.of(textContent);
+		AVector<AMap<AString, ACell>> content = buildTextContent(structured);
 		return Maps.of(
 			FIELD_CONTENT, content,
 			FIELD_STRUCTURED_CONTENT, structured,
@@ -124,14 +119,41 @@ public class McpProtocol {
 	}
 
 	/**
+	 * Build an MCP tool result containing only text content.
+	 *
+	 * <p>This is used for valid tool results that are not JSON objects. MCP permits
+	 * {@code structuredContent} only for object values, so it is deliberately omitted.
+	 *
+	 * @param value The value to serialise as text content
+	 * @param isError Whether this is an error result
+	 * @return MCP result map with content and isError fields
+	 */
+	public static AMap<AString, ACell> buildMcpTextResult(ACell value, boolean isError) {
+		return Maps.of(
+			FIELD_CONTENT, buildTextContent(value),
+			FIELD_IS_ERROR, isError ? CVMBool.TRUE : CVMBool.FALSE
+		);
+	}
+
+	private static AVector<AMap<AString, ACell>> buildTextContent(ACell value) {
+		AMap<AString, ACell> textContent = Maps.of(
+			FIELD_TYPE, "text",
+			FIELD_TEXT, JSON.print(value)
+		);
+		return Vectors.of(textContent);
+	}
+
+	/**
 	 * Create a successful tool result wrapped in a JSON-RPC response.
-	 * @param structuredResult The structured result (must be a map or null)
+	 * @param structuredResult The result value. Maps are returned as structured content;
+	 *        other values are returned as text content.
 	 * @return JSON-RPC response with MCP tool result
 	 */
 	public static AMap<AString, ACell> toolSuccess(ACell structuredResult) {
-		AMap<AString, ACell> payload = RT.castMap(structuredResult);
-		if (payload == null) payload = EMPTY_MAP;
-		return protocolResult(buildMcpResult(payload, false));
+		if (structuredResult == null) return protocolResult(buildMcpResult(EMPTY_MAP, false));
+		AMap<AString, ACell> payload = RT.ensureMap(structuredResult);
+		if (payload != null) return protocolResult(buildMcpResult(payload, false));
+		return protocolResult(buildMcpTextResult(structuredResult, false));
 	}
 
 	/**
