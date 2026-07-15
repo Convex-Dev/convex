@@ -860,8 +860,10 @@ pure characterisation, protecting the "required fixes" refactors:
    persist a large tree in store A, obtain a hash-only `RefSoft` from A
    (`RefSoft.createForHash`), persist it into store B, assert B alone serves the full
    tree with correct flags. The single most load-bearing missing test.
-4. **Root data round-trip** — `setRootData`/`getRootRef` including the `nil` /
-   `EMPTY_HASH` special cases in `AStore.getRootRef`.
+4. **Root data round-trip** — `setRootData`/`getRootRef`, including the distinct
+   zero-initialised `UNSET_HASH` and explicitly written `NULL_HASH` states. Both
+   read as null root data without requiring a stored entry; `getRootHash()`
+   preserves which state applies.
 5. **Reopen durability** — write entries + root, `flush()`, `close()`, reopen the same
    file: entries, flags and root intact. Existing tests only ever use fresh temp files;
    the file lifecycle work (adoption, roll-back) needs reopen semantics pinned first.

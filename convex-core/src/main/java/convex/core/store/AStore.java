@@ -108,9 +108,11 @@ public abstract class AStore implements Closeable {
 		Hash h=getRootHash();
 		Ref<T> ref=refForHash(h);
 		
-		// special cases:
-		// we always recognise `nil` or the zero hash `0x0000000....` even if not in store
-		if ((ref==null) &&((Hash.EMPTY_HASH.equals(h))||(Hash.NULL_HASH.equals(h)))) {
+		// Special roots need no stored entry. UNSET_HASH means the root was never
+		// assigned; NULL_HASH means null was explicitly written. Both read as null
+		// data, but remain distinguishable through getRootHash().
+		if ((ref==null) && ((Hash.UNSET_HASH.equals(h)) ||
+				(Hash.EMPTY_HASH.equals(h)) || (Hash.NULL_HASH.equals(h)))) {
 			return (Ref<T>) Ref.NULL_VALUE;
 		}
 		return ref;

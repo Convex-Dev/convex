@@ -1118,6 +1118,9 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);
 		byte[] bs=new byte[Hash.LENGTH];
 		mbb.get(bs);
+		// Preserve the distinction between a never-assigned, zero-initialised root
+		// and an explicitly written null root (Hash.NULL_HASH).
+		if (Arrays.equals(bs, Utils.ZERO_BYTES_32)) return Hash.UNSET_HASH;
 		return Hash.wrap(bs);
 	}
 

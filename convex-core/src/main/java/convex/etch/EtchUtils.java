@@ -22,8 +22,15 @@ public class EtchUtils {
 	 * Recovery logging uses the JDK platform logger: convex-core main sources
 	 * are deliberately free of external logging dependencies. Applications
 	 * using SLF4J pick these up via the standard platform-logging bridge.
+	 * Routine idempotent recovery, including safely deferred Windows cleanup,
+	 * is DEBUG; warnings indicate unusual but recoverable metadata problems,
+	 * while errors identify possible data loss or required operator attention.
 	 */
 	private static final System.Logger recoveryLog = System.getLogger("convex.etch.recovery");
+
+	private static void debug(String msg, Object... args) {
+		recoveryLog.log(System.Logger.Level.DEBUG, fmt(msg, args));
+	}
 
 	private static void warn(String msg, Object... args) {
 		recoveryLog.log(System.Logger.Level.WARNING, fmt(msg, args));
@@ -93,7 +100,7 @@ public class EtchUtils {
 		List<File> targets = gcTargets(file);
 		if (!marker.exists() && targets.isEmpty()) return file; // fast path: no GC residue
 
-		warn("Etch GC recovery started for {} (marker {}, target file(s) found: {})",
+		debug("Etch GC recovery started for {} (marker {}, target file(s) found: {})",
 				file, marker.exists() ? "present" : "absent", targets);
 
 		// ---- 1: identify the CURRENT store file ----
@@ -105,12 +112,12 @@ public class EtchUtils {
 			if (name != null) {
 				File named = new File(file.getParentFile(), name).getCanonicalFile();
 				if (named.equals(file)) {
-					warn("Etch GC recovery: marker {} names the base file itself - already adopted;"
+					debug("Etch GC recovery: marker {} names the base file itself - already adopted;"
 							+ " removing the leftover marker.", marker.getName());
 					deleteOrThrow(marker);
 				} else if (!named.exists()) {
 					if (file.exists()) {
-						warn("Etch GC recovery: marker {} names {} which no longer exists, while {} is"
+						debug("Etch GC recovery: marker {} names {} which no longer exists, while {} is"
 								+ " present - treating the marker as stale (cutover already adopted by a"
 								+ " previous run) and removing it.", marker.getName(), name, file.getName());
 						deleteOrThrow(marker);
@@ -124,7 +131,7 @@ public class EtchUtils {
 					}
 				} else {
 					current = named;
-					warn("Etch GC recovery: completed cutover found - current store file is {}",
+					debug("Etch GC recovery: completed cutover found - current store file is {}",
 							current.getName());
 				}
 			}
@@ -145,10 +152,10 @@ public class EtchUtils {
 			if (tomb.exists()) {
 				if (st.delete()) {
 					tomb.delete();
-					warn("Etch GC recovery: deleted defunct GC file {} (fully superseded or rolled back)",
+					debug("Etch GC recovery: deleted defunct GC file {} (fully superseded or rolled back)",
 							st.getName());
 				} else {
-					warn("Etch GC recovery: defunct GC file {} still cannot be deleted (pinned by memory"
+					debug("Etch GC recovery: defunct GC file {} still cannot be deleted (pinned by memory"
 							+ " mappings?). Harmless - its retained content lives elsewhere - and deletion"
 							+ " is retried on later starts.", st.getName());
 				}
@@ -166,7 +173,7 @@ public class EtchUtils {
 
 		// ---- 3: adopt the current file under the base name ----
 		if (current == null) {
-			warn("Etch GC recovery finished for {}: roll-back only, no completed cutover to adopt", file);
+			debug("Etch GC recovery finished for {}: roll-back only, no completed cutover to adopt", file);
 			return file;
 		}
 
@@ -177,7 +184,7 @@ public class EtchUtils {
 		// copy the file BEFORE invoking completeGC
 		if (file.exists()) {
 			if (!file.delete()) {
-				error("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
+				debug("Etch GC recovery: cannot delete superseded original {} (pinned by memory mappings"
 						+ " from this same process, e.g. on Windows?). Adoption DEFERRED: opening the"
 						+ " current store file {} directly - it holds the correct data - and the deletion"
 						+ " and installation will be retried on the next start.", file, current.getName());
@@ -188,17 +195,17 @@ public class EtchUtils {
 		try {
 			Files.move(current.toPath(), file.toPath());
 		} catch (IOException e) {
-			error("Etch GC recovery: deleted the superseded original but cannot install {} as {} ({})."
+			debug("Etch GC recovery: deleted the superseded original but cannot install {} as {} ({})."
 					+ " Opening it directly; the marker is intact, so the next start will complete the"
 					+ " adoption.", current.getName(), file.getName(), e);
 			return current;
 		}
 		if (!marker.delete()) {
-			error("Etch GC recovery: adoption succeeded but marker {} could not be deleted. Delete it"
+			warn("Etch GC recovery: adoption succeeded but marker {} could not be deleted. Delete it"
 					+ " manually; until then, later recoveries will detect it as stale and remove it.",
 					marker);
 		}
-		warn("Etch GC recovery finished: {} now holds the garbage-collected store", file);
+		debug("Etch GC recovery finished: {} now holds the garbage-collected store", file);
 		return file;
 	}
 
@@ -214,7 +221,7 @@ public class EtchUtils {
 		List<String> lines = Files.readAllLines(marker.toPath());
 		String name = lines.isEmpty() ? "" : lines.get(0).trim();
 		if (name.isEmpty()) {
-			error("Etch GC recovery: marker {} is empty/malformed - deleting it. Any completed GC"
+			warn("Etch GC recovery: marker {} is empty/malformed - deleting it. Any completed GC"
 					+ " target alongside {} will instead be treated as an abandoned cycle and rolled back"
 					+ " (safe: same data, just not adopted as the main file).", marker, base.getName());
 			deleteOrThrow(marker);
@@ -270,7 +277,7 @@ public class EtchUtils {
 	 * target deletion.
 	 */
 	static void rollback(File base, File staleTarget) throws IOException {
-		warn("Etch GC recovery: rolling back abandoned GC target {} into {} - data written during"
+		debug("Etch GC recovery: rolling back abandoned GC target {} into {} - data written during"
 				+ " that cycle exists nowhere else", staleTarget.getName(), base.getName());
 		long copied;
 		long[] skipped = {0};
@@ -289,7 +296,7 @@ public class EtchUtils {
 				if (missing.isEmpty()) {
 					baseStore.getEtch().setRootHash(root);
 					baseStore.getEtch().writeDataLength();
-					warn("Etch GC recovery: rolled back {} entries from {} and advanced the root of {}"
+					debug("Etch GC recovery: rolled back {} entries from {} and advanced the root of {}"
 							+ " to {}", copied, staleTarget.getName(), base.getName(), root);
 				} else {
 					error("Etch GC recovery: rolled back {} entries from {}, but its root {} does NOT"
@@ -313,7 +320,7 @@ public class EtchUtils {
 		}
 		if (!staleTarget.delete()) {
 			staleTarget.deleteOnExit();
-			warn("Etch GC recovery: rolled-back target {} could not be deleted (pinned by memory"
+			debug("Etch GC recovery: rolled-back target {} could not be deleted (pinned by memory"
 					+ " mappings from this process?). Deletion is retried on JVM exit; until then later"
 					+ " recoveries will redo this roll-back - idempotent and safe, just wasteful.",
 					staleTarget);
@@ -416,7 +423,7 @@ public class EtchUtils {
 	 * Iterative and duplicate-safe; no pruning — a full independent walk.
 	 *
 	 * @param e Etch file to verify against
-	 * @param rootHash Hash of the tree root (nil/empty roots are trivially complete)
+	 * @param rootHash Hash of the tree root (unset/nil/empty roots are trivially complete)
 	 * @return List of missing hashes, empty if the tree is fully present
 	 * @throws IOException in case of IO error
 	 */
@@ -424,9 +431,10 @@ public class EtchUtils {
 		List<Hash> missing = new ArrayList<>();
 		HashSet<Hash> seen = new HashSet<>();
 		ArrayDeque<Hash> stack = new ArrayDeque<>();
-		// nil / empty roots are recognised without a store entry (as in
+		// unset / nil / empty roots are recognised without a store entry (as in
 		// AStore.getRootRef), so there is nothing to verify
-		if (!(Hash.NULL_HASH.equals(rootHash) || Hash.EMPTY_HASH.equals(rootHash))) {
+		if (!(Hash.UNSET_HASH.equals(rootHash) || Hash.NULL_HASH.equals(rootHash)
+				|| Hash.EMPTY_HASH.equals(rootHash))) {
 			stack.push(rootHash);
 		}
 		while (!stack.isEmpty()) {
