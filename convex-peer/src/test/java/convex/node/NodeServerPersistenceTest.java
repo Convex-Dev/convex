@@ -1,19 +1,27 @@
 package convex.node;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -24,11 +32,13 @@ import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.RefSoft;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.Etch;
 import convex.etch.EtchStore;
 import convex.lattice.Lattice;
 
@@ -38,19 +48,75 @@ import convex.lattice.Lattice;
  * Tests a primary + backup scenario with EtchStore persistence,
  * verifying broadcast, stop/start, and restore at various points.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 public class NodeServerPersistenceTest {
+	@FunctionalInterface
+	private interface RootWriteHook {
+		void run() throws IOException;
+	}
+
+	/** One reusable Etch file per role; tests reset only the root pointer. */
+	private static class HookedEtchStore extends EtchStore {
+		private volatile RootWriteHook rootWriteHook;
+
+		HookedEtchStore(String prefix) throws IOException {
+			super(Etch.createTempEtch(prefix));
+		}
+
+		void setRootWriteHook(RootWriteHook hook) {
+			rootWriteHook = hook;
+		}
+
+		void reset() throws IOException {
+			rootWriteHook = null;
+			super.setRootData(null);
+		}
+
+		@Override
+		public <T extends ACell> convex.core.data.Ref<T> setRootData(T data) throws IOException {
+			RootWriteHook hook = rootWriteHook;
+			if (hook != null) hook.run();
+			return super.setRootData(data);
+		}
+	}
+
+	private static HookedEtchStore sharedPrimaryStore;
+	private static HookedEtchStore sharedBackupStore;
 
 	private NodeServer<?> primary;
 	private NodeServer<?> backup;
 	private AStore primaryStore;
 	private AStore backupStore;
 
+	@BeforeAll
+	static void createStores() throws IOException {
+		sharedPrimaryStore = new HookedEtchStore("node-persistence-primary");
+		sharedBackupStore = new HookedEtchStore("node-persistence-backup");
+	}
+
+	@AfterAll
+	static void closeStores() throws IOException {
+		sharedPrimaryStore.close();
+		sharedBackupStore.close();
+	}
+
+	@BeforeEach
+	void resetStores() throws IOException {
+		sharedPrimaryStore.reset();
+		sharedBackupStore.reset();
+		primaryStore = sharedPrimaryStore;
+		backupStore = sharedBackupStore;
+	}
+
 	@AfterEach
 	public void tearDown() throws IOException {
+		// Test hooks must not affect the final snapshot written during close().
+		sharedPrimaryStore.setRootWriteHook(null);
+		sharedBackupStore.setRootWriteHook(null);
 		if (primary != null) primary.close();
 		if (backup != null) backup.close();
-		if (primaryStore != null) primaryStore.close();
-		if (backupStore != null) backupStore.close();
+		if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close();
+		if (backupStore != null && backupStore != sharedBackupStore) backupStore.close();
 	}
 
 	/**
@@ -123,6 +189,25 @@ public class NodeServerPersistenceTest {
 		server.persistSnapshot(server.getLocalValue());
 	}
 
+	/** Adds enough small values to ensure the {@code :data} child is non-embedded. */
+	private void writeNonEmbeddedRoot(NodeServer<?> server) {
+		for (int i = 0; i < 20; i++) {
+			writeDataValue(server, i);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private void assertStoreBackedRoot(ACell value) {
+		// The small top-level Index is embedded and therefore keeps a direct ref.
+		// Its large :data value is the first non-embedded persistence boundary.
+		ACell data = ((Index<Keyword, ACell>) value).get(Keyword.intern("data"));
+		assertNotNull(data);
+		assertTrue(data.getRef() instanceof RefSoft,
+			"synced non-embedded :data child should have a soft store reference");
+		assertSame(primaryStore, ((RefSoft<?>) data.getRef()).getStore(),
+			"synced child reference should be bound to the primary store");
+	}
+
 	// ========== Tests ==========
 
 	/**
@@ -131,9 +216,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testPrimaryBackupPersistAndRestore() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-		backupStore = EtchStore.createTemp("backup");
-
 		// Launch primary and backup
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
@@ -182,8 +264,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testRestoreDisabled() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-
 		// Write and persist some data
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
@@ -206,8 +286,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testPersistDisabled() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-
 		// Launch with persist=false
 		NodeConfig noPersist = NodeConfig.create(Maps.of(NodeConfig.PERSIST, CVMBool.FALSE));
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, noPersist);
@@ -256,9 +334,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testPrimaryRestartThenSync() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-		backupStore = EtchStore.createTemp("backup");
-
 		// Launch primary, write data, close
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
@@ -292,9 +367,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testBackupRestoreAfterBroadcast() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-		backupStore = EtchStore.createTemp("backup");
-
 		// Launch both
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
@@ -336,8 +408,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testStoreRootDataIsLatticeValue() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
@@ -363,8 +433,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncTriggersPersist() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		primary.launch();
 
@@ -389,8 +457,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncPersistLocalOnly() throws Exception {
-		primaryStore = EtchStore.createTemp("primary");
-
 		// Local-only mode, same as venue: NodeConfig.port(-1)
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
@@ -418,20 +484,94 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
+	 * A quiescent sync installs the exact store-backed root returned by the
+	 * primary propagator. Repeating the sync must reuse that same identity.
+	 */
+	@Test
+	public void testSyncConvergesToStableStoreBackedIdentity() throws Exception {
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		writeNonEmbeddedRoot(primary);
+
+		ACell first = primary.getCursor().sync();
+		assertSame(first, primary.getCursor().get(),
+			"root cursor should install the value returned by synchronous persistence");
+		assertSame(first, primaryStore.getRootData(),
+			"cursor and store should expose the same canonical root object");
+		assertStoreBackedRoot(first);
+
+		ACell second = primary.getCursor().sync();
+		assertSame(first, second, "an unchanged sync should reuse the canonical root identity");
+		assertSame(first, primary.getCursor().get());
+		assertSame(first, primaryStore.getRootData());
+	}
+
+	/**
+	 * A concurrent write may make the first sync miss its installation CAS. The
+	 * write must survive, and the next quiescent sync must converge the cursor and
+	 * store to one exact store-backed root identity.
+	 */
+	@Test
+	public void testQuiescentSyncConvergesIdentityAfterRacedSync() throws Exception {
+		CountDownLatch persistenceEntered = new CountDownLatch(1);
+		CountDownLatch allowPersistence = new CountDownLatch(1);
+		AtomicInteger rootWrites = new AtomicInteger();
+
+		sharedPrimaryStore.setRootWriteHook(() -> {
+			if (rootWrites.getAndIncrement() == 0) {
+				persistenceEntered.countDown();
+				try {
+					if (!allowPersistence.await(5, TimeUnit.SECONDS)) {
+						throw new IOException("Timed out waiting to release test persistence");
+					}
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IOException("Interrupted while testing raced sync", e);
+				}
+			}
+		});
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		writeNonEmbeddedRoot(primary);
+
+		AtomicReference<Throwable> failure = new AtomicReference<>();
+		Thread syncThread = new Thread(() -> {
+			try {
+				primary.getCursor().sync();
+			} catch (Throwable e) {
+				failure.set(e);
+			}
+		}, "raced-identity-sync");
+		syncThread.start();
+
+		assertTrue(persistenceEntered.await(5, TimeUnit.SECONDS),
+			"sync should reach persistence before the concurrent write");
+		writeDataValue(primary, 999);
+		allowPersistence.countDown();
+		syncThread.join(5_000);
+
+		assertFalse(syncThread.isAlive(), "raced sync should complete promptly");
+		assertNull(failure.get(), "raced sync should not fail");
+		assertEquals(CVMLong.create(999), readDataValue(primary, 999),
+			"concurrent write must survive the raced sync");
+
+		ACell converged = primary.getCursor().sync();
+		assertSame(converged, primary.getCursor().get());
+		assertSame(converged, primaryStore.getRootData(),
+			"quiescent sync should converge cursor and store root identities");
+		assertStoreBackedRoot(converged);
+	}
+
+	/**
 	 * Synchronous commit must surface persistence errors to the caller. If
 	 * setRootData throws, cursor.sync() must throw — silent loss of durability
 	 * is the failure mode this design rules out.
 	 */
 	@Test
 	public void testSyncSurfacesPersistenceFailure() throws Exception {
-		// EtchStore subclass that throws on setRootData to simulate a disk error
-		EtchStore failingStore = new EtchStore(EtchStore.createTemp("failing").getEtch()) {
-			@Override
-			public <T extends ACell> convex.core.data.Ref<T> setRootData(T data) throws IOException {
-				throw new IOException("simulated disk failure");
-			}
-		};
-		primaryStore = failingStore;
+		sharedPrimaryStore.setRootWriteHook(() -> {
+			throw new IOException("simulated disk failure");
+		});
 
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
@@ -460,7 +600,6 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testConcurrentWriteDuringSync() throws Exception {
-		primaryStore = EtchStore.createTemp("primary-concurrent");
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
 
@@ -501,35 +640,34 @@ public class NodeServerPersistenceTest {
 	 * snapshot's setRootData cannot land after a newer snapshot's and demote
 	 * the root pointer.
 	 *
-	 * <p>The test instruments the merge callback to dwell inside the pipeline
+	 * <p>The test instruments {@code setRootData} to dwell inside the pipeline
 	 * and count concurrent pipeline activity. With the propagator's writeLock,
 	 * max-in-flight is exactly 1; without it, the dwell would let a second
 	 * pipeline enter while the first is still executing.
 	 */
 	@Test
 	public void testProcessSnapshotPipelinesAreSerialised() throws Exception {
-		primaryStore = EtchStore.createTemp("primary-serialise");
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
-		primary.launch();
-
-		LatticePropagator prop = primary.getPropagator();
-
 		AtomicInteger inFlight = new AtomicInteger();
 		AtomicInteger maxInFlight = new AtomicInteger();
-		AtomicReference<Throwable> failure = new AtomicReference<>();
 
-		// Replace merge callback with one that dwells inside the pipeline.
-		// This widens the window so two pipelines could overlap if not serialised.
-		prop.setMergeCallback(v -> {
+		sharedPrimaryStore.setRootWriteHook(() -> {
 			int n = inFlight.incrementAndGet();
 			maxInFlight.updateAndGet(m -> Math.max(m, n));
 			try {
 				Thread.sleep(50);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
+				throw new IOException("Interrupted while testing snapshot serialisation", e);
+			} finally {
+				inFlight.decrementAndGet();
 			}
-			inFlight.decrementAndGet();
 		});
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
+		LatticePropagator prop = primary.getPropagator();
+
+		AtomicReference<Throwable> failure = new AtomicReference<>();
 
 		// Two distinct snapshots (lattice-ordered) for the two threads.
 		primary.getCursor().assoc(Keyword.intern("a"), CVMLong.create(1));

@@ -38,22 +38,22 @@ import convex.lattice.cursor.Root;
  *
  * <p>A LatticePropagator handles the complete output pipeline for a lattice node:
  * announce to store (writes cells + tracks novelty), set root data (persistence),
- * invoke merge callback (feed store-backed refs to cursor), and broadcast deltas
- * to peers.
+ * and broadcast deltas to peers. Snapshot processing returns the store-backed
+ * value to its caller; it does not mutate a cursor through a side callback.
  *
  * <p>A LatticePropagator owns:
  * <ul>
  *   <li>An {@link AStore} — for delta tracking (announce/novelty detection),
  *       persistence (setRootData), and security boundary (DATA_REQUEST resolution).</li>
  *   <li>A {@link LatticeConnectionManager} — outbound peer connections and broadcast.</li>
- *   <li>An optional merge callback — called after announce with the store-backed value.
- *       Set by NodeServer on the primary propagator to feed store-backed refs into
- *       the cursor via lattice merge.</li>
+ *   <li>A temporary merge callback used only by the explicit pull path to hand an
+ *       acquired peer value back to NodeServer.</li>
  *   <li>A background thread — event-driven processing loop with periodic root sync.</li>
  * </ul>
  *
  * <p>The propagator has no knowledge of cursors or lattices. Values are pushed in
- * via {@link #triggerBroadcast(ACell)}. The merge callback is a plain
+ * via {@link #triggerBroadcast(ACell)}. For synchronous snapshots the caller owns
+ * installation of the returned value. The pull callback is a plain
  * {@code Consumer<ACell>} — NodeServer owns the merge logic.
  *
  * <p>The store also serves as the <b>security boundary</b>: peer connections are configured
@@ -111,12 +111,11 @@ public class LatticePropagator implements Closeable {
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
 
 	/**
-	 * Merge callback — called after announce with the store-backed value.
-	 * Set by NodeServer on the primary propagator to feed store-backed refs
-	 * into the cursor via lattice merge.
+	 * Temporary pull callback — called after an explicitly pulled value has been
+	 * acquired into this propagator's store. Snapshot processing never invokes it.
 	 *
 	 * <p>The propagator has no knowledge of cursors or lattices — it just calls
-	 * this Consumer with the announced value. NodeServer owns the merge logic.
+	 * this Consumer with the acquired value. NodeServer owns the merge logic.
 	 */
 	private Consumer<ACell> mergeCallback;
 
@@ -213,7 +212,7 @@ public class LatticePropagator implements Closeable {
 	// ========== Configuration ==========
 
 	/**
-	 * Sets the merge callback, called after announce with the store-backed value.
+	 * Sets the temporary callback used to merge explicitly pulled values.
 	 *
 	 * <p>Typically set by NodeServer on the primary propagator:
 	 * <pre>{@code
@@ -221,7 +220,7 @@ public class LatticePropagator implements Closeable {
 	 *     cursor.updateAndGet(current -> lattice.merge(persisted, current)));
 	 * }</pre>
 	 *
-	 * @param callback Consumer receiving the store-backed value after announce,
+	 * @param callback Consumer receiving a store-backed value after pull acquisition,
 	 *                 or null to disable
 	 */
 	public void setMergeCallback(Consumer<ACell> callback) {
@@ -443,7 +442,7 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Main propagation loop. Processes values from the trigger queue through
-	 * the full output pipeline: announce, setRootData, mergeCallback, broadcast.
+	 * the full output pipeline: announce, setRootData, broadcast.
 	 *
 	 * <p>When {@code running} is false, switches to drain mode: processes
 	 * remaining queued values without waiting, then exits.
@@ -503,14 +502,13 @@ public class LatticePropagator implements Closeable {
 	 * <ol>
 	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
 	 *   <li>Set root data — anchor for restore (if persist enabled)</li>
-	 *   <li>Merge callback — feed store-backed value back to cursor (if set)</li>
 	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
 	 * </ol>
 	 *
 	 * <p>Announce always runs (for delta tracking and store-backed refs).
-	 * setRootData is gated by {@link #persistInterval}. The merge callback
-	 * is gated by whether it was set (primary propagator only). Broadcast
-	 * is gated by peer existence and minimum delay.
+	 * setRootData is gated by {@link #persistInterval}. Broadcast is gated by
+	 * peer existence and minimum delay. The returned value is the sole handoff
+	 * back to a synchronous caller; the pull merge callback is not invoked.
 	 *
 	 * <p>Callable from any thread. The background propagation loop calls this
 	 * for queued triggers; for synchronous commit, NodeServer's sync callback
@@ -538,12 +536,7 @@ public class LatticePropagator implements Closeable {
 				store.setRootData(value);
 			}
 
-			// 3. Merge callback (feed store-backed value back to cursor)
-			if (mergeCallback != null) {
-				mergeCallback.accept(value);
-			}
-
-			// 4. Broadcast to peers (only if peers exist and delay elapsed)
+			// 3. Broadcast to peers (only if peers exist and delay elapsed)
 			long currentTime = Utils.getCurrentTimestamp();
 			if (!connectionManager.getPeers().isEmpty()
 					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
