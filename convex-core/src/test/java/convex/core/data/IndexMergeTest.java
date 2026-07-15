@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.store.NullStore;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
@@ -181,6 +182,49 @@ public class IndexMergeTest {
 			}
 		}
 		return m;
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private static Ref<Index<ABlob, CVMLong>> missingChildRef(Index<ABlob, CVMLong> child) {
+		return (Ref) RefSoft.createForHash(child.getHash(), NullStore.INSTANCE).markEmbedded(false);
+	}
+
+	/**
+	 * Equal roots containing hash-only children can be recognised structurally.
+	 * Merge must not try to resolve an equal child from storage.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testEqualRootsWithHashOnlyChildrenDoNotDereferenceChildren() {
+		MapEntry<ABlob, CVMLong> rootEntry = MapEntry.create(Blob.fromHex("ab"), CVMLong.ZERO);
+		Index<ABlob, CVMLong> child = Index.of(Blob.fromHex("ab10"), CVMLong.ONE);
+		Ref<Index<ABlob, CVMLong>>[] aChildren = new Ref[] { missingChildRef(child) };
+		Ref<Index<ABlob, CVMLong>>[] bChildren = new Ref[] { missingChildRef(child) };
+		Index<ABlob, CVMLong> a = Index.unsafeCreate(2, rootEntry, (Ref[]) aChildren, 1 << 1, 2);
+		Index<ABlob, CVMLong> b = Index.unsafeCreate(2, rootEntry, (Ref[]) bChildren, 1 << 1, 2);
+
+		assertSame(a, a.mergeDifferences(b, MAX));
+	}
+
+	/**
+	 * Equal child refs must be skipped before dereference even when the roots are
+	 * unequal. The right root is a subset, so a left-preserving merge is a no-op.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testEqualHashOnlyChildDoesNotDereferenceInSubsetMerge() {
+		MapEntry<ABlob, CVMLong> rootEntry = MapEntry.create(Blob.fromHex("ab"), CVMLong.ZERO);
+		Index<ABlob, CVMLong> missing = Index.of(Blob.fromHex("ab10"), CVMLong.ONE);
+		Index<ABlob, CVMLong> resident = Index.of(Blob.fromHex("ab20"), CVMLong.create(2));
+		Ref<Index<ABlob, CVMLong>>[] aChildren = new Ref[] {
+			missingChildRef(missing), resident.getRef()
+		};
+		Ref<Index<ABlob, CVMLong>>[] bChildren = new Ref[] { missingChildRef(missing) };
+		Index<ABlob, CVMLong> a = Index.unsafeCreate(2, rootEntry, (Ref[]) aChildren,
+			(1 << 1) | (1 << 2), 3);
+		Index<ABlob, CVMLong> b = Index.unsafeCreate(2, rootEntry, (Ref[]) bChildren, 1 << 1, 2);
+
+		assertSame(a, a.mergeDifferences(b, MAX));
 	}
 
 	/**
