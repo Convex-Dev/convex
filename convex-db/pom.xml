@@ -19,6 +19,25 @@
 		<calcite.version>1.42.0</calcite.version>
 	</properties>
 
+	<profiles>
+		<profile>
+			<!-- JDK 24+ warns on first sun.misc.Unsafe memory access, triggered here by
+			     protobuf-java through Calcite/Avatica. Keep this JDK-specific test option
+			     local to the affected module so it cannot leak into unrelated IDE launches. -->
+			<id>jdk24-quiet-unsafe-warnings</id>
+			<activation>
+				<jdk>[24,)</jdk>
+			</activation>
+			<properties>
+				<argLine>
+					--add-opens=java.base/java.util=ALL-UNNAMED
+					--sun-misc-unsafe-memory-access=allow
+					-Dslf4j.internal.verbosity=ERROR
+				</argLine>
+			</properties>
+		</profile>
+	</profiles>
+
 	<build>
 		<plugins>
 		</plugins>
