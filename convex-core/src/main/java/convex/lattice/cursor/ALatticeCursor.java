@@ -17,7 +17,7 @@ import convex.lattice.LatticeOps;
  * <h2>Capabilities</h2>
  * <ul>
  *   <li><b>{@link #fork()}</b> - Create independent working copy</li>
- *   <li><b>{@link #sync()}</b> - Sync changes back to parent (always succeeds with lattice)</li>
+ *   <li><b>{@link #sync()}</b> - Sync changes back to parent using lattice merge</li>
  *   <li><b>{@link #merge(ACell)}</b> - Merge external value using lattice merge</li>
  *   <li><b>{@link #path(ACell...)}</b> - Navigate into sub-lattices</li>
  * </ul>
@@ -86,6 +86,10 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	/**
 	 * Sets this cursor's local context override and returns this cursor.
 	 * Passing null clears the override, restoring inheritance from the parent.
+	 * A non-null context is a complete replacement: individual fields do not
+	 * inherit. To preserve selected values from the current effective context,
+	 * explicitly snapshot it with methods such as
+	 * {@link LatticeContext#withTimestamp(convex.core.data.prim.CVMLong)}.
 	 * @param context New local context override, or null to inherit
 	 * @return This cursor with updated context
 	 */
@@ -104,7 +108,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 
 	/**
 	 * Creates an independent fork for isolated modifications.
-	 * Changes don't affect the parent until {@link #sync()}.
+	 * Changes don't affect the parent until {@link #sync()}. The fork snapshots this
+	 * cursor's effective context for its own writes. If the parent has advanced,
+	 * sync merges using the parent's current effective context.
 	 *
 	 * @return A new forked cursor with local storage
 	 */
@@ -113,8 +119,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	}
 
 	/**
-	 * Syncs local changes back to the parent using lattice merge.
-	 * Always succeeds when a lattice is present. For root cursors, returns current value.
+	 * Syncs local changes back to the parent using lattice merge. A conflicting fork
+	 * sync uses the parent's current effective context; for root cursors, returns the
+	 * current value.
 	 *
 	 * @return The synced value from the underlying parent
 	 */

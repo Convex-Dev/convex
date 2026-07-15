@@ -4,8 +4,14 @@ import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -411,6 +417,98 @@ public class LatticeCursorTest {
 		assertEquals(1, callCount.get(), "onSync should fire once on root.sync()");
 		assertNotNull(received.get());
 		assertTrue(received.get().contains(CVMLong.ONE));
+	}
+
+	@Test
+	public void testConcurrentRootSyncCallbacksAreSerialised() throws Exception {
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(
+			lattice, Sets.of(CVMLong.ONE));
+
+		CVMLong concurrentValue = CVMLong.create(2);
+		CountDownLatch firstEntered = new CountDownLatch(1);
+		CountDownLatch releaseFirst = new CountDownLatch(1);
+		CountDownLatch secondStarted = new CountDownLatch(1);
+		CountDownLatch secondEntered = new CountDownLatch(1);
+		AtomicInteger callCount = new AtomicInteger();
+		AtomicInteger activeCallbacks = new AtomicInteger();
+		AtomicInteger maxActiveCallbacks = new AtomicInteger();
+		AtomicReference<ASet<CVMLong>> firstSnapshot = new AtomicReference<>();
+		AtomicReference<ASet<CVMLong>> secondSnapshot = new AtomicReference<>();
+		AtomicReference<Throwable> failure = new AtomicReference<>();
+
+		root.onSync(snapshot -> {
+			int call = callCount.incrementAndGet();
+			int active = activeCallbacks.incrementAndGet();
+			maxActiveCallbacks.updateAndGet(previous -> Math.max(previous, active));
+			try {
+				if (call == 1) {
+					firstSnapshot.set(snapshot);
+					firstEntered.countDown();
+					if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
+						throw new AssertionError("Timed out waiting to release first sync callback");
+					}
+				} else if (call == 2) {
+					secondSnapshot.set(snapshot);
+					secondEntered.countDown();
+				} else {
+					throw new AssertionError("Unexpected sync callback " + call);
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new AssertionError("Interrupted while coordinating sync callbacks", e);
+			} finally {
+				activeCallbacks.decrementAndGet();
+			}
+			return snapshot;
+		});
+
+		Runnable sync = () -> {
+			try {
+				root.sync();
+			} catch (Throwable t) {
+				failure.compareAndSet(null, t);
+			}
+		};
+
+		Thread first = new Thread(sync, "root-sync-first");
+		first.start();
+		assertTrue(firstEntered.await(5, TimeUnit.SECONDS), "First sync callback did not start");
+
+		// Advance the authoritative root while the first callback is blocked on its
+		// older snapshot. The second caller must wait, then capture this newer root.
+		root.updateAndGet(values -> values.include(concurrentValue));
+
+		Thread second = new Thread(() -> {
+			secondStarted.countDown();
+			sync.run();
+		}, "root-sync-second");
+		second.start();
+		assertTrue(secondStarted.await(5, TimeUnit.SECONDS), "Second sync caller did not start");
+
+		boolean overlapped;
+		try {
+			// The first callback remains deliberately blocked throughout this window.
+			overlapped = secondEntered.await(250, TimeUnit.MILLISECONDS);
+		} finally {
+			releaseFirst.countDown();
+			first.join(5_000);
+			second.join(5_000);
+		}
+
+		assertFalse(first.isAlive(), "First sync caller did not finish");
+		assertFalse(second.isAlive(), "Second sync caller did not finish");
+		assertNull(failure.get(), () -> "Sync caller failed: " + failure.get());
+		assertFalse(overlapped, "Second sync callback entered while the first callback was active");
+		assertEquals(1, maxActiveCallbacks.get(), "Root sync callbacks must not overlap");
+		assertEquals(2, callCount.get());
+
+		assertTrue(firstSnapshot.get().contains(CVMLong.ONE));
+		assertFalse(firstSnapshot.get().contains(concurrentValue));
+		assertTrue(secondSnapshot.get().contains(CVMLong.ONE));
+		assertTrue(secondSnapshot.get().contains(concurrentValue),
+			"Waiting sync caller must capture the root after the preceding sync completes");
+		assertTrue(root.get().contains(concurrentValue), "Concurrent root update must survive both syncs");
 	}
 
 	@Test

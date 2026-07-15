@@ -57,6 +57,51 @@ public class LatticeContext {
 	}
 
 	/**
+	 * Creates a context snapshot with a different timestamp, preserving this
+	 * context's signing key and owner verifier.
+	 *
+	 * <p>This is an immutable value-copy operation. It does not establish
+	 * field-level inheritance from this context; subsequent changes to the source
+	 * from which this context was obtained are not reflected in the result.</p>
+	 *
+	 * @param timestamp New timestamp, or null to clear it
+	 * @return Context snapshot with the supplied timestamp
+	 */
+	public LatticeContext withTimestamp(CVMLong timestamp) {
+		return create(timestamp, signingKey, ownerVerifier);
+	}
+
+	/**
+	 * Creates a context snapshot with a different signing key, preserving this
+	 * context's timestamp and owner verifier.
+	 *
+	 * <p>This is an immutable value-copy operation. It does not establish
+	 * field-level inheritance from this context; subsequent changes to the source
+	 * from which this context was obtained are not reflected in the result.</p>
+	 *
+	 * @param signingKey New signing key, or null to clear it
+	 * @return Context snapshot with the supplied signing key
+	 */
+	public LatticeContext withSigningKey(AKeyPair signingKey) {
+		return create(timestamp, signingKey, ownerVerifier);
+	}
+
+	/**
+	 * Creates a context snapshot with a different owner verifier, preserving this
+	 * context's timestamp and signing key.
+	 *
+	 * <p>This is an immutable value-copy operation. It does not establish
+	 * field-level inheritance from this context; subsequent changes to the source
+	 * from which this context was obtained are not reflected in the result.</p>
+	 *
+	 * @param ownerVerifier New owner verifier, or null to clear it
+	 * @return Context snapshot with the supplied owner verifier
+	 */
+	public LatticeContext withOwnerVerifier(BiPredicate<ACell, AccountKey> ownerVerifier) {
+		return create(timestamp, signingKey, ownerVerifier);
+	}
+
+	/**
 	 * Verifies that the given signer key is valid for the specified owner.
 	 *
 	 * For blob/AccountKey owners, checks direct equality with the signer key.

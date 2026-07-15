@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
@@ -37,6 +38,32 @@ public class ContextInheritanceTest {
 		LatticeContext laterParent = LatticeContext.create(CVMLong.create(3000), null);
 		root.setContext(laterParent);
 		assertSame(override, child.getContext());
+
+		child.setContext(null);
+		assertSame(laterParent, child.getContext());
+	}
+
+	@Test
+	public void testWithMethodCreatesCompleteChildSnapshot() {
+		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
+		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root =
+			Cursors.createLattice(lattice, Maps.empty());
+		ALatticeCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
+
+		AKeyPair originalKey = AKeyPair.generate();
+		LatticeContext original = LatticeContext.create(CVMLong.create(1000), originalKey);
+		root.setContext(original);
+
+		LatticeContext snapshot = child.getContext().withTimestamp(CVMLong.create(1500));
+		child.setContext(snapshot);
+
+		AKeyPair replacementKey = AKeyPair.generate();
+		LatticeContext laterParent = LatticeContext.create(CVMLong.create(2000), replacementKey);
+		root.setContext(laterParent);
+
+		assertSame(snapshot, child.getContext());
+		assertEquals(CVMLong.create(1500), child.getContext().getTimestamp());
+		assertSame(originalKey, child.getContext().getSigningKey());
 
 		child.setContext(null);
 		assertSame(laterParent, child.getContext());
