@@ -216,8 +216,8 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * <p>Typically set by NodeServer on the primary propagator:
 	 * <pre>{@code
-	 * propagator.setMergeCallback(persisted ->
-	 *     cursor.updateAndGet(current -> lattice.merge(persisted, current)));
+	 * propagator.setMergeCallback(acquired ->
+	 *     cursor.updateAndGet(current -> lattice.merge(current, acquired)));
 	 * }</pre>
 	 *
 	 * @param callback Consumer receiving a store-backed value after pull acquisition,

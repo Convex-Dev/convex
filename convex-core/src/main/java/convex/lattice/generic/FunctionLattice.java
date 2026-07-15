@@ -7,9 +7,12 @@ import convex.core.data.ACell;
 /**
  * Lattice with a caller-provided merge function.
  *
- * <p>The caller is responsible for ensuring the function satisfies lattice laws
- * (commutativity, associativity, idempotency). Null handling is provided
- * by this class — the function is only called with two non-null values.</p>
+ * <p>The caller is responsible for ensuring the function has the algebraic
+ * properties required by its use. Coordination-free, order-independent merging
+ * normally requires commutativity, associativity and idempotency; directional
+ * merge functions are also supported when callers preserve the
+ * {@code own}/{@code other} argument roles. Null handling is provided by this
+ * class — the function is only called with two non-null values.</p>
  *
  * @param <V> Type of lattice values
  */

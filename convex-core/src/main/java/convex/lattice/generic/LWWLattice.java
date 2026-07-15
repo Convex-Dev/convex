@@ -19,6 +19,13 @@ import convex.lattice.LatticeContext;
  * state churn. Merge is whole-value: it <em>never</em> recurses into the inner
  * lattice, so deletions are durable.</p>
  *
+ * <p>The equal-timestamp rule is intentionally directional. For distinct values
+ * with the same timestamp, {@code merge(a, b) == a} and
+ * {@code merge(b, a) == b}. Callers must put the value that should survive an
+ * unresolved tie in the {@code own} position. In particular, cursor fork/sync
+ * reconciliation treats the local edit as own, while an external merge normally
+ * treats the current local value as own and the received value as other.</p>
+ *
  * <p>As an {@link ADelegatingLattice} it owns only the merge concern — navigation
  * and write-interception are delegated to an optional inner lattice (terminal
  * register when none). It is the sibling of {@link LWPLattice}, which instead

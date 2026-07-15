@@ -15,8 +15,8 @@ import convex.lattice.LatticeTest;
 /**
  * Tests for LWWLattice — Last-Write-Wins register with timestamp-based merge.
  *
- * Verifies all three lattice laws (commutativity, associativity, idempotency)
- * and correct timestamp comparison behaviour.
+ * Verifies timestamp comparison, associativity and idempotency, plus the
+ * intentional directional own-wins rule for distinct equal-timestamp values.
  */
 public class LWWLatticeTest {
 
@@ -67,7 +67,7 @@ public class LWWLatticeTest {
 		assertSame(withTS, LWW.merge(noTS, withTS));
 	}
 
-	// ===== Lattice Law: Commutativity =====
+	// ===== Merge ordering =====
 
 	@Test
 	public void testCommutativityDifferentTimestamps() {
@@ -78,13 +78,16 @@ public class LWWLatticeTest {
 	}
 
 	@Test
-	public void testEqualTimestampsPrefersOwn() {
-		// Equal timestamps: each side prefers its own value
+	public void testEqualTimestampsAreDirectionalAndPreferOwn() {
+		// Equal timestamps: each call prefers its own value, so argument order matters
 		ACell a = value(100, "alpha");
 		ACell b = value(100, "beta");
 
-		assertSame(a, LWW.merge(a, b), "Should prefer own value on equal timestamp");
-		assertSame(b, LWW.merge(b, a), "Should prefer own value on equal timestamp");
+		ACell ab = LWW.merge(a, b);
+		ACell ba = LWW.merge(b, a);
+		assertSame(a, ab, "Should prefer own value on equal timestamp");
+		assertSame(b, ba, "Should prefer own value on equal timestamp");
+		assertNotEquals(ab, ba, "Distinct equal-timestamp values merge directionally");
 	}
 
 	@Test
