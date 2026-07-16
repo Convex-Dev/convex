@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
@@ -315,17 +316,31 @@ public class Peer {
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	public ResultContext executeQuery(ACell form, Address address) {
+		return executeQuery(form,address,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	/**
+	 * Compiles and executes a query with an explicit execution Juice ceiling.
+	 *
+	 * @param form Form to compile and execute
+	 * @param address Address to use for query execution, or {@code null} for the
+	 *        genesis address
+	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @return Query result context
+	 */
+	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
 
 		if (form instanceof ATransaction tx) {
-			return executeDetached(tx);
+			return executeDetached(tx,maxJuice);
 		}
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
 			ACell val=sc.getValue();
 			if (val instanceof ATransaction tx) {
-				return executeDetached(tx);
+				return executeDetached(tx,maxJuice);
 			}
 		}
 		
@@ -338,7 +353,7 @@ public class Peer {
 
 		// Run query in a fake transaction for given address
 		ATransaction tx=Invoke.create(address, state.getAccount(address).getSequence()+1, form);
-		ResultContext rctx=state.applyTransaction(tx);
+		ResultContext rctx=state.applyTransaction(tx,TransactionContext.create(state),maxJuice);
 		return rctx;
 	}
 
@@ -350,12 +365,24 @@ public class Peer {
 	 * @return The Context containing the transaction results.
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
+		return executeDetached(transaction,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	/**
+	 * Executes a detached transaction with an explicit execution Juice ceiling.
+	 *
+	 * @param transaction Transaction to execute
+	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @return Detached transaction result
+	 */
+	public ResultContext executeDetached(ATransaction transaction, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State s=getConsensusState();
 		TransactionContext tctx=TransactionContext.create(s);
 		
 		// This is a fake transaction
 		tctx.signedTx=SignedData.create(AccountKey.ZERO, Ed25519Signature.ZERO, transaction.getRef());
-		ResultContext ctx=s.applyTransaction(transaction,tctx);
+		ResultContext ctx=s.applyTransaction(transaction,tctx,maxJuice);
 		return ctx;
 	}
 

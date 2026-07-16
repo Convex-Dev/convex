@@ -71,6 +71,13 @@ public class PeerTest {
 		assertEquals(InitTest.HERO,p.executeQuery(Reader.read("*address*"),InitTest.HERO).getResult());
 
 		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS).context);
+
+		long limit=1_234;
+		ResultContext limited=p.executeQuery(Reader.read("*juice-limit*"),InitTest.HERO,limit);
+		assertEquals(CVMLong.create(limit),limited.getResult());
+		ResultContext exhausted=p.executeQuery(
+			Reader.read("(loop [x 0] (recur (inc x)))"),InitTest.HERO,limit);
+		assertEquals(ErrorCodes.JUICE,exhausted.getErrorCode());
 	}
 
 	@Test

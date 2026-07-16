@@ -561,10 +561,25 @@ public class State extends ARecordGeneric {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public ResultContext applyTransaction(ATransaction t, TransactionContext tctx) {
+		return applyTransaction(t,tctx,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	/**
+	 * Applies a transaction with an explicit upper bound on execution Juice.
+	 * Primarily useful for detached or repeatedly evaluated queries where the normal
+	 * transaction maximum would permit excessive work.
+	 *
+	 * @param t Transaction to apply
+	 * @param tctx Transaction context
+	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @return Result context after transaction application
+	 */
+	public ResultContext applyTransaction(ATransaction t, TransactionContext tctx, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		ResultContext rc=createResultContext(t);
 		
 		// Create prepared context 
-		Context ctx = prepareTransaction(rc,tctx);
+		Context ctx = prepareTransaction(rc,tctx,maxJuice);
 		
 		if (!ctx.isExceptional()) {
 			State preparedState=ctx.getState();
@@ -605,6 +620,10 @@ public class State extends ARecordGeneric {
 	 * @return
 	 */
 	protected Context prepareTransaction(ResultContext rc, TransactionContext tctx) {
+		return prepareTransaction(rc,tctx,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	private Context prepareTransaction(ResultContext rc, TransactionContext tctx, long maxJuice) {
 		ATransaction t=rc.tx;
 		long juicePrice=rc.juicePrice;
 		Address origin = t.getOrigin();
@@ -619,7 +638,7 @@ public class State extends ARecordGeneric {
 		// Create context with juice limit
 		long balance=account.getBalance();
 		long juiceLimit=Juice.calcAvailable(balance, juicePrice);
-		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,juiceLimit);
+		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,Math.min(maxJuice,juiceLimit));
 		long initialJuice=0;
 		if (juiceLimit<=initialJuice) {
 			return Context.create(this,origin).withJuiceError();
