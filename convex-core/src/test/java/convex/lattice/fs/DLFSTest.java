@@ -1,6 +1,7 @@
 package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +45,75 @@ import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
 
 public class DLFSTest {
+
+	@Test
+	public void testUnsupportedProviderOperationsFailHonestly() throws Exception {
+		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
+		Path a=fs.getPath("/a");
+		Path b=fs.getPath("/b");
+		Files.write(a,new byte[] {1});
+		assertThrows(UnsupportedOperationException.class,()->Files.copy(a,b));
+		assertThrows(UnsupportedOperationException.class,()->Files.move(a,b));
+		assertThrows(UnsupportedOperationException.class,()->fs.getPathMatcher("glob:*.txt"));
+		fs.close();
+		assertFalse(fs.isOpen());
+		assertThrows(java.nio.file.ClosedFileSystemException.class,()->fs.getPath("/closed"));
+	}
+
+	@Test
+	public void testDirectoryStreamFilter() throws Exception {
+		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
+		Files.write(fs.getPath("/keep.txt"),new byte[] {1});
+		Files.write(fs.getPath("/drop.bin"),new byte[] {2});
+		try (DirectoryStream<Path> stream=Files.newDirectoryStream(fs.getPath("/"),
+			p->p.toString().endsWith(".txt"))) {
+			Iterator<Path> it=stream.iterator();
+			assertTrue(it.hasNext());
+			assertEquals("/keep.txt",it.next().toString());
+			assertFalse(it.hasNext());
+			assertThrows(IllegalStateException.class,stream::iterator);
+		}
+	}
+
+	@Test
+	public void testAtomicWholeFileReplacement() throws Exception {
+		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
+		DLPath path=fs.getPath("/atomic.bin");
+		byte[] longValue=new byte[4096];
+		byte[] shortValue=new byte[17];
+		java.util.Arrays.fill(longValue,(byte)1);
+		java.util.Arrays.fill(shortValue,(byte)2);
+		CountDownLatch start=new CountDownLatch(1);
+		Thread a=Thread.ofVirtual().start(()->writeAfter(start,fs,path,longValue));
+		Thread b=Thread.ofVirtual().start(()->writeAfter(start,fs,path,shortValue));
+		start.countDown();
+		a.join();
+		b.join();
+		byte[] actual=Files.readAllBytes(path);
+		if (actual.length==longValue.length) {
+			assertArrayEquals(longValue,actual);
+		} else {
+			assertArrayEquals(shortValue,actual);
+		}
+	}
+
+	@Test
+	public void testLocalTimestampAdvanceIsStrictlyMonotonic() {
+		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
+		long future=System.currentTimeMillis()+10_000;
+		fs.setTimestamp(CVMLong.create(future));
+		assertEquals(future+1,fs.updateTimestamp().longValue());
+		assertEquals(future+2,fs.updateTimestamp().longValue());
+	}
+
+	private static void writeAfter(CountDownLatch start, DLFileSystem fs, DLPath path, byte[] value) {
+		try {
+			start.await();
+			fs.writeAllBytes(path,value);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
 	
 	@Test public void testProvider() throws URISyntaxException, IOException {
 		DLFSProvider provider=DLFS.provider();

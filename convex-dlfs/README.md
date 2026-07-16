@@ -4,14 +4,15 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-dlfs/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-dlfs)
 
 The **Data Lattice File System (DLFS)** — a decentralised, content-addressed,
-CRDT-mergeable filesystem built on Convex immutable data structures, with Java NIO
-compatibility and a WebDAV server for access from ordinary file clients.
+lattice-mergeable filesystem built on Convex immutable data structures, with a focused
+Java NIO implementation and a DAV class 1 server for access from ordinary file clients.
 
 ## Overview
 
 DLFS stores a whole filesystem as an immutable Convex lattice value. Because the
-underlying data structures merge like CRDTs, independent replicas can be reconciled
-without conflicts — making DLFS suitable for offline-first and decentralised storage.
+underlying data structures support recursive lattice merges, independent replicas can
+be reconciled using timestamp and tombstone rules. Equal-timestamp conflicts are
+directional, so applications must supply a sound mutation timestamp policy.
 
 It exposes the filesystem in three ways:
 
@@ -25,8 +26,8 @@ It exposes the filesystem in three ways:
 ## Features
 
 - Content-addressed, immutable storage with CRDT-style `fork()` / `sync()` / `merge()`
-- Java NIO `FileSystem` provider for drop-in file operations
-- WebDAV (RFC 4918) server built on Javalin, with virtual-thread request handling
+- Java NIO `FileSystem` provider for the implemented basic file operations
+- DAV class 1 server built on Javalin, with virtual-thread request handling
 - Per-identity, multi-drive registry — each authenticated user gets their own drives
 - Optional Ed25519 JWT bearer-token authentication
 - Model Context Protocol (MCP) integration
@@ -63,6 +64,15 @@ server.start(8080); // use 0 for a random port
 
 // Drives are now served under http://localhost:8080/dlfs/{drive}/{path}
 ```
+
+The server binds to `127.0.0.1` by default. Calling `setBindHost(...)` is an explicit
+decision to expose it on another interface. A configured key pair enables JWT
+validation and requires authentication for mutating WebDAV requests by default.
+
+DLFS is currently a robust-core project rather than a finished storage product. In
+particular, the standalone drive registry is process-local, directory MOVE/COPY and
+DAV locking are not implemented, and operators remain responsible for persistence,
+backup and trusted replication configuration.
 
 Connect any WebDAV client, e.g.:
 

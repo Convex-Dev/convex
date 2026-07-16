@@ -19,6 +19,8 @@ import convex.lattice.fs.DLFS;
  * replication support.
  */
 public class DLFSDriveManager {
+	/** Conservative per-identity bound for the in-process drive registry. */
+	public static final int MAX_DRIVES_PER_IDENTITY = 256;
 
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
 
@@ -30,6 +32,7 @@ public class DLFSDriveManager {
 	 * @return The FileSystem for the drive, or null if it doesn't exist
 	 */
 	public FileSystem getDrive(String identity, String driveName) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
 		return drives.get(driveKey(identity, driveName));
 	}
 
@@ -40,8 +43,10 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @return true if created, false if drive already exists
 	 */
-	public boolean createDrive(String identity, String driveName) {
+	public synchronized boolean createDrive(String identity, String driveName) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		String key = driveKey(identity, driveName);
+		if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
 		FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
 		return existing == null;
 	}
@@ -53,7 +58,8 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @return true if deleted, false if drive didn't exist
 	 */
-	public boolean deleteDrive(String identity, String driveName) {
+	public synchronized boolean deleteDrive(String identity, String driveName) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		return drives.remove(driveKey(identity, driveName)) != null;
 	}
 
@@ -71,6 +77,7 @@ public class DLFSDriveManager {
 				result.add(key.substring(prefix.length()));
 			}
 		}
+		result.sort(String::compareTo);
 		return result;
 	}
 
@@ -82,14 +89,19 @@ public class DLFSDriveManager {
 	 * @param newName New drive name
 	 * @return true if renamed, false if source doesn't exist or target already exists
 	 */
-	public boolean renameDrive(String identity, String oldName, String newName) {
+	public synchronized boolean renameDrive(String identity, String oldName, String newName) {
+		if (!DLFSPathValidator.isValidDriveName(oldName) || !DLFSPathValidator.isValidDriveName(newName)) return false;
+		if (oldName.equals(newName)) return getDrive(identity, oldName) != null;
 		String oldKey = driveKey(identity, oldName);
 		String newKey = driveKey(identity, newName);
 		FileSystem fs = drives.get(oldKey);
 		if (fs == null) return false;
-		// Atomically check newKey doesn't exist and insert
+		// The method lock makes the two map mutations one registry operation.
 		if (drives.putIfAbsent(newKey, fs) != null) return false;
-		drives.remove(oldKey);
+		if (!drives.remove(oldKey, fs)) {
+			drives.remove(newKey, fs);
+			return false;
+		}
 		return true;
 	}
 
@@ -100,7 +112,11 @@ public class DLFSDriveManager {
 	 * @param driveName Drive name
 	 * @param fs The filesystem to use for this drive
 	 */
-	public void seedDrive(String identity, String driveName, FileSystem fs) {
+	public synchronized void seedDrive(String identity, String driveName, FileSystem fs) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) {
+			throw new IllegalArgumentException("Invalid drive name: " + driveName);
+		}
+		if (fs == null) throw new IllegalArgumentException("Drive filesystem cannot be null");
 		drives.put(driveKey(identity, driveName), fs);
 	}
 

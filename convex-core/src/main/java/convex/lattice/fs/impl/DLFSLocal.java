@@ -73,7 +73,7 @@ public class DLFSLocal extends DLFileSystem {
 	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
 		AVector<ACell> rootNode=rootCursor.get();
 		AVector<ACell> result=DLFSNode.navigate(rootNode,dir);
-		return DLDirectoryStream.create(dir,result);
+		return DLDirectoryStream.create(dir,result,filter);
 	}
 
 	@Override

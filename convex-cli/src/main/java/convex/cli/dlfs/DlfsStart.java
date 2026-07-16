@@ -137,6 +137,9 @@ public class DlfsStart extends ACommand {
 
 		// Create DLFSServer with drives backed by the lattice cursor
 		DLFSServer dlfsServer = DLFSServer.create(keyPair);
+		// The CLI currently exposes shared anonymous drives on the loopback-only server.
+		// Authentication-aware per-user drive provisioning is a separate product concern.
+		dlfsServer.setRequireAuthForWrites(false);
 
 		for (String driveName : driveNames) {
 			FileSystem fs = DLFS.connect(drivesCursor, Strings.create(driveName));

@@ -110,9 +110,11 @@ DLFSServer
               └── DLFSLocal instances (one per identity + drive name)
 ```
 
-`DLFSServer` owns the Javalin lifecycle. It configures CORS, wires authentication
-middleware (optional), registers WebDAV routes, and configures Jetty with minimal
-platform threads (1 acceptor + 1 selector) since request handling uses virtual threads.
+`DLFSServer` owns the Javalin lifecycle. It binds to loopback by default, applies a
+bounded request size, wires authentication middleware (optional), registers WebDAV
+routes, and configures Jetty with minimal platform threads (1 acceptor + 1 selector)
+since request handling uses virtual threads. Cross-origin access is not enabled by
+default.
 
 ### URL Structure
 
@@ -139,12 +141,13 @@ authenticated users can each have a drive called "home" without conflict.
 | `COPY` | — | Copy file |
 | `HEAD` | Exists check | File metadata (Content-Type, Content-Length) |
 | `OPTIONS` | DAV capability discovery | DAV capability discovery |
-| `LOCK`/`UNLOCK` | — | Stub responses for client compatibility |
-| `PROPPATCH` | — | Stub 200 response |
+| `LOCK`/`UNLOCK` | 501 Not Implemented | 501 Not Implemented |
+| `PROPPATCH` | 501 Not Implemented | 501 Not Implemented |
 
-LOCK, UNLOCK and PROPPATCH return minimal valid responses to satisfy WebDAV clients
-(e.g. Windows Explorer, macOS Finder) that probe for these methods. Actual locking
-is not implemented — DLFS uses lattice merge for conflict resolution, not locks.
+Only DAV class 1 is advertised. LOCK, UNLOCK and PROPPATCH fail explicitly: returning
+success without enforcing locks or storing properties would give clients a false
+correctness guarantee. File MOVE/COPY is supported within one drive; directory
+MOVE/COPY currently returns 501 rather than performing a partial operation.
 
 ### Authentication
 
@@ -156,7 +159,7 @@ Authentication is optional and controlled by the `AKeyPair` passed to
 3. `DLFSWebDAV.getIdentity()` reads this from the request context
 4. `DLFSDriveManager` uses the identity to namespace drives per user
 
-When `requireAuthForWrites` is enabled on `DLFSWebDAV`, mutating operations (PUT,
+When a key pair is supplied, `requireAuthForWrites` is enabled by default. Mutating operations (PUT,
 DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operations
 (GET, HEAD, PROPFIND) are always allowed.
 
@@ -171,7 +174,7 @@ DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operati
 | Get | `getDrive(identity, name)` | Returns `FileSystem` or null |
 | Delete | `deleteDrive(identity, name)` | `remove` — fails if not exists |
 | List | `listDrives(identity)` | Scans keys by identity prefix |
-| Rename | `renameDrive(identity, old, new)` | Atomic `putIfAbsent` + `remove` |
+| Rename | `renameDrive(identity, old, new)` | Atomic under the manager lock |
 | Seed | `seedDrive(identity, name, fs)` | Unconditional `put` (for testing) |
 
 Currently drives are in-memory (`DLFS.createLocal()`). The drive manager is designed
@@ -192,9 +195,10 @@ HTTP request
           → DLFSLocal (cursor.updateAndGet for writes)
 ```
 
-All file operations go through the standard `java.nio.file` API. The WebDAV layer
-has no direct knowledge of lattice cursors, nodes, or merge semantics — it operates
-entirely through the NIO `FileSystem` abstraction.
+File operations go through the NIO filesystem abstraction. Whole-file replacements
+use `DLFileSystem.writeAllBytes` so truncate and write form one filesystem-locked
+mutation. Each external mutation advances the local timestamp and calls `sync()`;
+PUT also supports ETag-based `If-Match` and `If-None-Match` preconditions.
 
 ### Content-Type Detection
 
@@ -223,13 +227,37 @@ deterministically as `max(getUTime(a), getUTime(b))` — no external timestamp n
 
 - **Files**: Newer timestamp wins. Equal timestamps: `a` preferred.
 - **Directories**: Live entries merged recursively via `Index.mergeDifferences()`.
+- **Metadata**: Position 2 is an opaque, nullable `ACell`. DLFS does not interpret or
+  recursively merge it; metadata follows the containing node's timestamp ordering, with
+  `a` preferred on a tie. A metadata-only mutation must therefore update the node timestamp.
 - **Tombstones**: A directory node keeps deletions in a separate tombstone index
   (deleted child name → deletion timestamp), held as an optional 5th node element that
   is present only when non-empty (the default node stays 4 elements). Live entries and
   tombstones are merged independently, then reconciled: a tombstone whose timestamp is
   newer than (or equal to) a live child deletes it; a newer creation resurrects the name.
-- **Commutativity**: `merge(a, b) == merge(b, a)` (same inputs → same output).
+- **Directional ties**: unequal files with equal timestamps prefer `a`. Merge is
+  therefore intentionally not fully commutative; callers must preserve own/foreign
+  direction and avoid accidental timestamp ties.
 - **Idempotency**: `merge(a, a) == a`.
+
+### Metadata Contract
+
+Node metadata is deliberately application-defined, while following these interoperability
+and safety conventions:
+
+- `nil` means no metadata. Any other value must be an immutable CAD value (`ACell`).
+- Extensible structured metadata should use a map with stable, namespace-qualified keys;
+  consumers must ignore keys they do not understand.
+- Metadata readers must validate their own schema and impose suitable size and depth limits
+  before processing values received from another replica.
+- Core DLFS operations treat metadata as an opaque leaf and do not traverse it merely to
+  merge directory contents.
+- `DLFSNode.withMetadata(node, metadata, timestamp)` is the standard immutable update helper;
+  the supplied timestamp participates in normal node conflict resolution.
+
+Applications that need field-level or custom metadata convergence should place an explicit
+lattice value in the metadata slot and perform that merge at their application boundary;
+DLFS itself guarantees only whole-slot last-write-wins behaviour.
 
 ### Two Timestamps
 
@@ -370,17 +398,18 @@ node.sync();
 
 | Component | Status |
 |-----------|--------|
-| DLFSNode (pure merge/navigate) | ✅ Production ready |
-| DLFSLattice (lattice semantics) | ✅ Production ready |
-| DLFSLocal (Java NIO filesystem) | ✅ Production ready |
+| DLFSNode (pure merge/navigate) | ✅ Robust core, bounded foreign validation |
+| DLFSLattice (lattice semantics) | ✅ Robust core, directional tie semantics |
+| DLFSLocal (Java NIO filesystem) | ⚠️ Focused API; unsupported operations fail explicitly |
 | Lattice cursor-backed drives | ✅ Working (ALatticeCursor) |
 | Factory methods (create/connect) | ✅ Implemented |
 | Fork/sync batch operations | ✅ Implemented |
 | Deterministic merge (no time param) | ✅ Implemented |
-| WebDAV server | ✅ Working |
+| DAV class 1 server | ✅ Working, bounded and loopback by default |
 | DLFSBrowser GUI | ✅ Working (lifecycle managed) |
-| Multi-drive management | ✅ Working (GUI + WebDAV) |
-| DLFSBrowser with NodeServer | ✅ Etch-backed persistence, WebDAV, drive management |
+| Standalone multi-drive management | ✅ Working in process (GUI + WebDAV) |
+| Cursor-backed drive registry | ⚠️ Drive contents persist; registry operations are not yet lattice-backed |
+| DLFSBrowser with NodeServer | ⚠️ Etch-backed drive contents; persistent registry lifecycle incomplete |
 | Network replication via NodeServer | ⚠️ Basic (pull/push working, no signing) |
 
 ### DLFSBrowser
@@ -400,9 +429,10 @@ cursor-backed and registered in WebDAV automatically.
 
 ### Persistence
 
-Cursor-backed drives persist through the NodeServer's `LatticePropagator`
-(EtchStore). Standalone drives (via `DLFS.createLocal()`) are in-memory only
-and need explicit persistence if required.
+Cursor-backed drive contents persist through the NodeServer's `LatticePropagator`
+(EtchStore). The current `DLFSDriveManager` registry is still process-local, so drive
+creation, rename and deletion are not yet durable registry operations. Standalone drives
+(via `DLFS.createLocal()`) are entirely in-memory and need explicit persistence if required.
 
 ## CAD045 Conformance
 
@@ -418,21 +448,9 @@ DLFS follows the lattice application best practices defined in CAD045:
 | **Lattice merge** | `DLFSLocal.merge()` delegates to `rootCursor.merge()` using lattice semantics |
 | **Foreign validation** | `DLFSLattice.checkForeign()` validates node structure (vector length, timestamp type) |
 | **OwnerLattice** | ROOT lattice: `:fs → OwnerLattice(MapLattice(DLFSLattice))` — forgery-resistant with `LatticeContext` |
-| **NIO compatibility** | Full Java NIO FileSystem API; transparent to application code |
+| **NIO compatibility** | Focused basic-file API; unsupported operations throw explicitly |
 
 ## Future Enhancements
-
-### Context-Aware Merge API
-
-`DLFSLattice.merge(context, own, other)` accepts a `LatticeContext` but currently
-ignores the context timestamp (merge is fully deterministic from node data). A future
-enhancement could use context for:
-
-- Explicit timestamp override for advanced use cases
-- Signing key propagation for authenticated merges
-
-A corresponding `mergeWithContext(other, context)` method on `DLFSLocal` would
-expose this to applications.
 
 ### Owner-Signed Drives (OwnerLattice Integration)
 
