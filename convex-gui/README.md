@@ -26,6 +26,12 @@ Download `convex.jar` from the [releases page](https://github.com/Convex-Dev/con
 java -jar convex.jar desktop
 ```
 
+Convex GUI applications install one process-level system tray icon where
+supported. Double-clicking the icon or selecting **Open GUI** restores the main
+window; **Close** exits through the normal GUI shutdown path. Child windows do
+not create additional icons. Headless and unsupported systems simply run without
+tray integration. Set `CONVEX_NO_TRAY=1` to disable it explicitly.
+
 On Windows, you can also double-click `convex.jar` if Java is properly configured.
 
 ### First run on macOS / Windows

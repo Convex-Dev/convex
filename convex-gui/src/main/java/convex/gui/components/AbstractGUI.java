@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.util.Utils;
 import convex.gui.MainGUI;
 import convex.gui.utils.Toolkit;
+import convex.gui.utils.TrayManager;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -30,6 +31,7 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	
 	protected JFrame frame;
 	private String title;
+	private boolean ownsTrayIcon;
 	
 	public AbstractGUI(String title) {
 		this.title=title;
@@ -113,7 +115,18 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	 * Called after the GUI interface is run
 	 */
 	public void afterRun() {
-		
+		ownsTrayIcon=TrayManager.install(title,"Open GUI",this::openGUI,()->EventQueue.invokeLater(this::closeGUI));
+	}
+
+	private void openGUI() {
+		EventQueue.invokeLater(()->{
+			JFrame current=frame;
+			if (current==null) return;
+			current.setVisible(true);
+			current.setExtendedState(current.getExtendedState()&~JFrame.ICONIFIED);
+			current.toFront();
+			current.requestFocus();
+		});
 	}
 	
 	public void waitForClose() {
@@ -128,7 +141,10 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	}
 
 	public void close() {
-		// nothing to do by default
+		if (ownsTrayIcon) {
+			ownsTrayIcon=false;
+			TrayManager.remove();
+		}
 	}
 	
 	

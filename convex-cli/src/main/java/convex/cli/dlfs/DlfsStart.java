@@ -2,6 +2,7 @@ package convex.cli.dlfs;
 
 import java.io.File;
 import java.nio.file.FileSystem;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,8 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.dlfs.DLFSServer;
+import convex.gui.utils.Toolkit;
+import convex.gui.utils.TrayManager;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
@@ -90,6 +93,10 @@ public class DlfsStart extends ACommand {
 		description="Public URL for this node (enables P2P discovery). Must be reachable from the internet.")
 	private String publicUrl;
 
+	@Option(names={"--no-tray"},
+		description="Disable the system tray icon.")
+	private boolean noTray;
+
 	@Override
 	public Main cli() {
 		return parent.cli();
@@ -145,8 +152,9 @@ public class DlfsStart extends ACommand {
 
 		cli().notifyStartup();
 
-		// Add shutdown hooks
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+		AtomicBoolean closing=new AtomicBoolean();
+		Runnable shutdown=()->{
+			if (!closing.compareAndSet(false,true)) return;
 			dlfsServer.close();
 			try {
 				nodeServer.close();
@@ -154,11 +162,22 @@ public class DlfsStart extends ACommand {
 				log.warn("Error closing NodeServer", e);
 			}
 			store.close();
-		}));
+		};
 
-		// Block until node server shuts down
-		while (nodeServer.isRunning()) {
-			Thread.sleep(1000);
+		// Ensure JVM and tray shutdown use the same idempotent close path.
+		Runtime.getRuntime().addShutdownHook(new Thread(shutdown,"convex-dlfs-shutdown"));
+		String webUrl="http://localhost:"+dlfsServer.getPort()+"/dlfs/";
+		boolean trayInstalled=!noTray&&TrayManager.install(
+			"Convex DLFS on port "+dlfsServer.getPort(),"Open Web",()->Toolkit.launchBrowser(webUrl),shutdown);
+
+		try {
+			// Block until node server shuts down
+			while (nodeServer.isRunning()) {
+				Thread.sleep(1000);
+			}
+		} finally {
+			if (trayInstalled) TrayManager.remove();
+			shutdown.run();
 		}
 	}
 

@@ -46,11 +46,11 @@ function convex { java -jar C:\path\to\convex.jar $args }
 Spin up a local Convex network for development and testing. This creates a fresh network with genesis accounts you can use immediately.
 
 ```bash
-# Start local network with GUI
+# Start a local network (tray icon on desktop systems)
 convex local start
 
-# Start without GUI (headless)
-convex local start --gui=false
+# Start without a system tray icon
+convex local start --no-tray
 ```
 
 The local network includes:
@@ -58,6 +58,16 @@ The local network includes:
 - REST API on localhost:8080
 - Pre-funded genesis accounts (#11, #12) for testing
 - Faucet enabled for easy account funding
+
+## System Tray
+
+Convex Desktop and long-running `peer start`, `local start`, and `dlfs start`
+processes install one system tray icon when the desktop supports it. Double-click
+the icon, or use its menu, to open the relevant web interface or GUI. The
+**Close** item follows the command's normal graceful shutdown path.
+
+Headless systems continue without a tray automatically. Pass `--no-tray` to a
+server command, or set `CONVEX_NO_TRAY=1`, to disable tray integration explicitly.
 
 Test your connection:
 ```bash
@@ -230,6 +240,7 @@ convex peer start \
 | `--port` | Binary protocol port (default: 18888) |
 | `--bind` | Bind address (default: localhost) |
 | `--api-port` | REST API port (default: 8080) |
+| `--no-tray` | Disable the system tray icon |
 | `--state` | Directory for persistent state |
 
 ## Global Options

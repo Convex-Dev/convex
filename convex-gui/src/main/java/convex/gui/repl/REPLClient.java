@@ -81,6 +81,7 @@ public class REPLClient extends AbstractGUI {
 	
 	@Override
 	public void afterRun() {
+		super.afterRun();
 		if (convex.getKeyPair()==null) {
 			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
 			if (we!=null) {
