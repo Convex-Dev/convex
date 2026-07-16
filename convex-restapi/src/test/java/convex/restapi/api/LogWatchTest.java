@@ -19,7 +19,6 @@ import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.restapi.api.ConsensusLogScanner.LogEvent;
 import convex.restapi.api.LogWatch.Filter;
-import convex.restapi.api.LogWatch.Format;
 
 class LogWatchTest {
 
@@ -52,8 +51,8 @@ class LogWatchTest {
 	void encodesStableIDAndEquivalentJSONAndCVXEnvelopes() {
 		assertEquals("12:3:4",LogWatch.eventID(LOG_EVENT));
 
-		AMap<ACell,ACell> json=JSON.parse(LogWatch.encode(LOG_EVENT,Format.JSON));
-		AMap<ACell,ACell> cvx=Reader.read(LogWatch.encode(LOG_EVENT,Format.CVX));
+		AMap<ACell,ACell> json=JSON.parse(LogWatch.encode(LOG_EVENT,WatchFormat.JSON));
+		AMap<ACell,ACell> cvx=Reader.read(LogWatch.encode(LOG_EVENT,WatchFormat.CVX));
 		assertEquals(CVMLong.create(12),json.getIn("block"));
 		assertEquals(CVMLong.create(12),cvx.getIn(Reader.read(":block")));
 		AVector<ACell> cvxEntry=cvx.getIn(Reader.read(":entry"));

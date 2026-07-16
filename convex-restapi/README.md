@@ -59,6 +59,7 @@ rest.start(8080);
 | `/api/v1/transact` | POST | Submit signed transaction |
 | `/api/v1/faucet` | POST | Request test funds (test networks) |
 | `/api/v1/accounts/{address}` | GET | Get account information |
+| `/api/v1/watch` | GET (SSE) | Watch a query result against finalised state |
 | `/api/v1/watch/logs` | GET (SSE) | Watch filtered finalised log events |
 
 ### Example Requests
@@ -80,6 +81,7 @@ curl -X POST http://localhost:8080/api/v1/transact \
 ## Documentation
 
 - [Filtered log watching](LOG_WATCHING.md)
+- [Query-result watching](QUERY_WATCHING.md)
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-restapi)
 - [Convex Documentation](https://docs.convex.world)
 - [API Specification](https://docs.convex.world/docs/convex-api)

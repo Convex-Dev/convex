@@ -2,10 +2,8 @@ package convex.restapi.api;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,28 +18,26 @@ import convex.core.data.ACell;
 import convex.core.lang.Reader;
 import convex.core.util.StateWatcher;
 import convex.restapi.RESTServer;
-import convex.restapi.api.ConsensusLogScanner.LogEvent;
-import convex.restapi.api.LogWatch.Filter;
+import convex.restapi.api.QueryWatch.Event;
 import convex.restapi.mcp.SseConnection;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import jakarta.servlet.http.HttpServletResponse;
 
-/** SSE API for filtered finalised consensus log events. */
-public final class LogWatchAPI extends ABaseAPI {
+/** SSE API for queries re-evaluated against finalised consensus state. */
+public final class QueryWatchAPI extends ABaseAPI {
 
-	private static final Logger log=LoggerFactory.getLogger(LogWatchAPI.class);
+	private static final Logger log=LoggerFactory.getLogger(QueryWatchAPI.class);
 
 	public static final int MAX_CONNECTIONS=100;
-	public static final int MAX_FILTER_VALUES=16;
 	public static final int EVENT_QUEUE_CAPACITY=16;
 	public static final int MAX_EVENT_CHARS=64*1024;
-	public static final int MAX_FILTER_SOURCE_CHARS=1024;
+	public static final int MAX_SOURCE_CHARS=4096;
 	private static final long KEEPALIVE_MS=30_000;
 
-	private record Subscription(SseConnection connection, Filter filter, WatchFormat format,
-		long generation, long nextBlock) {}
+	private record Subscription(SseConnection connection, QueryWatch query,
+		WatchFormat format, long generation) {}
 
 	private final ConcurrentHashMap<SseConnection,Subscription> subscriptions=new ConcurrentHashMap<>();
 	private final AtomicInteger activeConnections=new AtomicInteger();
@@ -51,23 +47,23 @@ public final class LogWatchAPI extends ABaseAPI {
 	private StateWatcher<Peer> updates;
 	private Consumer<Peer> updateObserver;
 
-	public LogWatchAPI(RESTServer restServer) {
+	public QueryWatchAPI(RESTServer restServer) {
 		super(restServer);
 	}
 
 	@Override
 	public void addRoutes(RoutesConfig routes) {
-		routes.get("/api/v1/watch/logs",this::watchLogs);
+		routes.get("/api/v1/watch",this::watchQuery);
 	}
 
-	private void watchLogs(Context ctx) {
+	private void watchQuery(Context ctx) {
 		String accept=ctx.header("Accept");
 		if ((accept==null)||!accept.toLowerCase(Locale.ROOT).contains("text/event-stream")) {
 			ctx.status(406);
 			return;
 		}
 
-		Filter filter=parseFilter(ctx);
+		QueryWatch query=parseQuery(ctx);
 		WatchFormat format=parseFormat(ctx);
 		if (activeConnections.incrementAndGet()>MAX_CONNECTIONS) {
 			activeConnections.decrementAndGet();
@@ -85,13 +81,14 @@ public final class LogWatchAPI extends ABaseAPI {
 
 			PrintWriter writer=response.getWriter();
 			connection=new SseConnection(writer,EVENT_QUEUE_CAPACITY);
-			subscribe(connection,filter,format);
+			subscribe(connection,query,format);
 			synchronized (writer) {
 				writer.write(": connected\n\n");
 				writer.flush();
 			}
 			response.flushBuffer();
 			if (writer.checkError()) return;
+
 			while (!connection.awaitClosed(KEEPALIVE_MS,TimeUnit.MILLISECONDS)) {
 				synchronized (writer) {
 					writer.write(": keepalive\n\n");
@@ -102,7 +99,7 @@ public final class LogWatchAPI extends ABaseAPI {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		} catch (IOException e) {
-			log.debug("Log watch connection setup failed",e);
+			log.debug("Query watch connection setup failed",e);
 		} finally {
 			if (connection!=null) {
 				connection.close();
@@ -112,42 +109,29 @@ public final class LogWatchAPI extends ABaseAPI {
 		}
 	}
 
-	private Filter parseFilter(Context ctx) {
-		List<String> addressValues=boundedValues(ctx,"address",true);
-		Set<Address> addresses=new HashSet<>();
-		for (String source:addressValues) {
-			Address address=Address.parse(source);
-			if (address==null) throw new BadRequestResponse("Invalid address filter: "+source);
-			addresses.add(address);
+	private static QueryWatch parseQuery(Context ctx) {
+		List<String> sources=ctx.queryParams("source");
+		if (sources.size()!=1) throw new BadRequestResponse("Exactly one query source is required");
+		String source=sources.get(0);
+		if (source.isBlank()||(source.length()>MAX_SOURCE_CHARS)) {
+			throw new BadRequestResponse("Invalid query source");
 		}
-		return new Filter(addresses,parseCells(ctx,"event"),parseCells(ctx,"scope"));
-	}
 
-	private Set<ACell> parseCells(Context ctx, String name) {
-		List<String> values=boundedValues(ctx,name,false);
-		Set<ACell> result=new HashSet<>();
-		for (String source:values) {
-			try {
-				result.add(Reader.read(source));
-			} catch (Exception e) {
-				throw new BadRequestResponse("Invalid "+name+" filter: "+source);
-			}
+		ACell form;
+		try {
+			form=Reader.read(source);
+		} catch (Exception e) {
+			throw new BadRequestResponse("Invalid query source: "+e.getMessage());
 		}
-		return result;
-	}
 
-	private static List<String> boundedValues(Context ctx, String name, boolean required) {
-		List<String> values=ctx.queryParams(name);
-		if (required&&values.isEmpty()) throw new BadRequestResponse("At least one address filter is required");
-		if (values.size()>MAX_FILTER_VALUES) {
-			throw new BadRequestResponse("Too many "+name+" filters (max "+MAX_FILTER_VALUES+")");
+		List<String> addresses=ctx.queryParams("address");
+		if (addresses.size()>1) throw new BadRequestResponse("Specify query address only once");
+		Address address=null;
+		if (!addresses.isEmpty()) {
+			address=Address.parse(addresses.get(0));
+			if (address==null) throw new BadRequestResponse("Invalid query address: "+addresses.get(0));
 		}
-		for (String value:values) {
-			if ((value==null)||value.isBlank()||(value.length()>MAX_FILTER_SOURCE_CHARS)) {
-				throw new BadRequestResponse("Invalid "+name+" filter");
-			}
-		}
-		return values;
+		return new QueryWatch(form,address);
 	}
 
 	private static WatchFormat parseFormat(Context ctx) {
@@ -157,25 +141,24 @@ public final class LogWatchAPI extends ABaseAPI {
 		return switch (values.get(0).toLowerCase(Locale.ROOT)) {
 			case "json" -> WatchFormat.JSON;
 			case "cvx" -> WatchFormat.CVX;
-			default -> throw new BadRequestResponse("Unsupported log format: "+values.get(0));
+			default -> throw new BadRequestResponse("Unsupported query-watch format: "+values.get(0));
 		};
 	}
 
-	private void subscribe(SseConnection connection, Filter filter, WatchFormat format) {
+	private void subscribe(SseConnection connection, QueryWatch query, WatchFormat format) {
 		synchronized (lifecycleLock) {
 			boolean start=(updates==null);
-			Peer peer=server.getPeer();
-			long nextBlock=(peer==null)?0:peer.getStatePosition();
 			if (start) {
 				long currentGeneration=++generation;
-				ConsensusLogScanner scanner=new ConsensusLogScanner(nextBlock,
-					event->distribute(currentGeneration,event));
-				updates=new StateWatcher<>(scanner);
+				updates=new StateWatcher<>(peer->evaluateAll(currentGeneration,peer));
 				updateObserver=updates::update;
 			}
-			subscriptions.put(connection,
-				new Subscription(connection,filter,format,generation,nextBlock));
-			if (start) server.addStateUpdateObserver(updateObserver);
+			subscriptions.put(connection,new Subscription(connection,query,format,generation));
+			if (start) {
+				server.addStateUpdateObserver(updateObserver);
+			} else {
+				updates.update(server.getPeer());
+			}
 		}
 	}
 
@@ -191,37 +174,29 @@ public final class LogWatchAPI extends ABaseAPI {
 		}
 	}
 
-	private void distribute(long sourceGeneration, LogEvent event) {
-		if (sourceGeneration!=generation) return;
-		String json=null;
-		String cvx=null;
+	private void evaluateAll(long sourceGeneration, Peer peer) {
+		if ((peer==null)||(sourceGeneration!=generation)) return;
 		for (Subscription subscription:subscriptions.values()) {
-			if ((sourceGeneration!=generation)||(subscription.generation()!=sourceGeneration)
-				||(event.blockIndex()<subscription.nextBlock())) continue;
+			if ((sourceGeneration!=generation)||(subscription.generation()!=sourceGeneration)) continue;
 			SseConnection connection=subscription.connection();
-			if (connection.isClosed()||!subscription.filter().matches(event)) continue;
+			if (connection.isClosed()) continue;
 			try {
-				String data;
-				if (subscription.format()==WatchFormat.JSON) {
-					if (json==null) json=LogWatch.encode(event,WatchFormat.JSON);
-					data=json;
-				} else {
-					if (cvx==null) cvx=LogWatch.encode(event,WatchFormat.CVX);
-					data=cvx;
-				}
-				if (data.length()>MAX_EVENT_CHARS) {
+				Event event=subscription.query().evaluate(peer);
+				if (event==null) continue;
+				String data=QueryWatch.encode(event,subscription.format(),MAX_EVENT_CHARS);
+				if (data==null) {
 					connection.close();
 				} else {
-					connection.sendEvent(LogWatch.eventID(event),"log",data);
+					connection.sendEvent(Long.toString(event.position()),"result",data);
 				}
 			} catch (Exception e) {
 				connection.close();
-				log.debug("Closing log watch after event encoding failed",e);
+				log.debug("Closing query watch after evaluation failed",e);
 			}
 		}
 	}
 
-	/** Stops observation and closes all active log streams. */
+	/** Stops observation and closes all active query streams. */
 	public void shutdown() {
 		for (SseConnection connection:subscriptions.keySet()) connection.close();
 		synchronized (lifecycleLock) {

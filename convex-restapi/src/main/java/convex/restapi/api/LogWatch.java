@@ -25,8 +25,6 @@ final class LogWatch {
 	private static final Keyword K_LOG=Keyword.intern("log");
 	private static final Keyword K_ENTRY=Keyword.intern("entry");
 
-	enum Format { JSON, CVX }
-
 	record Filter(Set<Address> addresses, Set<ACell> events, Set<ACell> scopes) {
 		Filter {
 			if ((addresses==null)||addresses.isEmpty()) {
@@ -66,7 +64,7 @@ final class LogWatch {
 		return event.blockIndex()+":"+event.transactionIndex()+":"+event.logIndex();
 	}
 
-	static String encode(LogEvent event, Format format) {
+	static String encode(LogEvent event, WatchFormat format) {
 		AMap<ACell,ACell> envelope=Maps.of(
 			K_BLOCK,CVMLong.create(event.blockIndex()),
 			K_TRANSACTION,CVMLong.create(event.transactionIndex()),
