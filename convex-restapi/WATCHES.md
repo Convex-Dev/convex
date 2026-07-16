@@ -53,7 +53,7 @@ This document describes how state watches work with MCP Streamable HTTP on Conve
    → Starts watcher if not running
    → Response: JSON with {watchId: "w-1", value: ...}
 
-4. ConvexStateWatcher polls CVM state
+4. ConvexStateWatcher receives a finalised peer state update
    → On change: sends JSON-RPC notification on the McpConnection's GET stream
    → {"jsonrpc":"2.0","method":"notifications/stateChanged","params":{...}}
 
@@ -104,7 +104,7 @@ Client                              Convex Peer (McpAPI)
   │    Mcp-Session-Id: abc123            │  Adds watch to connection
   │<── JSON: {watchId: "w-1"} ──────────│
   │                                      │
-  │    ... ConvexStateWatcher polls ...  │
+  │    ... finalised state update ...    │
   │                                      │
   │<── GET stream SSE event: ────────────│  Notification on GET stream
   │    notifications/stateChanged        │
@@ -153,7 +153,7 @@ When `close()` is called, the connection is marked closed and removed from the m
 // Connection map: session ID → McpConnection (created on GET /mcp)
 private final ConcurrentHashMap<String, McpConnection> connections = new ConcurrentHashMap<>();
 
-// Watcher (Convex-specific, reads CVM state directly)
+// Watcher (Convex-specific, observes finalised Peer snapshots)
 private final ConvexStateWatcher stateWatcher;
 ```
 
@@ -177,46 +177,51 @@ private final ConvexStateWatcher stateWatcher;
 
 ### ConvexStateWatcher
 
-Convex-specific inner class of McpAPI. Polls CVM global state and pushes notifications to McpConnections.
+Convex-specific inner class of McpAPI. It registers with the Server's shared
+finalised-state observation point while watches exist. A generic asynchronous
+`StateWatcher<Peer>` coalesces triggers and keeps path resolution and SSE writes
+off the CVM executor thread.
 
 ```java
 class ConvexStateWatcher {
-    static final long POLL_INTERVAL_MS = 1000;
     static final long VALUE_SIZE_THRESHOLD = 1024;
 
-    private volatile Thread thread;
-    private volatile boolean running;
+    private StateWatcher<Peer> updates;
+    private Consumer<Peer> updateObserver;
 
-    void ensureRunning();   // start watcher thread if not running
-    void shutdown();        // stop watcher thread
+    void ensureRunning();   // register when the first watch is added
+    void stopIfIdle();      // unregister when no watches remain
+    void shutdown();
 
-    private void pollLoop() {
-        while (running && hasAnyWatches()) {
-            for (McpConnection conn : connections.values()) {
-                if (conn.isClosed() || !conn.hasWatches()) continue;
-                for (WatchEntry entry : conn.watches.values()) {
-                    ACell value = RT.getIn(server.getState(), entry.path);
-                    Hash hash = Hash.get(value);
-                    if (!hash.equals(entry.lastHash)) {
-                        entry.lastHash = hash;
-                        conn.sendEvent("message", buildNotification(entry, value));
-                    }
+    private void checkAllConnections(Peer peer) {
+        for (McpConnection conn : connections.values()) {
+            if (conn.isClosed() || !conn.hasWatches()) continue;
+            for (WatchEntry entry : conn.watches.values()) {
+                ACell value = RT.getIn(peer.getConsensusState(), entry.path);
+                Hash hash = Hash.get(value);
+                if (!hash.equals(entry.lastHash)) {
+                    entry.lastHash = hash;
+                    conn.sendEvent("message", buildNotification(entry, value));
                 }
             }
-            Thread.sleep(POLL_INTERVAL_MS);
         }
     }
 }
 ```
 
-Daemon virtual thread. Starts on first watch, exits when no watches remain.
+Registration atomically supplies the current immutable Peer snapshot, avoiding a
+gap between initial path resolution and observation. The shared Server callback only
+enqueues snapshots. The
+StateWatcher distributor thread performs resolution and notification. Rapid peer
+updates may coalesce, so watches report the latest stable value rather than every
+transient intermediate value.
 
 ## Resource Limits
 
 | Limit | Value | Rationale |
 |-------|-------|-----------|
 | `MAX_CONNECTIONS` | 1000 | Each holds a virtual thread + TCP socket |
-| `MAX_WATCHES_PER_CONNECTION` | 16 | Caps polling overhead per client |
+| `MAX_WATCHES_PER_CONNECTION` | 16 | Caps resolution work per state update and client |
 | `MAX_BATCH_SIZE` | 20 | Limits per-request processing |
 
 ## DoS Considerations
@@ -226,8 +231,8 @@ Daemon virtual thread. Starts on first watch, exits when no watches remain.
 | Flood `initialize` | No state created. Zero cost. |
 | Flood GET /mcp | `MAX_CONNECTIONS` hard cap. Each is a real TCP socket so OS limits also apply. |
 | Flood `watchState` | Requires valid McpConnection (must hold a GET stream). `MAX_WATCHES_PER_CONNECTION` caps per-client. |
-| Open connection, never watch | Connection holds one virtual thread + socket. Bounded by `MAX_CONNECTIONS`. No polling cost. |
-| Watch expensive paths | Polling cost is per-watch, bounded by total watches across all connections. |
+| Open connection, never watch | Connection holds one virtual thread + socket. Bounded by `MAX_CONNECTIONS`. No state-observation cost. |
+| Watch expensive paths | Resolution cost is per-watch and per delivered state update, bounded by total watches across all connections. |
 | Slow client (backpressure) | `sendEvent` is synchronised; writer error → connection closed. |
 
 **High-value peers (large stake, critical infrastructure) should disable MCP entirely** and leave it to lower-staked proxy/gateway peers.
@@ -235,7 +240,7 @@ Daemon virtual thread. Starts on first watch, exits when no watches remain.
 ## Client Responsibilities
 
 - **Reconnect and re-register.** Watches are ephemeral. If the GET stream drops (network, server restart, timeout), all watches are lost. The client must reconnect (new `initialize` → new GET /mcp) and re-register watches.
-- **Accept loss.** Notifications are best-effort. If the connection drops between polls, the client may miss a change. The client should poll current state on reconnect.
+- **Accept loss.** Notifications are best-effort. Coalescing may omit transient intermediate values, and a disconnected client may miss changes. The client should query current state on reconnect.
 - **Clean up.** Client SHOULD send DELETE when leaving, per MCP spec. But the server does not depend on this — disconnect cleans up regardless.
 
 ## Streamable HTTP in Javalin/Jetty
@@ -306,7 +311,7 @@ try {
 - **Javalin/Jetty keeps the connection alive** as long as the handler thread is running. The handler blocks in the keepalive loop; Jetty does not time out the request because the handler thread is still active.
 - **Virtual threads** — Jetty 12 (used by Javalin 6) runs request handlers on virtual threads. Each SSE connection blocks a virtual thread (not a platform thread), so thousands of concurrent SSE connections are feasible without thread pool exhaustion. `Thread.sleep()` in the loop yields the virtual thread to the carrier.
 - **Disconnect detection** — `writer.checkError()` returns `true` when the client TCP connection drops (Jetty sets the error flag on the underlying `ServletOutputStream`). The handler breaks out of the loop and cleans up in `finally`.
-- **Notifications** — The `ConvexStateWatcher` thread calls `conn.sendEvent()` from a different thread. The `sendEvent()` method is `synchronized` on the same `PrintWriter` to prevent interleaving with keepalive writes.
+- **Notifications** — The generic `StateWatcher` distributor calls `conn.sendEvent()` off the CVM executor thread. The `sendEvent()` method is `synchronized` on the same `PrintWriter` to prevent interleaving with keepalive writes.
 
 ### Session header
 
@@ -328,4 +333,4 @@ Standard Javalin handler. Looks up and destroys the McpConnection by session ID,
 - `SseConnection` — original shared class remains for Covia's use (thin PrintWriter wrapper).
 - `McpSession` — remains available for Covia (persistent sessions across reconnects, multiple connections per session).
 - `StateWatcher` — generic shared class remains for Covia (pluggable StateResolver).
-- Convex uses its own `McpConnection` and `ConvexStateWatcher` — Convex-specific, reads CVM state directly.
+- Convex uses its own `McpConnection` and `ConvexStateWatcher`; the latter registers with the canonical Server state-update observation point.

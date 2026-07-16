@@ -378,7 +378,7 @@ public class PeerGUI extends AbstractGUI {
 			StateModel<Peer> model=models.get(s);
 			if	(model!=null) return model;
 			StateModel<Peer> newModel=StateModel.create(s.getPeer());
-			s.getCVMExecutor().setUpdateHook(p->{
+			s.addStateUpdateObserver(p->{
 				newModel.setValue(p);
 			});
 			models.put(s, newModel);

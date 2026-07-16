@@ -3,7 +3,7 @@ package convex.core.cvm;
 /**
  * Constants and utility functions for CVM log
  * 
- * See CAD33
+ * See CAD27
  */
 public class Log {
 

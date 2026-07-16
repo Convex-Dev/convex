@@ -3,12 +3,14 @@ package convex.core.util;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -86,6 +88,66 @@ class StateWatcherTest {
 		org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(TIMEOUT,()-> {
 			while (watcher.isDispatcherRunning()) Thread.yield();
 		});
+	}
+
+	@Test
+	void updateAndWaitBlocksUntilConsumerRoundCompletes() throws Exception {
+		CountDownLatch consumerStarted=new CountDownLatch(1);
+		CountDownLatch releaseConsumer=new CountDownLatch(1);
+		AtomicBoolean returned=new AtomicBoolean();
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+
+		try (StateWatcher<Integer> watcher=new StateWatcher<>(v-> {
+			consumerStarted.countDown();
+			awaitUninterruptibly(releaseConsumer);
+		})) {
+			Thread caller=Thread.ofVirtual().start(()-> {
+				try {
+					watcher.updateAndWait(1);
+					returned.set(true);
+				} catch (Throwable t) {
+					failure.set(t);
+				}
+			});
+
+			assertTrue(await(consumerStarted));
+			assertFalse(returned.get());
+			releaseConsumer.countDown();
+			caller.join(TIMEOUT.toMillis());
+
+			assertFalse(caller.isAlive());
+			assertNull(failure.get());
+			assertTrue(returned.get());
+		}
+	}
+
+	@Test
+	void closeReleasesUpdateAndWait() throws Exception {
+		CountDownLatch consumerStarted=new CountDownLatch(1);
+		CountDownLatch releaseConsumer=new CountDownLatch(1);
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		StateWatcher<Integer> watcher=new StateWatcher<>(v-> {
+			consumerStarted.countDown();
+			awaitUninterruptibly(releaseConsumer);
+		});
+		Thread caller=Thread.ofVirtual().start(()-> {
+			try {
+				watcher.updateAndWait(1);
+			} catch (Throwable t) {
+				failure.set(t);
+			}
+		});
+
+		try {
+			assertTrue(await(consumerStarted));
+			watcher.close();
+			caller.join(TIMEOUT.toMillis());
+			assertFalse(caller.isAlive());
+			assertTrue(failure.get() instanceof IllegalStateException);
+		} finally {
+			releaseConsumer.countDown();
+			watcher.close();
+		}
 	}
 
 	private static void awaitUninterruptibly(CountDownLatch latch) {

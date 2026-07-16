@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,7 +128,7 @@ public class McpAPI extends ABaseAPI {
 	/** Maximum concurrent McpConnections. Each holds a virtual thread + TCP socket. */
 	public static final int MAX_CONNECTIONS = 1000;
 
-	/** Maximum watches per connection. Caps polling overhead per client. */
+	/** Maximum watches per connection. Caps resolution work per state update. */
 	public static final int MAX_WATCHES_PER_CONNECTION = 16;
 
 	/** Size threshold for queryState responses (bytes). Values larger than this are omitted. */
@@ -185,6 +186,13 @@ public class McpAPI extends ABaseAPI {
 
 	public McpServer getMcpServer() {
 		return mcpServer;
+	}
+
+	/**
+	 * Stops peer-state observation for this API instance.
+	 */
+	public void shutdown() {
+		stateWatcher.shutdown();
 	}
 
 	/**
@@ -309,6 +317,7 @@ public class McpAPI extends ABaseAPI {
 			} finally {
 				conn.close();
 				connections.remove(sessionId);
+				stateWatcher.stopIfIdle();
 			}
 		} catch (IOException e) {
 			log.debug("SSE connection setup failed", e);
@@ -327,6 +336,7 @@ public class McpAPI extends ABaseAPI {
 		McpConnection conn = connections.remove(sessionId);
 		if (conn != null) {
 			conn.close();
+			stateWatcher.stopIfIdle();
 			ctx.status(200);
 		} else {
 			ctx.status(404);
@@ -1516,6 +1526,7 @@ public class McpAPI extends ABaseAPI {
 				}
 				removed = conn.removeWatchesByPathPrefix(prefixVec);
 			}
+			stateWatcher.stopIfIdle();
 			return toolSuccess(Maps.of("removed", CVMLong.create(removed)));
 		}
 	}
@@ -1523,51 +1534,43 @@ public class McpAPI extends ABaseAPI {
 	// ===== Convex state watcher =====
 
 	/**
-	 * Convex-specific state watcher. Polls CVM global state and pushes
-	 * notifications to McpConnections when watched paths change.
+	 * Convex-specific state watcher. Observes finalised peer state updates and
+	 * pushes notifications to McpConnections when watched paths change.
 	 *
-	 * <p>Daemon virtual thread. Starts on first watch, exits when no watches remain.</p>
+	 * <p>Registers on the shared Server observation point only while watches are
+	 * present. State resolution and notification run on a StateWatcher distributor
+	 * thread, never on the CVM executor thread.</p>
 	 */
 	private class ConvexStateWatcher {
-		static final long POLL_INTERVAL_MS = 1000;
 		static final long VALUE_SIZE_THRESHOLD = 1024;
 
-		private volatile Thread thread;
-		private volatile boolean running;
+		private convex.core.util.StateWatcher<Peer> updates;
+		private Consumer<Peer> updateObserver;
 
 		synchronized void ensureRunning() {
-			if (running) return;
-			running = true;
-			thread = Thread.ofVirtual().name("convex-state-watcher").start(this::pollLoop);
+			if (updateObserver!=null) return;
+			var newUpdates=new convex.core.util.StateWatcher<Peer>(this::checkAllConnections);
+			Consumer<Peer> newObserver=newUpdates::update;
+			server.addStateUpdateObserver(newObserver);
+			updates=newUpdates;
+			updateObserver=newObserver;
 		}
 
-		void shutdown() {
-			running = false;
-			Thread t = thread;
-			if (t != null) t.interrupt();
+		synchronized void stopIfIdle() {
+			if (!hasAnyWatches()) shutdown();
+		}
+
+		synchronized void shutdown() {
+			Consumer<Peer> observer=updateObserver;
+			var watcher=updates;
+			updateObserver=null;
+			updates=null;
+			if (observer!=null) server.removeStateUpdateObserver(observer);
+			if (watcher!=null) watcher.close();
 		}
 
 		ACell resolveValue(ACell[] path) {
 			return RT.getIn(server.getState(), path);
-		}
-
-		private void pollLoop() {
-			try {
-				while (running) {
-					if (!hasAnyWatches()) break;
-					try {
-						checkAllConnections();
-					} catch (Exception e) {
-						log.debug("Error in state watcher poll", e);
-					}
-					Thread.sleep(POLL_INTERVAL_MS);
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			} finally {
-				running = false;
-				thread = null;
-			}
 		}
 
 		private boolean hasAnyWatches() {
@@ -1577,12 +1580,12 @@ public class McpAPI extends ABaseAPI {
 			return false;
 		}
 
-		private void checkAllConnections() {
+		private void checkAllConnections(Peer peer) {
 			for (McpConnection conn : connections.values()) {
 				if (conn.isClosed() || !conn.hasWatches()) continue;
 				for (StateWatcher.WatchEntry entry : conn.watches.values()) {
 					try {
-						ACell value = resolveValue(entry.path);
+						ACell value = RT.getIn(peer.getConsensusState(),entry.path);
 						Hash currentHash = Hash.get(value);
 						if (!currentHash.equals(entry.lastHash)) {
 							entry.lastHash = currentHash;

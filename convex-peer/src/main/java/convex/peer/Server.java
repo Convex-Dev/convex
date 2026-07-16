@@ -1008,6 +1008,31 @@ public class Server implements Closeable {
 		return executor;
 	}
 
+	/**
+	 * Adds an observer for finalised peer state updates. A newly registered observer
+	 * is first called with the current Peer while registration holds the executor
+	 * lock, eliminating a missed-update window. Later calls occur on the CVM executor
+	 * thread. Observers should return promptly; asynchronous observers should enqueue
+	 * or distribute the supplied Peer value.
+	 *
+	 * @param observer Observer to register
+	 * @return {@code true} if the observer was added
+	 */
+	public boolean addStateUpdateObserver(Consumer<Peer> observer) {
+		return executor.addUpdateObserver(observer);
+	}
+
+	/**
+	 * Removes a finalised peer state observer. An in-progress invocation may still
+	 * complete after this method returns.
+	 *
+	 * @param observer Observer instance to remove
+	 * @return {@code true} if the observer was removed
+	 */
+	public boolean removeStateUpdateObserver(Consumer<Peer> observer) {
+		return executor.removeUpdateObserver(observer);
+	}
+
 	public QueryHandler getQueryProcessor() {
 		return queryHandler;
 	}

@@ -107,7 +107,7 @@ public class Context {
 
 	/**
 	 * Local log is an ordered [vector of [address scope location [values ...] ] entries
-	 * See CAD33 for details
+	 * See CAD27 for details
 	 */
 	private AVector<AVector<ACell>> log;
 	private CompilerState compilerState;

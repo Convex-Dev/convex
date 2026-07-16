@@ -376,6 +376,7 @@ public class RESTServer implements Closeable {
 	}
 
 	public synchronized void close() {
+		if (mcpAPI!=null) mcpAPI.shutdown();
 		if (javalin!=null) javalin.stop();
 		javalin=null;
 		

@@ -28,11 +28,15 @@ public final class StateWatcher<V> implements AutoCloseable {
 	private static final System.Logger log=System.getLogger(StateWatcher.class.getName());
 	private static final AtomicLong THREAD_COUNTER=new AtomicLong();
 
-	private final LatestUpdateQueue<V> updates=new LatestUpdateQueue<>();
+	private final LatestUpdateQueue<Boolean> updates=new LatestUpdateQueue<>();
 	private final Consumer<? super V> consumer;
+	private final Object completionMonitor=new Object();
 
 	private volatile boolean closed;
 	private volatile Thread dispatcher;
+	private V latest;
+	private long submittedSequence;
+	private long completedSequence;
 
 	/**
 	 * Creates a distributor for a consumer.
@@ -51,10 +55,45 @@ public final class StateWatcher<V> implements AutoCloseable {
 	 * @throws IllegalStateException if this distributor is closed
 	 */
 	public void update(V value) {
+		submit(value);
+	}
+
+	/**
+	 * Supplies a value and waits until the consumer has completed a delivery round
+	 * containing this update or a later update that superseded it.
+	 *
+	 * <p>This method must not be called by the consumer itself because the consumer
+	 * runs on the sole dispatcher thread.</p>
+	 *
+	 * @param value New value, must not be {@code null}
+	 * @throws InterruptedException if interrupted while waiting
+	 * @throws IllegalStateException if this distributor is closed or this method is
+	 *         called from its dispatcher thread
+	 */
+	public void updateAndWait(V value) throws InterruptedException {
+		if (Thread.currentThread()==dispatcher) {
+			throw new IllegalStateException("StateWatcher consumer cannot wait for itself");
+		}
+		long target=submit(value);
+		synchronized (completionMonitor) {
+			while (completedSequence<target) {
+				if (closed) throw new IllegalStateException("StateWatcher closed before delivery completed");
+				completionMonitor.wait();
+			}
+		}
+	}
+
+	private long submit(V value) {
 		Objects.requireNonNull(value,"StateWatcher value cannot be null");
 		if (closed) throw new IllegalStateException("StateWatcher is closed");
 		ensureDispatcher();
-		updates.offer(value);
+		synchronized (updates) {
+			if (closed) throw new IllegalStateException("StateWatcher is closed");
+			long sequence=++submittedSequence;
+			latest=value;
+			updates.offer(Boolean.TRUE);
+			return sequence;
+		}
 	}
 
 	private void ensureDispatcher() {
@@ -72,18 +111,31 @@ public final class StateWatcher<V> implements AutoCloseable {
 		Thread thread=Thread.currentThread();
 		try {
 			while (!closed) {
-				V value;
 				try {
-					value=updates.take();
+					updates.take();
 				} catch (InterruptedException e) {
 					if (closed) break;
 					continue;
 				}
-				if (closed) break;
+
+				V value;
+				long sequence;
+				synchronized (updates) {
+					if (closed) break;
+					value=latest;
+					sequence=submittedSequence;
+					// Any signal already queued is represented by the claimed latest value.
+					updates.clear();
+				}
 				try {
 					consumer.accept(value);
 				} catch (Exception e) {
 					log.log(System.Logger.Level.DEBUG,"StateWatcher consumer failed",e);
+				} finally {
+					synchronized (completionMonitor) {
+						completedSequence=sequence;
+						completionMonitor.notifyAll();
+					}
 				}
 			}
 		} finally {
@@ -113,8 +165,14 @@ public final class StateWatcher<V> implements AutoCloseable {
 		synchronized (this) {
 			if (closed) return;
 			closed=true;
-			updates.clear();
 			thread=dispatcher;
+		}
+		synchronized (updates) {
+			updates.clear();
+			latest=null;
+		}
+		synchronized (completionMonitor) {
+			completionMonitor.notifyAll();
 		}
 		if (thread!=null) thread.interrupt();
 	}

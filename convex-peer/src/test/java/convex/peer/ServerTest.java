@@ -13,6 +13,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,7 @@ import convex.core.cpos.Belief;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
@@ -61,6 +64,20 @@ public class ServerTest {
 	@BeforeAll
 	public static void init() {
 		network = TestNetwork.getInstance();
+	}
+
+	@Test
+	public void testStateUpdateObserverRegistration() {
+		Server server=network.SERVER;
+		AtomicReference<Peer> observed=new AtomicReference<>();
+		Consumer<Peer> observer=observed::set;
+		try {
+			assertTrue(server.addStateUpdateObserver(observer));
+			assertNotNull(observed.get());
+			assertFalse(server.addStateUpdateObserver(observer));
+		} finally {
+			assertTrue(server.removeStateUpdateObserver(observer));
+		}
 	}
 
 	@Test
