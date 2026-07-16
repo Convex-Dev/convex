@@ -124,12 +124,11 @@ Client                              Convex Peer (McpAPI)
 
 ### McpConnection
 
-Wraps a response `PrintWriter` for the GET /mcp stream. Owns watches.
+Extends the shared bounded `SseConnection` and owns watches. Event producers
+never write to the network directly.
 
 ```java
-public class McpConnection {
-    final PrintWriter writer;
-    volatile boolean closed = false;
+public class McpConnection extends SseConnection {
 
     // Watches owned by this connection
     final ConcurrentHashMap<String, WatchEntry> watches = new ConcurrentHashMap<>();
@@ -233,7 +232,7 @@ transient intermediate value.
 | Flood `watchState` | Requires valid McpConnection (must hold a GET stream). `MAX_WATCHES_PER_CONNECTION` caps per-client. |
 | Open connection, never watch | Connection holds one virtual thread + socket. Bounded by `MAX_CONNECTIONS`. No state-observation cost. |
 | Watch expensive paths | Resolution cost is per-watch and per delivered state update, bounded by total watches across all connections. |
-| Slow client (backpressure) | `sendEvent` is synchronised; writer error → connection closed. |
+| Slow client (backpressure) | Events enter a bounded per-connection queue. Queue overflow or writer error closes only that connection. |
 
 **High-value peers (large stake, critical infrastructure) should disable MCP entirely** and leave it to lower-staked proxy/gateway peers.
 
@@ -311,7 +310,7 @@ try {
 - **Javalin/Jetty keeps the connection alive** as long as the handler thread is running. The handler blocks in the keepalive loop; Jetty does not time out the request because the handler thread is still active.
 - **Virtual threads** — Jetty 12 (used by Javalin 6) runs request handlers on virtual threads. Each SSE connection blocks a virtual thread (not a platform thread), so thousands of concurrent SSE connections are feasible without thread pool exhaustion. `Thread.sleep()` in the loop yields the virtual thread to the carrier.
 - **Disconnect detection** — `writer.checkError()` returns `true` when the client TCP connection drops (Jetty sets the error flag on the underlying `ServletOutputStream`). The handler breaks out of the loop and cleans up in `finally`.
-- **Notifications** — The generic `StateWatcher` distributor calls `conn.sendEvent()` off the CVM executor thread. The `sendEvent()` method is `synchronized` on the same `PrintWriter` to prevent interleaving with keepalive writes.
+- **Notifications** — The generic `StateWatcher` distributor calls `conn.sendEvent()` off the CVM executor thread. This only offers to a bounded queue. A lazy per-connection virtual thread performs network writes, synchronising on the `PrintWriter` to avoid interleaving with keepalives.
 
 ### Session header
 
@@ -330,7 +329,7 @@ Standard Javalin handler. Looks up and destroys the McpConnection by session ID,
 
 ## Shared Infrastructure
 
-- `SseConnection` — original shared class remains for Covia's use (thin PrintWriter wrapper).
+- `SseConnection` — shared bounded asynchronous SSE writer used by Convex and available to Covia.
 - `McpSession` — remains available for Covia (persistent sessions across reconnects, multiple connections per session).
 - `StateWatcher` — generic shared class remains for Covia (pluggable StateResolver).
 - Convex uses its own `McpConnection` and `ConvexStateWatcher`; the latter registers with the canonical Server state-update observation point.
