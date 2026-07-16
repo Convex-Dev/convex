@@ -7,6 +7,7 @@ import java.io.PrintWriter;
 import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -310,7 +311,7 @@ public class McpAPI extends ABaseAPI {
 					writer.write(": keepalive\n\n");
 					writer.flush();
 					if (writer.checkError()) break;
-					Thread.sleep(McpProtocol.SSE_KEEPALIVE_MS);
+					conn.awaitClosed(McpProtocol.SSE_KEEPALIVE_MS,TimeUnit.MILLISECONDS);
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();

@@ -1,6 +1,7 @@
 package convex.restapi.mcp;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -60,6 +61,28 @@ class SseConnectionTest {
 		}
 	}
 
+	@Test
+	void writesEventIDsAndFramesEveryDataLine() throws Exception {
+		CountDownLatch written=new CountDownLatch(1);
+		CapturingWriter output=new CapturingWriter(written);
+		SseConnection connection=new SseConnection(new PrintWriter(output));
+		try {
+			connection.sendEvent("12:3:4","log","first\nid: not-an-id\r\nthird");
+			assertTrue(written.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			assertEquals("id: 12:3:4\nevent: log\ndata: first\ndata: id: not-an-id\ndata: third\n\n",output.toString());
+		} finally {
+			connection.close();
+		}
+	}
+
+	@Test
+	void closeWakesWaiter() throws Exception {
+		SseConnection connection=new SseConnection(new PrintWriter(Writer.nullWriter()));
+		Thread closer=Thread.ofVirtual().start(connection::close);
+		assertTrue(connection.awaitClosed(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+		closer.join(TIMEOUT.toMillis());
+	}
+
 	private static final class BlockingWriter extends Writer {
 		private final CountDownLatch started;
 		private final CountDownLatch release;
@@ -102,5 +125,23 @@ class SseConnectionTest {
 
 		@Override public void flush() {}
 		@Override public void close() {}
+	}
+
+	private static final class CapturingWriter extends Writer {
+		private final CountDownLatch written;
+		private final StringBuilder builder=new StringBuilder();
+
+		private CapturingWriter(CountDownLatch written) {
+			this.written=written;
+		}
+
+		@Override
+		public synchronized void write(char[] chars, int offset, int length) {
+			builder.append(chars,offset,length);
+		}
+
+		@Override public void flush() { written.countDown(); }
+		@Override public void close() {}
+		@Override public synchronized String toString() { return builder.toString(); }
 	}
 }
