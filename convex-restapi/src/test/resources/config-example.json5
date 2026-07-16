@@ -75,6 +75,11 @@
 		// SECURITY: Only enable on test networks. Faucet has a per-request limit.
 		"faucet": false,
 
+		// Enable arbitrary consensus-driven query watches (default: false).
+		// SECURITY: Each connected watch consumes bounded execution resources whenever
+		// finalised state advances. Enable only when this service is intentionally offered.
+		"queryWatch": false,
+
 		// CORS allowed origins (default: "*" = all origins).
 		// "cors": "*",
 	},

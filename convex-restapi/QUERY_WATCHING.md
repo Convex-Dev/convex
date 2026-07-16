@@ -5,6 +5,22 @@ query is evaluated immediately against current consensus state and again wheneve
 finalised state advances. A new event is emitted only when the complete `Result`
 hash changes.
 
+The endpoint is disabled by default because every connected query consumes
+bounded execution resources whenever finalised state advances. Enable it in the
+JSON5 REST configuration:
+
+```json5
+{
+  "rest": {
+    "queryWatch": true
+  }
+}
+```
+
+Code using the legacy flat configuration may instead set
+`Keywords.QUERY_WATCH` to `true`. When disabled, the route is not registered and
+returns HTTP 404. Filtered `/api/v1/watch/logs` delivery remains enabled.
+
 The request must include `Accept: text/event-stream` and exactly one `source`
 parameter. Using `curl --data-urlencode` avoids manual query-string escaping:
 

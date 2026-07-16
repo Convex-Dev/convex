@@ -13,29 +13,62 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.JSON;
 import convex.java.ConvexHTTP;
+import convex.restapi.RESTServer;
 
 class QueryWatchAPITest extends ARESTTest {
 
 	private static final Duration TIMEOUT=Duration.ofSeconds(10);
+	private static final Object PREVIOUS_QUERY_WATCH;
+	private static final RESTServer QUERY_SERVER;
+	private static final String QUERY_API_PATH;
+
+	static {
+		HashMap<Keyword,Object> config=server.getServer().getConfig();
+		PREVIOUS_QUERY_WATCH=config.put(Keywords.QUERY_WATCH,true);
+		QUERY_SERVER=RESTServer.create(server.getServer());
+		QUERY_SERVER.start(0);
+		QUERY_API_PATH="http://localhost:"+QUERY_SERVER.getPort()+"/api/v1";
+	}
+
+	@AfterAll
+	static void closeQueryServer() {
+		QUERY_SERVER.close();
+		HashMap<Keyword,Object> config=server.getServer().getConfig();
+		if (PREVIOUS_QUERY_WATCH==null) {
+			config.remove(Keywords.QUERY_WATCH);
+		} else {
+			config.put(Keywords.QUERY_WATCH,PREVIOUS_QUERY_WATCH);
+		}
+	}
 
 	@Test
 	void requiresEventStreamAndOneQuerySource() throws Exception {
-		HttpResponse<String> noAccept=get(API_PATH+"/watch?source=42");
+		HttpRequest disabled=HttpRequest.newBuilder()
+			.uri(URI.create(API_PATH+"/watch?source=42"))
+			.header("Accept","text/event-stream")
+			.GET().build();
+		assertEquals(404,httpClient.send(disabled,HttpResponse.BodyHandlers.ofString()).statusCode());
+
+		HttpResponse<String> noAccept=get(QUERY_API_PATH+"/watch?source=42");
 		assertEquals(406,noAccept.statusCode());
 
 		HttpRequest noSource=HttpRequest.newBuilder()
-			.uri(URI.create(API_PATH+"/watch"))
+			.uri(URI.create(QUERY_API_PATH+"/watch"))
 			.header("Accept","text/event-stream")
 			.GET().build();
 		HttpResponse<String> response=httpClient.send(noSource,HttpResponse.BodyHandlers.ofString());
@@ -46,7 +79,7 @@ class QueryWatchAPITest extends ARESTTest {
 	void streamsInitialAndChangedQueryResultsAsJSON() throws Exception {
 		String query="?source="+encode("*timestamp*")+"&format=json";
 		HttpRequest request=HttpRequest.newBuilder()
-			.uri(URI.create(API_PATH+"/watch"+query))
+			.uri(URI.create(QUERY_API_PATH+"/watch"+query))
 			.header("Accept","text/event-stream")
 			.GET().build();
 

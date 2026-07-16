@@ -50,6 +50,7 @@ public class RESTConfig extends PeerConfig {
 	public static final AString BASE_URL = Strings.intern("baseUrl");
 	public static final AString FAUCET = Strings.intern("faucet");
 	public static final AString CORS = Strings.intern("cors");
+	public static final AString QUERY_WATCH = Strings.intern("queryWatch");
 
 	// ========== MCP config keys ==========
 
@@ -128,6 +129,14 @@ public class RESTConfig extends PeerConfig {
 	 */
 	public boolean isFaucetEnabled() {
 		return getBool(getSection(REST), FAUCET, false);
+	}
+
+	/**
+	 * Whether the query watch endpoint is enabled.
+	 * @return true if query watching is enabled (default: false)
+	 */
+	public boolean isQueryWatchEnabled() {
+		return getBool(getSection(REST), QUERY_WATCH, false);
 	}
 
 	// ========== MCP typed accessors ==========
@@ -251,6 +260,9 @@ public class RESTConfig extends PeerConfig {
 
 		if (getSection(REST).containsKey(FAUCET)) {
 			legacy.put(Keywords.FAUCET, isFaucetEnabled());
+		}
+		if (getSection(REST).containsKey(QUERY_WATCH)) {
+			legacy.put(Keywords.QUERY_WATCH, isQueryWatchEnabled());
 		}
 
 		// MCP security options (#552, #554)

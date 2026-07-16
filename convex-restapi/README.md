@@ -59,7 +59,7 @@ rest.start(8080);
 | `/api/v1/transact` | POST | Submit signed transaction |
 | `/api/v1/faucet` | POST | Request test funds (test networks) |
 | `/api/v1/accounts/{address}` | GET | Get account information |
-| `/api/v1/watch` | GET (SSE) | Watch a query result against finalised state |
+| `/api/v1/watch` | GET (SSE) | Watch a query result against finalised state (disabled by default) |
 | `/api/v1/watch/logs` | GET (SSE) | Watch filtered finalised log events |
 
 ### Example Requests

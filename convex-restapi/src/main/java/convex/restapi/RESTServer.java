@@ -166,8 +166,10 @@ public class RESTServer implements Closeable {
 		logWatchAPI = new LogWatchAPI(this);
 		logWatchAPI.addRoutes(routes);
 
-		queryWatchAPI = new QueryWatchAPI(this);
-		queryWatchAPI.addRoutes(routes);
+		if (RT.bool(getConfig().get(Keywords.QUERY_WATCH))) {
+			queryWatchAPI = new QueryWatchAPI(this);
+			queryWatchAPI.addRoutes(routes);
+		}
 
 		depAPI = new DepAPI(this);
 		depAPI.addRoutes(routes);
