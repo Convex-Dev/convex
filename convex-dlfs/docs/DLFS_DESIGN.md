@@ -408,7 +408,7 @@ node.sync();
 | DAV class 1 server | ✅ Working, bounded and loopback by default |
 | DLFSBrowser GUI | ✅ Working (lifecycle managed) |
 | Standalone multi-drive management | ✅ Working in process (GUI + WebDAV) |
-| Cursor-backed drive registry | ⚠️ Drive contents persist; registry operations are not yet lattice-backed |
+| Cursor-backed drive registry | ✅ Atomic create/rename/delete with explicit sync |
 | DLFSBrowser with NodeServer | ⚠️ Etch-backed drive contents; persistent registry lifecycle incomplete |
 | Network replication via NodeServer | ⚠️ Basic (pull/push working, no signing) |
 
@@ -429,10 +429,11 @@ cursor-backed and registered in WebDAV automatically.
 
 ### Persistence
 
-Cursor-backed drive contents persist through the NodeServer's `LatticePropagator`
-(EtchStore). The current `DLFSDriveManager` registry is still process-local, so drive
-creation, rename and deletion are not yet durable registry operations. Standalone drives
-(via `DLFS.createLocal()`) are entirely in-memory and need explicit persistence if required.
+Cursor-backed drive contents and registry operations persist through the NodeServer's
+`LatticePropagator` (EtchStore). `DLFSDriveManager.sync()` marks the explicit persistence
+boundary; ordinary in-memory mutations do not perform I/O. Cursor-backed manager mode
+currently represents one owner namespace. Standalone drives (via `DLFS.createLocal()`)
+remain entirely in-memory and need explicit persistence if required.
 
 ## CAD045 Conformance
 

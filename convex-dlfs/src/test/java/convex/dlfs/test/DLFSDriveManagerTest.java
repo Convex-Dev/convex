@@ -22,6 +22,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
+import convex.etch.EtchStore;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.RootLatticeCursor;
@@ -29,6 +30,8 @@ import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
 import convex.dlfs.DLFSDriveManager;
+import convex.node.NodeConfig;
+import convex.node.NodeServer;
 
 public class DLFSDriveManagerTest {
 
@@ -117,5 +120,35 @@ public class DLFSDriveManagerTest {
 		AHashMap<AString, AVector<ACell>> value=(AHashMap<AString, AVector<ACell>>)synced.get();
 		assertNotNull(value);
 		assertNotNull(value.get(Strings.create("home")));
+	}
+
+	@Test
+	public void testEtchRestartRestoresRegistryAndContents() throws Exception {
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		try (EtchStore store=EtchStore.createTemp("dlfs-registry")) {
+			NodeServer<AHashMap<AString, AVector<ACell>>> first=
+				new NodeServer<>(lattice, store, NodeConfig.port(-1));
+			first.launch();
+			try {
+				DLFSDriveManager manager=new DLFSDriveManager(first.getCursor());
+				assertTrue(manager.createDrive(null, "home"));
+				Files.writeString(manager.getDrive(null, "home").getPath("/hello.txt"), "after restart");
+				manager.sync();
+			} finally {
+				first.close();
+			}
+
+			NodeServer<AHashMap<AString, AVector<ACell>>> restored=
+				new NodeServer<>(lattice, store, NodeConfig.port(-1));
+			restored.launch();
+			try {
+				DLFSDriveManager manager=new DLFSDriveManager(restored.getCursor());
+				assertEquals(List.of("home"), manager.listDrives(null));
+				assertEquals("after restart",
+					Files.readString(manager.getDrive(null, "home").getPath("/hello.txt")));
+			} finally {
+				restored.close();
+			}
+		}
 	}
 }

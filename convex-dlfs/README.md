@@ -74,6 +74,11 @@ particular, the standalone drive registry is process-local, directory MOVE/COPY 
 DAV locking are not implemented, and operators remain responsible for persistence,
 backup and trusted replication configuration.
 
+The `convex dlfs start --etch <file>` command uses a cursor-backed registry and requires
+a stable keystore key (`--key` or `--public-key`). This prevents a restart from silently
+selecting a different owner namespace. Registry mutations and file writes are persisted
+synchronously at the service `sync()` boundary.
+
 Connect any WebDAV client, e.g.:
 
 ```bash

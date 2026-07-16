@@ -357,6 +357,7 @@ public class DLFSWebDAV {
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
 			boolean deleted = driveManager.deleteDrive(getIdentity(ctx), dp.driveName());
 			if (deleted) {
+				driveManager.sync();
 				ctx.status(204);
 			} else {
 				ctx.status(404).result("Not Found");
@@ -502,6 +503,7 @@ public class DLFSWebDAV {
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
 			boolean created = driveManager.createDrive(getIdentity(ctx), dp.driveName());
 			if (created) {
+				driveManager.sync();
 				ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/");
 				ctx.status(201);
 			} else {
@@ -545,6 +547,7 @@ public class DLFSWebDAV {
 			}
 			boolean renamed = driveManager.renameDrive(getIdentity(ctx), dp.driveName(), destDp.driveName());
 			if (renamed) {
+				driveManager.sync();
 				ctx.header("Location", ROUTE + encodePathComponent(destDp.driveName()) + "/");
 				ctx.status(201);
 			} else {

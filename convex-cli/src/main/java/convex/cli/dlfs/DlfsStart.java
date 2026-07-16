@@ -1,7 +1,6 @@
 package convex.cli.dlfs;
 
 import java.io.File;
-import java.nio.file.FileSystem;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -15,18 +14,22 @@ import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSServer;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
-import convex.lattice.fs.DLFS;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import picocli.CommandLine.Command;
@@ -104,6 +107,18 @@ public class DlfsStart extends ACommand {
 
 	@Override
 	public void execute() throws InterruptedException {
+		if (etchFile!=null && !etchFile.isBlank() && getKeySpec()==null) {
+			throw new CLIError(ExitCodes.CONFIG,
+				"Persistent --etch storage requires a stable key supplied with --public-key or --key");
+		}
+		if (driveNames.length>DLFSDriveManager.MAX_DRIVES_PER_IDENTITY) {
+			throw new CLIError(ExitCodes.CONFIG, "Too many initial drives");
+		}
+		for (String driveName: driveNames) {
+			if (!DLFSDriveManager.isValidDriveName(driveName)) {
+				throw new CLIError(ExitCodes.CONFIG, "Invalid drive name: " + driveName);
+			}
+		}
 		// Resolve or generate key pair
 		AKeyPair keyPair = resolveKeyPair();
 		inform("Key: " + keyPair.getAccountKey().toChecksumHex());
@@ -132,22 +147,36 @@ public class DlfsStart extends ACommand {
 		// Navigate cursor to this owner's drives map: :fs → accountKey → :value
 		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
 		AccountKey accountKey = keyPair.getAccountKey();
-		ALatticeCursor<?> drivesCursor = nodeServer.getCursor()
+		ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor = nodeServer.getCursor()
 			.path(Keywords.FS, accountKey, Keywords.VALUE);
 
 		// Create DLFSServer with drives backed by the lattice cursor
-		DLFSServer dlfsServer = DLFSServer.create(keyPair);
+		DLFSDriveManager driveManager=new DLFSDriveManager(drivesCursor);
+		DLFSServer dlfsServer = DLFSServer.create(driveManager, keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.
 		dlfsServer.setRequireAuthForWrites(false);
 
-		for (String driveName : driveNames) {
-			FileSystem fs = DLFS.connect(drivesCursor, Strings.create(driveName));
-			dlfsServer.getDriveManager().seedDrive(null, driveName, fs);
-			inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
+		try {
+			for (String driveName : driveNames) {
+				boolean created=driveManager.createDrive(null, driveName);
+				if (!created && driveManager.getDrive(null, driveName)==null) {
+					throw new CLIError(ExitCodes.CONFIG, "Cannot create excess drive: " + driveName);
+				}
+				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
+			}
+			driveManager.sync();
+			dlfsServer.start(port);
+		} catch (RuntimeException e) {
+			dlfsServer.close();
+			try {
+				nodeServer.close();
+			} catch (Exception closeError) {
+				e.addSuppressed(closeError);
+			}
+			store.close();
+			throw e;
 		}
-
-		dlfsServer.start(port);
 		informSuccess("DLFS WebDAV server running on http://localhost:" + dlfsServer.getPort() + "/dlfs/");
 		if (driveNames.length > 0) {
 			inform("Connect with: curl http://localhost:" + dlfsServer.getPort() + "/dlfs/" + driveNames[0] + "/");
@@ -185,10 +214,11 @@ public class DlfsStart extends ACommand {
 	}
 
 	private AKeyPair resolveKeyPair() {
-		if (publicKey != null && !publicKey.isBlank()) {
-			AKeyPair kp = storeMixin.loadKeyFromStore(publicKey, () -> keyMixin.getKeyPassword());
+		String keySpec=getKeySpec();
+		if (keySpec!=null) {
+			AKeyPair kp = storeMixin.loadKeyFromStore(keySpec, () -> keyMixin.getKeyPassword());
 			if (kp == null) {
-				throw new CLIError(ExitCodes.CONFIG, "Key not found in keystore: " + publicKey);
+				throw new CLIError(ExitCodes.CONFIG, "Key not found in keystore: " + keySpec);
 			}
 			return kp;
 		}
@@ -197,6 +227,12 @@ public class DlfsStart extends ACommand {
 		inform("  Public key: " + kp.getAccountKey().toChecksumHex());
 		inform("  Ed25519 seed: " + kp.getSeed().toHexString());
 		return kp;
+	}
+
+	private String getKeySpec() {
+		if (publicKey!=null && !publicKey.isBlank()) return publicKey;
+		String inherited=keyMixin.getPublicKey();
+		return (inherited==null || inherited.isBlank())?null:inherited;
 	}
 
 	private AStore createStore() {

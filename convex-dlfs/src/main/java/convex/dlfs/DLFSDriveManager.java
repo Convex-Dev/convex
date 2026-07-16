@@ -52,6 +52,16 @@ public class DLFSDriveManager {
 	}
 
 	/**
+	 * Checks whether a drive name is safe and representable at service boundaries.
+	 *
+	 * @param driveName Candidate drive name
+	 * @return true if valid
+	 */
+	public static boolean isValidDriveName(String driveName) {
+		return DLFSPathValidator.isValidDriveName(driveName);
+	}
+
+	/**
 	 * Gets an existing drive for the given identity and name.
 	 *
 	 * @param identity Owner identity (DID string), or null for anonymous

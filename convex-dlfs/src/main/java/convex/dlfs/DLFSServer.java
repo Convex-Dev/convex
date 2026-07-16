@@ -73,6 +73,18 @@ public class DLFSServer implements Closeable {
 	}
 
 	/**
+	 * Creates a DLFS server using an application-supplied drive manager.
+	 *
+	 * @param driveManager Drive registry and filesystem view manager
+	 * @param keyPair Ed25519 key pair for auth (null for no auth)
+	 * @return New DLFSServer instance
+	 */
+	public static DLFSServer create(DLFSDriveManager driveManager, AKeyPair keyPair) {
+		if (driveManager==null) throw new IllegalArgumentException("Drive manager cannot be null");
+		return new DLFSServer(driveManager, keyPair);
+	}
+
+	/**
 	 * Creates a DLFS server with a single filesystem exposed as a named drive.
 	 * Useful for backwards-compatible testing with a single drive.
 	 *

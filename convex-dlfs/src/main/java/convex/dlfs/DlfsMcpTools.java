@@ -330,6 +330,7 @@ public class DlfsMcpTools {
 			}
 			boolean created = driveManager.createDrive(getIdentity(), nameCell.toString());
 			if (!created) return McpProtocol.toolError("Drive already exists: " + nameCell);
+			driveManager.sync();
 
 			return McpProtocol.toolSuccess(Maps.of("created", CVMBool.TRUE, FIELD_NAME, nameCell));
 		}
@@ -350,6 +351,7 @@ public class DlfsMcpTools {
 			// Drive deletion only for own drives — no UCAN delegation
 			boolean deleted = driveManager.deleteDrive(getIdentity(), nameCell.toString());
 			if (!deleted) return McpProtocol.toolError("Drive not found: " + nameCell);
+			driveManager.sync();
 
 			return McpProtocol.toolSuccess(Maps.of("deleted", CVMBool.TRUE));
 		}
