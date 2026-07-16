@@ -55,6 +55,24 @@ public class DLFS {
 		return new DLFSLocal(PROVIDER, driveName.toString(), cursor);
 	}
 
+	/**
+	 * Opens an existing DLFS drive at a named path without creating it.
+	 *
+	 * <p>This is intended for registries which keep the parent map as their source of
+	 * truth. Unlike {@link #connect(ALatticeCursor, AString)}, a concurrent deletion
+	 * cannot be reversed merely by opening a cached filesystem view.</p>
+	 *
+	 * @param parent Parent lattice cursor containing named drives
+	 * @param driveName Existing drive name
+	 * @return Connected filesystem view, or {@code null} if the drive is absent
+	 */
+	public static DLFSLocal open(ALatticeCursor<?> parent, AString driveName) {
+		ALatticeCursor<AVector<ACell>> cursor=parent.path(driveName);
+		AVector<ACell> root=cursor.get();
+		if (root==null) return null;
+		return new DLFSLocal(PROVIDER, driveName.toString(), cursor, DLFSNode.getUTime(root));
+	}
+
 	public static DLFileSystem createLocal() {
 		return create();
 	}

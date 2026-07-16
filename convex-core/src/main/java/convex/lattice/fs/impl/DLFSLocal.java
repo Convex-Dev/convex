@@ -52,6 +52,16 @@ public class DLFSLocal extends DLFileSystem {
 		this.rootCursor =  cursor;
 	}
 
+	/**
+	 * Creates a cursor-backed view using a root timestamp captured by the caller.
+	 * This avoids re-reading a registry entry while opening an existing drive.
+	 */
+	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, CVMLong timestamp) {
+		super(dlfsProvider, uriPath, timestamp);
+		this.rootCursor=cursor;
+	}
+
 	public static DLFSLocal create(DLFSProvider provider) {
 		return new DLFSLocal(provider,null,DLFSNode.createDirectory(CVMLong.ZERO));
 	}
