@@ -5,6 +5,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
@@ -315,17 +316,31 @@ public class Peer {
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
 	public ResultContext executeQuery(ACell form, Address address) {
+		return executeQuery(form,address,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	/**
+	 * Compiles and executes a query with an explicit execution Juice ceiling.
+	 *
+	 * @param form Form to compile and execute
+	 * @param address Address to use for query execution, or {@code null} for the
+	 *        genesis address
+	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @return Query result context
+	 */
+	public ResultContext executeQuery(ACell form, Address address, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State state=getConsensusState();
 
 		if (form instanceof ATransaction tx) {
-			return executeDetached(tx);
+			return executeDetached(tx,maxJuice);
 		}
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
 			ACell val=sc.getValue();
 			if (val instanceof ATransaction tx) {
-				return executeDetached(tx);
+				return executeDetached(tx,maxJuice);
 			}
 		}
 		
@@ -338,7 +353,7 @@ public class Peer {
 
 		// Run query in a fake transaction for given address
 		ATransaction tx=Invoke.create(address, state.getAccount(address).getSequence()+1, form);
-		ResultContext rctx=state.applyTransaction(tx);
+		ResultContext rctx=state.applyTransaction(tx,TransactionContext.create(state),maxJuice);
 		return rctx;
 	}
 
@@ -350,12 +365,24 @@ public class Peer {
 	 * @return The Context containing the transaction results.
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
+		return executeDetached(transaction,Constants.MAX_TRANSACTION_JUICE);
+	}
+
+	/**
+	 * Executes a detached transaction with an explicit execution Juice ceiling.
+	 *
+	 * @param transaction Transaction to execute
+	 * @param maxJuice Maximum execution Juice, must be non-negative
+	 * @return Detached transaction result
+	 */
+	public ResultContext executeDetached(ATransaction transaction, long maxJuice) {
+		if (maxJuice<0) throw new IllegalArgumentException("Maximum Juice cannot be negative");
 		State s=getConsensusState();
 		TransactionContext tctx=TransactionContext.create(s);
 		
 		// This is a fake transaction
 		tctx.signedTx=SignedData.create(AccountKey.ZERO, Ed25519Signature.ZERO, transaction.getRef());
-		ResultContext ctx=s.applyTransaction(transaction,tctx);
+		ResultContext ctx=s.applyTransaction(transaction,tctx,maxJuice);
 		return ctx;
 	}
 
@@ -497,6 +524,26 @@ public class Peer {
 	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
 		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
+		return updateState(consensusPoint);
+	}
+
+	/**
+	 * Updates the state of the Peer to an exact finalised position.
+	 *
+	 * @param targetPosition Finalised Order position to compute
+	 * @return Updated Peer at the requested position
+	 */
+	public Peer updateState(long targetPosition) {
+		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
+		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
+		if ((targetPosition < 0) || (targetPosition > consensusPoint)) {
+			throw new IllegalArgumentException("State target position " + targetPosition
+					+ " outside finalised range 0.." + consensusPoint);
+		}
+
+		// An exact target behind the current state first requires local truncation.
+		if (targetPosition < statePosition) return truncateState(targetPosition).updateState(targetPosition);
+
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 		AVector<SignedData<Block>> consensusBlocks= consensusOrder.getBlocks();
 
@@ -520,13 +567,16 @@ public class Peer {
 		}
 		
 		// Return if we don't need to advance states
-		if (stateIndex>=consensusPoint) return this;
+		if (stateIndex>=targetPosition) {
+			if (stateIndex==statePosition) return this;
+			return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+		}
 		
 		// Kick off parallel signature validation
-		validateSignatures(blocks,stateIndex,consensusPoint);
+		validateSignatures(blocks,stateIndex,targetPosition);
 
 		// We need to compute at least one new state update
-		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
+		while (stateIndex < targetPosition) { // add states until last state is at target position
 			SignedData<Block> block = blocks.get(stateIndex);
 			
 			BlockResult br = s.applyBlock(block);
@@ -546,8 +596,23 @@ public class Peer {
 	}
 	
 	public Peer recalcState(long pos) {
+		return recalcState(pos,getFinalityPoint());
+	}
+
+	/**
+	 * Recalculates state from a local history position to an exact finalised target.
+	 *
+	 * @param pos Position from which to start recalculation
+	 * @param targetPosition Finalised Order position to compute
+	 * @return Recalculated Peer at the requested position
+	 */
+	public Peer recalcState(long pos, long targetPosition) {
+		if ((pos < 0) || (pos > targetPosition)) {
+			throw new IllegalArgumentException("Replay start position " + pos
+					+ " outside target range 0.." + targetPosition);
+		}
 		Peer result=truncateState(pos);
-		result=result.updateState();
+		result=result.updateState(targetPosition);
 		return result;
 	}
 
@@ -570,6 +635,7 @@ public class Peer {
 			// recalculate from beginning
 			newResults=Vectors.empty();
 			newState=genesis;
+			newHistory=0;
 			pos=0;
 		}
 		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);

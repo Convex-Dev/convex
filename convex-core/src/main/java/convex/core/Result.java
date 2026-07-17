@@ -450,7 +450,7 @@ public final class Result extends ARecordGeneric {
 		hm.put("result", RT.print(getValue()));
 		
 		AVector<AVector<ACell>> log = getLog();
-		if (log!=null) hm.put("info", JSON.json(log));
+		if (log!=null) hm.put("log", JSON.json(log));
 		
 		AMap<Keyword, ACell> info = getInfo();
 		if (info!=null) hm.put("info", JSON.json(info));

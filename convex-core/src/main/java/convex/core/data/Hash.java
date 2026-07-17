@@ -47,6 +47,14 @@ public class Hash extends AArrayBlob {
 	public static final Hash EMPTY_HASH = Hashing.sha3(new byte[0]);
 	public static final Hash ZERO = Hashing.sha3(Utils.ZERO_BYTES_32);
 
+	/**
+	 * All-zero sentinel used where a hash field has not yet been assigned, such
+	 * as a newly created Etch root. This is not the hash of a value and is
+	 * deliberately distinct from {@link #NULL_HASH}, which means null was
+	 * explicitly written.
+	 */
+	public static final Hash UNSET_HASH = Hash.wrap(new byte[LENGTH]);
+
 
 	/**
 	 * Wraps the specified bytes as a Data object Warning: underlying bytes are used

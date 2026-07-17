@@ -56,6 +56,25 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	public long count() {
 		return length;
 	}
+
+	/**
+	 * Checks if this String is blank, i.e. is empty or contains only ASCII whitespace
+	 * (space, tab, CR, LF, vertical tab, form feed). Operates directly on the UTF-8
+	 * byte representation with no allocation: every byte of a multi-byte UTF-8
+	 * character is &gt;= 0x80, so any non-ASCII content is correctly non-blank.
+	 * Note that exotic Unicode whitespace (e.g. U+00A0 no-break space) therefore
+	 * counts as non-blank.
+	 *
+	 * @return true if this String is empty or contains only ASCII whitespace
+	 */
+	public final boolean isBlank() {
+		long n=count();
+		for (long i=0; i<n; i++) {
+			byte b=byteAt(i);
+			if (b!=' ' && b!='\t' && b!='\n' && b!='\r' && b!=0x0b && b!=0x0c) return false;
+		}
+		return true;
+	}
 	
 	/**
 	 * Prints this string as escaped UTF-8

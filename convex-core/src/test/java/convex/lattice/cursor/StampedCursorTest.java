@@ -87,6 +87,22 @@ public class StampedCursorTest {
 		assertNull(RT.getIn(root.get(), Strings.create("nope")));
 	}
 
+	@Test public void testLongLivedDerivedPathUsesAdvancedContextTimestamp() {
+		ALattice<ACell> state = stateLattice((v, ts) -> stampWith(v, ts.longValue()));
+		ACell initial = Maps.of(LWWLattice.KEY_TIMESTAMP, CVMLong.create(5));
+		RootLatticeCursor<ACell> root = Cursors.createLattice(state, initial,
+			LatticeContext.create(CVMLong.create(100), null));
+
+		// Keep this derived cursor across a harness clock advance (#640).
+		ALatticeCursor<ACell> child = root.path(USERS, ALICE);
+		root.setContext(LatticeContext.create(CVMLong.create(200), null));
+		child.set(Strings.create("bob"));
+
+		assertEquals(Strings.create("bob"), RT.getIn(root.get(), USERS, ALICE));
+		assertEquals(200L, tsOf(root.get()),
+			"a long-lived derived cursor must stamp with the parent’s current context time");
+	}
+
 	// ===== Whole-value LWW merge: deletions are durable =====
 
 	@Test public void testWholeValueMergeDeletionDurable() {

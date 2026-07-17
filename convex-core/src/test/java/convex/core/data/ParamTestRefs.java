@@ -15,8 +15,7 @@ import org.junit.runners.Parameterized;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
-import convex.core.util.Utils;
-import convex.etch.EtchStore;
+import convex.test.Samples;
 
 @RunWith(Parameterized.class)
 public class ParamTestRefs {
@@ -28,14 +27,10 @@ public class ParamTestRefs {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		try {
-			return Arrays
-					.asList(new Object[][] { 
-						    { "Memory Store", new MemoryStore() }, 
-							{ "Temp Etch Store", EtchStore.createTemp() } });
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e); 
-		}
+		return Arrays
+				.asList(new Object[][] {
+					    { "Memory Store", new MemoryStore() },
+						{ "Shared Etch Store", Samples.TEST_STORE } });
 	}
 	
 	@Test

@@ -6,6 +6,7 @@ import java.nio.file.attribute.FileTime;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.lattice.fs.DLFSNode;
 
 public class DLFSFileAttributes implements BasicFileAttributes {
@@ -31,14 +32,12 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public FileTime lastAccessTime() {
-		// TODO Auto-generated method stub
-		return null;
+		return getFileTime();
 	}
 
 	@Override
 	public FileTime creationTime() {
-		// TODO Auto-generated method stub
-		return null;
+		return getFileTime();
 	}
 
 	@Override
@@ -70,8 +69,7 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public Object fileKey() {
-		// TODO Auto-generated method stub
-		return null;
+		return Cells.getHash(node);
 	}
 
 }

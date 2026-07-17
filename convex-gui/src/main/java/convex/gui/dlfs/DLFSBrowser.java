@@ -652,6 +652,7 @@ public class DLFSBrowser extends AbstractGUI {
 	@Override
 	public void afterRun() {
 		getFrame().setJMenuBar(menuBar);
+		super.afterRun();
 	}
 
 	@Override
@@ -682,6 +683,7 @@ public class DLFSBrowser extends AbstractGUI {
 	@Override
 	public void close() {
 		shutdown();
+		super.close();
 	}
 
 	public static void main(String[] args) {

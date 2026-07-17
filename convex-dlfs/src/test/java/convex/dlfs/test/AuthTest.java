@@ -52,7 +52,6 @@ public class AuthTest {
 		expectedAudience = DID.forKey(serverKeyPair.getAccountKey()).toString();
 
 		server = DLFSServer.create(serverKeyPair);
-		server.getWebDAV().setRequireAuthForWrites(true);
 		// Pre-seed a drive for anonymous read tests
 		server.getDriveManager().createDrive(null, "auth");
 		server.start(0);
@@ -720,6 +719,25 @@ public class AuthTest {
 		String deniedJson = JSON.print(deniedResult).toString();
 		assertTrue(deniedJson.contains("Drive not found") || deniedJson.contains("isError"),
 			"Bob should not read files outside the scoped path");
+
+		// Canonicalisation must happen before capability matching: otherwise the raw
+		// prefix public/../ would be covered and the NIO channel would read /secret.txt.
+		AMap<AString, ACell> traversalResult = mcpToolCallWithUcans("dlfs_read",
+			Maps.of("drive", "ucan-scoped", "path", "public/../secret.txt"),
+			bobJWT(), Vectors.of(ucan));
+		String traversalJson = JSON.print(traversalResult).toString();
+		assertTrue(traversalJson.contains("Invalid path") || traversalJson.contains("isError"),
+			"Dot segments must not escape a UCAN path grant");
+	}
+
+	@Test
+	void testMcpAnonymousMutationsRejectedByDefault() throws Exception {
+		AMap<AString, ACell> result = mcpToolCall("dlfs_write",
+			Maps.of("drive", "auth", "path", "anonymous.txt", "content", "denied"), null);
+		String json = JSON.print(result).toString();
+		assertTrue(json.contains("Authentication required") || json.contains("isError"));
+		assertFalse(java.nio.file.Files.exists(
+			server.getDriveManager().getDrive(null, "auth").getPath("/anonymous.txt")));
 	}
 
 	// --- Delegation chains (root authority + per-hop attenuation) ---

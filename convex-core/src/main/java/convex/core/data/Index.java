@@ -966,6 +966,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 */
 	static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeNode(Index<K, V> a, Index<K, V> b, MergeFunction<V> func) {
 		if (a == b) return a;                                // shared structure: O(1), no alloc, no hashing
+		if (a.getRef().equals(b.getRef())) return a;          // equal encoded structure: no child resolution
 		if (a.count == 0) return applySide(b, func, false);  // a empty: all of b is right-side
 		if (b.count == 0) return applySide(a, func, true);   // b empty: all of a is left-side
 
@@ -998,15 +999,17 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (((um >> d) & 1) == 0) continue;
 			Ref<Index<K, V>> aref = a.getChildRef(d);
 			Ref<Index<K, V>> bref = b.getChildRef(d);
-			Index<K, V> ac = (aref == null) ? null : aref.getValue();
+			Index<K, V> ac = null;
 			Index<K, V> nc;
 			if (aref == null) {
 				nc = applySide(bref.getValue(), func, false);      // b-only child
 			} else if (bref == null) {
+				ac = aref.getValue();
 				nc = applySide(ac, func, true);                    // a-only child
 			} else if (aref.equals(bref)) {
-				nc = ac;                                           // identical sub-trie: skip
+				continue;                                           // identical sub-trie: skip without resolving
 			} else {
+				ac = aref.getValue();
 				nc = mergeNode(ac, bref.getValue(), func);
 			}
 			if (nc != null && nc.count == 0) nc = null;            // empty child => absent

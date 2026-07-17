@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
+import convex.cli.Helpers;
+import convex.cli.TraySupport;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
@@ -26,6 +28,7 @@ import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
+import convex.gui.utils.TrayManager;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -62,6 +65,9 @@ public class PeerStart extends APeerCommand {
 	
 	@Option(names = { "--norest" }, description = "Disable REST server.")
 	private boolean norest;
+
+	@Option(names = { "--no-tray" }, description = "Disable the system tray icon.")
+	private boolean noTray;
 	
 	@Option(names = { "--recalc" }, description = "Recalculate state from the specified block position onwards.")
 	private Integer recalc;
@@ -71,7 +77,11 @@ public class PeerStart extends APeerCommand {
 			description = "Governance seed for network genesis. For testing use only.")
 	private String genesis;
 
-	@Option(names = { "--api-port" }, 
+	@Option(names = { "--protocol-version" },
+			description = "Protocol version for a new network genesis (used with --genesis). Default: latest version supported by this release.")
+	private Long protocolVersion;
+
+	@Option(names = { "--api-port" },
 			description = "Port for REST API. If unspecified, prefers port 8080.")
 	private Integer apiport;
 
@@ -162,6 +172,7 @@ public class PeerStart extends APeerCommand {
 			}
 
 			RESTServer restServer=null;
+			boolean trayInstalled=false;
 			try {
 				InetSocketAddress remoteSource=peerMixin.getSpecifiedSource();
 
@@ -189,8 +200,8 @@ public class PeerStart extends APeerCommand {
 					}
 
 					AccountKey gpk=genesisKey.getAccountKey();
-					State state=Init.createState(gpk,gpk,List.of(gpk));
-					informWarning("Created genesis State: "+state.getHash());
+					State state=Helpers.applyGenesisProtocol(Init.createState(gpk,gpk,List.of(gpk)),protocolVersion);
+					informWarning("Created genesis State: "+state.getHash()+" at protocol version "+state.getProtocolVersion());
 					config.put(Keywords.STATE, state);
 				}
 				server=API.launchPeer(config);
@@ -201,6 +212,9 @@ public class PeerStart extends APeerCommand {
 					restServer=RESTServer.create(server);
 					restServer.start(apiport);
 				}
+				Server launchedServer=server;
+				trayInstalled=TraySupport.installPeerTray(
+					"Convex Peer on port "+server.getPort(),server,restServer,noTray,launchedServer::close);
 
 				informSuccess("Peer started");
 				cli().notifyStartup();
@@ -211,6 +225,7 @@ public class PeerStart extends APeerCommand {
 			} catch (LaunchException e) {
 				throw new CLIError("Error launching peer: "+e.getMessage(),e);
 			} finally {
+				if (trayInstalled) TrayManager.remove();
 				if (restServer!=null) restServer.close();
 				if (server!=null) {
 					server.close();

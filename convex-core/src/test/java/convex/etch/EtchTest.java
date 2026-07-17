@@ -1,14 +1,17 @@
 package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
@@ -35,6 +38,25 @@ public class EtchTest {
 	public void testTempStore() throws IOException {
 		EtchStore store=EtchStore.createTemp();
 		Etch etch = store.getEtch();
+		java.io.File file = store.getFile();
+		assertEquals(Hash.UNSET_HASH, store.getRootHash());
+		assertNull(store.getRootData());
+		assertTrue(EtchUtils.verify(etch, store.getRootHash()).isEmpty());
+
+		// The physical root field remains zero-initialised. UNSET_HASH preserves
+		// this state while store-level reads correctly treat it as no root data.
+		store.close();
+		byte[] rootBytes = new byte[Hash.LENGTH];
+		try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+			raf.seek(Etch.OFFSET_ROOT_HASH);
+			raf.readFully(rootBytes);
+		}
+		assertArrayEquals(Utils.ZERO_BYTES_32, rootBytes);
+
+		store = EtchStore.create(file);
+		etch = store.getEtch();
+		assertEquals(Hash.UNSET_HASH, store.getRootHash());
+		assertNull(store.getRootData());
 
 		AVector<CVMLong> v=Vectors.of(1,2,3);
 		Hash h = v.getHash();
@@ -50,7 +72,10 @@ public class EtchTest {
 		assertEquals(h,r2.getHash());
 		
 		store.setRootData(null);
+		assertEquals(Hash.NULL_HASH, store.getRootHash());
+		assertNotEquals(Hash.UNSET_HASH, store.getRootHash());
 		assertNull(store.getRootData());
+		store.close();
 	}
 	
 	@Test 

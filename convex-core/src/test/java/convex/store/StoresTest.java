@@ -39,15 +39,7 @@ import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class StoresTest {
-	static EtchStore testStore;
-	
-	static {
-		try {
-			testStore=EtchStore.createTemp();
-		} catch (IOException e) {
-			throw new Error(e);
-		}
-	}
+	static EtchStore testStore = Samples.TEST_STORE;
 
 	@Test public void testInitState() throws InvalidDataException, IOException {
 		// Use fresh State
@@ -66,7 +58,7 @@ public class StoresTest {
 		AStore m2=new MemoryStore();
 		
 		AStore e1=testStore;
-		AStore e2=EtchStore.createTemp();
+		AStore e2=Samples.TEST_STORE2;
 		
 		// non-emebdded single Cell
 		AString nv=Samples.NON_EMBEDDED_STRING; 
@@ -122,7 +114,7 @@ public class StoresTest {
 	@Test
 	public void testLatticeMergeEtchToMemory() throws IOException {
 		// Simulate lattice merge: read deep structure from Etch, persist to MemoryStore
-		EtchStore source = EtchStore.createTemp();
+		EtchStore source = Samples.TEST_STORE;
 		MemoryStore target = new MemoryStore();
 
 		// Build and persist a nested structure in source
@@ -151,7 +143,7 @@ public class StoresTest {
 	public void testLatticeMergeMemoryToEtch() throws IOException {
 		// Reverse direction: MemoryStore → EtchStore
 		MemoryStore source = new MemoryStore();
-		EtchStore target = EtchStore.createTemp();
+		EtchStore target = Samples.TEST_STORE2;
 
 		ASet<ACell> set = Sets.empty();
 		for (int i = 0; i < 200; i++) {
@@ -272,7 +264,7 @@ public class StoresTest {
 	@Test
 	public void testCrossStoreIncrementalAcquisition() throws IOException {
 		// Simulate Acquiror: persist deep structure in source, incrementally store in target
-		EtchStore source = EtchStore.createTemp();
+		EtchStore source = Samples.TEST_STORE;
 		MemoryStore target = new MemoryStore();
 
 		// Build and persist a deep structure in source

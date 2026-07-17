@@ -18,14 +18,15 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 5. **Propagators handle ALL output** — persistence IS propagation (to disk instead of to
    peers). Each propagator owns its own store, filter, and peer connections.
    NodeServer hooks a sync callback on the cursor that triggers propagators.
-6. **Lattice-native concurrency** — `cursor.sync()` is currently non-blocking (async
-   propagation), but may become synchronous for persistence in future. All handoffs
-   between app, NodeServer, and propagators use atomic lattice merges. Lattice properties
-   (commutative, associative, idempotent) make all interleavings safe — no locks needed.
-7. **Store-backed refs via merge callback** — the primary propagator calls a merge
-   callback after announce, which merges the store-backed value into the cursor.
-   This replaces in-memory refs with soft references, allowing GC to reclaim cell data
-   that can be reloaded from the store on demand. Without this, OOM.
+6. **Lattice-native concurrency** — cursor state transitions are atomic and root sync
+   callbacks are serialised. Many lattice merges are commutative, associative and
+   idempotent, but directional tie-breaks exist. Every handoff must preserve the
+   documented `own`/`other` roles; correctness does not rely on arbitrary merge
+   reordering.
+7. **Store-backed refs via synchronous sync result** — the primary propagator returns
+   its announced, store-backed value from the root sync callback. The root cursor
+   installs it with CAS, or merges it behind a concurrent local write. This allows GC
+   to reclaim cell data that can be reloaded from the store on demand.
 8. **A NodeServer with no propagator is purely in-memory** — `cursor.sync()` is a no-op.
    The cursor works fine but nothing is persisted or broadcast.
 9. **Shutdown guarantees persistence, not broadcast** — `close()` ensures each propagator
@@ -42,19 +43,19 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
                      │                                           │
                      │  propagators: [LatticePropagator...]      │
                      │                                           │
- App calls ─────────►│  cursor.sync() (non-blocking, fast)      │
- (when ready)        │    └──► sync callback triggers ALL       │
-                     │         propagators (queue offer)         │
+ App calls ─────────►│  cursor.sync()                            │
+ (when ready)        │    ├──► primary processes synchronously  │
+                     │    └──► secondary queue offers           │
                      │                                           │
-                     │  Each propagator's background thread:     │
+                     │  Propagator pipeline:                     │
                      │    filter → announce → setRootData        │
-                     │    → mergeCallback(persisted)  [primary]  │
- Store-backed  ◄─────│    → broadcast(delta)          [network]  │
+ Store-backed  ◄─────│    → return announced value    [primary]  │
+                     │    → broadcast(delta)          [network]  │
  refs merged         │                                           │
  into cursor         │                                           │
                      │  Incoming merge:                          │
  From peers ────────►│    cursor.path(path).merge(value)         │
-                     │    └──► cursor.sync() (non-blocking)      │
+                     │    └──► cursor.sync()                      │
                      │                                           │
                      │  close()                                  │
                      │    └──► triggerAndClose each propagator    │
@@ -72,13 +73,14 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 ### Propagator Roles
 
 Propagators are held in a list. **Index 0 is always the primary propagator** (if present).
-All propagators are triggered the same way (non-blocking queue offer). What makes the
-primary special is that NodeServer sets a **merge callback** on it:
+NodeServer processes the primary synchronously from the root sync callback and queues
+secondary propagators asynchronously. A separate temporary merge callback is retained
+only for explicitly pulled peer values:
 
 ```java
-// NodeServer wires up the merge callback on the primary propagator
-propagators.get(0).setMergeCallback(persisted ->
-    cursor.updateAndGet(current -> lattice.merge(persisted, current))
+// Explicit pull path: current local state is own; acquired peer state is other
+propagators.get(0).setMergeCallback(acquired ->
+    cursor.updateAndGet(current -> lattice.merge(current, acquired))
 );
 ```
 
@@ -87,7 +89,7 @@ it just calls `Consumer<V>` with the store-backed value. NodeServer owns the mer
 
 | Index | Role | Filter | Peers | Merge Callback | Store | Purpose |
 |-------|------|--------|-------|----------------|-------|---------|
-| 0 | **Primary** | None | None (or local) | Yes (set by NodeServer) | EtchStore | Persistence + restore. Store-backs cursor. |
+| 0 | **Primary** | None | None (or local) | Pull only | EtchStore | Synchronous persistence + restore. Store-backs cursor. |
 | 1+ | **Public** | Yes (strip private) | Untrusted | No | Own store | Public data broadcast. Security boundary. |
 | 1+ | **Backup** | None | Trusted | No | Own store | Full replication to trusted peers. |
 
@@ -136,43 +138,45 @@ node.getCursor().set(newValue, :myKey);
 
 ```java
 // App decides it's time to sync
-cursor.sync();  // returns immediately — non-blocking
+cursor.sync();  // returns after the primary persistence pipeline completes
 ```
 
 NodeServer hooks a sync callback on the `RootLatticeCursor` at construction time.
-When `cursor.sync()` is called, the callback triggers all propagators:
+When `cursor.sync()` is called, the callback processes the primary propagator on the
+calling thread and queues asynchronous fan-out to the secondary propagators:
 
 ```java
 // In NodeServer constructor:
 cursor.onSync(value -> {
-    for (LatticePropagator p : propagators) {
-        p.triggerBroadcast(value);  // non-blocking queue offer
+    ACell announced = propagators.get(0).processSnapshot(value);
+    for (int i = 1; i < propagators.size(); i++) {
+        propagators.get(i).triggerBroadcast(value);
     }
-    return value;
+    return announced;
 });
 ```
 
-No I/O, no blocking. Each propagator's background thread picks up the value and does
-its work independently: filter, announce, setRootData, merge callback, broadcast.
+The primary announce, persistence and broadcast pipeline completes before sync returns.
+Each secondary propagator processes its queued value independently.
 
-The **merge callback** on the primary propagator handles feeding store-backed refs
-back into the cursor. After `Cells.announce()` writes cells to the store, the value's
-refs become soft references. The callback merges this into the cursor atomically:
+The callback returns the primary propagator's announced value to
+`RootLatticeCursor.sync()`. After `Cells.announce()` writes cells to the store, the
+value's refs become soft references. Root sync installs the result with CAS:
 
 ```java
-// Set by NodeServer on propagators[0] during setup
-propagator.setMergeCallback(persisted ->
-    cursor.updateAndGet(current -> lattice.merge(persisted, current))
-);
+V current = get();
+V persisted = syncCallback.apply(current);
+if (!compareAndSet(current, persisted)) merge(persisted);
 ```
 
 This merge safely combines:
 - **Persisted value** — store-backed soft refs for all cells at persist time
 - **Current cursor** — any new app writes that happened concurrently
 
-For identical cells, merge returns the persisted version (store-backed). For new writes,
-merge incorporates them (in-memory refs, store-backed on next sync). Lattice merge is
-commutative and idempotent, so all interleavings are safe — no data loss, no locks.
+For identical cells, sync converges on the persisted version (store-backed). If the
+cursor changed while persistence was running, root sync merges the current value as
+`own` with the persisted snapshot as `other`. This ordering is deliberate: an
+equal-priority concurrent local edit must not be reverted by the older snapshot.
 
 **Why merge, not set?** Apps may write to the cursor concurrently during persist. A
 naive `cursor.set(persisted)` would lose those writes. The lattice merge preserves both
@@ -189,9 +193,8 @@ When a peer sends a `LATTICE_VALUE` message:
 1. NodeServer navigates to the target path via `cursor.path(path)`
 2. Merges the received value via `target.merge(value)` — the cursor chain handles
    sub-lattice resolution, signing boundaries, and null-lattice bubble-up automatically
-3. Calls `cursor.sync()` to notify propagators — this is a non-blocking queue offer;
-   the `LatestUpdateQueue` coalesces rapid incoming merges so high-velocity
-   messages don't cause excessive broadcasting
+3. Calls `cursor.sync()` — this synchronously commits to the primary store and queues
+   secondary propagation
 
 NodeServer also supports explicit pull via `pull()` (query all connected peers)
 or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives
@@ -449,29 +452,35 @@ Recovery time: ~10–30 seconds after restart.
 
 ## Concurrency Model
 
-All handoffs between app, NodeServer, and propagators are non-blocking:
+Ordinary cursor reads and writes remain lock-free. Primary persistence during sync is
+intentionally synchronous; secondary propagation remains asynchronous:
 
 | From | To | Mechanism | Blocking? |
 |------|----|-----------|-----------|
 | App | Cursor | `AtomicReference.updateAndGet()` | No |
-| Cursor sync callback | Propagators | `LatestUpdateQueue.offer()` via `cursor.sync()` | No |
-| Propagator | Store | `Cells.announce()` + `setRootData()` on own thread | Own thread only |
-| Propagator | Cursor | `mergeCallback` → `cursor.updateAndGet(merge)` | No |
+| Cursor sync callback | Primary propagator | `processSnapshot()` on caller thread | Yes (intentional) |
+| Cursor sync callback | Secondary propagators | `LatestUpdateQueue.offer()` | No |
+| Propagator | Store | `Cells.announce()` + `setRootData()`, serialised by `writeLock` | Pipeline owner |
+| Primary result | Cursor | CAS, then merge on a concurrent write | No |
+| Pull callback | Cursor | `cursor.updateAndGet(merge)` | No |
 | Propagator | Peers | `broadcast(delta)` on own thread | Own thread only |
 | Peers | Cursor | `cursor.updateAndGet(merge)` | No |
 | Shutdown | Propagators | `triggerAndClose()` — wait for drain | Yes (intentional) |
 
-**Why this is safe.** Every concurrent operation on the cursor is a lattice merge via
-`AtomicReference.updateAndGet()`:
+**Why this is safe.** Cursor changes are atomic, and each path preserves its required
+argument roles:
 - App write: `cursor.updateAndGet(current -> RT.assocIn(current, key, value))`
-- Store-back: `cursor.updateAndGet(current -> lattice.merge(persisted, current))`
+- Concurrent store-back reconciliation: `lattice.merge(current, persisted)`
 - Peer merge: `cursor.updateAndGet(current -> lattice.merge(current, received))`
 
-Because lattice merge is **commutative, associative, and idempotent**, the order these
-execute doesn't matter. Any interleaving produces the same result. No locks needed.
+The first argument is the established local value and wins a directional unresolved
+tie. Root sync callbacks are serialised, while `AtomicReference` CAS/update operations
+make reconciliation indivisible with respect to concurrent cursor writes. Do not swap
+merge arguments merely because a particular child lattice happens to be commutative.
 
-The `LatestUpdateQueue` coalescing is also safe: if V2 is triggered before V1 is
-processed, V2 replaces V1. Since V2 >= V1 (lattice monotonicity), V1 is subsumed.
+The `LatestUpdateQueue` may coalesce snapshots only when they belong to the same
+monotonic local update sequence, so the later snapshot subsumes the earlier one.
+Commutativity alone would not justify reordering or folding directional candidates.
 
 ## Snapshot Semantics
 
@@ -482,9 +491,9 @@ reading the `AtomicReference` — O(1), zero-copy. Safe to hand to any thread.
 V snapshot = cursor.get();  // O(1), immutable, safe to share
 ```
 
-This is the foundation for non-blocking sync: app writes and the sync pipeline never
-contend on mutable state. If multiple writes happen between syncs, intermediate values
-are naturally skipped — only the latest snapshot matters (lattice idempotence).
+This makes snapshot capture cheap and lets ordinary app reads and writes continue while
+the primary pipeline processes an immutable value. Concurrent writes are reconciled
+atomically when the sync result returns.
 
 ## Filtering
 
@@ -501,12 +510,12 @@ Each propagator owns its own filter. NodeServer passes the full snapshot to ever
 propagator — the propagator applies its filter internally before announcing.
 
 ```
-cursor.sync():                         Propagator background threads:
+cursor.sync():                         Propagator processing:
   sync callback(value)
   │                                    propagators[0] (primary):
-  ├──► trigger(value) ────queue──►       announce(value)
+  ├──► processSnapshot(value) ─────────► announce(value)
   │                                      setRootData(value)
-  │                                      mergeCallback(persisted) ──► cursor
+  │◄──────────────────────────────────── return announced value
   │
   │                                    propagators[1] (public):
   ├──► trigger(value) ────queue──►       filter(value)
@@ -516,7 +525,7 @@ cursor.sync():                         Propagator background threads:
   │
   └──► trigger(value) ────queue──►     propagators[2] (backup):
                                          announce(value)
-  returns immediately                    setRootData(value)
+  returns after primary                   setRootData(value)
                                          broadcast(delta)
 ```
 
@@ -545,9 +554,9 @@ NodeServer<V> node = new NodeServer<>(lattice, store, config);
 node.addPropagator(primaryPropagator);   // index 0
 node.addPropagator(publicPropagator);    // index 1
 
-// NodeServer sets merge callback on primary during setup:
-// propagators.get(0).setMergeCallback(persisted ->
-//     cursor.updateAndGet(current -> lattice.merge(persisted, current)));
+// Temporary callback for explicitly pulled peer values:
+// propagators.get(0).setMergeCallback(acquired ->
+//     cursor.updateAndGet(current -> lattice.merge(current, acquired)));
 ```
 
 NodeConfig options:
@@ -648,16 +657,16 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 - Shared: background loop, trigger queue, delta encoding, broadcast
 - Separate: message format, merge semantics
 
-**Synchronous Commit** — see Sync Upgrades proposal below
+**Synchronous Commit** — see the implemented sync design below
 
-## Sync Upgrades (Proposal)
+## Synchronous Commit Design
 
-### Problem
+### Previous Problem
 
-The current sync callback is non-blocking: it offers the snapshot to propagators and
-returns immediately. The propagator's background thread later announces cells, persists
-root data, and calls the merge callback. This means `sync()` returns before persistence
-completes, store-backed refs arrive asynchronously, and tests need `Thread.sleep`.
+The earlier sync callback offered the snapshot to propagators and returned immediately.
+The propagator's background thread later announced cells, persisted root data, and
+called the merge callback. Thus `sync()` returned before persistence completed,
+store-backed refs arrived asynchronously, and tests needed `Thread.sleep`.
 
 ### Design: Synchronous Commit via Sync Callback
 
@@ -686,9 +695,8 @@ Caller's thread (inside the `onSync` callback) runs the primary's full pipeline:
 5. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
 6. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
 
-Steps 1-4 are the same pipeline today executed by the propagator's background
-thread. The change is to expose it as a method (`processSnapshot`) callable on
-any thread, and call it directly from the sync callback for the primary.
+Steps 1-4 are exposed as `processSnapshot`, which is callable on any thread and is
+invoked directly from the sync callback for the primary.
 
 The primary's background thread still exists for non-sync triggers:
 - Periodic root sync (Tier 2 divergence detection)

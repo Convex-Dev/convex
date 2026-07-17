@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 
 import convex.auth.did.DIDVerifier;
@@ -24,6 +27,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
+import convex.core.lang.RT;
 
 /**
  * Tests for the UCAN authority layer (#635): pluggable DIDVerifier signature
@@ -411,5 +415,63 @@ public class UCANAuthorityTest {
 		@SuppressWarnings("unchecked")
 		AMap<AString, ACell> selected = (AMap<AString, ACell>) found.get(0);
 		assertNotNull(selected.get(Capability.NB), "caveats must survive selection for enforcement");
+	}
+
+	@Test
+	public void testCaveatPredicateReceivesRootToLeafPath() {
+		AString gate = Strings.create("gate");
+		AMap<AString, ACell> rootNb = Maps.of(gate, Strings.create("root"));
+		AMap<AString, ACell> leafNb = Maps.of(gate, Strings.create("leaf"));
+		UCAN rootGrant = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(), EXPIRY,
+			caps(Capability.create(NOTES, CRUD, rootNb)), null);
+		UCAN delegated = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(), EXPIRY,
+			caps(Capability.create(NOTES, READ, leafNb)), Vectors.of(rootGrant.toMap()));
+
+		AtomicReference<AVector<ACell>> seen = new AtomicReference<>();
+		assertTrue(UCANValidator.isAuthorised(present(delegated), AGENT_B_DID, NOTES_ITEM,
+			READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, path -> {
+				seen.set(path);
+				return true;
+			}));
+
+		AVector<ACell> path = seen.get();
+		assertNotNull(path);
+		assertEquals(2L, path.count());
+		AMap<AString, ACell> rootCap = RT.castMap(path.get(0));
+		AMap<AString, ACell> leafCap = RT.castMap(path.get(1));
+		assertEquals(rootNb, rootCap.get(Capability.NB));
+		assertEquals(leafNb, leafCap.get(Capability.NB));
+	}
+
+	@Test
+	public void testThrowingCaveatPredicateSkipsPath() {
+		AString gate = Strings.create("gate");
+		AString throwsGate = Strings.create("throws");
+		AString acceptedGate = Strings.create("accepted");
+		UCAN throwingProof = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(), EXPIRY,
+			caps(Capability.create(NOTES, CRUD, Maps.of(gate, throwsGate))), null);
+		UCAN acceptedProof = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(), EXPIRY,
+			caps(Capability.create(NOTES, CRUD, Maps.of(gate, acceptedGate))), null);
+		UCAN delegated = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(), EXPIRY,
+			caps(cap(NOTES, READ)), Vectors.of(throwingProof.toMap(), acceptedProof.toMap()));
+
+		AtomicInteger checked = new AtomicInteger();
+		assertTrue(UCANValidator.isAuthorised(present(delegated), AGENT_B_DID, NOTES_ITEM,
+			READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, path -> {
+				checked.incrementAndGet();
+				AMap<AString, ACell> rootCap = RT.castMap(path.get(0));
+				AMap<AString, ACell> nb = RT.castMap(rootCap.get(Capability.NB));
+				ACell value = nb.get(gate);
+				if (throwsGate.equals(value)) throw new IllegalStateException("deny this path");
+				return acceptedGate.equals(value);
+			}));
+		assertEquals(2, checked.get(), "throwing path must be denied before trying alternatives");
+
+		assertFalse(UCANValidator.isAuthorised(present(delegated), AGENT_B_DID, NOTES_ITEM,
+			READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, path -> {
+				throw new AssertionError("all throwing predicates fail closed");
+			}));
+		assertTrue(UCANValidator.isAuthorised(present(delegated), AGENT_B_DID, NOTES_ITEM,
+			READ, RootAuthorityPolicy.SELF_SOVEREIGN, NOW, null));
 	}
 }

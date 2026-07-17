@@ -97,7 +97,8 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	@Override
 	public int write(ByteBuffer src) throws IOException {
-		synchronized(this) {
+		// Coordinate writes from distinct channels with filesystem-level mutations.
+		synchronized(fileSystem) {
 			checkOpen();
 			long pos=position;
 			AVector<ACell> node=getNode();

@@ -65,6 +65,20 @@ public class RESTConfigTest {
 		assertTrue(config.isFaucetEnabled());
 	}
 
+	@Test
+	public void testQueryWatchDefault() {
+		RESTConfig config = RESTConfig.parse("{}");
+		assertFalse(config.isQueryWatchEnabled());
+		assertFalse(config.toLegacy().containsKey(Keywords.QUERY_WATCH));
+	}
+
+	@Test
+	public void testQueryWatchEnabled() {
+		RESTConfig config = RESTConfig.parse("{\"rest\": {\"queryWatch\": true}}");
+		assertTrue(config.isQueryWatchEnabled());
+		assertEquals(true,config.toLegacy().get(Keywords.QUERY_WATCH));
+	}
+
 	// ========== MCP accessors ==========
 
 	@Test
@@ -243,6 +257,7 @@ public class RESTConfigTest {
 		RESTConfig config = loadExampleConfig();
 		assertEquals(8080, config.getRestPort());
 		assertFalse(config.isFaucetEnabled());
+		assertFalse(config.isQueryWatchEnabled());
 		assertNull(config.getBaseUrl());
 	}
 
@@ -268,6 +283,7 @@ public class RESTConfigTest {
 		assertNotNull(legacy);
 		assertNull(legacy.get(Keywords.PORT));
 		assertEquals(false, legacy.get(Keywords.FAUCET));
+		assertEquals(false, legacy.get(Keywords.QUERY_WATCH));
 		assertEquals(true, legacy.get(Keywords.RESTORE));
 		assertEquals(true, legacy.get(Keywords.PERSIST));
 		assertEquals(true, legacy.get(Keywords.AUTO_MANAGE));

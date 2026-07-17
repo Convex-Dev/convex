@@ -1,6 +1,7 @@
 package convex.auth.ucan;
 
 import java.nio.charset.StandardCharsets;
+import java.util.function.Predicate;
 
 import convex.auth.did.DIDVerifier;
 import convex.auth.jwt.JWT;
@@ -344,8 +345,10 @@ public class UCANValidator {
 	 *       token).</li>
 	 * </ol>
 	 *
-	 * <p>Returned capability maps retain their caveats ({@code nb}) so callers can
-	 * enforce them. <b>Assumes signatures and chains are already verified</b> at the
+	 * <p>Returned capability maps are the leaf capabilities and retain their caveats
+	 * ({@code nb}). Use the predicate overload of {@link #isAuthorised} when caveats
+	 * from the complete delegation path must be enforced. <b>Assumes signatures and
+	 * chains are already verified</b> at the
 	 * transport boundary ({@link #parseTransportUCANs}). <b>Fail-closed:</b> null
 	 * arguments, malformed tokens, and throwing policies all yield no capabilities —
 	 * never a wildcard. Root-authority decisions are stable per (root issuer, resource)
@@ -362,7 +365,8 @@ public class UCANValidator {
 	 */
 	public static AVector<ACell> capabilitiesFor(AVector<ACell> proofs, AString audience,
 			AString requestWith, AString requestCan, RootAuthorityPolicy policy, long nowSeconds) {
-		return collectAuthorised(proofs, audience, requestWith, requestCan, policy, nowSeconds, false);
+		return collectAuthorised(proofs, audience, requestWith, requestCan, policy, nowSeconds,
+			false, null);
 	}
 
 	/**
@@ -381,7 +385,40 @@ public class UCANValidator {
 	 */
 	public static boolean isAuthorised(AVector<ACell> proofs, AString audience,
 			AString requestWith, AString requestCan, RootAuthorityPolicy policy, long nowSeconds) {
-		return collectAuthorised(proofs, audience, requestWith, requestCan, policy, nowSeconds, true) != null;
+		return isAuthorised(proofs, audience, requestWith, requestCan, policy, nowSeconds, null);
+	}
+
+	/**
+	 * Check whether the presented proofs authorise a request, including a
+	 * caller-defined check over the complete capability path.
+	 *
+	 * <p>The predicate receives each structurally valid path as a vector of the exact
+	 * capability maps selected at every delegation hop, ordered root to leaf. This lets
+	 * callers interpret every {@code nb} value without imposing caveat vocabulary or
+	 * composition semantics in convex-core. A null predicate accepts any structurally
+	 * valid path.</p>
+	 *
+	 * <p>Multi-proof tokens and multiple covering capabilities are alternatives. If the
+	 * predicate returns false or throws for one path, that path is denied and traversal
+	 * continues. Authorisation succeeds if the predicate accepts any structurally valid
+	 * path. Since the predicate may be invoked more than once, it should perform a check
+	 * rather than an irreversible state change.</p>
+	 *
+	 * @param proofs verified proof payload maps, or null
+	 * @param audience the audience DID a token must name
+	 * @param requestWith the requested resource
+	 * @param requestCan the requested ability
+	 * @param policy root-authority policy
+	 * @param nowSeconds current time in unix seconds
+	 * @param pathPredicate predicate over a root-to-leaf capability path, or null for
+	 *        structural authorisation only
+	 * @return true iff some structurally valid path is accepted
+	 */
+	public static boolean isAuthorised(AVector<ACell> proofs, AString audience,
+			AString requestWith, AString requestCan, RootAuthorityPolicy policy, long nowSeconds,
+			Predicate<AVector<ACell>> pathPredicate) {
+		return collectAuthorised(proofs, audience, requestWith, requestCan, policy, nowSeconds,
+			true, pathPredicate) != null;
 	}
 
 	/**
@@ -425,7 +462,7 @@ public class UCANValidator {
 
 	private static AVector<ACell> collectAuthorised(AVector<ACell> proofs, AString audience,
 			AString requestWith, AString requestCan, RootAuthorityPolicy policy, long nowSeconds,
-			boolean shortCircuit) {
+			boolean shortCircuit, Predicate<AVector<ACell>> pathPredicate) {
 		if (proofs == null || audience == null || requestWith == null || requestCan == null
 				|| policy == null) return null;
 		AVector<ACell> result = Vectors.empty();
@@ -446,7 +483,9 @@ public class UCANValidator {
 				// Cheap filter first: no authority work for capabilities that don't cover
 				if (!coversSafely(cap, requestWith, requestCan)) continue;
 				AString grantWith = RT.ensureString(cap.get(Capability.WITH));
-				if (!chainAuthorised(token, requestWith, requestCan, grantWith, policy)) continue;
+				AVector<ACell> path = Vectors.of(cap);
+				if (!chainAuthorised(token, requestWith, requestCan, grantWith, policy, path,
+						pathPredicate)) continue;
 				result = result.conj(cap);
 				if (shortCircuit) return result;
 			}
@@ -461,23 +500,33 @@ public class UCANValidator {
 	 * root exists.
 	 */
 	private static boolean chainAuthorised(UCAN token, AString requestWith, AString requestCan,
-			AString grantWith, RootAuthorityPolicy policy) {
+			AString grantWith, RootAuthorityPolicy policy, AVector<ACell> path,
+			Predicate<AVector<ACell>> pathPredicate) {
 		AVector<ACell> prfs = token.getProofs();
 		if (prfs == null || prfs.isEmpty()) {
 			// This token is the root of the chain
 			try {
-				return policy.acceptsRoot(token.getIssuer(), grantWith);
+				if (!policy.acceptsRoot(token.getIssuer(), grantWith)) return false;
 			} catch (Throwable t) {
 				return false; // defective policy fails closed
 			}
+			return testsSafely(pathPredicate, path);
 		}
 		long n = prfs.count();
 		for (long i = 0; i < n; i++) {
 			UCAN proof = parseProof(prfs.get(i));
 			if (proof == null) continue;
-			// Per-hop attenuation: the proof must itself grant coverage of the request
-			if (!attCovers(proof, requestWith, requestCan)) continue;
-			if (chainAuthorised(proof, requestWith, requestCan, grantWith, policy)) return true;
+			// Per-hop attenuation: try every covering capability because each one may carry
+			// different caveats and therefore represents a distinct authorisation path.
+			AVector<ACell> att = proof.getCapabilities();
+			long nc = (att == null) ? 0 : att.count();
+			for (long j = 0; j < nc; j++) {
+				AMap<AString, ACell> cap = RT.castMap(att.get(j));
+				if (cap == null || !coversSafely(cap, requestWith, requestCan)) continue;
+				AVector<ACell> proofPath = Vectors.of(cap).concat(path);
+				if (chainAuthorised(proof, requestWith, requestCan, grantWith, policy,
+						proofPath, pathPredicate)) return true;
+			}
 		}
 		return false;
 	}
@@ -496,24 +545,21 @@ public class UCANValidator {
 		return UCAN.parse(map);
 	}
 
-	/** Whether any capability in the token's {@code att} covers the request. */
-	private static boolean attCovers(UCAN token, AString requestWith, AString requestCan) {
-		AVector<ACell> att = token.getCapabilities();
-		if (att == null) return false;
-		long n = att.count();
-		for (long i = 0; i < n; i++) {
-			AMap<AString, ACell> cap = RT.castMap(att.get(i));
-			if (cap == null) continue;
-			if (coversSafely(cap, requestWith, requestCan)) return true;
-		}
-		return false;
-	}
-
 	private static boolean coversSafely(AMap<AString, ACell> cap, AString requestWith, AString requestCan) {
 		try {
 			return Capability.covers(cap, requestWith, requestCan);
 		} catch (Throwable t) {
 			return false; // malformed capability grants nothing
+		}
+	}
+
+	private static boolean testsSafely(Predicate<AVector<ACell>> predicate,
+			AVector<ACell> path) {
+		if (predicate == null) return true;
+		try {
+			return predicate.test(path);
+		} catch (Throwable t) {
+			return false; // throwing predicate denies this path
 		}
 	}
 

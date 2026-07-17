@@ -31,8 +31,11 @@ By default, each user has full access to their own drives. No UCAN or
 capability token is needed — the caller's DID (from the JWT) is used to
 resolve drives in the `DLFSDriveManager`.
 
-When `requireAuthForWrites` is enabled on the WebDAV endpoint, mutating
-operations (PUT, DELETE, MKCOL, MOVE, COPY) return 401 without a valid JWT.
+Supplying a server key pair enables `requireAuthForWrites` for both WebDAV and MCP
+by default. Mutating WebDAV operations (PUT, DELETE, MKCOL, MOVE, COPY) return 401
+without a valid JWT; mutating MCP tools return an authentication error. Applications
+can configure both surfaces together with `DLFSServer.setRequireAuthForWrites(...)`
+before starting the server.
 Read operations are always allowed.
 
 ## Authorisation: Delegated Access via UCAN

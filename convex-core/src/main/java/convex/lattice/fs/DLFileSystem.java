@@ -2,12 +2,14 @@ package convex.lattice.fs;
 
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.ByteBuffer;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.UserPrincipalLookupService;
@@ -39,6 +41,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	protected final DLFSProvider provider;
 	private CVMLong timestamp; 
+	private volatile boolean open = true;
 	
 	// Singleton root / empty paths
 	protected final DLPath root=new DLPath(this,DLPath.EMPTY_STRINGS,true);
@@ -59,7 +62,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	@Override
 	public void close() throws IOException {
-		
+		open = false;
 	}
 	
 	/**
@@ -96,12 +99,18 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * Updates the timestamp of the drive to the current system timestamp
 	 */
 	public synchronized CVMLong updateTimestamp() {
-		return updateTimestamp(Utils.getCurrentTimestamp());
+		long current=timestamp.longValue();
+		long now=Utils.getCurrentTimestamp();
+		// Wall-clock resolution is commonly one millisecond. Ensure successive local
+		// logical mutations never receive an accidental tie within the same tick.
+		long next=(now>current)?now:((current<Long.MAX_VALUE)?current+1:current);
+		timestamp=CVMLong.create(next);
+		return timestamp;
 	}
 
 	@Override
 	public boolean isOpen() {
-		return true;
+		return open;
 	}
 
 	@Override
@@ -132,6 +141,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	@Override
 	public DLPath getPath(String first, String... more) {
+		if (!open) throw new java.nio.file.ClosedFileSystemException();
 		String fullPath=first;
 		if ((more!=null)&&(more.length>0)) {
 			fullPath=fullPath+SEP+String.join(SEP,more);
@@ -141,8 +151,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	@Override
 	public PathMatcher getPathMatcher(String syntaxAndPattern) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException("DLFS path matchers are not implemented");
 	}
 
 	@Override
@@ -180,6 +189,29 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * @throws IOException In case of IO Error
 	 */
 	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException;
+
+	/**
+	 * Replaces a complete file while holding the filesystem mutation lock.
+	 *
+	 * <p>This is intended for request-oriented APIs such as WebDAV where one PUT is
+	 * one logical mutation. It prevents the channel-open truncate and subsequent
+	 * write from interleaving with another whole-file replacement.</p>
+	 *
+	 * @param path destination path in this filesystem
+	 * @param data complete new file content
+	 * @return true if the file was created, false if it replaced an existing file
+	 */
+	public final synchronized boolean writeAllBytes(DLPath path, byte[] data) throws IOException {
+		if (path == null || path.getFileSystem() != this) throw new IllegalArgumentException("Path belongs to another filesystem");
+		boolean created = getNode(path) == null;
+		Set<StandardOpenOption> options = Set.of(StandardOpenOption.CREATE,
+			StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+		try (SeekableByteChannel channel = newByteChannel(path, options, new FileAttribute<?>[0])) {
+			ByteBuffer source = ByteBuffer.wrap(data);
+			while (source.hasRemaining()) channel.write(source);
+		}
+		return created;
+	}
 
 	/**
 	 * Implementation for delegation by DLFSProvider

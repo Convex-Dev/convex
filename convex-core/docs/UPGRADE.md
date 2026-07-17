@@ -85,18 +85,20 @@ Both the migrations and the machinery that schedules and applies them are **stat
 
 ## Current state of the code
 
-The transition-function seam is ready; the version-tracking state is not. What exists today:
+The bootstrap mechanism and v1 migration are implemented. Genesis remains byte-identical and reads as protocol version 0 until the on-chain bootstrap is scheduled and activated.
 
 | Concern | Status | Location |
 | ------- | ------ | -------- |
 | Pre-transaction hook point | **Present** — `prepareBlock` runs block-number bump → time update → scheduled transactions, in order, before block transactions | `convex-core/.../cvm/State.java:250` (`prepareBlock`), `:182` (`applyBlock`) |
 | Monotonic consensus clock | **Present** — `applyTimeUpdate` advances the clock and already performs threshold-crossing logic (memory-pool growth) | `State.java:269` |
 | Governance accounts | **Present** — genesis system accounts occupy addresses below the core library: `FOUNDATION` #2, `GOVERNANCE` #6, `ADMIN` #7; core library at `CORE_ADDRESS` #8 | `init/Init.java:41-53` |
-| Protocol global slot | **Stubbed, not wired** — `GLOBAL_SYMBOLS` reserves `PROTOCOL` at index 6 (`GLOBAL_PROTOCOL=6`, `// TODO: move to actor?`) | `State.java:74`, `:83` |
-| Protocol global value | **Missing** — `INITIAL_GLOBALS` has only 6 entries (indices 0–5) | `Constants.java:97` |
-| Version accessor | **Missing** — no `getProtocolVersion()`; nothing reads or writes globals index 6 | (absent) |
-| Genesis wiring | Genesis uses `INITIAL_GLOBALS` verbatim, so state carries no version | `init/Init.java:173` |
-| Scheduling core function / `Migrations` class / activation hook | **Missing** | (absent) |
+| Protocol globals | **Implemented** — protocol watermark at index 6 and upgrade vector at index 7; absent values read as version 0 and an empty vector | `cvm/State.java` |
+| Genesis wiring | **Preserved** — historical genesis carries neither new global; fresh networks may explicitly start at a supported version | `init/Init.java`, `peer/Config.java` |
+| Scheduling and activation | **Implemented** — governance-gated scheduling, append-only migration registry and activation in `prepareBlock` | `lang/Core.java`, `cvm/Migrations.java`, `cvm/State.java` |
+| Unsupported upgrade handling | **Implemented** — early warning, best-efforts stake withdrawal and consensus freeze at the boundary | `convex-peer` executor/propagator/server |
+| Peer startup replay | **Implemented** — local replay from genesis is authoritative; a supplied non-genesis state is accepted only when the local replay reproduces it exactly | `cvm/Peer.java`, `peer/Server.java` |
+| Upgrade rehearsal tooling | **Implemented** — isolated deterministic multi-peer activation/abort drill and read-only live sync/replay/migration verifier | `RehearseNetworkUpgrade.java`, `VerifyNetworkUpgrade.java` |
+| Versioned core-definition materialisation | **Decided 2026-07-17** — window for shipped codes 501–505 accepted operationally; implementation mandatory alongside any future core code | decode-skew policy below; plan step 7 |
 
 ## What an upgrade may do
 
@@ -139,15 +141,21 @@ long cost = (state.getProtocolVersion() >= 3) ? Juice.NEW_COST : Juice.OLD_COST;
 
 This is **not** the "dual-mode CVM runtime" excluded in Non-goals. That exclusion means old *releases* don't keep participating after activation. Every current release implements all historical semantics for replay, but exactly one behaviour is live at any point in history — selected deterministically by the version in state.
 
+Whether a tier-2 change needs a version gate at all is decided by **replay evidence**: flip the behaviour to unconditional locally and run `SnapshotStateTest` — if the replay hash moves, recorded history exercised the old semantics and the gate is mandatory; if not, the change ships unconditionally and no permanent branch is carried. (Even a replay-neutral unconditional change diverges between releases if live traffic hits the path mid-rollout; that residual window is accepted under the same coordinated-deployment assumption as the bootstrap itself.) The `*` juice change (#603) is proven to need its gate: making it unconditional moves the replay hash, so live history already multiplied big integers under the old cost.
+
 #### New core definitions: the pre-activation decode-skew window
 
 Adding a *new decodable executable value* (a core definition with a fresh `CORE_DEF` code) is a special tier-2 case. Decoding is stateless: a release carrying the code decodes the real function cell, while earlier releases decode the same bytes as an opaque extension value with an **identical re-encoding** — so state hashes agree while the value merely sits in state, but *executing* it diverges (cast-error-before-arguments vs real invocation), including juice consumed → fees → state. An attacker can inject such a constant by hand-crafting an encoding, opening a fork window between releases **before** the version gate activates.
 
-Handling, in layers:
+Current mitigations, precisely:
 
-1. **Address-gating** the new definitions (< `#8`) means no attacker-originated invocation can *succeed* on any release; both sides fail. The gate runs first and charges nothing, keeping the residual skew to juice differences in attacker-paid failure paths.
-2. **Exact closure** requires *versioned materialisation*: a core definition carries the protocol version that introduces it, and every function-materialisation seam (Invoke, `apply`, `*lang*`, expanders, callable exports) treats a not-yet-active definition as a non-function — byte-identical behaviour to older releases, same juice point. This is required before scheduling upgrades on a value-bearing network.
-3. Until then the window is **accepted operationally**: effectively all peers are expected to run the mechanism release before such values can appear on-chain.
+1. **Governance address-gating covers the scheduling pair only.** `schedule-upgrade` and `unschedule-upgrade` check the caller address (< `#8`) before anything else and charge nothing on failure, so no attacker-originated invocation can *succeed* on any release and the residual skew is confined to juice differences in attacker-paid failure paths. `gensym`, `cat` and `splice` carry **no gate**: a release with their codes executes an embedded cell at any protocol version, while an earlier release fails it with a cast error — success-vs-failure skew, not just juice. They are deliberately pure, deterministic utilities with no governance or state-mutation surface, so pre-activation execution is harmless in itself; the skew against older releases is the only cost.
+2. **Exact closure** requires *versioned materialisation*: a core definition carries the protocol version that introduces it, and every function-materialisation seam (Invoke, `apply`, `*lang*`, expanders, callable exports) treats a not-yet-active definition as a non-function — byte-identical behaviour to older releases, same juice point.
+
+**Policy (gate 3 call for 0.8.9, decided 2026-07-17):**
+
+- **The window for codes 501–505 is accepted operationally.** These codes shipped in 0.8.7/0.8.8; the exposure against ≤0.8.7 peers already exists and cannot be retracted. Nor can it be closed after the fact: retro-gating shipped codes would make the new release refuse what 0.8.8 executes, manufacturing during the rolling deployment exactly the mixed-release divergence the gate exists to prevent — and grandfathering them under a step-7 implementation closes nothing. Versioned materialisation therefore buys nothing for this bootstrap. The operational requirement stands: effectively all stake runs a mechanism release (≥0.8.8, in practice the 0.8.9 rollout) before v1 is scheduled.
+- **Standing rule: no release adds a core definition code beyond 505 unless versioned materialisation ships in the same release.** A future code would reopen the window on a by-then value-bearing network; this rule is checked at release time, not re-litigated per change.
 
 Note this exposure class is not new — historical releases have added core codes without it, so mixed-release networks already carry it. The upgrade mechanism is what ends the era; it cannot retroactively protect its own introduction window.
 
@@ -197,6 +205,8 @@ The applied prefix is **immutable forever**. Applying an upgrade changes nothing
 2. At activation, **migration v1 (the bootstrap)** installs the `schedule-upgrade` / `unschedule-upgrade` bindings into the core environment, making them normally resolvable from version 1 onward; the watermark advances to `1`.
 
 Replay reproduces all of this from the recorded transactions and upgrade. What must precede the scheduling transaction is a **peer release carrying the mechanism** (decode registration, activation hook, migration) — peers on earlier releases can follow neither the scheduling transaction nor the boundary, and lack the withdraw behaviour: upgrading effectively all stake to the mechanism release first is an operational precondition. Bootstrap state changes need rigorous tests asserting the exact expected deltas.
+
+**Fresh networks default to the latest protocol version.** Launchers that *create* a new genesis (CLI `local start`, `peer genesis`, `peer start --genesis`, GUI local networks, `API.launchPeer` defaults) apply all migrations at genesis creation via `Migrations.applyTo`, so a new network starts at `MAX_VERSION` — a fresh network has no history to preserve, and should not launch with known-fixed bugs. Pin a lower version with `--protocol-version` (CLI) or `:protocol-version` (peer config), e.g. `0` to mirror a network that has not yet upgraded. This sets the fresh network's *initial state*; it does not touch the scheduling mechanism, an explicitly supplied `:state` is always respected as-is, and the on-chain schedule remains the only way to upgrade a *running* network. (The shared JUnit test network deliberately stays pinned to `LIVE_VERSION` for Protonet parity, by supplying its own genesis state.)
 
 ### Scheduling: a native core function
 
@@ -421,7 +431,7 @@ Ordered so each step is independently testable and the genesis-affecting change 
 4. ✅ **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
 5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings *and* fixes all bugs known at genesis (#533 `update`/`update-in`, #528 `add-mint`), so 0→1 brings a network fully up to date in one step; adopted fully on-chain. A single fix is never its own protocol version.
 6. ✅ **Peer consensus freeze** (full freeze of executor + propagator) and **operator early-warning** on detection of an unsupported scheduled upgrade.
-7. **Versioned core-definition materialisation**: a not-yet-active core definition behaves as a non-function at every materialisation seam, closing the pre-activation decode-skew window exactly. Required before scheduling upgrades on a value-bearing network.
+7. **Versioned core-definition materialisation** — deferred by the gate 3 decision (2026-07-17): implementing it against the already-shipped codes 501–505 would itself create mixed-release skew during rollout, so it is not part of 0.8.9. It becomes mandatory in the same release as the first core code beyond 505 (standing rule; see the decode-skew policy above).
 8. ✅ **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) — a peer that cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window, gated on `:auto-manage` and guarded against removing the last viable peer. ✅ **Forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)) — stage (i) confirmation clamp (safety) and stage (ii) out-of-window demotion (liveness). See `CONSENSUS.md`.
 9. ✅ **Real bug fixes carried by v1**: [#533](https://github.com/Convex-Dev/convex/issues/533) (`update`/`update-in`) and [#528](https://github.com/Convex-Dev/convex/issues/528) (`add-mint`) are fixed via the v1 migration rather than naive code changes, validated against the statically-built upgraded state. [#354](https://github.com/Convex-Dev/convex/issues/354) (a `schedule` design question) and [#208](https://github.com/Convex-Dev/convex/issues/208) (a macro-call compiler regression) are not clean migration fixes and remain open.
 
@@ -439,6 +449,38 @@ Ordered so each step is independently testable and the genesis-affecting change 
 - **Migration state deltas:** every migration (bootstrap included) has tests asserting the *exact* expected state changes — and that nothing else in the state changed (compare untouched subtrees by hash).
 
 Follow the project testing conventions: no `sleep`s and no fixed ports — wait on real signals (futures / sync APIs); a missing waitable is an API gap in the main code, not a reason to sleep.
+
+### Coverage already in place for v0 → v1
+
+The fast deterministic unit coverage is intentionally split by concern:
+
+- `ApplyUpgradesTest` checks immediately before and exactly at the activation timestamp, ordered/catch-up application, missing and failing migrations, and the rule that upgrade failure never becomes an invalid-block result.
+- `BootstrapTest` runs the actual v1 migration through a signed block, checks the exact account/global footprint, repeats it for an identical hash, and verifies source-level symbol resolution before and after activation.
+- `UpgradeSchedulingTest` covers governance, validation, scheduling, unscheduling and direct encoding of the bootstrap cells.
+- `CoreGenesisTest` and `CoreUpgradedTest` run the same broad core behavioural suite against both semantic states; `MigrationFixesTest` owns the intended differences.
+
+These are quick, isolated tests with fixed timestamps and no networking. They should remain the first regression gate for migration edits.
+
+### Rehearsal programs
+
+Two standalone mains cover different trust boundaries:
+
+1. `convex.peer.tools.RehearseNetworkUpgrade` is safe to run at any time. It is wholly local and deterministic: three seeded peer state machines start at protocol v0, reach CPoS consensus over a signed governance scheduling transaction, process ordinary traffic immediately before, at and after activation, converge at v1, and independently replay the final belief from genesis. It repeats the activation run for identical hashes and also rehearses an `unschedule-upgrade` abort fork. It has no socket or remote submission path.
+2. `convex.peer.tools.VerifyNetworkUpgrade [host] [--report FILE]` is read-only against the named peer. It acquires Merkle-addressed genesis/state/belief values, replays through the exact peer startup path, applies v1 locally, enforces the migration's approved state footprint, and rehearses the boundary on a doctored local copy. It writes a strict JSON audit report containing release/artifact/runtime identifiers, network hashes, replay position, migration/boundary hashes and every check. Exit 0 means clean; failure is 1; any warning is non-ready and exits 2.
+
+Remote state is evidence, not authority: a peer's local replay from genesis is definitive. A mismatch is surfaced and never repaired by silently adopting the remote non-genesis state. A future sanctioned snapshot mechanism would require an explicit trust policy and configuration; it is not the default startup path.
+
+### 0.8.9 preparation gates
+
+No Protonet scheduling, deployment or read-only rehearsal is implied merely by completing a preceding gate. Each held action needs an explicit operator decision.
+
+1. **Release health:** `develop` passes the clean reactor on JDK 21 and 25. In particular, Etch in-place GC must preserve a populated root while retaining the all-zero/unset root as valid for a genuinely fresh store.
+2. **Local protocol evidence:** the focused pre/post suites and `RehearseNetworkUpgrade` pass with identical hashes across repeated runs. This may run continuously in CI.
+3. **Core-definition policy call — decided 2026-07-17.** Step 7 is not required for 0.8.9: the decode-skew window for shipped codes 501–505 is accepted operationally, and a standing rule replaces the open question — any release adding a core code beyond 505 must ship versioned materialisation alongside it (full rationale in the decode-skew policy above). Gate 5/6 evidence must additionally confirm, via attestation and the verifier reports, that no materially-staked peer still runs a release below 0.8.8.
+4. **Release call — HOLD:** only after an explicit decision, finish the release checklist/changelog and build the candidate artifacts. Do not infer this from green tests.
+5. **Live read-only rehearsal — HOLD:** when the 0.8.9 candidate is ready, run `VerifyNetworkUpgrade` against `peer.convex.live` and independently operated peer endpoints. Require exact local replay or an explicitly reviewed warning, identical migrated hashes across machines/JDKs, and a valid fail-closed footprint report.
+6. **Rolling software deployment — HOLD:** deploy the release without changing `Migrations.LIVE_VERSION` and without scheduling v1. Start with a non-staked/low-risk peer, preserve Etch/configuration/key backups, replay from genesis, and compare the exact state position/hash before continuing peer by peer. As each peer comes up, confirm its public service endpoints: `/mcp` completes the MCP handshake and `/openapi` serves a populated spec — this closes [#648](https://github.com/Convex-Dev/convex/issues/648) for `peer.convex.live`, and includes checking the reverse proxy routes both paths (deployment environment, not just the release).
+7. **Activation — HOLD:** prepare the governance transaction, stake-weighted readiness inventory, monitoring and pre-boundary unschedule procedure, but submit nothing until separately authorised. Before activation an upgrade can be unscheduled; after activation there is no rollback, only a later corrective migration.
 
 ### Default test state policy
 
@@ -482,6 +524,7 @@ is self-disabled as a duplicate of `CoreGenesisTest`; it activates automatically
 
 Remaining before first production use:
 
-- **Versioned core-definition materialisation** (plan step 5) — closes the pre-activation decode-skew window; required before scheduling upgrades on a value-bearing network.
+- **Core-definition policy (plan step 7) — decided 2026-07-17**: the decode-skew window for the shipped codes 501–505 is accepted operationally for the bootstrap; versioned materialisation is deferred and becomes mandatory in the same release as any future core code beyond 505. See the decode-skew section for the rationale and the standing rule.
+- **0.8.9 evidence package** — green JDK 21/25 CI, deterministic local rehearsal hashes, complete release notes, and (once explicitly authorised) matching read-only Protonet verifier reports from independent endpoints.
 
 Now implemented: **forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595) — stage (i) confirmation clamp and stage (ii) out-of-window demotion, see `CONSENSUS.md`) and **best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597) — randomised pre-activation window, never-last-peer guard, gated on `:auto-manage`).

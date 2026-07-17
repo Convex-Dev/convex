@@ -42,7 +42,7 @@ public class PathInterceptTest {
 		@Override protected ACell updateOnWrite(ACell current, ACell value) { TAPS.incrementAndGet(); return value; }
 		// view inherited (identity)
 		@Override public ACell merge(ACell other) {
-			return base.updateAndGet(current -> lattice.merge(context, current, other));
+			return base.updateAndGet(current -> lattice.merge(getContext(), current, other));
 		}
 	}
 

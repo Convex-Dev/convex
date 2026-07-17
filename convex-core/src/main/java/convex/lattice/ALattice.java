@@ -20,11 +20,18 @@ import convex.lattice.cursor.AUpdateCursor;
  *   <li>ability to obtain child lattices</li>
  * </ul>
  *
- * <p><b>Tiebreaker convention:</b> when a merge has no clear winner
+ * <p><b>Merge is ordered:</b> {@code own} is the value whose established
+ * precedence and identity should be retained, while {@code other} is the
+ * candidate being merged into it. Many lattice implementations are commutative,
+ * but callers must not assume this universally. When a merge has no clear winner
  * (e.g. equal timestamps in LWW, conflicting leaf values in JSON),
  * implementations should prefer the own (local) value. This reduces
  * risk from malicious or spurious incoming values, retains existing
- * structure beneficial for caching, and avoids unnecessary state churn.</p>
+ * structure beneficial for caching, and avoids unnecessary state churn.
+ * Internal reconciliation may deliberately place a local edit in the own
+ * position so that an equal-priority stale snapshot cannot revert it. Merge
+ * arguments must not be swapped or arbitrarily folded unless the concrete
+ * lattice documents that this is safe.</p>
  *
  * <p><b>Untrusted data — {@code merge} is the enforcement point.</b> A lattice may be
  * fed values by anonymous remote peers (see {@code NodeServer}), so {@link #merge} must
@@ -66,8 +73,8 @@ import convex.lattice.cursor.AUpdateCursor;
 public abstract class ALattice<V extends ACell> {
 	
 	/**
-	 * The lattice merge function: combines an externally received value into the own
-	 * value, returning the merged result.
+	 * The lattice merge function: combines another value into the own value,
+	 * returning the merged result.
 	 *
 	 * <p>This is the enforcement point for untrusted data (see class docs). The
 	 * implementation must reject or ignore an invalid, stale or malformed
@@ -76,8 +83,15 @@ public abstract class ALattice<V extends ACell> {
 	 * merge is aborted atomically, so the prior value is retained and nothing partial is
 	 * committed.</p>
 	 *
-	 * @param ownValue Own lattice value
-	 * @param otherValue Externally received (possibly untrusted) lattice value
+	 * <p>The argument order is part of the contract. At an external boundary,
+	 * {@code ownValue} is normally the current local value and {@code otherValue}
+	 * the received candidate. Internal cursor reconciliation may instead use the
+	 * own position for a local edit that must win an otherwise unresolved tie.
+	 * Do not exchange the arguments unless this lattice is known to be
+	 * commutative.</p>
+	 *
+	 * @param ownValue Established value, preferred by directional tie-breaks
+	 * @param otherValue Value to merge in, possibly received from an untrusted source
 	 * @return Merged lattice value
 	 */
 	public abstract V merge(V ownValue, V otherValue);
@@ -87,8 +101,8 @@ public abstract class ALattice<V extends ACell> {
 	 * Override this method if merge logic requires contextual information (timestamp, signing key, etc.)
 	 *
 	 * @param context Context for merge operation
-	 * @param ownValue Own lattice value
-	 * @param otherValue Externally received lattice value
+	 * @param ownValue Established value, preferred by directional tie-breaks
+	 * @param otherValue Value to merge in
 	 * @return Merged lattice root cell
 	 */
 	public V merge(LatticeContext context, V ownValue, V otherValue) {
@@ -156,7 +170,8 @@ public abstract class ALattice<V extends ACell> {
 	 *
 	 * @param base accumulated cursor at this lattice's level
 	 * @param key key being navigated
-	 * @param context lattice context (signing key, timestamp, etc.)
+	 * @param context Local context override for the new boundary cursor, or null
+	 *                for live inheritance from {@code base}
 	 * @return boundary cursor to insert
 	 */
 	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {

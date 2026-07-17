@@ -50,6 +50,39 @@ public class RefTest {
 	}
 
 	@Test
+	public void testWithStatus() {
+		// Direct ref
+		Ref<ACell> r = Samples.NON_EMBEDDED_STRING.getRef();
+
+		// Exact raise
+		Ref<ACell> rp = r.withStatus(Ref.PERSISTED);
+		assertEquals(Ref.PERSISTED, rp.getStatus());
+
+		// Exact lower (unlike withMinimumStatus, which never lowers)
+		Ref<ACell> rs = rp.withStatus(Ref.STORED);
+		assertEquals(Ref.STORED, rs.getStatus());
+		assertEquals(Ref.PERSISTED, rp.withMinimumStatus(Ref.STORED).getStatus());
+
+		// Same instance when unchanged
+		assertSame(rs, rs.withStatus(Ref.STORED));
+
+		// Non-status flags preserved in both directions
+		assertEquals(rp.getFlags() & ~Ref.STATUS_MASK, rs.getFlags() & ~Ref.STATUS_MASK);
+		assertEquals(rs.getFlags() & ~Ref.STATUS_MASK, rs.withStatus(Ref.ANNOUNCED).getFlags() & ~Ref.STATUS_MASK);
+
+		// Bits outside the status mask are ignored
+		assertEquals(Ref.ANNOUNCED, rs.withStatus(Ref.ANNOUNCED | 0x100).getStatus());
+
+		// Soft ref variant
+		Ref<?> soft = Ref.forHash(Samples.BAD_HASH, Samples.TEST_STORE);
+		assertEquals(Ref.UNKNOWN, soft.getStatus());
+		Ref<?> softStored = soft.withStatus(Ref.STORED);
+		assertEquals(Ref.STORED, softStored.getStatus());
+		assertEquals(Ref.UNKNOWN, softStored.withStatus(Ref.UNKNOWN).getStatus());
+		assertSame(soft, soft.withStatus(Ref.UNKNOWN));
+	}
+
+	@Test
 	public void testRefSet() {
 		// 10 element refs
 		assertEquals(11, Refs.accumulateRefSet(Samples.INT_VECTOR_10).size());

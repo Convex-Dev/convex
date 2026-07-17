@@ -10,8 +10,12 @@ import java.util.Map;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
+import convex.core.cvm.State;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.FileUtils;
@@ -77,7 +81,7 @@ public class Config {
 	/**
 	 * Number of fields in a Peer STATUS message
 	 */
-	public static final long STATUS_COUNT = 9;
+	public static final long STATUS_COUNT = 11;
 
 	/**
 	 * Default size for incoming client transaction queue
@@ -265,13 +269,41 @@ public class Config {
 	 * @throws ConfigException in case of configuration problem
 	 */
 	public static void ensureGenesisState(HashMap<Keyword, Object> config) throws ConfigException {
-		
+
 		if (!(config.containsKey(Keywords.STATE)
 				||config.containsKey(Keywords.STORE)
 				||config.containsKey(Keywords.SOURCE)
 				)) {
 			throw new ConfigException("Peer launch requires a genesis :state, remote :source or existing :store in config");
 		}
+	}
+
+	/**
+	 * Applies the configured genesis protocol version to a freshly created genesis
+	 * state. A new network has no history to preserve, so it defaults to the latest
+	 * supported protocol version ({@link Migrations#MAX_VERSION}) rather than
+	 * launching with known-fixed bugs; pin a lower version with
+	 * {@code :protocol-version} (e.g. {@code 0} to match a network that has not yet
+	 * upgraded). Never applied to an explicitly supplied {@code :state} — a supplied
+	 * genesis is respected as-is.
+	 *
+	 * @param genesis Freshly created genesis state (protocol version 0)
+	 * @param config Configuration map, possibly containing {@code :protocol-version}
+	 * @return Genesis state at the configured protocol version
+	 * @throws ConfigException if the configured version is not an integer in range
+	 */
+	public static State applyGenesisProtocol(State genesis, Map<Keyword, Object> config) throws ConfigException {
+		long target = Migrations.MAX_VERSION;
+		Object pv = (config == null) ? null : config.get(Keywords.PROTOCOL_VERSION);
+		if (pv != null) {
+			CVMLong v = RT.ensureLong(RT.cvm(pv));
+			if (v == null || v.longValue() < 0 || v.longValue() > Migrations.MAX_VERSION) {
+				throw new ConfigException(":protocol-version must be an integer in 0.." + Migrations.MAX_VERSION
+						+ " but was: " + pv);
+			}
+			target = v.longValue();
+		}
+		return Migrations.applyTo(genesis, target);
 	}
 
 	/**

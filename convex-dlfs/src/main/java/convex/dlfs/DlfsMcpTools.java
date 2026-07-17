@@ -66,6 +66,9 @@ import io.javalin.http.Context;
  * own drive of the same name.</p>
  */
 public class DlfsMcpTools {
+	/** MCP responses should remain small enough for interactive tool use. */
+	static final long MAX_MCP_FILE_SIZE = 8L * 1024 * 1024;
+	static final int MAX_MCP_DIRECTORY_ENTRIES = 10_000;
 
 	private static final String TOOLS_PATH = "convex/dlfs/mcp/tools/";
 
@@ -79,9 +82,22 @@ public class DlfsMcpTools {
 	private static final String DLFS_PATH_PREFIX = "/dlfs/";
 
 	private final DLFSDriveManager driveManager;
+	private boolean requireAuthForWrites;
 
 	public DlfsMcpTools(DLFSDriveManager driveManager) {
 		this.driveManager = driveManager;
+	}
+
+	DlfsMcpTools setRequireAuthForWrites(boolean require) {
+		this.requireAuthForWrites = require;
+		return this;
+	}
+
+	private AMap<AString, ACell> rejectUnauthenticatedWrite() {
+		if (requireAuthForWrites && getIdentity() == null) {
+			return McpProtocol.toolError("Authentication required");
+		}
+		return null;
 	}
 
 	/**
@@ -115,10 +131,19 @@ public class DlfsMcpTools {
 	 * Resolves a path within a drive.
 	 */
 	private Path resolvePath(FileSystem fs, String filePath) {
-		if (filePath == null || filePath.isEmpty()) {
+		String canonical = DLFSPathValidator.canonicalRelativePath(filePath);
+		if (canonical.isEmpty()) {
 			return fs.getRootDirectories().iterator().next();
 		}
-		return fs.getPath("/" + filePath);
+		return fs.getPath("/" + canonical);
+	}
+
+	private static void prepareMutation(FileSystem fs) {
+		if (fs instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.updateTimestamp();
+	}
+
+	private static void sync(FileSystem fs) {
+		if (fs instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.sync();
 	}
 
 	// ==================== UCAN Drive Resolution ====================
@@ -146,11 +171,19 @@ public class DlfsMcpTools {
 	 */
 	private DriveAccess resolveDrive(String driveName, String filePath,
 			AString requiredAbility, AMap<AString, ACell> arguments) {
+		try {
+			filePath = DLFSPathValidator.canonicalRelativePath(filePath);
+		} catch (IllegalArgumentException e) {
+			return DriveAccess.denied("Invalid path: " + e.getMessage());
+		}
 		String callerIdentity = getIdentity();
 
 		// Explicit owner: DID-URL drive reference
 		if (driveName != null && driveName.startsWith("did:")) {
 			return resolveDIDURLDrive(driveName, filePath, requiredAbility, arguments, callerIdentity);
+		}
+		if (!DLFSPathValidator.isValidDriveName(driveName)) {
+			return DriveAccess.denied("Invalid drive name");
 		}
 
 		// Try caller's own drive first
@@ -204,6 +237,9 @@ public class DlfsMcpTools {
 		if (drive != null && drive.startsWith("/")) drive = drive.substring(1);
 		if (drive == null || drive.isEmpty()) {
 			return DriveAccess.denied("DID-URL drive reference must name a drive, e.g. did:key:.../<drive>");
+		}
+		if (!DLFSPathValidator.isValidDriveName(drive)) {
+			return DriveAccess.denied("Invalid drive name in drive reference");
 		}
 
 		if (owner.equals(callerIdentity)) {
@@ -284,11 +320,17 @@ public class DlfsMcpTools {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AMap<AString, ACell> rejected = rejectUnauthenticatedWrite();
+			if (rejected != null) return rejected;
 			AString nameCell = RT.ensureString(arguments.get(FIELD_NAME));
 			if (nameCell == null) return McpProtocol.toolError("'name' is required");
 
+			if (!DLFSPathValidator.isValidDriveName(nameCell.toString())) {
+				return McpProtocol.toolError("Invalid drive name");
+			}
 			boolean created = driveManager.createDrive(getIdentity(), nameCell.toString());
 			if (!created) return McpProtocol.toolError("Drive already exists: " + nameCell);
+			driveManager.sync();
 
 			return McpProtocol.toolSuccess(Maps.of("created", CVMBool.TRUE, FIELD_NAME, nameCell));
 		}
@@ -301,12 +343,15 @@ public class DlfsMcpTools {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AMap<AString, ACell> rejected = rejectUnauthenticatedWrite();
+			if (rejected != null) return rejected;
 			AString nameCell = RT.ensureString(arguments.get(FIELD_NAME));
 			if (nameCell == null) return McpProtocol.toolError("'name' is required");
 
 			// Drive deletion only for own drives — no UCAN delegation
 			boolean deleted = driveManager.deleteDrive(getIdentity(), nameCell.toString());
 			if (!deleted) return McpProtocol.toolError("Drive not found: " + nameCell);
+			driveManager.sync();
 
 			return McpProtocol.toolSuccess(Maps.of("deleted", CVMBool.TRUE));
 		}
@@ -338,6 +383,9 @@ public class DlfsMcpTools {
 				AVector<AMap<AString, ACell>> entries = Vectors.empty();
 				try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
 					for (Path child : stream) {
+						if (entries.count() >= MAX_MCP_DIRECTORY_ENTRIES) {
+							return McpProtocol.toolError("Directory listing limit exceeded");
+						}
 						BasicFileAttributes childAttrs = Files.readAttributes(child, BasicFileAttributes.class);
 						Path fileName = child.getFileName();
 						String name = (fileName != null) ? fileName.toString() : child.toString();
@@ -378,6 +426,10 @@ public class DlfsMcpTools {
 
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
+				long size = Files.size(path);
+				if (size > MAX_MCP_FILE_SIZE) {
+					return McpProtocol.toolError("File is too large for MCP read");
+				}
 				byte[] bytes = Files.readAllBytes(path);
 
 				if (isLikelyText(bytes)) {
@@ -417,6 +469,8 @@ public class DlfsMcpTools {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AMap<AString, ACell> rejected = rejectUnauthenticatedWrite();
+			if (rejected != null) return rejected;
 			AString driveCell = RT.ensureString(arguments.get(FIELD_DRIVE));
 			if (driveCell == null) return McpProtocol.toolError("'drive' is required");
 
@@ -432,11 +486,18 @@ public class DlfsMcpTools {
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
 				byte[] bytes = contentCell.toString().getBytes(StandardCharsets.UTF_8);
+				if (bytes.length > MAX_MCP_FILE_SIZE) {
+					return McpProtocol.toolError("Content is too large for MCP write");
+				}
 				boolean isNew = !Files.exists(path);
-				Files.write(path, bytes,
-						StandardOpenOption.CREATE,
-						StandardOpenOption.TRUNCATE_EXISTING,
-						StandardOpenOption.WRITE);
+				prepareMutation(access.fs());
+				if (access.fs() instanceof convex.lattice.fs.DLFileSystem dlfs) {
+					dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, bytes);
+				} else {
+					Files.write(path, bytes, StandardOpenOption.CREATE,
+						StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+				}
+				sync(access.fs());
 				return McpProtocol.toolSuccess(Maps.of(
 					"written", CVMLong.create(bytes.length),
 					"created", isNew ? CVMBool.TRUE : CVMBool.FALSE
@@ -454,6 +515,8 @@ public class DlfsMcpTools {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AMap<AString, ACell> rejected = rejectUnauthenticatedWrite();
+			if (rejected != null) return rejected;
 			AString driveCell = RT.ensureString(arguments.get(FIELD_DRIVE));
 			if (driveCell == null) return McpProtocol.toolError("'drive' is required");
 
@@ -465,7 +528,9 @@ public class DlfsMcpTools {
 
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
+				prepareMutation(access.fs());
 				Files.createDirectory(path);
+				sync(access.fs());
 				return McpProtocol.toolSuccess(Maps.of("created", CVMBool.TRUE));
 			} catch (IOException e) {
 				return McpProtocol.toolError("Error creating directory: " + e.getMessage());
@@ -480,6 +545,8 @@ public class DlfsMcpTools {
 
 		@Override
 		public AMap<AString, ACell> handle(AMap<AString, ACell> arguments) {
+			AMap<AString, ACell> rejected = rejectUnauthenticatedWrite();
+			if (rejected != null) return rejected;
 			AString driveCell = RT.ensureString(arguments.get(FIELD_DRIVE));
 			if (driveCell == null) return McpProtocol.toolError("'drive' is required");
 
@@ -491,7 +558,9 @@ public class DlfsMcpTools {
 
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
+				prepareMutation(access.fs());
 				Files.delete(path);
+				sync(access.fs());
 				return McpProtocol.toolSuccess(Maps.of("deleted", CVMBool.TRUE));
 			} catch (NoSuchFileException e) {
 				return McpProtocol.toolError("File not found: " + pathCell);

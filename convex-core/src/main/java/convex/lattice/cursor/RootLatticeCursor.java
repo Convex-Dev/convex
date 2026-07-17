@@ -1,6 +1,7 @@
 package convex.lattice.cursor;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -20,7 +21,8 @@ import convex.lattice.LatticeContext;
 public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 
 	private final AtomicReference<V> value;
-	private Function<V, V> syncCallback;
+	private final ReentrantLock syncLock = new ReentrantLock();
+	private volatile Function<V, V> syncCallback;
 
 	/**
 	 * Creates a root lattice cursor.
@@ -47,6 +49,9 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	/**
 	 * Sets a callback invoked by {@link #sync()}. The callback receives the
 	 * current value and returns the synced result (e.g. with store-backed refs).
+	 * Callbacks run synchronously on the thread calling {@code sync()} and are
+	 * serialised with callbacks from other concurrent sync callers. Ordinary
+	 * cursor reads and writes remain lock-free while a callback is running.
 	 *
 	 * @param callback Function from current value to synced value, or null to clear
 	 */
@@ -56,16 +61,21 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 
 	@Override
 	public V sync() {
-		if (syncCallback != null) {
+		syncLock.lock();
+		try {
+			Function<V, V> callback = syncCallback;
+			if (callback == null) return get();
+
 			V current = get();
-			V synced = syncCallback.apply(current);
+			V synced = callback.apply(current);
 			// Fast path: no concurrent writes, CAS succeeds
 			if (compareAndSet(current, synced)) return synced;
 			// Concurrent write: fall back to lattice merge
 			if (lattice == null) throw new IllegalStateException("Concurrent write during sync with no lattice to resolve merge");
 			return merge(synced);
+		} finally {
+			syncLock.unlock();
 		}
-		return get();
 	}
 
 	// ===== Standard cursor operations =====

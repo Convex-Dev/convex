@@ -1,34 +1,128 @@
 package convex.restapi.mcp;
 
 import java.io.PrintWriter;
+import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
- * A server-to-client SSE connection opened via GET /mcp.
- * Wraps a PrintWriter with synchronised event sending.
+ * A server-to-client SSE connection. Queues events for delivery by a
+ * per-connection virtual thread.
  *
  * <p>Shared infrastructure for MCP servers that support the Streamable HTTP
- * transport with SSE notifications.</p>
+ * transport with SSE notifications. Sending is non-blocking. If a slow client
+ * fills the bounded queue, only that connection is closed.</p>
  */
 public class SseConnection {
-	final PrintWriter writer;
-	volatile boolean closed = false;
+	static final int DEFAULT_EVENT_QUEUE_CAPACITY=64;
+
+	private record Event(String id, String type, String data) {}
+
+	private final PrintWriter writer;
+	private final ArrayBlockingQueue<Event> events;
+	private volatile boolean closed;
+	private volatile Thread dispatcher;
 
 	public SseConnection(PrintWriter writer) {
-		this.writer = writer;
+		this(writer,DEFAULT_EVENT_QUEUE_CAPACITY);
 	}
 
 	/**
-	 * Send an SSE event to this connection.
+	 * Creates an SSE connection with an explicit bounded queue capacity.
+	 *
+	 * @param writer Destination writer
+	 * @param capacity Maximum queued events
+	 */
+	public SseConnection(PrintWriter writer, int capacity) {
+		this.writer=Objects.requireNonNull(writer,"SSE writer cannot be null");
+		if (capacity<=0) throw new IllegalArgumentException("SSE queue capacity must be positive");
+		this.events=new ArrayBlockingQueue<>(capacity);
+	}
+
+	/**
+	 * Queues an SSE event for this connection. If the client cannot keep up and
+	 * the bounded event queue is full, the connection is closed.
+	 *
 	 * @param eventType The event type (e.g. "message")
 	 * @param data The event data (e.g. JSON string)
 	 */
 	public void sendEvent(String eventType, String data) {
+		sendEvent(null,eventType,data);
+	}
+
+	/**
+	 * Queues an identified SSE event for this connection. The event ID may be used
+	 * by a client to identify its position in a stream.
+	 *
+	 * @param eventID Event ID, or {@code null} for no ID
+	 * @param eventType The event type (e.g. "message")
+	 * @param data The event data
+	 */
+	public void sendEvent(String eventID, String eventType, String data) {
 		if (closed) return;
-		synchronized (writer) {
-			writer.write("event: " + eventType + "\n");
-			writer.write("data: " + data + "\n\n");
-			writer.flush();
-			if (writer.checkError()) close();
+		Event event=new Event(
+			validateField(eventID,"SSE event ID"),
+			Objects.requireNonNull(validateField(eventType,"SSE event type"),"SSE event type cannot be null"),
+			Objects.requireNonNull(data,"SSE event data cannot be null"));
+		ensureDispatcher();
+		if (closed) return;
+		if (!events.offer(event)) close();
+	}
+
+	private static String validateField(String value, String name) {
+		if ((value!=null)&&((value.indexOf('\r')>=0)||(value.indexOf('\n')>=0))) {
+			throw new IllegalArgumentException(name+" cannot contain a line break");
+		}
+		return value;
+	}
+
+	private void ensureDispatcher() {
+		if ((dispatcher!=null)||closed) return;
+		synchronized (this) {
+			if ((dispatcher!=null)||closed) return;
+			dispatcher=Thread.ofVirtual().name("sse-connection-writer").start(this::dispatchLoop);
+		}
+	}
+
+	private void dispatchLoop() {
+		Thread thread=Thread.currentThread();
+		try {
+			while (!closed) {
+				Event event;
+				try {
+					event=events.take();
+				} catch (InterruptedException e) {
+					if (closed) break;
+					continue;
+				}
+				if (closed) break;
+				synchronized (writer) {
+					if (closed) break;
+					if (event.id()!=null) writer.write("id: " + event.id() + "\n");
+					writer.write("event: " + event.type() + "\n");
+					writeData(event.data());
+					writer.write("\n");
+					writer.flush();
+					if (writer.checkError()) close();
+				}
+			}
+		} finally {
+			synchronized (this) {
+				if (dispatcher==thread) dispatcher=null;
+			}
+		}
+	}
+
+	private void writeData(String data) {
+		int start=0;
+		int length=data.length();
+		for (int i=0;i<=length;i++) {
+			if ((i<length)&&(data.charAt(i)!='\r')&&(data.charAt(i)!='\n')) continue;
+			writer.write("data: ");
+			writer.write(data,start,i-start);
+			writer.write("\n");
+			if ((i<length)&&(data.charAt(i)=='\r')&&(i+1<length)&&(data.charAt(i+1)=='\n')) i++;
+			start=i+1;
 		}
 	}
 
@@ -36,7 +130,37 @@ public class SseConnection {
 	 * Close this connection. Idempotent.
 	 */
 	public void close() {
-		closed = true;
+		Thread thread;
+		synchronized (this) {
+			if (closed) return;
+			closed=true;
+			events.clear();
+			thread=dispatcher;
+			notifyAll();
+		}
+		if (thread!=null) thread.interrupt();
+	}
+
+	/**
+	 * Waits until this connection closes or the timeout expires.
+	 *
+	 * @param timeout Maximum wait
+	 * @param unit Timeout unit
+	 * @return {@code true} if closed, or {@code false} on timeout
+	 * @throws InterruptedException if interrupted while waiting
+	 */
+	public synchronized boolean awaitClosed(long timeout, TimeUnit unit) throws InterruptedException {
+		Objects.requireNonNull(unit,"Timeout unit cannot be null");
+		if (timeout<0) throw new IllegalArgumentException("Timeout cannot be negative");
+		if (closed) return true;
+		long timeoutNanos=unit.toNanos(timeout);
+		long remaining=timeoutNanos;
+		long start=System.nanoTime();
+		while (!closed&&(remaining>0)) {
+			TimeUnit.NANOSECONDS.timedWait(this,remaining);
+			remaining=timeoutNanos-(System.nanoTime()-start);
+		}
+		return closed;
 	}
 
 	/**

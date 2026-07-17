@@ -54,7 +54,8 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 	 * @param <V> Type of the unsigned value
 	 * @param base Lattice cursor pointing to SignedData
 	 * @param subLattice Lattice for the unsigned inner value (may be null)
-	 * @param context Lattice context (must contain signing key for writes)
+	 * @param context Local context override, or null to inherit from the base cursor
+	 *                (the effective context must contain a signing key for writes)
 	 * @return New SignedCursor
 	 */
 	public static <V extends ACell> SignedCursor<V> create(ALatticeCursor<SignedData<V>> base, ALattice<V> subLattice, LatticeContext context) {
@@ -71,7 +72,7 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 		if (value == null) return null;
 		// Unchanged value: keep the existing signature rather than re-signing
 		if (current != null && Utils.equals(value, current.getValue())) return current;
-		AKeyPair kp = context.getSigningKey();
+		AKeyPair kp = getContext().getSigningKey();
 		if (kp == null) throw new IllegalStateException("SignedCursor requires a signing key in context");
 		return kp.signData(value);
 	}
@@ -84,6 +85,6 @@ public class SignedCursor<V extends ACell> extends AUpdateCursor<V, SignedData<V
 	@Override
 	public V merge(V other) {
 		if (lattice == null) throw new UnsupportedOperationException("Cannot merge without a lattice");
-		return view(base.updateAndGet(cur -> updateOnWrite(cur, lattice.merge(context, view(cur), other))));
+		return view(base.updateAndGet(cur -> updateOnWrite(cur, lattice.merge(getContext(), view(cur), other))));
 	}
 }

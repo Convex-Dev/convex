@@ -27,6 +27,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
@@ -149,7 +150,8 @@ public class PeerGUI extends AbstractGUI {
 		AccountKey genPK=genesisKey.getAccountKey();
 		
 		PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
-		State genesisState=Init.createState(genPK,genPK,PEERKEYS);
+		// Fresh local network: launch at the latest supported protocol version
+		State genesisState=Migrations.applyAll(Init.createState(genPK,genPK,PEERKEYS));
 
 		try {
 			DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
@@ -376,7 +378,7 @@ public class PeerGUI extends AbstractGUI {
 			StateModel<Peer> model=models.get(s);
 			if	(model!=null) return model;
 			StateModel<Peer> newModel=StateModel.create(s.getPeer());
-			s.getCVMExecutor().setUpdateHook(p->{
+			s.addStateUpdateObserver(p->{
 				newModel.setValue(p);
 			});
 			models.put(s, newModel);

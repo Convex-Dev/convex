@@ -8,6 +8,7 @@ import convex.core.data.Keyword;
 public class Keywords {
 
 	public static final Keyword STATE = Keyword.intern("state");
+	public static final Keyword STATE_POSITION = Keyword.intern("state-position");
 	public static final Keyword KEYPAIR = Keyword.intern("keypair");
 	public static final Keyword PORT = Keyword.intern("port");
 	public static final Keyword ORDERS = Keyword.intern("orders");
@@ -23,6 +24,8 @@ public class Keywords {
 
 	// configuration parameters
 	public static final Keyword STORE = Keyword.intern("store");
+	public static final Keyword PROTOCOL_VERSION = Keyword.intern("protocol-version");
+	public static final Keyword SUPPORTED_PROTOCOL_VERSION = Keyword.intern("supported-protocol-version");
 	public static final Keyword RESTORE = Keyword.intern("restore");
 	public static final Keyword RECALC = Keyword.intern("recalc");
 
@@ -111,6 +114,7 @@ public class Keywords {
 	public static final Keyword MAX_CONNECTIONS = Keyword.intern("max-connections");
 	public static final Keyword ALLOWED_ORIGINS = Keyword.intern("allowed-origins");
 	public static final Keyword ALLOW_HTTP_SEEDS = Keyword.intern("allow-http-seeds");
+	public static final Keyword QUERY_WATCH = Keyword.intern("query-watch");
 	public static final Keyword AUTO_MANAGE = Keyword.intern("auto-manage");
 	public static final Keyword TIMEOUT = Keyword.intern("timeout");
 	public static final Keyword EVENT_HOOK = Keyword.intern("event-hook");

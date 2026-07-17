@@ -2,12 +2,12 @@ package convex.db.calcite;
 
 import java.util.Map;
 
+import org.apache.calcite.DataContext;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaFactory;
 import org.apache.calcite.schema.SchemaPlus;
 
 import convex.db.ConvexDB;
-import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 
 /**
@@ -47,19 +47,12 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	 * Navigates the database's cursor tree each time, so it always
 	 * reflects the current lattice state.
 	 *
-	 * <p>Looks up the database from the legacy static registry first,
-	 * then falls back to the driver's managed instances map.
-	 *
 	 * @param schemaName Schema name (maps to a database)
 	 * @param tableName Table name
 	 * @return The ConvexTable
 	 */
 	public static ConvexTable getTable(String schemaName, String tableName) {
 		SQLDatabase db = ConvexDB.lookupDatabase(schemaName);
-		if (db == null) {
-			// Try managed instances (mem: and file: connections)
-			db = lookupManagedDatabase(schemaName);
-		}
 		if (db == null) {
 			throw new IllegalStateException(
 				"No database found for '" + schemaName + "'.");
@@ -68,18 +61,24 @@ public class ConvexSchemaFactory implements SchemaFactory {
 	}
 
 	/**
-	 * Searches the driver's managed instances for a database by name.
+	 * Gets a table from the schema attached to the current connection's data context.
+	 * This preserves instance and transaction isolation without a global name lookup.
+	 *
+	 * @param context Current statement data context
+	 * @param schemaName Schema name
+	 * @param tableName Table name
+	 * @return The connection-local ConvexTable
 	 */
-	private static SQLDatabase lookupManagedDatabase(String dbName) {
-		for (ConvexDriver.ManagedInstance inst : ConvexDriver.instances.values()) {
-			try {
-				SQLDatabase db = inst.cdb.database(dbName);
-				if (db != null) return db;
-			} catch (Exception e) {
-				// skip
-			}
+	public static ConvexTable getTable(DataContext context, String schemaName, String tableName) {
+		if (context == null) throw new IllegalStateException("No data context for DML table lookup");
+		SchemaPlus root=context.getRootSchema();
+		SchemaPlus schema=(root==null) ? null : root.getSubSchema(schemaName);
+		ConvexSchema convexSchema=(schema==null) ? null : schema.unwrap(ConvexSchema.class);
+		if (convexSchema==null) {
+			throw new IllegalStateException(
+					"No Convex schema found for '" + schemaName + "' in the current connection");
 		}
-		return null;
+		return convexSchema.getConvexTable(tableName);
 	}
 
 	@Override

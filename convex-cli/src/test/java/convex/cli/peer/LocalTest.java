@@ -114,6 +114,7 @@ public class LocalTest {
 		cmd.add("start");
 		cmd.add("--count=1");
 		cmd.add("--key=09a5");
+		cmd.add("--no-tray");
 		// No --ports: peers take auto-assigned ports, reported via "Peer ports:"
 
 		ProcessBuilder builder = new ProcessBuilder(cmd);
@@ -178,6 +179,7 @@ public class LocalTest {
 				"--keystore", KEYSTORE_FILENAME, 
 				"--etch=temp",
 				"--norest",
+				"--no-tray",
 				"--peer-keypass",new String(KEY_PASSWORD),
 				"--host", "localhost",
 				"--port",Integer.toString(actualPort)

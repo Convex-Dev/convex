@@ -24,7 +24,7 @@ public class DLFSNode {
 	public static final long NODE_LENGTH = 4;
 	public static final int POS_DIR = 0; // Directory entries as index of live child nodes
 	public static final int POS_DATA = 1; // File data as a Blob
-	public static final int POS_METADATA = 2; // arbitrary node metadata
+	public static final int POS_METADATA = 2; // opaque application-defined metadata
 	public static final int POS_UTIME = 3;
 	/**
 	 * Optional directory tombstone index: maps deleted child name to deletion timestamp.
@@ -52,7 +52,9 @@ public class DLFSNode {
 		@Override
 		public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
 			if (cb==null) return ca;
+			if (!isValidNodeShallow(cb)) throw new IllegalArgumentException("Malformed foreign DLFS child");
 			if (ca==null) return cb;
+			if (!isValidNodeShallow(ca)) throw new IllegalArgumentException("Malformed own DLFS child");
 			return DLFSNode.merge(ca,cb);
 		}
 	};
@@ -61,12 +63,33 @@ public class DLFSNode {
 	
 	public static boolean isDirectory(AVector<ACell> node) {
 		if (node==null) return false;
-		return node.get(POS_DIR)!=null;
+		return node.get(POS_DIR) instanceof Index;
 	}
 	
 	public static boolean isRegularFile(AVector<ACell> node) {
 		if (node==null) return false;
 		return node.get(POS_DATA) instanceof ABlob;
+	}
+
+	/**
+	 * Performs bounded, shallow validation of a node without walking its children.
+	 * Child nodes are validated lazily as paths or merge differences reach them.
+	 */
+	public static boolean isValidNodeShallow(AVector<ACell> node) {
+		if (node == null || (node.count() != NODE_LENGTH && node.count() != NODE_LENGTH + 1)) return false;
+		ACell dirs = node.get(POS_DIR);
+		ACell data = node.get(POS_DATA);
+		boolean directory = dirs instanceof Index;
+		boolean file = data instanceof ABlob;
+		if (directory == file) return false; // exactly one node kind
+		if (directory && data != null) return false;
+		if (file && dirs != null) return false;
+		if (!(node.get(POS_UTIME) instanceof CVMLong)) return false;
+		if (node.count() > POS_TOMBS) {
+			ACell tombs = node.get(POS_TOMBS);
+			if (!directory || !(tombs instanceof Index<?, ?> index) || index.isEmpty()) return false;
+		}
+		return true;
 	}
 
 	/**
@@ -78,13 +101,16 @@ public class DLFSNode {
 	@SuppressWarnings("unchecked")
 	public static AVector<ACell> navigate(AVector<ACell> node, DLPath path) {
 		if (path==null) return null;
+		if (!isValidNodeShallow(node)) return null;
 		int n=path.getNameCount();
 		for (int i=0; i<n; i++) {
 			AString compName=path.getCVMName(i);
-			Index<AString,AVector<ACell>> dir=(Index<AString, AVector<ACell>>) node.get(POS_DIR);
+			Index<AString,AVector<ACell>> dir=getDirectoryEntries(node);
 			if (dir==null) return null;
-			AVector<ACell> child=dir.get(compName);
-			if (child==null) return null;
+			ACell candidate=dir.get(compName);
+			if (!(candidate instanceof AVector<?>)) return null;
+			AVector<ACell> child=(AVector<ACell>) candidate;
+			if (!isValidNodeShallow(child)) return null;
 			node=child;
 		}
 		return node;
@@ -98,7 +124,9 @@ public class DLFSNode {
 	@SuppressWarnings("unchecked")
 	public static Index<AString,AVector<ACell>> getDirectoryEntries(AVector<ACell> dirNode) {
 		if ((dirNode==null)||(dirNode.count()<NODE_LENGTH)) return null;
-		return (Index<AString, AVector<ACell>>) dirNode.get(POS_DIR);
+		ACell value=dirNode.get(POS_DIR);
+		if (!(value instanceof Index<?,?>)) return null;
+		return (Index<AString, AVector<ACell>>) value;
 	}
 
 	/**
@@ -175,7 +203,9 @@ public class DLFSNode {
 	@SuppressWarnings("unchecked")
 	public static Index<AString, CVMLong> getTombstones(AVector<ACell> node) {
 		if (node==null || node.count()<=POS_TOMBS) return EMPTY_TOMBS;
-		return (Index<AString, CVMLong>) node.get(POS_TOMBS);
+		ACell value=node.get(POS_TOMBS);
+		if (!(value instanceof Index<?,?>)) return EMPTY_TOMBS;
+		return (Index<AString, CVMLong>) value;
 	}
 
 	/**
@@ -201,14 +231,52 @@ public class DLFSNode {
 	 * Gets the data from a DLFS file node, or nil if not a regular File
 	 */
 	public static ABlob getData(AVector<ACell> node) {
-		return (ABlob) node.get(POS_DATA);
+		if (node==null || node.count()<NODE_LENGTH) return null;
+		ACell value=node.get(POS_DATA);
+		return (value instanceof ABlob blob) ? blob : null;
 	}
 	
 	/**
-	 * Gets the metadata from a DLFS node
+	 * Gets the opaque application-defined metadata from a DLFS node.
+	 *
+	 * <p>DLFS does not interpret the value. {@code null} means that no metadata is present;
+	 * any other {@link ACell} value is permitted. Applications are responsible for defining
+	 * and validating their own metadata schema.</p>
+	 *
+	 * @param node DLFS node, or {@code null}
+	 * @return metadata value, or {@code null} if absent
 	 */
-	public static Blob getMetaData(AVector<ACell> node) {
-		return (Blob) node.get(POS_METADATA);
+	public static ACell getMetadata(AVector<ACell> node) {
+		if (node==null || node.count()<NODE_LENGTH) return null;
+		return node.get(POS_METADATA);
+	}
+
+	/**
+	 * Legacy spelling for {@link #getMetadata(AVector)}.
+	 *
+	 * @deprecated Use {@link #getMetadata(AVector)}.
+	 */
+	@Deprecated(since="0.8.9", forRemoval=false)
+	public static ACell getMetaData(AVector<ACell> node) {
+		return getMetadata(node);
+	}
+
+	/**
+	 * Returns a node with new opaque metadata and modification timestamp.
+	 *
+	 * <p>The timestamp is part of the metadata contract: metadata is resolved with the
+	 * containing node's normal last-write-wins ordering, rather than merged separately.
+	 * Passing {@code null} as metadata clears it.</p>
+	 *
+	 * @param node DLFS node to update
+	 * @param metadata application-defined metadata, or {@code null} to clear
+	 * @param utime modification timestamp
+	 * @return updated immutable DLFS node
+	 */
+	public static AVector<ACell> withMetadata(AVector<ACell> node, ACell metadata, CVMLong utime) {
+		if (!isValidNodeShallow(node)) throw new IllegalArgumentException("Invalid DLFS node");
+		if (utime==null) throw new IllegalArgumentException("DLFS metadata timestamp cannot be null");
+		return node.assoc(POS_METADATA, metadata).assoc(POS_UTIME, utime);
 	}
 	
 	/**
@@ -298,7 +366,8 @@ public class DLFSNode {
 			// Common case: no deletions anywhere, so no live-vs-dead conflict is possible.
 			if (tombA.isEmpty() && tombB.isEmpty()) {
 				if ((mergedDir==contA)&&(timeA.longValue()>=timeB.longValue())) return a;
-				return buildDirectory(mergeTime, mergedDir, EMPTY_TOMBS);
+				AVector<ACell> metadataSource=timeA.longValue()>=timeB.longValue()?a:b;
+				return buildDirectory(metadataSource, mergeTime, mergedDir, EMPTY_TOMBS);
 			}
 
 			// Merge tombstones, collecting only the names whose tombstone changed. Every live-vs-dead
@@ -334,7 +403,8 @@ public class DLFSNode {
 
 			// Return a unchanged if it already subsumes b (no allocation)
 			if ((mergedDir==contA)&&(mergedTomb==tombA)&&(timeA.longValue()>=timeB.longValue())) return a;
-			return buildDirectory(mergeTime, mergedDir, mergedTomb);
+			AVector<ACell> metadataSource=timeA.longValue()>=timeB.longValue()?a:b;
+			return buildDirectory(metadataSource, mergeTime, mergedDir, mergedTomb);
 		}
 
 		// At least one node is a file: equal content keeps the most recent; otherwise newer wins
@@ -348,13 +418,9 @@ public class DLFSNode {
 	 * Builds a canonical directory node from merged live entries and tombstones, with the
 	 * POS_TOMBS element present if and only if the tombstone index is non-empty.
 	 */
-	static AVector<ACell> buildDirectory(CVMLong utime, Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs) {
-		AVector<ACell> result=createDirectory(utime);
-		result=result.assoc(POS_DIR, entries);
-		if (tombs!=null && !tombs.isEmpty()) {
-			result=result.conj(tombs);
-		}
-		return result;
+	static AVector<ACell> buildDirectory(AVector<ACell> metadataSource, CVMLong utime,
+			Index<AString, AVector<ACell>> entries, Index<AString, CVMLong> tombs) {
+		return withDir(metadataSource, entries, tombs, utime);
 	}
 
 }

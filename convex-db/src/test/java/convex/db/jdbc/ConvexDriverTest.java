@@ -9,6 +9,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -122,6 +124,62 @@ public class ConvexDriverTest {
 				assertEquals("Alice", rs.getString(1));
 			}
 		}
+	}
+
+	/** Regression for #645: generated DML must retain its connection instance. */
+	@Test
+	public void testDmlIsolationAcrossManagedInstances() throws Exception {
+		String a="jdbc:convex:mem:isolation_a";
+		String b="jdbc:convex:mem:isolation_b";
+
+		executeUpdate(a,"CREATE TABLE t (id INTEGER, name VARCHAR)");
+		assertEquals(1,executeUpdate(a,"INSERT INTO t VALUES (1, 'FromA')"));
+		executeUpdate(b,"CREATE TABLE t (id INTEGER, name VARCHAR)");
+		assertEquals(1,executeUpdate(b,"INSERT INTO t VALUES (1, 'FromB')"));
+
+		assertEquals(List.of("FromA"),queryStrings(a,"SELECT name FROM t"));
+		assertEquals(List.of("FromB"),queryStrings(b,"SELECT name FROM t"));
+
+		assertEquals(1,executeUpdate(b,"UPDATE t SET name = 'UpdatedB' WHERE id = 1"));
+		assertEquals(List.of("FromA"),queryStrings(a,"SELECT name FROM t"));
+		assertEquals(List.of("UpdatedB"),queryStrings(b,"SELECT name FROM t"));
+
+		assertEquals(1,executeUpdate(b,"DELETE FROM t WHERE id = 1"));
+		assertEquals(List.of("FromA"),queryStrings(a,"SELECT name FROM t"));
+		assertTrue(queryStrings(b,"SELECT name FROM t").isEmpty());
+	}
+
+	/** Regression for #646: Calcite represents a one-column row as a scalar. */
+	@Test
+	public void testSingleColumnDml() throws Exception {
+		String url="jdbc:convex:mem:single_column";
+		executeUpdate(url,"CREATE TABLE s (k VARCHAR)");
+
+		assertEquals(1,executeUpdate(url,"INSERT INTO s VALUES ('x')"));
+		assertEquals(List.of("x"),queryStrings(url,"SELECT k FROM s"));
+
+		assertEquals(1,executeUpdate(url,"UPDATE s SET k = 'y' WHERE k = 'x'"));
+		assertEquals(List.of("y"),queryStrings(url,"SELECT k FROM s"));
+
+		assertEquals(1,executeUpdate(url,"DELETE FROM s WHERE k = 'y'"));
+		assertTrue(queryStrings(url,"SELECT k FROM s").isEmpty());
+	}
+
+	private static int executeUpdate(String url, String sql) throws Exception {
+		try (Connection connection=DriverManager.getConnection(url);
+				Statement statement=connection.createStatement()) {
+			return statement.executeUpdate(sql);
+		}
+	}
+
+	private static List<String> queryStrings(String url, String sql) throws Exception {
+		ArrayList<String> result=new ArrayList<>();
+		try (Connection connection=DriverManager.getConnection(url);
+				Statement statement=connection.createStatement();
+				ResultSet rs=statement.executeQuery(sql)) {
+			while (rs.next()) result.add(rs.getString(1));
+		}
+		return result;
 	}
 
 	// ========== File-Backed Connections ==========

@@ -97,8 +97,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Propagators for persistence and broadcast. Index 0 is the primary propagator
-	 * (if present) — NodeServer sets a merge callback on it to feed store-backed
-	 * refs into the cursor. Additional propagators handle public/backup broadcast.
+	 * (if present). Its synchronous snapshot result is installed by the root cursor;
+	 * a temporary callback remains only for explicit pull acquisition. Additional
+	 * propagators handle public/backup broadcast.
 	 */
 	private final List<LatticePropagator> propagators = new ArrayList<>();
 
@@ -248,8 +249,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 			propagators.add(primary);
 		}
 
-		// Wire merge callback on primary propagator: feeds store-backed refs
-		// into the cursor via lattice merge, preventing OOM from strong refs
+		// Temporary pull callback on the primary propagator. Synchronous snapshot
+		// processing returns its store-backed result directly to RootLatticeCursor;
+		// only explicitly acquired peer values still use this callback.
 		if (!propagators.isEmpty()) {
 			propagators.get(0).setMergeCallback(persisted -> {
 				cursor.updateAndGet(current -> {
@@ -1009,7 +1011,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p><b>Configuration-only (#568).</b> This must be called before {@link #launch()}.
 	 * The context is then read by the propagator and Netty receive threads
-	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, the merge callback),
+	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, the pull callback),
 	 * and is safely published to them via the happens-before edge of thread start — so
 	 * the field is deliberately non-volatile. Setting it after launch is rejected: those
 	 * threads could otherwise observe a stale reference indefinitely, and any in-flight
@@ -1027,7 +1029,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
-		cursor.withContext(context);
+		cursor.setContext(context);
 	}
 
 	/**
@@ -1130,8 +1132,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Adds a propagator to this server. The first added propagator becomes the
-	 * primary (index 0) — NodeServer will set a merge callback on it during
-	 * launch to feed store-backed refs into the cursor.
+	 * primary (index 0) — NodeServer will use its returned snapshot value for
+	 * synchronous root sync and set a temporary callback for explicit pulls.
 	 *
 	 * @param propagator The propagator to add
 	 */
@@ -1183,8 +1185,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		connectionStats.clear();
 
 		// Final sync: trigger all propagators with current value and wait for drain.
-		// This guarantees persistence on the primary propagator (announce + setRootData
-		// + mergeCallback). Broadcast to peers is best-effort.
+		// This guarantees persistence on the primary propagator (announce + setRootData).
+		// Broadcast to peers is best-effort.
 		V snapshot = cursor.get();
 		for (LatticePropagator p : propagators) {
 			p.triggerAndClose(snapshot);

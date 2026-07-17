@@ -54,7 +54,7 @@ public class DLFSProvider extends FileSystemProvider {
 		String pathPart = uri.getPath();
 		if (pathPart==null) throw new IllegalArgumentException("URI contains no path");
 		DLFileSystem fs= fileSystems.get(pathPart);
-		if (fs==null) fs=newFileSystem(uri,null);
+		if (fs==null || !fs.isOpen()) fs=newFileSystem(uri,null);
 		return fs;
 	}
 
@@ -111,14 +111,12 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public void copy(Path source, Path target, CopyOption... options) throws IOException {
-		// TODO Auto-generated method stub
-		
+		throw new UnsupportedOperationException("DLFS provider copy is not implemented");
 	}
 
 	@Override
 	public void move(Path source, Path target, CopyOption... options) throws IOException {
-		// TODO Auto-generated method stub
-		
+		throw new UnsupportedOperationException("DLFS provider move is not implemented");
 	}
 
 	@Override
@@ -134,8 +132,7 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public FileStore getFileStore(Path path) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException("DLFS file stores are not implemented");
 	}
 
 	@Override
@@ -164,14 +161,12 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public Map<String, Object> readAttributes(Path path, String attributes, LinkOption... options) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException("String-based DLFS attributes are not implemented");
 	}
 
 	@Override
 	public void setAttribute(Path path, String attribute, Object value, LinkOption... options) throws IOException {
-		// TODO Auto-generated method stub
-		
+		throw new UnsupportedOperationException("DLFS attributes are read-only");
 	}
 
 }

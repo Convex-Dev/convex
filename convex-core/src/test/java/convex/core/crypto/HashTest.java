@@ -1,6 +1,7 @@
 package convex.core.crypto;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -82,7 +83,9 @@ public class HashTest {
 		Hash h1 = Hashing.sha3(Utils.EMPTY_BYTES);
 		assertEquals("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a", h1.toHexString());
 		assertEquals(Hash.EMPTY_HASH, h1);
-		
+
+		assertEquals("00".repeat(Hash.LENGTH), Hash.UNSET_HASH.toHexString());
+		assertNotEquals(Hash.NULL_HASH, Hash.UNSET_HASH);
 	}
 
 	@Test

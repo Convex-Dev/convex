@@ -14,6 +14,7 @@ import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
 import convex.core.exceptions.TODOException;
 import convex.core.exceptions.UpgradeError;
+import convex.core.util.ConsumerDispatcher;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
@@ -28,9 +29,13 @@ public class CVMExecutor extends AThreadedComponent {
 	private Peer peer;
 	
 	/**
-	 * Hook for observing peer updates
+	 * Dispatcher for observing finalised peer state updates. Kept null for the
+	 * no-observer fast path.
 	 */
-	private Consumer<Peer> updateHook=null;
+	private volatile ConsumerDispatcher<Peer> updateObservers;
+
+	/** Compatibility hook installed through setUpdateHook. */
+	private Consumer<Peer> updateHook;
 	
 	/**
 	 * Queue for latest incoming Beliefs
@@ -74,7 +79,7 @@ public class CVMExecutor extends AThreadedComponent {
 				if (updatedPeer!=peer) {
 					peer=updatedPeer;
 					persistPeerData();
-					maybeCallHook(peer);
+					maybeCallObservers(peer);
 				}
 			}
 
@@ -143,11 +148,9 @@ public class CVMExecutor extends AThreadedComponent {
 
 	}
 
-	private void maybeCallHook(Peer p) {
-		Consumer<Peer> hook=updateHook;
-		if (hook==null) return;
-		
-		hook.accept(p);
+	private void maybeCallObservers(Peer p) {
+		ConsumerDispatcher<Peer> observers=updateObservers;
+		if (observers!=null) observers.accept(p);
 	}
 
 	@Override
@@ -167,8 +170,54 @@ public class CVMExecutor extends AThreadedComponent {
 		update.offer(belief);
 	}
 
-	public void setUpdateHook(Consumer<Peer> hook) {
+	/**
+	 * Adds an observer for finalised peer state updates.
+	 */
+	synchronized boolean addUpdateObserver(Consumer<Peer> observer) {
+		ConsumerDispatcher<Peer> observers=updateObservers;
+		boolean added;
+		if (observers==null) {
+			observers=new ConsumerDispatcher<>();
+			added=observers.add(observer);
+			updateObservers=observers;
+		} else {
+			added=observers.add(observer);
+		}
+		if (added&&(peer!=null)) {
+			try {
+				observer.accept(peer);
+			} catch (Exception e) {
+				log.debug("State update observer failed during registration",e);
+			}
+		}
+		return added;
+	}
+
+	/**
+	 * Removes a finalised peer state observer.
+	 */
+	synchronized boolean removeUpdateObserver(Consumer<Peer> observer) {
+		ConsumerDispatcher<Peer> observers=updateObservers;
+		if (observers==null) return false;
+		boolean removed=observers.remove(observer);
+		if (removed&&observers.isEmpty()) updateObservers=null;
+		return removed;
+	}
+
+	/**
+	 * Replaces the legacy singleton update hook. New code should use
+	 * {@link Server#addStateUpdateObserver(Consumer)} and
+	 * {@link Server#removeStateUpdateObserver(Consumer)}.
+	 *
+	 * @param hook New hook, or {@code null} to clear it
+	 * @deprecated Use the additive Server observation point
+	 */
+	@Deprecated
+	public synchronized void setUpdateHook(Consumer<Peer> hook) {
+		Consumer<Peer> oldHook=updateHook;
+		if (oldHook!=null) removeUpdateObserver(oldHook);
 		updateHook=hook;
+		if (hook!=null) addUpdateObserver(hook);
 	}
 
 

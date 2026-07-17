@@ -714,8 +714,8 @@ public class SignedCursorTest {
 	// =========================================================================
 
 	/**
-	 * LatticeContext is inherited by descended and forked cursors.
-	 * withContext() returns a new cursor without mutating the original.
+	 * Descended cursors inherit their parent's effective context and forks snapshot it.
+	 * setContext() mutates the cursor's local context override.
 	 */
 	@Test
 	public void testContextPropagation() {
@@ -732,8 +732,8 @@ public class SignedCursorTest {
 		// Inherited through fork
 		assertEquals(ctx, root.path(Keywords.FOO).fork().getContext());
 
-		// withContext returns new cursor with different context
+		// setContext mutates the root's local context override
 		LatticeContext newCtx = LatticeContext.create(null, KP_BOB);
-		assertEquals(newCtx, root.withContext(newCtx).getContext());
+		assertEquals(newCtx, root.setContext(newCtx).getContext());
 	}
 }

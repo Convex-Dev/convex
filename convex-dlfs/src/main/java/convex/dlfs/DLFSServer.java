@@ -31,25 +31,35 @@ import io.javalin.config.RoutesConfig;
  * appear as top-level directories under {@code /dlfs/}.
  */
 public class DLFSServer implements Closeable {
+	/** Default bind host: DLFS is private/local unless an application explicitly exposes it. */
+	public static final String DEFAULT_BIND_HOST = "127.0.0.1";
+	/** Default upper bound for any HTTP request body. */
+	public static final long DEFAULT_MAX_REQUEST_SIZE = 64L * 1024 * 1024;
 
 	private static final Logger log = LoggerFactory.getLogger(DLFSServer.class);
 
 	private final DLFSDriveManager driveManager;
 	private final DLFSWebDAV webdav;
 	private final McpServer mcpServer;
+	private final DlfsMcpTools mcpTools;
 	private final AKeyPair keyPair;
+	private String bindHost = DEFAULT_BIND_HOST;
+	private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
 	private Javalin app;
 
 	private DLFSServer(DLFSDriveManager driveManager, AKeyPair keyPair) {
 		this.driveManager = driveManager;
 		this.keyPair = keyPair;
 		this.webdav = new DLFSWebDAV(driveManager);
+		// A configured authentication key should never silently leave mutations open.
+		this.webdav.setRequireAuthForWrites(keyPair != null);
 		this.mcpServer = new McpServer(Maps.of(
 			"name", "dlfs-mcp",
 			"title", "DLFS MCP",
 			"version", Utils.getVersion()
 		));
-		new DlfsMcpTools(driveManager).registerAll(mcpServer);
+		this.mcpTools = new DlfsMcpTools(driveManager).setRequireAuthForWrites(keyPair != null);
+		mcpTools.registerAll(mcpServer);
 	}
 
 	/**
@@ -60,6 +70,18 @@ public class DLFSServer implements Closeable {
 	 */
 	public static DLFSServer create(AKeyPair keyPair) {
 		return new DLFSServer(new DLFSDriveManager(), keyPair);
+	}
+
+	/**
+	 * Creates a DLFS server using an application-supplied drive manager.
+	 *
+	 * @param driveManager Drive registry and filesystem view manager
+	 * @param keyPair Ed25519 key pair for auth (null for no auth)
+	 * @return New DLFSServer instance
+	 */
+	public static DLFSServer create(DLFSDriveManager driveManager, AKeyPair keyPair) {
+		if (driveManager==null) throw new IllegalArgumentException("Drive manager cannot be null");
+		return new DLFSServer(driveManager, keyPair);
 	}
 
 	/**
@@ -84,10 +106,9 @@ public class DLFSServer implements Closeable {
 	 * @param port Port number (0 for random)
 	 */
 	public void start(int port) {
-		app = Javalin.create(config -> {
-			config.bundledPlugins.enableCors(cors -> {
-				cors.addRule(corsConfig -> corsConfig.anyHost());
-			});
+		if (app != null) throw new IllegalStateException("Server already started");
+		Javalin newApp = Javalin.create(config -> {
+			config.http.maxRequestSize = maxRequestSize;
 			config.concurrency.useVirtualThreads = true;
 
 			HttpMethodFilter.install(config);
@@ -97,11 +118,14 @@ public class DLFSServer implements Closeable {
 			// so we only need 1 acceptor + 1 selector for the connector.
 			config.jetty.addConnector((jettyServer, httpConfig) -> {
 				ServerConnector connector = new ServerConnector(jettyServer, 1, 1);
+				connector.setHost(bindHost);
 				connector.setPort(port);
 				return connector;
 			});
 
 			RoutesConfig routes = config.routes;
+			routes.exception(IllegalArgumentException.class, (e, ctx) ->
+				ctx.status(400).result("Bad Request: " + e.getMessage()));
 
 			// Wire auth middleware if key pair provided (with audience checking)
 			if (keyPair != null) {
@@ -132,7 +156,28 @@ public class DLFSServer implements Closeable {
 			mcpServer.addRoutes(routes);
 		});
 
-		app.start();
+		newApp.start();
+		app = newApp;
+	}
+
+	/**
+	 * Sets the network interface/address to bind. Must be called before start.
+	 * The default is {@value #DEFAULT_BIND_HOST}; exposing DLFS is an explicit choice.
+	 */
+	public DLFSServer setBindHost(String host) {
+		if (app != null) throw new IllegalStateException("Server already started");
+		if (host == null || host.isBlank()) throw new IllegalArgumentException("Bind host is required");
+		this.bindHost = host;
+		return this;
+	}
+
+	/** Sets the maximum accepted HTTP request body size. Must be called before start. */
+	public DLFSServer setMaxRequestSize(long bytes) {
+		if (app != null) throw new IllegalStateException("Server already started");
+		if (bytes <= 0) throw new IllegalArgumentException("Maximum request size must be positive");
+		this.maxRequestSize = bytes;
+		webdav.setMaxFileSize(bytes);
+		return this;
 	}
 
 	/**
@@ -162,6 +207,14 @@ public class DLFSServer implements Closeable {
 	 */
 	public McpServer getMcpServer() {
 		return mcpServer;
+	}
+
+	/** Applies the same mutation-authentication policy to WebDAV and MCP. */
+	public DLFSServer setRequireAuthForWrites(boolean require) {
+		if (app != null) throw new IllegalStateException("Server already started");
+		webdav.setRequireAuthForWrites(require);
+		mcpTools.setRequireAuthForWrites(require);
+		return this;
 	}
 
 	@Override

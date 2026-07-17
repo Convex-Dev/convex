@@ -13,11 +13,12 @@ import convex.core.exceptions.TODOException;
  * Non-blocking Queue implementation that overwrites the queued item in a non-blocking manner.
  * 
  * Adding a new item always succeeds.
+ * This queue is intended for a single consumer.
  * 
  * @param <E> Type of Queue elements
  */
 public class LatestUpdateQueue<E> implements BlockingQueue<E> {
-	private E item;
+	private volatile E item;
 	
 	@Override
 	public synchronized boolean offer(E e) {
@@ -36,9 +37,9 @@ public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 	
 	@Override
 	public synchronized E take() throws InterruptedException {
-		if (item==null) {
+		while (item==null) {
 			wait();
-		};
+		}
 		E result=item;
 		item=null;
 		return result;
@@ -46,9 +47,15 @@ public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 
 	@Override
 	public synchronized E poll(long timeout, TimeUnit unit) throws InterruptedException {
-		if (item==null) {
-			wait(unit.toMillis(timeout),0);
-		};
+		long remaining=unit.toNanos(timeout);
+		long start=System.nanoTime();
+		while (item==null) {
+			if (remaining<=0) return null;
+			TimeUnit.NANOSECONDS.timedWait(this,remaining);
+			long now=System.nanoTime();
+			remaining-=now-start;
+			start=now;
+		}
 		return poll();
 	}
 	

@@ -71,12 +71,22 @@ public class Samples {
 	/**
 	 * Shared test store for tests that need to persist data.
 	 * Uses a temp EtchStore so tests don't depend on a global thread-local store.
+	 *
+	 * Tests should re-use this store (with values unique to the test) rather than
+	 * creating their own temp stores, unless the test is specifically about store
+	 * lifecycle, configuration or exact store contents.
 	 */
-	public static final EtchStore TEST_STORE = createTestStore();
+	public static final EtchStore TEST_STORE = createTestStore("test-store");
 
-	private static EtchStore createTestStore() {
+	/**
+	 * Second shared test store, for tests of cross-store behaviour needing a
+	 * distinct source/destination pair. Same re-use guidance as TEST_STORE.
+	 */
+	public static final EtchStore TEST_STORE2 = createTestStore("test-store-2");
+
+	private static EtchStore createTestStore(String name) {
 		try {
-			return EtchStore.createTemp("test-store");
+			return EtchStore.createTemp(name);
 		} catch (IOException e) {
 			throw new Error("Failed to create test store", e);
 		}

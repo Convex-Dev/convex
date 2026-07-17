@@ -19,10 +19,13 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.AccountKey;
+import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -76,15 +79,30 @@ public class RestoreTest {
 		
 		Long balance1=cvx1.getBalance(HERO);
 		assertTrue(balance1>0);
+		Peer original=s1.getPeer();
+		Peer expected=original.recalcState(0);
 		s1.close();
+
+		// Simulate a persisted state produced by an older, faulty implementation.
+		// Startup replay must replace it both in memory and at the store root.
+		State corruptState=original.getConsensusState().withTimestamp(
+				original.getConsensusState().getTimestamp().longValue()+1);
+		AMap<Keyword,ACell> corruptData=original.toData().assoc(Keywords.STATE,corruptState);
+		store.setRootData(Maps.of(KP.getAccountKey(),corruptData));
 
 		// TODO: testing that server is definitely down. This is a bit slow....
 		// assertThrows(Throwable.class,()->cvx1.getBalance(HERO));
 
 		// Launch peer and connect
 		config.remove(Keywords.STATE);
-		config.remove(Keywords.RESTORE,true);
+		config.put(Keywords.RESTORE,true);
+		config.put(Keywords.RECALC,0L);
 		Server s2=API.launchPeer(config);
+
+		Peer persisted=Peer.restorePeer(store,KP,KP.getAccountKey());
+		assertEquals(expected.getConsensusState().getHash(),s2.getPeer().getConsensusState().getHash());
+		assertEquals(s2.getPeer().getConsensusState().getHash(),persisted.getConsensusState().getHash());
+		assertEquals(s2.getPeer().getStatePosition(),persisted.getStatePosition());
 		
 		assertNull(s2.getHostname());
 		

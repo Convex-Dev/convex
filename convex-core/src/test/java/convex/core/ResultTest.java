@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -22,6 +23,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.JSON;
 import convex.test.Samples;
 
 public class ResultTest {
@@ -57,6 +59,18 @@ public class ResultTest {
 		assertSame(ErrorCodes.FATAL,r1.getErrorCode());
 		
 		RecordTest.doRecordTests(r1);
+	}
+
+	@Test
+	public void testJSONIncludesLogAndInfo() {
+		AVector<ACell> entry=Vectors.of(RT.cvm(1L),null,Vectors.of(2L,3L),Vectors.of(Keywords.FOO));
+		AVector<AVector<ACell>> log=Vectors.of(entry);
+		AHashMap<Keyword,ACell> info=Maps.of(Keywords.JUICE,CVMLong.ONE);
+		Result result=Result.create(CVMLong.ZERO,Keywords.FOO,null,log,info);
+
+		var json=result.toJSON();
+		assertEquals(JSON.json(log),json.get("log"));
+		assertEquals(JSON.json(info),json.get("info"));
 	}
 	
 	@Test public void fromException() {
