@@ -87,6 +87,13 @@ public class EtchStore extends ACachedStore {
 	private volatile boolean completed = false;
 
 	/**
+	 * Ensures close-time file retirement runs exactly once. This matters after a
+	 * completed GC cutover: a later recovery may install the successor under the
+	 * legacy store's file name, which a second close must never delete.
+	 */
+	private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
 	 * The logical base file of this store, used for naming GC target files
 	 * (base~, base~1, ...). Inherited across GC cutovers, and set to the
 	 * requested file when a store opens on a chain tail under deferred
@@ -710,6 +717,7 @@ public class EtchStore extends ACachedStore {
 	}
 
 	public void close() {
+		if (!closed.compareAndSet(false, true)) return;
 		// Close the GC target too if a cycle is in progress. This abandons the
 		// cycle: data written since startGC() remains in the target file for a
 		// later recovery step, and the old file is untouched. After completeGC()

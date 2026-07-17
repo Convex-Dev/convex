@@ -442,5 +442,14 @@ public class EtchGCLifecycleTest {
 			assertTrue(marker.exists());
 		}
 		adopted.close();
+
+		// Closing the legacy view again after adoption must not delete the
+		// successor now installed under the legacy file name. CLI cleanup can
+		// legitimately close the same store from both its body and finally block.
+		store.close();
+		EtchStore afterDuplicateClose = EtchStore.create(f);
+		assertEquals(t3.getHash(), afterDuplicateClose.getRootHash());
+		assertEquals(t3, afterDuplicateClose.getRootData());
+		afterDuplicateClose.close();
 	}
 }
