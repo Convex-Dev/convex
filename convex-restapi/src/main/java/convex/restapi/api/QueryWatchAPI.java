@@ -80,7 +80,10 @@ public final class QueryWatchAPI extends ABaseAPI {
 			response.setHeader("X-Accel-Buffering","no");
 
 			PrintWriter writer=response.getWriter();
-			connection=new SseConnection(writer,EVENT_QUEUE_CAPACITY);
+			// Query results are conflatable — the newest supersedes anything queued —
+			// so a fast-changing query (e.g. *timestamp*) on a busy network degrades
+			// to bounded staleness rather than losing the connection
+			connection=new SseConnection(writer,EVENT_QUEUE_CAPACITY,SseConnection.OverflowPolicy.DROP_OLDEST);
 			subscribe(connection,query,format);
 			synchronized (writer) {
 				writer.write(": connected\n\n");

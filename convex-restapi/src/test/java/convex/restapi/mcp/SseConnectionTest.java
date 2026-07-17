@@ -62,6 +62,33 @@ class SseConnectionTest {
 	}
 
 	@Test
+	void dropOldestOverflowKeepsConnectionAndNewestEvents() throws Exception {
+		CountDownLatch writeStarted=new CountDownLatch(1);
+		CountDownLatch release=new CountDownLatch(1);
+		CountDownLatch flushes=new CountDownLatch(3);
+		GatedCapturingWriter output=new GatedCapturingWriter(writeStarted,release,flushes);
+		SseConnection connection=new SseConnection(new PrintWriter(output),2,
+			SseConnection.OverflowPolicy.DROP_OLDEST);
+		try {
+			connection.sendEvent("message","in-progress");
+			assertTrue(writeStarted.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			connection.sendEvent("message","queued-1");
+			connection.sendEvent("message","queued-2");
+			connection.sendEvent("message","overflow");
+			assertFalse(connection.isClosed());
+			release.countDown();
+			assertTrue(flushes.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			String written=output.toString();
+			assertTrue(written.contains("data: in-progress"));
+			assertFalse(written.contains("data: queued-1"));
+			assertTrue(written.contains("data: queued-2"));
+			assertTrue(written.contains("data: overflow"));
+		} finally {
+			connection.close();
+		}
+	}
+
+	@Test
 	void writesEventIDsAndFramesEveryDataLine() throws Exception {
 		CountDownLatch written=new CountDownLatch(1);
 		CapturingWriter output=new CapturingWriter(written);
@@ -125,6 +152,51 @@ class SseConnectionTest {
 
 		@Override public void flush() {}
 		@Override public void close() {}
+	}
+
+	/** Blocks the first write until released, capturing everything written. */
+	private static final class GatedCapturingWriter extends Writer {
+		private final CountDownLatch firstWriteStarted;
+		private final CountDownLatch release;
+		private final CountDownLatch flushes;
+		private final StringBuilder builder=new StringBuilder();
+		private boolean gated=true;
+
+		private GatedCapturingWriter(CountDownLatch firstWriteStarted, CountDownLatch release,
+			CountDownLatch flushes) {
+			this.firstWriteStarted=firstWriteStarted;
+			this.release=release;
+			this.flushes=flushes;
+		}
+
+		@Override
+		public void write(char[] chars, int offset, int length) {
+			if (gated) {
+				gated=false;
+				firstWriteStarted.countDown();
+				boolean interrupted=false;
+				while (true) {
+					try {
+						release.await();
+						break;
+					} catch (InterruptedException e) {
+						interrupted=true;
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+			}
+			synchronized (builder) {
+				builder.append(chars,offset,length);
+			}
+		}
+
+		@Override public void flush() { flushes.countDown(); }
+		@Override public void close() {}
+		@Override public String toString() {
+			synchronized (builder) {
+				return builder.toString();
+			}
+		}
 	}
 
 	private static final class CapturingWriter extends Writer {
