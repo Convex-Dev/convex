@@ -54,8 +54,12 @@ public class RESTAPITest extends ARESTTest {
 	@Test public void testOpenAPI() throws IOException, InterruptedException {
 		HttpResponse<String> response = get("http://localhost:" + server.getPort()+"/openapi");
 		assertEquals(200, response.statusCode());
-		String s = response.body();
-		assertNotNull(JSON.parse(s));
+		// A populated spec, not the bare {} an outdated peer serves (#648)
+		AMap<AString,ACell> spec = JSON.parse(response.body());
+		assertNotNull(spec.get(Strings.create("openapi")),"Spec should declare an OpenAPI version");
+		AMap<AString,ACell> paths = RT.ensureMap(spec.get(Strings.create("paths")));
+		assertNotNull(paths,"Spec should contain a paths object");
+		assertFalse(paths.isEmpty(),"Spec paths should not be empty");
 	}
 	
 	@Test public void testTxPrepareSubmit() throws IOException, InterruptedException, BadFormatException {
