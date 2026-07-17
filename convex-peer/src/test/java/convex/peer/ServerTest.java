@@ -27,6 +27,7 @@ import convex.core.cpos.Belief;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
@@ -34,6 +35,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -78,6 +80,22 @@ public class ServerTest {
 		} finally {
 			assertTrue(server.removeStateUpdateObserver(observer));
 		}
+	}
+
+	@Test
+	public void testStatusIncludesReplayAttestation() {
+		Server server=network.SERVER;
+		AMap<Keyword,ACell> status=server.getStatusMap();
+		assertEquals(server.getPeer().getStatePosition(),RT.ensureLong(status.get(Keywords.STATE_POSITION)).longValue());
+		assertEquals(Migrations.MAX_VERSION,
+				RT.ensureLong(status.get(Keywords.SUPPORTED_PROTOCOL_VERSION)).longValue());
+		assertEquals(Config.STATUS_COUNT,server.getStatusData().count());
+
+		// Append-only decoding keeps pre-attestation status vectors compatible.
+		AVector<ACell> oldStatus=server.getStatusData().slice(0,9);
+		AMap<Keyword,ACell> oldStatusMap=API.ensureStatusMap(oldStatus);
+		assertNull(oldStatusMap.get(Keywords.STATE_POSITION));
+		assertNull(oldStatusMap.get(Keywords.SUPPORTED_PROTOCOL_VERSION));
 	}
 
 	@Test

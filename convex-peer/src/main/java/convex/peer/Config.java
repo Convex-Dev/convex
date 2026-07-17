@@ -81,7 +81,7 @@ public class Config {
 	/**
 	 * Number of fields in a Peer STATUS message
 	 */
-	public static final long STATUS_COUNT = 9;
+	public static final long STATUS_COUNT = 11;
 
 	/**
 	 * Default size for incoming client transaction queue

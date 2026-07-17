@@ -524,6 +524,26 @@ public class Peer {
 	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
 		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
+		return updateState(consensusPoint);
+	}
+
+	/**
+	 * Updates the state of the Peer to an exact finalised position.
+	 *
+	 * @param targetPosition Finalised Order position to compute
+	 * @return Updated Peer at the requested position
+	 */
+	public Peer updateState(long targetPosition) {
+		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
+		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
+		if ((targetPosition < 0) || (targetPosition > consensusPoint)) {
+			throw new IllegalArgumentException("State target position " + targetPosition
+					+ " outside finalised range 0.." + consensusPoint);
+		}
+
+		// An exact target behind the current state first requires local truncation.
+		if (targetPosition < statePosition) return truncateState(targetPosition).updateState(targetPosition);
+
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 		AVector<SignedData<Block>> consensusBlocks= consensusOrder.getBlocks();
 
@@ -547,13 +567,16 @@ public class Peer {
 		}
 		
 		// Return if we don't need to advance states
-		if (stateIndex>=consensusPoint) return this;
+		if (stateIndex>=targetPosition) {
+			if (stateIndex==statePosition) return this;
+			return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+		}
 		
 		// Kick off parallel signature validation
-		validateSignatures(blocks,stateIndex,consensusPoint);
+		validateSignatures(blocks,stateIndex,targetPosition);
 
 		// We need to compute at least one new state update
-		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
+		while (stateIndex < targetPosition) { // add states until last state is at target position
 			SignedData<Block> block = blocks.get(stateIndex);
 			
 			BlockResult br = s.applyBlock(block);
@@ -573,8 +596,23 @@ public class Peer {
 	}
 	
 	public Peer recalcState(long pos) {
+		return recalcState(pos,getFinalityPoint());
+	}
+
+	/**
+	 * Recalculates state from a local history position to an exact finalised target.
+	 *
+	 * @param pos Position from which to start recalculation
+	 * @param targetPosition Finalised Order position to compute
+	 * @return Recalculated Peer at the requested position
+	 */
+	public Peer recalcState(long pos, long targetPosition) {
+		if ((pos < 0) || (pos > targetPosition)) {
+			throw new IllegalArgumentException("Replay start position " + pos
+					+ " outside target range 0.." + targetPosition);
+		}
 		Peer result=truncateState(pos);
-		result=result.updateState();
+		result=result.updateState(targetPosition);
 		return result;
 	}
 
@@ -597,6 +635,7 @@ public class Peer {
 			// recalculate from beginning
 			newResults=Vectors.empty();
 			newState=genesis;
+			newHistory=0;
 			pos=0;
 		}
 		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);

@@ -13,6 +13,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
+import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
@@ -46,7 +47,8 @@ import convex.peer.API;
  *     status, and acquire the genesis state, current consensus state and belief (all
  *     Merkle-verified by hash on acquisition).</li>
  * <li><b>REPLAY</b> — re-execute the peer's ordering from genesis via
- *     {@link State#applyBlock} (the exact consensus code path) and check this release
+ *     {@link Peer#recalcState(long, long)} (the exact Peer startup path, ultimately
+ *     applying entries through {@link State#applyBlock}) and check this release
  *     reproduces the peer's consensus state bit-for-bit. A mismatch is diffed down to
  *     the differing accounts and fields, and classified: divergence confined to cost
  *     accounting (balances/fees/juice/memory) is a warning while the live network is
@@ -132,10 +134,15 @@ public class VerifyNetworkUpgrade {
 		Hash stateHash = RT.ensureHash(smap.get(Keywords.STATE));
 		Hash beliefHash = RT.ensureHash(smap.get(Keywords.BELIEF));
 		AccountKey remotePeerKey = RT.ensureAccountKey(smap.get(Keywords.PEER));
+		CVMLong statePositionValue = RT.ensureLong(smap.get(Keywords.STATE_POSITION));
+		CVMLong supportedVersion = RT.ensureLong(smap.get(Keywords.SUPPORTED_PROTOCOL_VERSION));
+		Long remoteStatePosition = (statePositionValue == null) ? null : statePositionValue.longValue();
 		info("Remote peer key:  " + remotePeerKey);
 		info("Genesis hash:     " + genesisHash);
 		info("State hash:       " + stateHash);
+		info("State position:   " + ((remoteStatePosition == null) ? "not advertised (legacy status)" : remoteStatePosition));
 		info("Belief hash:      " + beliefHash);
+		if (supportedVersion != null) info("Peer supports protocol version: " + supportedVersion);
 
 		State genesis = acquire(convex, genesisHash, State.class, "genesis state");
 		State remoteState = acquire(convex, stateHash, State.class, "consensus state");
@@ -159,7 +166,7 @@ public class VerifyNetworkUpgrade {
 
 		// ==================== Phase 2: REPLAY ====================
 		heading("Phase 2: REPLAY");
-		State replayed = replay(genesis, belief, remotePeerKey, remoteState, stateHash);
+		State replayed = replay(genesis, belief, remotePeerKey, remoteState, stateHash,remoteStatePosition);
 
 		// ==================== Phase 3: MIGRATE ====================
 		heading("Phase 3: MIGRATE");
@@ -178,7 +185,7 @@ public class VerifyNetworkUpgrade {
 	 * @return The replayed state on success, null if replay failed or was skipped
 	 */
 	static State replay(State genesis, Belief belief, AccountKey remotePeerKey,
-			State remoteState, Hash stateHash) {
+			State remoteState, Hash stateHash, Long advertisedStatePosition) {
 		SignedData<Order> so = belief.getOrders().get(remotePeerKey);
 		if (so == null) {
 			fail("Remote peer's own order not present in acquired belief — cannot replay");
@@ -189,42 +196,49 @@ public class VerifyNetworkUpgrade {
 		AVector<SignedData<Block>> blocks = order.getBlocks();
 		info("Order: " + blocks.count() + " blocks, finality consensus point: " + cp);
 
-		State s = genesis;
-		long start = System.currentTimeMillis();
-		for (long i = 0; i < cp; i++) {
-			try {
-				s = s.applyBlock(blocks.get(i)).getState();
-			} catch (Throwable t) {
-				fail("Replay threw at block " + i + ": " + t);
-				t.printStackTrace(System.out);
+		long targetPosition;
+		if (advertisedStatePosition != null) {
+			targetPosition=advertisedStatePosition;
+			if ((targetPosition < 0) || (targetPosition > cp)) {
+				fail("Advertised state position " + targetPosition
+						+ " is outside the finalised Order range 0.." + cp);
 				return null;
 			}
-			if ((i > 0) && (i % 10000 == 0)) {
-				info("  ... replayed " + i + " blocks (" + (System.currentTimeMillis() - start) + "ms)");
+		} else {
+			// A legacy status does not identify which Order prefix produced its state.
+			// Discover a matching prefix where possible, then verify it again through Peer.
+			targetPosition=findLegacyStatePosition(genesis,blocks,cp,remoteState);
+			if (targetPosition < 0) {
+				targetPosition=cp;
+				warn("Legacy status state was not found in the locally replayed finalised prefixes; "
+						+ "using finality position " + cp + " for divergence diagnostics");
+			} else {
+				info("Derived legacy state position from matching replay prefix: " + targetPosition);
 			}
 		}
-		info("Replayed " + cp + " blocks in " + (System.currentTimeMillis() - start) + "ms");
+
+		long start = System.currentTimeMillis();
+		State s;
+		try {
+			// Give a locally controlled Peer the remote Order, exactly as source startup does.
+			AKeyPair replayKeyPair=AKeyPair.generate();
+			SignedData<Order> replayOrder=replayKeyPair.signData(order);
+			Belief replayBelief=belief.withOrders(
+					belief.getOrders().assoc(replayKeyPair.getAccountKey(),replayOrder));
+			Peer replayPeer=Peer.create(replayKeyPair,genesis,replayBelief);
+			replayPeer=replayPeer.recalcState(0,targetPosition);
+			s=replayPeer.getConsensusState();
+		} catch (Throwable t) {
+			fail("Peer replay threw while computing position " + targetPosition + ": " + t);
+			t.printStackTrace(System.out);
+			return null;
+		}
+		info("Replayed to position " + targetPosition + " through Peer startup path in "
+				+ (System.currentTimeMillis() - start) + "ms");
 
 		if (s.equals(remoteState)) {
 			pass("Replay reproduces the live consensus state exactly (hash " + s.getHash() + ")");
 			return s;
-		}
-
-		// The status snapshot may be slightly ahead of the belief's finality point:
-		// try extending the replay through any remaining blocks in the order
-		long extra = blocks.count();
-		State ext = s;
-		for (long i = cp; i < extra; i++) {
-			try {
-				ext = ext.applyBlock(blocks.get(i)).getState();
-			} catch (Throwable t) {
-				break;
-			}
-			if (ext.equals(remoteState)) {
-				pass("Replay reproduces the live consensus state at height " + (i + 1)
-						+ " (status snapshot was ahead of finality point " + cp + ")");
-				return ext;
-			}
 		}
 
 		info("Replayed state hash: " + s.getHash());
@@ -244,6 +258,27 @@ public class VerifyNetworkUpgrade {
 					+ "content differs) — see diff above");
 		}
 		return null;
+	}
+
+	/**
+	 * Finds an Order prefix matching a state from a legacy status response.
+	 * Returns -1 if current code does not reproduce the remote state at any finalised prefix.
+	 */
+	static long findLegacyStatePosition(State genesis, AVector<SignedData<Block>> blocks,
+			long finalityPoint, State remoteState) {
+		State s=genesis;
+		if (s.equals(remoteState)) return 0;
+		for (long i=0; i<finalityPoint; i++) {
+			try {
+				s=s.applyBlock(blocks.get(i)).getState();
+			} catch (Throwable t) {
+				info("Legacy prefix discovery threw at position " + i + ": " + t);
+				return -1;
+			}
+			if (s.equals(remoteState)) return i+1;
+			if ((i > 0) && (i % 10000 == 0)) info("  ... inspected " + i + " legacy replay prefixes");
+		}
+		return -1;
 	}
 
 	/**

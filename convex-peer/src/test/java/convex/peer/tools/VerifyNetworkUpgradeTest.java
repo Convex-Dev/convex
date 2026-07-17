@@ -8,8 +8,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cpos.Block;
 import convex.core.cvm.Migrations;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.init.Init;
 
 /**
@@ -45,5 +48,28 @@ public class VerifyNetworkUpgradeTest {
 		assertEquals(upgraded, VerifyNetworkUpgrade.verifyMigration(upgraded));
 		VerifyNetworkUpgrade.verifyBoundary(upgraded, upgraded);
 		assertEquals(before, VerifyNetworkUpgrade.failures);
+	}
+
+	@Test
+	public void testExactPeerReplayPath() throws Exception {
+		AKeyPair keyPair=AKeyPair.createSeeded(424242);
+		State genesis=Init.createState(List.of(keyPair.getAccountKey()));
+		Peer peer=Peer.create(keyPair,genesis);
+		Block block=Block.of(peer.getTimestamp(),keyPair.signData(
+				Invoke.create(Init.GENESIS_ADDRESS,1,"*address*")));
+		peer=peer.proposeBlock(block)
+				.mergeBeliefs().mergeBeliefs().mergeBeliefs().mergeBeliefs()
+				.updateState();
+
+		int before=VerifyNetworkUpgrade.failures;
+		State replayed=VerifyNetworkUpgrade.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
+				peer.getConsensusState(),peer.getConsensusState().getHash(),peer.getStatePosition());
+		assertEquals(peer.getConsensusState(),replayed);
+		assertEquals(before,VerifyNetworkUpgrade.failures);
+
+		State legacyReplay=VerifyNetworkUpgrade.replay(genesis,peer.getBelief(),keyPair.getAccountKey(),
+				peer.getConsensusState(),peer.getConsensusState().getHash(),null);
+		assertEquals(peer.getConsensusState(),legacyReplay);
+		assertEquals(before,VerifyNetworkUpgrade.failures);
 	}
 }

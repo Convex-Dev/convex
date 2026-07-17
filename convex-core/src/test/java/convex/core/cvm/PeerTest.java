@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -94,6 +95,18 @@ public class PeerTest {
 		p=p.updateState();
 		assertEquals(10,p.getStatePosition());
 		assertEquals(81,Utils.toInt(p.getBlockResult(9).getResults().get(0).getValue()));
+
+		{ // Replay to an exact intermediate position
+			Peer complete=p;
+			Peer pt=complete.recalcState(0,5);
+			assertEquals(5,pt.getStatePosition());
+			assertEquals(complete.getBlockResult(4).getState(),pt.getConsensusState());
+
+			pt=pt.updateState(10);
+			assertEquals(complete.getConsensusState(),pt.getConsensusState());
+			assertThrows(IllegalArgumentException.class,()->complete.recalcState(6,5));
+			assertThrows(IllegalArgumentException.class,()->complete.updateState(11));
+		}
 		
 		// check all invariants
 		doPeerTest(p);

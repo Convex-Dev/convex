@@ -261,7 +261,14 @@ public class Server implements Closeable {
 			AccountKey remotePeerKey=RT.ensureAccountKey(status.get(Keywords.PEER));
 			Hash genesisHash=RT.ensureHash(status.get(Keywords.GENESIS));
 			Hash stateHash=RT.ensureHash(status.get(Keywords.STATE));
+			CVMLong remoteStatePosition=RT.ensureLong(status.get(Keywords.STATE_POSITION));
 			
+			if (beliefHash==null) {
+				throw new LaunchException("Remote peer did not provide a Belief hash");
+			}
+			if (remotePeerKey==null) {
+				throw new LaunchException("Remote peer did not provide a Peer key");
+			}
 			if (genesisHash==null) {
 				throw new LaunchException("Remote peer did not provide genesis hash");
 			}
@@ -301,6 +308,31 @@ public class Server implements Closeable {
 			}
 
 			Peer peer=Peer.create(keyPair, genF, belF);
+			if (remoteStatePosition!=null) {
+				long targetPosition=remoteStatePosition.longValue();
+				if (stateHash==null) {
+					throw new LaunchException("Remote peer advertised a state position without a state hash");
+				}
+				try {
+					peer=peer.recalcState(0,targetPosition);
+				} catch (IllegalArgumentException e) {
+					throw new LaunchException("Remote peer advertised invalid state position " + targetPosition,e);
+				}
+
+				Hash localStateHash=peer.getConsensusState().getHash();
+				if (!localStateHash.equals(stateHash)) {
+					log.warn("STATE REPLAY DIVERGENCE at position {}: local state {} differs from remote peer {} state {}. Retaining locally replayed state.",
+							targetPosition,localStateHash,remotePeerKey,stateHash);
+				} else {
+					log.info("Locally replayed and verified state {} at position {}",localStateHash,targetPosition);
+				}
+			} else {
+				// Older status responses cannot qualify their state hash with a position.
+				// Still complete local replay before networking, but do not compare unlike snapshots.
+				peer=peer.recalcState(0);
+				log.info("Remote peer did not advertise a state position; locally replayed finalised Order to position {} without a remote state comparison",
+						peer.getStatePosition());
+			}
 			return peer;
 		} catch (ExecutionException | InvalidDataException e) {
 			throw new LaunchException("Erring while trying to sync peer",e);
@@ -375,9 +407,8 @@ public class Server implements Closeable {
 			// Establish Peer state
 			Peer peer = establishPeer();
 
-			// Ensure Peer is stored in executor and initially persisted prior to launch
+			// Ensure Peer is stored in executor before any optional recalculation
 			executor.setPeer(peer);
-			executor.persistPeerData();
 
 			HashMap<Keyword, Object> config = getConfig();
 
@@ -391,6 +422,9 @@ public class Server implements Closeable {
 			} catch (Exception e) {
 				throw new LaunchException("Launch failed to recalculate state: "+e,e);
 			}
+
+			// Persist the exact state that will be exposed before networking begins
+			executor.persistPeerData();
 
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
@@ -622,6 +656,8 @@ public class Server implements Closeable {
 	 * 6 = proposal point
 	 * 7 = ordering length
 	 * 8 = consensus point vector
+	 * 9 = locally computed state position
+	 * 10 = maximum protocol version supported by this release
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusData() {
@@ -642,7 +678,10 @@ public class Server implements Closeable {
 		CVMLong op = CVMLong.create(order.getBlockCount()) ;
 		AVector<CVMLong> cps = Vectors.of(Utils.toObjectArray(order.getConsensusPoints())) ;
 
-		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op,cps);
+		CVMLong statePosition=CVMLong.create(peer.getStatePosition());
+		CVMLong supportedProtocolVersion=CVMLong.create(Migrations.MAX_VERSION);
+		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash,
+				cp,pp,op,cps,statePosition,supportedProtocolVersion);
 		assert(reply.count()==Config.STATUS_COUNT);
 		return reply;
 	}

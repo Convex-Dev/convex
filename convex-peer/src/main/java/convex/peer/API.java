@@ -225,7 +225,9 @@ public class API {
 		Keywords.CONSENSUS_POINT,
 		Keywords.PROPOSAL_POINT,
 		Keywords.BLOCK_POINT,
-		Keywords.CONSENSUS);
+		Keywords.CONSENSUS,
+		Keywords.STATE_POSITION,
+		Keywords.SUPPORTED_PROTOCOL_VERSION);
 
 	/**
 	 * Converts a status map or value vector to a status map
