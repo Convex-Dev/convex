@@ -2,6 +2,8 @@ package convex.peer.tools;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -13,7 +15,9 @@ import convex.core.cvm.Migrations;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.Invoke;
+import convex.core.data.ACell;
 import convex.core.init.Init;
+import convex.core.util.JSON;
 
 /**
  * Tests the offline phases of {@link VerifyNetworkUpgrade} (migration application
@@ -48,6 +52,35 @@ public class VerifyNetworkUpgradeTest {
 		assertEquals(upgraded, VerifyNetworkUpgrade.verifyMigration(upgraded));
 		VerifyNetworkUpgrade.verifyBoundary(upgraded, upgraded);
 		assertEquals(before, VerifyNetworkUpgrade.failures);
+	}
+
+	@Test
+	public void testV1MigrationFootprintFailsClosed() {
+		State genesis = Init.createState(List.of(AKeyPair.createSeeded(123).getAccountKey()));
+		State upgraded = Migrations.applyAll(genesis);
+		assertNull(VerifyNetworkUpgrade.migrationFootprintError(genesis, upgraded));
+
+		State unrelated = upgraded.putAccount(Init.GENESIS_ADDRESS,
+				upgraded.getAccount(Init.GENESIS_ADDRESS)
+						.withBalance(upgraded.getAccount(Init.GENESIS_ADDRESS).getBalance() - 1));
+		assertTrue(VerifyNetworkUpgrade.migrationFootprintError(genesis, unrelated)
+				.contains("unapproved account"));
+
+		State coreBalance = upgraded.putAccount(Init.CORE_ADDRESS,
+				upgraded.getAccount(Init.CORE_ADDRESS)
+						.withBalance(upgraded.getAccount(Init.CORE_ADDRESS).getBalance() + 1));
+		assertTrue(VerifyNetworkUpgrade.migrationFootprintError(genesis, coreBalance)
+				.contains("outside environment/metadata"));
+	}
+
+	@Test
+	public void testMachineReportIsStrictJSON() {
+		VerifyNetworkUpgrade.Report r = new VerifyNetworkUpgrade.Report();
+		r.put("stateHash", Init.createState(
+				List.of(AKeyPair.createSeeded(999).getAccountKey())).getHash());
+		r.record("pass", "deterministic check");
+		ACell parsed = JSON.parse(r.toJSON());
+		assertNotNull(parsed);
 	}
 
 	@Test

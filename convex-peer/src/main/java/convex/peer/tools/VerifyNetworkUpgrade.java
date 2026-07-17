@@ -1,5 +1,15 @@
 package convex.peer.tools;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
@@ -31,8 +41,11 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.Lists;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
+import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.util.JSON;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.peer.API;
 
@@ -57,8 +70,7 @@ import convex.peer.API;
  * <li><b>MIGRATE</b> — apply this release's pending migrations directly to the live
  *     state ({@link Migrations#applyTo}) and validate the result: cell integrity,
  *     protocol version, semantic spot checks (new core functions, library fixes), and
- *     a listing of exactly which accounts changed — reviewable against the expected
- *     footprint of the migration.</li>
+ *     a fail-closed check of the exact state footprint permitted to migration v1.</li>
  * <li><b>BOUNDARY</b> — rehearse the real on-chain path on a doctored copy of the live
  *     state: a locally-keyed rehearsal peer is added (stake funded from an existing
  *     account, conserving the total coin balance), {@code schedule-upgrade} is invoked
@@ -77,9 +89,14 @@ import convex.peer.API;
  * the offline phases (MIGRATE, BOUNDARY) against a local genesis and never touches
  * the network.</p>
  *
- * <p>Usage: {@code java -cp convex.jar convex.peer.tools.VerifyNetworkUpgrade [host]}</p>
+ * <p>A strict JSON audit report is written to {@code upgrade-rehearsal-report.json}
+ * by default. Override it with {@code --report FILE}.</p>
  *
- * <p>Exit code 0 iff all checks pass.</p>
+ * <p>Usage: {@code java -cp convex.jar convex.peer.tools.VerifyNetworkUpgrade
+ * [host] [--report FILE]}</p>
+ *
+ * <p>Exit code 0 iff all checks pass without warnings; 1 means failure and 2 means
+ * review is required because at least one warning was emitted.</p>
  */
 public class VerifyNetworkUpgrade {
 
@@ -89,21 +106,55 @@ public class VerifyNetworkUpgrade {
 
 	static int failures = 0;
 	static int warnings = 0;
+	static Report report = new Report();
 
 	public static void main(String[] args) throws Exception {
-		String host = (args.length > 0) ? args[0] : DEFAULT_HOST;
+		String host = DEFAULT_HOST;
+		boolean hostSet = false;
+		Path reportPath = Path.of("upgrade-rehearsal-report.json");
+		for (int i = 0; i < args.length; i++) {
+			if ("--report".equals(args[i])) {
+				if (++i >= args.length) throw new IllegalArgumentException("--report requires a file name");
+				reportPath = Path.of(args[i]);
+			} else if (args[i].startsWith("--")) {
+				throw new IllegalArgumentException("Unknown option: " + args[i]);
+			} else if (!hostSet) {
+				host = args[i];
+				hostSet = true;
+			} else {
+				throw new IllegalArgumentException("Only one host may be specified");
+			}
+		}
+		failures = 0;
+		warnings = 0;
+		report = new Report();
+		report.put("tool", VerifyNetworkUpgrade.class.getName());
+		report.put("release", Utils.getVersion());
+		report.put("commit", firstNonBlank(System.getProperty("convex.commit"), System.getenv("GITHUB_SHA")));
+		report.put("artifactSha256", artifactSha256());
+		report.put("java", System.getProperty("java.version"));
+		report.put("os", System.getProperty("os.name") + " " + System.getProperty("os.arch"));
+		report.put("startedAt", Instant.now().toString());
+		report.put("host", host);
+		report.put("maxProtocolVersion", Migrations.MAX_VERSION);
+		report.put("expectedLiveProtocolVersion", Migrations.LIVE_VERSION);
 		info("Verifying network upgrade against: " + host);
 		info("This release supports protocol version: " + Migrations.MAX_VERSION
 				+ " (live network expected at: " + Migrations.LIVE_VERSION + ")");
 
-		try (EtchStore store = EtchStore.createTemp("verify-upgrade")) {
-			Convex convex = Convex.connect(host);
-			convex.setStore(store);
-			try {
-				run(convex);
-			} finally {
-				convex.close();
+		try {
+			try (EtchStore store = EtchStore.createTemp("verify-upgrade")) {
+				Convex convex = Convex.connect(host);
+				convex.setStore(store);
+				try {
+					run(convex);
+				} finally {
+					convex.close();
+				}
 			}
+		} catch (Throwable t) {
+			fail("Unhandled rehearsal failure: " + t);
+			t.printStackTrace(System.out);
 		}
 
 		info("");
@@ -112,7 +163,17 @@ public class VerifyNetworkUpgrade {
 		} else {
 			info(failures + " CHECK(S) FAILED" + ((warnings > 0) ? ", " + warnings + " warning(s)" : ""));
 		}
-		System.exit((failures == 0) ? 0 : 1);
+		report.put("finishedAt", Instant.now().toString());
+		report.put("failures", failures);
+		report.put("warnings", warnings);
+		report.put("ready", (failures == 0) && (warnings == 0));
+		try {
+			Files.writeString(reportPath, report.toJSON());
+			info("Machine-readable report: " + reportPath.toAbsolutePath());
+		} catch (Exception e) {
+			fail("Could not write machine-readable report " + reportPath + ": " + e);
+		}
+		System.exit((failures > 0) ? 1 : ((warnings > 0) ? 2 : 0));
 	}
 
 	static void run(Convex convex) throws Exception {
@@ -137,6 +198,12 @@ public class VerifyNetworkUpgrade {
 		CVMLong statePositionValue = RT.ensureLong(smap.get(Keywords.STATE_POSITION));
 		CVMLong supportedVersion = RT.ensureLong(smap.get(Keywords.SUPPORTED_PROTOCOL_VERSION));
 		Long remoteStatePosition = (statePositionValue == null) ? null : statePositionValue.longValue();
+		report.put("remotePeerKey", remotePeerKey);
+		report.put("genesisHash", genesisHash);
+		report.put("remoteStateHash", stateHash);
+		report.put("remoteStatePosition", remoteStatePosition);
+		report.put("beliefHash", beliefHash);
+		report.put("remoteSupportedProtocolVersion", supportedVersion);
 		info("Remote peer key:  " + remotePeerKey);
 		info("Genesis hash:     " + genesisHash);
 		info("State hash:       " + stateHash);
@@ -156,6 +223,10 @@ public class VerifyNetworkUpgrade {
 		info("Consensus protocol version: " + remoteState.getProtocolVersion());
 		info("Consensus timestamp:        " + remoteState.getTimestamp());
 		info("Accounts:                   " + remoteState.getAccounts().count());
+		report.put("genesisProtocolVersion", genesis.getProtocolVersion());
+		report.put("remoteProtocolVersion", remoteState.getProtocolVersion());
+		report.put("remoteTimestamp", remoteState.getTimestamp().longValue());
+		report.put("remoteAccountCount", remoteState.getAccounts().count());
 		if (remoteState.getProtocolVersion() != Migrations.LIVE_VERSION) {
 			fail("Live network at protocol version " + remoteState.getProtocolVersion()
 					+ " but this release expects LIVE_VERSION=" + Migrations.LIVE_VERSION
@@ -235,6 +306,9 @@ public class VerifyNetworkUpgrade {
 		}
 		info("Replayed to position " + targetPosition + " through Peer startup path in "
 				+ (System.currentTimeMillis() - start) + "ms");
+		report.put("replayPosition", targetPosition);
+		report.put("replayedStateHash", s.getHash());
+		report.put("replayExact", s.equals(remoteState));
 
 		if (s.equals(remoteState)) {
 			pass("Replay reproduces the live consensus state exactly (hash " + s.getHash() + ")");
@@ -287,6 +361,8 @@ public class VerifyNetworkUpgrade {
 	 */
 	static State verifyMigration(State pre) {
 		long fromVersion = pre.getProtocolVersion();
+		report.put("preMigrationHash", pre.getHash());
+		report.put("preMigrationVersion", fromVersion);
 		if (fromVersion >= Migrations.MAX_VERSION) {
 			info("State already at protocol version " + fromVersion + " — no pending migrations to rehearse");
 			return pre;
@@ -302,6 +378,8 @@ public class VerifyNetworkUpgrade {
 			return null;
 		}
 		pass("Migrations applied without error");
+		report.put("migratedStateHash", upgraded.getHash());
+		report.put("migratedProtocolVersion", upgraded.getProtocolVersion());
 
 		validateCell(upgraded, "upgraded state");
 
@@ -313,6 +391,8 @@ public class VerifyNetworkUpgrade {
 
 		long preTotal = pre.computeTotalBalance();
 		long postTotal = upgraded.computeTotalBalance();
+		report.put("preMigrationCoinSupply", preTotal);
+		report.put("postMigrationCoinSupply", postTotal);
 		if (preTotal == postTotal) {
 			pass("Migration conserves the total coin balance (" + preTotal + ")");
 		} else {
@@ -333,11 +413,74 @@ public class VerifyNetworkUpgrade {
 				"(do (import convex.trust :as trust) (str (lookup-meta trust 'change-control)))",
 				"(change-control", "set-control", "trust change-control docstring corrected");
 
-		// Delta review: exactly which accounts did the migration touch?
+		// Fail-closed footprint check: exact top-level state components and account
+		// fields allowed by the migration, resolved against this network's CNS.
 		info("Migration footprint (changed accounts):");
 		diffStates(pre, upgraded, "pre-upgrade", "upgraded");
+		String footprintError = migrationFootprintError(pre, upgraded);
+		report.put("migrationFootprintValid", footprintError == null);
+		if (footprintError == null) {
+			pass("Migration changed only the approved v1 state footprint");
+		} else {
+			fail("Migration footprint violation: " + footprintError);
+		}
 
 		return upgraded;
+	}
+
+	/** CNS names whose actor code or metadata may be redefined by migration v1. */
+	static final String[] V1_LIBRARY_NAMES = { "convex.fungible", "convex.asset",
+			"asset.multi-token", "asset.nft.simple", "asset.nft.basic",
+			"asset.box.actor", "convex.trust", "convex.trust.delegate" };
+
+	/**
+	 * Returns null iff the v1 migration changed only its declared state footprint.
+	 * This is deliberately independent of object identity so it works on acquired,
+	 * decoded network states as well as the in-memory genesis fixture.
+	 */
+	static String migrationFootprintError(State pre, State post) {
+		if (pre.getProtocolVersion() != 0 || post.getProtocolVersion() != 1) {
+			return "v1 footprint checker requires protocol versions 0 -> 1, got "
+					+ pre.getProtocolVersion() + " -> " + post.getProtocolVersion();
+		}
+		if (pre.getAccounts().count() != post.getAccounts().count()) {
+			return "account count changed: " + pre.getAccounts().count() + " -> "
+					+ post.getAccounts().count();
+		}
+		if (!pre.getPeers().equals(post.getPeers())) return "peer records changed";
+		if (!pre.getSchedule().equals(post.getSchedule())) return "scheduled operations changed";
+
+		AVector<CVMLong> expectedUpgrades = pre.getUpgradeVector();
+		for (long version = pre.getProtocolVersion(); version < post.getProtocolVersion(); version++) {
+			expectedUpgrades = expectedUpgrades.conj(pre.getTimestamp());
+		}
+		State expectedGlobals = pre.withProtocolGlobals(post.getProtocolVersion(), expectedUpgrades);
+		if (!expectedGlobals.getGlobals().equals(post.getGlobals())) {
+			return "globals changed outside the protocol version/upgrade record";
+		}
+
+		Set<Address> allowed = new java.util.HashSet<>();
+		allowed.add(Core.CORE_ADDRESS);
+		for (String name : V1_LIBRARY_NAMES) {
+			ACell resolved = pre.lookupCNS(name);
+			if (resolved instanceof Address a) allowed.add(a);
+		}
+		long n = pre.getAccounts().count();
+		for (long i = 0; i < n; i++) {
+			convex.core.cvm.AccountStatus before = pre.getAccounts().get(i);
+			convex.core.cvm.AccountStatus after = post.getAccounts().get(i);
+			if (before.equals(after)) continue;
+			Address address = Address.create(i);
+			if (!allowed.contains(address)) return "unapproved account changed: " + address;
+			convex.core.cvm.AccountStatus allowedAfter = before
+					.withEnvironment(after.getEnvironment())
+					.withMetadata(after.getMetadata());
+			if (!allowedAfter.equals(after)) {
+				return "account " + address + " changed outside environment/metadata:"
+						+ accountDiff(before, after);
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -401,6 +544,8 @@ public class VerifyNetworkUpgrade {
 			return;
 		}
 		State scheduled = ctx.getState();
+		report.put("boundaryScheduledHash", scheduled.getHash());
+		report.put("boundaryActivation", activation);
 		pass("schedule-upgrade accepted from governance account " + governance
 				+ " (activation " + activation + ")");
 
@@ -425,6 +570,8 @@ public class VerifyNetworkUpgrade {
 			return;
 		}
 		if (afterBlock.getProtocolVersion() == Migrations.MAX_VERSION) {
+			report.put("boundaryStateHash", afterBlock.getHash());
+			report.put("boundaryProtocolVersion", afterBlock.getProtocolVersion());
 			pass("applyBlock crossed the boundary to protocol version " + Migrations.MAX_VERSION);
 		} else {
 			fail("applyBlock did not apply the scheduled upgrade (version "
@@ -682,16 +829,61 @@ public class VerifyNetworkUpgrade {
 	}
 
 	static void pass(String s) {
+		report.record("pass", s);
 		System.out.println("[PASS] " + s);
 	}
 
 	static void warn(String s) {
 		warnings++;
+		report.record("warning", s);
 		System.out.println("[WARN] " + s);
 	}
 
 	static void fail(String s) {
 		failures++;
+		report.record("failure", s);
 		System.out.println("[FAIL] " + s);
+	}
+
+	static String firstNonBlank(String... values) {
+		for (String value : values) {
+			if (value != null && !value.isBlank()) return value;
+		}
+		return null;
+	}
+
+	/** SHA-256 of the running jar when packaged; null for an exploded classes directory. */
+	static String artifactSha256() {
+		try {
+			File source = new File(VerifyNetworkUpgrade.class.getProtectionDomain()
+					.getCodeSource().getLocation().toURI());
+			if (!source.isFile()) return null;
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(source.toPath()));
+			return java.util.HexFormat.of().formatHex(digest);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/** Minimal structured audit record kept alongside the human-readable diagnostics. */
+	static final class Report {
+		private final Map<String, Object> values = new LinkedHashMap<>();
+		private final List<Map<String, Object>> checks = new ArrayList<>();
+
+		void put(String key, Object value) {
+			values.put(key, value);
+		}
+
+		void record(String status, String message) {
+			Map<String, Object> check = new LinkedHashMap<>();
+			check.put("status", status);
+			check.put("message", message);
+			checks.add(check);
+		}
+
+		String toJSON() {
+			values.put("checks", checks);
+			return JSON.toStringPretty(values);
+		}
 	}
 }
