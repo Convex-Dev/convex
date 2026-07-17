@@ -13,16 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Etch online garbage collection: reclaim unreachable store data while running, with crash-safe recovery (see `convex-core/docs/ETCH_GC.md`).
 - CLI: `convex etch gc`, `migrate` and `recover` subcommands for offline store collection, migration and recovery.
 - `VerifyNetworkUpgrade` runnable tool — rehearses a protocol upgrade against a live network with state-diff and coin-supply checks.
+- `RehearseNetworkUpgrade` runnable tool — deterministic local multi-peer upgrade activation drill.
+- REST API: live query watches over SSE — `/api/v1/watch` follows a query against finalised state (enable with `queryWatch`); `/api/v1/watch/logs` streams filtered log events.
+- CLI: system tray icon and controls for `local start`, `peer start` and `dlfs start`.
+- UCAN: caveat path predicates to scope delegations to a path subtree.
+- DLFS: drive registry persists across server restarts.
 
 ### Changed
 
 - Fresh local/test networks launch at the latest protocol version by default (all migrations applied at genesis); pin lower with `--protocol-version` (CLI) or `:protocol-version` (peer config).
 - Etch reads are now fully lock-free.
+- Queries run with bounded execution resources.
+- Peer startup verifies any supplied state by local replay from genesis.
 
 ### Fixed
 
 - Etch: cross-store writes no longer copy Ref status earned in a different store.
 - Etch: reads on a closed or failing store throw `StoreException` instead of reporting values as absent.
+- Convex DB: DML transaction isolation and scalar row results.
+- MCP: scalar tool results.
 
 ## [0.8.8] - 2026-07-09
 
