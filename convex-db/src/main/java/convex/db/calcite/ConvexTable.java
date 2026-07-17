@@ -159,10 +159,11 @@ public class ConvexTable extends AbstractQueryableTable
 
 	// ========== DML Operations (called from generated code) ==========
 
-	public long executeInsert(Enumerable<Object[]> input) {
+	public long executeInsert(Enumerable<?> input) {
 		try {
 			long count = 0;
-			for (Object[] row : input) {
+			for (Object value : input) {
+				Object[] row=normaliseRow(value);
 				if (row != null && insertRow(row)) {
 					count++;
 				}
@@ -173,7 +174,7 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 	}
 
-	public long executeUpdate(Enumerable<Object[]> input, int columnCount, int[] updateIndices) {
+	public long executeUpdate(Enumerable<?> input, int columnCount, int[] updateIndices) {
 		try {
 			boolean pkBeingUpdated = false;
 			for (int idx : updateIndices) {
@@ -186,7 +187,8 @@ public class ConvexTable extends AbstractQueryableTable
 			ConvexColumnType[] types = getColumnTypes();
 
 			long count = 0;
-			for (Object[] row : input) {
+			for (Object value : input) {
+				Object[] row=normaliseRow(value);
 				if (row == null) continue;
 
 				Object[] updatedRow = new Object[columnCount];
@@ -224,10 +226,11 @@ public class ConvexTable extends AbstractQueryableTable
 		}
 	}
 
-	public long executeDelete(Enumerable<Object[]> input) {
+	public long executeDelete(Enumerable<?> input) {
 		try {
 			long count = 0;
-			for (Object[] row : input) {
+			for (Object value : input) {
+				Object[] row=normaliseRow(value);
 				if (row != null && row.length > 0) {
 					ACell pk = toCell(row[0], 0);
 					if (schema.getTables().deleteByKey(tableName, pk)) {
@@ -239,6 +242,13 @@ public class ConvexTable extends AbstractQueryableTable
 		} catch (ExceptionInInitializerError e) {
 			throw wrapTypeError(e, "DELETE");
 		}
+	}
+
+	/** Normalises Calcite's scalar representation for single-column rows. */
+	private static Object[] normaliseRow(Object value) {
+		if (value==null) return null;
+		if (value instanceof Object[] row) return row;
+		return new Object[] {value};
 	}
 
 	private RuntimeException wrapTypeError(ExceptionInInitializerError e, String operation) {

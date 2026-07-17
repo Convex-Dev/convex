@@ -72,6 +72,7 @@ public class ConvexTableModify extends TableModify implements EnumerableRel {
 		final Expression tableExp = Expressions.call(
 			ConvexSchemaFactory.class,
 			"getTable",
+			implementor.getRootExpression(),
 			Expressions.constant(schemaName),
 			Expressions.constant(tableName));
 
