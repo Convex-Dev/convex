@@ -5,6 +5,16 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.10-SNAPSHOT] - Unreleased
+
+### Added
+
+### Changed
+
+### Fixed
+
+- REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
+
 ## [0.8.9] - 2026-07-17
 
 ### Added
