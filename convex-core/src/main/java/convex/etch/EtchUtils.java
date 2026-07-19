@@ -334,7 +334,7 @@ public class EtchUtils {
 	 */
 	static long lenientCopy(Etch source, AStore dest, long[] skipped) {
 		long[] count = {0};
-		lenientWalk(source, 0, Etch.INDEX_START, dest, count, skipped);
+		lenientWalk(source, 0, source.getIndexStart(), dest, count, skipped);
 		return count[0];
 	}
 
