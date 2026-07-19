@@ -22,6 +22,67 @@
 	<description>Convex core libraries and common utilities, incliding high performance lattice data structures</description>
 	<url>https://convex.world</url>
 
+	<profiles>
+		<!--
+			The base artefact remains Java 21 bytecode. Builds on JDK 22+ also
+			include the final FFM Etch backend as a multi-release JAR entry.
+		-->
+		<profile>
+			<id>jdk22-ffm</id>
+			<activation>
+				<jdk>[22,)</jdk>
+			</activation>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-compiler-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>compile-java22</id>
+								<phase>compile</phase>
+								<goals>
+									<goal>compile</goal>
+								</goals>
+								<configuration>
+									<release>22</release>
+									<compileSourceRoots>
+										<compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
+									</compileSourceRoots>
+									<multiReleaseOutput>true</multiReleaseOutput>
+								</configuration>
+							</execution>
+							<execution>
+								<id>compile-java22-for-tests</id>
+								<phase>test-compile</phase>
+								<goals>
+									<goal>testCompile</goal>
+								</goals>
+								<configuration>
+									<release>22</release>
+									<compileSourceRoots>
+										<compileSourceRoot>${project.basedir}/src/main/java22</compileSourceRoot>
+									</compileSourceRoots>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-jar-plugin</artifactId>
+						<configuration>
+							<archive>
+								<manifestEntries>
+									<Multi-Release>true</Multi-Release>
+								</manifestEntries>
+							</archive>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 	<build>
 		<plugins>
 			<plugin>

@@ -42,6 +42,10 @@
 								true
 							</addDefaultImplementationEntries>
 						</manifest>
+						<manifestEntries>
+							<!-- Preserve version-specific backends from multi-release dependencies. -->
+							<Multi-Release>true</Multi-Release>
+						</manifestEntries>
 					</archive>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
