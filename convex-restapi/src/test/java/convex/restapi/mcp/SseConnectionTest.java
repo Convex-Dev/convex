@@ -103,6 +103,20 @@ class SseConnectionTest {
 	}
 
 	@Test
+	void serialisesCommentsAndEventsOnOneDispatcher() throws Exception {
+		ContentCapturingWriter output=new ContentCapturingWriter("data: value\n\n");
+		SseConnection connection=new SseConnection(new PrintWriter(output));
+		try {
+			connection.sendComment("connected");
+			connection.sendEvent("7","result","value");
+			assertTrue(output.awaitExpected(TIMEOUT));
+			assertEquals(": connected\n\nid: 7\nevent: result\ndata: value\n\n",output.toString());
+		} finally {
+			connection.close();
+		}
+	}
+
+	@Test
 	void closeWakesWaiter() throws Exception {
 		SseConnection connection=new SseConnection(new PrintWriter(Writer.nullWriter()));
 		Thread closer=Thread.ofVirtual().start(connection::close);
@@ -213,6 +227,30 @@ class SseConnectionTest {
 		}
 
 		@Override public void flush() { written.countDown(); }
+		@Override public void close() {}
+		@Override public synchronized String toString() { return builder.toString(); }
+	}
+
+	private static final class ContentCapturingWriter extends Writer {
+		private final CountDownLatch expectedSeen=new CountDownLatch(1);
+		private final String expected;
+		private final StringBuilder builder=new StringBuilder();
+
+		private ContentCapturingWriter(String expected) {
+			this.expected=expected;
+		}
+
+		@Override
+		public synchronized void write(char[] chars, int offset, int length) {
+			builder.append(chars,offset,length);
+			if (builder.indexOf(expected)>=0) expectedSeen.countDown();
+		}
+
+		private boolean awaitExpected(Duration timeout) throws InterruptedException {
+			return expectedSeen.await(timeout.toMillis(),TimeUnit.MILLISECONDS);
+		}
+
+		@Override public void flush() {}
 		@Override public void close() {}
 		@Override public synchronized String toString() { return builder.toString(); }
 	}

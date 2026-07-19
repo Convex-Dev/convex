@@ -26,7 +26,11 @@ public class CVMExecutor extends AThreadedComponent {
 	
 	private static final Logger log = LoggerFactory.getLogger(CVMExecutor.class.getName());
 	
-	private Peer peer;
+	/**
+	 * Latest immutable Peer snapshot. The executor publishes replacements while
+	 * network, query and transaction threads read them concurrently.
+	 */
+	private volatile Peer peer;
 	
 	/**
 	 * Dispatcher for observing finalised peer state updates. Kept null for the

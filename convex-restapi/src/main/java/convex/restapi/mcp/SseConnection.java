@@ -29,6 +29,7 @@ public class SseConnection {
 		DROP_OLDEST
 	}
 
+	/** A null type denotes an SSE comment frame. */
 	private record Event(String id, String type, String data) {}
 
 	private final PrintWriter writer;
@@ -91,6 +92,23 @@ public class SseConnection {
 			validateField(eventID,"SSE event ID"),
 			Objects.requireNonNull(validateField(eventType,"SSE event type"),"SSE event type cannot be null"),
 			Objects.requireNonNull(data,"SSE event data cannot be null"));
+		send(event);
+	}
+
+	/**
+	 * Queues an SSE comment on the same dispatcher as events. This is used for
+	 * connection and keepalive frames so the HTTP response has exactly one writer.
+	 *
+	 * @param comment Comment text without a line break
+	 */
+	public void sendComment(String comment) {
+		if (closed) return;
+		send(new Event(null,null,Objects.requireNonNull(
+			validateField(comment,"SSE comment"),"SSE comment cannot be null")));
+	}
+
+	private void send(Event event) {
+		if (closed) return;
 		ensureDispatcher();
 		if (closed) return;
 		if (!events.offer(event)) {
@@ -135,10 +153,14 @@ public class SseConnection {
 				if (closed) break;
 				synchronized (writer) {
 					if (closed) break;
-					if (event.id()!=null) writer.write("id: " + event.id() + "\n");
-					writer.write("event: " + event.type() + "\n");
-					writeData(event.data());
-					writer.write("\n");
+					if (event.type()==null) {
+						writer.write(": " + event.data() + "\n\n");
+					} else {
+						if (event.id()!=null) writer.write("id: " + event.id() + "\n");
+						writer.write("event: " + event.type() + "\n");
+						writeData(event.data());
+						writer.write("\n");
+					}
 					writer.flush();
 					if (writer.checkError()) close();
 				}

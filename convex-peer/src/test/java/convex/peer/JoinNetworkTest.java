@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
@@ -123,6 +125,13 @@ public class JoinNetworkTest {
 			Peer advertised=Peer.fromData(sourceKeyPair,corruptData);
 			source.getCVMExecutor().setPeer(advertised);
 			source.getCVMExecutor().persistPeerData();
+			try (Convex sourceClient=Convex.connect(source.getHostAddress())) {
+				Result statusResult=sourceClient.requestStatus().get(10,TimeUnit.SECONDS);
+				assertFalse(statusResult.isError(),()->"Source status failed: "+statusResult);
+				AMap<Keyword,ACell> status=API.ensureStatusMap(statusResult.getValue());
+				assertNotNull(status,"Source returned an invalid status payload");
+				assertEquals(CVMLong.create(correct.getStatePosition()),status.get(Keywords.STATE_POSITION));
+			}
 
 			AKeyPair destinationKeyPair=AKeyPair.createSeeded(987654322);
 			HashMap<Keyword,Object> destinationConfig=new HashMap<>();

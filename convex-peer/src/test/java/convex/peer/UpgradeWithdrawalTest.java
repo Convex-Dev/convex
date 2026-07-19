@@ -10,14 +10,18 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Migrations;
+import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.prim.CVMLong;
@@ -29,8 +33,10 @@ import convex.core.init.Init;
  * a full consensus freeze that leaves the server alive. See UPGRADE.md.
  *
  * These launch an isolated single-peer network (never the shared TestNetwork,
- * since halting the peer would break other tests).
+ * since halting the peer would break other tests). Methods run sequentially so
+ * their live peer components do not contend with each other.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 public class UpgradeWithdrawalTest {
 
 	static final AKeyPair PEER_KP = AKeyPair.createSeeded(101);
@@ -40,6 +46,18 @@ public class UpgradeWithdrawalTest {
 		State genesis = Init.createState(List.of(PEER_KP.getAccountKey()));
 		List<Server> servers = API.launchLocalPeers(List.of(PEER_KP), genesis);
 		return servers.get(0);
+	}
+
+	private CompletableFuture<Peer> awaitNextState(Server server) {
+		long currentPosition=server.getPeer().getStatePosition();
+		CompletableFuture<Peer> future=new CompletableFuture<>();
+		Consumer<Peer> observer=peer-> {
+			if (peer.getStatePosition()>currentPosition) future.complete(peer);
+		};
+		server.addStateUpdateObserver(observer);
+		future.orTimeout(20,TimeUnit.SECONDS)
+			.whenComplete((peer,error)->server.removeStateUpdateObserver(observer));
+		return future;
 	}
 
 	@Test
@@ -113,7 +131,10 @@ public class UpgradeWithdrawalTest {
 			assertEquals(activation, warn.activation);
 
 			// Normal operation before the boundary: a transaction confirms, version unchanged
-			Result r = convex.transactSync("(def a 1)");
+			CompletableFuture<Peer> stateAdvanced=awaitNextState(s);
+			CompletableFuture<Result> transaction=convex.transact("(def a 1)");
+			stateAdvanced.get();
+			Result r=transaction.get(5,TimeUnit.SECONDS);
 			assertFalse(r.isError(), () -> "pre-boundary transaction failed: " + r);
 			assertEquals(supported, s.getPeer().getConsensusState().getProtocolVersion());
 			assertFalse(s.isConsensusHalted());
@@ -166,7 +187,10 @@ public class UpgradeWithdrawalTest {
 			Convex convex = Convex.connect(s, GENESIS, PEER_KP);
 			// Move deep into the withdrawal window (past any randomised instant, before the boundary)
 			clock.set(activation - 60*1000);
-			Result r = convex.transactSync("(def a 1)");
+			CompletableFuture<Peer> stateAdvanced=awaitNextState(s);
+			CompletableFuture<Result> transaction=convex.transact("(def a 1)");
+			stateAdvanced.get();
+			Result r=transaction.get(5,TimeUnit.SECONDS);
 			assertFalse(r.isError(), () -> "in-window transaction failed: " + r);
 
 			// The last viable peer did NOT withdraw: still fully staked (a withdrawal would
