@@ -55,7 +55,11 @@ public class EtchFileMapperTest {
 		File file=File.createTempFile("etch-mapper-selection", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
 				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),Etch.ETCH_VERSION_2)) {
-			String expected=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged()
+			boolean ffmAvailable=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged();
+			if (Boolean.getBoolean("convex.etch.requireFFM")) {
+				assertTrue(ffmAvailable,"JDK 22+ Maven build did not include the Etch FFM backend");
+			}
+			String expected=ffmAvailable
 					?"MemorySegment":"MappedByteBuffer";
 			assertEquals(expected,mapper.implementationName());
 		}

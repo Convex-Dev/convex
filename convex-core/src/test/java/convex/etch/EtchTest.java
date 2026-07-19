@@ -117,7 +117,8 @@ public class EtchTest {
 		Etch v2=v2Store.getEtch();
 		assertEquals(Etch.ETCH_VERSION_2,v2.getVersion());
 		assertEquals(Etch.INDEX_START_V2,v2.getIndexStart());
-		String expectedV2=(Runtime.version().feature()>=22)?"MemorySegment":"MappedByteBuffer";
+		String expectedV2=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged()
+				?"MemorySegment":"MappedByteBuffer";
 		assertEquals(expectedV2,v2.getMappingImplementation());
 		v2Store.close();
 
@@ -147,6 +148,15 @@ public class EtchTest {
 		assertEquals(Etch.ETCH_VERSION_1,reopened.getEtch().getVersion());
 		assertEquals(value,reopened.getEtch().read(value.getHash()).getValue());
 		reopened.close();
+	}
+
+	private static boolean ffmBackendIsPackaged() {
+		try {
+			Class.forName("convex.etch.FFMEtchFileMapper");
+			return true;
+		} catch (ClassNotFoundException e) {
+			return false;
+		}
 	}
 	
 	@Test 

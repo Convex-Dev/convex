@@ -78,6 +78,16 @@
 							</archive>
 						</configuration>
 					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<systemPropertyVariables>
+								<!-- Maven builds on JDK 22+ must exercise the versioned backend. -->
+								<convex.etch.requireFFM>true</convex.etch.requireFFM>
+							</systemPropertyVariables>
+						</configuration>
+					</plugin>
 				</plugins>
 			</build>
 		</profile>
