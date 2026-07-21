@@ -13,6 +13,7 @@ import static j2html.TagCreator.h4;
 import static j2html.TagCreator.h5;
 import static j2html.TagCreator.h6;
 import static j2html.TagCreator.input;
+import static j2html.TagCreator.iff;
 import static j2html.TagCreator.label;
 import static j2html.TagCreator.li;
 import static j2html.TagCreator.option;
@@ -113,8 +114,10 @@ public class ExplorerAPI extends AWebSite {
 		routes.get(prefix+"peers", this::showPeers);
 		routes.get(prefix+"peers/{peerKey}", this::showPeerDetail);
 		routes.get(prefix+"connections", this::showConnections);
-		routes.get(prefix+"mcp", this::showMcp);
-		routes.get(prefix+"mcp/tools/{toolName}", this::showMcpTool);
+		if (restServer.getMcpAPI() != null) {
+			routes.get(prefix+"mcp", this::showMcp);
+			routes.get(prefix+"mcp/tools/{toolName}", this::showMcpTool);
+		}
 		routes.get(prefix+"repl", this::showRepl);
 		routes.post(prefix+"search", this::handleSearch);
 	}
@@ -146,10 +149,10 @@ public class ExplorerAPI extends AWebSite {
 					p(a("Connections").withHref(ROUTE+"connections").withStyle("font-weight:600;font-size:1.1em;")),
 					p("Inspect outbound peer connections maintained by this server.")
 				),
-				article(
+				iff(restServer.getMcpAPI() != null, article(
 					p(a("MCP").withHref(ROUTE+"mcp").withStyle("font-weight:600;font-size:1.1em;")),
 					p("View Model Context Protocol endpoint details and available tools.")
-				),
+				)),
 				article(
 					p(a("States").withHref(ROUTE+"states").withStyle("font-weight:600;font-size:1.1em;")),
 					p("View historical consensus states.")

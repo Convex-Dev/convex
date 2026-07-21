@@ -3,7 +3,9 @@ package convex.restapi;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Map;
 
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -12,6 +14,8 @@ import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
@@ -39,6 +43,8 @@ import convex.peer.PeerConfig;
  * @see PeerConfig
  */
 public class RESTConfig extends PeerConfig {
+	/** Legacy launch-map key carrying this typed configuration to RESTServer. */
+	public static final Keyword CONFIG = Keyword.intern("rest-config");
 
 	// ========== Top-level section keys ==========
 
@@ -51,6 +57,7 @@ public class RESTConfig extends PeerConfig {
 	public static final AString FAUCET = Strings.intern("faucet");
 	public static final AString CORS = Strings.intern("cors");
 	public static final AString QUERY_WATCH = Strings.intern("queryWatch");
+	public static final AString ADMIN = Strings.intern("admin");
 
 	// ========== MCP config keys ==========
 
@@ -139,6 +146,36 @@ public class RESTConfig extends PeerConfig {
 		return getBool(getSection(REST), QUERY_WATCH, false);
 	}
 
+	/**
+	 * Whether process administration routes are enabled.
+	 * @return true if administration is explicitly enabled (default: false)
+	 */
+	public boolean isAdminEnabled() {
+		return getBool(getSection(REST), ADMIN, false);
+	}
+
+	/**
+	 * Gets configured CORS origins.
+	 * @return Configured origin strings, or {@code null} to allow all origins
+	 */
+	public java.util.Set<String> getCorsAllowedOrigins() {
+		ACell value = getSection(REST).get(CORS);
+		if (value == null) return null;
+		AString single = RT.ensureString(value);
+		if (single != null) {
+			if ("*".equals(single.toString())) return null;
+			return java.util.Set.of(single.toString());
+		}
+		convex.core.data.AVector<ACell> values = RT.ensureVector(value);
+		if (values == null) return java.util.Set.of();
+		java.util.HashSet<String> result = new java.util.HashSet<>();
+		for (long i = 0; i < values.count(); i++) {
+			AString origin = RT.ensureString(values.get(i));
+			if (origin != null) result.add(origin.toString());
+		}
+		return result;
+	}
+
 	// ========== MCP typed accessors ==========
 
 	/**
@@ -159,10 +196,10 @@ public class RESTConfig extends PeerConfig {
 
 	/**
 	 * Whether elevated signing operations (import/export/delete) are enabled.
-	 * @return true if elevated ops enabled (default: true when signing is enabled)
+	 * @return true if elevated ops are explicitly enabled (default: false)
 	 */
 	public boolean isElevatedEnabled() {
-		return getBool(getSection(MCP), ELEVATED, isSigningEnabled());
+		return getBool(getSection(MCP), ELEVATED, false);
 	}
 
 	/**
@@ -198,6 +235,22 @@ public class RESTConfig extends PeerConfig {
 		AMap<AString, ACell> mcpSection = getSection(MCP);
 		AMap<AString, ACell> tools = RT.castMap(mcpSection.get(TOOLS));
 		return (tools != null) ? tools : Maps.empty();
+	}
+
+	/**
+	 * Tests whether an MCP tool is enabled by the per-tool policy.
+	 * Missing entries default to enabled; group switches such as signing and
+	 * elevated access are applied separately by the tool registrar.
+	 *
+	 * @param name MCP tool name
+	 * @return true unless the tool is explicitly disabled
+	 */
+	public boolean isToolEnabled(String name) {
+		ACell value = getToolsConfig().get(Strings.create(name));
+		if (value == null) return true;
+		AMap<AString, ACell> tool = RT.castMap(value);
+		if (tool != null) return getBool(tool, ENABLED, true);
+		return RT.bool(value);
 	}
 
 	// ========== OAuth typed accessors ==========
@@ -245,6 +298,45 @@ public class RESTConfig extends PeerConfig {
 	// ========== Legacy bridge ==========
 
 	/**
+	 * Normalises the supported legacy REST launch keys into typed configuration.
+	 *
+	 * <p>This is a compatibility boundary for programmatic callers that predate
+	 * {@link RESTConfig}. New configuration should attach the typed object using
+	 * {@link #toLegacy()}, so nested authentication and feature policy is retained.</p>
+	 *
+	 * @param legacy Peer launch map
+	 * @return Typed configuration containing recognised legacy REST keys
+	 */
+	public static RESTConfig fromLegacy(Map<Keyword, Object> legacy) {
+		AMap<AString,ACell> rest=Maps.empty();
+		AMap<AString,ACell> mcp=Maps.empty();
+
+		Object baseUrl=legacy.get(Keywords.BASE_URL);
+		if (baseUrl instanceof String s) rest=rest.assoc(BASE_URL,Strings.create(s));
+		if (legacy.containsKey(Keywords.FAUCET)) {
+			rest=rest.assoc(FAUCET,CVMBool.create(RT.bool(legacy.get(Keywords.FAUCET))));
+		}
+		if (legacy.containsKey(Keywords.QUERY_WATCH)) {
+			rest=rest.assoc(QUERY_WATCH,CVMBool.create(RT.bool(legacy.get(Keywords.QUERY_WATCH))));
+		}
+
+		Object origins=legacy.get(Keywords.ALLOWED_ORIGINS);
+		if (origins instanceof Collection<?> values) {
+			var vector=Vectors.<ACell>empty();
+			for (Object value:values) {
+				if (value!=null) vector=vector.conj(Strings.create(value.toString()));
+			}
+			mcp=mcp.assoc(ALLOWED_ORIGINS,vector);
+		}
+		if (legacy.containsKey(Keywords.ALLOW_HTTP_SEEDS)) {
+			mcp=mcp.assoc(ALLOW_HTTP_SEEDS,
+					CVMBool.create(RT.bool(legacy.get(Keywords.ALLOW_HTTP_SEEDS))));
+		}
+
+		return create(Maps.of(REST,rest,MCP,mcp));
+	}
+
+	/**
 	 * Convert this config to the legacy {@code HashMap<Keyword, Object>} format,
 	 * including both peer and REST section keys.
 	 *
@@ -253,6 +345,10 @@ public class RESTConfig extends PeerConfig {
 	@Override
 	public HashMap<Keyword, Object> toLegacy() {
 		HashMap<Keyword, Object> legacy = super.toLegacy();
+		// Preserve the typed configuration across the legacy Peer launch boundary.
+		// RESTServer consumes this object directly instead of reconstructing nested
+		// REST, MCP and authentication policy from flattened keys.
+		legacy.put(CONFIG, this);
 
 		// REST section → flat keys in legacy config
 		String baseUrl = getBaseUrl();

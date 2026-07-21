@@ -15,11 +15,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.peer.API;
 import convex.peer.Server;
+import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
 /**
@@ -68,9 +68,10 @@ public class McpSecurityTest {
 	 */
 	@Test
 	public void testOriginValidationEndToEnd() throws Exception {
-		HashMap<Keyword, Object> config = new HashMap<>();
-		config.put(Keywords.KEYPAIR, AKeyPair.generate());
-		config.put(Keywords.ALLOWED_ORIGINS, List.of("https://app.example.com"));
+		RESTConfig restConfig=RESTConfig.parse("""
+			{peer:{keypair:"%s"},mcp:{allowedOrigins:["https://app.example.com"]}}
+			""".formatted(AKeyPair.generate().getSeed().toHexString()));
+		HashMap<Keyword, Object> config = restConfig.toLegacy();
 		Server s = API.launchPeer(config);
 		try (RESTServer rs = RESTServer.create(s)) {
 			rs.start(0);

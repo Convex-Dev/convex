@@ -11,12 +11,14 @@ import java.time.Duration;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
 import convex.peer.API;
 import convex.peer.Server;
+import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
 public abstract class ARESTTest {
@@ -33,7 +35,12 @@ public abstract class ARESTTest {
 	
 	static {
 		try {
-			Server s = API.launchPeer();
+			// Signing and elevated tools are deliberately disabled by default. This
+			// shared fixture enables them explicitly for the signing test classes.
+			RESTConfig config=RESTConfig.parse("{rest:{faucet:true},mcp:{signing:true,elevated:true}}");
+			var launchConfig=config.toLegacy();
+			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
+			Server s = API.launchPeer(launchConfig);
 			RESTServer rs = RESTServer.create(s);
 			rs.start(0);
 			port = rs.getPort();

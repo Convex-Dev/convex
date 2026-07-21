@@ -164,13 +164,11 @@ public class McpAPI extends ABaseAPI {
 		this.mcpServer = mcpServer;
 
 		// #552: restrict MCP Origins if configured (DNS rebinding protection)
-		Object origins = restServer.getConfig().get(convex.core.cvm.Keywords.ALLOWED_ORIGINS);
-		if (origins instanceof java.util.Collection<?> coll) {
-			mcpServer.setAllowedOrigins(coll.stream().map(Object::toString).toList());
-		}
+		java.util.Set<String> origins = restServer.getRESTConfig().getAllowedOrigins();
+		if (origins != null) mcpServer.setAllowedOrigins(origins);
 
 		// #554: HTTPS enforcement for seed-based tools, opt-out for private networks
-		this.allowHttpSeeds = RT.bool(restServer.getConfig().get(convex.core.cvm.Keywords.ALLOW_HTTP_SEEDS));
+		this.allowHttpSeeds = restServer.getRESTConfig().isHttpSeedsAllowed();
 
 		// Enrich server info with peer details
 		AMap<AString, ACell> info = mcpServer.getServerInfo();
@@ -404,12 +402,16 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new WatchStateTool());
 		registerTool(new UnwatchStateTool());
 
-		// Signing service tools (standard + elevated)
-		new SigningMcpTools(this).registerAll();
+		// Signing service access is a separate opt-in from public MCP access.
+		if ((restServer.getSigningService() != null) && restServer.getRESTConfig().isSigningEnabled()) {
+			new SigningMcpTools(this).registerAll(restServer.getRESTConfig().isElevatedEnabled());
+		}
 	}
 
 	void registerTool(McpTool tool) {
-		mcpServer.registerTool(tool);
+		if (restServer.getRESTConfig().isToolEnabled(tool.getName())) {
+			mcpServer.registerTool(tool);
+		}
 	}
 
 	void registerPrompt(McpPrompt prompt) {

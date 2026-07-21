@@ -82,6 +82,11 @@
 
 		// CORS allowed origins (default: "*" = all origins).
 		// "cors": "*",
+
+		// Enable process administration routes (default: false).
+		// SECURITY: Keep disabled on public Peers. When enabled, these routes still
+		// retain their route-specific authentication and loopback restrictions.
+		"admin": false,
 	},
 
 	// ==================== MCP Configuration ====================
@@ -99,9 +104,10 @@
 		// Requires the peer to have a keypair configured.
 		"signing": false,
 
-		// Enable elevated signing operations (default: same as signing).
+		// Enable elevated signing operations (default: false).
 		// When enabled, provides import/export/delete/changePassphrase tools
-		// that require user confirmation via web browser.
+		// that require user confirmation via web browser. This switch has no
+		// effect unless signing is also enabled.
 		//   signingImportKey, signingExportKey, signingDeleteKey,
 		//   signingChangePassphrase
 		// "elevated": false,
@@ -122,7 +128,9 @@
 		"tokenExpiry": 86400,
 
 		// Allow unauthenticated (public) access to API endpoints (default: true).
-		// When false, all requests require a valid Bearer token.
+		// When false, dynamic service routes require a valid Bearer token. The
+		// authentication, DID and static bootstrap routes remain reachable so a
+		// client can establish an authenticated session.
 		"publicAccess": true,
 
 		// OAuth provider configuration (for social login, Stage 12).

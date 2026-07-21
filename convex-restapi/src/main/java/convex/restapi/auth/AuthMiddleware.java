@@ -40,12 +40,20 @@ public class AuthMiddleware {
 	 * Does not reject unauthenticated requests.
 	 */
 	public Handler handler() {
-		return ctx -> {
-			AString identity = extractAndVerify(ctx);
-			if (identity != null) {
-				ctx.attribute(ATTR_IDENTITY, identity);
-			}
-		};
+		return this::authenticate;
+	}
+
+	/**
+	 * Verifies any bearer token and attaches its identity to the request.
+	 * Invalid or absent credentials leave the request unauthenticated.
+	 *
+	 * @param ctx Request context
+	 * @return Verified identity, or null
+	 */
+	public AString authenticate(Context ctx) {
+		AString identity = extractAndVerify(ctx);
+		if (identity != null) ctx.attribute(ATTR_IDENTITY, identity);
+		return identity;
 	}
 
 	/**
@@ -54,14 +62,13 @@ public class AuthMiddleware {
 	 */
 	public Handler requiredHandler() {
 		return ctx -> {
-			AString identity = extractAndVerify(ctx);
+			AString identity = authenticate(ctx);
 			if (identity == null) {
 				ctx.status(401);
 				ctx.contentType("application/json");
 				ctx.result("{\"error\":\"Authentication required\"}");
-				return; // Javalin skips remaining handlers for this request
+				ctx.skipRemainingHandlers();
 			}
-			ctx.attribute(ATTR_IDENTITY, identity);
 		};
 	}
 

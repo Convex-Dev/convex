@@ -53,6 +53,7 @@ import io.javalin.config.JavalinConfig;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.HttpResponseException;
 import io.javalin.http.ContentTooLargeResponse;
+import io.javalin.http.UnauthorizedResponse;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
@@ -68,6 +69,7 @@ public class RESTServer implements Closeable {
 	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
 
 	protected final Server server;
+	protected final RESTConfig restConfig;
 	protected final Convex convex;
 	protected final PublicQueryService publicQueryService;
 	protected Javalin javalin;
@@ -77,8 +79,13 @@ public class RESTServer implements Closeable {
 	public static final long MAX_REQUEST_BODY_BYTES=1_000_000L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
-	private RESTServer(Server server) {
+	private RESTServer(Server server, RESTConfig explicitConfig) {
 		this.server = server;
+		Object attachedConfig = server.getConfig().get(RESTConfig.CONFIG);
+		this.restConfig = (explicitConfig != null)
+				? explicitConfig
+				: (attachedConfig instanceof RESTConfig rc
+						? rc : RESTConfig.fromLegacy(server.getConfig()));
 		this.convex = ConvexLocal.create(server);
 		this.publicQueryService = new PublicQueryService(server);
 
@@ -97,14 +104,18 @@ public class RESTServer implements Closeable {
 		}
 
 		AKeyPair kp = server.getKeyPair();
-		if (kp != null) {
+		if ((kp != null) && restConfig.isMcpEnabled() && restConfig.isSigningEnabled()) {
 			Root<ACell> cursor = new Root<>();
 			this.signingService = new SigningService(kp, cursor);
 			this.signingService.init();
 		} else {
 			this.signingService = null;
 		}
-		this.confirmationService = new ConfirmationService();
+		// Elevated operations are a strict subset of signing. A stray elevated=true
+		// must never expose confirmation or key-management routes by itself.
+		this.confirmationService = (restConfig.isMcpEnabled() && restConfig.isSigningEnabled()
+				&& restConfig.isElevatedEnabled())
+				? new ConfirmationService() : null;
 		this.oauthService = new OAuthService(this);
 	}
 	
@@ -136,6 +147,10 @@ public class RESTServer implements Closeable {
 		return mcpServer;
 	}
 
+	public RESTConfig getRESTConfig() {
+		return restConfig;
+	}
+
 	public PublicQueryService getPublicQueryService() {
 		return publicQueryService;
 	}
@@ -161,12 +176,23 @@ public class RESTServer implements Closeable {
 	}
 
 	private void addAPIRoutes(RoutesConfig routes) {
-		// Auth middleware — extracts identity from bearer token if present
+		// Authentication is optional for public Peers (the default). Operators may
+		// explicitly make dynamic service surfaces private while leaving the small
+		// authentication/bootstrap set reachable.
 		AKeyPair peerKP = server.getKeyPair();
 		if (peerKP != null) {
 			PeerAuth peerAuth = new PeerAuth(peerKP);
 			authMiddleware = new AuthMiddleware(peerAuth);
-			routes.before(authMiddleware.handler());
+			routes.before(ctx -> {
+				authMiddleware.authenticate(ctx);
+				if (!restConfig.isPublicAccess()
+						&& (AuthMiddleware.getIdentity(ctx) == null)
+						&& !isAuthenticationBootstrap(ctx)) {
+					throw new UnauthorizedResponse("Authentication required");
+				}
+			});
+		} else if (!restConfig.isPublicAccess()) {
+			throw new IllegalStateException("Private REST access requires a Peer key pair");
 		}
 
 		chainAPI = new ChainAPI(this);
@@ -175,7 +201,7 @@ public class RESTServer implements Closeable {
 		logWatchAPI = new LogWatchAPI(this);
 		logWatchAPI.addRoutes(routes);
 
-		if (RT.bool(getConfig().get(Keywords.QUERY_WATCH))) {
+		if (restConfig.isQueryWatchEnabled()) {
 			queryWatchAPI = new QueryWatchAPI(this);
 			queryWatchAPI.addRoutes(routes);
 		}
@@ -183,8 +209,21 @@ public class RESTServer implements Closeable {
 		depAPI = new DepAPI(this);
 		depAPI.addRoutes(routes);
 		
-		peerAPI = new PeerAdminAPI(this);
-		peerAPI.addRoutes(routes);
+		if (restConfig.isAdminEnabled()) {
+			peerAPI = new PeerAdminAPI(this);
+			peerAPI.addRoutes(routes);
+		}
+
+		if (restConfig.isMcpEnabled()) {
+			mcpServer = new McpServer(Maps.of(
+				"name", "convex-mcp",
+				"title", "Convex MCP",
+				"version", Utils.getVersion()
+			));
+			mcpAPI = new McpAPI(this, mcpServer);
+			mcpServer.addRoutes(routes);
+			mcpAPI.addRoutes(routes);
+		}
 
 		webApp = new WebApp(this);
 		webApp.addRoutes(routes);
@@ -195,26 +234,30 @@ public class RESTServer implements Closeable {
 		explorerAPI = new ExplorerAPI(this);
 		explorerAPI.addRoutes(routes);
 
-		mcpServer = new McpServer(Maps.of(
-			"name", "convex-mcp",
-			"title", "Convex MCP",
-			"version", Utils.getVersion()
-		));
-		mcpAPI = new McpAPI(this, mcpServer);
-		mcpServer.addRoutes(routes);
-		mcpAPI.addRoutes(routes);
-
 		x402API = new X402(this);
 		x402API.addRoutes(routes);
 
 		didAPI = new DIDAPI(this);
 		didAPI.addRoutes(routes);
 
-		confirmAPI = new ConfirmAPI(this);
-		confirmAPI.addRoutes(routes);
+		if (confirmationService != null) {
+			confirmAPI = new ConfirmAPI(this);
+			confirmAPI.addRoutes(routes);
+		}
 
 		authPage = new AuthPage(this);
 		authPage.addRoutes(routes);
+	}
+
+	private boolean isAuthenticationBootstrap(io.javalin.http.Context ctx) {
+		if (ctx.method() == io.javalin.http.HandlerType.OPTIONS) return true;
+		String path = ctx.path();
+		if (path.equals("/auth") || path.startsWith("/auth/")) return true;
+		if (path.equals("/confirm")) return true;
+		if (path.equals("/.well-known/did.json")) return true;
+		if (path.startsWith("/did/") || path.endsWith("/did.json")) return true;
+		return path.endsWith(".css") || path.endsWith(".js") || path.endsWith(".png")
+				|| path.endsWith(".svg") || path.endsWith(".ico");
 	}
 	
 	private Javalin buildApp(Integer port) {
@@ -225,10 +268,13 @@ public class RESTServer implements Closeable {
 
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
-					// ?? corsConfig.allowCredentials=true;
-
-					// replacement for enableCorsForAllOrigins()
-					corsConfig.anyHost();
+					java.util.Set<String> origins = restConfig.getCorsAllowedOrigins();
+					if (origins == null) {
+						corsConfig.anyHost();
+					} else if (!origins.isEmpty()) {
+						String[] configured = origins.toArray(String[]::new);
+						corsConfig.allowHost(configured[0], java.util.Arrays.copyOfRange(configured, 1, configured.length));
+					}
 				});
 			});
 
@@ -305,27 +351,6 @@ public class RESTServer implements Closeable {
 			ctx.status(500);
 		});
 
-
-		routes.options("/*", ctx-> {
-			ctx.status(204); // No context#
-			ctx.removeHeader("Content-type");
-			ctx.header("access-control-allow-headers", "content-type");
-			ctx.header("access-control-allow-methods", "GET,HEAD,PUT,PATCH,POST,DELETE");
-			ctx.header("access-control-allow-origin", "*");
-			ctx.header("vary","Origin, Access-Control-Request-Headers");
-		});
-		
-		// Header to every response
-		routes.afterMatched(ctx->{
-			// Reflect CORS origin
-			String origin = ctx.req().getHeader("Origin");
-			if (origin!=null) {
-				ctx.header("access-control-allow-origin", "*");
-			} else {
-				ctx.header("access-control-allow-origin", "*");
-			}
-		});
-
 		addAPIRoutes(routes);
 	}
 
@@ -369,8 +394,19 @@ public class RESTServer implements Closeable {
 	 * @return New {@link RESTServer} instance
 	 */
 	public static RESTServer create(Server server) {
-		RESTServer newServer = new RESTServer(server);
+		RESTServer newServer = new RESTServer(server, null);
 		return newServer;
+	}
+
+	/**
+	 * Creates a REST server with an explicit typed configuration.
+	 * @param server Peer server
+	 * @param config REST runtime configuration
+	 * @return New REST server
+	 */
+	public static RESTServer create(Server server, RESTConfig config) {
+		if (config == null) throw new IllegalArgumentException("RESTConfig required");
+		return new RESTServer(server, config);
 	}
 
 	/**
@@ -396,6 +432,7 @@ public class RESTServer implements Closeable {
 	 */
 	public synchronized void start(Integer port) {
 		close();
+		if (port == null) port = restConfig.getRestPort();
 		try {
 			javalin=buildApp(port);
 			javalin.start();
