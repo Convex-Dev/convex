@@ -13,12 +13,16 @@
         "type": "string",
         "description": "Transaction hash returned by the 'prepare' tool (hex string)"
       },
+      "data": {
+        "type": "string",
+        "description": "Complete hex-encoded transaction data returned by the prepare tool"
+      },
       "seed": {
         "type": "string",
         "description": "Ed25519 seed (64 hex chars) used to sign the transaction. SECURITY: Only submit this over HTTPS to a trusted peer!"
       }
     },
-    "required": ["hash", "seed"]
+    "required": ["hash", "data", "seed"]
   },
   "outputSchema": {
     "type": "object",

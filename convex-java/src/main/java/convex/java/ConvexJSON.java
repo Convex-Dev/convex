@@ -351,7 +351,9 @@ public class ConvexJSON {
 					if (!(hashHex instanceof String)) throw new Error("No hash field containg hex string in response provided by server, got result: "+r);
 					Blob hash=Blob.parse((String)hashHex); 
 					if (hash==null) throw new Error("Hash provided by server not valid hex, got: "+hashHex);
-					CompletableFuture<Map<String,Object>> tr = submitAsync(hash);
+					Object data=result.get("data");
+					if (!(data instanceof String)) throw new Error("No data field containing transaction hex in response provided by server, got result: "+r);
+					CompletableFuture<Map<String,Object>> tr = submitAsync(hash,(String)data);
 					return tr;
 				} catch (Exception e) {
 					throw Utils.sneakyThrow(e);
@@ -363,13 +365,15 @@ public class ConvexJSON {
 	/**
 	 * Asynchronously submit a transaction
 	 * @param message Message to sign
+	 * @param transactionData Complete transaction data returned by prepare
 	 * @return
 	 */
-	private CompletableFuture<Map<String,Object>> submitAsync(Blob message) {
+	private CompletableFuture<Map<String,Object>> submitAsync(Blob message, String transactionData) {
 		ASignature sd=getKeyPair().sign(message);
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("address", getAddress().longValue());
 		req.put("hash", message.toHexString());
+		req.put("data", transactionData);
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
 		String json=JSON.toString(req);

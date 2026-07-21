@@ -1,7 +1,7 @@
 {
   "name": "submit",
   "title": "Submit Prepared Transaction",
-  "description": "Submit a previously prepared transaction with hash, public key, and signature.",
+  "description": "Submit a previously prepared transaction with its complete data, hash, public key, and signature.",
   "annotations": {
     "destructiveHint": false,
     "openWorldHint": true
@@ -12,6 +12,10 @@
       "hash": {
         "type": "string",
         "description": "Transaction reference hash returned by the prepare tool (hex string). This is the ref-encoding of the transaction."
+      },
+      "data": {
+        "type": "string",
+        "description": "Complete hex-encoded transaction data returned by the prepare tool"
       },
       "accountKey": {
         "type": "string",
@@ -24,6 +28,7 @@
     },
     "required": [
       "hash",
+      "data",
       "accountKey",
       "sig"
     ]

@@ -35,7 +35,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
@@ -47,11 +46,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
+import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
@@ -111,6 +110,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
 	public static final StringShort ARG_RESOLVE = Strings.intern("resolve");
 	public static final StringShort ARG_HASH = Strings.intern("hash");
+	public static final StringShort ARG_DATA = Strings.intern("data");
 	public static final StringShort ARG_CAD3 = Strings.intern("cad3");
 	public static final StringShort ARG_GET_PATH = Strings.intern("getPath");
 	public static final StringShort ARG_NAME = Strings.intern("name");
@@ -416,12 +416,14 @@ public class McpAPI extends ABaseAPI {
 		mcpServer.registerPrompt(prompt);
 	}
 
-	private ATransaction decodeTransaction(Blob encodedBlob) throws BadFormatException, MissingDataException {
-		ACell value = server.getStore().decodeRef(encodedBlob).getValue();
-		if (!(value instanceof ATransaction transaction)) {
-			throw new BadFormatException("Value with data " + encodedBlob.toHexString() + " is not a transaction");
+	private ATransaction decodeTransaction(Blob hash, AMap<AString, ACell> arguments) throws BadFormatException {
+		AString dataCell = RT.ensureString(arguments.get(ARG_DATA));
+		if (dataCell == null) {
+			throw new BadFormatException("'data' is required; pass the complete data returned by prepare");
 		}
-		return transaction;
+		Blob data = Blob.parse(dataCell);
+		if (data == null) throw new BadFormatException("data must be valid hex");
+		return PreparedTransaction.decode(data, hash);
 	}
 
 	private class QueryTool extends McpTool {
@@ -544,7 +546,6 @@ public class McpAPI extends ABaseAPI {
 
 			try {
 				ATransaction transaction = Invoke.create(address, sequence, code);
-				transaction = Cells.persist(transaction, server.getStore());
 				Ref<ATransaction> ref = transaction.getRef();
 				String hashHex = SignedData.getMessageForRef(ref).toHexString();
 				String dataHex = Format.encodeMultiCell(transaction, true).toHexString();
@@ -652,7 +653,7 @@ public class McpAPI extends ABaseAPI {
 				return toolError("hash must be valid hex");
 			}
 			try {
-				ATransaction transaction = decodeTransaction(hashBlob);
+				ATransaction transaction = decodeTransaction(hashBlob, arguments);
 				AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
 				if (accountKeyCell == null) {
 					return toolError("Submit requires 'accountKey' string");
@@ -709,7 +710,7 @@ public class McpAPI extends ABaseAPI {
 				return toolError("seed must be a 32-byte hex string (64 hex characters)");
 			}
 			try {
-				ATransaction transaction = decodeTransaction(hashBlob);
+				ATransaction transaction = decodeTransaction(hashBlob, arguments);
 				AKeyPair keyPair = AKeyPair.create(seedBlob);
 				SignedData<ATransaction> signed = keyPair.signData(transaction);
 				Result result = restServer.getConvex().transactSync(signed);

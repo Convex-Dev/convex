@@ -39,7 +39,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -51,7 +50,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -60,6 +58,7 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.JSON;
 import convex.peer.Config;
+import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
 import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.handler.RequestBody;
@@ -831,7 +830,6 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
-		trans=Cells.persist(trans, server.getStore()); // persist data so we have a full copy if needed
 		Ref<ATransaction> ref = trans.getRef();
 		HashMap<String, Object> result = new HashMap<>();
 		result.put("source", srcValue);
@@ -1009,19 +1007,21 @@ public class ChainAPI extends ABaseAPI {
 		if (h == null)
 			throw new BadRequestResponse("Parameter 'hash' did not parse correctly, must be a hex string.");
 
-		ATransaction trans = null;
+		// Preparation is intentionally stateless. Requiring the complete data here
+		// prevents public prepare requests from populating the Peer's primary store.
+		Object dataValue = req.get("data");
+		if (!(dataValue instanceof String))
+			throw new BadRequestResponse("Parameter 'data' is required. Submit the complete 'data' value returned by transaction/prepare.");
+		Blob data = Blob.parse((String) dataValue);
+		if (data == null)
+			throw new BadRequestResponse("Parameter 'data' did not parse correctly, must be a hex string.");
+
+		ATransaction trans;
 		try {
-			ACell maybeTrans = server.getStore().decodeRef(h).getValue();
-			if (!(maybeTrans instanceof ATransaction))
-				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
-			trans = (ATransaction) maybeTrans;
-		} catch (MissingDataException e) {
-			setResult(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
-			return;
+			trans = PreparedTransaction.decode(data, h);
 		} catch (BadFormatException e) {
-			setResult(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
-			return;
-		} 
+			throw new BadRequestResponse("Invalid transaction data: " + e.getMessage());
+		}
 
 		// Get the account key
 		Object keyValue = req.get("accountKey");

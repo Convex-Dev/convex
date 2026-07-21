@@ -353,7 +353,6 @@ class SigningMcpTools {
 				// Build transaction
 				long sequence = as.getSequence() + 1;
 				ATransaction transaction = Invoke.create(address, sequence, code);
-				transaction = Cells.persist(transaction, srv.getStore());
 				Ref<ATransaction> ref = transaction.getRef();
 				Blob message = SignedData.getMessageForRef(ref);
 
