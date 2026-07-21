@@ -24,8 +24,10 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
+import convex.restapi.handler.RequestBody;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
+import io.javalin.http.HttpResponseException;
 
 /**
  * Standalone MCP (Model Context Protocol) server with pluggable tool and prompt
@@ -167,7 +169,7 @@ public class McpServer {
 		currentContext.set(ctx);
 		try {
 			boolean useSSE = acceptsEventStream(ctx);
-			ACell body = JSONReader.read(ctx.bodyInputStream());
+			ACell body = JSONReader.read(RequestBody.boundedInputStream(ctx));
 
 			if (body instanceof AMap<?, ?> map) {
 				if (isNotification(map)) {
@@ -215,6 +217,9 @@ public class McpServer {
 		} catch (ParseException | IOException e) {
 			ctx.contentType(ContentTypes.JSON);
 			ctx.result(JSON.print(protocolError(-32700, "Parse error")).toString());
+		} catch (HttpResponseException e) {
+			// Preserve transport-level responses such as the request-size 413.
+			throw e;
 		} catch (Exception e) {
 			log.warn("Unexpected error handling MCP request", e);
 			ctx.contentType(ContentTypes.JSON);

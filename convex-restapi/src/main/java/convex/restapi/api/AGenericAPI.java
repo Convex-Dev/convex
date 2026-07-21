@@ -25,6 +25,7 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
+import convex.restapi.handler.RequestBody;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -88,7 +89,7 @@ public abstract class AGenericAPI {
 	 */
 	protected AMap<AString, ACell> readJSONBody(Context ctx) {
 		try {
-			AMap<AString, ACell> req= JSONReader.readObject(ctx.bodyInputStream());
+			AMap<AString, ACell> req= JSONReader.readObject(RequestBody.boundedInputStream(ctx));
 			return req;
 		} catch (IllegalArgumentException | ParseException | IOException e) {
 			throw new BadRequestResponse("Invalid JSON body: "+e.getMessage());

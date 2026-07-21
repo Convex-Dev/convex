@@ -3,6 +3,7 @@ package convex.restapi.api;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,6 +62,7 @@ import convex.core.util.JSON;
 import convex.peer.Config;
 import convex.restapi.RESTServer;
 import convex.restapi.handler.ConcurrentLimit;
+import convex.restapi.handler.RequestBody;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
@@ -198,8 +200,9 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
 			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
+			InputStream body=RequestBody.boundedInputStream(ctx);
 			try {
-				value=Reader.read(ctx.bodyInputStream());
+				value=Reader.read(body);
 			} catch (Exception e) {
 				throw new BadRequestResponse("Could not parse CVX content: "+e.getMessage());
 			}
@@ -247,8 +250,9 @@ public class ChainAPI extends ABaseAPI {
 			if (field==null) throw new BadRequestResponse("Decode requires 'cad3' field");
 			value=Blob.parse(field);
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.BYTES.equals(type)) {
+			InputStream body=RequestBody.boundedInputStream(ctx);
 			try {
-				value=Blobs.fromStream(ctx.bodyInputStream());
+				value=Blobs.fromStream(body);
 			} catch (Exception e) {
 				throw new BadRequestResponse("Could not read CAD3 content: "+e.getMessage());
 			}

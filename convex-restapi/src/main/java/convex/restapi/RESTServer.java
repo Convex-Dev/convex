@@ -52,6 +52,7 @@ import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.HttpResponseException;
+import io.javalin.http.ContentTooLargeResponse;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
@@ -71,6 +72,8 @@ public class RESTServer implements Closeable {
 	protected Javalin javalin;
 	
 	protected static final Integer DEFAULT_PORT=8080;
+	/** Hard ceiling for structured REST request bodies. */
+	public static final long MAX_REQUEST_BODY_BYTES=1_000_000L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
 	private RESTServer(Server server) {
@@ -211,6 +214,9 @@ public class RESTServer implements Closeable {
 	private Javalin buildApp(Integer port) {
 		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
+			// RequestBody relies on this limit to bound chunked as well as fixed-length bodies.
+			config.http.maxRequestSize=MAX_REQUEST_BODY_BYTES;
+
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
 					// ?? corsConfig.allowCredentials=true;
@@ -250,6 +256,16 @@ public class RESTServer implements Closeable {
 	}
 
 	private void addHandlers(RoutesConfig routes) {
+		// Reject a known oversized body before a handler starts parsing it. Requests
+		// without Content-Length are still bounded while read by RequestBody.
+		routes.before(ctx -> {
+			long contentLength=ctx.req().getContentLengthLong();
+			if (contentLength>MAX_REQUEST_BODY_BYTES) {
+				throw new ContentTooLargeResponse("Request body exceeds maximum size of "
+						+MAX_REQUEST_BODY_BYTES+" bytes");
+			}
+		});
+
 		// Custom handler for HTTP error responses (BadRequestResponse, NotFoundResponse, etc.)
 		// Produces consistent output in the requested content type: {:error "message"} or {"error":"message"}
 		routes.exception(HttpResponseException.class, (e, ctx) -> {

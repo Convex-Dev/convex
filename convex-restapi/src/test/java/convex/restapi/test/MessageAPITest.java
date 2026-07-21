@@ -194,7 +194,7 @@ public class MessageAPITest extends ARESTTest {
 	public void testHugePayload() throws Exception {
 		byte[] huge = new byte[2_000_000];
 		HttpResponse<byte[]> resp = postRaw(huge);
-		assertTrue(resp.statusCode() >= 400, "Oversized payload should be rejected");
+		assertEquals(413, resp.statusCode(), "Oversized payload should use the request-size response");
 	}
 
 	@Test
