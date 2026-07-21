@@ -621,7 +621,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 				}
 				break;
 			case DATA_REQUEST:
-				rejectUnscopedDataRequest(message);
+				if (owner == null) {
+					rejectUnscopedDataRequest(message);
+				} else {
+					processDataRequest(message, owner);
+				}
 				break;
 			case CHALLENGE:
 				processChallenge(message);
@@ -830,11 +834,21 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Rejects a DATA_REQUEST received directly by the NodeServer listener. This
-	 * connection is not associated with a particular propagator, so selecting the
-	 * primary or any other store would risk crossing an operator-defined data boundary.
-	 * Peers receive data only on connections registered with a propagator's connection
-	 * manager, which serves requests from that propagator's store.
+	 * Serves a DATA_REQUEST only from the store selected for this physical connection.
+	 * Query and data resolution therefore expose the same propagator capability; this
+	 * method must never search another propagator or fall back to the primary store.
+	 */
+	private void processDataRequest(Message message, LatticePropagator owner)
+			throws BadFormatException {
+		Message response = message.makeDataResponse(owner.getStore());
+		if (!message.returnMessage(response)) {
+			log.debug("Unable to return lattice data: Peer send buffer is full");
+		}
+	}
+
+	/**
+	 * Rejects a DATA_REQUEST when operator policy has not assigned the connection
+	 * to a propagator. Choosing any store implicitly would cross a capability boundary.
 	 *
 	 * @param message The DATA_REQUEST message
 	 */

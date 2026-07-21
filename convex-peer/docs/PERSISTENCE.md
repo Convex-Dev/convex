@@ -118,9 +118,9 @@ cells in its store — so peers cannot request them.
 Adding a peer to a propagator's connection manager is the operator's grant of read
 access to that store. The connection manager does not prescribe whether those peers
 must be verified or whether a public propagator may accept public membership; operators
-choose the membership and rights appropriate to each store. A `DATA_REQUEST` arriving
-on the unscoped NodeServer listener is rejected because the listener cannot safely
-choose among propagator stores.
+choose the membership and rights appropriate to each store. On the NodeServer listener,
+an assigned connection serves `DATA_REQUEST` only from its selected propagator store;
+an unassigned connection is rejected because no store can be chosen safely.
 
 Inbound lattice access has the matching rule: **one physical connection, one owning
 propagator, one store**. Operator policy supplies a connection selector before launch.

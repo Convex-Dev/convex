@@ -690,6 +690,47 @@ public class NodeServerTest {
 			convex.close();
 		}
 	}
+
+	/**
+	 * Basic public-node configuration: the sole propagator shares the authoritative
+	 * cursor store, and explicit operator policy grants an inbound Peer that one view.
+	 * The Peer must be able to query the announced root and acquire its full value tree
+	 * from the same store; otherwise larger query results cannot be consumed.
+	 */
+	@Test
+	public void testPublicSinglePropagatorSharesPrimaryStore() throws Exception {
+		Blob branch = Blobs.createRandom(400);
+		ASet<ACell> expected = Sets.of(branch);
+		setNodeServer = new NodeServer<>(SetLattice.create(), store);
+		allowPrimaryInbound(setNodeServer);
+		setNodeServer.launch();
+
+		LatticePropagator propagator = setNodeServer.getPropagator();
+		assertNotNull(propagator);
+		assertSame(store, propagator.getStore(),
+			"the default propagator should share the authoritative cursor store");
+
+		setNodeServer.getCursor().merge(expected);
+		setNodeServer.getCursor().sync();
+		Hash rootHash = expected.getHash();
+
+		try (AStore peerStore = new MemoryStore();
+				ConvexRemote peer = ConvexRemote.connect(setNodeServer.getHostAddress())) {
+			peer.setStore(peerStore);
+			AVector<?> query = Vectors.create(
+				MessageTag.LATTICE_QUERY, CVMLong.create(70), Vectors.empty());
+			Result result = peer.message(Message.create(MessageType.LATTICE_QUERY, query))
+				.get(5, TimeUnit.SECONDS);
+
+			assertFalse(result.isError());
+			assertEquals(rootHash, result.getValue().getHash(),
+				"the public view should be the sole propagator's announced root");
+			ACell acquired = peer.acquire(rootHash, peerStore).get(5, TimeUnit.SECONDS);
+			assertEquals(expected, acquired);
+			assertNotNull(peerStore.refForHash(branch.getHash()),
+				"missing branches should be served from the selected shared store");
+		}
+	}
 	
 	/**
 	 * An inbound listener connection has no propagator identity, so it must not gain
@@ -707,6 +748,37 @@ public class NodeServerTest {
 
 			assertEquals(ErrorCodes.TRUST, result.getErrorCode());
 			assertEquals(CVMLong.create(71), result.getID());
+		}
+	}
+
+	/** An assigned listener connection reads only its selected propagator store. */
+	@Test
+	public void testInboundDataRequestUsesSelectedPropagatorStore() throws Exception {
+		try (AStore primaryStore = new MemoryStore();
+				AStore publicStore = new MemoryStore()) {
+			Blob privateValue = Cells.persist(Blobs.createRandom(400), primaryStore);
+			Blob publicValue = Cells.persist(Blobs.createRandom(400), publicStore);
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator publicPropagator = new LatticePropagator(publicStore);
+
+			try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), primaryStore)) {
+				node.addPropagator(primary);
+				node.addPropagator(publicPropagator);
+				node.setInboundPropagatorSelector(connection -> publicPropagator);
+				node.launch();
+
+				try (ConvexRemote peer = ConvexRemote.connect(node.getHostAddress())) {
+					Message request = Message.createDataRequest(CVMLong.create(74),
+						publicValue.getHash(), privateValue.getHash());
+					Result result = peer.message(request).get(5, TimeUnit.SECONDS);
+					AVector<?> values = result.getValue();
+
+					assertFalse(result.isError());
+					assertEquals(publicValue, values.get(0));
+					assertNull(values.get(1),
+						"an assigned public connection must not search the primary store");
+				}
+			}
 		}
 	}
 
