@@ -93,10 +93,10 @@ public class Connection extends AConnection {
 	private final MessageSender sender;
 
 	private Connection(ByteChannel channel, Consumer<Message> receiveAction,
-			AccountKey trustedPeerKey) {
+			AccountKey trustedPeerKey, int maxMessageLength) {
 		this.channel = channel;
 
-		receiver = new MessageReceiver(receiveAction);
+		receiver = new MessageReceiver(receiveAction, maxMessageLength);
 		receiver.setConnection(this); // messages carry this connection
 		sender = new MessageSender(channel);
 		this.lastActivity=Utils.getCurrentTimestamp();
@@ -116,10 +116,16 @@ public class Connection extends AConnection {
 	 */
 	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) throws IOException {
+		return create(channel, receiveAction, trustedPeerKey,
+			(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction,
+			AccountKey trustedPeerKey, int maxMessageLength) throws IOException {
 		// Needed in case server has incoming connections but no outbound?
 		ensureSelectorLoop(); 
 	
-		return new Connection(channel, receiveAction, trustedPeerKey);
+		return new Connection(channel, receiveAction, trustedPeerKey, maxMessageLength);
 	}
 
 	/**
@@ -136,6 +142,12 @@ public class Connection extends AConnection {
 	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction)
 			throws IOException, TimeoutException {
 		return connect(socketAddress, receiveAction, null);
+	}
+
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
+			int maxMessageLength) throws IOException, TimeoutException {
+		return connect(socketAddress, receiveAction, null, Config.SOCKET_SEND_BUFFER_SIZE,
+			Config.SOCKET_RECEIVE_BUFFER_SIZE, maxMessageLength);
 	}
 	
 	/**
@@ -173,6 +185,13 @@ public class Connection extends AConnection {
 	 */
 	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
+		return connect(socketAddress, receiveAction, trustedPeerKey, sendBufferSize, receiveBufferSize,
+			(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
+			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize,
+			int maxMessageLength) throws IOException, TimeoutException {
 		ensureSelectorLoop();
 		
 		SocketChannel clientChannel = SocketChannel.open();
@@ -200,7 +219,7 @@ public class Connection extends AConnection {
 			}
 		}
 
-		Connection pc = create(clientChannel, receiveAction, trustedPeerKey);
+		Connection pc = create(clientChannel, receiveAction, trustedPeerKey, maxMessageLength);
 		pc.startClientListening();
 		log.trace("Connect succeeded for host: {}", socketAddress);
 		return pc;
@@ -208,6 +227,14 @@ public class Connection extends AConnection {
 
 	public long getReceivedCount() {
 		return receiver.getReceivedCount();
+	}
+
+	public void setMaxMessageLength(int limit) {
+		receiver.setMaxMessageLength(limit);
+	}
+
+	public int getMaxMessageLength() {
+		return receiver.getMaxMessageLength();
 	}
 	
 	/**

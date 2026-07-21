@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -52,6 +53,12 @@ import convex.peer.AConnectionManager;
 public class LatticeConnectionManager extends AConnectionManager {
 
 	private static final Logger log = LoggerFactory.getLogger(LatticeConnectionManager.class.getName());
+
+	/** Receive limit before the remote AccountKey is verified. */
+	private volatile int untrustedMessageLimit = NodeConfig.DEFAULT_MAX_MESSAGE_SIZE;
+
+	/** Receive limit after challenge/response proves the expected remote AccountKey. */
+	private volatile int trustedMessageLimit = NodeConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
 
 	// ========== Constants ==========
 
@@ -111,6 +118,43 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void setKeyPair(AKeyPair keyPair) {
 		this.keyPair = keyPair;
+	}
+
+	/**
+	 * Configures the two receive tiers for manager-owned outbound connections.
+	 * Opening a socket or discovering a signed NodeInfo does not select the trusted
+	 * tier. Promotion occurs only after the live endpoint answers a challenge with
+	 * the AccountKey under which that Peer was registered.
+	 */
+	public void setInboundMessageLimits(int untrustedLimit, int trustedLimit) {
+		validateMessageLimit(untrustedLimit);
+		validateMessageLimit(trustedLimit);
+		if (trustedLimit < untrustedLimit) {
+			throw new IllegalArgumentException("Trusted message limit must be at least the untrusted limit: "
+				+ trustedLimit + " < " + untrustedLimit);
+		}
+		this.untrustedMessageLimit = untrustedLimit;
+		this.trustedMessageLimit = trustedLimit;
+
+		// Apply a configuration change to existing remote connections without
+		// accidentally promoting a connection whose verified key does not match its slot.
+		connections.forEach((peerKey, convex) -> {
+			AccountKey verifiedKey = convex.getVerifiedPeer();
+			configureReceiveLimit(convex, verifiedKey != null && verifiedKey.equals(peerKey));
+		});
+	}
+
+	private static void validateMessageLimit(int limit) {
+		if (limit <= 0 || limit > convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Message limit must be between 1 and "
+				+ convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH + ": " + limit);
+		}
+	}
+
+	private void configureReceiveLimit(Convex convex, boolean trusted) {
+		if (convex instanceof ConvexRemote remote) {
+			remote.setMaxInboundMessageLength(trusted ? trustedMessageLimit : untrustedMessageLimit);
+		}
 	}
 
 	// ========== Lifecycle ==========
@@ -193,8 +237,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return;
 		}
 		convex.setStore(store);
+		AccountKey verifiedKey = convex.getVerifiedPeer();
+		boolean alreadyVerified = verifiedKey != null && verifiedKey.equals(peerKey);
+		configureReceiveLimit(convex, alreadyVerified);
 		AKeyPair kp = this.keyPair;
-		if (kp != null && convex.getVerifiedPeer() == null) {
+		if (kp != null && !alreadyVerified) {
 			convex.setKeyPair(kp);
 			tryVerifyPeer(convex, peerKey);
 		}
@@ -326,7 +373,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			if (target == null) continue;
 
 			try {
-				Convex convex = Convex.connect(target);
+				// Install the untrusted cap as part of connection construction. Applying it
+				// after connect would leave a race in which the remote endpoint could send a
+				// protocol-sized frame before its identity challenge has even started.
+				Convex convex = ConvexRemote.connect(target, untrustedMessageLimit);
 				convex.setStore(store);
 				AKeyPair kp = this.keyPair;
 				if (kp != null) {
@@ -383,6 +433,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void tryVerifyPeer(Convex convex, AccountKey peerKey) {
 		convex.verifyPeer(peerKey).whenComplete((result, ex) -> {
 			if (result != null) {
+				// verifyPeer(expectedKey) has validated the signed response and stored the
+				// verified key on this exact connection. Only now may it use the larger tier.
+				configureReceiveLimit(convex, result.equals(peerKey));
 				log.debug("Verified peer: {} at {}", peerKey, convex.getHostAddress());
 			} else if (ex != null) {
 				log.debug("Peer verification not available for {}: {}", peerKey, ex.getMessage());

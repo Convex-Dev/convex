@@ -114,6 +114,17 @@ public class NettyConnection extends AConnection {
 	}
 
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException, IOException {
+		return connect(sa, receiveAction, (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	/**
+	 * Connects with an explicit limit for messages received from the remote endpoint.
+	 * The limit is installed before the channel pipeline begins processing traffic, so
+	 * there is no post-connect window in which an unverified endpoint gets the larger
+	 * protocol default.
+	 */
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction,
+			int maxMessageLength) throws InterruptedException, IOException {
 		Bootstrap b = getClientBootstrap();
 		ChannelFuture f = b.connect(sa);
 		f.await(); // Wait until done
@@ -128,7 +139,7 @@ public class NettyConnection extends AConnection {
 			receiveAction.accept(m);
 			return null; // always accepted
 		};
-		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null);
+		NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
 
 		NettyConnection client = new NettyConnection(chan,inbound);
 
@@ -156,6 +167,15 @@ public class NettyConnection extends AConnection {
 		);
 
 		return client;
+	}
+
+	/** Updates the receive limit, for example after successful peer verification. */
+	public void setMaxMessageLength(int limit) {
+		inboundHandler.setMaxMessageLength(limit);
+	}
+
+	public int getMaxMessageLength() {
+		return inboundHandler.getMaxMessageLength();
 	}
 
 	/**

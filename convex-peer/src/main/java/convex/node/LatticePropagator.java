@@ -46,15 +46,13 @@ import convex.lattice.cursor.Root;
  *   <li>An {@link AStore} — for delta tracking (announce/novelty detection),
  *       persistence (setRootData), and security boundary (DATA_REQUEST resolution).</li>
  *   <li>A {@link LatticeConnectionManager} — outbound peer connections and broadcast.</li>
- *   <li>A temporary merge callback used only by the explicit pull path to hand an
- *       acquired peer value back to NodeServer.</li>
  *   <li>A background thread — event-driven processing loop with periodic root sync.</li>
  * </ul>
  *
  * <p>The propagator has no knowledge of cursors or lattices. Values are pushed in
  * via {@link #triggerBroadcast(ACell)}. For synchronous snapshots the caller owns
- * installation of the returned value. The pull callback is a plain
- * {@code Consumer<ACell>} — NodeServer owns the merge logic.
+ * installation of the returned value. Pull operations only acquire store-backed
+ * values; NodeServer owns merge and re-propagation through its root cursor.
  *
  * <p>The store also serves as the <b>security boundary</b>: peer connections are configured
  * with the propagator's store, so DATA_REQUEST from peers can only resolve data that
@@ -109,15 +107,6 @@ public class LatticePropagator implements Closeable {
 	 * Safe because lattice values are monotonic (V2 >= V1 implies V1 is subsumed).
 	 */
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
-
-	/**
-	 * Temporary pull callback — called after an explicitly pulled value has been
-	 * acquired into this propagator's store. Snapshot processing never invokes it.
-	 *
-	 * <p>The propagator has no knowledge of cursors or lattices — it just calls
-	 * this Consumer with the acquired value. NodeServer owns the merge logic.
-	 */
-	private Consumer<ACell> mergeCallback;
 
 	/**
 	 * Controls whether setRootData is called after announce.
@@ -210,22 +199,6 @@ public class LatticePropagator implements Closeable {
 	}
 
 	// ========== Configuration ==========
-
-	/**
-	 * Sets the temporary callback used to merge explicitly pulled values.
-	 *
-	 * <p>Typically set by NodeServer on the primary propagator:
-	 * <pre>{@code
-	 * propagator.setMergeCallback(acquired ->
-	 *     cursor.updateAndGet(current -> lattice.merge(current, acquired)));
-	 * }</pre>
-	 *
-	 * @param callback Consumer receiving a store-backed value after pull acquisition,
-	 *                 or null to disable
-	 */
-	public void setMergeCallback(Consumer<ACell> callback) {
-		this.mergeCallback = callback;
-	}
 
 	/**
 	 * Sets the persist interval. Positive enables setRootData after announce;
@@ -349,8 +322,9 @@ public class LatticePropagator implements Closeable {
 		}
 
 		running = true;
-		announcedCursor.set(null);
-		lastTriggeredValue = null;
+		// Preserve a snapshot seeded by NodeServer launch (or retained across a
+		// restart) so query service is available as soon as the listener opens.
+		lastTriggeredValue = announcedCursor.get();
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
 		broadcastCount.set(0L);
@@ -615,12 +589,13 @@ public class LatticePropagator implements Closeable {
 	 * Pulls the latest lattice value from a specific peer into this propagator's store.
 	 *
 	 * <p>Sends a LATTICE_QUERY to the peer, acquires the full value tree into
-	 * this propagator's store via {@link Convex#acquire}, feeds the acquired value
-	 * into the cursor via the merge callback, and queues it for background
-	 * processing (announce + persist + broadcast to other peers).
+	 * this propagator's store via {@link Convex#acquire}, then returns that
+	 * store-backed value to the caller.
 	 *
-	 * <p>The future completes after the merge callback has run (cursor is updated)
-	 * but before the background broadcast to other peers.
+	 * <p>This method deliberately performs no merge, root publication or broadcast.
+	 * Only NodeServer knows the lattice and current root, so it must merge the acquired
+	 * value and call {@code cursor.sync()} before anything is re-propagated. Persisting
+	 * the raw peer value here could demote the root when local state already dominates it.
 	 *
 	 * @param peer Convex connection to the peer node
 	 * @return CompletableFuture that completes with the acquired value
@@ -663,15 +638,7 @@ public class LatticePropagator implements Closeable {
 					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
 				}
 
-				// 3. Feed into cursor via merge callback (inline — cursor updated before future completes)
-				if (mergeCallback != null) {
-					mergeCallback.accept(acquired);
-				}
-
-				// 4. Queue for background processing (announce + persist + broadcast to other peers)
-				triggerBroadcast(acquired);
-
-				log.debug("Pulled value from peer: {}", peer.getHostAddress());
+				log.debug("Acquired pulled value from peer: {}", peer.getHostAddress());
 				return acquired;
 
 			} catch (Exception e) {
@@ -685,14 +652,15 @@ public class LatticePropagator implements Closeable {
 	 * Pulls the latest lattice value from all connected peers.
 	 *
 	 * <p>Sends LATTICE_QUERY to each connected peer in parallel, acquires their
-	 * values into this propagator's store, and merges via the merge callback.
+	 * values into this propagator's store. The returned values remain unmerged;
+	 * NodeServer integrates them through its authoritative root cursor.
 	 *
-	 * @return CompletableFuture that completes when all pulls are done
+	 * @return future containing all acquired values when every pull is complete
 	 */
-	public CompletableFuture<ACell> pull() {
+	public CompletableFuture<List<ACell>> pullAll() {
 		Set<Convex> peerSet = connectionManager.getPeers();
 		if (peerSet.isEmpty()) {
-			return CompletableFuture.completedFuture(null);
+			return CompletableFuture.completedFuture(List.of());
 		}
 
 		List<CompletableFuture<ACell>> futures = new ArrayList<>();
@@ -703,10 +671,16 @@ public class LatticePropagator implements Closeable {
 		}
 
 		if (futures.isEmpty()) {
-			return CompletableFuture.completedFuture(null);
+			return CompletableFuture.completedFuture(List.of());
 		}
 
 		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-			.thenApply(v -> announcedCursor.get());
+			.thenApply(v -> {
+				List<ACell> acquired = new ArrayList<>(futures.size());
+				for (CompletableFuture<ACell> future : futures) {
+					acquired.add(future.join());
+				}
+				return acquired;
+			});
 	}
 }

@@ -11,9 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
+- NodeServer: public-node defaults now cap encoded messages at 4 MiB and inbound connections at 256, while cryptographically verified outbound Peers may use a separately configurable larger message tier.
+- NodeServer: lifecycle is represented by explicit starting, running, stopping and stopped states; merge context and propagator topology freeze when first launch begins, and propagator access returns an immutable snapshot.
+
 ### Fixed
 
 - REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
+- NodeServer: replayed lattice values that do not change local state no longer trigger repeated announce and root persistence work.
+- NodeServer: explicitly pulled values now merge through the authoritative root before persistence or re-propagation, preventing a dominated peer value from demoting the announced or persisted root.
+- NodeServer: a primary-store failure during a synchronous checkpoint now propagates to the sync caller; memory is not rolled back, root publication is unconfirmed, and recovery remains operator policy.
+- NodeServer: a NodeInfo checkpoint failure during launch now closes every service started by that launch, leaving the node stopped and safe to retry.
+- NodeServer: an inbound dispatcher drain timeout now leaves shutdown explicitly incomplete and retryable, preventing relaunch from creating a second ordered consumer while the original thread is still active.
+- NodeServer: fresh and restored nodes seed their announced snapshot during launch, so lattice queries work immediately without an extra application sync.
 
 ## [0.8.9] - 2026-07-17
 

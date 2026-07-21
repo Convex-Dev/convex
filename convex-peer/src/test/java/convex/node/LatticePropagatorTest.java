@@ -106,24 +106,6 @@ public class LatticePropagatorTest {
 	}
 
 	/**
-	 * Outbound snapshot processing returns the store-backed value to its caller.
-	 * It must not also feed that value back through the pull merge callback: the
-	 * root cursor's synchronous sync path owns installation of the returned value.
-	 */
-	@Test
-	public void testProcessSnapshotDoesNotInvokeMergeCallback() throws IOException {
-		MemoryStore store = new MemoryStore();
-		LatticePropagator propagator = new LatticePropagator(store);
-		int[] callbackCount = new int[1];
-		propagator.setMergeCallback(value -> callbackCount[0]++);
-
-		ACell value = CVMLong.create(42);
-		assertEquals(value, propagator.processSnapshot(value));
-		assertEquals(0, callbackCount[0],
-			"processSnapshot must return its result rather than merge it through a side callback");
-	}
-
-	/**
 	 * Tests that automatic propagation broadcasts updates to connected peers.
 	 *
 	 * This test verifies that:

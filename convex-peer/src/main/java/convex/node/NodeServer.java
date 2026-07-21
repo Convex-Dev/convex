@@ -6,9 +6,11 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +22,7 @@ import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -97,9 +100,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Propagators for persistence and broadcast. Index 0 is the primary propagator
-	 * (if present). Its synchronous snapshot result is installed by the root cursor;
-	 * a temporary callback remains only for explicit pull acquisition. Additional
-	 * propagators handle public/backup broadcast.
+	 * (if present). Its synchronous snapshot result is installed by the root cursor.
+	 * Additional propagators handle public/backup broadcast.
 	 */
 	private final List<LatticePropagator> propagators = new ArrayList<>();
 
@@ -120,10 +122,35 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private Integer port;
 
+	/** Complete lifecycle for the services owned by this node. */
+	enum LifecycleState {
+		NEW, STARTING, RUNNING, STOPPING, STOPPED
+	}
+
 	/**
-	 * Whether the server is currently running
+	 * Single lifecycle authority. In particular, STOPPING remains visible after a
+	 * dispatcher drain timeout, preventing relaunch or configuration mutation while
+	 * the original consumer may still be using the cursor or store.
 	 */
-	private boolean running = false;
+	private volatile LifecycleState lifecycleState = LifecycleState.NEW;
+
+	/** Bounded handoff from Netty event loops to the lattice processing thread. */
+	private final ArrayBlockingQueue<Message> inboundQueue;
+
+	/** Pre-allocated backpressure retry returned when {@link #inboundQueue} is full. */
+	private final Predicate<Message> inboundRetry = this::offerInboundBlocking;
+
+	/** Pre-allocated terminal rejection used while the server is stopping. */
+	private final Predicate<Message> inboundRejected = message -> false;
+
+	/** Whether new network messages may be admitted to the inbound queue. */
+	private volatile boolean acceptingInbound = false;
+
+	/** Whether the inbound dispatcher should wait for new work. */
+	private volatile boolean inboundRunning = false;
+
+	/** Single ordered consumer for decode, merge and persistence work. */
+	private Thread inboundThread;
 
 	/**
 	 * Per-connection inbound counters, keyed by the originating connection (#566). Used for
@@ -158,6 +185,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.lattice = lattice;
 		this.store = store;
 		this.config = (config != null) ? config : NodeConfig.create();
+		this.inboundQueue = new ArrayBlockingQueue<>(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
 
@@ -165,8 +193,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// async fan-out to secondaries.
 		//
 		// The primary's full pipeline (announce + setRootData + broadcast) runs
-		// on the caller's thread, so cursor.sync() is a real durability barrier:
-		// returning successfully means the value has reached the primary store.
+		// on the caller's thread, so cursor.sync() is a synchronous checkpoint:
+		// returning successfully means the primary store accepted the root update.
+		// Physical flushing is a separate store/operator policy.
 		// IOException from announce or setRootData is wrapped and propagated to
 		// the caller — sync failures are visible, not silently dropped.
 		//
@@ -182,7 +211,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			try {
 				announced = propagators.get(0).processSnapshot(value);
 			} catch (IOException e) {
-				throw new RuntimeException("NodeServer sync failed: persistence error", e);
+				throw new StoreException("NodeServer sync failed: persistence error", e);
 			}
 			for (int i = 1; i < propagators.size(); i++) {
 				propagators.get(i).triggerBroadcast(value);
@@ -217,10 +246,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws InterruptedException If the operation is interrupted
 	 */
 	@SuppressWarnings("unchecked")
-	public void launch() throws IOException, InterruptedException {
-		if (running) {
+	public synchronized void launch() throws IOException, InterruptedException {
+		if (lifecycleState == LifecycleState.RUNNING || lifecycleState == LifecycleState.STARTING) {
 			throw new IllegalStateException("NodeServer is already running");
 		}
+		if (lifecycleState == LifecycleState.STOPPING) {
+			throw new IllegalStateException("NodeServer shutdown is incomplete; call close() again before launch");
+		}
+
+		// Validate close-time policy before opening any service. The config is
+		// immutable, so discovering an unusable timeout only during close() would
+		// leave the instance unable to complete its own shutdown.
+		config.getInboundShutdownTimeout();
 
 		// #567: validate a configured public URL before advertising it. Fail fast on a
 		// misconfigured (private/loopback/malformed) URL rather than silently polluting the
@@ -233,83 +270,156 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 
-		log.debug("Launching NodeServer on port {}", port);
+		lifecycleState = LifecycleState.STARTING;
+		try {
+			log.debug("Launching NodeServer on port {}", port);
 
-		// Create primary propagator if none have been added
-		if (propagators.isEmpty() && store != null) {
-			LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
-			AKeyPair signingKey = mergeContext.getSigningKey();
-			if (signingKey != null) {
-				connectionManager.setKeyPair(signingKey);
+			// Create primary propagator if none have been added
+			if (propagators.isEmpty() && store != null) {
+				LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
+				AKeyPair signingKey = mergeContext.getSigningKey();
+				if (signingKey != null) {
+					connectionManager.setKeyPair(signingKey);
+				}
+				LatticePropagator primary = new LatticePropagator(store, connectionManager);
+				if (!config.isPersist()) {
+					primary.setPersistInterval(-1); // disable setRootData
+				}
+				propagators.add(primary);
 			}
-			LatticePropagator primary = new LatticePropagator(store, connectionManager);
-			if (!config.isPersist()) {
-				primary.setPersistInterval(-1); // disable setRootData
+
+			// Outbound sockets begin at the public/untrusted cap. Their connection manager
+			// promotes an individual socket to the trusted cap only after challenge/response
+			// proves the expected remote AccountKey.
+			for (LatticePropagator p : propagators) {
+				p.getConnectionManager().setInboundMessageLimits(
+					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
 			}
-			propagators.add(primary);
+
+			// Restore from primary propagator's store if configured
+			if (config.isRestore() && !propagators.isEmpty()) {
+				ACell restored = propagators.get(0).restore();
+				if (restored != null) {
+					cursor.set((V) restored);
+					log.info("Restored lattice value from store");
+				}
+			}
+
+			// Seed the primary's announced, store-backed view before opening the network.
+			// A fresh or restored node can answer LATTICE_QUERY immediately without an
+			// application-side sync solely to initialise query service.
+			if (!propagators.isEmpty()) {
+				ACell announced = propagators.get(0).processSnapshot(cursor.get());
+				cursor.set((V) announced);
+			}
+
+			// Create and launch network server unless port is negative (local-only mode)
+			boolean localOnly = (port != null && port < 0);
+			if (!localOnly) {
+				if (networkServer == null) {
+					NettyServer nettyServer = new NettyServer(port);
+					// Set the receive action for handling incoming messages
+					nettyServer.setReceiveAction(receiveAction);
+					// Use Netty's per-channel backpressure contract: event-loop threads only
+					// enqueue; decode, merge, persistence and responses run on our dispatcher.
+					nettyServer.setMessageDelivery(this::deliverIncomingMessage);
+					nettyServer.setMaxClientConnections(config.getMaxConnections());
+					nettyServer.setMaxMessageLength(config.getMaxMessageSize());
+					networkServer = nettyServer;
+					// #566: release per-connection stats eagerly when a connection closes. The
+					// periodic sweep remains as a backstop for transports without a close signal.
+					networkServer.setDisconnectAction(this::removeConnection);
+				}
+
+				if (port != null) {
+					networkServer.setPort(port);
+				}
+				startInboundDispatcher();
+				networkServer.launch();
+				port = networkServer.getPort();
+			}
+
+			// #566: periodic sweep of closed connections from the inbound stats map, so an idle
+			// node drains dead entries without relying on inbound traffic or a network close hook.
+			maintenanceThread = Thread.ofVirtual()
+					.name("NodeServer connection-stats maintenance")
+					.start(this::maintenanceLoop);
+
+			// Register shutdown hook to persist before Etch closes its files
+			Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
+
+			// Start all propagator threads and connection managers
+			for (LatticePropagator p : propagators) {
+				p.getConnectionManager().start();
+				p.start();
+			}
+
+			// Publication is part of the launch contract. If its synchronous checkpoint
+			// fails, launch must fail with every service stopped rather than returning an
+			// exception while a listener and background threads remain live.
+			publishNodeInfo();
+
+			lifecycleState = LifecycleState.RUNNING;
+			log.debug("NodeServer started successfully on port {}", port);
+		} catch (IOException | InterruptedException | RuntimeException | Error e) {
+			abortFailedLaunch(e);
+			throw e;
+		}
+	}
+
+	/**
+	 * Stops every service that may have started after the listener opened, attaching
+	 * cleanup failures to the original launch failure. This deliberately differs from
+	 * {@link #close()}: it does not submit a final persistence snapshot. Retrying the
+	 * checkpoint while unwinding the failure would obscure whether publication succeeded
+	 * and could turn lifecycle cleanup into a second failing persistence operation.
+	 */
+	private void abortFailedLaunch(Throwable failure) {
+		acceptingInbound = false;
+		lifecycleState = LifecycleState.STOPPING;
+
+		try {
+			if (networkServer != null) networkServer.close();
+		} catch (Throwable cleanupError) {
+			addCleanupFailure(failure, cleanupError);
 		}
 
-		// Temporary pull callback on the primary propagator. Synchronous snapshot
-		// processing returns its store-backed result directly to RootLatticeCursor;
-		// only explicitly acquired peer values still use this callback.
-		if (!propagators.isEmpty()) {
-			propagators.get(0).setMergeCallback(persisted -> {
-				cursor.updateAndGet(current -> {
-					V merged = lattice.merge(mergeContext, current, (V) persisted);
-					return merged;
-				});
-			});
+		boolean dispatcherStopped = false;
+		try {
+			stopInboundDispatcher();
+			dispatcherStopped = true;
+		} catch (Throwable cleanupError) {
+			addCleanupFailure(failure, cleanupError);
 		}
 
-		// Restore from primary propagator's store if configured
-		if (config.isRestore() && !propagators.isEmpty()) {
-			ACell restored = propagators.get(0).restore();
-			if (restored != null) {
-				cursor.set((V) restored);
-				log.info("Restored lattice value from store");
-			}
-		}
+		Thread maintenance = maintenanceThread;
+		maintenanceThread = null;
+		if (maintenance != null) maintenance.interrupt();
 
-		// Create and launch network server unless port is negative (local-only mode)
-		boolean localOnly = (port != null && port < 0);
-		if (!localOnly) {
-			if (networkServer == null) {
-				networkServer = new NettyServer(port);
-				// Set the receive action for handling incoming messages
-				networkServer.setReceiveAction(receiveAction);
-				// #566: release per-connection stats eagerly when a connection closes. The
-				// periodic sweep remains as a backstop for transports without a close signal.
-				networkServer.setDisconnectAction(this::removeConnection);
-			}
+		// A timed-out dispatcher may still be inside cursor.sync() or store decoding.
+		// Keep the propagators and store-facing services available until a later
+		// close() confirms that the sole ordered consumer has actually terminated.
+		if (!dispatcherStopped) return;
 
-			if (port != null) {
-				networkServer.setPort(port);
-			}
-			networkServer.launch();
-			port = networkServer.getPort();
-		}
+		connectionStats.clear();
 
-		running = true;
-
-		// #566: periodic sweep of closed connections from the inbound stats map, so an idle
-		// node drains dead entries without relying on inbound traffic or a network close hook.
-		maintenanceThread = Thread.ofVirtual()
-				.name("NodeServer connection-stats maintenance")
-				.start(this::maintenanceLoop);
-
-		// Register shutdown hook to persist before Etch closes its files
-		Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
-
-		// Start all propagator threads and connection managers
 		for (LatticePropagator p : propagators) {
-			p.getConnectionManager().start();
-			p.start();
+			try {
+				p.close(); // stop and drain existing work, but do not enqueue a final snapshot
+			} catch (Throwable cleanupError) {
+				addCleanupFailure(failure, cleanupError);
+			}
+			try {
+				p.getConnectionManager().close();
+			} catch (Throwable cleanupError) {
+				addCleanupFailure(failure, cleanupError);
+			}
 		}
+		lifecycleState = LifecycleState.STOPPED;
+	}
 
-		// Publish node info if publicly accessible
-		publishNodeInfo();
-
-		log.debug("NodeServer started successfully on port {}", port);
+	private static void addCleanupFailure(Throwable failure, Throwable cleanupError) {
+		if (cleanupError != failure) failure.addSuppressed(cleanupError);
 	}
 
 	/**
@@ -344,6 +454,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		// Navigate to :p2p :nodes and merge the signed entry
 		cursor.path(Keywords.P2P, Keywords.NODES).merge(entry);
+		// Publication is part of launch: make it durable and queryable immediately.
+		cursor.sync();
 
 		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
 	}
@@ -376,6 +488,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Handles an incoming message from a peer node.
 	 * Supports PING, LATTICE_QUERY, LATTICE_VALUE, and DATA_REQUEST message types.
+	 * Processing exceptions are contained at this message boundary. A request with an
+	 * ID receives an error result where possible; fire-and-forget message failures are
+	 * logged. In particular, a durability failure after an inbound lattice merge does
+	 * not impose a shutdown or retry policy on the node.
 	 *
 	 * @param message The incoming message
 	 */
@@ -435,6 +551,145 @@ public class NodeServer<V extends ACell> implements Closeable {
 				// best effort
 			}
 		}
+	}
+
+	/**
+	 * Non-blocking Netty delivery entry point. The event loop performs only a bounded
+	 * queue offer. When full, Netty pauses reads on this connection and invokes the
+	 * returned retry predicate on a virtual thread.
+	 */
+	Predicate<Message> deliverIncomingMessage(Message message) {
+		if (!acceptingInbound) return inboundRejected;
+		if (inboundQueue.offer(message)) return null;
+		return inboundRetry;
+	}
+
+	private boolean offerInboundBlocking(Message message) {
+		if (!acceptingInbound) return false;
+		try {
+			boolean offered = inboundQueue.offer(message, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			if (offered && !acceptingInbound) {
+				inboundQueue.remove(message);
+				return false;
+			}
+			return offered;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
+
+	private synchronized void startInboundDispatcher() {
+		if (inboundRunning) return;
+		if (inboundThread != null) {
+			throw new IllegalStateException("Previous inbound dispatcher has not been reaped");
+		}
+		inboundRunning = true;
+		acceptingInbound = true;
+		inboundThread = new Thread(this::inboundLoop, "NodeServer inbound dispatcher");
+		inboundThread.setDaemon(true);
+		inboundThread.start();
+	}
+
+	private void inboundLoop() {
+		try {
+			while (inboundRunning || !inboundQueue.isEmpty()) {
+				try {
+					Message message = inboundQueue.poll(1, TimeUnit.SECONDS);
+					if (message != null) dispatchInboundMessage(message);
+				} catch (InterruptedException e) {
+					// Closing interrupts the wait, then the loop drains any accepted messages.
+					if (inboundRunning) continue;
+				} catch (Exception e) {
+					// The per-message handler normally contains Exceptions. Keep this final
+					// guard around queue/dispatcher machinery so an implementation defect
+					// cannot silently terminate the only inbound consumer.
+					log.warn("Unexpected exception in inbound lattice dispatcher", e);
+				}
+			}
+		} finally {
+			// If the dispatcher terminates unexpectedly (for example after a fatal JVM
+			// error), fail closed. Leaving admission enabled with no consumer would fill
+			// the bounded queue and make every connection stall until timeout.
+			// Do not acquire this object's monitor here: stopInboundDispatcher joins
+			// this thread from a synchronized lifecycle method, so taking the same
+			// monitor during termination would force every normal close to hit its
+			// join timeout. Both flags are volatile and safe to publish directly.
+			if (Thread.currentThread() == inboundThread) {
+				acceptingInbound = false;
+				inboundRunning = false;
+			}
+		}
+	}
+
+	/**
+	 * Runs one accepted message behind a robustness boundary owned by the dispatcher.
+	 * {@link #handleIncomingMessage(Message)} contains ordinary Exceptions, while this
+	 * outer boundary handles Errors caused by hostile or pathologically deep values.
+	 *
+	 * <p>A {@link StackOverflowError} is recoverable once the offending call unwinds, so
+	 * it is isolated to that connection. Other non-fatal Errors are also isolated: an
+	 * assertion or third-party implementation failure in one message must not disable
+	 * all network processing. Fatal JVM conditions ({@link VirtualMachineError}, except
+	 * stack overflow) are deliberately rethrown; pretending the process is healthy after
+	 * such a condition is unsafe. The loop's {@code finally} block disables further
+	 * admission if one of these fatal conditions terminates it.
+	 */
+	private void dispatchInboundMessage(Message message) {
+		try {
+			handleIncomingMessage(message);
+		} catch (StackOverflowError e) {
+			log.warn("Rejected inbound message after stack overflow; closing its connection");
+			closeFaultingConnection(message);
+		} catch (VirtualMachineError e) {
+			throw e;
+		} catch (Error e) {
+			log.warn("Contained unexpected Error while handling inbound message; closing its connection", e);
+			closeFaultingConnection(message);
+		}
+	}
+
+	/** Closes and forgets the connection responsible for an Error at the message boundary. */
+	private void closeFaultingConnection(Message message) {
+		AConnection conn = message.getConnection();
+		if (conn == null) return;
+		try {
+			conn.close();
+		} catch (Exception e) {
+			log.debug("Unable to close connection after inbound message failure: {}", e.getMessage());
+		} finally {
+			removeConnection(conn);
+		}
+	}
+
+	/**
+	 * Stops admission and waits for the sole ordered dispatcher to drain work that was
+	 * already accepted. The thread reference is cleared only after termination is
+	 * observed. Retaining it on timeout is essential: otherwise a later launch could
+	 * start a second consumer while the first still mutates the cursor or uses the store.
+	 *
+	 * @throws IOException if shutdown is interrupted or the dispatcher does not drain
+	 *         within the configured timeout
+	 */
+	private synchronized void stopInboundDispatcher() throws IOException {
+		acceptingInbound = false;
+		inboundRunning = false;
+		Thread thread = inboundThread;
+		if (thread == null) return;
+		long timeout = config.getInboundShutdownTimeout();
+		thread.interrupt();
+		try {
+			thread.join(timeout);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("NodeServer shutdown interrupted while draining inbound work", e);
+		}
+		if (thread.isAlive()) {
+			log.warn("NodeServer inbound dispatcher did not drain within {} ms", timeout);
+			throw new IOException("NodeServer shutdown incomplete: inbound dispatcher did not drain within "
+				+ timeout + " ms");
+		}
+		if (inboundThread == thread) inboundThread = null;
 	}
 
 	/**
@@ -530,9 +785,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Processes an incoming LATTICE_VALUE message from a peer.
 	 *
 	 * <p>Navigates to the target path via {@code cursor.path()}, merges the
-	 * received value, then calls {@code cursor.sync()} to notify propagators. The
-	 * sync is cheap (non-blocking queue offer) and the {@code LatestUpdateQueue}
-	 * coalesces rapid incoming merges, so high-velocity messages are safe.
+	 * received value, then calls {@code cursor.sync()} to notify propagators. Network
+	 * delivery is first handed to a bounded dispatcher, so this synchronous durability
+	 * work never blocks a shared Netty event-loop thread.
 	 *
 	 * <p>Payload format: [:LV [*path*] value]
 	 *
@@ -560,7 +815,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		// #564: bound merge cost from untrusted peers — reject an oversized value before
-		// the (synchronous, receive-thread) merge runs.
+		// the synchronous dispatcher merge runs.
 		if (!withinInboundSizeLimit(value)) {
 			recordMergeReject(conn, stats);
 			return;
@@ -569,6 +824,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Navigate to target path and merge
 		ACell[] path = extractPath(pathCell);
 		ALatticeCursor<ACell> target = cursor.path(path);
+
+		ACell before = target.get();
 
 		// A rejected merge leaves the cursor unchanged (atomic abort), so there is
 		// nothing to sync or propagate.
@@ -580,10 +837,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// #566: a successful merge resets the connection's consecutive-reject streak.
 		recordAccept(stats);
 
-		// Notify propagators that cursor state has changed. This is non-blocking:
-		// cursor.sync() offers the current snapshot to each propagator's LatestUpdateQueue,
-		// which coalesces rapid incoming merges into a single latest value. The
-		// propagator decides when to actually broadcast based on MIN_BROADCAST_DELAY.
+		// A valid replay is accepted but must not trigger another announce/root write.
+		// Lattice merges conventionally preserve identity on no-op; equals is the
+		// defensive fallback for implementations that return an equivalent value.
+		ACell after = target.get();
+		if (before == after || (before != null && before.equals(after))) return;
+
+		// Notify propagators that cursor state has changed. This is a synchronous
+		// primary-store checkpoint on the dispatcher thread, never on a Netty event loop.
 		cursor.sync();
 
 		// If P2P node data changed, update desired peers on connection managers
@@ -622,7 +883,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * #564: whether an inbound LATTICE_VALUE is within the configured size limit for
 	 * merging. Values whose memory size exceeds
 	 * {@link NodeConfig#getMaxInboundValueSize()} are rejected before the merge runs on
-	 * the receive thread, bounding merge cost from untrusted peers. {@code getMemorySize}
+	 * the dispatcher thread, bounding merge cost from untrusted peers. {@code getMemorySize}
 	 * is cached (computed at decode), so this is O(1). Package-visible for testing.
 	 *
 	 * @param value inbound value (may be null)
@@ -665,11 +926,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 					(value == null) ? "null" : value.getClass().getSimpleName());
 			return false;
 		} catch (Throwable e) {
-			// This is the robustness firewall between untrusted input and the receive thread:
+			// This is the robustness firewall between untrusted input and the dispatcher thread:
 			// NO merge may propagate anything to the caller. We catch Throwable (not just
 			// Exception) deliberately — a maliciously deep value can make a recursive merge
 			// throw StackOverflowError, which is an Error and would otherwise escape and kill
-			// the receive thread. The cursor's updateAndGet never commits when the merge lambda
+			// the dispatcher thread. The cursor's updateAndGet never commits when the merge lambda
 			// throws, so the atomic abort holds for Errors too and the prior value is retained.
 			log.warn("Rejected inbound lattice value (merge failed: {})", e.toString());
 			return false;
@@ -680,9 +941,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Per-connection inbound counters. A connection's counters are written only from that
-	 * connection's Netty event-loop thread (a channel is bound to a single event loop), so
-	 * plain {@code volatile long}s are correct and cheap: exactly one writer per connection,
-	 * with volatile giving visibility to aggregate/operator reads on other threads.
+	 * ordered inbound dispatcher, so plain {@code volatile long}s are correct and cheap:
+	 * exactly one counter writer, with volatile giving visibility to aggregate/operator
+	 * reads and disconnect cleanup on other threads.
 	 */
 	static final class ConnectionStats {
 		/** Total messages received on this connection. */
@@ -749,7 +1010,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * within one sweep interval. Exits promptly on interrupt when the server closes.
 	 */
 	private void maintenanceLoop() {
-		while (running) {
+		while (lifecycleState == LifecycleState.STARTING
+				|| lifecycleState == LifecycleState.RUNNING) {
 			try {
 				Thread.sleep(CONNECTION_SWEEP_INTERVAL);
 			} catch (InterruptedException e) {
@@ -886,9 +1148,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/**
 	 * Pulls the latest lattice value from a specific peer and merges it locally.
 	 *
-	 * <p>Delegates to the primary propagator which acquires the full value tree
-	 * into its store, feeds it into the cursor via the merge callback, and queues
-	 * it for broadcast to other peers.
+	 * <p>The primary propagator only acquires the full value tree into its store.
+	 * NodeServer then merges through the authoritative root cursor and synchronously
+	 * checkpoints that merged root before it can be re-propagated.
 	 *
 	 * @param convex Convex connection to the peer node
 	 * @return CompletableFuture that completes with the current cursor value after merge
@@ -897,15 +1159,22 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (propagators.isEmpty()) {
 			return CompletableFuture.failedFuture(new IllegalStateException("No propagators configured"));
 		}
-		// Delegate to primary propagator; return cursor value after merge callback has run
-		return propagators.get(0).pull(convex).thenApply(v -> cursor.get());
+		return propagators.get(0).pull(convex).thenApply(acquired -> {
+			mergePulledValue(acquired);
+			// Always sync the root, even for a dominated pull. Local application writes
+			// may not yet have been checkpointed, and the raw peer value must never become
+			// the persisted or announced root independently of the merged cursor.
+			cursor.sync();
+			return cursor.get();
+		});
 	}
 
 	/**
 	 * Pulls the latest lattice value from all connected peers and merges locally.
 	 *
-	 * <p>Delegates to the primary propagator which queries each peer, acquires
-	 * full value trees, and merges via the merge callback.
+	 * <p>The primary propagator acquires full value trees from every peer in
+	 * parallel. NodeServer merges all successful results through its root cursor,
+	 * then performs one synchronous checkpoint of the combined result.
 	 *
 	 * @return true if all pulls completed successfully, false otherwise
 	 */
@@ -916,15 +1185,28 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		try {
-			propagators.get(0).pull().get(30, TimeUnit.SECONDS);
-			// Sync cursor so the full merged state (not just individual pulled
-			// values) gets announced — ensures LATTICE_QUERY returns current data
+			List<ACell> acquiredValues = propagators.get(0).pullAll().get(30, TimeUnit.SECONDS);
+			for (ACell acquired : acquiredValues) {
+				mergePulledValue(acquired);
+			}
+			// Persist and announce the combined root once, never an individual peer's
+			// pre-merge value.
 			cursor.sync();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull failed: {}", e.getMessage());
 			return false;
 		}
+	}
+
+	/**
+	 * Merges one store-backed pull result into the authoritative root cursor without
+	 * propagating it. The caller checkpoints only after the root merge has completed.
+	 */
+	@SuppressWarnings("unchecked")
+	private void mergePulledValue(ACell acquired) {
+		if (acquired == null) return;
+		cursor.updateAndGet(current -> lattice.merge(mergeContext, current, (V) acquired));
 	}
 
 	/**
@@ -996,7 +1278,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Gets the cursor for the lattice value.
+	 * Gets the memory-first cursor for the lattice value.
+	 *
+	 * <p>Cursor writes perform no persistence. Calling {@link ALatticeCursor#sync()}
+	 * runs the primary persistence pipeline synchronously. A successful return confirms
+	 * that the primary store accepted the logical root update; physical flushing is a
+	 * separate store/operator policy. A primary-store failure throws {@link StoreException}
+	 * without rolling back the in-memory cursor and does not confirm whether the store
+	 * completed its root update. NodeServer remains running so recovery remains operator
+	 * policy.
 	 *
 	 * @return The value cursor
 	 */
@@ -1010,8 +1300,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * lattice hierarchy (e.g. OwnerLattice, SignedLattice).
 	 *
 	 * <p><b>Configuration-only (#568).</b> This must be called before {@link #launch()}.
-	 * The context is then read by the propagator and Netty receive threads
-	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, the pull callback),
+	 * The context is then read by pull operations and the inbound dispatcher thread
+	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, root merges),
 	 * and is safely published to them via the happens-before edge of thread start — so
 	 * the field is deliberately non-volatile. Setting it after launch is rejected: those
 	 * threads could otherwise observe a stale reference indefinitely, and any in-flight
@@ -1021,12 +1311,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param context Merge context (must not be null — use LatticeContext.EMPTY for default)
 	 * @throws IllegalStateException if called after {@link #launch()}
 	 */
-	public void setMergeContext(LatticeContext context) {
+	public synchronized void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
-		if (running) {
-			throw new IllegalStateException(
-				"setMergeContext must be called before launch(): the merge context is configuration-only");
-		}
+		requireNewLifecycle("setMergeContext");
 		this.mergeContext = context;
 		// Propagate to lattice cursor so path-navigated cursors inherit it
 		cursor.setContext(context);
@@ -1047,7 +1334,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return The host address, or null if server is not launched
 	 */
 	public InetSocketAddress getHostAddress() {
-		if (networkServer != null && running) {
+		if (networkServer != null && lifecycleState == LifecycleState.RUNNING) {
 			return networkServer.getHostAddress();
 		}
 		return null;
@@ -1086,7 +1373,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return true if running, false otherwise
 	 */
 	public boolean isRunning() {
-		return running;
+		return lifecycleState == LifecycleState.RUNNING;
+	}
+
+	/** Package-visible lifecycle snapshot for deterministic lifecycle tests. */
+	LifecycleState getLifecycleState() {
+		return lifecycleState;
 	}
 
 	/**
@@ -1127,18 +1419,27 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @return List of propagators (index 0 is primary if present)
 	 */
 	public List<LatticePropagator> getPropagators() {
-		return propagators;
+		return List.copyOf(propagators);
 	}
 
 	/**
 	 * Adds a propagator to this server. The first added propagator becomes the
 	 * primary (index 0) — NodeServer will use its returned snapshot value for
-	 * synchronous root sync and set a temporary callback for explicit pulls.
+	 * synchronous root sync and its store for explicit pull acquisition.
 	 *
 	 * @param propagator The propagator to add
 	 */
-	public void addPropagator(LatticePropagator propagator) {
+	public synchronized void addPropagator(LatticePropagator propagator) {
+		if (propagator == null) throw new IllegalArgumentException("Propagator must not be null");
+		requireNewLifecycle("addPropagator");
 		propagators.add(propagator);
+	}
+
+	/** Configuration and topology are immutable after the first launch begins. */
+	private void requireNewLifecycle(String operation) {
+		if (lifecycleState != LifecycleState.NEW) {
+			throw new IllegalStateException(operation + " is configuration-only and must precede first launch");
+		}
 	}
 
 	/**
@@ -1159,7 +1460,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Called by the {@link Shutdown} hook at {@link Shutdown#SERVER} priority.
 	 */
 	private void shutdownPersist() {
-		if (!running) return;
+		LifecycleState state = lifecycleState;
+		if (state == LifecycleState.NEW || state == LifecycleState.STOPPED) return;
 		try {
 			close();
 		} catch (IOException e) {
@@ -1168,35 +1470,47 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	@Override
-	public void close() throws IOException {
-		if (!running) {
+	public synchronized void close() throws IOException {
+		if (lifecycleState == LifecycleState.NEW || lifecycleState == LifecycleState.STOPPED) {
 			return;
+		}
+		if (lifecycleState == LifecycleState.STARTING) {
+			throw new IllegalStateException("Cannot close NodeServer re-entrantly while launch is in progress");
 		}
 
 		log.trace("Closing NodeServer");
 
-		running = false;
+		acceptingInbound = false;
+		lifecycleState = LifecycleState.STOPPING;
 
-		// #566: stop the connection-stats maintenance thread and drop tracked inbound state
+		// Stop admission first. Already accepted messages are then drained before the
+		// final persistence snapshot is captured.
+		if (networkServer != null) {
+			networkServer.close();
+		}
+		// Stop maintenance immediately, even if draining the dispatcher later times out.
+		// Connection state itself is retained until the dispatcher has stopped because
+		// the current message may still update it.
 		if (maintenanceThread != null) {
 			maintenanceThread.interrupt();
 			maintenanceThread = null;
 		}
+
+		// On timeout this throws with lifecycleState=STOPPING and inboundThread retained. The
+		// caller may retry close() after the blocking merge/store operation returns.
+		stopInboundDispatcher();
+
+		// #566: the dispatcher can no longer add per-connection state.
 		connectionStats.clear();
 
 		// Final sync: trigger all propagators with current value and wait for drain.
-		// This guarantees persistence on the primary propagator (announce + setRootData).
-		// Broadcast to peers is best-effort.
 		V snapshot = cursor.get();
 		for (LatticePropagator p : propagators) {
 			p.triggerAndClose(snapshot);
 			p.getConnectionManager().close();
 		}
 
-		if (networkServer != null) {
-			networkServer.close();
-		}
-
+		lifecycleState = LifecycleState.STOPPED;
 		log.debug("NodeServer closed");
 	}
 }

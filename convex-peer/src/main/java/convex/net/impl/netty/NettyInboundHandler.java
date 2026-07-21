@@ -47,6 +47,9 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 */
 	private final Function<Message, Predicate<Message>> deliver;
 
+	/** Per-server maximum encoded message length, checked before full allocation. */
+	private volatile int maxMessageLength;
+
 	/**
 	 * Connection associated with this handler. Set for server-side inbound channels.
 	 */
@@ -82,7 +85,29 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 	 * @param returnAction Unused, kept for compatibility (will be removed)
 	 */
 	public NettyInboundHandler(Function<Message, Predicate<Message>> deliver, Predicate<Message> returnAction)  {
+		this(deliver, returnAction, (int) CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	public NettyInboundHandler(Function<Message, Predicate<Message>> deliver,
+			Predicate<Message> returnAction, int maxMessageLength) {
 		this.deliver=deliver;
+		setMaxMessageLength(maxMessageLength);
+	}
+
+	/**
+	 * Updates the encoded-message limit for this channel. The field is volatile because
+	 * peer verification completes off the Netty event loop: an outbound connection starts
+	 * with the conservative untrusted limit and may be promoted after its key is verified.
+	 *
+	 * @param limit maximum encoded body length in bytes
+	 */
+	void setMaxMessageLength(int limit) {
+		if (limit <= 0) throw new IllegalArgumentException("Maximum message length must be positive");
+		maxMessageLength = limit;
+	}
+
+	int getMaxMessageLength() {
+		return maxMessageLength;
 	}
 
 	@Override
@@ -163,7 +188,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
 
 	   			int bm=(b&0x7f); // new bits for length
 	   		    mlen=(mlen<<7)+bm;
-				if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+mlen);
+				if (mlen>maxMessageLength) throw new BadFormatException("Message too long: "+mlen);
 				if ((b&0x80)==0) {
 					// we have a complete message length
 					break;

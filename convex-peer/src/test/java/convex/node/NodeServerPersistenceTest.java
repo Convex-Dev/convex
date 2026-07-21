@@ -33,6 +33,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.RefSoft;
+import convex.core.exceptions.StoreException;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -170,6 +171,11 @@ public class NodeServerPersistenceTest {
 		// sync() returns — the announced cursor is up to date.
 		primary.getCursor().sync();
 
+		pullBackupFromPrimary();
+	}
+
+	/** Pulls the currently announced primary snapshot without syncing it first. */
+	private void pullBackupFromPrimary() throws Exception {
 		InetSocketAddress primaryAddr = primary.getHostAddress();
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(primaryAddr);
@@ -353,7 +359,7 @@ public class NodeServerPersistenceTest {
 		// Launch backup and sync from restarted primary
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
 		backup.launch();
-		syncBackupFromPrimary();
+		pullBackupFromPrimary();
 
 		// Backup should now have the data
 		assertEquals(CVMLong.create(100), readDataValue(backup, 100),
@@ -517,6 +523,9 @@ public class NodeServerPersistenceTest {
 		CountDownLatch allowPersistence = new CountDownLatch(1);
 		AtomicInteger rootWrites = new AtomicInteger();
 
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
 		sharedPrimaryStore.setRootWriteHook(() -> {
 			if (rootWrites.getAndIncrement() == 0) {
 				persistenceEntered.countDown();
@@ -530,8 +539,6 @@ public class NodeServerPersistenceTest {
 				}
 			}
 		});
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
-		primary.launch();
 		writeNonEmbeddedRoot(primary);
 
 		AtomicReference<Throwable> failure = new AtomicReference<>();
@@ -569,21 +576,21 @@ public class NodeServerPersistenceTest {
 	 */
 	@Test
 	public void testSyncSurfacesPersistenceFailure() throws Exception {
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		writeDataValue(primary, 99);
 		sharedPrimaryStore.setRootWriteHook(() -> {
 			throw new IOException("simulated disk failure");
 		});
 
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
-		primary.launch();
-		writeDataValue(primary, 99);
-
 		// sync() must propagate, not swallow
-		RuntimeException ex = assertThrows(RuntimeException.class,
+		StoreException ex = assertThrows(StoreException.class,
 			() -> primary.getCursor().sync(),
 			"sync() must throw when setRootData fails");
 		assertTrue(ex.getCause() instanceof IOException,
 			"Cause must be the original IOException, was: " + ex.getCause());
 		assertEquals("simulated disk failure", ex.getCause().getMessage());
+		assertTrue(primary.isRunning(), "sync failure must not impose an operator recovery policy");
 	}
 
 	/**
@@ -650,6 +657,9 @@ public class NodeServerPersistenceTest {
 		AtomicInteger inFlight = new AtomicInteger();
 		AtomicInteger maxInFlight = new AtomicInteger();
 
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+
 		sharedPrimaryStore.setRootWriteHook(() -> {
 			int n = inFlight.incrementAndGet();
 			maxInFlight.updateAndGet(m -> Math.max(m, n));
@@ -662,9 +672,6 @@ public class NodeServerPersistenceTest {
 				inFlight.decrementAndGet();
 			}
 		});
-		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
-		primary.launch();
-
 		LatticePropagator prop = primary.getPropagator();
 
 		AtomicReference<Throwable> failure = new AtomicReference<>();

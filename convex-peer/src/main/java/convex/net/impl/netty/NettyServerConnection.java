@@ -9,7 +9,9 @@ import io.netty.channel.Channel;
 /**
  * AConnection for server-side inbound Netty channels.
  *
- * Uses writeAndFlush() per message — simple and correct for result delivery.
+	 * Encodes on the caller thread, then uses writeAndFlush() per message. Refuses
+	 * writes while the channel is not writable so slow readers cannot build an
+	 * unbounded Netty outbound backlog.
  * One instance per accepted client channel.
  */
 class NettyServerConnection extends AConnection {
@@ -25,7 +27,11 @@ class NettyServerConnection extends AConnection {
 	@Override
 	public boolean sendMessage(Message msg) {
 		Channel ch = channel;
-		if (ch == null || !ch.isActive()) return false;
+		if (ch == null || !ch.isActive() || !ch.isWritable()) return false;
+		// Message encoding can traverse a large cell tree. Do it on the NodeServer
+		// dispatcher (or other caller), never lazily in NettyOutboundHandler.
+		msg.getMessageData();
+		if (!ch.isActive() || !ch.isWritable()) return false;
 		ch.writeAndFlush(msg);
 		return true;
 	}

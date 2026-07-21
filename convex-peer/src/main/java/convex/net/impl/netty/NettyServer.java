@@ -53,6 +53,9 @@ public class NettyServer extends AServer {
 	 */
 	private volatile int maxClientConnections = Config.MAX_CLIENT_CONNECTIONS;
 
+	/** Maximum encoded inbound message length, enforced before full message allocation. */
+	private volatile int maxMessageLength = (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+
 	/**
 	 * Delivery function for inbound messages. Returns null if accepted,
 	 * or a blocking retry predicate if the queue was full.
@@ -136,9 +139,9 @@ public class NettyServer extends AServer {
             	 }
             	 clientChannels.add(ch);
 
-            	 Function<Message, Predicate<Message>> deliverFn =
-            		 (deliver != null) ? deliver : wrapReceiveAction();
-            	 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null);
+				 Function<Message, Predicate<Message>> deliverFn =
+					 (deliver != null) ? deliver : wrapReceiveAction();
+				 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
             	 NettyServerConnection conn=new NettyServerConnection(ch,inbound);
             	 inbound.setConnection(conn);
             	 inbound.setDisconnectAction(getDisconnectAction()); // #566: eager per-connection cleanup
@@ -209,9 +212,27 @@ public class NettyServer extends AServer {
 
 	@Override
 	public void close() {
-		clientChannels.close();
-		if (channel!=null) {
-			channel.close();
+		// Stop accepting first, then close established clients. Waiting for both
+		// operations makes close a real lifecycle boundary, which NodeServer relies on
+		// when rolling back a launch that failed after binding successfully. A handler
+		// is still allowed to initiate close from its own event loop; that case must not
+		// wait on itself and completion remains asynchronous.
+		Channel serverChannel = channel;
+		boolean eventLoopThread = serverChannel != null && serverChannel.eventLoop().inEventLoop();
+		if (!eventLoopThread) {
+			for (Channel client : clientChannels) {
+				if (client.eventLoop().inEventLoop()) {
+					eventLoopThread = true;
+					break;
+				}
+			}
+		}
+		channel = null;
+		ChannelFuture serverClose = (serverChannel != null) ? serverChannel.close() : null;
+		var clientsClose = clientChannels.close();
+		if (!eventLoopThread) {
+			if (serverClose != null) serverClose.syncUninterruptibly();
+			clientsClose.awaitUninterruptibly();
 		}
 	}
 
@@ -232,6 +253,30 @@ public class NettyServer extends AServer {
 
 	public void setReceiveAction(Consumer<Message> handler) {
 		receiveAction=handler;
+	}
+
+	/**
+	 * Sets the non-blocking message delivery function used by the Netty inbound handler.
+	 * A returned predicate is retried on a virtual thread while reads on that channel pause.
+	 *
+	 * @param handler delivery function implementing the backpressure contract
+	 */
+	public void setMessageDelivery(Function<Message, Predicate<Message>> handler) {
+		this.deliver=handler;
+	}
+
+	/**
+	 * Sets the maximum encoded inbound message length.
+	 *
+	 * @param limit maximum bytes, must be positive
+	 */
+	public void setMaxMessageLength(int limit) {
+		if (limit <= 0) throw new IllegalArgumentException("Message length limit must be positive: " + limit);
+		this.maxMessageLength=limit;
+	}
+
+	public int getMaxMessageLength() {
+		return maxMessageLength;
 	}
 
 }

@@ -178,6 +178,25 @@ public class NettyServerTest {
 		}
 	}
 
+	/** A server-specific limit is enforced while parsing the length prefix. */
+	@Test public void testConfiguredMessageLimit() throws Exception {
+		try (NettyServer server = new NettyServer(0)) {
+			server.setMaxMessageLength(64);
+			assertEquals(64, server.getMaxMessageLength());
+			server.launch();
+
+			try (java.net.Socket s = new java.net.Socket()) {
+				s.connect(server.getHostAddress(), 5000);
+				s.setSoTimeout(10000);
+				// A one-byte VLQ declares 65 body bytes. It is rejected before a
+				// body buffer or complete message byte array is allocated.
+				s.getOutputStream().write(65);
+				s.getOutputStream().flush();
+				assertEquals(-1, s.getInputStream().read());
+			}
+		}
+	}
+
 	/**
 	 * #566: when an inbound channel closes, the handler fires the disconnect action with its
 	 * connection, letting the server release per-connection state eagerly. Uses an
