@@ -235,6 +235,27 @@ public class IndexTest {
 		doIndexTests(rm);
 	}
 	
+	/**
+	 * entrySet() must preserve the Index's sorted key order (#651) — the class
+	 * is documented as "a sorted radix-tree map... provide sorted orderings for
+	 * indexes", and callers commonly iterate entrySet() (e.g. `for (var e :
+	 * index.entrySet())`) expecting that guarantee to hold, not just entryAt(i).
+	 */
+	@Test
+	public void testEntrySetOrder() throws InvalidDataException {
+		Index<ABlob, CVMLong> m = Index.none();
+		for (int i = 0; i < 50; i++) {
+			m = m.assoc(LongBlob.create(i), RT.cvm((long) i));
+		}
+		assertEquals(50L, m.count());
+
+		java.util.Iterator<java.util.Map.Entry<ABlob, CVMLong>> it = m.entrySet().iterator();
+		for (long i = 0; i < m.count(); i++) {
+			assertEquals(m.entryAt(i), it.next(), "entrySet() order diverged from entryAt() sorted order");
+		}
+		assertFalse(it.hasNext());
+	}
+
 	@Test public void testContains() {
 		Index<ABlob, CVMLong> bm=Samples.INT_INDEX_256;
 		long n=bm.count;
