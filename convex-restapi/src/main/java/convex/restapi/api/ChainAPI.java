@@ -629,7 +629,7 @@ public class ChainAPI extends ABaseAPI {
 						description = "Account does not exist" )
 			}
 		)
-	public void queryAccount(Context ctx) throws InterruptedException {
+	public void queryAccount(Context ctx) {
 		Address addr = null;
 		String addrParam = ctx.pathParam("addr");
 
@@ -638,7 +638,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid address: " + addrParam);
 		}
 
-		Result r = convex.querySync(Lists.of(Symbols.ACCOUNT, addr));
+		Result r = restServer.getPublicQueryService().execute(Lists.of(Symbols.ACCOUNT, addr),null);
 
 		if (r.isError()) {
 			setContent(ctx,r);
@@ -674,7 +674,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	
-	public void queryPeer(Context ctx) throws InterruptedException {
+	public void queryPeer(Context ctx) {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
 
@@ -683,7 +683,8 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid peer key: " + addrParam);
 		}
  
-		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
+		Result r = restServer.getPublicQueryService().execute(
+				Reader.read("(get-in *state* [:peers " + addr + "])"),null);
 
 		if (r.isError()) {
 			setContent(ctx,r);
@@ -1091,7 +1092,7 @@ public class ChainAPI extends ABaseAPI {
 						description = "Query service unavailable" )
 			}
 		)
-	public void query(Context ctx) throws InterruptedException {
+	public void query(Context ctx) {
 		try {
 			Address addr;
 			ACell form;
@@ -1115,7 +1116,7 @@ public class ChainAPI extends ABaseAPI {
 				form = Reader.read(srcValue);
 			}
 	
-			Result r = convex.querySync(form, addr);
+			Result r = restServer.getPublicQueryService().execute(form,addr);
 			setContent(ctx,r);
 		} catch (ParseException e) {
 			throw new BadRequestResponse(e.getMessage());

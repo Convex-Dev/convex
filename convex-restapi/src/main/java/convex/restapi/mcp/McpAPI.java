@@ -436,21 +436,15 @@ public class McpAPI extends ABaseAPI {
 				return toolError("Query requires 'source' string");
 			}
 			String source = sourceCell.toString();
+			ACell form;
 			try {
-				ACell form;
-				try {
-					form = Reader.read(source);
-				} catch (Exception e) {
-					return toolError("Failed to parse query source: " + e.getMessage());
-				}
-				Address address = resolveAddress(arguments.get(ARG_ADDRESS)); // OK if null
-				Convex convex = restServer.getConvex();
-				Result result = convex.querySync(form, address);
-				return toolResult(result);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return toolError("Tool call interrupted");
-			} 
+				form = Reader.read(source);
+			} catch (Exception e) {
+				return toolError("Failed to parse query source: " + e.getMessage());
+			}
+			Address address = resolveAddress(arguments.get(ARG_ADDRESS)); // OK if null
+			Result result = restServer.getPublicQueryService().execute(form,address);
+			return toolResult(result);
 		}
 	}
 
@@ -1018,7 +1012,6 @@ public class McpAPI extends ABaseAPI {
 
 				Address token = resolveTokenAddress(arguments.get(ARG_TOKEN));
 
-				Convex convex = restServer.getConvex();
 				String source;
 				if (token == null) {
 					source = "(balance " + address + ")";
@@ -1026,7 +1019,7 @@ public class McpAPI extends ABaseAPI {
 					source = "(@convex.fungible/balance " + token + " " + address + ")";
 				}
 
-				Result result = convex.querySync(source);
+				Result result = restServer.getPublicQueryService().execute(Reader.read(source),null);
 				if (result.isError()) {
 					return toolResult(result);
 				}
@@ -1039,9 +1032,8 @@ public class McpAPI extends ABaseAPI {
 					out = out.assoc(ARG_TOKEN, CVMLong.create(token.longValue()));
 				}
 				return toolSuccess(out);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return toolError("Tool call interrupted");
+			} catch (Exception e) {
+				return toolError("Failed to query balance: "+e.getMessage());
 			}
 		}
 	}

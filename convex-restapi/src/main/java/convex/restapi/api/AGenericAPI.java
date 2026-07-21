@@ -161,6 +161,12 @@ public abstract class AGenericAPI {
 	private static final long MAX_CONTENT_SIZE = 1_000_000; // 1MB limit
 
 	public void setContent(Context ctx, ACell content) {
+		// CVM query errors remain successful HTTP query responses, but admission
+		// failure is a transport-level service availability response.
+		if ((content instanceof Result r)&&ErrorCodes.LOAD.equals(r.getErrorCode())) {
+			ctx.status(503);
+		}
+
 		long size = Cells.storageSize(content);
 		if (size > MAX_CONTENT_SIZE) {
 			setResult(ctx, Result.error(ErrorCodes.LIMIT, "Response too large: " + size + " bytes").withSource(SourceCodes.PEER));
@@ -229,6 +235,7 @@ public abstract class AGenericAPI {
 		if (ErrorCodes.FORMAT.equals(error)) return 400; // bad request
 		if (ErrorCodes.MISSING.equals(error)) return 404; // not found
 		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
+		if (ErrorCodes.LOAD.equals(error)) return 503; // service unavailable under bounded admission
 		int status = 422;
 		return status;
 	}

@@ -250,6 +250,16 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals("ARITY",errorCode.toString());
 		}
 	}
+
+	@Test public void testPublicQueryJuiceLimit() throws IOException, InterruptedException {
+		String query=JSON.toString(Maps.of(
+				"address",Init.GENESIS_ADDRESS,
+				"source","(loop [x 0] (recur (inc x)))"));
+		HttpResponse<String> res=post(API_PATH+"/query",query);
+		assertEquals(200,res.statusCode());
+		AMap<AString,ACell> result=RT.ensureMap(JSON.parse(res.body()));
+		assertEquals("JUICE",result.getIn("errorCode").toString());
+	}
 	
 	@Test public void testQueryAccount() throws IOException, InterruptedException {
 		{ // should be a bad request with bad JSON

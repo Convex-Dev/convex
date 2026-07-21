@@ -69,6 +69,7 @@ public class RESTServer implements Closeable {
 
 	protected final Server server;
 	protected final Convex convex;
+	protected final PublicQueryService publicQueryService;
 	protected Javalin javalin;
 	
 	protected static final Integer DEFAULT_PORT=8080;
@@ -79,6 +80,7 @@ public class RESTServer implements Closeable {
 	private RESTServer(Server server) {
 		this.server = server;
 		this.convex = ConvexLocal.create(server);
+		this.publicQueryService = new PublicQueryService(server);
 
 		if (RT.bool(getConfig().get(ChainAPI.K_FAUCET))) {
 			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
@@ -132,6 +134,10 @@ public class RESTServer implements Closeable {
 
 	public McpServer getMcpServer() {
 		return mcpServer;
+	}
+
+	public PublicQueryService getPublicQueryService() {
+		return publicQueryService;
 	}
 
 	public McpAPI getMcpAPI() {
