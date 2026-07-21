@@ -260,6 +260,16 @@ public class NodeServerTest {
 		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
 	}
 
+	/** A lattice modelling a fatal JVM failure rather than malformed recursion. */
+	static final class FatalThrowingLattice extends ALattice<AInteger> {
+		@Override public AInteger merge(AInteger ownValue, AInteger otherValue) {
+			throw new OutOfMemoryError("simulated fatal merge failure");
+		}
+		@Override public AInteger zero() { return null; }
+		@Override public boolean checkForeign(AInteger value) { return true; }
+		@Override public <T extends ACell> ALattice<T> path(ACell childKey) { return null; }
+	}
+
 	@Test
 	public void testProductionInboundDefaultsAndOverrides() {
 		NodeConfig defaults = NodeConfig.create();
@@ -370,19 +380,30 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * #561: a merge that throws an Error (not just an Exception) — e.g. StackOverflowError from
-	 * a maliciously deep value — must be caught by mergeIncoming, not propagated to the receive
-	 * thread, and must leave the cursor unchanged.
+	 * #561: StackOverflowError from a maliciously deep value is recoverable once its
+	 * stack unwinds, so the merge is rejected atomically without losing the dispatcher.
 	 */
 	@Test
-	public void testMergeErrorRejectedNotPropagated() {
+	public void testMergeStackOverflowRejectedNotPropagated() {
 		maxNodeServer = new NodeServer<>(new ThrowingLattice(), store, NodeConfig.port(-1));
 		var c = maxNodeServer.getCursor();
 		c.set(CVMLong.create(5));
 
 		assertFalse(maxNodeServer.mergeIncoming(c, CVMLong.create(7)),
-			"an Error from merge must be caught and rejected");
+			"a recursive stack overflow must be caught and rejected");
 		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted merge");
+	}
+
+	/** Fatal VM errors must reach the dispatcher's fail-closed boundary. */
+	@Test
+	public void testFatalMergeErrorPropagates() {
+		maxNodeServer = new NodeServer<>(new FatalThrowingLattice(), store, NodeConfig.port(-1));
+		var c = maxNodeServer.getCursor();
+		c.set(CVMLong.create(5));
+
+		assertThrows(OutOfMemoryError.class,
+			() -> maxNodeServer.mergeIncoming(c, CVMLong.create(7)));
+		assertEquals(CVMLong.create(5), c.get(), "cursor unchanged after aborted fatal merge");
 	}
 
 	/**

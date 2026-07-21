@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NodeServer: a NodeInfo checkpoint failure during launch now closes every service started by that launch, leaving the node stopped and safe to retry.
 - NodeServer: an inbound dispatcher drain timeout now leaves shutdown explicitly incomplete and retryable, preventing relaunch from creating a second ordered consumer while the original thread is still active.
 - NodeServer: fresh and restored nodes seed their announced snapshot during launch, so lattice queries work immediately without an extra application sync.
+- NodeServer: lattice merge containment now rejects recoverable stack overflows without swallowing fatal JVM errors, preserving the dispatcher's fail-closed error boundary.
 - Lattice propagation: delta and root-sync encodings now retain the `LATTICE_VALUE` protocol envelope, allowing receivers to identify the path and acquire missing branches before merge.
 
 ## [0.8.9] - 2026-07-17

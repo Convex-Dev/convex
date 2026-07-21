@@ -1211,13 +1211,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 			log.warn("Rejected inbound lattice value of wrong type: {}",
 					(value == null) ? "null" : value.getClass().getSimpleName());
 			return false;
-		} catch (Throwable e) {
-			// This is the robustness firewall between untrusted input and the dispatcher thread:
-			// NO merge may propagate anything to the caller. We catch Throwable (not just
-			// Exception) deliberately — a maliciously deep value can make a recursive merge
-			// throw StackOverflowError, which is an Error and would otherwise escape and kill
-			// the dispatcher thread. The cursor's updateAndGet never commits when the merge lambda
-			// throws, so the atomic abort holds for Errors too and the prior value is retained.
+		} catch (StackOverflowError e) {
+			// A pathologically deep untrusted value can exhaust the current stack. The
+			// cursor update aborts atomically, and this Error is safe to contain once the
+			// stack has unwound.
+			log.warn("Rejected inbound lattice value (merge failed: {})", e.toString());
+			return false;
+		} catch (Exception e) {
+			// Ordinary implementation failures reject this merge without terminating the
+			// ordered dispatcher. Other Errors deliberately propagate to its outer boundary:
+			// non-fatal Errors close the responsible connection, while fatal VM conditions
+			// terminate the dispatcher and disable further admission.
 			log.warn("Rejected inbound lattice value (merge failed: {})", e.toString());
 			return false;
 		}
