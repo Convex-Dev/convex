@@ -120,14 +120,15 @@ public class LatticePropagator implements Closeable {
 	 * Cursor holding the last value announced to this propagator's store.
 	 *
 	 * <p>This is the propagator's cached view of what it has published — the
-	 * filtered, store-backed snapshot it most recently announced. LATTICE_QUERY
+	 * store-backed snapshot it most recently announced. LATTICE_QUERY
 	 * responses are served from this cursor, so peers only see data this
-	 * propagator has actually committed (and whose cells the store can resolve
-	 * via DATA_REQUEST).
+	 * propagator has actually committed. NodeServer exposes this view only to
+	 * connections assigned to this propagator; reverse DATA_REQUEST resolution
+	 * uses the same store.
 	 *
-	 * <p>Each propagator owns its own announced cursor; secondary propagators
-	 * with filters publish a different (filtered) view from the primary, which
-	 * is the security boundary for cross-propagator data segregation.
+	 * <p>Each propagator owns its own announced cursor. This keeps query and data
+	 * access scoped to one store. Automatic per-propagator filtering is not yet
+	 * integrated; callers must not expose an unfiltered store as a public view.
 	 */
 	private final Root<ACell> announcedCursor = new Root<>();
 
@@ -514,13 +515,22 @@ public class LatticePropagator implements Closeable {
 			long currentTime = Utils.getCurrentTimestamp();
 			if (!connectionManager.getPeers().isEmpty()
 					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
-				// Ensure root value is in the novelty list
-				if (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value)) {
+				// Ensure the lattice root is available before the protocol envelope.
+				// Format.encodeDelta decodes its final list element as the message root,
+				// so the LATTICE_VALUE vector itself must be last. Encoding only the
+				// lattice value would lose the message tag and path on the wire.
+				// MemoryStore reports an embedded top-level value as novelty. Embedded
+				// cells are already inline in their parent and are invalid as trailing
+				// multi-cell children, so retain only independently addressable cells.
+				novelty.removeIf(ACell::isEmbedded);
+				if (!value.isEmbedded()
+						&& (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value))) {
 					novelty.add(value);
 				}
-				Blob deltaData = Format.encodeDelta(novelty);
 				AVector<ACell> emptyPath = Vectors.empty();
 				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+				novelty.add(payload);
+				Blob deltaData = Format.encodeDelta(novelty);
 				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
 				connectionManager.broadcast(message);
 				lastBroadcastTime = currentTime;
@@ -548,9 +558,12 @@ public class LatticePropagator implements Closeable {
 		if (connectionManager.getPeers().isEmpty()) return;
 
 		try {
-			Blob rootData = value.getEncoding();
 			AVector<ACell> emptyPath = Vectors.empty();
 			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+			// Root-only sync still needs a complete protocol envelope. Its lattice
+			// value is encoded as an indirect ref; the receiver acquires missing
+			// branches from this propagator store before attempting a merge.
+			Blob rootData = payload.getEncoding();
 			Message message = Message.create(MessageType.LATTICE_VALUE, payload, rootData);
 			connectionManager.broadcast(message);
 			lastRootSyncTime = currentTime;

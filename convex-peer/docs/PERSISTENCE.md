@@ -16,7 +16,8 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 4. **Automatic sync is configurable policy** — periodic sync, on-incoming-merge, or
    manual-only. Controlled by NodeServer configuration.
 5. **Propagators handle ALL output** — persistence IS propagation (to disk instead of to
-   peers). Each propagator owns its own store, filter, and peer connections.
+   peers). Each propagator currently owns its own store and peer connections. Per-propagator
+   filtering is a planned extension and is explicitly listed as remaining work.
    NodeServer hooks a sync callback on the cursor that triggers propagators.
 6. **Lattice-native concurrency** — cursor state transitions are atomic and root sync
    callbacks are serialised. Many lattice merges are commutative, associative and
@@ -48,13 +49,14 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
                      │    └──► secondary queue offers           │
                      │                                           │
                      │  Propagator pipeline:                     │
-                     │    filter → announce → setRootData        │
+                     │    announce → setRootData                 │
  Store-backed  ◄─────│    → return announced value    [primary]  │
                      │    → broadcast(delta)          [network]  │
  refs merged         │                                           │
  into cursor         │                                           │
-                     │  Incoming merge:                          │
- From peers ────────►│    cursor.path(path).merge(value)         │
+                     │  Incoming acquisition + merge:            │
+ From peers ────────►│    acquire fully in owning prop store     │
+                     │    → cursor.path(path).merge(value)        │
                      │    └──► cursor.sync()                      │
                      │                                           │
                      │  close()                                  │
@@ -85,6 +87,10 @@ cursor.sync();                                        // persist and re-propagat
 The propagator has no knowledge of cursors or lattices. It returns the store-backed
 value to NodeServer, which owns both the merge and the subsequent sync boundary.
 
+The following table is the intended multi-tier topology. The filter column describes
+the planned filtering extension; current propagators receive the same unfiltered
+snapshot unless the caller supplies an already filtered value.
+
 | Index | Role | Filter | Peers | Store | Purpose |
 |-------|------|--------|-------|-------|---------|
 | 0 | **Primary** | None | None (or local) | EtchStore | Synchronous persistence, restore and pull acquisition. Store-backs cursor. |
@@ -106,8 +112,33 @@ with no peers. A node with no propagators is purely in-memory.
 
 The store accumulates all announced cells. This is the **security boundary**: when peers
 send `DATA_REQUEST` messages, they can only resolve cells that exist in the propagator's
-store. A public propagator that only announces filtered values will never have private
+store. A future public propagator that only announces filtered values will never have private
 cells in its store — so peers cannot request them.
+
+Adding a peer to a propagator's connection manager is the operator's grant of read
+access to that store. The connection manager does not prescribe whether those peers
+must be verified or whether a public propagator may accept public membership; operators
+choose the membership and rights appropriate to each store. A `DATA_REQUEST` arriving
+on the unscoped NodeServer listener is rejected because the listener cannot safely
+choose among propagator stores.
+
+Inbound lattice access has the matching rule: **one physical connection, one owning
+propagator, one store**. Operator policy supplies a connection selector before launch.
+Once a non-null selection is made it is immutable for that connection. The selected
+propagator provides both the `LATTICE_QUERY` view and the store used to acquire incoming
+`LATTICE_VALUE` data. An unassigned connection is decoded without a store and may use
+basic protocol operations, but lattice queries and values are rejected. There is no
+fallback to the primary store and no search across propagators.
+
+```java
+// Explicitly public single-view node. This is a policy decision, not a default.
+node.setInboundPropagatorSelector(connection -> node.getPropagator());
+```
+
+A deployment with public and private views should select by authenticated connection
+identity or another operator-controlled capability. If one Peer has rights to multiple
+views, it uses distinct physical connections. Authentication policy is deliberately
+outside NodeServer; the selector expresses the operator's decision.
 
 ```
 Propagator[public]:
@@ -299,6 +330,10 @@ It is a safety net, not the primary mechanism.
 
 ### Store Separation
 
+This diagram shows the target public/private topology after `LatticeFilter` integration.
+Store ownership and connection capabilities are implemented now; automatic filtering
+inside `LatticePropagator` is not.
+
 ```
 Propagator[primary] store    Propagator[public] store     Propagator[backup] store
 (no filter, no peers)        (filtered announce)           (full announce)
@@ -316,8 +351,7 @@ for `DATA_REQUEST` from peers.
 
 ### Propagator Internals
 
-A `LatticePropagator` owns:
-- A `LatticeFilter` (optional) — applied before announce
+A `LatticePropagator` currently owns:
 - An `AStore` for delta tracking, persistence, and peer data resolution
 - A `LatticeConnectionManager` with its own set of peer connections
 - A background thread processing broadcast triggers
@@ -325,17 +359,14 @@ A `LatticePropagator` owns:
 When `triggerBroadcast(value)` is called:
 1. Value queued (LatestUpdateQueue coalesces rapid triggers)
 2. Background thread picks up latest value
-3. Apply filter: `filtered = (filter != null) ? filter.apply(value) : value`
-4. `Cells.announce(filtered, noveltyHandler, store)` — writes to store, collects novelty
-5. `store.setRootData(filtered)` — anchor for restore
-6. `Format.encodeDelta(novelty)` — encode only novel cells
-7. Send `LATTICE_VALUE` message to connected peers
+3. `Cells.announce(value, noveltyHandler, store)` — writes to store, collects novelty
+4. `store.setRootData(value)` — anchor for restore
+5. `Format.encodeDelta(novelty + protocol envelope)` — encode only novel cells
+6. Send `LATTICE_VALUE` message to connected peers
 
-Steps 7–8 are skipped if the propagator has no peers (pure persistence propagator).
-Step 6 is only active on the primary propagator (NodeServer sets the callback).
-
-The propagator has no knowledge of cursors or lattices — it just calls a `Consumer<V>`
-with the store-backed value. NodeServer owns the merge logic via the callback.
+The send step is skipped if the propagator has no peers (pure persistence propagator).
+The propagator has no knowledge of cursors or lattices. NodeServer owns merge logic
+and installs the primary's returned store-backed value through the root sync callback.
 
 ### Delta Tracking via Announce
 
@@ -371,10 +402,10 @@ network. Nodes can lose synchronisation due to:
 
 Push only the root cell hash periodically. Let the receiver pull what's missing.
 
-- Lattice forks are cheap (immutable data structures)
-- `Convex.acquire()` already handles efficient missing data retrieval
-- Speculative merge in a forked cursor detects exactly what's needed
-- Only pull data that's actually missing (not redundant data)
+- Immutable values identify every missing branch by content hash
+- Acquisition is isolated in the connection's owning propagator store
+- The receiver requests only absent cells from the update's originating connection
+- Lattice merge code sees one complete, size-checked value
 
 ### Three-Tier Strategy
 
@@ -396,25 +427,26 @@ Already implemented in `LatticePropagator.broadcast()`.
 - **Bandwidth**: Minimal (~50–200 bytes)
 - **Protocol**:
   1. Propagator broadcasts root cell hash to its peers
-  2. Receiver attempts speculative merge in forked cursor
-  3. If `MissingDataException` → pull only missing cells via `DATA_REQUEST`
-  4. Complete merge after acquisition
+  2. Receiver resolves the connection's owning propagator store
+  3. Receiver pulls missing cells via `DATA_REQUEST` without attempting a merge
+  4. The complete, size-checked value enters the ordered merge path
 
 The receiver knows the peer's latest state but only pulls what's actually missing.
 
-#### Tier 3: Speculative Fork + Acquire (Automatic)
+#### Tier 3: Acquire Then Merge (Automatic)
 
 - **When**: Whenever incoming message references unknown cells
-- **How**: Fork cursor, attempt merge, catch `MissingDataException`, acquire, retry
+- **How**: Fully acquire in the owning propagator store, then submit one complete value
+  to the ordered merge path
 - **Protocol**:
-  1. Fork current cursor (cheap, copy-on-write semantics)
-  2. Attempt merge in fork
-  3. Catch `MissingDataException`
-  4. Use `Acquiror` to pull missing cells from sender
-  5. Retry merge after acquisition
-  6. Commit successful merge to main cursor
+  1. Decode against the owning propagator store
+  2. Request every missing hash from the same connection
+  3. Validate response count and content hashes
+  4. Persist the complete value tree in the owning propagator store
+  5. Enforce the complete-value size limit
+  6. Submit the value once to NodeServer's ordered merge path
 - **Bandwidth**: Only missing data (tree difference)
-- **Reliability**: Very high (guaranteed complete after pull)
+- **Safety**: Partial values never reach lattice or cursor code
 
 ```java
 // Navigate to the target path and merge — the cursor handles everything
@@ -428,7 +460,7 @@ target.merge(value);  // cursor handles lattice merge, path write-back, null-lat
 |------|-----------|-----------|-----------|
 | 1 | Delta push (`Cells.announce` + `Format.encodeDelta`) | On sync | Low (novel cells only) |
 | 2 | Root-only push (root cell hash) | Periodic (30s) | Minimal (~100 bytes) |
-| 3 | Speculative fork + acquire | On incoming merge | On-demand (missing cells only) |
+| 3 | Acquire then merge | Before inbound merge | On-demand (missing cells only) |
 
 ### Bandwidth Comparison
 
@@ -519,7 +551,7 @@ This makes snapshot capture cheap and lets ordinary app reads and writes continu
 the primary pipeline processes an immutable value. Concurrent writes are reconciled
 atomically when the sync result returns.
 
-## Filtering
+## Filtering (Planned, Not Yet Integrated)
 
 ### Motivation
 
@@ -530,8 +562,9 @@ A node's lattice state may contain data that should not leave the node:
 
 ### Filter Ownership
 
-Each propagator owns its own filter. NodeServer passes the full snapshot to every
-propagator — the propagator applies its filter internally before announcing.
+The intended design gives each propagator its own filter. Today NodeServer passes the
+same full snapshot to every propagator and `LatticePropagator` does not invoke
+`LatticeFilter`. Do not configure an unfiltered secondary store as a public view.
 
 ```
 cursor.sync():                         Propagator processing:
@@ -699,16 +732,16 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 
 - **Core Persistence** — `Cells.announce()` + `store.setRootData()`, restore in `launch()`, final persist in `close()`
 - **Explicit Sync API** — `cursor.sync()` triggers propagators via callback, incoming merges call `cursor.sync()`, periodic auto-sync
-- **Speculative Fork + Acquire** — fork cursor, `Acquiror` pulls missing cells, retry merge
+- **Acquire Then Merge** — owning propagator store acquires and validates every missing
+  cell before NodeServer attempts one merge
 - **Root-Only Periodic Sync** — propagator broadcasts root cell hash, peers detect divergence, acquire missing data
 
 ### Remaining
 
 **Filtering + Security Tiers**
 - `LatticeFilter<V>` interface exists but is not yet integrated into propagator
-- Each propagator owns its own filter, applied internally before announce
-- Multiple propagators with separate stores and peer sets
-- Public / trusted / backup tiers
+- Add a filter to each propagator and apply it internally before announce
+- Document reference public / trusted / backup deployment policies
 
 **Propagator Convergence**
 - Extract `APropagator<T>` base from `BeliefPropagator` and `LatticePropagator`
@@ -747,12 +780,11 @@ Rationale:
 #### Sync Flow
 
 Caller's thread (inside the `onSync` callback) runs the primary's full pipeline:
-1. `value = filter.apply(cursor value)` — primary has no filter; identity
-2. `announced, novelty = Cells.announce(value, primaryStore)` — primary store, primary novelty
-3. `store.setRootData(announced)` — synchronous logical root publication
-4. Encode delta from novelty and broadcast to primary's peers (Netty fire-and-forget)
-5. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
-6. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
+1. `announced, novelty = Cells.announce(value, primaryStore)` — primary store, primary novelty
+2. `store.setRootData(announced)` — synchronous logical root publication
+3. Encode delta from novelty and broadcast to primary's peers (Netty fire-and-forget)
+4. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
+5. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
 
 Steps 1-4 are exposed as `processSnapshot`, which is callable on any thread and is
 invoked directly from the sync callback for the primary.
@@ -761,15 +793,18 @@ The primary's background thread still exists for non-sync triggers:
 - Periodic root sync (Tier 2 divergence detection)
 - Any other async `triggerBroadcast` invocations
 
-Secondary propagators' background threads (unchanged behaviour):
-- Apply their own filter
-- `Cells.announce(filtered, ownStore)` — produces filtered novelty against own store
-- `setRootData(filtered)`, `broadcast(delta)`
+Secondary propagators' current background behaviour:
+- `Cells.announce(value, ownStore)` — produces independent novelty against each store
+- `setRootData(value)`, `broadcast(delta)`
+
+Filter application belongs immediately before these steps once the planned integration
+is implemented.
 
 #### Per-Propagator Novelty is a Security Boundary
 
-**Novelty MUST be computed per-propagator, against that propagator's store, after
-that propagator's filter.** Sharing novelty across propagators would broadcast cells
+With the planned filtering extension, **novelty MUST be computed per-propagator,
+against that propagator's store, after that propagator's filter.** Sharing novelty
+across propagators would broadcast cells
 that were never tracked in the public propagator's store, bypassing its filter and
 leaking private data.
 
@@ -785,6 +820,10 @@ Public propagator (public filter, public store):
 
 Each propagator's announce IS its security boundary. Cross-propagator novelty
 sharing is forbidden.
+
+Announcement finishes before broadcast. Consequently, when a recipient needs a cell
+referenced by an update, a reverse `DATA_REQUEST` on that propagator-managed connection
+can be answered from the same store without consulting another propagator.
 
 #### Concurrency
 
@@ -841,7 +880,7 @@ re-propagation boundary.
 - Store-backed refs immediate — no OOM from lingering strong refs
 - No `Thread.sleep` in tests
 - Caller-visible durability errors
-- Per-propagator novelty preserves filter security boundaries
+- Per-propagator novelty preserves store boundaries and is ready for filtered views
 
 ### Follow-ups (deferred)
 

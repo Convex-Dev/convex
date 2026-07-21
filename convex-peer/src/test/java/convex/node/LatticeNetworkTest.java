@@ -88,6 +88,7 @@ public class LatticeNetworkTest {
 			// Port 0 = OS-assigned free port, avoiding bind collisions on busy CI
 			// runners; peer wiring below uses getHostAddress() (actual port).
 			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
+			server.setInboundPropagatorSelector(connection -> server.getPropagator());
 			nodeServers.add(server);
 
 			server.launch();

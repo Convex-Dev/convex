@@ -96,6 +96,7 @@ public class NodeNetworkTest {
 			// port, avoiding bind collisions on busy CI runners; peer wiring below
 			// uses getHostAddress() which reflects the actual port.
 			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
+			server.setInboundPropagatorSelector(connection -> server.getPropagator());
 			nodeServers.add(server);
 			
 			// Launch the server

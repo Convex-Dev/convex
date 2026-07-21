@@ -4,12 +4,16 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,9 +23,13 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
@@ -59,6 +67,12 @@ import convex.peer.Config;
  * The server uses the binary protocol (VLQ-encoded message lengths followed by
  * message data) to exchange and merge lattice values with peer nodes.
  *
+ * <p><b>Inbound capability boundary.</b> Network lattice traffic is denied until
+ * operator policy assigns its physical connection to exactly one propagator. That
+ * propagator supplies both the query view and the acquisition store. Partial values
+ * are acquired completely in that store before they enter the ordered merge path;
+ * NodeServer never searches another propagator or falls back to the primary store.
+ *
  * Features:
  * - Automatic delta-based broadcasting of lattice updates to peers
  * - Efficient novelty detection using store announcement mechanism
@@ -92,7 +106,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private AServer networkServer;
 
 	/**
-	 * Store for this server. Used for inbound message decoding and data requests.
+	 * Store for this server. Used for local/connection-less decoding and as the
+	 * default primary propagator store when no topology is supplied.
+	 *
+	 * <p>Network lattice acquisition uses the store of the connection's explicitly
+	 * assigned propagator, not this field merely because NodeServer owns it.
 	 * May be the same store as the propagator's store (typical single-propagator case)
 	 * or a different store if the operator chooses a different topology.
 	 */
@@ -160,6 +178,35 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final ConcurrentHashMap<AConnection, ConnectionStats> connectionStats = new ConcurrentHashMap<>();
 
 	/**
+	 * Operator policy for assigning an inbound physical connection to one propagator.
+	 * Null means that network lattice queries and values are denied. A successful
+	 * selection is cached for the lifetime of the connection and can never change.
+	 */
+	private Function<AConnection, LatticePropagator> inboundPropagatorSelector;
+
+	/** Immutable connection-to-propagator capabilities established by operator policy. */
+	private final ConcurrentHashMap<AConnection, LatticePropagator> inboundPropagators =
+		new ConcurrentHashMap<>();
+
+	/** Pending reverse data requests, isolated by physical connection and request ID. */
+	private final ConcurrentHashMap<AConnection, ConcurrentHashMap<ACell, CompletableFuture<Message>>>
+		pendingDataRequests = new ConcurrentHashMap<>();
+
+	/** Negative request IDs reserved for NodeServer acquisition sessions. */
+	private final AtomicLong nextDataRequestID = new AtomicLong(-1L);
+
+	/** Bounds acquisition sessions independently of the bounded merge dispatcher queue. */
+	private final Semaphore acquisitionPermits;
+
+	/** Prepared messages re-entering the ordered dispatcher after complete acquisition. */
+	private final ConcurrentHashMap<Message, LatticePropagator> acquiredMessages =
+		new ConcurrentHashMap<>();
+
+	/** Acquisition failures re-enter the dispatcher so connection metrics stay single-writer. */
+	private final ConcurrentHashMap<Message, Throwable> acquisitionFailures =
+		new ConcurrentHashMap<>();
+
+	/**
 	 * Tracked-connection count above which {@link #statsFor} sweeps closed entries (#566).
 	 * Sits just above the inbound channel cap ({@link Config#MAX_CLIENT_CONNECTIONS}): there
 	 * can be at most that many <em>live</em> connections, so exceeding this means stale
@@ -178,7 +225,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
 	 *
 	 * @param lattice The lattice instance defining merge semantics
-	 * @param store The store for inbound message decoding and data requests
+	 * @param store Local decode store and default primary propagator store
 	 * @param config Configuration (or null for defaults)
 	 */
 	public NodeServer(ALattice<V> lattice, AStore store, NodeConfig config) {
@@ -186,6 +233,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.store = store;
 		this.config = (config != null) ? config : NodeConfig.create();
 		this.inboundQueue = new ArrayBlockingQueue<>(this.config.getInboundQueueSize());
+		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
 
@@ -487,7 +535,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Handles an incoming message from a peer node.
-	 * Supports PING, LATTICE_QUERY, LATTICE_VALUE, and DATA_REQUEST message types.
+	 * Supports PING, LATTICE_QUERY, LATTICE_VALUE, CHALLENGE and explicit rejection
+	 * of unscoped DATA_REQUEST messages.
 	 * Processing exceptions are contained at this message boundary. A request with an
 	 * ID receives an error result where possible; fire-and-forget message failures are
 	 * logged. In particular, a durability failure after an inbound lattice merge does
@@ -500,11 +549,40 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		AConnection conn = message.getConnection();
 		ConnectionStats stats = statsFor(conn);
-		recordReceived(stats);
+		Throwable acquisitionFailure = acquisitionFailures.remove(message);
+		LatticePropagator acquiredOwner = acquiredMessages.remove(message);
+		boolean acquired = acquiredOwner != null;
+		if (!acquired && acquisitionFailure == null) recordReceived(stats);
+		if (acquisitionFailure != null) {
+			recordMergeReject(conn, stats);
+			log.warn("Rejected lattice value after acquisition failure: {}",
+				acquisitionFailure.getMessage());
+			return;
+		}
+
+		LatticePropagator owner;
+		try {
+			owner = acquired ? acquiredOwner : resolveInboundPropagator(conn);
+		} catch (Exception e) {
+			recordDecodeError(conn, stats);
+			log.warn("Rejected inbound connection ownership: {}", e.getMessage());
+			return;
+		}
 
 		try {
-			// Decode message payload using node's store before processing
-			message.getPayload(store);
+			// An assigned connection decodes only into its propagator store. An
+			// unassigned network connection uses storeless decoding so even a rejected
+			// message cannot deposit attacker-controlled cells in the primary store.
+			AStore decodeStore = (owner != null) ? owner.getStore() : ((conn == null) ? store : null);
+			message.getPayload(decodeStore);
+		} catch (MissingDataException e) {
+			if (!acquired && owner != null && conn != null) {
+				beginLatticeAcquisition(message, owner, stats);
+				return;
+			}
+			recordDecodeError(conn, stats);
+			log.warn("Rejected incomplete inbound message: {}", e.getMessage());
+			return;
 		} catch (Exception e) {
 			// #566: an undecodable message counts against the connection and can trip the breaker.
 			recordDecodeError(conn, stats);
@@ -520,18 +598,30 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		try {
 			MessageType type = message.getType();
+			if (type == MessageType.RESULT && completeDataRequest(message, conn)) return;
 			switch (type) {
 			case PING:
 				processPing(message);
 				break;
 			case LATTICE_QUERY:
-				processLatticeQuery(message);
+				if (owner == null) {
+					rejectUnscopedLatticeRequest(message);
+				} else {
+					processLatticeQuery(message, owner);
+				}
 				break;
 			case LATTICE_VALUE:
-				processLatticeValue(message);
+				if (owner == null) {
+					recordMergeReject(conn, stats);
+					log.warn("Rejected LATTICE_VALUE on an unassigned connection");
+				} else if (acquired) {
+					processLatticeValue(message);
+				} else {
+					prepareLatticeValue(message, owner, stats);
+				}
 				break;
 			case DATA_REQUEST:
-				processDataRequest(message);
+				rejectUnscopedDataRequest(message);
 				break;
 			case CHALLENGE:
 				processChallenge(message);
@@ -707,15 +797,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Processes a LATTICE_QUERY message by returning the value at the specified path.
 	 *
 	 * <p>Returns the most recently announced (store-backed) value rather than the
-	 * live cursor, so that subsequent DATA_REQUESTs can resolve child cells from
-	 * the same store. Never announces directly — that is the propagator's job.
+	 * live cursor. Never announces directly — that is the propagator's job.
 	 *
 	 * <p>Payload format: [:LQ id [*path*]]
 	 *
 	 * @param message The LATTICE_QUERY message
 	 * @throws BadFormatException If message format is invalid
 	 */
-	private void processLatticeQuery(Message message) throws BadFormatException {
+	private void processLatticeQuery(Message message, LatticePropagator owner) throws BadFormatException {
 		AVector<?> payload = RT.ensureVector(message.getPayload());
 		if (payload == null || payload.count() < 2) {
 			log.warn("Invalid LATTICE_QUERY message format");
@@ -727,19 +816,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell id = payload.get(1);
 		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
 
-		// Read from the propagator's announced cursor — its cells are already
-		// in the propagator's store, so DATA_REQUEST can resolve any child
-		// cells the requester needs. Each propagator owns its announced cursor;
-		// this is the security boundary for cross-propagator data segregation.
-		ACell valueAtPath;
-		if (propagators.isEmpty()) {
-			valueAtPath = null;
-		} else {
-			Root<ACell> announced = propagators.get(0).getAnnouncedCursor();
-			valueAtPath = (pathVector != null && pathVector.count() > 0)
-				? announced.get(pathVector.toCellArray())
-				: announced.get();
-		}
+		// Query and later DATA_REQUEST resolution use the same capability-bound
+		// propagator view. Falling back to the primary would cross a store boundary.
+		Root<ACell> announced = owner.getAnnouncedCursor();
+		ACell valueAtPath = (pathVector != null && pathVector.count() > 0)
+			? announced.get(pathVector.toCellArray())
+			: announced.get();
 
 		Result result = Result.create(id, valueAtPath);
 		message.returnResult(result);
@@ -748,37 +830,227 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Processes a DATA_REQUEST message by responding with available data from the store.
-	 * Missing data is signaled by null values in the response, which encode to NULL_ENCODING.
-	 *
-	 * This method is compatible with convex.peer.Server's handling of missing data requests.
-	 *
-	 * Payload format: [:DR id hash1 hash2 ...]
+	 * Rejects a DATA_REQUEST received directly by the NodeServer listener. This
+	 * connection is not associated with a particular propagator, so selecting the
+	 * primary or any other store would risk crossing an operator-defined data boundary.
+	 * Peers receive data only on connections registered with a propagator's connection
+	 * manager, which serves requests from that propagator's store.
 	 *
 	 * @param message The DATA_REQUEST message
-	 * @throws BadFormatException If message format is invalid
 	 */
-	private void processDataRequest(Message message) throws BadFormatException {
-		try {
-			// Use the same pattern as QueryHandler.handleDataRequest
-			// This creates a response with available data from the store,
-			// and null values for missing data (which encode to NULL_ENCODING)
-			Message response = message.makeDataResponse(store);
-			boolean sent = message.returnMessage(response);
-			if (!sent) {
-				log.info("Can't send data request response due to full buffer");
-			} else {
-				log.debug("Missing data request handled");
-			}
-		} catch (BadFormatException e) {
-			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", message);
-		} catch (Exception e) {
-			log.warn("Unable to deliver missing data due to exception:", e);
-		}
+	private void rejectUnscopedDataRequest(Message message) {
+		ACell id = message.getRequestID();
+		if (id == null) return;
+		Result result = Result.create(id,
+			Strings.create("DATA_REQUEST requires a configured propagator connection"),
+			ErrorCodes.TRUST);
+		message.returnResult(result);
+	}
+
+	/** Rejects a lattice query before selecting any propagator view. */
+	private void rejectUnscopedLatticeRequest(Message message) {
+		ACell id = message.getRequestID();
+		if (id == null) return;
+		message.returnResult(Result.create(id,
+			Strings.create("Lattice access requires an operator-assigned propagator connection"),
+			ErrorCodes.TRUST));
 	}
 
 	private void processChallenge(Message message) {
 		message.respondToChallenge(mergeContext.getSigningKey(), null);
+	}
+
+	/**
+	 * Completes a reverse DATA_REQUEST future. Results are correlated by both
+	 * physical connection and request ID, so one Peer cannot satisfy another
+	 * connection's acquisition request.
+	 */
+	private boolean completeDataRequest(Message message, AConnection connection) {
+		if (connection == null) return false;
+		ConcurrentHashMap<ACell, CompletableFuture<Message>> byID = pendingDataRequests.get(connection);
+		if (byID == null) return false;
+		try {
+			ACell id = message.getResultID();
+			if (id == null) return false;
+			CompletableFuture<Message> future = byID.remove(id);
+			if (byID.isEmpty()) pendingDataRequests.remove(connection, byID);
+			if (future == null) return false;
+			future.complete(message);
+			return true;
+		} catch (Exception e) {
+			log.warn("Unable to correlate lattice data response: {}", e.getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Persists a complete inbound value in its owning propagator store before
+	 * allowing the ordered dispatcher to call lattice merge code.
+	 */
+	private void prepareLatticeValue(Message message, LatticePropagator owner,
+			ConnectionStats stats) throws BadFormatException {
+		try {
+			Message complete = completeLatticeMessage(message, owner.getStore());
+			processLatticeValue(complete);
+		} catch (MissingDataException e) {
+			beginLatticeAcquisition(message, owner, stats);
+		} catch (IOException e) {
+			recordMergeReject(message.getConnection(), stats);
+			log.warn("Unable to persist inbound lattice value in its propagator store", e);
+		}
+	}
+
+	/**
+	 * Returns a message whose lattice value is known complete and persisted in the
+	 * supplied propagator store. This is the sole gateway into processLatticeValue.
+	 */
+	private Message completeLatticeMessage(Message message, AStore acquisitionStore)
+			throws BadFormatException, IOException {
+		AVector<?> payload = RT.ensureVector(message.getPayload());
+		if (payload == null || payload.count() < 3) {
+			throw new BadFormatException("Invalid LATTICE_VALUE message format");
+		}
+		ACell value = payload.get(2);
+		if (value == null) throw new BadFormatException("LATTICE_VALUE message missing value");
+
+		// Persist into the quarantine/ingress store, then independently prove that
+		// no missing descendant remains. Some stores deliberately retain a partial
+		// top Ref at STORED status instead of throwing during storeTopRef.
+		ACell complete = Cells.persist(value, acquisitionStore);
+		HashSet<Hash> missing = new HashSet<>();
+		Ref.get(complete).findMissing(missing, 1);
+		if (!missing.isEmpty()) {
+			throw new MissingDataException(acquisitionStore, missing.iterator().next());
+		}
+		if (!withinInboundSizeLimit(complete)) {
+			throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
+		}
+
+		AVector<?> completePayload = Vectors.create(payload.get(0), payload.get(1), complete);
+		return Message.create(MessageType.LATTICE_VALUE, completePayload)
+			.withConnection(message.getConnection());
+	}
+
+	/**
+	 * Starts bounded acquisition outside the ordered dispatcher. Completion or
+	 * failure is posted back to that dispatcher, so no slow Peer can block unrelated
+	 * merges and per-connection metrics retain a single writer.
+	 */
+	private void beginLatticeAcquisition(Message message, LatticePropagator owner,
+			ConnectionStats stats) {
+		AConnection connection = message.getConnection();
+		if (connection == null) {
+			recordMergeReject(null, stats);
+			return;
+		}
+		if (!acquisitionPermits.tryAcquire()) {
+			recordMergeReject(connection, stats);
+			log.warn("Rejected incomplete lattice value: acquisition capacity exhausted");
+			return;
+		}
+
+		Thread.ofVirtual().name("Lattice value acquisition").start(() -> {
+			try {
+				Message complete = acquireLatticeMessage(message, owner.getStore());
+				acquiredMessages.put(complete, owner);
+				if (!offerInboundBlocking(complete)) {
+					acquiredMessages.remove(complete);
+				}
+			} catch (Exception | StackOverflowError e) {
+				// A pathologically deep value may overflow its acquisition worker, but
+				// fatal VM errors must remain fatal rather than becoming Peer rejects.
+				acquisitionFailures.put(message, e);
+				if (!offerInboundBlocking(message)) {
+					acquisitionFailures.remove(message);
+				}
+			} finally {
+				acquisitionPermits.release();
+			}
+		});
+	}
+
+	/** Acquires every missing branch, then constructs a complete store-backed message. */
+	private Message acquireLatticeMessage(Message message, AStore acquisitionStore) throws Exception {
+		long acquiredBytes = message.getMessageData().count();
+		long acquisitionLimit = config.getMaxInboundValueSize();
+		if (acquiredBytes > acquisitionLimit) {
+			throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
+		}
+
+		while (true) {
+			try {
+				message.getPayload(acquisitionStore);
+			} catch (MissingDataException e) {
+				acquiredBytes += requestMissing(message.getConnection(), acquisitionStore,
+					new Hash[] { e.getMissingHash() });
+				if (acquiredBytes > acquisitionLimit) {
+					throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
+				}
+				continue;
+			}
+
+			if (message.getType() != MessageType.LATTICE_VALUE) {
+				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
+			}
+			AVector<?> payload = RT.ensureVector(message.getPayload());
+			if (payload == null || payload.count() < 3 || payload.get(2) == null) {
+				throw new BadFormatException("Invalid LATTICE_VALUE message format");
+			}
+
+			ACell value = payload.get(2);
+			HashSet<Hash> missing = new HashSet<>();
+			Ref.get(value).findMissing(missing, convex.core.cpos.CPoSConstants.MISSING_LIMIT);
+			if (!missing.isEmpty()) {
+				acquiredBytes += requestMissing(message.getConnection(), acquisitionStore,
+					missing.toArray(Hash[]::new));
+				if (acquiredBytes > acquisitionLimit) {
+					throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
+				}
+				continue;
+			}
+
+			return completeLatticeMessage(message, acquisitionStore);
+		}
+	}
+
+	/** Requests and validates one bounded batch of cells from the update's origin. */
+	private long requestMissing(AConnection connection, AStore acquisitionStore, Hash[] hashes)
+			throws Exception {
+		if (connection == null || connection.isClosed()) {
+			throw new IOException("Lattice source connection is closed");
+		}
+
+		CVMLong id = CVMLong.create(nextDataRequestID.getAndDecrement());
+		CompletableFuture<Message> future = new CompletableFuture<>();
+		ConcurrentHashMap<ACell, CompletableFuture<Message>> byID =
+			pendingDataRequests.computeIfAbsent(connection, c -> new ConcurrentHashMap<>());
+		byID.put(id, future);
+
+		try {
+			if (!connection.sendMessage(Message.createDataRequest(id, hashes))) {
+				throw new IOException("Unable to send lattice DATA_REQUEST");
+			}
+			Message response = future.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			Result result = response.toResult();
+			if (result.isError()) throw new IOException("Lattice DATA_REQUEST failed: " + result);
+
+			AVector<?> values = RT.ensureVector(result.getValue());
+			if (values == null || values.count() != hashes.length) {
+				throw new BadFormatException("Wrong number of cells in lattice data response");
+			}
+			for (int i = 0; i < hashes.length; i++) {
+				ACell value = values.get(i);
+				if (value == null) throw new MissingDataException(acquisitionStore, hashes[i]);
+				if (!hashes[i].equals(value.getHash())) {
+					throw new BadFormatException("Lattice data response does not match requested hash");
+				}
+				Cells.store(value, acquisitionStore);
+			}
+			return response.getMessageData().count();
+		} finally {
+			byID.remove(id);
+			if (byID.isEmpty()) pendingDataRequests.remove(connection, byID);
+		}
 	}
 
 	/**
@@ -991,6 +1263,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 	void removeConnection(AConnection conn) {
 		if (conn == null) return;
 		connectionStats.remove(conn);
+		inboundPropagators.remove(conn);
+		ConcurrentHashMap<ACell, CompletableFuture<Message>> pending = pendingDataRequests.remove(conn);
+		if (pending != null) {
+			IOException closed = new IOException("Lattice source connection closed during acquisition");
+			pending.values().forEach(future -> future.completeExceptionally(closed));
+		}
+		acquiredMessages.keySet().removeIf(message -> message.getConnection() == conn);
+		acquisitionFailures.keySet().removeIf(message -> message.getConnection() == conn);
 	}
 
 	/**
@@ -1001,7 +1281,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * event is missed or a transport does not surface one.
 	 */
 	void sweepClosedConnections() {
-		connectionStats.keySet().removeIf(AConnection::isClosed);
+		Set<AConnection> candidates = new java.util.HashSet<>(connectionStats.keySet());
+		candidates.addAll(inboundPropagators.keySet());
+		candidates.addAll(pendingDataRequests.keySet());
+		for (AConnection connection : candidates) {
+			if (connection.isClosed()) removeConnection(connection);
+		}
 	}
 
 	/**
@@ -1433,6 +1718,62 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (propagator == null) throw new IllegalArgumentException("Propagator must not be null");
 		requireNewLifecycle("addPropagator");
 		propagators.add(propagator);
+	}
+
+	/**
+	 * Sets the operator policy that assigns an inbound network connection to its
+	 * single owning propagator.
+	 *
+	 * <p>The selected propagator determines both the lattice view exposed by
+	 * LATTICE_QUERY and the store used to acquire a LATTICE_VALUE before merge.
+	 * Returning null denies lattice protocol access on that connection. A non-null
+	 * decision is permanent for the physical connection: later selector results
+	 * cannot move it to another store.
+	 *
+	 * <p>No default policy is installed. For an intentionally public single-view
+	 * node, an operator may explicitly use
+	 * {@code node.setInboundPropagatorSelector(c -> node.getPropagator())}. Private
+	 * deployments can select by verified connection identity or other external
+	 * policy. If one Peer needs access to multiple views, it must use distinct
+	 * physical connections.
+	 *
+	 * @param selector operator policy, or null to deny all inbound lattice traffic
+	 * @throws IllegalStateException if called after the first launch begins
+	 */
+	public synchronized void setInboundPropagatorSelector(
+			Function<AConnection, LatticePropagator> selector) {
+		requireNewLifecycle("setInboundPropagatorSelector");
+		this.inboundPropagatorSelector = selector;
+	}
+
+	/**
+	 * Resolves and permanently binds a connection to one configured propagator.
+	 * Null decisions are not cached, allowing an external policy to wait for
+	 * authentication before granting a capability.
+	 */
+	private LatticePropagator resolveInboundPropagator(AConnection connection) {
+		if (connection == null) {
+			// Connection-less delivery is local/in-process and uses the authoritative
+			// primary pipeline. Network capabilities always require explicit policy.
+			return propagators.isEmpty() ? null : propagators.get(0);
+		}
+
+		LatticePropagator bound = inboundPropagators.get(connection);
+		if (bound != null) return bound;
+
+		Function<AConnection, LatticePropagator> selector = inboundPropagatorSelector;
+		if (selector == null) return null;
+		LatticePropagator selected = selector.apply(connection);
+		if (selected == null) return null;
+		if (!propagators.contains(selected)) {
+			throw new IllegalStateException("Inbound policy selected a propagator not owned by this NodeServer");
+		}
+
+		bound = inboundPropagators.putIfAbsent(connection, selected);
+		if (bound != null && bound != selected) {
+			throw new IllegalStateException("Inbound connection is already bound to a different propagator");
+		}
+		return (bound != null) ? bound : selected;
 	}
 
 	/** Configuration and topology are immutable after the first launch begins. */

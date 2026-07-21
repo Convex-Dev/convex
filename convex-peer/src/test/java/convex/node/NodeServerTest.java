@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -32,6 +33,8 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.data.ASet;
 import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -59,6 +62,7 @@ import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.PathCursor;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
+import convex.net.impl.netty.NettyServer;
 
 /**
  * Tests for NodeServer class.
@@ -87,6 +91,11 @@ public class NodeServerTest {
 		if (store != null) {
 			store.close();
 		}
+	}
+
+	/** Explicit public test policy: every network connection uses the primary view. */
+	private static void allowPrimaryInbound(NodeServer<?> node) {
+		node.setInboundPropagatorSelector(connection -> node.getPropagator());
 	}
 
 	/**
@@ -465,6 +474,7 @@ public class NodeServerTest {
 	public void testPullFromPeer() throws Exception {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
+		allowPrimaryInbound(maxNodeServer);
 		maxNodeServer.launch();
 
 		// Create a Convex connection to the server
@@ -636,6 +646,7 @@ public class NodeServerTest {
 	public void testLatticeQueryEmptyPath() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
+		allowPrimaryInbound(maxNodeServer);
 		
 		// Launch the server
 		maxNodeServer.launch();
@@ -681,54 +692,157 @@ public class NodeServerTest {
 	}
 	
 	/**
-	 * Test that Convex.acquire can retrieve a lattice structure via repeated DATA_REQUESTs.
-	 *
-	 * This verifies that NodeServer's DATA_REQUEST handling is compatible with the peer
-	 * protocol and can serve a complete lattice value to a remote client store.
+	 * An inbound listener connection has no propagator identity, so it must not gain
+	 * accidental access to the NodeServer's primary store.
 	 */
 	@Test
-	public void testAcquireLatticeStructureViaDataRequests() throws IOException, InterruptedException, java.util.concurrent.TimeoutException, java.util.concurrent.ExecutionException {
-		// Use a SetLattice-backed NodeServer with the shared test store
-		ALattice<ASet<ACell>> lattice = SetLattice.create();
-		setNodeServer = new NodeServer<>(lattice, store);
-		
-		// Create a large lattice value (10,000 distinct elements) so that it spans multiple branches
-		ASet<ACell> latticeValue = Sets.empty();
-		for (int i = 0; i < 10_000; i++) {
-			latticeValue = latticeValue.conj(CVMLong.create(i));
-		}
-		
-		// Persist the lattice value into the NodeServer's store so it can be served via DATA_REQUEST
-		latticeValue = Cells.store(latticeValue, store);
-		Hash valueHash = Cells.getHash(latticeValue);
-		
-		// Launch the NodeServer
-		setNodeServer.launch();
-		assertTrue(setNodeServer.isRunning());
-		
-		// Connect a remote Convex client to the NodeServer
-		InetSocketAddress serverAddress = setNodeServer.getHostAddress();
-		assertNotNull(serverAddress, "Server should have a host address after launch");
-		
-		ConvexRemote convex = ConvexRemote.connect(serverAddress);
-		convex.setStore(new MemoryStore());
+	public void testUnscopedDataRequestCannotReadPrimaryStore() throws Exception {
+		Blob privateValue = Cells.persist(Blobs.createRandom(400), store);
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer.launch();
 
-		try {
-			// Acquire the lattice structure into the client store. This will issue
-			// one or more DATA_REQUEST messages that NodeServer must handle correctly.
-			CompletableFuture<ACell> future = convex.acquire(valueHash);
-			ACell acquired = future.get(10, TimeUnit.SECONDS);
-			
-			assertNotNull(acquired, "Acquired lattice value should not be null");
-			
-			// Verify that we acquired a large lattice structure (10,000 elements)
-			assertTrue(acquired instanceof ASet, "Acquired value should be a set");
-			ASet<?> acquiredSet = (ASet<?>) acquired;
-			assertEquals(10_000L, acquiredSet.count(), "Acquired set should contain 10,000 elements");
-			assertTrue(acquiredSet.contains(CVMLong.create(0)));
-			assertTrue(acquiredSet.contains(CVMLong.create(9_999)));
-		} finally {
-			convex.close();
+		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			Message request = Message.createDataRequest(CVMLong.create(71), privateValue.getHash());
+			Result result = convex.message(request).get(5, TimeUnit.SECONDS);
+
+			assertEquals(ErrorCodes.TRUST, result.getErrorCode());
+			assertEquals(CVMLong.create(71), result.getID());
+		}
+	}
+
+	/** An unassigned connection cannot select the primary lattice query view. */
+	@Test
+	public void testUnscopedLatticeQueryCannotReadPrimaryView() throws Exception {
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		maxNodeServer.launch();
+
+		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			AVector<?> payload = Vectors.create(
+				MessageTag.LATTICE_QUERY, CVMLong.create(73), Vectors.empty());
+			Result result = convex.message(Message.create(MessageType.LATTICE_QUERY, payload))
+				.get(5, TimeUnit.SECONDS);
+
+			assertEquals(ErrorCodes.TRUST, result.getErrorCode());
+			assertEquals(CVMLong.create(73), result.getID());
+		}
+	}
+
+	/**
+	 * A configured propagator connection serves reverse requests from its own store
+	 * and does not search another propagator's store. Futures provide deterministic
+	 * synchronisation with both network directions and the virtual request worker.
+	 */
+	@Test
+	public void testPropagatorDataRequestUsesOnlyItsStore() throws Exception {
+		try (AStore allowedStore = new MemoryStore();
+				AStore otherStore = new MemoryStore();
+				AStore decodeStore = new MemoryStore();
+				NettyServer requester = new NettyServer(0)) {
+			Blob allowed = Cells.persist(Blobs.createRandom(400), allowedStore);
+			Blob other = Cells.persist(Blobs.createRandom(400), otherStore);
+			CompletableFuture<AConnection> reverseConnection = new CompletableFuture<>();
+			CompletableFuture<Message> responseFuture = new CompletableFuture<>();
+
+			requester.setReceiveAction(message -> {
+				try {
+					if (message.getResultID() != null) {
+						responseFuture.complete(message);
+					} else {
+						reverseConnection.complete(message.getConnection());
+					}
+				} catch (Exception e) {
+					responseFuture.completeExceptionally(e);
+					reverseConnection.completeExceptionally(e);
+				}
+			});
+			requester.launch();
+
+			LatticeConnectionManager manager = new LatticeConnectionManager(allowedStore);
+			ConvexRemote peer = ConvexRemote.connect(requester.getHostAddress());
+			try {
+				manager.addPeer(AKeyPair.generate().getAccountKey(), peer);
+				assertTrue(peer.trySend(Message.createPing(1)));
+
+				AConnection connection = reverseConnection.get(5, TimeUnit.SECONDS);
+				Message request = Message.createDataRequest(CVMLong.create(72),
+					allowed.getHash(), other.getHash());
+				assertTrue(connection.sendMessage(request));
+
+				Message response = responseFuture.get(5, TimeUnit.SECONDS);
+				response.getPayload(decodeStore);
+				Result result = response.toResult();
+				AVector<?> values = result.getValue();
+				assertEquals(CVMLong.create(72), result.getID());
+				assertEquals(allowed, values.get(0),
+					"data announced to this propagator should be serviceable");
+				assertNull(values.get(1),
+					"the manager must not search a different propagator store");
+			} finally {
+				manager.close();
+				peer.close();
+			}
+		}
+	}
+
+	/**
+	 * A partial lattice value is acquired entirely in its owning ingress
+	 * propagator store. The authoritative cursor and primary store remain
+	 * untouched until acquisition is complete and the ordered merge is accepted.
+	 */
+	@Test
+	public void testIncompleteValueAcquiredBeforePrimaryMerge() throws Exception {
+		try (AStore primaryStore = new MemoryStore();
+				AStore ingressStore = new MemoryStore();
+				BlockingReadMemoryStore sourceStore = new BlockingReadMemoryStore()) {
+			Blob missingBranch = Blobs.createRandom(400);
+			ASet<ACell> remoteValue = Sets.of(missingBranch);
+			remoteValue = Cells.persist(remoteValue, sourceStore);
+			sourceStore.blockedHash = missingBranch.getHash();
+
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator ingress = new LatticePropagator(ingressStore);
+			try (NodeServer<ASet<ACell>> receiver = new NodeServer<>(SetLattice.create(), primaryStore)) {
+				receiver.addPropagator(primary);
+				receiver.addPropagator(ingress);
+				receiver.setInboundPropagatorSelector(connection -> ingress);
+				receiver.launch();
+
+				LatticeConnectionManager sourceManager = new LatticeConnectionManager(sourceStore);
+				ConvexRemote source = ConvexRemote.connect(receiver.getHostAddress());
+				try {
+					sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
+					CompletableFuture<ACell> primaryAnnounce = primary.nextAnnounce();
+
+					AVector<?> payload = Vectors.create(
+						MessageTag.LATTICE_VALUE, Vectors.empty(), remoteValue);
+					// Encode only the protocol root. The large Blob remains an indirect
+					// reference and must be requested from the source propagator store.
+					Message partial = Message.create(
+						MessageType.LATTICE_VALUE, payload, payload.getEncoding());
+					assertTrue(source.trySend(partial));
+
+					assertTrue(sourceStore.requested.await(5, TimeUnit.SECONDS),
+						"receiver should request the missing branch on the same connection");
+					assertTrue(receiver.getLocalValue().isEmpty(),
+						"partial data must never reach the lattice cursor");
+					assertNull(primaryStore.refForHash(missingBranch.getHash()),
+						"acquisition must not deposit unvalidated data in the primary store");
+					assertNull(ingressStore.refForHash(missingBranch.getHash()),
+						"the withheld branch should not appear before its response arrives");
+
+					sourceStore.release.countDown();
+					assertEquals(remoteValue, primaryAnnounce.get(5, TimeUnit.SECONDS));
+					assertEquals(remoteValue, receiver.getLocalValue());
+					assertNotNull(ingressStore.refForHash(missingBranch.getHash()),
+						"complete acquisition belongs to the ingress propagator store");
+					assertNotNull(primaryStore.refForHash(missingBranch.getHash()),
+						"only the accepted merged root may enter the primary checkpoint");
+				} finally {
+					sourceStore.release.countDown();
+					sourceManager.close();
+					source.close();
+				}
+			}
 		}
 	}
 
@@ -1018,6 +1132,31 @@ public class NodeServerTest {
 		@Override public long getReceivedCount() { return 0; }
 	}
 
+	/** Store gate used to make the DATA_REQUEST/acquire/merge transition deterministic. */
+	static final class BlockingReadMemoryStore extends MemoryStore {
+		final CountDownLatch requested = new CountDownLatch(1);
+		final CountDownLatch release = new CountDownLatch(1);
+		volatile Hash blockedHash;
+
+		@Override
+		public <T extends ACell> Ref<T> refForHash(Hash hash) {
+			if (blockedHash != null && blockedHash.equals(hash)) {
+				requested.countDown();
+				boolean interrupted = false;
+				while (true) {
+					try {
+						release.await();
+						break;
+					} catch (InterruptedException e) {
+						interrupted = true;
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+			}
+			return super.refForHash(hash);
+		}
+	}
+
 	/** A failed publication checkpoint must roll back every service started by launch(). */
 	@Test
 	public void testPublicationFailureAbortsLaunch() throws Exception {
@@ -1060,6 +1199,7 @@ public class NodeServerTest {
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
 		try (AStore remoteStore = new MemoryStore();
 				NodeServer<AInteger> remote = new NodeServer<>(MaxLattice.create(), remoteStore)) {
+			allowPrimaryInbound(remote);
 			maxNodeServer.launch();
 			remote.launch();
 
@@ -1204,6 +1344,8 @@ public class NodeServerTest {
 			NodeConfig.MAX_CONSECUTIVE_REJECTS, CVMLong.create(3)
 		));
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
+		maxNodeServer.addPropagator(new LatticePropagator(store));
+		allowPrimaryInbound(maxNodeServer);
 
 		// Wrong type for MaxLattice<AInteger> — mergeIncoming rejects it
 		ACell badValue = convex.core.data.Blob.wrap(new byte[8]);
@@ -1287,6 +1429,7 @@ public class NodeServerTest {
 		AStore testStore = new MemoryStore();
 
 		NodeServer<AInteger> node = new NodeServer<>(lattice, testStore);
+		allowPrimaryInbound(node);
 
 		try {
 			node.launch();
@@ -1341,6 +1484,7 @@ public class NodeServerTest {
 		RecordingLattice lattice = new RecordingLattice();
 		try (AStore testStore = new MemoryStore();
 				NodeServer<AInteger> node = new NodeServer<>(lattice, testStore)) {
+			allowPrimaryInbound(node);
 			node.launch();
 			CompletableFuture<ACell> announced = node.getPropagator().nextAnnounce();
 			try (ConvexRemote convex = ConvexRemote.connect(node.getHostAddress())) {
@@ -1358,6 +1502,7 @@ public class NodeServerTest {
 	@Test
 	public void testLatticeQueryImmediatelyAfterLaunch() throws Exception {
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		allowPrimaryInbound(maxNodeServer);
 		maxNodeServer.launch();
 
 		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
@@ -1377,6 +1522,7 @@ public class NodeServerTest {
 	public void testIncomingNoOpReplayDoesNotPersistAgain() throws Exception {
 		CountingMemoryStore testStore = new CountingMemoryStore();
 		try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), testStore)) {
+			allowPrimaryInbound(node);
 			node.launch();
 			int launchWrites = testStore.rootWrites.get();
 			LatticePropagator propagator = node.getPropagator();

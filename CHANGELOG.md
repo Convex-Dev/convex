@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
 - NodeServer: public-node defaults now cap encoded messages at 4 MiB and inbound connections at 256, while cryptographically verified outbound Peers may use a separately configurable larger message tier.
 - NodeServer: lifecycle is represented by explicit starting, running, stopping and stopped states; merge context and propagator topology freeze when first launch begins, and propagator access returns an immutable snapshot.
+- Lattice propagation: registering a Peer with a propagator now grants reverse `DATA_REQUEST` access only to that propagator's store; unscoped NodeServer requests are rejected, while membership and verification remain operator policy.
+- NodeServer: inbound lattice connections require an explicit, immutable propagator assignment; queries use that propagator's view and partial values are fully acquired and size-checked in its store before the ordered merge path can touch the cursor or primary checkpoint.
 
 ### Fixed
 
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NodeServer: a NodeInfo checkpoint failure during launch now closes every service started by that launch, leaving the node stopped and safe to retry.
 - NodeServer: an inbound dispatcher drain timeout now leaves shutdown explicitly incomplete and retryable, preventing relaunch from creating a second ordered consumer while the original thread is still active.
 - NodeServer: fresh and restored nodes seed their announced snapshot during launch, so lattice queries work immediately without an extra application sync.
+- Lattice propagation: delta and root-sync encodings now retain the `LATTICE_VALUE` protocol envelope, allowing receivers to identify the path and acquire missing branches before merge.
 
 ## [0.8.9] - 2026-07-17
 

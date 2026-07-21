@@ -9,6 +9,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.AConvexConnected;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
@@ -25,6 +26,8 @@ import convex.core.cvm.Keywords;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
+import convex.core.exceptions.BadFormatException;
+import convex.core.message.Message;
 import convex.net.IPUtils;
 import convex.peer.AConnectionManager;
 
@@ -42,9 +45,11 @@ import convex.peer.AConnectionManager;
  * a connection or address is already known, use {@link #addPeer(AccountKey, Convex)}
  * or {@link #addPeer(AccountKey, InetSocketAddress)}.
  *
- * <p>Each connection has this manager's {@link AStore} set on it, establishing a
- * security boundary: peers can only resolve data that exists in this store via
- * DATA_REQUEST.
+ * <p>Each connection has this manager's {@link AStore} set on it and serves reverse
+ * DATA_REQUEST messages only from that store. Registering a peer with this manager
+ * is therefore an operator-granted read capability for data announced by the owning
+ * propagator. The manager deliberately does not decide whether membership should be
+ * public, verified or otherwise restricted; that is deployment policy.
  *
  * <p>Extends {@link AConnectionManager} for shared connection infrastructure.
  *
@@ -236,7 +241,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Attempted to add peer with null key or connection");
 			return;
 		}
-		convex.setStore(store);
+		configureStoreAccess(convex);
 		AccountKey verifiedKey = convex.getVerifiedPeer();
 		boolean alreadyVerified = verifiedKey != null && verifiedKey.equals(peerKey);
 		configureReceiveLimit(convex, alreadyVerified);
@@ -254,6 +259,38 @@ public class LatticeConnectionManager extends AConnectionManager {
 			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
 		}
 		log.debug("Added peer with connection: {} at {}", peerKey, addr);
+	}
+
+	/**
+	 * Binds both local acquisition and remote data serving to this manager's store.
+	 * The explicit request handler is important: setting a client's local store alone
+	 * must never grant the remote endpoint read access to it.
+	 */
+	private void configureStoreAccess(Convex convex) {
+		convex.setStore(store);
+		if (convex instanceof AConvexConnected connected) {
+			connected.setDataRequestHandler(this::handleDataRequest);
+		}
+	}
+
+	/**
+	 * Hands store access off the network receive thread. Announce completes before a
+	 * propagator broadcasts, so every cell referenced by that update is already
+	 * serviceable from this exact store.
+	 */
+	private void handleDataRequest(Message message) {
+		Thread.ofVirtual().name("Lattice data request").start(() -> {
+			try {
+				Message response = message.makeDataResponse(store);
+				if (!message.returnMessage(response)) {
+					log.debug("Unable to return lattice data: peer send buffer is full");
+				}
+			} catch (BadFormatException e) {
+				log.warn("Ignoring malformed lattice DATA_REQUEST: {}", e.getMessage());
+			} catch (Exception e) {
+				log.warn("Unable to serve lattice DATA_REQUEST", e);
+			}
+		});
 	}
 
 	/**
@@ -377,7 +414,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				// after connect would leave a race in which the remote endpoint could send a
 				// protocol-sized frame before its identity challenge has even started.
 				Convex convex = ConvexRemote.connect(target, untrustedMessageLimit);
-				convex.setStore(store);
+				configureStoreAccess(convex);
 				AKeyPair kp = this.keyPair;
 				if (kp != null) {
 					convex.setKeyPair(kp);

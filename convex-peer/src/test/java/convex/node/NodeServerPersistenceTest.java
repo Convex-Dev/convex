@@ -225,6 +225,7 @@ public class NodeServerPersistenceTest {
 		// Launch primary and backup
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
 		primary.launch();
 		backup.launch();
 
@@ -350,6 +351,7 @@ public class NodeServerPersistenceTest {
 
 		// Restart primary
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
+		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
 		primary.launch();
 
 		// Verify restored
@@ -376,6 +378,7 @@ public class NodeServerPersistenceTest {
 		// Launch both
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
 		primary.launch();
 		backup.launch();
 

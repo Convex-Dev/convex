@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +54,8 @@ public class LatticePropagatorTest {
 		// Peer connections below use getHostAddress(), which reflects the actual ports.
 		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(0));
 		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(0));
+		server1.setInboundPropagatorSelector(connection -> server1.getPropagator());
+		server2.setInboundPropagatorSelector(connection -> server2.getPropagator());
 
 		// Launch both servers
 		server1.launch();
@@ -142,6 +145,30 @@ public class LatticePropagatorTest {
 		// Verify server1 received the value from server2
 		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
 			"Server1 should have received the value broadcast from server2");
+	}
+
+	/** Delta broadcast retains the protocol envelope and drives a real push merge. */
+	@Test
+	public void testDeltaPushUsesLatticeValueEnvelope() throws Exception {
+		Keyword dataKeyword = Keyword.intern("data");
+		ACell expected = CVMLong.create(4242);
+		Hash expectedHash = expected.getHash();
+		@SuppressWarnings("unchecked")
+		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
+		values = values.assoc(expectedHash, expected);
+		server1.getCursor().assoc(dataKeyword, values);
+		server1.getCursor().sync();
+
+		Convex connection = server1.getPropagator().getPeers().iterator().next();
+		connection.ping().get(5, TimeUnit.SECONDS);
+		assertEquals(1L, server1.getPropagator().getBroadcastCount(),
+			"source should send one delta broadcast");
+		NodeServer.InboundStats inbound = server2.getInboundStats();
+		assertEquals(1L, inbound.mergesAccepted,
+			"receiver should accept the pushed lattice merge: " + inbound);
+		ACell merged = server2.getLocalValue();
+		assertEquals(expected, RT.getIn(merged, dataKeyword, expectedHash),
+			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
 	}
 
 	/**

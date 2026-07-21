@@ -48,6 +48,12 @@ public abstract class AConvexConnected extends Convex {
 	 */
 	private final ConcurrentHashMap<ACell, CompletableFuture<Message>> awaiting = new ConcurrentHashMap<>();
 
+	/**
+	 * Handler for reverse DATA_REQUEST messages received from the remote endpoint.
+	 * Null means that this client connection grants no remote data access.
+	 */
+	private volatile Consumer<Message> dataRequestHandler;
+
 	protected AConvexConnected(Address address, AKeyPair keyPair) {
 		super(address, keyPair);
 	}
@@ -98,8 +104,8 @@ public abstract class AConvexConnected extends Convex {
 	 * Result handler for Messages received back from a connection.
 	 * Completes the awaiting future for result correlation.
 	 *
-	 * Also auto-responds to server-initiated CHALLENGE messages so that
-	 * inbound connections can be verified by the remote peer.
+	 * Also auto-responds to server-initiated CHALLENGE messages and delegates
+	 * explicitly enabled reverse DATA_REQUEST messages.
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
 		try {
@@ -115,16 +121,34 @@ public abstract class AConvexConnected extends Convex {
 
 			// Non-RESULT message — check for server-initiated CHALLENGE
 			m.getPayload(null);
-			if (m.getType() == MessageType.CHALLENGE) {
+			MessageType type = m.getType();
+			if (type == MessageType.CHALLENGE) {
 				AKeyPair kp = keyPair;
 				if (kp != null) {
 					m.respondToChallenge(kp, null);
 				}
+			} else if (type == MessageType.DATA_REQUEST) {
+				Consumer<Message> handler = dataRequestHandler;
+				if (handler != null) handler.accept(m);
 			}
 		} catch (Exception e) {
 			log.warn("Error in return message handler: {}",e.getMessage());
 		}
 	};
+
+	/**
+	 * Sets the handler for DATA_REQUEST messages initiated by the remote endpoint.
+	 * This is deliberately separate from {@link #setStore(convex.core.store.AStore)}:
+	 * a local acquisition store must not implicitly become remotely readable.
+	 *
+	 * <p>The handler runs on the connection's receive thread and should hand off any
+	 * blocking work.
+	 *
+	 * @param handler Data request handler, or null to deny reverse data requests
+	 */
+	public void setDataRequestHandler(Consumer<Message> handler) {
+		this.dataRequestHandler = handler;
+	}
 
 	/**
 	 * Sets the current Connection for this client.
