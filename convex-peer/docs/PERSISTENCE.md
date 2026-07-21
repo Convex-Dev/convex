@@ -60,6 +60,7 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
                      │    └──► cursor.sync()                      │
                      │                                           │
                      │  close()                                  │
+                     │    ├──► cancel + await inbound Acquirors   │
                      │    └──► triggerAndClose each propagator    │
                      └──────────────────────────────────────────┘
 ```
@@ -71,6 +72,7 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 | **Cursor** (`RootLatticeCursor<V>`) | In-memory state. Apps read/write freely. `sync()` triggers propagators via callback. Thread-safe via AtomicReference. |
 | **NodeServer** | Orchestration. Owns cursor + propagator list. Hooks sync callback on cursor. |
 | **Propagator** (`LatticePropagator`) | Owns store, peers and background propagation; pull operations acquire store-backed values without merging them. |
+| **Acquiror** | Owns one remote acquisition worker and request lifecycle. Stores decoded response cells, which may be partial, and follows their missing references using the existing CAD acquisition loop. |
 
 ### Propagator Roles
 
@@ -227,11 +229,18 @@ demand.
 ### Incoming Merge
 
 When a peer sends a `LATTICE_VALUE` message:
-1. NodeServer navigates to the target path via `cursor.path(path)`
-2. Merges the received value via `target.merge(value)` — the cursor chain handles
-   sub-lattice resolution, signing boundaries, and null-lattice bubble-up automatically
-3. Calls `cursor.sync()` — this synchronously commits to the primary store and queues
-   secondary propagation
+1. NodeServer binds the physical connection to its operator-selected propagator and
+   attempts to persist the complete value in that propagator's store.
+2. If CAD branches are missing, NodeServer creates an `Acquiror` for that store. The
+   Acquiror owns its virtual worker and correlated reverse `DATA_REQUEST`. Decoded
+   response cells are stored as received and may themselves be partial; the normal
+   acquisition loop continues with their missing references.
+3. Only the completed value returns to the ordered dispatcher. NodeServer navigates to
+   the target path via `cursor.path(path)` and merges via `target.merge(value)` — the
+   cursor chain handles sub-lattice resolution, signing boundaries, and null-lattice
+   bubble-up automatically.
+4. Calls `cursor.sync()` — this synchronously commits to the primary store and queues
+   secondary propagation.
 
 `LATTICE_VALUE` is fire-and-forget, so there is no application sync caller for a
 durability exception. NodeServer contains and logs the exception at the inbound-message
@@ -251,6 +260,9 @@ Shutdown is the one place where blocking is acceptable — we must guarantee per
 ```java
 public void close() {
     running = false;
+    networkServer.close();             // stop new acquisition work
+    closeAndAwaitInboundAcquirors();    // no worker can still touch a store
+    stopInboundDispatcher();           // drain complete ordered work
 
     // Final sync + wait for all propagators to drain and stop
     V snapshot = cursor.get();
@@ -260,15 +272,14 @@ public void close() {
     // Primary propagator's merge callback fires during drain,
     // so cursor has store-backed refs after close.
 
-    if (networkServer != null) {
-        networkServer.close();
-    }
 }
 ```
 
-Each propagator's `triggerAndClose()` ensures the queued value is processed (including
-the merge callback for primary) before the thread stops. This is the only blocking
-handoff in the system.
+Incomplete values are safe to cancel because they have not crossed the complete-value
+gateway into lattice merge code. `close()` waits for each Acquiror's actual termination,
+not merely cancellation of its future, before propagator stores may be closed. Each
+propagator's `triggerAndClose()` then ensures the queued value is processed (including
+the merge callback for primary) before the thread stops.
 
 ## Persistence Lifecycle
 
@@ -643,11 +654,13 @@ the AccountKey advertised for that Peer through challenge/response. Only success
 verification promotes that individual connection to `maxTrustedMessageSize`; discovery,
 a signed NodeInfo, or merely opening the socket is not sufficient.
 
-Shutdown stops network admission and waits for the ordered dispatcher before taking the
-final persistence snapshot. If accepted work does not drain within
-`inboundShutdownTimeout`, `close()` throws and retains the dispatcher and propagators;
-`launch()` remains forbidden so two consumers can never overlap. Once the blocking
-operation returns, calling `close()` again completes the same shutdown safely.
+Shutdown stops network admission, cancels and awaits incomplete-value Acquirors, then
+waits for the ordered dispatcher before taking the final persistence snapshot. If an
+Acquiror's store operation cannot stop safely or accepted ordered work does not drain
+within `inboundShutdownTimeout`, `close()` throws and retains the dispatcher and
+propagators; `launch()` remains forbidden so store users or ordered consumers cannot
+overlap a replacement lifecycle. Once the blocking operation returns, calling `close()`
+again completes the same shutdown safely.
 
 A primary-store error during `cursor.sync()` throws to the calling context. The
 memory-first cursor value is retained and the persisted root must be treated as
@@ -732,8 +745,8 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 
 - **Core Persistence** — `Cells.announce()` + `store.setRootData()`, restore in `launch()`, final persist in `close()`
 - **Explicit Sync API** — `cursor.sync()` triggers propagators via callback, incoming merges call `cursor.sync()`, periodic auto-sync
-- **Acquire Then Merge** — owning propagator store acquires and validates every missing
-  cell before NodeServer attempts one merge
+- **Acquire Then Merge** — the owning propagator store acquires every missing cell
+  before NodeServer attempts one merge
 - **Root-Only Periodic Sync** — propagator broadcasts root cell hash, peers detect divergence, acquire missing data
 
 ### Remaining

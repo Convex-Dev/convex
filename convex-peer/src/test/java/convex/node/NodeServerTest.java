@@ -939,6 +939,71 @@ public class NodeServerTest {
 		}
 	}
 
+	/**
+	 * NodeServer owns each inbound Acquiror until its worker has actually stopped.
+	 * This models a store operation that cannot honour interruption immediately: the
+	 * first close must report an incomplete shutdown, and a retry is safe once the
+	 * operation reaches its controlled completion point.
+	 */
+	@Test
+	public void testCloseWaitsForInboundAcquirorTermination() throws Exception {
+		MemoryStore primaryStore = new MemoryStore();
+		BlockingAcquisitionMemoryStore ingressStore = new BlockingAcquisitionMemoryStore();
+		MemoryStore sourceStore = new MemoryStore();
+		NodeServer<ASet<ACell>> receiver = null;
+		LatticeConnectionManager sourceManager = null;
+		ConvexRemote source = null;
+		try {
+			Blob missingBranch = Blobs.createRandom(400);
+			ASet<ACell> remoteValue = Cells.persist(Sets.of(missingBranch), sourceStore);
+			ingressStore.blockedHash = remoteValue.getHash();
+
+			NodeConfig config = NodeConfig.create(Maps.of(
+				NodeConfig.PORT, CVMLong.ZERO,
+				NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100)));
+			LatticePropagator primary = new LatticePropagator(primaryStore);
+			LatticePropagator ingress = new LatticePropagator(ingressStore);
+			receiver = new NodeServer<>(SetLattice.create(), primaryStore, config);
+			receiver.addPropagator(primary);
+			receiver.addPropagator(ingress);
+			receiver.setInboundPropagatorSelector(connection -> ingress);
+			receiver.launch();
+
+			sourceManager = new LatticeConnectionManager(sourceStore);
+			source = ConvexRemote.connect(receiver.getHostAddress());
+			sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
+
+			AVector<?> payload = Vectors.create(
+				MessageTag.LATTICE_VALUE, Vectors.empty(), remoteValue);
+			Message partial = Message.create(
+				MessageType.LATTICE_VALUE, payload, payload.getEncoding());
+			assertTrue(source.trySend(partial));
+			assertTrue(ingressStore.acquisitionReadEntered.await(5, TimeUnit.SECONDS),
+				"the inbound Acquiror should enter the controlled store operation");
+
+			IOException timeout = assertThrows(IOException.class, receiver::close);
+			assertTrue(timeout.getMessage().contains("acquisition shutdown incomplete"));
+			assertEquals(NodeServer.LifecycleState.STOPPING, receiver.getLifecycleState());
+			assertTrue(receiver.getLocalValue().isEmpty(),
+				"an acquisition cancelled during shutdown must never merge");
+			assertNull(primaryStore.refForHash(missingBranch.getHash()),
+				"cancelled acquisition must not expose data to the primary store");
+
+			ingressStore.release();
+			assertTrue(ingressStore.acquisitionReadFinished.await(5, TimeUnit.SECONDS));
+			receiver.close();
+			assertEquals(NodeServer.LifecycleState.STOPPED, receiver.getLifecycleState());
+		} finally {
+			ingressStore.release();
+			if (receiver != null) receiver.close();
+			if (sourceManager != null) sourceManager.close();
+			if (source != null) source.close();
+			sourceStore.close();
+			ingressStore.close();
+			primaryStore.close();
+		}
+	}
+
 	// ===== P2P NodeInfo advertisement tests =====
 
 	/**
@@ -1247,6 +1312,39 @@ public class NodeServerTest {
 				if (interrupted) Thread.currentThread().interrupt();
 			}
 			return super.refForHash(hash);
+		}
+	}
+
+	/** Store gate for proving shutdown waits for the Acquiror's store access. */
+	static final class BlockingAcquisitionMemoryStore extends MemoryStore {
+		final CountDownLatch acquisitionReadEntered = new CountDownLatch(1);
+		final CountDownLatch acquisitionReadFinished = new CountDownLatch(1);
+		final CountDownLatch release = new CountDownLatch(1);
+		volatile Hash blockedHash;
+
+		@Override
+		public <T extends ACell> Ref<T> refForHash(Hash hash) {
+			if (blockedHash != null && blockedHash.equals(hash)
+					&& "Acquiror".equals(Thread.currentThread().getName())) {
+				acquisitionReadEntered.countDown();
+				boolean interrupted = false;
+				while (true) {
+					try {
+						release.await();
+						break;
+					} catch (InterruptedException e) {
+						// Model a store call that can only stop at its own safe boundary.
+						interrupted = true;
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+				acquisitionReadFinished.countDown();
+			}
+			return super.refForHash(hash);
+		}
+
+		void release() {
+			release.countDown();
 		}
 	}
 

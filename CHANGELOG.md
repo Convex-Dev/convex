@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NodeServer: lifecycle is represented by explicit starting, running, stopping and stopped states; merge context and propagator topology freeze when first launch begins, and propagator access returns an immutable snapshot.
 - Lattice propagation: propagator-managed Peers and operator-assigned inbound connections now receive `DATA_REQUEST` access only to their selected propagator store; unassigned NodeServer requests are rejected, while membership and verification remain operator policy.
 - NodeServer: inbound lattice connections require an explicit, immutable propagator assignment; queries use that propagator's view and partial values are fully acquired and size-checked in its store before the ordered merge path can touch the cursor or primary checkpoint.
+- Lattice acquisition: `Acquiror` now owns a cancellable worker and request lifecycle, and lets NodeServer await termination before closing propagator stores.
 
 ### Fixed
 

@@ -18,6 +18,7 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Acquiror;
 import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -189,8 +190,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 		new ConcurrentHashMap<>();
 
 	/** Pending reverse data requests, isolated by physical connection and request ID. */
-	private final ConcurrentHashMap<AConnection, ConcurrentHashMap<ACell, CompletableFuture<Message>>>
+	private final ConcurrentHashMap<AConnection, ConcurrentHashMap<ACell, CompletableFuture<Result>>>
 		pendingDataRequests = new ConcurrentHashMap<>();
+
+	/** Active Acquirors retained until their owned workers have terminated. */
+	private final ConcurrentHashMap<AConnection, Set<Acquiror>> activeAcquirors =
+		new ConcurrentHashMap<>();
+	private final Object acquisitionLifecycleLock = new Object();
+	private boolean acceptingAcquisitions;
 
 	/** Negative request IDs reserved for NodeServer acquisition sessions. */
 	private final AtomicLong nextDataRequestID = new AtomicLong(-1L);
@@ -432,6 +439,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 			addCleanupFailure(failure, cleanupError);
 		}
 
+		boolean acquisitionsStopped = false;
+		try {
+			stopAcquisitions();
+			acquisitionsStopped = true;
+		} catch (Throwable cleanupError) {
+			addCleanupFailure(failure, cleanupError);
+		}
+
 		boolean dispatcherStopped = false;
 		try {
 			stopInboundDispatcher();
@@ -447,7 +462,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// A timed-out dispatcher may still be inside cursor.sync() or store decoding.
 		// Keep the propagators and store-facing services available until a later
 		// close() confirms that the sole ordered consumer has actually terminated.
-		if (!dispatcherStopped) return;
+		if (!acquisitionsStopped || !dispatcherStopped) return;
 
 		connectionStats.clear();
 
@@ -554,6 +569,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		boolean acquired = acquiredOwner != null;
 		if (!acquired && acquisitionFailure == null) recordReceived(stats);
 		if (acquisitionFailure != null) {
+			if (acquisitionFailure instanceof VirtualMachineError fatal
+					&& !(fatal instanceof StackOverflowError)) {
+				throw fatal;
+			}
 			recordMergeReject(conn, stats);
 			log.warn("Rejected lattice value after acquisition failure: {}",
 				acquisitionFailure.getMessage());
@@ -680,6 +699,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		inboundRunning = true;
 		acceptingInbound = true;
+		synchronized (acquisitionLifecycleLock) {
+			acceptingAcquisitions = true;
+		}
 		inboundThread = new Thread(this::inboundLoop, "NodeServer inbound dispatcher");
 		inboundThread.setDaemon(true);
 		inboundThread.start();
@@ -787,6 +809,38 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
+	 * Cancels every Acquiror owned by this NodeServer and waits until its worker can
+	 * no longer touch a propagator store. No new Acquiror can register after the
+	 * lifecycle gate closes.
+	 */
+	private void stopAcquisitions() throws IOException {
+		ArrayList<Acquiror> acquisitions = new ArrayList<>();
+		synchronized (acquisitionLifecycleLock) {
+			acceptingAcquisitions = false;
+			for (Set<Acquiror> values : activeAcquirors.values()) {
+				acquisitions.addAll(values);
+			}
+		}
+
+		acquisitions.forEach(Acquiror::close);
+		long timeout = config.getInboundShutdownTimeout();
+		long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeout);
+		try {
+			for (Acquiror acquiror : acquisitions) {
+				long remaining = deadline - System.nanoTime();
+				if (remaining <= 0
+						|| !acquiror.awaitTermination(remaining, TimeUnit.NANOSECONDS)) {
+					throw new IOException("NodeServer acquisition shutdown incomplete after "
+						+ timeout + " ms");
+				}
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while stopping lattice acquisitions", e);
+		}
+	}
+
+	/**
 	 * Processes a PING message by responding with a RESULT containing the same ID.
 	 *
 	 * @param message The PING message
@@ -881,15 +935,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private boolean completeDataRequest(Message message, AConnection connection) {
 		if (connection == null) return false;
-		ConcurrentHashMap<ACell, CompletableFuture<Message>> byID = pendingDataRequests.get(connection);
+		ConcurrentHashMap<ACell, CompletableFuture<Result>> byID = pendingDataRequests.get(connection);
 		if (byID == null) return false;
 		try {
 			ACell id = message.getResultID();
 			if (id == null) return false;
-			CompletableFuture<Message> future = byID.remove(id);
+			CompletableFuture<Result> future = byID.remove(id);
 			if (byID.isEmpty()) pendingDataRequests.remove(connection, byID);
 			if (future == null) return false;
-			future.complete(message);
+			future.complete(message.toResult());
 			return true;
 		} catch (Exception e) {
 			log.warn("Unable to correlate lattice data response: {}", e.getMessage());
@@ -963,46 +1017,53 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return;
 		}
 
-		Thread.ofVirtual().name("Lattice value acquisition").start(() -> {
-			try {
-				Message complete = acquireLatticeMessage(message, owner.getStore());
-				acquiredMessages.put(complete, owner);
-				if (!offerInboundBlocking(complete)) {
-					acquiredMessages.remove(complete);
+		CompletableFuture<Message> acquisition;
+		try {
+			acquisition = acquireLatticeMessage(message, owner.getStore(), connection);
+		} catch (Throwable t) {
+			// The permit belongs to this acquisition attempt even when hostile
+			// decoding fails before an asynchronous stage can be returned.
+			acquisitionPermits.release();
+			throw t;
+		}
+
+		acquisition.whenComplete((complete, error) -> {
+				try {
+					if (error == null) {
+						acquiredMessages.put(complete, owner);
+						if (!offerInboundBlocking(complete)) acquiredMessages.remove(complete);
+					} else {
+						acquisitionFailures.put(message, unwrapCompletion(error));
+						if (!offerInboundBlocking(message)) acquisitionFailures.remove(message);
+					}
+				} finally {
+					acquisitionPermits.release();
 				}
-			} catch (Exception | StackOverflowError e) {
-				// A pathologically deep value may overflow its acquisition worker, but
-				// fatal VM errors must remain fatal rather than becoming Peer rejects.
-				acquisitionFailures.put(message, e);
-				if (!offerInboundBlocking(message)) {
-					acquisitionFailures.remove(message);
-				}
-			} finally {
-				acquisitionPermits.release();
-			}
 		});
 	}
 
-	/** Acquires every missing branch, then constructs a complete store-backed message. */
-	private Message acquireLatticeMessage(Message message, AStore acquisitionStore) throws Exception {
-		long acquiredBytes = message.getMessageData().count();
-		long acquisitionLimit = config.getMaxInboundValueSize();
-		if (acquiredBytes > acquisitionLimit) {
-			throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
+	private static Throwable unwrapCompletion(Throwable error) {
+		while ((error instanceof java.util.concurrent.CompletionException
+				|| error instanceof java.util.concurrent.ExecutionException)
+				&& error.getCause() != null) {
+			error = error.getCause();
+		}
+		return error;
+	}
+
+	/** Acquires missing protocol/value roots without creating a NodeServer worker. */
+	private CompletableFuture<Message> acquireLatticeMessage(Message message,
+			AStore acquisitionStore, AConnection connection) {
+		try {
+			message.getPayload(acquisitionStore);
+		} catch (MissingDataException e) {
+			return acquireHash(connection, acquisitionStore, e.getMissingHash())
+				.thenCompose(value -> acquireLatticeMessage(message, acquisitionStore, connection));
+		} catch (Exception e) {
+			return CompletableFuture.failedFuture(e);
 		}
 
-		while (true) {
-			try {
-				message.getPayload(acquisitionStore);
-			} catch (MissingDataException e) {
-				acquiredBytes += requestMissing(message.getConnection(), acquisitionStore,
-					new Hash[] { e.getMissingHash() });
-				if (acquiredBytes > acquisitionLimit) {
-					throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
-				}
-				continue;
-			}
-
+		try {
 			if (message.getType() != MessageType.LATTICE_VALUE) {
 				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
 			}
@@ -1011,60 +1072,74 @@ public class NodeServer<V extends ACell> implements Closeable {
 				throw new BadFormatException("Invalid LATTICE_VALUE message format");
 			}
 
-			ACell value = payload.get(2);
-			HashSet<Hash> missing = new HashSet<>();
-			Ref.get(value).findMissing(missing, convex.core.cpos.CPoSConstants.MISSING_LIMIT);
-			if (!missing.isEmpty()) {
-				acquiredBytes += requestMissing(message.getConnection(), acquisitionStore,
-					missing.toArray(Hash[]::new));
-				if (acquiredBytes > acquisitionLimit) {
-					throw new BadFormatException("Lattice acquisition exceeds inbound size limit");
-				}
-				continue;
+			try {
+				return CompletableFuture.completedFuture(
+					completeLatticeMessage(message, acquisitionStore));
+			} catch (MissingDataException e) {
+				Hash rootHash = payload.get(2).getHash();
+				return acquireHash(connection, acquisitionStore, rootHash)
+					.thenCompose(value -> acquireLatticeMessage(
+						message, acquisitionStore, connection));
 			}
-
-			return completeLatticeMessage(message, acquisitionStore);
+		} catch (Exception e) {
+			return CompletableFuture.failedFuture(e);
 		}
 	}
 
-	/** Requests and validates one bounded batch of cells from the update's origin. */
-	private long requestMissing(AConnection connection, AStore acquisitionStore, Hash[] hashes)
-			throws Exception {
+	/** Creates one owned Acquiror for the missing root. */
+	private CompletableFuture<ACell> acquireHash(AConnection connection,
+			AStore acquisitionStore, Hash hash) {
+		Acquiror acquiror = Acquiror.create(hash, acquisitionStore,
+			hashes -> requestMissing(connection, hashes));
+		Set<Acquiror> acquisitions;
+		synchronized (acquisitionLifecycleLock) {
+			if (!acceptingAcquisitions) {
+				acquiror.close();
+				return CompletableFuture.failedFuture(
+					new IOException("NodeServer is not accepting lattice acquisitions"));
+			}
+			acquisitions = activeAcquirors.computeIfAbsent(connection,
+				c -> ConcurrentHashMap.newKeySet());
+			acquisitions.add(acquiror);
+		}
+		acquiror.getTerminationFuture().whenComplete((ignored, error) -> {
+			synchronized (acquisitionLifecycleLock) {
+				acquisitions.remove(acquiror);
+				if (acquisitions.isEmpty()) activeAcquirors.remove(connection, acquisitions);
+			}
+		});
+
+		return acquiror.getFuture();
+	}
+
+	/** Requests one correlated batch from the update's physical connection. */
+	private CompletableFuture<Result> requestMissing(AConnection connection, Hash[] hashes) {
 		if (connection == null || connection.isClosed()) {
-			throw new IOException("Lattice source connection is closed");
+			return CompletableFuture.failedFuture(
+				new IOException("Lattice source connection is closed"));
 		}
 
 		CVMLong id = CVMLong.create(nextDataRequestID.getAndDecrement());
-		CompletableFuture<Message> future = new CompletableFuture<>();
-		ConcurrentHashMap<ACell, CompletableFuture<Message>> byID =
+		CompletableFuture<Result> future = new CompletableFuture<>();
+		ConcurrentHashMap<ACell, CompletableFuture<Result>> byID =
 			pendingDataRequests.computeIfAbsent(connection, c -> new ConcurrentHashMap<>());
 		byID.put(id, future);
 
-		try {
-			if (!connection.sendMessage(Message.createDataRequest(id, hashes))) {
-				throw new IOException("Unable to send lattice DATA_REQUEST");
-			}
-			Message response = future.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
-			Result result = response.toResult();
-			if (result.isError()) throw new IOException("Lattice DATA_REQUEST failed: " + result);
-
-			AVector<?> values = RT.ensureVector(result.getValue());
-			if (values == null || values.count() != hashes.length) {
-				throw new BadFormatException("Wrong number of cells in lattice data response");
-			}
-			for (int i = 0; i < hashes.length; i++) {
-				ACell value = values.get(i);
-				if (value == null) throw new MissingDataException(acquisitionStore, hashes[i]);
-				if (!hashes[i].equals(value.getHash())) {
-					throw new BadFormatException("Lattice data response does not match requested hash");
-				}
-				Cells.store(value, acquisitionStore);
-			}
-			return response.getMessageData().count();
-		} finally {
+		future.orTimeout(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		future.whenComplete((result, error) -> {
 			byID.remove(id);
 			if (byID.isEmpty()) pendingDataRequests.remove(connection, byID);
+		});
+
+		try {
+			if (connection.isClosed()
+					|| !connection.sendMessage(Message.createDataRequest(id, hashes))) {
+				future.completeExceptionally(new IOException("Unable to send lattice DATA_REQUEST"));
+			}
+		} catch (Exception e) {
+			future.completeExceptionally(e);
 		}
+		return future;
 	}
 
 	/**
@@ -1282,11 +1357,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (conn == null) return;
 		connectionStats.remove(conn);
 		inboundPropagators.remove(conn);
-		ConcurrentHashMap<ACell, CompletableFuture<Message>> pending = pendingDataRequests.remove(conn);
+		ConcurrentHashMap<ACell, CompletableFuture<Result>> pending = pendingDataRequests.remove(conn);
 		if (pending != null) {
 			IOException closed = new IOException("Lattice source connection closed during acquisition");
 			pending.values().forEach(future -> future.completeExceptionally(closed));
 		}
+		Set<Acquiror> acquisitions = activeAcquirors.get(conn);
+		if (acquisitions != null) acquisitions.forEach(Acquiror::close);
 		acquiredMessages.keySet().removeIf(message -> message.getConnection() == conn);
 		acquisitionFailures.keySet().removeIf(message -> message.getConnection() == conn);
 	}
@@ -1302,6 +1379,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		Set<AConnection> candidates = new java.util.HashSet<>(connectionStats.keySet());
 		candidates.addAll(inboundPropagators.keySet());
 		candidates.addAll(pendingDataRequests.keySet());
+		candidates.addAll(activeAcquirors.keySet());
 		for (AConnection connection : candidates) {
 			if (connection.isClosed()) removeConnection(connection);
 		}
@@ -1854,6 +1932,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 			maintenanceThread.interrupt();
 			maintenanceThread = null;
 		}
+
+		// Incomplete remote values have not been merged and are safe to cancel. Wait
+		// for their Acquirors before any caller may close the propagator stores.
+		stopAcquisitions();
 
 		// On timeout this throws with lifecycleState=STOPPING and inboundThread retained. The
 		// caller may retry close() after the blocking merge/store operation returns.
