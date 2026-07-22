@@ -70,10 +70,9 @@ public class Main extends ACommand {
 			description = "Specify to disable interactive prompts. Useful for scripts.") 
 	boolean nonInteractive;
 	
-	@Option(names = { "--no-color" }, 
-			scope = ScopeType.INHERIT, 
-			defaultValue = "${env:NO_COLOR}", 
-			description = "Suppress ANSI colour output. Can also suppress with NO_COLOR environment variable.")
+	@Option(names = { "--no-color" },
+			scope = ScopeType.INHERIT,
+			description = "Suppress ANSI colour output. Can also suppress by setting the NO_COLOR environment variable to any non-empty value.")
 	private boolean noColour;
 
 	@Option(names = { "-v","--verbose" },
@@ -217,9 +216,31 @@ public class Main extends ACommand {
 	}
 	
 
+	/**
+	 * Name of the environment variable honoured per the NO_COLOR convention.
+	 */
+	static final String NO_COLOR_ENV = "NO_COLOR";
+
+	/**
+	 * Whether a NO_COLOR environment value suppresses colour, per the convention at
+	 * <a href="https://no-color.org/">no-color.org</a>: colour is suppressed when the
+	 * variable is <em>present and not an empty string</em>, whatever its value.
+	 *
+	 * <p>This is deliberately not a boolean parse. Binding the variable straight to the
+	 * {@code --no-color} option (as {@code defaultValue = "${env:NO_COLOR}"} did) made
+	 * picocli parse its value, so the widely used {@code NO_COLOR=1} was rejected with
+	 * "'1' is not a boolean" and the CLI refused to run at all.
+	 *
+	 * @param value Environment variable value, or null if unset
+	 * @return true if colour should be suppressed
+	 */
+	static boolean suppressesColour(String value) {
+		return (value != null) && !value.isEmpty();
+	}
+
 	@Override
 	public boolean isColoured() {
-		return !noColour;
+		return !(noColour || suppressesColour(System.getenv(NO_COLOR_ENV)));
 	}
 	
 	@Override

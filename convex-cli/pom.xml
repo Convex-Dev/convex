@@ -19,6 +19,23 @@
 
 	<build>
 		<plugins>
+			<!-- Run the CLI tests with NO_COLOR set, pinning the no-color.org convention:
+			     the variable is honoured by presence, and its value is never parsed. This
+			     value is not a valid boolean on purpose. Binding NO_COLOR straight to the
+			     "no-color" option once made picocli parse it, so every command exited 64
+			     with "'1' is not a boolean" and the CLI would not run for any user with
+			     NO_COLOR set. If that binding returns, these tests fail loudly.
+			     Safe to set: no test asserts coloured output, and HelperTest strips ANSI. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<environmentVariables>
+						<NO_COLOR>1</NO_COLOR>
+					</environmentVariables>
+				</configuration>
+			</plugin>
+
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.8.0</version>
