@@ -131,7 +131,9 @@ public class ChainAPI extends ABaseAPI {
 		
 		routes.get(prefix + "status", this::getStatus);
 
-		routes.post(prefix + "message", this::handleMessage);
+		if (restServer.getRESTConfig().isMessageEndpointEnabled()) {
+			routes.post(prefix + "message", this::handleMessage);
+		}
 
 		routes.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 	}
@@ -520,10 +522,17 @@ public class ChainAPI extends ABaseAPI {
 
 	/**
 	 * Generic message endpoint. Accepts a Message in CAD3 raw or CVX text format,
-	 * delivers it to the server, and returns the Result honouring the Accept header.
+	 * delivers it through the normal Peer message dispatcher, and returns the Result
+	 * honouring the Accept header.
 	 *
 	 * CAD3 raw supports all message types including SignedData. CVX text supports
 	 * vector-based messages (queries, status requests, etc.) but not SignedData.
+	 *
+	 * <p>When explicitly enabled this is a protocol transport, equivalent in trust
+	 * and admission semantics to exposing the Peer protocol port. TRANSACT, QUERY
+	 * and DATA_REQUEST messages therefore reach the same bounded Peer queues and
+	 * backpressure path used by port 18888. {@link GenericMessagePolicy} is the
+	 * deliberate classification point for any future HTTP-specific restrictions.</p>
 	 */
 	public void handleMessage(Context ctx) {
 		try {
@@ -532,16 +541,22 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadRequestResponse("JSON not acceptable as message format");
 			}
 
-			CompletableFuture<Result> cf;
+			Message message;
 			if (ContentTypes.CVX_RAW.equals(contentType)) {
 				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
-				cf = convex.messageRaw(rawData);
+				message = Message.create(rawData);
+				message.getPayload(server.getStore());
 			} else {
 				// Accept CVX text or default — parse as CVX data
 				ACell body = getCVXBody(ctx);
-				Message message = Message.create(MessageType.UNKNOWN, body);
-				cf = convex.message(message);
+				message = Message.create(MessageType.UNKNOWN, body);
 			}
+
+			MessageType type=message.getType();
+			if (!GenericMessagePolicy.allows(type)) {
+				throw new ForbiddenResponse("Message type not permitted over HTTP: "+type);
+			}
+			CompletableFuture<Result> cf = convex.message(message);
 
 			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 			setResult(ctx, r);

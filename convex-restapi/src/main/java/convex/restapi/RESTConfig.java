@@ -58,6 +58,7 @@ public class RESTConfig extends PeerConfig {
 	public static final AString CORS = Strings.intern("cors");
 	public static final AString QUERY_WATCH = Strings.intern("queryWatch");
 	public static final AString ADMIN = Strings.intern("admin");
+	public static final AString MESSAGE_ENDPOINT = Strings.intern("messageEndpoint");
 
 	// ========== MCP config keys ==========
 
@@ -152,6 +153,19 @@ public class RESTConfig extends PeerConfig {
 	 */
 	public boolean isAdminEnabled() {
 		return getBool(getSection(REST), ADMIN, false);
+	}
+
+	/**
+	 * Whether the generic Peer protocol message endpoint is enabled.
+	 *
+	 * <p>This endpoint is disabled by default because it exposes essentially the
+	 * same message surface as the public Peer protocol port. Operators may enable
+	 * it deliberately when HTTP is their chosen public protocol transport.</p>
+	 *
+	 * @return true if the generic message endpoint is explicitly enabled
+	 */
+	public boolean isMessageEndpointEnabled() {
+		return getBool(getSection(REST), MESSAGE_ENDPOINT, false);
 	}
 
 	/**

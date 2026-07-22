@@ -45,6 +45,16 @@ class RESTRuntimeConfigTest {
 		try (RunningServer running=launch("{mcp:{enabled:false}}")) {
 			assertTrue(running.rest().getRESTConfig().isPublicAccess());
 			assertEquals(200,get(running.url("/api/v1/status"),null).statusCode());
+			assertEquals(404,postCvx(running.url("/api/v1/message"),"[:SR 1]").statusCode());
+		}
+	}
+
+	@Test
+	void publicPeerMayExplicitlyExposeProtocolMessagesOverHttp() throws Exception {
+		try (RunningServer running=launch("{rest:{messageEndpoint:true},mcp:{enabled:false}}")) {
+			assertTrue(running.rest().getRESTConfig().isPublicAccess());
+			assertTrue(running.rest().getRESTConfig().isMessageEndpointEnabled());
+			assertEquals(200,postCvx(running.url("/api/v1/message"),"[:SR 1]").statusCode());
 		}
 	}
 
@@ -163,6 +173,14 @@ class RESTRuntimeConfigTest {
 		if (bearer!=null) request.header("Authorization","Bearer "+bearer);
 		if (origin!=null) request.header("Origin",origin);
 		return CLIENT.send(request.build(),HttpResponse.BodyHandlers.ofString());
+	}
+
+	private static HttpResponse<String> postCvx(String url,String body) throws Exception {
+		HttpRequest request=HttpRequest.newBuilder(URI.create(url))
+				.header("Content-Type","application/cvx")
+				.header("Accept","application/cvx")
+				.POST(HttpRequest.BodyPublishers.ofString(body)).build();
+		return CLIENT.send(request,HttpResponse.BodyHandlers.ofString());
 	}
 
 	private static String ping() {

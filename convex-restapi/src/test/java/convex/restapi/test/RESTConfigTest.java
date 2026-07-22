@@ -86,6 +86,12 @@ public class RESTConfigTest {
 	}
 
 	@Test
+	public void testMessageEndpointRequiresExplicitEnablement() {
+		assertFalse(RESTConfig.parse("{}").isMessageEndpointEnabled());
+		assertTrue(RESTConfig.parse("{rest:{messageEndpoint:true}}").isMessageEndpointEnabled());
+	}
+
+	@Test
 	public void testCorsOrigins() {
 		assertNull(RESTConfig.parse("{}").getCorsAllowedOrigins());
 		assertNull(RESTConfig.parse("{rest:{cors:\"*\"}}").getCorsAllowedOrigins());
@@ -310,6 +316,7 @@ public class RESTConfigTest {
 		assertEquals(8080, config.getRestPort());
 		assertFalse(config.isFaucetEnabled());
 		assertFalse(config.isQueryWatchEnabled());
+		assertFalse(config.isMessageEndpointEnabled());
 		assertNull(config.getBaseUrl());
 	}
 

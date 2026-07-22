@@ -35,9 +35,11 @@ public abstract class ARESTTest {
 	
 	static {
 		try {
-			// Signing and elevated tools are deliberately disabled by default. This
-			// shared fixture enables them explicitly for the signing test classes.
-			RESTConfig config=RESTConfig.parse("{rest:{faucet:true},mcp:{signing:true,elevated:true}}");
+			// Security-sensitive optional services are disabled by default. The shared
+			// integration fixture opts in only because dedicated tests exercise them.
+			RESTConfig config=RESTConfig.parse("""
+				{rest:{faucet:true,messageEndpoint:true},mcp:{signing:true,elevated:true}}
+				""");
 			var launchConfig=config.toLegacy();
 			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
 			Server s = API.launchPeer(launchConfig);

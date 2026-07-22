@@ -87,6 +87,13 @@
 		// SECURITY: Keep disabled on public Peers. When enabled, these routes still
 		// retain their route-specific authentication and loopback restrictions.
 		"admin": false,
+
+		// Expose POST /api/v1/message as a transport for Peer protocol messages
+		// (default: false). This is suitable for public Peers that intentionally use
+		// HTTP instead of exposing the Peer protocol port (normally 18888). Enabling
+		// it exposes equivalent message and trust semantics; normal Peer queue
+		// backpressure still applies to queries, data requests and transactions.
+		"messageEndpoint": false,
 	},
 
 	// ==================== MCP Configuration ====================
