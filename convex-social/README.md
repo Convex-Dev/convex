@@ -71,15 +71,26 @@ forked.sync();
 
 ### Node integration
 
-The social lattice is **not** part of convex-core's `Lattice.ROOT`. Nodes opt in by
-composing it into their root lattice:
+Convex Social is an **application layered on P2P infrastructure**. It supplies one
+lattice region, `:social`; discovering peers, advertising node identity and moving values
+between nodes are convex-p2p's job, not its own. A social node is therefore a P2P node
+plus the social region:
 
 ```java
-KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
 ```
 
-A `Social` instance can then be connected to a node's root cursor so that writes
-propagate up for lattice push/pull:
+The social lattice is not part of any root by default — neither convex-p2p's nor
+convex-core's `Lattice.ROOT` — so a node opts in by composing it, and the dependency runs
+one way: convex-social depends on the P2P layer, never the reverse. Peers that do not
+serve `:social` ignore the region rather than failing on it, so social can be deployed to
+part of a network without coordinating an upgrade across all of it.
+
+Composing onto `Lattice.ROOT` instead is equally valid where the application regions
+(`:data`, `:fs`, `:kv`, `:queue`) are wanted alongside it.
+
+A `Social` instance is then connected to the node's root cursor so that writes propagate
+up for lattice push/pull:
 
 ```java
 Social social = Social.connect(rootCursor, keyPair);

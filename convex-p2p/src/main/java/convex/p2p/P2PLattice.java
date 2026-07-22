@@ -21,10 +21,26 @@ import convex.lattice.generic.ReservedLattice;
  * The root lattice for a Convex P2P node — the top-level regions the P2P system needs
  * to know about and merge.
  *
- * <p>This root declares <em>only</em> P2P concerns. It deliberately does not include the
- * application regions of {@code convex.lattice.Lattice#ROOT} ({@code :data}, {@code :fs},
- * {@code :kv}, {@code :queue}); a node that also wants to relay those composes a larger
- * root.
+ * <p>This root declares <em>only</em> P2P concerns — who is on the network, what they
+ * run, and how to reach them. It deliberately excludes the application regions of
+ * {@code convex.lattice.Lattice#ROOT} ({@code :data}, {@code :fs}, {@code :kv},
+ * {@code :queue}).
+ *
+ * <h2>A base to build on</h2>
+ *
+ * <p>This module is infrastructure, and applications are its users. An application
+ * supplies its own region and composes it onto this root; a social node, for instance, is
+ * a P2P node plus the social region:
+ *
+ * <pre>{@code
+ * KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+ * }</pre>
+ *
+ * <p>The dependency runs one way — applications depend on convex-p2p, never the reverse —
+ * so this module knows nothing of convex-social, convex-db or anything else layered on
+ * it, and a bootstrap node or pure relay carries none of their weight. Composition leaves
+ * the P2P regions' paths and merge semantics untouched, and peers that do not recognise
+ * an added region ignore it.
  *
  * <h2>Structure</h2>
  * <pre>

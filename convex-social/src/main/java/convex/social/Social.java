@@ -36,8 +36,19 @@ import convex.lattice.generic.OwnerLattice;
  * }</pre>
  *
  * <h2>Integration</h2>
- * <p>Nodes opt in to social support by adding the social lattice to their
- * root lattice instance:</p>
+ *
+ * <p>Convex Social is an application layered on P2P infrastructure: it supplies the
+ * {@code :social} region and nothing else, leaving peer discovery, node identity and
+ * value propagation to convex-p2p. A social node is a P2P node plus this region:</p>
+ * <pre>{@code
+ * KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+ * }</pre>
+ *
+ * <p>The social lattice belongs to no root by default, so a node opts in by composing it,
+ * and the dependency runs one way — convex-social depends on the P2P layer, never the
+ * reverse. Peers that do not serve {@code :social} ignore the region rather than failing
+ * on it. Composing onto {@code Lattice.ROOT} is equally valid where the application
+ * regions ({@code :data}, {@code :fs}, {@code :kv}, {@code :queue}) are wanted too:</p>
  * <pre>{@code
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>

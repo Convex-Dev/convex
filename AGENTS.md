@@ -23,14 +23,14 @@ mvn clean install          # Full build with local install
 |--------|---------|
 | `convex-core` | CVM, consensus (CPoS), data structures, Etch database |
 | `convex-peer` | Peer implementation, binary protocol, networking |
-| `convex-p2p` | Core lattice peer-to-peer functionality |
+| `convex-p2p` | Core lattice P2P infrastructure (`:p2p` `:id` `:kad` regions) |
 | `convex-cli` | Command-line tools and scripting |
 | `convex-gui` | Swing desktop application |
 | `convex-restapi` | HTTP REST API server |
 | `convex-java` | Java client library |
 | `convex-db` | SQL database with JDBC and PostgreSQL protocol |
 | `convex-dlfs` | Distributed Lattice File System (WebDAV server) |
-| `convex-social` | Social network primitives on Convex |
+| `convex-social` | Social network primitives — an application layered on `convex-p2p` |
 | `convex-benchmarks` | JMH performance benchmarks |
 | `convex-observer` | Network monitoring tools |
 | `convex-integration` | Build assembly (produces convex.jar) |

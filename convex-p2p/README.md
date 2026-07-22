@@ -73,6 +73,38 @@ is safe (`ALatticeCursor.merge` always passes a context, and `LatticeContext.EMP
 triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
 on these regions.
 
+## Building on P2P
+
+convex-p2p is **infrastructure**, not an application. It answers "who is on this network,
+what do they run, and how do I reach them" — and nothing else. Applications layer on top
+by composing their own region onto the P2P root:
+
+```
+        ┌─────────────┬─────────────┬─────────────┐
+        │   :social   │    :sql     │     ...     │   application regions
+        ├─────────────┴─────────────┴─────────────┤
+        │        :p2p    :id    :kad              │   convex-p2p  (this module)
+        ├─────────────────────────────────────────┤
+        │   NodeServer — merge, gossip, transport │   convex-peer
+        ├─────────────────────────────────────────┤
+        │   lattice types, cursors, CAD3, Etch    │   convex-core
+        └─────────────────────────────────────────┘
+```
+
+A node is the sum of the regions it registers. A social node, for example, is a P2P node
+plus the social region:
+
+```java
+KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+```
+
+The dependency runs one way: applications depend on convex-p2p, never the reverse. This
+module has no knowledge of convex-social, convex-db or anything else built on it, so a
+bootstrap node or a pure relay carries none of their weight. Adding a region does not
+disturb the P2P ones — they keep their paths and merge semantics — and peers that do not
+recognise the new region simply ignore it, so an application can be deployed to part of
+a network without coordinating an upgrade across all of it.
+
 ## Installation
 
 ### Maven

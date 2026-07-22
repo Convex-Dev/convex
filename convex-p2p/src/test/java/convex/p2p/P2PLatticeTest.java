@@ -19,11 +19,14 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.RootLatticeCursor;
+import convex.lattice.generic.KeyedLattice;
+import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.ReservedLattice;
 
 /**
@@ -160,6 +163,39 @@ public class P2PLatticeTest {
 		assertNotNull(merged.get(P2PLattice.KEY_P2P), ":p2p is understood by both roots");
 		assertNull(merged.get(P2PLattice.KEY_ID), ":id is ignored, not fatal");
 		assertNull(merged.get(P2PLattice.KEY_KAD), ":kad is ignored, not fatal");
+	}
+
+	/**
+	 * The P2P root is a base to compose on, not a closed set. An application region
+	 * (convex-social, convex-db, anything else) is added with {@code addLattice} and
+	 * merges alongside the P2P regions — which is why convex-p2p does not need to know
+	 * about, or depend on, any of them.
+	 */
+	@Test
+	public void testApplicationRegionCanBeComposedOnto() {
+		Keyword appKey = Keyword.intern("someapp");
+		KeyedLattice composed = P2PLattice.ROOT.addLattice(appKey, MaxLattice.create());
+
+		// P2P regions still resolve at their original paths
+		assertSame(P2PLattice.ROOT.path(Keywords.P2P, Keywords.NODES),
+			composed.path(Keywords.P2P, Keywords.NODES));
+		assertNotNull(composed.path(P2PLattice.KEY_ID));
+		assertNotNull(composed.path(appKey));
+
+		@SuppressWarnings("unchecked")
+		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
+			.assoc(P2PLattice.KEY_ID, P2PLattice.createSignedIdentity(KP,
+				P2PLattice.createIdentity(Strings.create("erin"), null, null, 1000L)))
+			.assoc(appKey, CVMLong.create(42));
+
+		Index<Keyword, ACell> merged = composed.merge(
+			LatticeContext.EMPTY, composed.zero(), incoming);
+
+		assertEquals(CVMLong.create(42), merged.get(appKey), "App region merges");
+		assertEquals(Strings.create("erin"),
+			P2PLattice.getIdentity(ownerMap(merged.get(P2PLattice.KEY_ID)), KEY)
+				.get(P2PLattice.ID_NAME),
+			"P2P regions unaffected");
 	}
 
 	/** The converse: a P2P node serves its own regions and ignores application ones. */
