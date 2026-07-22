@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex P2P API</title>
+</head>
+<body>
+
+<h1>Convex P2P</h1>
+
+<p>Core peer-to-peer lattice functionality for Convex, building on the lattice
+data structures of convex-core and the <code>NodeServer</code> binary networking
+of convex-peer.</p>
+
+<h2>Key Types</h2>
+
+<ul>
+  <li><code>convex.p2p.P2PLattice</code> — the P2P root lattice, declaring the
+      top-level <code>:p2p</code> (node registry), <code>:id</code> (user identity)
+      and reserved <code>:kad</code> regions</li>
+  <li><code>convex.p2p.P2PNode</code> — a peer-to-peer lattice node over that root</li>
+  <li><code>convex.p2p.P2PUser</code> — a single user's owned area, with signing handled
+      by the cursor chain</li>
+</ul>
+
+</body>
+</html>

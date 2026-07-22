@@ -17,12 +17,13 @@ mvn clean install          # Full build with local install
 
 ## Module Structure
 
-12 Maven modules with clear separation of concerns:
+13 Maven modules with clear separation of concerns:
 
 | Module | Purpose |
 |--------|---------|
 | `convex-core` | CVM, consensus (CPoS), data structures, Etch database |
 | `convex-peer` | Peer implementation, binary protocol, networking |
+| `convex-p2p` | Core lattice peer-to-peer functionality |
 | `convex-cli` | Command-line tools and scripting |
 | `convex-gui` | Swing desktop application |
 | `convex-restapi` | HTTP REST API server |

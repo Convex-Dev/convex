@@ -209,6 +209,50 @@ public class GenericLatticeTest {
 		assertEquals(CVMLong.create(20), merged.get(owner2).getValue());
 	}
 
+	@Test
+	public void testOwnerLatticeRawMergeSkipsOwnerVerification() {
+		// The context-free merge(own, other) does NOT call verifyOwner: owner binding is
+		// enforced only by the context-aware overload. Contrast with
+		// testOwnerVerificationBlobKeyMismatch, which rejects the identical value.
+		// Callers exposing an OwnerLattice to untrusted data must merge with a context
+		// (an ALatticeCursor always does).
+		AKeyPair kpOwner = AKeyPair.generate();
+		AKeyPair kpFake = AKeyPair.generate();
+
+		OwnerLattice<AInteger> ownerLattice = OwnerLattice.create(MaxLattice.create());
+
+		// Slot keyed by kpOwner but signed by kpFake — a valid signature, wrong owner
+		ACell ownerKey = kpOwner.getAccountKey();
+		AHashMap<ACell, SignedData<AInteger>> forged =
+			Maps.of(ownerKey, kpFake.signData(CVMLong.create(42)));
+
+		AHashMap<ACell, SignedData<AInteger>> viaRaw = ownerLattice.merge(null, forged);
+		assertNotNull(viaRaw.get(ownerKey), "Context-free merge does not check signer against owner");
+
+		AHashMap<ACell, SignedData<AInteger>> viaContext =
+			ownerLattice.merge(LatticeContext.EMPTY, null, forged);
+		assertNull(viaContext.get(ownerKey), "Context merge rejects the same value");
+	}
+
+	@Test
+	public void testKeyedLatticeMergeIgnoresUnregisteredKeys() {
+		// AKeyedLattice merge iterates its registered keys, so an incoming key with no
+		// registered child lattice is never visited and is silently dropped. This is what
+		// lets independent top-level regions be adopted and retired: a node merges the
+		// regions it knows and ignores the rest, rather than failing on the whole value.
+		KeyedLattice lattice = KeyedLattice.create(Keywords.DATA, MaxLattice.create());
+
+		@SuppressWarnings("unchecked")
+		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
+			.assoc(Keywords.DATA, CVMLong.create(42))
+			.assoc(Keyword.intern("unregistered"), CVMLong.create(99));
+
+		Index<Keyword, ACell> merged = lattice.merge(lattice.zero(), incoming);
+
+		assertEquals(CVMLong.create(42), merged.get(Keywords.DATA), "Registered key merges");
+		assertNull(merged.get(Keyword.intern("unregistered")), "Unregistered key is dropped");
+	}
+
 	// ===== Owner verification tests =====
 
 	@Test
