@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New `convex-p2p` module: a rollup package for lattice P2P nodes, bundling the P2P regions (`:p2p` node registry, `:id` user identity, reserved `:kad`), the application regions a node serves, and the `P2PNode` server that serves them. `node.p2p(userID).cursor()` gives an application a cursor onto one user's owned area, signed on write.
+
 ### Changed
 
 - NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CLI: the `NO_COLOR` environment variable now follows the [convention](https://no-color.org) of suppressing colour whenever it is set to any non-empty value. Previously its value was parsed as a boolean, so a common `NO_COLOR=1` made every command fail with "'1' is not a boolean" before it ran.
 - REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
 - NodeServer: replayed lattice values that do not change local state no longer trigger repeated announce and root persistence work.
 - NodeServer: explicitly pulled values now merge through the authoritative root before persistence or re-propagation, preventing a dominated peer value from demoting the announced or persisted root.
