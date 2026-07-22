@@ -23,7 +23,7 @@ mvn clean install          # Full build with local install
 |--------|---------|
 | `convex-core` | CVM, consensus (CPoS), data structures, Etch database |
 | `convex-peer` | Peer implementation, binary protocol, networking |
-| `convex-p2p` | Lattice P2P infrastructure (`:p2p` `:id` `:kad`) and the node server |
+| `convex-p2p` | Rollup P2P package: infrastructure regions (`:p2p` `:id` `:kad`), bundled app regions, node server |
 | `convex-cli` | Command-line tools and scripting |
 | `convex-gui` | Swing desktop application |
 | `convex-restapi` | HTTP REST API server |

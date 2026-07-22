@@ -12,7 +12,8 @@
 	<artifactId>convex-p2p</artifactId>
 
 	<name>Convex P2P</name>
-	<description>Core lattice peer-to-peer functionality for Convex</description>
+	<description>Rollup package for Convex P2P nodes: lattice P2P infrastructure, the
+		application regions a node serves, and the node server that serves them</description>
 	<url>https://convex.world</url>
 
 	<dependencies>
@@ -28,9 +29,11 @@
 			<version>${convex.version}</version>
 			<scope>compile</scope>
 		</dependency>
-		<!-- A P2P node serves application regions too, so that operators run one node
-		     server rather than a P2P one and a social one. Regions are selected per node
-		     (see P2PNode), not per build. -->
+		<!-- Rolled-up application regions. This module bundles the regions a node serves
+		     so operators run one node server rather than a P2P one and a social one; the
+		     dependency runs this way only, and each application stays usable standalone.
+		     Add a region here and to P2PLattice.NODE_ROOT together. Regions are selected
+		     per node (see P2PNode), not per build. -->
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-social</artifactId>

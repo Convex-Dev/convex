@@ -75,8 +75,9 @@ Convex Social is an **application layered on P2P infrastructure**. It supplies o
 lattice region, `:social`; discovering peers, advertising node identity and moving values
 between nodes are convex-p2p's job, not its own.
 
-There is no separate "social node" to run. `convex-p2p`'s `P2PNode` is the only node
-server, and it serves `:social` by default as part of `P2PLattice.NODE_ROOT`:
+There is no separate "social node" to run. `convex-p2p` is a rollup package that bundles
+this region along with the P2P infrastructure and the node server, so its `P2PNode` is
+the only node server, serving `:social` by default as part of `P2PLattice.NODE_ROOT`:
 
 ```java
 P2PNode node = P2PNode.create(store, config, keyPair);   // serves :social
@@ -92,6 +93,10 @@ P2PNode relay = P2PNode.create(store, config, keyPair, P2PLattice.ROOT);
 Region sets need not match across a network — a node that does not serve `:social`
 ignores the region rather than failing on it — so social can be rolled out to part of a
 network without a coordinated upgrade.
+
+The bundling is one-directional: convex-p2p depends on convex-social, not the reverse.
+This module remains usable on its own, with no P2P node involved, as in the standalone
+example above.
 
 For a node that also wants convex-core's application regions (`:data`, `:fs`, `:kv`,
 `:queue`), composing onto `Lattice.ROOT` remains equally valid:

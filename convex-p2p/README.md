@@ -3,10 +3,11 @@
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-p2p.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-p2p/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-p2p)
 
-Core peer-to-peer lattice functionality for Convex. Builds on the lattice data
-structures in `convex-core` and the `NodeServer` binary networking in `convex-peer`
-to provide nodes that discover each other, exchange lattice values and converge on
-shared state.
+Rollup package for Convex P2P nodes. Builds on the lattice data structures in
+`convex-core` and the `NodeServer` binary networking in `convex-peer` to provide nodes
+that discover each other, exchange lattice values and converge on shared state — and
+bundles the application regions those nodes serve, so one dependency gives you a
+complete node.
 
 > **Status: early stub.** The module scaffolding and entry point are in place;
 > discovery, region subscription and replication policy are still to be built.
@@ -73,11 +74,22 @@ is safe (`ALatticeCursor.merge` always passes a context, and `LatticeContext.EMP
 triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
 on these regions.
 
-## One node server, selectable regions
+## A rollup package
 
-There is a single node server — `P2PNode` — not a P2P one and a social one. Applications
-are users of the P2P infrastructure, but they do not each bring their own node: the
-regions a node serves are a **per-node choice, not a per-build one**.
+convex-p2p is a **rollup**: one dependency that gives you a complete, runnable P2P node.
+It aggregates three things that would otherwise have to be assembled by hand —
+
+- the P2P infrastructure regions (`:p2p`, `:id`, `:kad`) it defines itself,
+- the application regions bundled with a node (currently `:social`),
+- and the node server that serves them, `P2PNode`.
+
+so that operators run *one* node rather than a P2P one and a social one. Which of the
+rolled-up regions a node actually serves is a **per-node choice, not a per-build one**.
+
+Rolling up is deliberately one-directional. convex-p2p depends on the applications it
+bundles; they do not depend on it, and each stays usable on its own — convex-social works
+standalone, with no P2P node in sight. Adding a region to the bundle is a convex-p2p
+decision, and the only place that decision is recorded.
 
 ```
         ┌─────────────┬─────────────┬─────────────┐
@@ -91,7 +103,7 @@ regions a node serves are a **per-node choice, not a per-build one**.
         └─────────────────────────────────────────┘
 ```
 
-Two region sets are provided:
+Two region sets are provided — the whole rollup, or the infrastructure floor:
 
 | | Regions | Use |
 |---|---|---|
@@ -114,11 +126,15 @@ interoperate on everything they share — which is what makes switching a region
 safe local decision, and lets an application be rolled out to part of a network without
 a coordinated upgrade.
 
-A region that isn't bundled composes the same way `NODE_ROOT` composes social:
+A region outside the rollup composes the same way `NODE_ROOT` composes social:
 
 ```java
 KeyedLattice root = P2PLattice.NODE_ROOT.addLattice(MyApp.KEY, MyApp.LATTICE);
 ```
+
+A region that should ship with every node instead becomes part of the rollup: add the
+dependency to this module's POM and the region to `NODE_ROOT`, and every node picks it
+up with the option to switch it off.
 
 ## Installation
 

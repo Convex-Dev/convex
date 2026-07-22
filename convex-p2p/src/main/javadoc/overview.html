@@ -8,17 +8,17 @@
 
 <h1>Convex P2P</h1>
 
-<p>Core peer-to-peer lattice functionality for Convex, building on the lattice
-data structures of convex-core and the <code>NodeServer</code> binary networking
-of convex-peer.</p>
+<p>Rollup package for Convex P2P nodes, building on the lattice data structures
+of convex-core and the <code>NodeServer</code> binary networking of convex-peer.</p>
 
-<p>This module is infrastructure: it answers who is on the network, what they run
-and how to reach them. Applications such as convex-social are its users, but they
-do not each bring their own node server — <code>P2PNode</code> is the only one, and
-the regions it serves are a per-node choice rather than a per-build one.
-<code>P2PLattice.NODE_ROOT</code> is the default (infrastructure plus bundled
-applications); <code>P2PLattice.ROOT</code> is the same node with the application
-regions switched off, and is still a fully capable discovery node.</p>
+<p>One dependency gives a complete node. This module defines the P2P
+infrastructure regions — who is on the network, what they run, how to reach them —
+and bundles the application regions a node serves, so <code>P2PNode</code> is the
+only node server rather than one per application. Which rolled-up regions a node
+serves is a per-node choice: <code>P2PLattice.NODE_ROOT</code> is the default
+(infrastructure plus bundled applications), and <code>P2PLattice.ROOT</code> is
+the same node with the application regions switched off, still a fully capable
+discovery node.</p>
 
 <h2>Key Types</h2>
 

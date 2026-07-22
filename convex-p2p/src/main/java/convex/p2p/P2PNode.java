@@ -24,10 +24,11 @@ import convex.node.NodeServer;
 /**
  * A Convex peer-to-peer lattice node.
  *
- * <p>This is the main entry point for convex-p2p, and the <em>only</em> node server:
- * there is no separate social node or per-application node. It composes a region set
- * with the {@link NodeServer} networking provided by convex-peer, giving a node that can
- * query, merge and propagate lattice values with other nodes over the binary protocol.
+ * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
+ * <em>only</em> node server, with no separate social or per-application node. It composes
+ * a region set with the {@link NodeServer} networking provided by convex-peer, giving a
+ * node that can query, merge and propagate lattice values with other nodes over the
+ * binary protocol.
  *
  * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
  * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application

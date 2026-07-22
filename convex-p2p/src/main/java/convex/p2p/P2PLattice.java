@@ -27,21 +27,21 @@ import convex.social.Social;
  * {@code convex.lattice.Lattice#ROOT} ({@code :data}, {@code :fs}, {@code :kv},
  * {@code :queue}).
  *
- * <h2>One node server, selectable regions</h2>
+ * <h2>Part of a rollup</h2>
  *
- * <p>Applications are users of this infrastructure, but that does not mean a separate node
- * server per application. There is one — {@link P2PNode} — and the regions it serves are
- * a per-node choice rather than a per-build one. {@link #NODE_ROOT} is what it serves by
- * default; {@link #ROOT} is the same node with the application regions switched off, and
- * is still a complete discovery node.
+ * <p>convex-p2p is a rollup package: one dependency giving a complete node. This class
+ * holds both halves of its region story — {@link #ROOT}, the infrastructure regions the
+ * module defines itself, and {@link #NODE_ROOT}, those plus the application regions
+ * bundled with a node. There is one node server ({@link P2PNode}) serving whichever set
+ * is chosen, not a separate node per application.
  *
  * <p>Region sets need not match across a network: an unrecognised top-level region is
  * ignored on merge rather than rejected, so a node serving only {@code ROOT} and one
  * serving {@code NODE_ROOT} interoperate on everything they have in common. That is what
  * makes switching a region off a safe local decision.
  *
- * <p>A region not bundled here is composed the same way {@link #NODE_ROOT} composes
- * social:
+ * <p>A region outside the rollup is composed the same way {@link #NODE_ROOT} composes
+ * social; one that should ship with every node is added to {@code NODE_ROOT} instead.
  *
  * <pre>{@code
  * KeyedLattice root = P2PLattice.NODE_ROOT.addLattice(MyApp.KEY, MyApp.LATTICE);
@@ -185,13 +185,16 @@ public class P2PLattice {
 
 	/**
 	 * The regions a standard node serves: {@link #ROOT} plus the application regions
-	 * bundled with it.
+	 * rolled up into this package.
 	 *
 	 * <p>There is one node server ({@link P2PNode}), not a P2P one and a social one.
 	 * Which regions it serves is a per-node choice, not a per-build one — an operator
 	 * who does not want social passes {@link #ROOT} instead, and still runs a complete
 	 * discovery node. Regions a node does not serve are ignored on merge rather than
 	 * rejected, so nodes with different region sets interoperate.
+	 *
+	 * <p>This is the single place the bundle is declared: a region that should ship with
+	 * every node is added here, alongside its dependency in this module's POM.
 	 */
 	public static final KeyedLattice NODE_ROOT =
 		ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
