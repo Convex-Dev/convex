@@ -172,6 +172,19 @@ public class PeerAuthTest {
 
 		AString identity = audAuth.verifyBearerToken(jwt);
 		assertNotNull(identity, "Self-issued JWT with correct aud should authenticate");
+		assertEquals(clientKP.getAccountKey(),audAuth.verifySelfIssuedToken(jwt),
+				"key-authority callers need the actual cryptographic signer");
+	}
+
+	@Test
+	public void testPeerIssuedTokenIsNotSelfIssuedKeyAuthority() {
+		PeerAuth audAuth = PeerAuth.createWithDIDAudience(PEER_KP);
+		AString identity = DID.forKey(AKeyPair.generate().getAccountKey());
+		AString jwt = audAuth.issuePeerToken(identity,300);
+
+		assertEquals(identity,audAuth.verifyBearerToken(jwt));
+		assertNull(audAuth.verifySelfIssuedToken(jwt),
+				"an asserted subject must not be mistaken for the JWT signing key");
 	}
 
 	@Test

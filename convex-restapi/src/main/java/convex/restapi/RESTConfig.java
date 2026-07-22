@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import convex.auth.did.DID;
+import convex.core.crypto.util.Multikey;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -59,6 +61,8 @@ public class RESTConfig extends PeerConfig {
 	public static final AString QUERY_WATCH = Strings.intern("queryWatch");
 	public static final AString ADMIN = Strings.intern("admin");
 	public static final AString MESSAGE_ENDPOINT = Strings.intern("messageEndpoint");
+	public static final AString KEYS = Strings.intern("keys");
+	public static final AString TRUSTED_PROXIES = Strings.intern("trustedProxies");
 
 	// ========== MCP config keys ==========
 
@@ -152,7 +156,65 @@ public class RESTConfig extends PeerConfig {
 	 * @return true if administration is explicitly enabled (default: false)
 	 */
 	public boolean isAdminEnabled() {
-		return getBool(getSection(REST), ADMIN, false);
+		ACell value=getSection(REST).get(ADMIN);
+		AMap<AString,ACell> section=RT.castMap(value);
+		if (section!=null) value=section.get(ENABLED);
+		if (value==null) return false;
+		if (value instanceof CVMBool enabled) return enabled.booleanValue();
+		throw new IllegalArgumentException("rest.admin must be a boolean or an object with a boolean enabled field");
+	}
+
+	/**
+	 * Gets an explicit administrator-key allowlist.
+	 *
+	 * <p>Keys are represented as {@code did:key} identities. A missing value means
+	 * use the venue operational key and the current consensus controller key. An
+	 * explicitly configured empty vector therefore denies all keys.</p>
+	 *
+	 * @return configured key identities, or {@code null} for the dynamic defaults
+	 */
+	public java.util.Set<AString> getAdminKeys() {
+		AMap<AString,ACell> section=RT.castMap(getSection(REST).get(ADMIN));
+		if ((section==null)||!section.containsKey(KEYS)) return null;
+		convex.core.data.AVector<ACell> values=RT.ensureVector(section.get(KEYS));
+		if (values==null) throw new IllegalArgumentException("rest.admin.keys must be a vector of did:key strings");
+		java.util.HashSet<AString> result=new java.util.HashSet<>();
+		for (long i=0;i<values.count();i++) {
+			AString key=RT.ensureString(values.get(i));
+			if ((key==null)||!key.toString().startsWith("did:key:")) {
+				throw new IllegalArgumentException("rest.admin.keys entries must be did:key strings");
+			}
+			try {
+				var accountKey=Multikey.decodePublicKey(key.toString().substring("did:key:".length()));
+				result.add(DID.forKey(accountKey));
+			} catch (Exception e) {
+				throw new IllegalArgumentException("Invalid did:key in rest.admin.keys: "+key,e);
+			}
+		}
+		return java.util.Set.copyOf(result);
+	}
+
+	/**
+	 * Gets immediate proxy addresses trusted to report HTTPS transport for remote
+	 * administration. Loopback proxies are always trusted; forwarded client
+	 * addresses are never used for authorisation.
+	 *
+	 * @return configured immediate proxy IP addresses
+	 */
+	public java.util.Set<String> getAdminTrustedProxies() {
+		AMap<AString,ACell> section=RT.castMap(getSection(REST).get(ADMIN));
+		if ((section==null)||!section.containsKey(TRUSTED_PROXIES)) return java.util.Set.of();
+		convex.core.data.AVector<ACell> values=RT.ensureVector(section.get(TRUSTED_PROXIES));
+		if (values==null) throw new IllegalArgumentException("rest.admin.trustedProxies must be a vector of IP address strings");
+		java.util.HashSet<String> result=new java.util.HashSet<>();
+		for (long i=0;i<values.count();i++) {
+			AString address=RT.ensureString(values.get(i));
+			if ((address==null)||address.toString().isBlank()) {
+				throw new IllegalArgumentException("rest.admin.trustedProxies entries must be IP address strings");
+			}
+			result.add(address.toString());
+		}
+		return java.util.Set.copyOf(result);
 	}
 
 	/**

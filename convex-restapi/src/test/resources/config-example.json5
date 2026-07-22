@@ -66,9 +66,10 @@
 		// HTTP port for REST API and web interface (default: 8080).
 		"port": 8080,
 
-		// External base URL for links in responses and DID documents.
+		// External base URL for links, DID documents and administrator JWT audiences.
 		// If not set, derived from request headers (Host, X-Forwarded-*).
-		// Set this when behind a reverse proxy or load balancer.
+		// Set this when behind a reverse proxy or load balancer. It is mandatory when
+		// administration is enabled because security decisions must not use request headers.
 		// "baseUrl": "https://peer.convex.live",
 
 		// Enable the faucet endpoint for test coin distribution (default: false).
@@ -83,10 +84,18 @@
 		// CORS allowed origins (default: "*" = all origins).
 		// "cors": "*",
 
-		// Enable process administration routes (default: false).
-		// SECURITY: Keep disabled on public Peers. When enabled, these routes still
-		// retain their route-specific authentication and loopback restrictions.
-		"admin": false,
+		// Process administration routes are absent by default. When enabled, every request
+		// needs a self-issued JWT with aud equal to the did:web derived from baseUrl. The
+		// default signers are the local Peer operational key and the Peer controller account
+		// key resolved from current consensus state. Remote requests also require HTTPS.
+		// A loopback TLS proxy is trusted to report X-Forwarded-Proto; list any other
+		// immediate proxy by IP. Forwarded client-address headers are never trusted.
+		"admin": {
+			"enabled": false,
+			// Optional replacement for the two dynamic default signers. [] denies all.
+			// "keys": ["did:key:z..."],
+			// "trustedProxies": ["10.0.0.10"],
+		},
 
 		// Expose POST /api/v1/message as a transport for Peer protocol messages
 		// (default: false). This is suitable for public Peers that intentionally use

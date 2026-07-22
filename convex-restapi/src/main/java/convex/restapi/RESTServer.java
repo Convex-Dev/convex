@@ -14,6 +14,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -37,8 +38,10 @@ import convex.restapi.api.X402;
 import convex.restapi.api.LogWatchAPI;
 import convex.restapi.api.QueryWatchAPI;
 import convex.restapi.auth.AuthMiddleware;
+import convex.restapi.auth.AdminAuthorizer;
 import convex.restapi.auth.ConfirmationService;
 import convex.restapi.auth.OAuthService;
+import convex.restapi.auth.VenueIdentity;
 import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
@@ -72,6 +75,8 @@ public class RESTServer implements Closeable {
 	protected final RESTConfig restConfig;
 	protected final Convex convex;
 	protected final PublicQueryService publicQueryService;
+	protected final AString venueDID;
+	protected final AdminAuthorizer adminAuthorizer;
 	protected Javalin javalin;
 	
 	protected static final Integer DEFAULT_PORT=8080;
@@ -88,6 +93,20 @@ public class RESTServer implements Closeable {
 						? rc : RESTConfig.fromLegacy(server.getConfig()));
 		this.convex = ConvexLocal.create(server);
 		this.publicQueryService = new PublicQueryService(server);
+		String baseUrl=restConfig.getBaseUrl();
+		this.venueDID=(baseUrl==null)?null:VenueIdentity.fromBaseUrl(baseUrl);
+		if (restConfig.isAdminEnabled()) {
+			if (venueDID==null) {
+				throw new IllegalArgumentException("rest.baseUrl is required when REST administration is enabled");
+			}
+			if (server.getKeyPair()==null) {
+				throw new IllegalArgumentException("REST administration requires a local Peer key pair");
+			}
+			this.adminAuthorizer=new AdminAuthorizer(server,venueDID,
+				restConfig.getAdminKeys(),restConfig.getAdminTrustedProxies());
+		} else {
+			this.adminAuthorizer=null;
+		}
 
 		if (RT.bool(getConfig().get(ChainAPI.K_FAUCET))) {
 			this.convexFaucet = ConvexLocal.create(server,server.getPeerController(),server.getKeyPair());
@@ -149,6 +168,16 @@ public class RESTServer implements Closeable {
 
 	public RESTConfig getRESTConfig() {
 		return restConfig;
+	}
+
+	/** Gets the stable configured venue DID, or null when no base URL is configured. */
+	public AString getVenueDID() {
+		return venueDID;
+	}
+
+	/** Gets the administrator authorizer when administration is enabled. */
+	public AdminAuthorizer getAdminAuthorizer() {
+		return adminAuthorizer;
 	}
 
 	public PublicQueryService getPublicQueryService() {
@@ -497,9 +526,7 @@ public class RESTServer implements Closeable {
 	 * @return BAse URL String
 	 */
 	public String getBaseURL() {
-		Object o= server.getConfig().get(Keywords.BASE_URL);
-		if (o instanceof String) return (String)o;
-		return null;
+		return restConfig.getBaseUrl();
 	}
 
 	/**

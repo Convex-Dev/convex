@@ -13,10 +13,13 @@ import java.net.http.HttpResponse;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
+import convex.auth.jwt.JWT;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
@@ -127,6 +130,73 @@ class RESTRuntimeConfigTest {
 	}
 
 	@Test
+	void administrationRequiresStableConfiguredVenueIdentity() throws Exception {
+		RESTConfig config=RESTConfig.parse("{rest:{admin:true},mcp:{enabled:false}}");
+		var launchConfig=config.toLegacy();
+		launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
+		Server peer=API.launchPeer(launchConfig);
+		try {
+			org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+				()->RESTServer.create(peer));
+		} finally {
+			peer.close();
+		}
+	}
+
+	@Test
+	void administrationRejectsMissingWrongAndForgedCredentials() throws Exception {
+		String config="""
+			{rest:{baseUrl:"http://localhost",admin:{enabled:true}},mcp:{enabled:false}}
+			""";
+		try (RunningServer running=launch(config)) {
+			String shutdown=running.url("/api/v1/peer/shutdown");
+			assertEquals(401,post(shutdown,"{}",null,null).statusCode());
+
+			AKeyPair attacker=AKeyPair.generate();
+			AString attackerToken=selfIssuedToken(attacker,"did:web:localhost");
+			assertEquals(403,postAdmin(shutdown,attackerToken.toString(),
+				"127.0.0.1","https").statusCode(),
+				"forwarded client and protocol headers must not grant administrator authority");
+			AString operationalToken=selfIssuedToken(running.peer().getKeyPair(),"did:web:localhost");
+			assertEquals(403,postAdmin(shutdown,operationalToken.toString(),
+				"203.0.113.7",null).statusCode(),
+				"proxy metadata must not make cleartext external traffic look like direct loopback access");
+
+			AString wrongAudience=selfIssuedToken(running.peer().getKeyPair(),"did:web:other.example");
+			assertEquals(401,postAdmin(shutdown,wrongAudience.toString(),null,null).statusCode());
+			assertTrue(running.peer().isRunning());
+		}
+	}
+
+	@Test
+	void operationalKeyMayShutDownLocalPeerWithVenueAudience() throws Exception {
+		String config="""
+			{rest:{baseUrl:"http://localhost",admin:{enabled:true}},mcp:{enabled:false}}
+			""";
+		try (RunningServer running=launch(config)) {
+			AString token=selfIssuedToken(running.peer().getKeyPair(),"did:web:localhost");
+			HttpResponse<String> response=post(
+				running.url("/api/v1/peer/shutdown"),"{}",token.toString(),null);
+			assertEquals(200,response.statusCode());
+			assertFalse(running.peer().isRunning());
+		}
+	}
+
+	@Test
+	void configuredVenueDIDIgnoresForgedForwardedHost() throws Exception {
+		try (RunningServer running=launch(
+				"{rest:{baseUrl:\"https://venue.example.com\"},mcp:{enabled:false}}")) {
+			HttpRequest request=HttpRequest.newBuilder(URI.create(running.url("/.well-known/did.json")))
+				.header("X-Forwarded-Host","attacker.example")
+				.GET().build();
+			HttpResponse<String> response=CLIENT.send(request,HttpResponse.BodyHandlers.ofString());
+			assertEquals(200,response.statusCode());
+			AMap<AString,ACell> doc=RT.castMap(JSON.parse(response.body()));
+			assertEquals(Strings.create("did:web:venue.example.com"),doc.get(Strings.create("id")));
+		}
+	}
+
+	@Test
 	void corsAllowListIsNotOverriddenByWildcardHeaders() throws Exception {
 		try (RunningServer running=launch("{rest:{cors:[\"https://app.example\"]},mcp:{enabled:false}}")) {
 			HttpResponse<String> allowed=getWithOrigin(running.url("/api/v1/status"),"https://app.example");
@@ -181,6 +251,30 @@ class RESTRuntimeConfigTest {
 				.header("Accept","application/cvx")
 				.POST(HttpRequest.BodyPublishers.ofString(body)).build();
 		return CLIENT.send(request,HttpResponse.BodyHandlers.ofString());
+	}
+
+	private static HttpResponse<String> postAdmin(String url,String bearer,String forwardedFor,
+			String forwardedProto) throws Exception {
+		HttpRequest.Builder request=HttpRequest.newBuilder(URI.create(url))
+			.header("Content-Type","application/json")
+			.header("Authorization","Bearer "+bearer)
+			.POST(HttpRequest.BodyPublishers.ofString("{}"));
+		if (forwardedFor!=null) request.header("X-Forwarded-For",forwardedFor);
+		if (forwardedProto!=null) request.header("X-Forwarded-Proto",forwardedProto);
+		return CLIENT.send(request.build(),HttpResponse.BodyHandlers.ofString());
+	}
+
+	private static AString selfIssuedToken(AKeyPair signer,String audience) {
+		long now=System.currentTimeMillis()/1000;
+		AString did=DID.forKey(signer.getAccountKey());
+		AMap<AString,ACell> claims=Maps.of(
+			JWT.SUB,did,
+			JWT.ISS,did,
+			JWT.AUD,Strings.create(audience),
+			JWT.IAT,now,
+			JWT.EXP,now+300
+		);
+		return JWT.signPublic(claims,signer);
 	}
 
 	private static String ping() {

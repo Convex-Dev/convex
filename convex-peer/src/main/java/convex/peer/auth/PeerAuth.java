@@ -72,14 +72,32 @@ public class PeerAuth {
 		if (parsed == null) return null;
 
 		// Try self-issued: kid header contains multikey public key
-		AString identity = verifySelfIssued(parsed);
-		if (identity != null) return identity;
+		AccountKey signerKey = verifySelfIssued(parsed);
+		if (signerKey != null) return DID.forKey(signerKey);
 
 		// Try peer-signed: verify against peer's known key
-		identity = verifyPeerSigned(parsed);
+		AString identity = verifyPeerSigned(parsed);
 		if (identity != null) return identity;
 
 		return null;
+	}
+
+	/**
+	 * Verifies a self-issued bearer token and returns the key that actually signed it.
+	 *
+	 * <p>This deliberately excludes peer-issued identity tokens. Callers making an
+	 * authorisation decision about key ownership (for example venue administration)
+	 * must compare the cryptographic signer, not a subject asserted by another issuer.</p>
+	 *
+	 * @param jwt Encoded JWT string
+	 * @return Ed25519 signing key, or {@code null} if the token is invalid, expired,
+	 *         has the wrong audience, or is not self-issued
+	 */
+	public AccountKey verifySelfIssuedToken(AString jwt) {
+		if (jwt == null) return null;
+		JWT parsed = JWT.parse(jwt);
+		if (parsed == null) return null;
+		return verifySelfIssued(parsed);
 	}
 
 	/**
@@ -132,7 +150,7 @@ public class PeerAuth {
 
 	// ==================== Internal ====================
 
-	private AString verifySelfIssued(JWT parsed) {
+	private AccountKey verifySelfIssued(JWT parsed) {
 		try {
 			String kid = parsed.getKeyID();
 			if (kid == null) return null;
@@ -151,7 +169,7 @@ public class PeerAuth {
 			AString expectedDID = DID.forKey(signerKey);
 			if (!expectedDID.equals(sub)) return null;
 
-			return sub;
+			return signerKey;
 		} catch (Exception e) {
 			return null;
 		}
