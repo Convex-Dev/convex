@@ -16,6 +16,7 @@ import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
 import convex.lattice.generic.OwnerLattice;
 import convex.lattice.generic.ReservedLattice;
+import convex.social.Social;
 
 /**
  * The root lattice for a Convex P2P node — the top-level regions the P2P system needs
@@ -26,29 +27,36 @@ import convex.lattice.generic.ReservedLattice;
  * {@code convex.lattice.Lattice#ROOT} ({@code :data}, {@code :fs}, {@code :kv},
  * {@code :queue}).
  *
- * <h2>A base to build on</h2>
+ * <h2>One node server, selectable regions</h2>
  *
- * <p>This module is infrastructure, and applications are its users. An application
- * supplies its own region and composes it onto this root; a social node, for instance, is
- * a P2P node plus the social region:
+ * <p>Applications are users of this infrastructure, but that does not mean a separate node
+ * server per application. There is one — {@link P2PNode} — and the regions it serves are
+ * a per-node choice rather than a per-build one. {@link #NODE_ROOT} is what it serves by
+ * default; {@link #ROOT} is the same node with the application regions switched off, and
+ * is still a complete discovery node.
+ *
+ * <p>Region sets need not match across a network: an unrecognised top-level region is
+ * ignored on merge rather than rejected, so a node serving only {@code ROOT} and one
+ * serving {@code NODE_ROOT} interoperate on everything they have in common. That is what
+ * makes switching a region off a safe local decision.
+ *
+ * <p>A region not bundled here is composed the same way {@link #NODE_ROOT} composes
+ * social:
  *
  * <pre>{@code
- * KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+ * KeyedLattice root = P2PLattice.NODE_ROOT.addLattice(MyApp.KEY, MyApp.LATTICE);
  * }</pre>
- *
- * <p>The dependency runs one way — applications depend on convex-p2p, never the reverse —
- * so this module knows nothing of convex-social, convex-db or anything else layered on
- * it, and a bootstrap node or pure relay carries none of their weight. Composition leaves
- * the P2P regions' paths and merge semantics untouched, and peers that do not recognise
- * an added region ignore it.
  *
  * <h2>Structure</h2>
  * <pre>
- *   P2PLattice.ROOT (KeyedLattice)
+ *   P2PLattice.ROOT (KeyedLattice)                 infrastructure floor
  *   ├── :p2p → KeyedLattice                        shared node registry
  *   │     └── :nodes → OwnerLattice(LWWLattice)      user key → Signed(NodeInfo)
  *   ├── :id  → OwnerLattice(LWWLattice)            user key → Signed(IdentityInfo)
  *   └── :kad → ReservedLattice                     reserved, nothing merges yet
+ *
+ *   P2PLattice.NODE_ROOT                           what a node serves by default
+ *   └── ROOT + :social → Social.SOCIAL_LATTICE
  * </pre>
  *
  * <h2>Independent top-level regions</h2>
@@ -160,14 +168,33 @@ public class P2PLattice {
 	// ========== Composition ==========
 
 	/**
-	 * Root lattice for a P2P node: the node registry, user identity and reserved
-	 * routing regions, as independent top-level siblings.
+	 * The P2P regions alone: node registry, user identity and reserved routing, as
+	 * independent top-level siblings.
+	 *
+	 * <p>This is the infrastructure floor — what a node must serve to be a useful
+	 * participant. It is also the root to run when every application region is switched
+	 * off; such a node is still a fully capable discovery node.
+	 *
+	 * <p>For the regions a node serves by default, see {@link #NODE_ROOT}.
 	 */
 	public static final KeyedLattice ROOT = KeyedLattice.create(
 		KEY_P2P, P2P_LATTICE,
 		KEY_ID, ID_LATTICE,
 		KEY_KAD, KAD_LATTICE
 	);
+
+	/**
+	 * The regions a standard node serves: {@link #ROOT} plus the application regions
+	 * bundled with it.
+	 *
+	 * <p>There is one node server ({@link P2PNode}), not a P2P one and a social one.
+	 * Which regions it serves is a per-node choice, not a per-build one — an operator
+	 * who does not want social passes {@link #ROOT} instead, and still runs a complete
+	 * discovery node. Regions a node does not serve are ignored on merge rather than
+	 * rejected, so nodes with different region sets interoperate.
+	 */
+	public static final KeyedLattice NODE_ROOT =
+		ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
 
 	// ========== Identity helpers ==========
 

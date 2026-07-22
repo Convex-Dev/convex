@@ -39,16 +39,17 @@ import convex.lattice.generic.OwnerLattice;
  *
  * <p>Convex Social is an application layered on P2P infrastructure: it supplies the
  * {@code :social} region and nothing else, leaving peer discovery, node identity and
- * value propagation to convex-p2p. A social node is a P2P node plus this region:</p>
- * <pre>{@code
- * KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
- * }</pre>
+ * value propagation to convex-p2p.</p>
  *
- * <p>The social lattice belongs to no root by default, so a node opts in by composing it,
- * and the dependency runs one way — convex-social depends on the P2P layer, never the
- * reverse. Peers that do not serve {@code :social} ignore the region rather than failing
- * on it. Composing onto {@code Lattice.ROOT} is equally valid where the application
- * regions ({@code :data}, {@code :fs}, {@code :kv}, {@code :queue}) are wanted too:</p>
+ * <p>There is no separate social node to run. {@code P2PNode} is the only node server,
+ * and serves {@code :social} by default as part of {@code P2PLattice.NODE_ROOT}. An
+ * operator who does not want social passes {@code P2PLattice.ROOT} instead and still runs
+ * a fully capable discovery node. Region sets need not match across a network: a node
+ * that does not serve {@code :social} ignores the region rather than failing on it.</p>
+ *
+ * <p>For a node that also wants convex-core's application regions ({@code :data},
+ * {@code :fs}, {@code :kv}, {@code :queue}), composing onto {@code Lattice.ROOT} remains
+ * equally valid:</p>
  * <pre>{@code
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>

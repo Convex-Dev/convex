@@ -17,16 +17,24 @@ import convex.core.store.AStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 
 /**
  * A Convex peer-to-peer lattice node.
  *
- * <p>This is the main entry point for convex-p2p. It composes the P2P root lattice
- * ({@link P2PLattice#ROOT}) with the {@link NodeServer} networking provided by
- * convex-peer, giving a node that can query, merge and propagate P2P lattice values
- * with other nodes over the binary protocol.
+ * <p>This is the main entry point for convex-p2p, and the <em>only</em> node server:
+ * there is no separate social node or per-application node. It composes a region set
+ * with the {@link NodeServer} networking provided by convex-peer, giving a node that can
+ * query, merge and propagate lattice values with other nodes over the binary protocol.
+ *
+ * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
+ * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
+ * regions. To switch the application regions off, pass {@link P2PLattice#ROOT} to the
+ * four-argument overload; the result is still a complete discovery node, because the
+ * infrastructure regions are the same either way. Since a node ignores regions it does
+ * not serve, region sets need not match across a network.
  *
  * <p><b>Stub.</b> The current implementation is deliberately minimal: it wires up a
  * store, a signing key and a NodeServer, and exposes the root cursor. Peer discovery,
@@ -51,7 +59,9 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Creates a P2P node over the root lattice. The node is not launched.
+	 * Creates a P2P node serving the default region set
+	 * ({@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
+	 * regions). The node is not launched.
 	 *
 	 * @param store Store backing lattice persistence and acquisition
 	 * @param config Node configuration, or null for defaults
@@ -59,9 +69,32 @@ public class P2PNode implements Closeable {
 	 * @return A new (unlaunched) P2PNode
 	 */
 	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair) {
-		if (store == null) throw new IllegalArgumentException("Store must not be null");
+		return create(store, config, keyPair, P2PLattice.NODE_ROOT);
+	}
 
-		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(P2PLattice.ROOT, store, config);
+	/**
+	 * Creates a P2P node serving an explicit region set.
+	 *
+	 * <p>This is how regions are switched off or added — not by running a different node
+	 * server. Pass {@link P2PLattice#ROOT} for infrastructure only (a complete discovery
+	 * node with the application regions off), or a root composed with
+	 * {@code addLattice} to serve additional ones.
+	 *
+	 * <p>A node ignores incoming values for regions it does not serve, so its region set
+	 * need not match its peers'.
+	 *
+	 * @param store Store backing lattice persistence and acquisition
+	 * @param config Node configuration, or null for defaults
+	 * @param keyPair Signing key for this node's owned lattice data, or null for none
+	 * @param root Regions this node serves; must include the P2P regions
+	 * @return A new (unlaunched) P2PNode
+	 */
+	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair,
+			KeyedLattice root) {
+		if (store == null) throw new IllegalArgumentException("Store must not be null");
+		if (root == null) throw new IllegalArgumentException("Root lattice must not be null");
+
+		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root, store, config);
 		if (keyPair != null) {
 			server.setMergeContext(LatticeContext.create(null, keyPair));
 		}

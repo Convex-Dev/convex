@@ -16,7 +16,6 @@
 		<module>convex-cli</module>
 		<module>convex-gui</module>
 		<module>convex-peer</module>
-		<module>convex-p2p</module>
 		<module>convex-db</module>
 		<module>convex-benchmarks</module>
 		<module>convex-observer</module>
@@ -24,6 +23,7 @@
 		<module>convex-restapi</module>
 		<module>convex-dlfs</module>
 		<module>convex-social</module>
+		<module>convex-p2p</module>
 		<module>convex-integration</module>
 	</modules>
 

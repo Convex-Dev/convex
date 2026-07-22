@@ -73,17 +73,17 @@ is safe (`ALatticeCursor.merge` always passes a context, and `LatticeContext.EMP
 triggers the `AccountKey` fast path), but don't reach for a raw `ALattice.merge(a, b)`
 on these regions.
 
-## Building on P2P
+## One node server, selectable regions
 
-convex-p2p is **infrastructure**, not an application. It answers "who is on this network,
-what do they run, and how do I reach them" — and nothing else. Applications layer on top
-by composing their own region onto the P2P root:
+There is a single node server — `P2PNode` — not a P2P one and a social one. Applications
+are users of the P2P infrastructure, but they do not each bring their own node: the
+regions a node serves are a **per-node choice, not a per-build one**.
 
 ```
         ┌─────────────┬─────────────┬─────────────┐
-        │   :social   │    :sql     │     ...     │   application regions
+        │   :social   │    :sql     │     ...     │   application regions (optional)
         ├─────────────┴─────────────┴─────────────┤
-        │        :p2p    :id    :kad              │   convex-p2p  (this module)
+        │        :p2p    :id    :kad              │   infrastructure floor (always on)
         ├─────────────────────────────────────────┤
         │   NodeServer — merge, gossip, transport │   convex-peer
         ├─────────────────────────────────────────┤
@@ -91,19 +91,34 @@ by composing their own region onto the P2P root:
         └─────────────────────────────────────────┘
 ```
 
-A node is the sum of the regions it registers. A social node, for example, is a P2P node
-plus the social region:
+Two region sets are provided:
+
+| | Regions | Use |
+|---|---|---|
+| `P2PLattice.NODE_ROOT` | infrastructure + bundled apps | default |
+| `P2PLattice.ROOT` | infrastructure only | applications switched off |
 
 ```java
-KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+P2PNode node = P2PNode.create(store, config, keyPair);                      // social on
+P2PNode relay = P2PNode.create(store, config, keyPair, P2PLattice.ROOT);    // social off
 ```
 
-The dependency runs one way: applications depend on convex-p2p, never the reverse. This
-module has no knowledge of convex-social, convex-db or anything else built on it, so a
-bootstrap node or a pure relay carries none of their weight. Adding a region does not
-disturb the P2P ones — they keep their paths and merge semantics — and peers that do not
-recognise the new region simply ignore it, so an application can be deployed to part of
-a network without coordinating an upgrade across all of it.
+Both are the same class serving the same infrastructure regions, so a node with social
+switched off is a **fully capable discovery node** — nothing about its P2P role is
+diminished. That is why the split is a configuration knob rather than a second binary:
+the overlap between "a P2P node" and "a social node" is nearly all of it.
+
+Region sets do not have to match across a network. An unrecognised top-level region is
+ignored on merge rather than rejected, so a `ROOT` node and a `NODE_ROOT` node
+interoperate on everything they share — which is what makes switching a region off a
+safe local decision, and lets an application be rolled out to part of a network without
+a coordinated upgrade.
+
+A region that isn't bundled composes the same way `NODE_ROOT` composes social:
+
+```java
+KeyedLattice root = P2PLattice.NODE_ROOT.addLattice(MyApp.KEY, MyApp.LATTICE);
+```
 
 ## Installation
 

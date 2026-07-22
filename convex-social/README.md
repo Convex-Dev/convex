@@ -73,21 +73,32 @@ forked.sync();
 
 Convex Social is an **application layered on P2P infrastructure**. It supplies one
 lattice region, `:social`; discovering peers, advertising node identity and moving values
-between nodes are convex-p2p's job, not its own. A social node is therefore a P2P node
-plus the social region:
+between nodes are convex-p2p's job, not its own.
+
+There is no separate "social node" to run. `convex-p2p`'s `P2PNode` is the only node
+server, and it serves `:social` by default as part of `P2PLattice.NODE_ROOT`:
 
 ```java
-KeyedLattice root = P2PLattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+P2PNode node = P2PNode.create(store, config, keyPair);   // serves :social
 ```
 
-The social lattice is not part of any root by default — neither convex-p2p's nor
-convex-core's `Lattice.ROOT` — so a node opts in by composing it, and the dependency runs
-one way: convex-social depends on the P2P layer, never the reverse. Peers that do not
-serve `:social` ignore the region rather than failing on it, so social can be deployed to
-part of a network without coordinating an upgrade across all of it.
+An operator who does not want social passes the infrastructure-only region set instead,
+and still runs a fully capable P2P discovery node:
 
-Composing onto `Lattice.ROOT` instead is equally valid where the application regions
-(`:data`, `:fs`, `:kv`, `:queue`) are wanted alongside it.
+```java
+P2PNode relay = P2PNode.create(store, config, keyPair, P2PLattice.ROOT);
+```
+
+Region sets need not match across a network — a node that does not serve `:social`
+ignores the region rather than failing on it — so social can be rolled out to part of a
+network without a coordinated upgrade.
+
+For a node that also wants convex-core's application regions (`:data`, `:fs`, `:kv`,
+`:queue`), composing onto `Lattice.ROOT` remains equally valid:
+
+```java
+KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+```
 
 A `Social` instance is then connected to the node's root cursor so that writes propagate
 up for lattice push/pull:

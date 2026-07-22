@@ -16,6 +16,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -28,6 +29,7 @@ import convex.lattice.cursor.RootLatticeCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.ReservedLattice;
+import convex.social.Social;
 
 /**
  * Tests for the P2P root lattice structure.
@@ -165,11 +167,57 @@ public class P2PLatticeTest {
 		assertNull(merged.get(P2PLattice.KEY_KAD), ":kad is ignored, not fatal");
 	}
 
+	// ===== Region sets =====
+
+	/** The default node region set is the infrastructure floor plus the bundled apps. */
+	@Test
+	public void testNodeRootAddsApplicationRegions() {
+		assertNotNull(P2PLattice.NODE_ROOT.path(Social.KEY_SOCIAL));
+
+		// ...without disturbing the P2P regions
+		assertSame(P2PLattice.ROOT.path(Keywords.P2P, Keywords.NODES),
+			P2PLattice.NODE_ROOT.path(Keywords.P2P, Keywords.NODES));
+		assertSame(P2PLattice.ROOT.path(P2PLattice.KEY_ID),
+			P2PLattice.NODE_ROOT.path(P2PLattice.KEY_ID));
+	}
+
+	/** Switching applications off leaves the infrastructure regions intact. */
+	@Test
+	public void testRootIsInfrastructureOnly() {
+		assertNull(P2PLattice.ROOT.path(Social.KEY_SOCIAL));
+
+		assertNotNull(P2PLattice.ROOT.path(Keywords.P2P, Keywords.NODES));
+		assertNotNull(P2PLattice.ROOT.path(P2PLattice.KEY_ID));
+		assertNotNull(P2PLattice.ROOT.path(P2PLattice.KEY_KAD));
+	}
+
 	/**
-	 * The P2P root is a base to compose on, not a closed set. An application region
-	 * (convex-social, convex-db, anything else) is added with {@code addLattice} and
-	 * merges alongside the P2P regions — which is why convex-p2p does not need to know
-	 * about, or depend on, any of them.
+	 * The property that makes switching a region off a safe local decision: a node
+	 * serving only ROOT drops :social from an incoming value and merges the rest, rather
+	 * than rejecting the whole update.
+	 */
+	@Test
+	public void testSocialOffNodeStillMergesP2PRegions() {
+		AHashMap<Keyword, ACell> nodeInfo = convex.lattice.P2PLattice.createNodeInfo(
+			Vectors.of(Strings.create("tcp://example.com:18888")),
+			Strings.create("Convex Lattice Node"), Strings.create("test"), null, 1000L);
+
+		@SuppressWarnings("unchecked")
+		Index<Keyword, ACell> incoming = (Index<Keyword, ACell>) Index.EMPTY
+			.assoc(P2PLattice.KEY_P2P, Index.EMPTY.assoc(P2PLattice.KEY_NODES,
+				convex.lattice.P2PLattice.createSignedEntry(KP, nodeInfo)))
+			.assoc(Social.KEY_SOCIAL, Maps.empty());
+
+		Index<Keyword, ACell> merged = P2PLattice.ROOT.merge(
+			LatticeContext.EMPTY, P2PLattice.ROOT.zero(), incoming);
+
+		assertNotNull(merged.get(P2PLattice.KEY_P2P), "Discovery data still merges");
+		assertNull(merged.get(Social.KEY_SOCIAL), ":social ignored, not fatal");
+	}
+
+	/**
+	 * Region sets are not a closed set either: an application not bundled here composes
+	 * the same way NODE_ROOT composes social.
 	 */
 	@Test
 	public void testApplicationRegionCanBeComposedOnto() {

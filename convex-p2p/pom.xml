@@ -28,6 +28,15 @@
 			<version>${convex.version}</version>
 			<scope>compile</scope>
 		</dependency>
+		<!-- A P2P node serves application regions too, so that operators run one node
+		     server rather than a P2P one and a social one. Regions are selected per node
+		     (see P2PNode), not per build. -->
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-social</artifactId>
+			<version>${convex.version}</version>
+			<scope>compile</scope>
+		</dependency>
 
 		<!-- Logging -->
 		<dependency>

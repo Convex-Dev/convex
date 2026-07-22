@@ -13,11 +13,12 @@ data structures of convex-core and the <code>NodeServer</code> binary networking
 of convex-peer.</p>
 
 <p>This module is infrastructure: it answers who is on the network, what they run
-and how to reach them. Applications such as convex-social are its users — each
-supplies its own lattice region and composes it onto
-<code>P2PLattice.ROOT</code>, so a social node is a P2P node plus the social
-region. The dependency runs one way; convex-p2p knows nothing of what is layered
-on it.</p>
+and how to reach them. Applications such as convex-social are its users, but they
+do not each bring their own node server — <code>P2PNode</code> is the only one, and
+the regions it serves are a per-node choice rather than a per-build one.
+<code>P2PLattice.NODE_ROOT</code> is the default (infrastructure plus bundled
+applications); <code>P2PLattice.ROOT</code> is the same node with the application
+regions switched off, and is still a fully capable discovery node.</p>
 
 <h2>Key Types</h2>
 
