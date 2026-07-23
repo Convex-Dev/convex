@@ -25,12 +25,21 @@ directory per skill with a `SKILL.md` inside:
 
 - *Orientation* — `ecosystem`, `cad-reference`
 - *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
-- *Protocol internals* — `cad3-encoding`, `juice`, `memory`
+- *Protocol internals* — `protocol-versions`, `cad3-encoding`, `juice`, `memory`
 - *Writing CVM code* — `convex-lisp`, `trust`, `deploy`, `query`, `transact`
 - *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`
 
 `convex-lisp` holds the shared CVM conventions the others assume; read it
 before writing CVM source.
+
+Claude Code discovers these automatically. **Other agents should read the
+relevant `SKILL.md` directly** — they are plain Markdown and carry no
+tool-specific syntax beyond `$ARGUMENTS` placeholders for user input. Check for
+a skill covering your task before working out a procedure from scratch.
+
+Convex MCP tooling (live query, transact and signing against a running network)
+is optional and configured per user, not in this repository. Without it, use the
+CLI as the skills describe.
 
 ## Specifications
 
@@ -44,14 +53,20 @@ raise, not a choice to make silently. Before changing behaviour in a specified
 area, find the governing CAD via the `cad-reference` skill and say which one
 you relied on.
 
-Claude Code discovers these automatically. **Other agents should read the
-relevant `SKILL.md` directly** — they are plain Markdown and carry no
-tool-specific syntax beyond `$ARGUMENTS` placeholders for user input. Check for
-a skill covering your task before working out a procedure from scratch.
+## Protocol Versions
 
-Convex MCP tooling (live query, transact and signing against a running network)
-is optional and configured per user, not in this repository. Without it, use the
-CLI as the skills describe.
+Networks carry a protocol version, counted from `0` at genesis. **Protocol
+version 1 is the target**: it bundles the upgrade bootstrap and every bug known
+at genesis, and it is what networks will be running.
+
+Write and test against v1 semantics — `InitTest.UPGRADED` is the `ACVMTest`
+default for exactly this reason. `Migrations.LIVE_VERSION` tracks what live
+peers run today and gates releases against breaking them; genesis states are
+pinned only where genesis is the point.
+
+Changing CVM behaviour without forking the network has rules — which tier a
+change falls into, and when a version gate is mandatory. See the
+`protocol-versions` skill and `convex-core/docs/UPGRADE.md`.
 
 ## Verifying Changes
 

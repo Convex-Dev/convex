@@ -92,3 +92,17 @@ Errors surface as keywords. The ones you will actually hit:
 `:UNDECLARED` on a library call almost always means the function name is
 wrong. Check the library source in `convex-core/src/main/cvx/` rather than
 guessing — several plausible names (`quantity`, `supply`) do not exist.
+
+## Protocol Version
+
+Write against **protocol version 1** semantics — see the `protocol-versions`
+skill. Several core behaviours are fixed there rather than at genesis, so a
+network still at version 0 differs:
+
+- `update` and `update-in` drop an argument in their variadic (5+ arg) arities
+- quasiquote of a set or map containing an unquote yields a call form, `~false`
+  does not unquote, `define` evaluates its value twice, and `call` with too
+  many arguments silently does nothing
+
+If you hit one of these, it is a known genesis bug fixed by v1 — not something
+to work around in new code.

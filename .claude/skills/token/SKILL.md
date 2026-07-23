@@ -30,8 +30,15 @@ Decide which the user wants before deploying — the choice is permanent, and a
 token deployed without `add-mint` fails on any later mint attempt.
 
 `build-token` config: `:supply` (defaults to 0), `:initial-holder` (defaults to
-`*address*`), `:decimals`. `add-mint` config: `:minter` (a `convex.trust`
-monitor, defaults to `*address*`) and `:max-supply` (defaults to unlimited).
+`*address*`), `:decimals`. `add-mint` config: `:minter` (any trust monitor,
+defaults to `*address*`) and `:max-supply` (from protocol v1, defaults to
+unlimited).
+
+**Always set `:max-supply` explicitly.** Before v1 activates, omitting it
+defaults the cap to `0` — and because `0` is truthy in CVM, that installs a
+zero cap which blocks *all* minting, silently producing a mintable-looking
+token that can never mint (#528). Setting it explicitly is correct under both
+genesis and v1. See the `protocol-versions` skill.
 
 `deploy` returns the token's actor address.
 

@@ -59,7 +59,7 @@ Inside an actor, the usual shape is:
 
 Use `:TRUST` for authorisation failures — that is what callers expect.
 
-## Fail Closed — and Do Not Assume It Yet
+## Fail Closed
 
 A monitor MUST return `true` or `false`, but a defective or malicious one may
 throw or return something else. A checker MUST treat any error or non-`true`
@@ -67,20 +67,22 @@ result as **denial**, and must not let it propagate — an error-propagating
 checker is itself a denial-of-service vector, since an actor holding an
 attacker-supplied monitor would throw on every check.
 
-**This defensive behaviour arrives at protocol version 1, and v1 is not yet
-live.** It is implemented in `convex/migrations/v1-trust.cvx`, while
-`Migrations.LIVE_VERSION` is currently `0`. The genesis `trusted?` in
-`core/trust.cvx` wraps the call in `query` for re-entrancy protection but does
-**not** `try` the error or coerce the result.
-
-So if you are writing an actor that accepts a **caller-supplied** monitor, do
-not yet rely on `trusted?` failing closed. Wrap it yourself:
+`trusted?` implements this from **protocol version 1**: the monitor call is
+wrapped in `query` against re-entrancy, errors are caught as `false`, and the
+result is `boolean`-coerced. Write against that behaviour — it is the target
+semantics, and `MigrationFixesTest` pins it.
 
 ```clojure
+;; what trusted? does from v1
 (boolean (try (query (call monitor (check-trusted? subject action object))) false))
 ```
 
-For monitors you control, the plain call is fine.
+**Before v1 activates**, the genesis `trusted?` in `core/trust.cvx` keeps the
+`query` guard but does *not* catch the error or coerce the result — so a
+defective monitor can throw through it, or grant on a truthy non-boolean. If
+you are deploying an actor that accepts **caller-supplied** monitors onto a
+network still at version 0, apply the wrapper yourself. For monitors you
+control, the plain call is fine either way. See the `protocol-versions` skill.
 
 ## Writing a Monitor
 
