@@ -25,4 +25,5 @@ target/
 /pom.xml.versionsBackup
 .lsp
 .clj-kondo
-/.claude/
+/.claude/settings.local.json
+/.claude/worktrees/

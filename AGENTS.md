@@ -1,4 +1,7 @@
-# Claude Code Guidelines for Convex
+# Agent Guidelines for Convex
+
+Guidance for any coding agent working in this repository. `CLAUDE.md` simply
+includes this file, so there is one source of truth.
 
 ## Project Overview
 
@@ -14,6 +17,33 @@ Quick start:
 ```bash
 mvn clean install          # Full build with local install
 ```
+
+## Agent Tooling
+
+Task-specific instructions live as skills in **`.claude/skills/`**, one
+directory per skill with a `SKILL.md` inside. They cover building, querying,
+transacting, deploying actors, transfers, CNS, accounts, tokens and Convex DB.
+
+Claude Code discovers these automatically. **Other agents should read the
+relevant `SKILL.md` directly** — they are plain Markdown and carry no
+tool-specific syntax beyond `$ARGUMENTS` placeholders for user input. Check for
+a skill covering your task before working out a procedure from scratch.
+
+Convex MCP tooling (live query, transact and signing against a running network)
+is optional and configured per user, not in this repository. Without it, use the
+CLI as the skills describe.
+
+## Verifying Changes
+
+Do not report work as complete on the strength of a compile. Run what CI runs:
+
+```bash
+mvn -B clean install
+```
+
+Scope it down while iterating with `-pl <module> -am`, but a full run is the
+bar for "done". If tests fail, say so and quote the failure — never describe a
+red build as passing.
 
 ## Module Structure
 
@@ -50,6 +80,16 @@ Examples:
 ### Test Structure
 Tests follow JUnit 6 conventions with `src/test/java` mirroring `src/main/java` structure.
 
+Two rules matter for the networked modules, where violations produce tests that
+pass locally and fail intermittently in CI:
+
+- **Never sleep to wait for something.** Wait on a real signal — a future, a
+  latch, or a synchronous API that returns once the work is done. If no such
+  signal exists, that is a missing affordance in the main code: add it there
+  rather than papering over it with a timeout in the test.
+- **Never bind a fixed port.** Bind port `0` and ask the server for the port it
+  actually got. Fixed ports collide when tests run in parallel.
+
 ### Language
 Concise language, British English spelling
 
@@ -82,6 +122,17 @@ convex key generate
 - `master` - Release branch
 - Feature branches as needed
 
+### Commit Identity
+Commit identity is **per repository** — never assume the global git config.
+Check `git config user.name` and `git config user.email` in this repository
+before committing, and leave them as you found them.
+
+### CHANGELOG
+`CHANGELOG.md` records **user-visible changes only**. Dependency bumps, build
+plumbing, test-only refactors and agent tooling do not belong in it. If a change
+alters nothing an operator, contributor or API consumer would notice from the
+outside, leave the CHANGELOG alone.
+
 ### Release Process
 See BUILD.md for complete release workflow.
 
@@ -100,7 +151,9 @@ See BUILD.md for complete release workflow.
 
 ## Terminology
 
-Canonical glossary: `../design/docs/tutorial/glossary.md` (rendered at https://docs.convex.world/docs/tutorial/glossary). Use canonical terms — never substitute "gas", "fees", "blockchain", "chain", "miner", "validator", "block", "wei", "satoshi", or "mainnet". Key terms: CVM coin, Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, Protonet.
+Canonical glossary: `docs/tutorial/glossary.md` in the sibling `design`
+repository, rendered at https://docs.convex.world/docs/tutorial/glossary — use
+the URL if you do not have that repository checked out alongside this one. Use canonical terms — never substitute "gas", "fees", "blockchain", "chain", "miner", "validator", "block", "wei", "satoshi", or "mainnet". Key terms: CVM coin, Juice, Copper, Peer, Actor, Lattice, CPoS, Belief, Etch, CAD, CNS, Protonet.
 
 ## Network Defaults
 

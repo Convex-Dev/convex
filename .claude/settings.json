@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(mvn -B compile:*)",
+      "Bash(mvn -B test-compile:*)",
+      "Bash(mvn -B test:*)",
+      "Bash(mvn -B clean install:*)",
+      "Bash(mvn -B dependency:tree:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn test-compile:*)",
+      "Bash(mvn test:*)",
+      "Bash(mvn clean install:*)",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(./mvnw -B compile:*)",
+      "Bash(./mvnw -B test-compile:*)",
+      "Bash(./mvnw -B test:*)",
+      "Bash(./mvnw -B clean install:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git branch --list:*)",
+      "Bash(git fetch:*)"
+    ]
+  }
+}

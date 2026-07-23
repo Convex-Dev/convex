@@ -164,6 +164,10 @@ Contributions are welcome under the Convex Public License. Contributors retain c
 
 The Convex Foundation may award Convex Coins to contributors for significant ecosystem contributions. These native utility tokens enable network service access and may be exchangeable for other digital assets.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to get started, [BUILD.md](BUILD.md) for
+build and release detail, and [AGENTS.md](AGENTS.md) for the conventions any
+coding agent working in this repository should follow.
+
 ## Community
 
 We use Discord as for discussing Convex - you can join the public server at [https://discord.com/invite/xfYGq4CT7v](https://discord.com/invite/xfYGq4CT7v)
