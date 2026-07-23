@@ -59,6 +59,8 @@ also accept a `token` parameter.
 ## Authorisation
 
 Minting requires the caller to satisfy the token's `:minter` trust monitor;
-anything else fails with `:TRUST`. Creating, transferring, minting and burning
+anything else fails with `:TRUST`. `:minter` takes any trust monitor, not just
+an address — see the `trust` skill for composing them (a mint window, a
+multi-party whitelist, delegated revocation). Creating, transferring, minting and burning
 are all transactions, so they need a key the user has supplied — see the
 `transact` skill. Without one you can prepare the source but not execute it.

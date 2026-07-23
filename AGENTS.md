@@ -26,7 +26,7 @@ directory per skill with a `SKILL.md` inside:
 - *Orientation* — `ecosystem`, `cad-reference`
 - *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
 - *Protocol internals* — `cad3-encoding`, `juice`, `memory`
-- *Writing CVM code* — `convex-lisp`, `deploy`, `query`, `transact`
+- *Writing CVM code* — `convex-lisp`, `trust`, `deploy`, `query`, `transact`
 - *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`
 
 `convex-lisp` holds the shared CVM conventions the others assume; read it

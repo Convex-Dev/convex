@@ -27,9 +27,14 @@ This is the idiom used throughout the codebase — match it. A `let`-bound
 address also works (`(let [f @convex.fungible] (f/balance …))`) and is
 occasionally tidier for repeated calls, but is rare in practice.
 
-**Never use `import`.** It mutates the account environment and costs extra
-juice on every transaction that carries it. There is no case in ordinary
-query or transaction source where it is the right tool.
+**Never use `import` in query or transaction source.** It mutates the account
+environment and costs extra juice on every transaction that carries it. Use the
+`@name/fn` form instead.
+
+Library and actor *bodies* are different: they are deployed once, so an
+`import` at the top of a `.cvx` library resolves once and is idiomatic — the
+core libraries do it, for instance `convex/trust/monitors.cvx`. Do not "fix"
+those.
 
 ## Actors
 

@@ -85,7 +85,7 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | 029 | `fungible` | Fungible token standard — see the `token` skill |
 | 031 | `nft_metadata` | NFT metadata |
 | 030 | `torus` | Torus DEX |
-| 022 | `trustmon` | Trust monitors — the `:minter`-style authority model |
+| 022 | `trustmon` | **Trust monitors** — the authorisation model; see the `trust` skill |
 | 014 | `cns` | Convex Name System — see the `cns` skill |
 | 034 | `curated_registry` | Curated registry |
 | 023 | `keystore` | Keystore |
