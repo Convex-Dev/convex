@@ -161,7 +161,9 @@ public class SseConnection {
 						writeData(event.data());
 						writer.write("\n");
 					}
-					writer.flush();
+					// checkError() flushes an open stream (documented behaviour) and reports any
+					// IOException recorded by the writes above, so this delivers the event and
+					// detects a broken client in one step. A separate flush() would only repeat it.
 					if (writer.checkError()) close();
 				}
 			}
