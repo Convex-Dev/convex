@@ -37,7 +37,7 @@ would give a parent two valid encodings, breaking uniqueness. When you touch
 embedding rules, that invariant is what you are protecting.
 
 Embedding is why `[1 2 3 4 5]` is one encoding rather than six, and why
-embedded values cost zero memory — see the `juice-and-memory` skill.
+embedded values cost zero memory — see the `memory` skill.
 
 ## Validity
 

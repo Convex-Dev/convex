@@ -33,8 +33,8 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 
 | CAD | Slug | Covers |
 |-----|------|--------|
-| 006 | `memory` | **Memory accounting and allowances** — see `juice-and-memory` |
-| 007 | `juice` | **Juice accounting and pricing** — see `juice-and-memory` |
+| 006 | `memory` | **Memory accounting and allowances** — see the `memory` skill |
+| 007 | `juice` | **Juice accounting and pricing** — see the `juice` skill |
 | 020 | `tokenomics` | Coin supply, distribution, denominations |
 | 016 | `peerstake` | Peer staking |
 

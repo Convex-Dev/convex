@@ -62,8 +62,9 @@ memory allowance if they grow the state. Queries are free — they execute
 against current state and are discarded, so prefer a query whenever you only
 need to read.
 
-See the `juice-and-memory` skill before reasoning about costs, or when
-diagnosing a `:JUICE` or `:MEMORY` failure.
+See the `juice` skill for execution costs and `memory` for storage — including
+how to minimise and reclaim on-chain storage, which is worth reading before
+designing an actor that stores anything.
 
 ## Error Codes
 
