@@ -82,6 +82,20 @@ public class RESTServer implements Closeable {
 	protected static final Integer DEFAULT_PORT=8080;
 	/** Hard ceiling for structured REST request bodies. */
 	public static final long MAX_REQUEST_BODY_BYTES=1_000_000L;
+	/**
+	 * Bytes of a rejected request body to read and discard before answering 413.
+	 *
+	 * <p>Closing a connection that still holds unread body data resets it rather than
+	 * closing gracefully, and a reset makes the client's TCP stack discard its receive
+	 * buffer — including the 413 already written. The client then sees a bare connection
+	 * failure and cannot tell "too large" from "server died". Draining first lets the
+	 * close be graceful so the status actually arrives.</p>
+	 *
+	 * <p>Bounded so a rejected request never costs more to read than a legal one. Bodies
+	 * beyond this are still reset, which is exactly how the chunked path behaves: it
+	 * reads through {@code bodyAsBytes()} up to the same ceiling before rejecting.</p>
+	 */
+	static final long OVERSIZE_DRAIN_BYTES=MAX_REQUEST_BODY_BYTES+65536L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
 	private RESTServer(Server server, RESTConfig explicitConfig) {
@@ -336,12 +350,42 @@ public class RESTServer implements Closeable {
 		return app;
 	}
 
+	/**
+	 * Reads and discards a bounded prefix of a request body we are about to reject, so the
+	 * connection can be closed gracefully and the 413 survives. See
+	 * {@link #OVERSIZE_DRAIN_BYTES}.
+	 *
+	 * <p>Does nothing when the client offered {@code Expect: 100-continue}: it is waiting
+	 * for permission and has sent no body, so there is nothing to drain — and touching the
+	 * stream would make Jetty invite it to send the very body being rejected.</p>
+	 *
+	 * @param ctx Request context for the rejected request
+	 */
+	private static void drainRejectedBody(io.javalin.http.Context ctx) {
+		String expect=ctx.header("Expect");
+		if ((expect!=null)&&expect.toLowerCase().contains("100-continue")) return;
+		try {
+			java.io.InputStream in=ctx.req().getInputStream();
+			byte[] buffer=new byte[8192];
+			long remaining=OVERSIZE_DRAIN_BYTES;
+			while (remaining>0) {
+				int n=in.read(buffer,0,(int)Math.min(buffer.length,remaining));
+				if (n<0) break;
+				remaining-=n;
+			}
+		} catch (java.io.IOException e) {
+			// Client vanished mid-drain. Answering it is best-efforts by nature, and the
+			// 413 below still runs; nothing here should mask the rejection.
+		}
+	}
+
 	private void addHandlers(RoutesConfig routes) {
 		// Reject a known oversized body before a handler starts parsing it. Requests
 		// without Content-Length are still bounded while read by RequestBody.
 		routes.before(ctx -> {
 			long contentLength=ctx.req().getContentLengthLong();
 			if (contentLength>MAX_REQUEST_BODY_BYTES) {
+				drainRejectedBody(ctx);
 				throw new ContentTooLargeResponse("Request body exceeds maximum size of "
 						+MAX_REQUEST_BODY_BYTES+" bytes");
 			}

@@ -27,8 +27,19 @@ public class RequestBodyLimitTest extends ARESTTest {
 		byte[] exact = validMcpBody((int) RESTServer.MAX_REQUEST_BODY_BYTES);
 		assertEquals(200, postBytes("/mcp", ContentTypes.JSON, exact, false).statusCode());
 
+		// Deliberately without Expect: 100-continue, so this exercises the drain path. The
+		// client streams a body the server has already decided to reject; without draining,
+		// closing on unread data resets the connection and destroys the 413 in transit.
 		byte[] oversized = validMcpBody((int) RESTServer.MAX_REQUEST_BODY_BYTES+1);
 		assertEquals(413, postBytes("/mcp", ContentTypes.JSON, oversized, false).statusCode());
+	}
+
+	@Test
+	public void testFixedLengthBoundaryWithExpectContinue() throws IOException, InterruptedException {
+		// A client offering Expect: 100-continue is rejected on Content-Length alone and never
+		// sends the body, so there is nothing to drain and no reset to race.
+		byte[] oversized = validMcpBody((int) RESTServer.MAX_REQUEST_BODY_BYTES+1);
+		assertEquals(413, postBytes("/mcp", ContentTypes.JSON, oversized, false, true).statusCode());
 	}
 
 	@Test
@@ -52,12 +63,18 @@ public class RequestBodyLimitTest extends ARESTTest {
 
 	private static HttpResponse<String> postBytes(String path, String contentType, byte[] body,
 			boolean chunked) throws IOException, InterruptedException {
+		return postBytes(path, contentType, body, chunked, false);
+	}
+
+	private static HttpResponse<String> postBytes(String path, String contentType, byte[] body,
+			boolean chunked, boolean expectContinue) throws IOException, InterruptedException {
 		BodyPublisher publisher = chunked
 				? HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body))
 				: HttpRequest.BodyPublishers.ofByteArray(body);
 		HttpRequest request = HttpRequest.newBuilder()
 				.uri(URI.create(HOST_PATH+path))
 				.header("Content-Type", contentType)
+				.expectContinue(expectContinue)
 				.POST(publisher)
 				.build();
 		return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
