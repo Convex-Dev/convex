@@ -23,12 +23,26 @@ mvn clean install          # Full build with local install
 Task-specific instructions live as skills in **`.claude/skills/`**, one
 directory per skill with a `SKILL.md` inside:
 
+- *Orientation* — `ecosystem`, `cad-reference`
 - *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
+- *Protocol internals* — `cad3-encoding`, `juice-and-memory`
 - *Writing CVM code* — `convex-lisp`, `deploy`, `query`, `transact`
 - *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`
 
 `convex-lisp` holds the shared CVM conventions the others assume; read it
 before writing CVM source.
+
+## Specifications
+
+The **CADs** (Convex Architecture Documents) are the normative specifications,
+maintained in the sibling `Convex-Dev/design` repository and rendered at
+https://docs.convex.world/docs/cad. They govern encoding, consensus, resource
+accounting, assets and identity.
+
+Where the code and a CAD disagree, one of them is wrong — that is a question to
+raise, not a choice to make silently. Before changing behaviour in a specified
+area, find the governing CAD via the `cad-reference` skill and say which one
+you relied on.
 
 Claude Code discovers these automatically. **Other agents should read the
 relevant `SKILL.md` directly** — they are plain Markdown and carry no

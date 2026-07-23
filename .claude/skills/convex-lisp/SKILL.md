@@ -55,11 +55,15 @@ Actors are on-chain accounts with their own address, balance and state.
   `(deploy [(build-token …) (add-mint …)])`.
 - `(set-controller #ADDR)` sets who may upgrade the actor.
 
-## Juice
+## Juice and Memory
 
-Transactions consume juice, paid in copper by the origin account. Queries are
-free — they execute against current state and are discarded. Prefer a query
-whenever you only need to read.
+Transactions consume juice, paid in copper by the origin account, and consume
+memory allowance if they grow the state. Queries are free — they execute
+against current state and are discarded, so prefer a query whenever you only
+need to read.
+
+See the `juice-and-memory` skill before reasoning about costs, or when
+diagnosing a `:JUICE` or `:MEMORY` failure.
 
 ## Error Codes
 
