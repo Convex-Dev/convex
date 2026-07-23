@@ -21,8 +21,14 @@ mvn clean install          # Full build with local install
 ## Agent Tooling
 
 Task-specific instructions live as skills in **`.claude/skills/`**, one
-directory per skill with a `SKILL.md` inside. They cover building, querying,
-transacting, deploying actors, transfers, CNS, accounts, tokens and Convex DB.
+directory per skill with a `SKILL.md` inside:
+
+- *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
+- *Writing CVM code* — `convex-lisp`, `deploy`, `query`, `transact`
+- *Using a network* — `account`, `transfer`, `token`, `cns`, `convex-db`
+
+`convex-lisp` holds the shared CVM conventions the others assume; read it
+before writing CVM source.
 
 Claude Code discovers these automatically. **Other agents should read the
 relevant `SKILL.md` directly** — they are plain Markdown and carry no

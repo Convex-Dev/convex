@@ -8,11 +8,19 @@ argument-hint: "[resolve|register|update] <name>"
 
 CNS maps human-readable names (like `convex.fungible`) to on-chain addresses.
 
+See the `convex-lisp` skill for CVM conventions.
+
 ## Resolve a Name
 
-Use `mcp__convex-testnet__resolveCNS` with the name.
+In CVM source, `@convex.fungible` resolves the name directly — this is the
+normal way to reach a library.
 
-Returns: value (usually an address), controller, metadata, and child node.
+To inspect a name's record (value, controller, metadata, child node), use a
+Convex MCP server's `resolveCNS` tool if one is configured. Otherwise query it:
+
+```bash
+java -jar convex.jar client query '@convex.fungible'
+```
 
 ## Register or Update a Name
 

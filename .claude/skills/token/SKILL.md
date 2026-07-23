@@ -6,43 +6,59 @@ argument-hint: "[create|balance|mint|transfer] [args...]"
 
 # Fungible Tokens on Convex
 
-Fungible tokens use the `@convex.fungible` standard library.
+Fungible tokens use the `@convex.fungible` standard library
+(`convex-core/src/main/cvx/convex/asset/fungible.cvx`). See the `convex-lisp`
+skill for CVM conventions, and `transact` for how transactions are signed.
 
 ## Create a New Token
 
-Deploy a token actor using the fungible token standard:
+**Fixed supply** — no further tokens can ever be minted:
 
 ```clojure
-(deploy
-  (let [f @convex.fungible]
-    (f/build-token
-      {:supply 1000000})))
+(deploy (@convex.fungible/build-token {:supply 1000000}))
 ```
 
-This creates a token with initial supply held by the deployer. The returned address is the token's actor address.
+**Mintable** — `build-token` alone provides *no* mint or burn capability. To
+allow minting you must compose `add-mint` into the same deployment:
 
-## Check Token Balance
+```clojure
+(deploy [(@convex.fungible/build-token {:supply 1000000})
+         (@convex.fungible/add-mint {:minter *address* :max-supply 1000000000})])
+```
 
-Query: `(@convex.fungible/balance #TOKEN #HOLDER)`
+Decide which the user wants before deploying — the choice is permanent, and a
+token deployed without `add-mint` fails on any later mint attempt.
 
-Or use `mcp__convex-testnet__getBalance` with the `token` parameter.
+`build-token` config: `:supply` (defaults to 0), `:initial-holder` (defaults to
+`*address*`), `:decimals`. `add-mint` config: `:minter` (a `convex.trust`
+monitor, defaults to `*address*`) and `:max-supply` (defaults to unlimited).
 
-## Transfer Tokens
+`deploy` returns the token's actor address.
 
-Transaction: `(@convex.fungible/transfer #TOKEN #DEST AMOUNT)`
+## Operations
 
-Or use `mcp__convex-testnet__transfer` with the `token` parameter.
-
-## Mint Additional Supply
-
-Transaction (must be token controller): `(call #TOKEN (mint AMOUNT))`
-
-## Common Operations
-
-| Task | Expression |
-|------|-----------|
-| Create token | `(deploy (let [f @convex.fungible] (f/build-token {:supply N})))` |
-| Check balance | `(@convex.fungible/balance #TOKEN #ADDR)` |
+| Task | Source |
+|------|--------|
+| Check balance | `(@convex.fungible/balance #TOKEN #HOLDER)` |
+| Total supply | `(@convex.fungible/total-supply #TOKEN)` |
+| Decimals | `(@convex.fungible/decimals #TOKEN)` |
 | Transfer | `(@convex.fungible/transfer #TOKEN #DEST AMOUNT)` |
-| Total supply | `(@convex.fungible/quantity #TOKEN)` |
-| Mint | `(call #TOKEN (mint AMOUNT))` |
+| Mint | `(@convex.fungible/mint #TOKEN AMOUNT)` |
+| Burn | `(@convex.fungible/burn #TOKEN AMOUNT)` |
+
+There is no `quantity` function — it returns `:UNDECLARED`. Total supply is
+`total-supply`.
+
+`balance`, `total-supply` and `decimals` are reads: use a query, not a
+transaction. `transfer`, `mint` and `burn` change state and must be
+transactions.
+
+If a Convex MCP server is configured, its `getBalance` and `transfer` tools
+also accept a `token` parameter.
+
+## Authorisation
+
+Minting requires the caller to satisfy the token's `:minter` trust monitor;
+anything else fails with `:TRUST`. Creating, transferring, minting and burning
+are all transactions, so they need a key the user has supplied — see the
+`transact` skill. Without one you can prepare the source but not execute it.

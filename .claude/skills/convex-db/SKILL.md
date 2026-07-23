@@ -149,10 +149,12 @@ db.tables().deleteByKey("users", 1);
 
 ## Building and Testing
 
+Run from the repository root — see the `build-convex` skill.
+
 ```bash
-# Build (requires Convex core installed first)
-cd convex && mvn clean install -DskipTests -pl convex-db -am
+# Build (-am also builds convex-core, which this depends on)
+./mvnw -B clean install -DskipTests -pl convex-db -am
 
 # Run tests
-cd convex && mvn test -pl convex-db
+./mvnw -B test -pl convex-db -am
 ```

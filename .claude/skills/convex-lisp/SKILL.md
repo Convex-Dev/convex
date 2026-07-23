@@ -1,0 +1,84 @@
+---
+name: convex-lisp
+description: Convex Lisp language reference — CVM conventions, calling library code, actor definitions, juice and error codes. Use when writing or debugging CVM source for queries, transactions or actors.
+---
+
+# Convex Lisp
+
+Shared conventions for all CVM source. The `query`, `transact`, `deploy`,
+`token` and `transfer` skills assume what is written here.
+
+## Units and Notation
+
+- Coin amounts are in **copper**. 1 CVM coin = 1,000,000,000 copper (10^9).
+  Convert for display: report "1.5 CVM", not "1500000000".
+- Account addresses take a `#` prefix: `#13`, `#1337`.
+- CNS names take an `@` prefix when resolved in source: `@convex.fungible`.
+
+## Calling Library Code
+
+Resolve libraries through CNS rather than hardcoding addresses:
+
+```clojure
+(@convex.fungible/balance #128 #13)
+```
+
+This is the idiom used throughout the codebase — match it. A `let`-bound
+address also works (`(let [f @convex.fungible] (f/balance …))`) and is
+occasionally tidier for repeated calls, but is rare in practice.
+
+**Never use `import`.** It mutates the account environment and costs extra
+juice on every transaction that carries it. There is no case in ordinary
+query or transaction source where it is the right tool.
+
+## Actors
+
+Actors are on-chain accounts with their own address, balance and state.
+
+```clojure
+(deploy
+  '(do
+     (def counter 0)
+
+     (defn ^:callable increment []
+       (set! counter (+ counter 1))
+       counter)))
+```
+
+- **`^:callable` is the only export mechanism.** There is no `export` form.
+  The map form `^{:callable true}` is equivalent and equally common in the
+  core libraries.
+- `def`s in the actor body that are not `^:callable` are private state.
+  Update them from inside with `set!`.
+- `deploy` returns the new address. `deploy` also accepts a **vector** of
+  code forms, which is how library builders are composed:
+  `(deploy [(build-token …) (add-mint …)])`.
+- `(set-controller #ADDR)` sets who may upgrade the actor.
+
+## Juice
+
+Transactions consume juice, paid in copper by the origin account. Queries are
+free — they execute against current state and are discarded. Prefer a query
+whenever you only need to read.
+
+## Error Codes
+
+Errors surface as keywords. The ones you will actually hit:
+
+| Code | Meaning |
+|------|---------|
+| `:UNDECLARED` | Symbol does not exist — usually a wrong function name |
+| `:CAST` | Wrong type passed to a function |
+| `:ARGUMENT` | Right type, invalid value |
+| `:ARITY` | Wrong number of arguments |
+| `:STATE` | Operation invalid for current state (e.g. missing callable) |
+| `:TRUST` | Caller lacks rights for the operation |
+| `:FUNDS` | Insufficient coin balance |
+| `:JUICE` | Ran out of juice — transaction too expensive |
+| `:MEMORY` | Insufficient memory allowance |
+| `:NOBODY` | Target account does not exist |
+| `:COMPILE` | Source did not compile |
+
+`:UNDECLARED` on a library call almost always means the function name is
+wrong. Check the library source in `convex-core/src/main/cvx/` rather than
+guessing — several plausible names (`quantity`, `supply`) do not exist.

@@ -6,23 +6,34 @@ argument-hint: "<to-address> <amount> [token-address]"
 
 # Transfer Coins or Tokens
 
+A transfer is a transaction, so it needs a key the user has supplied — see the
+`transact` skill for the authorisation model and the CLI form. Without a key
+you can prepare the transfer but not execute it.
+
 ## CVM Coin Transfer
 
-Transfer native CVM coins using `mcp__convex-testnet__transfer`:
-- **to:** destination address (e.g. `#42`)
-- **amount:** in copper (1 CVM = 1,000,000,000 copper)
+Source: `(transfer #42 1000000000)` — sends 1 CVM.
 
-Or via transaction: `(transfer #42 1000000000)` — sends 1 CVM.
+With a Convex MCP server configured, its `transfer` tool takes **to**
+(destination address) and **amount** (in copper).
 
 ## Fungible Token Transfer
 
-For non-native tokens, include the token actor address:
-- Via transfer tool: set `token` parameter to the token actor address
-- Via transaction: `(@convex.fungible/transfer #TOKEN #DEST AMOUNT)`
+Source: `(@convex.fungible/transfer #TOKEN #DEST AMOUNT)`
 
-## Important
+With the MCP `transfer` tool, set the `token` parameter to the token actor
+address.
 
-- Always confirm the destination address and amount with the user before executing
-- Convert user-friendly amounts to copper: multiply by 1,000,000,000
-- Check the sender has sufficient balance first with a query
-- Display amounts in CVM units in responses (e.g. "Sent 2.5 CVM to #42")
+## Before Executing
+
+- **Confirm destination and amount with the user.** Restate both in CVM units
+  — "send 2.5 CVM to #42" — and get agreement before signing. A transfer is
+  irreversible.
+- **Convert to copper**: multiply CVM by 1,000,000,000. Getting this wrong by a
+  factor of 10^9 is the easiest and most expensive mistake here.
+- **Check the sender's balance first** with a query, so a `:FUNDS` failure is
+  caught before signing rather than after.
+- For tokens, check the *token* balance, not the coin balance — they are
+  unrelated.
+
+Report the result in CVM units (e.g. "Sent 2.5 CVM to #42").

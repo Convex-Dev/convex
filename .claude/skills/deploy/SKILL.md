@@ -6,7 +6,10 @@ argument-hint: "<description-of-actor>"
 
 # Deploy a Convex Actor
 
-Actors are autonomous on-chain programs with their own address, state, and exported functions.
+Actors are autonomous on-chain programs with their own address, state, and callable functions.
+
+See the `convex-lisp` skill for CVM conventions and error codes. Deploying is a
+transaction, so it needs a key the user has supplied — see `transact`.
 
 ## Actor Structure
 
@@ -35,6 +38,9 @@ A typical actor deployment:
 - Use `set!` to update an existing `def` from inside a function; plain `def`s declared in the actor body are private state
 - Actors have their own `*address*` and `*balance*`
 - Use `(set-controller #ADDR)` inside the actor to set who can upgrade it
+- `deploy` also accepts a **vector** of code forms, which is how library
+  builders are composed into one actor:
+  `(deploy [(@convex.fungible/build-token {…}) (@convex.fungible/add-mint {…})])`
 
 ## After Deployment
 
