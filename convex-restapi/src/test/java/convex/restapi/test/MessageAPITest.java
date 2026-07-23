@@ -23,6 +23,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.restapi.RESTServer;
 import convex.core.data.Format;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -192,7 +193,13 @@ public class MessageAPITest extends ARESTTest {
 
 	@Test
 	public void testHugePayload() throws Exception {
-		byte[] huge = new byte[2_000_000];
+		// Just over the limit, deliberately. The server rejects on Content-Length without
+		// reading the body, so a body far above the limit is still in flight when the socket
+		// closes — the resulting TCP reset discards the 413 that was already written, and the
+		// client sees "header parser received no bytes" instead. Draining an oversized body to
+		// avoid that is exactly what rejecting early exists to prevent, so the reset is accepted
+		// behaviour for very large bodies; what must be deterministic is the limit itself.
+		byte[] huge = new byte[(int) RESTServer.MAX_REQUEST_BODY_BYTES + 4096];
 		HttpResponse<byte[]> resp = postRaw(huge);
 		assertEquals(413, resp.statusCode(), "Oversized payload should use the request-size response");
 	}
