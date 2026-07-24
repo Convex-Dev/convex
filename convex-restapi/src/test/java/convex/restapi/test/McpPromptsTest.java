@@ -189,7 +189,7 @@ public class McpPromptsTest extends ARESTTest {
 		String persona = getMessageText(messages, 0);
 		assertTrue(persona.contains("peerStatus"), "Should list peerStatus tool");
 		assertTrue(persona.contains("Convergent Proof of Stake"), "Should explain CPoS consensus");
-		assertTrue(persona.contains("#7"), "Should explain memory exchange");
+		assertTrue(persona.contains("*memory-price*"), "Should explain memory pricing via the memory-price global");
 	}
 
 	@Test
@@ -245,14 +245,14 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testGetDeployContract() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
-			"{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do (defn greet [x] (str \\\"Hello \\\" x)) (export greet))\",\"address\":\"#42\",\"passphrase\":\"mypass\"}}");
+			"{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do (defn ^:callable greet [x] (str \\\"Hello \\\" x)))\",\"address\":\"#42\",\"passphrase\":\"mypass\"}}");
 
 		AVector<ACell> messages = getMessages(response);
 		assertTrue(messages.count() >= 3);
 
 		String persona = getMessageText(messages, 0);
 		assertTrue(persona.contains("deploy"), "Persona should explain deployment");
-		assertTrue(persona.contains("export"), "Persona should explain exports");
+		assertTrue(persona.contains("^:callable"), "Persona should explain callable functions");
 		assertTrue(persona.contains("signingTransact"), "Should list tools");
 
 		String allText = getAllText(messages);

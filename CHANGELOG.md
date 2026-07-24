@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- MCP: the built-in prompts served factually incorrect Convex guidance to clients — a non-existent `(export ...)` form for actor functions (the mechanism is `^:callable`), wrong system-account addresses, a fabricated "memory exchange" account, and a token example that could not deploy. All corrected against the live CVM, and the shared reference (system accounts, coin units, CNS) consolidated into the `convex-guide` prompt so the task prompts stay focused.
 - CLI: the `NO_COLOR` environment variable now follows the [convention](https://no-color.org) of suppressing colour whenever it is set to any non-empty value. Previously its value was parsed as a boolean, so a common `NO_COLOR=1` made every command fail with "'1' is not a boolean" before it ran.
 - REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
 - NodeServer: replayed lattice values that do not change local state no longer trigger repeated announce and root persistence work.

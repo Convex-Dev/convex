@@ -88,7 +88,7 @@ Bad: _"You are an account explorer."_
 Every prompt must include at least one link to a relevant Convex resource, so the LLM can ground its knowledge and perform web searches if needed. Prefer valid links to `docs.convex.world`:
 
 - Convex Lisp spec (CAD026): https://docs.convex.world/docs/cad/lisp
-- Data encoding (CAD002): https://docs.convex.world/docs/cad/encoding
+- Encoding format (CAD003): https://docs.convex.world/docs/cad/encoding
 - Accounts and actors (CAD004): https://docs.convex.world/docs/cad/accounts
 - Compiler (CAD008): https://docs.convex.world/docs/cad/compiler
 - Docs hub: https://docs.convex.world
@@ -99,7 +99,7 @@ Every prompt must include at least one link to a relevant Convex resource, so th
 The persona message should provide genuine Convex domain knowledge — not just "use tool X". LLMs may not know how Convex works. The persona should teach the specific concepts needed for the task:
 
 - For account exploration: explain user accounts vs actors vs system accounts, what system account numbers mean, how CNS resolution works
-- For deployment: explain the actor model, `deploy`/`export` semantics, controller accounts
+- For deployment: explain the actor model, `deploy` and `^:callable` semantics (there is no `export` form), controller accounts
 - For transfers: explain copper/Gold units, juice costs, atomicity
 
 This is the most important content in the prompt — it determines whether the LLM gives correct, Convex-specific answers or generic guesses.
@@ -136,11 +136,11 @@ Consistent with the Convex project convention: decentralised, organised, behavio
 
 | Name | Title | Always? | Key Convex context | Doc links |
 |------|-------|---------|-------------------|-----------|
-| `explore-account` | Explore Account | Yes | Account types (user/actor/system), system account roles, CNS resolution | CAD004 |
-| `network-status` | Network Status | Yes | CPoS consensus, peers, stake, memory exchange, health indicators | docs hub |
-| `convex-guide` | Convex Lisp Guide | Yes | Full CVM language overview — types, syntax, special forms, actors, assets, system accounts | CAD026, CAD002, CAD004, CAD008, sandbox |
+| `explore-account` | Explore Account | Yes | Account types (user/actor/system), CNS resolution, `^:callable` | CAD004 |
+| `network-status` | Network Status | Yes | CPoS consensus, peers, stake, memory pricing (`*memory-price*`), health indicators | docs hub |
+| `convex-guide` | Convex Lisp Guide | Yes | Full CVM language overview — types, syntax, special forms, actors, assets, system accounts. The canonical home for the broad reference tables; task prompts stay lean per principle 4 | CAD026, CAD003, CAD004, CAD008, sandbox |
 | `create-account` | Create Account | Signing | Ed25519 signing service, passphrase encryption, faucet limits | CAD004 |
-| `deploy-contract` | Deploy Smart Contract | Signing | Actor model, deploy/export semantics, controller, common patterns | CAD004, CAD026 |
+| `deploy-contract` | Deploy Smart Contract | Signing | Actor model, deploy and `^:callable` semantics, controller, common patterns | CAD004, CAD026 |
 | `transfer-funds` | Transfer Coins | Signing | Transfer function, copper/Gold units, juice costs, atomicity | CAD026 |
 
 ## Adding a New Prompt
