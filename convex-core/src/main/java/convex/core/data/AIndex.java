@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Set;
 
 import convex.core.data.type.AType;
@@ -49,19 +47,9 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 	 */
 	public abstract V get(K key);
 
-	// entryAt(i) walks the radix tree in ascending key order, so a
-	// LinkedHashSet (which preserves insertion order) is needed here to keep
-	// that ordering visible through entrySet() — a plain HashSet iterates in
-	// hash-bucket order and silently discards it (#651).
 	@Override
 	public Set<Entry<K, V>> entrySet() {
-		LinkedHashSet<Entry<K,V>> hs=new LinkedHashSet<>(size());
-		long n=count();
-		for (long i=0; i<n; i++) {
-			MapEntry<K,V> me=entryAt(i);
-			hs.add(me);
-		}
-		return Collections.unmodifiableSet(hs);
+		return new IndexEntrySet<>(this);
 	}
 	
 	@Override

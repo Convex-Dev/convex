@@ -93,6 +93,7 @@ public class RecordTest {
 		}
 		assertThrows(IndexOutOfBoundsException.class,()->r.getRef(rc));
 
+		CollectionsTest.doMapEntrySetTests(r);
 		CollectionsTest.doDataStructureTests(r);
 	}
 	

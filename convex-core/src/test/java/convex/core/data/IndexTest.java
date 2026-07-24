@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static convex.test.Assertions.assertCVMEquals;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -10,7 +11,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.AbstractMap;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.Spliterator;
 
 import org.junit.jupiter.api.Test;
 
@@ -254,6 +260,39 @@ public class IndexTest {
 			assertEquals(m.entryAt(i), it.next(), "entrySet() order diverged from entryAt() sorted order");
 		}
 		assertFalse(it.hasNext());
+		assertThrows(NoSuchElementException.class, it::next);
+		assertTrue(m.entrySet().spliterator().hasCharacteristics(Spliterator.ORDERED));
+	}
+
+	@Test
+	public void testEntrySetContainsJavaEntry() {
+		Index<ABlob, CVMLong> m = Samples.INT_INDEX_256;
+		Set<Map.Entry<ABlob, CVMLong>> entries = m.entrySet();
+		MapEntry<ABlob, CVMLong> entry = m.entryAt(m.count() / 2);
+
+		assertTrue(entries.contains(Map.entry(entry.getKey(), entry.getValue())));
+		assertFalse(entries.contains(Map.entry(entry.getKey(), CVMLong.MINUS_ONE)));
+
+		ABlob nilKey = Blob.fromHex("cafebabe");
+		Index<ABlob, ACell> nilIndex = Index.of(nilKey, null);
+		assertTrue(nilIndex.entrySet().contains(new AbstractMap.SimpleImmutableEntry<>(nilKey, null)));
+	}
+
+	@Test
+	public void testEntrySetIsImmutable() {
+		Index<ABlob, CVMLong> m = Samples.INT_INDEX_256;
+		Set<Map.Entry<ABlob, CVMLong>> entries = m.entrySet();
+		MapEntry<ABlob, CVMLong> entry = m.entryAt(0);
+
+		assertAll(
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.add(entry)),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.remove(entry)),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.addAll(Set.of())),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.removeAll(Set.of())),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.retainAll(Set.of())),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.removeIf(e -> false)),
+				() -> assertThrows(UnsupportedOperationException.class, entries::clear),
+				() -> assertThrows(UnsupportedOperationException.class, () -> entries.iterator().remove()));
 	}
 
 	@Test public void testContains() {
