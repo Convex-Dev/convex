@@ -7,8 +7,8 @@ package convex.restapi.mcp;
  * resource files under {@code convex/restapi/mcp/prompts/}. This class
  * simply loads and registers them.
  *
- * <p>Three prompts are always available; three additional prompts are
- * registered only when the signing service is configured.
+ * <p>Read-only prompts are always available; prompts that submit transactions
+ * are registered only when the signing service is configured.
  *
  * <p>See {@code docs/MCP_PROMPTS.md} for design principles and authoring guidelines.
  *
@@ -31,16 +31,19 @@ class McpPrompts {
 	 * when the signing service is available.
 	 */
 	void registerAll() {
-		// Always available
+		// Always available (read-only)
 		register("explore-account.json");
 		register("network-status.json");
 		register("convex-guide.json");
+		register("resolve-name.json");
 
-		// Only if signing service is available
+		// Only if signing service is available (submit transactions)
 		if (api.getRESTServer().getSigningService() != null) {
 			register("create-account.json");
 			register("deploy-contract.json");
 			register("transfer-funds.json");
+			register("call-actor.json");
+			register("token.json");
 		}
 	}
 

@@ -127,16 +127,18 @@ public class McpPromptsTest extends ARESTTest {
 		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
-		boolean hasExploreAccount = false, hasNetworkStatus = false, hasConvexGuide = false;
+		boolean hasExploreAccount = false, hasNetworkStatus = false, hasConvexGuide = false, hasResolveName = false;
 		for (long i = 0; i < prompts.count(); i++) {
 			String name = RT.ensureString(RT.castMap(prompts.get(i)).get(Strings.create("name"))).toString();
 			if ("explore-account".equals(name)) hasExploreAccount = true;
 			if ("network-status".equals(name)) hasNetworkStatus = true;
 			if ("convex-guide".equals(name)) hasConvexGuide = true;
+			if ("resolve-name".equals(name)) hasResolveName = true;
 		}
 		assertTrue(hasExploreAccount, "explore-account should always be available");
 		assertTrue(hasNetworkStatus, "network-status should always be available");
 		assertTrue(hasConvexGuide, "convex-guide should always be available");
+		assertTrue(hasResolveName, "resolve-name should always be available");
 	}
 
 	@Test
@@ -146,7 +148,7 @@ public class McpPromptsTest extends ARESTTest {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
 		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
-		assertEquals(6, prompts.count(), "Should have exactly 6 prompts");
+		assertEquals(9, prompts.count(), "Should have exactly 9 prompts");
 	}
 
 	// ===== prompts/get — message structure =====
@@ -275,6 +277,53 @@ public class McpPromptsTest extends ARESTTest {
 		assertTrue(allText.contains("juice"), "Should mention transaction costs");
 	}
 
+	@Test
+	public void testGetResolveName() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"resolve-name\",\"arguments\":{\"name\":\"convex.fungible\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("*registry*"), "Persona should explain the CNS registry");
+		assertTrue(persona.contains("resolve"), "Persona should explain resolution");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("convex.fungible"), "Should substitute the name argument");
+	}
+
+	@Test
+	public void testGetCallActor() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"call-actor\",\"arguments\":{\"actor\":\"#123\",\"call\":\"(increment)\",\"address\":\"#42\",\"passphrase\":\"topsecret999\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("^:callable"), "Persona should explain callable functions");
+		assertTrue(persona.contains("signingTransact"), "Should list tools");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("#123"), "Should substitute actor");
+		assertTrue(allText.contains("(increment)"), "Should substitute the call form");
+		assertFalse(allText.contains("topsecret999"), "Should NOT echo the passphrase");
+	}
+
+	@Test
+	public void testGetToken() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"token\",\"arguments\":{\"task\":\"mint 500\",\"address\":\"#42\",\"passphrase\":\"pass\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("@convex.fungible"), "Persona should reference the fungible library");
+		assertTrue(persona.contains("build-token"), "Persona should explain token creation");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("mint 500"), "Should substitute the task argument");
+	}
+
 	// ===== Message quality =====
 
 	@Test
@@ -316,6 +365,9 @@ public class McpPromptsTest extends ARESTTest {
 			{"create-account",  "{\"name\":\"create-account\",\"arguments\":{\"passphrase\":\"test\"}}"},
 			{"deploy-contract", "{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do nil)\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
 			{"transfer-funds",  "{\"name\":\"transfer-funds\",\"arguments\":{\"from\":\"#1\",\"to\":\"#2\",\"amount\":\"100\",\"passphrase\":\"test\"}}"},
+			{"resolve-name",    "{\"name\":\"resolve-name\",\"arguments\":{\"name\":\"convex.fungible\"}}"},
+			{"call-actor",      "{\"name\":\"call-actor\",\"arguments\":{\"actor\":\"#123\",\"call\":\"(increment)\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
+			{"token",           "{\"name\":\"token\",\"arguments\":{\"task\":\"check supply\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
 		};
 
 		for (String[] tc : testCases) {

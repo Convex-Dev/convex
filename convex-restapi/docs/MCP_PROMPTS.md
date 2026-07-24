@@ -65,7 +65,7 @@ Each prompt returns three messages:
 
 ### Registration
 
-`McpPrompts.java` registers prompts at startup. Three are always available; three more are conditionally registered when the signing service is configured. Registration is just loading JSON files — no per-prompt Java classes needed.
+`McpPrompts.java` registers prompts at startup. The read-only prompts are always available; the prompts that submit transactions are conditionally registered when the signing service is configured. Registration is just loading JSON files — no per-prompt Java classes needed.
 
 For prompts that require custom argument processing (beyond simple substitution), subclass `McpPrompt` and override `render()`.
 
@@ -139,9 +139,12 @@ Consistent with the Convex project convention: decentralised, organised, behavio
 | `explore-account` | Explore Account | Yes | Account types (user/actor/system), CNS resolution, `^:callable` | CAD004 |
 | `network-status` | Network Status | Yes | CPoS consensus, peers, stake, memory pricing (`*memory-price*`), health indicators | docs hub |
 | `convex-guide` | Convex Lisp Guide | Yes | Full CVM language overview — types, syntax, special forms, actors, assets, system accounts. The canonical home for the broad reference tables; task prompts stay lean per principle 4 | CAD026, CAD003, CAD004, CAD008, sandbox |
+| `resolve-name` | Resolve CNS Name | Yes | CNS resolution (`@name`, `*registry*` resolve/read), records, controllers | CAD014 |
 | `create-account` | Create Account | Signing | Ed25519 signing service, passphrase encryption, faucet limits | CAD004 |
 | `deploy-contract` | Deploy Smart Contract | Signing | Actor model, deploy and `^:callable` semantics, controller, common patterns | CAD004, CAD026 |
 | `transfer-funds` | Transfer Coins | Signing | Transfer function, copper/Gold units, juice costs, atomicity | CAD026 |
+| `call-actor` | Call Actor Function | Signing | `^:callable` calls, query vs transaction, `*caller*`, revert semantics | CAD004 |
+| `token` | Create or Manage Token | Signing | `@convex.fungible` build-token/add-mint, balance/supply/mint/transfer | CAD029 |
 
 ## Adding a New Prompt
 

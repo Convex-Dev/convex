@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New `convex-p2p` module: a rollup package for lattice P2P nodes, bundling the P2P regions (`:p2p` node registry, `:id` user identity, reserved `:kad`), the application regions a node serves, and the `P2PNode` server that serves them. `node.p2p(userID).cursor()` gives an application a cursor onto one user's owned area, signed on write.
+- MCP: three new guided prompts — `resolve-name` (resolve and inspect a CNS name, always available), `call-actor` (call an actor's `^:callable` function via a signed transaction), and `token` (create, mint, transfer and inspect a `convex.fungible` token). These fill the transact, asset and naming gaps alongside the existing account/deploy/transfer prompts.
 
 ### Changed
 
