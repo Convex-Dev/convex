@@ -28,6 +28,9 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
+import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
@@ -112,19 +115,32 @@ public class JoinNetworkTest {
 		Server source=null;
 		Server destination=null;
 		try {
-			HashMap<Keyword,Object> sourceConfig=new HashMap<>();
-			sourceConfig.put(Keywords.KEYPAIR,sourceKeyPair);
-			sourceConfig.put(Keywords.STATE,genesis);
-			sourceConfig.put(Keywords.STORE,EtchStore.createTemp());
-			sourceConfig.put(Keywords.PORT,0);
-			source=API.launchPeer(sourceConfig);
-
 			State corruptState=correct.getConsensusState().withTimestamp(
 					correct.getConsensusState().getTimestamp().longValue()+1);
 			AMap<Keyword,ACell> corruptData=correct.toData().assoc(Keywords.STATE,corruptState);
 			Peer advertised=Peer.fromData(sourceKeyPair,corruptData);
-			source.getCVMExecutor().setPeer(advertised);
-			source.getCVMExecutor().persistPeerData();
+
+			// Seed a store with the advertised peer data and restore from it, rather than
+			// injecting into a running server. Setting the CVMExecutor's peer is not enough:
+			// the BeliefPropagator keeps its own pre-injection Belief and feeds it back through
+			// queueUpdate, and that Order carries no blocks (finality 0), so the executor
+			// correctly truncates the state back to 0 and the source then advertises 0.
+			// Restoring at launch initialises every component from the same peer data.
+			EtchStore sourceStore=EtchStore.createTemp();
+			AMap<ACell,ACell> rootData=Maps.empty().assoc(sourceKeyPair.getAccountKey(),corruptData);
+			rootData=sourceStore.setRootData(rootData).getValue();
+			sourceStore.storeTopRef(advertised.getGenesisState().getRef(),Ref.PERSISTED,null);
+			sourceStore.storeTopRef(advertised.getBelief().getRef(),Ref.PERSISTED,null);
+			Cells.persist(corruptState,sourceStore);
+			sourceStore.flush();
+
+			HashMap<Keyword,Object> sourceConfig=new HashMap<>();
+			sourceConfig.put(Keywords.KEYPAIR,sourceKeyPair);
+			sourceConfig.put(Keywords.STATE,genesis);
+			sourceConfig.put(Keywords.STORE,sourceStore);
+			sourceConfig.put(Keywords.RESTORE,true);
+			sourceConfig.put(Keywords.PORT,0);
+			source=API.launchPeer(sourceConfig);
 			try (Convex sourceClient=Convex.connect(source.getHostAddress())) {
 				Result statusResult=sourceClient.requestStatus().get(10,TimeUnit.SECONDS);
 				assertFalse(statusResult.isError(),()->"Source status failed: "+statusResult);
