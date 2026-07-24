@@ -389,6 +389,19 @@ public class Server implements Closeable {
 	}
 
 	/**
+	 * Gets a future completing with this Server's Peer once its state has been computed to
+	 * at least the given block position. A real signal to wait on rather than polling
+	 * {@link #getPeer()} — state position advances asynchronously on the executor thread,
+	 * so a caller reading it straight after launch may observe an earlier position.
+	 *
+	 * @param position Block position the state must reach
+	 * @return Future completing with the Peer at or beyond that state position
+	 */
+	public CompletableFuture<Peer> awaitStatePosition(long position) {
+		return executor.awaitStatePosition(position);
+	}
+
+	/**
 	 * Gets the desired host name for this Peer
 	 * @return Hostname String
 	 */

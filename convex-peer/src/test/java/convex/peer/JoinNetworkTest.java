@@ -141,11 +141,19 @@ public class JoinNetworkTest {
 			destinationConfig.put(Keywords.SOURCE,source.getHostAddress());
 			destination=API.launchPeer(destinationConfig);
 
-			assertEquals(correct.getStatePosition(),destination.getPeer().getStatePosition());
+			// Wait on the real signal rather than reading the live peer: the executor thread
+			// advances state asynchronously once launched, and a peer whose finality point is
+			// behind its state truncates on update, so an immediate read can observe either an
+			// earlier position or a momentary rollback. Assert against the snapshot returned
+			// here, so the checks below all describe the same observation.
+			Peer joined=destination.awaitStatePosition(correct.getStatePosition())
+					.get(10,TimeUnit.SECONDS);
+
+			assertEquals(correct.getStatePosition(),joined.getStatePosition());
 			assertEquals(correct.getConsensusState().getHash(),
-					destination.getPeer().getConsensusState().getHash());
+					joined.getConsensusState().getHash());
 			assertNotEquals(advertised.getConsensusState().getHash(),
-					destination.getPeer().getConsensusState().getHash());
+					joined.getConsensusState().getHash());
 		} finally {
 			if (destination!=null) destination.close();
 			if (source!=null) source.close();

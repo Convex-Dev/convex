@@ -1,6 +1,7 @@
 package convex.peer;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -73,6 +74,7 @@ public class CVMExecutor extends AThreadedComponent {
 		maybeWarnUpgrade();
 
 		try {
+			boolean stateAdvanced=false;
 			synchronized(this) {
 				if (beliefUpdate!=null) {
 					peer=peer.updateBelief(beliefUpdate);
@@ -84,8 +86,10 @@ public class CVMExecutor extends AThreadedComponent {
 					peer=updatedPeer;
 					persistPeerData();
 					maybeCallObservers(peer);
+					stateAdvanced=true;
 				}
 			}
+			if (stateAdvanced) completeStatePositionWaiters();
 
 			server.transactionHandler.maybeReportTransactions(peer);
 		} catch (UpgradeError e) {
@@ -162,12 +166,82 @@ public class CVMExecutor extends AThreadedComponent {
 		return "CVM Executor thread on port "+server.getPort();
 	}
 
-	public synchronized void setPeer(Peer peer) {
-		this.peer=peer;
+	public void setPeer(Peer peer) {
+		synchronized (this) {
+			this.peer=peer;
+		}
+		completeStatePositionWaiters();
 	}
-	
+
 	public Peer getPeer() {
 		return peer;
+	}
+
+	/**
+	 * Waiters for the peer's state position to reach a target, newest last. Kept small:
+	 * entries are removed as soon as they are satisfied.
+	 */
+	private final java.util.List<StatePositionWaiter> statePositionWaiters=new java.util.ArrayList<>();
+
+	private static final class StatePositionWaiter {
+		final long position;
+		final CompletableFuture<Peer> future=new CompletableFuture<>();
+
+		StatePositionWaiter(long position) {
+			this.position=position;
+		}
+	}
+
+	/**
+	 * Gets a future completing with the Peer once its state has been computed to at least
+	 * the given block position.
+	 *
+	 * <p>A real signal to wait on instead of polling {@link #getPeer()} or sleeping. State
+	 * position advances asynchronously on the executor thread, so a caller that reads the
+	 * peer immediately after launch or after submitting work may observe an earlier
+	 * position. Note the position can also move <em>backwards</em>: a peer whose finality
+	 * point is behind its state truncates on update, so this completes on the first
+	 * observation at or beyond the target rather than promising the peer stays there.</p>
+	 *
+	 * @param position Block position the state must reach
+	 * @return Future completing with the Peer at or beyond that state position
+	 */
+	public CompletableFuture<Peer> awaitStatePosition(long position) {
+		StatePositionWaiter waiter;
+		synchronized (this) {
+			Peer p=peer;
+			if ((p!=null)&&(p.getStatePosition()>=position)) return CompletableFuture.completedFuture(p);
+			waiter=new StatePositionWaiter(position);
+			statePositionWaiters.add(waiter);
+		}
+		// Re-check outside the fast path: the executor may have advanced between the read
+		// above and the registration, which would otherwise leave this waiter unnotified.
+		completeStatePositionWaiters();
+		return waiter.future;
+	}
+
+	/**
+	 * Completes any waiters the current state position has reached. Futures are completed
+	 * outside the lock so dependent actions cannot run while holding the executor monitor.
+	 */
+	private void completeStatePositionWaiters() {
+		java.util.List<StatePositionWaiter> ready=null;
+		Peer p;
+		synchronized (this) {
+			p=peer;
+			if ((p==null)||statePositionWaiters.isEmpty()) return;
+			long pos=p.getStatePosition();
+			java.util.Iterator<StatePositionWaiter> it=statePositionWaiters.iterator();
+			while (it.hasNext()) {
+				StatePositionWaiter w=it.next();
+				if (pos>=w.position) {
+					if (ready==null) ready=new java.util.ArrayList<>();
+					ready.add(w);
+					it.remove();
+				}
+			}
+		}
+		if (ready!=null) for (StatePositionWaiter w: ready) w.future.complete(p);
 	}
 
 	public void queueUpdate(Belief belief) {
