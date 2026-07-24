@@ -23,14 +23,7 @@ public class Juice {
 	 * Base Juice cost for any top level transaction, added to consumed juice
 	 */
 	public static final long TRANSACTION = 500L;
-	
-	/**
-	 * UNDER CONSIDERATION, PROBABLY WON'T BE NEEDED
-	 * Juice cost per byte of transaction size executed, added to consumed juice
-	 */
-	// public static final long TX_PER_BYTE = 5L;
 
-	
 	/**
 	 * Base Juice cost for any sub transaction executed, added to consumed juice
 	 */
