@@ -150,6 +150,13 @@
 			<artifactId>convex-gui</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		<!-- Rollup P2P package: pulls in the node server and the application regions
+		     it serves (convex-social) so convex.jar can run a full node. -->
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-p2p</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-core</artifactId>
