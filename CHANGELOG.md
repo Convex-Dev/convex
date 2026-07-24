@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- REST API: explorer pagination is now bounded — the `limit` parameter is read correctly (it was keyed off `offset`, so `?offset=N` without a limit failed) and clamped to a maximum, so a public caller cannot request an unbounded page and force large historical reads (#660).
+- MCP: SSE connection registration is now atomic — the connection cap can no longer be exceeded by concurrent opens, and reusing a session ID is refused rather than silently replacing (and orphaning) the existing connection (#659).
 - MCP: the built-in prompts served factually incorrect Convex guidance to clients — a non-existent `(export ...)` form for actor functions (the mechanism is `^:callable`), wrong system-account addresses, a fabricated "memory exchange" account, a token example that could not deploy, and a claim that a deployed actor's controller defaults to the deployer (it is nil — actors are autonomous unless a controller is set explicitly). All corrected against the live CVM, and the shared reference (system accounts, coin units, CNS) consolidated into the `convex-guide` prompt so the task prompts stay focused.
 - CLI: the `NO_COLOR` environment variable now follows the [convention](https://no-color.org) of suppressing colour whenever it is set to any non-empty value. Previously its value was parsed as a boolean, so a common `NO_COLOR=1` made every command fail with "'1' is not a boolean" before it ran.
 - REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.

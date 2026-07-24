@@ -277,7 +277,9 @@ public class McpAPI extends ABaseAPI {
 			return;
 		}
 
-		// Enforce global connection limit (soft cap)
+		// Fast-path cap and session-reuse checks, so the common rejection cases get a
+		// clean response before we commit to an SSE stream. The authoritative, atomic
+		// versions of both checks happen in registerConnection below.
 		if (connections.size() >= MAX_CONNECTIONS) {
 			ctx.status(429);
 			return;
@@ -287,6 +289,10 @@ public class McpAPI extends ABaseAPI {
 		String sessionId = ctx.header(HEADER_SESSION_ID);
 		if (sessionId == null) {
 			sessionId = UUID.randomUUID().toString();
+		} else if (connections.containsKey(sessionId)) {
+			// A session ID with a live connection: refuse rather than replacing it.
+			ctx.status(409);
+			return;
 		}
 
 		try {
@@ -299,9 +305,21 @@ public class McpAPI extends ABaseAPI {
 
 			PrintWriter writer = res.getWriter();
 			McpConnection conn = new McpConnection(writer);
-			// Register connection BEFORE flushing headers so POSTs using
-			// the session ID can find it immediately.
-			connections.put(sessionId, conn);
+			// Register atomically BEFORE flushing headers so POSTs using the session ID
+			// can find it immediately, and so a reused ID or a raced cap cannot orphan
+			// a connection (#659).
+			switch (registerConnection(connections, sessionId, conn, MAX_CONNECTIONS)) {
+				case SESSION_IN_USE:
+					conn.close();
+					ctx.status(409);
+					return;
+				case CAP_EXCEEDED:
+					conn.close();
+					ctx.status(429);
+					return;
+				case OK:
+					break;
+			}
 			res.flushBuffer();
 			try {
 				// Keep-alive loop — blocks virtual thread until client disconnects
@@ -315,12 +333,50 @@ public class McpAPI extends ABaseAPI {
 				Thread.currentThread().interrupt();
 			} finally {
 				conn.close();
-				connections.remove(sessionId);
+				// Conditional remove: only evict our own connection, never one a later
+				// open registered under the same session ID (#659).
+				connections.remove(sessionId, conn);
 				stateWatcher.stopIfIdle();
 			}
 		} catch (IOException e) {
 			log.debug("SSE connection setup failed", e);
 		}
+	}
+
+	/** Outcome of {@link #registerConnection}. */
+	enum RegisterResult { OK, SESSION_IN_USE, CAP_EXCEEDED }
+
+	/**
+	 * Atomically register an SSE connection under a session ID, enforcing the connection
+	 * cap. Fixes two races in the old {@code size()}-then-{@code put} pattern (#659):
+	 *
+	 * <ul>
+	 *   <li>{@code putIfAbsent} never replaces a live connection, so a reused session ID
+	 *       cannot orphan an existing socket/thread — it is refused instead.</li>
+	 *   <li>The cap is checked <em>after</em> the insert, so concurrent opens cannot
+	 *       collectively exceed {@code maxConnections} (an over-cap opener rolls back its
+	 *       own slot). At most it over-rejects under contention; it never over-admits.</li>
+	 * </ul>
+	 *
+	 * <p>Package-private and static for direct unit testing.</p>
+	 *
+	 * @param connections The live connection registry
+	 * @param sessionId Session ID to register under
+	 * @param conn Connection to register
+	 * @param maxConnections Hard connection cap
+	 * @return the registration outcome; on anything but {@link RegisterResult#OK} the
+	 *         connection was not left in the registry
+	 */
+	static RegisterResult registerConnection(ConcurrentHashMap<String, McpConnection> connections,
+			String sessionId, McpConnection conn, int maxConnections) {
+		if (connections.putIfAbsent(sessionId, conn) != null) {
+			return RegisterResult.SESSION_IN_USE;
+		}
+		if (connections.size() > maxConnections) {
+			connections.remove(sessionId, conn);
+			return RegisterResult.CAP_EXCEEDED;
+		}
+		return RegisterResult.OK;
 	}
 
 	/**
