@@ -24,11 +24,31 @@ java -jar convex.jar client query '@convex.fungible'
 
 ## Register or Update a Name
 
-Transaction: `(call #9 (cns-update 'my.name *address*))`
+The registry actor is `#9`, available in CVM code as `*registry*`. It has no
+`cns-update` function — use `create` for a new name and `update` for an
+existing one:
 
-- `#9` is the CNS registry actor
-- The name must be under a namespace you control
-- Top-level names require special authority
+```clojure
+;; Create a new name pointing at a target, with *address* as controller
+(*registry*/create 'my.name #TARGET *address*)
+
+;; Update an existing name you control
+(*registry*/update 'my.name #NEW-TARGET)
+
+;; Change who controls a name
+(*registry*/change-control 'my.name #NEW-CONTROLLER)
+```
+
+These are transactions (they change state). Notes:
+
+- **Creating requires controlling the parent namespace.** `(*registry*/create
+  'my.name ...)` needs the `my` node to exist and to trust you — otherwise it
+  fails with `:TRUST` "Forbidden to create CNS node". Top-level names require
+  special authority.
+- `create` also accepts optional controller, metadata and child arguments:
+  `(*registry*/create 'my.name target controller metadata)`.
+- Note `(*registry*/register {:name "..."})` is unrelated — it registers
+  metadata for the *caller's own account*, not a CNS name.
 
 ## CNS in Code
 
@@ -42,5 +62,9 @@ Transaction: `(call #9 (cns-update 'my.name *address*))`
 |------|---------|
 | `convex.fungible` | Fungible token standard library |
 | `convex.trust` | Trust and access control |
-| `convex.asset` | Multi-asset interface |
-| `convex.nft` | Non-fungible token support |
+| `convex.asset` | Generic asset interface |
+| `asset.nft.simple` | Non-fungible token standard |
+| `asset.multi-token` | Multi-token standard |
+
+(Resolve with `(*registry*/resolve 'name)` to get the current address — these
+are network-specific.)
