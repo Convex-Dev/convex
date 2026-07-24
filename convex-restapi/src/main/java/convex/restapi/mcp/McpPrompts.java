@@ -36,6 +36,7 @@ class McpPrompts {
 		register("network-status.json");
 		register("convex-guide.json");
 		register("resolve-name.json");
+		register("diagnose-transaction.json");
 
 		// Only if signing service is available (submit transactions)
 		if (api.getRESTServer().getSigningService() != null) {
@@ -44,6 +45,7 @@ class McpPrompts {
 			register("transfer-funds.json");
 			register("call-actor.json");
 			register("token.json");
+			register("manage-access.json");
 		}
 	}
 
