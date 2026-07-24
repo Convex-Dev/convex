@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New `convex-p2p` module: a rollup package for lattice P2P nodes, bundling the P2P regions (`:p2p` node registry, `:id` user identity, reserved `:kad`), the application regions a node serves, and the `P2PNode` server that serves them. `node.p2p(userID).cursor()` gives an application a cursor onto one user's owned area, signed on write.
-- MCP: five new guided prompts — `resolve-name` (resolve and inspect a CNS name), `call-actor` (call an actor's `^:callable` function), `token` (create, mint, transfer and inspect a `convex.fungible` token), `diagnose-transaction` (look up a transaction by hash and explain its result or CVM error code), and `manage-access` (set up and inspect controllers and `convex.trust` monitors). These fill the transact, asset, naming, debugging and access-control gaps alongside the existing account/deploy/transfer prompts.
+- MCP: five new guided prompts — `resolve-name`, `call-actor`, `token`, `diagnose-transaction` and `manage-access` — covering name resolution, actor calls, fungible tokens (CAD029), transaction diagnosis, and access control (CAD022).
 
 ### Changed
 
+- MCP: improved and streamlined the built-in prompts — clearer, accurate Convex guidance, with the shared reference (system accounts, coin units, CNS) consolidated into `convex-guide` so the task prompts stay focused.
 - `AIndex.entrySet()` now returns a lightweight immutable view, avoiding a full ordered set copy on every call while preserving sorted iteration order.
 - NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
 - NodeServer: public-node defaults now cap encoded messages at 4 MiB and inbound connections at 256, while cryptographically verified outbound Peers may use a separately configurable larger message tier.
@@ -24,9 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- REST API: explorer pagination is now bounded — the `limit` parameter is read correctly (it was keyed off `offset`, so `?offset=N` without a limit failed) and clamped to a maximum, so a public caller cannot request an unbounded page and force large historical reads (#660).
-- MCP: SSE connection registration is now atomic — the connection cap can no longer be exceeded by concurrent opens, and reusing a session ID is refused rather than silently replacing (and orphaning) the existing connection (#659).
-- MCP: the built-in prompts served factually incorrect Convex guidance to clients — a non-existent `(export ...)` form for actor functions (the mechanism is `^:callable`), wrong system-account addresses, a fabricated "memory exchange" account, a token example that could not deploy, and a claim that a deployed actor's controller defaults to the deployer (it is nil — actors are autonomous unless a controller is set explicitly). All corrected against the live CVM, and the shared reference (system accounts, coin units, CNS) consolidated into the `convex-guide` prompt so the task prompts stay focused.
+- REST API: explorer pagination is now bounded by a maximum page size, so public endpoints can't be driven into unbounded historical reads (#660).
+- MCP: SSE connections enforce the connection cap atomically and reject reused session IDs cleanly (#659).
 - CLI: the `NO_COLOR` environment variable now follows the [convention](https://no-color.org) of suppressing colour whenever it is set to any non-empty value. Previously its value was parsed as a boolean, so a common `NO_COLOR=1` made every command fail with "'1' is not a boolean" before it ran.
 - REST API: query watches on fast-changing queries stay connected under load — the newest result supersedes queued events.
 - NodeServer: replayed lattice values that do not change local state no longer trigger repeated announce and root persistence work.
