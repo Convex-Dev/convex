@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -27,7 +28,11 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
+import convex.core.data.Maps;
+import convex.core.data.Ref;
 import convex.core.data.Keyword;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
@@ -110,19 +115,39 @@ public class JoinNetworkTest {
 		Server source=null;
 		Server destination=null;
 		try {
-			HashMap<Keyword,Object> sourceConfig=new HashMap<>();
-			sourceConfig.put(Keywords.KEYPAIR,sourceKeyPair);
-			sourceConfig.put(Keywords.STATE,genesis);
-			sourceConfig.put(Keywords.STORE,EtchStore.createTemp());
-			sourceConfig.put(Keywords.PORT,0);
-			source=API.launchPeer(sourceConfig);
-
 			State corruptState=correct.getConsensusState().withTimestamp(
 					correct.getConsensusState().getTimestamp().longValue()+1);
 			AMap<Keyword,ACell> corruptData=correct.toData().assoc(Keywords.STATE,corruptState);
 			Peer advertised=Peer.fromData(sourceKeyPair,corruptData);
-			source.getCVMExecutor().setPeer(advertised);
-			source.getCVMExecutor().persistPeerData();
+
+			// Seed a store with the advertised peer data and restore from it, rather than
+			// injecting into a running server. Setting the CVMExecutor's peer is not enough:
+			// the BeliefPropagator keeps its own pre-injection Belief and feeds it back through
+			// queueUpdate, and that Order carries no blocks (finality 0), so the executor
+			// correctly truncates the state back to 0 and the source then advertises 0.
+			// Restoring at launch initialises every component from the same peer data.
+			EtchStore sourceStore=EtchStore.createTemp();
+			AMap<ACell,ACell> rootData=Maps.empty().assoc(sourceKeyPair.getAccountKey(),corruptData);
+			rootData=sourceStore.setRootData(rootData).getValue();
+			sourceStore.storeTopRef(advertised.getGenesisState().getRef(),Ref.PERSISTED,null);
+			sourceStore.storeTopRef(advertised.getBelief().getRef(),Ref.PERSISTED,null);
+			Cells.persist(corruptState,sourceStore);
+			sourceStore.flush();
+
+			HashMap<Keyword,Object> sourceConfig=new HashMap<>();
+			sourceConfig.put(Keywords.KEYPAIR,sourceKeyPair);
+			sourceConfig.put(Keywords.STATE,genesis);
+			sourceConfig.put(Keywords.STORE,sourceStore);
+			sourceConfig.put(Keywords.RESTORE,true);
+			sourceConfig.put(Keywords.PORT,0);
+			source=API.launchPeer(sourceConfig);
+			try (Convex sourceClient=Convex.connect(source.getHostAddress())) {
+				Result statusResult=sourceClient.requestStatus().get(10,TimeUnit.SECONDS);
+				assertFalse(statusResult.isError(),()->"Source status failed: "+statusResult);
+				AMap<Keyword,ACell> status=API.ensureStatusMap(statusResult.getValue());
+				assertNotNull(status,"Source returned an invalid status payload");
+				assertEquals(CVMLong.create(correct.getStatePosition()),status.get(Keywords.STATE_POSITION));
+			}
 
 			AKeyPair destinationKeyPair=AKeyPair.createSeeded(987654322);
 			HashMap<Keyword,Object> destinationConfig=new HashMap<>();
@@ -132,11 +157,19 @@ public class JoinNetworkTest {
 			destinationConfig.put(Keywords.SOURCE,source.getHostAddress());
 			destination=API.launchPeer(destinationConfig);
 
-			assertEquals(correct.getStatePosition(),destination.getPeer().getStatePosition());
+			// Wait on the real signal rather than reading the live peer: the executor thread
+			// advances state asynchronously once launched, and a peer whose finality point is
+			// behind its state truncates on update, so an immediate read can observe either an
+			// earlier position or a momentary rollback. Assert against the snapshot returned
+			// here, so the checks below all describe the same observation.
+			Peer joined=destination.awaitStatePosition(correct.getStatePosition())
+					.get(10,TimeUnit.SECONDS);
+
+			assertEquals(correct.getStatePosition(),joined.getStatePosition());
 			assertEquals(correct.getConsensusState().getHash(),
-					destination.getPeer().getConsensusState().getHash());
+					joined.getConsensusState().getHash());
 			assertNotEquals(advertised.getConsensusState().getHash(),
-					destination.getPeer().getConsensusState().getHash());
+					joined.getConsensusState().getHash());
 		} finally {
 			if (destination!=null) destination.close();
 			if (source!=null) source.close();

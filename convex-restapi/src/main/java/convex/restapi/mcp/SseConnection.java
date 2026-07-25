@@ -10,16 +10,31 @@ import java.util.concurrent.TimeUnit;
  * per-connection virtual thread.
  *
  * <p>Shared infrastructure for MCP servers that support the Streamable HTTP
- * transport with SSE notifications. Sending is non-blocking. If a slow client
- * fills the bounded queue, only that connection is closed.</p>
+ * transport with SSE notifications. Sending is non-blocking; a full event queue
+ * is handled per the connection's {@link OverflowPolicy}, affecting only that
+ * connection.</p>
  */
 public class SseConnection {
 	static final int DEFAULT_EVENT_QUEUE_CAPACITY=64;
 
+	/** Policy applied when an event arrives and the bounded queue is full. */
+	public enum OverflowPolicy {
+		/** Close the connection. Correct where every event matters and silent
+		 * loss would corrupt the stream (MCP messages, log events). */
+		CLOSE,
+		/** Drop the oldest queued event to make room. Correct for conflatable
+		 * streams where the newest value supersedes anything queued (query
+		 * watches): a fast-changing source degrades to bounded staleness
+		 * instead of losing the connection. */
+		DROP_OLDEST
+	}
+
+	/** A null type denotes an SSE comment frame. */
 	private record Event(String id, String type, String data) {}
 
 	private final PrintWriter writer;
 	private final ArrayBlockingQueue<Event> events;
+	private final OverflowPolicy overflowPolicy;
 	private volatile boolean closed;
 	private volatile Thread dispatcher;
 
@@ -34,14 +49,27 @@ public class SseConnection {
 	 * @param capacity Maximum queued events
 	 */
 	public SseConnection(PrintWriter writer, int capacity) {
+		this(writer,capacity,OverflowPolicy.CLOSE);
+	}
+
+	/**
+	 * Creates an SSE connection with an explicit bounded queue capacity and
+	 * overflow policy.
+	 *
+	 * @param writer Destination writer
+	 * @param capacity Maximum queued events
+	 * @param overflowPolicy Behaviour when the queue is full
+	 */
+	public SseConnection(PrintWriter writer, int capacity, OverflowPolicy overflowPolicy) {
 		this.writer=Objects.requireNonNull(writer,"SSE writer cannot be null");
 		if (capacity<=0) throw new IllegalArgumentException("SSE queue capacity must be positive");
 		this.events=new ArrayBlockingQueue<>(capacity);
+		this.overflowPolicy=Objects.requireNonNull(overflowPolicy,"SSE overflow policy cannot be null");
 	}
 
 	/**
 	 * Queues an SSE event for this connection. If the client cannot keep up and
-	 * the bounded event queue is full, the connection is closed.
+	 * the bounded event queue is full, the {@link OverflowPolicy} applies.
 	 *
 	 * @param eventType The event type (e.g. "message")
 	 * @param data The event data (e.g. JSON string)
@@ -64,9 +92,36 @@ public class SseConnection {
 			validateField(eventID,"SSE event ID"),
 			Objects.requireNonNull(validateField(eventType,"SSE event type"),"SSE event type cannot be null"),
 			Objects.requireNonNull(data,"SSE event data cannot be null"));
+		send(event);
+	}
+
+	/**
+	 * Queues an SSE comment on the same dispatcher as events. This is used for
+	 * connection and keepalive frames so the HTTP response has exactly one writer.
+	 *
+	 * @param comment Comment text without a line break
+	 */
+	public void sendComment(String comment) {
+		if (closed) return;
+		send(new Event(null,null,Objects.requireNonNull(
+			validateField(comment,"SSE comment"),"SSE comment cannot be null")));
+	}
+
+	private void send(Event event) {
+		if (closed) return;
 		ensureDispatcher();
 		if (closed) return;
-		if (!events.offer(event)) close();
+		if (!events.offer(event)) {
+			if (overflowPolicy==OverflowPolicy.CLOSE) {
+				close();
+				return;
+			}
+			// DROP_OLDEST: evict until the new event fits; the dispatcher may be
+			// draining concurrently, so poll and offer race benignly until success
+			do {
+				events.poll();
+			} while (!closed&&!events.offer(event));
+		}
 	}
 
 	private static String validateField(String value, String name) {
@@ -98,11 +153,17 @@ public class SseConnection {
 				if (closed) break;
 				synchronized (writer) {
 					if (closed) break;
-					if (event.id()!=null) writer.write("id: " + event.id() + "\n");
-					writer.write("event: " + event.type() + "\n");
-					writeData(event.data());
-					writer.write("\n");
-					writer.flush();
+					if (event.type()==null) {
+						writer.write(": " + event.data() + "\n\n");
+					} else {
+						if (event.id()!=null) writer.write("id: " + event.id() + "\n");
+						writer.write("event: " + event.type() + "\n");
+						writeData(event.data());
+						writer.write("\n");
+					}
+					// checkError() flushes an open stream (documented behaviour) and reports any
+					// IOException recorded by the writes above, so this delivers the event and
+					// detects a broken client in one step. A separate flush() would only repeat it.
 					if (writer.checkError()) close();
 				}
 			}

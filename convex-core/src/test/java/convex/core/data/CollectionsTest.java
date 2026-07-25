@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -175,15 +177,7 @@ public class CollectionsTest {
 			assertEquals(a, da.assocEntry(me));
 		}
 		
-		{ // test that entrySet works properly
-			java.util.Set<Map.Entry<K, V>> es=a.entrySet();
-			assertEquals(es.size(),a.size());
-			AMap<K, V> t=a;
-			for (Map.Entry<K, V> me: es) {
-				t=t.dissoc(me.getKey());
-			}
-			assertSame(a.empty(),t);
-		}
+		doMapEntrySetTests(a);
 		
 		{ // test that keySet works properly
 			java.util.Set<K> ks=a.keySet();
@@ -200,5 +194,46 @@ public class CollectionsTest {
 		assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(n));
 
 		doDataStructureTests(a);
+	}
+
+	/**
+	 * Generic tests for the Java {@link Map#entrySet()} view of any Convex map.
+	 *
+	 * @param a Any Convex map
+	 */
+	public static <K extends ACell, V extends ACell> void doMapEntrySetTests(AMap<K, V> a) {
+		long n = a.count();
+		Set<Map.Entry<K, V>> entries = a.entrySet();
+
+		assertEquals(a.size(), entries.size());
+		assertEquals(a.isEmpty(), entries.isEmpty());
+		assertFalse(entries.contains("not an entry"));
+
+		Iterator<Map.Entry<K, V>> iterator = entries.iterator();
+		AMap<K, V> remaining = a;
+		long seen = 0L;
+		while (iterator.hasNext()) {
+			Map.Entry<K, V> entry = iterator.next();
+			MapEntry<K, V> expected = a.getEntry(entry.getKey());
+
+			assertNotNull(expected);
+			assertEquals(expected.getKey(), entry.getKey());
+			assertEquals(expected.getValue(), entry.getValue());
+			assertTrue(entries.contains(entry));
+
+			remaining = remaining.dissoc(entry.getKey());
+			seen++;
+		}
+
+		assertEquals(n, seen);
+		assertFalse(iterator.hasNext());
+		assertThrows(NoSuchElementException.class, iterator::next);
+		assertSame(a.empty(), remaining);
+
+		if (n > 0L) {
+			MapEntry<K, V> entry = a.entryAt(n / 2L);
+			assertTrue(entries.contains(entry));
+			assertThrows(UnsupportedOperationException.class, () -> entry.setValue(entry.getValue()));
+		}
 	}
 }

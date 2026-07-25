@@ -85,19 +85,10 @@ public final class LogWatchAPI extends ABaseAPI {
 
 			PrintWriter writer=response.getWriter();
 			connection=new SseConnection(writer,EVENT_QUEUE_CAPACITY);
+			connection.sendComment("connected");
 			subscribe(connection,filter,format);
-			synchronized (writer) {
-				writer.write(": connected\n\n");
-				writer.flush();
-			}
-			response.flushBuffer();
-			if (writer.checkError()) return;
 			while (!connection.awaitClosed(KEEPALIVE_MS,TimeUnit.MILLISECONDS)) {
-				synchronized (writer) {
-					writer.write(": keepalive\n\n");
-					writer.flush();
-					if (writer.checkError()) connection.close();
-				}
+				connection.sendComment("keepalive");
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();

@@ -127,16 +127,20 @@ public class McpPromptsTest extends ARESTTest {
 		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
 
-		boolean hasExploreAccount = false, hasNetworkStatus = false, hasConvexGuide = false;
+		boolean hasExploreAccount = false, hasNetworkStatus = false, hasConvexGuide = false, hasResolveName = false, hasDiagnose = false;
 		for (long i = 0; i < prompts.count(); i++) {
 			String name = RT.ensureString(RT.castMap(prompts.get(i)).get(Strings.create("name"))).toString();
 			if ("explore-account".equals(name)) hasExploreAccount = true;
 			if ("network-status".equals(name)) hasNetworkStatus = true;
 			if ("convex-guide".equals(name)) hasConvexGuide = true;
+			if ("resolve-name".equals(name)) hasResolveName = true;
+			if ("diagnose-transaction".equals(name)) hasDiagnose = true;
 		}
 		assertTrue(hasExploreAccount, "explore-account should always be available");
 		assertTrue(hasNetworkStatus, "network-status should always be available");
 		assertTrue(hasConvexGuide, "convex-guide should always be available");
+		assertTrue(hasResolveName, "resolve-name should always be available");
+		assertTrue(hasDiagnose, "diagnose-transaction should always be available");
 	}
 
 	@Test
@@ -146,7 +150,7 @@ public class McpPromptsTest extends ARESTTest {
 		AMap<AString, ACell> response = mcpCall("prompts/list", null);
 		AMap<AString, ACell> result = RT.castMap(response.get(McpProtocol.FIELD_RESULT));
 		AVector<ACell> prompts = RT.ensureVector(result.get(Strings.create("prompts")));
-		assertEquals(6, prompts.count(), "Should have exactly 6 prompts");
+		assertEquals(11, prompts.count(), "Should have exactly 11 prompts");
 	}
 
 	// ===== prompts/get — message structure =====
@@ -189,7 +193,7 @@ public class McpPromptsTest extends ARESTTest {
 		String persona = getMessageText(messages, 0);
 		assertTrue(persona.contains("peerStatus"), "Should list peerStatus tool");
 		assertTrue(persona.contains("Convergent Proof of Stake"), "Should explain CPoS consensus");
-		assertTrue(persona.contains("#7"), "Should explain memory exchange");
+		assertTrue(persona.contains("*memory-price*"), "Should explain memory pricing via the memory-price global");
 	}
 
 	@Test
@@ -245,14 +249,14 @@ public class McpPromptsTest extends ARESTTest {
 	@Test
 	public void testGetDeployContract() throws IOException, InterruptedException {
 		AMap<AString, ACell> response = mcpCall("prompts/get",
-			"{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do (defn greet [x] (str \\\"Hello \\\" x)) (export greet))\",\"address\":\"#42\",\"passphrase\":\"mypass\"}}");
+			"{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do (defn ^:callable greet [x] (str \\\"Hello \\\" x)))\",\"address\":\"#42\",\"passphrase\":\"mypass\"}}");
 
 		AVector<ACell> messages = getMessages(response);
 		assertTrue(messages.count() >= 3);
 
 		String persona = getMessageText(messages, 0);
 		assertTrue(persona.contains("deploy"), "Persona should explain deployment");
-		assertTrue(persona.contains("export"), "Persona should explain exports");
+		assertTrue(persona.contains("^:callable"), "Persona should explain callable functions");
 		assertTrue(persona.contains("signingTransact"), "Should list tools");
 
 		String allText = getAllText(messages);
@@ -273,6 +277,84 @@ public class McpPromptsTest extends ARESTTest {
 		assertTrue(allText.contains("#13"), "Should substitute recipient");
 		assertTrue(allText.contains("5000"), "Should substitute amount");
 		assertTrue(allText.contains("juice"), "Should mention transaction costs");
+	}
+
+	@Test
+	public void testGetResolveName() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"resolve-name\",\"arguments\":{\"name\":\"convex.fungible\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("*registry*"), "Persona should explain the CNS registry");
+		assertTrue(persona.contains("resolve"), "Persona should explain resolution");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("convex.fungible"), "Should substitute the name argument");
+	}
+
+	@Test
+	public void testGetCallActor() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"call-actor\",\"arguments\":{\"actor\":\"#123\",\"call\":\"(increment)\",\"address\":\"#42\",\"passphrase\":\"topsecret999\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("^:callable"), "Persona should explain callable functions");
+		assertTrue(persona.contains("signingTransact"), "Should list tools");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("#123"), "Should substitute actor");
+		assertTrue(allText.contains("(increment)"), "Should substitute the call form");
+		assertFalse(allText.contains("topsecret999"), "Should NOT echo the passphrase");
+	}
+
+	@Test
+	public void testGetToken() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"token\",\"arguments\":{\"task\":\"mint 500\",\"address\":\"#42\",\"passphrase\":\"pass\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("@convex.fungible"), "Persona should reference the fungible library");
+		assertTrue(persona.contains("build-token"), "Persona should explain token creation");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("mint 500"), "Should substitute the task argument");
+	}
+
+	@Test
+	public void testGetDiagnoseTransaction() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"diagnose-transaction\",\"arguments\":{\"hash\":\"0xABCD1234\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("getTransaction"), "Persona should explain the getTransaction tool");
+		assertTrue(persona.contains(":JUICE"), "Persona should teach CVM error codes");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("0xABCD1234"), "Should substitute the hash argument");
+	}
+
+	@Test
+	public void testGetManageAccess() throws IOException, InterruptedException {
+		AMap<AString, ACell> response = mcpCall("prompts/get",
+			"{\"name\":\"manage-access\",\"arguments\":{\"task\":\"who controls #123\",\"address\":\"#42\",\"passphrase\":\"topsecret999\"}}");
+
+		AVector<ACell> messages = getMessages(response);
+		assertTrue(messages.count() >= 3);
+
+		String persona = getMessageText(messages, 0);
+		assertTrue(persona.contains("trusted?"), "Persona should explain trust monitors");
+		assertTrue(persona.contains("controller"), "Persona should explain controllers");
+		String allText = getAllText(messages);
+		assertTrue(allText.contains("who controls #123"), "Should substitute the task argument");
+		assertFalse(allText.contains("topsecret999"), "Should NOT echo the passphrase");
 	}
 
 	// ===== Message quality =====
@@ -316,6 +398,11 @@ public class McpPromptsTest extends ARESTTest {
 			{"create-account",  "{\"name\":\"create-account\",\"arguments\":{\"passphrase\":\"test\"}}"},
 			{"deploy-contract", "{\"name\":\"deploy-contract\",\"arguments\":{\"source\":\"(do nil)\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
 			{"transfer-funds",  "{\"name\":\"transfer-funds\",\"arguments\":{\"from\":\"#1\",\"to\":\"#2\",\"amount\":\"100\",\"passphrase\":\"test\"}}"},
+			{"resolve-name",    "{\"name\":\"resolve-name\",\"arguments\":{\"name\":\"convex.fungible\"}}"},
+			{"call-actor",      "{\"name\":\"call-actor\",\"arguments\":{\"actor\":\"#123\",\"call\":\"(increment)\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
+			{"token",           "{\"name\":\"token\",\"arguments\":{\"task\":\"check supply\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
+			{"diagnose-transaction", "{\"name\":\"diagnose-transaction\",\"arguments\":{\"hash\":\"0x1234\"}}"},
+			{"manage-access",   "{\"name\":\"manage-access\",\"arguments\":{\"task\":\"who controls #123\",\"address\":\"#1\",\"passphrase\":\"test\"}}"},
 		};
 
 		for (String[] tc : testCases) {

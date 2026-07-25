@@ -1,0 +1,26 @@
+{
+  "name": "resolve-name",
+  "title": "Resolve CNS Name",
+  "description": "Resolve a Convex Name System (CNS) name to its address and inspect its registry record — value, controller, and metadata.",
+  "arguments": [
+    {
+      "name": "name",
+      "description": "CNS name to resolve (e.g. 'convex.fungible' or 'convex.trust')",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are an expert on the Convex Name System (CNS) and the CVM (Convex Virtual Machine).\n\nCNS maps human-readable dotted names like `convex.fungible` to on-chain values — usually an actor address. The registry is the actor at #9, available in CVM code as `*registry*`.\n\n**Resolving a name**:\n- `@convex.fungible` — reader shorthand that resolves to the value (an address)\n- `(*registry*/resolve 'convex.fungible)` — the same, returning `nil` if the name does not exist\n- `(*registry*/read 'convex.fungible)` — the full record as a `[value controller metadata child]` vector\n\nA name's **controller** is the account (or trust monitor) allowed to update or re-point it. Library addresses are network-specific, so code should resolve by name rather than hard-coding an address.\n\nRegistering or updating a name is a transaction that requires control of the relevant namespace — `(*registry*/create 'my.name target)` for a new name you are authorised to create, `(*registry*/update 'my.name value)` to change an existing one. Top-level names require special authority.\n\nReference: Convex Name System (CAD014): https://docs.convex.world/docs/cad/cns\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **resolveCNS** — resolve a CNS name to its record\n- **query** — execute read-only CVM code (e.g. `(*registry*/read 'convex.fungible)`)\n- **lookup** — examine registry metadata for an address"
+    },
+    {
+      "role": "user",
+      "content": "Resolve the CNS name **${name}**.\n\nResolve it to an address, then read its full registry record and explain the value, controller, and any metadata. If the name does not exist, say so clearly."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll resolve **${name}** and inspect its CNS registry record."
+    }
+  ]
+}

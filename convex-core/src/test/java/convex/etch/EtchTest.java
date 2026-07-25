@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
@@ -103,6 +104,59 @@ public class EtchTest {
 		assertEquals(v2,etch.read(k2).getValue());
 		assertEquals(v3,etch.read(k3).getValue());
 		assertEquals(vb,etch.read(kb).getValue());
+
+		long rootIndex=etch.getIndexStart();
+		long childIndex=etch.rawPointer(etch.readSlot(rootIndex,0));
+		assertEquals(Etch.PTR_INDEX,etch.extractType(etch.readSlot(rootIndex,0)));
+		assertEquals(0L,childIndex&(Etch.POINTER_SIZE-1),"New child index is not naturally aligned");
+	}
+
+	@Test
+	public void testV1AndV2Layouts() throws IOException {
+		EtchStore v2Store=EtchStore.createTemp();
+		Etch v2=v2Store.getEtch();
+		assertEquals(Etch.ETCH_VERSION_2,v2.getVersion());
+		assertEquals(Etch.INDEX_START_V2,v2.getIndexStart());
+		String expectedV2=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged()
+				?"MemorySegment":"MappedByteBuffer";
+		assertEquals(expectedV2,v2.getMappingImplementation());
+		v2Store.close();
+
+		File file=File.createTempFile("etch-v1-layout", ".etch");
+		file.deleteOnExit();
+		long initialLength=Etch.INDEX_START_V1+65536L*Etch.POINTER_SIZE;
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			data.setLength(initialLength);
+			data.seek(0L);
+			data.write(Etch.MAGIC_NUMBER);
+			data.writeShort(Etch.ETCH_VERSION_1);
+			data.writeLong(initialLength);
+		}
+
+		EtchStore v1Store=EtchStore.create(file);
+		Etch v1=v1Store.getEtch();
+		assertEquals(Etch.ETCH_VERSION_1,v1.getVersion());
+		assertEquals(Etch.INDEX_START_V1,v1.getIndexStart());
+		assertEquals("MappedByteBuffer",v1.getMappingImplementation());
+
+		AVector<CVMLong> value=Vectors.of(11,22,33);
+		v1.write(value.getHash(),value.getRef());
+		assertEquals(value,v1.read(value.getHash()).getValue());
+		v1Store.close();
+
+		EtchStore reopened=EtchStore.create(file);
+		assertEquals(Etch.ETCH_VERSION_1,reopened.getEtch().getVersion());
+		assertEquals(value,reopened.getEtch().read(value.getHash()).getValue());
+		reopened.close();
+	}
+
+	private static boolean ffmBackendIsPackaged() {
+		try {
+			Class.forName("convex.etch.FFMEtchFileMapper");
+			return true;
+		} catch (ClassNotFoundException e) {
+			return false;
+		}
 	}
 	
 	@Test 

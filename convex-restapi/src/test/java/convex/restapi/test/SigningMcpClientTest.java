@@ -60,9 +60,11 @@ public class SigningMcpClientTest extends ARESTTest {
 				.build();
 		mcpNoAuth.initialize();
 
-		// Client with Alice's bearer token
+		// Client with Alice's bearer token. SDK 2.0.0 replaced customizeRequest(Consumer)
+		// with an httpRequestCustomizer that also receives the method, URI, body and context.
 		McpClientTransport aliceTransport = HttpClientStreamableHttpTransport.builder(MCP_URL)
-				.customizeRequest(b -> b.header("Authorization", "Bearer " + ALICE_JWT))
+				.httpRequestCustomizer((builder, method, uri, body, context) ->
+						builder.header("Authorization", "Bearer " + ALICE_JWT))
 				.build();
 		mcpAlice = McpClient.sync(aliceTransport)
 				.requestTimeout(Duration.ofSeconds(10))

@@ -25,6 +25,7 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
+import convex.restapi.handler.RequestBody;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -88,7 +89,7 @@ public abstract class AGenericAPI {
 	 */
 	protected AMap<AString, ACell> readJSONBody(Context ctx) {
 		try {
-			AMap<AString, ACell> req= JSONReader.readObject(ctx.bodyInputStream());
+			AMap<AString, ACell> req= JSONReader.readObject(RequestBody.boundedInputStream(ctx));
 			return req;
 		} catch (IllegalArgumentException | ParseException | IOException e) {
 			throw new BadRequestResponse("Invalid JSON body: "+e.getMessage());
@@ -160,6 +161,12 @@ public abstract class AGenericAPI {
 	private static final long MAX_CONTENT_SIZE = 1_000_000; // 1MB limit
 
 	public void setContent(Context ctx, ACell content) {
+		// CVM query errors remain successful HTTP query responses, but admission
+		// failure is a transport-level service availability response.
+		if ((content instanceof Result r)&&ErrorCodes.LOAD.equals(r.getErrorCode())) {
+			ctx.status(503);
+		}
+
 		long size = Cells.storageSize(content);
 		if (size > MAX_CONTENT_SIZE) {
 			setResult(ctx, Result.error(ErrorCodes.LIMIT, "Response too large: " + size + " bytes").withSource(SourceCodes.PEER));
@@ -228,6 +235,7 @@ public abstract class AGenericAPI {
 		if (ErrorCodes.FORMAT.equals(error)) return 400; // bad request
 		if (ErrorCodes.MISSING.equals(error)) return 404; // not found
 		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
+		if (ErrorCodes.LOAD.equals(error)) return 503; // service unavailable under bounded admission
 		int status = 422;
 		return status;
 	}

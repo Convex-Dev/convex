@@ -1,0 +1,56 @@
+---
+name: deploy
+description: Deploy an actor (smart contract) to the Convex network. Use when the user wants to create a new on-chain actor with exported functions.
+argument-hint: "<description-of-actor>"
+---
+
+# Deploy a Convex Actor
+
+Actors are autonomous on-chain programs with their own address, state, and callable functions.
+
+See the `convex-lisp` skill for CVM conventions and error codes. Deploying is a
+transaction, so it needs a key the user has supplied — see `transact`.
+
+## Actor Structure
+
+A typical actor deployment:
+
+```clojure
+(deploy
+  '(do
+     ;; Internal state (private to the actor)
+     (def counter 0)
+
+     ;; Callable functions: mark each with ^:callable so it can be
+     ;; invoked from outside the actor via (call ...)
+     (defn ^:callable increment []
+       (set! counter (+ counter 1))
+       counter)
+
+     (defn ^:callable get-count []
+       counter)))
+```
+
+## Key Rules
+
+- `deploy` returns the new actor's address (e.g. `#12345`)
+- Only functions tagged with `^:callable` metadata can be called from outside (there is no `export` form). The equivalent map form is `^{:callable true}`
+- Use `set!` to update an existing `def` from inside a function; plain `def`s declared in the actor body are private state
+- Actors have their own `*address*` and `*balance*`
+- Use `(set-controller #ADDR)` inside the actor to set who can upgrade it
+- `deploy` also accepts a **vector** of code forms, which is how library
+  builders are composed into one actor:
+  `(deploy [(@convex.fungible/build-token {…}) (@convex.fungible/add-mint {…})])`
+
+## After Deployment
+
+1. Note the returned address for the user
+2. Optionally register a CNS name: `(call #9 (cns-update 'my.actor.name *address*))`
+3. Test by calling a `^:callable` function: `(call #NEW-ADDR (get-count))`
+
+## Workflow
+
+1. Help the user design the actor based on `$ARGUMENTS`
+2. Write the Convex Lisp source
+3. Deploy using `transact` with the `(deploy ...)` expression
+4. Verify the deployment with a test query

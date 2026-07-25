@@ -35,7 +35,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
@@ -47,11 +46,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.JSON;
 import convex.core.util.Utils;
+import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
@@ -111,6 +110,7 @@ public class McpAPI extends ABaseAPI {
 	public static final StringShort ARG_FAUCET = Strings.intern("faucet");
 	public static final StringShort ARG_RESOLVE = Strings.intern("resolve");
 	public static final StringShort ARG_HASH = Strings.intern("hash");
+	public static final StringShort ARG_DATA = Strings.intern("data");
 	public static final StringShort ARG_CAD3 = Strings.intern("cad3");
 	public static final StringShort ARG_GET_PATH = Strings.intern("getPath");
 	public static final StringShort ARG_NAME = Strings.intern("name");
@@ -164,13 +164,11 @@ public class McpAPI extends ABaseAPI {
 		this.mcpServer = mcpServer;
 
 		// #552: restrict MCP Origins if configured (DNS rebinding protection)
-		Object origins = restServer.getConfig().get(convex.core.cvm.Keywords.ALLOWED_ORIGINS);
-		if (origins instanceof java.util.Collection<?> coll) {
-			mcpServer.setAllowedOrigins(coll.stream().map(Object::toString).toList());
-		}
+		java.util.Set<String> origins = restServer.getRESTConfig().getAllowedOrigins();
+		if (origins != null) mcpServer.setAllowedOrigins(origins);
 
 		// #554: HTTPS enforcement for seed-based tools, opt-out for private networks
-		this.allowHttpSeeds = RT.bool(restServer.getConfig().get(convex.core.cvm.Keywords.ALLOW_HTTP_SEEDS));
+		this.allowHttpSeeds = restServer.getRESTConfig().isHttpSeedsAllowed();
 
 		// Enrich server info with peer details
 		AMap<AString, ACell> info = mcpServer.getServerInfo();
@@ -279,7 +277,9 @@ public class McpAPI extends ABaseAPI {
 			return;
 		}
 
-		// Enforce global connection limit (soft cap)
+		// Fast-path cap and session-reuse checks, so the common rejection cases get a
+		// clean response before we commit to an SSE stream. The authoritative, atomic
+		// versions of both checks happen in registerConnection below.
 		if (connections.size() >= MAX_CONNECTIONS) {
 			ctx.status(429);
 			return;
@@ -289,6 +289,10 @@ public class McpAPI extends ABaseAPI {
 		String sessionId = ctx.header(HEADER_SESSION_ID);
 		if (sessionId == null) {
 			sessionId = UUID.randomUUID().toString();
+		} else if (connections.containsKey(sessionId)) {
+			// A session ID with a live connection: refuse rather than replacing it.
+			ctx.status(409);
+			return;
 		}
 
 		try {
@@ -301,9 +305,21 @@ public class McpAPI extends ABaseAPI {
 
 			PrintWriter writer = res.getWriter();
 			McpConnection conn = new McpConnection(writer);
-			// Register connection BEFORE flushing headers so POSTs using
-			// the session ID can find it immediately.
-			connections.put(sessionId, conn);
+			// Register atomically BEFORE flushing headers so POSTs using the session ID
+			// can find it immediately, and so a reused ID or a raced cap cannot orphan
+			// a connection (#659).
+			switch (registerConnection(connections, sessionId, conn, MAX_CONNECTIONS)) {
+				case SESSION_IN_USE:
+					conn.close();
+					ctx.status(409);
+					return;
+				case CAP_EXCEEDED:
+					conn.close();
+					ctx.status(429);
+					return;
+				case OK:
+					break;
+			}
 			res.flushBuffer();
 			try {
 				// Keep-alive loop — blocks virtual thread until client disconnects
@@ -317,12 +333,50 @@ public class McpAPI extends ABaseAPI {
 				Thread.currentThread().interrupt();
 			} finally {
 				conn.close();
-				connections.remove(sessionId);
+				// Conditional remove: only evict our own connection, never one a later
+				// open registered under the same session ID (#659).
+				connections.remove(sessionId, conn);
 				stateWatcher.stopIfIdle();
 			}
 		} catch (IOException e) {
 			log.debug("SSE connection setup failed", e);
 		}
+	}
+
+	/** Outcome of {@link #registerConnection}. */
+	enum RegisterResult { OK, SESSION_IN_USE, CAP_EXCEEDED }
+
+	/**
+	 * Atomically register an SSE connection under a session ID, enforcing the connection
+	 * cap. Fixes two races in the old {@code size()}-then-{@code put} pattern (#659):
+	 *
+	 * <ul>
+	 *   <li>{@code putIfAbsent} never replaces a live connection, so a reused session ID
+	 *       cannot orphan an existing socket/thread — it is refused instead.</li>
+	 *   <li>The cap is checked <em>after</em> the insert, so concurrent opens cannot
+	 *       collectively exceed {@code maxConnections} (an over-cap opener rolls back its
+	 *       own slot). At most it over-rejects under contention; it never over-admits.</li>
+	 * </ul>
+	 *
+	 * <p>Package-private and static for direct unit testing.</p>
+	 *
+	 * @param connections The live connection registry
+	 * @param sessionId Session ID to register under
+	 * @param conn Connection to register
+	 * @param maxConnections Hard connection cap
+	 * @return the registration outcome; on anything but {@link RegisterResult#OK} the
+	 *         connection was not left in the registry
+	 */
+	static RegisterResult registerConnection(ConcurrentHashMap<String, McpConnection> connections,
+			String sessionId, McpConnection conn, int maxConnections) {
+		if (connections.putIfAbsent(sessionId, conn) != null) {
+			return RegisterResult.SESSION_IN_USE;
+		}
+		if (connections.size() > maxConnections) {
+			connections.remove(sessionId, conn);
+			return RegisterResult.CAP_EXCEEDED;
+		}
+		return RegisterResult.OK;
 	}
 
 	/**
@@ -404,24 +458,30 @@ public class McpAPI extends ABaseAPI {
 		registerTool(new WatchStateTool());
 		registerTool(new UnwatchStateTool());
 
-		// Signing service tools (standard + elevated)
-		new SigningMcpTools(this).registerAll();
+		// Signing service access is a separate opt-in from public MCP access.
+		if ((restServer.getSigningService() != null) && restServer.getRESTConfig().isSigningEnabled()) {
+			new SigningMcpTools(this).registerAll(restServer.getRESTConfig().isElevatedEnabled());
+		}
 	}
 
 	void registerTool(McpTool tool) {
-		mcpServer.registerTool(tool);
+		if (restServer.getRESTConfig().isToolEnabled(tool.getName())) {
+			mcpServer.registerTool(tool);
+		}
 	}
 
 	void registerPrompt(McpPrompt prompt) {
 		mcpServer.registerPrompt(prompt);
 	}
 
-	private ATransaction decodeTransaction(Blob encodedBlob) throws BadFormatException, MissingDataException {
-		ACell value = server.getStore().decodeRef(encodedBlob).getValue();
-		if (!(value instanceof ATransaction transaction)) {
-			throw new BadFormatException("Value with data " + encodedBlob.toHexString() + " is not a transaction");
+	private ATransaction decodeTransaction(Blob hash, AMap<AString, ACell> arguments) throws BadFormatException {
+		AString dataCell = RT.ensureString(arguments.get(ARG_DATA));
+		if (dataCell == null) {
+			throw new BadFormatException("'data' is required; pass the complete data returned by prepare");
 		}
-		return transaction;
+		Blob data = Blob.parse(dataCell);
+		if (data == null) throw new BadFormatException("data must be valid hex");
+		return PreparedTransaction.decode(data, hash);
 	}
 
 	private class QueryTool extends McpTool {
@@ -436,21 +496,15 @@ public class McpAPI extends ABaseAPI {
 				return toolError("Query requires 'source' string");
 			}
 			String source = sourceCell.toString();
+			ACell form;
 			try {
-				ACell form;
-				try {
-					form = Reader.read(source);
-				} catch (Exception e) {
-					return toolError("Failed to parse query source: " + e.getMessage());
-				}
-				Address address = resolveAddress(arguments.get(ARG_ADDRESS)); // OK if null
-				Convex convex = restServer.getConvex();
-				Result result = convex.querySync(form, address);
-				return toolResult(result);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return toolError("Tool call interrupted");
-			} 
+				form = Reader.read(source);
+			} catch (Exception e) {
+				return toolError("Failed to parse query source: " + e.getMessage());
+			}
+			Address address = resolveAddress(arguments.get(ARG_ADDRESS)); // OK if null
+			Result result = restServer.getPublicQueryService().execute(form,address);
+			return toolResult(result);
 		}
 	}
 
@@ -550,7 +604,6 @@ public class McpAPI extends ABaseAPI {
 
 			try {
 				ATransaction transaction = Invoke.create(address, sequence, code);
-				transaction = Cells.persist(transaction, server.getStore());
 				Ref<ATransaction> ref = transaction.getRef();
 				String hashHex = SignedData.getMessageForRef(ref).toHexString();
 				String dataHex = Format.encodeMultiCell(transaction, true).toHexString();
@@ -658,7 +711,7 @@ public class McpAPI extends ABaseAPI {
 				return toolError("hash must be valid hex");
 			}
 			try {
-				ATransaction transaction = decodeTransaction(hashBlob);
+				ATransaction transaction = decodeTransaction(hashBlob, arguments);
 				AString accountKeyCell = RT.ensureString(arguments.get(ARG_ACCOUNT_KEY));
 				if (accountKeyCell == null) {
 					return toolError("Submit requires 'accountKey' string");
@@ -715,7 +768,7 @@ public class McpAPI extends ABaseAPI {
 				return toolError("seed must be a 32-byte hex string (64 hex characters)");
 			}
 			try {
-				ATransaction transaction = decodeTransaction(hashBlob);
+				ATransaction transaction = decodeTransaction(hashBlob, arguments);
 				AKeyPair keyPair = AKeyPair.create(seedBlob);
 				SignedData<ATransaction> signed = keyPair.signData(transaction);
 				Result result = restServer.getConvex().transactSync(signed);
@@ -1018,7 +1071,6 @@ public class McpAPI extends ABaseAPI {
 
 				Address token = resolveTokenAddress(arguments.get(ARG_TOKEN));
 
-				Convex convex = restServer.getConvex();
 				String source;
 				if (token == null) {
 					source = "(balance " + address + ")";
@@ -1026,7 +1078,7 @@ public class McpAPI extends ABaseAPI {
 					source = "(@convex.fungible/balance " + token + " " + address + ")";
 				}
 
-				Result result = convex.querySync(source);
+				Result result = restServer.getPublicQueryService().execute(Reader.read(source),null);
 				if (result.isError()) {
 					return toolResult(result);
 				}
@@ -1039,9 +1091,8 @@ public class McpAPI extends ABaseAPI {
 					out = out.assoc(ARG_TOKEN, CVMLong.create(token.longValue()));
 				}
 				return toolSuccess(out);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return toolError("Tool call interrupted");
+			} catch (Exception e) {
+				return toolError("Failed to query balance: "+e.getMessage());
 			}
 		}
 	}

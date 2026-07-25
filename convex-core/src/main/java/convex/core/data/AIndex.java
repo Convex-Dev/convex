@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 import convex.core.data.type.AType;
@@ -51,13 +49,7 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 
 	@Override
 	public Set<Entry<K, V>> entrySet() {
-		HashSet<Entry<K,V>> hs=new HashSet<>(size());
-		long n=count();
-		for (long i=0; i<n; i++) {
-			MapEntry<K,V> me=entryAt(i);
-			hs.add(me);
-		}
-		return Collections.unmodifiableSet(hs);
+		return new IndexEntrySet<>(this);
 	}
 	
 	@Override

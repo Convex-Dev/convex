@@ -29,6 +29,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
 import convex.core.util.JSON;
 import convex.java.ConvexHTTP;
 
@@ -94,7 +95,8 @@ public class RESTAPITest extends ARESTTest {
 			
 			Blob data=Blob.parse(responseMap.getIn(Strings.DATA));
 			assertNotNull(data);
-			ACell txValue=server.getServer().getStore().decodeMultiCell(data);
+			// Prepared data must be complete without consulting the primary store.
+			ACell txValue=Message.create(data).getPayload(null);
 			assertTrue(txValue instanceof ATransaction);
 			
 			// Get the hash value required for signing
@@ -105,7 +107,8 @@ public class RESTAPITest extends ARESTTest {
 
 			AMap<AString,ACell> sub=Maps.of(
 					"accountKey", KP.getAccountKey(),
-					"hash",hash.toCVMHexString(), 
+					"hash",hash.toCVMHexString(),
+					"data",data.toCVMHexString(),
 					"sig",sig.toCVMHexString());
 
 			HttpResponse<String> res2 = post(API_PATH+"/transaction/submit", JSON.toStringPretty(sub));
@@ -115,6 +118,53 @@ public class RESTAPITest extends ARESTTest {
 			assertEquals(CVMLong.create(6),result.getIn("value"));
 
 		}
+	}
+
+	@Test public void testTxSubmitRequiresCompleteData() throws IOException, InterruptedException {
+		AMap<AString,ACell> req=Maps.of(
+				"address",Init.GENESIS_ADDRESS,
+				"source","(* 7 9)");
+		HttpResponse<String> prepared = post(API_PATH+"/transaction/prepare", JSON.toString(req));
+		assertEquals(200, prepared.statusCode());
+		AMap<AString,ACell> response = JSON.parse(prepared.body());
+		Blob hash=Blob.parse(response.getIn(Strings.HASH));
+
+		AMap<AString,ACell> sub=Maps.of(
+				"accountKey", KP.getAccountKey(),
+				"hash",hash.toCVMHexString(),
+				"sig",KP.sign(hash).toCVMHexString());
+		HttpResponse<String> submitted = post(API_PATH+"/transaction/submit", JSON.toString(sub));
+		assertEquals(400, submitted.statusCode());
+		assertTrue(submitted.body().contains("complete 'data' value returned by transaction/prepare"));
+	}
+
+	@Test public void testTxPrepareDoesNotPopulatePrimaryStore() throws IOException, InterruptedException, BadFormatException {
+		String source="\"prepared-only-"+"q".repeat(512)+"\"";
+		ACell command=Reader.read(source);
+		assertFalse(command.isEmbedded());
+		assertNull(server.getServer().getStore().refForHash(command.getHash()));
+
+		AMap<AString,ACell> req=Maps.of(
+				"address",Init.GENESIS_ADDRESS,
+				"source",source);
+		HttpResponse<String> prepared = post(API_PATH+"/transaction/prepare", JSON.toString(req));
+		assertEquals(200, prepared.statusCode());
+
+		// Public preparation returns the complete value but leaves even its
+		// non-embedded children out of the durable Peer store.
+		assertNull(server.getServer().getStore().refForHash(command.getHash()));
+		AMap<AString,ACell> response = JSON.parse(prepared.body());
+		Blob data=Blob.parse(response.getIn(Strings.DATA));
+		assertTrue(Message.create(data).getPayload(null) instanceof ATransaction);
+
+		Blob hash=Blob.parse(response.getIn(Strings.HASH));
+		AMap<AString,ACell> sub=Maps.of(
+				"accountKey", KP.getAccountKey(),
+				"hash",hash.toCVMHexString(),
+				"data",data.toCVMHexString(),
+				"sig",KP.sign(hash).toCVMHexString());
+		HttpResponse<String> submitted = post(API_PATH+"/transaction/submit", JSON.toString(sub));
+		assertEquals(200, submitted.statusCode());
 	}
 	
 	
@@ -249,6 +299,16 @@ public class RESTAPITest extends ARESTTest {
 			assertNotNull(errorCode,()->"No errorCode in result: "+json);
 			assertEquals("ARITY",errorCode.toString());
 		}
+	}
+
+	@Test public void testPublicQueryJuiceLimit() throws IOException, InterruptedException {
+		String query=JSON.toString(Maps.of(
+				"address",Init.GENESIS_ADDRESS,
+				"source","(loop [x 0] (recur (inc x)))"));
+		HttpResponse<String> res=post(API_PATH+"/query",query);
+		assertEquals(200,res.statusCode());
+		AMap<AString,ACell> result=RT.ensureMap(JSON.parse(res.body()));
+		assertEquals("JUICE",result.getIn("errorCode").toString());
 	}
 	
 	@Test public void testQueryAccount() throws IOException, InterruptedException {

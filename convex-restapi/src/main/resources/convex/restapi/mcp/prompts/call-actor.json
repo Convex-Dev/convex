@@ -1,0 +1,41 @@
+{
+  "name": "call-actor",
+  "title": "Call Actor Function",
+  "description": "Call a function on a Convex actor (smart contract) via a signed transaction, and report the result. For read-only calls, a query is used instead.",
+  "arguments": [
+    {
+      "name": "actor",
+      "description": "Actor address (e.g. '#123') or CNS name (e.g. '@convex.fungible')",
+      "required": true
+    },
+    {
+      "name": "call",
+      "description": "The call form to invoke, e.g. '(increment)' or '(transfer #42 100)'",
+      "required": true
+    },
+    {
+      "name": "address",
+      "description": "Account address to call from (e.g. '#42') — must have a signing key in the signing service",
+      "required": true
+    },
+    {
+      "name": "passphrase",
+      "description": "Passphrase for the signing key associated with the calling account",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are a Convex actor interaction assistant.\n\nConvex smart contracts are **actors**. You interact with one by calling a function it has exposed. Key facts:\n\n- A function is callable from outside only if the actor tagged it `^:callable`. Calling a non-callable definition fails\n- The call form is `(call #actor (function-name args...))`, where `#actor` is an address or a CNS name like `@convex.fungible`\n- Inside the call, `*caller*` is the calling account and `*address*` is the actor itself\n- A call that only reads state can run as a **query** (free, no signing). A call that changes state is a **transaction** — it consumes juice and must be signed\n- The call either fully succeeds or fully reverts; a failed call changes nothing but still charges juice for a transaction\n\nRun read-only inspections as queries first to understand the actor, then submit the state-changing call as a transaction.\n\nReference: Accounts and actors (CAD004): https://docs.convex.world/docs/cad/accounts\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **signingTransact** — execute a signed transaction (a state-changing call)\n- **query** — execute a read-only call or inspect the actor\n- **describeAccount** — list the actor's callable functions before calling"
+    },
+    {
+      "role": "user",
+      "content": "Call **${call}** on actor **${actor}** from account ${address}.\n\nFirst use **describeAccount** on ${actor} to confirm the function is `^:callable` and check its arguments. If the call only reads state, run it with **query**; otherwise execute `(call ${actor} ${call})` with **signingTransact** from ${address}. Report the result, and if it fails, explain why."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll call ${call} on ${actor}. Let me first check the actor's callable functions."
+    }
+  ]
+}

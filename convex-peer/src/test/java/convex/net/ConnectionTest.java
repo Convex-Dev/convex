@@ -1,8 +1,10 @@
 package convex.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,17 @@ import convex.net.impl.nio.Connection;
  * Tests for the low level Connection class
  */
 public class ConnectionTest {
+
+	/** The legacy NIO receiver enforces the same pre-allocation frame cap as Netty. */
+	@Test
+	public void testConfiguredReceiveLimit() throws Exception {
+		MemoryByteChannel chan = MemoryByteChannel.create(16);
+		MessageReceiver receiver = new MessageReceiver(message -> {}, 64);
+		chan.write(ByteBuffer.wrap(new byte[] {65})); // one-byte VLQ declaring 65 body bytes
+
+		assertThrows(BadFormatException.class, () -> receiver.receiveFromChannel(chan));
+		assertEquals(64, receiver.getMaxMessageLength());
+	}
 	
 	@Test
 	public void testMessageFlood() throws IOException, BadFormatException, InterruptedException, HandlerException {

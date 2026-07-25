@@ -28,6 +28,12 @@ public abstract class ABaseAPI extends AGenericAPI {
 	 * Default pagination limit
 	 */
 	private static final long DEFAULT_LIMIT = 10;
+
+	/**
+	 * Maximum pagination limit. A request may ask for more, but the range is
+	 * clamped to this so a public caller cannot force unbounded reads/allocation.
+	 */
+	static final long MAX_LIMIT = 1000;
 	
 	protected final RESTServer restServer;
 	protected final Server server;
@@ -129,26 +135,38 @@ public abstract class ABaseAPI extends AGenericAPI {
 	 * @return
 	 */
 	protected long[] getPaginationRange(Context ctx, long maxIndex) {
-		long[] range=new long[3];
 		try {
-			String offsetParam=ctx.queryParam("offset");
-			long offset=(offsetParam==null)?0:Integer.parseInt(offsetParam);
-			if (offset<0) throw new BadRequestResponse("Negative offset parameter: "+offset);
-			if (offset>maxIndex) throw new BadRequestResponse("Offset out of range: "+offset);
-			
-			String limitParam=ctx.queryParam("limit");
-			long limit=(offsetParam==null)?DEFAULT_LIMIT:Integer.parseInt(limitParam);
-			if (limit<0) throw new BadRequestResponse("Negative limit parameter: "+limit);
-
-			range[0]=offset;
-			range[1]=Math.min(maxIndex, offset+limit);
-			range[2]=limit;
+			return paginationRange(ctx.queryParam("offset"), ctx.queryParam("limit"), maxIndex);
 		} catch (BadRequestResponse e) {
 			throw e;
 		} catch (NumberFormatException e) {
 			throw new BadRequestResponse("Unable to parse offset/limit");
 		}
-		return range;
+	}
+
+	/**
+	 * Pure pagination logic, split out from {@link Context} extraction so it can be
+	 * unit-tested. Returns {@code [start, end, limit]}.
+	 *
+	 * <p>The limit defaults to {@link #DEFAULT_LIMIT} when absent and is clamped to
+	 * {@link #MAX_LIMIT}, so a request cannot drive an unbounded read regardless of
+	 * the value supplied (#660).</p>
+	 *
+	 * @param offsetParam Raw {@code offset} query parameter, or null
+	 * @param limitParam Raw {@code limit} query parameter, or null
+	 * @param maxIndex Maximum element index (exclusive)
+	 * @return {@code [start, end, limit]}
+	 */
+	static long[] paginationRange(String offsetParam, String limitParam, long maxIndex) {
+		long offset=(offsetParam==null)?0:Long.parseLong(offsetParam.trim());
+		if (offset<0) throw new BadRequestResponse("Negative offset parameter: "+offset);
+		if (offset>maxIndex) throw new BadRequestResponse("Offset out of range: "+offset);
+
+		long limit=(limitParam==null)?DEFAULT_LIMIT:Long.parseLong(limitParam.trim());
+		if (limit<0) throw new BadRequestResponse("Negative limit parameter: "+limit);
+		if (limit>MAX_LIMIT) limit=MAX_LIMIT;
+
+		return new long[] {offset, Math.min(maxIndex, offset+limit), limit};
 	}
 
 	/**

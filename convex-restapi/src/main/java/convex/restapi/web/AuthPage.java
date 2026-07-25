@@ -137,7 +137,7 @@ public class AuthPage extends AWebSite {
 
 		// Issue peer-signed JWT
 		PeerAuth peerAuth = restServer.getAuthMiddleware().getPeerAuth();
-		long expiry = 86400; // 24 hours
+		long expiry = restServer.getRESTConfig().getTokenExpiry();
 		AString peerToken = peerAuth.issuePeerToken(identity, expiry);
 
 		returnPage(ctx, "Authenticated",
@@ -145,7 +145,7 @@ public class AuthPage extends AWebSite {
 				h3("Authentication Successful"),
 				p("Identity:"),
 				preCode(identity.toString()),
-				p("Your bearer token (valid 24 hours):"),
+				p("Your bearer token (valid "+expiry+" seconds):"),
 				pre(code(peerToken.toString()))
 					.withStyle("word-break: break-all; white-space: pre-wrap;"),
 				p(small("Copy this token and use it as a Bearer token in API requests."))

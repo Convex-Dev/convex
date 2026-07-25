@@ -3,6 +3,7 @@ package convex.restapi.api;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -38,7 +39,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -50,7 +50,6 @@ import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -59,8 +58,10 @@ import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.JSON;
 import convex.peer.Config;
+import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
 import convex.restapi.handler.ConcurrentLimit;
+import convex.restapi.handler.RequestBody;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
@@ -130,7 +131,9 @@ public class ChainAPI extends ABaseAPI {
 		
 		routes.get(prefix + "status", this::getStatus);
 
-		routes.post(prefix + "message", this::handleMessage);
+		if (restServer.getRESTConfig().isMessageEndpointEnabled()) {
+			routes.post(prefix + "message", this::handleMessage);
+		}
 
 		routes.get("/identicon/{hex}", identiconLimit.handler(this::getIdenticon));
 	}
@@ -198,8 +201,9 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadRequestResponse("Could not parse CVX data: "+e.getMessage());
 			}
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.TEXT.equals(type)) {
+			InputStream body=RequestBody.boundedInputStream(ctx);
 			try {
-				value=Reader.read(ctx.bodyInputStream());
+				value=Reader.read(body);
 			} catch (Exception e) {
 				throw new BadRequestResponse("Could not parse CVX content: "+e.getMessage());
 			}
@@ -247,8 +251,9 @@ public class ChainAPI extends ABaseAPI {
 			if (field==null) throw new BadRequestResponse("Decode requires 'cad3' field");
 			value=Blob.parse(field);
 		} else if (ContentTypes.CVX.equals(type)||ContentTypes.BYTES.equals(type)) {
+			InputStream body=RequestBody.boundedInputStream(ctx);
 			try {
-				value=Blobs.fromStream(ctx.bodyInputStream());
+				value=Blobs.fromStream(body);
 			} catch (Exception e) {
 				throw new BadRequestResponse("Could not read CAD3 content: "+e.getMessage());
 			}
@@ -517,10 +522,17 @@ public class ChainAPI extends ABaseAPI {
 
 	/**
 	 * Generic message endpoint. Accepts a Message in CAD3 raw or CVX text format,
-	 * delivers it to the server, and returns the Result honouring the Accept header.
+	 * delivers it through the normal Peer message dispatcher, and returns the Result
+	 * honouring the Accept header.
 	 *
 	 * CAD3 raw supports all message types including SignedData. CVX text supports
 	 * vector-based messages (queries, status requests, etc.) but not SignedData.
+	 *
+	 * <p>When explicitly enabled this is a protocol transport, equivalent in trust
+	 * and admission semantics to exposing the Peer protocol port. TRANSACT, QUERY
+	 * and DATA_REQUEST messages therefore reach the same bounded Peer queues and
+	 * backpressure path used by port 18888. {@link GenericMessagePolicy} is the
+	 * deliberate classification point for any future HTTP-specific restrictions.</p>
 	 */
 	public void handleMessage(Context ctx) {
 		try {
@@ -529,16 +541,22 @@ public class ChainAPI extends ABaseAPI {
 				throw new BadRequestResponse("JSON not acceptable as message format");
 			}
 
-			CompletableFuture<Result> cf;
+			Message message;
 			if (ContentTypes.CVX_RAW.equals(contentType)) {
 				Blob rawData = Blob.wrap(ctx.bodyAsBytes());
-				cf = convex.messageRaw(rawData);
+				message = Message.create(rawData);
+				message.getPayload(server.getStore());
 			} else {
 				// Accept CVX text or default — parse as CVX data
 				ACell body = getCVXBody(ctx);
-				Message message = Message.create(MessageType.UNKNOWN, body);
-				cf = convex.message(message);
+				message = Message.create(MessageType.UNKNOWN, body);
 			}
+
+			MessageType type=message.getType();
+			if (!GenericMessagePolicy.allows(type)) {
+				throw new ForbiddenResponse("Message type not permitted over HTTP: "+type);
+			}
+			CompletableFuture<Result> cf = convex.message(message);
 
 			Result r = cf.get(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
 			setResult(ctx, r);
@@ -625,7 +643,7 @@ public class ChainAPI extends ABaseAPI {
 						description = "Account does not exist" )
 			}
 		)
-	public void queryAccount(Context ctx) throws InterruptedException {
+	public void queryAccount(Context ctx) {
 		Address addr = null;
 		String addrParam = ctx.pathParam("addr");
 
@@ -634,7 +652,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid address: " + addrParam);
 		}
 
-		Result r = convex.querySync(Lists.of(Symbols.ACCOUNT, addr));
+		Result r = restServer.getPublicQueryService().execute(Lists.of(Symbols.ACCOUNT, addr),null);
 
 		if (r.isError()) {
 			setContent(ctx,r);
@@ -670,7 +688,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	
-	public void queryPeer(Context ctx) throws InterruptedException {
+	public void queryPeer(Context ctx) {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
 
@@ -679,7 +697,8 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse("Invalid peer key: " + addrParam);
 		}
  
-		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
+		Result r = restServer.getPublicQueryService().execute(
+				Reader.read("(get-in *state* [:peers " + addr + "])"),null);
 
 		if (r.isError()) {
 			setContent(ctx,r);
@@ -826,7 +845,6 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		ATransaction trans = Invoke.create(addr, sequence, code);
-		trans=Cells.persist(trans, server.getStore()); // persist data so we have a full copy if needed
 		Ref<ATransaction> ref = trans.getRef();
 		HashMap<String, Object> result = new HashMap<>();
 		result.put("source", srcValue);
@@ -1004,19 +1022,21 @@ public class ChainAPI extends ABaseAPI {
 		if (h == null)
 			throw new BadRequestResponse("Parameter 'hash' did not parse correctly, must be a hex string.");
 
-		ATransaction trans = null;
+		// Preparation is intentionally stateless. Requiring the complete data here
+		// prevents public prepare requests from populating the Peer's primary store.
+		Object dataValue = req.get("data");
+		if (!(dataValue instanceof String))
+			throw new BadRequestResponse("Parameter 'data' is required. Submit the complete 'data' value returned by transaction/prepare.");
+		Blob data = Blob.parse((String) dataValue);
+		if (data == null)
+			throw new BadRequestResponse("Parameter 'data' did not parse correctly, must be a hex string.");
+
+		ATransaction trans;
 		try {
-			ACell maybeTrans = server.getStore().decodeRef(h).getValue();
-			if (!(maybeTrans instanceof ATransaction))
-				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
-			trans = (ATransaction) maybeTrans;
-		} catch (MissingDataException e) {
-			setResult(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
-			return;
+			trans = PreparedTransaction.decode(data, h);
 		} catch (BadFormatException e) {
-			setResult(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
-			return;
-		} 
+			throw new BadRequestResponse("Invalid transaction data: " + e.getMessage());
+		}
 
 		// Get the account key
 		Object keyValue = req.get("accountKey");
@@ -1087,7 +1107,7 @@ public class ChainAPI extends ABaseAPI {
 						description = "Query service unavailable" )
 			}
 		)
-	public void query(Context ctx) throws InterruptedException {
+	public void query(Context ctx) {
 		try {
 			Address addr;
 			ACell form;
@@ -1111,7 +1131,7 @@ public class ChainAPI extends ABaseAPI {
 				form = Reader.read(srcValue);
 			}
 	
-			Result r = convex.querySync(form, addr);
+			Result r = restServer.getPublicQueryService().execute(form,addr);
 			setContent(ctx,r);
 		} catch (ParseException e) {
 			throw new BadRequestResponse(e.getMessage());

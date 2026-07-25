@@ -74,7 +74,7 @@ class SigningMcpTools {
 	/**
 	 * Registers all signing service tools with the MCP API.
 	 */
-	void registerAll() {
+	void registerAll(boolean elevated) {
 		api.registerTool(new SigningServiceInfoTool());
 		api.registerTool(new SigningCreateKeyTool());
 		api.registerTool(new SigningListKeysTool());
@@ -87,11 +87,12 @@ class SigningMcpTools {
 		api.registerTool(new SigningListAccountsTool());
 		api.registerTool(new SigningDelegateTool());
 
-		// Elevated tools
-		api.registerTool(new SigningImportKeyTool());
-		api.registerTool(new SigningExportKeyTool());
-		api.registerTool(new SigningDeleteKeyTool());
-		api.registerTool(new SigningChangePassphraseTool());
+		if (elevated) {
+			api.registerTool(new SigningImportKeyTool());
+			api.registerTool(new SigningExportKeyTool());
+			api.registerTool(new SigningDeleteKeyTool());
+			api.registerTool(new SigningChangePassphraseTool());
+		}
 	}
 
 	// ==================== Helpers ====================
@@ -353,7 +354,6 @@ class SigningMcpTools {
 				// Build transaction
 				long sequence = as.getSequence() + 1;
 				ATransaction transaction = Invoke.create(address, sequence, code);
-				transaction = Cells.persist(transaction, srv.getStore());
 				Ref<ATransaction> ref = transaction.getRef();
 				Blob message = SignedData.getMessageForRef(ref);
 

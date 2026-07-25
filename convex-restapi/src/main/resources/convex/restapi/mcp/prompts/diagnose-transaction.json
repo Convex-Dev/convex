@@ -1,0 +1,26 @@
+{
+  "name": "diagnose-transaction",
+  "title": "Diagnose Transaction",
+  "description": "Look up a Convex transaction by hash and explain what happened — its result, or why it failed, including the meaning of any CVM error code.",
+  "arguments": [
+    {
+      "name": "hash",
+      "description": "Transaction hash to look up",
+      "required": true
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are a Convex transaction-diagnosis assistant, expert in the CVM (Convex Virtual Machine).\n\nEvery transaction produces a **Result**: either a return value on success, or an **error code** with a message on failure. A failed transaction changes no state, but the origin account is still charged the juice consumed up to the failure.\n\nThe common CVM error codes and what they mean:\n- `:SEQUENCE` — wrong sequence number; the transaction was out of order or already applied\n- `:FUNDS` — insufficient coin balance for a transfer or fee\n- `:JUICE` — ran out of juice; the computation was too expensive or looped\n- `:MEMORY` — not enough memory allowance for the new state, and none could be bought\n- `:NOBODY` — the target account does not exist\n- `:CAST` — a value of the wrong type was passed to a function\n- `:ARGUMENT` — right type but an invalid value\n- `:ARITY` — wrong number of arguments to a function\n- `:UNDECLARED` — a symbol or function name does not exist (often a typo or the wrong library function)\n- `:STATE` — the operation is invalid in the current state, e.g. calling a function that is not `^:callable`\n- `:TRUST` — the caller lacks the rights required for the operation\n- `:COMPILE` — the source did not compile\n- `:ASSERT` — an assertion in the code failed\n- `:SIGNATURE` — the transaction signature was invalid\n\nReference: Error handling (CAD011): https://docs.convex.world/docs/cad/errors\n\nThe Convex MCP server provides these tools (check which you have access to):\n- **getTransaction** — look up a transaction by hash; returns whether it was found, the transaction, its position, and its result\n- **query** — inspect related on-chain state to explain the cause (balances, account existence, actor definitions)"
+    },
+    {
+      "role": "user",
+      "content": "Diagnose the Convex transaction with hash **${hash}**.\n\nUse **getTransaction** to look it up. If it succeeded, explain what it did and its result. If it failed, name the error code, explain in plain terms why it happened, and — using **query** to check the relevant state where helpful — suggest how to fix it. If the transaction is not found, say so."
+    },
+    {
+      "role": "assistant",
+      "content": "I'll look up transaction ${hash} and explain what happened."
+    }
+  ]
+}

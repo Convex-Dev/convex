@@ -90,7 +90,7 @@ public class WebApp extends AWebSite {
 					)
 				).attr("open", true)
 			),
-			article(
+			iff(mcp != null, article(
 				details(
 					summary("Agent Integration (MCP)"),
 					p(text("This peer provides "), a("Model Context Protocol").withHref("https://modelcontextprotocol.io/"), text(" access for AI agents and LLMs.")),
@@ -101,7 +101,7 @@ public class WebApp extends AWebSite {
 					),
 					p(small("Agents can query state, prepare transactions, sign data, and interact with the network programmatically."))
 				).attr("open", true)
-			),
+			)),
 			article(
 				details(
 				    summary("Status"),
@@ -153,7 +153,7 @@ public class WebApp extends AWebSite {
 		} else {
 			sb.append("This is a **TEST** Convex peer at " + host + " connected to a test network.\n\n");
 			sb.append("Coins on this network have no real value. This peer may have a faucet available\n");
-			sb.append("for free test coins via the `createAccount` MCP tool with a `faucet` parameter.\n\n");
+			sb.append("for free test coins when the operator enables the faucet service.\n\n");
 			sb.append("For the live network with real Convex Coins, use: https://peer.convex.live\n\n");
 		}
 
@@ -163,12 +163,12 @@ public class WebApp extends AWebSite {
 		sb.append("- Peer Key: " + peerKey + "\n");
 		sb.append("- Genesis Hash: " + genesisHash.toString() + "\n");
 		sb.append("- API Base: " + host + "\n");
-		sb.append("- MCP Endpoint: " + host + "/mcp (POST JSON-RPC)\n");
+		McpAPI mcp = restServer.getMcpAPI();
+		if (mcp != null) sb.append("- MCP Endpoint: " + host + "/mcp (POST JSON-RPC)\n");
 		sb.append("- REST API: " + host + "/api/v1/\n");
 		sb.append("- Explorer: " + host + "/explorer/\n\n");
 
 		// MCP Tools section
-		McpAPI mcp = restServer.getMcpAPI();
 		if (mcp != null) {
 			AVector<AMap<AString, ACell>> toolMetadata = mcp.getToolMetadata();
 			if (toolMetadata != null && toolMetadata.count() > 0) {
@@ -211,10 +211,12 @@ public class WebApp extends AWebSite {
 		sb.append("curl -X POST " + host + "/api/v1/query \\\n");
 		sb.append("  -H 'Content-Type: application/json' \\\n");
 		sb.append("  -d '{\"source\": \"(+ 1 2)\", \"address\": \"#11\"}'\n\n");
-		sb.append("# MCP Tool Call\n");
-		sb.append("curl -X POST " + host + "/mcp \\\n");
-		sb.append("  -H 'Content-Type: application/json' \\\n");
-		sb.append("  -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"query\",\"arguments\":{\"source\":\"*balance*\"}},\"id\":1}'\n");
+		if (mcp != null) {
+			sb.append("# MCP Tool Call\n");
+			sb.append("curl -X POST " + host + "/mcp \\\n");
+			sb.append("  -H 'Content-Type: application/json' \\\n");
+			sb.append("  -d '{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"params\":{\"name\":\"query\",\"arguments\":{\"source\":\"*balance*\"}},\"id\":1}'\n");
+		}
 		sb.append("```\n\n");
 
 		// References

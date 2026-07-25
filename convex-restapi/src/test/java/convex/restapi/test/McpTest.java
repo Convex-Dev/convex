@@ -267,7 +267,9 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
 		AString hashCell = RT.getIn(prepared, "hash");
+		AString dataCell = RT.getIn(prepared, "data");
 		assertNotNull(hashCell);
+		assertNotNull(dataCell);
 		Blob hashBlob = Blob.parse(hashCell.toString());
 
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
@@ -286,6 +288,7 @@ public class McpTest extends ARESTTest {
 
 		AMap<AString, ACell> submitArgs = Maps.of(
 			"hash", hashCell,
+			"data", dataCell,
 			"signature", signatureHex,
 			"accountKey", accountKeyHex
 		);
@@ -310,16 +313,30 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
 		AString hashCell = RT.getIn(prepared, "hash");
+		AString dataCell = RT.getIn(prepared, "data");
 		assertNotNull(hashCell, "Prepare should return a hash");
+		assertNotNull(dataCell, "Prepare should return complete data");
 
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
 		AMap<AString, ACell> signAndSubmitArgs = Maps.of(
 			"hash", hashCell,
+			"data", dataCell,
 			"seed", seedHex
 		);
 		AMap<AString, ACell> signAndSubmitResponse = makeToolCall("signAndSubmit", signAndSubmitArgs);
 		AMap<AString, ACell> result = expectResult(signAndSubmitResponse);
 		assertEquals(CVMLong.create(30), RT.getIn(result, "value"), "Result should be 30 for (+ 10 20)");
+	}
+
+	@Test
+	public void testSignAndSubmitRequiresCompleteData() throws IOException, InterruptedException {
+		AMap<AString, ACell> args = Maps.of(
+			"hash", "0x1234",
+			"seed", Strings.create(KP.getSeed().toHexString())
+		);
+		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
+		AMap<AString, ACell> error = expectError(response);
+		assertTrue(RT.toString(RT.getIn(error, "message")).contains("'data' is required"));
 	}
 
 	/**
@@ -352,10 +369,12 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
 		AString hashCell = RT.getIn(prepared, "hash");
+		AString dataCell = RT.getIn(prepared, "data");
 
 		// Try with invalid seed (too short)
 		AMap<AString, ACell> args = Maps.of(
 			"hash", hashCell,
+			"data", dataCell,
 			"seed", "0x1234"
 		);
 		AMap<AString, ACell> response = makeToolCall("signAndSubmit", args);
@@ -409,11 +428,14 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
 		AString hashCell = RT.getIn(prepared, "hash");
+		AString dataCell = RT.getIn(prepared, "data");
 		assertNotNull(hashCell, "Prepare should return a hash");
+		assertNotNull(dataCell, "Prepare should return complete data");
 
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
 		AMap<AString, ACell> signAndSubmitArgs = Maps.of(
 			"hash", hashCell,
+			"data", dataCell,
 			"seed", seedHex
 		);
 		AMap<AString, ACell> signAndSubmitResponse = makeToolCall("signAndSubmit", signAndSubmitArgs);
@@ -1284,7 +1306,9 @@ public class McpTest extends ARESTTest {
 		AMap<AString, ACell> prepareResponse = makeToolCall("prepare", prepareArgs);
 		AMap<AString, ACell> prepared = expectResult(prepareResponse);
 		AString hashCell = RT.getIn(prepared, "hash");
+		AString dataCell = RT.getIn(prepared, "data");
 		assertNotNull(hashCell);
+		assertNotNull(dataCell);
 
 		AString seedHex = Strings.create(KP.getSeed().toHexString());
 		AMap<AString, ACell> signArgs = Maps.of(
@@ -1299,6 +1323,7 @@ public class McpTest extends ARESTTest {
 		// Use 'sig' parameter instead of 'signature'
 		AMap<AString, ACell> submitArgs = Maps.of(
 			"hash", hashCell,
+			"data", dataCell,
 			"sig", signatureHex,
 			"accountKey", accountKeyHex
 		);

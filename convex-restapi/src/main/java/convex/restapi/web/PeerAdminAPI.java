@@ -1,8 +1,5 @@
 package convex.restapi.web;
 
-import java.util.Arrays;
-import java.util.HashSet;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,24 +50,10 @@ public class PeerAdminAPI extends ABaseAPI {
 									from = CreateAccountResponse.class) })
 				})
 	public void shutDown(Context ctx) {
-		ensureLocalAdmin(ctx);
-		log.warn("Server Shuttting down due to REST admin shutdown request");
+		restServer.getAdminAuthorizer().require(ctx);
+		log.warn("Peer shutting down due to an authorised REST administration request");
 		server.shutdown();
 
 		ctx.result("Shutdown initiated.");
 	}
-	
-	private HashSet<String> authorisedIPs = new HashSet<String>(Arrays.asList("127.0.0.1","::1","[0:0:0:0:0:0:0:1]"));
-
-	private void ensureLocalAdmin(Context ctx) {
-		String ip=ctx.ip();
-		if (authorisedIPs.contains(ip)) {
-			return;
-		} else {
-			throw new io.javalin.http.UnauthorizedResponse("Can't performa admin actions from IP: "+ip);
-		}
-	}
-
-
-
 }

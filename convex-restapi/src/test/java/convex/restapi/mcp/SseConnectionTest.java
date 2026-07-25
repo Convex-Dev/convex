@@ -62,6 +62,38 @@ class SseConnectionTest {
 	}
 
 	@Test
+	void dropOldestOverflowKeepsConnectionAndNewestEvents() throws Exception {
+		CountDownLatch writeStarted=new CountDownLatch(1);
+		CountDownLatch release=new CountDownLatch(1);
+		// Wait for the newest event itself, never for a flush count: the dispatcher calls
+		// PrintWriter.checkError(), which flushes internally, so each event produces two
+		// flushes and a flush tally says nothing about which events have been written.
+		GatedCapturingWriter output=new GatedCapturingWriter(writeStarted,release,"data: overflow");
+		SseConnection connection=new SseConnection(new PrintWriter(output),2,
+			SseConnection.OverflowPolicy.DROP_OLDEST);
+		try {
+			connection.sendEvent("message","in-progress");
+			assertTrue(writeStarted.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
+			// The dispatcher is parked inside the gated write for all three sends, so the
+			// queue holds exactly queued-1 and queued-2 when overflow arrives and evicts
+			// the oldest. No race: the dispatcher cannot drain while it is blocked.
+			connection.sendEvent("message","queued-1");
+			connection.sendEvent("message","queued-2");
+			connection.sendEvent("message","overflow");
+			assertFalse(connection.isClosed());
+			release.countDown();
+			assertTrue(output.awaitExpected(TIMEOUT));
+			String written=output.toString();
+			assertTrue(written.contains("data: in-progress"));
+			assertFalse(written.contains("data: queued-1"));
+			assertTrue(written.contains("data: queued-2"));
+			assertFalse(connection.isClosed());
+		} finally {
+			connection.close();
+		}
+	}
+
+	@Test
 	void writesEventIDsAndFramesEveryDataLine() throws Exception {
 		CountDownLatch written=new CountDownLatch(1);
 		CapturingWriter output=new CapturingWriter(written);
@@ -70,6 +102,20 @@ class SseConnectionTest {
 			connection.sendEvent("12:3:4","log","first\nid: not-an-id\r\nthird");
 			assertTrue(written.await(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS));
 			assertEquals("id: 12:3:4\nevent: log\ndata: first\ndata: id: not-an-id\ndata: third\n\n",output.toString());
+		} finally {
+			connection.close();
+		}
+	}
+
+	@Test
+	void serialisesCommentsAndEventsOnOneDispatcher() throws Exception {
+		ContentCapturingWriter output=new ContentCapturingWriter("data: value\n\n");
+		SseConnection connection=new SseConnection(new PrintWriter(output));
+		try {
+			connection.sendComment("connected");
+			connection.sendEvent("7","result","value");
+			assertTrue(output.awaitExpected(TIMEOUT));
+			assertEquals(": connected\n\nid: 7\nevent: result\ndata: value\n\n",output.toString());
 		} finally {
 			connection.close();
 		}
@@ -127,6 +173,60 @@ class SseConnectionTest {
 		@Override public void close() {}
 	}
 
+	/**
+	 * Blocks the first write until released, capturing everything written and signalling
+	 * once the expected content has arrived.
+	 */
+	private static final class GatedCapturingWriter extends Writer {
+		private final CountDownLatch firstWriteStarted;
+		private final CountDownLatch release;
+		private final CountDownLatch expectedSeen=new CountDownLatch(1);
+		private final String expected;
+		private final StringBuilder builder=new StringBuilder();
+		private boolean gated=true;
+
+		private GatedCapturingWriter(CountDownLatch firstWriteStarted, CountDownLatch release,
+			String expected) {
+			this.firstWriteStarted=firstWriteStarted;
+			this.release=release;
+			this.expected=expected;
+		}
+
+		private boolean awaitExpected(Duration timeout) throws InterruptedException {
+			return expectedSeen.await(timeout.toMillis(),TimeUnit.MILLISECONDS);
+		}
+
+		@Override
+		public void write(char[] chars, int offset, int length) {
+			if (gated) {
+				gated=false;
+				firstWriteStarted.countDown();
+				boolean interrupted=false;
+				while (true) {
+					try {
+						release.await();
+						break;
+					} catch (InterruptedException e) {
+						interrupted=true;
+					}
+				}
+				if (interrupted) Thread.currentThread().interrupt();
+			}
+			synchronized (builder) {
+				builder.append(chars,offset,length);
+				if (builder.indexOf(expected)>=0) expectedSeen.countDown();
+			}
+		}
+
+		@Override public void flush() { }
+		@Override public void close() {}
+		@Override public String toString() {
+			synchronized (builder) {
+				return builder.toString();
+			}
+		}
+	}
+
 	private static final class CapturingWriter extends Writer {
 		private final CountDownLatch written;
 		private final StringBuilder builder=new StringBuilder();
@@ -141,6 +241,30 @@ class SseConnectionTest {
 		}
 
 		@Override public void flush() { written.countDown(); }
+		@Override public void close() {}
+		@Override public synchronized String toString() { return builder.toString(); }
+	}
+
+	private static final class ContentCapturingWriter extends Writer {
+		private final CountDownLatch expectedSeen=new CountDownLatch(1);
+		private final String expected;
+		private final StringBuilder builder=new StringBuilder();
+
+		private ContentCapturingWriter(String expected) {
+			this.expected=expected;
+		}
+
+		@Override
+		public synchronized void write(char[] chars, int offset, int length) {
+			builder.append(chars,offset,length);
+			if (builder.indexOf(expected)>=0) expectedSeen.countDown();
+		}
+
+		private boolean awaitExpected(Duration timeout) throws InterruptedException {
+			return expectedSeen.await(timeout.toMillis(),TimeUnit.MILLISECONDS);
+		}
+
+		@Override public void flush() {}
 		@Override public void close() {}
 		@Override public synchronized String toString() { return builder.toString(); }
 	}

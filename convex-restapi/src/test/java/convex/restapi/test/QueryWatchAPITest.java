@@ -13,7 +13,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -21,26 +20,23 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
-import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.JSON;
 import convex.java.ConvexHTTP;
+import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
 class QueryWatchAPITest extends ARESTTest {
 
 	private static final Duration TIMEOUT=Duration.ofSeconds(10);
-	private static final Object PREVIOUS_QUERY_WATCH;
 	private static final RESTServer QUERY_SERVER;
 	private static final String QUERY_API_PATH;
 
 	static {
-		HashMap<Keyword,Object> config=server.getServer().getConfig();
-		PREVIOUS_QUERY_WATCH=config.put(Keywords.QUERY_WATCH,true);
-		QUERY_SERVER=RESTServer.create(server.getServer());
+		RESTConfig config=RESTConfig.parse("{rest:{queryWatch:true},mcp:{enabled:false}}");
+		QUERY_SERVER=RESTServer.create(server.getServer(),config);
 		QUERY_SERVER.start(0);
 		QUERY_API_PATH="http://localhost:"+QUERY_SERVER.getPort()+"/api/v1";
 	}
@@ -48,12 +44,6 @@ class QueryWatchAPITest extends ARESTTest {
 	@AfterAll
 	static void closeQueryServer() {
 		QUERY_SERVER.close();
-		HashMap<Keyword,Object> config=server.getServer().getConfig();
-		if (PREVIOUS_QUERY_WATCH==null) {
-			config.remove(Keywords.QUERY_WATCH);
-		} else {
-			config.put(Keywords.QUERY_WATCH,PREVIOUS_QUERY_WATCH);
-		}
 	}
 
 	@Test

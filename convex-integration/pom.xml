@@ -14,7 +14,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.9</version>
+		<version>0.8.10-SNAPSHOT</version>
 	</parent>
 
 	<build>
@@ -42,6 +42,10 @@
 								true
 							</addDefaultImplementationEntries>
 						</manifest>
+						<manifestEntries>
+							<!-- Preserve version-specific backends from multi-release dependencies. -->
+							<Multi-Release>true</Multi-Release>
+						</manifestEntries>
 					</archive>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
@@ -77,7 +81,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>3.5.4</version>
+                    <version>3.5.6</version>
                     <executions>
                         <execution>
                             <goals>
@@ -144,6 +148,13 @@
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-gui</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+		<!-- Rollup P2P package: pulls in the node server and the application regions
+		     it serves (convex-social) so convex.jar can run a full node. -->
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-p2p</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
 		<dependency>

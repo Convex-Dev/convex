@@ -172,20 +172,10 @@ public class OAuthService {
 	}
 
 	private String getOAuthConfig(String providerId, String key) {
-		// Read from server config map: auth.oauth.<provider>.<key>
-		Map<?, ?> config = restServer.getConfig();
-		Object authObj = config.get(convex.core.data.Keyword.create("auth"));
-		if (authObj instanceof AMap<?,?> authMap) {
-			AMap<AString, ACell> oauth = RT.castMap(((AMap<?,?>)authMap).get(Strings.create("oauth")));
-			if (oauth != null) {
-				AMap<AString, ACell> providerMap = RT.castMap(oauth.get(Strings.create(providerId)));
-				if (providerMap != null) {
-					AString v = RT.ensureString(providerMap.get(Strings.create(key)));
-					if (v != null) return v.toString();
-				}
-			}
-		}
-		return null;
+		AMap<AString, ACell> provider = restServer.getRESTConfig().getOAuthProvider(providerId);
+		if (provider == null) return null;
+		AString value = RT.ensureString(provider.get(Strings.create(key)));
+		return (value == null) ? null : value.toString();
 	}
 
 	// ========== PKCE helpers ==========

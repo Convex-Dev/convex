@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Convex P2P API</title>
+</head>
+<body>
+
+<h1>Convex P2P</h1>
+
+<p>Rollup package for Convex P2P nodes, building on the lattice data structures
+of convex-core and the <code>NodeServer</code> binary networking of convex-peer.</p>
+
+<p>One dependency gives a complete node. This module defines the P2P
+infrastructure regions — who is on the network, what they run, how to reach them —
+and bundles the application regions a node serves, so <code>P2PNode</code> is the
+only node server rather than one per application. Which rolled-up regions a node
+serves is a per-node choice: <code>P2PLattice.NODE_ROOT</code> is the default
+(infrastructure plus bundled applications), and <code>P2PLattice.ROOT</code> is
+the same node with the application regions switched off, still a fully capable
+discovery node.</p>
+
+<h2>Key Types</h2>
+
+<ul>
+  <li><code>convex.p2p.P2PLattice</code> — the P2P root lattice, declaring the
+      top-level <code>:p2p</code> (node registry), <code>:id</code> (user identity)
+      and reserved <code>:kad</code> regions</li>
+  <li><code>convex.p2p.P2PNode</code> — a peer-to-peer lattice node over that root</li>
+  <li><code>convex.p2p.P2PUser</code> — a single user's owned area, with signing handled
+      by the cursor chain</li>
+</ul>
+
+</body>
+</html>

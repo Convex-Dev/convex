@@ -11,12 +11,14 @@ import java.time.Duration;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
 import convex.peer.API;
 import convex.peer.Server;
+import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
 public abstract class ARESTTest {
@@ -33,7 +35,14 @@ public abstract class ARESTTest {
 	
 	static {
 		try {
-			Server s = API.launchPeer();
+			// Security-sensitive optional services are disabled by default. The shared
+			// integration fixture opts in only because dedicated tests exercise them.
+			RESTConfig config=RESTConfig.parse("""
+				{rest:{faucet:true,messageEndpoint:true},mcp:{signing:true,elevated:true}}
+				""");
+			var launchConfig=config.toLegacy();
+			launchConfig.put(Keywords.KEYPAIR,AKeyPair.generate());
+			Server s = API.launchPeer(launchConfig);
 			RESTServer rs = RESTServer.create(s);
 			rs.start(0);
 			port = rs.getPort();

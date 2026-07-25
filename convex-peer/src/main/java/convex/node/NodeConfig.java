@@ -54,6 +54,37 @@ public class NodeConfig {
 	 *  circuit-breaker closes it (Long, default 100; 0 disables). #566 */
 	public static final AString MAX_CONSECUTIVE_REJECTS = Strings.intern("maxConsecutiveRejects");
 
+	/** Maximum encoded inbound network message size in bytes (Long, default 4 MiB). */
+	public static final AString MAX_MESSAGE_SIZE = Strings.intern("maxMessageSize");
+
+	/** Maximum encoded message size from a cryptographically verified Peer. */
+	public static final AString MAX_TRUSTED_MESSAGE_SIZE = Strings.intern("maxTrustedMessageSize");
+
+	/** Maximum simultaneous inbound network connections (Long, default 256). */
+	public static final AString MAX_CONNECTIONS = Strings.intern("maxConnections");
+
+	/** Capacity of the bounded inbound processing queue (Long, default 1024). */
+	public static final AString INBOUND_QUEUE_SIZE = Strings.intern("inboundQueueSize");
+
+	/** Time allowed for the ordered inbound dispatcher to drain during shutdown. */
+	public static final AString INBOUND_SHUTDOWN_TIMEOUT = Strings.intern("inboundShutdownTimeout");
+
+	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
+	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
+
+	/** Verified Peers may use the full protocol message allowance. */
+	public static final int DEFAULT_MAX_TRUSTED_MESSAGE_SIZE =
+		(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+
+	/** Conservative public-node connection cap. */
+	public static final int DEFAULT_MAX_CONNECTIONS = 256;
+
+	/** Default number of decoded messages awaiting lattice processing. */
+	public static final int DEFAULT_INBOUND_QUEUE_SIZE = 1024;
+
+	/** Default time allowed for accepted inbound work to finish during shutdown. */
+	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT = 10_000L;
+
 	// ========== Instance ==========
 
 	private final AMap<AString, ACell> config;
@@ -144,15 +175,14 @@ public class NodeConfig {
 	/**
 	 * Maximum memory size (bytes) of an inbound LATTICE_VALUE this node will merge (#564).
 	 * Larger values are rejected before the merge runs, bounding merge cost from untrusted
-	 * peers. Defaults to the transport message cap
-	 * ({@link convex.core.cpos.CPoSConstants#MAX_MESSAGE_LENGTH}) — i.e. no restriction
-	 * beyond transport by default; set it lower when exposing the node to untrusted peers.
+	 * peers. Defaults to this node's configured encoded-message cap, providing a
+	 * consistent conservative limit for public nodes.
 	 *
 	 * @return maximum inbound value size in bytes
 	 */
 	public long getMaxInboundValueSize() {
 		CVMLong v = RT.ensureLong(config.get(MAX_INBOUND_VALUE_SIZE));
-		return (v != null) ? v.longValue() : convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+		return (v != null) ? v.longValue() : getMaxMessageSize();
 	}
 
 	/**
@@ -178,6 +208,61 @@ public class NodeConfig {
 	public long getMaxConsecutiveRejects() {
 		CVMLong v = RT.ensureLong(config.get(MAX_CONSECUTIVE_REJECTS));
 		return (v != null) ? v.longValue() : 100L;
+	}
+
+	/**
+	 * Gets the maximum encoded inbound network message size. This limit is applied by
+	 * Netty before allocating the complete message byte array.
+	 *
+	 * @return maximum encoded message size in bytes
+	 */
+	public int getMaxMessageSize() {
+		return getMessageSize(MAX_MESSAGE_SIZE, DEFAULT_MAX_MESSAGE_SIZE);
+	}
+
+	/**
+	 * Gets the encoded-message limit used after an outbound Peer's AccountKey has
+	 * passed challenge/response verification. Unverified connections always remain
+	 * subject to {@link #getMaxMessageSize()}.
+	 *
+	 * @return trusted peer message limit in bytes
+	 */
+	public int getMaxTrustedMessageSize() {
+		return getMessageSize(MAX_TRUSTED_MESSAGE_SIZE, DEFAULT_MAX_TRUSTED_MESSAGE_SIZE);
+	}
+
+	/**
+	 * Gets the maximum number of simultaneous inbound network connections.
+	 *
+	 * @return inbound connection cap
+	 */
+	public int getMaxConnections() {
+		return getPositiveInt(MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS);
+	}
+
+	/**
+	 * Gets the capacity of the bounded inbound processing queue.
+	 *
+	 * @return inbound queue capacity
+	 */
+	public int getInboundQueueSize() {
+		return getPositiveInt(INBOUND_QUEUE_SIZE, DEFAULT_INBOUND_QUEUE_SIZE);
+	}
+
+	/**
+	 * Gets the time allowed for the ordered inbound dispatcher to drain during
+	 * shutdown. A timeout does not abandon the dispatcher: shutdown remains
+	 * incomplete and may be retried once the current operation finishes.
+	 *
+	 * @return dispatcher shutdown timeout in milliseconds
+	 */
+	public long getInboundShutdownTimeout() {
+		CVMLong v = RT.ensureLong(config.get(INBOUND_SHUTDOWN_TIMEOUT));
+		long value = (v != null) ? v.longValue() : DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
+		if (value <= 0) {
+			throw new IllegalArgumentException(INBOUND_SHUTDOWN_TIMEOUT + " must be positive: " + value);
+		}
+		return value;
 	}
 
 	// ========== URL validation (#567) ==========
@@ -299,5 +384,26 @@ public class NodeConfig {
 		ACell v = config.get(key);
 		if (v == null) return defaultValue;
 		return RT.bool(v);
+	}
+
+	private int getPositiveInt(AString key, int defaultValue) {
+		CVMLong v = RT.ensureLong(config.get(key));
+		if (v == null) return defaultValue;
+		long value = v.longValue();
+		if (value <= 0 || value > Integer.MAX_VALUE) {
+			throw new IllegalArgumentException(key + " must be between 1 and " + Integer.MAX_VALUE
+					+ ": " + value);
+		}
+		return (int) value;
+	}
+
+	private int getMessageSize(AString key, int defaultValue) {
+		int value = getPositiveInt(key, defaultValue);
+		long protocolMax = convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+		if (value > protocolMax) {
+			throw new IllegalArgumentException(key + " must not exceed the protocol maximum of "
+				+ protocolMax + ": " + value);
+		}
+		return value;
 	}
 }

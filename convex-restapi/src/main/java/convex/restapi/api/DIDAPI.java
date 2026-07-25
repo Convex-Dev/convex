@@ -43,8 +43,7 @@ public class DIDAPI extends ABaseAPI {
 	 * Serve the peer's own DID document at /.well-known/did.json
 	 */
 	protected void handlePeerDID(Context ctx) {
-		String hostname = getWebHost(ctx);
-		String did = "did:web:" + hostname;
+		String did = getVenueDID(ctx);
 
 		AccountKey peerKey = server.getPeer().getPeerKey();
 		Address peerController = server.getPeerController();
@@ -79,8 +78,7 @@ public class DIDAPI extends ABaseAPI {
 
 		AccountKey key = as.getAccountKey();
 
-		String hostname = getWebHost(ctx);
-		String did = "did:web:" + hostname + ":" + identifier;
+		String did = getVenueDID(ctx) + ":" + identifier;
 
 		// alsoKnownAs: did:convex always, did:key only if account has a key
 		List<String> aliases = new ArrayList<>();
@@ -161,6 +159,16 @@ public class DIDAPI extends ABaseAPI {
 			host = ("80".equals(port) || "443".equals(port)) ? name : name + "%3A" + port;
 		}
 		return host;
+	}
+
+	/**
+	 * Gets the venue identity. A configured base URL is the canonical source;
+	 * request headers are retained only as a compatibility fallback for public
+	 * DID discovery and are never used as an administrator-token audience.
+	 */
+	private String getVenueDID(Context ctx) {
+		if (restServer.getVenueDID()!=null) return restServer.getVenueDID().toString();
+		return "did:web:"+getWebHost(ctx);
 	}
 
 	/**

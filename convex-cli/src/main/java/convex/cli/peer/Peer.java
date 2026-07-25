@@ -4,7 +4,7 @@ import convex.cli.ATopCommand;
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.core.data.Keyword;
-import convex.peer.PeerConfig;
+import convex.restapi.RESTConfig;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -48,7 +48,7 @@ public class Peer extends ATopCommand {
 		HashMap<Keyword,Object> result=new HashMap<>();
 		if ((configFilename==null)||configFilename.isBlank()) return result;
 		try {
-			PeerConfig pc=PeerConfig.load(configFilename.trim());
+			RESTConfig pc=RESTConfig.load(configFilename.trim());
 			result.putAll(pc.toLegacy());
 			inform("Loaded peer config from: "+configFilename);
 		} catch (IOException e) {

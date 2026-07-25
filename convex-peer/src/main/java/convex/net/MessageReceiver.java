@@ -47,13 +47,32 @@ public class MessageReceiver {
 	private final Consumer<Message> action;
 	private Consumer<Message> hook=null;
 	private AConnection connection;
+	/** Maximum encoded body length, checked before expanding the receive buffer. */
+	private volatile int maxMessageLength;
 
 	private long receivedMessageCount = 0;
 
 	private static final Logger log = LoggerFactory.getLogger(MessageReceiver.class.getName());
 
 	public MessageReceiver(Consumer<Message> receiveAction) {
+		this(receiveAction, (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	public MessageReceiver(Consumer<Message> receiveAction, int maxMessageLength) {
 		this.action = receiveAction;
+		setMaxMessageLength(maxMessageLength);
+	}
+
+	public void setMaxMessageLength(int limit) {
+		if (limit <= 0 || limit > convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Message length limit must be between 1 and "
+				+ convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH + ": " + limit);
+		}
+		maxMessageLength = limit;
+	}
+
+	public int getMaxMessageLength() {
+		return maxMessageLength;
 	}
 
 	/**
@@ -105,6 +124,9 @@ public class MessageReceiver {
 			// peek message length at start of buffer. May throw BFE.
 			int len = Format.peekMessageLength(buffer);
 			if (len<0) return numRead; // Not enough bytes for a message length yet
+			if (len>maxMessageLength) {
+				throw new BadFormatException("Message too long: " + len);
+			}
 
 			int lengthLength = Format.getVLQCountLength(len);
 			int totalFrameSize=lengthLength + len;
