@@ -336,11 +336,15 @@ public final class CVMBigInteger extends AInteger {
 	/**
 	 * Parses a string as a CVMBigInteger. Might not be canonical.
 	 * @param s String containing at least one numeric digit. May have an optional sign.
-	 * @return Integer result
+	 * @return Integer result, or null if not a valid integer
 	 */
 	public static CVMBigInteger parse(String s) {
-		BigInteger bi=new BigInteger(s);
-		return wrap(bi);
+		try {
+			BigInteger bi=new BigInteger(s);
+			return wrap(bi);
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 
 	@Override
