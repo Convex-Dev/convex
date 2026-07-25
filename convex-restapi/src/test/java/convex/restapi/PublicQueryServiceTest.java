@@ -33,7 +33,7 @@ public class PublicQueryServiceTest {
 			entered.countDown();
 			if (!release.await(5,TimeUnit.SECONDS)) throw new IllegalStateException("Test query was not released");
 			return Result.value(CVMLong.ONE);
-		},1,123_456L);
+		},1,0L,123_456L);
 
 		CompletableFuture<Result> first=CompletableFuture.supplyAsync(() -> service.execute(CVMLong.ZERO,null));
 		assertTrue(entered.await(5,TimeUnit.SECONDS),"First query did not acquire the permit");
@@ -52,12 +52,42 @@ public class PublicQueryServiceTest {
 	}
 
 	@Test
+	public void testWaitsForSlotInsteadOfRejecting() throws Exception {
+		// With a non-zero wait, a query that finds the single slot occupied blocks for it
+		// and then succeeds, rather than returning LOAD immediately as a zero wait would.
+		CountDownLatch holderEntered=new CountDownLatch(1);
+		CountDownLatch waiterReady=new CountDownLatch(1);
+		CountDownLatch release=new CountDownLatch(1);
+
+		PublicQueryService service=new PublicQueryService((form,address,maxJuice) -> {
+			holderEntered.countDown();
+			// Hold the only slot until the waiter has reached execute(), then release
+			if (!waiterReady.await(5,TimeUnit.SECONDS)) throw new IllegalStateException("Waiter never started");
+			if (!release.await(5,TimeUnit.SECONDS)) throw new IllegalStateException("Never released");
+			return Result.value(CVMLong.ONE);
+		},1,2_000L,PublicQueryService.MAX_QUERY_JUICE);
+
+		CompletableFuture<Result> holder=CompletableFuture.supplyAsync(() -> service.execute(CVMLong.ZERO,null));
+		assertTrue(holderEntered.await(5,TimeUnit.SECONDS),"Holder did not acquire the slot");
+
+		CompletableFuture<Result> waiter=CompletableFuture.supplyAsync(() -> {
+			waiterReady.countDown();
+			return service.execute(CVMLong.ZERO,null);
+		});
+		// Only the holder is holding the slot; release it and the blocked waiter must proceed
+		release.countDown();
+
+		assertFalse(waiter.get(5,TimeUnit.SECONDS).isError(),"Waiting query should succeed once a slot frees");
+		assertFalse(holder.get(5,TimeUnit.SECONDS).isError());
+	}
+
+	@Test
 	public void testPermitReleasedAfterExecutorFailure() {
 		AtomicInteger executions=new AtomicInteger();
 		PublicQueryService service=new PublicQueryService((form,address,maxJuice) -> {
 			if (executions.getAndIncrement()==0) throw new IllegalStateException("Expected test failure");
 			return Result.value(CVMLong.ONE);
-		},1,PublicQueryService.MAX_QUERY_JUICE);
+		},1,0L,PublicQueryService.MAX_QUERY_JUICE);
 
 		assertTrue(service.execute(CVMLong.ZERO,null).isError());
 		assertFalse(service.execute(CVMLong.ZERO,null).isError(),

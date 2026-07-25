@@ -63,6 +63,24 @@ public class RESTConfig extends PeerConfig {
 	public static final AString MESSAGE_ENDPOINT = Strings.intern("messageEndpoint");
 	public static final AString KEYS = Strings.intern("keys");
 	public static final AString TRUSTED_PROXIES = Strings.intern("trustedProxies");
+	public static final AString MAX_CONCURRENT_REQUESTS = Strings.intern("maxConcurrentRequests");
+	public static final AString MAX_REQUEST_BYTES = Strings.intern("maxRequestBytes");
+
+	// ========== Public query lane keys (rest.query.*) ==========
+
+	public static final AString QUERY = Strings.intern("query");
+	public static final AString MAX_CONCURRENT = Strings.intern("maxConcurrent");
+	public static final AString MAX_WAIT_MILLIS = Strings.intern("maxWaitMillis");
+	public static final AString MAX_JUICE = Strings.intern("maxJuice");
+
+	// ========== Public-surface limit defaults ==========
+
+	/** Default global cap on concurrent short-lived REST requests. */
+	public static final long DEFAULT_MAX_CONCURRENT_REQUESTS = 10_000L;
+	/** Default maximum size in bytes of a structured REST request body. */
+	public static final long DEFAULT_MAX_REQUEST_BYTES = 1_000_000L;
+	/** Default time a public query waits for an execution slot before shedding load. */
+	public static final long DEFAULT_QUERY_MAX_WAIT_MILLIS = 1_000L;
 
 	// ========== MCP config keys ==========
 
@@ -250,6 +268,68 @@ public class RESTConfig extends PeerConfig {
 			if (origin != null) result.add(origin.toString());
 		}
 		return result;
+	}
+
+	// ========== Public-surface limit accessors ==========
+
+	/**
+	 * Global cap on concurrent short-lived REST requests. Long-lived SSE streams
+	 * keep their own connection limits and are not counted here.
+	 * @return maximum concurrent requests (default 10,000)
+	 */
+	public long getMaxConcurrentRequests() {
+		return getLong(getSection(REST), MAX_CONCURRENT_REQUESTS, DEFAULT_MAX_CONCURRENT_REQUESTS);
+	}
+
+	/**
+	 * Maximum size in bytes of a structured REST request body.
+	 * @return maximum request body size (default 1,000,000)
+	 */
+	public long getMaxRequestBytes() {
+		return getLong(getSection(REST), MAX_REQUEST_BYTES, DEFAULT_MAX_REQUEST_BYTES);
+	}
+
+	/**
+	 * Maximum number of public queries executed concurrently. This bounds the CPU
+	 * cores public reads may take from consensus, not throughput — a single core
+	 * evaluates queries fast enough that a small slice of cores serves a high query
+	 * rate. Defaults to roughly a tenth of the available processors (at least one).
+	 * @return maximum concurrent public queries
+	 */
+	public int getMaxConcurrentQueries() {
+		long dflt = Math.max(1L, Runtime.getRuntime().availableProcessors()/10 + 1);
+		return (int) getLong(getQuerySection(), MAX_CONCURRENT, dflt);
+	}
+
+	/**
+	 * Time a public query waits for a free execution slot before returning a load
+	 * result. A short wait absorbs bursts without rejecting; only a sustained
+	 * overload sheds.
+	 * @return maximum wait in milliseconds (default 1000)
+	 */
+	public long getQueryMaxWaitMillis() {
+		return getLong(getQuerySection(), MAX_WAIT_MILLIS, DEFAULT_QUERY_MAX_WAIT_MILLIS);
+	}
+
+	/**
+	 * Execution ceiling applied to each public query.
+	 * @return maximum Juice per public query (default {@link PublicQueryService#MAX_QUERY_JUICE})
+	 */
+	public long getMaxQueryJuice() {
+		return getLong(getQuerySection(), MAX_JUICE, PublicQueryService.MAX_QUERY_JUICE);
+	}
+
+	private AMap<AString,ACell> getQuerySection() {
+		AMap<AString,ACell> q = RT.castMap(getSection(REST).get(QUERY));
+		return (q!=null) ? q : Maps.empty();
+	}
+
+	private static long getLong(AMap<AString,ACell> section, AString key, long defaultValue) {
+		ACell raw = section.get(key);
+		if (raw==null) return defaultValue;
+		CVMLong v = RT.ensureLong(raw);
+		if (v==null) throw new IllegalArgumentException("rest config value for '"+key+"' must be an integer");
+		return v.longValue();
 	}
 
 	// ========== MCP typed accessors ==========

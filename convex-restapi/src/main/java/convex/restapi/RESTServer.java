@@ -2,6 +2,7 @@ package convex.restapi;
 
 import java.io.Closeable;
 import java.util.HashMap;
+import java.util.concurrent.Semaphore;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -56,6 +57,8 @@ import io.javalin.config.JavalinConfig;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.HttpResponseException;
 import io.javalin.http.ContentTooLargeResponse;
+import io.javalin.http.HandlerType;
+import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.http.UnauthorizedResponse;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
@@ -77,25 +80,22 @@ public class RESTServer implements Closeable {
 	protected final PublicQueryService publicQueryService;
 	protected final AString venueDID;
 	protected final AdminAuthorizer adminAuthorizer;
+	/** Configured maximum size of a structured REST request body (bytes). */
+	protected final long maxRequestBytes;
+	/** Bytes of an oversized body to drain before rejecting; see {@link #drainRejectedBody}. */
+	protected final long oversizeDrainBytes;
+	/** Global admission control bounding concurrent short-lived requests. */
+	protected final Semaphore requestPermits;
 	protected Javalin javalin;
-	
+
+	/** Context attribute marking a request that holds a global admission permit. */
+	private static final String REQUEST_PERMIT_ATTR="convex.rest.admitted";
+
 	protected static final Integer DEFAULT_PORT=8080;
-	/** Hard ceiling for structured REST request bodies. */
-	public static final long MAX_REQUEST_BODY_BYTES=1_000_000L;
-	/**
-	 * Bytes of a rejected request body to read and discard before answering 413.
-	 *
-	 * <p>Closing a connection that still holds unread body data resets it rather than
-	 * closing gracefully, and a reset makes the client's TCP stack discard its receive
-	 * buffer — including the 413 already written. The client then sees a bare connection
-	 * failure and cannot tell "too large" from "server died". Draining first lets the
-	 * close be graceful so the status actually arrives.</p>
-	 *
-	 * <p>Bounded so a rejected request never costs more to read than a legal one. Bodies
-	 * beyond this are still reset, which is exactly how the chunked path behaves: it
-	 * reads through {@code bodyAsBytes()} up to the same ceiling before rejecting.</p>
-	 */
-	static final long OVERSIZE_DRAIN_BYTES=MAX_REQUEST_BODY_BYTES+65536L;
+	/** Default hard ceiling for structured REST request bodies (see {@code rest.maxRequestBytes}). */
+	public static final long MAX_REQUEST_BODY_BYTES=RESTConfig.DEFAULT_MAX_REQUEST_BYTES;
+	/** Extra bytes drained beyond the body ceiling before a rejection is answered. */
+	static final long DRAIN_SLACK_BYTES=65536L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
 	private RESTServer(Server server, RESTConfig explicitConfig) {
@@ -106,7 +106,11 @@ public class RESTServer implements Closeable {
 				: (attachedConfig instanceof RESTConfig rc
 						? rc : RESTConfig.fromLegacy(server.getConfig()));
 		this.convex = ConvexLocal.create(server);
-		this.publicQueryService = new PublicQueryService(server);
+		this.publicQueryService = new PublicQueryService(server, restConfig);
+		this.maxRequestBytes = restConfig.getMaxRequestBytes();
+		this.oversizeDrainBytes = maxRequestBytes + DRAIN_SLACK_BYTES;
+		long maxRequests = restConfig.getMaxConcurrentRequests();
+		this.requestPermits = new Semaphore((int) Math.min(Integer.MAX_VALUE, Math.max(1L, maxRequests)));
 		String baseUrl=restConfig.getBaseUrl();
 		this.venueDID=(baseUrl==null)?null:VenueIdentity.fromBaseUrl(baseUrl);
 		if (restConfig.isAdminEnabled()) {
@@ -307,7 +311,7 @@ public class RESTServer implements Closeable {
 		int bindPort = (port == null) ? DEFAULT_PORT : port;
 		Javalin app = Javalin.create(config -> {
 			// RequestBody relies on this limit to bound chunked as well as fixed-length bodies.
-			config.http.maxRequestSize=MAX_REQUEST_BODY_BYTES;
+			config.http.maxRequestSize=maxRequestBytes;
 
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
@@ -352,22 +356,28 @@ public class RESTServer implements Closeable {
 
 	/**
 	 * Reads and discards a bounded prefix of a request body we are about to reject, so the
-	 * connection can be closed gracefully and the 413 survives. See
-	 * {@link #OVERSIZE_DRAIN_BYTES}.
+	 * connection can be closed gracefully and the 413 survives.
+	 *
+	 * <p>Closing a connection that still holds unread body data resets it rather than
+	 * closing gracefully, and a reset makes the client's TCP stack discard its receive
+	 * buffer — including the 413 already written. Draining first lets the close be graceful
+	 * so the status actually arrives. Bounded (body ceiling plus {@link #DRAIN_SLACK_BYTES})
+	 * so a rejected request never costs more to read than a legal one.</p>
 	 *
 	 * <p>Does nothing when the client offered {@code Expect: 100-continue}: it is waiting
 	 * for permission and has sent no body, so there is nothing to drain — and touching the
 	 * stream would make Jetty invite it to send the very body being rejected.</p>
 	 *
 	 * @param ctx Request context for the rejected request
+	 * @param oversizeDrainBytes Maximum bytes to read and discard
 	 */
-	private static void drainRejectedBody(io.javalin.http.Context ctx) {
+	private static void drainRejectedBody(io.javalin.http.Context ctx, long oversizeDrainBytes) {
 		String expect=ctx.header("Expect");
 		if ((expect!=null)&&expect.toLowerCase().contains("100-continue")) return;
 		try {
 			java.io.InputStream in=ctx.req().getInputStream();
 			byte[] buffer=new byte[8192];
-			long remaining=OVERSIZE_DRAIN_BYTES;
+			long remaining=oversizeDrainBytes;
 			while (remaining>0) {
 				int n=in.read(buffer,0,(int)Math.min(buffer.length,remaining));
 				if (n<0) break;
@@ -379,15 +389,47 @@ public class RESTServer implements Closeable {
 		}
 	}
 
+	/**
+	 * Whether a request is a long-lived stream excluded from the global admission cap.
+	 * The query-watch and log-watch SSE endpoints hold their connection open, and the MCP
+	 * SSE stream (the GET on {@code /mcp}) keeps its own connection cap (#659); short-lived
+	 * MCP POST/DELETE calls are still counted.
+	 *
+	 * @param ctx Request context
+	 * @return true if the request is a long-lived stream
+	 */
+	private static boolean isStreamingRequest(io.javalin.http.Context ctx) {
+		String path=ctx.path();
+		if (path==null) return false;
+		if (path.equals("/api/v1/watch") || path.equals("/api/v1/watch/logs")) return true;
+		if (path.equals("/mcp")) return ctx.method()==HandlerType.GET;
+		return false;
+	}
+
 	private void addHandlers(RoutesConfig routes) {
+		// Global admission control: bound concurrent short-lived requests so a flood
+		// cannot pile up unbounded work. Long-lived SSE streams keep their own
+		// connection limits and are excluded. Runs first so the permit is held for the
+		// whole request; the after handler releases it even when a later stage throws.
+		routes.before(ctx -> {
+			if (isStreamingRequest(ctx)) return;
+			if (!requestPermits.tryAcquire()) {
+				throw new ServiceUnavailableResponse("Server busy: too many concurrent requests");
+			}
+			ctx.attribute(REQUEST_PERMIT_ATTR, Boolean.TRUE);
+		});
+		routes.after(ctx -> {
+			if (ctx.attribute(REQUEST_PERMIT_ATTR)!=null) requestPermits.release();
+		});
+
 		// Reject a known oversized body before a handler starts parsing it. Requests
 		// without Content-Length are still bounded while read by RequestBody.
 		routes.before(ctx -> {
 			long contentLength=ctx.req().getContentLengthLong();
-			if (contentLength>MAX_REQUEST_BODY_BYTES) {
-				drainRejectedBody(ctx);
+			if (contentLength>maxRequestBytes) {
+				drainRejectedBody(ctx, oversizeDrainBytes);
 				throw new ContentTooLargeResponse("Request body exceeds maximum size of "
-						+MAX_REQUEST_BODY_BYTES+" bytes");
+						+maxRequestBytes+" bytes");
 			}
 		});
 
