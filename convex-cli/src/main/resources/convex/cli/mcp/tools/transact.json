@@ -1,0 +1,34 @@
+{
+  "name": "transact",
+  "title": "Convex Transaction",
+  "description": "Execute Convex Lisp source as a transaction on the targeted Convex instance, signed with the locally configured account. Transactions can modify state (def, call, transfer, deploy) and cost juice on real networks.\n\nOn the default ephemeral local instance, transactions are free and signed automatically with the generated genesis account.",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {
+        "type": "string",
+        "description": "CVM source code to execute as a transaction, e.g. '(def x 42)'. Multiple forms are wrapped in a do block."
+      }
+    },
+    "required": ["source"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "description": "Resulting CVM value"
+      },
+      "errorCode": {
+        "description": "CVM error code if the transaction failed"
+      },
+      "info": {
+        "description": "Additional execution metadata, e.g. juice used"
+      }
+    }
+  }
+}

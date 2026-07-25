@@ -1,0 +1,30 @@
+{
+  "name": "resolveCNS",
+  "title": "Resolve CNS Name",
+  "description": "Resolve a Convex Name System (CNS) name to its target value, typically an actor or library address. Example names: 'convex.asset', 'convex.fungible', 'torus.exchange'.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "CNS name to resolve, e.g. 'convex.asset'"
+      }
+    },
+    "required": ["name"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "value": {
+        "description": "Resolved value, typically an address; nil if the name is not registered"
+      },
+      "errorCode": {
+        "description": "CVM error code if resolution failed"
+      }
+    }
+  }
+}

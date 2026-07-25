@@ -189,6 +189,30 @@ convex repl --host localhost -a 11 --key 021efb
 convex eval --query "(balance #11)" --host localhost -a 11
 ```
 
+### MCP server for AI agents
+
+`convex mcp` runs an [MCP (Model Context Protocol)](https://modelcontextprotocol.io)
+server on stdin/stdout, so local MCP clients — Claude Code, Claude Desktop and
+other agent tools — can run Convex queries and transactions through a standard
+interface. Like `eval` and `repl`, it targets an ephemeral local instance by
+default, or any peer specified with `--host`.
+
+Tools offered: `query`, `transact`, `getBalance`, `resolveCNS` and `status`.
+With `--query` the server is read-only and `transact` is not offered. On a
+remote target, transactions sign with the local keystore: start the server
+with `--address` and `--key` (plus `--keypass` or `CONVEX_KEY_PASSWORD`,
+since an MCP client cannot answer interactive prompts).
+
+Example Claude Code registration:
+
+```bash
+# Sandboxed local instance (safe default)
+claude mcp add convex -- convex mcp
+
+# Read-only against a real network
+claude mcp add convex-live -- convex mcp --host peer.convex.live --query
+```
+
 ## Use Case 4: Query and Transact
 
 Interact with any Convex network: read state with queries (free), modify state with transactions (requires signed account).
@@ -338,6 +362,7 @@ convex
 
   eval        Evaluate Convex Lisp (local instance by default)
   repl        Interactive Convex Lisp REPL
+  mcp         MCP server on stdio for AI agent clients
   query       Execute read-only query
   transact    Execute transaction
   status      Check peer/network status

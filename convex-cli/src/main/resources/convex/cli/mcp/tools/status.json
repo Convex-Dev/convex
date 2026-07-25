@@ -1,0 +1,34 @@
+{
+  "name": "status",
+  "title": "Connection Status",
+  "description": "Report the targeted Convex instance (local ephemeral instance or remote peer), the configured account address, whether transaction signing is available, and the current network timestamp. Also verifies connectivity.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {}
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "target": {
+        "type": "string",
+        "description": "Description of the targeted Convex instance"
+      },
+      "address": {
+        "type": "string",
+        "description": "Configured account address, e.g. '#12'"
+      },
+      "signing": {
+        "type": "boolean",
+        "description": "Whether a signing key is configured, i.e. the transact tool is usable"
+      },
+      "timestamp": {
+        "type": "number",
+        "description": "Current network timestamp in milliseconds"
+      }
+    }
+  }
+}
