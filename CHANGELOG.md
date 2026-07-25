@@ -11,9 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New `convex-p2p` module: a rollup package for lattice P2P nodes, bundling the P2P regions (`:p2p` node registry, `:id` user identity, reserved `:kad`), the application regions a node serves, and the `P2PNode` server that serves them. `node.p2p(userID).cursor()` gives an application a cursor onto one user's owned area, signed on write.
 - MCP: five new guided prompts — `resolve-name`, `call-actor`, `token`, `diagnose-transaction` and `manage-access` — covering name resolution, actor calls, fungible tokens (CAD029), transaction diagnosis, and access control (CAD022).
+- REST API: typed, secure-by-default configuration for the HTTP and MCP endpoints via the `rest`, `mcp` and `auth` sections of the JSON5 config. The faucet, query watch, process-administration routes and the generic Peer-message endpoint are each gated and stay off unless explicitly enabled; administration additionally requires an authorised operator key (the venue and consensus-controller keys by default, or a configured `did:key` allowlist) and HTTPS for non-loopback access.
 
 ### Changed
 
+- REST API: the `transaction/submit` endpoint now requires the complete `data` value returned by `transaction/prepare`; public transaction preparation no longer writes pending state into the Peer's primary store. Clients that previously submitted only a transaction hash must now return the full prepared data.
+- REST API: public queries run on a bounded, isolated lane — serial and Juice-capped, separate from the Peer's network query queue — so public HTTP traffic cannot starve consensus queries; an overloaded lane returns a clean "server busy" result instead of blocking.
+- REST API: request bodies are size-bounded even when chunked, so a streaming parser sees the same limit as a request with a declared content length.
+- Etch: version-2 stores use a Foreign Function & Memory (FFM) mapped-file backend on Java 22+, falling back to the `MappedByteBuffer` backend on Java 21; `convex.jar` ships both as a multi-release jar and selects the backend at runtime.
 - MCP: improved and streamlined the built-in prompts — clearer, accurate Convex guidance, with the shared reference (system accounts, coin units, CNS) consolidated into `convex-guide` so the task prompts stay focused.
 - `AIndex.entrySet()` now returns a lightweight immutable view, avoiding a full ordered set copy on every call while preserving sorted iteration order.
 - NodeServer: network work is dispatched through a bounded queue, keeping decode, lattice merge, synchronous persistence and response encoding off shared Netty event-loop threads
