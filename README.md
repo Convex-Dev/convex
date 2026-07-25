@@ -134,6 +134,17 @@ mvn clean install
 
 ### Running Convex
 
+Try Convex Lisp straight from the terminal — no network, keys or setup needed:
+
+```bash
+convex eval "(+ 1 2)"
+# => 3
+
+convex repl          # interactive REPL on an ephemeral local instance
+```
+
+Both commands run against any network too, e.g. `convex repl --host localhost`.
+
 Launch the desktop GUI:
 
 ```bash

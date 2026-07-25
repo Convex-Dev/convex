@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CLI: new `convex eval` and `convex repl` commands for headless Convex Lisp evaluation — one-shot scriptable evaluation (arguments or piped standard input) and an interactive REPL. Both run against an ephemeral local in-memory instance by default, needing no setup, keys or network, or against any peer targeted with `--host`.
+
 ### Changed
 
 ### Fixed

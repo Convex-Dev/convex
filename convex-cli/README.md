@@ -13,6 +13,12 @@ convex --version
 # Get help
 convex --help
 
+# Try Convex Lisp instantly (no network needed)
+convex eval "(+ 1 2)"
+
+# Interactive Convex Lisp REPL
+convex repl
+
 # Start a local test network
 convex local start
 ```
@@ -129,7 +135,61 @@ export CONVEX_KEY_PASSWORD=secret       # Key encryption password
 export CONVEX_KEYSTORE=~/my-keys.pfx    # Custom keystore location
 ```
 
-## Use Case 3: Query and Transact
+## Use Case 3: Try Convex Lisp (eval and repl)
+
+Evaluate Convex Lisp directly from the terminal. By default both commands run
+against an ephemeral local in-memory instance — no network, keys or setup
+required — making them ideal for learning the language, scripting and agent
+tooling.
+
+### One-shot evaluation
+
+```bash
+# Evaluate a form and print the result
+convex eval "(+ 1 2)"
+# 3
+
+# Each argument is evaluated in sequence; state persists between them
+convex eval "(def x 10)" "(* x x)"
+# 10
+# 100
+
+# Pipe a script via standard input
+echo "(def a 3) (+ a a)" | convex eval
+cat script.cvx | convex eval -
+```
+
+Errors print a message on stderr and exit with a non-zero code, so `eval` is
+safe to use in scripts and CI.
+
+### Interactive REPL
+
+```bash
+convex repl
+```
+
+Evaluates each form you enter and prints the result. Multi-line forms are
+supported (the prompt changes until the form closes). Exit with `quit` or
+Ctrl-D (Ctrl-Z then Enter on Windows).
+
+Tip: for line editing and input history, wrap the REPL with
+[`rlwrap`](https://github.com/hanslub42/rlwrap): `rlwrap convex repl`.
+
+### Evaluating against a real network
+
+Both commands accept the standard client options. With `--host`, forms are
+executed on the targeted network — as transactions by default (requiring
+`--address` and `--key`), or as read-only queries with `--query`:
+
+```bash
+# REPL against a local test network
+convex repl --host localhost -a 11 --key 021efb
+
+# Read-only queries against any network, no key needed
+convex eval --query "(balance #11)" --host localhost -a 11
+```
+
+## Use Case 4: Query and Transact
 
 Interact with any Convex network: read state with queries (free), modify state with transactions (requires signed account).
 
@@ -191,7 +251,7 @@ convex account fund -a 1234 1000000000 --host localhost
 
 Note: The faucet is disabled on production networks like Protonet.
 
-## Use Case 4: Running a Production Peer
+## Use Case 5: Running a Production Peer
 
 Operate a peer node that participates in Convex consensus. Peers validate transactions, maintain state, and serve client requests.
 
@@ -276,6 +336,8 @@ convex
     import    Import key from mnemonic/seed
     export    Export key
 
+  eval        Evaluate Convex Lisp (local instance by default)
+  repl        Interactive Convex Lisp REPL
   query       Execute read-only query
   transact    Execute transaction
   status      Check peer/network status
