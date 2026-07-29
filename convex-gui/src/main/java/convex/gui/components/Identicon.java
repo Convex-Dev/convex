@@ -11,8 +11,10 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.border.BevelBorder;
 
+import convex.auth.did.DID;
 import convex.core.crypto.IdenticonBuilder;
 import convex.core.data.AArrayBlob;
+import convex.core.data.AccountKey;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -28,6 +30,9 @@ import net.miginfocom.swing.MigLayout;
 public class Identicon extends JLabel {
 	
 	protected int displaySize=Toolkit.IDENTICON_SIZE;
+	private AArrayBlob key;
+	final JMenuItem copyPublicKeyItem;
+	final JMenuItem copyDIDKeyItem;
 
 	protected static final int SIZE=IdenticonBuilder.SIZE;
 	
@@ -62,19 +67,26 @@ public class Identicon extends JLabel {
 	public Identicon(AArrayBlob a, int displaySize) {
 		super();
 		this.displaySize=displaySize;
-		setKey(a);
 		setFont(Toolkit.MONO_FONT);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 		
-		Toolkit.addPopupMenu(this,new JPopupMenu() {
-			{
-				JMenuItem closeButton = new JMenuItem("Copy Public Key",Toolkit.menuIcon(0xe14d));
-				closeButton.addActionListener(e -> {
-					Toolkit.copyToClipboard(a.toString());
-				});
-				add(closeButton);
+		JPopupMenu popupMenu=new JPopupMenu();
+		copyPublicKeyItem = new JMenuItem("Copy Public Key",Toolkit.menuIcon(0xe14d));
+		copyPublicKeyItem.addActionListener(e -> {
+			if (key!=null) Toolkit.copyToClipboard(key.toString());
+		});
+		popupMenu.add(copyPublicKeyItem);
+
+		copyDIDKeyItem = new JMenuItem("Copy did:key",Toolkit.menuIcon(0xe14d));
+		copyDIDKeyItem.addActionListener(e -> {
+			if (key instanceof AccountKey accountKey) {
+				Toolkit.copyToClipboard(DID.forKey(accountKey).toString());
 			}
 		});
+		popupMenu.add(copyDIDKeyItem);
+
+		Toolkit.addPopupMenu(this,popupMenu);
+		setKey(a);
 	}
 
 	public Identicon(AArrayBlob a) {
@@ -122,9 +134,12 @@ public class Identicon extends JLabel {
 	}
 
 	public void setKey(AArrayBlob a) {
+		this.key=a;
 		ImageIcon icon=createIcon(a, displaySize); 
 		this.setToolTipText(icon.getDescription());
 
 		setIcon(icon);
+		copyPublicKeyItem.setEnabled(a!=null);
+		copyDIDKeyItem.setVisible(a instanceof AccountKey);
 	}
 }

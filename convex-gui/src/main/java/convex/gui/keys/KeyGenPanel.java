@@ -13,6 +13,7 @@ import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
 
+import convex.auth.did.DID;
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
@@ -47,6 +48,7 @@ public class KeyGenPanel extends JPanel {
 	JTextArea derivedKeyArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
+	JTextArea didKeyArea;
 	
 	JSpinner numSpinner;
 
@@ -111,6 +113,7 @@ public class KeyGenPanel extends JPanel {
 			warningArea.setText("");
 			derivedKeyArea.setText(pks);
 			privateKeyArea.setText(pks);
+			clearPublicIdentity();
 		}		
 	}
 	
@@ -164,7 +167,7 @@ public class KeyGenPanel extends JPanel {
 			deriveSeed();
 		} catch (Exception ex) {
 			privateKeyArea.setText(ex.getMessage());
-			publicKeyArea.setText(ex.getMessage());
+			clearPublicIdentity();
 			derivationPath=null;
 			return;
 		}
@@ -195,7 +198,7 @@ public class KeyGenPanel extends JPanel {
 			generatePublicKey();
 		} catch (Exception ex) {
 			privateKeyArea.setText(ex.getMessage());
-			publicKeyArea.setText(ex.getMessage());
+			clearPublicIdentity();
 			return;
 		}
 	}
@@ -219,7 +222,7 @@ public class KeyGenPanel extends JPanel {
 		}
 	}
 
-	private void generatePublicKey() {
+	void generatePublicKey() {
 		String s = privateKeyArea.getText().trim();
 		try {
 			if (s.startsWith("0x")) s=s.substring(2);
@@ -229,14 +232,21 @@ public class KeyGenPanel extends JPanel {
 			AccountKey publicKey=kp.getAccountKey();
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
 			publicKeyArea.setText("0x"+publicKey.toChecksumHex());
+			didKeyArea.setText(DID.forKey(publicKey).toString());
 			addWalletButton.setEnabled(true);
 			
 			identicon.setKey(publicKey);
 		} catch (Exception ex) {
-			publicKeyArea.setText("<enter valid private key>");
-			addWalletButton.setEnabled(false);
+			clearPublicIdentity();
 			return;
 		}
+	}
+
+	private void clearPublicIdentity() {
+		if (publicKeyArea!=null) publicKeyArea.setText("<enter valid private key>");
+		if (didKeyArea!=null) didKeyArea.setText("<public key not ready>");
+		if (addWalletButton!=null) addWalletButton.setEnabled(false);
+		if (identicon!=null) identicon.setKey(null);
 	}
 
 	/**
@@ -377,6 +387,15 @@ public class KeyGenPanel extends JPanel {
 			publicKeyArea.setText("(private key not ready)");
 			publicKeyArea.setFont(HEX_FONT);
 			formPanel.add(publicKeyArea,TEXTAREA_CONSTRAINT);
+		}
+
+		{
+			addLabel("did:key Identifier","This is the self-certifying DID for the Ed25519 public key. It can be shared publicly and used wherever a DID is required.",true);
+			didKeyArea = makeTextArea();
+			didKeyArea.setEditable(false);
+			didKeyArea.setRows(1);
+			didKeyArea.setText("(public key not ready)");
+			formPanel.add(didKeyArea,TEXTAREA_CONSTRAINT);
 		}
 		
 		identicon=new Identicon(null,Toolkit.IDENTICON_SIZE_LARGE);

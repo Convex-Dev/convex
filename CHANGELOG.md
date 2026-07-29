@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- GUI: generated keys, keyring entries and keyed account overviews now show their canonical `did:key` identifier, with a copy action on account-key identicons.
 - CLI: new `convex eval` and `convex repl` commands for headless Convex Lisp evaluation — one-shot scriptable evaluation (arguments or piped standard input) and an interactive REPL. Both run against an ephemeral local in-memory instance by default, needing no setup, keys or network, or against any peer targeted with `--host`.
 - CLI: new `convex mcp` command running an MCP (Model Context Protocol) server on the standard stdio transport, so local MCP clients such as AI agents can query and transact against an ephemeral local instance or any peer targeted with `--host`. Offers `query`, `transact` (signed with the locally configured key), `getBalance`, `resolveCNS` and `status` tools; `--query` restricts the server to read-only tools.
 
