@@ -2,14 +2,13 @@ package convex.restapi.api;
 
 import convex.core.crypto.util.Base58;
 import convex.core.crypto.util.Multikey;
-import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.data.AccountKey;
-import convex.core.data.Strings;
 import convex.core.util.JSON;
 import convex.restapi.RESTServer;
 import io.javalin.config.RoutesConfig;
 import io.javalin.http.Context;
+import io.javalin.http.HttpStatus;
 import io.javalin.http.NotFoundResponse;
 
 import java.util.ArrayList;
@@ -66,50 +65,27 @@ public class DIDAPI extends ABaseAPI {
 	 */
 	protected void handleAccountDID(Context ctx) {
 		String identifier = ctx.pathParam("identifier");
-		Address address = resolveIdentifier(identifier);
-		if (address == null) {
-			throw new NotFoundResponse("Account not found: " + identifier);
-		}
-
-		AccountStatus as = server.getState().getAccount(address);
-		if (as == null) {
-			throw new NotFoundResponse("Account not found: " + identifier);
-		}
-
-		AccountKey key = as.getAccountKey();
-
 		String did = getVenueDID(ctx) + ":" + identifier;
-
-		// alsoKnownAs: did:convex always, did:key only if account has a key
-		List<String> aliases = new ArrayList<>();
-		aliases.add("did:convex:" + address.longValue());
-		if (key != null) {
-			aliases.add("did:key:" + multibaseEncodeEd25519DIDKey(key));
+		DIDResolver.Resolution resolution = DIDResolver.resolve(server.getState(), identifier, did);
+		Map<String, Object> doc;
+		switch (resolution.status()) {
+			case ACTIVE -> doc = resolution.document();
+			case DEACTIVATED -> {
+				Map<String, Object> result = new HashMap<>();
+				result.put("didResolutionMetadata", Map.of());
+				result.put("didDocument", null);
+				result.put("didDocumentMetadata", resolution.documentMetadata());
+				ctx.status(HttpStatus.GONE);
+				ctx.contentType("application/did-resolution");
+				ctx.result(JSON.toString(result));
+				return;
+			}
+			case NOT_FOUND, INVALID -> throw new NotFoundResponse("DID not found: " + identifier);
+			default -> throw new IllegalStateException("Unexpected DID resolution status: " + resolution.status());
 		}
-
-		Map<String, Object> doc = buildDIDDocument(did, key, aliases);
 
 		ctx.contentType("application/json");
 		ctx.result(JSON.toString(doc));
-	}
-
-	/**
-	 * Resolve an identifier string to an Address.
-	 * Numeric strings are parsed as account addresses, non-numeric as CNS names.
-	 */
-	private Address resolveIdentifier(String identifier) {
-		if (identifier == null || identifier.isEmpty()) return null;
-
-		// Try numeric address first
-		Address addr = Address.parse(identifier);
-		if (addr != null) return addr;
-
-		// Try CNS resolution
-		try {
-			return resolveAddress(Strings.create(identifier));
-		} catch (Exception e) {
-			return null;
-		}
 	}
 
 	/**

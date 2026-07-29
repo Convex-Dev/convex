@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
 - JSON readers no longer throw `NumberFormatException` for non-integer numbers of 19 or more characters (long decimals, exponent notation, JSON5 hex literals): the integer fast path now falls through to the double parser as intended.
 
 ## [0.8.10] - 2026-07-25
