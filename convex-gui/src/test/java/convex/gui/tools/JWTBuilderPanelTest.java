@@ -1,6 +1,7 @@
 package convex.gui.tools;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -64,6 +65,21 @@ public class JWTBuilderPanelTest {
 			JWTBuilderPanel.buildAccessClaims(
 				"issuer","subject","audience",10L,null,20L,
 				"id","client",null,extra));
+	}
+
+	@Test
+	public void testClientIDIsOptional() {
+		AMap<AString,ACell> claims=JWTBuilderPanel.buildAccessClaims(
+			"issuer","subject","audience",10L,null,20L,
+			"id","",null,Maps.empty());
+
+		assertFalse(claims.containsKey(JWTBuilderPanel.CLIENT_ID));
+	}
+
+	@Test
+	public void testReadableDuration() {
+		assertEquals("1h",JWTBuilderPanel.formatDuration(3600));
+		assertEquals("1d 2h 3m 4s",JWTBuilderPanel.formatDuration(93_784));
 	}
 
 	@Test

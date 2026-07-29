@@ -3,6 +3,11 @@ package convex.gui.tools;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.security.SecureRandom;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 import javax.swing.BorderFactory;
@@ -69,9 +74,12 @@ public class JWTBuilderPanel extends JPanel {
 	private final JTextField accessSubject=new JTextField();
 	private final JTextField accessAudience=new JTextField();
 	private final JSpinner accessIssuedAt=timestampSpinner(0);
+	private final JLabel accessIssuedAtText=timeLabel();
 	private final JCheckBox accessUseNotBefore=new JCheckBox("Include");
 	private final JSpinner accessNotBefore=timestampSpinner(0);
+	private final JLabel accessNotBeforeText=timeLabel();
 	private final JSpinner accessExpiry=timestampSpinner(0);
+	private final JLabel accessExpiryText=timeLabel();
 	private final JTextField accessTokenID=new JTextField();
 	private final JTextField accessClientID=new JTextField();
 	private final JTextField accessScope=new JTextField();
@@ -81,7 +89,9 @@ public class JWTBuilderPanel extends JPanel {
 	private final JTextField ucanAudience=new JTextField();
 	private final JCheckBox ucanUseNotBefore=new JCheckBox("Include");
 	private final JSpinner ucanNotBefore=timestampSpinner(0);
+	private final JLabel ucanNotBeforeText=timeLabel();
 	private final JSpinner ucanExpiry=timestampSpinner(0);
+	private final JLabel ucanExpiryText=timeLabel();
 	private final JTextField ucanNonce=new JTextField();
 	private final JTextArea ucanCapabilities=jsonArea("[]");
 	private final JTextArea ucanProofs=jsonArea("[]");
@@ -137,6 +147,11 @@ public class JWTBuilderPanel extends JPanel {
 			accessNotBefore.setEnabled(accessUseNotBefore.isSelected()));
 		ucanUseNotBefore.addActionListener(e ->
 			ucanNotBefore.setEnabled(ucanUseNotBefore.isSelected()));
+		accessIssuedAt.addChangeListener(e -> updateTimeLabels());
+		accessNotBefore.addChangeListener(e -> updateTimeLabels());
+		accessExpiry.addChangeListener(e -> updateTimeLabels());
+		ucanNotBefore.addChangeListener(e -> updateTimeLabels());
+		ucanExpiry.addChangeListener(e -> updateTimeLabels());
 		keyCombo.addItemListener(e -> updateSignerDefaults());
 
 		infoArea.setRows(4);
@@ -158,16 +173,17 @@ public class JWTBuilderPanel extends JPanel {
 			"Principal represented by the access token.");
 		addField(panel,"Audience (aud):",accessAudience,
 			"Resource server or API expected to accept the token.");
-		addField(panel,"Issued at (iat):",accessIssuedAt,
+		addTime(panel,"Issued at (iat):",accessIssuedAt,accessIssuedAtText,
 			"Unix timestamp in seconds when the token was issued.");
 		addOptionalTime(panel,"Not before (nbf):",accessUseNotBefore,accessNotBefore,
+			accessNotBeforeText,
 			"Optional Unix timestamp before which the token must not be accepted.");
-		addField(panel,"Expiry (exp):",accessExpiry,
+		addTime(panel,"Expiry (exp):",accessExpiry,accessExpiryText,
 			"Unix timestamp in seconds when the token expires.");
 		addField(panel,"JWT ID (jti):",accessTokenID,
 			"Unique token identifier.");
 		addField(panel,"Client ID:",accessClientID,
-			"OAuth client_id claim required by the JWT access-token profile.");
+			"Optional OAuth client_id claim.");
 		addField(panel,"Scope:",accessScope,
 			"Optional space-separated OAuth scopes.");
 		addArea(panel,"Additional claims:",accessExtraClaims,
@@ -183,8 +199,9 @@ public class JWTBuilderPanel extends JPanel {
 		addField(panel,"Audience (aud):",ucanAudience,
 			"did:key of the principal receiving the delegated capabilities.");
 		addOptionalTime(panel,"Not before (nbf):",ucanUseNotBefore,ucanNotBefore,
+			ucanNotBeforeText,
 			"Optional Unix timestamp before which the UCAN must not be accepted.");
-		addField(panel,"Expiry (exp):",ucanExpiry,
+		addTime(panel,"Expiry (exp):",ucanExpiry,ucanExpiryText,
 			"Unix timestamp in seconds when the UCAN expires.");
 		addField(panel,"Nonce (nnc):",ucanNonce,
 			"Unique nonce used by applications for replay protection.");
@@ -312,6 +329,7 @@ public class JWTBuilderPanel extends JPanel {
 		ucanCapabilities.setText("[]");
 		ucanProofs.setText("[]");
 		ucanFacts.setText("");
+		updateTimeLabels();
 
 		previousSignerDID=null;
 		accessIssuer.setText("");
@@ -330,6 +348,17 @@ public class JWTBuilderPanel extends JPanel {
 		replaceSignerDefault(accessSubject,next);
 		replaceSignerDefault(ucanIssuer,next);
 		previousSignerDID=next;
+	}
+
+	private void updateTimeLabels() {
+		long issuedAt=spinnerLong(accessIssuedAt);
+		long accessExpires=spinnerLong(accessExpiry);
+		accessIssuedAtText.setText(formatTimestamp(issuedAt));
+		accessNotBeforeText.setText(formatTimestamp(spinnerLong(accessNotBefore)));
+		accessExpiryText.setText(formatTimestamp(accessExpires)
+			+" \u00b7 lifetime "+formatDuration(accessExpires-issuedAt));
+		ucanNotBeforeText.setText(formatTimestamp(spinnerLong(ucanNotBefore)));
+		ucanExpiryText.setText(formatTimestamp(spinnerLong(ucanExpiry)));
 	}
 
 	private void replaceSignerDefault(JTextField field,String next) {
@@ -352,7 +381,6 @@ public class JWTBuilderPanel extends JPanel {
 		AString sub=requiredString(subject,"Subject");
 		AString aud=requiredString(audience,"Audience");
 		AString jti=requiredString(tokenID,"JWT ID");
-		AString client=requiredString(clientID,"Client ID");
 		if (expiry<=issuedAt) throw new IllegalArgumentException("Expiry must be after issued-at");
 		if (notBefore!=null&&notBefore>=expiry) {
 			throw new IllegalArgumentException("Not-before must be before expiry");
@@ -372,7 +400,9 @@ public class JWTBuilderPanel extends JPanel {
 		claims=claims.assoc(JWT.IAT,CVMLong.create(issuedAt));
 		claims=claims.assoc(JWT.EXP,CVMLong.create(expiry));
 		claims=claims.assoc(TOKEN_ID,jti);
-		claims=claims.assoc(CLIENT_ID,client);
+		if (clientID!=null&&!clientID.isBlank()) {
+			claims=claims.assoc(CLIENT_ID,Strings.create(clientID.trim()));
+		}
 		if (notBefore!=null) claims=claims.assoc(NOT_BEFORE,CVMLong.create(notBefore));
 		if (scope!=null&&!scope.isBlank()) claims=claims.assoc(SCOPE,Strings.create(scope.trim()));
 		return claims;
@@ -454,6 +484,31 @@ public class JWTBuilderPanel extends JPanel {
 		return (message==null||message.isBlank())?throwable.getClass().getSimpleName():message;
 	}
 
+	static String formatTimestamp(long epochSeconds) {
+		try {
+			return DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss z")
+				.withZone(ZoneId.systemDefault())
+				.format(Instant.ofEpochSecond(epochSeconds));
+		} catch (DateTimeException ex) {
+			return "outside supported date range";
+		}
+	}
+
+	static String formatDuration(long seconds) {
+		if (seconds<0) return "invalid";
+		Duration duration=Duration.ofSeconds(seconds);
+		long days=duration.toDays();
+		long hours=duration.minusDays(days).toHours();
+		long minutes=duration.minusDays(days).minusHours(hours).toMinutes();
+		long remainingSeconds=duration.minusDays(days).minusHours(hours).minusMinutes(minutes).toSeconds();
+		StringBuilder result=new StringBuilder();
+		if (days>0) result.append(days).append('d').append(' ');
+		if (hours>0) result.append(hours).append('h').append(' ');
+		if (minutes>0) result.append(minutes).append('m').append(' ');
+		if (remainingSeconds>0||result.length()==0) result.append(remainingSeconds).append('s');
+		return result.toString().trim();
+	}
+
 	private static JPanel formPanel() {
 		return new JPanel(new MigLayout("fillx,wrap 2,insets 10","[][grow,fill]",""));
 	}
@@ -468,12 +523,22 @@ public class JWTBuilderPanel extends JPanel {
 	}
 
 	private static void addOptionalTime(JPanel panel,String label,JCheckBox checkbox,
-			JSpinner spinner,String tooltip) {
-		JPanel control=new JPanel(new MigLayout("insets 0,fillx","[][grow,fill]",""));
+			JSpinner spinner,JLabel translation,String tooltip) {
+		JPanel control=new JPanel(new MigLayout("insets 0,fillx,wrap 2","[][grow,fill]",""));
 		checkbox.setToolTipText(tooltip);
 		spinner.setToolTipText(tooltip);
 		control.add(checkbox);
 		control.add(spinner,"growx");
+		control.add(translation,"skip 1,growx");
+		addField(panel,label,control,tooltip);
+	}
+
+	private static void addTime(JPanel panel,String label,JSpinner spinner,JLabel translation,
+			String tooltip) {
+		JPanel control=new JPanel(new MigLayout("insets 0,fillx,wrap 1","[grow,fill]",""));
+		spinner.setToolTipText(tooltip);
+		control.add(spinner,"growx");
+		control.add(translation,"growx");
 		addField(panel,label,control,tooltip);
 	}
 
@@ -490,6 +555,12 @@ public class JWTBuilderPanel extends JPanel {
 		JSpinner spinner=new JSpinner(new SpinnerNumberModel(value,0L,Long.MAX_VALUE,1L));
 		spinner.setEditor(new JSpinner.NumberEditor(spinner,"0"));
 		return spinner;
+	}
+
+	private static JLabel timeLabel() {
+		JLabel label=new JLabel();
+		label.setForeground(Color.GRAY);
+		return label;
 	}
 
 	private static JTextArea jsonArea(String text) {
