@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.KeyPair;
@@ -24,6 +25,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 
 public class JWTTest {
 
@@ -116,6 +118,39 @@ public class JWTTest {
 
 		String decodedClaims = new String(JWT.decodeRaw(payloadB64));
 		assertEquals(JWT.claims(claims).toString(), decodedClaims);
+	}
+
+	@Test public void testBuildAccessTokenClaims() {
+		long issuedAt=1_800_000_000L;
+		AMap<AString,ACell> claims=JWT.buildAccessTokenClaims(
+			Strings.create("issuer"),
+			Strings.create("did:convex:13"),
+			Strings.create("https://api.example"),
+			issuedAt,issuedAt+5,issuedAt+3600,
+			Strings.create("token-123"),
+			Strings.create("desktop-client"),
+			Strings.create("read write"),
+			Maps.of("role","operator"));
+
+		assertEquals(CVMLong.create(issuedAt),claims.get(JWT.IAT));
+		assertEquals(Strings.create("desktop-client"),claims.get(JWT.CLIENT_ID));
+		assertEquals(Strings.create("read write"),claims.get(JWT.SCOPE));
+		assertEquals(Strings.create("operator"),claims.get(Strings.create("role")));
+	}
+
+	@Test public void testAccessTokenAdditionalClaimsCannotReplaceManagedFields() {
+		assertThrows(IllegalArgumentException.class,() ->
+			JWT.buildAccessTokenClaims(
+				Strings.create("issuer"),Strings.create("subject"),Strings.create("audience"),
+				10L,null,20L,Strings.create("id"),null,null,Maps.of("sub","attacker")));
+	}
+
+	@Test public void testAccessTokenClientIDIsOptional() {
+		AMap<AString,ACell> claims=JWT.buildAccessTokenClaims(
+			Strings.create("issuer"),Strings.create("subject"),Strings.create("audience"),
+			10L,null,20L,Strings.create("id"),null,null,Maps.empty());
+
+		assertFalse(claims.containsKey(JWT.CLIENT_ID));
 	}
 
 	@Test public void testVerifyPublicRoundTrip() {

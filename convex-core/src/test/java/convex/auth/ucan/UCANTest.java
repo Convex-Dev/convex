@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -84,6 +85,38 @@ public class UCANTest {
 		// Round-trip: key -> DID -> key
 		assertEquals(ROOT_KP.getAccountKey(), token.getIssuerKey());
 		assertEquals(AGENT_A_KP.getAccountKey(), token.getAudienceKey());
+	}
+
+	@Test
+	public void testBuildPayloadWithDIDWebAudience() {
+		AString audience = Strings.create("did:web:covia.ai");
+		AString nonce = Strings.create("test-nonce");
+		AMap<AString, ACell> payload = UCAN.buildPayload(
+			ROOT_KP.getAccountKey(), audience, FUTURE_EXPIRY,
+			null, nonce, null, null, null);
+
+		assertEquals(audience, payload.get(UCAN.AUD));
+		assertEquals(nonce, payload.get(UCAN.NNC));
+		assertNull(UCAN.fromPayload(payload,
+			ROOT_KP.sign(convex.core.data.Ref.get(payload).getEncoding())).getAudienceKey());
+	}
+
+	@Test
+	public void testBuildPayloadRejectsInvalidAudienceDID() {
+		assertThrows(IllegalArgumentException.class, () -> UCAN.buildPayload(
+			ROOT_KP.getAccountKey(), Strings.create("did:web:"),
+			FUTURE_EXPIRY, null, null, null, null));
+	}
+
+	@Test
+	public void testSignJWTPayloadRequiresMatchingIssuerKey() {
+		AMap<AString, ACell> payload = UCAN.buildPayload(
+			ROOT_KP.getAccountKey(), Strings.create("did:web:covia.ai"),
+			FUTURE_EXPIRY, null, null, null, null);
+
+		AString token = UCAN.signJWT(payload, ROOT_KP);
+		assertNotNull(UCANValidator.validateJWT(token, NOW, convex.auth.did.DIDVerifier.CONVEX));
+		assertThrows(IllegalArgumentException.class, () -> UCAN.signJWT(payload, ROGUE_KP));
 	}
 
 	@Test

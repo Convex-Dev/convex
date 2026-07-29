@@ -143,6 +143,29 @@ public class DelegateMcpTest extends ARESTTest {
 		assertEquals(DELEGATE_KEY, ucan.getAudienceKey());
 	}
 
+	@Test
+	public void testDelegateWithDIDWebAud() throws IOException, InterruptedException {
+		AString publicKeyHex = createSigningKey(ALICE_JWT, TEST_PASSPHRASE);
+		AString audience = Strings.create("did:web:covia.ai");
+		AMap<AString, ACell> ucanArgs = Maps.of(
+			"aud", audience,
+			"exp", CVMLong.create(FUTURE_EXPIRY)
+		);
+		AMap<AString, ACell> args = Maps.of(
+			"publicKey", publicKeyHex,
+			"passphrase", TEST_PASSPHRASE,
+			"ucan", ucanArgs
+		);
+		AMap<AString, ACell> result = expectResult(
+			makeAuthToolCall("signingDelegate", args, ALICE_JWT));
+
+		UCAN ucan = UCAN.parse(RT.castMap(result.get(Strings.create("token"))));
+		assertNotNull(ucan);
+		assertEquals(audience, ucan.getAudience());
+		assertNull(ucan.getAudienceKey());
+		assertTrue(ucan.verifySignature());
+	}
+
 	// ===== Optional Fields =====
 
 	@Test

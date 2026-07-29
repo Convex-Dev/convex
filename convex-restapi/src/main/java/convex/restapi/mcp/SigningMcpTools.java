@@ -3,6 +3,7 @@ package convex.restapi.mcp;
 import java.util.List;
 
 import convex.api.Convex;
+import convex.auth.did.DID;
 import convex.auth.ucan.UCAN;
 import convex.core.Coin;
 import convex.core.Result;
@@ -535,14 +536,25 @@ class SigningMcpTools {
 			AString audCell = RT.ensureString(ucanArgs.get(UCAN.AUD));
 			if (audCell == null) return api.toolError("ucan.aud is required");
 
-			AccountKey audienceKey;
+			AString audienceDID;
 			String audStr = audCell.toString();
-			if (audStr.startsWith("did:key:")) {
-				audienceKey = UCAN.fromDIDKey(audCell);
+			if (audStr.startsWith("did:")) {
+				try {
+					DID did = DID.fromString(audStr);
+					if (did.getMethod().isEmpty() || did.getID().isEmpty()) {
+						return api.toolError("Invalid aud: must be a valid DID or hex public key");
+					}
+					audienceDID = audCell;
+				} catch (RuntimeException ex) {
+					return api.toolError("Invalid aud: must be a valid DID or hex public key");
+				}
 			} else {
-				audienceKey = AccountKey.parse(audStr);
+				AccountKey audienceKey = AccountKey.parse(audStr);
+				if (audienceKey == null) {
+					return api.toolError("Invalid aud: must be a valid DID or hex public key");
+				}
+				audienceDID = UCAN.toDIDKey(audienceKey);
 			}
-			if (audienceKey == null) return api.toolError("Invalid aud: must be a did:key string or hex public key");
 
 			// Parse exp (required)
 			CVMLong expCell = RT.ensureLong(ucanArgs.get(UCAN.EXP));
@@ -561,7 +573,7 @@ class SigningMcpTools {
 			try {
 				// Build payload and sign via signing service
 				AMap<AString, ACell> payload = UCAN.buildPayload(
-					publicKey, audienceKey, expiry, notBefore, att, prf, fct);
+					publicKey, audienceDID, expiry, notBefore, att, prf, fct);
 				Blob message = Ref.get(payload).getEncoding();
 				ASignature signature = svc.sign(identity, publicKey, passphrase, message);
 				if (signature == null) return api.toolError("Key not found or wrong passphrase");

@@ -35,11 +35,8 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Maps;
-import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.gui.components.ActionButton;
@@ -55,15 +52,6 @@ import net.miginfocom.swing.MigLayout;
  */
 @SuppressWarnings("serial")
 public class JWTBuilderPanel extends JPanel {
-
-	static final AString CLIENT_ID=Strings.intern("client_id");
-	static final AString SCOPE=Strings.intern("scope");
-	static final AString NOT_BEFORE=Strings.intern("nbf");
-	static final AString TOKEN_ID=Strings.intern("jti");
-
-	private static final AString[] ACCESS_RESERVED={
-		JWT.ISS,JWT.SUB,JWT.AUD,JWT.EXP,NOT_BEFORE,JWT.IAT,TOKEN_ID,CLIENT_ID,SCOPE
-	};
 
 	private static final SecureRandom RANDOM=new SecureRandom();
 
@@ -197,7 +185,7 @@ public class JWTBuilderPanel extends JPanel {
 		addField(panel,"Issuer (iss):",ucanIssuer,
 			"Issuer DID. Defaults to the selected signing key's did:key.");
 		addField(panel,"Audience (aud):",ucanAudience,
-			"did:key of the principal receiving the delegated capabilities.");
+			"DID of the principal receiving the delegated capabilities, e.g. did:web:covia.ai.");
 		addOptionalTime(panel,"Not before (nbf):",ucanUseNotBefore,ucanNotBefore,
 			ucanNotBeforeText,
 			"Optional Unix timestamp before which the UCAN must not be accepted.");
@@ -232,7 +220,7 @@ public class JWTBuilderPanel extends JPanel {
 
 			boolean ucanMode=(modeTabs.getSelectedIndex()==1);
 			AMap<AString,ACell> claims=ucanMode ? buildUCANFromFields() : buildAccessFromFields();
-			AString token=signToken(claims,keyPair,ucanMode);
+			AString token=ucanMode ? UCAN.signJWT(claims,keyPair) : JWT.signPublic(claims,keyPair);
 			showResult(token,keyPair,ucanMode);
 		} catch (Exception ex) {
 			clearOutput();
@@ -243,10 +231,13 @@ public class JWTBuilderPanel extends JPanel {
 	private AMap<AString,ACell> buildAccessFromFields() {
 		AMap<AString,ACell> extra=parseMap(accessExtraClaims.getText(),"Additional claims");
 		Long notBefore=accessUseNotBefore.isSelected() ? spinnerLong(accessNotBefore) : null;
-		return buildAccessClaims(
-			accessIssuer.getText(),accessSubject.getText(),accessAudience.getText(),
+		return JWT.buildAccessTokenClaims(
+			requiredString(accessIssuer.getText(),"Issuer"),
+			requiredString(accessSubject.getText(),"Subject"),
+			requiredString(accessAudience.getText(),"Audience"),
 			spinnerLong(accessIssuedAt),notBefore,spinnerLong(accessExpiry),
-			accessTokenID.getText(),accessClientID.getText(),accessScope.getText(),extra);
+			requiredString(accessTokenID.getText(),"JWT ID"),
+			optionalString(accessClientID.getText()),optionalString(accessScope.getText()),extra);
 	}
 
 	private AMap<AString,ACell> buildUCANFromFields() {
@@ -254,11 +245,12 @@ public class JWTBuilderPanel extends JPanel {
 		AVector<ACell> proofs=parseVector(ucanProofs.getText(),"Proofs");
 		ACell facts=parseOptionalJSON(ucanFacts.getText(),"Facts");
 		Long notBefore=ucanUseNotBefore.isSelected() ? spinnerLong(ucanNotBefore) : null;
-		return buildUCANClaims(
+		return UCAN.buildPayload(
 			requiredDIDKey(ucanIssuer.getText(),"Issuer"),
-			requiredDIDKey(ucanAudience.getText(),"Audience"),
-			notBefore,spinnerLong(ucanExpiry),
-			ucanNonce.getText(),capabilities,proofs,facts);
+			requiredDID(ucanAudience.getText(),"Audience"),
+			spinnerLong(ucanExpiry),notBefore,
+			requiredString(ucanNonce.getText(),"Nonce"),
+			capabilities,proofs,facts);
 	}
 
 	private AKeyPair getKeyPair() {
@@ -374,68 +366,6 @@ public class JWTBuilderPanel extends JPanel {
 		payloadArea.setText("");
 	}
 
-	static AMap<AString,ACell> buildAccessClaims(String issuer,String subject,String audience,
-			long issuedAt,Long notBefore,long expiry,String tokenID,String clientID,String scope,
-			AMap<AString,ACell> extraClaims) {
-		AString iss=requiredString(issuer,"Issuer");
-		AString sub=requiredString(subject,"Subject");
-		AString aud=requiredString(audience,"Audience");
-		AString jti=requiredString(tokenID,"JWT ID");
-		if (expiry<=issuedAt) throw new IllegalArgumentException("Expiry must be after issued-at");
-		if (notBefore!=null&&notBefore>=expiry) {
-			throw new IllegalArgumentException("Not-before must be before expiry");
-		}
-
-		AMap<AString,ACell> claims=(extraClaims==null)?Maps.empty():extraClaims;
-		for (AString key:ACCESS_RESERVED) {
-			if (claims.containsKey(key)) {
-				throw new IllegalArgumentException(
-					"Additional claims must not redefine '"+key+"'");
-			}
-		}
-
-		claims=claims.assoc(JWT.ISS,iss);
-		claims=claims.assoc(JWT.SUB,sub);
-		claims=claims.assoc(JWT.AUD,aud);
-		claims=claims.assoc(JWT.IAT,CVMLong.create(issuedAt));
-		claims=claims.assoc(JWT.EXP,CVMLong.create(expiry));
-		claims=claims.assoc(TOKEN_ID,jti);
-		if (clientID!=null&&!clientID.isBlank()) {
-			claims=claims.assoc(CLIENT_ID,Strings.create(clientID.trim()));
-		}
-		if (notBefore!=null) claims=claims.assoc(NOT_BEFORE,CVMLong.create(notBefore));
-		if (scope!=null&&!scope.isBlank()) claims=claims.assoc(SCOPE,Strings.create(scope.trim()));
-		return claims;
-	}
-
-	static AMap<AString,ACell> buildUCANClaims(AccountKey issuerKey,AccountKey audienceKey,
-			Long notBefore,
-			long expiry,String nonce,AVector<ACell> capabilities,AVector<ACell> proofs,ACell facts) {
-		if (issuerKey==null) throw new IllegalArgumentException("Issuer key is required");
-		if (audienceKey==null) throw new IllegalArgumentException("Audience key is required");
-		AString nnc=requiredString(nonce,"Nonce");
-		if (expiry<=0) throw new IllegalArgumentException("Expiry must be positive");
-		if (notBefore!=null&&notBefore>=expiry) {
-			throw new IllegalArgumentException("Not-before must be before expiry");
-		}
-
-		AMap<AString,ACell> claims=UCAN.buildPayload(
-			issuerKey,audienceKey,expiry,notBefore,capabilities,proofs,facts);
-		return claims.assoc(UCAN.NNC,nnc);
-	}
-
-	static AString signToken(AMap<AString,ACell> claims,AKeyPair keyPair,boolean ucanMode) {
-		if (!ucanMode) return JWT.signPublic(claims,keyPair);
-
-		AString issuer=RT.ensureString(claims.get(UCAN.ISS));
-		AccountKey claimedKey=DID.keyFromDID(issuer);
-		if (claimedKey!=null&&!claimedKey.equals(keyPair.getAccountKey())) {
-			throw new IllegalArgumentException(
-				"UCAN did:key issuer does not match the selected signing key");
-		}
-		return UCAN.fromPayload(claims,keyPair.sign(Ref.get(claims).getEncoding())).toJWT(keyPair);
-	}
-
 	private static AMap<AString,ACell> parseMap(String json,String name) {
 		AMap<AString,ACell> map=RT.castMap(JSON.parse(json));
 		if (map==null) throw new IllegalArgumentException(name+" must be a JSON object");
@@ -462,11 +392,28 @@ public class JWTBuilderPanel extends JPanel {
 		return Strings.create(value.trim());
 	}
 
+	private static AString optionalString(String value) {
+		return (value==null||value.isBlank()) ? null : Strings.create(value.trim());
+	}
+
 	private static AccountKey requiredDIDKey(String value,String name) {
-		AString did=requiredString(value,name);
+		AString did=requiredDID(value,name);
 		AccountKey key=DID.keyFromDID(did);
 		if (key==null) throw new IllegalArgumentException(name+" must be a valid did:key");
 		return key;
+	}
+
+	private static AString requiredDID(String value,String name) {
+		AString did=requiredString(value,name);
+		try {
+			DID parsed=DID.fromString(did.toString());
+			if (parsed.getMethod().isEmpty()||parsed.getID().isEmpty()) {
+				throw new IllegalArgumentException();
+			}
+			return did;
+		} catch (RuntimeException ex) {
+			throw new IllegalArgumentException(name+" must be a valid DID",ex);
+		}
 	}
 
 	private static String newNonce() {
@@ -484,7 +431,7 @@ public class JWTBuilderPanel extends JPanel {
 		return (message==null||message.isBlank())?throwable.getClass().getSimpleName():message;
 	}
 
-	static String formatTimestamp(long epochSeconds) {
+	private static String formatTimestamp(long epochSeconds) {
 		try {
 			return DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss z")
 				.withZone(ZoneId.systemDefault())
@@ -494,7 +441,7 @@ public class JWTBuilderPanel extends JPanel {
 		}
 	}
 
-	static String formatDuration(long seconds) {
+	private static String formatDuration(long seconds) {
 		if (seconds<0) return "invalid";
 		Duration duration=Duration.ofSeconds(seconds);
 		long days=duration.toDays();

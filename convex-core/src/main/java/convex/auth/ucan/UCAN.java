@@ -154,9 +154,55 @@ public class UCAN {
 	 */
 	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AccountKey audience,
 			long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		if (audience == null) throw new IllegalArgumentException("Audience key cannot be null");
+		return buildPayload(issuerKey, toDIDKey(audience), expiry, notBefore,
+			capabilities, proofs, facts);
+	}
+
+	/**
+	 * Build a UCAN payload for an audience identified by any valid DID method.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in unix seconds
+	 * @param notBefore Not-before time in unix seconds (null to omit)
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		return buildPayload(issuerKey, audienceDID, expiry, notBefore, generateNonce(),
+			capabilities, proofs, facts);
+	}
+
+	/**
+	 * Build a UCAN payload with an explicit nonce.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in Unix seconds
+	 * @param notBefore Not-before time in Unix seconds (null to omit)
+	 * @param nonce Application nonce
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			long expiry, Long notBefore, AString nonce, AVector<ACell> capabilities,
+			AVector<ACell> proofs, ACell facts) {
+		if (issuerKey == null) throw new IllegalArgumentException("Issuer key cannot be null");
+		AString audDID = requireDID(audienceDID, "Audience");
+		if (expiry <= 0) throw new IllegalArgumentException("Expiry must be positive");
+		if (notBefore != null && notBefore >= expiry) {
+			throw new IllegalArgumentException("Not-before must be before expiry");
+		}
+		if (nonce == null || nonce.isEmpty()) {
+			throw new IllegalArgumentException("Nonce cannot be empty");
+		}
 		AString issDID = toDIDKey(issuerKey);
-		AString audDID = toDIDKey(audience);
-		AString nonce = generateNonce();
 
 		AMap<AString, ACell> payload = Maps.of(
 			ISS, issDID,
@@ -175,6 +221,21 @@ public class UCAN {
 		}
 
 		return payload;
+	}
+
+	private static AString requireDID(AString value, String name) {
+		if (value == null || value.isEmpty()) {
+			throw new IllegalArgumentException(name+" DID cannot be empty");
+		}
+		try {
+			DID did = DID.fromString(value.toString());
+			if (did.getMethod().isEmpty() || did.getID().isEmpty()) {
+				throw new IllegalArgumentException(name+" must be a valid DID");
+			}
+			return value;
+		} catch (RuntimeException ex) {
+			throw new IllegalArgumentException(name+" must be a valid DID", ex);
+		}
 	}
 
 	/**
@@ -228,15 +289,15 @@ public class UCAN {
 	}
 
 	/**
-	 * Get the audience DID string (did:key:z6Mk...).
+	 * Get the audience DID string.
 	 */
 	public AString getAudience() {
 		return RT.ensureString(payload.get(AUD));
 	}
 
 	/**
-	 * Get the audience's AccountKey, decoded from the did:key.
-	 * Returns null if the DID is malformed.
+	 * Get the audience's AccountKey, decoded from a did:key audience.
+	 * Returns null for other DID methods or if the DID is malformed.
 	 */
 	public AccountKey getAudienceKey() {
 		return fromDIDKey(getAudience());
@@ -367,6 +428,25 @@ public class UCAN {
 	 * @return JWT-encoded UCAN string
 	 */
 	public AString toJWT(AKeyPair issuerKP) {
+		return signJWT(payload, issuerKP);
+	}
+
+	/**
+	 * Sign a pre-built UCAN payload as a JWT, requiring the did:key issuer to
+	 * match the signing key.
+	 *
+	 * @param payload UCAN payload
+	 * @param issuerKP Issuer key pair
+	 * @return JWT-encoded UCAN
+	 */
+	public static AString signJWT(AMap<AString, ACell> payload, AKeyPair issuerKP) {
+		if (payload == null) throw new IllegalArgumentException("UCAN payload is required");
+		if (issuerKP == null) throw new IllegalArgumentException("Issuer key pair is required");
+		AccountKey claimedKey = DID.keyFromDID(RT.ensureString(payload.get(ISS)));
+		if (claimedKey == null || !claimedKey.equals(issuerKP.getAccountKey())) {
+			throw new IllegalArgumentException(
+				"UCAN did:key issuer does not match the signing key");
+		}
 		return JWT.signPublic(payload, issuerKP);
 	}
 

@@ -22,6 +22,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
@@ -60,6 +61,14 @@ public class JWT {
 	public static final AString ISS = Strings.intern("iss");
 	public static final AString IAT = Strings.intern("iat");
 	public static final AString AUD = Strings.intern("aud");
+	public static final AString NBF = Strings.intern("nbf");
+	public static final AString JTI = Strings.intern("jti");
+	public static final AString CLIENT_ID = Strings.intern("client_id");
+	public static final AString SCOPE = Strings.intern("scope");
+
+	private static final AString[] ACCESS_TOKEN_RESERVED = {
+		ISS, SUB, AUD, EXP, NBF, IAT, JTI, CLIENT_ID, SCOPE
+	};
 
 	// ========== Instance fields (parsed and cached) ==========
 
@@ -275,6 +284,67 @@ public class JWT {
 	}
 
 	// ========== Static signing methods (unchanged) ==========
+
+	/**
+	 * Build the claims for a JWT access token.
+	 *
+	 * <p>The issuer, subject, audience, issued-at, expiry and token ID claims are
+	 * required. Client ID, scope and not-before are optional. Additional claims
+	 * cannot replace fields managed by this method.</p>
+	 *
+	 * @param issuer Token issuer
+	 * @param subject Principal represented by the token
+	 * @param audience Intended resource server or API
+	 * @param issuedAt Issue time in Unix seconds
+	 * @param notBefore Optional lower validity bound in Unix seconds
+	 * @param expiry Expiry time in Unix seconds
+	 * @param tokenID Unique token identifier
+	 * @param clientID Optional OAuth client identifier
+	 * @param scope Optional space-separated OAuth scopes
+	 * @param additionalClaims Additional non-standard claims, or null
+	 * @return Access-token claims ready for signing
+	 */
+	public static AMap<AString,ACell> buildAccessTokenClaims(
+			AString issuer, AString subject, AString audience,
+			long issuedAt, Long notBefore, long expiry, AString tokenID,
+			AString clientID, AString scope, AMap<AString,ACell> additionalClaims) {
+		requireClaim(issuer, "Issuer");
+		requireClaim(subject, "Subject");
+		requireClaim(audience, "Audience");
+		requireClaim(tokenID, "JWT ID");
+		if (expiry <= issuedAt) {
+			throw new IllegalArgumentException("Expiry must be after issued-at");
+		}
+		if (notBefore != null && notBefore >= expiry) {
+			throw new IllegalArgumentException("Not-before must be before expiry");
+		}
+
+		AMap<AString,ACell> claims =
+			(additionalClaims == null) ? Maps.empty() : additionalClaims;
+		for (AString key : ACCESS_TOKEN_RESERVED) {
+			if (claims.containsKey(key)) {
+				throw new IllegalArgumentException(
+					"Additional claims must not redefine '"+key+"'");
+			}
+		}
+
+		claims = claims.assoc(ISS, issuer);
+		claims = claims.assoc(SUB, subject);
+		claims = claims.assoc(AUD, audience);
+		claims = claims.assoc(IAT, CVMLong.create(issuedAt));
+		claims = claims.assoc(EXP, CVMLong.create(expiry));
+		claims = claims.assoc(JTI, tokenID);
+		if (notBefore != null) claims = claims.assoc(NBF, CVMLong.create(notBefore));
+		if (clientID != null && !clientID.isEmpty()) claims = claims.assoc(CLIENT_ID, clientID);
+		if (scope != null && !scope.isEmpty()) claims = claims.assoc(SCOPE, scope);
+		return claims;
+	}
+
+	private static void requireClaim(AString value, String name) {
+		if (value == null || value.isEmpty()) {
+			throw new IllegalArgumentException(name+" is required");
+		}
+	}
 
 	/**
 	 * Get the claims string for a JWT before encoding
