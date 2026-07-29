@@ -69,6 +69,15 @@
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
 		</dependency>
+		<!-- JUnit 6 class signatures use JSpecify. Keep it directly on Eclipse's
+		     project build path: m2e's test-classpath separation can otherwise
+		     leave ECJ unable to resolve those indirect annotation references. -->
+		<dependency>
+			<groupId>org.jspecify</groupId>
+			<artifactId>jspecify</artifactId>
+			<version>1.0.0</version>
+			<scope>provided</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
