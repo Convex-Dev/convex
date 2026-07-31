@@ -11,7 +11,7 @@ import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.handler.X402Gate;
 import convex.x402.Fields;
 import convex.x402.NetworkId;
-import convex.x402.facilitator.Facilitator;
+import convex.x402.facilitator.ConvexFacilitator;
 import convex.x402.model.PaymentPayload;
 import convex.x402.model.PaymentRequirements;
 import convex.x402.model.SettlementResponse;
@@ -40,18 +40,18 @@ public class X402API extends ABaseAPI {
 	/** Base route for facilitator endpoints */
 	public static final String ROUTE = "/x402/";
 
-	protected final Facilitator facilitator;
+	protected final ConvexFacilitator facilitator;
 
 	private final ConcurrentLimit settleLimit = new ConcurrentLimit(4);
 
 	public X402API(RESTServer restServer) {
 		super(restServer);
 		NetworkId networkId = NetworkId.create(server.getPeer().getNetworkID());
-		this.facilitator = new Facilitator(restServer.getConvex(), networkId,
+		this.facilitator = new ConvexFacilitator(restServer.getConvex(), networkId,
 				hash -> server.getPeer().getTransaction(hash) != null);
 	}
 
-	public Facilitator getFacilitator() {
+	public ConvexFacilitator getFacilitator() {
 		return facilitator;
 	}
 

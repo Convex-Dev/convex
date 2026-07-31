@@ -35,7 +35,7 @@ import convex.x402.Fields;
 import convex.x402.NetworkId;
 import convex.x402.X402;
 import convex.x402.client.X402Client;
-import convex.x402.facilitator.Facilitator;
+import convex.x402.facilitator.ConvexFacilitator;
 import convex.x402.model.PaymentPayload;
 import convex.x402.model.PaymentRequirements;
 import convex.x402.model.SettlementResponse;
@@ -109,7 +109,7 @@ public class X402PolicyTest {
 		convex = Convex.connect(peerServer);
 		convex.setAddress(Init.GENESIS_ADDRESS, kp);
 
-		Facilitator facilitator = new Facilitator(convex,
+		ConvexFacilitator facilitator = new ConvexFacilitator(convex,
 				NetworkId.create(peerServer.getPeer().getNetworkID()),
 				hash -> peerServer.getPeer().getTransaction(hash) != null);
 

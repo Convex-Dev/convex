@@ -240,6 +240,18 @@ public class X402Test {
 				.fromJSON(RT.castMap(JSON.parse(badResponse.body())));
 		assertFalse(rejected.isValid());
 		assertEquals(ErrorReasons.INVALID_NETWORK, rejected.invalidReason());
+
+		// The peer facilitator's settle endpoint refuses foreign kinds identically
+		HttpResponse<String> badSettle = httpClient.send(
+				HttpRequest.newBuilder(URI.create(hostPath + "/x402/settle"))
+						.header("Content-Type", "application/json")
+						.POST(HttpRequest.BodyPublishers.ofString(badBody)).build(),
+				HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, badSettle.statusCode());
+		SettlementResponse rejectedSettle = SettlementResponse
+				.fromJSON(RT.castMap(JSON.parse(badSettle.body())));
+		assertFalse(rejectedSettle.success());
+		assertEquals(ErrorReasons.INVALID_NETWORK, rejectedSettle.errorReason());
 	}
 
 	@Test

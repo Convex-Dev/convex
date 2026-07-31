@@ -17,6 +17,7 @@ import convex.restapi.RESTConfig;
 import convex.x402.ErrorReasons;
 import convex.x402.Fields;
 import convex.x402.X402;
+import convex.x402.facilitator.ConvexFacilitator;
 import convex.x402.facilitator.Facilitator;
 import convex.x402.model.PaymentPayload;
 import convex.x402.model.PaymentRequired;
@@ -40,13 +41,17 @@ import io.javalin.http.HandlerType;
  * the exact scheme: a merely verified payment could still be spent elsewhere
  * first.</p>
  *
- * <p>Embedding services (e.g. Covia venues) can protect routes on their own
- * Javalin apps with custom policies:</p>
+ * <p>A gate combines one or more {@link Facilitator}s and routes each payment
+ * to the first facilitator handling its (scheme, network). This lets a
+ * resource server accept Convex payments directly and foreign kinds (e.g.
+ * USDC on Base) via a {@link convex.x402.facilitator.RemoteFacilitator}:</p>
  *
  * <pre>{@code
- * Facilitator facilitator = new Facilitator(convex, networkId, confirmedCheck);
- * X402Gate gate = new X402Gate(facilitator);
- * gate.protect(routes, "/paid/*", myCreditPolicy);
+ * ConvexFacilitator convexF = new ConvexFacilitator(convex, networkId, confirmedCheck);
+ * Facilitator baseF = RemoteFacilitator.create(http, URI.create("https://x402.org/facilitator"))
+ *         .withKind("exact", "eip155:8453");
+ * X402Gate gate = new X402Gate(convexF, baseF);
+ * gate.protect(routes, "/paid/*", myPolicy);   // policy offers both options via charge(List, desc)
  * }</pre>
  */
 public class X402Gate {
@@ -59,15 +64,23 @@ public class X402Gate {
 	/** Context attribute holding the payer address string for a paid request */
 	public static final String ATTR_PAYER = "x402.payer";
 
-	protected final Facilitator facilitator;
+	protected final List<Facilitator> facilitators;
 
-	public X402Gate(Facilitator facilitator) {
-		if (facilitator == null) throw new IllegalArgumentException("Facilitator required");
-		this.facilitator = facilitator;
+	/**
+	 * Creates a gate over one or more facilitators. Payments route to the first
+	 * facilitator that handles their (scheme, network).
+	 *
+	 * @param facilitators Facilitators in routing priority order
+	 */
+	public X402Gate(Facilitator... facilitators) {
+		if ((facilitators == null) || (facilitators.length == 0)) {
+			throw new IllegalArgumentException("At least one facilitator required");
+		}
+		this.facilitators = List.of(facilitators);
 	}
 
-	public Facilitator getFacilitator() {
-		return facilitator;
+	public List<Facilitator> getFacilitators() {
+		return facilitators;
 	}
 
 	/**
@@ -83,17 +96,23 @@ public class X402Gate {
 	}
 
 	/**
-	 * Builds exact scheme payment requirements against this gate's network, for
-	 * use in policy decisions.
+	 * Builds exact scheme payment requirements against this gate's Convex
+	 * network, for use in policy decisions.
 	 *
 	 * @param amount Amount in atomic units as a base-10 string
 	 * @param asset Asset identifier, e.g. "slip44:864" or "cad29:789"
 	 * @param payTo Recipient address, e.g. "#13"
-	 * @return Payment requirements for this gate's facilitator network
+	 * @return Payment requirements for this gate's Convex facilitator network
+	 * @throws IllegalStateException if the gate has no {@link ConvexFacilitator}
 	 */
 	public PaymentRequirements price(String amount, String asset, String payTo) {
-		return new PaymentRequirements(X402.SCHEME_EXACT, facilitator.getNetworkId().canonical(),
-				amount, asset, payTo, PaymentRequirements.DEFAULT_TIMEOUT_SECONDS, null);
+		for (Facilitator f : facilitators) {
+			if (f instanceof ConvexFacilitator cf) {
+				return new PaymentRequirements(X402.SCHEME_EXACT, cf.getNetworkId().canonical(),
+						amount, asset, payTo, PaymentRequirements.DEFAULT_TIMEOUT_SECONDS, null);
+			}
+		}
+		throw new IllegalStateException("Gate has no Convex facilitator to price against");
 	}
 
 	/**
@@ -146,7 +165,7 @@ public class X402Gate {
 			String description = getString(entry, Fields.DESCRIPTION);
 
 			PaymentRequirements requirements = new PaymentRequirements(X402.SCHEME_EXACT,
-					facilitator.getNetworkId().canonical(), amount, asset, payTo, timeout, null);
+					price(amount, asset, payTo).network(), amount, asset, payTo, timeout, null);
 			validate(requirements, path);
 			protect(routes, path, fixedPrice(requirements, description));
 		}
@@ -194,10 +213,10 @@ public class X402Gate {
 			return;
 		}
 
-		PaymentRequirements requirements = decision.requirements();
+		List<PaymentRequirements> offered = decision.requirements();
 		String header = ctx.header(X402.HEADER_PAYMENT_SIGNATURE);
 		if (header == null) {
-			respondPaymentRequired(ctx, requirements, decision.description(), null);
+			respondPaymentRequired(ctx, offered, decision.description(), null);
 			return;
 		}
 
@@ -205,13 +224,35 @@ public class X402Gate {
 		try {
 			payment = PaymentPayload.fromJSON(X402.decodeHeader(header));
 		} catch (IllegalArgumentException e) {
-			respondPaymentRequired(ctx, requirements, decision.description(), ErrorReasons.INVALID_PAYLOAD);
+			respondPaymentRequired(ctx, offered, decision.description(), ErrorReasons.INVALID_PAYLOAD);
 			return;
 		}
 
-		SettlementResponse settlement = facilitator.settle(payment, requirements);
+		// Settle against the server's own copy of the option the client chose:
+		// the client's echo selects, but never defines, the requirements
+		PaymentRequirements chosen = null;
+		for (PaymentRequirements option : offered) {
+			if (option.equals(payment.accepted())) {
+				chosen = option;
+				break;
+			}
+		}
+		if (chosen == null) {
+			respondPaymentRequired(ctx, offered, decision.description(),
+					ErrorReasons.INVALID_PAYMENT_REQUIREMENTS);
+			return;
+		}
+
+		Facilitator facilitator = route(chosen);
+		if (facilitator == null) {
+			respondPaymentRequired(ctx, offered, decision.description(),
+					ErrorReasons.UNSUPPORTED_SCHEME);
+			return;
+		}
+
+		SettlementResponse settlement = facilitator.settle(payment, chosen);
 		if (!settlement.success()) {
-			respondPaymentRequired(ctx, requirements, decision.description(), settlement.errorReason());
+			respondPaymentRequired(ctx, offered, decision.description(), settlement.errorReason());
 			return;
 		}
 
@@ -221,12 +262,20 @@ public class X402Gate {
 			// Typically a replayed payment whose value was already consumed
 			ctx.attribute(ATTR_RECEIPT, null);
 			ctx.attribute(ATTR_PAYER, null);
-			respondPaymentRequired(ctx, requirements, decision.description(),
+			respondPaymentRequired(ctx, offered, decision.description(),
 					ErrorReasons.INVALID_SEQUENCE);
 			return;
 		}
 		ctx.header(X402.HEADER_PAYMENT_RESPONSE, X402.encodeHeader(settlement.toJSON()));
 		// fall through to the protected handler
+	}
+
+	/** Finds the first facilitator handling the given requirements, or null. */
+	protected Facilitator route(PaymentRequirements requirements) {
+		for (Facilitator f : facilitators) {
+			if (f.handles(requirements.scheme(), requirements.network())) return f;
+		}
+		return null;
 	}
 
 	/**
@@ -251,11 +300,10 @@ public class X402Gate {
 		return ctx.attribute(ATTR_PAYER);
 	}
 
-	protected void respondPaymentRequired(Context ctx, PaymentRequirements requirements,
+	protected void respondPaymentRequired(Context ctx, List<PaymentRequirements> offered,
 			String description, String error) {
 		ResourceInfo resource = new ResourceInfo(ctx.fullUrl(), description, null);
-		PaymentRequired required = new PaymentRequired(X402.VERSION, error, resource,
-				List.of(requirements));
+		PaymentRequired required = new PaymentRequired(X402.VERSION, error, resource, offered);
 		ACell json = required.toJSON();
 		ctx.status(402);
 		ctx.header(X402.HEADER_PAYMENT_REQUIRED, X402.encodeHeader(json));
