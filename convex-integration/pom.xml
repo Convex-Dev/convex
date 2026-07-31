@@ -134,6 +134,11 @@
 			<artifactId>convex-restapi</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-x402</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
 
 		<dependency>
 			<groupId>world.convex</groupId>

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- x402 payments (CAD042): new `convex-x402` module implementing the x402 v2 payment protocol with Convex as the settlement network, using pre-signed transactions in CVM coin or CAD29 fungible tokens as the `exact` payment scheme. The REST API can now act as an x402 facilitator (`/x402/verify`, `/x402/settle`, `/x402/supported`) and payment-gate any route via the `rest.x402` config section, settling payments against its own peer with sub-second finality; an `X402Client` pays x402 demands with locally-signed transactions, so keys never leave the payer.
+
 - GUI: Hacker Tools now includes a keyring-backed JWT / UCAN builder for EdDSA access tokens and Convex UCAN delegations to any valid DID, with standard and optional claim fields, readable validity times and decoded output inspection.
 - GUI: generated keys, keyring entries and keyed account overviews now show their canonical `did:key` identifier, with a copy action on account-key identicons.
 - CLI: new `convex eval` and `convex repl` commands for headless Convex Lisp evaluation — one-shot scriptable evaluation (arguments or piped standard input) and an interactive REPL. Both run against an ephemeral local in-memory instance by default, needing no setup, keys or network, or against any peer targeted with `--host`.
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `Call` transactions decoded from their network encoding no longer fail with an internal error on execution: the lazily-decoded argument list was never populated on the execution path, so every Call submitted over the wire errored instead of invoking the actor function.
 - REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
 - JSON readers no longer throw `NumberFormatException` for non-integer numbers of 19 or more characters (long decimals, exponent notation, JSON5 hex literals): the integer fast path now falls through to the double parser as intended.
 

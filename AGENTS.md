@@ -82,7 +82,7 @@ red build as passing.
 
 ## Module Structure
 
-13 Maven modules with clear separation of concerns:
+14 Maven modules with clear separation of concerns:
 
 | Module | Purpose |
 |--------|---------|
@@ -93,6 +93,7 @@ red build as passing.
 | `convex-gui` | Swing desktop application |
 | `convex-restapi` | HTTP REST API server |
 | `convex-java` | Java client library |
+| `convex-x402` | x402 payment protocol: model, exact scheme, facilitator core, paying client |
 | `convex-db` | SQL database with JDBC and PostgreSQL protocol |
 | `convex-dlfs` | Distributed Lattice File System (WebDAV server) |
 | `convex-social` | Social network primitives — a region served by the `convex-p2p` node |

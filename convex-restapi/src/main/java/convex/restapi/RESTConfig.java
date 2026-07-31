@@ -66,6 +66,13 @@ public class RESTConfig extends PeerConfig {
 	public static final AString MAX_CONCURRENT_REQUESTS = Strings.intern("maxConcurrentRequests");
 	public static final AString MAX_REQUEST_BYTES = Strings.intern("maxRequestBytes");
 
+	// ========== x402 config keys (rest.x402.*) ==========
+
+	public static final AString X402 = Strings.intern("x402");
+	public static final AString FACILITATOR = Strings.intern("facilitator");
+	public static final AString PAY_TO = Strings.intern("payTo");
+	public static final AString ROUTES = Strings.intern("routes");
+
 	// ========== Public query lane keys (rest.query.*) ==========
 
 	public static final AString QUERY = Strings.intern("query");
@@ -317,6 +324,51 @@ public class RESTConfig extends PeerConfig {
 	 */
 	public long getMaxQueryJuice() {
 		return getLong(getQuerySection(), MAX_JUICE, PublicQueryService.MAX_QUERY_JUICE);
+	}
+
+	// ========== x402 typed accessors ==========
+
+	/**
+	 * Whether x402 payment support is enabled (CAD042).
+	 * @return true if x402 is explicitly enabled (default: false)
+	 */
+	public boolean isX402Enabled() {
+		ACell value=getSection(REST).get(X402);
+		AMap<AString,ACell> section=RT.castMap(value);
+		if (section!=null) value=section.get(ENABLED);
+		if (value==null) return false;
+		if (value instanceof CVMBool enabled) return enabled.booleanValue();
+		throw new IllegalArgumentException("rest.x402 must be a boolean or an object with a boolean enabled field");
+	}
+
+	/**
+	 * Whether the x402 facilitator endpoints are served when x402 is enabled.
+	 * @return true unless explicitly disabled (default: true)
+	 */
+	public boolean isX402FacilitatorEnabled() {
+		return getBool(getX402Section(), FACILITATOR, true);
+	}
+
+	/**
+	 * Gets the default recipient address for x402-gated routes.
+	 * @return payTo address string, or null if not configured
+	 */
+	public AString getX402PayTo() {
+		return RT.ensureString(getX402Section().get(PAY_TO));
+	}
+
+	/**
+	 * Gets the configured x402 gated routes.
+	 * @return Vector of route config objects, or empty vector if none
+	 */
+	public convex.core.data.AVector<ACell> getX402Routes() {
+		convex.core.data.AVector<ACell> v=RT.ensureVector(getX402Section().get(ROUTES));
+		return (v!=null) ? v : Vectors.empty();
+	}
+
+	private AMap<AString,ACell> getX402Section() {
+		AMap<AString,ACell> s = RT.castMap(getSection(REST).get(X402));
+		return (s!=null) ? s : Maps.empty();
 	}
 
 	private AMap<AString,ACell> getQuerySection() {

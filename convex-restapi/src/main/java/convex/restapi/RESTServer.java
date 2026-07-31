@@ -35,7 +35,7 @@ import convex.restapi.api.ConfirmAPI;
 import convex.restapi.api.DIDAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
-import convex.restapi.api.X402;
+import convex.restapi.api.X402API;
 import convex.restapi.api.LogWatchAPI;
 import convex.restapi.api.QueryWatchAPI;
 import convex.restapi.auth.AuthMiddleware;
@@ -164,7 +164,7 @@ public class RESTServer implements Closeable {
 	protected ExplorerAPI explorerAPI;
 	protected McpServer mcpServer;
 	protected McpAPI mcpAPI;
-	protected X402 x402API;
+	protected X402API x402API;
 	protected DIDAPI didAPI;
 	protected LogWatchAPI logWatchAPI;
 	protected QueryWatchAPI queryWatchAPI;
@@ -281,8 +281,10 @@ public class RESTServer implements Closeable {
 		explorerAPI = new ExplorerAPI(this);
 		explorerAPI.addRoutes(routes);
 
-		x402API = new X402(this);
-		x402API.addRoutes(routes);
+		if (restConfig.isX402Enabled()) {
+			x402API = new X402API(this);
+			x402API.addRoutes(routes);
+		}
 
 		didAPI = new DIDAPI(this);
 		didAPI.addRoutes(routes);
