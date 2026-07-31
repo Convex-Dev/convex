@@ -47,6 +47,7 @@ import convex.restapi.handler.HttpMethodFilter;
 import convex.restapi.mcp.McpAPI;
 import convex.restapi.mcp.McpServer;
 import convex.restapi.web.AuthPage;
+import convex.x402.X402;
 import convex.restapi.web.ExplorerAPI;
 import convex.restapi.web.PeerAdminAPI;
 import convex.restapi.web.WebApp;
@@ -324,6 +325,10 @@ public class RESTServer implements Closeable {
 						String[] configured = origins.toArray(String[]::new);
 						corsConfig.allowHost(configured[0], java.util.Arrays.copyOfRange(configured, 1, configured.length));
 					}
+					// Browser x402 clients can only read custom response headers that
+					// CORS explicitly exposes
+					corsConfig.exposeHeader(X402.HEADER_PAYMENT_REQUIRED);
+					corsConfig.exposeHeader(X402.HEADER_PAYMENT_RESPONSE);
 				});
 			});
 

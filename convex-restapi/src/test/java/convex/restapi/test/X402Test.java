@@ -116,6 +116,17 @@ public class X402Test {
 	}
 
 	@Test
+	public void testMalformedPaymentRejected() throws Exception {
+		// A structurally unparseable payment header maps to 400 per the x402 HTTP
+		// transport; payment failures on well-formed payments stay 402
+		HttpResponse<String> response = httpClient.send(
+				HttpRequest.newBuilder(gatedUri()).GET()
+						.header(X402.HEADER_PAYMENT_SIGNATURE, "!!not-base64!!").build(),
+				HttpResponse.BodyHandlers.ofString());
+		assertEquals(400, response.statusCode());
+	}
+
+	@Test
 	public void testSupported() throws Exception {
 		HttpResponse<String> response = httpClient.send(
 				HttpRequest.newBuilder(URI.create(hostPath + "/x402/supported")).GET().build(),

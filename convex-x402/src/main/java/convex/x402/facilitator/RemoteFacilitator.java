@@ -106,8 +106,10 @@ public class RemoteFacilitator implements Facilitator {
 	}
 
 	/**
-	 * Returns a copy that handles the given payment kind explicitly, instead of
-	 * (or in addition to) kinds discovered from {@code /supported}.
+	 * Returns a copy that handles the given payment kind explicitly. Configuring
+	 * any explicit kind disables discovery from {@code /supported}: routing then
+	 * depends only on the configured kinds, keeping it predictable and free of
+	 * network calls.
 	 *
 	 * @param scheme Payment scheme, e.g. "exact"
 	 * @param network CAIP-2 network, e.g. "eip155:8453"

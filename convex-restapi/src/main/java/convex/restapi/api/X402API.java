@@ -43,6 +43,9 @@ public class X402API extends ABaseAPI {
 	protected final ConvexFacilitator facilitator;
 
 	private final ConcurrentLimit settleLimit = new ConcurrentLimit(4);
+	// Verification is read-only but does signature checks and state reads per
+	// call, so it gets its own cap beneath the global admission control
+	private final ConcurrentLimit verifyLimit = new ConcurrentLimit(8);
 
 	public X402API(RESTServer restServer) {
 		super(restServer);
@@ -58,7 +61,7 @@ public class X402API extends ABaseAPI {
 	@Override
 	public void addRoutes(RoutesConfig routes) {
 		if (restServer.getRESTConfig().isX402FacilitatorEnabled()) {
-			routes.post(ROUTE + "verify", this::verify);
+			routes.post(ROUTE + "verify", verifyLimit.handler(this::verify));
 			routes.post(ROUTE + "settle", settleLimit.handler(this::settle));
 			routes.get(ROUTE + "supported", this::supported);
 		}

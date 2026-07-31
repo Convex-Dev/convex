@@ -26,6 +26,7 @@ import convex.x402.model.ResourceInfo;
 import convex.x402.model.SettlementResponse;
 import convex.x402.scheme.ExactConvexScheme;
 import io.javalin.config.RoutesConfig;
+import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.HandlerType;
 
@@ -224,8 +225,9 @@ public class X402Gate {
 		try {
 			payment = PaymentPayload.fromJSON(X402.decodeHeader(header));
 		} catch (IllegalArgumentException e) {
-			respondPaymentRequired(ctx, offered, decision.description(), ErrorReasons.INVALID_PAYLOAD);
-			return;
+			// Malformed payment maps to 400 in the x402 HTTP transport; the client
+			// should re-fetch the payment demand rather than retry the same header
+			throw new BadRequestResponse("Malformed x402 payment: " + e.getMessage());
 		}
 
 		// Settle against the server's own copy of the option the client chose:
