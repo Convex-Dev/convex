@@ -23,6 +23,7 @@ import convex.core.lang.RT;
 import convex.core.util.JSON;
 import convex.x402.ErrorReasons;
 import convex.x402.Fields;
+import convex.x402.PaymentError;
 import convex.x402.X402;
 import convex.x402.model.PaymentPayload;
 import convex.x402.model.PaymentRequirements;
@@ -130,7 +131,9 @@ public class RemoteFacilitator implements Facilitator {
 			return VerifyResponse.fromJSON(response);
 		} catch (IOException | RuntimeException e) {
 			log.warn("Remote facilitator verify failed at {}: {}", baseUrl, e.toString());
-			return VerifyResponse.invalid(ErrorReasons.UNEXPECTED_VERIFY_ERROR, null);
+			return VerifyResponse.invalid(PaymentError.of(ErrorReasons.UNEXPECTED_VERIFY_ERROR,
+					"remote facilitator " + baseUrl + " unreachable or returned an invalid response: "
+							+ e), null);
 		}
 	}
 
@@ -146,8 +149,9 @@ public class RemoteFacilitator implements Facilitator {
 			return SettlementResponse.fromJSON(response);
 		} catch (IOException | RuntimeException e) {
 			log.warn("Remote facilitator settle failed at {}: {}", baseUrl, e.toString());
-			return SettlementResponse.failure(ErrorReasons.UNEXPECTED_SETTLE_ERROR, null,
-					requirements.network());
+			return SettlementResponse.failure(PaymentError.of(ErrorReasons.UNEXPECTED_SETTLE_ERROR,
+					"remote facilitator " + baseUrl + " unreachable or returned an invalid response: "
+							+ e), null, requirements.network());
 		}
 	}
 

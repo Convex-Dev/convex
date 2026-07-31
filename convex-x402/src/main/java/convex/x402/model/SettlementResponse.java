@@ -8,27 +8,36 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.lang.RT;
 import convex.x402.Fields;
+import convex.x402.PaymentError;
 
 /**
  * x402 v2 SettlementResponse: the outcome of payment settlement.
  *
  * @param success Whether the payment settled on the network
- * @param errorReason Error reason when settlement failed, else null
+ * @param errorReason Machine-readable reason code when settlement failed, else null
  * @param payer Payer's Convex address, may be null when undeterminable
  * @param transaction Hex hash of the settled transaction, empty when unsettled
  * @param network CAIP-2 network identifier
  * @param amount Amount settled in atomic units, may be null when unsettled
+ * @param detail Human-readable diagnostic for the failure, may be null.
+ *        Additive to the upstream schema; reason codes stay exact in
+ *        errorReason.
  */
 public record SettlementResponse(boolean success, String errorReason, String payer,
-		String transaction, String network, String amount) {
+		String transaction, String network, String amount, String detail) {
 
 	public static SettlementResponse settled(String payer, String transaction, String network,
 			String amount) {
-		return new SettlementResponse(true, null, payer, transaction, network, amount);
+		return new SettlementResponse(true, null, payer, transaction, network, amount, null);
 	}
 
 	public static SettlementResponse failure(String reason, String payer, String network) {
-		return new SettlementResponse(false, reason, payer, "", network, null);
+		return new SettlementResponse(false, reason, payer, "", network, null, null);
+	}
+
+	public static SettlementResponse failure(PaymentError error, String payer, String network) {
+		return new SettlementResponse(false, error.reason(), payer, "", network, null,
+				error.detail());
 	}
 
 	public AMap<AString, ACell> toJSON() {
@@ -39,6 +48,7 @@ public record SettlementResponse(boolean success, String errorReason, String pay
 		if (errorReason != null) m = m.assoc(Fields.ERROR_REASON, Strings.create(errorReason));
 		if (payer != null) m = m.assoc(Fields.PAYER, Strings.create(payer));
 		if (amount != null) m = m.assoc(Fields.AMOUNT, Strings.create(amount));
+		if (detail != null) m = m.assoc(Fields.DETAIL, Strings.create(detail));
 		return m;
 	}
 
@@ -51,6 +61,7 @@ public record SettlementResponse(boolean success, String errorReason, String pay
 				Model.optString(json, Fields.PAYER),
 				Model.optString(json, Fields.TRANSACTION),
 				Model.optString(json, Fields.NETWORK),
-				Model.optString(json, Fields.AMOUNT));
+				Model.optString(json, Fields.AMOUNT),
+				Model.optString(json, Fields.DETAIL));
 	}
 }

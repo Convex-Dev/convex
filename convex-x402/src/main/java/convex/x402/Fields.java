@@ -38,6 +38,8 @@ public class Fields {
 	public static final AString IS_VALID = Strings.intern("isValid");
 	public static final AString INVALID_REASON = Strings.intern("invalidReason");
 	public static final AString PAYER = Strings.intern("payer");
+	/** Additive diagnostic field on verify/settlement responses (not in the upstream schemas) */
+	public static final AString DETAIL = Strings.intern("detail");
 
 	// SettlementResponse
 	public static final AString SUCCESS = Strings.intern("success");

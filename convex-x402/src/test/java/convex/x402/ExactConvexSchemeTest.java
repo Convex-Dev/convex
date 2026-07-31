@@ -3,6 +3,7 @@ package convex.x402;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -59,16 +60,20 @@ public class ExactConvexSchemeTest {
 	public void testNonCanonicalTransactionsRejected() {
 		// Wrong amount
 		assertEquals(ErrorReasons.INVALID_TRANSACTION, ExactConvexScheme
-				.checkStructure(sign(Transfer.create(ORIGIN, 5, PAY_TO, 999999)), CVM_REQ));
+				.checkStructure(sign(Transfer.create(ORIGIN, 5, PAY_TO, 999999)), CVM_REQ).reason());
 		// Wrong recipient
 		assertEquals(ErrorReasons.INVALID_TRANSACTION, ExactConvexScheme
-				.checkStructure(sign(Transfer.create(ORIGIN, 5, Address.create(14), 1000000)), CVM_REQ));
+				.checkStructure(sign(Transfer.create(ORIGIN, 5, Address.create(14), 1000000)), CVM_REQ).reason());
 		// Wrong transaction type: an Invoke computing the same transfer is not canonical
 		assertEquals(ErrorReasons.INVALID_TRANSACTION, ExactConvexScheme
-				.checkStructure(sign(Invoke.create(ORIGIN, 5, "(transfer #13 1000000)")), CVM_REQ));
+				.checkStructure(sign(Invoke.create(ORIGIN, 5, "(transfer #13 1000000)")), CVM_REQ).reason());
 		// Coin transfer presented against a token requirement
 		assertEquals(ErrorReasons.INVALID_TRANSACTION, ExactConvexScheme
-				.checkStructure(sign(Transfer.create(ORIGIN, 5, PAY_TO, 500)), TOKEN_REQ));
+				.checkStructure(sign(Transfer.create(ORIGIN, 5, PAY_TO, 500)), TOKEN_REQ).reason());
+		// The diagnostic shows the expected canonical transaction
+		assertTrue(ExactConvexScheme
+				.checkStructure(sign(Transfer.create(ORIGIN, 5, PAY_TO, 999999)), CVM_REQ)
+				.detail().contains("1000000"));
 	}
 
 	@Test
@@ -77,22 +82,22 @@ public class ExactConvexSchemeTest {
 		assertEquals(ErrorReasons.INVALID_TRANSACTION,
 				ExactConvexScheme.checkStructure(sign(Call.create(ORIGIN, 7, TOKEN, 1,
 						ExactConvexScheme.DIRECT_TRANSFER,
-						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ));
+						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ).reason());
 		// Wrong function name
 		assertEquals(ErrorReasons.INVALID_TRANSACTION,
 				ExactConvexScheme.checkStructure(sign(Call.create(ORIGIN, 7, TOKEN,
 						Call.DEFAULT_OFFER, convex.core.data.Symbol.create("transfer"),
-						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ));
+						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ).reason());
 		// Wrong token actor
 		assertEquals(ErrorReasons.INVALID_TRANSACTION,
 				ExactConvexScheme.checkStructure(sign(Call.create(ORIGIN, 7, Address.create(790),
 						Call.DEFAULT_OFFER, ExactConvexScheme.DIRECT_TRANSFER,
-						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ));
+						Vectors.of(PAY_TO, AInteger.create(500), null))), TOKEN_REQ).reason());
 		// Missing nil data argument
 		assertEquals(ErrorReasons.INVALID_TRANSACTION,
 				ExactConvexScheme.checkStructure(sign(Call.create(ORIGIN, 7, TOKEN,
 						Call.DEFAULT_OFFER, ExactConvexScheme.DIRECT_TRANSFER,
-						Vectors.of(PAY_TO, AInteger.create(500)))), TOKEN_REQ));
+						Vectors.of(PAY_TO, AInteger.create(500)))), TOKEN_REQ).reason());
 	}
 
 	@Test
@@ -100,19 +105,19 @@ public class ExactConvexSchemeTest {
 		SignedData<ATransaction> sd = sign(Transfer.create(ORIGIN, 5, PAY_TO, 1000000));
 		// Scoped CAD29 assets are not yet supported
 		assertEquals(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS, ExactConvexScheme.checkStructure(sd,
-				new PaymentRequirements("exact", "convex:local", "500", "cad29:789-56", "#13", 30, null)));
+				new PaymentRequirements("exact", "convex:local", "500", "cad29:789-56", "#13", 30, null)).reason());
 		// Unknown asset namespace
 		assertEquals(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS, ExactConvexScheme.checkStructure(sd,
-				new PaymentRequirements("exact", "convex:local", "500", "erc20:0x1234", "#13", 30, null)));
+				new PaymentRequirements("exact", "convex:local", "500", "erc20:0x1234", "#13", 30, null)).reason());
 		// Malformed amount
 		assertEquals(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS, ExactConvexScheme.checkStructure(sd,
-				new PaymentRequirements("exact", "convex:local", "lots", "slip44:864", "#13", 30, null)));
+				new PaymentRequirements("exact", "convex:local", "lots", "slip44:864", "#13", 30, null)).reason());
 		// Negative amount
 		assertEquals(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS, ExactConvexScheme.checkStructure(sd,
-				new PaymentRequirements("exact", "convex:local", "-5", "slip44:864", "#13", 30, null)));
+				new PaymentRequirements("exact", "convex:local", "-5", "slip44:864", "#13", 30, null)).reason());
 		// Malformed payTo
 		assertEquals(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS, ExactConvexScheme.checkStructure(sd,
-				new PaymentRequirements("exact", "convex:local", "1000000", "slip44:864", "nowhere", 30, null)));
+				new PaymentRequirements("exact", "convex:local", "1000000", "slip44:864", "nowhere", 30, null)).reason());
 	}
 
 	@Test

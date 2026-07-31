@@ -194,7 +194,10 @@ public class X402Test {
 				HttpResponse.BodyHandlers.ofString());
 		assertEquals(402, rejected.statusCode());
 		String header = rejected.headers().firstValue(X402.HEADER_PAYMENT_REQUIRED).orElseThrow();
-		assertEquals(ErrorReasons.INVALID_SEQUENCE, PaymentRequired.fromJSON(X402.decodeHeader(header)).error());
+		String error = PaymentRequired.fromJSON(X402.decodeHeader(header)).error();
+		// The error carries the reason code plus an actionable diagnostic
+		assertTrue(error.startsWith(ErrorReasons.INVALID_SEQUENCE), error);
+		assertTrue(error.contains("next valid sequence"), error);
 		assertEquals(before + PRICE, convex.getBalance(PAY_TO));
 	}
 

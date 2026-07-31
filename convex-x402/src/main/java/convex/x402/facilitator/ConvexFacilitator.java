@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMLong;
 import convex.x402.ErrorReasons;
 import convex.x402.Fields;
 import convex.x402.NetworkId;
+import convex.x402.PaymentError;
 import convex.x402.X402;
 import convex.x402.model.PaymentPayload;
 import convex.x402.model.PaymentRequirements;
@@ -93,7 +94,7 @@ public class ConvexFacilitator implements Facilitator {
 	public VerifyResponse verify(PaymentPayload payload, PaymentRequirements requirements)
 			throws InterruptedException {
 		Checked c = check(payload, requirements);
-		if (c.reason != null) return VerifyResponse.invalid(c.reason, c.payer);
+		if (c.error != null) return VerifyResponse.invalid(c.error, c.payer);
 		return VerifyResponse.valid(c.payer);
 	}
 
@@ -109,7 +110,7 @@ public class ConvexFacilitator implements Facilitator {
 	public SettlementResponse settle(PaymentPayload payload, PaymentRequirements requirements)
 			throws InterruptedException {
 		Checked c = check(payload, requirements);
-		if (c.reason != null) return SettlementResponse.failure(c.reason, c.payer, networkId.canonical());
+		if (c.error != null) return SettlementResponse.failure(c.error, c.payer, networkId.canonical());
 
 		SignedData<ATransaction> sd = c.transaction;
 		String txHash = "0x" + sd.getHash().toHexString();
@@ -136,22 +137,42 @@ public class ConvexFacilitator implements Facilitator {
 		return SettlementResponse.failure(settlementReason(r), c.payer, networkId.canonical());
 	}
 
-	/** Maps a failed settlement Result to an x402 error reason. */
-	private String settlementReason(Result r) {
+	/** Maps a failed settlement Result to a payment error with diagnostic detail. */
+	private PaymentError settlementReason(Result r) {
 		ACell error = r.getErrorCode();
-		if (ErrorCodes.SEQUENCE.equals(error)) return ErrorReasons.INVALID_SEQUENCE;
-		if (ErrorCodes.FUNDS.equals(error)) return ErrorReasons.INSUFFICIENT_FUNDS;
-		if (ErrorCodes.SIGNATURE.equals(error)) return ErrorReasons.INVALID_SIGNATURE;
-		if (ErrorCodes.TIMEOUT.equals(error)) return ErrorReasons.INVALID_TRANSACTION_STATE;
+		String value = truncate(String.valueOf(r.getValue()));
+		if (ErrorCodes.SEQUENCE.equals(error)) {
+			return PaymentError.of(ErrorReasons.INVALID_SEQUENCE,
+					"transaction rejected with :SEQUENCE (already spent or out of order): " + value
+							+ "; rebuild the payment with the current sequence");
+		}
+		if (ErrorCodes.FUNDS.equals(error)) {
+			return PaymentError.of(ErrorReasons.INSUFFICIENT_FUNDS,
+					"transaction rejected with :FUNDS: " + value);
+		}
+		if (ErrorCodes.SIGNATURE.equals(error)) {
+			return PaymentError.of(ErrorReasons.INVALID_SIGNATURE,
+					"transaction rejected with :SIGNATURE: " + value);
+		}
+		if (ErrorCodes.TIMEOUT.equals(error)) {
+			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION_STATE,
+					"settlement not confirmed within the timeout; it may still confirm —"
+							+ " retrying with the same payment settles idempotently");
+		}
 		log.warn("Unexpected x402 settlement failure {}: {}", error, r.getValue());
-		return ErrorReasons.UNEXPECTED_SETTLE_ERROR;
+		return PaymentError.of(ErrorReasons.UNEXPECTED_SETTLE_ERROR,
+				"transaction rejected with " + error + ": " + value);
 	}
 
-	/** Outcome of shared verification: a decoded transaction or an error reason. */
-	protected record Checked(SignedData<ATransaction> transaction, String payer, String reason,
-			boolean alreadySettled) {
-		static Checked fail(String reason, String payer) {
-			return new Checked(null, payer, reason, false);
+	private static String truncate(String s) {
+		return (s.length() <= 300) ? s : s.substring(0, 300) + "…";
+	}
+
+	/** Outcome of shared verification: a decoded transaction or a payment error. */
+	protected record Checked(SignedData<ATransaction> transaction, String payer,
+			PaymentError error, boolean alreadySettled) {
+		static Checked fail(PaymentError error, String payer) {
+			return new Checked(null, payer, error, false);
 		}
 
 		static Checked ok(SignedData<ATransaction> transaction, String payer) {
@@ -165,37 +186,44 @@ public class ConvexFacilitator implements Facilitator {
 	protected Checked check(PaymentPayload payload, PaymentRequirements requirements)
 			throws InterruptedException {
 		if ((payload == null) || (requirements == null)) {
-			return Checked.fail(ErrorReasons.INVALID_PAYLOAD, null);
+			return Checked.fail(PaymentError.of(ErrorReasons.INVALID_PAYLOAD,
+					"missing payment payload or payment requirements"), null);
 		}
 		if (payload.x402Version() != X402.VERSION) {
-			return Checked.fail(ErrorReasons.INVALID_X402_VERSION, null);
+			return Checked.fail(PaymentError.of(ErrorReasons.INVALID_X402_VERSION,
+					"expected x402Version " + X402.VERSION + " but payment has "
+							+ payload.x402Version()), null);
 		}
 		if (!X402.SCHEME_EXACT.equals(requirements.scheme())) {
-			return Checked.fail(ErrorReasons.UNSUPPORTED_SCHEME, null);
+			return Checked.fail(PaymentError.of(ErrorReasons.UNSUPPORTED_SCHEME,
+					"scheme '" + requirements.scheme() + "' is not supported; this facilitator"
+							+ " supports '" + X402.SCHEME_EXACT + "'"), null);
 		}
 		if (!networkId.matches(requirements.network())) {
-			return Checked.fail(ErrorReasons.INVALID_NETWORK, null);
+			return Checked.fail(PaymentError.of(ErrorReasons.INVALID_NETWORK,
+					"network '" + requirements.network() + "' does not match this facilitator;"
+							+ " recognised forms: " + networkId.knownForms()), null);
 		}
 
 		final SignedData<ATransaction> sd;
 		try {
 			sd = ExactConvexScheme.decodeTransaction(payload.payload());
 		} catch (IllegalArgumentException e) {
-			return Checked.fail(ErrorReasons.INVALID_PAYLOAD, null);
+			return Checked.fail(PaymentError.of(ErrorReasons.INVALID_PAYLOAD, e.getMessage()), null);
 		}
 		String payer = sd.getValue().getOrigin().toString();
 
-		String reason = ExactConvexScheme.checkStructure(sd, requirements);
-		if (reason != null) return Checked.fail(reason, payer);
+		PaymentError error = ExactConvexScheme.checkStructure(sd, requirements);
+		if (error != null) return Checked.fail(error, payer);
 
-		reason = ExactConvexScheme.checkState(convex, sd, requirements);
-		if (reason != null) {
+		error = ExactConvexScheme.checkState(convex, sd, requirements);
+		if (error != null) {
 			// An already-settled retry shows up as a stale sequence; report it as
 			// success so settlement is idempotent for the resource server.
-			if (ErrorReasons.INVALID_SEQUENCE.equals(reason) && isConfirmed(sd)) {
+			if (ErrorReasons.INVALID_SEQUENCE.equals(error.reason()) && isConfirmed(sd)) {
 				return new Checked(sd, payer, null, true);
 			}
-			return Checked.fail(reason, payer);
+			return Checked.fail(error, payer);
 		}
 		return Checked.ok(sd, payer);
 	}

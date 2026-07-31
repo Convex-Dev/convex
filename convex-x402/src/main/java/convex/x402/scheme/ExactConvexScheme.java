@@ -25,6 +25,7 @@ import convex.core.message.Message;
 import convex.core.util.CAIP;
 import convex.x402.ErrorReasons;
 import convex.x402.Fields;
+import convex.x402.PaymentError;
 import convex.x402.model.PaymentRequirements;
 
 /**
@@ -104,20 +105,35 @@ public class ExactConvexScheme {
 	 *
 	 * @param sd Signed transaction to check
 	 * @param req Payment requirements to check against
-	 * @return null if canonical, otherwise an x402 error reason
+	 * @return null if canonical, otherwise the payment error
 	 */
-	public static String checkStructure(SignedData<ATransaction> sd, PaymentRequirements req) {
+	public static PaymentError checkStructure(SignedData<ATransaction> sd, PaymentRequirements req) {
 		ATransaction tx = sd.getValue();
 		Address origin = tx.getOrigin();
-		if (origin == null) return ErrorReasons.INVALID_TRANSACTION;
+		if (origin == null) {
+			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION,
+					"transaction has no origin address");
+		}
 		long sequence = tx.getSequence();
 
 		Address payTo = Address.parse(req.payTo());
-		if (payTo == null) return ErrorReasons.INVALID_PAYMENT_REQUIREMENTS;
+		if (payTo == null) {
+			return PaymentError.of(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS,
+					"payTo is not a valid Convex address: " + req.payTo());
+		}
 
 		ATransaction expected = expectedTransaction(origin, sequence, payTo, req);
-		if (expected == null) return ErrorReasons.INVALID_PAYMENT_REQUIREMENTS;
-		if (!expected.equals(tx)) return ErrorReasons.INVALID_TRANSACTION;
+		if (expected == null) {
+			return PaymentError.of(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS,
+					"amount '" + req.amount() + "' or asset '" + req.asset()
+							+ "' is not usable with the exact Convex scheme"
+							+ " (scoped cad29 assets are not yet supported)");
+		}
+		if (!expected.equals(tx)) {
+			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION,
+					"transaction does not match the canonical form; expected " + expected
+							+ " but payment contains " + tx);
+		}
 		return null;
 	}
 
@@ -172,45 +188,75 @@ public class ExactConvexScheme {
 	 * @param convex Client connection used for state reads
 	 * @param sd Signed transaction to check
 	 * @param req Payment requirements the transaction satisfies structurally
-	 * @return null if the payment is expected to settle, otherwise an x402 error reason
+	 * @return null if the payment is expected to settle, otherwise the payment error
 	 * @throws InterruptedException if interrupted while querying
 	 */
-	public static String checkState(Convex convex, SignedData<ATransaction> sd,
+	public static PaymentError checkState(Convex convex, SignedData<ATransaction> sd,
 			PaymentRequirements req) throws InterruptedException {
 		ATransaction tx = sd.getValue();
 		Address origin = tx.getOrigin();
 
 		AccountKey key = convex.getAccountKey(origin);
-		if (key == null) return ErrorReasons.INVALID_SIGNATURE; // no account, or an actor
-		if (!sd.checkSignature(key)) return ErrorReasons.INVALID_SIGNATURE;
+		if (key == null) {
+			return PaymentError.of(ErrorReasons.INVALID_SIGNATURE, "origin account " + origin
+					+ " does not exist or has no account key (actor accounts cannot pay)");
+		}
+		if (!sd.checkSignature(key)) {
+			return PaymentError.of(ErrorReasons.INVALID_SIGNATURE,
+					"signature does not verify against the current account key for " + origin
+							+ "; was the transaction signed with this account's current key?");
+		}
 
 		final long current;
 		try {
 			current = convex.getSequence(origin);
 		} catch (ResultException e) {
-			return ErrorReasons.INVALID_TRANSACTION;
+			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION,
+					"could not read the sequence for " + origin + ": " + e.getMessage());
 		}
-		if (tx.getSequence() != current + 1) return ErrorReasons.INVALID_SEQUENCE;
+		if (tx.getSequence() != current + 1) {
+			return PaymentError.of(ErrorReasons.INVALID_SEQUENCE,
+					"transaction sequence is " + tx.getSequence() + " but the next valid sequence for "
+							+ origin + " is " + (current + 1)
+							+ "; rebuild the payment with the current sequence");
+		}
 
 		final long coinBalance;
 		try {
 			coinBalance = convex.getBalance(origin);
 		} catch (ResultException e) {
-			return ErrorReasons.INVALID_TRANSACTION;
+			return PaymentError.of(ErrorReasons.INVALID_TRANSACTION,
+					"could not read the balance for " + origin + ": " + e.getMessage());
 		}
 
 		if (CAIP.isCVM(req.asset())) {
 			long amount = Long.parseLong(req.amount()); // structural check ensured validity
-			if (coinBalance < amount + FEE_ALLOWANCE) return ErrorReasons.INSUFFICIENT_FUNDS;
+			if (coinBalance < amount + FEE_ALLOWANCE) {
+				return PaymentError.of(ErrorReasons.INSUFFICIENT_FUNDS,
+						"balance of " + origin + " is " + coinBalance + " copper, below the amount "
+								+ amount + " plus fee allowance " + FEE_ALLOWANCE);
+			}
 		} else {
-			if (coinBalance < FEE_ALLOWANCE) return ErrorReasons.INSUFFICIENT_FUNDS;
+			if (coinBalance < FEE_ALLOWANCE) {
+				return PaymentError.of(ErrorReasons.INSUFFICIENT_FUNDS,
+						"coin balance of " + origin + " is " + coinBalance
+								+ " copper, below the fee allowance " + FEE_ALLOWANCE
+								+ " needed to pay juice for the token transfer");
+			}
 			ACell tokenID = CAIP.parseTokenID(req.asset());
 			AInteger amount = AInteger.parse(req.amount());
 			// All components are canonically printed values, so the code is injection-safe
 			String code = "(< (@convex.fungible/balance " + tokenID + " " + origin + ") " + amount + ")";
 			Result r = convex.querySync(code);
-			if (r.isError()) return ErrorReasons.INVALID_PAYMENT_REQUIREMENTS;
-			if (RT.bool(r.getValue())) return ErrorReasons.INSUFFICIENT_FUNDS;
+			if (r.isError()) {
+				return PaymentError.of(ErrorReasons.INVALID_PAYMENT_REQUIREMENTS,
+						"token balance query failed for asset '" + req.asset() + "': "
+								+ r.getValue());
+			}
+			if (RT.bool(r.getValue())) {
+				return PaymentError.of(ErrorReasons.INSUFFICIENT_FUNDS, "token balance of " + origin
+						+ " is below the amount " + req.amount() + " for asset '" + req.asset() + "'");
+			}
 		}
 		return null;
 	}

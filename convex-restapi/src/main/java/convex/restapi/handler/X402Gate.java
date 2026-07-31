@@ -241,20 +241,25 @@ public class X402Gate {
 		}
 		if (chosen == null) {
 			respondPaymentRequired(ctx, offered, decision.description(),
-					ErrorReasons.INVALID_PAYMENT_REQUIREMENTS);
+					ErrorReasons.INVALID_PAYMENT_REQUIREMENTS
+							+ ": the payment's 'accepted' does not match any offered option;"
+							+ " echo one of the 'accepts' entries exactly as offered");
 			return;
 		}
 
 		Facilitator facilitator = route(chosen);
 		if (facilitator == null) {
 			respondPaymentRequired(ctx, offered, decision.description(),
-					ErrorReasons.UNSUPPORTED_SCHEME);
+					ErrorReasons.UNSUPPORTED_SCHEME + ": no facilitator for scheme '"
+							+ chosen.scheme() + "' on network '" + chosen.network() + "'");
 			return;
 		}
 
 		SettlementResponse settlement = facilitator.settle(payment, chosen);
 		if (!settlement.success()) {
-			respondPaymentRequired(ctx, offered, decision.description(), settlement.errorReason());
+			String error = (settlement.detail() == null) ? settlement.errorReason()
+					: settlement.errorReason() + ": " + settlement.detail();
+			respondPaymentRequired(ctx, offered, decision.description(), error);
 			return;
 		}
 
@@ -265,7 +270,8 @@ public class X402Gate {
 			ctx.attribute(ATTR_RECEIPT, null);
 			ctx.attribute(ATTR_PAYER, null);
 			respondPaymentRequired(ctx, offered, decision.description(),
-					ErrorReasons.INVALID_SEQUENCE);
+					ErrorReasons.INVALID_SEQUENCE + ": this payment has already been settled and"
+							+ " its value consumed; construct a new payment");
 			return;
 		}
 		ctx.header(X402.HEADER_PAYMENT_RESPONSE, X402.encodeHeader(settlement.toJSON()));

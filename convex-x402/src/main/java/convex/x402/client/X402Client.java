@@ -8,6 +8,9 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -43,6 +46,7 @@ import convex.x402.scheme.ExactConvexScheme;
  * payment construction per instance.</p>
  */
 public class X402Client {
+	private static final Logger log = LoggerFactory.getLogger(X402Client.class);
 
 	protected final HttpClient http;
 	protected final Convex convex;
@@ -135,15 +139,26 @@ public class X402Client {
 	 */
 	protected PaymentRequirements selectRequirement(PaymentRequired required) {
 		for (PaymentRequirements req : required.accepts()) {
-			if (!X402.SCHEME_EXACT.equals(req.scheme())) continue;
+			if (!X402.SCHEME_EXACT.equals(req.scheme())) {
+				log.debug("Skipping payment option: scheme '{}' is not '{}'", req.scheme(), X402.SCHEME_EXACT);
+				continue;
+			}
 			String network = req.network();
-			if ((network == null) || !network.startsWith(NetworkId.NAMESPACE + ":")) continue;
-			if (Address.parse(req.payTo()) == null) continue;
+			if ((network == null) || !network.startsWith(NetworkId.NAMESPACE + ":")) {
+				log.debug("Skipping payment option: network '{}' is not a Convex network", network);
+				continue;
+			}
+			if (Address.parse(req.payTo()) == null) {
+				log.debug("Skipping payment option: payTo '{}' is not a Convex address", req.payTo());
+				continue;
+			}
 			if (ExactConvexScheme.expectedTransaction(address, 1, Address.parse(req.payTo()), req) == null) {
-				continue; // unusable asset or amount
+				log.debug("Skipping payment option: amount '{}' or asset '{}' unusable", req.amount(), req.asset());
+				continue;
 			}
 			return req;
 		}
+		log.debug("No payable option among {} offered requirements", required.accepts().size());
 		return null;
 	}
 

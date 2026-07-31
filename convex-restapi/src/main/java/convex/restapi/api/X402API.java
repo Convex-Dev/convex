@@ -74,10 +74,17 @@ public class X402API extends ABaseAPI {
 
 	protected FacilitatorRequest parseFacilitatorRequest(Context ctx) {
 		AMap<AString, ACell> body = readJSONBody(ctx);
+		ACell rawPayload = body.get(Fields.PAYMENT_PAYLOAD);
+		if (rawPayload == null) {
+			throw new BadRequestResponse("Request body requires a 'paymentPayload' object");
+		}
+		ACell rawRequirements = body.get(Fields.PAYMENT_REQUIREMENTS);
+		if (rawRequirements == null) {
+			throw new BadRequestResponse("Request body requires a 'paymentRequirements' object");
+		}
 		try {
-			PaymentPayload payload = PaymentPayload.fromJSON(RT.castMap(body.get(Fields.PAYMENT_PAYLOAD)));
-			PaymentRequirements requirements = PaymentRequirements
-					.fromJSON(RT.castMap(body.get(Fields.PAYMENT_REQUIREMENTS)));
+			PaymentPayload payload = PaymentPayload.fromJSON(RT.castMap(rawPayload));
+			PaymentRequirements requirements = PaymentRequirements.fromJSON(RT.castMap(rawRequirements));
 			return new FacilitatorRequest(payload, requirements);
 		} catch (IllegalArgumentException e) {
 			throw new BadRequestResponse(e.getMessage());
