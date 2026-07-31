@@ -62,8 +62,8 @@ public class X402API extends ABaseAPI {
 			routes.post(ROUTE + "settle", settleLimit.handler(this::settle));
 			routes.get(ROUTE + "supported", this::supported);
 		}
-		X402Gate gate = X402Gate.fromConfig(facilitator, restServer.getRESTConfig());
-		gate.install(routes);
+		X402Gate gate = new X402Gate(facilitator);
+		gate.installFromConfig(routes, restServer.getRESTConfig());
 	}
 
 	/** Parsed body of a facilitator verify/settle request. */
