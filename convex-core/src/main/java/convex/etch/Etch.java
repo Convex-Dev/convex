@@ -148,7 +148,7 @@ public class Etch {
 		FileChannel fileChannel=this.data.getChannel();
 		FileLock lock=fileChannel.tryLock();
 		if (lock==null) {
-			throw new IOException("File lock failed");
+			throw new IOException("File lock failed on "+dataFile);
 		}
 		// at this point, we have an exclusive lock on the database file.
 		boolean newFile=(dataFile.length()==0);
