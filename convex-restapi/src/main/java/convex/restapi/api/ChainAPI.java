@@ -60,6 +60,7 @@ import convex.core.util.JSON;
 import convex.peer.Config;
 import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
+import convex.restapi.SeedTransport;
 import convex.restapi.handler.ConcurrentLimit;
 import convex.restapi.handler.RequestBody;
 import convex.restapi.model.CreateAccountRequest;
@@ -862,7 +863,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST,
 			operationId = "transact",
 			tags= {"Transactions"},
-			summary="Execute a Convex transaction. WARNING: sends Ed25519 seed over the network for peer to complete signature. Only do this with a secure HTTPS connection to a peer that you trust.",
+			summary="Execute a Convex transaction. Sends an Ed25519 seed for peer-side signing and therefore requires HTTPS for non-loopback clients. If an HTTP attempt is rejected, key rotation is suggested because the seed has already crossed the network.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction execution request",
 					content= {@OpenApiContent(
@@ -929,6 +930,10 @@ public class ChainAPI extends ABaseAPI {
 		} else {
 			// Assume JSON type using simple form including seed
 			Map<String, Object> req = getJSONBody(ctx);
+			if (req.containsKey("seed") && !restServer.getRESTConfig().isHttpSeedsAllowed()
+					&& !SeedTransport.isSecure(ctx)) {
+				throw new ForbiddenResponse(SeedTransport.rejectedIncomingMessage());
+			}
 	
 			Address addr = Address.parse(req.get("address"));
 			if (addr == null)

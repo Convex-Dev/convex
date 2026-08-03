@@ -6,6 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
 
 import org.junit.jupiter.api.Test;
 
@@ -70,7 +74,8 @@ public class KeyExportTest {
 			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--key", publicKey,
-			"--export-password", new String(EXPORT_PASSWORD)
+			"--export-password", new String(EXPORT_PASSWORD),
+			"--output-file", "-"
 		);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		String s=tester.getOutput();
@@ -82,15 +87,58 @@ public class KeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--type","seed",
 			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--key", publicKey
+			"--key", publicKey,
+			"--output-file", "-"
 		);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		String s2=tester.getOutput();
-		assertTrue(s2.contains(kp.getSeed().toHexString()));
+		assertEquals(kp.getSeed().toHexString(),s2.trim());
+
+		Path exportFile=Files.createTempFile("convex-seed-export", ".txt");
+		Files.delete(exportFile);
+		exportFile.toFile().deleteOnExit();
+		tester = CLTester.run(
+			"key", "export", "-n",
+			"--storepass", new String(KEYSTORE_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
+			"--keystore", KEYSTORE_FILENAME,
+			"--key", publicKey,
+			"--output-file", exportFile.toString());
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		assertEquals(kp.getSeed().toHexString(),Files.readString(exportFile).trim());
+
+		PosixFileAttributeView posix=Files.getFileAttributeView(exportFile,PosixFileAttributeView.class);
+		if (posix!=null) {
+			assertEquals(PosixFilePermissions.fromString("rw-------"),posix.readAttributes().permissions());
+		} else {
+			AclFileAttributeView acl=Files.getFileAttributeView(exportFile,AclFileAttributeView.class);
+			assertEquals(1,acl.getAcl().size());
+			assertEquals(Files.getOwner(exportFile),acl.getAcl().get(0).principal());
+		}
+
+		// Secret export files are never overwritten.
+		tester = CLTester.run(
+			"key", "export", "-n",
+			"--storepass", new String(KEYSTORE_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
+			"--keystore", KEYSTORE_FILENAME,
+			"--key", publicKey,
+			"--output-file", exportFile.toString());
+		tester.assertExitCode(ExitCodes.IOERR);
+		assertEquals(kp.getSeed().toHexString(),Files.readString(exportFile).trim());
+
+		// Automation must choose a file or explicitly opt in to stdout.
+		tester = CLTester.run(
+			"key", "export", "-n",
+			"--storepass", new String(KEYSTORE_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
+			"--keystore", KEYSTORE_FILENAME,
+			"--key", publicKey);
+		tester.assertExitCode(ExitCodes.USAGE);
+		assertTrue(tester.getError().contains("--output-file"));
 	}
 }
 

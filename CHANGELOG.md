@@ -19,11 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Auth: UCAN payload builders and the `signingDelegate` MCP tool now accept audiences using any valid DID method, while retaining `did:key` and hex public-key compatibility.
+- CLI: `key generate` no longer sends BIP39 mnemonics through stderr, where log collectors could capture them. Interactive use writes directly to the attached console; automation must select a new owner-only file with `--mnemonic-file`, or explicitly opt into stdout with `--mnemonic-file -`.
+- CLI: `key export` now gives raw seeds and encrypted PEM the same protected destination handling: an attached console interactively, or an explicit new owner-only file / stdout selection for automation. Raw seed remains the default export format.
 
 ### Fixed
 
 - `Call` transactions decoded from their network encoding no longer fail with an internal error on execution: the lazily-decoded argument list was never populated on the execution path, so every Call submitted over the wire errored instead of invoking the actor function.
 - REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
+- REST API: seed-returning MCP tools and the legacy JSON `transact` endpoint now refuse remote cleartext HTTP by default. Loopback development remains available, and rejected requests that already carried sensitive key material recommend key rotation.
 - JSON readers no longer throw `NumberFormatException` for non-integer numbers of 19 or more characters (long decimals, exponent notation, JSON5 hex literals): the integer fast path now falls through to the double parser as intended.
 
 ## [0.8.10] - 2026-07-25

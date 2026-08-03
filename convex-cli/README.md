@@ -91,7 +91,7 @@ convex key generate
 ```
 
 This outputs:
-1. A BIP39 mnemonic phrase (12 words) - **back this up securely!**
+1. A BIP39 mnemonic phrase (12 words), written directly to the attached console - **back this up securely!**
 2. The public key (32-byte hex)
 
 You'll be prompted for:
@@ -104,6 +104,20 @@ BIP39 mnemonic generated with 12 words:
 evidence expand family claw crack dawn name salmon resource leg once curious
 Generated key pair with public key: 0x021efb3ff24898dffb30c9c7e490e86b2d0cb7a87c974a51894354532ff4670f
 ```
+
+The mnemonic is not written to stdout or stderr by default, so redirecting or
+capturing ordinary command output will not capture it. To save it directly,
+specify a new file; Convex restricts the file to its owner and refuses to
+overwrite an existing path:
+
+```bash
+convex key generate --mnemonic-file ~/convex-recovery.txt
+```
+
+Non-interactive BIP39 generation requires an explicit mnemonic destination.
+Use `--mnemonic-file -` only when the mnemonic must be written to stdout, for
+example when piping it to a secret manager. In this explicit mode each mnemonic
+line is followed by its matching public-key line on stdout.
 
 ### List Keys
 
@@ -120,10 +134,25 @@ convex key import --type=bip39 --text='evidence expand family claw crack dawn na
 
 ### Export a Key
 
-Export as seed (hex) or mnemonic for backup:
+Raw Ed25519 seed is the default, lossless export format. Interactive use writes
+it directly to the attached console:
 ```bash
-convex key export --key 021efb --type=seed
-convex key export --key 021efb --type=bip39
+convex key export --key 021efb
+```
+
+For automation, select a new owner-only file or explicitly opt into stdout.
+Existing files are never overwritten:
+
+```bash
+convex key export --key 021efb --output-file ~/convex-seed.txt
+convex key export --key 021efb --output-file -
+```
+
+Encrypted PEM is available when a passphrase-protected interchange format is
+more suitable:
+
+```bash
+convex key export --key 021efb --type=pem --output-file ~/convex-key.pem
 ```
 
 ### Environment Variables

@@ -428,10 +428,15 @@ public class RESTConfig extends PeerConfig {
 	}
 
 	/**
-	 * Whether seed-based MCP tools may be used over cleartext HTTP (#554).
+	 * Whether seed-based REST and MCP operations may be used over cleartext HTTP (#554).
 	 * @return true if HTTP seeds are allowed (default: false — HTTPS or loopback required)
 	 */
 	public boolean isHttpSeedsAllowed() {
+		AMap<AString,ACell> restSection=getSection(REST);
+		if (restSection.containsKey(ALLOW_HTTP_SEEDS)) {
+			return getBool(restSection,ALLOW_HTTP_SEEDS,false);
+		}
+		// Backwards compatibility with the original MCP-only option.
 		return getBool(getSection(MCP), ALLOW_HTTP_SEEDS, false);
 	}
 
@@ -572,7 +577,7 @@ public class RESTConfig extends PeerConfig {
 		// MCP security options (#552, #554)
 		java.util.Set<String> origins = getAllowedOrigins();
 		if (origins != null) legacy.put(Keywords.ALLOWED_ORIGINS, origins);
-		if (getSection(MCP).containsKey(ALLOW_HTTP_SEEDS)) {
+		if (getSection(REST).containsKey(ALLOW_HTTP_SEEDS)||getSection(MCP).containsKey(ALLOW_HTTP_SEEDS)) {
 			legacy.put(Keywords.ALLOW_HTTP_SEEDS, isHttpSeedsAllowed());
 		}
 

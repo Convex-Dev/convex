@@ -56,7 +56,7 @@ rest.start(8080);
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/v1/query` | POST | Execute read-only query |
-| `/api/v1/transact` | POST | Submit signed transaction |
+| `/api/v1/transact` | POST | Submit a signed transaction, or a seed for server-side signing |
 | `/api/v1/faucet` | POST | Request test funds (test networks) |
 | `/api/v1/accounts/{address}` | GET | Get account information |
 | `/api/v1/watch` | GET (SSE) | Watch a query result against finalised state (disabled by default) |
@@ -75,8 +75,13 @@ curl -X POST http://localhost:8080/api/v1/query \
 ```bash
 curl -X POST http://localhost:8080/api/v1/transact \
   -H "Content-Type: application/json" \
-  -d '{"address": "#11", "source": "(transfer #42 1000)", "sig": "..."}'
+  -d '{"address": "#11", "source": "(transfer #42 1000)", "seed": "<64 hex characters>"}'
 ```
+
+The JSON form of `transact` sends a private seed to the server. Cleartext HTTP
+is accepted only from loopback by default; remote clients must use HTTPS. Use
+locally signed transactions with `transaction/prepare` and `transaction/submit`
+where possible so the private key never leaves the client.
 
 ## Documentation
 

@@ -1,7 +1,5 @@
 package convex.cli.key;
 
-import java.io.IOException;
-import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 
@@ -12,7 +10,6 @@ import convex.cli.CLIError;
 import convex.cli.mixins.KeyMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -38,7 +35,7 @@ public class KeyExport extends AKeyCommand {
 
 	
 	@Option(names={"-o", "--output-file"},
-			description="Output file for the private key. Use '-' for STDOUT (default).")
+			description="Write the private key to a new owner-only file. Use '-' to explicitly write to stdout. Required non-interactively; defaults to the attached console.")
 	private String outputFilename;
 
 
@@ -88,11 +85,8 @@ public class KeyExport extends AKeyCommand {
 				". Use 'convex key list' to see available keys.");
 		}
 		
-		// Default to "seed" type unless security is strict
-		if (type==null) {
-			if (cli().isParanoid()) throw new CLIError("Strict security: must specify key export type, e.g. --type=seed");
-			type="seed";
-		}
+		// Raw seed is the canonical lossless export and remains the default.
+		if (type==null) type="seed";
 		
 		String output;
 		if ("pem".equals(type)) {
@@ -105,21 +99,14 @@ public class KeyExport extends AKeyCommand {
 				Arrays.fill(exportPassword, 'x');
 			}
 		} else if ("seed".equals(type)){
-			paranoia("Raw seed export forbidden in strict mode.");
 			String rawSeed = keyPair.getSeed().toHexString();
 			output=rawSeed;
 		} else {
 			throw new CLIError("Export type not recognised: "+type);
 		}
 
-		if ((outputFilename==null)||("-".equals(outputFilename.trim()))) {
-			println(output);
-		} else {
-			try {
-				FileUtils.writeFileAsString(Paths.get(outputFilename),output);
-			} catch (IOException e) {
-				throw new CLIError("Failed to write output file: "+outputFilename, e);
-			}
+		try (SecretOutput secretOutput=SecretOutput.open(this,outputFilename,"--output-file","Private key")) {
+			secretOutput.write(output,"Private key export ("+type+"):");
 		}
 	}
 

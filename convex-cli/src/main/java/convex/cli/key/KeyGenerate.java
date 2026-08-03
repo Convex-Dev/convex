@@ -51,6 +51,10 @@ public class KeyGenerate extends AKeyCommand {
 			defaultValue=convex.core.Constants.DEFAULT_BIP39_PATH,
 			description="Derivation path for SLIP-0010 when using BIP39. Default: ${DEFAULT-VALUE}")
 	private String path;
+
+	@Option(names="--mnemonic-file",
+			description="Write BIP39 mnemonic(s) to a new owner-only file. Use '-' to explicitly write to stdout. Required non-interactively; defaults to the attached console.")
+	private String mnemonicFilename;
 	
 	@Option(names="--passphrase",
 			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")
@@ -61,18 +65,14 @@ public class KeyGenerate extends AKeyCommand {
 			description = "Key pair password for generated key. Can specify with CONVEX_KEY_PASSWORD.")
 	protected char[] keyPassword;
 
-	private AKeyPair generateKeyPair() {	
+	private AKeyPair generateKeyPair(SecretOutput mnemonicOutput) {
 		if ("bip39".equals(type)) {
 			if (words<12) {
 				paranoia("Can't use less than 12 BIP39 words in strict security mode");
 			}
 			
 			String mnemonic=BIP39.createSecureMnemonic(words);
-			// A suppressed mnemonic is unrecoverable, so show it regardless of verbosity:
-			// level 0 is never gated, fixing -v0 silently discarding it. Kept on stderr so
-			// stdout stays the stable public-key contract; machine capture is #581 (--json). (#583)
-			inform(0, "BIP39 mnemonic generated with "+words+" words:");
-			inform(0, mnemonic);
+			mnemonicOutput.write(mnemonic,"BIP39 mnemonic generated with "+words+" words:");
 			if (passphrase==null) {
 				if (isInteractive()) {
 					passphrase=new String(readPassword("Enter BIP39 passphrase: "));
@@ -109,6 +109,17 @@ public class KeyGenerate extends AKeyCommand {
 			throw new CLIError(ExitCodes.USAGE,"Unsupported key generation type: "+type);
 		}
 	}
+
+	private SecretOutput prepareMnemonicOutput() {
+		if (!"bip39".equals(type)) {
+			if (mnemonicFilename!=null) {
+				throw new CLIError(ExitCodes.USAGE,"--mnemonic-file is only valid with --type=bip39");
+			}
+			return null;
+		}
+
+		return SecretOutput.open(this,mnemonicFilename,"--mnemonic-file","BIP39 mnemonic");
+	}
 	
 	@Override
 	public void execute() {
@@ -132,18 +143,23 @@ public class KeyGenerate extends AKeyCommand {
 			}
 		}
 
-		for ( int index = 0; index < count; index ++) {
-			AKeyPair kp=generateKeyPair();
+		try {
+			try (SecretOutput mnemonicOutput=prepareMnemonicOutput()) {
+				for ( int index = 0; index < count; index ++) {
+					AKeyPair kp=generateKeyPair(mnemonicOutput);
 
-			String publicKeyHexString =  kp.getAccountKey().toHexString();
-			inform("Generated key pair with public key: 0x"+kp.getAccountKey().toChecksumHex());
+					String publicKeyHexString =  kp.getAccountKey().toHexString();
+					inform("Generated key pair with public key: 0x"+kp.getAccountKey().toChecksumHex());
 
-			storeMixin.addKeyPairToStore(kp, keyPassword);
-			println(publicKeyHexString); // Output generated public key
+					storeMixin.addKeyPairToStore(kp, keyPassword);
+					println(publicKeyHexString); // Output generated public key
+				}
+			}
+		} finally {
+			// Wipe the password only after ALL keys are stored, otherwise keys 2..n
+			// would be encrypted with the wiped buffer contents.
+			Arrays.fill(keyPassword, 'p');
 		}
-		// Wipe the password only after ALL keys are stored, otherwise keys 2..n
-		// would be encrypted with the wiped buffer contents
-		Arrays.fill(keyPassword, 'p');
 		storeMixin.saveKeyStore();
 		informSuccess(count+ " key(s) generated and saved in store "+storeMixin.getStorePath());
 	}

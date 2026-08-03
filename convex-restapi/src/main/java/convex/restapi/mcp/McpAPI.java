@@ -52,6 +52,7 @@ import convex.core.util.JSON;
 import convex.core.util.Utils;
 import convex.restapi.PreparedTransaction;
 import convex.restapi.RESTServer;
+import convex.restapi.SeedTransport;
 import convex.restapi.api.ABaseAPI;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.auth.AuthMiddleware;
@@ -155,7 +156,7 @@ public class McpAPI extends ABaseAPI {
 	/**
 	 * When true, seed-carrying tools accept cleartext HTTP from any client (#554).
 	 * Default false: seeds require HTTPS or a loopback client. Configure via
-	 * {@code :allow-http-seeds} for trusted private networks only.
+	 * {@code rest.allowHttpSeeds} for trusted development or test networks only.
 	 */
 	private final boolean allowHttpSeeds;
 
@@ -195,25 +196,36 @@ public class McpAPI extends ABaseAPI {
 	}
 
 	/**
-	 * Transport-security check for tools that receive an Ed25519 seed (#554).
+	 * Transport-security check for tools that receive sensitive key material (#554).
 	 * A seed sent over cleartext HTTP is fully compromised in transit, so
 	 * seed-carrying tools require HTTPS — either directly or via an
 	 * {@code X-Forwarded-Proto: https} header from a TLS-terminating proxy.
 	 * Loopback clients are exempt (local development), and the check can be
-	 * disabled entirely with the {@code :allow-http-seeds} config option for
-	 * trusted private networks.
+	 * disabled entirely with the {@code rest.allowHttpSeeds} config option for
+	 * trusted development or test networks.
 	 *
 	 * @return null if the transport is acceptable, otherwise a tool error result
 	 */
 	AMap<AString, ACell> checkSeedTransport() {
+		return checkSeedTransport(true);
+	}
+
+	/** Transport-security check made before a tool returns a newly generated seed. */
+	AMap<AString, ACell> checkSeedOutputTransport() {
+		return checkSeedTransport(false);
+	}
+
+	private AMap<AString, ACell> checkSeedTransport(boolean sensitiveInputReceived) {
 		if (allowHttpSeeds) return null;
 		Context ctx = McpServer.getCurrentContext();
 		if (ctx == null) return null; // not an HTTP request (internal or test invocation)
-		if (isSecureSeedTransport(ctx.scheme(), ctx.header("X-Forwarded-Proto"), ctx.req().getRemoteAddr())) {
+		if (SeedTransport.isSecure(ctx)) {
 			return null;
 		}
-		return toolError("Seed-based tools require HTTPS: refusing to accept an Ed25519 seed over cleartext HTTP. "
-				+ "Use an HTTPS endpoint, or set allow-http-seeds in the peer config for trusted private networks.");
+		String message=sensitiveInputReceived
+				?SeedTransport.rejectedIncomingMessage()
+				:SeedTransport.rejectedOutputMessage();
+		return toolError(message);
 	}
 
 	/**
@@ -230,21 +242,7 @@ public class McpAPI extends ABaseAPI {
 	 * @return true if the transport is acceptable for seed material
 	 */
 	static boolean isSecureSeedTransport(String scheme, String forwardedProto, String remoteAddr) {
-		if ("https".equalsIgnoreCase(scheme)) return true;
-		if (forwardedProto != null) {
-			// May be a comma-separated list from chained proxies; first is the client-facing hop
-			String first = forwardedProto.split(",")[0].trim();
-			if ("https".equalsIgnoreCase(first)) return true;
-		}
-		if (remoteAddr != null) {
-			try {
-				// IP literal only — no DNS resolution happens for numeric addresses
-				if (java.net.InetAddress.getByName(remoteAddr).isLoopbackAddress()) return true;
-			} catch (java.net.UnknownHostException e) {
-				// Unknown remote address: not exempt
-			}
-		}
-		return false;
+		return SeedTransport.isSecure(scheme,forwardedProto,remoteAddr);
 	}
 
 	public AMap<AString, ACell> getServerInfo() {
@@ -873,6 +871,8 @@ public class McpAPI extends ABaseAPI {
 						return toolError("Seed must be 32-byte hex string (64 hex characters)");
 					}
 				} else {
+					AMap<AString, ACell> transportError = checkSeedOutputTransport();
+					if (transportError != null) return transportError;
 					// Generate secure random seed
 					seedBlob = Blob.createRandom(new SecureRandom(), AKeyPair.SEED_LENGTH);
 				}

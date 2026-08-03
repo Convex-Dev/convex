@@ -654,6 +654,8 @@ class SigningMcpTools {
 
 			AString passphrase = RT.ensureString(arguments.get(McpAPI.ARG_PASSPHRASE));
 			if (passphrase == null) return api.toolError("signingExportKey requires 'passphrase' string");
+			AMap<AString, ACell> transportError = api.checkSeedTransport();
+			if (transportError != null) return transportError;
 
 			AccountKey publicKey = AccountKey.parse(publicKeyCell.toString());
 			if (publicKey == null) return api.toolError("Invalid public key format");
