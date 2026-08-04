@@ -34,24 +34,158 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public EtchCursor cursor(long position, long dataLength) throws IOException {
-		ensureMapped(position,dataLength);
-		return new SegmentCursor(this,position);
+	public byte getByte(long position) throws IOException {
+		ensureMapped(position,Byte.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				return current.segment.get(ValueLayout.JAVA_BYTE,position);
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
 	}
 
-	private void ensureMapped(long position, long dataLength) throws IOException {
-		long required=Math.addExact(position,Etch.REGION_MARGIN);
+	@Override
+	public short getShort(long position) throws IOException {
+		ensureMapped(position,Short.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				return current.segment.get(SHORT,position);
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public long getLong(long position) throws IOException {
+		ensureMapped(position,Long.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				return current.segment.get(LONG,position);
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public long getLongAcquire(long position) throws IOException {
+		ensureMapped(position,Long.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				return (long)ALIGNED_LONG.getAcquire(current.segment,position);
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void get(long position, byte[] destination, int offset, int length) throws IOException {
+		if (length==0) return;
+		ensureMapped(position,length);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				MemorySegment.copy(current.segment,ValueLayout.JAVA_BYTE,position,
+						destination,offset,length);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void putByte(long position, byte value) throws IOException {
+		ensureMapped(position,Byte.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				current.segment.set(ValueLayout.JAVA_BYTE,position,value);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void putShort(long position, short value) throws IOException {
+		ensureMapped(position,Short.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				current.segment.set(SHORT,position,value);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void putLong(long position, long value) throws IOException {
+		ensureMapped(position,Long.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				current.segment.set(LONG,position,value);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void putLongRelease(long position, long value) throws IOException {
+		ensureMapped(position,Long.BYTES);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				ALIGNED_LONG.setRelease(current.segment,position,value);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	@Override
+	public void put(long position, byte[] source, int offset, int length) throws IOException {
+		if (length==0) return;
+		ensureMapped(position,length);
+		Mapping current=currentMapping(null);
+		while (true) {
+			try {
+				MemorySegment.copy(source,offset,current.segment,ValueLayout.JAVA_BYTE,
+						position,length);
+				return;
+			} catch (IllegalStateException e) {
+				current=currentMapping(current);
+			}
+		}
+	}
+
+	private void ensureMapped(long position, long length) throws IOException {
+		long requiredEnd=Math.addExact(position,length);
+		long preferredEnd=Math.addExact(requiredEnd,Etch.REGION_MARGIN);
 		Mapping current=mapping;
-		if ((current!=null)&&(current.segment.byteSize()>=required)) return;
+		if ((current!=null)&&(current.segment.byteSize()>=preferredEnd)) return;
 
 		synchronized (this) {
 			if (closed) throw new IOException("Etch mapping is closed");
 			current=mapping;
-			if ((current!=null)&&(current.segment.byteSize()>=required)) return;
+			if ((current!=null)&&(current.segment.byteSize()>=preferredEnd)) return;
 
 			long target=INITIAL_MAPPING_SIZE;
-			long logicalRequired=Math.max(required,Math.addExact(dataLength,Etch.REGION_MARGIN));
-			while (target<logicalRequired) target=Math.multiplyExact(target,2L);
+			while (target<preferredEnd) target=Math.multiplyExact(target,2L);
 
 			Arena arena=Arena.ofShared();
 			MemorySegment segment;
@@ -104,165 +238,5 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	private record Mapping(MemorySegment segment, Arena arena) {
-	}
-
-	private static final class SegmentCursor implements EtchCursor {
-		private final FFMEtchFileMapper owner;
-		private long position;
-
-		private SegmentCursor(FFMEtchFileMapper owner, long position) {
-			this.owner=owner;
-			this.position=position;
-		}
-
-		@Override
-		public byte get() {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					byte value=current.segment.get(ValueLayout.JAVA_BYTE,position);
-					position++;
-					return value;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public short getShort() {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					short value=current.segment.get(SHORT,position);
-					position+=Short.BYTES;
-					return value;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public long getLong() {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					long value=current.segment.get(LONG,position);
-					position+=Long.BYTES;
-					return value;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public long getLongAcquire() {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					long value=(long)ALIGNED_LONG.getAcquire(current.segment,position);
-					position+=Long.BYTES;
-					return value;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void get(byte[] destination) {
-			get(destination,0,destination.length);
-		}
-
-		@Override
-		public void get(byte[] destination, int offset, int length) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					current.segment.asSlice(position,length).asByteBuffer().get(destination,offset,length);
-					position+=length;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void put(byte value) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					current.segment.set(ValueLayout.JAVA_BYTE,position,value);
-					position++;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void putShort(short value) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					current.segment.set(SHORT,position,value);
-					position+=Short.BYTES;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void putLong(long value) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					current.segment.set(LONG,position,value);
-					position+=Long.BYTES;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void putLongRelease(long value) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					ALIGNED_LONG.setRelease(current.segment,position,value);
-					position+=Long.BYTES;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
-
-		@Override
-		public void put(byte[] source) {
-			put(source,0,source.length);
-		}
-
-		@Override
-		public void put(byte[] source, int offset, int length) {
-			Mapping current=owner.currentMapping(null);
-			while (true) {
-				try {
-					current.segment.asSlice(position,length).asByteBuffer().put(source,offset,length);
-					position+=length;
-					return;
-				} catch (IllegalStateException e) {
-					current=owner.currentMapping(current);
-				}
-			}
-		}
 	}
 }

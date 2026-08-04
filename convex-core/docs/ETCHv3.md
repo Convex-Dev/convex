@@ -51,12 +51,19 @@ recovery scanner treats them only as untrusted hints. A candidate record is
 valid only when its length is in bounds, its encoding is valid canonical CAD3,
 and the encoding's content hash equals the stored hash.
 
-A dedicated offline repair operation can therefore scan the file body
-through `syncedFileEnd` for valid hash-and-encoding pairs without following any
-source index pointer. It writes the recovered cells into a fresh Etch store,
-then uses the selected `rootHash` to verify that the complete synced state is
-fully persisted with no missing reachable value. Index blocks, alignment bytes
-and other non-record regions simply do not produce valid candidates.
+A dedicated offline repair operation can therefore scan the file body through
+physical EOF for valid hash-and-encoding pairs without following any source
+index pointer. It writes the recovered cells into a fresh Etch store, then uses
+the selected `rootHash` to verify that the complete synced state is fully
+persisted with no missing reachable value. Index blocks, alignment bytes,
+partial tail writes and other non-record regions are ignored unless their bytes
+independently satisfy the same CAD3 and content-hash checks.
+
+Records ending at or below `syncedFileEnd` are covered by the durability
+guarantee. Valid records beyond it are opportunistic salvage: they are safe to
+retain because their CAD3 encodings match their immutable content hashes, but
+their presence was never promised by `sync` and they do not advance or replace
+the selected root.
 
 This requires no journal, additional index-slot write or force on the normal
 write path. The exact v3 record layout may include a cheap immutable marker or
@@ -489,6 +496,42 @@ The result by crash point is:
 | While writing the new header | Select the new header if its check validates; otherwise recover from the older header |
 | During body force, or after later unsynchronised writes | Normal open scans and validates referenced allocations beyond `syncedFileEnd`; index corruption fails open but the last synced logical state remains recoverable by explicit repair |
 
+## Unsafe maintenance open
+
+Migration and repair need a way to inspect a file that normal open has rejected.
+V3 therefore requires an explicitly requested unsafe maintenance-open mode. It
+is never an automatic fallback from normal open and does not weaken the normal
+fail-fast policy.
+
+"Unsafe" describes the consistency assumptions that callers may make about the
+source, not weaker bounds checking or permission to modify it. An unsafe
+maintenance open:
+
+- opens an existing source through a read-only file handle and mapping;
+- obtains a lock that excludes writers for the lifetime of the operation;
+- validates and selects a header, including key verification for encryption,
+  but bypasses the normal `OPEN` index scan and accepts that the index may be
+  inconsistent;
+- performs no clean-state transition, header commit, sync, truncation, tail
+  adoption, automatic GC cutover or other source-file mutation;
+- bounds every read independently and treats every pointer, length, status and
+  metadata field as untrusted; and
+- defaults to the selected `syncedFileEnd` for index-based operations. Repair
+  explicitly scans through a snapshot of physical EOF; tail records carry no
+  durability or root-publication claim.
+
+The maintenance reader should expose two consumers without presenting itself
+as an ordinary writable `EtchStore`:
+
+1. a lenient index walker for migration, which reports and skips an invalid
+   slot or subtree where traversal can safely continue; and
+2. a raw body scanner for repair, which ignores the index and recognises cells
+   from their immutable hash and validated CAD3 encoding.
+
+For Etch v1 and v2 the same facility uses their recorded logical file length as
+the default bound. Those versions do not gain v3's synced-root durability
+guarantee, but unsafe migration or repair may still salvage their valid cells.
+
 ## Explicit repair
 
 Repair is distinct from garbage collection:
@@ -499,15 +542,16 @@ Repair is distinct from garbage collection:
   from immutable records, reconstructs a new index and proves that the selected
   synced root is complete.
 
-Repair is always offline, read-only on the source and directed into a new
-file. Its default upper bound is the selected header's `syncedFileEnd`; physical
-bytes beyond that point have no committed root and are outside the durability
-guarantee. A repair implementation:
+Repair always uses unsafe maintenance open, is offline and read-only on the
+source, and is directed into a new file. After obtaining the writer-excluding
+lock, it snapshots physical EOF and scans to that bound. Physical bytes beyond
+`syncedFileEnd` are outside the durability guarantee but may contain complete,
+valid cells from unsynchronised writes. A repair implementation:
 
 1. validates and selects a header, obtaining `rootHash`, `syncedFileEnd` and
-   any required cipher parameters;
-2. sequentially scans the body for candidate cell records, decrypting at their
-   absolute offsets when necessary;
+   any required cipher parameters, then snapshots physical EOF;
+2. sequentially scans the body through physical EOF for candidate cell
+   records, decrypting at their absolute offsets when necessary;
 3. ignores mutable status and cached metadata, and accepts a candidate only
    after bounds, canonical CAD3 and content-hash validation;
 4. writes every accepted hash-and-encoding pair into a new Etch file, thereby
@@ -516,6 +560,17 @@ guarantee. A repair implementation:
 6. verifies the recovered root transitively and sets it only when every value
    reachable from it is present and valid in the new store; and
 7. syncs and fully validates the new file before reporting success.
+
+A candidate that crosses physical EOF is incomplete and rejected. A valid cell
+beyond `syncedFileEnd` is copied exactly like an earlier valid cell, but is
+reported as salvaged tail data. It cannot supply a newer root because no such
+root was committed in a valid header. The selected synced root remains the only
+root used for repair verification and destination-root assignment.
+
+If physical EOF is smaller than `syncedFileEnd`, the checkpoint has been
+truncated and the durability precondition has failed. Repair may still scan the
+available bytes and succeeds only if the selected root nevertheless verifies
+as fully persisted in the destination.
 
 The defining success criterion is that the selected `rootHash` is verified as
 fully persisted in the repaired store. The root must resolve to a valid cell
@@ -732,6 +787,36 @@ A crash during migration leaves the source valid. The incomplete destination is
 recoverable or disposable; it must not replace the source until its final sync
 and validation have completed.
 
+### Migration from a corrupt source
+
+Normal migration remains strict. It uses normal fail-fast open and reports
+success only after every indexed source entry has been copied and the
+destination has been synced and validated.
+
+`etch migrate --unsafe --into <destination>` instead uses unsafe maintenance
+open and a lenient index walk. It attempts to copy every independently readable
+indexed cell, records the exact slots and subtrees it could not traverse, and
+continues wherever bounds and structure permit. The source remains read-only.
+This can be substantially faster than full-file repair and may rescue all data
+when damage is confined to an entry that can be skipped or when alternative
+index paths still expose everything required.
+
+Unsafe migration cannot claim that it copied every source cell if any index
+path was skipped: valid but unreachable records may remain hidden. Its report
+therefore contains two independent results:
+
+- **index coverage** is complete only if the entire index walk finished with no
+  skipped or invalid slot, block or record; and
+- **root persistence** is complete only if the selected source root verifies
+  transitively in the destination with an empty missing-hash set.
+
+`--set-root` may set the destination root only after the root-persistence check
+succeeds. A complete root means the synced logical state has been rescued even
+if migration cannot prove complete index coverage. Conversely, copied entries
+are retained for further attempts when root verification fails, but the
+command must report a partial result rather than successful rescue or complete
+migration. Full-file `etch repair` remains the index-independent path.
+
 ## Follow-up format work
 
 The header fixes enough structure to design the remaining v3 pieces separately:
@@ -743,7 +828,8 @@ The header fixes enough structure to design the remaining v3 pieces separately:
 - monotonic status and memory-size update ordering;
 - precise index-block encodings and recovery treatment of abandoned chain
   slots; and
-- API names and semantics for `sync`, relaxed recovery and any strict mode.
+- API names and semantics for `sync`, unsafe read-only maintenance open,
+  lenient migration and any strict mode.
 
 The data-record design must preserve the same performance principle: no durable
 write is required until `sync`, while a completed `sync` must be independently

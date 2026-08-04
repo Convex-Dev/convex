@@ -173,15 +173,13 @@ public class Etch {
 
 		if (newFile) {
 			// Need to populate  new file, with data length long and initial index block
-			EtchCursor mbb=seekMap(0);
-
 			// write Header, initally zeros expect magic number and version
 			byte[] temp=new byte[Math.toIntExact(indexStart)];
 			System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
 			Utils.writeShort(temp, (int)OFFSET_VERSION,version);
-			mbb.put(temp);
+			writeBytes(0,temp,0,temp.length);
 			
-			dataLength=indexStart;
+			setDataLength(indexStart);
 
 			// add an index block
 			long rootIndex=appendNewIndexBlock(0);
@@ -240,21 +238,54 @@ public class Etch {
 	}
 
 	/**
-	 * Gets a mapped-storage cursor for a given position.
+	 * Validates and normalises a mapped-storage position.
 	 * Type flags are ignored if included in the position pointer.
 	 *
-	 * @param position Target position for the cursor
-	 * @return cursor at the requested absolute file position
-	 * @throws IOException
+	 * @param position Target position
+	 * @return requested absolute file position without pointer type flags
 	 */
-	private EtchCursor seekMap(long position) throws IOException {
+	private long checkedPosition(long position) {
 		position=rawPointer(position); // ensure we don't have any pesky type bits
 
 		if ((position<0)||(position>dataLength)) {
 			throw new EtchCorruptionError("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
 		}
 
-		return fileMapper.cursor(position,dataLength);
+		return position;
+	}
+
+	private byte readByte(long position) throws IOException {
+		return fileMapper.getByte(checkedPosition(position));
+	}
+
+	private short readShort(long position) throws IOException {
+		return fileMapper.getShort(checkedPosition(position));
+	}
+
+	private long readLongAcquire(long position) throws IOException {
+		return fileMapper.getLongAcquire(checkedPosition(position));
+	}
+
+	private void readBytes(long position, byte[] destination, int offset, int length)
+			throws IOException {
+		fileMapper.get(checkedPosition(position),destination,offset,length);
+	}
+
+	private void writeByte(long position, byte value) throws IOException {
+		fileMapper.putByte(checkedPosition(position),value);
+	}
+
+	private void writeLong(long position, long value) throws IOException {
+		fileMapper.putLong(checkedPosition(position),value);
+	}
+
+	private void writeLongRelease(long position, long value) throws IOException {
+		fileMapper.putLongRelease(checkedPosition(position),value);
+	}
+
+	private void writeBytes(long position, byte[] source, int offset, int length)
+			throws IOException {
+		fileMapper.put(checkedPosition(position),source,offset,length);
 	}
 
 	/**
@@ -498,16 +529,14 @@ public class Etch {
 	 * @throws IOException
 	 */
 	Blob readBlob(long pointer, int length) throws IOException {
-		EtchCursor mbb=seekMap(pointer);
 		byte[] bs=new byte[length];
-		mbb.get(bs);
+		readBytes(pointer,bs,0,length);
 		return Blob.wrap(bs);
 	}
 	
 	public Hash readValueKey(long ptr) throws IOException {
-		EtchCursor mbb=seekMap(ptr);
 		byte[] bs=new byte[KEY_SIZE];
-		mbb.get(bs);
+		readBytes(ptr,bs,0,KEY_SIZE);
 		return Hash.wrap(bs);
 	}
 
@@ -571,9 +600,7 @@ public class Etch {
 	 */
 	protected void writeDataLength() throws IOException {
 		// write final data length
-		EtchCursor mbb=seekMap(OFFSET_FILE_SIZE);
-		mbb.putLong(dataLength);
-		mbb=null;
+		writeLong(OFFSET_FILE_SIZE,dataLength);
 	}
 	
 	/**
@@ -610,9 +637,8 @@ public class Etch {
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
 		long dataPosition=rawPointer(dataPointer);
-		EtchCursor mbb=seekMap(dataPosition);
 		byte[] temp=tempArray.get();
-		mbb.get(temp, 0, KEY_SIZE);
+		readBytes(dataPosition,temp,0,KEY_SIZE);
 		if (key.equalsBytes(temp,0)) {
 			// key already in store matching at this data position
 			return true;
@@ -643,8 +669,7 @@ public class Etch {
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		// set the datalength to the last available byte in the file after adding index block
 		setDataLength(position+indexBlockLength);
-		EtchCursor mbb=seekMap(position);
-		mbb.put(temp,0,indexBlockLength); // write index block
+		writeBytes(position,temp,0,indexBlockLength); // write index block
 		return position;
 	}
 
@@ -680,27 +705,27 @@ public class Etch {
 	}
 		
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
-		EtchCursor mbb;
+		long recordPosition=checkedPosition(pointer);
+		byte[] recordHeader=tempArray.get();
+		int headerOffset=0;
 		if (key==null) {
-			mbb=seekMap(pointer);
-			byte[] bs=new byte[KEY_SIZE];
-			mbb.get(bs);
-			key=Hash.wrap(bs);
+			readBytes(recordPosition,recordHeader,0,KEY_SIZE+LABEL_SIZE+LENGTH_SIZE);
+			key=Hash.wrap(Arrays.copyOf(recordHeader,KEY_SIZE));
+			headerOffset=KEY_SIZE;
 		} else {
-			// seek to correct position, skipping over key
-			mbb=seekMap(pointer+KEY_SIZE);
+			readBytes(recordPosition+KEY_SIZE,recordHeader,0,LABEL_SIZE+LENGTH_SIZE);
 		}
 		
 		// get flags byte
-		byte flagByte=mbb.get();
+		byte flagByte=recordHeader[headerOffset];
 
 		// Get memory size
-		long memorySize=mbb.getLong();
+		long memorySize=Utils.readLong(recordHeader,headerOffset+Byte.BYTES,Long.BYTES);
 
 		// get Data length
-		short length=mbb.getShort();
+		short length=Utils.readShort(recordHeader,headerOffset+LABEL_SIZE);
 		byte[] bs=new byte[length];
-		mbb.get(bs);
+		readBytes(recordPosition+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE,bs,0,length);
 		Blob encoding= Blob.wrap(bs);
 		try {
 			Hash hash=Hash.wrap(key);
@@ -749,8 +774,7 @@ public class Etch {
 	 */
 	public long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
-		EtchCursor mbb=seekMap(pointerIndex);
-		return mbb.getLongAcquire();
+		return readLongAcquire(pointerIndex);
 	}
 
 	/**
@@ -780,24 +804,24 @@ public class Etch {
 		// ensure we have a raw position
 		position=rawPointer(position);
 		
-		// Seek to status location
-		EtchCursor mbb=seekMap(position+KEY_SIZE);
+		long labelPosition=position+KEY_SIZE;
 
 		// Get current stored values
-		int currentFlags=mbb.get();
+		byte[] label=tempArray.get();
+		readBytes(labelPosition,label,0,LABEL_SIZE);
+		int currentFlags=label[0];
 		int newFlags=Ref.mergeFlags(currentFlags,ref.getFlags()); // idempotent flag merge
 
-		long currentSize=mbb.getLong();
+		long currentSize=Utils.readLong(label,Byte.BYTES,Long.BYTES);
 
 		if (currentFlags==newFlags) return ref;
 
 		// We have a status change, need to increase status of store
-		mbb=seekMap(position+KEY_SIZE);
-		mbb.put((byte)newFlags);
+		writeByte(labelPosition,(byte)newFlags);
 
 		// maybe update size, if not already persisted
 		if ((currentSize==0L)&&((newFlags&Ref.STATUS_MASK)>=Ref.PERSISTED)) {
-			mbb.putLong(ref.getValue().getMemorySize());
+			writeLong(labelPosition+Byte.BYTES,ref.getValue().getMemorySize());
 		}
 
 		return ref.withFlags(newFlags);	// reflect merged flags
@@ -813,8 +837,7 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position=indexPosition+digit*POINTER_SIZE;
-		EtchCursor mbb=seekMap(position);
-		mbb.putLongRelease(slotValue);
+		writeLongRelease(position,slotValue);
 	}
 	
 	/**
@@ -926,17 +949,14 @@ public class Etch {
 	 */
 	private int getDigit(long dp, int level) throws IOException {
 		if (level==0) {
-			EtchCursor mbb=seekMap(dp);
-			return mbb.getShort()&0xffff;
+			return readShort(dp)&0xffff;
 		} 
 		if (level==1) {
-			EtchCursor mbb=seekMap(dp+(level+1));
-			return mbb.get()&0xFF;
+			return readByte(dp+(level+1))&0xFF;
 		}
 		int bi=(level+4)/2;      // level 2,3 maps to 3 etc.
 		boolean hi=(level&1)==0; // we want high byte if even
-		EtchCursor mbb=seekMap(dp+bi);
-		byte v= mbb.get();
+		byte v=readByte(dp+bi);
 		return (hi?(v>>4):v)&0xf;		
 	}
 
@@ -970,15 +990,12 @@ public class Etch {
 		// Root placement is selected by the file version. All child indexes are
 		// naturally aligned and reached through explicit pointers.
 		long position=(level==0)?indexStart:nextIndexPosition();
-		EtchCursor mbb=null;
-		
 		// set the datalength to the last available byte in the file
 		setDataLength(position+sizeBytes);
 		
 		// Use temporary zero array to fill new index block
 		for (int ix=0; ix<sizeBytes; ix+=ZLEN) {
-			mbb=seekMap(position+ix);
-			mbb.put(ZERO_ARRAY,0,Math.min(sizeBytes-ix,ZLEN));
+			writeBytes(position+ix,ZERO_ARRAY,0,Math.min(sizeBytes-ix,ZLEN));
 		}
 		return position;
 	}
@@ -1010,33 +1027,33 @@ public class Etch {
 			memorySize=cell.getMemorySize();
 		}
 
-		// position ready for append
-		final long position=dataLength;
-		EtchCursor mbb=seekMap(position);
-
-		// append key
-		mbb.put(key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
-
-		// append flags (1 byte)
-		int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
-		mbb.put((byte)(flags)); // currently all flags fit in one byte
-
-		// append Memory Size (8 bytes). Initialised to 0L if STORED only.
-		mbb.putLong(memorySize);
-
-		// append blob length
 		short length=Utils.checkedShort(encoding.count());
 		if (length==0) {
 			// Blob b=cell.createEncoding();
 			throw new Error("Etch trying to write zero length encoding for: "+Utils.getClassName(cell));
 		}
-		mbb.putShort(length);
+
+		// position ready for append
+		final long position=dataLength;
+		final long newDataLength=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length;
+		long writePosition=position;
+		// append key
+		fileMapper.put(writePosition,key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
+		writePosition+=KEY_SIZE;
+
+		// append flags, Memory Size and blob length as one fixed-size header
+		byte[] recordHeader=tempArray.get();
+		int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
+		recordHeader[0]=(byte)flags; // currently all flags fit in one byte
+		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
+		Utils.writeShort(recordHeader,LABEL_SIZE,length);
+		fileMapper.put(writePosition,recordHeader,0,LABEL_SIZE+LENGTH_SIZE);
+		writePosition+=LABEL_SIZE+LENGTH_SIZE;
 
 		// append blob value
-		mbb.put(encoding.getInternalArray(),encoding.getInternalOffset(),length);
+		fileMapper.put(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),length);
 
-		// set the datalength to the last available byte in the file
-		setDataLength(position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length);
+		setDataLength(newDataLength);
 
 		// return file position for added data
 		return position;
@@ -1066,9 +1083,8 @@ public class Etch {
 	}
 
 	public synchronized Hash getRootHash() throws IOException {
-		EtchCursor mbb=seekMap(OFFSET_ROOT_HASH);
 		byte[] bs=new byte[Hash.LENGTH];
-		mbb.get(bs);
+		readBytes(OFFSET_ROOT_HASH,bs,0,Hash.LENGTH);
 		// Preserve the distinction between a never-assigned, zero-initialised root
 		// and an explicitly written null root (Hash.NULL_HASH).
 		if (Arrays.equals(bs, Utils.ZERO_BYTES_32)) return Hash.UNSET_HASH;
@@ -1081,10 +1097,9 @@ public class Etch {
 	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
-		EtchCursor mbb=seekMap(OFFSET_ROOT_HASH);
 		byte[] bs=h.getBytes();
 		assert(bs.length==Hash.LENGTH);
-		mbb.put(bs);
+		writeBytes(OFFSET_ROOT_HASH,bs,0,bs.length);
 	}
 
 	public void setStore(EtchStore etchStore) {
