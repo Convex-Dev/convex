@@ -528,6 +528,24 @@ public class Utils {
 		if (a != i) throw new IllegalArgumentException(ErrorMessages.sizeOutOfRange(a));
 		return i;
 	}
+
+	/**
+	 * Rounds a non-negative value up to the next multiple of an alignment.
+	 * An already aligned value is returned unchanged.
+	 *
+	 * @param value Value to align
+	 * @param alignment Positive alignment
+	 * @return Smallest aligned value greater than or equal to {@code value}
+	 * @throws IllegalArgumentException If the value is negative or alignment is not positive
+	 * @throws ArithmeticException If the aligned result exceeds the {@code long} range
+	 */
+	public static long roundUpToAlignment(long value, long alignment) {
+		if (value<0L) throw new IllegalArgumentException("Cannot align a negative value: "+value);
+		if (alignment<=0L) throw new IllegalArgumentException("Alignment must be positive: "+alignment);
+		long remainder=value%alignment;
+		if (remainder==0L) return value;
+		return Math.addExact(value,alignment-remainder);
+	}
 	
 
 	public static long checkedLong(double d) {

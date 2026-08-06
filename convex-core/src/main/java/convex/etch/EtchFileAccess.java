@@ -2,6 +2,7 @@ package convex.etch;
 
 import java.io.IOException;
 
+import convex.core.data.AArrayBlob;
 import convex.core.util.Utils;
 
 /**
@@ -14,15 +15,10 @@ import convex.core.util.Utils;
 final class EtchFileAccess implements AutoCloseable {
 	private static final int ZERO_BUFFER_SIZE=16_384;
 	private static final byte[] ZERO_BUFFER=new byte[ZERO_BUFFER_SIZE];
-	private static final long NO_APPEND=-1L;
 
 	private final EtchFileMapper mapper;
 	private final String fileName;
 	private volatile long dataLength;
-
-	// Append state is accessed only by Etch's single writer.
-	private long appendBase=NO_APPEND;
-	private long appendEnd=NO_APPEND;
 
 	EtchFileAccess(EtchFileMapper mapper, String fileName, long dataLength, long physicalLength) {
 		this.mapper=mapper;
@@ -33,96 +29,81 @@ final class EtchFileAccess implements AutoCloseable {
 		}
 	}
 
-	byte getByte(long position) throws IOException {
-		return mapper.getByte(checkedRange(position,Byte.BYTES));
-	}
-
-	short getShort(long position) throws IOException {
-		return mapper.getShort(checkedRange(position,Short.BYTES));
-	}
-
-	long getLongAcquire(long position) throws IOException {
-		return mapper.getLongAcquire(checkedRange(position,Long.BYTES));
-	}
-
-	void get(long position, byte[] destination, int offset, int length) throws IOException {
+	void readHeader(long position, byte[] destination, int offset, int length) throws IOException {
 		mapper.get(checkedRange(position,length),destination,offset,length);
 	}
 
-	void putByte(long position, byte value) throws IOException {
-		mapper.putByte(checkedRange(position,Byte.BYTES),value);
-	}
-
-	void putLong(long position, long value) throws IOException {
-		mapper.putLong(checkedRange(position,Long.BYTES),value);
-	}
-
-	void putLongRelease(long position, long value) throws IOException {
-		mapper.putLongRelease(checkedRange(position,Long.BYTES),value);
-	}
-
-	void put(long position, byte[] source, int offset, int length) throws IOException {
-		mapper.put(checkedRange(position,length),source,offset,length);
-	}
-
-	long append(byte[] source, int offset, int length, int alignment) throws IOException {
-		long position=beginAppend(length,alignment);
-		try {
-			putAppend(position,source,offset,length);
-			commitAppend();
-			return position;
-		} catch (IOException | RuntimeException | Error e) {
-			abortAppend();
-			throw e;
-		}
-	}
-
-	long appendZeroes(int length, int alignment) throws IOException {
-		long position=beginAppend(length,alignment);
-		try {
-			for (int offset=0;offset<length;offset+=ZERO_BUFFER_SIZE) {
-				putAppend(position+offset,ZERO_BUFFER,0,Math.min(length-offset,ZERO_BUFFER_SIZE));
-			}
-			commitAppend();
-			return position;
-		} catch (IOException | RuntimeException | Error e) {
-			abortAppend();
-			throw e;
-		}
-	}
-
-	long beginAppend(long length, int alignment) {
-		if (appendEnd!=NO_APPEND) throw new IllegalStateException("Etch append already in progress");
-		if ((length<0L)||(alignment<=0)||((alignment&(alignment-1))!=0)) {
-			throw new IllegalArgumentException("Invalid Etch append length or alignment");
-		}
-		long base=dataLength;
-		long position=Math.addExact(base,alignment-1L)&-alignment;
-		appendBase=base;
-		appendEnd=Math.addExact(position,length);
-		return position;
-	}
-
-	void putAppend(long position, byte[] source, int offset, int length) throws IOException {
-		if (appendEnd==NO_APPEND) throw new IllegalStateException("No Etch append in progress");
-		long end=rangeEnd(position,length);
-		if ((position<appendBase)||(end>appendEnd)) {
-			throw new IllegalArgumentException("Write outside reserved Etch append range");
-		}
+	void writeHeader(long position, byte[] source, int offset, int length) throws IOException {
+		position=checkedRange(position,length);
+		mapper.ensureWriteCapacity(position,length);
 		mapper.put(position,source,offset,length);
 	}
 
-	void commitAppend() {
-		if (appendEnd==NO_APPEND) throw new IllegalStateException("No Etch append in progress");
-		if (dataLength!=appendBase) throw new IllegalStateException("Etch data length changed during append");
-		dataLength=appendEnd;
-		appendBase=NO_APPEND;
-		appendEnd=NO_APPEND;
+	void readData(long position, byte[] destination, int offset, int length) throws IOException {
+		mapper.get(checkedRange(position,length),destination,offset,length);
 	}
 
-	void abortAppend() {
-		appendBase=NO_APPEND;
-		appendEnd=NO_APPEND;
+	void writeData(long position, byte[] source, int offset, int length) throws IOException {
+		position=checkedRange(position,length);
+		mapper.ensureWriteCapacity(position,length);
+		mapper.put(position,source,offset,length);
+	}
+
+	long readIndexSlotAcquire(long position) throws IOException {
+		return mapper.readIndexSlotAcquire(checkedRange(position,Long.BYTES));
+	}
+
+	void writeIndexSlotRelease(long position, long value) throws IOException {
+		mapper.writeIndexSlotRelease(checkedRange(position,Long.BYTES),value);
+	}
+
+	long appendHeader(byte[] source, int offset, int length) throws IOException {
+		return append(source,offset,length,1);
+	}
+
+	long appendIndex(byte[] source, int offset, int length, int alignment) throws IOException {
+		return append(source,offset,length,alignment);
+	}
+
+	private long append(byte[] source, int offset, int length, int alignment) throws IOException {
+		long position=prepareAppend(length,alignment);
+		mapper.put(position,source,offset,length);
+		dataLength=Math.addExact(position,length);
+		return position;
+	}
+
+	long appendZeroIndex(int length, int alignment) throws IOException {
+		long position=prepareAppend(length,alignment);
+		for (int offset=0;offset<length;offset+=ZERO_BUFFER_SIZE) {
+			mapper.put(position+offset,ZERO_BUFFER,0,Math.min(length-offset,ZERO_BUFFER_SIZE));
+		}
+		dataLength=Math.addExact(position,length);
+		return position;
+	}
+
+	long appendDataRecord(AArrayBlob key, byte[] recordHeader, int headerLength,
+			AArrayBlob encoding) throws IOException {
+		int keyLength=Math.toIntExact(key.count());
+		int encodingLength=Math.toIntExact(encoding.count());
+		long recordLength=Math.addExact(Math.addExact(keyLength,headerLength),encodingLength);
+		long position=prepareAppend(recordLength,1);
+		long writePosition=position;
+		mapper.put(writePosition,key.getInternalArray(),key.getInternalOffset(),keyLength);
+		writePosition+=keyLength;
+		mapper.put(writePosition,recordHeader,0,headerLength);
+		writePosition+=headerLength;
+		mapper.put(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),encodingLength);
+		dataLength=Math.addExact(position,recordLength);
+		return position;
+	}
+
+	private long prepareAppend(long length, int alignment) throws IOException {
+		if ((length<0L)||(alignment<=0)||((alignment&(alignment-1))!=0)) {
+			throw new IllegalArgumentException("Invalid Etch append length or alignment");
+		}
+		long position=Utils.roundUpToAlignment(dataLength,alignment);
+		mapper.ensureWriteCapacity(position,length);
+		return position;
 	}
 
 	long getDataLength() {

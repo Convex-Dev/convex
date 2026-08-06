@@ -61,10 +61,6 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	private static final Mapping[] EMPTY_MAPPINGS=new Mapping[0];
 
-	private static final ValueLayout.OfShort SHORT=
-			ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
-	private static final ValueLayout.OfLong LONG=
-			ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 	private static final VarHandle ALIGNED_LONG=
 			ValueLayout.JAVA_LONG.withOrder(ByteOrder.BIG_ENDIAN).varHandle();
 
@@ -77,56 +73,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public byte getByte(long position) throws IOException {
-		ensureMapped(position,Byte.BYTES,false);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				return current.segment.get(ValueLayout.JAVA_BYTE,current.offset(position));
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public short getShort(long position) throws IOException {
-		if (crossesRegion(position,Short.BYTES)) {
-			byte[] data=new byte[Short.BYTES];
-			get(position,data,0,data.length);
-			return Utils.readShort(data,0);
-		}
-		ensureMapped(position,Short.BYTES,false);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				return current.segment.get(SHORT,current.offset(position));
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public long getLong(long position) throws IOException {
-		if (crossesRegion(position,Long.BYTES)) {
-			byte[] data=new byte[Long.BYTES];
-			get(position,data,0,data.length);
-			return Utils.readLong(data,0,Long.BYTES);
-		}
-		ensureMapped(position,Long.BYTES,false);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				return current.segment.get(LONG,current.offset(position));
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public long getLongAcquire(long position) throws IOException {
+	public long readIndexSlotAcquire(long position) throws IOException {
 		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES,false);
 		Mapping current=mappingFor(position,null);
@@ -166,61 +113,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public void putByte(long position, byte value) throws IOException {
-		ensureMapped(position,Byte.BYTES,true);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				current.segment.set(ValueLayout.JAVA_BYTE,current.offset(position),value);
-				return;
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public void putShort(long position, short value) throws IOException {
-		if (crossesRegion(position,Short.BYTES)) {
-			byte[] data=new byte[Short.BYTES];
-			Utils.writeShort(data,0,value);
-			put(position,data,0,data.length);
-			return;
-		}
-		ensureMapped(position,Short.BYTES,true);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				current.segment.set(SHORT,current.offset(position),value);
-				return;
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public void putLong(long position, long value) throws IOException {
-		if (crossesRegion(position,Long.BYTES)) {
-			byte[] data=new byte[Long.BYTES];
-			Utils.writeLong(data,0,value);
-			put(position,data,0,data.length);
-			return;
-		}
-		ensureMapped(position,Long.BYTES,true);
-		Mapping current=mappingFor(position,null);
-		while (true) {
-			try {
-				current.segment.set(LONG,current.offset(position),value);
-				return;
-			} catch (IllegalStateException e) {
-				current=mappingFor(position,current);
-			}
-		}
-	}
-
-	@Override
-	public void putLongRelease(long position, long value) throws IOException {
+	public void writeIndexSlotRelease(long position, long value) throws IOException {
 		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES,true);
 		Mapping current=mappingFor(position,null);
@@ -235,10 +128,13 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public void put(long position, byte[] source, int offset, int length) throws IOException {
-		checkRange(position,length);
-		if (length==0) return;
+	public void ensureWriteCapacity(long position, long length) throws IOException {
 		ensureMapped(position,length,true);
+	}
+
+	@Override
+	public void put(long position, byte[] source, int offset, int length) {
+		if (length==0) return;
 
 		long currentPosition=position;
 		int currentOffset=offset;
@@ -301,11 +197,11 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 		boolean initialMapping=writable&&(regionIndex==0)&&(previous==null)
 				&&(fileSize==0L)&&(target<=INITIAL_MAPPING_SIZE);
 		if (initialMapping) {
-			target=alignUp(INITIAL_MAPPING_SIZE);
+			target=Utils.roundUpToAlignment(INITIAL_MAPPING_SIZE,MAPPING_ALIGNMENT);
 		} else if (writable&&(requiredLength>physicalLength)) {
 			long extent=Math.max(fileSize,Math.addExact(start,target));
 			target=Math.min(REGION_SIZE,Math.addExact(target,mappingGrowth(extent)));
-			target=Math.min(REGION_SIZE,alignUp(target));
+			target=Math.min(REGION_SIZE,Utils.roundUpToAlignment(target,MAPPING_ALIGNMENT));
 		}
 
 		long targetEnd=Math.addExact(start,target);
@@ -350,10 +246,6 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	private static long mappingGrowth(long extent) {
 		long proportional=extent>>PROPORTIONAL_GROWTH_SHIFT;
 		return Math.max(MIN_MAPPING_GROWTH,Math.min(MAX_MAPPING_GROWTH,proportional));
-	}
-
-	private static long alignUp(long value) {
-		return Math.addExact(value,MAPPING_ALIGNMENT-1L)&-MAPPING_ALIGNMENT;
 	}
 
 	private static boolean covers(Mapping[] current, long position, long end) {

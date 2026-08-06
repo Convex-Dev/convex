@@ -75,6 +75,31 @@ public class EtchFileMapperTest {
 		}
 	}
 
+	@Test
+	public void testWriteCapacityIsPreparedBeforePut() throws Exception {
+		assertWriteCapacityIsPrepared(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER);
+		if (EtchFileMapperFactory.isFFMAvailable()) {
+			assertWriteCapacityIsPrepared(EtchConfig.MappingMode.MEMORY_SEGMENT);
+		}
+	}
+
+	private static void assertWriteCapacityIsPrepared(EtchConfig.MappingMode mode) throws Exception {
+		File file=File.createTempFile("etch-mapper-capacity", ".dat");
+		long position=GROWN_POSITION;
+		byte[] value=new byte[] { 1,2,3,4,5,6,7,8 };
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
+				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
+			mapper.ensureWriteCapacity(position,value.length);
+			assertTrue(data.length()>=position+value.length,
+					"Write capacity was not present before put");
+			mapper.put(position,value,0,value.length);
+			byte[] actual=new byte[value.length];
+			mapper.get(position,actual,0,actual.length);
+			assertArrayEquals(value,actual);
+		}
+		if (!file.delete()) file.deleteOnExit();
+	}
+
 	private static void assertReadsDoNotExtend(EtchConfig.MappingMode mode) throws Exception {
 		File file=File.createTempFile("etch-mapper-existing", ".dat");
 		long existingLength=1_003L;
@@ -83,9 +108,9 @@ public class EtchFileMapperTest {
 			data.setLength(existingLength);
 			try (EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
 				implementation=mapper.implementationName();
-				mapper.getByte(existingLength-1L);
+				mapper.get(existingLength-1L,new byte[1],0,1);
 				assertEquals(existingLength,data.length(),"Reading an existing file changed its length");
-				assertThrows(java.io.IOException.class,()->mapper.getByte(existingLength));
+				assertThrows(java.io.IOException.class,()->mapper.get(existingLength,new byte[1],0,1));
 				assertEquals(existingLength,data.length(),"An invalid read extended the file");
 			}
 		}
@@ -98,26 +123,28 @@ public class EtchFileMapperTest {
 	}
 
 	private static void assertRoundTripAndGrowth(EtchFileMapper mapper) throws Exception {
-		mapper.putByte(3L,(byte)0x12);
-		mapper.putShort(4L,(short)0x3456);
-		mapper.putLong(6L,0x789abcdef0123456L);
-		mapper.putLongRelease(16L,0x0102030405060708L);
+		byte[] prefix=new byte[] { 0x12,0x34,0x56,0x78,0x09,0x0a,0x0b,0x0c };
+		mapper.ensureWriteCapacity(3L,32L);
+		mapper.put(3L,prefix,0,prefix.length);
+		mapper.writeIndexSlotRelease(24L,0x0102030405060708L);
 		byte[] source=new byte[] { 9,8,7,6,5 };
 		mapper.put(32L,source,1,3);
 
 		// Force a remap, then confirm old positions remain accessible.
-		mapper.putLong(GROWN_POSITION,0x1122334455667788L);
-		mapper.putByte(14L,(byte)0x5a);
+		byte[] grown=new byte[] { 0x11,0x22,0x33,0x44,0x55,0x66,0x77,(byte)0x88 };
+		mapper.ensureWriteCapacity(GROWN_POSITION,grown.length);
+		mapper.put(GROWN_POSITION,grown,0,grown.length);
 
-		assertEquals((byte)0x12,mapper.getByte(3L));
-		assertEquals((short)0x3456,mapper.getShort(4L));
-		assertEquals(0x789abcdef0123456L,mapper.getLong(6L));
-		assertEquals((byte)0x5a,mapper.getByte(14L));
-		assertEquals(0x0102030405060708L,mapper.getLongAcquire(16L));
+		byte[] actualPrefix=new byte[prefix.length];
+		mapper.get(3L,actualPrefix,0,actualPrefix.length);
+		assertArrayEquals(prefix,actualPrefix);
+		assertEquals(0x0102030405060708L,mapper.readIndexSlotAcquire(24L));
 		byte[] destination=new byte[3];
 		mapper.get(32L,destination,0,destination.length);
 		assertArrayEquals(new byte[] { 8,7,6 },destination);
-		assertEquals(0x1122334455667788L,mapper.getLong(GROWN_POSITION));
+		byte[] actualGrown=new byte[grown.length];
+		mapper.get(GROWN_POSITION,actualGrown,0,actualGrown.length);
+		assertArrayEquals(grown,actualGrown);
 
 		mapper.force();
 	}
