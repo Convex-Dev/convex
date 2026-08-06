@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
  * Contract tests shared by the Java 21 and FFM mapping backends.
  */
 public class EtchFileMapperTest {
+	private static final long GROWN_POSITION=2_000_000L;
+
 	@Test
 	public void testMapperRoundTripAndGrowth() throws Exception {
 		File file=File.createTempFile("etch-mapper", ".dat");
@@ -21,6 +23,11 @@ public class EtchFileMapperTest {
 			EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2);
 			implementation=mapper.implementationName();
 			assertRoundTripAndGrowth(mapper);
+			if ("MemorySegment".equals(implementation)) {
+				long allocated=data.length();
+				assertTrue(allocated>=(64L<<20),"FFM growth used an unexpectedly small increment");
+				assertTrue(allocated<=(70L<<20),"FFM growth allocated excessive file space");
+			}
 			mapper.close();
 		}
 
@@ -59,6 +66,22 @@ public class EtchFileMapperTest {
 		if (!file.delete()) file.deleteOnExit();
 	}
 
+	@Test
+	public void testFFMDoesNotExtendExistingFileOnOpen() throws Exception {
+		File file=File.createTempFile("etch-mapper-existing", ".dat");
+		long existingLength=(10L<<20)+123L;
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			data.setLength(existingLength);
+			try (EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
+				if ("MemorySegment".equals(mapper.implementationName())) {
+					mapper.getByte(0L);
+					assertEquals(existingLength,data.length(),"Opening an existing file changed its length");
+				}
+			}
+		}
+		if (!file.delete()) file.deleteOnExit();
+	}
+
 	private static void assertRoundTripAndGrowth(EtchFileMapper mapper) throws Exception {
 		mapper.putByte(3L,(byte)0x12);
 		mapper.putShort(4L,(short)0x3456);
@@ -68,8 +91,7 @@ public class EtchFileMapperTest {
 		mapper.put(32L,source,1,3);
 
 		// Force a remap, then confirm old positions remain accessible.
-		long grownPosition=300_000L;
-		mapper.putLong(grownPosition,0x1122334455667788L);
+		mapper.putLong(GROWN_POSITION,0x1122334455667788L);
 		mapper.putByte(14L,(byte)0x5a);
 
 		assertEquals((byte)0x12,mapper.getByte(3L));
@@ -80,7 +102,7 @@ public class EtchFileMapperTest {
 		byte[] destination=new byte[3];
 		mapper.get(32L,destination,0,destination.length);
 		assertArrayEquals(new byte[] { 8,7,6 },destination);
-		assertEquals(0x1122334455667788L,mapper.getLong(grownPosition));
+		assertEquals(0x1122334455667788L,mapper.getLong(GROWN_POSITION));
 
 		mapper.force();
 	}

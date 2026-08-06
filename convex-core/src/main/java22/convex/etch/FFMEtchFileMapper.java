@@ -5,28 +5,71 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.VarHandle;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
+import java.util.Arrays;
+
+import convex.core.util.Utils;
 
 /**
  * FFM Etch mapping backend, loaded on JDK 22+ from the multi-release JAR.
  *
- * <p>A single shared-arena segment covers the file. Growth publishes a larger
- * mapping and closes the superseded arena, so Windows releases the old mapping
- * deterministically.</p>
+ * <p>The file is divided into fixed-size address regions. Completed regions
+ * remain mapped for the life of the mapper; growth replaces only the final
+ * partial region. This bounds both remapping work and unused file allocation,
+ * while direct region indexing keeps the normal access path small.</p>
+ *
+ * <p>Growth tuning is deliberately local to this implementation. These values
+ * affect only allocation and mapping frequency, not the Etch file format.</p>
  */
 final class FFMEtchFileMapper implements EtchFileMapper {
+	/** Shift used for direct address-to-region conversion. */
+	private static final int REGION_SHIFT=30;
+
+	/**
+	 * Maximum size of one mapping. A 1 GiB region bounds the cost of replacing
+	 * the active mapping while requiring only 1,024 entries for a 1 TiB file.
+	 */
+	private static final long REGION_SIZE=1L<<REGION_SHIFT;
+
+	/** Mask used to obtain an address within a region. */
+	private static final long REGION_MASK=REGION_SIZE-1L;
+
+	/**
+	 * Capacity rounding for new mappings. 64 KiB matches the conservative
+	 * Windows allocation granularity and is also a multiple of common page sizes.
+	 */
+	private static final long MAPPING_ALIGNMENT=1L<<16;
+
+	/** Initial allocation for a new, small Etch file. */
+	private static final long INITIAL_MAPPING_SIZE=1L<<20;
+
+	/**
+	 * Minimum extension once the initial mapping is exhausted. Remapping is
+	 * substantially more expensive than ordinary mapped access, so small files
+	 * grow by at least 64 MiB rather than repeatedly remapping in tiny steps.
+	 */
+	private static final long MIN_MAPPING_GROWTH=1L<<26;
+
+	/** Maximum speculative extension; never larger than one address region. */
+	private static final long MAX_MAPPING_GROWTH=REGION_SIZE;
+
+	/** Use 1/32 (3.125%) of current file extent as proportional headroom. */
+	private static final int PROPORTIONAL_GROWTH_SHIFT=5;
+
+	private static final Mapping[] EMPTY_MAPPINGS=new Mapping[0];
+
 	private static final ValueLayout.OfShort SHORT=
 			ValueLayout.JAVA_SHORT_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 	private static final ValueLayout.OfLong LONG=
 			ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 	private static final VarHandle ALIGNED_LONG=
 			ValueLayout.JAVA_LONG.withOrder(ByteOrder.BIG_ENDIAN).varHandle();
-	private static final long INITIAL_MAPPING_SIZE=1L<<17;
 
 	private final FileChannel channel;
-	private volatile Mapping mapping;
+	private volatile Mapping[] mappings=EMPTY_MAPPINGS;
 	private volatile boolean closed;
 
 	FFMEtchFileMapper(FileChannel channel) {
@@ -36,190 +79,333 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	@Override
 	public byte getByte(long position) throws IOException {
 		ensureMapped(position,Byte.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				return current.segment.get(ValueLayout.JAVA_BYTE,position);
+				return current.segment.get(ValueLayout.JAVA_BYTE,current.offset(position));
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public short getShort(long position) throws IOException {
+		if (crossesRegion(position,Short.BYTES)) {
+			byte[] data=new byte[Short.BYTES];
+			get(position,data,0,data.length);
+			return Utils.readShort(data,0);
+		}
 		ensureMapped(position,Short.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				return current.segment.get(SHORT,position);
+				return current.segment.get(SHORT,current.offset(position));
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public long getLong(long position) throws IOException {
+		if (crossesRegion(position,Long.BYTES)) {
+			byte[] data=new byte[Long.BYTES];
+			get(position,data,0,data.length);
+			return Utils.readLong(data,0,Long.BYTES);
+		}
 		ensureMapped(position,Long.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				return current.segment.get(LONG,position);
+				return current.segment.get(LONG,current.offset(position));
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public long getLongAcquire(long position) throws IOException {
+		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				return (long)ALIGNED_LONG.getAcquire(current.segment,position);
+				return (long)ALIGNED_LONG.getAcquire(current.segment,current.offset(position));
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public void get(long position, byte[] destination, int offset, int length) throws IOException {
+		checkRange(position,length);
 		if (length==0) return;
 		ensureMapped(position,length);
-		Mapping current=currentMapping(null);
-		while (true) {
+
+		long currentPosition=position;
+		int currentOffset=offset;
+		int remaining=length;
+		Mapping current=mappingFor(currentPosition,null);
+		while (remaining>0) {
+			int count=(int)Math.min(remaining,current.end()-currentPosition);
 			try {
-				MemorySegment.copy(current.segment,ValueLayout.JAVA_BYTE,position,
-						destination,offset,length);
-				return;
+				MemorySegment.copy(current.segment,ValueLayout.JAVA_BYTE,current.offset(currentPosition),
+						destination,currentOffset,count);
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(currentPosition,current);
+				continue;
 			}
+			currentPosition+=count;
+			currentOffset+=count;
+			remaining-=count;
+			if (remaining>0) current=mappingFor(currentPosition,null);
 		}
 	}
 
 	@Override
 	public void putByte(long position, byte value) throws IOException {
 		ensureMapped(position,Byte.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				current.segment.set(ValueLayout.JAVA_BYTE,position,value);
+				current.segment.set(ValueLayout.JAVA_BYTE,current.offset(position),value);
 				return;
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public void putShort(long position, short value) throws IOException {
+		if (crossesRegion(position,Short.BYTES)) {
+			byte[] data=new byte[Short.BYTES];
+			Utils.writeShort(data,0,value);
+			put(position,data,0,data.length);
+			return;
+		}
 		ensureMapped(position,Short.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				current.segment.set(SHORT,position,value);
+				current.segment.set(SHORT,current.offset(position),value);
 				return;
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public void putLong(long position, long value) throws IOException {
+		if (crossesRegion(position,Long.BYTES)) {
+			byte[] data=new byte[Long.BYTES];
+			Utils.writeLong(data,0,value);
+			put(position,data,0,data.length);
+			return;
+		}
 		ensureMapped(position,Long.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				current.segment.set(LONG,position,value);
+				current.segment.set(LONG,current.offset(position),value);
 				return;
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public void putLongRelease(long position, long value) throws IOException {
+		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES);
-		Mapping current=currentMapping(null);
+		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
-				ALIGNED_LONG.setRelease(current.segment,position,value);
+				ALIGNED_LONG.setRelease(current.segment,current.offset(position),value);
 				return;
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(position,current);
 			}
 		}
 	}
 
 	@Override
 	public void put(long position, byte[] source, int offset, int length) throws IOException {
+		checkRange(position,length);
 		if (length==0) return;
 		ensureMapped(position,length);
-		Mapping current=currentMapping(null);
-		while (true) {
+
+		long currentPosition=position;
+		int currentOffset=offset;
+		int remaining=length;
+		Mapping current=mappingFor(currentPosition,null);
+		while (remaining>0) {
+			int count=(int)Math.min(remaining,current.end()-currentPosition);
 			try {
-				MemorySegment.copy(source,offset,current.segment,ValueLayout.JAVA_BYTE,
-						position,length);
-				return;
+				MemorySegment.copy(source,currentOffset,current.segment,ValueLayout.JAVA_BYTE,
+						current.offset(currentPosition),count);
 			} catch (IllegalStateException e) {
-				current=currentMapping(current);
+				current=mappingFor(currentPosition,current);
+				continue;
 			}
+			currentPosition+=count;
+			currentOffset+=count;
+			remaining-=count;
+			if (remaining>0) current=mappingFor(currentPosition,null);
 		}
 	}
 
 	private void ensureMapped(long position, long length) throws IOException {
-		long requiredEnd=Math.addExact(position,length);
-		long preferredEnd=Math.addExact(requiredEnd,EtchConstants.REGION_MARGIN);
-		Mapping current=mapping;
-		if ((current!=null)&&(current.segment.byteSize()>=preferredEnd)) return;
+		checkRange(position,length);
+		if (length==0) return;
+		long requiredEnd=position+length;
+		Mapping[] current=mappings;
+		if (covers(current,position,requiredEnd)) return;
 
 		synchronized (this) {
 			if (closed) throw new IOException("Etch mapping is closed");
-			current=mapping;
-			if ((current!=null)&&(current.segment.byteSize()>=preferredEnd)) return;
+			current=mappings;
+			if (covers(current,position,requiredEnd)) return;
 
-			long target=INITIAL_MAPPING_SIZE;
-			while (target<preferredEnd) target=Math.multiplyExact(target,2L);
-
-			Arena arena=Arena.ofShared();
-			MemorySegment segment;
-			try {
-				segment=channel.map(MapMode.READ_WRITE,0L,target,arena);
-			} catch (IOException | RuntimeException e) {
-				arena.close();
-				throw e;
+			long fileSize=channel.size();
+			int firstRegion=regionIndex(position);
+			int lastRegion=regionIndex(requiredEnd-1L);
+			for (int i=firstRegion;i<=lastRegion;i++) {
+				long regionStart=regionStart(i);
+				long requiredLength=Math.min(REGION_SIZE,requiredEnd-regionStart);
+				if (requiredLength<=0L) continue;
+				fileSize=ensureRegionMapped(i,requiredLength,fileSize);
 			}
-
-			Mapping replacement=new Mapping(segment,arena);
-			Mapping previous=mapping;
-			mapping=replacement;
-			if (previous!=null) previous.arena.close();
 		}
 	}
 
-	private Mapping currentMapping(Mapping previous) {
-		Mapping current=mapping;
-		if (current==null) throw new IllegalStateException("Etch mapping is closed");
-		if ((previous!=null)&&(previous==current)) throw new IllegalStateException("Etch mapping is not accessible");
-		return current;
+	private long ensureRegionMapped(int regionIndex, long requiredLength, long fileSize) throws IOException {
+		Mapping[] current=mappings;
+		Mapping previous=(regionIndex<current.length)?current[regionIndex]:null;
+		if ((previous!=null)&&(previous.segment.byteSize()>=requiredLength)) return fileSize;
+
+		long start=regionStart(regionIndex);
+		long physicalLength=Math.min(REGION_SIZE,Math.max(0L,fileSize-start));
+		long existingLength=(previous==null)?0L:previous.segment.byteSize();
+		long target=Math.max(requiredLength,Math.max(physicalLength,existingLength));
+
+		boolean initialMapping=(regionIndex==0)&&(previous==null)&&(target<=INITIAL_MAPPING_SIZE);
+		if (initialMapping) {
+			target=alignUp(INITIAL_MAPPING_SIZE);
+		} else if (requiredLength>physicalLength) {
+			long extent=Math.max(fileSize,Math.addExact(start,target));
+			target=Math.min(REGION_SIZE,Math.addExact(target,mappingGrowth(extent)));
+			target=Math.min(REGION_SIZE,alignUp(target));
+		}
+
+		long targetEnd=Math.addExact(start,target);
+		if (targetEnd>fileSize) {
+			extendFile(targetEnd);
+			fileSize=targetEnd;
+		}
+
+		Arena arena=Arena.ofShared();
+		MemorySegment segment;
+		try {
+			segment=channel.map(MapMode.READ_WRITE,start,target,arena);
+		} catch (IOException | RuntimeException e) {
+			arena.close();
+			throw e;
+		}
+
+		Mapping replacement=new Mapping(start,segment,arena);
+		try {
+			current=mappings;
+			Mapping[] updated=(regionIndex<current.length)
+					?current.clone():Arrays.copyOf(current,regionIndex+1);
+			previous=(regionIndex<current.length)?current[regionIndex]:null;
+			updated[regionIndex]=replacement;
+			mappings=updated;
+		} catch (RuntimeException | Error e) {
+			arena.close();
+			throw e;
+		}
+		if (previous!=null) previous.arena.close();
+		return fileSize;
+	}
+
+	private void extendFile(long targetEnd) throws IOException {
+		if (channel.size()>=targetEnd) return;
+		ByteBuffer marker=ByteBuffer.allocate(1);
+		while (marker.hasRemaining()) {
+			channel.write(marker,targetEnd-1L);
+		}
+	}
+
+	private static long mappingGrowth(long extent) {
+		long proportional=extent>>PROPORTIONAL_GROWTH_SHIFT;
+		return Math.max(MIN_MAPPING_GROWTH,Math.min(MAX_MAPPING_GROWTH,proportional));
+	}
+
+	private static long alignUp(long value) {
+		return Math.addExact(value,MAPPING_ALIGNMENT-1L)&-MAPPING_ALIGNMENT;
+	}
+
+	private static boolean covers(Mapping[] current, long position, long end) {
+		int first=regionIndex(position);
+		int last=regionIndex(end-1L);
+		for (int i=first;i<=last;i++) {
+			if (i>=current.length) return false;
+			Mapping mapping=current[i];
+			if (mapping==null) return false;
+			long requiredEnd=Math.min(end,regionStart(i)+REGION_SIZE);
+			if (mapping.end()<requiredEnd) return false;
+		}
+		return true;
+	}
+
+	private Mapping mappingFor(long position, Mapping previous) {
+		Mapping[] current=mappings;
+		int index=regionIndex(position);
+		Mapping mapping=(index<current.length)?current[index]:null;
+		if (mapping==null) throw new IllegalStateException("Etch mapping is closed");
+		if (mapping==previous) throw new IllegalStateException("Etch mapping is not accessible");
+		return mapping;
+	}
+
+	private static int regionIndex(long position) {
+		return Math.toIntExact(position>>REGION_SHIFT);
+	}
+
+	private static long regionStart(int regionIndex) {
+		return ((long)regionIndex)<<REGION_SHIFT;
+	}
+
+	private static boolean crossesRegion(long position, long length) {
+		checkRange(position,length);
+		return (position&REGION_MASK)>REGION_SIZE-length;
+	}
+
+	private static void checkRange(long position, long length) {
+		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
+		Math.addExact(position,length);
+	}
+
+	private static void checkAtomicLong(long position) {
+		checkRange(position,Long.BYTES);
+		if ((position&(Long.BYTES-1L))!=0L) {
+			throw new IllegalArgumentException("Atomic Etch index position is not 8-byte aligned: "+position);
+		}
+		if (crossesRegion(position,Long.BYTES)) {
+			throw new IllegalArgumentException("Atomic Etch index position crosses an FFM region: "+position);
+		}
 	}
 
 	@Override
-	public void force() {
-		Mapping current=currentMapping(null);
-		while (true) {
-			try {
-				current.segment.force();
-				return;
-			} catch (IllegalStateException e) {
-				current=currentMapping(current);
-			}
+	public synchronized void force() {
+		if (closed) throw new IllegalStateException("Etch mapping is closed");
+		for (Mapping mapping:mappings) {
+			if (mapping!=null) mapping.segment.force();
 		}
 	}
 
@@ -232,11 +418,20 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	public synchronized void close() {
 		if (closed) return;
 		closed=true;
-		Mapping previous=mapping;
-		mapping=null;
-		if (previous!=null) previous.arena.close();
+		Mapping[] previous=mappings;
+		mappings=EMPTY_MAPPINGS;
+		for (Mapping mapping:previous) {
+			if (mapping!=null) mapping.arena.close();
+		}
 	}
 
-	private record Mapping(MemorySegment segment, Arena arena) {
+	private record Mapping(long start, MemorySegment segment, Arena arena) {
+		long end() {
+			return start+segment.byteSize();
+		}
+
+		long offset(long position) {
+			return position-start;
+		}
 	}
 }
