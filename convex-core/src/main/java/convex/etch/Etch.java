@@ -78,9 +78,9 @@ public class Etch {
 	 */
 	static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
 	
-	static final short ETCH_VERSION_1=1;
-	static final short ETCH_VERSION_2=2;
-	static final short CURRENT_VERSION=ETCH_VERSION_2;
+	static final short ETCH_VERSION_1=EtchConfig.VERSION_1;
+	static final short ETCH_VERSION_2=EtchConfig.VERSION_2;
+	static final short CURRENT_VERSION=EtchConfig.CURRENT_VERSION;
 
 	static final int SIZE_HEADER_MAGIC=2;
 	static final int SIZE_HEADER_VERSION=2;
@@ -127,72 +127,111 @@ public class Etch {
 	private final String fileName;
 	private final RandomAccessFile data;
 
+	private final EtchConfig config;
 	private final short version;
 	private final long indexStart;
 	private final EtchFileMapper fileMapper;
+	private final boolean buildChains;
 
 	private volatile long dataLength=0;
 
-	private boolean BUILD_CHAINS=true;
 	private EtchStore store;
 
 	private Etch(File dataFile) throws IOException {
+		this(dataFile,null);
+	}
+
+	private Etch(File dataFile, EtchConfig requestedConfig) throws IOException {
 		// Ensure we have a RandomAccessFile that exists
 		this.file=dataFile;
 		if (!dataFile.exists()) dataFile.createNewFile();
 		this.data=new RandomAccessFile(dataFile,"rw");
 
 		this.fileName = dataFile.getName();
-
-		// Try to exclusively lock the Etch database file
-		FileChannel fileChannel=this.data.getChannel();
-		FileLock lock=fileChannel.tryLock();
-		if (lock==null) {
-			throw new IOException("File lock failed on "+dataFile);
-		}
-		// at this point, we have an exclusive lock on the database file.
-		boolean newFile=(dataFile.length()==0);
-		long storedLength=0L;
-		short fileVersion;
-		if (newFile) {
-			fileVersion=CURRENT_VERSION;
-		} else {
-			this.data.seek(0L);
-			byte[] check=new byte[SIZE_HEADER_MAGIC];
-			this.data.readFully(check);
-			if (!Arrays.equals(MAGIC_NUMBER,check)) {
-				throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
+		EtchFileMapper mapper=null;
+		try {
+			// Try to exclusively lock the Etch database file
+			FileChannel fileChannel=this.data.getChannel();
+			FileLock lock=fileChannel.tryLock();
+			if (lock==null) {
+				throw new IOException("File lock failed on "+dataFile);
 			}
-			fileVersion=this.data.readShort();
-			storedLength=this.data.readLong();
+			// at this point, we have an exclusive lock on the database file.
+			boolean newFile=(dataFile.length()==0);
+			long storedLength=0L;
+			short fileVersion;
+			EtchConfig effectiveConfig=null;
+			if (newFile) {
+				effectiveConfig=(requestedConfig==null)?EtchConfig.create():requestedConfig;
+				fileVersion=effectiveConfig.getVersion();
+			} else {
+				this.data.seek(0L);
+				byte[] check=new byte[SIZE_HEADER_MAGIC];
+				this.data.readFully(check);
+				if (!Arrays.equals(MAGIC_NUMBER,check)) {
+					throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
+				}
+				fileVersion=this.data.readShort();
+				storedLength=this.data.readLong();
+			}
+
+			long resolvedIndexStart=indexStartForVersion(fileVersion);
+			if (!newFile) {
+				if (requestedConfig==null) {
+					effectiveConfig=EtchConfig.create(fileVersion);
+				} else {
+					if (requestedConfig.getVersion()!=fileVersion) {
+						throw new IOException("Configured Etch version "+requestedConfig.getVersion()
+								+" does not match file version "+fileVersion+": "+dataFile);
+					}
+					effectiveConfig=requestedConfig;
+				}
+			}
+
+			this.config=effectiveConfig;
+			this.version=fileVersion;
+			this.indexStart=resolvedIndexStart;
+			this.buildChains=effectiveConfig.isBuildChains();
+			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
+			this.fileMapper=mapper;
+
+			if (newFile) {
+				// Need to populate new file, with data length long and initial index block
+				// write Header, initially zeros except magic number and version
+				byte[] temp=new byte[Math.toIntExact(indexStart)];
+				System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
+				Utils.writeShort(temp, (int)OFFSET_VERSION,version);
+				writeBytes(0,temp,0,temp.length);
+
+				setDataLength(indexStart);
+
+				// add an index block
+				long rootIndex=appendNewIndexBlock(0);
+				assert(rootIndex==indexStart);
+
+				// ensure data length is initially correct
+				writeDataLength();
+			} else {
+				dataLength=storedLength;
+			}
+
+			// shutdown hook to close file / release lock
+			convex.core.util.Shutdown.addHook(Shutdown.ETCH,this::close);
+		} catch (IOException | RuntimeException | Error e) {
+			if (mapper!=null) {
+				try {
+					mapper.close();
+				} catch (IOException closeException) {
+					e.addSuppressed(closeException);
+				}
+			}
+			try {
+				this.data.close();
+			} catch (IOException closeException) {
+				e.addSuppressed(closeException);
+			}
+			throw e;
 		}
-
-		this.version=fileVersion;
-		this.indexStart=indexStartForVersion(fileVersion);
-		this.fileMapper=EtchFileMapperFactory.create(fileChannel,fileVersion);
-
-		if (newFile) {
-			// Need to populate  new file, with data length long and initial index block
-			// write Header, initally zeros expect magic number and version
-			byte[] temp=new byte[Math.toIntExact(indexStart)];
-			System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
-			Utils.writeShort(temp, (int)OFFSET_VERSION,version);
-			writeBytes(0,temp,0,temp.length);
-			
-			setDataLength(indexStart);
-
-			// add an index block
-			long rootIndex=appendNewIndexBlock(0);
-			assert(rootIndex==indexStart);
-
-			// ensure data length is initially correct
-			writeDataLength();
-		} else {
-			dataLength=storedLength;
-		}
-
-		// shutdown hook to close file / release lock
-		convex.core.util.Shutdown.addHook(Shutdown.ETCH,this::close);
 	}
 
 	private static long indexStartForVersion(short version) throws IOException {
@@ -215,6 +254,18 @@ public class Etch {
 	}
 
 	/**
+	 * Create an Etch instance using a temporary file and compiled configuration.
+	 * @param config compiled Etch configuration
+	 * @return The new Etch instance
+	 * @throws IOException If an IO error occurs
+	 */
+	public static Etch createTempEtch(EtchConfig config) throws IOException {
+		Etch newEtch=createTempEtch("etch-"+tempIndex,config);
+		tempIndex++;
+		return newEtch;
+	}
+
+	/**
 	 * Create an Etch instance using a temporary file with a specific file prefix.
 	 * @param prefix temporary file prefix to use
 	 * @return The new Etch instance
@@ -227,14 +278,41 @@ public class Etch {
 	}
 
 	/**
+	 * Create an Etch instance using a temporary file and compiled configuration.
+	 * @param prefix temporary file prefix to use
+	 * @param config compiled Etch configuration
+	 * @return The new Etch instance
+	 * @throws IOException If an IO error occurs
+	 */
+	public static Etch createTempEtch(String prefix, EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		File data = File.createTempFile(prefix+"-", null);
+		if (Constants.ETCH_DELETE_TEMP_ON_EXIT) data.deleteOnExit();
+		return new Etch(data,config);
+	}
+
+	/**
 	 * Create an Etch instance using the specified file
 	 * @param file File with which to create Etch instance
 	 * @return The new Etch instance
 	 * @throws IOException If an IO error occurs
 	 */
 	public static Etch create(File file) throws IOException {
-		Etch etch= new Etch(file);
-		return etch;
+		return new Etch(file);
+	}
+
+	/**
+	 * Create or open an Etch instance using compiled configuration. For an
+	 * existing file, the configured version must match the file header.
+	 *
+	 * @param file File with which to create the Etch instance
+	 * @param config compiled Etch configuration
+	 * @return Etch instance
+	 * @throws IOException If an IO error occurs or the file version conflicts
+	 */
+	public static Etch create(File file, EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		return new Etch(file,config);
 	}
 
 	/**
@@ -336,7 +414,7 @@ public class Etch {
 			long nextSlotValue=readSlot(indexPosition,nextDigit);
 
 			// if next slot is empty, we can make a chain!
-			if (BUILD_CHAINS&&(nextSlotValue==0L)) {
+			if (buildChains&&(nextSlotValue==0L)) {
 				// update current slot to be the start of a chain
 				writeSlot(indexPosition,digit,slotValue|PTR_START);
 
@@ -609,6 +687,13 @@ public class Etch {
 	 */
 	public short getVersion() {
 		return version;
+	}
+
+	/**
+	 * Gets the compiled configuration used to construct this Etch instance.
+	 */
+	public EtchConfig getConfig() {
+		return config;
 	}
 
 	long getIndexStart() {
