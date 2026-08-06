@@ -18,7 +18,7 @@ public class EtchFileMapperTest {
 		File file=File.createTempFile("etch-mapper", ".dat");
 		String implementation;
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),Etch.ETCH_VERSION_2);
+			EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2);
 			implementation=mapper.implementationName();
 			assertRoundTripAndGrowth(mapper);
 			mapper.close();
@@ -36,7 +36,7 @@ public class EtchFileMapperTest {
 	public void testRuntimeBackendSelection() throws Exception {
 		File file=File.createTempFile("etch-mapper-selection", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
-				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),Etch.ETCH_VERSION_2)) {
+				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
 			boolean ffmAvailable=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged();
 			if (Boolean.getBoolean("convex.etch.requireFFM")) {
 				assertTrue(ffmAvailable,"JDK 22+ Maven build did not include the Etch FFM backend");
@@ -52,7 +52,7 @@ public class EtchFileMapperTest {
 	public void testV1AlwaysUsesCompatibleBackend() throws Exception {
 		File file=File.createTempFile("etch-mapper-v1", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
-				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),Etch.ETCH_VERSION_1)) {
+				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_1)) {
 			assertEquals("MappedByteBuffer",mapper.implementationName());
 			assertRoundTripAndGrowth(mapper);
 		}

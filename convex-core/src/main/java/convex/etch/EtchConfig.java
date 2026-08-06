@@ -19,13 +19,6 @@ import convex.core.util.Utils;
  * on its read or write paths.</p>
  */
 public final class EtchConfig {
-	public static final short VERSION_1=1;
-	public static final short VERSION_2=2;
-	public static final short VERSION_3=3;
-	public static final short CURRENT_VERSION=VERSION_2;
-
-	public static final boolean DEFAULT_BUILD_CHAINS=true;
-
 	/** JSON-style configuration key for the Etch file version. */
 	public static final AString VERSION=Strings.intern("version");
 	/** JSON-style configuration key for the mapping backend. */
@@ -65,7 +58,7 @@ public final class EtchConfig {
 	 * Creates the default compiled configuration for a new Etch file.
 	 */
 	public static EtchConfig create() {
-		return create(CURRENT_VERSION);
+		return create(EtchConstants.CURRENT_VERSION);
 	}
 
 	/**
@@ -75,7 +68,7 @@ public final class EtchConfig {
 	 */
 	public static EtchConfig create(short version) {
 		validateVersion(version);
-		return new EtchConfig(version,EtchFileMapperFactory.defaultMapping(version),DEFAULT_BUILD_CHAINS);
+		return new EtchConfig(version,EtchFileMapperFactory.defaultMapping(version),EtchConstants.DEFAULT_BUILD_CHAINS);
 	}
 
 	/**
@@ -94,7 +87,7 @@ public final class EtchConfig {
 	 * @throws IllegalArgumentException if a key or value is invalid
 	 */
 	public static EtchConfig fromMap(AMap<AString,ACell> source) {
-		return fromMap(source,CURRENT_VERSION);
+		return fromMap(source,EtchConstants.CURRENT_VERSION);
 	}
 
 	/**
@@ -121,7 +114,7 @@ public final class EtchConfig {
 		}
 		validateVersion(version);
 
-		boolean buildChains=DEFAULT_BUILD_CHAINS;
+		boolean buildChains=EtchConstants.DEFAULT_BUILD_CHAINS;
 		MapEntry<AString,ACell> chainsEntry=source.getEntry(BUILD_CHAINS);
 		if (chainsEntry!=null) {
 			ACell chainsValue=chainsEntry.getValue();
@@ -164,7 +157,7 @@ public final class EtchConfig {
 	}
 
 	private static void validateVersion(short version) {
-		if ((version!=VERSION_1)&&(version!=VERSION_2)) {
+		if ((version!=EtchConstants.VERSION_1)&&(version!=EtchConstants.VERSION_2)) {
 			throw new IllegalArgumentException("Unsupported Etch version: "+version);
 		}
 	}

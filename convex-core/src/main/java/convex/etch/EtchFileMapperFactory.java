@@ -36,8 +36,8 @@ final class EtchFileMapperFactory {
 
 	static EtchConfig.MappingMode defaultMapping(short etchVersion) {
 		return switch (etchVersion) {
-			case EtchConfig.VERSION_1 -> EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
-			case EtchConfig.VERSION_2 -> FFM_AVAILABLE
+			case EtchConstants.VERSION_1 -> EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
+			case EtchConstants.VERSION_2 -> FFM_AVAILABLE
 					?EtchConfig.MappingMode.MEMORY_SEGMENT
 					:EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
 			default -> throw new IllegalArgumentException("Unsupported Etch version: "+etchVersion);
@@ -46,7 +46,7 @@ final class EtchFileMapperFactory {
 
 	static void validate(short etchVersion, EtchConfig.MappingMode mappingMode) {
 		Objects.requireNonNull(mappingMode,"mappingMode");
-		if ((etchVersion==EtchConfig.VERSION_1)&&(mappingMode==EtchConfig.MappingMode.MEMORY_SEGMENT)) {
+		if ((etchVersion==EtchConstants.VERSION_1)&&(mappingMode==EtchConfig.MappingMode.MEMORY_SEGMENT)) {
 			throw new IllegalArgumentException("Etch v1 requires the mapped-byte-buffer backend");
 		}
 		if ((mappingMode==EtchConfig.MappingMode.MEMORY_SEGMENT)&&!FFM_AVAILABLE) {

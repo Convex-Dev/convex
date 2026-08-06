@@ -175,7 +175,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	private void ensureMapped(long position, long length) throws IOException {
 		long requiredEnd=Math.addExact(position,length);
-		long preferredEnd=Math.addExact(requiredEnd,Etch.REGION_MARGIN);
+		long preferredEnd=Math.addExact(requiredEnd,EtchConstants.REGION_MARGIN);
 		Mapping current=mapping;
 		if ((current!=null)&&(current.segment.byteSize()>=preferredEnd)) return;
 

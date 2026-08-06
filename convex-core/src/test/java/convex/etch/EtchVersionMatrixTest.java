@@ -32,9 +32,9 @@ import convex.lattice.Lattice;
 public class EtchVersionMatrixTest {
 
 	private static final short[] VERSIONS={
-		EtchConfig.VERSION_1,
-		EtchConfig.VERSION_2
-		// TODO: Add EtchConfig.VERSION_3 when Etch v3 is implemented.
+		EtchConstants.VERSION_1,
+		EtchConstants.VERSION_2
+		// TODO: Add EtchConstants.VERSION_3 when Etch v3 is implemented.
 	};
 
 	private final List<EtchStore> openStores=new ArrayList<>();

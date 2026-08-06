@@ -345,7 +345,7 @@ public class EtchUtils {
 			try {
 				long slot = e.readSlot(indexPointer, i);
 				if (slot == 0L) continue;
-				if (e.extractType(slot) == Etch.PTR_INDEX) {
+				if (e.extractType(slot) == EtchConstants.POINTER_INDEX) {
 					lenientWalk(e, level + 1, e.rawPointer(slot), dest, count, skipped);
 				} else {
 					ACell cell = e.readCell(e.rawPointer(slot));
@@ -488,7 +488,7 @@ public class EtchUtils {
 				
 				if (slot==0) {
 					empty++;
-				} else if (type!=Etch.PTR_INDEX) {
+				} else if (type!=EtchConstants.POINTER_INDEX) {
 					values++;
 					
 					Hash h=e.readValueKey(ptr);
@@ -502,19 +502,19 @@ public class EtchUtils {
 					indexPtrs++;
 				}
 				
-				if (type==Etch.PTR_START) {
+				if (type==EtchConstants.POINTER_START) {
 					int ipp=(i+1)%isize; // next slot
 					long nextSlot=e.readSlot(indexPointer, ipp);
-					if (e.extractType(nextSlot)!=Etch.PTR_CHAIN) {
+					if (e.extractType(nextSlot)!=EtchConstants.POINTER_CHAIN) {
 						fail("Invalid slot after chain start: "+Utils.toHexString(nextSlot));
 					}
 				}
 				
-				if (type==Etch.PTR_CHAIN) {
+				if (type==EtchConstants.POINTER_CHAIN) {
 					int imm=(i+isize-1)%isize; // prev slot
 					long prevSlot=e.readSlot(indexPointer, imm);
 					long pt=e.extractType(prevSlot);
-					if (!((pt==Etch.PTR_CHAIN)||(pt==Etch.PTR_START))) {
+					if (!((pt==EtchConstants.POINTER_CHAIN)||(pt==EtchConstants.POINTER_START))) {
 						fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
 					}
 				}
@@ -543,7 +543,7 @@ public class EtchUtils {
 				long type=e.extractType(slot);			
 				if ((ptr|type)!=slot) throw new Error("Inconsistent slot code?!?");
 				
-				if (type==Etch.PTR_INDEX) continue;
+				if (type==EtchConstants.POINTER_INDEX) continue;
 				
 				ACell cell=e.readCell(ptr);
 				

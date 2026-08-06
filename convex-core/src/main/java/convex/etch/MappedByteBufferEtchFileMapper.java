@@ -42,7 +42,7 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 		int destinationOffset=offset;
 		while (remaining>0) {
 			int chunk=Math.min(remaining,
-					Math.toIntExact(Etch.MAX_REGION_SIZE-(current%Etch.MAX_REGION_SIZE)));
+					Math.toIntExact(EtchConstants.MAX_REGION_SIZE-(current%EtchConstants.MAX_REGION_SIZE)));
 			MappedByteBuffer mapped=getBuffer(current,chunk);
 			int index=bufferIndex(current);
 			mapped.get(index,destination,destinationOffset,chunk);
@@ -77,7 +77,7 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 		int sourceOffset=offset;
 		while (remaining>0) {
 			int chunk=Math.min(remaining,
-					Math.toIntExact(Etch.MAX_REGION_SIZE-(current%Etch.MAX_REGION_SIZE)));
+					Math.toIntExact(EtchConstants.MAX_REGION_SIZE-(current%EtchConstants.MAX_REGION_SIZE)));
 			MappedByteBuffer mapped=getBuffer(current,chunk);
 			int index=bufferIndex(current);
 			mapped.put(index,source,sourceOffset,chunk);
@@ -88,19 +88,19 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	}
 
 	private MappedByteBuffer getBuffer(long position, int length) throws IOException {
-		int regionIndex=Math.toIntExact(position/Etch.MAX_REGION_SIZE);
+		int regionIndex=Math.toIntExact(position/EtchConstants.MAX_REGION_SIZE);
 		return getInternalBuffer(regionIndex,Math.addExact(position,length));
 	}
 
 	private int bufferIndex(long position) {
-		return Math.toIntExact(position%Etch.MAX_REGION_SIZE);
+		return Math.toIntExact(position%EtchConstants.MAX_REGION_SIZE);
 	}
 
 	private MappedByteBuffer getInternalBuffer(int regionIndex, long requiredEnd) throws IOException {
 		int mapSize=regionMap.size();
 		MappedByteBuffer mapped=(regionIndex<mapSize)?regionMap.get(regionIndex):null;
-		long preferredEnd=Math.addExact(requiredEnd,Etch.REGION_MARGIN);
-		if ((mapped==null)||((mapped.capacity()+regionIndex*Etch.MAX_REGION_SIZE)<preferredEnd)) {
+		long preferredEnd=Math.addExact(requiredEnd,EtchConstants.REGION_MARGIN);
+		if ((mapped==null)||((mapped.capacity()+regionIndex*EtchConstants.MAX_REGION_SIZE)<preferredEnd)) {
 			mapped=createBuffer(regionIndex,requiredEnd);
 		}
 		return mapped;
@@ -109,18 +109,18 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	private synchronized MappedByteBuffer createBuffer(int regionIndex, long requiredEnd) throws IOException {
 		while (regionMap.size()<=regionIndex) regionMap.add(null);
 
-		long position=((long)regionIndex)*Etch.MAX_REGION_SIZE;
+		long position=((long)regionIndex)*EtchConstants.MAX_REGION_SIZE;
 		int length;
 		if (regionIndex==0) {
 			length=1<<16;
-			while ((length<Etch.MAX_REGION_SIZE)&&((position+length)<requiredEnd)) {
+			while ((length<EtchConstants.MAX_REGION_SIZE)&&((position+length)<requiredEnd)) {
 				length*=2;
 			}
 		} else {
-			length=(int)Etch.MAX_REGION_SIZE;
+			length=(int)EtchConstants.MAX_REGION_SIZE;
 		}
 
-		length+=Etch.REGION_MARGIN;
+		length+=EtchConstants.REGION_MARGIN;
 		MappedByteBuffer mapped=channel.map(MapMode.READ_WRITE,position,length);
 		regionMap.set(regionIndex,mapped);
 		return mapped;

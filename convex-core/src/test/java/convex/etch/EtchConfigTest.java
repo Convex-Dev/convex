@@ -24,8 +24,8 @@ public class EtchConfigTest {
 	@Test
 	public void testDefaultsAreCompiled() {
 		EtchConfig config=EtchConfig.create();
-		assertEquals(EtchConfig.CURRENT_VERSION,config.getVersion());
-		assertEquals(EtchFileMapperFactory.defaultMapping(EtchConfig.CURRENT_VERSION),
+		assertEquals(EtchConstants.CURRENT_VERSION,config.getVersion());
+		assertEquals(EtchFileMapperFactory.defaultMapping(EtchConstants.CURRENT_VERSION),
 				config.getMappingMode());
 		assertTrue(config.isBuildChains());
 	}
@@ -33,12 +33,12 @@ public class EtchConfigTest {
 	@Test
 	public void testCompileMap() {
 		AMap<AString,ACell> source=Maps.of(
-				EtchConfig.VERSION,CVMLong.create(EtchConfig.VERSION_2),
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_2),
 				EtchConfig.MAPPING,Strings.create("mapped-byte-buffer"),
 				EtchConfig.BUILD_CHAINS,CVMBool.FALSE);
 
 		EtchConfig config=EtchConfig.fromMap(source);
-		assertEquals(EtchConfig.VERSION_2,config.getVersion());
+		assertEquals(EtchConstants.VERSION_2,config.getVersion());
 		assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,config.getMappingMode());
 		assertFalse(config.isBuildChains());
 		assertNotNull(config.toString());
@@ -55,12 +55,12 @@ public class EtchConfigTest {
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.fromMap(
 				Maps.of(EtchConfig.MAPPING,Strings.create("unknown"))));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.create(
-				EtchConfig.VERSION_1,EtchConfig.MappingMode.MEMORY_SEGMENT,true));
+				EtchConstants.VERSION_1,EtchConfig.MappingMode.MEMORY_SEGMENT,true));
 	}
 
 	@Test
 	public void testCompiledBuildChainsOptionIsUsed() throws IOException {
-		EtchConfig config=EtchConfig.create(EtchConfig.VERSION_2,
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_2,
 				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false);
 		Etch etch=Etch.createTempEtch(config);
 		EtchStore store=new EtchStore(etch);
@@ -70,7 +70,7 @@ public class EtchConfigTest {
 		etch.write(second,second.getRef());
 
 		long rootSlot=etch.readSlot(etch.getIndexStart(),0);
-		assertEquals(Etch.PTR_INDEX,etch.extractType(rootSlot));
+		assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(rootSlot));
 		store.close();
 	}
 
@@ -78,7 +78,7 @@ public class EtchConfigTest {
 	public void testConfiguredEtchAndLegacyInference() throws IOException {
 		File file=File.createTempFile("etch-config", ".etch");
 		file.deleteOnExit();
-		EtchConfig configured=EtchConfig.create(EtchConfig.VERSION_1,
+		EtchConfig configured=EtchConfig.create(EtchConstants.VERSION_1,
 				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,false);
 
 		Etch etch=Etch.create(file,configured);
@@ -87,7 +87,7 @@ public class EtchConfigTest {
 		etch.close();
 
 		Etch reopened=Etch.create(file);
-		assertEquals(EtchConfig.VERSION_1,reopened.getConfig().getVersion());
+		assertEquals(EtchConstants.VERSION_1,reopened.getConfig().getVersion());
 		assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,reopened.getConfig().getMappingMode());
 		assertTrue(reopened.getConfig().isBuildChains(),"Non-persisted options use defaults on legacy reopen");
 		reopened.close();
@@ -97,15 +97,15 @@ public class EtchConfigTest {
 	public void testVersionMismatchReleasesFile() throws IOException {
 		File file=File.createTempFile("etch-config-mismatch", ".etch");
 		file.deleteOnExit();
-		Etch configured=Etch.create(file,EtchConfig.create(EtchConfig.VERSION_1));
+		Etch configured=Etch.create(file,EtchConfig.create(EtchConstants.VERSION_1));
 		configured.close();
 
 		assertThrows(IOException.class,
-				() -> Etch.create(file,EtchConfig.create(EtchConfig.VERSION_2)));
+				() -> Etch.create(file,EtchConfig.create(EtchConstants.VERSION_2)));
 
 		// A failed configured open must release its channel and exclusive lock.
 		Etch reopened=Etch.create(file);
-		assertEquals(EtchConfig.VERSION_1,reopened.getVersion());
+		assertEquals(EtchConstants.VERSION_1,reopened.getVersion());
 		reopened.close();
 	}
 }

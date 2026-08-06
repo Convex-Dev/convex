@@ -49,7 +49,7 @@ public class EtchTest {
 		store.close();
 		byte[] rootBytes = new byte[Hash.LENGTH];
 		try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
-			raf.seek(Etch.OFFSET_ROOT_HASH);
+			raf.seek(EtchConstants.ROOT_HASH_OFFSET);
 			raf.readFully(rootBytes);
 		}
 		assertArrayEquals(Utils.ZERO_BYTES_32, rootBytes);
@@ -107,16 +107,16 @@ public class EtchTest {
 
 		long rootIndex=etch.getIndexStart();
 		long childIndex=etch.rawPointer(etch.readSlot(rootIndex,0));
-		assertEquals(Etch.PTR_INDEX,etch.extractType(etch.readSlot(rootIndex,0)));
-		assertEquals(0L,childIndex&(Etch.POINTER_SIZE-1),"New child index is not naturally aligned");
+		assertEquals(EtchConstants.POINTER_INDEX,etch.extractType(etch.readSlot(rootIndex,0)));
+		assertEquals(0L,childIndex&(EtchConstants.POINTER_SIZE-1),"New child index is not naturally aligned");
 	}
 
 	@Test
 	public void testV1AndV2Layouts() throws IOException {
 		EtchStore v2Store=EtchStore.createTemp();
 		Etch v2=v2Store.getEtch();
-		assertEquals(Etch.ETCH_VERSION_2,v2.getVersion());
-		assertEquals(Etch.INDEX_START_V2,v2.getIndexStart());
+		assertEquals(EtchConstants.VERSION_2,v2.getVersion());
+		assertEquals(EtchConstants.V2_INDEX_START,v2.getIndexStart());
 		String expectedV2=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged()
 				?"MemorySegment":"MappedByteBuffer";
 		assertEquals(expectedV2,v2.getMappingImplementation());
@@ -124,19 +124,20 @@ public class EtchTest {
 
 		File file=File.createTempFile("etch-v1-layout", ".etch");
 		file.deleteOnExit();
-		long initialLength=Etch.INDEX_START_V1+65536L*Etch.POINTER_SIZE;
+		long initialLength=EtchConstants.V1_INDEX_START
+				+(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE;
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(initialLength);
 			data.seek(0L);
-			data.write(Etch.MAGIC_NUMBER);
-			data.writeShort(Etch.ETCH_VERSION_1);
+			data.writeShort(EtchConstants.MAGIC_NUMBER);
+			data.writeShort(EtchConstants.VERSION_1);
 			data.writeLong(initialLength);
 		}
 
 		EtchStore v1Store=EtchStore.create(file);
 		Etch v1=v1Store.getEtch();
-		assertEquals(Etch.ETCH_VERSION_1,v1.getVersion());
-		assertEquals(Etch.INDEX_START_V1,v1.getIndexStart());
+		assertEquals(EtchConstants.VERSION_1,v1.getVersion());
+		assertEquals(EtchConstants.V1_INDEX_START,v1.getIndexStart());
 		assertEquals("MappedByteBuffer",v1.getMappingImplementation());
 
 		AVector<CVMLong> value=Vectors.of(11,22,33);
@@ -145,7 +146,7 @@ public class EtchTest {
 		v1Store.close();
 
 		EtchStore reopened=EtchStore.create(file);
-		assertEquals(Etch.ETCH_VERSION_1,reopened.getEtch().getVersion());
+		assertEquals(EtchConstants.VERSION_1,reopened.getEtch().getVersion());
 		assertEquals(value,reopened.getEtch().read(value.getHash()).getValue());
 		reopened.close();
 	}
@@ -242,11 +243,12 @@ public class EtchTest {
 					int n=e.indexSize(level);
 					for (int i=0; i<n; i++) {
 						long slot=e.readSlot(indexPointer,i);
-						long type=slot&Etch.TYPE_MASK;
-						if ((type==Etch.PTR_PLAIN)||(type==Etch.PTR_START)||(type==Etch.PTR_CHAIN)) {
+						long type=slot&EtchConstants.POINTER_TYPE_MASK;
+						if ((type==EtchConstants.POINTER_PLAIN)||(type==EtchConstants.POINTER_START)
+								||(type==EtchConstants.POINTER_CHAIN)) {
 							if (slot!=0) {
 								long pointer=e.rawPointer(slot);
-								Blob k=e.readBlob(pointer, 32);
+								Blob k=e.readBlob(pointer,EtchConstants.KEY_SIZE);
 								hs.add(k);
 							}
 						}

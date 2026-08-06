@@ -1,5 +1,7 @@
 package convex.etch;
 
+import static convex.etch.EtchConstants.*;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -61,52 +63,8 @@ import convex.core.util.Utils;
  * - N byes actual data
  */
 public class Etch {
-	// structural constants for data block
-	static final int KEY_SIZE=32;
-	static final int MAX_LEVEL=60; // 2 bytes + 1 byte + 58 hex digits for 29 remaining bytes
-
-	static final int LABEL_SIZE=1+8; // Flags (byte) plus Memory Size (long)
-	static final int LENGTH_SIZE=2;
-	static final int POINTER_SIZE=8;
-
-	// constants for memory mapping buffers into manageable regions
-	static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable, note JVM 2GB limit :-/
-	static final long REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
-
-	/**
-	 * Magic number for Etch files, must be first 2 bytes
-	 */
-	static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
-	
-	static final short ETCH_VERSION_1=EtchConfig.VERSION_1;
-	static final short ETCH_VERSION_2=EtchConfig.VERSION_2;
-	static final short CURRENT_VERSION=EtchConfig.CURRENT_VERSION;
-
-	static final int SIZE_HEADER_MAGIC=2;
-	static final int SIZE_HEADER_VERSION=2;
-	static final int SIZE_HEADER_FILESIZE=8;
-	static final int SIZE_HEADER_ROOT=32;
-	
-	static final int ZLEN=16384;
-	static final byte[] ZERO_ARRAY=new byte[ZLEN];
-
-	static final int SIZE_HEADER_COMMON=SIZE_HEADER_MAGIC+SIZE_HEADER_VERSION+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
-	static final int SIZE_HEADER_V1=SIZE_HEADER_COMMON;
-	static final int SIZE_HEADER_V2=64;
-
-	protected static final long OFFSET_VERSION = SIZE_HEADER_MAGIC; // Skip past magic number
-	protected static final long OFFSET_FILE_SIZE = OFFSET_VERSION+SIZE_HEADER_VERSION; // Skip past version
-	protected static final long OFFSET_ROOT_HASH = OFFSET_FILE_SIZE+SIZE_HEADER_FILESIZE; // Skip past file size
-
-	static final long INDEX_START_V1=SIZE_HEADER_V1;
-	static final long INDEX_START_V2=SIZE_HEADER_V2;
-
-	static final long TYPE_MASK = 0xC000000000000000L;
-	static final long PTR_PLAIN = 0x0000000000000000L; // direct pointer to data
-	static final long PTR_INDEX = 0x4000000000000000L; // pointer to index block
-	static final long PTR_START = 0x8000000000000000L; // start of chained entries
-	static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
-
+	private static final int ZERO_BUFFER_SIZE=16384;
+	private static final byte[] ZERO_BUFFER=new byte[ZERO_BUFFER_SIZE];
 
 	/**
 	 * Temporary byte array on a thread local basis.
@@ -166,9 +124,8 @@ public class Etch {
 				fileVersion=effectiveConfig.getVersion();
 			} else {
 				this.data.seek(0L);
-				byte[] check=new byte[SIZE_HEADER_MAGIC];
-				this.data.readFully(check);
-				if (!Arrays.equals(MAGIC_NUMBER,check)) {
+				int magic=this.data.readUnsignedShort();
+				if (magic!=MAGIC_NUMBER) {
 					throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
 				}
 				fileVersion=this.data.readShort();
@@ -199,8 +156,8 @@ public class Etch {
 				// Need to populate new file, with data length long and initial index block
 				// write Header, initially zeros except magic number and version
 				byte[] temp=new byte[Math.toIntExact(indexStart)];
-				System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
-				Utils.writeShort(temp, (int)OFFSET_VERSION,version);
+				Utils.writeShort(temp,0,(short)MAGIC_NUMBER);
+				Utils.writeShort(temp,(int)VERSION_OFFSET,version);
 				writeBytes(0,temp,0,temp.length);
 
 				setDataLength(indexStart);
@@ -236,8 +193,8 @@ public class Etch {
 
 	private static long indexStartForVersion(short version) throws IOException {
 		return switch (version) {
-			case ETCH_VERSION_1 -> INDEX_START_V1;
-			case ETCH_VERSION_2 -> INDEX_START_V2;
+			case VERSION_1 -> V1_INDEX_START;
+			case VERSION_2 -> V2_INDEX_START;
 			default -> throw new IOException("Unsupported Etch version: "+version);
 		};
 	}
@@ -394,14 +351,14 @@ public class Etch {
 
 		if (slotValue==0L) {
 			// empty location, so simply write new value
-			return writeNewData(indexPosition,digit,key,ref,PTR_PLAIN);
+			return writeNewData(indexPosition,digit,key,ref,POINTER_PLAIN);
 
-		} else if (type==PTR_INDEX) {
+		} else if (type==POINTER_INDEX) {
 			// recursively check next level of index
 			long newIndexPosition=rawPointer(slotValue); // clear high bits
 			return write(key,level+1,ref,newIndexPosition);
 
-		} else if (type==PTR_PLAIN) {
+		} else if (type==POINTER_PLAIN) {
 			// existing data pointer (non-zero)
 			// check if we have the same value first, otherwise need to resolve conflict
 			// This should have the current (potential collision) key in tempArray
@@ -416,11 +373,11 @@ public class Etch {
 			// if next slot is empty, we can make a chain!
 			if (buildChains&&(nextSlotValue==0L)) {
 				// update current slot to be the start of a chain
-				writeSlot(indexPosition,digit,slotValue|PTR_START);
+				writeSlot(indexPosition,digit,slotValue|POINTER_START);
 
 				// write new data pointer to next slot
 				long newDataPointer=appendData(key,ref);
-				writeSlot(indexPosition,nextDigit,newDataPointer|PTR_CHAIN);
+				writeSlot(indexPosition,nextDigit,newDataPointer|POINTER_CHAIN);
 
 				return ref;
 			}
@@ -433,11 +390,11 @@ public class Etch {
 			long newIndexPosition=appendLeafIndex(nextLevel,nextDigitOfCollided,slotValue);
 
 			// put index pointer into this index block, setting flags for index node
-			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
+			writeSlot(indexPosition,digit,newIndexPosition|POINTER_INDEX);
 
 			// recursively write this key
 			return write(key,nextLevel,ref,newIndexPosition);
-		} else if (type==PTR_START) {
+		} else if (type==POINTER_START) {
 			// first check if the start pointer is the right value. if so, just update in place
 			if (checkMatchingKey(key, slotValue)) {
 				return updateInPlace(slotValue,ref);
@@ -449,13 +406,13 @@ public class Etch {
 				int ix=(digit+i)&mask;
 				slotValue=readSlot(indexPosition,ix);
 
-				// if we reach an empty location simply write new value as a chain continuation (PTR_CHAIN)
+				// If we reach an empty location, write a chain continuation.
 				if (slotValue==0L) {
-					return writeNewData(indexPosition,ix,key,ref,PTR_CHAIN);
+					return writeNewData(indexPosition,ix,key,ref,POINTER_CHAIN);
 				}
 
 				// if we are not in a chain, we have reached the maximum chain length. Exit loop and compress.
-				if (slotType(slotValue)!=PTR_CHAIN) break;
+				if (slotType(slotValue)!=POINTER_CHAIN) break;
 
 				// if we found the key itself, return since already stored.
 				if (checkMatchingKey(key, slotValue)) {
@@ -484,12 +441,12 @@ public class Etch {
 
 			// publish the complete new index block BEFORE clearing the old chain:
 			// lock-free readers then see either the intact chain or the new block
-			writeSlot(indexPosition,digit,newIndexPos|PTR_INDEX);
+			writeSlot(indexPosition,digit,newIndexPos|POINTER_INDEX);
 			for (int j=1; j<i; j++) {
 				writeSlot(indexPosition,(digit+j)&mask,0L); // clear the old chain
 			}
 			return ref;
-		} else if (type==PTR_CHAIN) {
+		} else if (type==POINTER_CHAIN) {
 			// need to collapse existing chain
 			int chainStartDigit=seekChainStart(indexPosition,digit,isize);
 			if (chainStartDigit==digit) throw new Error("Can't start chain at this digit? "+digit);
@@ -507,13 +464,13 @@ public class Etch {
 
 			// publish the complete new index block BEFORE clearing the old chain:
 			// lock-free readers then see either the intact chain or the new block
-			writeSlot(indexPosition,chainStartDigit,newIndexPos|PTR_INDEX);
+			writeSlot(indexPosition,chainStartDigit,newIndexPos|POINTER_INDEX);
 			for (int j=1; j<n; j++) {
 				writeSlot(indexPosition,(chainStartDigit+j)&mask,0L); // clear the old chain
 			}
 
 			// write to the current slot
-			return writeNewData(indexPosition,digit,key,ref,PTR_PLAIN);
+			return writeNewData(indexPosition,digit,key,ref,POINTER_PLAIN);
 		} else {
 			throw new Error("Unexpected type: "+type);
 		}
@@ -523,7 +480,7 @@ public class Etch {
 	/**
 	 * Finds the start digit of a chain, stepping backwards from the given digit
 	 * @param indexPosition Position of index block
-	 * @param digit Position at which PTR_CHAIN is detected, i.e. search begins.
+	 * @param digit Position at which a chain continuation is detected, i.e. search begins.
 	 * @return
 	 * @throws IOException
 	 */
@@ -533,7 +490,7 @@ public class Etch {
 		int i=(digit-1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
-			if (slotType(slotValue)==PTR_START) return i;
+			if (slotType(slotValue)==POINTER_START) return i;
 			i=(i-1)&mask;
 		}
 		throw new Error("Infinite chain?");
@@ -543,7 +500,7 @@ public class Etch {
 	 * Finds the end digit of a chain, stepping forwards from the given digit
 	 * @param indexPosition
 	 * @param digit
-	 * @return Next index position that is not PTR_CHAIN
+	 * @return Next index position that is not a chain continuation
 	 * @throws IOException
 	 */
 	private int seekChainEnd(long indexPosition, int digit, int isize) throws IOException {
@@ -552,7 +509,7 @@ public class Etch {
 		int i=(digit+1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
-			if (slotType(slotValue)!=PTR_CHAIN) return i;
+			if (slotType(slotValue)!=POINTER_CHAIN) return i;
 			i=(i+1)&mask;
 		}
 		throw new Error("Infinite chain?");
@@ -580,20 +537,20 @@ public class Etch {
 		int digit=getDigit(dp,level);
 
 		long currentSlot=readSlot(indexPosition,digit);
-		long type = currentSlot&TYPE_MASK;
+		long type = currentSlot&POINTER_TYPE_MASK;
 		if (currentSlot==0L) {
 			writeSlot(indexPosition,digit,dp);
-		} else if (type==PTR_INDEX) {
+		} else if (type==POINTER_INDEX) {
 			// Write into the new index block (presumably recently created)
 			rewriteExistingData(rawPointer(currentSlot),level+1,dp);
-		} else if (type==PTR_PLAIN) {
+		} else if (type==POINTER_PLAIN) {
 			int newLevel=level+1;
 
 			// expand to a new index block for collision
 			long newIndexPosition=appendNewIndexBlock(newLevel);
 			rewriteExistingData(newIndexPosition,newLevel,currentSlot);
 			rewriteExistingData(newIndexPosition,newLevel,dp);
-			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
+			writeSlot(indexPosition,digit,newIndexPosition|POINTER_INDEX);
 		} else {
 			throw new Error("Unexpected type while rewriting existing data: "+type);
 		}
@@ -625,7 +582,7 @@ public class Etch {
 	 * @return
 	 */
 	private long slotType(long slotValue) {
-		return slotValue&TYPE_MASK;
+		return slotValue&POINTER_TYPE_MASK;
 	}
 
 	/**
@@ -678,7 +635,7 @@ public class Etch {
 	 */
 	protected void writeDataLength() throws IOException {
 		// write final data length
-		writeLong(OFFSET_FILE_SIZE,dataLength);
+		writeLong(DATA_LENGTH_OFFSET,dataLength);
 	}
 	
 	/**
@@ -710,7 +667,7 @@ public class Etch {
 	 * @return Pointer extracted from slot value
 	 */
 	public long rawPointer(long slotValue) {
-		return slotValue&~TYPE_MASK;
+		return slotValue&~POINTER_TYPE_MASK;
 	}
 
 	/**
@@ -794,11 +751,11 @@ public class Etch {
 		byte[] recordHeader=tempArray.get();
 		int headerOffset=0;
 		if (key==null) {
-			readBytes(recordPosition,recordHeader,0,KEY_SIZE+LABEL_SIZE+LENGTH_SIZE);
+			readBytes(recordPosition,recordHeader,0,KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE);
 			key=Hash.wrap(Arrays.copyOf(recordHeader,KEY_SIZE));
 			headerOffset=KEY_SIZE;
 		} else {
-			readBytes(recordPosition+KEY_SIZE,recordHeader,0,LABEL_SIZE+LENGTH_SIZE);
+			readBytes(recordPosition+KEY_SIZE,recordHeader,0,LABEL_SIZE+ENCODING_LENGTH_SIZE);
 		}
 		
 		// get flags byte
@@ -810,7 +767,7 @@ public class Etch {
 		// get Data length
 		short length=Utils.readShort(recordHeader,headerOffset+LABEL_SIZE);
 		byte[] bs=new byte[length];
-		readBytes(recordPosition+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE,bs,0,length);
+		readBytes(recordPosition+KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE,bs,0,length);
 		Blob encoding= Blob.wrap(bs);
 		try {
 			Hash hash=Hash.wrap(key);
@@ -946,7 +903,7 @@ public class Etch {
 		int n=indexSize(level);
 		for (int i=0; i<n; i++) {
 			long slot=readSlot(indexPointer,i);
-			if ((slot&TYPE_MASK)==PTR_INDEX) {
+			if ((slot&POINTER_TYPE_MASK)==POINTER_INDEX) {
 				digits[level]=i;
 				visitIndex(v,digits,level+1,rawPointer(slot));
 			}
@@ -970,21 +927,21 @@ public class Etch {
 		int digit=getDigit(key,level);
 		long slotValue=readSlot(indexPosition,digit);
 		
-		long type=(slotValue&TYPE_MASK);
+		long type=(slotValue&POINTER_TYPE_MASK);
 		if (slotValue==0) {
 			// Empty slot i.e. not found
 			return -1;
-		} else if (type==PTR_INDEX) {
+		} else if (type==POINTER_INDEX) {
 			// recursively check next index node
 			long newIndexPosition=rawPointer(slotValue);
 			return seekPosition(key,level+1,newIndexPosition);
-		} else if (type==PTR_PLAIN) {
+		} else if (type==POINTER_PLAIN) {
 			if (checkMatchingKey(key,slotValue)) return slotValue;
 			return -1;
-		} else if (type==PTR_CHAIN) {
+		} else if (type==POINTER_CHAIN) {
 			// continuation of chain from some previous index, therefore key can't be present
 			return -1;
-		} else if (type==PTR_START) {
+		} else if (type==POINTER_START) {
 			// Optimistic lock-free chain scan. A concurrent collapse publishes its
 			// new index block into the start slot BEFORE clearing chain entries, so
 			// on a miss we revalidate the start slot and retry if it changed. Slot
@@ -992,13 +949,13 @@ public class Etch {
 			long startValue=slotValue;
 			int i=0;
 			while (i<isize) {
-				long ptr=slotValue&(~TYPE_MASK);
+				long ptr=slotValue&(~POINTER_TYPE_MASK);
 				if (checkMatchingKey(key,ptr)) return ptr;
 
 				i++; // advance to next position
 				slotValue=readSlot(indexPosition,(digit+i)&mask);
-				type=(slotValue&TYPE_MASK);
-				if (!(type==PTR_CHAIN)) break; // reached end of chain
+				type=(slotValue&POINTER_TYPE_MASK);
+				if (!(type==POINTER_CHAIN)) break; // reached end of chain
 			}
 			if (readSlot(indexPosition,digit)!=startValue) {
 				// chain restructured during our scan: retry at this position
@@ -1051,9 +1008,9 @@ public class Etch {
 	 * @return Index block size as number of entries
 	 */
 	public int indexSize(int level) {
-		if (level==0) return 65536;
-		if (level==1) return 256;
-		return 16;
+		if (level==0) return ROOT_INDEX_SIZE;
+		if (level==1) return SECOND_LEVEL_INDEX_SIZE;
+		return DEEP_INDEX_SIZE;
 	}
 
 	/**
@@ -1079,8 +1036,8 @@ public class Etch {
 		setDataLength(position+sizeBytes);
 		
 		// Use temporary zero array to fill new index block
-		for (int ix=0; ix<sizeBytes; ix+=ZLEN) {
-			writeBytes(position+ix,ZERO_ARRAY,0,Math.min(sizeBytes-ix,ZLEN));
+		for (int ix=0; ix<sizeBytes; ix+=ZERO_BUFFER_SIZE) {
+			writeBytes(position+ix,ZERO_BUFFER,0,Math.min(sizeBytes-ix,ZERO_BUFFER_SIZE));
 		}
 		return position;
 	}
@@ -1090,7 +1047,7 @@ public class Etch {
 	}
 
 	/**
-	 * Appends a new key / value data block. Returns a pointer to the data, with cleared type bits (PTR_PLAIN)
+	 * Appends a new key / value data block. Returns a pointer to the data with cleared type bits.
 	 *
 	 * @param key The key to include in the data block
 	 * @param a the Blob representing the new data value
@@ -1120,7 +1077,7 @@ public class Etch {
 
 		// position ready for append
 		final long position=dataLength;
-		final long newDataLength=position+KEY_SIZE+LABEL_SIZE+LENGTH_SIZE+length;
+		final long newDataLength=position+KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE+length;
 		long writePosition=position;
 		// append key
 		fileMapper.put(writePosition,key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
@@ -1132,8 +1089,8 @@ public class Etch {
 		recordHeader[0]=(byte)flags; // currently all flags fit in one byte
 		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
 		Utils.writeShort(recordHeader,LABEL_SIZE,length);
-		fileMapper.put(writePosition,recordHeader,0,LABEL_SIZE+LENGTH_SIZE);
-		writePosition+=LABEL_SIZE+LENGTH_SIZE;
+		fileMapper.put(writePosition,recordHeader,0,LABEL_SIZE+ENCODING_LENGTH_SIZE);
+		writePosition+=LABEL_SIZE+ENCODING_LENGTH_SIZE;
 
 		// append blob value
 		fileMapper.put(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),length);
@@ -1169,7 +1126,7 @@ public class Etch {
 
 	public synchronized Hash getRootHash() throws IOException {
 		byte[] bs=new byte[Hash.LENGTH];
-		readBytes(OFFSET_ROOT_HASH,bs,0,Hash.LENGTH);
+		readBytes(ROOT_HASH_OFFSET,bs,0,Hash.LENGTH);
 		// Preserve the distinction between a never-assigned, zero-initialised root
 		// and an explicitly written null root (Hash.NULL_HASH).
 		if (Arrays.equals(bs, Utils.ZERO_BYTES_32)) return Hash.UNSET_HASH;
@@ -1184,7 +1141,7 @@ public class Etch {
 	public synchronized void setRootHash(Hash h) throws IOException {
 		byte[] bs=h.getBytes();
 		assert(bs.length==Hash.LENGTH);
-		writeBytes(OFFSET_ROOT_HASH,bs,0,bs.length);
+		writeBytes(ROOT_HASH_OFFSET,bs,0,bs.length);
 	}
 
 	public void setStore(EtchStore etchStore) {
@@ -1197,7 +1154,7 @@ public class Etch {
 	 * @return Type code
 	 */
 	public long extractType(long slot) {
-		return slot&TYPE_MASK;
+		return slot&POINTER_TYPE_MASK;
 	}
 
 
