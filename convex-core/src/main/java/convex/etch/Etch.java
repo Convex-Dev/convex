@@ -63,9 +63,6 @@ import convex.core.util.Utils;
  * - N byes actual data
  */
 public class Etch {
-	private static final int ZERO_BUFFER_SIZE=16384;
-	private static final byte[] ZERO_BUFFER=new byte[ZERO_BUFFER_SIZE];
-
 	/**
 	 * Temporary byte array on a thread local basis.
 	 */
@@ -88,10 +85,8 @@ public class Etch {
 	private final EtchConfig config;
 	private final short version;
 	private final long indexStart;
-	private final EtchFileMapper fileMapper;
+	private final EtchFileAccess fileAccess;
 	private final boolean buildChains;
-
-	private volatile long dataLength=0;
 
 	private EtchStore store;
 
@@ -107,6 +102,7 @@ public class Etch {
 
 		this.fileName = dataFile.getName();
 		EtchFileMapper mapper=null;
+		EtchFileAccess access=null;
 		try {
 			// Try to exclusively lock the Etch database file
 			FileChannel fileChannel=this.data.getChannel();
@@ -150,7 +146,8 @@ public class Etch {
 			this.indexStart=resolvedIndexStart;
 			this.buildChains=effectiveConfig.isBuildChains();
 			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
-			this.fileMapper=mapper;
+			access=new EtchFileAccess(mapper,fileName,newFile?0L:storedLength,fileChannel.size());
+			this.fileAccess=access;
 
 			if (newFile) {
 				// Need to populate new file, with data length long and initial index block
@@ -158,9 +155,8 @@ public class Etch {
 				byte[] temp=new byte[Math.toIntExact(indexStart)];
 				Utils.writeShort(temp,0,(short)MAGIC_NUMBER);
 				Utils.writeShort(temp,(int)VERSION_OFFSET,version);
-				writeBytes(0,temp,0,temp.length);
-
-				setDataLength(indexStart);
+				long headerPosition=fileAccess.append(temp,0,temp.length,1);
+				assert(headerPosition==0L);
 
 				// add an index block
 				long rootIndex=appendNewIndexBlock(0);
@@ -168,14 +164,18 @@ public class Etch {
 
 				// ensure data length is initially correct
 				writeDataLength();
-			} else {
-				dataLength=storedLength;
 			}
 
 			// shutdown hook to close file / release lock
 			convex.core.util.Shutdown.addHook(Shutdown.ETCH,this::close);
 		} catch (IOException | RuntimeException | Error e) {
-			if (mapper!=null) {
+			if (access!=null) {
+				try {
+					access.close();
+				} catch (IOException closeException) {
+					e.addSuppressed(closeException);
+				}
+			} else if (mapper!=null) {
 				try {
 					mapper.close();
 				} catch (IOException closeException) {
@@ -272,55 +272,38 @@ public class Etch {
 		return new Etch(file,config);
 	}
 
-	/**
-	 * Validates and normalises a mapped-storage position.
-	 * Type flags are ignored if included in the position pointer.
-	 *
-	 * @param position Target position
-	 * @return requested absolute file position without pointer type flags
-	 */
-	private long checkedPosition(long position) {
-		position=rawPointer(position); // ensure we don't have any pesky type bits
-
-		if ((position<0)||(position>dataLength)) {
-			throw new EtchCorruptionError("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
-		}
-
-		return position;
-	}
-
 	private byte readByte(long position) throws IOException {
-		return fileMapper.getByte(checkedPosition(position));
+		return fileAccess.getByte(rawPointer(position));
 	}
 
 	private short readShort(long position) throws IOException {
-		return fileMapper.getShort(checkedPosition(position));
+		return fileAccess.getShort(rawPointer(position));
 	}
 
 	private long readLongAcquire(long position) throws IOException {
-		return fileMapper.getLongAcquire(checkedPosition(position));
+		return fileAccess.getLongAcquire(rawPointer(position));
 	}
 
 	private void readBytes(long position, byte[] destination, int offset, int length)
 			throws IOException {
-		fileMapper.get(checkedPosition(position),destination,offset,length);
+		fileAccess.get(rawPointer(position),destination,offset,length);
 	}
 
 	private void writeByte(long position, byte value) throws IOException {
-		fileMapper.putByte(checkedPosition(position),value);
+		fileAccess.putByte(rawPointer(position),value);
 	}
 
 	private void writeLong(long position, long value) throws IOException {
-		fileMapper.putLong(checkedPosition(position),value);
+		fileAccess.putLong(rawPointer(position),value);
 	}
 
 	private void writeLongRelease(long position, long value) throws IOException {
-		fileMapper.putLongRelease(checkedPosition(position),value);
+		fileAccess.putLongRelease(rawPointer(position),value);
 	}
 
 	private void writeBytes(long position, byte[] source, int offset, int length)
 			throws IOException {
-		fileMapper.put(checkedPosition(position),source,offset,length);
+		fileAccess.put(rawPointer(position),source,offset,length);
 	}
 
 	/**
@@ -593,7 +576,7 @@ public class Etch {
 	protected void truncateFile() throws FileNotFoundException, IOException {
 		try (FileOutputStream fos=new FileOutputStream(file, true)) {
 			FileChannel outChan = fos.getChannel() ;
-			outChan.truncate(dataLength);
+			outChan.truncate(fileAccess.getDataLength());
 		}
 	}
 
@@ -611,7 +594,7 @@ public class Etch {
 				// Send writes to disk
 				flush();
 				
-				fileMapper.close();
+				fileAccess.close();
 	
 				data.close();
 	
@@ -626,7 +609,7 @@ public class Etch {
 	 * @return Current data size in bytes
 	 */
 	public long getDataLength() {
-		return dataLength;
+		return fileAccess.getDataLength();
 	}
 
 	/**
@@ -635,7 +618,7 @@ public class Etch {
 	 */
 	protected void writeDataLength() throws IOException {
 		// write final data length
-		writeLong(DATA_LENGTH_OFFSET,dataLength);
+		writeLong(DATA_LENGTH_OFFSET,fileAccess.getDataLength());
 	}
 	
 	/**
@@ -658,7 +641,7 @@ public class Etch {
 	}
 
 	String getMappingImplementation() {
-		return fileMapper.implementationName();
+		return fileAccess.implementationName();
 	}
 
 	/**
@@ -703,16 +686,12 @@ public class Etch {
 		int indexBlockLength=POINTER_SIZE*isize;
 		digit=digit&mask;
 		
-		long position=nextIndexPosition();
 		byte[] temp=tempArray.get();
 		Arrays.fill(temp, 0,indexBlockLength,(byte)0x00);
 		
 		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix,dataPointer); // single node
-		// set the datalength to the last available byte in the file after adding index block
-		setDataLength(position+indexBlockLength);
-		writeBytes(position,temp,0,indexBlockLength); // write index block
-		return position;
+		return fileAccess.append(temp,0,indexBlockLength,POINTER_SIZE);
 	}
 
 	/**
@@ -747,7 +726,7 @@ public class Etch {
 	}
 		
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
-		long recordPosition=checkedPosition(pointer);
+		long recordPosition=rawPointer(pointer);
 		byte[] recordHeader=tempArray.get();
 		int headerOffset=0;
 		if (key==null) {
@@ -793,7 +772,7 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
-		fileMapper.force();
+		fileAccess.force();
 		data.getChannel().force(false);
 	}
 
@@ -1029,21 +1008,13 @@ public class Etch {
 		int isize=indexSize(level);
 		int sizeBytes=isize*POINTER_SIZE;
 		
-		// Root placement is selected by the file version. All child indexes are
-		// naturally aligned and reached through explicit pointers.
-		long position=(level==0)?indexStart:nextIndexPosition();
-		// set the datalength to the last available byte in the file
-		setDataLength(position+sizeBytes);
-		
-		// Use temporary zero array to fill new index block
-		for (int ix=0; ix<sizeBytes; ix+=ZERO_BUFFER_SIZE) {
-			writeBytes(position+ix,ZERO_BUFFER,0,Math.min(sizeBytes-ix,ZERO_BUFFER_SIZE));
+		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
+		int alignment=(level==0)?1:POINTER_SIZE;
+		long position=fileAccess.appendZeroes(sizeBytes,alignment);
+		if ((level==0)&&(position!=indexStart)) {
+			throw new IllegalStateException("Unexpected Etch root index position: "+position);
 		}
 		return position;
-	}
-
-	private long nextIndexPosition() {
-		return (dataLength+(POINTER_SIZE-1))&-POINTER_SIZE;
 	}
 
 	/**
@@ -1076,44 +1047,33 @@ public class Etch {
 		}
 
 		// position ready for append
-		final long position=dataLength;
-		final long newDataLength=position+KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE+length;
+		final long recordLength=KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE+length;
+		final long position=fileAccess.beginAppend(recordLength,1);
 		long writePosition=position;
-		// append key
-		fileMapper.put(writePosition,key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
-		writePosition+=KEY_SIZE;
+		try {
+			// append key
+			fileAccess.putAppend(writePosition,key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
+			writePosition+=KEY_SIZE;
 
-		// append flags, Memory Size and blob length as one fixed-size header
-		byte[] recordHeader=tempArray.get();
-		int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
-		recordHeader[0]=(byte)flags; // currently all flags fit in one byte
-		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
-		Utils.writeShort(recordHeader,LABEL_SIZE,length);
-		fileMapper.put(writePosition,recordHeader,0,LABEL_SIZE+ENCODING_LENGTH_SIZE);
-		writePosition+=LABEL_SIZE+ENCODING_LENGTH_SIZE;
+			// append flags, Memory Size and blob length as one fixed-size header
+			byte[] recordHeader=tempArray.get();
+			int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
+			recordHeader[0]=(byte)flags; // currently all flags fit in one byte
+			Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
+			Utils.writeShort(recordHeader,LABEL_SIZE,length);
+			fileAccess.putAppend(writePosition,recordHeader,0,LABEL_SIZE+ENCODING_LENGTH_SIZE);
+			writePosition+=LABEL_SIZE+ENCODING_LENGTH_SIZE;
 
-		// append blob value
-		fileMapper.put(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),length);
-
-		setDataLength(newDataLength);
+			// append blob value
+			fileAccess.putAppend(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),length);
+			fileAccess.commitAppend();
+		} catch (IOException | RuntimeException | Error e) {
+			fileAccess.abortAppend();
+			throw e;
+		}
 
 		// return file position for added data
 		return position;
-	}
-
-	/**
-	 * Sets the total db dataLength in memory. This is the last position in the database
-	 * that new data can be written too.
-	 *
-	 * @param value The new data length to be set
-	 *
-	 */
-	private void setDataLength(long value) {
-		// we can never go back! If we do then we will be corrupting the database
-		if (value < dataLength) {
-			throw new Error("PANIC! New data length is less than the old data length");
-		}
-		dataLength = value;
 	}
 
 	public File getFile() {

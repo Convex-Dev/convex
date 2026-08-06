@@ -78,7 +78,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public byte getByte(long position) throws IOException {
-		ensureMapped(position,Byte.BYTES);
+		ensureMapped(position,Byte.BYTES,false);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -96,7 +96,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			get(position,data,0,data.length);
 			return Utils.readShort(data,0);
 		}
-		ensureMapped(position,Short.BYTES);
+		ensureMapped(position,Short.BYTES,false);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -114,7 +114,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			get(position,data,0,data.length);
 			return Utils.readLong(data,0,Long.BYTES);
 		}
-		ensureMapped(position,Long.BYTES);
+		ensureMapped(position,Long.BYTES,false);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -128,7 +128,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	@Override
 	public long getLongAcquire(long position) throws IOException {
 		checkAtomicLong(position);
-		ensureMapped(position,Long.BYTES);
+		ensureMapped(position,Long.BYTES,false);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -143,7 +143,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	public void get(long position, byte[] destination, int offset, int length) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
-		ensureMapped(position,length);
+		ensureMapped(position,length,false);
 
 		long currentPosition=position;
 		int currentOffset=offset;
@@ -167,7 +167,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void putByte(long position, byte value) throws IOException {
-		ensureMapped(position,Byte.BYTES);
+		ensureMapped(position,Byte.BYTES,true);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -187,7 +187,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			put(position,data,0,data.length);
 			return;
 		}
-		ensureMapped(position,Short.BYTES);
+		ensureMapped(position,Short.BYTES,true);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -207,7 +207,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			put(position,data,0,data.length);
 			return;
 		}
-		ensureMapped(position,Long.BYTES);
+		ensureMapped(position,Long.BYTES,true);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -222,7 +222,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	@Override
 	public void putLongRelease(long position, long value) throws IOException {
 		checkAtomicLong(position);
-		ensureMapped(position,Long.BYTES);
+		ensureMapped(position,Long.BYTES,true);
 		Mapping current=mappingFor(position,null);
 		while (true) {
 			try {
@@ -238,7 +238,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	public void put(long position, byte[] source, int offset, int length) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
-		ensureMapped(position,length);
+		ensureMapped(position,length,true);
 
 		long currentPosition=position;
 		int currentOffset=offset;
@@ -260,7 +260,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 		}
 	}
 
-	private void ensureMapped(long position, long length) throws IOException {
+	private void ensureMapped(long position, long length, boolean writable) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
 		long requiredEnd=position+length;
@@ -273,18 +273,22 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			if (covers(current,position,requiredEnd)) return;
 
 			long fileSize=channel.size();
+			if (!writable&&(requiredEnd>fileSize)) {
+				throw new IOException("Read beyond physical Etch file: end="+requiredEnd+" size="+fileSize);
+			}
 			int firstRegion=regionIndex(position);
 			int lastRegion=regionIndex(requiredEnd-1L);
 			for (int i=firstRegion;i<=lastRegion;i++) {
 				long regionStart=regionStart(i);
 				long requiredLength=Math.min(REGION_SIZE,requiredEnd-regionStart);
 				if (requiredLength<=0L) continue;
-				fileSize=ensureRegionMapped(i,requiredLength,fileSize);
+				fileSize=ensureRegionMapped(i,requiredLength,fileSize,writable);
 			}
 		}
 	}
 
-	private long ensureRegionMapped(int regionIndex, long requiredLength, long fileSize) throws IOException {
+	private long ensureRegionMapped(int regionIndex, long requiredLength, long fileSize,
+			boolean writable) throws IOException {
 		Mapping[] current=mappings;
 		Mapping previous=(regionIndex<current.length)?current[regionIndex]:null;
 		if ((previous!=null)&&(previous.segment.byteSize()>=requiredLength)) return fileSize;
@@ -294,10 +298,11 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 		long existingLength=(previous==null)?0L:previous.segment.byteSize();
 		long target=Math.max(requiredLength,Math.max(physicalLength,existingLength));
 
-		boolean initialMapping=(regionIndex==0)&&(previous==null)&&(target<=INITIAL_MAPPING_SIZE);
+		boolean initialMapping=writable&&(regionIndex==0)&&(previous==null)
+				&&(fileSize==0L)&&(target<=INITIAL_MAPPING_SIZE);
 		if (initialMapping) {
 			target=alignUp(INITIAL_MAPPING_SIZE);
-		} else if (requiredLength>physicalLength) {
+		} else if (writable&&(requiredLength>physicalLength)) {
 			long extent=Math.max(fileSize,Math.addExact(start,target));
 			target=Math.min(REGION_SIZE,Math.addExact(target,mappingGrowth(extent)));
 			target=Math.min(REGION_SIZE,alignUp(target));

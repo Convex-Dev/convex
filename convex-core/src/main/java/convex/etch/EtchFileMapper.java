@@ -3,7 +3,10 @@ package convex.etch;
 import java.io.IOException;
 
 /**
- * Internal memory-mapping backend for an Etch file.
+ * Internal physical memory-mapping backend for an Etch file.
+ *
+ * <p>Read operations never extend the underlying file. Write operations may
+ * extend it according to the backend's mapping growth policy.</p>
  */
 interface EtchFileMapper extends AutoCloseable {
 	byte getByte(long position) throws IOException;

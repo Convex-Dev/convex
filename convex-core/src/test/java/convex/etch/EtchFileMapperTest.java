@@ -2,6 +2,7 @@ package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -67,19 +68,33 @@ public class EtchFileMapperTest {
 	}
 
 	@Test
-	public void testFFMDoesNotExtendExistingFileOnOpen() throws Exception {
+	public void testReadsDoNotExtendExistingFile() throws Exception {
+		assertReadsDoNotExtend(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER);
+		if (EtchFileMapperFactory.isFFMAvailable()) {
+			assertReadsDoNotExtend(EtchConfig.MappingMode.MEMORY_SEGMENT);
+		}
+	}
+
+	private static void assertReadsDoNotExtend(EtchConfig.MappingMode mode) throws Exception {
 		File file=File.createTempFile("etch-mapper-existing", ".dat");
-		long existingLength=(10L<<20)+123L;
+		long existingLength=1_003L;
+		String implementation;
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(existingLength);
-			try (EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
-				if ("MemorySegment".equals(mapper.implementationName())) {
-					mapper.getByte(0L);
-					assertEquals(existingLength,data.length(),"Opening an existing file changed its length");
-				}
+			try (EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
+				implementation=mapper.implementationName();
+				mapper.getByte(existingLength-1L);
+				assertEquals(existingLength,data.length(),"Reading an existing file changed its length");
+				assertThrows(java.io.IOException.class,()->mapper.getByte(existingLength));
+				assertEquals(existingLength,data.length(),"An invalid read extended the file");
 			}
 		}
-		if (!file.delete()) file.deleteOnExit();
+		boolean deleted=file.delete();
+		if ("MemorySegment".equals(implementation)) {
+			assertTrue(deleted,"FFM mapping backend did not release temporary file");
+		} else if (!deleted) {
+			file.deleteOnExit();
+		}
 	}
 
 	private static void assertRoundTripAndGrowth(EtchFileMapper mapper) throws Exception {
