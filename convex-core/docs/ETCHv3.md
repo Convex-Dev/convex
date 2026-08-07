@@ -5,6 +5,13 @@ the rest of the v3 format must preserve. It deliberately does not yet fix the
 v3 data-record or index-block encodings beyond the constraints needed by the
 header.
 
+Implementation status: normal Etch access supports new plaintext and
+AES-256-CTR v3 files, optional index encryption, key verification, clean close
+and fast clean reopen. An existing v3 file whose selected header is `OPEN`
+currently fails normal opening with an explicit recovery/repair requirement;
+the index scan specified in the recovery section and unsafe maintenance open
+remain follow-up work.
+
 Etch v3 remains a content-addressed store for CAD3 values. Encryption is a
 storage overlay below CAD3: it must not change cell encodings, hashes, reference
 status semantics or the logical contents of a store.
@@ -387,7 +394,8 @@ durability boundary:
 3. write the inactive header copy with `generation + 1`, the new root and
    `syncedFileEnd`, retaining `closeState = OPEN` and including its
    `headerCheck`;
-4. force that header copy and required file metadata;
+4. force only that already allocated 4096-byte header copy; no unrelated
+   mapping or file-metadata force is required at this second barrier;
 5. return and allow writers to continue.
 
 The body is forced before the new header can become valid. If a completely

@@ -89,13 +89,19 @@ public class EtchV3HeaderTest {
 			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
 					false,salt,null);
 			header.initialise(access);
-			assertEquals(3,mapper.forceCount());
+			assertEquals(1,mapper.fullForceCount());
+			assertEquals(2,mapper.rangeForceCount());
+			assertEquals(EtchConstants.V3_HEADER_B_OFFSET,mapper.forcedPosition());
+			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 
 			Hash root=hashSequence(1);
 			header.setRootHash(access,root);
 			access.appendIndex(new byte[] { 42 },0,1,1);
 			header.sync(access);
-			assertEquals(5,mapper.forceCount());
+			assertEquals(2,mapper.fullForceCount());
+			assertEquals(3,mapper.rangeForceCount());
+			assertEquals(EtchConstants.V3_HEADER_A_OFFSET,mapper.forcedPosition());
+			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 			assertEquals(2L,header.generation());
 			assertEquals(0,header.activeCopy());
 			assertEquals(INITIAL_FILE_END+1L,header.syncedFileEnd());
@@ -110,10 +116,22 @@ public class EtchV3HeaderTest {
 			assertEquals(INITIAL_FILE_END+1L,reopened.syncedFileEnd());
 
 			header.close(access);
-			assertEquals(7,mapper.forceCount());
+			assertEquals(3,mapper.fullForceCount());
+			assertEquals(4,mapper.rangeForceCount());
+			assertEquals(EtchConstants.V3_HEADER_B_OFFSET,mapper.forcedPosition());
+			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 			assertEquals(3L,header.generation());
 			assertEquals(1,header.activeCopy());
 			assertEquals(EtchConstants.V3_CLEAN_CLOSED,header.closeState());
+
+			header.prepareMutation(access);
+			assertEquals(3,mapper.fullForceCount());
+			assertEquals(5,mapper.rangeForceCount());
+			assertEquals(EtchConstants.V3_HEADER_A_OFFSET,mapper.forcedPosition());
+			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
+			assertEquals(4L,header.generation());
+			assertEquals(0,header.activeCopy());
+			assertEquals(EtchConstants.V3_OPEN,header.closeState());
 		}
 	}
 

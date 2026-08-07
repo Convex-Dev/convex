@@ -201,6 +201,10 @@ public class EtchFileAccessTest {
 		}
 
 		@Override
+		public void forceRange(long position, long length) {
+		}
+
+		@Override
 		public String implementationName() {
 			return "failing-test";
 		}

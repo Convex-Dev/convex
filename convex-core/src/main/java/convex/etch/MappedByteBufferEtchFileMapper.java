@@ -181,6 +181,23 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
+	public synchronized void forceRange(long position, long length) throws IOException {
+		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
+		long end=Math.addExact(position,length);
+		long current=position;
+		while (current<end) {
+			int regionIndex=Math.toIntExact(current/EtchConstants.MAX_REGION_SIZE);
+			MappedByteBuffer mapped=(regionIndex<regionMap.size())?regionMap.get(regionIndex):null;
+			if (mapped==null) throw new IOException("Etch force range is not mapped: "+current);
+			int index=bufferIndex(current);
+			int count=Math.toIntExact(Math.min(end-current,(long)mapped.capacity()-index));
+			if (count<=0) throw new IOException("Etch force range exceeds mapping: "+current);
+			mapped.force(index,count);
+			current+=count;
+		}
+	}
+
+	@Override
 	public String implementationName() {
 		return "MappedByteBuffer";
 	}

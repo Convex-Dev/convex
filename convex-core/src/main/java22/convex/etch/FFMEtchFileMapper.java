@@ -372,6 +372,23 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
+	public synchronized void forceRange(long position, long length) throws IOException {
+		checkRange(position,length);
+		if (closed) throw new IllegalStateException("Etch mapping is closed");
+		long end=position+length;
+		long current=position;
+		while (current<end) {
+			int index=regionIndex(current);
+			Mapping mapping=(index<mappings.length)?mappings[index]:null;
+			if (mapping==null) throw new IOException("Etch force range is not mapped: "+current);
+			long count=Math.min(end-current,mapping.end()-current);
+			if (count<=0L) throw new IOException("Etch force range exceeds mapping: "+current);
+			mapping.segment.asSlice(mapping.offset(current),count).force();
+			current+=count;
+		}
+	}
+
+	@Override
 	public String implementationName() {
 		return "MemorySegment";
 	}

@@ -14,6 +14,7 @@ import java.util.Arrays;
 import convex.core.Constants;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -88,6 +89,7 @@ public class Etch {
 	private final long indexStart;
 	private final EtchFileAccess fileAccess;
 	private final boolean buildChains;
+	private boolean requiresOpenTransition;
 
 	private EtchStore store;
 
@@ -119,19 +121,53 @@ public class Etch {
 				effectiveConfig=(requestedConfig==null)?EtchConfig.create():requestedConfig;
 				resolvedHeader=EtchHeader.create(effectiveConfig);
 			} else {
-				resolvedHeader=EtchHeader.open(this.data,fileName);
+				byte[] openSecret=(requestedConfig==null)?null:requestedConfig.encryptionSecret();
+				try {
+					resolvedHeader=EtchHeader.open(this.data,fileName,openSecret);
+				} finally {
+					if (openSecret!=null) Arrays.fill(openSecret,(byte)0);
+				}
 			}
 
 			short fileVersion=resolvedHeader.version();
 			if (!newFile) {
-				if (requestedConfig==null) {
-					effectiveConfig=EtchConfig.create(fileVersion)
-							.withPublicKeyHint(resolvedHeader.publicKeyHint());
-				} else {
+				if (requestedConfig!=null) {
 					if (requestedConfig.getVersion()!=fileVersion) {
 						throw new IOException("Configured Etch version "+requestedConfig.getVersion()
 								+" does not match file version "+fileVersion+": "+dataFile);
 					}
+				}
+
+				if (resolvedHeader instanceof EtchV3Header v3Header) {
+					if (!v3Header.isCleanClosed()) {
+						throw new IOException("Etch v3 file was not cleanly closed; explicit recovery or repair required: "
+								+dataFile);
+					}
+					EtchConfig.CipherMode fileCipher;
+					try {
+						fileCipher=EtchConfig.CipherMode.fromFileId(v3Header.cipherId());
+					} catch (IllegalArgumentException e) {
+						throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId(),e);
+					}
+					EtchConfig basis=(requestedConfig==null)?EtchConfig.create(fileVersion):requestedConfig;
+					if ((requestedConfig!=null)&&(requestedConfig.getCipherMode()!=fileCipher)) {
+						throw new IOException("Configured Etch cipher "+requestedConfig.getCipherMode().configName()
+								+" does not match file cipher "+fileCipher.configName()+": "+dataFile);
+					}
+					if ((requestedConfig!=null)
+							&&(requestedConfig.isIndexEncrypted()!=v3Header.isIndexEncrypted())) {
+						throw new IOException("Configured Etch index encryption does not match file: "+dataFile);
+					}
+					AccountKey configuredHint=basis.getPublicKeyHint();
+					AccountKey fileHint=v3Header.publicKeyHint();
+					if ((configuredHint!=null)&&!configuredHint.equals(fileHint)) {
+						throw new IOException("Configured Etch public-key hint does not match file: "+dataFile);
+					}
+					effectiveConfig=basis.withV3FileOptions(fileCipher,
+							v3Header.isIndexEncrypted(),fileHint);
+				} else if (requestedConfig==null) {
+					effectiveConfig=EtchConfig.create(fileVersion);
+				} else {
 					effectiveConfig=requestedConfig;
 				}
 			}
@@ -141,8 +177,23 @@ public class Etch {
 			this.version=fileVersion;
 			this.indexStart=resolvedHeader.indexStart();
 			this.buildChains=effectiveConfig.isBuildChains();
+			this.requiresOpenTransition=!newFile&&(resolvedHeader instanceof EtchV3Header);
 			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
-			access=new EtchFileAccess(mapper,fileName,newFile?0L:resolvedHeader.storedLength(),fileChannel.size());
+			EtchFileCipher cipher=null;
+			boolean encryptedIndex=false;
+			if (resolvedHeader instanceof EtchV3Header v3Header) {
+				encryptedIndex=v3Header.isIndexEncrypted();
+				if (v3Header.cipherId()==V3_CIPHER_AES_256_CTR) {
+					byte[] cipherSecret=effectiveConfig.encryptionSecret();
+					try {
+						cipher=AES256CTREtchCipher.derive(cipherSecret,v3Header.fileSalt());
+					} finally {
+						if (cipherSecret!=null) Arrays.fill(cipherSecret,(byte)0);
+					}
+				}
+			}
+			access=new EtchFileAccess(mapper,fileName,newFile?0L:resolvedHeader.storedLength(),
+					fileChannel.size(),cipher,encryptedIndex);
 			this.fileAccess=access;
 
 			if (newFile) {
@@ -268,7 +319,14 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized <T extends ACell > Ref<T> write(AArrayBlob key, Ref<T> value) throws IOException {
+		prepareMutation();
 		return write(key,0,value,indexStart);
+	}
+
+	private void prepareMutation() throws IOException {
+		if (!requiresOpenTransition) return;
+		header.prepareMutation(fileAccess);
+		requiresOpenTransition=false;
 	}
 
 	private <T extends ACell > Ref<T> write(AArrayBlob key, int level, Ref<T> ref, long indexPosition) throws IOException {
@@ -586,7 +644,13 @@ public class Etch {
 		return indexStart;
 	}
 
-	String getMappingImplementation() {
+	/**
+	 * Gets the active file-mapping implementation name for diagnostics and
+	 * performance reporting.
+	 *
+	 * @return mapper implementation name
+	 */
+	public String getMappingImplementation() {
 		return fileAccess.implementationName();
 	}
 
@@ -722,6 +786,7 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
+		header.writeDataLength(fileAccess);
 		header.sync(fileAccess);
 	}
 
@@ -1001,6 +1066,7 @@ public class Etch {
 	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
+		prepareMutation();
 		header.setRootHash(fileAccess,h);
 	}
 

@@ -22,7 +22,7 @@ public final class EtchConstants {
 
 	public static final short VERSION_1=1;
 	public static final short VERSION_2=2;
-	/** Reserved for the planned Etch v3 format; not yet accepted for opening. */
+	/** Etch v3 dual-header format with optional file-overlay encryption. */
 	public static final short VERSION_3=3;
 	/** Version written by default for newly created Etch files. */
 	public static final short CURRENT_VERSION=VERSION_2;

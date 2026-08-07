@@ -162,7 +162,9 @@ public class EtchStore extends ACachedStore {
 
 		// Fully initialise the target before publication: readers must never see
 		// a target without its store binding and root hash
-		Etch t = Etch.create(temp);
+		// Preserve the store format and encryption policy while generating a new
+		// v3 file salt for the independent target file.
+		Etch t = Etch.create(temp,etch.getConfig());
 		t.setStore(this);
 		t.setRootHash(etch.getRootHash());
 		sweepComplete = false;

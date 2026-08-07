@@ -34,6 +34,7 @@ import static convex.etch.EtchConstants.VERSION_3;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -47,14 +48,15 @@ import convex.core.util.Utils;
 /**
  * Etch v3 dual-copy header state and exact byte codec.
  *
- * <p>This component is deliberately off the record and index hot paths. Normal
- * v3 opening remains disabled until the key-resolution API and dirty-reopen
- * path are complete.</p>
+ * <p>This component is deliberately off the record and index hot paths. Clean
+ * reopening is supported by normal Etch access; dirty reopening remains
+ * fail-fast until the separate recovery scanner is complete.</p>
  */
 final class EtchV3Header extends EtchHeader {
 	private static final String SHA_256="SHA-256";
 	private static final String HMAC_SHA_256="HmacSHA256";
 	private static final long UNSIGNED_MAX_GENERATION=-1L;
+	private static final SecureRandom SECURE_RANDOM=new SecureRandom();
 
 	private final int cipherId;
 	private final boolean encryptedIndex;
@@ -90,6 +92,18 @@ final class EtchV3Header extends EtchHeader {
 	static EtchV3Header create(int cipherId, boolean encryptedIndex, byte[] fileSalt,
 			byte[] secret) {
 		return create(cipherId,encryptedIndex,fileSalt,null,secret);
+	}
+
+	static EtchV3Header create(EtchConfig config) {
+		byte[] fileSalt=new byte[V3_FILE_SALT_SIZE];
+		SECURE_RANDOM.nextBytes(fileSalt);
+		byte[] secret=config.encryptionSecret();
+		try {
+			return create(config.getCipherMode().fileId(),config.isIndexEncrypted(),
+					fileSalt,config.getPublicKeyHint(),secret);
+		} finally {
+			if (secret!=null) Arrays.fill(secret,(byte)0);
+		}
 	}
 
 	static EtchV3Header create(int cipherId, boolean encryptedIndex, byte[] fileSalt,
@@ -319,9 +333,9 @@ final class EtchV3Header extends EtchHeader {
 		long initialEnd=access.getDataLength();
 		access.force();
 		writeCopy(access,0,0L,initialEnd,rootHash,V3_OPEN);
-		access.force();
+		forceCopy(access,0);
 		writeCopy(access,1,1L,initialEnd,rootHash,V3_OPEN);
-		access.force();
+		forceCopy(access,1);
 		generation=1L;
 		syncedFileEnd=initialEnd;
 		closeState=V3_OPEN;
@@ -331,8 +345,15 @@ final class EtchV3Header extends EtchHeader {
 	private void writeCopy(EtchFileAccess access, int copyIndex, long nextGeneration,
 			long nextSyncedEnd, Hash nextRoot, long nextCloseState) throws IOException {
 		byte[] encoded=encode(nextGeneration,nextSyncedEnd,nextRoot,nextCloseState);
-		long position=(copyIndex==0)?V3_HEADER_A_OFFSET:V3_HEADER_B_OFFSET;
-		access.writeHeader(position,encoded,0,encoded.length);
+		access.writeHeader(copyPosition(copyIndex),encoded,0,encoded.length);
+	}
+
+	private void forceCopy(EtchFileAccess access, int copyIndex) throws IOException {
+		access.forceHeader(copyPosition(copyIndex),V3_HEADER_COPY_SIZE);
+	}
+
+	private static long copyPosition(int copyIndex) {
+		return (copyIndex==0)?V3_HEADER_A_OFFSET:V3_HEADER_B_OFFSET;
 	}
 
 	@Override
@@ -346,22 +367,38 @@ final class EtchV3Header extends EtchHeader {
 	}
 
 	@Override
+	void prepareMutation(EtchFileAccess access) throws IOException {
+		if (closeState==V3_CLEAN_CLOSED) commitHeaderOnly(access,V3_OPEN);
+	}
+
+	@Override
 	void writeDataLength(EtchFileAccess access) {
 		// V3 records writeEnd only as part of an ordered header commit in sync().
 	}
 
 	@Override
 	void sync(EtchFileAccess access) throws IOException {
+		if (closeState==V3_CLEAN_CLOSED) return;
 		commit(access,V3_OPEN);
 	}
 
 	@Override
 	void close(EtchFileAccess access) throws IOException {
-		commit(access,V3_CLEAN_CLOSED);
+		if (closeState!=V3_CLEAN_CLOSED) commit(access,V3_CLEAN_CLOSED);
 		if (headerMacKey!=null) Arrays.fill(headerMacKey,(byte)0);
 	}
 
 	private void commit(EtchFileAccess access, long nextCloseState)
+			throws IOException {
+		commit(access,nextCloseState,true);
+	}
+
+	private void commitHeaderOnly(EtchFileAccess access, long nextCloseState)
+			throws IOException {
+		commit(access,nextCloseState,false);
+	}
+
+	private void commit(EtchFileAccess access, long nextCloseState, boolean forceBody)
 			throws IOException {
 		if (activeCopy<0) throw new IllegalStateException("Etch v3 header is not initialised");
 		if (generation==UNSIGNED_MAX_GENERATION) {
@@ -371,9 +408,9 @@ final class EtchV3Header extends EtchHeader {
 		long nextSyncedEnd=access.getDataLength();
 		int nextCopy=1-activeCopy;
 
-		access.force();
+		if (forceBody) access.force();
 		writeCopy(access,nextCopy,nextGeneration,nextSyncedEnd,rootHash,nextCloseState);
-		access.force();
+		forceCopy(access,nextCopy);
 
 		generation=nextGeneration;
 		syncedFileEnd=nextSyncedEnd;
@@ -407,6 +444,10 @@ final class EtchV3Header extends EtchHeader {
 
 	boolean isDegraded() {
 		return degraded;
+	}
+
+	boolean isCleanClosed() {
+		return closeState==V3_CLEAN_CLOSED;
 	}
 
 	byte[] fileSalt() {

@@ -49,6 +49,14 @@ interface EtchFileMapper extends AutoCloseable {
 	void force() throws IOException;
 
 	/**
+	 * Forces dirty mapped pages intersecting an already mapped file range.
+	 * Unlike {@link #force()}, this does not force unrelated mappings or file
+	 * metadata. It is used internally after an Etch v3 header-copy write, once
+	 * the preceding full-file durability barrier has completed.
+	 */
+	void forceRange(long position, long length) throws IOException;
+
+	/**
 	 * Human-readable backend name, primarily for diagnostics and tests.
 	 */
 	String implementationName();

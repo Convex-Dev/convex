@@ -33,8 +33,8 @@ public class EtchVersionMatrixTest {
 
 	private static final short[] VERSIONS={
 		EtchConstants.VERSION_1,
-		EtchConstants.VERSION_2
-		// TODO: Add EtchConstants.VERSION_3 when Etch v3 is implemented.
+		EtchConstants.VERSION_2,
+		EtchConstants.VERSION_3
 	};
 
 	private final List<EtchStore> openStores=new ArrayList<>();

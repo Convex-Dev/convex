@@ -85,6 +85,37 @@ public class EtchConfigTest {
 	}
 
 	@Test
+	public void testV3EncryptionConfiguration() {
+		byte[] secret=new byte[] {1,2,3,4};
+		AMap<AString,ACell> source=Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
+				EtchConfig.CIPHER,Strings.create("aes-256-ctr"),
+				EtchConfig.ENCRYPT_INDEX,CVMBool.TRUE);
+		EtchConfig config=EtchConfig.fromMap(source,secret);
+		secret[0]=99;
+
+		assertEquals(EtchConfig.CipherMode.AES_256_CTR,config.getCipherMode());
+		assertTrue(config.isIndexEncrypted());
+		assertTrue(config.hasEncryptionSecret());
+		assertFalse(config.toString().contains("01020304"));
+		assertEquals(config,EtchConfig.createV3(config.getMappingMode(),true,
+				EtchConfig.CipherMode.AES_256_CTR,true,null,new byte[] {1,2,3,4}));
+	}
+
+	@Test
+	public void testInvalidV3EncryptionConfiguration() {
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.createV3(
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,
+				EtchConfig.CipherMode.AES_256_CTR,false,null,null));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.createV3(
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,
+				EtchConfig.CipherMode.NONE,true,null,null));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.fromMap(Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_2),
+				EtchConfig.CIPHER,Strings.create("aes-256-ctr")),new byte[] {1}));
+	}
+
+	@Test
 	public void testPublicKeyHintRejectedForLegacyVersions() {
 		AccountKey hint=AccountKey.dummy("1234");
 		assertThrows(IllegalArgumentException.class,()->EtchConfig.create(

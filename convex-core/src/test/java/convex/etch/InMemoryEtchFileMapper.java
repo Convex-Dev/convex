@@ -9,7 +9,10 @@ import convex.core.util.Utils;
 /** Small deterministic mapper for byte-exact Etch format tests. */
 final class InMemoryEtchFileMapper implements EtchFileMapper {
 	private byte[] bytes=new byte[0];
-	private int forceCount;
+	private int fullForceCount;
+	private int rangeForceCount;
+	private long forcedPosition=-1L;
+	private long forcedLength=-1L;
 
 	byte[] copyOf(long length) {
 		return Arrays.copyOf(bytes,Math.toIntExact(length));
@@ -19,8 +22,20 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 		return Arrays.copyOfRange(bytes,Math.toIntExact(start),Math.toIntExact(end));
 	}
 
-	int forceCount() {
-		return forceCount;
+	int fullForceCount() {
+		return fullForceCount;
+	}
+
+	int rangeForceCount() {
+		return rangeForceCount;
+	}
+
+	long forcedPosition() {
+		return forcedPosition;
+	}
+
+	long forcedLength() {
+		return forcedLength;
 	}
 
 	@Override
@@ -65,7 +80,14 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void force() {
-		forceCount++;
+		fullForceCount++;
+	}
+
+	@Override
+	public void forceRange(long position, long length) {
+		rangeForceCount++;
+		forcedPosition=position;
+		forcedLength=length;
 	}
 
 	@Override

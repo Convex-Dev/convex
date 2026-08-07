@@ -95,6 +95,11 @@ final class LegacyEtchHeader extends EtchHeader {
 	}
 
 	@Override
+	void prepareMutation(EtchFileAccess access) {
+		// Legacy headers have no writing-session marker.
+	}
+
+	@Override
 	void writeDataLength(EtchFileAccess access) throws IOException {
 		byte[] bytes=new byte[Long.BYTES];
 		Utils.writeLong(bytes,0,access.getDataLength());

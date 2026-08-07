@@ -207,6 +207,10 @@ final class EtchFileAccess implements AutoCloseable {
 		mapper.force();
 	}
 
+	void forceHeader(long position, int length) throws IOException {
+		mapper.forceRange(checkedRange(position,length),length);
+	}
+
 	String implementationName() {
 		return mapper.implementationName();
 	}
