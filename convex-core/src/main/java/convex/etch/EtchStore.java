@@ -459,13 +459,34 @@ public class EtchStore extends ACachedStore {
 	 * @throws IOException If an IO error occurs
 	 */
 	public static EtchStore create(File file) throws IOException {
+		return createConfigured(file,null);
+	}
+
+	/**
+	 * Creates an EtchStore using a specified file and compiled configuration.
+	 * The configuration is used for GC recovery and the eventual store open, so
+	 * encrypted v3 files never lose their caller-supplied secret or policy while
+	 * reconciling lifecycle files.
+	 *
+	 * @param file File to use for storage. Will be created if it does not already
+	 *             exist.
+	 * @param config compiled Etch configuration
+	 * @return EtchStore instance
+	 * @throws IOException If an IO error occurs
+	 */
+	public static EtchStore create(File file, EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		return createConfigured(file,config);
+	}
+
+	private static EtchStore createConfigured(File file, EtchConfig config) throws IOException {
 		file = FileUtils.ensureFilePath(file);
 		// Automatic GC adoption/recovery: reconcile any completed or abandoned
 		// GC cycle state before opening (see ETCH_GC.md "File lifecycle").
 		// Normally returns the same file; returns the cutover-chain tail when
 		// adoption had to be deferred (e.g. mapped-file pinning on Windows)
-		File open = EtchUtils.recover(file);
-		Etch etch = Etch.create(open);
+		File open = (config==null)?EtchUtils.recover(file):EtchUtils.recover(file,config);
+		Etch etch = (config==null)?Etch.create(open):Etch.create(open,config);
 		EtchStore store = new EtchStore(etch);
 		// The logical base stays the REQUESTED file even under deferred
 		// adoption, so future GC targets are named off it (bounded names)
@@ -498,6 +519,20 @@ public class EtchStore extends ACachedStore {
 	}
 
 	/**
+	 * Creates a configured Etch store using a new temporary file with the given
+	 * prefix.
+	 *
+	 * @param prefix String prefix for temporary file
+	 * @param config compiled Etch configuration
+	 * @return New EtchStore instance
+	 * @throws IOException In case of IO error creating database
+	 */
+	public static EtchStore createTemp(String prefix, EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		return new EtchStore(Etch.createTempEtch(prefix,config));
+	}
+
+	/**
 	 * Create an Etch store using a new temporary file with a generated prefix
 	 *
 	 * @return New EtchStore instance
@@ -506,6 +541,19 @@ public class EtchStore extends ACachedStore {
 	public static EtchStore createTemp() throws IOException {
 		Etch etch = Etch.createTempEtch();
 		return new EtchStore(etch);
+	}
+
+	/**
+	 * Creates a configured Etch store using a new temporary file with a generated
+	 * prefix.
+	 *
+	 * @param config compiled Etch configuration
+	 * @return New EtchStore instance
+	 * @throws IOException In case of IO error creating database
+	 */
+	public static EtchStore createTemp(EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		return new EtchStore(Etch.createTempEtch(config));
 	}
 
 	@SuppressWarnings("unchecked")

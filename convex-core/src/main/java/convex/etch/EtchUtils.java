@@ -2,11 +2,14 @@ package convex.etch;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import convex.core.data.ACell;
@@ -83,6 +86,12 @@ public class EtchUtils {
 	 * Every step is idempotent: a crash mid-recovery leaves a state this
 	 * method recognises and resumes on the next run.
 	 *
+	 * Before the first mutation, every participating non-empty file is checked
+	 * with a direct, non-mapping header read. Encrypted v3 headers are
+	 * authenticated with the caller's compiled configuration. Normal recovery
+	 * accepts only cleanly closed v3 files; dirty v3 files require an explicitly
+	 * selected maintenance or repair operation.
+	 *
 	 * If files cannot be renamed/deleted (e.g. pinned by memory mappings from
 	 * this same process on Windows), adoption is DEFERRED: the returned file
 	 * is the marker-named current file, which holds the correct data, and the
@@ -95,6 +104,28 @@ public class EtchUtils {
 	 * @throws IOException in case of IO error, or unresolvable on-disk state
 	 */
 	public static File recover(File file) throws IOException {
+		return recoverConfigured(file,null);
+	}
+
+	/**
+	 * Performs automatic GC recovery using compiled Etch configuration. The
+	 * configuration is applied consistently to the live file and every GC target.
+	 * All participating non-empty files are authenticated before recovery mutates
+	 * any marker, store or sibling file.
+	 *
+	 * @param file Etch store file the caller wishes to open
+	 * @param config compiled Etch configuration, including secret material when
+	 *        opening an encrypted v3 store
+	 * @return file that should actually be opened
+	 * @throws IOException in case of invalid configuration, authentication failure,
+	 *         dirty v3 state or an unresolvable on-disk state
+	 */
+	public static File recover(File file, EtchConfig config) throws IOException {
+		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		return recoverConfigured(file,config);
+	}
+
+	private static File recoverConfigured(File file, EtchConfig config) throws IOException {
 		file = file.getCanonicalFile();
 		File marker = markerFile(file);
 		List<File> targets = gcTargets(file);
@@ -107,20 +138,19 @@ public class EtchUtils {
 		// The single marker (rewritten by every completeGC) names it; no marker
 		// means the base file itself is current
 		File current = null;
+		String markerDiscardReason = null;
 		if (marker.exists()) {
 			String name = readMarkerName(marker, file);
-			if (name != null) {
+			if (name == null) {
+				markerDiscardReason = "empty or malformed";
+			} else {
 				File named = new File(file.getParentFile(), name).getCanonicalFile();
 				if (named.equals(file)) {
-					debug("Etch GC recovery: marker {} names the base file itself - already adopted;"
-							+ " removing the leftover marker.", marker.getName());
-					deleteOrThrow(marker);
+					markerDiscardReason = "names the already-adopted base file";
 				} else if (!named.exists()) {
 					if (file.exists()) {
-						debug("Etch GC recovery: marker {} names {} which no longer exists, while {} is"
-								+ " present - treating the marker as stale (cutover already adopted by a"
-								+ " previous run) and removing it.", marker.getName(), name, file.getName());
-						deleteOrThrow(marker);
+						markerDiscardReason = "names missing target "+name
+								+" while the adopted base file is present";
 					} else {
 						throw new IOException("Etch GC recovery cannot proceed for " + file + ": marker "
 								+ marker.getName() + " names " + name + " as the current store file, but"
@@ -129,6 +159,9 @@ public class EtchUtils {
 								+ " Restore " + name + " or " + file.getName() + " from a backup, or delete"
 								+ " the marker to start a fresh empty store.");
 					}
+				} else if (!containsCanonical(targets,named)) {
+					throw new IOException("Etch GC recovery marker "+marker
+							+" names a file outside the GC target set for "+file+": "+name);
 				} else {
 					current = named;
 					debug("Etch GC recovery: completed cutover found - current store file is {}",
@@ -138,6 +171,18 @@ public class EtchUtils {
 		}
 		// Where rolled-back data belongs: the live store file
 		File live = (current != null) ? current : file;
+
+		// Recovery metadata is unauthenticated. Authenticate every non-empty store
+		// file which recovery may read, delete or replace before the first mutation.
+		// Normal opening deliberately refuses dirty v3 files; callers must select the
+		// explicit maintenance/rebuild path for those.
+		validateRecoveryFiles(file,targets,config);
+
+		if (markerDiscardReason!=null) {
+			debug("Etch GC recovery: marker {} {} - removing the stale marker.",
+					marker.getName(),markerDiscardReason);
+			deleteOrThrow(marker);
+		}
 
 		// ---- 2: dispose of defunct targets, roll back abandoned ones ----
 		// Defunct files (.gc-defunct tombstone) are superseded cutover originals
@@ -168,7 +213,12 @@ public class EtchUtils {
 						+ " during that cycle matters.", st, live);
 				continue;
 			}
-			rollback(live, st);
+			if (st.length()==0L) {
+				deleteOrThrow(st);
+				debug("Etch GC recovery: deleted empty abandoned GC target {}",st.getName());
+				continue;
+			}
+			rollback(live,st,config);
 		}
 
 		// ---- 3: adopt the current file under the base name ----
@@ -209,22 +259,71 @@ public class EtchUtils {
 		return file;
 	}
 
+	private static boolean containsCanonical(List<File> files, File candidate) throws IOException {
+		for (File file:files) {
+			if (file.getCanonicalFile().equals(candidate)) return true;
+		}
+		return false;
+	}
+
+	private static void validateRecoveryFiles(File base, List<File> targets,
+			EtchConfig config) throws IOException {
+		LinkedHashSet<File> files=new LinkedHashSet<>();
+		if (base.isFile()) files.add(base.getCanonicalFile());
+		for (File target:targets) {
+			if (target.isFile()) files.add(target.getCanonicalFile());
+		}
+		for (File candidate:files) {
+			if (candidate.length()==0L) continue;
+			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
+				byte[] secret=(config==null)?null:config.encryptionSecret();
+				EtchHeader header;
+				try {
+					header=EtchHeader.open(data,candidate.getName(),secret);
+				} finally {
+					if (secret!=null) Arrays.fill(secret,(byte)0);
+				}
+				Etch.resolveExistingConfig(header,config,candidate);
+				long physicalEnd=data.length();
+				long storedEnd=header.storedLength();
+				if ((storedEnd<0L)||(storedEnd>physicalEnd)) {
+					throw new IOException("Etch stored length is outside the physical file: stored="
+							+storedEnd+" physical="+physicalEnd+" file="+candidate);
+				}
+				long rootIndexEnd;
+				try {
+					rootIndexEnd=Math.addExact(header.indexStart(),
+							(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE);
+				} catch (ArithmeticException e) {
+					throw new IOException("Etch index range overflows: "+candidate,e);
+				}
+				if (rootIndexEnd>storedEnd) {
+					throw new IOException("Etch root index extends beyond stored length: "+candidate);
+				}
+				if ((header instanceof EtchV3Header v3)&&!v3.isCleanClosed()) {
+					throw new IOException("Etch v3 GC recovery requires a cleanly closed file; "
+							+"explicit recovery or repair is required: "+candidate);
+				}
+			}
+		}
+	}
+
 	static File markerFile(File base) throws IOException {
 		return new File(base.getCanonicalPath() + ".gc-complete");
 	}
 
 	/**
-	 * Reads the file name from a GC completion marker, or null (deleting the
-	 * marker with a full explanation) if it is malformed.
+	 * Reads the file name from a GC completion marker, or null if it is malformed.
+	 * This inspection is deliberately side-effect free: recovery authenticates
+	 * participating Etch files before deleting even malformed metadata.
 	 */
 	static String readMarkerName(File marker, File base) throws IOException {
 		List<String> lines = Files.readAllLines(marker.toPath());
 		String name = lines.isEmpty() ? "" : lines.get(0).trim();
 		if (name.isEmpty()) {
-			warn("Etch GC recovery: marker {} is empty/malformed - deleting it. Any completed GC"
-					+ " target alongside {} will instead be treated as an abandoned cycle and rolled back"
-					+ " (safe: same data, just not adopted as the main file).", marker, base.getName());
-			deleteOrThrow(marker);
+			warn("Etch GC recovery: marker {} is empty/malformed. Any completed GC target alongside"
+					+ " {} will be treated as an abandoned cycle after store authentication.",
+					marker,base.getName());
 			return null;
 		}
 		return name;
@@ -277,18 +376,22 @@ public class EtchUtils {
 	 * target deletion.
 	 */
 	static void rollback(File base, File staleTarget) throws IOException {
+		rollback(base,staleTarget,null);
+	}
+
+	static void rollback(File base, File staleTarget, EtchConfig config) throws IOException {
 		debug("Etch GC recovery: rolling back abandoned GC target {} into {} - data written during"
 				+ " that cycle exists nowhere else", staleTarget.getName(), base.getName());
 		long copied;
 		long[] skipped = {0};
-		EtchStore baseStore = new EtchStore(Etch.create(base)); // direct open: no recursive recovery
+		EtchStore baseStore = new EtchStore(openEtch(base,config)); // direct open: no recursive recovery
 		try {
 			// The target is opened as a store of its own so decoded refs bind to
 			// it: the index scan visits entries in hash order (not post-order),
 			// and a parent's persist must be able to resolve children from the
 			// SOURCE during its descent. Binding refs to the base store instead
 			// would make every parent visited before its children fail
-			EtchStore srcStore = new EtchStore(Etch.create(staleTarget));
+			EtchStore srcStore = new EtchStore(openEtch(staleTarget,config));
 			try {
 				copied = lenientCopy(srcStore.getEtch(), baseStore, skipped);
 				Hash root = srcStore.getEtch().getRootHash();
@@ -325,6 +428,10 @@ public class EtchUtils {
 					+ " recoveries will redo this roll-back - idempotent and safe, just wasteful.",
 					staleTarget);
 		}
+	}
+
+	private static Etch openEtch(File file, EtchConfig config) throws IOException {
+		return (config==null)?Etch.create(file):Etch.create(file,config);
 	}
 
 	/**
