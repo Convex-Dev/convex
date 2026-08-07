@@ -60,6 +60,7 @@ import convex.lattice.LatticeContext;
 import convex.lattice.P2PLattice;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.PathCursor;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 import convex.net.impl.netty.NettyServer;
@@ -511,6 +512,54 @@ public class NodeServerTest {
 			assertEquals(CVMLong.ZERO, result); // Should return initial zero value
 		} finally {
 			peer.close();
+		}
+	}
+
+	/**
+	 * Test that pullPath(Convex, ACell...) pulls only the requested sub-path
+	 * of a peer's lattice value, and does not leak sibling regions the
+	 * caller never asked for — the mechanism behind selective/partial
+	 * replication (e.g. a node replicating just one named sub-database from
+	 * a peer that may host several).
+	 */
+	@Test
+	public void testPullPathDoesNotLeakSiblingRegions() throws Exception {
+		Keyword regionA = Keyword.create("regiona");
+		Keyword regionB = Keyword.create("regionb");
+		KeyedLattice testLattice = KeyedLattice.create(
+			regionA, MaxLattice.create(),
+			regionB, MaxLattice.create());
+
+		NodeServer<Index<Keyword, ACell>> serverA = new NodeServer<>(testLattice, new MemoryStore());
+		NodeServer<Index<Keyword, ACell>> serverB = new NodeServer<>(testLattice, new MemoryStore());
+		try {
+			allowPrimaryInbound(serverA);
+			serverA.launch();
+			serverB.launch();
+
+			// A has data in BOTH regions
+			serverA.getCursor().path(regionA).merge(CVMLong.create(111));
+			serverA.getCursor().path(regionB).merge(CVMLong.create(222));
+			serverA.getCursor().sync();
+
+			ConvexRemote peerA = ConvexRemote.connect(serverA.getHostAddress());
+			try {
+				// B pulls ONLY regionA from A
+				CompletableFuture<ACell> future = serverB.pullPath(peerA, regionA);
+				ACell result = future.get(5, TimeUnit.SECONDS);
+
+				assertEquals(CVMLong.create(111), result);
+				assertEquals(CVMLong.create(111), serverB.getCursor().get(regionA));
+
+				// regionB must NOT have leaked in, even though it lives in
+				// the same lattice value on the peer
+				assertNull(serverB.getCursor().get(regionB));
+			} finally {
+				peerA.close();
+			}
+		} finally {
+			serverA.close();
+			serverB.close();
 		}
 	}
 

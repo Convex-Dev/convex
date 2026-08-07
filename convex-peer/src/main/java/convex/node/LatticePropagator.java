@@ -696,4 +696,71 @@ public class LatticePropagator implements Closeable {
 				return acquired;
 			});
 	}
+
+	/**
+	 * Pulls just a sub-path of a peer's lattice value (e.g. one entry of a
+	 * keyed map) instead of its entire root, into this propagator's store.
+	 *
+	 * <p>Sends a LATTICE_QUERY with a real path — the server side
+	 * ({@code NodeServer#processLatticeQuery}) already honours an optional
+	 * path parameter; only the full-root convenience methods above ({@link
+	 * #pull(Convex)}/{@link #pullAll()}) always request the whole root. This
+	 * exists for applications where a peer's lattice root aggregates many
+	 * independent regions (e.g. one entry per named sub-database) and a
+	 * caller only wants — and is only entitled to receive — one of them,
+	 * without transitively pulling everything else that peer happens to
+	 * host too.
+	 *
+	 * <p>Like {@link #pull(Convex)}, this deliberately performs no merge,
+	 * root publication or broadcast — only the caller (typically {@code
+	 * NodeServer}) knows which cursor path the acquired value belongs at,
+	 * and must merge it there itself before any re-propagation.
+	 *
+	 * @param peer Convex connection to the peer node
+	 * @param path Path within the peer's lattice to fetch
+	 * @return CompletableFuture completing with the value at that path (or null if absent there)
+	 */
+	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
+		if (peer == null) {
+			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
+		}
+
+		return CompletableFuture.supplyAsync(() -> {
+			try {
+				if (!peer.isConnected()) {
+					throw new RuntimeException("Peer is not connected");
+				}
+
+				CVMLong queryId = CVMLong.create(System.currentTimeMillis());
+				AVector<ACell> pathVector = Vectors.of((Object[]) path);
+				AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, pathVector);
+				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
+
+				CompletableFuture<Result> resultFuture = peer.message(queryMessage);
+				Result result = resultFuture.get(10, TimeUnit.SECONDS);
+
+				if (result.isError()) {
+					throw new RuntimeException("Path pull query failed: " + result);
+				}
+
+				ACell receivedValue = result.getValue();
+				if (receivedValue == null) return null;
+
+				ACell acquired;
+				try {
+					acquired = Cells.announce(receivedValue, r -> {}, store);
+				} catch (MissingDataException mde) {
+					Hash rootHash = Hash.get(receivedValue);
+					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
+				}
+
+				log.debug("Acquired pulled path value from peer: {}", peer.getHostAddress());
+				return acquired;
+
+			} catch (Exception e) {
+				log.warn("Path pull failed from peer: {}", peer.getHostAddress(), e);
+				throw new RuntimeException("Path pull failed from peer", e);
+			}
+		});
+	}
 }
