@@ -16,7 +16,7 @@ import convex.core.util.Utils;
 final class AES256CTREtchCipher implements EtchFileCipher {
 	private static final String TRANSFORMATION="AES/CTR/NoPadding";
 	private static final int KEY_LENGTH=32;
-	private static final int BLOCK_LENGTH=16;
+	private static final int BLOCK_LENGTH=EtchConstants.V3_AES_BLOCK_SIZE;
 
 	private final SecretKeySpec key;
 	private final ThreadLocal<State> states;
@@ -60,7 +60,7 @@ final class AES256CTREtchCipher implements EtchFileCipher {
 
 	private final class State implements EtchCipherCursor {
 		private final Cipher cipher;
-		private final byte[] iv=new byte[BLOCK_LENGTH];
+		private final byte[] iv=new byte[EtchConstants.V3_CIPHER_LOCATOR_SIZE];
 		private final byte[] skipInput=new byte[BLOCK_LENGTH-1];
 		private final byte[] skipOutput=new byte[BLOCK_LENGTH-1];
 		private final byte[] longInput=new byte[Long.BYTES];
@@ -71,11 +71,9 @@ final class AES256CTREtchCipher implements EtchFileCipher {
 		}
 
 		private void initialise(long fileOffset) throws IOException {
-			Arrays.fill(iv,(byte)0);
-			Utils.writeLong(iv,Long.BYTES,fileOffset>>>4);
+			int skip=EtchCipherLocator.writeAES(fileOffset,iv);
 			try {
 				cipher.init(Cipher.ENCRYPT_MODE,key,new IvParameterSpec(iv));
-				int skip=(int)(fileOffset&(BLOCK_LENGTH-1));
 				if (skip>0) {
 					int written=cipher.update(skipInput,0,skip,skipOutput,0);
 					if (written!=skip) throw new IOException("AES-CTR failed to seek within a block");

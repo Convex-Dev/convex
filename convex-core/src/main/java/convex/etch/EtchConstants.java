@@ -67,6 +67,23 @@ public final class EtchConstants {
 	public static final int V3_CIPHER_NONE=0;
 	public static final int V3_CIPHER_AES_256_CTR=1;
 	public static final int V3_CIPHER_CHACHA20=2;
+	/** Size of the canonical v3 cipher-block locator. */
+	public static final int V3_CIPHER_LOCATOR_SIZE=16;
+	/** Base-two block-size shift for AES: {@code 1 << 4 == 16} bytes. */
+	public static final int V3_AES_BLOCK_SHIFT=4;
+	/** AES cipher-block size in bytes. */
+	public static final int V3_AES_BLOCK_SIZE=1<<V3_AES_BLOCK_SHIFT;
+	/** Base-two block-size shift for ChaCha20: {@code 1 << 6 == 64} bytes. */
+	public static final int V3_CHACHA_BLOCK_SHIFT=6;
+	/** ChaCha20 cipher-block size in bytes. */
+	public static final int V3_CHACHA_BLOCK_SIZE=1<<V3_CHACHA_BLOCK_SHIFT;
+	/** Size of the ChaCha20 nonce prefix in the canonical locator. */
+	public static final int V3_CHACHA_NONCE_SIZE=12;
+	/** Number of counter bits in the ChaCha20 locator suffix. */
+	public static final int V3_CHACHA_COUNTER_BITS=Integer.SIZE;
+	/** Number of file bytes addressed by one ChaCha20 nonce. */
+	public static final long V3_CHACHA_NONCE_REGION_SIZE=
+			(1L<<V3_CHACHA_COUNTER_BITS)*V3_CHACHA_BLOCK_SIZE;
 	public static final int V3_INDEX_PLAINTEXT=0;
 	public static final int V3_INDEX_ENCRYPTED=1;
 	public static final long V3_OPEN=0L;

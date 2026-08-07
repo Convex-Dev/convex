@@ -8,9 +8,10 @@ header.
 Implementation status: normal Etch access supports new plaintext and
 AES-256-CTR v3 files, optional index encryption, key verification, clean close
 and fast clean reopen. An existing v3 file whose selected header is `OPEN`
-currently fails normal opening with an explicit recovery/repair requirement;
-the index scan specified in the recovery section and unsafe maintenance open
-remain follow-up work.
+fails normal opening with an explicit recovery/repair requirement. Explicit
+read-only unsafe maintenance opening is available through
+`EtchMaintenanceReader`; the index scan specified in the recovery section and
+its repair and migration consumers remain follow-up work.
 
 Etch v3 remains a content-addressed store for CAD3 values. Encryption is a
 storage overlay below CAD3: it must not change cell encodings, hashes, reference
@@ -36,53 +37,33 @@ memory-mapped writes are durably ordered.
 
 ## Durability guarantee
 
-After a successful `sync`, Etch v3 does not guarantee that the original file
-will remain directly openable after a later dirty crash. A subsequent
-unsynchronised index-slot write may reach storage and replace a pointer needed
-by the synced index view.
+A successful `sync` guarantees the ordering of two completed persistence
+barriers: the file body through `syncedFileEnd` was forced before the new header
+copy naming that end and `rootHash` was written and forced. Subject to the
+storage system honouring those operations, bytes below `syncedFileEnd` are the
+trusted synced portion of the file.
 
-V3 instead guarantees recovery of the logical state named by the last valid
-synced header: its `rootHash` and every CAD3 value reachable from that root can
-be recovered into a fresh Etch file. This guarantee holds provided that:
+Normal Etch access deliberately does not re-decode or content-hash that trusted
+portion on reopen or on every read. This is a performance decision and part of
+the v3 trust model. Media corruption, deliberate modification and storage that
+does not honour a completed force are handled by explicit validation, repair
+or restoration from backup rather than by mandatory verification on the hot
+path.
 
-- at least one header for the completed sync remains valid;
-- the storage system retains the bytes whose force completed successfully;
-- the correct caller secret remains available for an encrypted file; and
-- the synced data records themselves have not subsequently suffered media
-  corruption or deliberate modification.
+After a later unsynchronised mutation begins, Etch does not guarantee that the
+original file remains directly openable after a dirty crash. An in-place index
+slot may reach storage and replace a pointer needed by the synced index view.
+Dirty reopening is a bounded structural recovery attempt, not a transaction
+rollback and not a proof of every stored value. If the resulting index or tail
+cannot be traversed safely and consistently, normal open fails without changing
+the source and the operator restores a backup or invokes explicit best-effort
+repair.
 
-The guarantee relies on the immutable part of each cell record: its stored
-hash, encoding length and CAD3 encoding. Once published, these bytes are never
-modified. Status and cached memory-size fields may be updated in place, so a
-recovery scanner treats them only as untrusted hints. A candidate record is
-valid only when its length is in bounds, its encoding is valid canonical CAD3,
-and the encoding's content hash equals the stored hash.
-
-A dedicated offline repair operation can therefore scan the file body through
-physical EOF for valid hash-and-encoding pairs without following any source
-index pointer. It writes the recovered cells into a fresh Etch store, then uses
-the selected `rootHash` to verify that the complete synced state is fully
-persisted with no missing reachable value. Index blocks, alignment bytes,
-partial tail writes and other non-record regions are ignored unless their bytes
-independently satisfy the same CAD3 and content-hash checks.
-
-Records ending at or below `syncedFileEnd` are covered by the durability
-guarantee. Valid records beyond it are opportunistic salvage: they are safe to
-retain because their CAD3 encodings match their immutable content hashes, but
-their presence was never promised by `sync` and they do not advance or replace
-the selected root.
-
-This requires no journal, additional index-slot write or force on the normal
-write path. The exact v3 record layout may include a cheap immutable marker or
-framing to accelerate the exceptional full-file scan, but recovery correctness
-must come from validating the stored hash against the CAD3 encoding rather
-than trusting that marker.
-
-This is a logical-data durability guarantee, not an in-place repair guarantee.
-The original index shape, offsets, cached metadata and unsynchronised tail are
-not promised to survive. If the newest header is invalid and recovery selects
-an older valid header, the guarantee applies to that older header's root and
-`syncedFileEnd`.
+Offline repair may scan through physical EOF for independently valid
+hash-and-encoding pairs and verify the selected root in a fresh store. This is
+a salvage facility rather than the primary durability guarantee. Record
+markers, checksums or additional framing may accelerate that exceptional scan,
+but are not required on the normal v3 write path.
 
 ## Fixed root index
 
@@ -402,12 +383,10 @@ The body is forced before the new header can become valid. If a completely
 written new header reaches storage before the final force returns, it is still
 safe to select because step 2 has already completed.
 
-After `sync` returns, every operation preceding that call is directly
-recoverable while no later mutation has begun. Even after a later dirty crash,
-the synced root's logical data remains recoverable into a fresh file under the
-durability guarantee above. `close` performs this body sync while excluding
-further operations, but commits the final header as `CLEAN_CLOSED` before
-releasing the file.
+After `sync` returns, every operation preceding that call is directly readable
+while no later mutation has begun. `close` performs this body sync while
+excluding further operations, then commits the final header as `CLEAN_CLOSED`
+before releasing the file.
 
 A failed body force, header write or header force must be reported to the
 caller. The in-memory active generation advances only after the final force
@@ -421,10 +400,11 @@ generation is not guaranteed. In-place index pages can be written back by the
 operating system before `sync`, so a duplicated header alone cannot provide
 that stronger guarantee.
 
-An opener must never silently return a value that fails its content hash or
-structural checks. Normal recovery reports questionable index state and leaves
-repair to an explicit maintenance operation; it does not guess or rewrite the
-only source file.
+Normal access trusts synced bytes and does not necessarily recompute content
+hashes. It must still bound every file access and fail on structural errors it
+encounters. Full content verification belongs to `etch validate`, migration
+verification and repair; normal recovery does not guess or rewrite the only
+source file.
 
 ## Recovery
 
@@ -462,9 +442,10 @@ Recovery performs one complete index scan from the fixed root index and tracks
    referenced allocation. No record decode, content-hash check or other data
    validation is required.
 3. For a referenced allocation that starts at, or extends beyond,
-   `syncedFileEnd`, verify its alignment, framing and physical bounds. Validate
-   data keys and content hashes, and recursively validate new child indexes.
-4. For each valid referenced allocation beyond the checkpoint, advance
+   `syncedFileEnd`, check its pointer type, alignment, declared extent and
+   physical bounds, and recursively inspect new child indexes. Normal recovery
+   does not decode or content-hash records merely because they are in the tail.
+4. For each structurally complete referenced allocation beyond the checkpoint, advance
    `highestUsedEnd` to the maximum exclusive end of that allocation.
 5. On the first invalid slot, child index or referenced record, stop recovery,
    report the exact failing location and leave the source file unchanged.
@@ -485,9 +466,9 @@ If `highestUsedEnd == syncedFileEnd`, recovery may resume with the selected
 checkpoint, recovery forces those contents and commits a new `OPEN` header
 generation with `syncedFileEnd = highestUsedEnd` before ordinary writes resume.
 
-This recovery cost is one complete index scan plus validation only of referenced
-allocations beyond the checkpoint. It deliberately avoids reading or hashing
-the potentially much larger body below `syncedFileEnd`.
+This recovery cost is one complete index scan plus structural and bounds checks
+for referenced allocations beyond the checkpoint. It deliberately avoids
+decoding or hashing the file body.
 
 Recovery never writes `CLEAN_CLOSED`. If recovery itself crashes, reopening
 again observes `OPEN` and repeats the scan; only a later successful close may
@@ -513,7 +494,7 @@ The result by crash point is:
 | During the first-write transition to `OPEN` | No mutation has been permitted; an `OPEN` result conservatively runs the index scan |
 | After `sync` returns, before another mutation | Scan confirms the synced generation without validating old data |
 | While writing the new header | Select the new header if its check validates; otherwise recover from the older header |
-| During body force, or after later unsynchronised writes | Normal open scans and validates referenced allocations beyond `syncedFileEnd`; index corruption fails open but the last synced logical state remains recoverable by explicit repair |
+| During body force, or after later unsynchronised writes | Normal open scans referenced allocations beyond `syncedFileEnd`; structural inconsistency fails open and requires backup restoration or explicit best-effort repair |
 
 ## Unsafe maintenance open
 
@@ -548,8 +529,19 @@ as an ordinary writable `EtchStore`:
    from their immutable hash and validated CAD3 encoding.
 
 For Etch v1 and v2 the same facility uses their recorded logical file length as
-the default bound. Those versions do not gain v3's synced-root durability
-guarantee, but unsafe migration or repair may still salvage their valid cells.
+the default bound. Those versions do not gain v3's ordered body-and-header sync
+boundary, but unsafe migration or repair may still salvage their valid cells.
+
+The implemented primitive is
+`EtchMaintenanceReader.openUnsafe(file[, config])`. It uses a read-only file
+handle and mapping plus a shared lock that excludes normal Etch writers. It
+validates the selected header and encryption key, snapshots physical EOF, and
+exposes metadata, raw reads, cipher-overlay data reads and index-slot reads. Raw
+and candidate-data reads are independently bounded by the physical snapshot;
+index-slot reads default to the selected logical end. No ordinary Etch or
+`EtchStore` mutation API is reachable from the reader. The lenient index walker
+and validated CAD3 body scanner remain separate consumers to be built on these
+bounded primitives.
 
 ## Explicit repair
 
@@ -606,9 +598,8 @@ operation, not part of recovering durability.
 
 Repair fails if a root-reachable synced record cannot be found or validated,
 if no synced header remains valid, or if the encryption secret is unavailable.
-Those cases are outside the crash-durability guarantee and require another
-trusted copy or a separate forensic tool. The damaged source is never modified
-or automatically replaced.
+Those cases require a backup, another trusted copy or a separate forensic tool.
+The damaged source is never modified or automatically replaced.
 
 The CLI shape is `etch repair --into <new-file>`. The existing `etch recover`
 command retains its narrower meaning of completing or rolling back an
@@ -716,37 +707,118 @@ file cipher key and a separate header-MAC key. The header remains plaintext.
 Data and encrypted index bytes use the same cipher key, distinguished naturally
 by their disjoint absolute file offsets.
 
-Cipher addressing always uses the absolute byte offset from the start of the
-Etch file. It does not reset at the root index, a child index or a data record.
-For a non-negative 64-bit offset `p`, AES-CTR addressing is:
+Cipher addressing always starts from the absolute byte offset from the
+beginning of the Etch file. It does not reset at the root index, a child index
+or a data record. Both ciphers use the same canonical 128-bit block-locator
+construction. For a non-negative file offset `p` and cipher block size `B`:
 
 ```text
-blockNumber = p >>> 4             // floor(p / 16)
+blockNumber = floor(p / B)
+byteInBlock = p mod B
+locator     = I2OSP(blockNumber, 16) // unsigned, big-endian
+```
+
+The pair `(locator, byteInBlock)` identifies the first keystream byte. AES and
+ChaCha have different locator values at the same file offset because their
+block sizes differ, but the construction and carry rule are identical.
+
+AES-256-CTR has `B = 16`. The complete 16-byte locator is the initial AES
+counter block, often called the IV by cipher APIs:
+
+```text
+locator     = I2OSP(p >>> 4, 16)
 byteInBlock = p & 15
-counter     = I2OSP(blockNumber, 16) // unsigned, big-endian
+AES counter = locator
 ```
 
-The 128-bit `counter` is the initial counter block (often called the IV by
-cipher APIs). After generating that block, the implementation discards
-`byteInBlock` leading keystream bytes. A request spanning further blocks
-increments the complete 128-bit counter in big-endian order.
+After generating that block, the implementation discards `byteInBlock`
+leading keystream bytes. Processing subsequent blocks increments the complete
+128-bit locator as an unsigned big-endian integer.
 
-ChaCha20 has 64-byte blocks, a 32-bit block counter and a 96-bit nonce. V3 maps
-the same absolute address without imposing a 256 GiB file limit:
+ChaCha20 has `B = 64`. It partitions the same locator representation into a
+96-bit nonce prefix and an unsigned 32-bit counter suffix:
 
 ```text
-blockNumber = p >>> 6
+locator     = I2OSP(p >>> 6, 16)
 byteInBlock = p & 63
-counter     = low32(blockNumber)
-nonce       = I2OSP(blockNumber >>> 32, 12) // unsigned, big-endian
+nonce       = locator[0..12)
+counter     = OS2IP(locator[12..16)) // unsigned, big-endian
 ```
 
-The nonce therefore changes every `2^32` ChaCha blocks, or 256 GiB of file
-address space. A request crossing that boundary is split: processing resumes
-with the next nonce and counter zero. A 1 TiB file uses four complete nonce
-ranges; offsets at and above 1 TiB begin the fifth. The 96-bit nonce plus
-32-bit counter provides far more address space than the signed 64-bit offsets
-available through the Java file APIs.
+The locator is the normative format value. The counter suffix is first decoded
+as an unsigned big-endian integer; a ChaCha implementation may then store that
+value in its native word representation. In particular, ChaCha's internal
+little-endian words do not change the byte order of the Etch locator.
+
+Each nonce addresses exactly `2^32` consecutive 64-byte blocks. The next block
+increments the high 96-bit nonce prefix and resets the counter suffix to zero:
+
+```text
+nonceRegionSize = 2^32 * 64 bytes = 2^38 bytes = 256 GiB
+```
+
+A request crossing a nonce-region boundary is split and processing resumes at
+counter zero under the incremented nonce. A 1 TiB file uses four complete nonce
+regions and begins the fifth at offset 1 TiB.
+
+Bouncy Castle's ChaCha core is used by the Java implementation and its exact
+test vectors. The production cursor wraps that reviewed core with Etch's
+locator and direct-buffer access rather than inheriting a provider's IV or
+counter conventions. It implements the 128-bit carry explicitly and does not
+depend on provider-specific signed-counter or automatic nonce-rollover
+behaviour.
+
+The following canonical state vectors make the locator mapping explicit:
+
+```text
+p = 0
+  AES:    locator=00000000000000000000000000000000 byteInBlock=0
+  ChaCha: locator=00000000000000000000000000000000 byteInBlock=0
+
+p = 1000
+  AES:    locator=0000000000000000000000000000003e byteInBlock=8
+  ChaCha: locator=0000000000000000000000000000000f byteInBlock=40
+
+p = 1024
+  AES:    locator=00000000000000000000000000000040 byteInBlock=0
+  ChaCha: locator=00000000000000000000000000000010 byteInBlock=0
+
+p = 2^38 (256 GiB)
+  ChaCha: locator=00000000000000000000000100000000 byteInBlock=0
+          nonce=000000000000000000000001 counter=0x00000000
+
+p = 2^40 (1 TiB)
+  ChaCha: locator=00000000000000000000000400000000 byteInBlock=0
+          nonce=000000000000000000000004 counter=0x00000000
+```
+
+With a 32-byte all-zero cipher key and all-zero input, the first 32 transformed
+bytes at selected offsets are:
+
+```text
+AES p=0
+dc95c078a2408989ad48a21492842087530f8afbc74536b9a963b4f1c4cb738b
+
+AES p=1000
+8afd0dbc2a4d423756a368c7a34325e4adce918732e8ea7e60aba678a506608d
+
+ChaCha p=0
+76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7
+
+ChaCha p=1000
+b95182dbc5eec042b89e22f11a085b739a3611cd8d836018c4fff0b86c02ed66
+
+ChaCha p=2^38
+de9cba7bf3d69ef5e786dc63973f653a0b49e015adbff7134fcb7df137821031
+```
+
+The 64-byte ChaCha vector beginning 32 bytes before the nonce carry is:
+
+```text
+p = 2^38 - 32
+92c74f2f626c6a640c0b1284d839ec81f1696281dafc3e684593937023b58b1d
+de9cba7bf3d69ef5e786dc63973f653a0b49e015adbff7134fcb7df137821031
+```
 
 For an eight-byte index slot, the implementation calculates this state from
 the slot's absolute offset, skips to `byteInBlock` and XORs exactly eight bytes.
@@ -788,14 +860,23 @@ index rather than implying authenticated or history-safe encryption.
 
 The same fixed-offset limitation applies to the mutable nine-byte data label:
 status flags and the recorded memory size may change in place and therefore
-reuse their keystream bytes. CAD3 keys and encodings are immutable once
-written, so this qualification does not apply to their bytes.
+reuse their keystream bytes. The label deliberately remains encrypted as part
+of the contiguous data record, allowing the hash, label, encoding length and
+encoding to use one sequential cipher cursor. Making it plaintext would add a
+hole requiring another mapper operation plus a cipher skip or reinitialisation
+on the record read path. Across multiple snapshots, reuse reveals only the XOR
+of the old and new nine-byte labels; it does not expose keystream bytes for the
+adjacent immutable hash or encoding. V3 accepts this limited history leakage as
+the performance trade-off. CAD3 keys and encodings are immutable once written,
+so this qualification does not apply to their bytes.
 
 Pure XOR overlays are also malleable. CAD3 content hashes allow decrypted value
 bytes to be verified against their keys, and pointer/record validation detects
 many index modifications, but this is not equivalent to whole-file
-authentication. Per-record or per-page authentication can be introduced by a
-future Etch version.
+authentication. Normal access trusts synced file contents and does not require
+verification on every read. `etch validate`, migration verification and repair
+perform explicit integrity checks when requested. Per-record or per-page
+authentication can be introduced by a future Etch version.
 
 ## Migration from Etch v1 and v2
 
@@ -859,15 +940,13 @@ migration. Full-file `etch repair` remains the index-independent path.
 
 The header fixes enough structure to design the remaining v3 pieces separately:
 
-- normative AES-CTR and ChaCha20 test vectors for the defined address mapping;
 - data-record candidate recognition and efficient sequential repair;
 - data-record checksum and optional authentication;
 - post-checkpoint validation, diagnostics and maintenance-GC behaviour;
 - monotonic status and memory-size update ordering;
 - precise index-block encodings and recovery treatment of abandoned chain
   slots; and
-- API names and semantics for `sync`, unsafe read-only maintenance open,
-  lenient migration and any strict mode.
+- API names and semantics for `sync`, lenient migration and any strict mode.
 
 The data-record design must preserve the same performance principle: no durable
 write is required until `sync`, while a completed `sync` must be independently

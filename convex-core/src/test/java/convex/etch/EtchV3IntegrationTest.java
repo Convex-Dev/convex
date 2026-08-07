@@ -38,12 +38,17 @@ public class EtchV3IntegrationTest {
 
 	@Test
 	public void testAESCreateWrongKeyAndReopen() throws Exception {
-		assertEncryptedRoundTrip(false);
+		assertEncryptedRoundTrip(EtchConfig.CipherMode.AES_256_CTR,false);
 	}
 
 	@Test
 	public void testAESEncryptedIndexRoundTrip() throws Exception {
-		assertEncryptedRoundTrip(true);
+		assertEncryptedRoundTrip(EtchConfig.CipherMode.AES_256_CTR,true);
+	}
+
+	@Test
+	public void testChaCha20CreateWrongKeyAndReopen() throws Exception {
+		assertEncryptedRoundTrip(EtchConfig.CipherMode.CHACHA20,false);
 	}
 
 	@Test
@@ -66,11 +71,13 @@ public class EtchV3IntegrationTest {
 		assertTrue(mutated.isCleanClosed());
 	}
 
-	private static void assertEncryptedRoundTrip(boolean encryptedIndex) throws Exception {
-		File file=tempFile(encryptedIndex?"etch-v3-aes-index":"etch-v3-aes");
-		AString value=value(encryptedIndex?"encrypted-index":"encrypted-data");
+	private static void assertEncryptedRoundTrip(EtchConfig.CipherMode cipherMode,
+			boolean encryptedIndex) throws Exception {
+		String cipherName=cipherMode.configName();
+		File file=tempFile("etch-v3-"+cipherName+(encryptedIndex?"-index":""));
+		AString value=value(cipherName+(encryptedIndex?"-index":"-data"));
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
-				true,EtchConfig.CipherMode.AES_256_CTR,encryptedIndex,null,SECRET);
+				true,cipherMode,encryptedIndex,null,SECRET);
 
 		EtchStore store=new EtchStore(Etch.create(file,config));
 		store.setRootData(value);
@@ -80,15 +87,14 @@ public class EtchV3IntegrationTest {
 		byte[] wrong=SECRET.clone();
 		wrong[0]^=1;
 		EtchConfig wrongConfig=EtchConfig.createV3(config.getMappingMode(),true,
-				EtchConfig.CipherMode.AES_256_CTR,encryptedIndex,null,wrong);
+				cipherMode,encryptedIndex,null,wrong);
 		assertThrows(IOException.class,()->Etch.create(file,wrongConfig));
 		assertThrows(IOException.class,()->Etch.create(file));
 
 		EtchStore reopened=new EtchStore(Etch.create(file,config));
 		try {
 			assertEquals(value,reopened.getRootData());
-			assertEquals(EtchConfig.CipherMode.AES_256_CTR,
-					reopened.getEtch().getConfig().getCipherMode());
+			assertEquals(cipherMode,reopened.getEtch().getConfig().getCipherMode());
 			assertEquals(encryptedIndex,reopened.getEtch().getConfig().isIndexEncrypted());
 		} finally {
 			reopened.close();

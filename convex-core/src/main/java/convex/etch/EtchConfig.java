@@ -53,7 +53,8 @@ public final class EtchConfig {
 	/** Complete v3 file-overlay cipher choices supported by normal Etch access. */
 	public enum CipherMode {
 		NONE("none",EtchConstants.V3_CIPHER_NONE),
-		AES_256_CTR("aes-256-ctr",EtchConstants.V3_CIPHER_AES_256_CTR);
+		AES_256_CTR("aes-256-ctr",EtchConstants.V3_CIPHER_AES_256_CTR),
+		CHACHA20("chacha20",EtchConstants.V3_CIPHER_CHACHA20);
 
 		private final String configName;
 		private final int fileId;
@@ -262,6 +263,7 @@ public final class EtchConfig {
 			cipherMode=switch (name) {
 				case "none" -> CipherMode.NONE;
 				case "aes-256-ctr" -> CipherMode.AES_256_CTR;
+				case "chacha20" -> CipherMode.CHACHA20;
 				default -> throw invalid(CIPHER,"unsupported value: "+name);
 			};
 		}

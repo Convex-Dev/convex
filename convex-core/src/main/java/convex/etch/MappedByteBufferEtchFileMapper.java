@@ -13,10 +13,16 @@ import java.util.ArrayList;
  */
 final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	private final FileChannel channel;
+	private final boolean readOnly;
 	private final ArrayList<MappedByteBuffer> regionMap=new ArrayList<>();
 
 	MappedByteBufferEtchFileMapper(FileChannel channel) {
+		this(channel,false);
+	}
+
+	MappedByteBufferEtchFileMapper(FileChannel channel, boolean readOnly) {
 		this.channel=channel;
+		this.readOnly=readOnly;
 	}
 
 	@Override
@@ -167,13 +173,14 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 			length=(int)EtchConstants.MAX_REGION_SIZE;
 		}
 
-		MappedByteBuffer mapped=channel.map(MapMode.READ_WRITE,position,length);
+		MappedByteBuffer mapped=channel.map(readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE,position,length);
 		regionMap.set(regionIndex,mapped);
 		return mapped;
 	}
 
 	@Override
 	public synchronized void force() throws IOException {
+		if (readOnly) return;
 		for (MappedByteBuffer mapped: regionMap) {
 			if (mapped!=null) mapped.force();
 		}
@@ -182,6 +189,7 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public synchronized void forceRange(long position, long length) throws IOException {
+		if (readOnly) return;
 		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
 		long end=Math.addExact(position,length);
 		long current=position;

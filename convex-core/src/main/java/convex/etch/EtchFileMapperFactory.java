@@ -1,5 +1,6 @@
 package convex.etch;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.nio.channels.FileChannel;
 import java.util.Objects;
@@ -19,14 +20,23 @@ final class EtchFileMapperFactory {
 	}
 
 	static EtchFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode) {
+		return create(channel,mappingMode,false);
+	}
+
+	static EtchFileMapper createReadOnly(FileChannel channel, EtchConfig.MappingMode mappingMode) {
+		return new ReadOnlyEtchFileMapper(create(channel,mappingMode,true));
+	}
+
+	private static EtchFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode,
+			boolean readOnly) {
 		Objects.requireNonNull(mappingMode,"mappingMode");
 		return switch (mappingMode) {
-			case MAPPED_BYTE_BUFFER -> new MappedByteBufferEtchFileMapper(channel);
+			case MAPPED_BYTE_BUFFER -> new MappedByteBufferEtchFileMapper(channel,readOnly);
 			case MEMORY_SEGMENT -> {
 				try {
 					Class<?> type=Class.forName(FFM_MAPPER_CLASS);
-					Constructor<?> constructor=type.getDeclaredConstructor(FileChannel.class);
-					yield (EtchFileMapper)constructor.newInstance(channel);
+					Constructor<?> constructor=type.getDeclaredConstructor(FileChannel.class,boolean.class);
+					yield (EtchFileMapper)constructor.newInstance(channel,readOnly);
 				} catch (ReflectiveOperationException | LinkageError e) {
 					throw new IllegalStateException("Unable to initialise Etch FFM mapping backend",e);
 				}
@@ -65,6 +75,81 @@ final class EtchFileMapperFactory {
 			return true;
 		} catch (ClassNotFoundException | LinkageError e) {
 			return false;
+		}
+	}
+
+	/**
+	 * Maintenance-only guard around a physically read-only mapping. Keeping the
+	 * guard here avoids adding a read-only branch to ordinary Etch write paths.
+	 */
+	private static final class ReadOnlyEtchFileMapper implements EtchFileMapper {
+		private final EtchFileMapper delegate;
+
+		private ReadOnlyEtchFileMapper(EtchFileMapper delegate) {
+			this.delegate=delegate;
+		}
+
+		@Override
+		public void get(long position, byte[] destination, int offset, int length)
+				throws IOException {
+			delegate.get(position,destination,offset,length);
+		}
+
+		@Override
+		public void getTransformed(long position, byte[] destination, int offset, int length,
+				EtchCipherCursor cursor) throws IOException {
+			delegate.getTransformed(position,destination,offset,length,cursor);
+		}
+
+		@Override
+		public void ensureWriteCapacity(long position, long length) throws IOException {
+			throw readOnly();
+		}
+
+		@Override
+		public void put(long position, byte[] source, int offset, int length)
+				throws IOException {
+			throw readOnly();
+		}
+
+		@Override
+		public void putTransformed(long position, byte[] source, int offset, int length,
+				EtchCipherCursor cursor) throws IOException {
+			throw readOnly();
+		}
+
+		@Override
+		public long readIndexSlotAcquire(long position) throws IOException {
+			return delegate.readIndexSlotAcquire(position);
+		}
+
+		@Override
+		public void writeIndexSlotRelease(long position, long value) throws IOException {
+			throw readOnly();
+		}
+
+		@Override
+		public void force() {
+			// A maintenance reader has no dirty pages to force.
+		}
+
+		@Override
+		public void forceRange(long position, long length) {
+			// A maintenance reader has no dirty pages to force.
+		}
+
+		@Override
+		public String implementationName() {
+			return delegate.implementationName();
+		}
+
+		@Override
+		public void close() throws IOException {
+			delegate.close();
+		}
+
+		private IOException readOnly() {
+			return new IOException("Etch mapping is read-only");
 		}
 	}
 }

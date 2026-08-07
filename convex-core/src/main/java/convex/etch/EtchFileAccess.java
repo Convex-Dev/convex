@@ -45,6 +45,10 @@ final class EtchFileAccess implements AutoCloseable {
 		mapper.get(checkedRange(position,length),destination,offset,length);
 	}
 
+	void readRaw(long position, byte[] destination, int offset, int length) throws IOException {
+		mapper.get(checkedRange(position,length),destination,offset,length);
+	}
+
 	void writeHeader(long position, byte[] source, int offset, int length) throws IOException {
 		position=checkedRange(position,length);
 		mapper.ensureWriteCapacity(position,length);

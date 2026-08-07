@@ -65,11 +65,17 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			ValueLayout.JAVA_LONG.withOrder(ByteOrder.BIG_ENDIAN).varHandle();
 
 	private final FileChannel channel;
+	private final boolean readOnly;
 	private volatile Mapping[] mappings=EMPTY_MAPPINGS;
 	private volatile boolean closed;
 
 	FFMEtchFileMapper(FileChannel channel) {
+		this(channel,false);
+	}
+
+	FFMEtchFileMapper(FileChannel channel, boolean readOnly) {
 		this.channel=channel;
+		this.readOnly=readOnly;
 	}
 
 	@Override
@@ -277,7 +283,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 		Arena arena=Arena.ofShared();
 		MemorySegment segment;
 		try {
-			segment=channel.map(MapMode.READ_WRITE,start,target,arena);
+			segment=channel.map(readOnly?MapMode.READ_ONLY:MapMode.READ_WRITE,start,target,arena);
 		} catch (IOException | RuntimeException e) {
 			arena.close();
 			throw e;
@@ -365,6 +371,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	@Override
 	public synchronized void force() throws IOException {
 		if (closed) throw new IllegalStateException("Etch mapping is closed");
+		if (readOnly) return;
 		for (Mapping mapping:mappings) {
 			if (mapping!=null) mapping.segment.force();
 		}
@@ -375,6 +382,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	public synchronized void forceRange(long position, long length) throws IOException {
 		checkRange(position,length);
 		if (closed) throw new IllegalStateException("Etch mapping is closed");
+		if (readOnly) return;
 		long end=position+length;
 		long current=position;
 		while (current<end) {

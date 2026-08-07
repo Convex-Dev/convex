@@ -83,6 +83,34 @@ public class EtchFileMapperTest {
 		}
 	}
 
+	@Test
+	public void testReadOnlyMappingRejectsWritePreparation() throws Exception {
+		assertReadOnlyMapping(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER);
+		if (EtchFileMapperFactory.isFFMAvailable()) {
+			assertReadOnlyMapping(EtchConfig.MappingMode.MEMORY_SEGMENT);
+		}
+	}
+
+	private static void assertReadOnlyMapping(EtchConfig.MappingMode mode) throws Exception {
+		File file=File.createTempFile("etch-mapper-read-only", ".dat");
+		byte[] expected=new byte[] { 1,2,3,4,5,6,7,8 };
+		try (RandomAccessFile writer=new RandomAccessFile(file,"rw")) {
+			writer.write(expected);
+		}
+		try (RandomAccessFile reader=new RandomAccessFile(file,"r");
+				EtchFileMapper mapper=EtchFileMapperFactory.createReadOnly(reader.getChannel(),mode)) {
+			byte[] actual=new byte[expected.length];
+			mapper.get(0L,actual,0,actual.length);
+			assertArrayEquals(expected,actual);
+			assertThrows(java.io.IOException.class,()->mapper.ensureWriteCapacity(0L,1L));
+			assertThrows(java.io.IOException.class,()->mapper.writeIndexSlotRelease(0L,42L));
+			mapper.force();
+			mapper.forceRange(0L,expected.length);
+		}
+		assertEquals(expected.length,file.length());
+		if (!file.delete()) file.deleteOnExit();
+	}
+
 	private static void assertWriteCapacityIsPrepared(EtchConfig.MappingMode mode) throws Exception {
 		File file=File.createTempFile("etch-mapper-capacity", ".dat");
 		long position=GROWN_POSITION;

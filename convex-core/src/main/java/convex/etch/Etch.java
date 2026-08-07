@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.util.Arrays;
 
 import convex.core.Constants;
@@ -109,7 +110,12 @@ public class Etch {
 		try {
 			// Try to exclusively lock the Etch database file
 			FileChannel fileChannel=this.data.getChannel();
-			FileLock lock=fileChannel.tryLock();
+			FileLock lock;
+			try {
+				lock=fileChannel.tryLock();
+			} catch (OverlappingFileLockException e) {
+				throw new IOException("File lock failed on "+dataFile,e);
+			}
 			if (lock==null) {
 				throw new IOException("File lock failed on "+dataFile);
 			}
@@ -131,45 +137,13 @@ public class Etch {
 
 			short fileVersion=resolvedHeader.version();
 			if (!newFile) {
-				if (requestedConfig!=null) {
-					if (requestedConfig.getVersion()!=fileVersion) {
-						throw new IOException("Configured Etch version "+requestedConfig.getVersion()
-								+" does not match file version "+fileVersion+": "+dataFile);
-					}
-				}
-
 				if (resolvedHeader instanceof EtchV3Header v3Header) {
 					if (!v3Header.isCleanClosed()) {
 						throw new IOException("Etch v3 file was not cleanly closed; explicit recovery or repair required: "
 								+dataFile);
 					}
-					EtchConfig.CipherMode fileCipher;
-					try {
-						fileCipher=EtchConfig.CipherMode.fromFileId(v3Header.cipherId());
-					} catch (IllegalArgumentException e) {
-						throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId(),e);
-					}
-					EtchConfig basis=(requestedConfig==null)?EtchConfig.create(fileVersion):requestedConfig;
-					if ((requestedConfig!=null)&&(requestedConfig.getCipherMode()!=fileCipher)) {
-						throw new IOException("Configured Etch cipher "+requestedConfig.getCipherMode().configName()
-								+" does not match file cipher "+fileCipher.configName()+": "+dataFile);
-					}
-					if ((requestedConfig!=null)
-							&&(requestedConfig.isIndexEncrypted()!=v3Header.isIndexEncrypted())) {
-						throw new IOException("Configured Etch index encryption does not match file: "+dataFile);
-					}
-					AccountKey configuredHint=basis.getPublicKeyHint();
-					AccountKey fileHint=v3Header.publicKeyHint();
-					if ((configuredHint!=null)&&!configuredHint.equals(fileHint)) {
-						throw new IOException("Configured Etch public-key hint does not match file: "+dataFile);
-					}
-					effectiveConfig=basis.withV3FileOptions(fileCipher,
-							v3Header.isIndexEncrypted(),fileHint);
-				} else if (requestedConfig==null) {
-					effectiveConfig=EtchConfig.create(fileVersion);
-				} else {
-					effectiveConfig=requestedConfig;
 				}
+				effectiveConfig=resolveExistingConfig(resolvedHeader,requestedConfig,dataFile);
 			}
 
 			this.config=effectiveConfig;
@@ -179,18 +153,10 @@ public class Etch {
 			this.buildChains=effectiveConfig.isBuildChains();
 			this.requiresOpenTransition=!newFile&&(resolvedHeader instanceof EtchV3Header);
 			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
-			EtchFileCipher cipher=null;
+			EtchFileCipher cipher=createFileCipher(resolvedHeader,effectiveConfig);
 			boolean encryptedIndex=false;
 			if (resolvedHeader instanceof EtchV3Header v3Header) {
 				encryptedIndex=v3Header.isIndexEncrypted();
-				if (v3Header.cipherId()==V3_CIPHER_AES_256_CTR) {
-					byte[] cipherSecret=effectiveConfig.encryptionSecret();
-					try {
-						cipher=AES256CTREtchCipher.derive(cipherSecret,v3Header.fileSalt());
-					} finally {
-						if (cipherSecret!=null) Arrays.fill(cipherSecret,(byte)0);
-					}
-				}
 			}
 			access=new EtchFileAccess(mapper,fileName,newFile?0L:resolvedHeader.storedLength(),
 					fileChannel.size(),cipher,encryptedIndex);
@@ -296,6 +262,56 @@ public class Etch {
 	public static Etch create(File file, EtchConfig config) throws IOException {
 		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
 		return new Etch(file,config);
+	}
+
+	static EtchConfig resolveExistingConfig(EtchHeader resolvedHeader,
+			EtchConfig requestedConfig, File dataFile) throws IOException {
+		short fileVersion=resolvedHeader.version();
+		if ((requestedConfig!=null)&&(requestedConfig.getVersion()!=fileVersion)) {
+			throw new IOException("Configured Etch version "+requestedConfig.getVersion()
+					+" does not match file version "+fileVersion+": "+dataFile);
+		}
+		if (!(resolvedHeader instanceof EtchV3Header v3Header)) {
+			return (requestedConfig==null)?EtchConfig.create(fileVersion):requestedConfig;
+		}
+
+		EtchConfig.CipherMode fileCipher;
+		try {
+			fileCipher=EtchConfig.CipherMode.fromFileId(v3Header.cipherId());
+		} catch (IllegalArgumentException e) {
+			throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId(),e);
+		}
+		EtchConfig basis=(requestedConfig==null)?EtchConfig.create(fileVersion):requestedConfig;
+		if ((requestedConfig!=null)&&(requestedConfig.getCipherMode()!=fileCipher)) {
+			throw new IOException("Configured Etch cipher "+requestedConfig.getCipherMode().configName()
+					+" does not match file cipher "+fileCipher.configName()+": "+dataFile);
+		}
+		if ((requestedConfig!=null)
+				&&(requestedConfig.isIndexEncrypted()!=v3Header.isIndexEncrypted())) {
+			throw new IOException("Configured Etch index encryption does not match file: "+dataFile);
+		}
+		AccountKey configuredHint=basis.getPublicKeyHint();
+		AccountKey fileHint=v3Header.publicKeyHint();
+		if ((configuredHint!=null)&&!configuredHint.equals(fileHint)) {
+			throw new IOException("Configured Etch public-key hint does not match file: "+dataFile);
+		}
+		return basis.withV3FileOptions(fileCipher,v3Header.isIndexEncrypted(),fileHint);
+	}
+
+	static EtchFileCipher createFileCipher(EtchHeader resolvedHeader,
+			EtchConfig effectiveConfig) throws IOException {
+		if (!(resolvedHeader instanceof EtchV3Header v3Header)) return null;
+		byte[] cipherSecret=effectiveConfig.encryptionSecret();
+		try {
+			return switch (v3Header.cipherId()) {
+				case V3_CIPHER_NONE -> null;
+				case V3_CIPHER_AES_256_CTR -> AES256CTREtchCipher.derive(cipherSecret,v3Header.fileSalt());
+				case V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(cipherSecret,v3Header.fileSalt());
+				default -> throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId());
+			};
+		} finally {
+			if (cipherSecret!=null) Arrays.fill(cipherSecret,(byte)0);
+		}
 	}
 
 	private void readData(long position, byte[] destination, int offset, int length)

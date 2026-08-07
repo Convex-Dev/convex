@@ -103,6 +103,17 @@ public class EtchConfigTest {
 	}
 
 	@Test
+	public void testV3ChaCha20Configuration() {
+		byte[] secret=new byte[] {1,2,3,4};
+		EtchConfig config=EtchConfig.fromMap(Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
+				EtchConfig.CIPHER,Strings.create("chacha20")),secret);
+		assertEquals(EtchConfig.CipherMode.CHACHA20,config.getCipherMode());
+		assertFalse(config.isIndexEncrypted());
+		assertTrue(config.hasEncryptionSecret());
+	}
+
+	@Test
 	public void testInvalidV3EncryptionConfiguration() {
 		assertThrows(IllegalArgumentException.class,()->EtchConfig.createV3(
 				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,
