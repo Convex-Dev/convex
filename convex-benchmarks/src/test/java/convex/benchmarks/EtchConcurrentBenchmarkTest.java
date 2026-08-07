@@ -15,6 +15,7 @@ public class EtchConcurrentBenchmarkTest {
 		EtchConcurrentBenchmark.Options options=EtchConcurrentBenchmark.Options.parse(new String[] {
 				"--config","v2-mapped",
 				"--config","v3-aes-mapped",
+				"--config","v3-chacha-index-mapped",
 				"--readers","2",
 				"--writers","2",
 				"--syncs","5",
@@ -31,7 +32,7 @@ public class EtchConcurrentBenchmarkTest {
 			results=EtchConcurrentBenchmark.run(options,output);
 		}
 
-		assertEquals(2,results.size());
+		assertEquals(3,results.size());
 		for (EtchConcurrentBenchmark.RunResult result:results) {
 			assertEquals(5000L,result.cachedHits()+result.directHits()+result.misses());
 			assertEquals(500L,result.writes());

@@ -65,6 +65,8 @@ import convex.core.util.Utils;
  * - N byes actual data
  */
 public class Etch {
+	private static final System.Logger LOG=System.getLogger(Etch.class.getName());
+
 	/**
 	 * Temporary byte array on a thread local basis.
 	 */
@@ -91,6 +93,7 @@ public class Etch {
 	private final EtchFileAccess fileAccess;
 	private final boolean buildChains;
 	private boolean requiresOpenTransition;
+	private boolean closeStarted;
 
 	private EtchStore store;
 
@@ -380,11 +383,13 @@ public class Etch {
 
 			// if next slot is empty, we can make a chain!
 			if (buildChains&&(nextSlotValue==0L)) {
-				// update current slot to be the start of a chain
-				writeSlot(indexPosition,digit,slotValue|POINTER_START);
-
-				// write new data pointer to next slot
+				// Complete the new record before exposing any index transition.
 				long newDataPointer=appendData(key,ref);
+
+				// Publish a valid one-entry chain, then its continuation. A reader
+				// may observe either the old plain slot, the one-entry chain or the
+				// completed two-entry chain, all of which are structurally valid.
+				writeSlot(indexPosition,digit,slotValue|POINTER_START);
 				writeSlot(indexPosition,nextDigit,newDataPointer|POINTER_CHAIN);
 
 				return ref;
@@ -610,19 +615,37 @@ public class Etch {
 	 * data length.
 	 */
 	void close() {
-		if (!(data.getChannel().isOpen())) return; // already closed
 		synchronized(this) {
+			if (closeStarted) return;
+			closeStarted=true;
+			Exception failure=null;
 			try {
 				header.close(fileAccess);
-				
+			} catch (Exception e) {
+				failure=e;
+			}
+			try {
 				fileAccess.close();
-	
+			} catch (Exception e) {
+				failure=combineCloseFailure(failure,e);
+			}
+			try {
 				data.close();
-	
-			} catch (IOException e) {
-				// ignore
+			} catch (Exception e) {
+				failure=combineCloseFailure(failure,e);
+			}
+			if (failure!=null) {
+				LOG.log(System.Logger.Level.WARNING,
+						"Etch close did not complete cleanly for "+fileName
+						+"; treat the file as dirty (v3 requires explicit recovery open)",failure);
 			}
 		}
+	}
+
+	private static Exception combineCloseFailure(Exception first, Exception next) {
+		if (first==null) return next;
+		first.addSuppressed(next);
+		return first;
 	}
 
 

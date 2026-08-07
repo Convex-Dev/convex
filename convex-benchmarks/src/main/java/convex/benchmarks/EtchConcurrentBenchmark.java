@@ -487,6 +487,7 @@ public final class EtchConcurrentBenchmark {
 		output.println("  --config NAME              Repeat for each config (default: v2-auto)");
 		output.println("                             v1-mapped, v2-auto, v2-mapped, v2-ffm");
 		output.println("                             v3-auto, v3-aes-auto, v3-aes-index-auto");
+		output.println("                             v3-chacha-auto, v3-chacha-index-auto");
 		output.println("                             append -no-chains to disable short chains");
 		output.println("  --readers N                Reader threads (default: up to 8)");
 		output.println("  --writers N                Writer threads (default: 2)");
@@ -694,6 +695,13 @@ public final class EtchConcurrentBenchmark {
 				} else if (mapping.startsWith("aes-")) {
 					cipher=EtchConfig.CipherMode.AES_256_CTR;
 					mapping=mapping.substring("aes-".length());
+				} else if (mapping.startsWith("chacha-index-")) {
+					cipher=EtchConfig.CipherMode.CHACHA20;
+					encryptedIndex=true;
+					mapping=mapping.substring("chacha-index-".length());
+				} else if (mapping.startsWith("chacha-")) {
+					cipher=EtchConfig.CipherMode.CHACHA20;
+					mapping=mapping.substring("chacha-".length());
 				} else if (mapping.startsWith("plain-")) {
 					mapping=mapping.substring("plain-".length());
 				}

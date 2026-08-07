@@ -52,6 +52,11 @@ public class EtchV3IntegrationTest {
 	}
 
 	@Test
+	public void testChaCha20EncryptedIndexRoundTrip() throws Exception {
+		assertEncryptedRoundTrip(EtchConfig.CipherMode.CHACHA20,true);
+	}
+
+	@Test
 	public void testCleanReadOnlyReopenDoesNotRewriteHeader() throws Exception {
 		File file=tempFile("etch-v3-clean-generation");
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);

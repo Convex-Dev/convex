@@ -226,7 +226,7 @@ final class EtchV3Header extends EtchHeader {
 		if (encryptedIndex&&(cipherId==V3_CIPHER_NONE)) {
 			throw new IllegalArgumentException("Etch v3 index encryption requires a file cipher");
 		}
-		if ((indexStart<V3_HEADER_REGION_SIZE)||((indexStart&(POINTER_SIZE-1L))!=0L)) {
+		if (indexStart!=V3_INDEX_START) {
 			throw new IllegalArgumentException("Invalid Etch v3 index start: "+indexStart);
 		}
 		if ((fileSalt==null)||(fileSalt.length!=V3_FILE_SALT_SIZE)) {
@@ -384,8 +384,11 @@ final class EtchV3Header extends EtchHeader {
 
 	@Override
 	void close(EtchFileAccess access) throws IOException {
-		if (closeState!=V3_CLEAN_CLOSED) commit(access,V3_CLEAN_CLOSED);
-		if (headerMacKey!=null) Arrays.fill(headerMacKey,(byte)0);
+		try {
+			if (closeState!=V3_CLEAN_CLOSED) commit(access,V3_CLEAN_CLOSED);
+		} finally {
+			if (headerMacKey!=null) Arrays.fill(headerMacKey,(byte)0);
+		}
 	}
 
 	private void commit(EtchFileAccess access, long nextCloseState)

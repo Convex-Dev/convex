@@ -13,6 +13,7 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 	private int rangeForceCount;
 	private long forcedPosition=-1L;
 	private long forcedLength=-1L;
+	private boolean failNextFullForce;
 
 	byte[] copyOf(long length) {
 		return Arrays.copyOf(bytes,Math.toIntExact(length));
@@ -36,6 +37,10 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 
 	long forcedLength() {
 		return forcedLength;
+	}
+
+	void failNextFullForce() {
+		failNextFullForce=true;
 	}
 
 	@Override
@@ -79,8 +84,12 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public void force() {
+	public void force() throws IOException {
 		fullForceCount++;
+		if (failNextFullForce) {
+			failNextFullForce=false;
+			throw new IOException("Injected full-force failure");
+		}
 	}
 
 	@Override

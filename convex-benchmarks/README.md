@@ -77,14 +77,16 @@ java -cp convex-benchmarks/target/convex-benchmarks-jar-with-dependencies.jar \
   --config v1-mapped \
   --config v2-mapped \
   --config v3-auto \
-  --config v3-aes-auto
+  --config v3-aes-auto \
+  --config v3-chacha-auto
 ```
 
 Use `--help` for workload sizes, thread counts, read-mix controls, deterministic
 seed selection and file-retention options. `v2-auto` selects the runtime's
 default mapper; append `-no-chains` to a configuration name to disable short
-collision chains. V3 supports `v3-auto` (plaintext), `v3-aes-auto` (AES-CTR
-data with a plaintext index), and `v3-aes-index-auto` (AES-CTR data and index).
+collision chains. V3 supports `v3-auto` (plaintext), `v3-aes-auto` and
+`v3-chacha-auto` (encrypted data with a plaintext index), plus
+`v3-aes-index-auto` and `v3-chacha-index-auto` (encrypted data and index).
 The utility uses a fixed public benchmark secret for reproducibility; retained
 benchmark files are therefore not confidential.
 

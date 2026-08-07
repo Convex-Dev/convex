@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.security.MessageDigest;
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,10 @@ public class EtchV3HeaderTest {
 			"0a43c34f97035b62c43d0588870b44160d264e36dfa6e5e9100aeb91d8810c7e";
 	private static final String AES_CHECK_B=
 			"d14dd1cf54a2178c887b6e7865636f439607a713115b2f7adc2031594cc6129e";
+	private static final String CHACHA_CHECK_A=
+			"9897d28bb7f1574e6e1c047f353e05f7065f58cacc67d39410f434ed76481c3a";
+	private static final String CHACHA_CHECK_B=
+			"e74cbf945ca9fd3257a799aca82dc039755839c2a6813da40327c842dadf18c0";
 
 	@Test
 	public void testCanonicalPlaintextFile() throws Exception {
@@ -70,6 +75,27 @@ public class EtchV3HeaderTest {
 	}
 
 	@Test
+	public void testCanonicalChaCha20FileAndKeyVerification() throws Exception {
+		byte[] secret=sequence(0x00,32);
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		AccountKey publicKeyHint=AccountKey.wrap(sequence(0x20,AccountKey.LENGTH));
+		CanonicalFile file=createCanonical(EtchConstants.V3_CIPHER_CHACHA20,
+				false,salt,publicKeyHint,secret);
+
+		assertCanonicalCopy(file.copyA(),EtchConstants.V3_CIPHER_CHACHA20,
+				0L,salt,publicKeyHint,CHACHA_CHECK_A);
+		assertCanonicalCopy(file.copyB(),EtchConstants.V3_CIPHER_CHACHA20,
+				1L,salt,publicKeyHint,CHACHA_CHECK_B);
+		assertZero(file.bytes(),Math.toIntExact(EtchConstants.V3_INDEX_START),file.bytes().length);
+
+		EtchV3Header selected=EtchV3Header.select(file.copyA(),file.copyB(),secret,"memory-chacha");
+		assertSelectedInitialHeader(selected,1L,1,false,publicKeyHint);
+		assertEquals(EtchConstants.V3_CIPHER_CHACHA20,selected.cipherId());
+		assertThrows(IOException.class,()->EtchV3Header.select(file.copyA(),file.copyB(),
+				sequence(0x40,32),"memory-chacha"));
+	}
+
+	@Test
 	public void testFallsBackFromDamagedNewestCopy() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		CanonicalFile file=createCanonical(EtchConstants.V3_CIPHER_NONE,false,
@@ -79,6 +105,22 @@ public class EtchV3HeaderTest {
 
 		EtchV3Header selected=EtchV3Header.select(file.copyA(),damagedB,null,"memory-damaged");
 		assertSelectedInitialHeader(selected,0L,0,true,null);
+	}
+
+	@Test
+	public void testRejectsAuthenticatedNonFixedIndexStart() throws Exception {
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		CanonicalFile file=createCanonical(EtchConstants.V3_CIPHER_NONE,false,
+				salt,null,null);
+		byte[] invalid=file.copyB().clone();
+		Utils.writeLong(invalid,EtchConstants.V3_INDEX_START_OFFSET,
+				EtchConstants.V3_INDEX_START+EtchConstants.POINTER_SIZE);
+		byte[] check=MessageDigest.getInstance("SHA-256").digest(
+				Arrays.copyOf(invalid,EtchConstants.V3_HEADER_PREFIX_SIZE));
+		System.arraycopy(check,0,invalid,EtchConstants.V3_HEADER_CHECK_OFFSET,check.length);
+
+		assertThrows(IOException.class,()->EtchV3Header.select(invalid,invalid,
+				null,"memory-index-start"));
 	}
 
 	@Test
@@ -131,6 +173,21 @@ public class EtchV3HeaderTest {
 			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 			assertEquals(4L,header.generation());
 			assertEquals(0,header.activeCopy());
+			assertEquals(EtchConstants.V3_OPEN,header.closeState());
+		}
+	}
+
+	@Test
+	public void testFailedCloseDoesNotPublishCleanStateInMemory() throws Exception {
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
+		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-close-failure",0L,0L)) {
+			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
+					false,salt,null);
+			header.initialise(access);
+			mapper.failNextFullForce();
+
+			assertThrows(IOException.class,()->header.close(access));
 			assertEquals(EtchConstants.V3_OPEN,header.closeState());
 		}
 	}
@@ -191,8 +248,12 @@ public class EtchV3HeaderTest {
 	private static CanonicalFile createCanonical(int cipherId, boolean encryptedIndex,
 			byte[] salt, AccountKey publicKeyHint, byte[] secret) throws Exception {
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		EtchFileCipher cipher=(cipherId==EtchConstants.V3_CIPHER_NONE)
-				?null:AES256CTREtchCipher.derive(secret,salt);
+		EtchFileCipher cipher=switch (cipherId) {
+			case EtchConstants.V3_CIPHER_NONE -> null;
+			case EtchConstants.V3_CIPHER_AES_256_CTR -> AES256CTREtchCipher.derive(secret,salt);
+			case EtchConstants.V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(secret,salt);
+			default -> throw new IllegalArgumentException("Unsupported test cipher: "+cipherId);
+		};
 		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-v3",0L,0L,
 				cipher,encryptedIndex)) {
 			EtchV3Header header=EtchV3Header.create(cipherId,encryptedIndex,salt,

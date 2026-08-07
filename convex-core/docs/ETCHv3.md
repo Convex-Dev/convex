@@ -1,17 +1,17 @@
 # Etch v3 header and durability design
 
-This document defines the proposed Etch v3 file header and the invariants that
-the rest of the v3 format must preserve. It deliberately does not yet fix the
-v3 data-record or index-block encodings beyond the constraints needed by the
-header.
+This document defines the Etch v3 file header and the invariants that the rest
+of the v3 format must preserve. V3 retains the v2 data-record and index-block
+encodings; encryption is a length-preserving overlay and does not alter their
+logical layout.
 
 Implementation status: normal Etch access supports new plaintext and
-AES-256-CTR v3 files, optional index encryption, key verification, clean close
-and fast clean reopen. An existing v3 file whose selected header is `OPEN`
-fails normal opening with an explicit recovery/repair requirement. Explicit
-read-only unsafe maintenance opening is available through
-`EtchMaintenanceReader`; the index scan specified in the recovery section and
-its repair and migration consumers remain follow-up work.
+AES-256-CTR and ChaCha20 v3 files, optional index encryption, key verification,
+clean close and fast clean reopen. An existing v3 file whose selected header is
+`OPEN` fails normal opening with an explicit recovery/repair requirement.
+Explicit read-only unsafe maintenance opening is available through
+`EtchMaintenanceReader`; the explicit recovery scan specified below and its
+repair and migration consumers remain follow-up work.
 
 Etch v3 remains a content-addressed store for CAD3 values. Encryption is a
 storage overlay below CAD3: it must not change cell encodings, hashes, reference
@@ -53,11 +53,11 @@ path.
 After a later unsynchronised mutation begins, Etch does not guarantee that the
 original file remains directly openable after a dirty crash. An in-place index
 slot may reach storage and replace a pointer needed by the synced index view.
-Dirty reopening is a bounded structural recovery attempt, not a transaction
-rollback and not a proof of every stored value. If the resulting index or tail
-cannot be traversed safely and consistently, normal open fails without changing
-the source and the operator restores a backup or invokes explicit best-effort
-repair.
+Explicit dirty recovery is a bounded structural attempt, not a transaction
+rollback and not a proof of every stored value. Normal open rejects the
+`OPEN` state without attempting it. If the resulting index or tail cannot be
+traversed safely and consistently, recovery fails without changing the source
+and the operator restores a backup or invokes explicit best-effort repair.
 
 Offline repair may scan through physical EOF for independently valid
 hash-and-encoding pairs and verify the selected root in a fresh store. This is
@@ -71,7 +71,7 @@ The root index has a fixed location for the lifetime of the file. Its start is
 stored in the header as `indexStartOffset`; it is not a changing root pointer or
 a commit record.
 
-The proposed default is:
+The v3 layout is:
 
 ```text
 0x0000  4096-byte header copy A
@@ -80,9 +80,11 @@ The proposed default is:
          appended data records and child indexes
 ```
 
-`indexStartOffset` and every child-index offset must be divisible by eight. The
-root index cannot be relocated, including during recovery or key rotation. A
-different layout is produced by migration into a new file.
+`indexStartOffset` must equal `0x2000`; the field is retained as an explicit
+sanity check and repair input rather than as a configurable layout choice.
+Every child-index offset must be divisible by eight. The root index cannot be
+relocated, including during recovery or key rotation. Migration into another
+v3 file produces the same fixed layout.
 
 The duplicated headers protect header metadata. They do not implement index
 transactions. Index crash behaviour comes from ordered, atomic slot
@@ -164,7 +166,10 @@ decide how that secret is derived, including from an Ed25519 seed, but Etch
 accepts only the resulting opaque caller secret. Because the header is
 plaintext, the hint can be inspected before key lookup; it remains untrusted
 until the selected header's `headerCheck` has been verified. A non-zero hint is
-immutable for the lifetime of the file and changing it requires migration.
+immutable for the lifetime of the file and changing it requires migration. It
+also makes copies of the store linkable to that public key, so privacy-sensitive
+applications should leave it zero or use a deliberately opaque application
+identifier in a future format.
 
 `syncedFileEnd` is the exclusive end of the logical file extent covered by this
 header generation. It includes the fixed root index, data records, child
@@ -174,7 +179,7 @@ because of mapping granularity, preallocation, orphaned appends or
 unsynchronised writes.
 
 `syncedFileEnd` must be at least `indexStartOffset + 524288`.
-`indexStartOffset` must be at least `0x2000` and divisible by eight.
+`indexStartOffset` must equal `0x2000`.
 
 The writer also maintains an in-memory append cursor, called `writeEnd` here to
 distinguish it from the header field:
@@ -242,7 +247,10 @@ The clean state must be invalidated durably before another mutation:
 4. Further writes and ordinary syncs keep `closeState = OPEN` and add no marker
    force.
 5. `close` first excludes all further operations, forces the body, then commits
-   and forces a new header with `closeState = CLEAN_CLOSED`.
+   and forces a new header with `closeState = CLEAN_CLOSED`. Once close begins,
+   resource cleanup continues even if either force or the header commit fails.
+   The implementation logs a warning and the close is dirty by definition; a
+   later caller must select explicit recovery opening.
 
 Thus the marker costs one additional header force before the first mutation of
 each writing session. The close transition is folded into the final sync and
@@ -351,15 +359,18 @@ Index algorithms must preserve a valid old view until their single publication
 write:
 
 - A new entry is appended completely before its empty slot is filled.
-- When converting one plain slot into a chain, write the continuation slot
-  first and change the original slot to `PTR_START` last. A stray continuation
-  is ignored before publication; the reverse order can expose an incomplete
-  chain.
+- When converting one plain slot into a chain, append the new record first,
+  change the original slot from `PTR_PLAIN` to `PTR_START`, then publish the
+  new pointer as `PTR_CHAIN`. The intermediate one-entry chain is valid and a
+  failed publication leaves only an unreachable appended record.
 - When replacing a chain with a child index, build the complete child index and
   change the parent slot to `PTR_INDEX` last.
-- Old chain slots are cleanup, not part of publication. They may be cleared
-  only after a sync has committed the replacement child index. A crash while
-  clearing them must not affect the already-synced child index.
+- Old continuation slots are cleanup, not part of publication, and may be
+  cleared after the parent slot publishes the child index. A lock-free reader
+  that began from the old `PTR_START` must re-read that start slot before
+  returning a miss; if it changed, the reader retries from that index level.
+  A reader that already acquired an old data pointer may finish that immutable
+  record read after the slot is cleared.
 
 These rules make live readers safe and improve crash recovery. They deliberately
 do not add a force to the hot path.
@@ -388,22 +399,24 @@ while no later mutation has begun. `close` performs this body sync while
 excluding further operations, then commits the final header as `CLEAN_CLOSED`
 before releasing the file.
 
-A failed body force, header write or header force must be reported to the
-caller. The in-memory active generation advances only after the final force
-succeeds. `close` must not silently turn a failed sync into an apparently clean
-shutdown.
+A failed explicit `sync` body force, header write or header force is reported
+to the caller. The in-memory active generation advances only after the final
+force succeeds. `close` cannot be cancelled or usefully retried once resource
+cleanup starts, so it continues closing all resources and logs a warning if
+any step fails. Such a close has no clean-close guarantee even if a complete
+header happened to reach storage.
 
 Once later unsynchronised writes begin, a crash may preserve any mixture of
-those writes. Recovery scans the complete index and validates referenced
-allocations beyond `syncedFileEnd`, but exact rollback to the last header
-generation is not guaranteed. In-place index pages can be written back by the
-operating system before `sync`, so a duplicated header alone cannot provide
-that stronger guarantee.
+those writes. Explicit recovery opening scans the complete index and validates
+referenced allocations beyond `syncedFileEnd`, but exact rollback to the last
+header generation is not guaranteed. In-place index pages can be written back
+by the operating system before `sync`, so a duplicated header alone cannot
+provide that stronger guarantee.
 
 Normal access trusts synced bytes and does not necessarily recompute content
 hashes. It must still bound every file access and fail on structural errors it
 encounters. Full content verification belongs to `etch validate`, migration
-verification and repair; normal recovery does not guess or rewrite the only
+verification and repair; explicit recovery does not guess or rewrite the only
 source file.
 
 ## Recovery
@@ -422,12 +435,14 @@ physical-length check complete the fast path. The opener sets
 and performs no index or data validation. A read-only open may proceed
 immediately; a mutation first performs the forced transition to `OPEN`.
 
-### Reopening `OPEN`
+### Explicitly recovering `OPEN`
 
 `OPEN` means that the previous writing session did not complete a clean close;
-it does not prove that any write was lost. Recovery acquires the exclusive file
-lock, keeps the store read-only and treats `syncedFileEnd` as the last completed
-body checkpoint.
+it does not prove that any write was lost. Normal opening rejects this state
+without scanning or mutating the file. The caller decides whether to restore a
+backup, repair the file or request explicit recovery opening. Recovery acquires
+the exclusive file lock, keeps the store read-only during validation and treats
+`syncedFileEnd` as the last completed body checkpoint.
 
 The root hash always comes from the selected header. This is the root from the
 last completed sync represented by that header, or from an older sync if header
@@ -476,25 +491,26 @@ take the fast path.
 
 ### Corruption
 
-If the index scan finds corruption, normal open fails without clearing slots,
+Normal open has already rejected `OPEN` before this scan. If an explicitly
+requested recovery scan finds corruption, it fails without clearing slots,
 truncating the file or changing either header. The error reports at least the
 selected header generation, `syncedFileEnd`, index-block offset, slot number,
 pointer value and validation failure.
 
 At this point the caller may run the separate repair operation
-described below. Normal open never turns a failed index scan into an implicit
-whole-file scan: that could make an ordinary restart of a large Etch file
-unexpectedly take hours.
+described below. Neither normal open nor recovery turns a failed index scan
+into an implicit whole-file scan: that could make an ordinary restart of a
+large Etch file unexpectedly take hours.
 
 The result by crash point is:
 
 | Crash point | Recovery result |
 |---|---|
 | After successful `close` | `CLEAN_CLOSED` fast path; no index or data validation |
-| During the first-write transition to `OPEN` | No mutation has been permitted; an `OPEN` result conservatively runs the index scan |
-| After `sync` returns, before another mutation | Scan confirms the synced generation without validating old data |
+| During the first-write transition to `OPEN` | Normal open fails; explicit recovery conservatively runs the index scan even though no mutation may have begun |
+| After `sync` returns, before another mutation | Normal open fails; explicit recovery confirms the synced generation without validating old data |
 | While writing the new header | Select the new header if its check validates; otherwise recover from the older header |
-| During body force, or after later unsynchronised writes | Normal open scans referenced allocations beyond `syncedFileEnd`; structural inconsistency fails open and requires backup restoration or explicit best-effort repair |
+| During body force, or after later unsynchronised writes | Normal open fails; explicit recovery scans referenced allocations beyond `syncedFileEnd`, while structural inconsistency requires backup restoration or explicit best-effort repair |
 
 ## Unsafe maintenance open
 
@@ -510,7 +526,7 @@ maintenance open:
 - opens an existing source through a read-only file handle and mapping;
 - obtains a lock that excludes writers for the lifetime of the operation;
 - validates and selects a header, including key verification for encryption,
-  but bypasses the normal `OPEN` index scan and accepts that the index may be
+  but bypasses the normal `OPEN` rejection and accepts that the index may be
   inconsistent;
 - performs no clean-state transition, header commit, sync, truncation, tail
   adoption, automatic GC cutover or other source-file mutation;
@@ -604,6 +620,35 @@ The damaged source is never modified or automatically replaced.
 The CLI shape is `etch repair --into <new-file>`. The existing `etch recover`
 command retains its narrower meaning of completing or rolling back an
 interrupted GC cycle.
+
+## Retained body layout
+
+Etch v3 deliberately retains the v2 body layout. This avoids a new decoding
+branch on ordinary reads and makes migration a logical copy rather than a CAD3
+conversion. When encryption is enabled, the following bytes are transformed
+in place without changing their offsets or lengths.
+
+A data record is unaligned and consists of:
+
+| Size | Field |
+|---:|---|
+| 32 bytes | CAD3 content hash used as the Etch key |
+| 1 byte | monotonic reference flags and status |
+| 8 bytes | cached memory size, big-endian; zero means not recorded |
+| 2 bytes | positive signed encoding length, big-endian |
+| encoding length | canonical CAD3 encoding |
+
+The encoding length is therefore from 1 through 32,767 bytes. The nine-byte
+label is the only mutable part of a published data record; the hash, length and
+CAD3 encoding are immutable once written.
+
+An index block is an aligned array of big-endian eight-byte slots. The fixed
+root has 65,536 slots, level one has 256 slots and every deeper level has 16
+slots. The two high bits select `PTR_PLAIN`, `PTR_INDEX`, `PTR_START` or
+`PTR_CHAIN`; the remaining 62 bits are the absolute file offset. Child-index
+starts are eight-byte aligned. A v3 implementation must follow the publication
+and reader-revalidation rules above, but no checksum, marker, epoch or second
+physical slot is added to these legacy blocks.
 
 ## Stronger recovery alternatives
 
@@ -936,18 +981,20 @@ are retained for further attempts when root verification fails, but the
 command must report a partial result rather than successful rescue or complete
 migration. Full-file `etch repair` remains the index-independent path.
 
-## Follow-up format work
+## Remaining implementation work
 
-The header fixes enough structure to design the remaining v3 pieces separately:
+The v3 on-disk layout is fixed. Remaining work is operational rather than a
+reason to leave the format ambiguous:
 
-- data-record candidate recognition and efficient sequential repair;
-- data-record checksum and optional authentication;
-- post-checkpoint validation, diagnostics and maintenance-GC behaviour;
-- monotonic status and memory-size update ordering;
-- precise index-block encodings and recovery treatment of abandoned chain
-  slots; and
-- API names and semantics for `sync`, lenient migration and any strict mode.
+- implement explicit recovery opening and its post-checkpoint diagnostics;
+- implement sequential legacy-record candidate recognition for repair;
+- build the lenient migration and repair consumers on
+  `EtchMaintenanceReader`;
+- finish maintenance-GC behaviour and the public API names for explicit
+  recovery and strict validation; and
+- add failure-injection coverage around body force, header publication and
+  dirty close.
 
-The data-record design must preserve the same performance principle: no durable
-write is required until `sync`, while a completed `sync` must be independently
-verifiable on reopen.
+Per-record authentication, checksums, new framing or a different index
+publication structure would change the body layout and therefore require a
+future Etch version. They are not implicit extensions to v3.
