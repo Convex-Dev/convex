@@ -956,7 +956,16 @@ public class NodeServerTest {
 		try {
 			Blob missingBranch = Blobs.createRandom(400);
 			ASet<ACell> remoteValue = Cells.persist(Sets.of(missingBranch), sourceStore);
-			ingressStore.blockedHash = remoteValue.getHash();
+			// acquireLatticeMessage's MissingDataException handler now acquires
+			// e.getMissingHash() directly (the specific hash the exception already
+			// names) rather than re-deriving the payload's root hash via a second,
+			// separately-risky lazy dereference that could itself throw
+			// MissingDataException, uncaught, permanently failing delivery -- see
+			// NodeServer.acquireLatticeMessage's own comment. remoteValue itself
+			// is small/embeddable and decodes fine; missingBranch (400 bytes,
+			// referenced but not included on the wire) is the actual hash
+			// findMissing reports and Acquiror is asked to fetch.
+			ingressStore.blockedHash = missingBranch.getHash();
 
 			NodeConfig config = NodeConfig.create(Maps.of(
 				NodeConfig.PORT, CVMLong.ZERO,

@@ -155,8 +155,32 @@ public final class Acquiror implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Max consecutive request/response rounds tolerated where the response
+	 * contains a null (not-yet-available) value for a still-outstanding hash,
+	 * before giving up on this acquisition entirely. A single null response is
+	 * an ordinary, expected condition -- e.g. the peer answering has not yet
+	 * finished persisting the value, or the request raced a concurrent write
+	 * on the peer's side -- and typically self-resolves within milliseconds.
+	 * Treating it as immediately fatal (the previous behaviour) meant a single
+	 * transient hiccup during a periodic root-sync or delta broadcast turned
+	 * into a permanent, silent delivery failure: nothing ever retried that
+	 * specific hash again, and since a node's lattice root routes through the
+	 * same unresolved branch on every later update too, EVERY subsequent
+	 * broadcast referencing it failed identically, forever, until an operator
+	 * noticed and restarted the stuck node (which recovers via the unrelated,
+	 * always-retried {@code pullPath} full-sync path). Found diagnosing two
+	 * peer nodes that silently drifted apart indefinitely under ordinary
+	 * live traffic.
+	 */
+	private static final int MAX_NULL_RESPONSE_RETRIES = 10;
+
+	/** Delay between retries after a null (not-yet-available) response. */
+	private static final long NULL_RESPONSE_RETRY_DELAY_MS = 200;
+
 	private ACell acquire() throws Exception {
 		HashSet<Hash> missing = new HashSet<>();
+		int nullResponseRetries = 0;
 
 		while (!closed) {
 			Ref<ACell> ref = store.refForHash(hash);
@@ -189,13 +213,34 @@ public final class Acquiror implements AutoCloseable {
 				currentRequest = null;
 			}
 			if (closed) throw new CancellationException("Acquisition closed");
-			acceptResponse(requested, result);
+
+			Hash firstNullHash = acceptResponse(requested, result);
+			if (firstNullHash == null) {
+				nullResponseRetries = 0;
+			} else {
+				nullResponseRetries++;
+				if (nullResponseRetries > MAX_NULL_RESPONSE_RETRIES) {
+					throw new MissingDataException(store, firstNullHash);
+				}
+				log.debug("Acquisition got a null/not-yet-available response acquiring {} (root {}), retrying ({}/{})",
+					firstNullHash, hash, nullResponseRetries, MAX_NULL_RESPONSE_RETRIES);
+				if (closed) throw new CancellationException("Acquisition closed");
+				Thread.sleep(NULL_RESPONSE_RETRY_DELAY_MS);
+			}
 		}
 
 		throw new CancellationException("Acquisition closed");
 	}
 
-	private void acceptResponse(Hash[] requested, Result result)
+	/**
+	 * Stores every non-null value from the response. Returns the first
+	 * requested hash whose value came back null, or null if every requested
+	 * hash was present -- the caller retries a bounded number of times on a
+	 * null return before treating it as a genuine failure (see
+	 * {@link #MAX_NULL_RESPONSE_RETRIES}'s javadoc for why this isn't treated
+	 * as immediately fatal).
+	 */
+	private Hash acceptResponse(Hash[] requested, Result result)
 			throws BadFormatException, IOException, ResultException {
 		if (result == null) throw new BadFormatException("Missing acquisition result");
 		if (result.isError()) throw new ResultException(result);
@@ -203,16 +248,20 @@ public final class Acquiror implements AutoCloseable {
 		AVector<?> values = RT.ensureVector(result.getValue());
 		if (values == null) throw new BadFormatException("Expected vector in acquisition result");
 
+		Hash firstNullHash = null;
 		for (int i = 0; i < values.count(); i++) {
 			ACell value = values.get(i);
 			if (value == null) {
-				Hash missingHash = (i < requested.length) ? requested[i] : hash;
-				throw new MissingDataException(store, missingHash);
+				if (firstNullHash == null) {
+					firstNullHash = (i < requested.length) ? requested[i] : hash;
+				}
+				continue;
 			}
 			// DATA response cells may themselves be partial. Store the top cell and
 			// let the normal missing-reference loop request its absent branches.
 			Cells.store(value, store);
 		}
+		return firstNullHash;
 	}
 
 	/** True once the worker has terminated, or cancellation prevented it starting. */

@@ -1067,17 +1067,46 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (message.getType() != MessageType.LATTICE_VALUE) {
 				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
 			}
+			// Structural-only checks here -- deliberately NOT calling payload.get(2)
+			// in this guard (see below). A root-sync message's 3rd element is an
+			// "indirect ref" (LatticePropagator.maybePerformRootSync's own
+			// javadoc): a genuinely unresolved branch that dereferences lazily on
+			// first access and can itself throw MissingDataException. That exact
+			// throw, if it happens on THIS guard's own payload.get(2) call, escaped
+			// to the generic catch below (which just gives up -- no acquisition
+			// attempted at all) instead of the MissingDataException-aware recovery
+			// path a few lines down, turning every periodic root sync referencing
+			// not-yet-local data into an immediate, permanent, silently-never-
+			// retried delivery failure -- repeating identically every
+			// ROOT_SYNC_INTERVAL forever, since nothing about the node's state
+			// ever changes to make the SAME lazy access succeed differently next
+			// time.
 			AVector<?> payload = RT.ensureVector(message.getPayload());
-			if (payload == null || payload.count() < 3 || payload.get(2) == null) {
+			if (payload == null || payload.count() < 3) {
 				throw new BadFormatException("Invalid LATTICE_VALUE message format");
 			}
 
 			try {
-				return CompletableFuture.completedFuture(
-					completeLatticeMessage(message, acquisitionStore));
+				Message complete = completeLatticeMessage(message, acquisitionStore);
+				return CompletableFuture.completedFuture(complete);
 			} catch (MissingDataException e) {
-				Hash rootHash = payload.get(2).getHash();
-				return acquireHash(connection, acquisitionStore, rootHash)
+				// Use the hash the exception itself already carries, exactly like
+				// the envelope-decode catch above -- NOT payload.get(2).getHash().
+				// completeLatticeMessage's own payload.get(2) access is what threw
+				// this exception in the first place (a lazy dereference on a
+				// still-incomplete ref, e.g. a root-sync "indirect ref" payload --
+				// see LatticePropagator.maybePerformRootSync's javadoc); calling
+				// payload.get(2) again here hits the exact same still-unresolved
+				// ref and throws again, uncaught, escaping to the generic catch
+				// below with no acquisition ever attempted -- the same underlying
+				// mistake as the guard above (re-deriving a hash via another
+				// risky lazy access instead of using the one the exception
+				// already handed us). The recursive acquireLatticeMessage call
+				// below iterates again after this fetch, so acquiring just this
+				// one missing piece per round (rather than needing the true tree
+				// root in one shot) is sufficient -- it converges the same way
+				// the envelope-decode path above already does.
+				return acquireHash(connection, acquisitionStore, e.getMissingHash())
 					.thenCompose(value -> acquireLatticeMessage(
 						message, acquisitionStore, connection));
 			}
