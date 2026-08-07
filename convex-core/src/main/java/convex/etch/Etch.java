@@ -83,6 +83,7 @@ public class Etch {
 	private final RandomAccessFile data;
 
 	private final EtchConfig config;
+	private final EtchHeader header;
 	private final short version;
 	private final long indexStart;
 	private final EtchFileAccess fileAccess;
@@ -112,23 +113,16 @@ public class Etch {
 			}
 			// at this point, we have an exclusive lock on the database file.
 			boolean newFile=(dataFile.length()==0);
-			long storedLength=0L;
-			short fileVersion;
+			EtchHeader resolvedHeader;
 			EtchConfig effectiveConfig=null;
 			if (newFile) {
 				effectiveConfig=(requestedConfig==null)?EtchConfig.create():requestedConfig;
-				fileVersion=effectiveConfig.getVersion();
+				resolvedHeader=EtchHeader.create(effectiveConfig);
 			} else {
-				this.data.seek(0L);
-				int magic=this.data.readUnsignedShort();
-				if (magic!=MAGIC_NUMBER) {
-					throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
-				}
-				fileVersion=this.data.readShort();
-				storedLength=this.data.readLong();
+				resolvedHeader=EtchHeader.open(this.data,fileName);
 			}
 
-			long resolvedIndexStart=indexStartForVersion(fileVersion);
+			short fileVersion=resolvedHeader.version();
 			if (!newFile) {
 				if (requestedConfig==null) {
 					effectiveConfig=EtchConfig.create(fileVersion);
@@ -142,28 +136,16 @@ public class Etch {
 			}
 
 			this.config=effectiveConfig;
+			this.header=resolvedHeader;
 			this.version=fileVersion;
-			this.indexStart=resolvedIndexStart;
+			this.indexStart=resolvedHeader.indexStart();
 			this.buildChains=effectiveConfig.isBuildChains();
 			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
-			access=new EtchFileAccess(mapper,fileName,newFile?0L:storedLength,fileChannel.size());
+			access=new EtchFileAccess(mapper,fileName,newFile?0L:resolvedHeader.storedLength(),fileChannel.size());
 			this.fileAccess=access;
 
 			if (newFile) {
-				// Need to populate new file, with data length long and initial index block
-				// write Header, initially zeros except magic number and version
-				byte[] temp=new byte[Math.toIntExact(indexStart)];
-				Utils.writeShort(temp,0,(short)MAGIC_NUMBER);
-				Utils.writeShort(temp,(int)VERSION_OFFSET,version);
-				long headerPosition=fileAccess.appendHeader(temp,0,temp.length);
-				assert(headerPosition==0L);
-
-				// add an index block
-				long rootIndex=appendNewIndexBlock(0);
-				assert(rootIndex==indexStart);
-
-				// ensure data length is initially correct
-				writeDataLength();
+				header.initialise(fileAccess);
 			}
 
 			// shutdown hook to close file / release lock
@@ -189,14 +171,6 @@ public class Etch {
 			}
 			throw e;
 		}
-	}
-
-	private static long indexStartForVersion(short version) throws IOException {
-		return switch (version) {
-			case VERSION_1 -> V1_INDEX_START;
-			case VERSION_2 -> V2_INDEX_START;
-			default -> throw new IOException("Unsupported Etch version: "+version);
-		};
 	}
 
 	/**
@@ -564,11 +538,7 @@ public class Etch {
 		if (!(data.getChannel().isOpen())) return; // already closed
 		synchronized(this) {
 			try {
-				// Update data length
-				writeDataLength();
-	
-				// Send writes to disk
-				flush();
+				header.close(fileAccess,data.getChannel());
 				
 				fileAccess.close();
 	
@@ -593,9 +563,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	protected void writeDataLength() throws IOException {
-		byte[] lengthBytes=tempArray.get();
-		Utils.writeLong(lengthBytes,0,fileAccess.getDataLength());
-		fileAccess.writeHeader(DATA_LENGTH_OFFSET,lengthBytes,0,Long.BYTES);
+		header.writeDataLength(fileAccess);
 	}
 	
 	/**
@@ -753,8 +721,7 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
-		fileAccess.force();
-		data.getChannel().force(false);
+		header.sync(fileAccess,data.getChannel());
 	}
 
 	/**
@@ -1024,12 +991,7 @@ public class Etch {
 	}
 
 	public synchronized Hash getRootHash() throws IOException {
-		byte[] bs=new byte[Hash.LENGTH];
-		fileAccess.readHeader(ROOT_HASH_OFFSET,bs,0,Hash.LENGTH);
-		// Preserve the distinction between a never-assigned, zero-initialised root
-		// and an explicitly written null root (Hash.NULL_HASH).
-		if (Arrays.equals(bs, Utils.ZERO_BYTES_32)) return Hash.UNSET_HASH;
-		return Hash.wrap(bs);
+		return header.getRootHash(fileAccess);
 	}
 
 	/**
@@ -1038,9 +1000,7 @@ public class Etch {
 	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
-		byte[] bs=h.getBytes();
-		assert(bs.length==Hash.LENGTH);
-		fileAccess.writeHeader(ROOT_HASH_OFFSET,bs,0,bs.length);
+		header.setRootHash(fileAccess,h);
 	}
 
 	public void setStore(EtchStore etchStore) {
