@@ -83,6 +83,18 @@ public class EtchCLITest {
 		t=CLTester.run("etch", "recover", "--etch", f.getCanonicalPath());
 		t.assertExitCode(ExitCodes.SUCCESS);
 
+		// Offline repair reconstructs a fresh, independently verified store.
+		File repaired=Helpers.createTempFile("gcCliRepair", ".db");
+		t=CLTester.run("etch", "repair", "--etch", f.getCanonicalPath(),
+				"--into", repaired.getCanonicalPath());
+		t.assertExitCode(ExitCodes.SUCCESS);
+		{
+			convex.etch.EtchStore r=convex.etch.EtchStore.create(repaired);
+			assertEquals(rootHash,r.getRootHash());
+			assertEquals(root,r.getRootData());
+			r.close();
+		}
+
 		// GC --output: collect into a fresh file, source untouched
 		File out=Helpers.createTempFile("gcCliOut", ".db");
 		t=CLTester.run("etch", "gc", "--etch", dest.getCanonicalPath(),

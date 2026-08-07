@@ -80,6 +80,17 @@ final class EtchFileAccess implements AutoCloseable {
 		return encryptedIndex?cipher.start(position).transformLong(value):value;
 	}
 
+	/** Bulk index read for exclusive maintenance scans. */
+	void readIndex(long position, byte[] destination, int offset, int length)
+			throws IOException {
+		position=checkedRange(position,length);
+		if (encryptedIndex) {
+			mapper.getTransformed(position,destination,offset,length,cipher.start(position));
+		} else {
+			mapper.get(position,destination,offset,length);
+		}
+	}
+
 	void writeIndexSlotRelease(long position, long value) throws IOException {
 		position=checkedRange(position,Long.BYTES);
 		if (encryptedIndex) value=cipher.start(position).transformLong(value);

@@ -160,6 +160,19 @@ public class EtchMaintenanceReaderTest {
 		}
 	}
 
+	@Test
+	public void testExclusiveMaintenanceOpenPreventsAllOtherOpens() throws Exception {
+		File file=tempFile("etch-maintenance-exclusive");
+		Etch etch=Etch.create(file,EtchConfig.create(EtchConstants.VERSION_3));
+		etch.close();
+
+		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openExclusive(file,null)) {
+			assertTrue(reader.isCleanClosed());
+			assertThrows(IOException.class,()->Etch.create(file));
+			assertThrows(IOException.class,()->EtchMaintenanceReader.openUnsafe(file));
+		}
+	}
+
 	private static void markV3Open(File file, byte[] secret) throws Exception {
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			EtchV3Header header=(EtchV3Header)EtchHeader.open(data,file.getName(),secret);

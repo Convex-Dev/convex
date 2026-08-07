@@ -78,17 +78,34 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	 */
 	public static EtchMaintenanceReader openUnsafe(File file, EtchConfig requestedConfig)
 			throws IOException {
+		return open(file,requestedConfig,false);
+	}
+
+	/**
+	 * Opens an existing Etch file through a read-only API while holding an
+	 * exclusive lock. Reconstruction uses this form so the physical snapshot and
+	 * selected root cannot change before the destination is complete.
+	 */
+	public static EtchMaintenanceReader openExclusive(File file,
+			EtchConfig requestedConfig) throws IOException {
+		return open(file,requestedConfig,true);
+	}
+
+	private static EtchMaintenanceReader open(File file, EtchConfig requestedConfig,
+			boolean exclusive) throws IOException {
 		Objects.requireNonNull(file,"file");
 		if (!file.isFile()) throw new FileNotFoundException("Etch file does not exist: "+file);
 
-		RandomAccessFile data=new RandomAccessFile(file,"r");
+		// Java requires a writable channel for an exclusive lock. The mapper and
+		// public API remain read-only and never mutate the source.
+		RandomAccessFile data=new RandomAccessFile(file,exclusive?"rw":"r");
 		FileLock lock=null;
 		EtchFileMapper mapper=null;
 		EtchFileAccess access=null;
 		try {
 			FileChannel channel=data.getChannel();
 			try {
-				lock=channel.tryLock(0L,Long.MAX_VALUE,true);
+				lock=exclusive?channel.tryLock():channel.tryLock(0L,Long.MAX_VALUE,true);
 			} catch (OverlappingFileLockException e) {
 				throw new IOException("File lock failed on "+file,e);
 			}
@@ -249,6 +266,24 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		}
 		checkRange(position,POINTER_SIZE,header.indexStart(),logicalFileEnd,"index read");
 		return access.readIndexSlotAcquire(position);
+	}
+
+	/**
+	 * Reads and decrypts a complete candidate index range through physical EOF.
+	 * Intended for exclusive reconstruction; callers must validate its slots.
+	 */
+	public void readIndex(long position, byte[] destination, int offset, int length)
+			throws IOException {
+		checkDestination(destination,offset,length);
+		checkRange(position,length,header.indexStart(),physicalFileEnd,"candidate index read");
+		access.readIndex(position,destination,offset,length);
+	}
+
+	EtchFileAccess.DataRecord readCandidateDataRecord(long position) throws IOException {
+		checkRange(position,EtchConstants.KEY_SIZE+EtchConstants.LABEL_SIZE
+				+EtchConstants.ENCODING_LENGTH_SIZE,bodyStart,physicalFileEnd,
+				"candidate record read");
+		return access.readDataRecord(position,true);
 	}
 
 	private static void checkDestination(byte[] destination, int offset, int length) {

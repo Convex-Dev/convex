@@ -56,6 +56,14 @@ public class EtchMixin extends AMixin {
 		return getEtchStore(etchStoreFilename);
 	}
 
+	/** Returns the configured Etch path without attempting a normal store open. */
+	public File getEtchFile() {
+		if (etchStoreFilename==null) {
+			throw new CLIError("No Etch store file specified. Include --etch or set CONVEX_ETCH_FILE.");
+		}
+		return FileUtils.getFile(etchStoreFilename);
+	}
+
 	public List<AccountKey> getPeerList() {
 		EtchStore etchStore=getEtchStore();
 
