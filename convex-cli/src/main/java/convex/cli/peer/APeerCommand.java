@@ -7,6 +7,7 @@ import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.PeerKeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
+import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.ParentCommand;
@@ -43,6 +44,11 @@ public abstract class APeerCommand extends ACommand {
 
 	public EtchStore getEtchStore() {
 		return etchMixin.getEtchStore();
+	}
+
+	/** Opens the peer store using caller-resolved Etch configuration. */
+	public EtchStore getEtchStore(EtchConfig config) {
+		return etchMixin.getEtchStore(config);
 	}
 	
 	/**

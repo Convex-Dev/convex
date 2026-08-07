@@ -24,6 +24,8 @@ public class Keywords {
 
 	// configuration parameters
 	public static final Keyword STORE = Keyword.intern("store");
+	/** Compiled {@link convex.etch.EtchConfig} used when constructing an Etch store. */
+	public static final Keyword ETCH_CONFIG = Keyword.intern("etch-config");
 	public static final Keyword PROTOCOL_VERSION = Keyword.intern("protocol-version");
 	public static final Keyword SUPPORTED_PROTOCOL_VERSION = Keyword.intern("supported-protocol-version");
 	public static final Keyword RESTORE = Keyword.intern("restore");
