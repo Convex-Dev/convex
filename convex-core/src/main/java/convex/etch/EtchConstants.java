@@ -41,6 +41,8 @@ public final class EtchConstants {
 			MAGIC_NUMBER_SIZE+VERSION_SIZE+DATA_LENGTH_SIZE+ROOT_HASH_SIZE;
 	public static final int V1_HEADER_SIZE=COMMON_HEADER_SIZE;
 	public static final int V2_HEADER_SIZE=64;
+	/** Size of the immutable per-file salt in an Etch v3 header. */
+	public static final int V3_FILE_SALT_SIZE=32;
 
 	public static final long V1_INDEX_START=V1_HEADER_SIZE;
 	public static final long V2_INDEX_START=V2_HEADER_SIZE;

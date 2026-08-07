@@ -2,6 +2,7 @@ package convex.etch;
 
 import java.io.IOException;
 import java.lang.invoke.VarHandle;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
@@ -36,6 +37,25 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
+	public void getTransformed(long position, byte[] destination, int offset, int length,
+			EtchCipherCursor cursor) throws IOException {
+		int remaining=length;
+		long current=position;
+		int destinationOffset=offset;
+		while (remaining>0) {
+			int chunk=Math.min(remaining,
+					Math.toIntExact(EtchConstants.MAX_REGION_SIZE-(current%EtchConstants.MAX_REGION_SIZE)));
+			MappedByteBuffer mapped=getBuffer(current,chunk,false);
+			ByteBuffer input=mappedSlice(mapped,bufferIndex(current),chunk);
+			ByteBuffer output=ByteBuffer.wrap(destination,destinationOffset,chunk);
+			cursor.transform(input,output);
+			current+=chunk;
+			destinationOffset+=chunk;
+			remaining-=chunk;
+		}
+	}
+
+	@Override
 	public void ensureWriteCapacity(long position, long length) throws IOException {
 		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
 		long end=Math.addExact(position,length);
@@ -63,6 +83,29 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 			sourceOffset+=chunk;
 			remaining-=chunk;
 		}
+	}
+
+	@Override
+	public void putTransformed(long position, byte[] source, int offset, int length,
+			EtchCipherCursor cursor) throws IOException {
+		int remaining=length;
+		long current=position;
+		int sourceOffset=offset;
+		while (remaining>0) {
+			int chunk=Math.min(remaining,
+					Math.toIntExact(EtchConstants.MAX_REGION_SIZE-(current%EtchConstants.MAX_REGION_SIZE)));
+			MappedByteBuffer mapped=regionMap.get(Math.toIntExact(current/EtchConstants.MAX_REGION_SIZE));
+			ByteBuffer input=ByteBuffer.wrap(source,sourceOffset,chunk);
+			ByteBuffer output=mappedSlice(mapped,bufferIndex(current),chunk);
+			cursor.transform(input,output);
+			current+=chunk;
+			sourceOffset+=chunk;
+			remaining-=chunk;
+		}
+	}
+
+	private static ByteBuffer mappedSlice(MappedByteBuffer mapped, int offset, int length) {
+		return mapped.duplicate().position(offset).limit(offset+length);
 	}
 
 	@Override

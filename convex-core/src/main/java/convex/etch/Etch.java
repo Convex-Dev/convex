@@ -679,14 +679,11 @@ public class Etch {
 	 */
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
-
-		long pointer=seekPosition(key);
-		if (pointer<0) {
+		RefSoft<T> result=readAtIndex(key,0,indexStart);
+		if (result==null) {
 			Counters.etchMiss++;
-			return null; // not found
 		}
-		
-		return read(key,pointer);
+		return result;
 	}
 	
 	/**
@@ -704,15 +701,24 @@ public class Etch {
 		
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
 		long recordPosition=rawPointer(pointer);
-		byte[] recordHeader=tempArray.get();
-		int headerOffset=0;
+		EtchFileAccess.DataRecord stored;
 		if (key==null) {
-			readData(recordPosition,recordHeader,0,KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE);
-			key=Hash.wrap(Arrays.copyOf(recordHeader,KEY_SIZE));
-			headerOffset=KEY_SIZE;
+			stored=fileAccess.readDataRecord(recordPosition,true);
+		} else if (fileAccess.isEncrypted()) {
+			stored=fileAccess.readDataRecord(recordPosition,key);
 		} else {
-			readData(recordPosition+KEY_SIZE,recordHeader,0,LABEL_SIZE+ENCODING_LENGTH_SIZE);
+			// The plaintext index traversal has already checked the stored key.
+			stored=fileAccess.readDataRecord(recordPosition,false);
 		}
+		if (stored==null) return null;
+		byte[] recordHeader=stored.header();
+		int headerOffset=stored.headerOffset();
+		if (key==null) key=Hash.wrap(Arrays.copyOf(recordHeader,KEY_SIZE));
+		return decodeDataRecord(key,pointer,stored,recordHeader,headerOffset);
+	}
+
+	private <T extends ACell> RefSoft<T> decodeDataRecord(AArrayBlob key, long pointer,
+			EtchFileAccess.DataRecord stored, byte[] recordHeader, int headerOffset) {
 		
 		// get flags byte
 		byte flagByte=recordHeader[headerOffset];
@@ -721,10 +727,8 @@ public class Etch {
 		long memorySize=Utils.readLong(recordHeader,headerOffset+Byte.BYTES,Long.BYTES);
 
 		// get Data length
-		short length=Utils.readShort(recordHeader,headerOffset+LABEL_SIZE);
-		byte[] bs=new byte[length];
-		readData(recordPosition+KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE,bs,0,length);
-		Blob encoding= Blob.wrap(bs);
+		int length=stored.encoding().length;
+		Blob encoding=Blob.wrap(stored.encoding());
 		try {
 			Hash hash=Hash.wrap(key);
 			T cell=store.decode(encoding);
@@ -751,16 +755,6 @@ public class Etch {
 	public synchronized void flush() throws IOException {
 		fileAccess.force();
 		data.getChannel().force(false);
-	}
-
-	/**
-	 * Gets the position of a value in the data file from the index
-	 * @param key Key value
-	 * @return data file offset or -1 if not found
-	 * @throws IOException
-	 */
-	private long seekPosition(AArrayBlob key) throws IOException {
-		return seekPosition(key,0,indexStart);
 	}
 
 	/**
@@ -838,6 +832,12 @@ public class Etch {
 		long position=indexPosition+digit*POINTER_SIZE;
 		fileAccess.writeIndexSlotRelease(position,slotValue);
 	}
+
+	private <T extends ACell> RefSoft<T> readMatching(AArrayBlob key, long pointer)
+			throws IOException {
+		if (!fileAccess.isEncrypted()&&!checkMatchingKey(key,pointer)) return null;
+		return read(key,pointer);
+	}
 	
 	/**
 	 * Visits all index blocks in this Etch file.
@@ -868,14 +868,15 @@ public class Etch {
 	}
 
 	/**
-	 * Gets the position of a data block from the given offset into the key
+	 * Finds and reads a data block from the given offset into the key.
 	 * @param key Key value
 	 * @param level Level in Etch index (0 = top level)
 	 * @param indexPosition offset of the current index block
-	 * @return data position for data block or -1 if not found
+	 * @return decoded reference, or {@code null} if not found
 	 * @throws IOException
 	 */
-	private long seekPosition(AArrayBlob key, int level, long indexPosition) throws IOException {
+	private <T extends ACell> RefSoft<T> readAtIndex(AArrayBlob key, int level,
+			long indexPosition) throws IOException {
 		if (level>=MAX_LEVEL) {
 			throw new Error("Etch index level exceeded for key: "+key);
 		}
@@ -887,17 +888,16 @@ public class Etch {
 		long type=(slotValue&POINTER_TYPE_MASK);
 		if (slotValue==0) {
 			// Empty slot i.e. not found
-			return -1;
+			return null;
 		} else if (type==POINTER_INDEX) {
 			// recursively check next index node
 			long newIndexPosition=rawPointer(slotValue);
-			return seekPosition(key,level+1,newIndexPosition);
+			return readAtIndex(key,level+1,newIndexPosition);
 		} else if (type==POINTER_PLAIN) {
-			if (checkMatchingKey(key,slotValue)) return slotValue;
-			return -1;
+			return readMatching(key,slotValue);
 		} else if (type==POINTER_CHAIN) {
 			// continuation of chain from some previous index, therefore key can't be present
-			return -1;
+			return null;
 		} else if (type==POINTER_START) {
 			// Optimistic lock-free chain scan. A concurrent collapse publishes its
 			// new index block into the start slot BEFORE clearing chain entries, so
@@ -907,7 +907,8 @@ public class Etch {
 			int i=0;
 			while (i<isize) {
 				long ptr=slotValue&(~POINTER_TYPE_MASK);
-				if (checkMatchingKey(key,ptr)) return ptr;
+				RefSoft<T> result=readMatching(key,ptr);
+				if (result!=null) return result;
 
 				i++; // advance to next position
 				slotValue=readSlot(indexPosition,(digit+i)&mask);
@@ -916,9 +917,9 @@ public class Etch {
 			}
 			if (readSlot(indexPosition,digit)!=startValue) {
 				// chain restructured during our scan: retry at this position
-				return seekPosition(key,level,indexPosition);
+				return readAtIndex(key,level,indexPosition);
 			}
-			return -1;
+			return null;
 		} else {
 			throw new Error("Shouldn't be possible!");
 		}

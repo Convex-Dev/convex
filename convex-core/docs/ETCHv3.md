@@ -658,8 +658,22 @@ Etch neither records nor identifies that source.
 V3 uses HKDF-SHA-256 with `fileSalt` and fixed Etch context labels to derive
 only two file-scoped keys:
 
-- the cipher key used at every encrypted file offset; and
-- the header-MAC key, used only to authenticate the plaintext header.
+- the cipher key used at every encrypted file offset, with the ASCII HKDF
+  `info` value `convex-etch-v3-file-cipher`; and
+- the header-MAC key, used only to authenticate the plaintext header, with the
+  ASCII HKDF `info` value `convex-etch-v3-header-mac`.
+
+Precisely, each derivation follows RFC 5869:
+
+```text
+PRK  = HMAC-SHA-256(key=fileSalt, data=callerSecret)
+T(1) = HMAC-SHA-256(key=PRK, data=ASCII(info) || 0x01)
+key  = T(1)
+```
+
+Both derived keys are exactly 32 bytes, so only the first HKDF-Expand block is
+used. `0x01` is RFC 5869's mandatory one-byte block counter. It is appended by
+HKDF and is not part of either Etch `info` string.
 
 The second derivation avoids using the same key directly with both a stream
 cipher and HMAC. It does not imply anything about the source secret. A client
@@ -752,6 +766,11 @@ different trade-off, for example:
 Those choices affect the atomic eight-byte update model and are intentionally
 deferred. The v3 reader must report the confidentiality level of an encrypted
 index rather than implying authenticated or history-safe encryption.
+
+The same fixed-offset limitation applies to the mutable nine-byte data label:
+status flags and the recorded memory size may change in place and therefore
+reuse their keystream bytes. CAD3 keys and encodings are immutable once
+written, so this qualification does not apply to their bytes.
 
 Pure XOR overlays are also malleable. CAD3 content hashes allow decrypted value
 bytes to be verified against their keys, and pointer/record validation detects

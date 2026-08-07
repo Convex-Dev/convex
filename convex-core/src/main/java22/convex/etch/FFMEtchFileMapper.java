@@ -113,6 +113,39 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
+	public void getTransformed(long position, byte[] destination, int offset, int length,
+			EtchCipherCursor cursor) throws IOException {
+		checkRange(position,length);
+		if (length==0) return;
+		ensureMapped(position,length,false);
+
+		long currentPosition=position;
+		int currentOffset=offset;
+		int remaining=length;
+		Mapping current=mappingFor(currentPosition,null);
+		while (remaining>0) {
+			int count=(int)Math.min(remaining,current.end()-currentPosition);
+			ByteBuffer input;
+			try {
+				input=current.segment.asSlice(current.offset(currentPosition),count).asByteBuffer();
+			} catch (IllegalStateException e) {
+				current=mappingFor(currentPosition,current);
+				continue;
+			}
+			try {
+				cursor.transform(input,ByteBuffer.wrap(destination,currentOffset,count));
+			} catch (IllegalStateException e) {
+				// Retrying could reuse the wrong part of the cipher stream.
+				throw new IOException("Etch mapping changed during encrypted read",e);
+			}
+			currentPosition+=count;
+			currentOffset+=count;
+			remaining-=count;
+			if (remaining>0) current=mappingFor(currentPosition,null);
+		}
+	}
+
+	@Override
 	public void writeIndexSlotRelease(long position, long value) throws IOException {
 		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES,true);
@@ -148,6 +181,37 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			} catch (IllegalStateException e) {
 				current=mappingFor(currentPosition,current);
 				continue;
+			}
+			currentPosition+=count;
+			currentOffset+=count;
+			remaining-=count;
+			if (remaining>0) current=mappingFor(currentPosition,null);
+		}
+	}
+
+	@Override
+	public void putTransformed(long position, byte[] source, int offset, int length,
+			EtchCipherCursor cursor) throws IOException {
+		if (length==0) return;
+
+		long currentPosition=position;
+		int currentOffset=offset;
+		int remaining=length;
+		Mapping current=mappingFor(currentPosition,null);
+		while (remaining>0) {
+			int count=(int)Math.min(remaining,current.end()-currentPosition);
+			ByteBuffer output;
+			try {
+				output=current.segment.asSlice(current.offset(currentPosition),count).asByteBuffer();
+			} catch (IllegalStateException e) {
+				current=mappingFor(currentPosition,current);
+				continue;
+			}
+			try {
+				cursor.transform(ByteBuffer.wrap(source,currentOffset,count),output);
+			} catch (IllegalStateException e) {
+				// Retrying could reuse the wrong part of the cipher stream.
+				throw new IOException("Etch mapping changed during encrypted write",e);
 			}
 			currentPosition+=count;
 			currentOffset+=count;

@@ -13,6 +13,10 @@ interface EtchFileMapper extends AutoCloseable {
 	// the header/data distinction and any future encryption transformation.
 	void get(long position, byte[] destination, int offset, int length) throws IOException;
 
+	/** Reads and transforms mapped bytes directly into the destination. */
+	void getTransformed(long position, byte[] destination, int offset, int length,
+			EtchCipherCursor cursor) throws IOException;
+
 	/**
 	 * Ensures the complete range is writable. Must be called once before one or
 	 * more {@link #put(long, byte[], int, int)} operations fill that range.
@@ -23,6 +27,10 @@ interface EtchFileMapper extends AutoCloseable {
 	 * Writes into a range already prepared by {@link #ensureWriteCapacity(long, long)}.
 	 */
 	void put(long position, byte[] source, int offset, int length) throws IOException;
+
+	/** Transforms source bytes directly into an already prepared mapped range. */
+	void putTransformed(long position, byte[] source, int offset, int length,
+			EtchCipherCursor cursor) throws IOException;
 
 	/**
 	 * Reads a published index slot and orders subsequent mapped reads after it.
