@@ -37,7 +37,7 @@ final class EtchFileMapperFactory {
 	static EtchConfig.MappingMode defaultMapping(short etchVersion) {
 		return switch (etchVersion) {
 			case EtchConstants.VERSION_1 -> EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
-			case EtchConstants.VERSION_2 -> FFM_AVAILABLE
+			case EtchConstants.VERSION_2, EtchConstants.VERSION_3 -> FFM_AVAILABLE
 					?EtchConfig.MappingMode.MEMORY_SEGMENT
 					:EtchConfig.MappingMode.MAPPED_BYTE_BUFFER;
 			default -> throw new IllegalArgumentException("Unsupported Etch version: "+etchVersion);

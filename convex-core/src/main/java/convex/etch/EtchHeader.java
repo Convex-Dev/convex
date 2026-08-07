@@ -6,8 +6,8 @@ import static convex.etch.EtchConstants.VERSION_2;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 
 /**
@@ -65,6 +65,8 @@ abstract class EtchHeader {
 		return storedLength;
 	}
 
+	abstract AccountKey publicKeyHint();
+
 	abstract void initialise(EtchFileAccess access) throws IOException;
 
 	abstract Hash getRootHash(EtchFileAccess access) throws IOException;
@@ -73,7 +75,7 @@ abstract class EtchHeader {
 
 	abstract void writeDataLength(EtchFileAccess access) throws IOException;
 
-	abstract void sync(EtchFileAccess access, FileChannel channel) throws IOException;
+	abstract void sync(EtchFileAccess access) throws IOException;
 
-	abstract void close(EtchFileAccess access, FileChannel channel) throws IOException;
+	abstract void close(EtchFileAccess access) throws IOException;
 }

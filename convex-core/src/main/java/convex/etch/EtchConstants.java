@@ -1,5 +1,6 @@
 package convex.etch;
 
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 
 /**
@@ -43,6 +44,33 @@ public final class EtchConstants {
 	public static final int V2_HEADER_SIZE=64;
 	/** Size of the immutable per-file salt in an Etch v3 header. */
 	public static final int V3_FILE_SALT_SIZE=32;
+	public static final int V3_HEADER_COPY_SIZE=4096;
+	public static final int V3_HEADER_REGION_SIZE=2*V3_HEADER_COPY_SIZE;
+	public static final int V3_CIPHER_OFFSET=0x004;
+	public static final int V3_INDEX_ENCRYPTION_OFFSET=0x006;
+	public static final int V3_GENERATION_OFFSET=0x008;
+	public static final int V3_SYNCED_FILE_END_OFFSET=0x010;
+	public static final int V3_INDEX_START_OFFSET=0x018;
+	public static final int V3_ROOT_HASH_OFFSET=0x020;
+	public static final int V3_FILE_SALT_OFFSET=0x040;
+	public static final int V3_PUBLIC_KEY_HINT_OFFSET=0x060;
+	public static final int V3_PUBLIC_KEY_HINT_SIZE=AccountKey.LENGTH;
+	public static final int V3_CLOSE_STATE_OFFSET=0x080;
+	public static final int V3_HEADER_PREFIX_SIZE=0x088;
+	public static final int V3_HEADER_CHECK_SIZE=32;
+	public static final int V3_HEADER_CHECK_OFFSET=0xfe0;
+
+	public static final long V3_HEADER_A_OFFSET=0L;
+	public static final long V3_HEADER_B_OFFSET=V3_HEADER_COPY_SIZE;
+	public static final long V3_INDEX_START=V3_HEADER_REGION_SIZE;
+
+	public static final int V3_CIPHER_NONE=0;
+	public static final int V3_CIPHER_AES_256_CTR=1;
+	public static final int V3_CIPHER_CHACHA20=2;
+	public static final int V3_INDEX_PLAINTEXT=0;
+	public static final int V3_INDEX_ENCRYPTED=1;
+	public static final long V3_OPEN=0L;
+	public static final long V3_CLEAN_CLOSED=1L;
 
 	public static final long V1_INDEX_START=V1_HEADER_SIZE;
 	public static final long V2_INDEX_START=V2_HEADER_SIZE;

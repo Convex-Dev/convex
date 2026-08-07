@@ -43,7 +43,8 @@ interface EtchFileMapper extends AutoCloseable {
 	void writeIndexSlotRelease(long position, long value) throws IOException;
 
 	/**
-	 * Forces dirty mapped pages to persistent storage.
+	 * Forces dirty mapped pages and the backing file contents to persistent storage.
+	 * A successful return is the durability boundary exposed to higher layers.
 	 */
 	void force() throws IOException;
 

@@ -363,11 +363,12 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public synchronized void force() {
+	public synchronized void force() throws IOException {
 		if (closed) throw new IllegalStateException("Etch mapping is closed");
 		for (Mapping mapping:mappings) {
 			if (mapping!=null) mapping.segment.force();
 		}
+		channel.force(false);
 	}
 
 	@Override

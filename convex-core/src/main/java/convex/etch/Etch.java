@@ -125,7 +125,8 @@ public class Etch {
 			short fileVersion=resolvedHeader.version();
 			if (!newFile) {
 				if (requestedConfig==null) {
-					effectiveConfig=EtchConfig.create(fileVersion);
+					effectiveConfig=EtchConfig.create(fileVersion)
+							.withPublicKeyHint(resolvedHeader.publicKeyHint());
 				} else {
 					if (requestedConfig.getVersion()!=fileVersion) {
 						throw new IOException("Configured Etch version "+requestedConfig.getVersion()
@@ -538,7 +539,7 @@ public class Etch {
 		if (!(data.getChannel().isOpen())) return; // already closed
 		synchronized(this) {
 			try {
-				header.close(fileAccess,data.getChannel());
+				header.close(fileAccess);
 				
 				fileAccess.close();
 	
@@ -721,7 +722,7 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
-		header.sync(fileAccess,data.getChannel());
+		header.sync(fileAccess);
 	}
 
 	/**

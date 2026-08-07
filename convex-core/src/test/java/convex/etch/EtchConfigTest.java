@@ -3,6 +3,7 @@ package convex.etch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
@@ -54,8 +56,46 @@ public class EtchConfigTest {
 				Maps.of(EtchConfig.BUILD_CHAINS,CVMLong.ONE)));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.fromMap(
 				Maps.of(EtchConfig.MAPPING,Strings.create("unknown"))));
+		assertThrows(IllegalArgumentException.class,() -> EtchConfig.fromMap(Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
+				EtchConfig.PUBLIC_KEY_HINT,Strings.create("1234"))));
 		assertThrows(IllegalArgumentException.class,() -> EtchConfig.create(
 				EtchConstants.VERSION_1,EtchConfig.MappingMode.MEMORY_SEGMENT,true));
+	}
+
+	@Test
+	public void testV3PublicKeyHintConfiguration() {
+		AccountKey hint=AccountKey.fromHex(
+				"202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f");
+		EtchConfig direct=EtchConfig.create(EtchConstants.VERSION_3,
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,hint);
+		assertEquals(hint,direct.getPublicKeyHint());
+		assertEquals(direct,EtchConfig.create(EtchConstants.VERSION_3,
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true).withPublicKeyHint(hint));
+
+		AMap<AString,ACell> source=Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
+				EtchConfig.MAPPING,Strings.create("mapped-byte-buffer"),
+				EtchConfig.PUBLIC_KEY_HINT,Strings.create(hint.toHexString()));
+		assertEquals(hint,EtchConfig.fromMap(source).getPublicKeyHint());
+
+		assertNull(EtchConfig.create(EtchConstants.VERSION_3,
+				EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,AccountKey.ZERO)
+				.getPublicKeyHint());
+	}
+
+	@Test
+	public void testPublicKeyHintRejectedForLegacyVersions() {
+		AccountKey hint=AccountKey.dummy("1234");
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.create(
+				EtchConstants.VERSION_1,EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,hint));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.create(
+				EtchConstants.VERSION_2,EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,hint));
+		assertThrows(IllegalArgumentException.class,
+				()->EtchConfig.create(EtchConstants.VERSION_2).withPublicKeyHint(hint));
+		assertThrows(IllegalArgumentException.class,()->EtchConfig.fromMap(Maps.of(
+				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_2),
+				EtchConfig.PUBLIC_KEY_HINT,Strings.create(hint.toHexString()))));
 	}
 
 	@Test

@@ -199,6 +199,10 @@ final class EtchFileAccess implements AutoCloseable {
 		return cipher!=null;
 	}
 
+	boolean isIndexEncrypted() {
+		return encryptedIndex;
+	}
+
 	void force() throws IOException {
 		mapper.force();
 	}

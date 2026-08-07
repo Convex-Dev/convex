@@ -11,9 +11,9 @@ import static convex.etch.EtchConstants.VERSION_OFFSET;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
+import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
 
@@ -57,6 +57,11 @@ final class LegacyEtchHeader extends EtchHeader {
 	}
 
 	@Override
+	AccountKey publicKeyHint() {
+		return null;
+	}
+
+	@Override
 	void initialise(EtchFileAccess access) throws IOException {
 		if (access.getDataLength()!=0L) {
 			throw new IllegalStateException("Cannot initialise a non-empty Etch file");
@@ -97,14 +102,13 @@ final class LegacyEtchHeader extends EtchHeader {
 	}
 
 	@Override
-	void sync(EtchFileAccess access, FileChannel channel) throws IOException {
+	void sync(EtchFileAccess access) throws IOException {
 		access.force();
-		channel.force(false);
 	}
 
 	@Override
-	void close(EtchFileAccess access, FileChannel channel) throws IOException {
+	void close(EtchFileAccess access) throws IOException {
 		writeDataLength(access);
-		sync(access,channel);
+		sync(access);
 	}
 }

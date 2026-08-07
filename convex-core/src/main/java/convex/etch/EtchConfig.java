@@ -5,6 +5,7 @@ import java.util.Objects;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.MapEntry;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
@@ -25,6 +26,8 @@ public final class EtchConfig {
 	public static final AString MAPPING=Strings.intern("mapping");
 	/** JSON-style configuration key controlling short collision chains. */
 	public static final AString BUILD_CHAINS=Strings.intern("buildChains");
+	/** JSON-style configuration key for the optional Etch v3 public-key hint. */
+	public static final AString PUBLIC_KEY_HINT=Strings.intern("publicKeyHint");
 
 	/** Concrete mapping implementations selectable at Etch construction. */
 	public enum MappingMode {
@@ -45,13 +48,24 @@ public final class EtchConfig {
 	private final short version;
 	private final MappingMode mappingMode;
 	private final boolean buildChains;
+	private final AccountKey publicKeyHint;
 
 	private EtchConfig(short version, MappingMode mappingMode, boolean buildChains) {
+		this(version,mappingMode,buildChains,null);
+	}
+
+	private EtchConfig(short version, MappingMode mappingMode, boolean buildChains,
+			AccountKey publicKeyHint) {
 		validateVersion(version);
 		EtchFileMapperFactory.validate(version,mappingMode);
+		publicKeyHint=normalisePublicKeyHint(publicKeyHint);
+		if ((publicKeyHint!=null)&&(version!=EtchConstants.VERSION_3)) {
+			throw new IllegalArgumentException("Etch public-key hint requires Etch v3");
+		}
 		this.version=version;
 		this.mappingMode=mappingMode;
 		this.buildChains=buildChains;
+		this.publicKeyHint=publicKeyHint;
 	}
 
 	/**
@@ -76,6 +90,16 @@ public final class EtchConfig {
 	 */
 	public static EtchConfig create(short version, MappingMode mappingMode, boolean buildChains) {
 		return new EtchConfig(version,Objects.requireNonNull(mappingMode,"mappingMode"),buildChains);
+	}
+
+	/**
+	 * Creates a fully specified compiled configuration with an optional v3
+	 * public-key hint. A non-null hint is rejected for Etch v1 and v2.
+	 */
+	public static EtchConfig create(short version, MappingMode mappingMode,
+			boolean buildChains, AccountKey publicKeyHint) {
+		return new EtchConfig(version,Objects.requireNonNull(mappingMode,"mappingMode"),
+				buildChains,publicKeyHint);
 	}
 
 	/**
@@ -124,6 +148,18 @@ public final class EtchConfig {
 			buildChains=value.booleanValue();
 		}
 
+		AccountKey publicKeyHint=null;
+		MapEntry<AString,ACell> hintEntry=source.getEntry(PUBLIC_KEY_HINT);
+		if ((hintEntry!=null)&&(hintEntry.getValue()!=null)) {
+			ACell hintValue=hintEntry.getValue();
+			AccountKey parsed=AccountKey.parse(hintValue);
+			if (parsed==null) {
+				throw invalid(PUBLIC_KEY_HINT,"expected a 32-byte public key, got "
+						+Utils.getClassName(hintValue));
+			}
+			publicKeyHint=normalisePublicKeyHint(parsed);
+		}
+
 		MappingMode mappingMode;
 		MapEntry<AString,ACell> mappingEntry=source.getEntry(MAPPING);
 		if (mappingEntry==null) {
@@ -142,7 +178,7 @@ public final class EtchConfig {
 			};
 		}
 
-		return create(version,mappingMode,buildChains);
+		return create(version,mappingMode,buildChains,publicKeyHint);
 	}
 
 	private static void validateKeys(AMap<AString,ACell> source) {
@@ -150,14 +186,16 @@ public final class EtchConfig {
 		for (long i=0; i<count; i++) {
 			MapEntry<AString,ACell> entry=source.entryAt(i);
 			AString key=entry.getKey();
-			if (!(VERSION.equals(key)||MAPPING.equals(key)||BUILD_CHAINS.equals(key))) {
+			if (!(VERSION.equals(key)||MAPPING.equals(key)||BUILD_CHAINS.equals(key)
+					||PUBLIC_KEY_HINT.equals(key))) {
 				throw new IllegalArgumentException("Unknown Etch configuration key: "+key);
 			}
 		}
 	}
 
 	private static void validateVersion(short version) {
-		if ((version!=EtchConstants.VERSION_1)&&(version!=EtchConstants.VERSION_2)) {
+		if ((version!=EtchConstants.VERSION_1)&&(version!=EtchConstants.VERSION_2)
+				&&(version!=EtchConstants.VERSION_3)) {
 			throw new IllegalArgumentException("Unsupported Etch version: "+version);
 		}
 	}
@@ -178,21 +216,40 @@ public final class EtchConfig {
 		return buildChains;
 	}
 
+	/**
+	 * Gets the optional Etch v3 public-key hint. This identifies key material to
+	 * the application but does not define how an encryption secret is derived.
+	 */
+	public AccountKey getPublicKeyHint() {
+		return publicKeyHint;
+	}
+
+	/** Returns a copy of this compiled configuration with the supplied hint. */
+	public EtchConfig withPublicKeyHint(AccountKey hint) {
+		return new EtchConfig(version,mappingMode,buildChains,hint);
+	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this==obj) return true;
 		if (!(obj instanceof EtchConfig other)) return false;
-		return (version==other.version)&&(mappingMode==other.mappingMode)&&(buildChains==other.buildChains);
+		return (version==other.version)&&(mappingMode==other.mappingMode)
+				&&(buildChains==other.buildChains)
+				&&Objects.equals(publicKeyHint,other.publicKeyHint);
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(version,mappingMode,buildChains);
+		return Objects.hash(version,mappingMode,buildChains,publicKeyHint);
 	}
 
 	@Override
 	public String toString() {
 		return "EtchConfig[version="+version+", mapping="+mappingMode.configName()
-				+", buildChains="+buildChains+"]";
+				+", buildChains="+buildChains+", publicKeyHint="+publicKeyHint+"]";
+	}
+
+	private static AccountKey normalisePublicKeyHint(AccountKey hint) {
+		return ((hint==null)||AccountKey.ZERO.equals(hint))?null:hint;
 	}
 }

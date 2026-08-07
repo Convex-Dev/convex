@@ -173,10 +173,11 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
-	public synchronized void force() {
+	public synchronized void force() throws IOException {
 		for (MappedByteBuffer mapped: regionMap) {
 			if (mapped!=null) mapped.force();
 		}
+		channel.force(false);
 	}
 
 	@Override

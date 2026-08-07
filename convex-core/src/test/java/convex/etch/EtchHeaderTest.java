@@ -4,10 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Hash;
@@ -27,7 +23,7 @@ public class EtchHeaderTest {
 
 	private static void assertCanonicalLegacyFile(short version, long expectedIndexStart)
 			throws Exception {
-		InMemoryMapper mapper=new InMemoryMapper();
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
 		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-v"+version,0L,0L)) {
 			EtchHeader header=EtchHeader.create(EtchConfig.create(version));
 			header.initialise(access);
@@ -55,9 +51,8 @@ public class EtchHeaderTest {
 			Hash root=Hash.wrap(rootBytes);
 			decoded.setRootHash(access,root);
 			assertEquals(root,decoded.getRootHash(access));
-			assertArrayEquals(rootBytes,Arrays.copyOfRange(mapper.bytes,
-					(int)EtchConstants.ROOT_HASH_OFFSET,
-					(int)EtchConstants.ROOT_HASH_OFFSET+Hash.LENGTH));
+			assertArrayEquals(rootBytes,mapper.copyRange(EtchConstants.ROOT_HASH_OFFSET,
+					EtchConstants.ROOT_HASH_OFFSET+Hash.LENGTH));
 		}
 	}
 
@@ -67,64 +62,4 @@ public class EtchHeaderTest {
 		}
 	}
 
-	private static final class InMemoryMapper implements EtchFileMapper {
-		private byte[] bytes=new byte[0];
-
-		byte[] copyOf(long length) {
-			return Arrays.copyOf(bytes,Math.toIntExact(length));
-		}
-
-		@Override
-		public void get(long position, byte[] destination, int offset, int length) {
-			System.arraycopy(bytes,Math.toIntExact(position),destination,offset,length);
-		}
-
-		@Override
-		public void getTransformed(long position, byte[] destination, int offset, int length,
-				EtchCipherCursor cursor) throws IOException {
-			cursor.transform(ByteBuffer.wrap(bytes,Math.toIntExact(position),length),
-					ByteBuffer.wrap(destination,offset,length));
-		}
-
-		@Override
-		public void ensureWriteCapacity(long position, long length) {
-			int required=Math.toIntExact(Math.addExact(position,length));
-			if (required>bytes.length) bytes=Arrays.copyOf(bytes,required);
-		}
-
-		@Override
-		public void put(long position, byte[] source, int offset, int length) {
-			System.arraycopy(source,offset,bytes,Math.toIntExact(position),length);
-		}
-
-		@Override
-		public void putTransformed(long position, byte[] source, int offset, int length,
-				EtchCipherCursor cursor) throws IOException {
-			cursor.transform(ByteBuffer.wrap(source,offset,length),
-					ByteBuffer.wrap(bytes,Math.toIntExact(position),length));
-		}
-
-		@Override
-		public long readIndexSlotAcquire(long position) {
-			return Utils.readLong(bytes,Math.toIntExact(position),Long.BYTES);
-		}
-
-		@Override
-		public void writeIndexSlotRelease(long position, long value) {
-			Utils.writeLong(bytes,Math.toIntExact(position),value);
-		}
-
-		@Override
-		public void force() {
-		}
-
-		@Override
-		public String implementationName() {
-			return "in-memory";
-		}
-
-		@Override
-		public void close() {
-		}
-	}
 }
