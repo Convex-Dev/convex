@@ -18,17 +18,23 @@ final class MBBFileMapper extends AFileMapper {
 	private final boolean readOnly;
 	private final ArrayList<MappedByteBuffer> regionMap=new ArrayList<>();
 
-	MBBFileMapper(FileChannel channel) {
-		this(channel,false);
+	MBBFileMapper(FileChannel channel) throws IOException {
+		this(channel,false,channel.size(),"mapped-byte-buffer");
 	}
 
-	MBBFileMapper(FileChannel channel, boolean readOnly) {
+	MBBFileMapper(FileChannel channel, boolean readOnly) throws IOException {
+		this(channel,readOnly,channel.size(),"mapped-byte-buffer");
+	}
+
+	MBBFileMapper(FileChannel channel, boolean readOnly, long length, String fileName)
+			throws IOException {
+		super(fileName,length,channel.size(),readOnly);
 		this.channel=channel;
 		this.readOnly=readOnly;
 	}
 
 	@Override
-	public void get(long position, byte[] destination, int offset, int length) throws IOException {
+	void readMapped(long position, byte[] destination, int offset, int length) throws IOException {
 		int remaining=length;
 		long current=position;
 		int destinationOffset=offset;
@@ -45,7 +51,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public boolean matches(long position, byte[] expected, int offset, int length) throws IOException {
+	boolean matchesMapped(long position, byte[] expected, int offset, int length) throws IOException {
 		int remaining=length;
 		long current=position;
 		int expectedOffset=offset;
@@ -70,7 +76,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void getTransformed(long position, byte[] destination, int offset, int length,
+	void readTransformedMapped(long position, byte[] destination, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		int remaining=length;
 		long current=position;
@@ -88,7 +94,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void ensureWriteCapacity(long position, long length) throws IOException {
+	void ensureMapped(long position, long length) throws IOException {
 		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
 		long end=Math.addExact(position,length);
 		long current=position;
@@ -101,7 +107,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void put(long position, byte[] source, int offset, int length) {
+	void writeMapped(long position, byte[] source, int offset, int length) {
 		int remaining=length;
 		long current=position;
 		int sourceOffset=offset;
@@ -118,7 +124,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void putTransformed(long position, byte[] source, int offset, int length,
+	void writeTransformedMapped(long position, byte[] source, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		int remaining=length;
 		long current=position;
@@ -140,7 +146,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public long readIndexSlotAcquire(long position) throws IOException {
+	long readLongAcquireMapped(long position) throws IOException {
 		MappedByteBuffer mapped=getBuffer(position,Long.BYTES,false);
 		long value=mapped.getLong(bufferIndex(position));
 		VarHandle.acquireFence();
@@ -148,7 +154,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void writeIndexSlotRelease(long position, long value) throws IOException {
+	void writeLongReleaseMapped(long position, long value) throws IOException {
 		VarHandle.releaseFence();
 		MappedByteBuffer mapped=getBuffer(position,Long.BYTES,true);
 		mapped.putLong(bufferIndex(position),value);
@@ -213,7 +219,7 @@ final class MBBFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public synchronized void forceRange(long position, long length) throws IOException {
+	synchronized void forceRangeMapped(long position, long length) throws IOException {
 		if (readOnly) return;
 		if ((position<0L)||(length<0L)) throw new IllegalArgumentException("Negative Etch file range");
 		long end=Math.addExact(position,length);

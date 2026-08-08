@@ -3,7 +3,6 @@ package convex.etch;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -14,18 +13,21 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.Blob;
 import convex.core.util.Utils;
 
-public class EtchFileAccessTest {
+public class EtchIOTest {
 	@Test
 	public void testCompleteLogicalRangeChecks() throws Exception {
 		File file=File.createTempFile("etch-access-range", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(128L);
-			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),64L,data.length())) {
-				access.readData(63L,new byte[1],0,1);
-				assertThrows(EtchCorruptionError.class,()->access.readData(63L,new byte[2],0,2));
-				assertThrows(EtchCorruptionError.class,()->access.writeData(63L,new byte[2],0,2));
+			AFileMapper mapper=new MBBFileMapper(data.getChannel(),false,64L,file.getName());
+			Etch etch=new Etch(mapper,file.getName(),null,false);
+			try {
+				etch.readData(63L,new byte[1],0,1);
+				assertThrows(EtchCorruptionError.class,()->etch.readData(63L,new byte[2],0,2));
+				assertThrows(EtchCorruptionError.class,()->etch.writeData(63L,new byte[2],0,2));
 				assertEquals(128L,data.length());
+			} finally {
+				etch.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -36,19 +38,22 @@ public class EtchFileAccessTest {
 		File file=File.createTempFile("etch-access-append", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L)) {
+			Etch etch=new Etch(mapper,file.getName(),null,false);
+			try {
 				Blob key=Blob.wrap(new byte[] { 1,2,3,4 });
 				byte[] header=new byte[] { 5,6 };
 				Blob encoding=Blob.wrap(new byte[] { 7,8,9 });
-				assertEquals(0L,access.appendDataRecord(key,header,header.length,encoding));
-				assertEquals(9L,access.getDataLength());
+				assertEquals(0L,etch.appendDataRecord(key,header,header.length,encoding));
+				assertEquals(9L,etch.getDataLength());
 				byte[] actual=new byte[9];
-				access.readData(0L,actual,0,actual.length);
+				etch.readData(0L,actual,0,actual.length);
 				assertArrayEquals(new byte[] { 1,2,3,4,5,6,7,8,9 },actual);
 
 				byte[] second=new byte[] { 5,6,7,8 };
-				assertEquals(16L,access.appendIndex(second,0,second.length,8));
-				assertEquals(20L,access.getDataLength());
+				assertEquals(16L,etch.appendIndex(second,0,second.length,8));
+				assertEquals(20L,etch.getDataLength());
+			} finally {
+				etch.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -60,7 +65,7 @@ public class EtchFileAccessTest {
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			assertThrows(EtchCorruptionError.class,
-					()->new EtchFileAccess(mapper,file.getName(),1L,data.length()));
+					()->new MBBFileMapper(data.getChannel(),false,1L,file.getName()));
 			mapper.close();
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -69,17 +74,20 @@ public class EtchFileAccessTest {
 	@Test
 	public void testFailedMultipartAppendDoesNotPublishLogicalEnd() throws Exception {
 		FailingWriteMapper mapper=new FailingWriteMapper();
-		try (EtchFileAccess access=new EtchFileAccess(mapper,"failing",0L,0L)) {
+		Etch etch=new Etch(mapper,"failing",null,false);
+		try {
 			Blob key=Blob.wrap(new byte[] { 1,2,3,4 });
 			byte[] header=new byte[] { 5,6 };
 			Blob encoding=Blob.wrap(new byte[] { 7,8,9 });
 			assertThrows(java.io.IOException.class,
-					()->access.appendDataRecord(key,header,header.length,encoding));
+					()->etch.appendDataRecord(key,header,header.length,encoding));
 			assertEquals(1,mapper.capacityChecks);
 			assertEquals(3,mapper.puts);
 			assertEquals(0L,mapper.preparedPosition);
 			assertEquals(9L,mapper.preparedLength);
-			assertEquals(0L,access.getDataLength());
+			assertEquals(0L,etch.getDataLength());
+		} finally {
+			etch.close();
 		}
 	}
 
@@ -89,9 +97,10 @@ public class EtchFileAccessTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L,cipher,false)) {
+			Etch etch=new Etch(mapper,file.getName(),cipher,false);
+			try {
 				byte[] plainHeader=new byte[] { 11,12,13,14 };
-				assertEquals(0L,access.appendHeader(plainHeader,0,plainHeader.length));
+				assertEquals(0L,etch.appendHeader(plainHeader,0,plainHeader.length));
 				assertEquals(0,cipher.starts);
 
 				byte[] keyBytes=new byte[EtchConstants.KEY_SIZE];
@@ -105,11 +114,11 @@ public class EtchFileAccessTest {
 				Utils.writeShort(recordHeader,EtchConstants.LABEL_SIZE,(short)encodingBytes.length);
 
 				cipher.reset();
-				long position=access.appendDataRecord(key,recordHeader,recordHeader.length,encoding);
+				long position=etch.appendDataRecord(key,recordHeader,recordHeader.length,encoding);
 				assertEquals(1,cipher.starts);
 
 				byte[] raw=new byte[keyBytes.length+recordHeader.length+encodingBytes.length];
-				mapper.get(position,raw,0,raw.length);
+				mapper.read(position,raw,0,raw.length,null);
 				byte[] plain=new byte[raw.length];
 				System.arraycopy(keyBytes,0,plain,0,keyBytes.length);
 				System.arraycopy(recordHeader,0,plain,keyBytes.length,recordHeader.length);
@@ -117,16 +126,40 @@ public class EtchFileAccessTest {
 				assertFalse(java.util.Arrays.equals(plain,raw));
 
 				cipher.reset();
-				EtchFileAccess.DataRecord stored=access.readDataRecord(position,key);
+				byte[] stored=new byte[plain.length];
+				etch.readData(position,stored,0,stored.length);
 				assertEquals(1,cipher.starts);
-				assertArrayEquals(java.util.Arrays.copyOf(plain,keyBytes.length+recordHeader.length),stored.header());
-				assertArrayEquals(encodingBytes,stored.encoding());
+				assertArrayEquals(plain,stored);
+			} finally {
+				etch.close();
+			}
+		}
+		if (!file.delete()) file.deleteOnExit();
+	}
 
-				byte[] wrongKeyBytes=keyBytes.clone();
-				wrongKeyBytes[0]^=1;
-				cipher.reset();
-				assertNull(access.readDataRecord(position,Blob.wrap(wrongKeyBytes)));
+	@Test
+	public void testSequentialDataOperationsReuseCipherPosition() throws Exception {
+		File file=File.createTempFile("etch-io-sequential", ".dat");
+		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			data.setLength(8L);
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
+			Etch etch=new Etch(mapper,file.getName(),cipher,false);
+			try {
+				byte[] first=new byte[] { 1,2,3,4 };
+				byte[] second=new byte[] { 5,6,7,8 };
+				etch.writeData(0L,first,0,first.length);
+				etch.writeData(4L,second,0,second.length);
 				assertEquals(1,cipher.starts);
+
+				cipher.reset();
+				byte[] actual=new byte[8];
+				etch.readData(0L,actual,0,first.length);
+				etch.readData(4L,actual,first.length,second.length);
+				assertEquals(1,cipher.starts);
+				assertArrayEquals(new byte[] { 1,2,3,4,5,6,7,8 },actual);
+			} finally {
+				etch.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -138,14 +171,17 @@ public class EtchFileAccessTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L,cipher,true)) {
-				long indexPosition=access.appendZeroIndex(2*Long.BYTES,Long.BYTES);
+			Etch etch=new Etch(mapper,file.getName(),cipher,true);
+			try {
+				long indexPosition=etch.appendZeroIndex(2*Long.BYTES,Long.BYTES);
 				assertEquals(1,cipher.starts);
-				assertEquals(0L,access.readIndexSlotAcquire(indexPosition));
+				assertEquals(0L,etch.readIndexSlotAcquire(indexPosition));
 				long value=0x0123456789abcdefL;
-				access.writeIndexSlotRelease(indexPosition+Long.BYTES,value);
-				assertEquals(value,access.readIndexSlotAcquire(indexPosition+Long.BYTES));
-				assertFalse(value==mapper.readIndexSlotAcquire(indexPosition+Long.BYTES));
+				etch.writeIndexSlotRelease(indexPosition+Long.BYTES,value);
+				assertEquals(value,etch.readIndexSlotAcquire(indexPosition+Long.BYTES));
+				assertFalse(value==mapper.readLongAcquire(indexPosition+Long.BYTES,null));
+			} finally {
+				etch.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -157,16 +193,18 @@ public class EtchFileAccessTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			mapper.ensureWriteCapacity(0L,Long.BYTES);
-			mapper.writeIndexSlotRelease(0L,0x0123456789abcdefL);
-			try (EtchFileAccess access=new EtchFileAccess(
-					mapper,file.getName(),Long.BYTES,data.length(),cipher,false)) {
+			mapper.appendZeros(Long.BYTES,Long.BYTES,null);
+			mapper.writeLongRelease(0L,0x0123456789abcdefL,null);
+			Etch etch=new Etch(mapper,file.getName(),cipher,false);
+			try {
 				cipher.reset();
-				assertEquals(0x0123456789abcdefL,access.readIndexSlotAcquire(0L));
-				access.writeIndexSlotRelease(0L,0x1020304050607080L);
-				assertEquals(0x1020304050607080L,access.readIndexSlotAcquire(0L));
+				assertEquals(0x0123456789abcdefL,etch.readIndexSlotAcquire(0L));
+				etch.writeIndexSlotRelease(0L,0x1020304050607080L);
+				assertEquals(0x1020304050607080L,etch.readIndexSlotAcquire(0L));
 				assertEquals(0,cipher.starts);
 				assertEquals(0,cipher.slotTransforms);
+			} finally {
+				etch.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -178,47 +216,52 @@ public class EtchFileAccessTest {
 		private long preparedPosition;
 		private long preparedLength;
 
+		private FailingWriteMapper() {
+			super("failing",0L,0L,false);
+		}
+
 		@Override
-		public void ensureWriteCapacity(long position, long length) {
+		void ensureMapped(long position, long length) {
 			capacityChecks++;
 			preparedPosition=position;
 			preparedLength=length;
 		}
 
 		@Override
-		public void put(long position, byte[] source, int offset, int length) throws java.io.IOException {
+		void writeMapped(long position, byte[] source, int offset, int length)
+				throws java.io.IOException {
 			if (++puts==3) throw new java.io.IOException("Expected test failure");
 		}
 
 		@Override
-		public void get(long position, byte[] destination, int offset, int length) {
+		void readMapped(long position, byte[] destination, int offset, int length) {
 			throw new UnsupportedOperationException();
 		}
 
 		@Override
-		public boolean matches(long position, byte[] expected, int offset, int length) {
+		boolean matchesMapped(long position, byte[] expected, int offset, int length) {
 			throw new UnsupportedOperationException();
 		}
 
 		@Override
-		public void getTransformed(long position, byte[] destination, int offset, int length,
+		void readTransformedMapped(long position, byte[] destination, int offset, int length,
 				EtchFileCipher cipher) {
 			throw new UnsupportedOperationException();
 		}
 
 		@Override
-		public void putTransformed(long position, byte[] source, int offset, int length,
+		void writeTransformedMapped(long position, byte[] source, int offset, int length,
 				EtchFileCipher cipher) throws java.io.IOException {
-			put(position,source,offset,length);
+			writeMapped(position,source,offset,length);
 		}
 
 		@Override
-		public long readIndexSlotAcquire(long position) {
+		long readLongAcquireMapped(long position) {
 			throw new UnsupportedOperationException();
 		}
 
 		@Override
-		public void writeIndexSlotRelease(long position, long value) {
+		void writeLongReleaseMapped(long position, long value) {
 			throw new UnsupportedOperationException();
 		}
 
@@ -227,7 +270,7 @@ public class EtchFileAccessTest {
 		}
 
 		@Override
-		public void forceRange(long position, long length) {
+		void forceRangeMapped(long position, long length) {
 		}
 
 		@Override
@@ -244,6 +287,7 @@ public class EtchFileAccessTest {
 		private final EtchFileCipher delegate;
 		private int starts;
 		private int slotTransforms;
+		private long position=-1L;
 
 		private CountingCipher(EtchFileCipher delegate) {
 			this.delegate=delegate;
@@ -251,26 +295,34 @@ public class EtchFileAccessTest {
 
 		@Override
 		public void initialise(long fileOffset) throws java.io.IOException {
+			if (position==fileOffset) return;
 			starts++;
 			delegate.initialise(fileOffset);
+			position=fileOffset;
 		}
 
 		@Override
 		public void decrypt(java.nio.ByteBuffer input, byte[] destination, int destinationOffset)
 				throws java.io.IOException {
+			int length=input.remaining();
 			delegate.decrypt(input,destination,destinationOffset);
+			position+=length;
 		}
 
 		@Override
 		public void encrypt(byte[] source, int sourceOffset, java.nio.ByteBuffer output)
 				throws java.io.IOException {
+			int length=output.remaining();
 			delegate.encrypt(source,sourceOffset,output);
+			position+=length;
 		}
 
 		@Override
 		public long transformLong(long fileOffset, long value) throws java.io.IOException {
 			slotTransforms++;
-			return delegate.transformLong(fileOffset,value);
+			long result=delegate.transformLong(fileOffset,value);
+			position=fileOffset+Long.BYTES;
+			return result;
 		}
 
 		private void reset() {

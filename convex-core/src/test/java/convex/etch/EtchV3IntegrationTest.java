@@ -248,8 +248,9 @@ public class EtchV3IntegrationTest {
 	}
 
 	private static EtchV3Header readHeader(File file, byte[] secret) throws Exception {
-		try (RandomAccessFile data=new RandomAccessFile(file,"r")) {
-			return (EtchV3Header)AEtchHeader.open(data,file.getName(),secret);
+		try (RandomAccessFile data=new RandomAccessFile(file,"r");
+				AFileMapper mapper=new MBBFileMapper(data.getChannel(),true)) {
+			return (EtchV3Header)AEtchHeader.open(mapper,file.getName(),secret);
 		}
 	}
 

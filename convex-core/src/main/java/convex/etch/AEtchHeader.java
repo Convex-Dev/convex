@@ -8,7 +8,6 @@ import static convex.etch.EtchConstants.VERSION_2;
 import static convex.etch.EtchConstants.VERSION_3;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
@@ -41,36 +40,36 @@ abstract class AEtchHeader {
 	}
 
 	/** Resolves an encrypted v3 master key from plaintext header fields. */
-	static byte[] resolveKey(RandomAccessFile data, String fileName, EtchConfig config)
+	static byte[] resolveKey(AFileMapper mapper, String fileName, EtchConfig config)
 			throws IOException {
-		data.seek(0L);
-		int magic=data.readUnsignedShort();
-		short version=data.readShort();
+		byte[] probe=readProbe(mapper,0L);
+		int magic=readUnsignedShort(probe,0);
+		short version=(short)readUnsignedShort(probe,Short.BYTES);
 		boolean v3=(magic==MAGIC_NUMBER)&&(version==VERSION_3);
-		if (!v3) v3=hasV3Probe(data,V3_HEADER_B_OFFSET);
+		if (!v3) v3=hasV3Probe(mapper,V3_HEADER_B_OFFSET);
 		if (!v3) return null;
-		byte[] copyA=readCopy(data,0L);
-		byte[] copyB=readCopy(data,V3_HEADER_B_OFFSET);
+		byte[] copyA=readCopy(mapper,0L);
+		byte[] copyB=readCopy(mapper,V3_HEADER_B_OFFSET);
 		return EtchV3Header.resolveKey(copyA,copyB,config,fileName);
 	}
 
-	static AEtchHeader open(RandomAccessFile data, String fileName, byte[] masterKey) throws IOException {
-		data.seek(0L);
-		int magic=data.readUnsignedShort();
-		short version=data.readShort();
+	static AEtchHeader open(AFileMapper mapper, String fileName, byte[] masterKey)
+			throws IOException {
+		byte[] probe=readProbe(mapper,0L);
+		int magic=readUnsignedShort(probe,0);
+		short version=(short)readUnsignedShort(probe,Short.BYTES);
 		if (magic==MAGIC_NUMBER) {
-			if (version==VERSION_3) return openV3(data,fileName,masterKey);
+			if (version==VERSION_3) return openV3(mapper,fileName,masterKey);
 		}
 
 		// A damaged v3 copy A must not hide a valid independent copy B, even
 		// when the damaged probe happens to resemble a supported legacy version.
-		if (hasV3Probe(data,V3_HEADER_B_OFFSET)) {
-			return openV3(data,fileName,masterKey);
+		if (hasV3Probe(mapper,V3_HEADER_B_OFFSET)) {
+			return openV3(mapper,fileName,masterKey);
 		}
 
 		if ((magic==MAGIC_NUMBER)&&((version==VERSION_1)||(version==VERSION_2))) {
-			data.seek(Short.BYTES*2L);
-			return LegacyEtchHeader.open(data,version);
+			return LegacyEtchHeader.open(mapper,fileName);
 		}
 
 		if (magic!=MAGIC_NUMBER) {
@@ -79,25 +78,38 @@ abstract class AEtchHeader {
 		throw unsupported(version);
 	}
 
-	private static boolean hasV3Probe(RandomAccessFile data, long position) throws IOException {
-		if (data.length()<position+Short.BYTES*2L) return false;
-		data.seek(position);
-		return (data.readUnsignedShort()==MAGIC_NUMBER)&&(data.readShort()==VERSION_3);
+	private static boolean hasV3Probe(AFileMapper mapper, long position) throws IOException {
+		if (mapper.length()<position+Short.BYTES*2L) return false;
+		byte[] probe=readProbe(mapper,position);
+		return (readUnsignedShort(probe,0)==MAGIC_NUMBER)
+				&&((short)readUnsignedShort(probe,Short.BYTES)==VERSION_3);
 	}
 
-	private static EtchV3Header openV3(RandomAccessFile data, String fileName,
+	private static EtchV3Header openV3(AFileMapper mapper, String fileName,
 			byte[] masterKey) throws IOException {
-		byte[] copyA=readCopy(data,0L);
-		byte[] copyB=readCopy(data,V3_HEADER_B_OFFSET);
+		byte[] copyA=readCopy(mapper,0L);
+		byte[] copyB=readCopy(mapper,V3_HEADER_B_OFFSET);
 		return EtchV3Header.select(copyA,copyB,masterKey,fileName);
 	}
 
-	private static byte[] readCopy(RandomAccessFile data, long position) throws IOException {
-		long available=Math.max(0L,Math.min(V3_HEADER_COPY_SIZE,data.length()-position));
+	private static byte[] readCopy(AFileMapper mapper, long position) throws IOException {
+		long available=Math.max(0L,Math.min(V3_HEADER_COPY_SIZE,mapper.length()-position));
 		byte[] copy=new byte[Math.toIntExact(available)];
-		data.seek(position);
-		data.readFully(copy);
+		mapper.read(position,copy,0,copy.length,null);
 		return copy;
+	}
+
+	private static byte[] readProbe(AFileMapper mapper, long position) throws IOException {
+		if (mapper.length()<position+Short.BYTES*2L) {
+			throw new IOException("Truncated Etch format probe at "+position);
+		}
+		byte[] probe=new byte[Short.BYTES*2];
+		mapper.read(position,probe,0,probe.length,null);
+		return probe;
+	}
+
+	private static int readUnsignedShort(byte[] source, int offset) {
+		return ((source[offset]&0xff)<<8)|(source[offset+1]&0xff);
 	}
 
 	private static IOException unsupported(short version) {
@@ -118,19 +130,19 @@ abstract class AEtchHeader {
 
 	abstract AccountKey publicKeyHint();
 
-	abstract void initialise(EtchFileAccess access) throws IOException;
+	abstract void initialise(Etch etch) throws IOException;
 
-	abstract Hash getRootHash(EtchFileAccess access) throws IOException;
+	abstract Hash getRootHash();
 
-	abstract void setRootHash(EtchFileAccess access, Hash rootHash) throws IOException;
+	abstract void setRootHash(Etch etch, Hash rootHash) throws IOException;
 
-	abstract void prepareMutation(EtchFileAccess access) throws IOException;
+	abstract void prepareMutation(Etch etch) throws IOException;
 
-	abstract void writeDataLength(EtchFileAccess access) throws IOException;
+	abstract void writeDataLength(Etch etch) throws IOException;
 
-	abstract void sync(EtchFileAccess access) throws IOException;
+	abstract void sync(Etch etch) throws IOException;
 
-	abstract void close(EtchFileAccess access) throws IOException;
+	abstract void close(Etch etch) throws IOException;
 
 	/** Wipes header-owned key material without writing to the file. */
 	void destroy() {

@@ -153,7 +153,7 @@ public class EtchTest {
 
 	private static boolean ffmBackendIsPackaged() {
 		try {
-			Class.forName("convex.etch.FFMEtchFileMapper");
+			Class.forName("convex.etch.FFMFileMapper");
 			return true;
 		} catch (ClassNotFoundException e) {
 			return false;

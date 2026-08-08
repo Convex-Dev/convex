@@ -24,13 +24,14 @@ public class EtchHeaderTest {
 	private static void assertCanonicalLegacyFile(short version, long expectedIndexStart)
 			throws Exception {
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-v"+version,0L,0L)) {
+		Etch etch=new Etch(mapper,"memory-v"+version,null,false);
+		try {
 			AEtchHeader header=AEtchHeader.create(EtchConfig.create(version),null);
-			header.initialise(access);
+			header.initialise(etch);
 
 			long expectedLength=expectedIndexStart
 					+(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE;
-			assertEquals(expectedLength,access.getDataLength());
+			assertEquals(expectedLength,etch.getDataLength());
 			byte[] file=mapper.copyOf(expectedLength);
 
 			assertEquals(EtchConstants.MAGIC_NUMBER,Utils.readShort(file,0)&0xffff);
@@ -44,15 +45,17 @@ public class EtchHeaderTest {
 			assertEquals(version,decoded.version());
 			assertEquals(expectedIndexStart,decoded.indexStart());
 			assertEquals(expectedLength,decoded.storedLength());
-			assertEquals(Hash.UNSET_HASH,decoded.getRootHash(access));
+			assertEquals(Hash.UNSET_HASH,decoded.getRootHash());
 
 			byte[] rootBytes=new byte[Hash.LENGTH];
 			for (int i=0;i<rootBytes.length;i++) rootBytes[i]=(byte)(i+1);
 			Hash root=Hash.wrap(rootBytes);
-			decoded.setRootHash(access,root);
-			assertEquals(root,decoded.getRootHash(access));
+			decoded.setRootHash(etch,root);
+			assertEquals(root,decoded.getRootHash());
 			assertArrayEquals(rootBytes,mapper.copyRange(EtchConstants.ROOT_HASH_OFFSET,
 					EtchConstants.ROOT_HASH_OFFSET+Hash.LENGTH));
+		} finally {
+			etch.close();
 		}
 	}
 

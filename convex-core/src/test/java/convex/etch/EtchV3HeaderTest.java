@@ -127,19 +127,20 @@ public class EtchV3HeaderTest {
 	public void testSyncAndCleanCloseAlternateHeaderCopies() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-sync",0L,0L)) {
+		Etch etch=new Etch(mapper,"memory-sync",null,false);
+		try {
 			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
 					false,salt,null);
-			header.initialise(access);
+			header.initialise(etch);
 			assertEquals(1,mapper.fullForceCount());
 			assertEquals(2,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_B_OFFSET,mapper.forcedPosition());
 			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 
 			Hash root=hashSequence(1);
-			header.setRootHash(access,root);
-			access.appendIndex(new byte[] { 42 },0,1,1);
-			header.sync(access);
+			header.setRootHash(etch,root);
+			etch.appendIndex(new byte[] { 42 },0,1,1);
+			header.sync(etch);
 			assertEquals(2,mapper.fullForceCount());
 			assertEquals(3,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_A_OFFSET,mapper.forcedPosition());
@@ -154,10 +155,10 @@ public class EtchV3HeaderTest {
 					EtchConstants.V3_HEADER_B_OFFSET+EtchConstants.V3_HEADER_COPY_SIZE);
 			EtchV3Header reopened=EtchV3Header.select(syncedA,previousB,null,"memory-sync");
 			assertEquals(2L,reopened.generation());
-			assertEquals(root,reopened.getRootHash(null));
+			assertEquals(root,reopened.getRootHash());
 			assertEquals(INITIAL_FILE_END+1L,reopened.syncedFileEnd());
 
-			header.close(access);
+			header.close(etch);
 			assertEquals(3,mapper.fullForceCount());
 			assertEquals(4,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_B_OFFSET,mapper.forcedPosition());
@@ -166,7 +167,7 @@ public class EtchV3HeaderTest {
 			assertEquals(1,header.activeCopy());
 			assertEquals(EtchConstants.V3_CLEAN_CLOSED,header.closeState());
 
-			header.prepareMutation(access);
+			header.prepareMutation(etch);
 			assertEquals(3,mapper.fullForceCount());
 			assertEquals(5,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_A_OFFSET,mapper.forcedPosition());
@@ -174,6 +175,8 @@ public class EtchV3HeaderTest {
 			assertEquals(4L,header.generation());
 			assertEquals(0,header.activeCopy());
 			assertEquals(EtchConstants.V3_OPEN,header.closeState());
+		} finally {
+			etch.close();
 		}
 	}
 
@@ -181,14 +184,17 @@ public class EtchV3HeaderTest {
 	public void testFailedCloseDoesNotPublishCleanStateInMemory() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-close-failure",0L,0L)) {
+		Etch etch=new Etch(mapper,"memory-close-failure",null,false);
+		try {
 			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
 					false,salt,null);
-			header.initialise(access);
+			header.initialise(etch);
 			mapper.failNextFullForce();
 
-			assertThrows(IOException.class,()->header.close(access));
+			assertThrows(IOException.class,()->header.close(etch));
 			assertEquals(EtchConstants.V3_OPEN,header.closeState());
+		} finally {
+			etch.close();
 		}
 	}
 
@@ -254,18 +260,20 @@ public class EtchV3HeaderTest {
 			case EtchConstants.V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(secret,salt);
 			default -> throw new IllegalArgumentException("Unsupported test cipher: "+cipherId);
 		};
-		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-v3",0L,0L,
-				cipher,encryptedIndex)) {
+		Etch etch=new Etch(mapper,"memory-v3",cipher,encryptedIndex);
+		try {
 			EtchV3Header header=EtchV3Header.create(cipherId,encryptedIndex,salt,
 					publicKeyHint,secret);
-			header.initialise(access);
-			assertEquals(INITIAL_FILE_END,access.getDataLength());
+			header.initialise(etch);
+			assertEquals(INITIAL_FILE_END,etch.getDataLength());
 			assertSelectedInitialHeader(header,1L,1,false,publicKeyHint);
 			byte[] bytes=mapper.copyOf(INITIAL_FILE_END);
 			return new CanonicalFile(bytes,
 					Arrays.copyOfRange(bytes,0,EtchConstants.V3_HEADER_COPY_SIZE),
 					Arrays.copyOfRange(bytes,EtchConstants.V3_HEADER_COPY_SIZE,
 							EtchConstants.V3_HEADER_REGION_SIZE));
+		} finally {
+			etch.close();
 		}
 	}
 
@@ -305,7 +313,7 @@ public class EtchV3HeaderTest {
 		assertEquals(EtchConstants.VERSION_3,header.version());
 		assertEquals(EtchConstants.V3_INDEX_START,header.indexStart());
 		assertEquals(INITIAL_FILE_END,header.syncedFileEnd());
-		assertEquals(Hash.UNSET_HASH,header.getRootHash(null));
+		assertEquals(Hash.UNSET_HASH,header.getRootHash());
 		assertEquals(EtchConstants.V3_OPEN,header.closeState());
 		assertEquals(generation,header.generation());
 		assertEquals(activeCopy,header.activeCopy());

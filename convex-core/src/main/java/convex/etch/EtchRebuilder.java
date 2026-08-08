@@ -122,6 +122,7 @@ public final class EtchRebuilder {
 		private final EtchStore destination;
 		private final HashSet<Long> visitedIndexes=new HashSet<>();
 		private final ArrayList<String> problems=new ArrayList<>();
+		private final byte[] recordHeader=new byte[RECORD_HEADER_SIZE];
 		private long indexProblems;
 		private long indexedRecordsAccepted;
 		private long scannedRecordsAccepted;
@@ -271,15 +272,16 @@ public final class EtchRebuilder {
 
 		private void tryRecoverRecord(long position, boolean indexed) {
 			try {
-				EtchFileAccess.DataRecord record=source.readCandidateDataRecord(position);
-				byte[] header=record.header();
-				int length=record.encoding().length;
+				source.readData(position,recordHeader,0,recordHeader.length);
+				int length=Utils.readShort(recordHeader,KEY_SIZE+LABEL_SIZE);
 				if ((length<=0)||(length>Format.LIMIT_ENCODING_LENGTH)) {
 					indexProblem("Invalid indexed record length at "+position+": "+length);
 					return;
 				}
-				Hash stored=Hash.wrap(header,0);
-				Blob encoding=Blob.wrap(record.encoding());
+				byte[] encodingBytes=new byte[length];
+				source.readData(position+RECORD_HEADER_SIZE,encodingBytes,0,length);
+				Hash stored=Hash.wrap(recordHeader,0);
+				Blob encoding=Blob.wrap(encodingBytes);
 				if (!stored.equals(Hashing.sha3(encoding))||!copyEncoding(stored,encoding)) {
 					indexProblem("Invalid indexed record at "+position);
 					return;

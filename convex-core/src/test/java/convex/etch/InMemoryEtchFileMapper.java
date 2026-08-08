@@ -8,12 +8,21 @@ import convex.core.util.Utils;
 
 /** Small deterministic mapper for byte-exact Etch format tests. */
 final class InMemoryEtchFileMapper extends AFileMapper {
-	private byte[] bytes=new byte[0];
+	private byte[] bytes;
 	private int fullForceCount;
 	private int rangeForceCount;
 	private long forcedPosition=-1L;
 	private long forcedLength=-1L;
 	private boolean failNextFullForce;
+
+	InMemoryEtchFileMapper() {
+		this(0L);
+	}
+
+	InMemoryEtchFileMapper(long length) {
+		super("in-memory",length,length,false);
+		bytes=new byte[Math.toIntExact(length)];
+	}
 
 	byte[] copyOf(long length) {
 		return Arrays.copyOf(bytes,Math.toIntExact(length));
@@ -44,46 +53,46 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void get(long position, byte[] destination, int offset, int length) {
+	void readMapped(long position, byte[] destination, int offset, int length) {
 		System.arraycopy(bytes,Math.toIntExact(position),destination,offset,length);
 	}
 
 	@Override
-	public boolean matches(long position, byte[] expected, int offset, int length) {
+	boolean matchesMapped(long position, byte[] expected, int offset, int length) {
 		int start=Math.toIntExact(position);
 		return Arrays.equals(bytes,start,start+length,expected,offset,offset+length);
 	}
 
 	@Override
-	public void getTransformed(long position, byte[] destination, int offset, int length,
+	void readTransformedMapped(long position, byte[] destination, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		cipher.decrypt(ByteBuffer.wrap(bytes,Math.toIntExact(position),length),destination,offset);
 	}
 
 	@Override
-	public void ensureWriteCapacity(long position, long length) {
+	void ensureMapped(long position, long length) {
 		int required=Math.toIntExact(Math.addExact(position,length));
 		if (required>bytes.length) bytes=Arrays.copyOf(bytes,required);
 	}
 
 	@Override
-	public void put(long position, byte[] source, int offset, int length) {
+	void writeMapped(long position, byte[] source, int offset, int length) {
 		System.arraycopy(source,offset,bytes,Math.toIntExact(position),length);
 	}
 
 	@Override
-	public void putTransformed(long position, byte[] source, int offset, int length,
+	void writeTransformedMapped(long position, byte[] source, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		cipher.encrypt(source,offset,ByteBuffer.wrap(bytes,Math.toIntExact(position),length));
 	}
 
 	@Override
-	public long readIndexSlotAcquire(long position) {
+	long readLongAcquireMapped(long position) {
 		return Utils.readLong(bytes,Math.toIntExact(position),Long.BYTES);
 	}
 
 	@Override
-	public void writeIndexSlotRelease(long position, long value) {
+	void writeLongReleaseMapped(long position, long value) {
 		Utils.writeLong(bytes,Math.toIntExact(position),value);
 	}
 
@@ -97,7 +106,7 @@ final class InMemoryEtchFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void forceRange(long position, long length) {
+	void forceRangeMapped(long position, long length) {
 		rangeForceCount++;
 		forcedPosition=position;
 		forcedLength=length;

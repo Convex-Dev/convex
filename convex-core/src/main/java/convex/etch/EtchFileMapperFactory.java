@@ -2,6 +2,8 @@ package convex.etch;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Objects;
 
@@ -9,34 +11,93 @@ import java.util.Objects;
  * Selects the best Etch mapping backend available in the running artefact.
  */
 final class EtchFileMapperFactory {
-	private static final String FFM_MAPPER_CLASS="convex.etch.FFMEtchFileMapper";
+	private static final String FFM_MAPPER_CLASS="convex.etch.FFMFileMapper";
 	private static final boolean FFM_AVAILABLE=detectFFM();
 
 	private EtchFileMapperFactory() {
 	}
 
-	static AFileMapper create(FileChannel channel, short etchVersion) {
+	static AFileMapper create(FileChannel channel, short etchVersion) throws IOException {
 		return create(channel,defaultMapping(etchVersion));
 	}
 
-	static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode) {
-		return create(channel,mappingMode,false);
+	static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode)
+			throws IOException {
+		return create(channel,mappingMode,channel.size(),"mapped Etch file",false);
 	}
 
-	static AFileMapper createReadOnly(FileChannel channel, EtchConfig.MappingMode mappingMode) {
-		return new ReadOnlyEtchFileMapper(create(channel,mappingMode,true));
+	static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode,
+			long length, String fileName) throws IOException {
+		return create(channel,mappingMode,length,fileName,false);
+	}
+
+	static AFileMapper createReadOnly(FileChannel channel, EtchConfig.MappingMode mappingMode,
+			String fileName) throws IOException {
+		return create(channel,mappingMode,channel.size(),fileName,true);
+	}
+
+	static AFileMapper createExisting(FileChannel channel, EtchConfig requestedConfig,
+			String fileName, boolean readOnly) throws IOException {
+		Short version=probeVersion(channel);
+		EtchConfig.MappingMode mappingMode;
+		if (requestedConfig!=null) {
+			mappingMode=requestedConfig.getMappingMode();
+		} else {
+			mappingMode=(version==null)?EtchConfig.MappingMode.MAPPED_BYTE_BUFFER
+					:defaultMapping(version);
+		}
+		return create(channel,mappingMode,channel.size(),fileName,readOnly);
+	}
+
+	private static Short probeVersion(FileChannel channel) throws IOException {
+		byte[] first=readProbe(channel,0L);
+		if (first==null) return null;
+		int magic=((first[0]&0xff)<<8)|(first[1]&0xff);
+		short version=(short)(((first[2]&0xff)<<8)|(first[3]&0xff));
+		if ((magic==EtchConstants.MAGIC_NUMBER)&&(version==EtchConstants.VERSION_3)) {
+			return version;
+		}
+		byte[] second=readProbe(channel,EtchConstants.V3_HEADER_B_OFFSET);
+		if (second!=null) {
+			int secondMagic=((second[0]&0xff)<<8)|(second[1]&0xff);
+			short secondVersion=(short)(((second[2]&0xff)<<8)|(second[3]&0xff));
+			if ((secondMagic==EtchConstants.MAGIC_NUMBER)
+					&&(secondVersion==EtchConstants.VERSION_3)) return secondVersion;
+		}
+		if ((magic==EtchConstants.MAGIC_NUMBER)
+				&&((version==EtchConstants.VERSION_1)||(version==EtchConstants.VERSION_2))) {
+			return version;
+		}
+		return null;
+	}
+
+	private static byte[] readProbe(FileChannel channel, long position) throws IOException {
+		if (channel.size()<position+Short.BYTES*2L) return null;
+		byte[] bytes=new byte[Short.BYTES*2];
+		ByteBuffer buffer=ByteBuffer.wrap(bytes);
+		while (buffer.hasRemaining()) {
+			if (channel.read(buffer,position+buffer.position())<=0) return null;
+		}
+		return bytes;
 	}
 
 	private static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode,
-			boolean readOnly) {
+			long length, String fileName, boolean readOnly) throws IOException {
 		Objects.requireNonNull(mappingMode,"mappingMode");
 		return switch (mappingMode) {
-			case MAPPED_BYTE_BUFFER -> new MBBFileMapper(channel,readOnly);
+			case MAPPED_BYTE_BUFFER -> new MBBFileMapper(channel,readOnly,length,fileName);
 			case MEMORY_SEGMENT -> {
 				try {
 					Class<?> type=Class.forName(FFM_MAPPER_CLASS);
-					Constructor<?> constructor=type.getDeclaredConstructor(FileChannel.class,boolean.class);
-					yield (AFileMapper)constructor.newInstance(channel,readOnly);
+					Constructor<?> constructor=type.getDeclaredConstructor(FileChannel.class,
+							boolean.class,long.class,String.class);
+					yield (AFileMapper)constructor.newInstance(channel,readOnly,length,fileName);
+				} catch (InvocationTargetException e) {
+					Throwable cause=e.getCause();
+					if (cause instanceof IOException io) throw io;
+					if (cause instanceof RuntimeException runtime) throw runtime;
+					if (cause instanceof Error error) throw error;
+					throw new IllegalStateException("Unable to initialise Etch FFM mapping backend",cause);
 				} catch (ReflectiveOperationException | LinkageError e) {
 					throw new IllegalStateException("Unable to initialise Etch FFM mapping backend",e);
 				}
@@ -75,87 +136,6 @@ final class EtchFileMapperFactory {
 			return true;
 		} catch (ClassNotFoundException | LinkageError e) {
 			return false;
-		}
-	}
-
-	/**
-	 * Maintenance-only guard around a physically read-only mapping. Keeping the
-	 * guard here avoids adding a read-only branch to ordinary Etch write paths.
-	 */
-	private static final class ReadOnlyEtchFileMapper extends AFileMapper {
-		private final AFileMapper delegate;
-
-		private ReadOnlyEtchFileMapper(AFileMapper delegate) {
-			this.delegate=delegate;
-		}
-
-		@Override
-		public void get(long position, byte[] destination, int offset, int length)
-				throws IOException {
-			delegate.get(position,destination,offset,length);
-		}
-
-		@Override
-		public boolean matches(long position, byte[] expected, int offset, int length)
-				throws IOException {
-			return delegate.matches(position,expected,offset,length);
-		}
-
-		@Override
-		public void getTransformed(long position, byte[] destination, int offset, int length,
-				EtchFileCipher cipher) throws IOException {
-			delegate.getTransformed(position,destination,offset,length,cipher);
-		}
-
-		@Override
-		public void ensureWriteCapacity(long position, long length) throws IOException {
-			throw readOnly();
-		}
-
-		@Override
-		public void put(long position, byte[] source, int offset, int length)
-				throws IOException {
-			throw readOnly();
-		}
-
-		@Override
-		public void putTransformed(long position, byte[] source, int offset, int length,
-				EtchFileCipher cipher) throws IOException {
-			throw readOnly();
-		}
-
-		@Override
-		public long readIndexSlotAcquire(long position) throws IOException {
-			return delegate.readIndexSlotAcquire(position);
-		}
-
-		@Override
-		public void writeIndexSlotRelease(long position, long value) throws IOException {
-			throw readOnly();
-		}
-
-		@Override
-		public void force() {
-			// A maintenance reader has no dirty pages to force.
-		}
-
-		@Override
-		public void forceRange(long position, long length) {
-			// A maintenance reader has no dirty pages to force.
-		}
-
-		@Override
-		public String implementationName() {
-			return delegate.implementationName();
-		}
-
-		@Override
-		public void close() throws IOException {
-			delegate.close();
-		}
-
-		private IOException readOnly() {
-			return new IOException("Etch mapping is read-only");
 		}
 	}
 }

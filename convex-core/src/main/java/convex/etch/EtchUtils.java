@@ -274,11 +274,13 @@ public class EtchUtils {
 		}
 		for (File candidate:files) {
 			if (candidate.length()==0L) continue;
-			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
-				byte[] masterKey=AEtchHeader.resolveKey(data,candidate.getName(),config);
+			try (RandomAccessFile data=new RandomAccessFile(candidate,"r");
+					AFileMapper mapper=EtchFileMapperFactory.createExisting(data.getChannel(),config,
+							candidate.getName(),true)) {
+				byte[] masterKey=AEtchHeader.resolveKey(mapper,candidate.getName(),config);
 				AEtchHeader header=null;
 				try {
-					header=AEtchHeader.open(data,candidate.getName(),masterKey);
+					header=AEtchHeader.open(mapper,candidate.getName(),masterKey);
 					masterKey=null; // borrowed caller-owned array is not retained
 					Etch.resolveExistingConfig(header,config,candidate);
 					long physicalEnd=data.length();

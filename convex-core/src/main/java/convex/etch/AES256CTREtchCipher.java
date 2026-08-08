@@ -81,12 +81,15 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 		private final byte[] skipOutput=new byte[BLOCK_LENGTH-1];
 		private final byte[] longInput=new byte[Long.BYTES];
 		private final byte[] longOutput=new byte[Long.BYTES];
+		private long position=-1L;
 
 		private State(Cipher cipher) {
 			this.cipher=cipher;
 		}
 
 		private void initialise(long fileOffset) throws IOException {
+			if (position==fileOffset) return;
+			position=-1L;
 			int skip=EtchCipherLocator.writeAES(fileOffset,iv);
 			try {
 				cipher.init(Cipher.ENCRYPT_MODE,key,new IvParameterSpec(iv));
@@ -97,28 +100,39 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 			} catch (GeneralSecurityException e) {
 				throw new IOException("Failed to initialise AES-CTR",e);
 			}
+			position=fileOffset;
 		}
 
 		private void transform(ByteBuffer input, ByteBuffer output) throws IOException {
 			int length=input.remaining();
 			if (output.remaining()<length) throw new IllegalArgumentException("Insufficient cipher output space");
+			long nextPosition=Math.addExact(position,length);
+			boolean success=false;
 			try {
 				int written=cipher.update(input,output);
 				if ((written!=length)||input.hasRemaining()) {
 					throw new IOException("AES-CTR provider buffered an unpadded stream transform");
 				}
+				success=true;
 			} catch (ShortBufferException e) {
 				throw new IOException("Insufficient AES-CTR output space",e);
+			} finally {
+				position=success?nextPosition:-1L;
 			}
 		}
 
 		private long transformLong(long value) throws IOException {
 			Utils.writeLong(longInput,0,value);
+			long nextPosition=Math.addExact(position,Long.BYTES);
+			boolean success=false;
 			try {
 				int written=cipher.update(longInput,0,Long.BYTES,longOutput,0);
 				if (written!=Long.BYTES) throw new IOException("AES-CTR failed to transform an index slot");
+				success=true;
 			} catch (ShortBufferException e) {
 				throw new IOException("Insufficient AES-CTR index output space",e);
+			} finally {
+				position=success?nextPosition:-1L;
 			}
 			return Utils.readLong(longOutput,0,Long.BYTES);
 		}

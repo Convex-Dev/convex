@@ -3,8 +3,6 @@ package convex.etch;
 import static convex.etch.EtchConstants.*;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
@@ -86,7 +84,9 @@ public class Etch {
 	private final AEtchHeader header;
 	private final short version;
 	private final long indexStart;
-	private final EtchFileAccess fileAccess;
+	private final AFileMapper mapper;
+	private final EtchFileCipher cipher;
+	private final boolean encryptedIndex;
 	private final boolean buildChains;
 	private boolean requiresOpenTransition;
 	private boolean closeStarted;
@@ -109,7 +109,6 @@ public class Etch {
 
 		this.fileName = dataFile.getName();
 		AFileMapper mapper=null;
-		EtchFileAccess access=null;
 		AEtchHeader resolvedHeader=null;
 		byte[] resolvedMasterKey=suppliedMasterKey;
 		try {
@@ -139,10 +138,13 @@ public class Etch {
 					throw new IOException("Plaintext Etch must not receive a master key");
 				}
 				resolvedHeader=AEtchHeader.create(effectiveConfig,resolvedMasterKey);
+				mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode(),
+						0L,fileName);
 			} else {
 				if (resolvedMasterKey!=null) throw new IOException("Cannot supply a direct key while opening an existing Etch file");
-				resolvedMasterKey=AEtchHeader.resolveKey(this.data,fileName,requestedConfig);
-				resolvedHeader=AEtchHeader.open(this.data,fileName,resolvedMasterKey);
+				mapper=EtchFileMapperFactory.createExisting(fileChannel,requestedConfig,fileName,false);
+				resolvedMasterKey=AEtchHeader.resolveKey(mapper,fileName,requestedConfig);
+				resolvedHeader=AEtchHeader.open(mapper,fileName,resolvedMasterKey);
 			}
 
 			short fileVersion=resolvedHeader.version();
@@ -159,10 +161,10 @@ public class Etch {
 			this.config=effectiveConfig;
 			this.header=resolvedHeader;
 			this.version=fileVersion;
-			this.indexStart=resolvedHeader.indexStart();
-			this.buildChains=effectiveConfig.isBuildChains();
-			this.requiresOpenTransition=!newFile&&(resolvedHeader instanceof EtchV3Header);
-			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
+		this.indexStart=resolvedHeader.indexStart();
+		this.buildChains=effectiveConfig.isBuildChains();
+		this.requiresOpenTransition=!newFile&&(resolvedHeader instanceof EtchV3Header);
+			if (!newFile) mapper.adoptLength(resolvedHeader.storedLength());
 			EtchFileCipher cipher=createFileCipher(resolvedHeader,resolvedMasterKey);
 			// The caller owns the master-key array. All file-scoped derivation is
 			// complete, so Etch deliberately drops the borrowed reference here.
@@ -171,24 +173,18 @@ public class Etch {
 			if (resolvedHeader instanceof EtchV3Header v3Header) {
 				encryptedIndex=v3Header.isIndexEncrypted();
 			}
-			access=new EtchFileAccess(mapper,fileName,newFile?0L:resolvedHeader.storedLength(),
-					fileChannel.size(),cipher,encryptedIndex);
-			this.fileAccess=access;
+			this.mapper=mapper;
+			this.cipher=cipher;
+			this.encryptedIndex=encryptedIndex;
 
 			if (newFile) {
-				header.initialise(fileAccess);
+				header.initialise(this);
 			}
 
 			// shutdown hook to close file / release lock
 			convex.core.util.Shutdown.addHook(Shutdown.ETCH,this::close);
 		} catch (IOException | RuntimeException | Error e) {
-			if (access!=null) {
-				try {
-					access.close();
-				} catch (IOException closeException) {
-					e.addSuppressed(closeException);
-				}
-			} else if (mapper!=null) {
+			if (mapper!=null) {
 				try {
 					mapper.close();
 				} catch (IOException closeException) {
@@ -202,6 +198,24 @@ public class Etch {
 			}
 			if (resolvedHeader!=null) resolvedHeader.destroy();
 			throw e;
+		}
+	}
+
+	/** Test-only construction around a deterministic mapper. */
+	Etch(AFileMapper mapper, String fileName, EtchFileCipher cipher, boolean encryptedIndex) {
+		this.file=null;
+		this.fileName=fileName;
+		this.data=null;
+		this.config=null;
+		this.header=null;
+		this.version=0;
+		this.indexStart=0L;
+		this.mapper=mapper;
+		this.cipher=cipher;
+		this.encryptedIndex=encryptedIndex;
+		this.buildChains=false;
+		if (encryptedIndex&&(cipher==null)) {
+			throw new IllegalArgumentException("Index encryption requires a file cipher");
 		}
 	}
 
@@ -322,14 +336,72 @@ public class Etch {
 		};
 	}
 
-	private void readData(long position, byte[] destination, int offset, int length)
+	void readData(long position, byte[] destination, int offset, int length)
 			throws IOException {
-		fileAccess.readData(rawPointer(position),destination,offset,length);
+		mapper.read(rawPointer(position),destination,offset,length,cipher);
 	}
 
-	private void writeData(long position, byte[] source, int offset, int length)
+	void writeData(long position, byte[] source, int offset, int length)
 			throws IOException {
-		fileAccess.writeData(rawPointer(position),source,offset,length);
+		mapper.write(rawPointer(position),source,offset,length,cipher);
+	}
+
+	void readHeader(long position, byte[] destination, int offset, int length) throws IOException {
+		mapper.read(position,destination,offset,length,null);
+	}
+
+	void writeHeader(long position, byte[] source, int offset, int length) throws IOException {
+		mapper.write(position,source,offset,length,null);
+	}
+
+	long appendHeader(byte[] source, int offset, int length) throws IOException {
+		return mapper.append(source,offset,length,1,null);
+	}
+
+	long appendIndex(byte[] source, int offset, int length, int alignment) throws IOException {
+		return mapper.append(source,offset,length,alignment,encryptedIndex?cipher:null);
+	}
+
+	long appendZeroIndex(int length, int alignment) throws IOException {
+		return mapper.appendZeros(length,alignment,encryptedIndex?cipher:null);
+	}
+
+	long appendDataRecord(AArrayBlob key, byte[] recordHeader, int headerLength,
+			AArrayBlob encoding) throws IOException {
+		return mapper.append(key,recordHeader,headerLength,encoding,cipher);
+	}
+
+	private void readDataContinued(long position, byte[] destination, int offset, int length)
+			throws IOException {
+		mapper.read(position,destination,offset,length,cipher);
+	}
+
+	private boolean matchesPlainData(long position, AArrayBlob expected) throws IOException {
+		if (cipher!=null) throw new IllegalStateException("Direct comparison requires plaintext Etch data");
+		int length=Math.toIntExact(expected.count());
+		return mapper.matches(position,expected.getInternalArray(),expected.getInternalOffset(),length);
+	}
+
+	long readIndexSlotAcquire(long position) throws IOException {
+		return mapper.readLongAcquire(position,encryptedIndex?cipher:null);
+	}
+
+	void writeIndexSlotRelease(long position, long value) throws IOException {
+		mapper.writeLongRelease(position,value,encryptedIndex?cipher:null);
+	}
+
+	void force() throws IOException {
+		mapper.force();
+	}
+
+	void forceHeader(long position, int length) throws IOException {
+		mapper.forceRange(position,length);
+	}
+
+	private EtchCorruptionError corruption(String message, long first, long second) {
+		return new EtchCorruptionError(message+": first="+Utils.toHexString(first)
+				+" second="+Utils.toHexString(second)+" dataLength="
+				+Utils.toHexString(mapper.length())+" file="+fileName);
 	}
 
 	/**
@@ -349,7 +421,7 @@ public class Etch {
 
 	private void prepareMutation() throws IOException {
 		if (!requiresOpenTransition) return;
-		header.prepareMutation(fileAccess);
+		header.prepareMutation(this);
 		requiresOpenTransition=false;
 	}
 
@@ -604,18 +676,6 @@ public class Etch {
 	}
 
 	/**
-	 * Utility function to truncate file. Won't work if mapped byte buffers are active?
-	 * @throws FileNotFoundException
-	 * @throws IOException
-	 */
-	protected void truncateFile() throws FileNotFoundException, IOException {
-		try (FileOutputStream fos=new FileOutputStream(file, true)) {
-			FileChannel outChan = fos.getChannel() ;
-			outChan.truncate(fileAccess.getDataLength());
-		}
-	}
-
-	/**
 	 * Close all files resources with this Etch store, including writing the final
 	 * data length.
 	 */
@@ -625,17 +685,17 @@ public class Etch {
 			closeStarted=true;
 			Exception failure=null;
 			try {
-				header.close(fileAccess);
+				if (header!=null) header.close(this);
 			} catch (Exception e) {
 				failure=e;
 			}
 			try {
-				fileAccess.close();
+				mapper.close();
 			} catch (Exception e) {
 				failure=combineCloseFailure(failure,e);
 			}
 			try {
-				data.close();
+				if (data!=null) data.close();
 			} catch (Exception e) {
 				failure=combineCloseFailure(failure,e);
 			}
@@ -658,7 +718,15 @@ public class Etch {
 	 * @return Current data size in bytes
 	 */
 	public long getDataLength() {
-		return fileAccess.getDataLength();
+		return mapper.length();
+	}
+
+	boolean isEncrypted() {
+		return cipher!=null;
+	}
+
+	boolean isIndexEncrypted() {
+		return encryptedIndex;
 	}
 
 	/**
@@ -666,7 +734,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	protected void writeDataLength() throws IOException {
-		header.writeDataLength(fileAccess);
+		header.writeDataLength(this);
 	}
 	
 	/**
@@ -695,7 +763,7 @@ public class Etch {
 	 * @return mapper implementation name
 	 */
 	public String getMappingImplementation() {
-		return fileAccess.implementationName();
+		return mapper.implementationName();
 	}
 
 	/**
@@ -745,7 +813,7 @@ public class Etch {
 		
 		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix,dataPointer); // single node
-		return fileAccess.appendIndex(temp,0,indexBlockLength,POINTER_SIZE);
+		return appendIndex(temp,0,indexBlockLength,POINTER_SIZE);
 	}
 
 	/**
@@ -778,24 +846,27 @@ public class Etch {
 		
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
 		long recordPosition=rawPointer(pointer);
-		EtchFileAccess.DataRecord stored;
-		if (key==null) {
-			stored=fileAccess.readDataRecord(recordPosition,true);
-		} else if (fileAccess.isEncrypted()) {
-			stored=fileAccess.readDataRecord(recordPosition,key);
-		} else {
-			// The plaintext index traversal has already checked the stored key.
-			stored=fileAccess.readDataRecord(recordPosition,false);
+		boolean includeKey=(key==null)||(cipher!=null);
+		long readPosition=includeKey?recordPosition:Math.addExact(recordPosition,KEY_SIZE);
+		int headerOffset=includeKey?KEY_SIZE:0;
+		int headerLength=headerOffset+LABEL_SIZE+ENCODING_LENGTH_SIZE;
+		byte[] recordHeader=new byte[headerLength];
+		readDataContinued(readPosition,recordHeader,0,headerLength);
+		if ((key!=null)&&includeKey&&!key.equalsBytes(recordHeader,0)) return null;
+
+		int encodingLength=Utils.readShort(recordHeader,headerOffset+LABEL_SIZE);
+		if (encodingLength<=0) {
+			throw corruption("Invalid Etch encoding length",readPosition,encodingLength);
 		}
-		if (stored==null) return null;
-		byte[] recordHeader=stored.header();
-		int headerOffset=stored.headerOffset();
-		if (key==null) key=Hash.wrap(Arrays.copyOf(recordHeader,KEY_SIZE));
-		return decodeDataRecord(key,pointer,stored,recordHeader,headerOffset);
+		long encodingPosition=Math.addExact(readPosition,headerLength);
+		byte[] encoding=new byte[encodingLength];
+		readDataContinued(encodingPosition,encoding,0,encodingLength);
+		if (key==null) key=Hash.wrap(recordHeader,0);
+		return decodeDataRecord(key,pointer,recordHeader,headerOffset,encoding);
 	}
 
 	private <T extends ACell> RefSoft<T> decodeDataRecord(AArrayBlob key, long pointer,
-			EtchFileAccess.DataRecord stored, byte[] recordHeader, int headerOffset) {
+			byte[] recordHeader, int headerOffset, byte[] encodingBytes) {
 		
 		// get flags byte
 		byte flagByte=recordHeader[headerOffset];
@@ -804,8 +875,8 @@ public class Etch {
 		long memorySize=Utils.readLong(recordHeader,headerOffset+Byte.BYTES,Long.BYTES);
 
 		// get Data length
-		int length=stored.encoding().length;
-		Blob encoding=Blob.wrap(stored.encoding());
+		int length=encodingBytes.length;
+		Blob encoding=Blob.wrap(encodingBytes);
 		try {
 			Hash hash=Hash.wrap(key);
 			T cell=store.decode(encoding);
@@ -830,8 +901,8 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized void flush() throws IOException {
-		header.writeDataLength(fileAccess);
-		header.sync(fileAccess);
+		header.writeDataLength(this);
+		header.sync(this);
 	}
 
 	/**
@@ -843,7 +914,7 @@ public class Etch {
 	 */
 	public long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
-		return fileAccess.readIndexSlotAcquire(pointerIndex);
+		return readIndexSlotAcquire(pointerIndex);
 	}
 
 	/**
@@ -907,13 +978,12 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position=indexPosition+digit*POINTER_SIZE;
-		fileAccess.writeIndexSlotRelease(position,slotValue);
+		writeIndexSlotRelease(position,slotValue);
 	}
 
 	private <T extends ACell> RefSoft<T> readMatching(AArrayBlob key, long pointer)
 			throws IOException {
-		if (!fileAccess.isEncrypted()
-				&&!fileAccess.matchesPlainData(rawPointer(pointer),key)) return null;
+		if ((cipher==null)&&!matchesPlainData(rawPointer(pointer),key)) return null;
 		return read(key,pointer);
 	}
 	
@@ -1047,7 +1117,7 @@ public class Etch {
 		
 		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
 		int alignment=(level==0)?1:POINTER_SIZE;
-		long position=fileAccess.appendZeroIndex(sizeBytes,alignment);
+		long position=appendZeroIndex(sizeBytes,alignment);
 		if ((level==0)&&(position!=indexStart)) {
 			throw new IllegalStateException("Unexpected Etch root index position: "+position);
 		}
@@ -1089,7 +1159,7 @@ public class Etch {
 		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
 		Utils.writeShort(recordHeader,LABEL_SIZE,length);
 
-		return fileAccess.appendDataRecord(key,recordHeader,
+		return appendDataRecord(key,recordHeader,
 				LABEL_SIZE+ENCODING_LENGTH_SIZE,encoding);
 	}
 
@@ -1102,7 +1172,7 @@ public class Etch {
 	}
 
 	public synchronized Hash getRootHash() throws IOException {
-		return header.getRootHash(fileAccess);
+		return header.getRootHash();
 	}
 
 	/**
@@ -1112,7 +1182,7 @@ public class Etch {
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
 		prepareMutation();
-		header.setRootHash(fileAccess,h);
+		header.setRootHash(this,h);
 	}
 
 	public void setStore(EtchStore etchStore) {

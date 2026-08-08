@@ -36,7 +36,9 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	private final FileLock lock;
 	private final AEtchHeader header;
 	private final EtchConfig config;
-	private final EtchFileAccess access;
+	private final AFileMapper mapper;
+	private final EtchFileCipher cipher;
+	private final boolean encryptedIndex;
 	private final Hash rootHash;
 	private final long logicalFileEnd;
 	private final long physicalFileEnd;
@@ -44,14 +46,16 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	private boolean closed;
 
 	private EtchMaintenanceReader(File file, RandomAccessFile data, FileLock lock,
-			AEtchHeader header, EtchConfig config, EtchFileAccess access, Hash rootHash,
-			long physicalFileEnd) {
+			AEtchHeader header, EtchConfig config, AFileMapper mapper,
+			EtchFileCipher cipher, boolean encryptedIndex, Hash rootHash, long physicalFileEnd) {
 		this.file=file;
 		this.data=data;
 		this.lock=lock;
 		this.header=header;
 		this.config=config;
-		this.access=access;
+		this.mapper=mapper;
+		this.cipher=cipher;
+		this.encryptedIndex=encryptedIndex;
 		this.rootHash=rootHash;
 		this.logicalFileEnd=header.storedLength();
 		this.physicalFileEnd=physicalFileEnd;
@@ -100,7 +104,6 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		RandomAccessFile data=new RandomAccessFile(file,exclusive?"rw":"r");
 		FileLock lock=null;
 		AFileMapper mapper=null;
-		EtchFileAccess access=null;
 		AEtchHeader header=null;
 		byte[] masterKey=null;
 		try {
@@ -114,8 +117,10 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 
 			long physicalEnd=channel.size();
 			if (physicalEnd==0L) throw new IOException("Empty Etch file: "+file);
-			masterKey=AEtchHeader.resolveKey(data,file.getName(),requestedConfig);
-			header=AEtchHeader.open(data,file.getName(),masterKey);
+			mapper=EtchFileMapperFactory.createExisting(channel,requestedConfig,
+					file.getName(),true);
+			masterKey=AEtchHeader.resolveKey(mapper,file.getName(),requestedConfig);
+			header=AEtchHeader.open(mapper,file.getName(),masterKey);
 			EtchConfig config=Etch.resolveExistingConfig(header,requestedConfig,file);
 			long logicalEnd=header.storedLength();
 			if ((logicalEnd<0L)||(logicalEnd>physicalEnd)) {
@@ -134,30 +139,21 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 
 			EtchFileCipher cipher=Etch.createFileCipher(header,masterKey);
 			masterKey=null; // borrowed caller-owned array is not retained
-			mapper=EtchFileMapperFactory.createReadOnly(channel,config.getMappingMode());
 			boolean encryptedIndex=(header instanceof EtchV3Header v3)&&v3.isIndexEncrypted();
-			access=new EtchFileAccess(mapper,file.getName(),physicalEnd,physicalEnd,
-					cipher,encryptedIndex);
-			Hash rootHash=header.getRootHash(access);
+			Hash rootHash=header.getRootHash();
 			EtchMaintenanceReader result=new EtchMaintenanceReader(file,data,lock,header,
-					config,access,rootHash,physicalEnd);
+					config,mapper,cipher,encryptedIndex,rootHash,physicalEnd);
 			return result;
 		} catch (IOException | RuntimeException | Error e) {
-			closeAfterFailure(access,mapper,lock,data,e);
+			closeAfterFailure(mapper,lock,data,e);
 			if (header!=null) header.destroy();
 			throw e;
 		}
 	}
 
-	private static void closeAfterFailure(EtchFileAccess access, AFileMapper mapper,
-			FileLock lock, RandomAccessFile data, Throwable failure) {
-		if (access!=null) {
-			try {
-				access.close();
-			} catch (IOException e) {
-				failure.addSuppressed(e);
-			}
-		} else if (mapper!=null) {
+	private static void closeAfterFailure(AFileMapper mapper, FileLock lock,
+			RandomAccessFile data, Throwable failure) {
+		if (mapper!=null) {
 			try {
 				mapper.close();
 			} catch (IOException e) {
@@ -237,7 +233,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throws IOException {
 		checkDestination(destination,offset,length);
 		checkRange(position,length,0L,physicalFileEnd,"raw read");
-		access.readRaw(position,destination,offset,length);
+		mapper.read(position,destination,offset,length,null);
 	}
 
 	/**
@@ -249,7 +245,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throws IOException {
 		checkDestination(destination,offset,length);
 		checkRange(position,length,bodyStart,physicalFileEnd,"candidate data read");
-		access.readData(position,destination,offset,length);
+		mapper.read(position,destination,offset,length,cipher);
 	}
 
 	/**
@@ -264,7 +260,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throw new IOException("Unaligned Etch index slot at "+position+" in "+file);
 		}
 		checkRange(position,POINTER_SIZE,header.indexStart(),logicalFileEnd,"index read");
-		return access.readIndexSlotAcquire(position);
+		return mapper.readLongAcquire(position,encryptedIndex?cipher:null);
 	}
 
 	/**
@@ -275,14 +271,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throws IOException {
 		checkDestination(destination,offset,length);
 		checkRange(position,length,header.indexStart(),physicalFileEnd,"candidate index read");
-		access.readIndex(position,destination,offset,length);
-	}
-
-	EtchFileAccess.DataRecord readCandidateDataRecord(long position) throws IOException {
-		checkRange(position,EtchConstants.KEY_SIZE+EtchConstants.LABEL_SIZE
-				+EtchConstants.ENCODING_LENGTH_SIZE,bodyStart,physicalFileEnd,
-				"candidate record read");
-		return access.readDataRecord(position,true);
+		mapper.read(position,destination,offset,length,encryptedIndex?cipher:null);
 	}
 
 	private static void checkDestination(byte[] destination, int offset, int length) {
@@ -320,7 +309,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		closed=true;
 		IOException failure=null;
 		try {
-			access.close();
+			mapper.close();
 		} catch (IOException e) {
 			failure=e;
 		}

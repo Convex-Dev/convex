@@ -199,11 +199,12 @@ public class EtchConfiguredLifecycleTest {
 	private static byte[] readV3Salt(File file, EtchConfig config) throws IOException {
 		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
 				:config.resolveKey(config.getPublicKeyHint());
-		try (RandomAccessFile data=new RandomAccessFile(file,"r")) {
-			AEtchHeader header=AEtchHeader.open(data,file.getName(),secret);
+		try (RandomAccessFile data=new RandomAccessFile(file,"r");
+				AFileMapper mapper=new MBBFileMapper(data.getChannel(),true)) {
+			AEtchHeader header=AEtchHeader.open(mapper,file.getName(),secret);
 			return ((EtchV3Header)header).fileSalt();
 		} finally {
-			Arrays.fill(secret,(byte)0);
+			if (secret!=null) Arrays.fill(secret,(byte)0);
 		}
 	}
 
@@ -211,11 +212,14 @@ public class EtchConfiguredLifecycleTest {
 		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
 				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchV3Header header=(EtchV3Header)AEtchHeader.open(data,file.getName(),secret);
+			EtchV3Header header;
+			try (AFileMapper mapper=new MBBFileMapper(data.getChannel(),true)) {
+				header=(EtchV3Header)AEtchHeader.open(mapper,file.getName(),secret);
+			}
 			byte[] copyA=header.encode(header.generation()+1L,header.syncedFileEnd(),
-					header.getRootHash(null),EtchConstants.V3_OPEN);
+					header.getRootHash(),EtchConstants.V3_OPEN);
 			byte[] copyB=header.encode(header.generation()+2L,header.syncedFileEnd(),
-					header.getRootHash(null),EtchConstants.V3_OPEN);
+					header.getRootHash(),EtchConstants.V3_OPEN);
 			data.seek(EtchConstants.V3_HEADER_A_OFFSET);
 			data.write(copyA);
 			data.seek(EtchConstants.V3_HEADER_B_OFFSET);

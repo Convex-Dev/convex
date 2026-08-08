@@ -5,7 +5,10 @@ import java.nio.ByteBuffer;
 
 /** Random-access, length-preserving Etch file cipher. */
 abstract class EtchFileCipher {
-	/** Initialises the current thread's reusable state at an absolute file offset. */
+	/**
+	 * Positions the current thread's reusable state at an absolute file offset.
+	 * Implementations must make this a no-op when already positioned there.
+	 */
 	abstract void initialise(long fileOffset) throws IOException;
 
 	/** Decrypts mapped input directly into a byte array. */

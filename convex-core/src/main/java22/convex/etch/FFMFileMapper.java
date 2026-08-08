@@ -71,17 +71,23 @@ final class FFMFileMapper extends AFileMapper {
 	private volatile Mapping[] mappings=EMPTY_MAPPINGS;
 	private volatile boolean closed;
 
-	FFMFileMapper(FileChannel channel) {
-		this(channel,false);
+	FFMFileMapper(FileChannel channel) throws IOException {
+		this(channel,false,channel.size(),"memory-segment");
 	}
 
-	FFMFileMapper(FileChannel channel, boolean readOnly) {
+	FFMFileMapper(FileChannel channel, boolean readOnly) throws IOException {
+		this(channel,readOnly,channel.size(),"memory-segment");
+	}
+
+	FFMFileMapper(FileChannel channel, boolean readOnly, long length, String fileName)
+			throws IOException {
+		super(fileName,length,channel.size(),readOnly);
 		this.channel=channel;
 		this.readOnly=readOnly;
 	}
 
 	@Override
-	public long readIndexSlotAcquire(long position) throws IOException {
+	long readLongAcquireMapped(long position) throws IOException {
 		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES,false);
 		Mapping current=mappingFor(position,null);
@@ -95,7 +101,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void get(long position, byte[] destination, int offset, int length) throws IOException {
+	void readMapped(long position, byte[] destination, int offset, int length) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
 		ensureMapped(position,length,false);
@@ -121,7 +127,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public boolean matches(long position, byte[] expected, int offset, int length) throws IOException {
+	boolean matchesMapped(long position, byte[] expected, int offset, int length) throws IOException {
 		checkRange(position,length);
 		if (length==0) return true;
 		ensureMapped(position,length,false);
@@ -159,7 +165,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void getTransformed(long position, byte[] destination, int offset, int length,
+	void readTransformedMapped(long position, byte[] destination, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
@@ -192,7 +198,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void writeIndexSlotRelease(long position, long value) throws IOException {
+	void writeLongReleaseMapped(long position, long value) throws IOException {
 		checkAtomicLong(position);
 		ensureMapped(position,Long.BYTES,true);
 		Mapping current=mappingFor(position,null);
@@ -207,12 +213,12 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void ensureWriteCapacity(long position, long length) throws IOException {
+	void ensureMapped(long position, long length) throws IOException {
 		ensureMapped(position,length,true);
 	}
 
 	@Override
-	public void put(long position, byte[] source, int offset, int length) {
+	void writeMapped(long position, byte[] source, int offset, int length) {
 		if (length==0) return;
 
 		long currentPosition=position;
@@ -236,7 +242,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public void putTransformed(long position, byte[] source, int offset, int length,
+	void writeTransformedMapped(long position, byte[] source, int offset, int length,
 			EtchFileCipher cipher) throws IOException {
 		if (length==0) return;
 
@@ -419,7 +425,7 @@ final class FFMFileMapper extends AFileMapper {
 	}
 
 	@Override
-	public synchronized void forceRange(long position, long length) throws IOException {
+	synchronized void forceRangeMapped(long position, long length) throws IOException {
 		checkRange(position,length);
 		if (closed) throw new IllegalStateException("Etch mapping is closed");
 		if (readOnly) return;

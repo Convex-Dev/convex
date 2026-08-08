@@ -72,7 +72,7 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		private final byte[] keyStream=new byte[EtchConstants.V3_CHACHA_BLOCK_SIZE];
 		private final int[] inputState=new int[STATE_WORDS];
 		private final int[] outputState=new int[STATE_WORDS];
-		private long position;
+		private long position=-1L;
 		private int keyStreamOffset=EtchConstants.V3_CHACHA_BLOCK_SIZE;
 
 		private State() {
@@ -81,6 +81,7 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		}
 
 		private void initialise(long fileOffset) {
+			if (position==fileOffset) return;
 			position=fileOffset;
 			keyStreamOffset=EtchConstants.V3_CHACHA_BLOCK_SIZE;
 		}

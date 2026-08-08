@@ -10,7 +10,6 @@ import static convex.etch.EtchConstants.VERSION_2;
 import static convex.etch.EtchConstants.VERSION_OFFSET;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.Arrays;
 
 import convex.core.data.AccountKey;
@@ -19,16 +18,23 @@ import convex.core.util.Utils;
 
 /** Existing single-header Etch v1/v2 metadata behaviour. */
 final class LegacyEtchHeader extends AEtchHeader {
-	private LegacyEtchHeader(short version, long storedLength) {
+	private Hash rootHash;
+
+	private LegacyEtchHeader(short version, long storedLength, Hash rootHash) {
 		super(version,indexStart(version),storedLength);
+		this.rootHash=rootHash;
 	}
 
 	static LegacyEtchHeader create(short version) {
-		return new LegacyEtchHeader(version,0L);
+		return new LegacyEtchHeader(version,0L,Hash.UNSET_HASH);
 	}
 
-	static LegacyEtchHeader open(RandomAccessFile data, short version) throws IOException {
-		return new LegacyEtchHeader(version,data.readLong());
+	static LegacyEtchHeader open(AFileMapper mapper, String fileName) throws IOException {
+		int headerLength=Math.toIntExact(ROOT_HASH_OFFSET+Hash.LENGTH);
+		if (mapper.length()<headerLength) throw new IOException("Truncated Etch header: "+fileName);
+		byte[] header=new byte[headerLength];
+		mapper.read(0L,header,0,header.length,null);
+		return decode(header,fileName);
 	}
 
 	/** Decodes the fixed legacy prefix, primarily for byte-level format tests. */
@@ -44,8 +50,15 @@ final class LegacyEtchHeader extends AEtchHeader {
 		if ((version!=VERSION_1)&&(version!=VERSION_2)) {
 			throw new IOException("Unsupported legacy Etch version: "+version);
 		}
+		if (source.length<ROOT_HASH_OFFSET+Hash.LENGTH) {
+			throw new IOException("Truncated Etch root hash: "+fileName);
+		}
+		byte[] rootBytes=Arrays.copyOfRange(source,(int)ROOT_HASH_OFFSET,
+				(int)ROOT_HASH_OFFSET+Hash.LENGTH);
+		Hash rootHash=Arrays.equals(rootBytes,Utils.ZERO_BYTES_32)
+				?Hash.UNSET_HASH:Hash.wrap(rootBytes);
 		return new LegacyEtchHeader(version,
-				Utils.readLong(source,(int)DATA_LENGTH_OFFSET,Long.BYTES));
+				Utils.readLong(source,(int)DATA_LENGTH_OFFSET,Long.BYTES),rootHash);
 	}
 
 	private static long indexStart(short version) {
@@ -62,58 +75,56 @@ final class LegacyEtchHeader extends AEtchHeader {
 	}
 
 	@Override
-	void initialise(EtchFileAccess access) throws IOException {
-		if (access.getDataLength()!=0L) {
+	void initialise(Etch etch) throws IOException {
+		if (etch.getDataLength()!=0L) {
 			throw new IllegalStateException("Cannot initialise a non-empty Etch file");
 		}
 		byte[] initialHeader=new byte[Math.toIntExact(indexStart())];
 		Utils.writeShort(initialHeader,0,(short)MAGIC_NUMBER);
 		Utils.writeShort(initialHeader,(int)VERSION_OFFSET,version());
-		long headerPosition=access.appendHeader(initialHeader,0,initialHeader.length);
+		long headerPosition=etch.appendHeader(initialHeader,0,initialHeader.length);
 		if (headerPosition!=0L) throw new IllegalStateException("Unexpected Etch header position");
 
 		int rootLength=ROOT_INDEX_SIZE*POINTER_SIZE;
-		long rootPosition=access.appendZeroIndex(rootLength,1);
+		long rootPosition=etch.appendZeroIndex(rootLength,1);
 		if (rootPosition!=indexStart()) {
 			throw new IllegalStateException("Unexpected Etch root index position: "+rootPosition);
 		}
-		writeDataLength(access);
+		writeDataLength(etch);
 	}
 
 	@Override
-	Hash getRootHash(EtchFileAccess access) throws IOException {
-		byte[] bytes=new byte[Hash.LENGTH];
-		access.readHeader(ROOT_HASH_OFFSET,bytes,0,bytes.length);
-		if (Arrays.equals(bytes,Utils.ZERO_BYTES_32)) return Hash.UNSET_HASH;
-		return Hash.wrap(bytes);
+	Hash getRootHash() {
+		return rootHash;
 	}
 
 	@Override
-	void setRootHash(EtchFileAccess access, Hash rootHash) throws IOException {
+	void setRootHash(Etch etch, Hash rootHash) throws IOException {
 		byte[] bytes=rootHash.getBytes();
-		access.writeHeader(ROOT_HASH_OFFSET,bytes,0,bytes.length);
+		etch.writeHeader(ROOT_HASH_OFFSET,bytes,0,bytes.length);
+		this.rootHash=rootHash;
 	}
 
 	@Override
-	void prepareMutation(EtchFileAccess access) {
+	void prepareMutation(Etch etch) {
 		// Legacy headers have no writing-session marker.
 	}
 
 	@Override
-	void writeDataLength(EtchFileAccess access) throws IOException {
+	void writeDataLength(Etch etch) throws IOException {
 		byte[] bytes=new byte[Long.BYTES];
-		Utils.writeLong(bytes,0,access.getDataLength());
-		access.writeHeader(DATA_LENGTH_OFFSET,bytes,0,bytes.length);
+		Utils.writeLong(bytes,0,etch.getDataLength());
+		etch.writeHeader(DATA_LENGTH_OFFSET,bytes,0,bytes.length);
 	}
 
 	@Override
-	void sync(EtchFileAccess access) throws IOException {
-		access.force();
+	void sync(Etch etch) throws IOException {
+		etch.force();
 	}
 
 	@Override
-	void close(EtchFileAccess access) throws IOException {
-		writeDataLength(access);
-		sync(access);
+	void close(Etch etch) throws IOException {
+		writeDataLength(etch);
+		sync(etch);
 	}
 }
