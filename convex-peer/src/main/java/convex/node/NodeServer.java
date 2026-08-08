@@ -244,17 +244,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
 
-		// Hook sync callback: synchronous commit on the primary propagator,
+		// Hook sync callback: synchronous publication on the primary propagator,
 		// async fan-out to secondaries.
 		//
-		// The primary's full pipeline (announce + setRootData + flush + broadcast) runs
-		// on the caller's thread, so cursor.sync() is a synchronous checkpoint:
-		// returning successfully means the primary store durably committed the root.
-		// IOException from announce, setRootData or flush is wrapped and propagated to
-		// the caller — sync failures are visible, not silently dropped.
+		// The primary's pipeline (announce + setRootData + broadcast) runs on the
+		// caller's thread. A successful cursor.sync() confirms that the root and its
+		// reachable cells have been published to the primary store; it is not a
+		// physical durability barrier. IOException from announce or setRootData is
+		// wrapped and propagated to the caller.
 		//
 		// Secondary propagators use the existing async path; their broadcast
-		// latency is independent of caller durability.
+		// latency is independent of caller publication.
 		//
 		// The returned (announced/store-backed) value is CASed back into the
 		// cursor by RootLatticeCursor.sync(), with lattice-merge fallback if a
@@ -1661,12 +1661,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Gets the memory-first cursor for the lattice value.
 	 *
 	 * <p>Cursor writes perform no persistence. Calling {@link ALatticeCursor#sync()}
-	 * runs the primary persistence pipeline synchronously. A successful return confirms
-	 * that the primary store durably committed the root update. A primary-store failure
-	 * throws {@link StoreException}
-	 * without rolling back the in-memory cursor and does not confirm whether the store
-	 * completed its root update. NodeServer remains running so recovery remains operator
-	 * policy.
+	 * runs the primary publication pipeline synchronously. A successful return confirms
+	 * that the root and its reachable cells are available from the primary store, but
+	 * does not perform a physical durability barrier. A primary-store publication failure
+	 * throws {@link StoreException} without rolling back the in-memory cursor. NodeServer
+	 * remains running so recovery remains operator policy.
 	 *
 	 * @return The value cursor
 	 */

@@ -48,6 +48,28 @@ public class EtchV3IntegrationTest {
 	}
 
 	@Test
+	public void testMutationAfterFlushIsIncludedInNextCheckpoint() throws Exception {
+		File file=tempFile("etch-v3-second-checkpoint");
+		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);
+		AString first=value("first-checkpoint");
+		AString second=value("second-checkpoint");
+
+		EtchStore store=new EtchStore(Etch.create(file,config));
+		store.setRootData(first);
+		store.flush();
+		store.setRootData(second);
+		store.flush();
+		store.close();
+
+		EtchStore reopened=new EtchStore(Etch.create(file,config));
+		try {
+			assertEquals(second,reopened.getRootData());
+		} finally {
+			reopened.close();
+		}
+	}
+
+	@Test
 	public void testAESCreateWrongKeyAndReopen() throws Exception {
 		assertEncryptedRoundTrip(EtchConfig.CipherMode.AES_256_CTR,false);
 	}

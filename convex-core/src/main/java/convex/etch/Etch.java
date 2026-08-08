@@ -908,6 +908,9 @@ public class Etch {
 	public synchronized void flush() throws IOException {
 		header.writeDataLength(this);
 		header.sync(this);
+		// A successful v3 sync publishes a clean checkpoint. The next mutation
+		// must first publish OPEN, even when this Etch instance created the file.
+		requiresOpenTransition = header instanceof EtchV3Header;
 	}
 
 	/**

@@ -612,20 +612,21 @@ public class NodeServerPersistenceTest {
 	}
 
 	@Test
-	public void testSyncCompletesDurabilityBarrier() throws Exception {
+	public void testSyncPublishesWithoutDurabilityBarrier() throws Exception {
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		AtomicInteger flushes=new AtomicInteger();
 		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
 		writeDataValue(primary,100);
 
-		primary.getCursor().sync();
+		ACell synced=primary.getCursor().sync();
 
-		assertEquals(1,flushes.get(),"sync must complete one primary-store durability barrier");
+		assertEquals(0,flushes.get(),"sync must not force a physical durability barrier");
+		assertSame(synced,primaryStore.getRootData(),"sync must publish the root to the primary store");
 	}
 
 	@Test
-	public void testSyncSurfacesDurabilityBarrierFailure() throws Exception {
+	public void testSyncDoesNotInvokeDurabilityBarrier() throws Exception {
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
 		writeDataValue(primary,101);
@@ -633,12 +634,10 @@ public class NodeServerPersistenceTest {
 			throw new IOException("simulated flush failure");
 		});
 
-		StoreException ex=assertThrows(StoreException.class,
-				()->primary.getCursor().sync(),
-				"sync must throw when the durability barrier fails");
-		assertTrue(ex.getCause() instanceof IOException);
-		assertEquals("simulated flush failure",ex.getCause().getMessage());
-		assertTrue(primary.isRunning(),"flush failure must not impose an operator recovery policy");
+		ACell synced=primary.getCursor().sync();
+
+		assertSame(synced,primaryStore.getRootData(),"sync must still publish with a failing flush hook");
+		assertTrue(primary.isRunning());
 	}
 
 	@Test

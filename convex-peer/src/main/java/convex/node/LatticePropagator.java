@@ -134,14 +134,14 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Last value that was triggered (used for periodic root sync). Volatile
-	 * because it may be written by the caller's thread (synchronous commit
+	 * because it may be written by the caller's thread (synchronous publication
 	 * path) and read by the background propagation thread.
 	 */
 	private volatile ACell lastTriggeredValue;
 
 	/**
 	 * Timestamp of last broadcast. Volatile for cross-thread visibility — the
-	 * caller's thread (synchronous commit path) and the background propagation
+	 * caller's thread (synchronous publication path) and the background propagation
 	 * thread may both read and write this.
 	 */
 	private volatile long lastBroadcastTime = 0L;
@@ -167,8 +167,7 @@ public class LatticePropagator implements Closeable {
 	 * propagator is the sole live writer of {@code setRootData} on its store
 	 * (see {@code PERSISTENCE.md} — sole-writer invariant), and pipelines
 	 * must not interleave: an older snapshot's {@code setRootData} landing
-	 * after a newer snapshot's would silently demote the root pointer and
-	 * break the durability promise of {@code cursor.sync()}. {@link
+	 * after a newer snapshot's would silently demote the published root. {@link
 	 * #processSnapshot} and {@link #persist} both acquire this lock so the
 	 * caller's thread (sync hook), the background propagation thread (pull,
 	 * drain), and explicit persistence calls run their full pipelines
@@ -460,9 +459,7 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Background-thread wrapper around {@link #processSnapshot}. IOException
-	 * is logged rather than propagated — the background path is best-effort
-	 * (callers who need durability errors should call {@link #processSnapshot}
-	 * directly).
+	 * is logged rather than propagated — the background path is best-effort.
 	 */
 	private void processSnapshotSafe(ACell value) {
 		try {
@@ -476,7 +473,7 @@ public class LatticePropagator implements Closeable {
 	 * Processes a single lattice value through the full output pipeline:
 	 * <ol>
 	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
-	 *   <li>Set and durably flush root data — anchor for restore (if persist enabled)</li>
+	 *   <li>Publish root data — anchor for restore (if persist enabled)</li>
 	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
 	 * </ol>
 	 *
@@ -486,14 +483,14 @@ public class LatticePropagator implements Closeable {
 	 * back to a synchronous caller; the pull merge callback is not invoked.
 	 *
 	 * <p>Callable from any thread. The background propagation loop calls this
-	 * for queued triggers; for synchronous commit, NodeServer's sync callback
+	 * for queued triggers; for synchronous publication, NodeServer's sync callback
 	 * calls this directly on the caller's thread for the primary propagator.
 	 * Pipelines are serialised by {@link #writeLock} — see field javadoc for
 	 * the sole-writer invariant.
 	 *
 	 * @param value Snapshot to process (must not be null)
 	 * @return The announced (store-backed) value
-	 * @throws IOException If announce, root publication or its durability barrier fails
+	 * @throws IOException If announce or root publication fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
@@ -509,7 +506,6 @@ public class LatticePropagator implements Closeable {
 			// 2. Set root data for restore (if persist enabled)
 			if (persistInterval > 0) {
 				store.setRootData(value);
-				store.flush();
 			}
 
 			// 3. Broadcast to peers (only if peers exist and delay elapsed)

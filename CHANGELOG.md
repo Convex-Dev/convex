@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Etch: `AStore` now exposes an explicit durability barrier; successful Etch v3 flushes publish directly reopenable clean checkpoints, and lattice cursor sync now flushes the primary store before confirming the checkpoint, as required by CAD036 (#650).
+- Etch: `AStore` now exposes an explicit durability barrier, and successful Etch v3 flushes publish directly reopenable clean checkpoints while ordinary lattice cursor sync remains buffered. Mutations after a checkpoint correctly return the file to `OPEN`, so later checkpoints include their complete logical file extent (#650).
 - Etch: closed encrypted stores and maintenance readers now promptly release their global shutdown registrations and wipe file-scoped keys and reusable cipher state, including state created on worker threads; online-GC cutover preserves ownership of the successor's live cipher resources (#686).
 - `Call` transactions decoded from their network encoding no longer fail with an internal error on execution: the lazily-decoded argument list was never populated on the execution path, so every Call submitted over the wire errored instead of invoking the actor function.
 - REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
@@ -210,7 +210,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - UCANValidator: `checkTemporalBounds` for post-ingress re-validation of `nbf`/`exp` outside the parse path
 - UCANValidator: `parseTransportUCANsWithBearer` helper merging proof chain and bearer token in a single call
-- NodeServer: synchronous commit on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning only after primary durability; secondaries remain async; persistence errors propagate to the caller (#569)
+- NodeServer: synchronous publication on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning after primary store publication; secondaries remain async; publication errors propagate to the caller (#569)
 
 ### Changed
 
