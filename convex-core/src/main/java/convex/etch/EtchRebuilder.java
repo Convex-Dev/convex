@@ -77,7 +77,7 @@ public final class EtchRebuilder {
 	 * Rebuilds an Etch source into a fresh destination.
 	 *
 	 * @param source existing source, opened exclusively and never modified
-	 * @param sourceConfig source options including any required encryption secret
+	 * @param sourceConfig source options including any required key function
 	 * @param destination absent or empty destination file
 	 * @param destinationConfig destination options; {@code null} preserves the
 	 *        source version, cipher, index-encryption and public-key-hint options

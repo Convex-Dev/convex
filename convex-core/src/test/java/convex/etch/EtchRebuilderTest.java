@@ -34,9 +34,9 @@ public class EtchRebuilderTest {
 				EtchConfig.create(EtchConstants.VERSION_2,mapped,true),
 				EtchConfig.createV3(mapped,true,EtchConfig.CipherMode.NONE,false,null,null),
 				EtchConfig.createV3(mapped,true,EtchConfig.CipherMode.AES_256_CTR,
-						false,null,SECRET),
+						false,null,hint->SECRET.clone()),
 				EtchConfig.createV3(mapped,true,EtchConfig.CipherMode.CHACHA20,
-						true,null,SECRET));
+						true,null,hint->SECRET.clone()));
 
 		for (EtchConfig config:configs) {
 			File source=tempFile("etch-rebuild-source-v"+config.getVersion());
@@ -159,7 +159,8 @@ public class EtchRebuilderTest {
 	}
 
 	private static void markV3Open(File file, EtchConfig config) throws Exception {
-		byte[] secret=config.encryptionSecret();
+		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
+				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			EtchV3Header header=(EtchV3Header)EtchHeader.open(data,file.getName(),secret);
 			Hash root=header.getRootHash(null);

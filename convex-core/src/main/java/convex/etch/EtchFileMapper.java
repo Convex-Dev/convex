@@ -13,6 +13,9 @@ interface EtchFileMapper extends AutoCloseable {
 	// the header/data distinction and any future encryption transformation.
 	void get(long position, byte[] destination, int offset, int length) throws IOException;
 
+	/** Compares mapped bytes without copying them into a temporary array. */
+	boolean matches(long position, byte[] expected, int offset, int length) throws IOException;
+
 	/** Reads and transforms mapped bytes directly into the destination. */
 	void getTransformed(long position, byte[] destination, int offset, int length,
 			EtchCipherCursor cursor) throws IOException;

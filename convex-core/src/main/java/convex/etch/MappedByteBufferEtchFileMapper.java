@@ -8,6 +8,8 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 import java.util.ArrayList;
 
+import convex.core.util.Utils;
+
 /**
  * Java 21-compatible Etch mapping backend.
  */
@@ -40,6 +42,31 @@ final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
 			destinationOffset+=chunk;
 			remaining-=chunk;
 		}
+	}
+
+	@Override
+	public boolean matches(long position, byte[] expected, int offset, int length) throws IOException {
+		int remaining=length;
+		long current=position;
+		int expectedOffset=offset;
+		while (remaining>0) {
+			int chunk=Math.min(remaining,
+					Math.toIntExact(EtchConstants.MAX_REGION_SIZE-(current%EtchConstants.MAX_REGION_SIZE)));
+			MappedByteBuffer mapped=getBuffer(current,chunk,false);
+			int index=bufferIndex(current);
+			int end=index+chunk;
+			while (index+Long.BYTES<=end) {
+				if (mapped.getLong(index)!=Utils.readLong(expected,expectedOffset,Long.BYTES)) return false;
+				index+=Long.BYTES;
+				expectedOffset+=Long.BYTES;
+			}
+			while (index<end) {
+				if (mapped.get(index++)!=expected[expectedOffset++]) return false;
+			}
+			current+=chunk;
+			remaining-=chunk;
+		}
+		return true;
 	}
 
 	@Override

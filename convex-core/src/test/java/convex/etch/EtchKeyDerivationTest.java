@@ -12,10 +12,10 @@ public class EtchKeyDerivationTest {
 	/*
 	 * Fixed Etch v3 vector:
 	 *
-	 * secret = 000102...1f
-	 * salt   = a0a1a2...bf
+	 * master key = 000102...1f
+	 * salt       = a0a1a2...bf
 	 *
-	 * HKDF-Extract uses HMAC-SHA-256(salt, secret), producing:
+	 * HKDF-Extract uses HMAC-SHA-256(salt, master key), producing:
 	 * 417e7502c38837c356dc6d3f1c84cfac0efea0e929628cb89ce52f74716620ad
 	 *
 	 * Since each requested key is exactly 32 bytes, HKDF-Expand uses one block:
@@ -24,13 +24,20 @@ public class EtchKeyDerivationTest {
 	 */
 	@Test
 	public void testEtchV3KnownVector() {
-		byte[] secret=sequence(0x00,EtchConstants.V3_FILE_SALT_SIZE);
+		byte[] masterKey=sequence(0x00,EtchConstants.V3_MASTER_KEY_SIZE);
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 
 		assertEquals("8c87a0e18c82d24d61d83ae05e1b9ee2fdf163d138abc71f593ad9a96360c279",
-				Utils.toHexString(EtchKeyDerivation.deriveFileCipherKey(secret,salt)));
+				Utils.toHexString(EtchKeyDerivation.deriveFileCipherKey(masterKey,salt)));
 		assertEquals("a34f914626e441accdb2af818ff6c470c8477abf3695e474448511653f58f479",
-				Utils.toHexString(EtchKeyDerivation.deriveHeaderMacKey(secret,salt)));
+				Utils.toHexString(EtchKeyDerivation.deriveHeaderMacKey(masterKey,salt)));
+	}
+
+	@Test
+	public void testMasterKeyKnownVector() {
+		byte[] source=sequence(0x00,EtchConstants.V3_MASTER_KEY_SIZE);
+		assertEquals("f2cd5efefe2d520f3b93c531b8edc549d9ee2cef2e62cd741c1890246b4bb2e5",
+				Utils.toHexString(EtchKeyDerivation.deriveMasterKey(source)));
 	}
 
 	@Test
@@ -47,6 +54,8 @@ public class EtchKeyDerivationTest {
 				()->EtchKeyDerivation.deriveFileCipherKey(validSecret,new byte[31]));
 		assertThrows(IllegalArgumentException.class,
 				()->EtchKeyDerivation.deriveFileCipherKey(validSecret,new byte[32]));
+		assertThrows(IllegalArgumentException.class,()->EtchKeyDerivation.deriveMasterKey(null));
+		assertThrows(IllegalArgumentException.class,()->EtchKeyDerivation.deriveMasterKey(new byte[31]));
 	}
 
 	private static byte[] sequence(int first, int length) {

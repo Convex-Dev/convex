@@ -1,15 +1,21 @@
 package convex.etch;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Strings;
 
 public class EtchV3IntegrationTest {
@@ -76,13 +82,146 @@ public class EtchV3IntegrationTest {
 		assertTrue(mutated.isCleanClosed());
 	}
 
+	@Test
+	public void testKeyFunctionReturnsBorrowedKeyNotRetainedOrModified() throws Exception {
+		File file=tempFile("etch-v3-key-ownership");
+		byte[] borrowed=SECRET.clone();
+		AccountKey[] seenHint=new AccountKey[1];
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->{
+					seenHint[0]=hint;
+					return borrowed;
+				});
+
+		Etch etch=Etch.create(file,config);
+		assertNull(seenHint[0]);
+		assertArrayEquals(SECRET,borrowed);
+		java.util.Arrays.fill(borrowed,(byte)0);
+		AString stored=value("borrowed-key");
+		EtchStore store=new EtchStore(etch);
+		store.setRootData(stored);
+		store.close();
+
+		EtchConfig reopenConfig=EtchConfig.create(EtchConstants.VERSION_3)
+				.withKeyFunction(hint->SECRET.clone());
+		EtchStore reopened=new EtchStore(Etch.create(file,reopenConfig));
+		try {
+			assertEquals(stored,reopened.getRootData());
+		} finally {
+			reopened.close();
+		}
+	}
+
+	@Test
+	public void testKeyFunctionReceivesPublicKeyHintFromFile() throws Exception {
+		File file=tempFile("etch-v3-key-hint");
+		AccountKey expectedHint=AccountKey.wrap(sequence(0x40,AccountKey.LENGTH));
+		AccountKey[] createHint=new AccountKey[1];
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,expectedHint,hint->{
+					createHint[0]=hint;
+					return SECRET.clone();
+				});
+
+		Etch.create(file,config).close();
+		assertEquals(expectedHint,createHint[0]);
+
+		AccountKey[] openHint=new AccountKey[1];
+		EtchConfig openConfig=EtchConfig.create(EtchConstants.VERSION_3).withKeyFunction(hint->{
+			openHint[0]=hint;
+			return SECRET.clone();
+		});
+		Etch.create(file,openConfig).close();
+		assertEquals(expectedHint,openHint[0]);
+	}
+
+	@Test
+	public void testSecondV3CopyWinsOverDamagedLegacyLookingProbe() throws Exception {
+		File file=tempFile("etch-v3-second-probe");
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->SECRET.clone());
+		Etch etch=Etch.create(file,config);
+		etch.flush(); // makes copy B the clean-close target
+		etch.close();
+
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			data.seek(Short.BYTES);
+			data.writeShort(EtchConstants.VERSION_1);
+		}
+
+		EtchConfig openConfig=EtchConfig.create(EtchConstants.VERSION_3)
+				.withKeyFunction(hint->SECRET.clone());
+		Etch reopened=Etch.create(file,openConfig);
+		try {
+			assertEquals(EtchConstants.VERSION_3,reopened.getVersion());
+		} finally {
+			reopened.close();
+		}
+	}
+
+	@Test
+	public void testKeyFunctionFailurePropagatesWithoutFileChanges() throws Exception {
+		File file=tempFile("etch-v3-key-failure");
+		RuntimeException expected=new RuntimeException("key lookup failed");
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->{throw expected;});
+
+		RuntimeException actual=assertThrows(RuntimeException.class,()->Etch.create(file,config));
+		assertSame(expected,actual);
+		assertEquals(0L,file.length());
+	}
+
+	@Test
+	public void testKeyFunctionFailureDoesNotCreateTarget() throws Exception {
+		File file=tempFile("etch-v3-key-no-target");
+		assertTrue(file.delete());
+		RuntimeException expected=new RuntimeException("key lookup failed");
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->{throw expected;});
+
+		RuntimeException actual=assertThrows(RuntimeException.class,()->Etch.create(file,config));
+		assertSame(expected,actual);
+		assertFalse(file.exists());
+	}
+
+	@Test
+	public void testKeyFunctionFailureDoesNotModifyExistingFile() throws Exception {
+		File file=tempFile("etch-v3-key-existing-failure");
+		EtchConfig createConfig=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->SECRET.clone());
+		Etch.create(file,createConfig).close();
+		byte[] before=Files.readAllBytes(file.toPath());
+		RuntimeException expected=new RuntimeException("key lookup failed");
+		EtchConfig openConfig=EtchConfig.create(EtchConstants.VERSION_3)
+				.withKeyFunction(hint->{throw expected;});
+
+		RuntimeException actual=assertThrows(RuntimeException.class,()->Etch.create(file,openConfig));
+		assertSame(expected,actual);
+		assertArrayEquals(before,Files.readAllBytes(file.toPath()));
+	}
+
+	@Test
+	public void testInvalidReturnedKeyIsNotModifiedWithoutFileChanges() throws Exception {
+		File file=tempFile("etch-v3-invalid-key");
+		byte[] invalid=new byte[31];
+		java.util.Arrays.fill(invalid,(byte)0x5a);
+		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->invalid);
+
+		assertThrows(IOException.class,()->Etch.create(file,config));
+		byte[] expected=new byte[invalid.length];
+		java.util.Arrays.fill(expected,(byte)0x5a);
+		assertArrayEquals(expected,invalid);
+		assertEquals(0L,file.length());
+	}
+
 	private static void assertEncryptedRoundTrip(EtchConfig.CipherMode cipherMode,
 			boolean encryptedIndex) throws Exception {
 		String cipherName=cipherMode.configName();
 		File file=tempFile("etch-v3-"+cipherName+(encryptedIndex?"-index":""));
 		AString value=value(cipherName+(encryptedIndex?"-index":"-data"));
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
-				true,cipherMode,encryptedIndex,null,SECRET);
+				true,cipherMode,encryptedIndex,null,hint->SECRET.clone());
 
 		EtchStore store=new EtchStore(Etch.create(file,config));
 		store.setRootData(value);
@@ -92,11 +231,13 @@ public class EtchV3IntegrationTest {
 		byte[] wrong=SECRET.clone();
 		wrong[0]^=1;
 		EtchConfig wrongConfig=EtchConfig.createV3(config.getMappingMode(),true,
-				cipherMode,encryptedIndex,null,wrong);
+				cipherMode,encryptedIndex,null,hint->wrong.clone());
 		assertThrows(IOException.class,()->Etch.create(file,wrongConfig));
 		assertThrows(IOException.class,()->Etch.create(file));
 
-		EtchStore reopened=new EtchStore(Etch.create(file,config));
+		EtchConfig openConfig=EtchConfig.create(EtchConstants.VERSION_3)
+				.withKeyFunction(hint->SECRET.clone());
+		EtchStore reopened=new EtchStore(Etch.create(file,openConfig));
 		try {
 			assertEquals(value,reopened.getRootData());
 			assertEquals(cipherMode,reopened.getEtch().getConfig().getCipherMode());

@@ -31,34 +31,46 @@ abstract class EtchHeader {
 		this.storedLength=storedLength;
 	}
 
-	static EtchHeader create(EtchConfig config) throws IOException {
+	static EtchHeader create(EtchConfig config, byte[] masterKey) throws IOException {
 		short version=config.getVersion();
 		return switch (version) {
 			case VERSION_1, VERSION_2 -> LegacyEtchHeader.create(version);
-			case VERSION_3 -> EtchV3Header.create(config);
+			case VERSION_3 -> EtchV3Header.create(config,masterKey);
 			default -> throw unsupported(version);
 		};
 	}
 
-	static EtchHeader open(RandomAccessFile data, String fileName, byte[] secret) throws IOException {
+	/** Resolves an encrypted v3 master key from plaintext header fields. */
+	static byte[] resolveKey(RandomAccessFile data, String fileName, EtchConfig config)
+			throws IOException {
+		data.seek(0L);
+		int magic=data.readUnsignedShort();
+		short version=data.readShort();
+		boolean v3=(magic==MAGIC_NUMBER)&&(version==VERSION_3);
+		if (!v3) v3=hasV3Probe(data,V3_HEADER_B_OFFSET);
+		if (!v3) return null;
+		byte[] copyA=readCopy(data,0L);
+		byte[] copyB=readCopy(data,V3_HEADER_B_OFFSET);
+		return EtchV3Header.resolveKey(copyA,copyB,config,fileName);
+	}
+
+	static EtchHeader open(RandomAccessFile data, String fileName, byte[] masterKey) throws IOException {
 		data.seek(0L);
 		int magic=data.readUnsignedShort();
 		short version=data.readShort();
 		if (magic==MAGIC_NUMBER) {
-			if ((version==VERSION_1)||(version==VERSION_2)) {
-				return LegacyEtchHeader.open(data,version);
-			}
-			if (version==VERSION_3) return openV3(data,fileName,secret);
+			if (version==VERSION_3) return openV3(data,fileName,masterKey);
 		}
 
-		// A damaged v3 copy A must not hide a valid independent copy B.
-		if (data.length()>=V3_HEADER_B_OFFSET+Short.BYTES*2L) {
-			data.seek(V3_HEADER_B_OFFSET);
-			int secondMagic=data.readUnsignedShort();
-			short secondVersion=data.readShort();
-			if ((secondMagic==MAGIC_NUMBER)&&(secondVersion==VERSION_3)) {
-				return openV3(data,fileName,secret);
-			}
+		// A damaged v3 copy A must not hide a valid independent copy B, even
+		// when the damaged probe happens to resemble a supported legacy version.
+		if (hasV3Probe(data,V3_HEADER_B_OFFSET)) {
+			return openV3(data,fileName,masterKey);
+		}
+
+		if ((magic==MAGIC_NUMBER)&&((version==VERSION_1)||(version==VERSION_2))) {
+			data.seek(Short.BYTES*2L);
+			return LegacyEtchHeader.open(data,version);
 		}
 
 		if (magic!=MAGIC_NUMBER) {
@@ -67,11 +79,17 @@ abstract class EtchHeader {
 		throw unsupported(version);
 	}
 
+	private static boolean hasV3Probe(RandomAccessFile data, long position) throws IOException {
+		if (data.length()<position+Short.BYTES*2L) return false;
+		data.seek(position);
+		return (data.readUnsignedShort()==MAGIC_NUMBER)&&(data.readShort()==VERSION_3);
+	}
+
 	private static EtchV3Header openV3(RandomAccessFile data, String fileName,
-			byte[] secret) throws IOException {
+			byte[] masterKey) throws IOException {
 		byte[] copyA=readCopy(data,0L);
 		byte[] copyB=readCopy(data,V3_HEADER_B_OFFSET);
-		return EtchV3Header.select(copyA,copyB,secret,fileName);
+		return EtchV3Header.select(copyA,copyB,masterKey,fileName);
 	}
 
 	private static byte[] readCopy(RandomAccessFile data, long position) throws IOException {
@@ -113,4 +131,9 @@ abstract class EtchHeader {
 	abstract void sync(EtchFileAccess access) throws IOException;
 
 	abstract void close(EtchFileAccess access) throws IOException;
+
+	/** Wipes header-owned key material without writing to the file. */
+	void destroy() {
+		// Legacy and plaintext header implementations own no key material.
+	}
 }

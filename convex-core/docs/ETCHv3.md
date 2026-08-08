@@ -101,8 +101,9 @@ publication as described below.
   secure random number generator.
 - A file may carry an immutable 32-byte `publicKeyHint` identifying the public
   key that the application expects to own the store; all zero means unset.
-- Etch accepts opaque secret material from its caller. HKDF-SHA-256 uses
-  `fileSalt` to derive a file cipher key and a header-MAC key.
+- Encrypted Etch accepts an exact 32-byte master key from its caller.
+  HKDF-SHA-256 uses `fileSalt` to derive a file cipher key and a header-MAC
+  key.
 - Encrypted header verification uses HMAC-SHA-256. Plaintext header tear
   detection uses SHA-256 in the same field.
 - Each cipher identifier fixes its complete offset-to-keystream mapping. There
@@ -418,7 +419,7 @@ verification and repair. Repair does not guess or rewrite the only source file.
 ## Recovery
 
 Opening first validates both plaintext header copies, using SHA-256 for an
-unencrypted file or HMAC-SHA-256 with the caller-supplied secret for an
+unencrypted file or HMAC-SHA-256 with a key derived from the resolved master key for an
 encrypted file. It selects the valid copy with the highest generation. If no
 copy validates, opening fails with a wrong-key or damaged-header error. The
 physical file must reach at least the selected `syncedFileEnd`.
@@ -667,10 +668,51 @@ require running the cipher over preceding file bytes.
 
 ### Caller key material and verification
 
-A caller supplies opaque secret material. Its origin and storage are outside
-the Etch format: it may be a random application secret, output from a hardware
-or operating-system keystore, a password-hardened value, or an Ed25519 seed.
-Etch neither records nor identifies that source.
+An encrypted Etch configuration supplies a synchronous key function. Etch
+calls it during create or open with the file's `publicKeyHint`, or with `null`
+when the hint is unset. The function may block for an operating-system
+keystore, hardware device, interactive prompt or other application-specific
+resolution mechanism. Any unchecked exception from the function is propagated
+and Etch does not finish opening. For a new path, key resolution occurs before
+the target file is created.
+
+The function returns an exactly 32-byte master-key array that remains owned by
+the caller. Etch reads it synchronously to derive the file cipher key and
+header-MAC key, then drops the reference. Etch never retains, modifies or wipes
+the master-key array; its storage, sharing and destruction policy remain the
+caller's responsibility. The array need only remain stable for the duration of
+the key-function call and immediate derivation. Plaintext files do not invoke
+the key function.
+
+The hint is a lookup aid, not authenticated input at the time the function is
+called: the master key is needed to authenticate the header that contains it.
+Applications must not treat an unverified hint as authority for any operation
+other than selecting a candidate key. Successful `headerCheck` verification
+then authenticates the hint with the rest of the immutable header fields.
+
+The origin and persistent storage of the master key are outside the Etch file
+format. It may be random application key material, output from a hardware or
+operating-system keystore, or derived from another high-entropy application
+key. Passphrases must first pass through an appropriate password-hardening KDF.
+
+Convex provides one optional interoperable derivation for applications that
+want to reuse a 32-byte high-entropy source such as an Ed25519 seed without
+using the seed directly as the Etch master key:
+
+```text
+masterPRK = HMAC-SHA-256(key=32 zero bytes, data=sourceKey)
+masterKey = HMAC-SHA-256(
+    key=masterPRK,
+    data=ASCII("convex-etch-master-key-v1") || 0x01)
+```
+
+This is RFC 5869 HKDF-SHA-256 with no salt, the ASCII `info` value
+`convex-etch-master-key-v1`, and a 32-byte output. It is exposed as
+`EtchKeyDerivation.deriveMasterKey`. For the source bytes `00 01 ... 1f`, the
+derived master key is
+`f2cd5efefe2d520f3b93c531b8edc549d9ee2cef2e62cd741c1890246b4bb2e5`.
+The derivation is application policy rather than an on-disk v3 field; other
+applications may resolve the same 32-byte master-key contract differently.
 
 V3 uses HKDF-SHA-256 with `fileSalt` and fixed Etch context labels to derive
 only two file-scoped keys:
@@ -683,7 +725,7 @@ only two file-scoped keys:
 Precisely, each derivation follows RFC 5869:
 
 ```text
-PRK  = HMAC-SHA-256(key=fileSalt, data=callerSecret)
+PRK  = HMAC-SHA-256(key=fileSalt, data=masterKey)
 T(1) = HMAC-SHA-256(key=PRK, data=ASCII(info) || 0x01)
 key  = T(1)
 ```
@@ -693,14 +735,13 @@ used. `0x01` is RFC 5869's mandatory one-byte block counter. It is appended by
 HKDF and is not part of either Etch `info` string.
 
 The second derivation avoids using the same key directly with both a stream
-cipher and HMAC. It does not imply anything about the source secret. A client
-that accepts passphrases must apply an appropriate password-hardening KDF
-before supplying its secret to Etch.
+cipher and HMAC. It does not imply anything about how the master key was
+resolved or derived.
 
 The keyed `headerCheck` is also the key verifier. It is compared in constant
 time and allows a wrong key to be rejected before any index or data is
 interpreted. Like every offline verifier, it also permits offline guessing if a
-client supplies a low-entropy secret directly.
+client derives the master key directly from low-entropy input.
 
 ### File salt, IVs and nonces
 

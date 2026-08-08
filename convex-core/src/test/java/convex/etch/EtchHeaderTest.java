@@ -25,7 +25,7 @@ public class EtchHeaderTest {
 			throws Exception {
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
 		try (EtchFileAccess access=new EtchFileAccess(mapper,"memory-v"+version,0L,0L)) {
-			EtchHeader header=EtchHeader.create(EtchConfig.create(version));
+			EtchHeader header=EtchHeader.create(EtchConfig.create(version),null);
 			header.initialise(access);
 
 			long expectedLength=expectedIndexStart

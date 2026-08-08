@@ -63,6 +63,8 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	private static final VarHandle ALIGNED_LONG=
 			ValueLayout.JAVA_LONG.withOrder(ByteOrder.BIG_ENDIAN).varHandle();
+	private static final ValueLayout.OfLong UNALIGNED_LONG=
+			ValueLayout.JAVA_LONG_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 
 	private final FileChannel channel;
 	private final boolean readOnly;
@@ -116,6 +118,44 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 			remaining-=count;
 			if (remaining>0) current=mappingFor(currentPosition,null);
 		}
+	}
+
+	@Override
+	public boolean matches(long position, byte[] expected, int offset, int length) throws IOException {
+		checkRange(position,length);
+		if (length==0) return true;
+		ensureMapped(position,length,false);
+
+		long currentPosition=position;
+		int expectedOffset=offset;
+		int remaining=length;
+		Mapping current=mappingFor(currentPosition,null);
+		while (remaining>0) {
+			int count=(int)Math.min(remaining,current.end()-currentPosition);
+			int compared=0;
+			try {
+				long segmentOffset=current.offset(currentPosition);
+				while (compared+Long.BYTES<=count) {
+					long actual=current.segment.get(UNALIGNED_LONG,segmentOffset+compared);
+					long wanted=Utils.readLong(expected,expectedOffset+compared,Long.BYTES);
+					if (actual!=wanted) return false;
+					compared+=Long.BYTES;
+				}
+				while (compared<count) {
+					byte actual=current.segment.get(ValueLayout.JAVA_BYTE,segmentOffset+compared);
+					if (actual!=expected[expectedOffset+compared]) return false;
+					compared++;
+				}
+			} catch (IllegalStateException e) {
+				current=mappingFor(currentPosition,current);
+				continue;
+			}
+			currentPosition+=count;
+			expectedOffset+=count;
+			remaining-=count;
+			if (remaining>0) current=mappingFor(currentPosition,null);
+		}
+		return true;
 	}
 
 	@Override

@@ -96,6 +96,12 @@ final class EtchFileMapperFactory {
 		}
 
 		@Override
+		public boolean matches(long position, byte[] expected, int offset, int length)
+				throws IOException {
+			return delegate.matches(position,expected,offset,length);
+		}
+
+		@Override
 		public void getTransformed(long position, byte[] destination, int offset, int length,
 				EtchCipherCursor cursor) throws IOException {
 			delegate.getTransformed(position,destination,offset,length,cursor);

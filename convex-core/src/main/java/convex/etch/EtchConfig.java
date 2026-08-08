@@ -1,7 +1,8 @@
 package convex.etch;
 
-import java.util.Arrays;
+import java.io.IOException;
 import java.util.Objects;
+import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -86,7 +87,7 @@ public final class EtchConfig {
 	private final AccountKey publicKeyHint;
 	private final CipherMode cipherMode;
 	private final boolean encryptedIndex;
-	private final byte[] encryptionSecret;
+	private final Function<AccountKey,byte[]> keyFunction;
 
 	private EtchConfig(short version, MappingMode mappingMode, boolean buildChains) {
 		this(version,mappingMode,buildChains,null,CipherMode.NONE,false,null);
@@ -99,7 +100,7 @@ public final class EtchConfig {
 
 	private EtchConfig(short version, MappingMode mappingMode, boolean buildChains,
 			AccountKey publicKeyHint, CipherMode cipherMode, boolean encryptedIndex,
-			byte[] encryptionSecret) {
+			Function<AccountKey,byte[]> keyFunction) {
 		validateVersion(version);
 		EtchFileMapperFactory.validate(version,mappingMode);
 		cipherMode=Objects.requireNonNull(cipherMode,"cipherMode");
@@ -108,18 +109,15 @@ public final class EtchConfig {
 			throw new IllegalArgumentException("Etch public-key hint requires Etch v3");
 		}
 		if (version!=EtchConstants.VERSION_3) {
-			if ((cipherMode!=CipherMode.NONE)||encryptedIndex||(encryptionSecret!=null)) {
+			if ((cipherMode!=CipherMode.NONE)||encryptedIndex) {
 				throw new IllegalArgumentException("Etch encryption requires Etch v3");
 			}
 		} else if (cipherMode==CipherMode.NONE) {
 			if (encryptedIndex) {
 				throw new IllegalArgumentException("Etch index encryption requires a file cipher");
 			}
-			if (encryptionSecret!=null) {
-				throw new IllegalArgumentException("Plaintext Etch must not receive encryption secret material");
-			}
-		} else if ((encryptionSecret==null)||(encryptionSecret.length==0)) {
-			throw new IllegalArgumentException("Encrypted Etch requires caller secret material");
+		} else if (keyFunction==null) {
+			throw new IllegalArgumentException("Encrypted Etch requires a key function");
 		}
 		this.version=version;
 		this.mappingMode=mappingMode;
@@ -127,7 +125,7 @@ public final class EtchConfig {
 		this.publicKeyHint=publicKeyHint;
 		this.cipherMode=cipherMode;
 		this.encryptedIndex=encryptedIndex;
-		this.encryptionSecret=(encryptionSecret==null)?null:encryptionSecret.clone();
+		this.keyFunction=keyFunction;
 	}
 
 	/**
@@ -165,15 +163,18 @@ public final class EtchConfig {
 	}
 
 	/**
-	 * Creates a fully specified Etch v3 configuration. Secret material is opaque
-	 * to Etch and is copied defensively before per-file keys are derived from it.
+	 * Creates a fully specified Etch v3 configuration. The key function receives
+	 * the public-key hint, or {@code null} when the file has none, and returns a
+	 * caller-owned 32-byte master key. Etch uses the array synchronously to derive
+	 * file-scoped keys and neither retains nor modifies it. The function may block;
+	 * any unchecked exception it throws is propagated from open or create.
 	 */
 	public static EtchConfig createV3(MappingMode mappingMode, boolean buildChains,
 			CipherMode cipherMode, boolean encryptedIndex, AccountKey publicKeyHint,
-			byte[] encryptionSecret) {
+			Function<AccountKey,byte[]> keyFunction) {
 		return new EtchConfig(EtchConstants.VERSION_3,
 				Objects.requireNonNull(mappingMode,"mappingMode"),buildChains,
-				publicKeyHint,cipherMode,encryptedIndex,encryptionSecret);
+				publicKeyHint,cipherMode,encryptedIndex,keyFunction);
 	}
 
 	/**
@@ -189,11 +190,12 @@ public final class EtchConfig {
 	}
 
 	/**
-	 * Compiles a JSON-style configuration map with separately resolved opaque
-	 * secret material. This keeps key lookup and string conversion outside Etch.
+	 * Compiles a JSON-style configuration map with a synchronous key function.
+	 * This keeps key lookup and interactive prompting outside Etch.
 	 */
-	public static EtchConfig fromMap(AMap<AString,ACell> source, byte[] encryptionSecret) {
-		return fromMap(source,EtchConstants.CURRENT_VERSION,encryptionSecret);
+	public static EtchConfig fromMap(AMap<AString,ACell> source,
+			Function<AccountKey,byte[]> keyFunction) {
+		return fromMap(source,EtchConstants.CURRENT_VERSION,keyFunction);
 	}
 
 	/**
@@ -206,12 +208,10 @@ public final class EtchConfig {
 	}
 
 	private static EtchConfig fromMap(AMap<AString,ACell> source, short defaultVersion,
-			byte[] encryptionSecret) {
+			Function<AccountKey,byte[]> keyFunction) {
 		if (source==null) {
-			if (encryptionSecret!=null) {
-				throw new IllegalArgumentException("Encryption secret supplied without an Etch cipher");
-			}
-			return create(defaultVersion);
+			EtchConfig config=create(defaultVersion);
+			return (keyFunction==null)?config:config.withKeyFunction(keyFunction);
 		}
 		validateKeys(source);
 
@@ -297,7 +297,7 @@ public final class EtchConfig {
 		}
 
 		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,
-				cipherMode,encryptedIndex,encryptionSecret);
+				cipherMode,encryptedIndex,keyFunction);
 	}
 
 	private static void validateKeys(AMap<AString,ACell> source) {
@@ -337,7 +337,7 @@ public final class EtchConfig {
 
 	/**
 	 * Gets the optional Etch v3 public-key hint. This identifies key material to
-	 * the application but does not define how an encryption secret is derived.
+	 * the application but does not define how the master key is resolved.
 	 */
 	public AccountKey getPublicKeyHint() {
 		return publicKeyHint;
@@ -351,24 +351,48 @@ public final class EtchConfig {
 		return encryptedIndex;
 	}
 
-	public boolean hasEncryptionSecret() {
-		return encryptionSecret!=null;
+	public boolean hasKeyFunction() {
+		return keyFunction!=null;
 	}
 
-	byte[] encryptionSecret() {
-		return (encryptionSecret==null)?null:encryptionSecret.clone();
+	/**
+	 * Gets the synchronous master-key function, or {@code null} if none is set.
+	 * The argument is nullable because an encrypted file need not carry a
+	 * public-key hint. The returned array remains caller-owned: Etch derives its
+	 * file keys synchronously and does not retain or modify the array.
+	 */
+	public Function<AccountKey,byte[]> getKeyFunction() {
+		return keyFunction;
+	}
+
+	byte[] resolveKey(AccountKey publicKeyHint) throws IOException {
+		if (keyFunction==null) {
+			throw new IOException("Encrypted Etch requires a key function");
+		}
+		byte[] key=keyFunction.apply(publicKeyHint);
+		if ((key==null)||(key.length!=EtchConstants.V3_MASTER_KEY_SIZE)) {
+			throw new IOException("Etch key function must return a "
+					+EtchConstants.V3_MASTER_KEY_SIZE+"-byte key");
+		}
+		return key;
 	}
 
 	EtchConfig withV3FileOptions(CipherMode fileCipher, boolean fileIndexEncrypted,
 			AccountKey filePublicKeyHint) {
 		return new EtchConfig(version,mappingMode,buildChains,filePublicKeyHint,
-				fileCipher,fileIndexEncrypted,encryptionSecret);
+				fileCipher,fileIndexEncrypted,keyFunction);
 	}
 
 	/** Returns a copy of this compiled configuration with the supplied hint. */
 	public EtchConfig withPublicKeyHint(AccountKey hint) {
 		return new EtchConfig(version,mappingMode,buildChains,hint,cipherMode,
-				encryptedIndex,encryptionSecret);
+				encryptedIndex,keyFunction);
+	}
+
+	/** Returns a copy using the supplied synchronous key function. */
+	public EtchConfig withKeyFunction(Function<AccountKey,byte[]> function) {
+		return new EtchConfig(version,mappingMode,buildChains,publicKeyHint,cipherMode,
+				encryptedIndex,function);
 	}
 
 	@Override
@@ -378,15 +402,13 @@ public final class EtchConfig {
 		return (version==other.version)&&(mappingMode==other.mappingMode)
 				&&(buildChains==other.buildChains)
 				&&Objects.equals(publicKeyHint,other.publicKeyHint)
-				&&(cipherMode==other.cipherMode)&&(encryptedIndex==other.encryptedIndex)
-				&&Arrays.equals(encryptionSecret,other.encryptionSecret);
+				&&(cipherMode==other.cipherMode)&&(encryptedIndex==other.encryptedIndex);
 	}
 
 	@Override
 	public int hashCode() {
-		int result=Objects.hash(version,mappingMode,buildChains,publicKeyHint,
+		return Objects.hash(version,mappingMode,buildChains,publicKeyHint,
 				cipherMode,encryptedIndex);
-		return 31*result+Arrays.hashCode(encryptionSecret);
 	}
 
 	@Override
@@ -394,7 +416,7 @@ public final class EtchConfig {
 		return "EtchConfig[version="+version+", mapping="+mappingMode.configName()
 				+", buildChains="+buildChains+", cipher="+cipherMode.configName()
 				+", encryptedIndex="+encryptedIndex+", publicKeyHint="+publicKeyHint
-				+", encryptionSecret="+(encryptionSecret==null?"absent":"present")+"]";
+				+", keyFunction="+(keyFunction==null?"absent":"present")+"]";
 	}
 
 	private static AccountKey normalisePublicKeyHint(AccountKey hint) {

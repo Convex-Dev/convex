@@ -2,6 +2,7 @@ package convex.etch;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,6 +172,10 @@ public class EtchFileMapperTest {
 		byte[] actualPrefix=new byte[prefix.length];
 		mapper.get(3L,actualPrefix,0,actualPrefix.length);
 		assertArrayEquals(prefix,actualPrefix);
+		assertTrue(mapper.matches(3L,prefix,0,prefix.length));
+		byte[] different=prefix.clone();
+		different[different.length-1]^=1;
+		assertFalse(mapper.matches(3L,different,0,different.length));
 		assertEquals(0x0102030405060708L,mapper.readIndexSlotAcquire(24L));
 		byte[] destination=new byte[3];
 		mapper.get(32L,destination,0,destination.length);

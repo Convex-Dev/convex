@@ -175,6 +175,11 @@ public class EtchFileAccessTest {
 		}
 
 		@Override
+		public boolean matches(long position, byte[] expected, int offset, int length) {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
 		public void getTransformed(long position, byte[] destination, int offset, int length,
 				EtchCipherCursor cursor) {
 			throw new UnsupportedOperationException();

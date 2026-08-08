@@ -714,7 +714,7 @@ public final class EtchConcurrentBenchmark {
 			};
 			EtchConfig config=(version==EtchConstants.VERSION_3)
 					?EtchConfig.createV3(mappingMode,buildChains,cipher,encryptedIndex,null,
-							(cipher==EtchConfig.CipherMode.NONE)?null:BENCHMARK_SECRET)
+							(cipher==EtchConfig.CipherMode.NONE)?null:hint->BENCHMARK_SECRET.clone())
 					:EtchConfig.create(version,mappingMode,buildChains);
 			return new StoreConfig(name,config);
 		}

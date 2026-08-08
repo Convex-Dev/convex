@@ -10,7 +10,6 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
-import java.util.Arrays;
 import java.util.Objects;
 
 import convex.core.data.AccountKey;
@@ -71,7 +70,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	 * Opens an existing Etch file for explicit read-only maintenance.
 	 *
 	 * @param file existing Etch file
-	 * @param requestedConfig compiled options, including secret material for an
+	 * @param requestedConfig compiled options, including a key function for an
 	 *        encrypted file; {@code null} permits file-inferred plaintext options
 	 * @return a writer-excluding, read-only maintenance reader
 	 * @throws IOException if the file, lock, header, key or configuration is invalid
@@ -102,6 +101,8 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		FileLock lock=null;
 		EtchFileMapper mapper=null;
 		EtchFileAccess access=null;
+		EtchHeader header=null;
+		byte[] masterKey=null;
 		try {
 			FileChannel channel=data.getChannel();
 			try {
@@ -113,13 +114,8 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 
 			long physicalEnd=channel.size();
 			if (physicalEnd==0L) throw new IOException("Empty Etch file: "+file);
-			byte[] openSecret=(requestedConfig==null)?null:requestedConfig.encryptionSecret();
-			EtchHeader header;
-			try {
-				header=EtchHeader.open(data,file.getName(),openSecret);
-			} finally {
-				if (openSecret!=null) Arrays.fill(openSecret,(byte)0);
-			}
+			masterKey=EtchHeader.resolveKey(data,file.getName(),requestedConfig);
+			header=EtchHeader.open(data,file.getName(),masterKey);
 			EtchConfig config=Etch.resolveExistingConfig(header,requestedConfig,file);
 			long logicalEnd=header.storedLength();
 			if ((logicalEnd<0L)||(logicalEnd>physicalEnd)) {
@@ -136,16 +132,19 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 				throw new IOException("Etch root index extends beyond stored length: "+file);
 			}
 
-			EtchFileCipher cipher=Etch.createFileCipher(header,config);
+			EtchFileCipher cipher=Etch.createFileCipher(header,masterKey);
+			masterKey=null; // borrowed caller-owned array is not retained
 			mapper=EtchFileMapperFactory.createReadOnly(channel,config.getMappingMode());
 			boolean encryptedIndex=(header instanceof EtchV3Header v3)&&v3.isIndexEncrypted();
 			access=new EtchFileAccess(mapper,file.getName(),physicalEnd,physicalEnd,
 					cipher,encryptedIndex);
 			Hash rootHash=header.getRootHash(access);
-			return new EtchMaintenanceReader(file,data,lock,header,config,access,rootHash,
-					physicalEnd);
+			EtchMaintenanceReader result=new EtchMaintenanceReader(file,data,lock,header,
+					config,access,rootHash,physicalEnd);
+			return result;
 		} catch (IOException | RuntimeException | Error e) {
 			closeAfterFailure(access,mapper,lock,data,e);
+			if (header!=null) header.destroy();
 			throw e;
 		}
 	}
@@ -335,6 +334,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		} catch (IOException e) {
 			if (failure==null) failure=e; else failure.addSuppressed(e);
 		}
+		header.destroy();
 		if (failure!=null) throw failure;
 	}
 }

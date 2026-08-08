@@ -51,6 +51,6 @@ public class EtchMixinTest {
 		byte[] secret=new byte[32];
 		secret[0]=first;
 		return EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
-				CipherMode.AES_256_CTR,true,null,secret);
+				CipherMode.AES_256_CTR,true,null,hint->secret.clone());
 	}
 }

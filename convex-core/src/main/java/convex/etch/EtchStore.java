@@ -465,7 +465,7 @@ public class EtchStore extends ACachedStore {
 	/**
 	 * Creates an EtchStore using a specified file and compiled configuration.
 	 * The configuration is used for GC recovery and the eventual store open, so
-	 * encrypted v3 files never lose their caller-supplied secret or policy while
+	 * encrypted v3 files retain their caller-supplied key function and policy while
 	 * reconciling lifecycle files.
 	 *
 	 * @param file File to use for storage. Will be created if it does not already

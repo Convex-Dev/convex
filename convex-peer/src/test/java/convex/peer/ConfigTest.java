@@ -44,7 +44,7 @@ public class ConfigTest {
 		byte[] secret=new byte[32];
 		for (int i=0;i<secret.length;i++) secret[i]=(byte)i;
 		EtchConfig etchConfig=EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
-				CipherMode.AES_256_CTR,true,null,secret);
+				CipherMode.AES_256_CTR,true,null,hint->secret.clone());
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE,"temp");
 		config.put(Keywords.ETCH_CONFIG,etchConfig);
@@ -83,7 +83,7 @@ public class ConfigTest {
 		byte[] secret=new byte[32];
 		secret[0]=first;
 		return EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
-				CipherMode.AES_256_CTR,true,null,secret);
+				CipherMode.AES_256_CTR,true,null,hint->secret.clone());
 	}
 	
 	@Test public void testKeypair() throws ConfigException {

@@ -86,7 +86,7 @@ public class EtchMaintenanceReaderTest {
 	public void testEncryptedDirtyV3ReadsDataAndIndexWithVerifiedKey() throws Exception {
 		File file=tempFile("etch-maintenance-encrypted");
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
-				true,EtchConfig.CipherMode.AES_256_CTR,true,null,SECRET);
+				true,EtchConfig.CipherMode.AES_256_CTR,true,null,hint->SECRET.clone());
 		AString value=Strings.create("encrypted maintenance root "+"0123456789abcdef".repeat(4));
 		EtchStore store=new EtchStore(Etch.create(file,config));
 		store.setRootData(value);
@@ -97,7 +97,7 @@ public class EtchMaintenanceReaderTest {
 		byte[] wrongSecret=SECRET.clone();
 		wrongSecret[0]^=1;
 		EtchConfig wrong=EtchConfig.createV3(config.getMappingMode(),true,
-				EtchConfig.CipherMode.AES_256_CTR,true,null,wrongSecret);
+				EtchConfig.CipherMode.AES_256_CTR,true,null,hint->wrongSecret.clone());
 		assertThrows(IOException.class,()->EtchMaintenanceReader.openUnsafe(file));
 		assertThrows(IOException.class,()->EtchMaintenanceReader.openUnsafe(file,wrong));
 

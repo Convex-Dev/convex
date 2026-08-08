@@ -6,7 +6,6 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -114,7 +113,7 @@ public class EtchUtils {
 	 * any marker, store or sibling file.
 	 *
 	 * @param file Etch store file the caller wishes to open
-	 * @param config compiled Etch configuration, including secret material when
+	 * @param config compiled Etch configuration, including a key function when
 	 *        opening an encrypted v3 store
 	 * @return file that should actually be opened
 	 * @throws IOException in case of invalid configuration, authentication failure,
@@ -276,33 +275,34 @@ public class EtchUtils {
 		for (File candidate:files) {
 			if (candidate.length()==0L) continue;
 			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
-				byte[] secret=(config==null)?null:config.encryptionSecret();
-				EtchHeader header;
+				byte[] masterKey=EtchHeader.resolveKey(data,candidate.getName(),config);
+				EtchHeader header=null;
 				try {
-					header=EtchHeader.open(data,candidate.getName(),secret);
+					header=EtchHeader.open(data,candidate.getName(),masterKey);
+					masterKey=null; // borrowed caller-owned array is not retained
+					Etch.resolveExistingConfig(header,config,candidate);
+					long physicalEnd=data.length();
+					long storedEnd=header.storedLength();
+					if ((storedEnd<0L)||(storedEnd>physicalEnd)) {
+						throw new IOException("Etch stored length is outside the physical file: stored="
+								+storedEnd+" physical="+physicalEnd+" file="+candidate);
+					}
+					long rootIndexEnd;
+					try {
+						rootIndexEnd=Math.addExact(header.indexStart(),
+								(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE);
+					} catch (ArithmeticException e) {
+						throw new IOException("Etch index range overflows: "+candidate,e);
+					}
+					if (rootIndexEnd>storedEnd) {
+						throw new IOException("Etch root index extends beyond stored length: "+candidate);
+					}
+					if ((header instanceof EtchV3Header v3)&&!v3.isCleanClosed()) {
+						throw new IOException("Etch v3 GC recovery requires a cleanly closed file; "
+								+"explicit recovery or repair is required: "+candidate);
+					}
 				} finally {
-					if (secret!=null) Arrays.fill(secret,(byte)0);
-				}
-				Etch.resolveExistingConfig(header,config,candidate);
-				long physicalEnd=data.length();
-				long storedEnd=header.storedLength();
-				if ((storedEnd<0L)||(storedEnd>physicalEnd)) {
-					throw new IOException("Etch stored length is outside the physical file: stored="
-							+storedEnd+" physical="+physicalEnd+" file="+candidate);
-				}
-				long rootIndexEnd;
-				try {
-					rootIndexEnd=Math.addExact(header.indexStart(),
-							(long)EtchConstants.ROOT_INDEX_SIZE*EtchConstants.POINTER_SIZE);
-				} catch (ArithmeticException e) {
-					throw new IOException("Etch index range overflows: "+candidate,e);
-				}
-				if (rootIndexEnd>storedEnd) {
-					throw new IOException("Etch root index extends beyond stored length: "+candidate);
-				}
-				if ((header instanceof EtchV3Header v3)&&!v3.isCleanClosed()) {
-					throw new IOException("Etch v3 GC recovery requires a cleanly closed file; "
-							+"explicit recovery or repair is required: "+candidate);
+					if (header!=null) header.destroy();
 				}
 			}
 		}

@@ -68,14 +68,10 @@ public class Etch {
 	private static final System.Logger LOG=System.getLogger(Etch.class.getName());
 
 	/**
-	 * Temporary byte array on a thread local basis.
+	 * Scratch space used by the synchronised mutation path. The largest temporary
+	 * value is a second-level index block.
 	 */
-	private final ThreadLocal<byte[]> tempArray=new ThreadLocal<>() {
-		@Override
-		public byte[]  initialValue() {
-			return new byte[2048];
-		}
-	};
+	private final byte[] writeScratch=new byte[POINTER_SIZE*SECOND_LEVEL_INDEX_SIZE];
 
 	/**
 	 * Internal pointer to end of database
@@ -98,10 +94,14 @@ public class Etch {
 	private EtchStore store;
 
 	private Etch(File dataFile) throws IOException {
-		this(dataFile,null);
+		this(dataFile,null,null);
 	}
 
 	private Etch(File dataFile, EtchConfig requestedConfig) throws IOException {
+		this(dataFile,requestedConfig,null);
+	}
+
+	private Etch(File dataFile, EtchConfig requestedConfig, byte[] suppliedMasterKey) throws IOException {
 		// Ensure we have a RandomAccessFile that exists
 		this.file=dataFile;
 		if (!dataFile.exists()) dataFile.createNewFile();
@@ -110,6 +110,8 @@ public class Etch {
 		this.fileName = dataFile.getName();
 		EtchFileMapper mapper=null;
 		EtchFileAccess access=null;
+		EtchHeader resolvedHeader=null;
+		byte[] resolvedMasterKey=suppliedMasterKey;
 		try {
 			// Try to exclusively lock the Etch database file
 			FileChannel fileChannel=this.data.getChannel();
@@ -124,18 +126,23 @@ public class Etch {
 			}
 			// at this point, we have an exclusive lock on the database file.
 			boolean newFile=(dataFile.length()==0);
-			EtchHeader resolvedHeader;
 			EtchConfig effectiveConfig=null;
 			if (newFile) {
 				effectiveConfig=(requestedConfig==null)?EtchConfig.create():requestedConfig;
-				resolvedHeader=EtchHeader.create(effectiveConfig);
-			} else {
-				byte[] openSecret=(requestedConfig==null)?null:requestedConfig.encryptionSecret();
-				try {
-					resolvedHeader=EtchHeader.open(this.data,fileName,openSecret);
-				} finally {
-					if (openSecret!=null) Arrays.fill(openSecret,(byte)0);
+				if (effectiveConfig.getCipherMode()!=EtchConfig.CipherMode.NONE) {
+					if (resolvedMasterKey==null) {
+						resolvedMasterKey=effectiveConfig.resolveKey(effectiveConfig.getPublicKeyHint());
+					} else if (resolvedMasterKey.length!=V3_MASTER_KEY_SIZE) {
+						throw new IOException("Etch master key must be exactly "+V3_MASTER_KEY_SIZE+" bytes");
+					}
+				} else if (resolvedMasterKey!=null) {
+					throw new IOException("Plaintext Etch must not receive a master key");
 				}
+				resolvedHeader=EtchHeader.create(effectiveConfig,resolvedMasterKey);
+			} else {
+				if (resolvedMasterKey!=null) throw new IOException("Cannot supply a direct key while opening an existing Etch file");
+				resolvedMasterKey=EtchHeader.resolveKey(this.data,fileName,requestedConfig);
+				resolvedHeader=EtchHeader.open(this.data,fileName,resolvedMasterKey);
 			}
 
 			short fileVersion=resolvedHeader.version();
@@ -156,7 +163,10 @@ public class Etch {
 			this.buildChains=effectiveConfig.isBuildChains();
 			this.requiresOpenTransition=!newFile&&(resolvedHeader instanceof EtchV3Header);
 			mapper=EtchFileMapperFactory.create(fileChannel,effectiveConfig.getMappingMode());
-			EtchFileCipher cipher=createFileCipher(resolvedHeader,effectiveConfig);
+			EtchFileCipher cipher=createFileCipher(resolvedHeader,resolvedMasterKey);
+			// The caller owns the master-key array. All file-scoped derivation is
+			// complete, so Etch deliberately drops the borrowed reference here.
+			resolvedMasterKey=null;
 			boolean encryptedIndex=false;
 			if (resolvedHeader instanceof EtchV3Header v3Header) {
 				encryptedIndex=v3Header.isIndexEncrypted();
@@ -190,6 +200,7 @@ public class Etch {
 			} catch (IOException closeException) {
 				e.addSuppressed(closeException);
 			}
+			if (resolvedHeader!=null) resolvedHeader.destroy();
 			throw e;
 		}
 	}
@@ -240,7 +251,12 @@ public class Etch {
 		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
 		File data = File.createTempFile(prefix+"-", null);
 		if (Constants.ETCH_DELETE_TEMP_ON_EXIT) data.deleteOnExit();
-		return new Etch(data,config);
+		try {
+			return new Etch(data,config);
+		} catch (IOException | RuntimeException | Error e) {
+			if (!data.delete()) data.deleteOnExit();
+			throw e;
+		}
 	}
 
 	/**
@@ -264,6 +280,12 @@ public class Etch {
 	 */
 	public static Etch create(File file, EtchConfig config) throws IOException {
 		if (config==null) throw new IllegalArgumentException("Etch config cannot be null");
+		// Resolve before creating a new encrypted target. A blocking prompt or key
+		// lookup may therefore fail without leaving even an empty Etch file behind.
+		if (!file.exists()&&(config.getCipherMode()!=EtchConfig.CipherMode.NONE)) {
+			byte[] masterKey=config.resolveKey(config.getPublicKeyHint());
+			return new Etch(file,config,masterKey);
+		}
 		return new Etch(file,config);
 	}
 
@@ -285,36 +307,19 @@ public class Etch {
 			throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId(),e);
 		}
 		EtchConfig basis=(requestedConfig==null)?EtchConfig.create(fileVersion):requestedConfig;
-		if ((requestedConfig!=null)&&(requestedConfig.getCipherMode()!=fileCipher)) {
-			throw new IOException("Configured Etch cipher "+requestedConfig.getCipherMode().configName()
-					+" does not match file cipher "+fileCipher.configName()+": "+dataFile);
-		}
-		if ((requestedConfig!=null)
-				&&(requestedConfig.isIndexEncrypted()!=v3Header.isIndexEncrypted())) {
-			throw new IOException("Configured Etch index encryption does not match file: "+dataFile);
-		}
-		AccountKey configuredHint=basis.getPublicKeyHint();
 		AccountKey fileHint=v3Header.publicKeyHint();
-		if ((configuredHint!=null)&&!configuredHint.equals(fileHint)) {
-			throw new IOException("Configured Etch public-key hint does not match file: "+dataFile);
-		}
 		return basis.withV3FileOptions(fileCipher,v3Header.isIndexEncrypted(),fileHint);
 	}
 
 	static EtchFileCipher createFileCipher(EtchHeader resolvedHeader,
-			EtchConfig effectiveConfig) throws IOException {
+			byte[] masterKey) throws IOException {
 		if (!(resolvedHeader instanceof EtchV3Header v3Header)) return null;
-		byte[] cipherSecret=effectiveConfig.encryptionSecret();
-		try {
-			return switch (v3Header.cipherId()) {
-				case V3_CIPHER_NONE -> null;
-				case V3_CIPHER_AES_256_CTR -> AES256CTREtchCipher.derive(cipherSecret,v3Header.fileSalt());
-				case V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(cipherSecret,v3Header.fileSalt());
-				default -> throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId());
-			};
-		} finally {
-			if (cipherSecret!=null) Arrays.fill(cipherSecret,(byte)0);
-		}
+		return switch (v3Header.cipherId()) {
+			case V3_CIPHER_NONE -> null;
+			case V3_CIPHER_AES_256_CTR -> AES256CTREtchCipher.derive(masterKey,v3Header.fileSalt());
+			case V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(masterKey,v3Header.fileSalt());
+			default -> throw new IOException("Unsupported Etch v3 file cipher: "+v3Header.cipherId());
+		};
 	}
 
 	private void readData(long position, byte[] destination, int offset, int length)
@@ -372,7 +377,7 @@ public class Etch {
 		} else if (type==POINTER_PLAIN) {
 			// existing data pointer (non-zero)
 			// check if we have the same value first, otherwise need to resolve conflict
-			// This should have the current (potential collision) key in tempArray
+			// This should have the current (potential collision) key in writeScratch
 			if (checkMatchingKey(key,slotValue)) {
 				return updateInPlace(slotValue,ref);
 			}
@@ -398,7 +403,7 @@ public class Etch {
 			// have collision, so create new index node including the existing pointer
 			int nextLevel=level+1;
 			// Note: temp should contain key from checkMatchingKey!
-			byte[] temp=tempArray.get();
+			byte[] temp=writeScratch;
 			int nextDigitOfCollided=getDigit(Blob.wrap(temp,0,KEY_SIZE),nextLevel);
 			long newIndexPosition=appendLeafIndex(nextLevel,nextDigitOfCollided,slotValue);
 
@@ -711,7 +716,7 @@ public class Etch {
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
 		long dataPosition=rawPointer(dataPointer);
-		byte[] temp=tempArray.get();
+		byte[] temp=writeScratch;
 		readData(dataPosition,temp,0,KEY_SIZE);
 		if (key.equalsBytes(temp,0)) {
 			// key already in store matching at this data position
@@ -735,7 +740,7 @@ public class Etch {
 		int indexBlockLength=POINTER_SIZE*isize;
 		digit=digit&mask;
 		
-		byte[] temp=tempArray.get();
+		byte[] temp=writeScratch;
 		Arrays.fill(temp, 0,indexBlockLength,(byte)0x00);
 		
 		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
@@ -871,7 +876,7 @@ public class Etch {
 		long labelPosition=position+KEY_SIZE;
 
 		// Get current stored values
-		byte[] label=tempArray.get();
+		byte[] label=writeScratch;
 		readData(labelPosition,label,0,LABEL_SIZE);
 		int currentFlags=label[0];
 		int newFlags=Ref.mergeFlags(currentFlags,ref.getFlags()); // idempotent flag merge
@@ -907,7 +912,8 @@ public class Etch {
 
 	private <T extends ACell> RefSoft<T> readMatching(AArrayBlob key, long pointer)
 			throws IOException {
-		if (!fileAccess.isEncrypted()&&!checkMatchingKey(key,pointer)) return null;
+		if (!fileAccess.isEncrypted()
+				&&!fileAccess.matchesPlainData(rawPointer(pointer),key)) return null;
 		return read(key,pointer);
 	}
 	
@@ -1077,7 +1083,7 @@ public class Etch {
 			throw new Error("Etch trying to write zero length encoding for: "+Utils.getClassName(cell));
 		}
 
-		byte[] recordHeader=tempArray.get();
+		byte[] recordHeader=writeScratch;
 		int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
 		recordHeader[0]=(byte)flags; // currently all flags fit in one byte
 		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);

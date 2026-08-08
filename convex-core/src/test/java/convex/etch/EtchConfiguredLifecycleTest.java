@@ -177,27 +177,28 @@ public class EtchConfiguredLifecycleTest {
 				new MatrixCase("v3-plain",EtchConfig.create(EtchConstants.VERSION_3)),
 				new MatrixCase("v3-aes-data",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.AES_256_CTR,
-						false,PUBLIC_KEY_HINT,SECRET)),
+						false,PUBLIC_KEY_HINT,hint->SECRET.clone())),
 				new MatrixCase("v3-aes-index",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.AES_256_CTR,
-						true,PUBLIC_KEY_HINT,SECRET)),
+						true,PUBLIC_KEY_HINT,hint->SECRET.clone())),
 				new MatrixCase("v3-chacha-data",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.CHACHA20,
-						false,PUBLIC_KEY_HINT,SECRET)),
+						false,PUBLIC_KEY_HINT,hint->SECRET.clone())),
 				new MatrixCase("v3-chacha-index",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.CHACHA20,
-						true,PUBLIC_KEY_HINT,SECRET)));
+						true,PUBLIC_KEY_HINT,hint->SECRET.clone())));
 	}
 
 	private static EtchConfig encryptedConfig(EtchConfig.CipherMode cipher,
 			boolean encryptedIndex, byte[] secret) {
 		EtchConfig.MappingMode mapping=EtchConfig.create(EtchConstants.VERSION_3).getMappingMode();
 		return EtchConfig.createV3(mapping,EtchConstants.DEFAULT_BUILD_CHAINS,cipher,
-				encryptedIndex,PUBLIC_KEY_HINT,secret);
+				encryptedIndex,PUBLIC_KEY_HINT,hint->secret.clone());
 	}
 
 	private static byte[] readV3Salt(File file, EtchConfig config) throws IOException {
-		byte[] secret=config.encryptionSecret();
+		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
+				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"r")) {
 			EtchHeader header=EtchHeader.open(data,file.getName(),secret);
 			return ((EtchV3Header)header).fileSalt();
@@ -207,7 +208,8 @@ public class EtchConfiguredLifecycleTest {
 	}
 
 	private static void markV3Open(File file, EtchConfig config) throws IOException {
-		byte[] secret=config.encryptionSecret();
+		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
+				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			EtchV3Header header=(EtchV3Header)EtchHeader.open(data,file.getName(),secret);
 			byte[] copyA=header.encode(header.generation()+1L,header.syncedFileEnd(),
@@ -220,7 +222,7 @@ public class EtchConfiguredLifecycleTest {
 			data.write(copyB);
 			data.getChannel().force(true);
 		} finally {
-			Arrays.fill(secret,(byte)0);
+			if (secret!=null) Arrays.fill(secret,(byte)0);
 		}
 	}
 

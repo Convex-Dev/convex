@@ -157,10 +157,10 @@ public class EtchVersionMatrixTest {
 				new MatrixCase("v3-plain",EtchConfig.create(EtchConstants.VERSION_3)),
 				new MatrixCase("v3-aes",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.AES_256_CTR,
-						false,null,ENCRYPTION_SECRET)),
+						false,null,hint->ENCRYPTION_SECRET.clone())),
 				new MatrixCase("v3-chacha20",EtchConfig.createV3(mapping,
 						EtchConstants.DEFAULT_BUILD_CHAINS,EtchConfig.CipherMode.CHACHA20,
-						false,null,ENCRYPTION_SECRET)));
+						false,null,hint->ENCRYPTION_SECRET.clone())));
 	}
 
 	private static Index<Keyword,ACell> rootFor(AString value) {

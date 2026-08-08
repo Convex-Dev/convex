@@ -86,39 +86,59 @@ final class EtchV3Header extends EtchHeader {
 		this.closeState=closeState;
 		this.activeCopy=activeCopy;
 		this.degraded=degraded;
-		this.headerMacKey=(headerMacKey==null)?null:headerMacKey.clone();
+		this.headerMacKey=headerMacKey;
 	}
 
 	static EtchV3Header create(int cipherId, boolean encryptedIndex, byte[] fileSalt,
-			byte[] secret) {
-		return create(cipherId,encryptedIndex,fileSalt,null,secret);
+			byte[] masterKey) {
+		return create(cipherId,encryptedIndex,fileSalt,null,masterKey);
 	}
 
-	static EtchV3Header create(EtchConfig config) {
+	static EtchV3Header create(EtchConfig config, byte[] masterKey) {
 		byte[] fileSalt=new byte[V3_FILE_SALT_SIZE];
 		SECURE_RANDOM.nextBytes(fileSalt);
-		byte[] secret=config.encryptionSecret();
-		try {
-			return create(config.getCipherMode().fileId(),config.isIndexEncrypted(),
-					fileSalt,config.getPublicKeyHint(),secret);
-		} finally {
-			if (secret!=null) Arrays.fill(secret,(byte)0);
+		return create(config.getCipherMode().fileId(),config.isIndexEncrypted(),
+				fileSalt,config.getPublicKeyHint(),masterKey);
+	}
+
+	static byte[] resolveKey(byte[] copyA, byte[] copyB, EtchConfig config,
+			String fileName) throws IOException {
+		Validation a=decodeCopy(copyA,0);
+		Validation b=decodeCopy(copyB,1);
+		Candidate selected;
+		if ((a.candidate==null)&&(b.candidate==null)) {
+			IOException failure=new IOException("No structurally valid Etch v3 header copy: "+fileName);
+			failure.addSuppressed(a.failure);
+			failure.addSuppressed(b.failure);
+			throw failure;
+		} else if (a.candidate==null) {
+			selected=b.candidate;
+		} else if (b.candidate==null) {
+			selected=a.candidate;
+		} else {
+			if (!a.candidate.sameImmutableFields(b.candidate)) {
+				throw new IOException("Etch v3 headers disagree on immutable fields: "+fileName);
+			}
+			selected=a.candidate;
 		}
+		if (selected.cipherId==V3_CIPHER_NONE) return null;
+		if (config==null) throw new IOException("Encrypted Etch requires configured key resolution: "+fileName);
+		return config.resolveKey(selected.publicKeyHint);
 	}
 
 	static EtchV3Header create(int cipherId, boolean encryptedIndex, byte[] fileSalt,
-			AccountKey publicKeyHint, byte[] secret) {
+			AccountKey publicKeyHint, byte[] masterKey) {
 		publicKeyHint=normalisePublicKeyHint(publicKeyHint);
 		validateImmutable(cipherId,encryptedIndex,V3_INDEX_START,fileSalt,publicKeyHint);
-		byte[] macKey=deriveMacKey(cipherId,secret,fileSalt);
+		byte[] macKey=deriveMacKey(cipherId,masterKey,fileSalt);
 		return new EtchV3Header(cipherId,encryptedIndex,0L,0L,V3_INDEX_START,
 				Hash.UNSET_HASH,fileSalt,publicKeyHint,V3_OPEN,-1,false,macKey);
 	}
 
-	static EtchV3Header select(byte[] copyA, byte[] copyB, byte[] secret,
+	static EtchV3Header select(byte[] copyA, byte[] copyB, byte[] masterKey,
 			String fileName) throws IOException {
-		Validation a=validateCopy(copyA,secret,0);
-		Validation b=validateCopy(copyB,secret,1);
+		Validation a=validateCopy(copyA,masterKey,0);
+		Validation b=validateCopy(copyB,masterKey,1);
 		Candidate selected;
 		boolean degraded;
 		if ((a.candidate==null)&&(b.candidate==null)) {
@@ -150,13 +170,13 @@ final class EtchV3Header extends EtchHeader {
 			degraded=false;
 		}
 
-		byte[] macKey=deriveMacKey(selected.cipherId,secret,selected.fileSalt);
+		byte[] macKey=deriveMacKey(selected.cipherId,masterKey,selected.fileSalt);
 		return selected.toHeader(degraded,macKey);
 	}
 
-	private static Validation validateCopy(byte[] copy, byte[] secret, int copyIndex) {
+	private static Validation validateCopy(byte[] copy, byte[] masterKey, int copyIndex) {
 		try {
-			return new Validation(decodeAndVerify(copy,secret,copyIndex),null);
+			return new Validation(decodeAndVerify(copy,masterKey,copyIndex),null);
 		} catch (IOException | RuntimeException e) {
 			IOException failure=(e instanceof IOException io)?io
 					:new IOException("Invalid Etch v3 header copy "+copyIndex,e);
@@ -164,8 +184,34 @@ final class EtchV3Header extends EtchHeader {
 		}
 	}
 
-	private static Candidate decodeAndVerify(byte[] copy, byte[] secret, int copyIndex)
+	private static Validation decodeCopy(byte[] copy, int copyIndex) {
+		try {
+			return new Validation(decode(copy,copyIndex),null);
+		} catch (IOException | RuntimeException e) {
+			IOException failure=(e instanceof IOException io)?io
+					:new IOException("Invalid Etch v3 header copy "+copyIndex,e);
+			return new Validation(null,failure);
+		}
+	}
+
+	private static Candidate decodeAndVerify(byte[] copy, byte[] masterKey, int copyIndex)
 			throws IOException {
+		Candidate candidate=decode(copy,copyIndex);
+		byte[] macKey=deriveMacKey(candidate.cipherId,masterKey,candidate.fileSalt);
+		try {
+			byte[] expected=calculateCheck(copy,candidate.cipherId,macKey);
+			byte[] actual=Arrays.copyOfRange(copy,V3_HEADER_CHECK_OFFSET,
+					V3_HEADER_CHECK_OFFSET+V3_HEADER_CHECK_SIZE);
+			if (!MessageDigest.isEqual(expected,actual)) {
+				throw new IOException("Etch v3 header check failed for copy "+copyIndex);
+			}
+		} finally {
+			if (macKey!=null) Arrays.fill(macKey,(byte)0);
+		}
+		return candidate;
+	}
+
+	private static Candidate decode(byte[] copy, int copyIndex) throws IOException {
 		if ((copy==null)||(copy.length!=V3_HEADER_COPY_SIZE)) {
 			throw new IOException("Etch v3 header copy must be exactly "+V3_HEADER_COPY_SIZE+" bytes");
 		}
@@ -199,18 +245,6 @@ final class EtchV3Header extends EtchHeader {
 		validateMutable(syncedFileEnd,indexStart,closeState);
 		for (int i=V3_HEADER_PREFIX_SIZE;i<V3_HEADER_CHECK_OFFSET;i++) {
 			if (copy[i]!=0) throw new IOException("Non-zero reserved Etch v3 header byte at "+i);
-		}
-
-		byte[] macKey=deriveMacKey(cipherId,secret,fileSalt);
-		try {
-			byte[] expected=calculateCheck(copy,cipherId,macKey);
-			byte[] actual=Arrays.copyOfRange(copy,V3_HEADER_CHECK_OFFSET,
-					V3_HEADER_CHECK_OFFSET+V3_HEADER_CHECK_SIZE);
-			if (!MessageDigest.isEqual(expected,actual)) {
-				throw new IOException("Etch v3 header check failed for copy "+copyIndex);
-			}
-		} finally {
-			if (macKey!=null) Arrays.fill(macKey,(byte)0);
 		}
 
 		return new Candidate(cipherId,encryptedIndex,generation,syncedFileEnd,
@@ -259,12 +293,12 @@ final class EtchV3Header extends EtchHeader {
 		}
 	}
 
-	private static byte[] deriveMacKey(int cipherId, byte[] secret, byte[] fileSalt) {
+	private static byte[] deriveMacKey(int cipherId, byte[] masterKey, byte[] fileSalt) {
 		if (cipherId==V3_CIPHER_NONE) return null;
-		if ((secret==null)||(secret.length==0)) {
-			throw new IllegalArgumentException("Encrypted Etch v3 header requires caller secret material");
+		if ((masterKey==null)||(masterKey.length!=EtchConstants.V3_MASTER_KEY_SIZE)) {
+			throw new IllegalArgumentException("Encrypted Etch v3 header requires a 32-byte master key");
 		}
-		return EtchKeyDerivation.deriveHeaderMacKey(secret,fileSalt);
+		return EtchKeyDerivation.deriveHeaderMacKey(masterKey,fileSalt);
 	}
 
 	byte[] encode(long generation, long syncedFileEnd, Hash rootHash, long closeState) {
@@ -387,8 +421,13 @@ final class EtchV3Header extends EtchHeader {
 		try {
 			if (closeState!=V3_CLEAN_CLOSED) commit(access,V3_CLEAN_CLOSED);
 		} finally {
-			if (headerMacKey!=null) Arrays.fill(headerMacKey,(byte)0);
+			destroy();
 		}
+	}
+
+	@Override
+	void destroy() {
+		if (headerMacKey!=null) Arrays.fill(headerMacKey,(byte)0);
 	}
 
 	private void commit(EtchFileAccess access, long nextCloseState)

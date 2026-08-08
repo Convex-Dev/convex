@@ -86,31 +86,31 @@ public class EtchConfigTest {
 
 	@Test
 	public void testV3EncryptionConfiguration() {
-		byte[] secret=new byte[] {1,2,3,4};
+		byte[] secret=new byte[EtchConstants.V3_MASTER_KEY_SIZE];
+		secret[0]=1;
 		AMap<AString,ACell> source=Maps.of(
 				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
 				EtchConfig.CIPHER,Strings.create("aes-256-ctr"),
 				EtchConfig.ENCRYPT_INDEX,CVMBool.TRUE);
-		EtchConfig config=EtchConfig.fromMap(source,secret);
-		secret[0]=99;
+		EtchConfig config=EtchConfig.fromMap(source,hint->secret.clone());
 
 		assertEquals(EtchConfig.CipherMode.AES_256_CTR,config.getCipherMode());
 		assertTrue(config.isIndexEncrypted());
-		assertTrue(config.hasEncryptionSecret());
-		assertFalse(config.toString().contains("01020304"));
+		assertTrue(config.hasKeyFunction());
+		assertTrue(config.toString().contains("keyFunction=present"));
 		assertEquals(config,EtchConfig.createV3(config.getMappingMode(),true,
-				EtchConfig.CipherMode.AES_256_CTR,true,null,new byte[] {1,2,3,4}));
+				EtchConfig.CipherMode.AES_256_CTR,true,null,hint->new byte[32]));
 	}
 
 	@Test
 	public void testV3ChaCha20Configuration() {
-		byte[] secret=new byte[] {1,2,3,4};
+		byte[] secret=new byte[EtchConstants.V3_MASTER_KEY_SIZE];
 		EtchConfig config=EtchConfig.fromMap(Maps.of(
 				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_3),
-				EtchConfig.CIPHER,Strings.create("chacha20")),secret);
+				EtchConfig.CIPHER,Strings.create("chacha20")),hint->secret.clone());
 		assertEquals(EtchConfig.CipherMode.CHACHA20,config.getCipherMode());
 		assertFalse(config.isIndexEncrypted());
-		assertTrue(config.hasEncryptionSecret());
+		assertTrue(config.hasKeyFunction());
 	}
 
 	@Test
@@ -123,7 +123,7 @@ public class EtchConfigTest {
 				EtchConfig.CipherMode.NONE,true,null,null));
 		assertThrows(IllegalArgumentException.class,()->EtchConfig.fromMap(Maps.of(
 				EtchConfig.VERSION,CVMLong.create(EtchConstants.VERSION_2),
-				EtchConfig.CIPHER,Strings.create("aes-256-ctr")),new byte[] {1}));
+				EtchConfig.CIPHER,Strings.create("aes-256-ctr")),hint->new byte[32]));
 	}
 
 	@Test

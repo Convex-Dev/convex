@@ -49,6 +49,12 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 	}
 
 	@Override
+	public boolean matches(long position, byte[] expected, int offset, int length) {
+		int start=Math.toIntExact(position);
+		return Arrays.equals(bytes,start,start+length,expected,offset,offset+length);
+	}
+
+	@Override
 	public void getTransformed(long position, byte[] destination, int offset, int length,
 			EtchCipherCursor cursor) throws IOException {
 		cursor.transform(ByteBuffer.wrap(bytes,Math.toIntExact(position),length),

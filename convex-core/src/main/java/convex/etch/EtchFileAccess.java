@@ -64,6 +64,13 @@ final class EtchFileAccess implements AutoCloseable {
 		}
 	}
 
+	boolean matchesPlainData(long position, AArrayBlob expected) throws IOException {
+		if (cipher!=null) throw new IllegalStateException("Direct comparison requires plaintext Etch data");
+		int length=Math.toIntExact(expected.count());
+		position=checkedRange(position,length);
+		return mapper.matches(position,expected.getInternalArray(),expected.getInternalOffset(),length);
+	}
+
 	void writeData(long position, byte[] source, int offset, int length) throws IOException {
 		position=checkedRange(position,length);
 		mapper.ensureWriteCapacity(position,length);

@@ -44,6 +44,8 @@ public final class EtchConstants {
 	public static final int V2_HEADER_SIZE=64;
 	/** Size of the immutable per-file salt in an Etch v3 header. */
 	public static final int V3_FILE_SALT_SIZE=32;
+	/** Size of caller-provided Etch v3 master keys. */
+	public static final int V3_MASTER_KEY_SIZE=32;
 	public static final int V3_HEADER_COPY_SIZE=4096;
 	public static final int V3_HEADER_REGION_SIZE=2*V3_HEADER_COPY_SIZE;
 	public static final int V3_CIPHER_OFFSET=0x004;
