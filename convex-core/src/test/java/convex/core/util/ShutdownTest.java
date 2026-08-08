@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,37 @@ public class ShutdownTest {
 
 	/** Priority base chosen well clear of the real hook priorities (60..120). */
 	private static final int BASE = 900_000;
+
+	@Test
+	public void testRemoveHookByIdentity() throws Exception {
+		int priority=BASE+2000;
+		Runnable retained=()->{};
+		Runnable equalOnly=()->{};
+		Shutdown.addHook(priority,retained);
+		try {
+			Shutdown.removeHook(priority,equalOnly);
+			assertEquals(1,hookCount(order().get(priority)));
+			Shutdown.removeHook(priority,retained);
+			assertEquals(0,hookCount(order().get(priority)));
+		} finally {
+			order().remove(priority);
+		}
+	}
+
+	@Test
+	public void testHookMayDeregisterItself() throws Exception {
+		Shutdown.Group group=new Shutdown.Group(BASE+3000);
+		AtomicInteger calls=new AtomicInteger();
+		Runnable[] holder=new Runnable[1];
+		holder[0]=()->{
+			calls.incrementAndGet();
+			group.removeHook(holder[0]);
+		};
+		group.addHook(holder[0]);
+		group.runHooks();
+		assertEquals(1,calls.get());
+		assertEquals(0,hookCount(group));
+	}
 
 	@Test
 	public void testConcurrentAddHookDistinctPriorities() throws Exception {

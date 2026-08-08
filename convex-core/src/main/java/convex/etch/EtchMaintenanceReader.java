@@ -106,6 +106,8 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		FileLock lock=null;
 		AFileMapper mapper=null;
 		AEtchHeader header=null;
+		EtchFileCipher dataCipher=null;
+		EtchFileCipher indexCipher=null;
 		byte[] masterKey=null;
 		try {
 			FileChannel channel=data.getChannel();
@@ -138,8 +140,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 				throw new IOException("Etch root index extends beyond stored length: "+file);
 			}
 
-			EtchFileCipher dataCipher=Etch.createFileCipher(header,masterKey);
-			EtchFileCipher indexCipher=null;
+			dataCipher=Etch.createFileCipher(header,masterKey);
 			if ((header instanceof EtchV3Header v3)&&v3.isIndexEncrypted()) {
 				indexCipher=Etch.createFileCipher(header,masterKey);
 			}
@@ -149,6 +150,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 					config,mapper,dataCipher,indexCipher,rootHash,physicalEnd);
 			return result;
 		} catch (IOException | RuntimeException | Error e) {
+			Etch.destroyCiphers(dataCipher,indexCipher);
 			closeAfterFailure(mapper,lock,data,e);
 			if (header!=null) header.destroy();
 			throw e;
@@ -232,6 +234,11 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		return (header instanceof EtchV3Header v3)?v3.generation():-1L;
 	}
 
+	boolean isCryptoDestroyed() {
+		return ((dataCipher==null)||dataCipher.isDestroyed())
+				&&((indexCipher==null)||indexCipher.isDestroyed());
+	}
+
 	/** Reads physical bytes without applying an encryption overlay. */
 	public void readRaw(long position, byte[] destination, int offset, int length)
 			throws IOException {
@@ -308,26 +315,33 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	}
 
 	@Override
-	public void close() throws IOException {
+	public synchronized void close() throws IOException {
 		if (closed) return;
 		closed=true;
 		IOException failure=null;
 		try {
-			mapper.close();
-		} catch (IOException e) {
-			failure=e;
+			try {
+				mapper.close();
+			} catch (IOException e) {
+				failure=e;
+			}
+			try {
+				lock.release();
+			} catch (IOException e) {
+				if (failure==null) failure=e; else failure.addSuppressed(e);
+			}
+			try {
+				data.close();
+			} catch (IOException e) {
+				if (failure==null) failure=e; else failure.addSuppressed(e);
+			}
+		} finally {
+			try {
+				header.destroy();
+			} finally {
+				Etch.destroyCiphers(dataCipher,indexCipher);
+			}
 		}
-		try {
-			lock.release();
-		} catch (IOException e) {
-			if (failure==null) failure=e; else failure.addSuppressed(e);
-		}
-		try {
-			data.close();
-		} catch (IOException e) {
-			if (failure==null) failure=e; else failure.addSuppressed(e);
-		}
-		header.destroy();
 		if (failure!=null) throw failure;
 	}
 }

@@ -85,6 +85,7 @@ public class Etch {
 	private final boolean buildChains;
 	private boolean requiresOpenTransition;
 	private boolean closeStarted;
+	private Runnable shutdownHook;
 
 	private EtchStore store;
 
@@ -106,6 +107,8 @@ public class Etch {
 		this.fileName = dataFile.getName();
 		AFileMapper mapper = null;
 		AEtchHeader resolvedHeader = null;
+		EtchFileCipher resolvedDataCipher = null;
+		EtchFileCipher resolvedIndexCipher = null;
 		byte[] resolvedMasterKey = suppliedMasterKey;
 		try {
 			// Try to exclusively lock the Etch database file
@@ -163,25 +166,29 @@ public class Etch {
 			this.requiresOpenTransition = !newFile && (resolvedHeader instanceof EtchV3Header);
 			if (!newFile)
 				mapper.adoptLength(resolvedHeader.storedLength());
-			EtchFileCipher dataCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
-			EtchFileCipher indexCipher = null;
+			resolvedDataCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
 			if ((resolvedHeader instanceof EtchV3Header v3Header) && v3Header.isIndexEncrypted()) {
-				indexCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
+				resolvedIndexCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
 			}
 			// The caller owns the master-key array. All file-scoped derivation is
 			// complete, so Etch deliberately drops the borrowed reference here.
 			resolvedMasterKey = null;
 			this.mapper = mapper;
-			this.dataCipher = dataCipher;
-			this.indexCipher = indexCipher;
+			this.dataCipher = resolvedDataCipher;
+			this.indexCipher = resolvedIndexCipher;
 
 			if (newFile) {
 				header.initialise(this);
 			}
 
 			// shutdown hook to close file / release lock
-			convex.core.util.Shutdown.addHook(Shutdown.ETCH, this::close);
+			shutdownHook=this::close;
+			convex.core.util.Shutdown.addHook(Shutdown.ETCH,shutdownHook);
 		} catch (IOException | RuntimeException | Error e) {
+			Runnable hook=shutdownHook;
+			shutdownHook=null;
+			if (hook!=null) Shutdown.removeHook(Shutdown.ETCH,hook);
+			destroyCiphers(resolvedDataCipher,resolvedIndexCipher);
 			if (mapper != null) {
 				try {
 					mapper.close();
@@ -214,6 +221,7 @@ public class Etch {
 		this.dataCipher = dataCipher;
 		this.indexCipher = indexCipher;
 		this.buildChains = false;
+		this.shutdownHook = null;
 	}
 
 	/**
@@ -628,29 +636,42 @@ public class Etch {
 			if (closeStarted)
 				return;
 			closeStarted = true;
-			Exception failure = null;
+			Runnable hook=shutdownHook;
+			shutdownHook=null;
+			if (hook!=null) Shutdown.removeHook(Shutdown.ETCH,hook);
 			try {
-				if (header != null)
-					header.close(this);
-			} catch (Exception e) {
-				failure = e;
-			}
-			try {
-				mapper.close();
-			} catch (Exception e) {
-				failure = combineCloseFailure(failure, e);
-			}
-			try {
-				if (data != null)
-					data.close();
-			} catch (Exception e) {
-				failure = combineCloseFailure(failure, e);
-			}
-			if (failure != null) {
-				LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
-						+ "; treat the file as dirty (v3 requires explicit recovery open)", failure);
+				Exception failure = null;
+				try {
+					if (header != null)
+						header.close(this);
+				} catch (Exception e) {
+					failure = e;
+				}
+				try {
+					mapper.close();
+				} catch (Exception e) {
+					failure = combineCloseFailure(failure, e);
+				}
+				try {
+					if (data != null)
+						data.close();
+				} catch (Exception e) {
+					failure = combineCloseFailure(failure, e);
+				}
+				if (failure != null) {
+					LOG.log(System.Logger.Level.WARNING, "Etch close did not complete cleanly for " + fileName
+							+ "; treat the file as dirty (v3 requires explicit recovery open)", failure);
+				}
+			} finally {
+				destroyCiphers(dataCipher,indexCipher);
 			}
 		}
+	}
+
+	static void destroyCiphers(EtchFileCipher dataCipher,
+			EtchFileCipher indexCipher) {
+		if (dataCipher!=null) dataCipher.destroy();
+		if ((indexCipher!=null)&&(indexCipher!=dataCipher)) indexCipher.destroy();
 	}
 
 	private static Exception combineCloseFailure(Exception first, Exception next) {
@@ -673,6 +694,15 @@ public class Etch {
 
 	boolean isIndexEncrypted() {
 		return indexCipher != null;
+	}
+
+	boolean isCryptoDestroyed() {
+		return ((dataCipher==null)||dataCipher.isDestroyed())
+				&&((indexCipher==null)||indexCipher.isDestroyed());
+	}
+
+	boolean hasShutdownHook() {
+		return shutdownHook!=null;
 	}
 
 	/**

@@ -313,7 +313,7 @@ public class EtchIOTest {
 		}
 
 		@Override
-		public void initialise(long fileOffset) throws java.io.IOException {
+		void initialiseState(long fileOffset) throws java.io.IOException {
 			if (position==fileOffset) return;
 			starts++;
 			delegate.initialise(fileOffset);
@@ -321,7 +321,7 @@ public class EtchIOTest {
 		}
 
 		@Override
-		public void decrypt(java.nio.ByteBuffer input, byte[] destination, int destinationOffset)
+		void decryptState(java.nio.ByteBuffer input, byte[] destination, int destinationOffset)
 				throws java.io.IOException {
 			int length=input.remaining();
 			delegate.decrypt(input,destination,destinationOffset);
@@ -329,7 +329,7 @@ public class EtchIOTest {
 		}
 
 		@Override
-		public void encrypt(byte[] source, int sourceOffset, java.nio.ByteBuffer output)
+		void encryptState(byte[] source, int sourceOffset, java.nio.ByteBuffer output)
 				throws java.io.IOException {
 			int length=output.remaining();
 			delegate.encrypt(source,sourceOffset,output);
@@ -337,11 +337,16 @@ public class EtchIOTest {
 		}
 
 		@Override
-		public long transformLong(long fileOffset, long value) throws java.io.IOException {
+		long transformLongState(long fileOffset, long value) throws java.io.IOException {
 			slotTransforms++;
 			long result=delegate.transformLong(fileOffset,value);
 			position=fileOffset+Long.BYTES;
 			return result;
+		}
+
+		@Override
+		void destroyState() {
+			delegate.destroy();
 		}
 
 		private void reset() {

@@ -1,6 +1,7 @@
 package convex.etch;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.bouncycastle.crypto.engines.ChaChaEngine;
@@ -21,6 +22,7 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 
 	private final int[] keyWords=new int[KEY_LENGTH/Integer.BYTES];
 	private final ThreadLocal<State> states;
+	private final ArrayList<State> createdStates=new ArrayList<>();
 
 	static ChaCha20EtchCipher derive(byte[] secret, byte[] fileSalt) {
 		byte[] derived=EtchKeyDerivation.deriveFileCipherKey(secret,fileSalt);
@@ -42,32 +44,51 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		for (int i=0;i<keyWords.length;i++) {
 			keyWords[i]=Pack.littleEndianToInt(key,i*Integer.BYTES);
 		}
-		states=ThreadLocal.withInitial(State::new);
+		states=ThreadLocal.withInitial(this::createState);
+	}
+
+	private State createState() {
+		synchronized (this) {
+			ensureActive();
+			State state=new State(keyWords);
+			createdStates.add(state);
+			return state;
+		}
 	}
 
 	@Override
-	public void initialise(long fileOffset) {
+	void initialiseState(long fileOffset) {
 		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
 		states.get().initialise(fileOffset);
 	}
 
 	@Override
-	public void decrypt(ByteBuffer input, byte[] destination, int destinationOffset) {
+	void decryptState(ByteBuffer input, byte[] destination, int destinationOffset) {
 		states.get().decrypt(input,destination,destinationOffset);
 	}
 
 	@Override
-	public void encrypt(byte[] source, int sourceOffset, ByteBuffer output) {
+	void encryptState(byte[] source, int sourceOffset, ByteBuffer output) {
 		states.get().encrypt(source,sourceOffset,output);
 	}
 
 	@Override
-	public long transformLong(long fileOffset, long value) {
-		initialise(fileOffset);
-		return states.get().transformLong(value);
+	long transformLongState(long fileOffset, long value) {
+		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
+		State state=states.get();
+		state.initialise(fileOffset);
+		return state.transformLong(value);
 	}
 
-	private final class State {
+	@Override
+	void destroyState() {
+		Arrays.fill(keyWords,0);
+		for (State state:createdStates) state.destroy();
+		createdStates.clear();
+		states.remove();
+	}
+
+	private static final class State {
 		private final byte[] locator=new byte[EtchConstants.V3_CIPHER_LOCATOR_SIZE];
 		private final byte[] keyStream=new byte[EtchConstants.V3_CHACHA_BLOCK_SIZE];
 		private final int[] inputState=new int[STATE_WORDS];
@@ -75,7 +96,7 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 		private long position=-1L;
 		private int keyStreamOffset=EtchConstants.V3_CHACHA_BLOCK_SIZE;
 
-		private State() {
+		private State(int[] keyWords) {
 			System.arraycopy(CONSTANTS,0,inputState,0,CONSTANTS.length);
 			System.arraycopy(keyWords,0,inputState,CONSTANTS.length,keyWords.length);
 		}
@@ -151,6 +172,15 @@ final class ChaCha20EtchCipher extends EtchFileCipher {
 			keyStreamOffset+=Long.BYTES;
 			position+=Long.BYTES;
 			return transformed;
+		}
+
+		private void destroy() {
+			position=-1L;
+			keyStreamOffset=keyStream.length;
+			Arrays.fill(locator,(byte)0);
+			Arrays.fill(keyStream,(byte)0);
+			Arrays.fill(inputState,0);
+			Arrays.fill(outputState,0);
 		}
 	}
 }

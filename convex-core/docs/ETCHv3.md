@@ -684,6 +684,12 @@ caller's responsibility. The array need only remain stable for the duration of
 the key-function call and immediate derivation. Plaintext files do not invoke
 the key function.
 
+Etch owns the derived file keys and reusable cipher state. It wipes them when
+an open attempt fails or when the owning `Etch` or `EtchMaintenanceReader` is
+closed. Closing an `EtchStore` also closes each Etch file it still owns; after a
+completed online GC cutover, ownership of the target file has transferred to
+the successor store and closing the legacy view does not close that target.
+
 The hint is a lookup aid, not authenticated input at the time the function is
 called: the master key is needed to authenticate the header that contains it.
 Applications must not treat an unverified hint as authority for any operation

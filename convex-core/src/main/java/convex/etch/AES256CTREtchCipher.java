@@ -3,9 +3,11 @@ package convex.etch;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
 import javax.crypto.ShortBufferException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -17,9 +19,12 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 	private static final String TRANSFORMATION="AES/CTR/NoPadding";
 	private static final int KEY_LENGTH=32;
 	private static final int BLOCK_LENGTH=EtchConstants.V3_AES_BLOCK_SIZE;
+	private static final SecretKey ZERO_KEY=new SecretKeySpec(new byte[KEY_LENGTH],"AES");
+	private static final IvParameterSpec ZERO_IV=new IvParameterSpec(new byte[BLOCK_LENGTH]);
 
-	private final SecretKeySpec key;
+	private final OwnedSecretKey key;
 	private final ThreadLocal<State> states;
+	private final ArrayList<State> createdStates=new ArrayList<>();
 
 	static AES256CTREtchCipher derive(byte[] secret, byte[] fileSalt) {
 		byte[] derived=EtchKeyDerivation.deriveFileCipherKey(secret,fileSalt);
@@ -38,43 +43,58 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 		if ((keyBytes==null)||(keyBytes.length!=KEY_LENGTH)) {
 			throw new IllegalArgumentException("AES-256 requires a 32-byte key");
 		}
-		this.key=new SecretKeySpec(keyBytes,"AES");
+		this.key=new OwnedSecretKey(keyBytes);
 		this.states=ThreadLocal.withInitial(this::createState);
 	}
 
 	private State createState() {
-		try {
-			return new State(Cipher.getInstance(TRANSFORMATION));
-		} catch (GeneralSecurityException e) {
-			throw new IllegalStateException("AES-CTR is unavailable",e);
+		synchronized (this) {
+			ensureActive();
+			try {
+				State state=new State(Cipher.getInstance(TRANSFORMATION));
+				createdStates.add(state);
+				return state;
+			} catch (GeneralSecurityException e) {
+				throw new IllegalStateException("AES-CTR is unavailable",e);
+			}
 		}
 	}
 
 	@Override
-	public void initialise(long fileOffset) throws IOException {
+	void initialiseState(long fileOffset) throws IOException {
 		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
-		states.get().initialise(fileOffset);
+		states.get().initialise(fileOffset,key);
 	}
 
 	@Override
-	public void decrypt(ByteBuffer input, byte[] destination, int destinationOffset)
+	void decryptState(ByteBuffer input, byte[] destination, int destinationOffset)
 			throws IOException {
 		int length=input.remaining();
 		states.get().transform(input,ByteBuffer.wrap(destination,destinationOffset,length));
 	}
 
 	@Override
-	public void encrypt(byte[] source, int sourceOffset, ByteBuffer output) throws IOException {
+	void encryptState(byte[] source, int sourceOffset, ByteBuffer output) throws IOException {
 		states.get().transform(ByteBuffer.wrap(source,sourceOffset,output.remaining()),output);
 	}
 
 	@Override
-	public long transformLong(long fileOffset, long value) throws IOException {
-		initialise(fileOffset);
-		return states.get().transformLong(value);
+	long transformLongState(long fileOffset, long value) throws IOException {
+		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
+		State state=states.get();
+		state.initialise(fileOffset,key);
+		return state.transformLong(value);
 	}
 
-	private final class State {
+	@Override
+	void destroyState() {
+		for (State state:createdStates) state.destroy();
+		createdStates.clear();
+		states.remove();
+		key.destroy();
+	}
+
+	private static final class State {
 		private final Cipher cipher;
 		private final byte[] iv=new byte[EtchConstants.V3_CIPHER_LOCATOR_SIZE];
 		private final byte[] skipInput=new byte[BLOCK_LENGTH-1];
@@ -87,7 +107,7 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 			this.cipher=cipher;
 		}
 
-		private void initialise(long fileOffset) throws IOException {
+		private void initialise(long fileOffset, SecretKey key) throws IOException {
 			if (position==fileOffset) return;
 			position=-1L;
 			int skip=EtchCipherLocator.writeAES(fileOffset,iv);
@@ -135,6 +155,59 @@ final class AES256CTREtchCipher extends EtchFileCipher {
 				position=success?nextPosition:-1L;
 			}
 			return Utils.readLong(longOutput,0,Long.BYTES);
+		}
+
+		private void destroy() {
+			position=-1L;
+			try {
+				cipher.init(Cipher.ENCRYPT_MODE,ZERO_KEY,ZERO_IV);
+			} catch (GeneralSecurityException e) {
+				// Best effort: the owned key and all Java-side state are still wiped.
+			}
+			Arrays.fill(iv,(byte)0);
+			Arrays.fill(skipInput,(byte)0);
+			Arrays.fill(skipOutput,(byte)0);
+			Arrays.fill(longInput,(byte)0);
+			Arrays.fill(longOutput,(byte)0);
+		}
+	}
+
+	/** AES key whose owned encoding can be wiped deterministically. */
+	private static final class OwnedSecretKey implements SecretKey {
+		private static final long serialVersionUID=1L;
+		private final byte[] encoded;
+		private volatile boolean destroyed;
+
+		private OwnedSecretKey(byte[] source) {
+			this.encoded=source.clone();
+		}
+
+		@Override
+		public String getAlgorithm() {
+			return "AES";
+		}
+
+		@Override
+		public String getFormat() {
+			return "RAW";
+		}
+
+		@Override
+		public byte[] getEncoded() {
+			if (destroyed) throw new IllegalStateException("AES key is destroyed");
+			return encoded.clone();
+		}
+
+		@Override
+		public void destroy() {
+			if (destroyed) return;
+			destroyed=true;
+			Arrays.fill(encoded,(byte)0);
+		}
+
+		@Override
+		public boolean isDestroyed() {
+			return destroyed;
 		}
 	}
 }

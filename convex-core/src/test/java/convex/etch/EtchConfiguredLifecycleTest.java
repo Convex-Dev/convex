@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -167,6 +168,78 @@ public class EtchConfiguredLifecycleTest {
 			generated.getFile().deleteOnExit();
 			prefixed.getFile().deleteOnExit();
 		}
+	}
+
+	@Test
+	public void testEncryptedEtchCloseDestroysCryptoAndDeregistersHook() throws IOException {
+		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.AES_256_CTR,true,SECRET);
+		File file=File.createTempFile("etch-config-crypto-close",".etch");
+		file.deleteOnExit();
+		Etch etch=Etch.create(file,config);
+		assertTrue(etch.hasShutdownHook());
+		assertFalse(etch.isCryptoDestroyed());
+		etch.close();
+		assertFalse(etch.hasShutdownHook());
+		assertTrue(etch.isCryptoDestroyed());
+	}
+
+	@Test
+	public void testMaintenanceCloseDestroysCrypto() throws IOException {
+		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.CHACHA20,true,SECRET);
+		File file=File.createTempFile("etch-config-maintenance-close",".etch");
+		file.deleteOnExit();
+		try (EtchStore store=EtchStore.create(file,config)) {
+			store.setRootData(EtchGCLifecycleTest.tree(5000));
+		}
+		EtchMaintenanceReader reader=EtchMaintenanceReader.openUnsafe(file,config);
+		assertFalse(reader.isCryptoDestroyed());
+		reader.close();
+		assertTrue(reader.isCryptoDestroyed());
+	}
+
+	@Test
+	public void testCompletedGCTransfersCipherOwnershipToSuccessor() throws IOException {
+		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.AES_256_CTR,true,SECRET);
+		File file=File.createTempFile("etch-config-gc-crypto-owner",".etch");
+		file.deleteOnExit();
+		EtchStore old=EtchStore.create(file,config);
+		EtchStore successor=null;
+		Etch transferred=null;
+		try {
+			AVector<ACell> root=EtchGCLifecycleTest.tree(6000);
+			old.setRootData(root);
+			old.startGC();
+			old.transferGC();
+			successor=old.completeGC();
+			transferred=successor.getEtch();
+			old.close();
+			assertFalse(transferred.isCryptoDestroyed());
+			assertEquals(root,successor.getRootData());
+			successor.close();
+			assertTrue(transferred.isCryptoDestroyed());
+			successor=null;
+		} finally {
+			if (successor!=null) successor.close();
+			old.close();
+		}
+		markRelatedForDeletion(file);
+	}
+
+	@Test
+	public void testClosingActiveGCClosesBothCipherOwners() throws IOException {
+		EtchConfig config=encryptedConfig(EtchConfig.CipherMode.CHACHA20,true,SECRET);
+		File file=File.createTempFile("etch-config-gc-crypto-close",".etch");
+		file.deleteOnExit();
+		EtchStore store=EtchStore.create(file,config);
+		Etch base=store.getEtch();
+		store.startGC();
+		Etch target=store.getTargetEtch();
+		store.close();
+		assertTrue(base.isCryptoDestroyed());
+		assertTrue(target.isCryptoDestroyed());
+		assertFalse(base.hasShutdownHook());
+		assertFalse(target.hasShutdownHook());
+		markRelatedForDeletion(file);
 	}
 
 	private static List<MatrixCase> matrixCases() {
