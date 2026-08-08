@@ -359,7 +359,7 @@ final class EtchV3Header extends AEtchHeader {
 		byte[] emptyHeaders=new byte[V3_HEADER_REGION_SIZE];
 		long headerPosition=etch.appendHeader(emptyHeaders,0,emptyHeaders.length);
 		if (headerPosition!=0L) throw new IllegalStateException("Unexpected Etch v3 header position");
-		long rootPosition=etch.appendZeroIndex(ROOT_INDEX_SIZE*POINTER_SIZE,POINTER_SIZE);
+		long rootPosition=etch.appendNewIndexBlock(0);
 		if (rootPosition!=indexStart()) {
 			throw new IllegalStateException("Unexpected Etch v3 root index position: "+rootPosition);
 		}

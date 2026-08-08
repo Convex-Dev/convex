@@ -34,6 +34,23 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class EtchTest {
+	@Test
+	public void testDirectReadValidatesKey() throws IOException {
+		EtchStore store=EtchStore.createTemp();
+		try {
+			Etch etch=store.getEtch();
+			AVector<CVMLong> value=Vectors.of(1,2,3);
+			Hash key=value.getHash();
+			etch.write(key,value.getRef());
+
+			int digit=key.shortAt(0)&0xffff;
+			long pointer=etch.readSlot(etch.getIndexStart(),digit);
+			assertNotNull(etch.read(key,pointer));
+			assertNull(etch.read(Hash.NULL_HASH,pointer));
+		} finally {
+			store.close();
+		}
+	}
 
 	@Test
 	public void testTempStore() throws IOException {

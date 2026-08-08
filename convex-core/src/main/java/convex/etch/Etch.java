@@ -338,16 +338,7 @@ public class Etch {
 
 	void readData(long position, byte[] destination, int offset, int length)
 			throws IOException {
-		mapper.read(rawPointer(position),destination,offset,length,cipher);
-	}
-
-	void writeData(long position, byte[] source, int offset, int length)
-			throws IOException {
-		mapper.write(rawPointer(position),source,offset,length,cipher);
-	}
-
-	void readHeader(long position, byte[] destination, int offset, int length) throws IOException {
-		mapper.read(position,destination,offset,length,null);
+		mapper.read(position,destination,offset,length,cipher);
 	}
 
 	void writeHeader(long position, byte[] source, int offset, int length) throws IOException {
@@ -358,50 +349,12 @@ public class Etch {
 		return mapper.append(source,offset,length,1,null);
 	}
 
-	long appendIndex(byte[] source, int offset, int length, int alignment) throws IOException {
-		return mapper.append(source,offset,length,alignment,encryptedIndex?cipher:null);
-	}
-
-	long appendZeroIndex(int length, int alignment) throws IOException {
-		return mapper.appendZeros(length,alignment,encryptedIndex?cipher:null);
-	}
-
-	long appendDataRecord(AArrayBlob key, byte[] recordHeader, int headerLength,
-			AArrayBlob encoding) throws IOException {
-		return mapper.append(key,recordHeader,headerLength,encoding,cipher);
-	}
-
-	private void readDataContinued(long position, byte[] destination, int offset, int length)
-			throws IOException {
-		mapper.read(position,destination,offset,length,cipher);
-	}
-
-	private boolean matchesPlainData(long position, AArrayBlob expected) throws IOException {
-		if (cipher!=null) throw new IllegalStateException("Direct comparison requires plaintext Etch data");
-		int length=Math.toIntExact(expected.count());
-		return mapper.matches(position,expected.getInternalArray(),expected.getInternalOffset(),length);
-	}
-
-	long readIndexSlotAcquire(long position) throws IOException {
-		return mapper.readLongAcquire(position,encryptedIndex?cipher:null);
-	}
-
-	void writeIndexSlotRelease(long position, long value) throws IOException {
-		mapper.writeLongRelease(position,value,encryptedIndex?cipher:null);
-	}
-
 	void force() throws IOException {
 		mapper.force();
 	}
 
 	void forceHeader(long position, int length) throws IOException {
 		mapper.forceRange(position,length);
-	}
-
-	private EtchCorruptionError corruption(String message, long first, long second) {
-		return new EtchCorruptionError(message+": first="+Utils.toHexString(first)
-				+" second="+Utils.toHexString(second)+" dataLength="
-				+Utils.toHexString(mapper.length())+" file="+fileName);
 	}
 
 	/**
@@ -538,9 +491,21 @@ public class Etch {
 			return ref;
 		} else if (type==POINTER_CHAIN) {
 			// need to collapse existing chain
-			int chainStartDigit=seekChainStart(indexPosition,digit,isize);
-			if (chainStartDigit==digit) throw new Error("Can't start chain at this digit? "+digit);
-			int chainEndDigit=seekChainEnd(indexPosition,digit,isize);
+			int chainStartDigit=(digit-1)&mask;
+			while (chainStartDigit!=digit) {
+				long candidate=readSlot(indexPosition,chainStartDigit);
+				if (slotType(candidate)==POINTER_START) break;
+				chainStartDigit=(chainStartDigit-1)&mask;
+			}
+			if (chainStartDigit==digit) throw new Error("Infinite chain?");
+
+			int chainEndDigit=(digit+1)&mask;
+			while (chainEndDigit!=digit) {
+				long candidate=readSlot(indexPosition,chainEndDigit);
+				if (slotType(candidate)!=POINTER_CHAIN) break;
+				chainEndDigit=(chainEndDigit+1)&mask;
+			}
+			if (chainEndDigit==digit) throw new Error("Infinite chain?");
 			int nextLevel=level+1;
 
 			int n=(chainStartDigit==chainEndDigit)?isize:(chainEndDigit-chainStartDigit)&mask;
@@ -565,46 +530,6 @@ public class Etch {
 			throw new Error("Unexpected type: "+type);
 		}
 	}
-
-
-	/**
-	 * Finds the start digit of a chain, stepping backwards from the given digit
-	 * @param indexPosition Position of index block
-	 * @param digit Position at which a chain continuation is detected, i.e. search begins.
-	 * @return
-	 * @throws IOException
-	 */
-	private int seekChainStart(long indexPosition, int digit, int isize) throws IOException {
-		int mask=isize-1;
-		digit=digit&mask;
-		int i=(digit-1)&mask;
-		while (i!=digit) {
-			long slotValue=readSlot(indexPosition,i);
-			if (slotType(slotValue)==POINTER_START) return i;
-			i=(i-1)&mask;
-		}
-		throw new Error("Infinite chain?");
-	}
-
-	/**
-	 * Finds the end digit of a chain, stepping forwards from the given digit
-	 * @param indexPosition
-	 * @param digit
-	 * @return Next index position that is not a chain continuation
-	 * @throws IOException
-	 */
-	private int seekChainEnd(long indexPosition, int digit, int isize) throws IOException {
-		int mask=isize-1;
-		digit=digit&mask;
-		int i=(digit+1)&mask;
-		while (i!=digit) {
-			long slotValue=readSlot(indexPosition,i);
-			if (slotType(slotValue)!=POINTER_CHAIN) return i;
-			i=(i+1)&mask;
-		}
-		throw new Error("Infinite chain?");
-	}
-
 	/**
 	 * Writes and existing data pointer into an index block. Existing data assumed to be unique,
 	 * so we don't check for key clashes.
@@ -655,13 +580,13 @@ public class Etch {
 	 */
 	Blob readBlob(long pointer, int length) throws IOException {
 		byte[] bs=new byte[length];
-		readData(pointer,bs,0,length);
+		readData(rawPointer(pointer),bs,0,length);
 		return Blob.wrap(bs);
 	}
 	
 	public Hash readValueKey(long ptr) throws IOException {
 		byte[] bs=new byte[KEY_SIZE];
-		readData(ptr,bs,0,KEY_SIZE);
+		readData(rawPointer(ptr),bs,0,KEY_SIZE);
 		return Hash.wrap(bs);
 	}
 
@@ -813,7 +738,8 @@ public class Etch {
 		
 		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix,dataPointer); // single node
-		return appendIndex(temp,0,indexBlockLength,POINTER_SIZE);
+		return mapper.append(temp,0,indexBlockLength,POINTER_SIZE,
+				encryptedIndex?cipher:null);
 	}
 
 	/**
@@ -843,30 +769,45 @@ public class Etch {
 		ptr=rawPointer(ptr);
 		return (T)(read(null,ptr).getValue());
 	}
-		
+
+	/**
+	 * Reads and validates a Ref at a data pointer.
+	 * @param <T>
+	 * @param key Desired key for lookup
+	 * @param pointer Data position pointer in etch file
+	 * @return Valid Ref for this store, or null if not found
+	 * @throws IOException
+	 */
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
 		long recordPosition=rawPointer(pointer);
-		boolean includeKey=(key==null)||(cipher!=null);
-		long readPosition=includeKey?recordPosition:Math.addExact(recordPosition,KEY_SIZE);
-		int headerOffset=includeKey?KEY_SIZE:0;
+		long readPosition=recordPosition;
+		int headerOffset=KEY_SIZE;
+		if ((key!=null)&&(cipher==null)) {
+			int keyLength=Math.toIntExact(key.count());
+			if (!mapper.matches(recordPosition,key.getInternalArray(),key.getInternalOffset(),keyLength)) return null;
+			readPosition=Math.addExact(recordPosition,KEY_SIZE);
+			headerOffset=0;
+		}
 		int headerLength=headerOffset+LABEL_SIZE+ENCODING_LENGTH_SIZE;
 		byte[] recordHeader=new byte[headerLength];
-		readDataContinued(readPosition,recordHeader,0,headerLength);
-		if ((key!=null)&&includeKey&&!key.equalsBytes(recordHeader,0)) return null;
+		mapper.read(readPosition,recordHeader,0,headerLength,cipher);
+		if (headerOffset==KEY_SIZE) {
+			if (key==null) {
+				key=Hash.wrap(recordHeader,0);
+			} else if (!key.equalsBytes(recordHeader,0)) {
+				return null;
+			}
+		}
 
 		int encodingLength=Utils.readShort(recordHeader,headerOffset+LABEL_SIZE);
 		if (encodingLength<=0) {
-			throw corruption("Invalid Etch encoding length",readPosition,encodingLength);
+			throw new EtchCorruptionError("Invalid Etch encoding length: first="
+					+Utils.toHexString(readPosition)+" second="+Utils.toHexString(encodingLength)
+					+" dataLength="+Utils.toHexString(mapper.length())+" file="+fileName);
 		}
 		long encodingPosition=Math.addExact(readPosition,headerLength);
-		byte[] encoding=new byte[encodingLength];
-		readDataContinued(encodingPosition,encoding,0,encodingLength);
-		if (key==null) key=Hash.wrap(recordHeader,0);
-		return decodeDataRecord(key,pointer,recordHeader,headerOffset,encoding);
-	}
-
-	private <T extends ACell> RefSoft<T> decodeDataRecord(AArrayBlob key, long pointer,
-			byte[] recordHeader, int headerOffset, byte[] encodingBytes) {
+		byte[] encodingBytes=new byte[encodingLength];
+		mapper.read(encodingPosition,encodingBytes,0,encodingLength,cipher);
 		
 		// get flags byte
 		byte flagByte=recordHeader[headerOffset];
@@ -914,7 +855,7 @@ public class Etch {
 	 */
 	public long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
-		return readIndexSlotAcquire(pointerIndex);
+		return mapper.readLongAcquire(pointerIndex,encryptedIndex?cipher:null);
 	}
 
 	/**
@@ -963,7 +904,7 @@ public class Etch {
 		if ((currentSize==0L)&&((newFlags&Ref.STATUS_MASK)>=Ref.PERSISTED)) {
 			Utils.writeLong(label,Byte.BYTES,ref.getValue().getMemorySize());
 		}
-		writeData(labelPosition,label,0,LABEL_SIZE);
+		mapper.write(labelPosition,label,0,LABEL_SIZE,cipher);
 
 		return ref.withFlags(newFlags);	// reflect merged flags
 	}
@@ -978,15 +919,9 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position=indexPosition+digit*POINTER_SIZE;
-		writeIndexSlotRelease(position,slotValue);
+		mapper.writeLongRelease(position,slotValue,encryptedIndex?cipher:null);
 	}
 
-	private <T extends ACell> RefSoft<T> readMatching(AArrayBlob key, long pointer)
-			throws IOException {
-		if ((cipher==null)&&!matchesPlainData(rawPointer(pointer),key)) return null;
-		return read(key,pointer);
-	}
-	
 	/**
 	 * Visits all index blocks in this Etch file.
 	 *
@@ -1042,7 +977,7 @@ public class Etch {
 			long newIndexPosition=rawPointer(slotValue);
 			return readAtIndex(key,level+1,newIndexPosition);
 		} else if (type==POINTER_PLAIN) {
-			return readMatching(key,slotValue);
+			return read(key,slotValue);
 		} else if (type==POINTER_CHAIN) {
 			// continuation of chain from some previous index, therefore key can't be present
 			return null;
@@ -1055,7 +990,7 @@ public class Etch {
 			int i=0;
 			while (i<isize) {
 				long ptr=slotValue&(~POINTER_TYPE_MASK);
-				RefSoft<T> result=readMatching(key,ptr);
+				RefSoft<T> result=read(key,ptr);
 				if (result!=null) return result;
 
 				i++; // advance to next position
@@ -1106,7 +1041,7 @@ public class Etch {
 	 * @return The location of the newly added index block.
 	 * @throws IOException
 	 */
-	private long appendNewIndexBlock(int level) throws IOException {
+	long appendNewIndexBlock(int level) throws IOException {
 		if (level>=MAX_LEVEL) {
 			// Invalid level! Prepare to output error
 			throw new Error("Overflowing key size - key collision?");
@@ -1117,11 +1052,7 @@ public class Etch {
 		
 		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
 		int alignment=(level==0)?1:POINTER_SIZE;
-		long position=appendZeroIndex(sizeBytes,alignment);
-		if ((level==0)&&(position!=indexStart)) {
-			throw new IllegalStateException("Unexpected Etch root index position: "+position);
-		}
-		return position;
+		return mapper.appendZeros(sizeBytes,alignment,encryptedIndex?cipher:null);
 	}
 
 	/**
@@ -1159,8 +1090,8 @@ public class Etch {
 		Utils.writeLong(recordHeader,Byte.BYTES,memorySize);
 		Utils.writeShort(recordHeader,LABEL_SIZE,length);
 
-		return appendDataRecord(key,recordHeader,
-				LABEL_SIZE+ENCODING_LENGTH_SIZE,encoding);
+		return mapper.append(key,recordHeader,LABEL_SIZE+ENCODING_LENGTH_SIZE,
+				encoding,cipher);
 	}
 
 	public File getFile() {

@@ -20,14 +20,13 @@ public class EtchIOTest {
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(128L);
 			AFileMapper mapper=new MBBFileMapper(data.getChannel(),false,64L,file.getName());
-			Etch etch=new Etch(mapper,file.getName(),null,false);
 			try {
-				etch.readData(63L,new byte[1],0,1);
-				assertThrows(EtchCorruptionError.class,()->etch.readData(63L,new byte[2],0,2));
-				assertThrows(EtchCorruptionError.class,()->etch.writeData(63L,new byte[2],0,2));
+				mapper.read(63L,new byte[1],0,1,null);
+				assertThrows(EtchCorruptionError.class,()->mapper.read(63L,new byte[2],0,2,null));
+				assertThrows(EtchCorruptionError.class,()->mapper.write(63L,new byte[2],0,2,null));
 				assertEquals(128L,data.length());
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -38,22 +37,21 @@ public class EtchIOTest {
 		File file=File.createTempFile("etch-access-append", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			Etch etch=new Etch(mapper,file.getName(),null,false);
 			try {
 				Blob key=Blob.wrap(new byte[] { 1,2,3,4 });
 				byte[] header=new byte[] { 5,6 };
 				Blob encoding=Blob.wrap(new byte[] { 7,8,9 });
-				assertEquals(0L,etch.appendDataRecord(key,header,header.length,encoding));
-				assertEquals(9L,etch.getDataLength());
+				assertEquals(0L,mapper.append(key,header,header.length,encoding,null));
+				assertEquals(9L,mapper.length());
 				byte[] actual=new byte[9];
-				etch.readData(0L,actual,0,actual.length);
+				mapper.read(0L,actual,0,actual.length,null);
 				assertArrayEquals(new byte[] { 1,2,3,4,5,6,7,8,9 },actual);
 
 				byte[] second=new byte[] { 5,6,7,8 };
-				assertEquals(16L,etch.appendIndex(second,0,second.length,8));
-				assertEquals(20L,etch.getDataLength());
+				assertEquals(16L,mapper.append(second,0,second.length,8,null));
+				assertEquals(20L,mapper.length());
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -74,20 +72,19 @@ public class EtchIOTest {
 	@Test
 	public void testFailedMultipartAppendDoesNotPublishLogicalEnd() throws Exception {
 		FailingWriteMapper mapper=new FailingWriteMapper();
-		Etch etch=new Etch(mapper,"failing",null,false);
 		try {
 			Blob key=Blob.wrap(new byte[] { 1,2,3,4 });
 			byte[] header=new byte[] { 5,6 };
 			Blob encoding=Blob.wrap(new byte[] { 7,8,9 });
 			assertThrows(java.io.IOException.class,
-					()->etch.appendDataRecord(key,header,header.length,encoding));
+					()->mapper.append(key,header,header.length,encoding,null));
 			assertEquals(1,mapper.capacityChecks);
 			assertEquals(3,mapper.puts);
 			assertEquals(0L,mapper.preparedPosition);
 			assertEquals(9L,mapper.preparedLength);
-			assertEquals(0L,etch.getDataLength());
+			assertEquals(0L,mapper.length());
 		} finally {
-			etch.close();
+			mapper.close();
 		}
 	}
 
@@ -97,10 +94,9 @@ public class EtchIOTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			Etch etch=new Etch(mapper,file.getName(),cipher,false);
 			try {
 				byte[] plainHeader=new byte[] { 11,12,13,14 };
-				assertEquals(0L,etch.appendHeader(plainHeader,0,plainHeader.length));
+				assertEquals(0L,mapper.append(plainHeader,0,plainHeader.length,1,null));
 				assertEquals(0,cipher.starts);
 
 				byte[] keyBytes=new byte[EtchConstants.KEY_SIZE];
@@ -114,7 +110,7 @@ public class EtchIOTest {
 				Utils.writeShort(recordHeader,EtchConstants.LABEL_SIZE,(short)encodingBytes.length);
 
 				cipher.reset();
-				long position=etch.appendDataRecord(key,recordHeader,recordHeader.length,encoding);
+				long position=mapper.append(key,recordHeader,recordHeader.length,encoding,cipher);
 				assertEquals(1,cipher.starts);
 
 				byte[] raw=new byte[keyBytes.length+recordHeader.length+encodingBytes.length];
@@ -127,11 +123,11 @@ public class EtchIOTest {
 
 				cipher.reset();
 				byte[] stored=new byte[plain.length];
-				etch.readData(position,stored,0,stored.length);
+				mapper.read(position,stored,0,stored.length,cipher);
 				assertEquals(1,cipher.starts);
 				assertArrayEquals(plain,stored);
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -144,22 +140,21 @@ public class EtchIOTest {
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(8L);
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			Etch etch=new Etch(mapper,file.getName(),cipher,false);
 			try {
 				byte[] first=new byte[] { 1,2,3,4 };
 				byte[] second=new byte[] { 5,6,7,8 };
-				etch.writeData(0L,first,0,first.length);
-				etch.writeData(4L,second,0,second.length);
+				mapper.write(0L,first,0,first.length,cipher);
+				mapper.write(4L,second,0,second.length,cipher);
 				assertEquals(1,cipher.starts);
 
 				cipher.reset();
 				byte[] actual=new byte[8];
-				etch.readData(0L,actual,0,first.length);
-				etch.readData(4L,actual,first.length,second.length);
+				mapper.read(0L,actual,0,first.length,cipher);
+				mapper.read(4L,actual,first.length,second.length,cipher);
 				assertEquals(1,cipher.starts);
 				assertArrayEquals(new byte[] { 1,2,3,4,5,6,7,8 },actual);
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -171,17 +166,16 @@ public class EtchIOTest {
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
-			Etch etch=new Etch(mapper,file.getName(),cipher,true);
 			try {
-				long indexPosition=etch.appendZeroIndex(2*Long.BYTES,Long.BYTES);
+				long indexPosition=mapper.appendZeros(2*Long.BYTES,Long.BYTES,cipher);
 				assertEquals(1,cipher.starts);
-				assertEquals(0L,etch.readIndexSlotAcquire(indexPosition));
+				assertEquals(0L,mapper.readLongAcquire(indexPosition,cipher));
 				long value=0x0123456789abcdefL;
-				etch.writeIndexSlotRelease(indexPosition+Long.BYTES,value);
-				assertEquals(value,etch.readIndexSlotAcquire(indexPosition+Long.BYTES));
+				mapper.writeLongRelease(indexPosition+Long.BYTES,value,cipher);
+				assertEquals(value,mapper.readLongAcquire(indexPosition+Long.BYTES,cipher));
 				assertFalse(value==mapper.readLongAcquire(indexPosition+Long.BYTES,null));
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
@@ -195,16 +189,15 @@ public class EtchIOTest {
 			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			mapper.appendZeros(Long.BYTES,Long.BYTES,null);
 			mapper.writeLongRelease(0L,0x0123456789abcdefL,null);
-			Etch etch=new Etch(mapper,file.getName(),cipher,false);
 			try {
 				cipher.reset();
-				assertEquals(0x0123456789abcdefL,etch.readIndexSlotAcquire(0L));
-				etch.writeIndexSlotRelease(0L,0x1020304050607080L);
-				assertEquals(0x1020304050607080L,etch.readIndexSlotAcquire(0L));
+				assertEquals(0x0123456789abcdefL,mapper.readLongAcquire(0L,null));
+				mapper.writeLongRelease(0L,0x1020304050607080L,null);
+				assertEquals(0x1020304050607080L,mapper.readLongAcquire(0L,null));
 				assertEquals(0,cipher.starts);
 				assertEquals(0,cipher.slotTransforms);
 			} finally {
-				etch.close();
+				mapper.close();
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();

@@ -139,7 +139,7 @@ public class EtchV3HeaderTest {
 
 			Hash root=hashSequence(1);
 			header.setRootHash(etch,root);
-			etch.appendIndex(new byte[] { 42 },0,1,1);
+			mapper.append(new byte[] { 42 },0,1,1,null);
 			header.sync(etch);
 			assertEquals(2,mapper.fullForceCount());
 			assertEquals(3,mapper.rangeForceCount());

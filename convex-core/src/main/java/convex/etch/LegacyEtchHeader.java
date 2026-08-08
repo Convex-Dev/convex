@@ -2,9 +2,7 @@ package convex.etch;
 
 import static convex.etch.EtchConstants.DATA_LENGTH_OFFSET;
 import static convex.etch.EtchConstants.MAGIC_NUMBER;
-import static convex.etch.EtchConstants.POINTER_SIZE;
 import static convex.etch.EtchConstants.ROOT_HASH_OFFSET;
-import static convex.etch.EtchConstants.ROOT_INDEX_SIZE;
 import static convex.etch.EtchConstants.VERSION_1;
 import static convex.etch.EtchConstants.VERSION_2;
 import static convex.etch.EtchConstants.VERSION_OFFSET;
@@ -85,8 +83,7 @@ final class LegacyEtchHeader extends AEtchHeader {
 		long headerPosition=etch.appendHeader(initialHeader,0,initialHeader.length);
 		if (headerPosition!=0L) throw new IllegalStateException("Unexpected Etch header position");
 
-		int rootLength=ROOT_INDEX_SIZE*POINTER_SIZE;
-		long rootPosition=etch.appendZeroIndex(rootLength,1);
+		long rootPosition=etch.appendNewIndexBlock(0);
 		if (rootPosition!=indexStart()) {
 			throw new IllegalStateException("Unexpected Etch root index position: "+rootPosition);
 		}
