@@ -162,7 +162,8 @@ public class EtchFileMapperTest {
 		AES256CTREtchCipher cipher=AES256CTREtchCipher.fromKey(new byte[32]);
 		byte[] transformed=new byte[] { 21,22,23,24,25 };
 		mapper.ensureWriteCapacity(48L,transformed.length);
-		mapper.putTransformed(48L,transformed,0,transformed.length,cipher.start(48L));
+		cipher.initialise(48L);
+		mapper.putTransformed(48L,transformed,0,transformed.length,cipher);
 
 		// Force a remap, then confirm old positions remain accessible.
 		byte[] grown=new byte[] { 0x11,0x22,0x33,0x44,0x55,0x66,0x77,(byte)0x88 };
@@ -181,7 +182,8 @@ public class EtchFileMapperTest {
 		mapper.get(32L,destination,0,destination.length);
 		assertArrayEquals(new byte[] { 8,7,6 },destination);
 		byte[] transformedResult=new byte[transformed.length];
-		mapper.getTransformed(48L,transformedResult,0,transformedResult.length,cipher.start(48L));
+		cipher.initialise(48L);
+		mapper.getTransformed(48L,transformedResult,0,transformedResult.length,cipher);
 		assertArrayEquals(transformed,transformedResult);
 		byte[] actualGrown=new byte[grown.length];
 		mapper.get(GROWN_POSITION,actualGrown,0,actualGrown.length);

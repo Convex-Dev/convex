@@ -35,7 +35,7 @@ public class AES256CTREtchCipherTest {
 	}
 
 	@Test
-	public void testRandomAccessAndSplitCursor() throws Exception {
+	public void testRandomAccessAndSplitOperation() throws Exception {
 		byte[] key=new byte[32];
 		for (int i=0;i<key.length;i++) key[i]=(byte)(i*7+3);
 		AES256CTREtchCipher cipher=AES256CTREtchCipher.fromKey(key);
@@ -52,10 +52,10 @@ public class AES256CTREtchCipherTest {
 		assertArrayEquals(Arrays.copyOfRange(encrypted,offset,offset+length),
 				transform(cipher,offset,slice));
 
-		EtchCipherCursor cursor=cipher.start(offset);
 		byte[] splitOutput=new byte[length];
-		cursor.transform(ByteBuffer.wrap(slice,0,7),ByteBuffer.wrap(splitOutput,0,7));
-		cursor.transform(ByteBuffer.wrap(slice,7,length-7),ByteBuffer.wrap(splitOutput,7,length-7));
+		cipher.initialise(offset);
+		cipher.encrypt(slice,0,ByteBuffer.wrap(splitOutput,0,7));
+		cipher.encrypt(slice,7,ByteBuffer.wrap(splitOutput,7,length-7));
 		assertArrayEquals(Arrays.copyOfRange(encrypted,offset,offset+length),splitOutput);
 	}
 
@@ -64,8 +64,8 @@ public class AES256CTREtchCipherTest {
 		AES256CTREtchCipher cipher=AES256CTREtchCipher.fromKey(new byte[32]);
 		long value=0x0123456789abcdefL;
 		for (long offset:new long[] { 0L,8L,16L,24L,ONE_TEBIBYTE }) {
-			long encrypted=cipher.start(offset).transformLong(value);
-			long decrypted=cipher.start(offset).transformLong(encrypted);
+			long encrypted=cipher.transformLong(offset,value);
+			long decrypted=cipher.transformLong(offset,encrypted);
 			org.junit.jupiter.api.Assertions.assertEquals(value,decrypted);
 		}
 	}
@@ -78,7 +78,8 @@ public class AES256CTREtchCipherTest {
 
 	private static byte[] transform(EtchFileCipher cipher, long offset, byte[] input) throws Exception {
 		byte[] output=new byte[input.length];
-		cipher.start(offset).transform(ByteBuffer.wrap(input),ByteBuffer.wrap(output));
+		cipher.initialise(offset);
+		cipher.encrypt(input,0,ByteBuffer.wrap(output));
 		return output;
 	}
 

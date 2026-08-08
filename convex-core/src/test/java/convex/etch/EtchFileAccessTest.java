@@ -151,6 +151,27 @@ public class EtchFileAccessTest {
 		if (!file.delete()) file.deleteOnExit();
 	}
 
+	@Test
+	public void testPlainIndexFastPathDoesNotTouchCipher() throws Exception {
+		File file=File.createTempFile("etch-access-plain-index", ".dat");
+		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			mapper.ensureWriteCapacity(0L,Long.BYTES);
+			mapper.writeIndexSlotRelease(0L,0x0123456789abcdefL);
+			try (EtchFileAccess access=new EtchFileAccess(
+					mapper,file.getName(),Long.BYTES,data.length(),cipher,false)) {
+				cipher.reset();
+				assertEquals(0x0123456789abcdefL,access.readIndexSlotAcquire(0L));
+				access.writeIndexSlotRelease(0L,0x1020304050607080L);
+				assertEquals(0x1020304050607080L,access.readIndexSlotAcquire(0L));
+				assertEquals(0,cipher.starts);
+				assertEquals(0,cipher.slotTransforms);
+			}
+		}
+		if (!file.delete()) file.deleteOnExit();
+	}
+
 	private static final class FailingWriteMapper implements EtchFileMapper {
 		private int capacityChecks;
 		private int puts;
@@ -181,13 +202,13 @@ public class EtchFileAccessTest {
 
 		@Override
 		public void getTransformed(long position, byte[] destination, int offset, int length,
-				EtchCipherCursor cursor) {
+				EtchFileCipher cipher) {
 			throw new UnsupportedOperationException();
 		}
 
 		@Override
 		public void putTransformed(long position, byte[] source, int offset, int length,
-				EtchCipherCursor cursor) throws java.io.IOException {
+				EtchFileCipher cipher) throws java.io.IOException {
 			put(position,source,offset,length);
 		}
 
@@ -222,19 +243,39 @@ public class EtchFileAccessTest {
 	private static final class CountingCipher implements EtchFileCipher {
 		private final EtchFileCipher delegate;
 		private int starts;
+		private int slotTransforms;
 
 		private CountingCipher(EtchFileCipher delegate) {
 			this.delegate=delegate;
 		}
 
 		@Override
-		public EtchCipherCursor start(long fileOffset) throws java.io.IOException {
+		public void initialise(long fileOffset) throws java.io.IOException {
 			starts++;
-			return delegate.start(fileOffset);
+			delegate.initialise(fileOffset);
+		}
+
+		@Override
+		public void decrypt(java.nio.ByteBuffer input, byte[] destination, int destinationOffset)
+				throws java.io.IOException {
+			delegate.decrypt(input,destination,destinationOffset);
+		}
+
+		@Override
+		public void encrypt(byte[] source, int sourceOffset, java.nio.ByteBuffer output)
+				throws java.io.IOException {
+			delegate.encrypt(source,sourceOffset,output);
+		}
+
+		@Override
+		public long transformLong(long fileOffset, long value) throws java.io.IOException {
+			slotTransforms++;
+			return delegate.transformLong(fileOffset,value);
 		}
 
 		private void reset() {
 			starts=0;
+			slotTransforms=0;
 		}
 	}
 }

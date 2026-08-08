@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.util.Utils;
 
-/** Exact random-access and cursor tests for the Etch ChaCha20 overlay. */
+/** Exact random-access and split-operation tests for the Etch ChaCha20 overlay. */
 public class ChaCha20EtchCipherTest {
 
 	@Test
@@ -35,7 +35,7 @@ public class ChaCha20EtchCipherTest {
 	}
 
 	@Test
-	public void testRoundTripRandomAccessAndSplitCursor() throws Exception {
+	public void testRoundTripRandomAccessAndSplitOperation() throws Exception {
 		byte[] key=new byte[32];
 		for (int i=0;i<key.length;i++) key[i]=(byte)(i*7+3);
 		ChaCha20EtchCipher cipher=ChaCha20EtchCipher.fromKey(key);
@@ -52,10 +52,9 @@ public class ChaCha20EtchCipherTest {
 				transform(cipher,37L+offset,Arrays.copyOfRange(plain,offset,offset+length)));
 
 		byte[] splitOutput=new byte[length];
-		EtchCipherCursor cursor=cipher.start(37L+offset);
-		cursor.transform(ByteBuffer.wrap(plain,offset,17),ByteBuffer.wrap(splitOutput,0,17));
-		cursor.transform(ByteBuffer.wrap(plain,offset+17,length-17),
-				ByteBuffer.wrap(splitOutput,17,length-17));
+		cipher.initialise(37L+offset);
+		cipher.encrypt(plain,offset,ByteBuffer.wrap(splitOutput,0,17));
+		cipher.encrypt(plain,offset+17,ByteBuffer.wrap(splitOutput,17,length-17));
 		assertArrayEquals(Arrays.copyOfRange(encrypted,offset,offset+length),splitOutput);
 	}
 
@@ -64,8 +63,8 @@ public class ChaCha20EtchCipherTest {
 		ChaCha20EtchCipher cipher=ChaCha20EtchCipher.fromKey(new byte[32]);
 		long value=0x0123456789abcdefL;
 		for (long offset:new long[] {0L,8L,56L,64L,1000L}) {
-			long encrypted=cipher.start(offset).transformLong(value);
-			long decrypted=cipher.start(offset).transformLong(encrypted);
+			long encrypted=cipher.transformLong(offset,value);
+			long decrypted=cipher.transformLong(offset,encrypted);
 			org.junit.jupiter.api.Assertions.assertEquals(value,decrypted);
 		}
 	}
@@ -73,7 +72,8 @@ public class ChaCha20EtchCipherTest {
 	private static byte[] transform(EtchFileCipher cipher, long offset, byte[] input)
 			throws Exception {
 		byte[] output=new byte[input.length];
-		cipher.start(offset).transform(ByteBuffer.wrap(input),ByteBuffer.wrap(output));
+		cipher.initialise(offset);
+		cipher.encrypt(input,0,ByteBuffer.wrap(output));
 		return output;
 	}
 

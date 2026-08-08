@@ -56,9 +56,8 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void getTransformed(long position, byte[] destination, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
-		cursor.transform(ByteBuffer.wrap(bytes,Math.toIntExact(position),length),
-				ByteBuffer.wrap(destination,offset,length));
+			EtchFileCipher cipher) throws IOException {
+		cipher.decrypt(ByteBuffer.wrap(bytes,Math.toIntExact(position),length),destination,offset);
 	}
 
 	@Override
@@ -74,9 +73,8 @@ final class InMemoryEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void putTransformed(long position, byte[] source, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
-		cursor.transform(ByteBuffer.wrap(source,offset,length),
-				ByteBuffer.wrap(bytes,Math.toIntExact(position),length));
+			EtchFileCipher cipher) throws IOException {
+		cipher.encrypt(source,offset,ByteBuffer.wrap(bytes,Math.toIntExact(position),length));
 	}
 
 	@Override

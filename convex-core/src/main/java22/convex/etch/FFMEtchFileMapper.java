@@ -160,7 +160,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void getTransformed(long position, byte[] destination, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
+			EtchFileCipher cipher) throws IOException {
 		checkRange(position,length);
 		if (length==0) return;
 		ensureMapped(position,length,false);
@@ -179,7 +179,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 				continue;
 			}
 			try {
-				cursor.transform(input,ByteBuffer.wrap(destination,currentOffset,count));
+				cipher.decrypt(input,destination,currentOffset);
 			} catch (IllegalStateException e) {
 				// Retrying could reuse the wrong part of the cipher stream.
 				throw new IOException("Etch mapping changed during encrypted read",e);
@@ -237,7 +237,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 
 	@Override
 	public void putTransformed(long position, byte[] source, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
+			EtchFileCipher cipher) throws IOException {
 		if (length==0) return;
 
 		long currentPosition=position;
@@ -254,7 +254,7 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 				continue;
 			}
 			try {
-				cursor.transform(ByteBuffer.wrap(source,currentOffset,count),output);
+				cipher.encrypt(source,currentOffset,output);
 			} catch (IllegalStateException e) {
 				// Retrying could reuse the wrong part of the cipher stream.
 				throw new IOException("Etch mapping changed during encrypted write",e);

@@ -810,10 +810,10 @@ counter zero under the incremented nonce. A 1 TiB file uses four complete nonce
 regions and begins the fifth at offset 1 TiB.
 
 Bouncy Castle's ChaCha core is used by the Java implementation and its exact
-test vectors. The production cursor wraps that reviewed core with Etch's
-locator and direct-buffer access rather than inheriting a provider's IV or
-counter conventions. It implements the 128-bit carry explicitly and does not
-depend on provider-specific signed-counter or automatic nonce-rollover
+test vectors. The production operation state combines that reviewed core with
+Etch's locator and direct mapped access rather than inheriting a provider's IV
+or counter conventions. It implements the 128-bit carry explicitly and does
+not depend on provider-specific signed-counter or automatic nonce-rollover
 behaviour.
 
 The following canonical state vectors make the locator mapping explicit:
@@ -910,7 +910,7 @@ The same fixed-offset limitation applies to the mutable nine-byte data label:
 status flags and the recorded memory size may change in place and therefore
 reuse their keystream bytes. The label deliberately remains encrypted as part
 of the contiguous data record, allowing the hash, label, encoding length and
-encoding to use one sequential cipher cursor. Making it plaintext would add a
+encoding to use one initialised sequential cipher operation. Making it plaintext would add a
 hole requiring another mapper operation plus a cipher skip or reinitialisation
 on the record read path. Across multiple snapshots, reuse reveals only the XOR
 of the old and new nine-byte labels; it does not expose keystream bytes for the

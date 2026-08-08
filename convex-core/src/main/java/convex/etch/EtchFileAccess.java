@@ -60,7 +60,8 @@ final class EtchFileAccess implements AutoCloseable {
 		if (cipher==null) {
 			mapper.get(position,destination,offset,length);
 		} else {
-			mapper.getTransformed(position,destination,offset,length,cipher.start(position));
+			cipher.initialise(position);
+			mapper.getTransformed(position,destination,offset,length,cipher);
 		}
 	}
 
@@ -77,14 +78,16 @@ final class EtchFileAccess implements AutoCloseable {
 		if (cipher==null) {
 			mapper.put(position,source,offset,length);
 		} else {
-			mapper.putTransformed(position,source,offset,length,cipher.start(position));
+			cipher.initialise(position);
+			mapper.putTransformed(position,source,offset,length,cipher);
 		}
 	}
 
 	long readIndexSlotAcquire(long position) throws IOException {
 		position=checkedRange(position,Long.BYTES);
-		long value=mapper.readIndexSlotAcquire(position);
-		return encryptedIndex?cipher.start(position).transformLong(value):value;
+		// This is the normal hot path: one acquire-load directly from the mapped index.
+		if (!encryptedIndex) return mapper.readIndexSlotAcquire(position);
+		return cipher.transformLong(position,mapper.readIndexSlotAcquire(position));
 	}
 
 	/** Bulk index read for exclusive maintenance scans. */
@@ -92,7 +95,8 @@ final class EtchFileAccess implements AutoCloseable {
 			throws IOException {
 		position=checkedRange(position,length);
 		if (encryptedIndex) {
-			mapper.getTransformed(position,destination,offset,length,cipher.start(position));
+			cipher.initialise(position);
+			mapper.getTransformed(position,destination,offset,length,cipher);
 		} else {
 			mapper.get(position,destination,offset,length);
 		}
@@ -100,7 +104,7 @@ final class EtchFileAccess implements AutoCloseable {
 
 	void writeIndexSlotRelease(long position, long value) throws IOException {
 		position=checkedRange(position,Long.BYTES);
-		if (encryptedIndex) value=cipher.start(position).transformLong(value);
+		if (encryptedIndex) value=cipher.transformLong(position,value);
 		mapper.writeIndexSlotRelease(position,value);
 	}
 
@@ -118,7 +122,8 @@ final class EtchFileAccess implements AutoCloseable {
 		if (writeCipher==null) {
 			mapper.put(position,source,offset,length);
 		} else {
-			mapper.putTransformed(position,source,offset,length,writeCipher.start(position));
+			writeCipher.initialise(position);
+			mapper.putTransformed(position,source,offset,length,writeCipher);
 		}
 		dataLength=Math.addExact(position,length);
 		return position;
@@ -126,13 +131,13 @@ final class EtchFileAccess implements AutoCloseable {
 
 	long appendZeroIndex(int length, int alignment) throws IOException {
 		long position=prepareAppend(length,alignment);
-		EtchCipherCursor cursor=encryptedIndex?cipher.start(position):null;
+		if (encryptedIndex) cipher.initialise(position);
 		for (int offset=0;offset<length;offset+=ZERO_BUFFER_SIZE) {
 			int count=Math.min(length-offset,ZERO_BUFFER_SIZE);
-			if (cursor==null) {
+			if (!encryptedIndex) {
 				mapper.put(position+offset,ZERO_BUFFER,0,count);
 			} else {
-				mapper.putTransformed(position+offset,ZERO_BUFFER,0,count,cursor);
+				mapper.putTransformed(position+offset,ZERO_BUFFER,0,count,cipher);
 			}
 		}
 		dataLength=Math.addExact(position,length);
@@ -146,22 +151,21 @@ final class EtchFileAccess implements AutoCloseable {
 		long recordLength=Math.addExact(Math.addExact(keyLength,headerLength),encodingLength);
 		long position=prepareAppend(recordLength,1);
 		long writePosition=position;
-		EtchCipherCursor cursor=(cipher==null)?null:cipher.start(position);
-		putData(writePosition,key.getInternalArray(),key.getInternalOffset(),keyLength,cursor);
+		if (cipher!=null) cipher.initialise(position);
+		putData(writePosition,key.getInternalArray(),key.getInternalOffset(),keyLength);
 		writePosition+=keyLength;
-		putData(writePosition,recordHeader,0,headerLength,cursor);
+		putData(writePosition,recordHeader,0,headerLength);
 		writePosition+=headerLength;
-		putData(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),encodingLength,cursor);
+		putData(writePosition,encoding.getInternalArray(),encoding.getInternalOffset(),encodingLength);
 		dataLength=Math.addExact(position,recordLength);
 		return position;
 	}
 
-	private void putData(long position, byte[] source, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
-		if (cursor==null) {
+	private void putData(long position, byte[] source, int offset, int length) throws IOException {
+		if (cipher==null) {
 			mapper.put(position,source,offset,length);
 		} else {
-			mapper.putTransformed(position,source,offset,length,cursor);
+			mapper.putTransformed(position,source,offset,length,cipher);
 		}
 	}
 
@@ -179,25 +183,25 @@ final class EtchFileAccess implements AutoCloseable {
 		int headerOffset=includeKey?EtchConstants.KEY_SIZE:0;
 		int headerLength=headerOffset+EtchConstants.LABEL_SIZE+EtchConstants.ENCODING_LENGTH_SIZE;
 		byte[] header=new byte[headerLength];
-		EtchCipherCursor cursor=(cipher==null)?null:cipher.start(readPosition);
-		readData(readPosition,header,0,headerLength,cursor);
+		if (cipher!=null) cipher.initialise(readPosition);
+		readData(readPosition,header,0,headerLength,cipher!=null);
 		if ((expectedKey!=null)&&!expectedKey.equalsBytes(header,0)) return null;
 
 		int encodingLength=Utils.readShort(header,headerOffset+EtchConstants.LABEL_SIZE);
 		if (encodingLength<=0) throw corruption("Invalid Etch encoding length",readPosition,encodingLength);
 		long encodingPosition=Math.addExact(readPosition,headerLength);
 		byte[] encoding=new byte[encodingLength];
-		readData(encodingPosition,encoding,0,encodingLength,cursor);
+		readData(encodingPosition,encoding,0,encodingLength,cipher!=null);
 		return new DataRecord(header,headerOffset,encoding);
 	}
 
 	private void readData(long position, byte[] destination, int offset, int length,
-			EtchCipherCursor cursor) throws IOException {
+			boolean encrypted) throws IOException {
 		position=checkedRange(position,length);
-		if (cursor==null) {
+		if (!encrypted) {
 			mapper.get(position,destination,offset,length);
 		} else {
-			mapper.getTransformed(position,destination,offset,length,cursor);
+			mapper.getTransformed(position,destination,offset,length,cipher);
 		}
 	}
 

@@ -103,8 +103,8 @@ final class EtchFileMapperFactory {
 
 		@Override
 		public void getTransformed(long position, byte[] destination, int offset, int length,
-				EtchCipherCursor cursor) throws IOException {
-			delegate.getTransformed(position,destination,offset,length,cursor);
+				EtchFileCipher cipher) throws IOException {
+			delegate.getTransformed(position,destination,offset,length,cipher);
 		}
 
 		@Override
@@ -120,7 +120,7 @@ final class EtchFileMapperFactory {
 
 		@Override
 		public void putTransformed(long position, byte[] source, int offset, int length,
-				EtchCipherCursor cursor) throws IOException {
+				EtchFileCipher cipher) throws IOException {
 			throw readOnly();
 		}
 

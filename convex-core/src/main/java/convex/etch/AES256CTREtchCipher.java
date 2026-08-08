@@ -51,14 +51,30 @@ final class AES256CTREtchCipher implements EtchFileCipher {
 	}
 
 	@Override
-	public EtchCipherCursor start(long fileOffset) throws IOException {
+	public void initialise(long fileOffset) throws IOException {
 		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
-		State state=states.get();
-		state.initialise(fileOffset);
-		return state;
+		states.get().initialise(fileOffset);
 	}
 
-	private final class State implements EtchCipherCursor {
+	@Override
+	public void decrypt(ByteBuffer input, byte[] destination, int destinationOffset)
+			throws IOException {
+		int length=input.remaining();
+		states.get().transform(input,ByteBuffer.wrap(destination,destinationOffset,length));
+	}
+
+	@Override
+	public void encrypt(byte[] source, int sourceOffset, ByteBuffer output) throws IOException {
+		states.get().transform(ByteBuffer.wrap(source,sourceOffset,output.remaining()),output);
+	}
+
+	@Override
+	public long transformLong(long fileOffset, long value) throws IOException {
+		initialise(fileOffset);
+		return states.get().transformLong(value);
+	}
+
+	private final class State {
 		private final Cipher cipher;
 		private final byte[] iv=new byte[EtchConstants.V3_CIPHER_LOCATOR_SIZE];
 		private final byte[] skipInput=new byte[BLOCK_LENGTH-1];
@@ -83,8 +99,7 @@ final class AES256CTREtchCipher implements EtchFileCipher {
 			}
 		}
 
-		@Override
-		public void transform(ByteBuffer input, ByteBuffer output) throws IOException {
+		private void transform(ByteBuffer input, ByteBuffer output) throws IOException {
 			int length=input.remaining();
 			if (output.remaining()<length) throw new IllegalArgumentException("Insufficient cipher output space");
 			try {
@@ -97,8 +112,7 @@ final class AES256CTREtchCipher implements EtchFileCipher {
 			}
 		}
 
-		@Override
-		public long transformLong(long value) throws IOException {
+		private long transformLong(long value) throws IOException {
 			Utils.writeLong(longInput,0,value);
 			try {
 				int written=cipher.update(longInput,0,Long.BYTES,longOutput,0);

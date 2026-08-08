@@ -47,14 +47,28 @@ final class ChaCha20EtchCipher implements EtchFileCipher {
 	}
 
 	@Override
-	public EtchCipherCursor start(long fileOffset) {
+	public void initialise(long fileOffset) {
 		if (fileOffset<0L) throw new IllegalArgumentException("Negative Etch cipher offset");
-		State state=states.get();
-		state.initialise(fileOffset);
-		return state;
+		states.get().initialise(fileOffset);
 	}
 
-	private final class State implements EtchCipherCursor {
+	@Override
+	public void decrypt(ByteBuffer input, byte[] destination, int destinationOffset) {
+		states.get().decrypt(input,destination,destinationOffset);
+	}
+
+	@Override
+	public void encrypt(byte[] source, int sourceOffset, ByteBuffer output) {
+		states.get().encrypt(source,sourceOffset,output);
+	}
+
+	@Override
+	public long transformLong(long fileOffset, long value) {
+		initialise(fileOffset);
+		return states.get().transformLong(value);
+	}
+
+	private final class State {
 		private final byte[] locator=new byte[EtchConstants.V3_CIPHER_LOCATOR_SIZE];
 		private final byte[] keyStream=new byte[EtchConstants.V3_CHACHA_BLOCK_SIZE];
 		private final int[] inputState=new int[STATE_WORDS];
@@ -82,11 +96,10 @@ final class ChaCha20EtchCipher implements EtchFileCipher {
 			Pack.intToLittleEndian(outputState,keyStream,0);
 		}
 
-		@Override
-		public void transform(ByteBuffer input, ByteBuffer output) {
+		private void decrypt(ByteBuffer input, byte[] destination, int destinationOffset) {
 			int length=input.remaining();
-			if (output.remaining()<length) {
-				throw new IllegalArgumentException("Insufficient cipher output space");
+			if ((destinationOffset<0)||(destinationOffset>destination.length-length)) {
+				throw new IllegalArgumentException("Insufficient ChaCha20 output space");
 			}
 			while (input.hasRemaining()) {
 				if (keyStreamOffset==keyStream.length) loadBlock();
@@ -94,19 +107,42 @@ final class ChaCha20EtchCipher implements EtchFileCipher {
 				int end=keyStreamOffset+count;
 				while (keyStreamOffset+Long.BYTES<=end) {
 					long mask=Utils.readLong(keyStream,keyStreamOffset,Long.BYTES);
-					output.putLong(input.getLong()^mask);
+					Utils.writeLong(destination,destinationOffset,input.getLong()^mask);
+					destinationOffset+=Long.BYTES;
 					keyStreamOffset+=Long.BYTES;
 					position+=Long.BYTES;
 				}
 				while (keyStreamOffset<end) {
-					output.put((byte)(input.get()^keyStream[keyStreamOffset++]));
+					destination[destinationOffset++]=(byte)(input.get()^keyStream[keyStreamOffset++]);
 					position++;
 				}
 			}
 		}
 
-		@Override
-		public long transformLong(long value) {
+		private void encrypt(byte[] source, int sourceOffset, ByteBuffer output) {
+			int length=output.remaining();
+			if ((sourceOffset<0)||(sourceOffset>source.length-length)) {
+				throw new IllegalArgumentException("Insufficient ChaCha20 input bytes");
+			}
+			while (output.hasRemaining()) {
+				if (keyStreamOffset==keyStream.length) loadBlock();
+				int count=Math.min(output.remaining(),keyStream.length-keyStreamOffset);
+				int end=keyStreamOffset+count;
+				while (keyStreamOffset+Long.BYTES<=end) {
+					long mask=Utils.readLong(keyStream,keyStreamOffset,Long.BYTES);
+					output.putLong(Utils.readLong(source,sourceOffset,Long.BYTES)^mask);
+					sourceOffset+=Long.BYTES;
+					keyStreamOffset+=Long.BYTES;
+					position+=Long.BYTES;
+				}
+				while (keyStreamOffset<end) {
+					output.put((byte)(source[sourceOffset++]^keyStream[keyStreamOffset++]));
+					position++;
+				}
+			}
+		}
+
+		private long transformLong(long value) {
 			if (keyStreamOffset==keyStream.length) loadBlock();
 			if (keyStreamOffset+Long.BYTES>keyStream.length) {
 				throw new IllegalStateException("Etch index slot crosses a ChaCha20 block boundary");
