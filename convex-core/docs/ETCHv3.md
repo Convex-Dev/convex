@@ -225,42 +225,42 @@ The current Java 21 mapper illustrates the first limitation: creating a
 writable mapping extends it with a 64 KiB margin. V3 should not require
 truncation at every sync merely to make physical length act as a dirty marker.
 
-### Clean-close state
+### Clean-checkpoint state
 
-`closeState` permits a fast reopen after a successful close. It is covered by
+`closeState` permits a fast reopen after a successful durability boundary. It is covered by
 `headerCheck`, so it is committed as part of a complete header generation and
 is never updated as an unchecked flag.
 
 A new file starts in `OPEN` state. A selected `CLEAN_CLOSED` header means the
-previous writer completed its final body force, committed this header and
-performed no later mutation. After checking the header and confirming that the
-physical file reaches `syncedFileEnd`, an opener may set `writeEnd` to
-`syncedFileEnd` without scanning the index or append tail.
+previous writer completed a body force, committed this header and performed no
+later mutation. The writer need not have released its file handle: the on-disk
+value retains the name `CLEAN_CLOSED`, but semantically records a clean
+checkpoint. After checking the header and confirming that the physical file
+reaches `syncedFileEnd`, an opener may set `writeEnd` to `syncedFileEnd` without
+scanning the index or append tail.
 
 The clean state must be invalidated durably before another mutation:
 
 1. A read-only open leaves `CLEAN_CLOSED` unchanged.
-2. Before the first mutation of a new writing session, write the inactive
+2. Before the first mutation after a clean checkpoint, whether in the same or a
+   new writing session, write the inactive
    header with `generation + 1`, the same root and `syncedFileEnd`, and
    `closeState = OPEN`.
 3. Force that header and permit mutation only after the force succeeds.
-4. Further writes and ordinary syncs keep `closeState = OPEN` and add no marker
-   force.
-5. `close` first excludes all further operations, forces the body, then commits
-   and forces a new header with `closeState = CLEAN_CLOSED`. Once close begins,
-   resource cleanup continues even if either force or the header commit fails.
-   The implementation logs a warning and the close is dirty by definition; a
-   later caller must restore a backup or run explicit repair.
+4. Further writes keep `closeState = OPEN` and add no marker force.
+5. `sync` forces the body, then commits and forces a new header with
+   `closeState = CLEAN_CLOSED`.
+6. `close` performs the same commit only when the file is dirty. Once close
+   begins, resource cleanup continues even if either force or the header commit
+   fails. The implementation logs a warning and the close is dirty by
+   definition; a later caller must restore a backup or run explicit repair.
 
-Thus the marker costs one additional header force before the first mutation of
-each writing session. The close transition is folded into the final sync and
-does not require a second body force. A crash during either header transition
-selects a complete old or new generation; an `OPEN` result is conservative and
-requires backup restoration or explicit repair.
-
-Marking every ordinary sync as clean would require the same forced `OPEN`
-transition before the next mutation, adding this cost once per sync interval.
-V3 therefore reserves `CLEAN_CLOSED` specifically for a terminal close.
+Thus each successful sync adds one forced `OPEN` header transition before the
+next mutation. This cost occurs once per sync interval, never once per record,
+and makes every completed durability boundary directly reopenable. A crash
+during either header transition selects a complete old or new generation; an
+`OPEN` result is conservative and requires backup restoration or explicit
+repair.
 
 ### Header verification
 
@@ -384,7 +384,7 @@ durability boundary:
 2. force all data and index mappings, then force the file contents and required
    file metadata;
 3. write the inactive header copy with `generation + 1`, the new root and
-   `syncedFileEnd`, retaining `closeState = OPEN` and including its
+   `syncedFileEnd`, setting `closeState = CLEAN_CLOSED` and including its
    `headerCheck`;
 4. force only that already allocated 4096-byte header copy; no unrelated
    mapping or file-metadata force is required at this second barrier;
@@ -395,9 +395,9 @@ written new header reaches storage before the final force returns, it is still
 safe to select because step 2 has already completed.
 
 After `sync` returns, every operation preceding that call is directly readable
-while no later mutation has begun. `close` performs this body sync while
-excluding further operations, then commits the final header as `CLEAN_CLOSED`
-before releasing the file.
+and the file may use the normal clean-checkpoint reopen path while no later
+mutation has begun. `close` performs no further header write when the selected
+checkpoint is already clean.
 
 A failed explicit `sync` body force, header write or header force is reported
 to the caller. The in-memory active generation advances only after the final
@@ -434,8 +434,8 @@ immediately; a mutation first performs the forced transition to `OPEN`.
 
 ### Handling `OPEN`
 
-`OPEN` means that the previous writing session did not complete a clean close;
-it does not prove that any write was lost. Normal opening rejects this state
+`OPEN` means that mutation began after the last completed clean checkpoint; it
+does not prove that any write was lost. Normal opening rejects this state
 without scanning or mutating the file. There is deliberately no writable
 recovery-open mode: the caller restores a backup or reconstructs a new file
 with explicit repair. This prevents an uncertain index from becoming the base
@@ -461,9 +461,8 @@ The result by crash point is:
 
 | Crash point | Recovery result |
 |---|---|
-| After successful `close` | `CLEAN_CLOSED` fast path; no index or data validation |
+| After successful `sync` or `close`, before another mutation | `CLEAN_CLOSED` fast path; no index or data validation |
 | During the first-write transition to `OPEN` | Normal open fails; backup restoration or explicit repair is required even though no later mutation may have begun |
-| After `sync` returns, before another mutation | A subsequent mutation has not begun, so the header may still be `CLEAN_CLOSED`; if it is `OPEN`, normal open fails and repair uses its selected root |
 | While writing the new header | Select the new header if its check validates; otherwise select the older valid header |
 | During body force, or after later unsynchronised writes | Normal open fails; repair reconstructs a fresh output and validates the selected root, while a failed root requires backup restoration |
 

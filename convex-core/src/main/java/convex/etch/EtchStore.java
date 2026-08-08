@@ -798,6 +798,7 @@ public class EtchStore extends ACachedStore {
 	 * 
 	 * @throws IOException If an IO error occurs
 	 */
+	@Override
 	public void flush() throws IOException {
 		etch.flush();
 		Etch target = this.target;

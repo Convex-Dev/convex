@@ -124,7 +124,7 @@ public class EtchV3HeaderTest {
 	}
 
 	@Test
-	public void testSyncAndCleanCloseAlternateHeaderCopies() throws Exception {
+	public void testSyncPublishesCleanCheckpointAndNextMutationPublishesOpen() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
 		Etch etch=new Etch(mapper,"memory-sync",null,null);
@@ -148,6 +148,7 @@ public class EtchV3HeaderTest {
 			assertEquals(2L,header.generation());
 			assertEquals(0,header.activeCopy());
 			assertEquals(INITIAL_FILE_END+1L,header.syncedFileEnd());
+			assertEquals(EtchConstants.V3_CLEAN_CLOSED,header.closeState());
 
 			byte[] syncedA=mapper.copyRange(EtchConstants.V3_HEADER_A_OFFSET,
 					EtchConstants.V3_HEADER_A_OFFSET+EtchConstants.V3_HEADER_COPY_SIZE);
@@ -157,23 +158,48 @@ public class EtchV3HeaderTest {
 			assertEquals(2L,reopened.generation());
 			assertEquals(root,reopened.getRootHash());
 			assertEquals(INITIAL_FILE_END+1L,reopened.syncedFileEnd());
+			assertEquals(EtchConstants.V3_CLEAN_CLOSED,reopened.closeState());
 
-			header.close(etch);
-			assertEquals(3,mapper.fullForceCount());
+			header.sync(etch);
+			assertEquals(2,mapper.fullForceCount());
+			assertEquals(3,mapper.rangeForceCount());
+			assertEquals(2L,header.generation());
+
+			header.prepareMutation(etch);
+			assertEquals(2,mapper.fullForceCount());
 			assertEquals(4,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_B_OFFSET,mapper.forcedPosition());
 			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 			assertEquals(3L,header.generation());
 			assertEquals(1,header.activeCopy());
-			assertEquals(EtchConstants.V3_CLEAN_CLOSED,header.closeState());
+			assertEquals(EtchConstants.V3_OPEN,header.closeState());
 
-			header.prepareMutation(etch);
+			header.close(etch);
 			assertEquals(3,mapper.fullForceCount());
 			assertEquals(5,mapper.rangeForceCount());
 			assertEquals(EtchConstants.V3_HEADER_A_OFFSET,mapper.forcedPosition());
 			assertEquals(EtchConstants.V3_HEADER_COPY_SIZE,mapper.forcedLength());
 			assertEquals(4L,header.generation());
 			assertEquals(0,header.activeCopy());
+			assertEquals(EtchConstants.V3_CLEAN_CLOSED,header.closeState());
+		} finally {
+			etch.close();
+		}
+	}
+
+	@Test
+	public void testFailedSyncDoesNotPublishCleanStateInMemory() throws Exception {
+		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
+		Etch etch=new Etch(mapper,"memory-sync-failure",null,null);
+		try {
+			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
+					false,salt,null);
+			header.initialise(etch);
+			mapper.failNextFullForce();
+
+			assertThrows(IOException.class,()->header.sync(etch));
+			assertEquals(1L,header.generation());
 			assertEquals(EtchConstants.V3_OPEN,header.closeState());
 		} finally {
 			etch.close();

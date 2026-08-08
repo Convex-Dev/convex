@@ -1,5 +1,6 @@
 package convex.core.store;
 
+import java.io.IOException;
 import java.util.function.Consumer;
 
 import convex.core.cvm.CVMEncoder;
@@ -47,6 +48,11 @@ public class NullStore extends AStore {
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) {
 		return Ref.get(data);
+	}
+
+	@Override
+	public void flush() throws IOException {
+		// Null store has no state to make durable.
 	}
 
 	@Override

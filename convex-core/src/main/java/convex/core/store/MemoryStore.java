@@ -145,6 +145,11 @@ public class MemoryStore extends AStore {
 	}
 
 	@Override
+	public void flush() {
+		// Volatile store: there is no physical durability barrier.
+	}
+
+	@Override
 	public void close() {
 		hashRefs.clear();
 		rootData=null;

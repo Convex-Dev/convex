@@ -413,7 +413,7 @@ final class EtchV3Header extends AEtchHeader {
 	@Override
 	void sync(Etch etch) throws IOException {
 		if (closeState==V3_CLEAN_CLOSED) return;
-		commit(etch,V3_OPEN);
+		commit(etch,V3_CLEAN_CLOSED);
 	}
 
 	@Override

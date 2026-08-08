@@ -59,6 +59,7 @@ public class NodeServerPersistenceTest {
 	/** One reusable Etch file per role; tests reset only the root pointer. */
 	private static class HookedEtchStore extends EtchStore {
 		private volatile RootWriteHook rootWriteHook;
+		private volatile RootWriteHook flushHook;
 
 		HookedEtchStore(String prefix) throws IOException {
 			super(Etch.createTempEtch(prefix));
@@ -68,8 +69,13 @@ public class NodeServerPersistenceTest {
 			rootWriteHook = hook;
 		}
 
+		void setFlushHook(RootWriteHook hook) {
+			flushHook = hook;
+		}
+
 		void reset() throws IOException {
 			rootWriteHook = null;
+			flushHook = null;
 			super.setRootData(null);
 		}
 
@@ -78,6 +84,13 @@ public class NodeServerPersistenceTest {
 			RootWriteHook hook = rootWriteHook;
 			if (hook != null) hook.run();
 			return super.setRootData(data);
+		}
+
+		@Override
+		public void flush() throws IOException {
+			RootWriteHook hook = flushHook;
+			if (hook != null) hook.run();
+			super.flush();
 		}
 	}
 
@@ -114,6 +127,8 @@ public class NodeServerPersistenceTest {
 		// Test hooks must not affect the final snapshot written during close().
 		sharedPrimaryStore.setRootWriteHook(null);
 		sharedBackupStore.setRootWriteHook(null);
+		sharedPrimaryStore.setFlushHook(null);
+		sharedBackupStore.setFlushHook(null);
 		if (primary != null) primary.close();
 		if (backup != null) backup.close();
 		if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close();
@@ -167,7 +182,7 @@ public class NodeServerPersistenceTest {
 	 */
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses.
-		// Synchronous commit guarantees announce + setRootData complete before
+		// Synchronous commit guarantees announce + setRootData + flush complete before
 		// sync() returns — the announced cursor is up to date.
 		primary.getCursor().sync();
 
@@ -594,6 +609,49 @@ public class NodeServerPersistenceTest {
 			"Cause must be the original IOException, was: " + ex.getCause());
 		assertEquals("simulated disk failure", ex.getCause().getMessage());
 		assertTrue(primary.isRunning(), "sync failure must not impose an operator recovery policy");
+	}
+
+	@Test
+	public void testSyncCompletesDurabilityBarrier() throws Exception {
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		AtomicInteger flushes=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
+		writeDataValue(primary,100);
+
+		primary.getCursor().sync();
+
+		assertEquals(1,flushes.get(),"sync must complete one primary-store durability barrier");
+	}
+
+	@Test
+	public void testSyncSurfacesDurabilityBarrierFailure() throws Exception {
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		writeDataValue(primary,101);
+		sharedPrimaryStore.setFlushHook(()->{
+			throw new IOException("simulated flush failure");
+		});
+
+		StoreException ex=assertThrows(StoreException.class,
+				()->primary.getCursor().sync(),
+				"sync must throw when the durability barrier fails");
+		assertTrue(ex.getCause() instanceof IOException);
+		assertEquals("simulated flush failure",ex.getCause().getMessage());
+		assertTrue(primary.isRunning(),"flush failure must not impose an operator recovery policy");
+	}
+
+	@Test
+	public void testExplicitPersistSurfacesDurabilityBarrierFailure() throws Exception {
+		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
+		primary.launch();
+		sharedPrimaryStore.setFlushHook(()->{
+			throw new IOException("simulated explicit flush failure");
+		});
+
+		IOException ex=assertThrows(IOException.class,
+				()->primary.persistSnapshot(primary.getLocalValue()));
+		assertEquals("simulated explicit flush failure",ex.getMessage());
 	}
 
 	/**

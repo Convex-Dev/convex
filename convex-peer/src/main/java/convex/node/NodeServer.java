@@ -247,11 +247,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Hook sync callback: synchronous commit on the primary propagator,
 		// async fan-out to secondaries.
 		//
-		// The primary's full pipeline (announce + setRootData + broadcast) runs
+		// The primary's full pipeline (announce + setRootData + flush + broadcast) runs
 		// on the caller's thread, so cursor.sync() is a synchronous checkpoint:
-		// returning successfully means the primary store accepted the root update.
-		// Physical flushing is a separate store/operator policy.
-		// IOException from announce or setRootData is wrapped and propagated to
+		// returning successfully means the primary store durably committed the root.
+		// IOException from announce, setRootData or flush is wrapped and propagated to
 		// the caller — sync failures are visible, not silently dropped.
 		//
 		// Secondary propagators use the existing async path; their broadcast
@@ -1663,8 +1662,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p>Cursor writes perform no persistence. Calling {@link ALatticeCursor#sync()}
 	 * runs the primary persistence pipeline synchronously. A successful return confirms
-	 * that the primary store accepted the logical root update; physical flushing is a
-	 * separate store/operator policy. A primary-store failure throws {@link StoreException}
+	 * that the primary store durably committed the root update. A primary-store failure
+	 * throws {@link StoreException}
 	 * without rolling back the in-memory cursor and does not confirm whether the store
 	 * completed its root update. NodeServer remains running so recovery remains operator
 	 * policy.
@@ -1880,8 +1879,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Persists the given lattice value to the primary propagator's store.
-	 * Delegates to the primary propagator's explicit persist method.
+	 * Persists and durably flushes the given lattice value to the primary
+	 * propagator's store. Delegates to the primary propagator's explicit persist
+	 * method.
 	 *
 	 * @param value The lattice value to persist
 	 * @throws IOException If an IO error occurs during persistence

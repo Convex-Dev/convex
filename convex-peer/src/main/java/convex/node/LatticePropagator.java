@@ -476,7 +476,7 @@ public class LatticePropagator implements Closeable {
 	 * Processes a single lattice value through the full output pipeline:
 	 * <ol>
 	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
-	 *   <li>Set root data — anchor for restore (if persist enabled)</li>
+	 *   <li>Set and durably flush root data — anchor for restore (if persist enabled)</li>
 	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
 	 * </ol>
 	 *
@@ -493,7 +493,7 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * @param value Snapshot to process (must not be null)
 	 * @return The announced (store-backed) value
-	 * @throws IOException If announce or setRootData fails
+	 * @throws IOException If announce, root publication or its durability barrier fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
@@ -509,6 +509,7 @@ public class LatticePropagator implements Closeable {
 			// 2. Set root data for restore (if persist enabled)
 			if (persistInterval > 0) {
 				store.setRootData(value);
+				store.flush();
 			}
 
 			// 3. Broadcast to peers (only if peers exist and delay elapsed)
@@ -581,18 +582,16 @@ public class LatticePropagator implements Closeable {
 	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of persistInterval.
 	 *
 	 * @param value The value to persist
+	 * @throws IOException If persistence or its durability barrier fails
 	 */
-	void persist(ACell value) {
+	void persist(ACell value) throws IOException {
 		if (value == null) return;
 		if (!store.isPersistent()) return;
 		synchronized (writeLock) {
-			try {
-				value = Cells.announce(value, r -> {}, store);
-				store.setRootData(value);
-				log.debug("Persisted lattice snapshot to store");
-			} catch (IOException e) {
-				log.warn("Error persisting lattice snapshot", e);
-			}
+			value = Cells.announce(value, r -> {}, store);
+			store.setRootData(value);
+			store.flush();
+			log.debug("Persisted lattice snapshot to store");
 		}
 	}
 

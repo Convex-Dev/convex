@@ -49,7 +49,7 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
                      │    └──► secondary queue offers           │
                      │                                           │
                      │  Propagator pipeline:                     │
-                     │    announce → setRootData                 │
+                     │    announce → setRootData → flush         │
  Store-backed  ◄─────│    → return announced value    [primary]  │
                      │    → broadcast(delta)          [network]  │
  refs merged         │                                           │
@@ -172,10 +172,10 @@ node.getCursor().set(newValue, :myKey);
 cursor.sync();  // returns after the primary persistence pipeline completes
 ```
 
-`sync()` is the synchronous logical-checkpoint boundary. A successful return confirms
-that the primary store accepted the root update; it does not imply a physical Etch
-`flush()`, which is a separate operator policy. A primary announce or root-write
-failure is reported to this caller as `StoreException`. The in-memory cursor is not
+`sync()` is the synchronous durability boundary. A successful return confirms
+that the primary store accepted and durably flushed the root update. A primary
+announce, root-write or durability-barrier failure is reported to this caller as
+`StoreException`. The in-memory cursor is not
 rolled back, and NodeServer does not choose a recovery policy. A failed call provides
 no root-publication confirmation, so the operator must treat the persisted root as
 unconfirmed.
@@ -356,8 +356,8 @@ Propagator[primary] store    Propagator[public] store     Propagator[backup] sto
 └──────────────┘             └──────────────┘              └──────────────┘
 ```
 
-Each propagator's store receives `Cells.announce()` for delta tracking and
-`store.setRootData()` for restore. Stores also serve as security boundaries
+Each propagator's store receives `Cells.announce()` for delta tracking,
+`store.setRootData()` for restore and `store.flush()` for durability. Stores also serve as security boundaries
 for `DATA_REQUEST` from peers.
 
 ### Propagator Internals
@@ -372,8 +372,9 @@ When `triggerBroadcast(value)` is called:
 2. Background thread picks up latest value
 3. `Cells.announce(value, noveltyHandler, store)` — writes to store, collects novelty
 4. `store.setRootData(value)` — anchor for restore
-5. `Format.encodeDelta(novelty + protocol envelope)` — encode only novel cells
-6. Send `LATTICE_VALUE` message to connected peers
+5. `store.flush()` — complete the store durability barrier
+6. `Format.encodeDelta(novelty + protocol envelope)` — encode only novel cells
+7. Send `LATTICE_VALUE` message to connected peers
 
 The send step is skipped if the propagator has no peers (pure persistence propagator).
 The propagator has no knowledge of cursors or lattices. NodeServer owns merge logic
@@ -527,7 +528,7 @@ intentionally synchronous; secondary propagation remains asynchronous:
 | App | Cursor | `AtomicReference.updateAndGet()` | No |
 | Cursor sync callback | Primary propagator | `processSnapshot()` on caller thread | Yes (intentional) |
 | Cursor sync callback | Secondary propagators | `LatestUpdateQueue.offer()` | No |
-| Propagator | Store | `Cells.announce()` + `setRootData()`, serialised by `writeLock` | Pipeline owner |
+| Propagator | Store | `Cells.announce()` + `setRootData()` + `flush()`, serialised by `writeLock` | Pipeline owner |
 | Primary result | Cursor | CAS, then merge on a concurrent write | No |
 | Pull callback | Cursor | `cursor.updateAndGet(merge)` | No |
 | Propagator | Peers | `broadcast(delta)` on own thread | Own thread only |
@@ -583,17 +584,20 @@ cursor.sync():                         Propagator processing:
   │                                    propagators[0] (primary):
   ├──► processSnapshot(value) ─────────► announce(value)
   │                                      setRootData(value)
+  │                                      flush()
   │◄──────────────────────────────────── return announced value
   │
   │                                    propagators[1] (public):
   ├──► trigger(value) ────queue──►       filter(value)
   │                                      announce(filtered)
   │                                      setRootData(filtered)
+  │                                      flush()
   │                                      broadcast(delta)
   │
   └──► trigger(value) ────queue──►     propagators[2] (backup):
                                          announce(value)
   returns after primary                   setRootData(value)
+                                         flush()
                                          broadcast(delta)
 ```
 
@@ -743,7 +747,7 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 
 ### Completed ✓
 
-- **Core Persistence** — `Cells.announce()` + `store.setRootData()`, restore in `launch()`, final persist in `close()`
+- **Core Persistence** — `Cells.announce()` + `store.setRootData()` + `store.flush()`, restore in `launch()`, final persist in `close()`
 - **Explicit Sync API** — `cursor.sync()` triggers propagators via callback, incoming merges call `cursor.sync()`, periodic auto-sync
 - **Acquire Then Merge** — the owning propagator store acquires every missing cell
   before NodeServer attempts one merge
@@ -785,19 +789,19 @@ Only the **primary propagator** runs synchronously on the caller's thread. Secon
 propagators (public, backup) keep their existing async broadcast loop.
 
 Rationale:
-- Primary is the checkpoint anchor — `sync()` returning means it accepted the logical root update.
-- Physical Etch flush is a separate operator policy (see issue #650).
+- Primary is the checkpoint anchor — `sync()` returning means it durably committed the root update.
 - Secondaries are best-effort broadcast; their latency does not affect the primary checkpoint.
-- Caller's thread does **one** store write (primary), not N. Bounded cost.
+- Caller's thread completes **one** store durability barrier (primary), not N. Bounded cost.
 
 #### Sync Flow
 
 Caller's thread (inside the `onSync` callback) runs the primary's full pipeline:
 1. `announced, novelty = Cells.announce(value, primaryStore)` — primary store, primary novelty
 2. `store.setRootData(announced)` — synchronous logical root publication
-3. Encode delta from novelty and broadcast to primary's peers (Netty fire-and-forget)
-4. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
-5. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
+3. `store.flush()` — synchronous durability barrier
+4. Encode delta from novelty and broadcast to primary's peers (Netty fire-and-forget)
+5. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
+6. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
 
 Steps 1-4 are exposed as `processSnapshot`, which is callable on any thread and is
 invoked directly from the sync callback for the primary.
@@ -808,7 +812,7 @@ The primary's background thread still exists for non-sync triggers:
 
 Secondary propagators' current background behaviour:
 - `Cells.announce(value, ownStore)` — produces independent novelty against each store
-- `setRootData(value)`, `broadcast(delta)`
+- `setRootData(value)`, `flush()`, `broadcast(delta)`
 
 Filter application belongs immediately before these steps once the planned integration
 is implemented.
@@ -850,7 +854,7 @@ on its store, and pipelines through the propagator must not interleave.
 `processSnapshot` and `persist` both acquire a propagator-internal `writeLock` so
 the caller's thread (sync hook), the background propagation thread (pull, drain),
 and explicit `NodeServer.persistSnapshot` calls run their full announce +
-setRootData + broadcast sequences sequentially. Without this, an older snapshot's
+setRootData + flush + broadcast sequences sequentially. Without this, an older snapshot's
 setRootData could land *after* a newer snapshot's — Etch's class-level
 `synchronized` only orders the individual root-pointer write, not the surrounding
 pipeline — silently demoting the root pointer and breaking the durability promise
@@ -869,14 +873,14 @@ preserved for cells that overlap.
 
 #### Error Propagation
 
-If announce or `setRootData` throws, the exception propagates to the `sync()` caller.
+If announce, `setRootData` or `flush` throws, the exception propagates to the `sync()` caller.
 The memory-first cursor value remains available. Because `AStore.setRootData()` does
 not specify transactional rollback for every failure point, the persisted root is
 unconfirmed: it may still be the previous root, but callers must not infer that solely
 from the exception. NodeServer stays running; shutdown, replacement, inspection or a
 later explicit sync are operator policy. A successful `sync()` confirms that the
-primary store accepted the root update, not that Etch physically flushed it; a thrown
-`sync()` confirms only that the checkpoint did not complete successfully.
+primary store completed its durability barrier; a thrown `sync()` confirms only
+that the checkpoint did not complete successfully.
 
 #### Pull Path Uses the Root Sync Boundary
 

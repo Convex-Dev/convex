@@ -30,7 +30,12 @@ public class EtchV3IntegrationTest {
 		EtchStore store=new EtchStore(Etch.create(file,config));
 		store.setRootData(value);
 		store.flush();
+		EtchV3Header flushed=readHeader(file,null);
+		assertTrue(flushed.isCleanClosed());
+		long flushGeneration=flushed.generation();
 		store.close();
+		assertEquals(flushGeneration,readHeader(file,null).generation(),
+				"closing an already clean checkpoint must not rewrite its header");
 
 		EtchStore reopened=new EtchStore(Etch.create(file));
 		try {
@@ -141,10 +146,17 @@ public class EtchV3IntegrationTest {
 		EtchConfig config=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
 				true,EtchConfig.CipherMode.AES_256_CTR,false,null,hint->SECRET.clone());
 		Etch etch=Etch.create(file,config);
-		etch.flush(); // makes copy B the clean-close target
+		etch.flush();
 		etch.close();
 
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			// Preserve a valid clean v3 copy in B, then make the leading copy look
+			// legacy. The format probe must still discover and select B.
+			byte[] cleanCopy=new byte[EtchConstants.V3_HEADER_COPY_SIZE];
+			data.seek(EtchConstants.V3_HEADER_A_OFFSET);
+			data.readFully(cleanCopy);
+			data.seek(EtchConstants.V3_HEADER_B_OFFSET);
+			data.write(cleanCopy);
 			data.seek(Short.BYTES);
 			data.writeShort(EtchConstants.VERSION_1);
 		}
