@@ -24,7 +24,7 @@ public class EtchHeaderTest {
 	private static void assertCanonicalLegacyFile(short version, long expectedIndexStart)
 			throws Exception {
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		Etch etch=new Etch(mapper,"memory-v"+version,null,false);
+		Etch etch=new Etch(mapper,"memory-v"+version,null,null);
 		try {
 			AEtchHeader header=AEtchHeader.create(EtchConfig.create(version),null);
 			header.initialise(etch);

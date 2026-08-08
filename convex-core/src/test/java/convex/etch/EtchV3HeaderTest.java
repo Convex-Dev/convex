@@ -127,7 +127,7 @@ public class EtchV3HeaderTest {
 	public void testSyncAndCleanCloseAlternateHeaderCopies() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		Etch etch=new Etch(mapper,"memory-sync",null,false);
+		Etch etch=new Etch(mapper,"memory-sync",null,null);
 		try {
 			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
 					false,salt,null);
@@ -184,7 +184,7 @@ public class EtchV3HeaderTest {
 	public void testFailedCloseDoesNotPublishCleanStateInMemory() throws Exception {
 		byte[] salt=sequence(0xa0,EtchConstants.V3_FILE_SALT_SIZE);
 		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
-		Etch etch=new Etch(mapper,"memory-close-failure",null,false);
+		Etch etch=new Etch(mapper,"memory-close-failure",null,null);
 		try {
 			EtchV3Header header=EtchV3Header.create(EtchConstants.V3_CIPHER_NONE,
 					false,salt,null);
@@ -260,7 +260,7 @@ public class EtchV3HeaderTest {
 			case EtchConstants.V3_CIPHER_CHACHA20 -> ChaCha20EtchCipher.derive(secret,salt);
 			default -> throw new IllegalArgumentException("Unsupported test cipher: "+cipherId);
 		};
-		Etch etch=new Etch(mapper,"memory-v3",cipher,encryptedIndex);
+		Etch etch=new Etch(mapper,"memory-v3",cipher,encryptedIndex?cipher:null);
 		try {
 			EtchV3Header header=EtchV3Header.create(cipherId,encryptedIndex,salt,
 					publicKeyHint,secret);

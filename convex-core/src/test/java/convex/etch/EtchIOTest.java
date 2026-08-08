@@ -11,6 +11,7 @@ import java.io.RandomAccessFile;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
+import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 
 public class EtchIOTest {
@@ -201,6 +202,31 @@ public class EtchIOTest {
 			}
 		}
 		if (!file.delete()) file.deleteOnExit();
+	}
+
+	@Test
+	public void testEtchSupportsDistinctIndexCipher() throws Exception {
+		InMemoryEtchFileMapper mapper=new InMemoryEtchFileMapper();
+		CountingCipher dataCipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
+		byte[] indexKey=new byte[32];
+		indexKey[0]=1;
+		CountingCipher indexCipher=new CountingCipher(AES256CTREtchCipher.fromKey(indexKey));
+		Etch etch=new Etch(mapper,"distinct-index-cipher",dataCipher,indexCipher);
+		try {
+			etch.appendNewIndexBlock(0);
+			assertEquals(0,dataCipher.starts);
+			assertEquals(1,indexCipher.starts);
+
+			dataCipher.reset();
+			indexCipher.reset();
+			CVMLong value=CVMLong.create(42);
+			etch.write(value.getHash(),value.getRef());
+			assertEquals(1,dataCipher.starts);
+			assertEquals(0,dataCipher.slotTransforms);
+			assertFalse(indexCipher.slotTransforms==0);
+		} finally {
+			etch.close();
+		}
 	}
 
 	private static final class FailingWriteMapper extends AFileMapper {

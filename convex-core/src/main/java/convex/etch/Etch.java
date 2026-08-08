@@ -80,8 +80,8 @@ public class Etch {
 	private final short version;
 	private final long indexStart;
 	private final AFileMapper mapper;
-	private final EtchFileCipher cipher;
-	private final boolean encryptedIndex;
+	private final EtchFileCipher dataCipher;
+	private final EtchFileCipher indexCipher;
 	private final boolean buildChains;
 	private boolean requiresOpenTransition;
 	private boolean closeStarted;
@@ -163,17 +163,17 @@ public class Etch {
 			this.requiresOpenTransition = !newFile && (resolvedHeader instanceof EtchV3Header);
 			if (!newFile)
 				mapper.adoptLength(resolvedHeader.storedLength());
-			EtchFileCipher cipher = createFileCipher(resolvedHeader, resolvedMasterKey);
+			EtchFileCipher dataCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
+			EtchFileCipher indexCipher = null;
+			if ((resolvedHeader instanceof EtchV3Header v3Header) && v3Header.isIndexEncrypted()) {
+				indexCipher = createFileCipher(resolvedHeader, resolvedMasterKey);
+			}
 			// The caller owns the master-key array. All file-scoped derivation is
 			// complete, so Etch deliberately drops the borrowed reference here.
 			resolvedMasterKey = null;
-			boolean encryptedIndex = false;
-			if (resolvedHeader instanceof EtchV3Header v3Header) {
-				encryptedIndex = v3Header.isIndexEncrypted();
-			}
 			this.mapper = mapper;
-			this.cipher = cipher;
-			this.encryptedIndex = encryptedIndex;
+			this.dataCipher = dataCipher;
+			this.indexCipher = indexCipher;
 
 			if (newFile) {
 				header.initialise(this);
@@ -201,7 +201,8 @@ public class Etch {
 	}
 
 	/** Test-only construction around a deterministic mapper. */
-	Etch(AFileMapper mapper, String fileName, EtchFileCipher cipher, boolean encryptedIndex) {
+	Etch(AFileMapper mapper, String fileName, EtchFileCipher dataCipher,
+			EtchFileCipher indexCipher) {
 		this.file = null;
 		this.fileName = fileName;
 		this.data = null;
@@ -210,12 +211,9 @@ public class Etch {
 		this.version = 0;
 		this.indexStart = 0L;
 		this.mapper = mapper;
-		this.cipher = cipher;
-		this.encryptedIndex = encryptedIndex;
+		this.dataCipher = dataCipher;
+		this.indexCipher = indexCipher;
 		this.buildChains = false;
-		if (encryptedIndex && (cipher == null)) {
-			throw new IllegalArgumentException("Index encryption requires a file cipher");
-		}
 	}
 
 	/**
@@ -346,7 +344,7 @@ public class Etch {
 	}
 
 	void readData(long position, byte[] destination, int offset, int length) throws IOException {
-		mapper.read(position, destination, offset, length, cipher);
+		mapper.read(position, destination, offset, length, dataCipher);
 	}
 
 	void writeHeader(long position, byte[] source, int offset, int length) throws IOException {
@@ -670,11 +668,11 @@ public class Etch {
 	}
 
 	boolean isEncrypted() {
-		return cipher != null;
+		return dataCipher != null;
 	}
 
 	boolean isIndexEncrypted() {
-		return encryptedIndex;
+		return indexCipher != null;
 	}
 
 	/**
@@ -767,7 +765,7 @@ public class Etch {
 
 		int ix = POINTER_SIZE * digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix, dataPointer); // single node
-		return mapper.append(temp, 0, indexBlockLength, POINTER_SIZE, encryptedIndex ? cipher : null);
+		return mapper.append(temp, 0, indexBlockLength, POINTER_SIZE, indexCipher);
 	}
 
 	/**
@@ -814,7 +812,7 @@ public class Etch {
 		long recordPosition = rawPointer(pointer);
 		long readPosition = recordPosition;
 		int headerOffset = KEY_SIZE;
-		if ((key != null) && (cipher == null)) {
+		if ((key != null) && (dataCipher == null)) {
 			int keyLength = Math.toIntExact(key.count());
 			if (!mapper.matches(recordPosition, key.getInternalArray(), key.getInternalOffset(), keyLength))
 				return null;
@@ -823,7 +821,7 @@ public class Etch {
 		}
 		int headerLength = headerOffset + LABEL_SIZE + ENCODING_LENGTH_SIZE;
 		byte[] recordHeader = new byte[headerLength];
-		mapper.read(readPosition, recordHeader, 0, headerLength, cipher);
+		mapper.read(readPosition, recordHeader, 0, headerLength, dataCipher);
 		if (headerOffset == KEY_SIZE) {
 			if (key == null) {
 				key = Hash.wrap(recordHeader, 0);
@@ -840,7 +838,7 @@ public class Etch {
 		}
 		long encodingPosition = Math.addExact(readPosition, headerLength);
 		byte[] encodingBytes = new byte[encodingLength];
-		mapper.read(encodingPosition, encodingBytes, 0, encodingLength, cipher);
+		mapper.read(encodingPosition, encodingBytes, 0, encodingLength, dataCipher);
 
 		// get flags byte
 		byte flagByte = recordHeader[headerOffset];
@@ -893,7 +891,7 @@ public class Etch {
 	 */
 	public long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex = indexPosition + POINTER_SIZE * digit;
-		return mapper.readLongAcquire(pointerIndex, encryptedIndex ? cipher : null);
+		return mapper.readLongAcquire(pointerIndex, indexCipher);
 	}
 
 	/**
@@ -945,7 +943,7 @@ public class Etch {
 		if ((currentSize == 0L) && ((newFlags & Ref.STATUS_MASK) >= Ref.PERSISTED)) {
 			Utils.writeLong(label, Byte.BYTES, ref.getValue().getMemorySize());
 		}
-		mapper.write(labelPosition, label, 0, LABEL_SIZE, cipher);
+		mapper.write(labelPosition, label, 0, LABEL_SIZE, dataCipher);
 
 		return ref.withFlags(newFlags); // reflect merged flags
 	}
@@ -960,7 +958,7 @@ public class Etch {
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
 		long position = indexPosition + digit * POINTER_SIZE;
-		mapper.writeLongRelease(position, slotValue, encryptedIndex ? cipher : null);
+		mapper.writeLongRelease(position, slotValue, indexCipher);
 	}
 
 	/**
@@ -1103,7 +1101,7 @@ public class Etch {
 
 		// The v1 root deliberately starts at byte 44; all child indexes are aligned.
 		int alignment = (level == 0) ? 1 : POINTER_SIZE;
-		return mapper.appendZeros(sizeBytes, alignment, encryptedIndex ? cipher : null);
+		return mapper.appendZeros(sizeBytes, alignment, indexCipher);
 	}
 
 	/**
@@ -1142,7 +1140,7 @@ public class Etch {
 		Utils.writeLong(recordHeader, Byte.BYTES, memorySize);
 		Utils.writeShort(recordHeader, LABEL_SIZE, length);
 
-		return mapper.append(key, recordHeader, LABEL_SIZE + ENCODING_LENGTH_SIZE, encoding, cipher);
+		return mapper.append(key, recordHeader, LABEL_SIZE + ENCODING_LENGTH_SIZE, encoding, dataCipher);
 	}
 
 	public File getFile() {

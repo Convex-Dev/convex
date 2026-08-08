@@ -37,8 +37,8 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	private final AEtchHeader header;
 	private final EtchConfig config;
 	private final AFileMapper mapper;
-	private final EtchFileCipher cipher;
-	private final boolean encryptedIndex;
+	private final EtchFileCipher dataCipher;
+	private final EtchFileCipher indexCipher;
 	private final Hash rootHash;
 	private final long logicalFileEnd;
 	private final long physicalFileEnd;
@@ -47,15 +47,16 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 
 	private EtchMaintenanceReader(File file, RandomAccessFile data, FileLock lock,
 			AEtchHeader header, EtchConfig config, AFileMapper mapper,
-			EtchFileCipher cipher, boolean encryptedIndex, Hash rootHash, long physicalFileEnd) {
+			EtchFileCipher dataCipher, EtchFileCipher indexCipher, Hash rootHash,
+			long physicalFileEnd) {
 		this.file=file;
 		this.data=data;
 		this.lock=lock;
 		this.header=header;
 		this.config=config;
 		this.mapper=mapper;
-		this.cipher=cipher;
-		this.encryptedIndex=encryptedIndex;
+		this.dataCipher=dataCipher;
+		this.indexCipher=indexCipher;
 		this.rootHash=rootHash;
 		this.logicalFileEnd=header.storedLength();
 		this.physicalFileEnd=physicalFileEnd;
@@ -137,12 +138,15 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 				throw new IOException("Etch root index extends beyond stored length: "+file);
 			}
 
-			EtchFileCipher cipher=Etch.createFileCipher(header,masterKey);
+			EtchFileCipher dataCipher=Etch.createFileCipher(header,masterKey);
+			EtchFileCipher indexCipher=null;
+			if ((header instanceof EtchV3Header v3)&&v3.isIndexEncrypted()) {
+				indexCipher=Etch.createFileCipher(header,masterKey);
+			}
 			masterKey=null; // borrowed caller-owned array is not retained
-			boolean encryptedIndex=(header instanceof EtchV3Header v3)&&v3.isIndexEncrypted();
 			Hash rootHash=header.getRootHash();
 			EtchMaintenanceReader result=new EtchMaintenanceReader(file,data,lock,header,
-					config,mapper,cipher,encryptedIndex,rootHash,physicalEnd);
+					config,mapper,dataCipher,indexCipher,rootHash,physicalEnd);
 			return result;
 		} catch (IOException | RuntimeException | Error e) {
 			closeAfterFailure(mapper,lock,data,e);
@@ -245,7 +249,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throws IOException {
 		checkDestination(destination,offset,length);
 		checkRange(position,length,bodyStart,physicalFileEnd,"candidate data read");
-		mapper.read(position,destination,offset,length,cipher);
+		mapper.read(position,destination,offset,length,dataCipher);
 	}
 
 	/**
@@ -260,7 +264,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throw new IOException("Unaligned Etch index slot at "+position+" in "+file);
 		}
 		checkRange(position,POINTER_SIZE,header.indexStart(),logicalFileEnd,"index read");
-		return mapper.readLongAcquire(position,encryptedIndex?cipher:null);
+		return mapper.readLongAcquire(position,indexCipher);
 	}
 
 	/**
@@ -271,7 +275,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 			throws IOException {
 		checkDestination(destination,offset,length);
 		checkRange(position,length,header.indexStart(),physicalFileEnd,"candidate index read");
-		mapper.read(position,destination,offset,length,encryptedIndex?cipher:null);
+		mapper.read(position,destination,offset,length,indexCipher);
 	}
 
 	private static void checkDestination(byte[] destination, int offset, int length) {
