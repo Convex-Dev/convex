@@ -99,7 +99,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		// public API remain read-only and never mutate the source.
 		RandomAccessFile data=new RandomAccessFile(file,exclusive?"rw":"r");
 		FileLock lock=null;
-		EtchFileMapper mapper=null;
+		AFileMapper mapper=null;
 		EtchFileAccess access=null;
 		EtchHeader header=null;
 		byte[] masterKey=null;
@@ -149,7 +149,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		}
 	}
 
-	private static void closeAfterFailure(EtchFileAccess access, EtchFileMapper mapper,
+	private static void closeAfterFailure(EtchFileAccess access, AFileMapper mapper,
 			FileLock lock, RandomAccessFile data, Throwable failure) {
 		if (access!=null) {
 			try {

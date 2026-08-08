@@ -22,7 +22,7 @@ public class EtchFileMapperTest {
 		File file=File.createTempFile("etch-mapper", ".dat");
 		String implementation;
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2);
+			AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2);
 			implementation=mapper.implementationName();
 			assertRoundTripAndGrowth(mapper);
 			if ("MemorySegment".equals(implementation)) {
@@ -45,7 +45,7 @@ public class EtchFileMapperTest {
 	public void testRuntimeBackendSelection() throws Exception {
 		File file=File.createTempFile("etch-mapper-selection", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
-				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
+				AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_2)) {
 			boolean ffmAvailable=(Runtime.version().feature()>=22)&&ffmBackendIsPackaged();
 			if (Boolean.getBoolean("convex.etch.requireFFM")) {
 				assertTrue(ffmAvailable,"JDK 22+ Maven build did not include the Etch FFM backend");
@@ -61,7 +61,7 @@ public class EtchFileMapperTest {
 	public void testV1AlwaysUsesCompatibleBackend() throws Exception {
 		File file=File.createTempFile("etch-mapper-v1", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
-				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_1)) {
+				AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),EtchConstants.VERSION_1)) {
 			assertEquals("MappedByteBuffer",mapper.implementationName());
 			assertRoundTripAndGrowth(mapper);
 		}
@@ -99,7 +99,7 @@ public class EtchFileMapperTest {
 			writer.write(expected);
 		}
 		try (RandomAccessFile reader=new RandomAccessFile(file,"r");
-				EtchFileMapper mapper=EtchFileMapperFactory.createReadOnly(reader.getChannel(),mode)) {
+				AFileMapper mapper=EtchFileMapperFactory.createReadOnly(reader.getChannel(),mode)) {
 			byte[] actual=new byte[expected.length];
 			mapper.get(0L,actual,0,actual.length);
 			assertArrayEquals(expected,actual);
@@ -117,7 +117,7 @@ public class EtchFileMapperTest {
 		long position=GROWN_POSITION;
 		byte[] value=new byte[] { 1,2,3,4,5,6,7,8 };
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw");
-				EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
+				AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
 			mapper.ensureWriteCapacity(position,value.length);
 			assertTrue(data.length()>=position+value.length,
 					"Write capacity was not present before put");
@@ -135,7 +135,7 @@ public class EtchFileMapperTest {
 		String implementation;
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(existingLength);
-			try (EtchFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
+			try (AFileMapper mapper=EtchFileMapperFactory.create(data.getChannel(),mode)) {
 				implementation=mapper.implementationName();
 				mapper.get(existingLength-1L,new byte[1],0,1);
 				assertEquals(existingLength,data.length(),"Reading an existing file changed its length");
@@ -151,7 +151,7 @@ public class EtchFileMapperTest {
 		}
 	}
 
-	private static void assertRoundTripAndGrowth(EtchFileMapper mapper) throws Exception {
+	private static void assertRoundTripAndGrowth(AFileMapper mapper) throws Exception {
 		byte[] prefix=new byte[] { 0x12,0x34,0x56,0x78,0x09,0x0a,0x0b,0x0c };
 		mapper.ensureWriteCapacity(3L,32L);
 		mapper.put(3L,prefix,0,prefix.length);

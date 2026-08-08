@@ -13,16 +13,16 @@ import convex.core.util.Utils;
 /**
  * Java 21-compatible Etch mapping backend.
  */
-final class MappedByteBufferEtchFileMapper implements EtchFileMapper {
+final class MBBFileMapper extends AFileMapper {
 	private final FileChannel channel;
 	private final boolean readOnly;
 	private final ArrayList<MappedByteBuffer> regionMap=new ArrayList<>();
 
-	MappedByteBufferEtchFileMapper(FileChannel channel) {
+	MBBFileMapper(FileChannel channel) {
 		this(channel,false);
 	}
 
-	MappedByteBufferEtchFileMapper(FileChannel channel, boolean readOnly) {
+	MBBFileMapper(FileChannel channel, boolean readOnly) {
 		this.channel=channel;
 		this.readOnly=readOnly;
 	}

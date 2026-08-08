@@ -24,7 +24,7 @@ import convex.core.util.Utils;
  * <p>Growth tuning is deliberately local to this implementation. These values
  * affect only allocation and mapping frequency, not the Etch file format.</p>
  */
-final class FFMEtchFileMapper implements EtchFileMapper {
+final class FFMFileMapper extends AFileMapper {
 	/** Shift used for direct address-to-region conversion. */
 	private static final int REGION_SHIFT=30;
 
@@ -71,11 +71,11 @@ final class FFMEtchFileMapper implements EtchFileMapper {
 	private volatile Mapping[] mappings=EMPTY_MAPPINGS;
 	private volatile boolean closed;
 
-	FFMEtchFileMapper(FileChannel channel) {
+	FFMFileMapper(FileChannel channel) {
 		this(channel,false);
 	}
 
-	FFMEtchFileMapper(FileChannel channel, boolean readOnly) {
+	FFMFileMapper(FileChannel channel, boolean readOnly) {
 		this.channel=channel;
 		this.readOnly=readOnly;
 	}

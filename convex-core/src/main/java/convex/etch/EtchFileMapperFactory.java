@@ -15,28 +15,28 @@ final class EtchFileMapperFactory {
 	private EtchFileMapperFactory() {
 	}
 
-	static EtchFileMapper create(FileChannel channel, short etchVersion) {
+	static AFileMapper create(FileChannel channel, short etchVersion) {
 		return create(channel,defaultMapping(etchVersion));
 	}
 
-	static EtchFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode) {
+	static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode) {
 		return create(channel,mappingMode,false);
 	}
 
-	static EtchFileMapper createReadOnly(FileChannel channel, EtchConfig.MappingMode mappingMode) {
+	static AFileMapper createReadOnly(FileChannel channel, EtchConfig.MappingMode mappingMode) {
 		return new ReadOnlyEtchFileMapper(create(channel,mappingMode,true));
 	}
 
-	private static EtchFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode,
+	private static AFileMapper create(FileChannel channel, EtchConfig.MappingMode mappingMode,
 			boolean readOnly) {
 		Objects.requireNonNull(mappingMode,"mappingMode");
 		return switch (mappingMode) {
-			case MAPPED_BYTE_BUFFER -> new MappedByteBufferEtchFileMapper(channel,readOnly);
+			case MAPPED_BYTE_BUFFER -> new MBBFileMapper(channel,readOnly);
 			case MEMORY_SEGMENT -> {
 				try {
 					Class<?> type=Class.forName(FFM_MAPPER_CLASS);
 					Constructor<?> constructor=type.getDeclaredConstructor(FileChannel.class,boolean.class);
-					yield (EtchFileMapper)constructor.newInstance(channel,readOnly);
+					yield (AFileMapper)constructor.newInstance(channel,readOnly);
 				} catch (ReflectiveOperationException | LinkageError e) {
 					throw new IllegalStateException("Unable to initialise Etch FFM mapping backend",e);
 				}
@@ -82,10 +82,10 @@ final class EtchFileMapperFactory {
 	 * Maintenance-only guard around a physically read-only mapping. Keeping the
 	 * guard here avoids adding a read-only branch to ordinary Etch write paths.
 	 */
-	private static final class ReadOnlyEtchFileMapper implements EtchFileMapper {
-		private final EtchFileMapper delegate;
+	private static final class ReadOnlyEtchFileMapper extends AFileMapper {
+		private final AFileMapper delegate;
 
-		private ReadOnlyEtchFileMapper(EtchFileMapper delegate) {
+		private ReadOnlyEtchFileMapper(AFileMapper delegate) {
 			this.delegate=delegate;
 		}
 

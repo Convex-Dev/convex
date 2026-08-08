@@ -7,7 +7,7 @@ import java.util.Arrays;
 import convex.core.util.Utils;
 
 /** Small deterministic mapper for byte-exact Etch format tests. */
-final class InMemoryEtchFileMapper implements EtchFileMapper {
+final class InMemoryEtchFileMapper extends AFileMapper {
 	private byte[] bytes=new byte[0];
 	private int fullForceCount;
 	private int rangeForceCount;

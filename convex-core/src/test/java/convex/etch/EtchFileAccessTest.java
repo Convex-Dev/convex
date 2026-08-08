@@ -20,7 +20,7 @@ public class EtchFileAccessTest {
 		File file=File.createTempFile("etch-access-range", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
 			data.setLength(128L);
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),64L,data.length())) {
 				access.readData(63L,new byte[1],0,1);
 				assertThrows(EtchCorruptionError.class,()->access.readData(63L,new byte[2],0,2));
@@ -35,7 +35,7 @@ public class EtchFileAccessTest {
 	public void testSemanticAppendsPublishLogicalEnd() throws Exception {
 		File file=File.createTempFile("etch-access-append", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L)) {
 				Blob key=Blob.wrap(new byte[] { 1,2,3,4 });
 				byte[] header=new byte[] { 5,6 };
@@ -58,7 +58,7 @@ public class EtchFileAccessTest {
 	public void testRejectsLogicalEndBeyondPhysicalFile() throws Exception {
 		File file=File.createTempFile("etch-access-length", ".dat");
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			assertThrows(EtchCorruptionError.class,
 					()->new EtchFileAccess(mapper,file.getName(),1L,data.length()));
 			mapper.close();
@@ -88,7 +88,7 @@ public class EtchFileAccessTest {
 		File file=File.createTempFile("etch-access-encrypted-data", ".dat");
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L,cipher,false)) {
 				byte[] plainHeader=new byte[] { 11,12,13,14 };
 				assertEquals(0L,access.appendHeader(plainHeader,0,plainHeader.length));
@@ -137,7 +137,7 @@ public class EtchFileAccessTest {
 		File file=File.createTempFile("etch-access-encrypted-index", ".dat");
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			try (EtchFileAccess access=new EtchFileAccess(mapper,file.getName(),0L,0L,cipher,true)) {
 				long indexPosition=access.appendZeroIndex(2*Long.BYTES,Long.BYTES);
 				assertEquals(1,cipher.starts);
@@ -156,7 +156,7 @@ public class EtchFileAccessTest {
 		File file=File.createTempFile("etch-access-plain-index", ".dat");
 		CountingCipher cipher=new CountingCipher(AES256CTREtchCipher.fromKey(new byte[32]));
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchFileMapper mapper=new MappedByteBufferEtchFileMapper(data.getChannel());
+			AFileMapper mapper=new MBBFileMapper(data.getChannel());
 			mapper.ensureWriteCapacity(0L,Long.BYTES);
 			mapper.writeIndexSlotRelease(0L,0x0123456789abcdefL);
 			try (EtchFileAccess access=new EtchFileAccess(
@@ -172,7 +172,7 @@ public class EtchFileAccessTest {
 		if (!file.delete()) file.deleteOnExit();
 	}
 
-	private static final class FailingWriteMapper implements EtchFileMapper {
+	private static final class FailingWriteMapper extends AFileMapper {
 		private int capacityChecks;
 		private int puts;
 		private long preparedPosition;

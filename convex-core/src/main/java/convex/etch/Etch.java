@@ -108,7 +108,7 @@ public class Etch {
 		this.data=new RandomAccessFile(dataFile,"rw");
 
 		this.fileName = dataFile.getName();
-		EtchFileMapper mapper=null;
+		AFileMapper mapper=null;
 		EtchFileAccess access=null;
 		EtchHeader resolvedHeader=null;
 		byte[] resolvedMasterKey=suppliedMasterKey;

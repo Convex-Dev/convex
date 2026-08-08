@@ -6,7 +6,7 @@ import convex.core.data.AArrayBlob;
 import convex.core.util.Utils;
 
 /**
- * Logical file access layered over an {@link EtchFileMapper}.
+ * Logical file access layered over an {@link AFileMapper}.
  *
  * <p>The mapper owns physical addressability. This class owns the logical end
  * of valid Etch data, checks complete access ranges, and publishes append
@@ -16,17 +16,17 @@ final class EtchFileAccess implements AutoCloseable {
 	private static final int ZERO_BUFFER_SIZE=16_384;
 	private static final byte[] ZERO_BUFFER=new byte[ZERO_BUFFER_SIZE];
 
-	private final EtchFileMapper mapper;
+	private final AFileMapper mapper;
 	private final String fileName;
 	private final EtchFileCipher cipher;
 	private final boolean encryptedIndex;
 	private volatile long dataLength;
 
-	EtchFileAccess(EtchFileMapper mapper, String fileName, long dataLength, long physicalLength) {
+	EtchFileAccess(AFileMapper mapper, String fileName, long dataLength, long physicalLength) {
 		this(mapper,fileName,dataLength,physicalLength,null,false);
 	}
 
-	EtchFileAccess(EtchFileMapper mapper, String fileName, long dataLength, long physicalLength,
+	EtchFileAccess(AFileMapper mapper, String fileName, long dataLength, long physicalLength,
 			EtchFileCipher cipher, boolean encryptedIndex) {
 		this.mapper=mapper;
 		this.fileName=fileName;
