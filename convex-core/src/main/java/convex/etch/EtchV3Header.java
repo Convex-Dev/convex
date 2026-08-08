@@ -52,7 +52,7 @@ import convex.core.util.Utils;
  * reopening is supported by normal Etch access; dirty reopening remains
  * fail-fast until the separate recovery scanner is complete.</p>
  */
-final class EtchV3Header extends EtchHeader {
+final class EtchV3Header extends AEtchHeader {
 	private static final String SHA_256="SHA-256";
 	private static final String HMAC_SHA_256="HmacSHA256";
 	private static final long UNSIGNED_MAX_GENERATION=-1L;

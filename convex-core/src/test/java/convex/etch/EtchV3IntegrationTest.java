@@ -249,7 +249,7 @@ public class EtchV3IntegrationTest {
 
 	private static EtchV3Header readHeader(File file, byte[] secret) throws Exception {
 		try (RandomAccessFile data=new RandomAccessFile(file,"r")) {
-			return (EtchV3Header)EtchHeader.open(data,file.getName(),secret);
+			return (EtchV3Header)AEtchHeader.open(data,file.getName(),secret);
 		}
 	}
 

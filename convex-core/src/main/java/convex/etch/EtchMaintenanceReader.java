@@ -34,7 +34,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	private final File file;
 	private final RandomAccessFile data;
 	private final FileLock lock;
-	private final EtchHeader header;
+	private final AEtchHeader header;
 	private final EtchConfig config;
 	private final EtchFileAccess access;
 	private final Hash rootHash;
@@ -44,7 +44,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 	private boolean closed;
 
 	private EtchMaintenanceReader(File file, RandomAccessFile data, FileLock lock,
-			EtchHeader header, EtchConfig config, EtchFileAccess access, Hash rootHash,
+			AEtchHeader header, EtchConfig config, EtchFileAccess access, Hash rootHash,
 			long physicalFileEnd) {
 		this.file=file;
 		this.data=data;
@@ -101,7 +101,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 		FileLock lock=null;
 		AFileMapper mapper=null;
 		EtchFileAccess access=null;
-		EtchHeader header=null;
+		AEtchHeader header=null;
 		byte[] masterKey=null;
 		try {
 			FileChannel channel=data.getChannel();
@@ -114,8 +114,8 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 
 			long physicalEnd=channel.size();
 			if (physicalEnd==0L) throw new IOException("Empty Etch file: "+file);
-			masterKey=EtchHeader.resolveKey(data,file.getName(),requestedConfig);
-			header=EtchHeader.open(data,file.getName(),masterKey);
+			masterKey=AEtchHeader.resolveKey(data,file.getName(),requestedConfig);
+			header=AEtchHeader.open(data,file.getName(),masterKey);
 			EtchConfig config=Etch.resolveExistingConfig(header,requestedConfig,file);
 			long logicalEnd=header.storedLength();
 			if ((logicalEnd<0L)||(logicalEnd>physicalEnd)) {

@@ -18,7 +18,7 @@ import convex.core.data.Hash;
 import convex.core.util.Utils;
 
 /** Existing single-header Etch v1/v2 metadata behaviour. */
-final class LegacyEtchHeader extends EtchHeader {
+final class LegacyEtchHeader extends AEtchHeader {
 	private LegacyEtchHeader(short version, long storedLength) {
 		super(version,indexStart(version),storedLength);
 	}

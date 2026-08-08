@@ -175,7 +175,7 @@ public class EtchMaintenanceReaderTest {
 
 	private static void markV3Open(File file, byte[] secret) throws Exception {
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchV3Header header=(EtchV3Header)EtchHeader.open(data,file.getName(),secret);
+			EtchV3Header header=(EtchV3Header)AEtchHeader.open(data,file.getName(),secret);
 			Hash root=header.getRootHash(null);
 			byte[] copyA=header.encode(header.generation()+1L,header.syncedFileEnd(),root,
 					EtchConstants.V3_OPEN);

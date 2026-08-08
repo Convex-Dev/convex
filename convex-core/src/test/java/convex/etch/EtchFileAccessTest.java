@@ -240,7 +240,7 @@ public class EtchFileAccessTest {
 		}
 	}
 
-	private static final class CountingCipher implements EtchFileCipher {
+	private static final class CountingCipher extends EtchFileCipher {
 		private final EtchFileCipher delegate;
 		private int starts;
 		private int slotTransforms;

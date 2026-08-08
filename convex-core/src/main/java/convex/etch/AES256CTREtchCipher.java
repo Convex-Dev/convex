@@ -13,7 +13,7 @@ import javax.crypto.spec.SecretKeySpec;
 import convex.core.util.Utils;
 
 /** AES-256-CTR Etch overlay addressed by absolute file offset. */
-final class AES256CTREtchCipher implements EtchFileCipher {
+final class AES256CTREtchCipher extends EtchFileCipher {
 	private static final String TRANSFORMATION="AES/CTR/NoPadding";
 	private static final int KEY_LENGTH=32;
 	private static final int BLOCK_LENGTH=EtchConstants.V3_AES_BLOCK_SIZE;

@@ -200,7 +200,7 @@ public class EtchConfiguredLifecycleTest {
 		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
 				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"r")) {
-			EtchHeader header=EtchHeader.open(data,file.getName(),secret);
+			AEtchHeader header=AEtchHeader.open(data,file.getName(),secret);
 			return ((EtchV3Header)header).fileSalt();
 		} finally {
 			Arrays.fill(secret,(byte)0);
@@ -211,7 +211,7 @@ public class EtchConfiguredLifecycleTest {
 		byte[] secret=(config.getCipherMode()==EtchConfig.CipherMode.NONE)?null
 				:config.resolveKey(config.getPublicKeyHint());
 		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
-			EtchV3Header header=(EtchV3Header)EtchHeader.open(data,file.getName(),secret);
+			EtchV3Header header=(EtchV3Header)AEtchHeader.open(data,file.getName(),secret);
 			byte[] copyA=header.encode(header.generation()+1L,header.syncedFileEnd(),
 					header.getRootHash(null),EtchConstants.V3_OPEN);
 			byte[] copyB=header.encode(header.generation()+2L,header.syncedFileEnd(),

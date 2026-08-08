@@ -1,6 +1,5 @@
 package convex.etch;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -10,7 +9,7 @@ import org.bouncycastle.util.Pack;
 import convex.core.util.Utils;
 
 /** ChaCha20 Etch overlay addressed by absolute file offset. */
-final class ChaCha20EtchCipher implements EtchFileCipher {
+final class ChaCha20EtchCipher extends EtchFileCipher {
 	private static final int KEY_LENGTH=32;
 	private static final int ROUNDS=20;
 	private static final int STATE_WORDS=16;

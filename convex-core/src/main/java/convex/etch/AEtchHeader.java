@@ -20,18 +20,18 @@ import convex.core.data.Hash;
  * It owns only file initialisation and metadata operations whose persistence
  * rules differ between Etch versions.</p>
  */
-abstract class EtchHeader {
+abstract class AEtchHeader {
 	private final short version;
 	private final long indexStart;
 	private final long storedLength;
 
-	EtchHeader(short version, long indexStart, long storedLength) {
+	AEtchHeader(short version, long indexStart, long storedLength) {
 		this.version=version;
 		this.indexStart=indexStart;
 		this.storedLength=storedLength;
 	}
 
-	static EtchHeader create(EtchConfig config, byte[] masterKey) throws IOException {
+	static AEtchHeader create(EtchConfig config, byte[] masterKey) throws IOException {
 		short version=config.getVersion();
 		return switch (version) {
 			case VERSION_1, VERSION_2 -> LegacyEtchHeader.create(version);
@@ -54,7 +54,7 @@ abstract class EtchHeader {
 		return EtchV3Header.resolveKey(copyA,copyB,config,fileName);
 	}
 
-	static EtchHeader open(RandomAccessFile data, String fileName, byte[] masterKey) throws IOException {
+	static AEtchHeader open(RandomAccessFile data, String fileName, byte[] masterKey) throws IOException {
 		data.seek(0L);
 		int magic=data.readUnsignedShort();
 		short version=data.readShort();

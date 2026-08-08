@@ -275,10 +275,10 @@ public class EtchUtils {
 		for (File candidate:files) {
 			if (candidate.length()==0L) continue;
 			try (RandomAccessFile data=new RandomAccessFile(candidate,"r")) {
-				byte[] masterKey=EtchHeader.resolveKey(data,candidate.getName(),config);
-				EtchHeader header=null;
+				byte[] masterKey=AEtchHeader.resolveKey(data,candidate.getName(),config);
+				AEtchHeader header=null;
 				try {
-					header=EtchHeader.open(data,candidate.getName(),masterKey);
+					header=AEtchHeader.open(data,candidate.getName(),masterKey);
 					masterKey=null; // borrowed caller-owned array is not retained
 					Etch.resolveExistingConfig(header,config,candidate);
 					long physicalEnd=data.length();

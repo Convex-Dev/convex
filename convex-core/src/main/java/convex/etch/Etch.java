@@ -83,7 +83,7 @@ public class Etch {
 	private final RandomAccessFile data;
 
 	private final EtchConfig config;
-	private final EtchHeader header;
+	private final AEtchHeader header;
 	private final short version;
 	private final long indexStart;
 	private final EtchFileAccess fileAccess;
@@ -110,7 +110,7 @@ public class Etch {
 		this.fileName = dataFile.getName();
 		AFileMapper mapper=null;
 		EtchFileAccess access=null;
-		EtchHeader resolvedHeader=null;
+		AEtchHeader resolvedHeader=null;
 		byte[] resolvedMasterKey=suppliedMasterKey;
 		try {
 			// Try to exclusively lock the Etch database file
@@ -138,11 +138,11 @@ public class Etch {
 				} else if (resolvedMasterKey!=null) {
 					throw new IOException("Plaintext Etch must not receive a master key");
 				}
-				resolvedHeader=EtchHeader.create(effectiveConfig,resolvedMasterKey);
+				resolvedHeader=AEtchHeader.create(effectiveConfig,resolvedMasterKey);
 			} else {
 				if (resolvedMasterKey!=null) throw new IOException("Cannot supply a direct key while opening an existing Etch file");
-				resolvedMasterKey=EtchHeader.resolveKey(this.data,fileName,requestedConfig);
-				resolvedHeader=EtchHeader.open(this.data,fileName,resolvedMasterKey);
+				resolvedMasterKey=AEtchHeader.resolveKey(this.data,fileName,requestedConfig);
+				resolvedHeader=AEtchHeader.open(this.data,fileName,resolvedMasterKey);
 			}
 
 			short fileVersion=resolvedHeader.version();
@@ -289,7 +289,7 @@ public class Etch {
 		return new Etch(file,config);
 	}
 
-	static EtchConfig resolveExistingConfig(EtchHeader resolvedHeader,
+	static EtchConfig resolveExistingConfig(AEtchHeader resolvedHeader,
 			EtchConfig requestedConfig, File dataFile) throws IOException {
 		short fileVersion=resolvedHeader.version();
 		if ((requestedConfig!=null)&&(requestedConfig.getVersion()!=fileVersion)) {
@@ -311,7 +311,7 @@ public class Etch {
 		return basis.withV3FileOptions(fileCipher,v3Header.isIndexEncrypted(),fileHint);
 	}
 
-	static EtchFileCipher createFileCipher(EtchHeader resolvedHeader,
+	static EtchFileCipher createFileCipher(AEtchHeader resolvedHeader,
 			byte[] masterKey) throws IOException {
 		if (!(resolvedHeader instanceof EtchV3Header v3Header)) return null;
 		return switch (v3Header.cipherId()) {
