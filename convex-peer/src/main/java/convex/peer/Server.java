@@ -801,15 +801,33 @@ public class Server implements Closeable {
 		queryHandler.close();
 		transactionHandler.close();
 		executor.close();
+
+		boolean writersStopped=true;
+		try {
+			writersStopped&=propagator.awaitStopped();
+			writersStopped&=transactionHandler.awaitStopped();
+			writersStopped&=executor.awaitStopped();
+		} catch (InterruptedException e) {
+			writersStopped=false;
+			Thread.currentThread().interrupt();
+		}
 		
 		Peer peer=getPeer();
 		// persist peer state if necessary
-		if ((peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
+		if ((peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))
+				&&writersStopped) {
 			try {
-				persistPeerData();
+				executor.persistPeerData();
+				// Normal state publication remains buffered. An orderly shutdown is
+				// the durability boundary for the Peer-owned root.
+				store.flush();
 			} catch (IOException e) {
-				log.warn("Unable to persist Peer data in "+store,e);
+				log.error("Unable to complete final Peer checkpoint in "+store
+						+"; the store may require operator recovery",e);
 			}
+		} else if ((peer!=null)&&!Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
+			log.error("Peer writers did not stop cleanly; skipping the final checkpoint for "
+					+store+" and leaving recovery to the operator");
 		}
 
 		nio.close();
@@ -1110,7 +1128,8 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Waits for the Server to shut down (i.e. {@link #isRunning()} becoming false).
+	 * Waits for the Server shutdown sequence, including its final persistence
+	 * checkpoint, to complete.
 	 *
 	 * @throws InterruptedException if the calling thread is interrupted, including if the
 	 *         interrupt flag is already set on entry. This guarantees callers see an
@@ -1118,9 +1137,10 @@ public class Server implements Closeable {
 	 *         cannot be mistaken for a completed shutdown.
 	 */
 	public void waitForShutdown() throws InterruptedException {
-		while (isRunning()) {
-			// Note: throws immediately if the interrupt flag is already set
-			Thread.sleep(1000);
+		try {
+			shutdownFuture.get();
+		} catch (java.util.concurrent.ExecutionException e) {
+			throw new IllegalStateException("Unexpected Peer shutdown failure",e.getCause());
 		}
 	}
 

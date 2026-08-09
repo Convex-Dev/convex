@@ -77,4 +77,17 @@ public abstract class AThreadedComponent {
 		Thread t=thread;
 		t.interrupt();
 	}
+
+	/**
+	 * Waits until this component can no longer access Peer resources.
+	 *
+	 * @return {@code false} when called by the component thread itself
+	 * @throws InterruptedException if the waiting thread is interrupted
+	 */
+	boolean awaitStopped() throws InterruptedException {
+		Thread t=thread;
+		if (Thread.currentThread()==t) return false;
+		t.join();
+		return true;
+	}
 }

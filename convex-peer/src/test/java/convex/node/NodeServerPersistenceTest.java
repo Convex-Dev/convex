@@ -15,9 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
@@ -60,6 +58,7 @@ public class NodeServerPersistenceTest {
 	private static class HookedEtchStore extends EtchStore {
 		private volatile RootWriteHook rootWriteHook;
 		private volatile RootWriteHook flushHook;
+		private volatile RootWriteHook flushCompleteHook;
 
 		HookedEtchStore(String prefix) throws IOException {
 			super(Etch.createTempEtch(prefix));
@@ -73,10 +72,8 @@ public class NodeServerPersistenceTest {
 			flushHook = hook;
 		}
 
-		void reset() throws IOException {
-			rootWriteHook = null;
-			flushHook = null;
-			super.setRootData(null);
+		void setFlushCompleteHook(RootWriteHook hook) {
+			flushCompleteHook = hook;
 		}
 
 		@Override
@@ -91,33 +88,23 @@ public class NodeServerPersistenceTest {
 			RootWriteHook hook = flushHook;
 			if (hook != null) hook.run();
 			super.flush();
+			hook = flushCompleteHook;
+			if (hook != null) hook.run();
 		}
 	}
 
-	private static HookedEtchStore sharedPrimaryStore;
-	private static HookedEtchStore sharedBackupStore;
+	private HookedEtchStore sharedPrimaryStore;
+	private HookedEtchStore sharedBackupStore;
 
 	private NodeServer<?> primary;
 	private NodeServer<?> backup;
 	private AStore primaryStore;
 	private AStore backupStore;
 
-	@BeforeAll
-	static void createStores() throws IOException {
+	@BeforeEach
+	void createStores() throws IOException {
 		sharedPrimaryStore = new HookedEtchStore("node-persistence-primary");
 		sharedBackupStore = new HookedEtchStore("node-persistence-backup");
-	}
-
-	@AfterAll
-	static void closeStores() throws IOException {
-		sharedPrimaryStore.close();
-		sharedBackupStore.close();
-	}
-
-	@BeforeEach
-	void resetStores() throws IOException {
-		sharedPrimaryStore.reset();
-		sharedBackupStore.reset();
 		primaryStore = sharedPrimaryStore;
 		backupStore = sharedBackupStore;
 	}
@@ -129,10 +116,14 @@ public class NodeServerPersistenceTest {
 		sharedBackupStore.setRootWriteHook(null);
 		sharedPrimaryStore.setFlushHook(null);
 		sharedBackupStore.setFlushHook(null);
+		sharedPrimaryStore.setFlushCompleteHook(null);
+		sharedBackupStore.setFlushCompleteHook(null);
 		if (primary != null) primary.close();
 		if (backup != null) backup.close();
 		if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close();
 		if (backupStore != null && backupStore != sharedBackupStore) backupStore.close();
+		sharedPrimaryStore.close();
+		sharedBackupStore.close();
 	}
 
 	/**
@@ -182,8 +173,8 @@ public class NodeServerPersistenceTest {
 	 */
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses.
-		// Synchronous commit guarantees announce + setRootData + flush complete before
-		// sync() returns — the announced cursor is up to date.
+		// Synchronous publication guarantees announce + setRootData complete before
+		// sync() returns — the announced cursor is up to date without forcing storage.
 		primary.getCursor().sync();
 
 		pullBackupFromPrimary();
@@ -462,7 +453,7 @@ public class NodeServerPersistenceTest {
 
 		writeDataValue(primary, 42);
 
-		// Sync cursor — synchronous commit on the primary completes announce
+		// Sync cursor — synchronous publication on the primary completes announce
 		// + setRootData on this thread before returning.
 		primary.getCursor().sync();
 
@@ -588,9 +579,9 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Synchronous commit must surface persistence errors to the caller. If
-	 * setRootData throws, cursor.sync() must throw — silent loss of durability
-	 * is the failure mode this design rules out.
+	 * Synchronous publication must surface store errors to the caller. If
+	 * setRootData throws, cursor.sync() must throw rather than falsely confirming
+	 * root publication.
 	 */
 	@Test
 	public void testSyncSurfacesPersistenceFailure() throws Exception {
@@ -609,6 +600,136 @@ public class NodeServerPersistenceTest {
 			"Cause must be the original IOException, was: " + ex.getCause());
 		assertEquals("simulated disk failure", ex.getCause().getMessage());
 		assertTrue(primary.isRunning(), "sync failure must not impose an operator recovery policy");
+	}
+
+	@Test
+	public void testLaunchCompletesInitialCheckpoint() throws Exception {
+		AtomicInteger flushes=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+
+		primary.launch();
+
+		assertEquals(1,flushes.get(),"launch must checkpoint the initial published root");
+	}
+
+	@Test
+	public void testExplicitCheckpointCoalescesCleanStore() throws Exception {
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary.launch();
+		AtomicInteger flushes=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
+		writeDataValue(primary,102);
+		primary.getCursor().sync();
+
+		assertTrue(primary.checkpoint());
+		assertFalse(primary.checkpoint(),"a clean store must not be flushed again");
+		assertEquals(1,flushes.get());
+	}
+
+	@Test
+	public void testFailedCheckpointRemainsDirtyForRetry() throws Exception {
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary.launch();
+		writeDataValue(primary,103);
+		primary.getCursor().sync();
+		AtomicInteger attempts=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(()->{
+			if (attempts.incrementAndGet()==1) throw new IOException("simulated checkpoint failure");
+		});
+
+		IOException failure=assertThrows(IOException.class,primary::checkpoint);
+		assertEquals("simulated checkpoint failure",failure.getMessage());
+		assertTrue(primary.checkpoint(),"a failed barrier must leave the store dirty");
+		assertFalse(primary.checkpoint());
+		assertEquals(2,attempts.get());
+	}
+
+	@Test
+	public void testPeriodicCheckpointUsesMaintenanceLoop() throws Exception {
+		NodeConfig config=NodeConfig.create(Maps.of(
+				NodeConfig.PORT,CVMLong.create(-1),
+				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary.launch();
+		CountDownLatch checkpointed=new CountDownLatch(1);
+		AtomicInteger flushes=new AtomicInteger();
+		sharedPrimaryStore.setFlushCompleteHook(()->{
+			flushes.incrementAndGet();
+			checkpointed.countDown();
+		});
+		writeDataValue(primary,104);
+		primary.getCursor().sync();
+
+		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint signal not received");
+		assertEquals(1,flushes.get());
+	}
+
+	@Test
+	public void testPeriodicCheckpointRetriesFailure() throws Exception {
+		NodeConfig config=NodeConfig.create(Maps.of(
+				NodeConfig.PORT,CVMLong.create(-1),
+				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary.launch();
+		CountDownLatch checkpointed=new CountDownLatch(1);
+		AtomicInteger attempts=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(()->{
+			if (attempts.incrementAndGet()==1) throw new IOException("simulated periodic failure");
+		});
+		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
+		writeDataValue(primary,107);
+		primary.getCursor().sync();
+
+		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"periodic checkpoint retry not received");
+		assertEquals(2,attempts.get());
+	}
+
+	@Test
+	public void testPeriodicCheckpointAppliesToCustomPrimary() throws Exception {
+		NodeConfig config=NodeConfig.create(Maps.of(
+				NodeConfig.PORT,CVMLong.create(-1),
+				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
+		primary.addPropagator(new LatticePropagator(primaryStore));
+		primary.launch();
+		CountDownLatch checkpointed=new CountDownLatch(1);
+		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
+		writeDataValue(primary,108);
+		primary.getCursor().sync();
+
+		assertTrue(checkpointed.await(2,TimeUnit.SECONDS),"custom primary was not checkpointed");
+	}
+
+	@Test
+	public void testCloseCompletesFinalCheckpoint() throws Exception {
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary.launch();
+		AtomicInteger flushes=new AtomicInteger();
+		sharedPrimaryStore.setFlushHook(flushes::incrementAndGet);
+		writeDataValue(primary,105);
+
+		primary.close();
+
+		assertEquals(1,flushes.get());
+		assertNotNull(readDataValue(primary,105));
+		assertNotNull(RT.getIn(primaryStore.getRootData(),Keyword.intern("data"),Hash.get(CVMLong.create(105))));
+	}
+
+	@Test
+	public void testCloseSurfacesFinalCheckpointFailureAfterStopping() throws Exception {
+		primary=new NodeServer<>(Lattice.ROOT,primaryStore,NodeConfig.port(-1));
+		primary.launch();
+		writeDataValue(primary,106);
+		sharedPrimaryStore.setFlushHook(()->{
+			throw new IOException("simulated final checkpoint failure");
+		});
+
+		IOException failure=assertThrows(IOException.class,primary::close);
+		sharedPrimaryStore.setFlushHook(null);
+		assertEquals("simulated final checkpoint failure",failure.getMessage());
+		assertFalse(primary.isRunning(),"resources must be stopped even when the final barrier fails");
+		assertEquals(NodeServer.LifecycleState.STOPPED,primary.getLifecycleState());
 	}
 
 	@Test
@@ -716,6 +837,10 @@ public class NodeServerPersistenceTest {
 	public void testProcessSnapshotPipelinesAreSerialised() throws Exception {
 		AtomicInteger inFlight = new AtomicInteger();
 		AtomicInteger maxInFlight = new AtomicInteger();
+		AtomicInteger rootWrites = new AtomicInteger();
+		CountDownLatch firstEntered = new CountDownLatch(1);
+		CountDownLatch releaseFirst = new CountDownLatch(1);
+		CountDownLatch secondStarted = new CountDownLatch(1);
 
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore, NodeConfig.port(-1));
 		primary.launch();
@@ -724,7 +849,12 @@ public class NodeServerPersistenceTest {
 			int n = inFlight.incrementAndGet();
 			maxInFlight.updateAndGet(m -> Math.max(m, n));
 			try {
-				Thread.sleep(50);
+				if (rootWrites.getAndIncrement() == 0) {
+					firstEntered.countDown();
+					if (!releaseFirst.await(5,TimeUnit.SECONDS)) {
+						throw new IOException("Timed out waiting to release first snapshot");
+					}
+				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 				throw new IOException("Interrupted while testing snapshot serialisation", e);
@@ -747,12 +877,20 @@ public class NodeServerPersistenceTest {
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-A");
 		Thread t2 = new Thread(() -> {
+			secondStarted.countDown();
 			try { prop.processSnapshot(v2); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-B");
 
 		t1.start();
-		t2.start();
+		try {
+			assertTrue(firstEntered.await(5,TimeUnit.SECONDS));
+			t2.start();
+			assertTrue(secondStarted.await(5,TimeUnit.SECONDS));
+			assertEquals(1,maxInFlight.get(),"second pipeline must wait outside setRootData");
+		} finally {
+			releaseFirst.countDown();
+		}
 		t1.join();
 		t2.join();
 

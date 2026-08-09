@@ -227,6 +227,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/** Virtual thread that periodically prunes closed connections from {@link #connectionStats}. */
 	private Thread maintenanceThread;
+	private final Object maintenanceSignal = new Object();
+
+	/** Stable identity required for prompt shutdown-hook deregistration. */
+	private final Runnable shutdownHook = this::shutdownPersist;
+	private boolean shutdownHookRegistered;
 
 	/**
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
@@ -336,10 +341,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 					connectionManager.setKeyPair(signingKey);
 				}
 				LatticePropagator primary = new LatticePropagator(store, connectionManager);
-				if (!config.isPersist()) {
-					primary.setPersistInterval(-1); // disable setRootData
-				}
 				propagators.add(primary);
+			}
+
+			for (LatticePropagator p : propagators) {
+				p.setPersistenceEnabled(config.isPersist());
 			}
 
 			// Outbound sockets begin at the public/untrusted cap. Their connection manager
@@ -365,6 +371,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (!propagators.isEmpty()) {
 				ACell announced = propagators.get(0).processSnapshot(cursor.get());
 				cursor.set((V) announced);
+				if (config.isPersist()) propagators.get(0).checkpoint();
 			}
 
 			// Create and launch network server unless port is negative (local-only mode)
@@ -400,7 +407,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 					.start(this::maintenanceLoop);
 
 			// Register shutdown hook to persist before Etch closes its files
-			Shutdown.addHook(Shutdown.SERVER, this::shutdownPersist);
+			Shutdown.addHook(Shutdown.SERVER, shutdownHook);
+			shutdownHookRegistered = true;
 
 			// Start all propagator threads and connection managers
 			for (LatticePropagator p : propagators) {
@@ -408,7 +416,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				p.start();
 			}
 
-			// Publication is part of the launch contract. If its synchronous checkpoint
+			// Publication is part of the launch contract. If synchronous publication
 			// fails, launch must fail with every service stopped rather than returning an
 			// exception while a listener and background threads remain live.
 			publishNodeInfo();
@@ -425,7 +433,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Stops every service that may have started after the listener opened, attaching
 	 * cleanup failures to the original launch failure. This deliberately differs from
 	 * {@link #close()}: it does not submit a final persistence snapshot. Retrying the
-	 * checkpoint while unwinding the failure would obscure whether publication succeeded
+	 * persistence while unwinding the failure would obscure whether publication succeeded
 	 * and could turn lifecycle cleanup into a second failing persistence operation.
 	 */
 	private void abortFailedLaunch(Throwable failure) {
@@ -454,9 +462,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			addCleanupFailure(failure, cleanupError);
 		}
 
-		Thread maintenance = maintenanceThread;
-		maintenanceThread = null;
-		if (maintenance != null) maintenance.interrupt();
+		try {
+			stopMaintenance();
+		} catch (Throwable cleanupError) {
+			addCleanupFailure(failure, cleanupError);
+		}
 
 		// A timed-out dispatcher may still be inside cursor.sync() or store decoding.
 		// Keep the propagators and store-facing services available until a later
@@ -478,6 +488,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 		lifecycleState = LifecycleState.STOPPED;
+		removeShutdownHook();
 	}
 
 	private static void addCleanupFailure(Throwable failure, Throwable cleanupError) {
@@ -516,7 +527,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		// Navigate to :p2p :nodes and merge the signed entry
 		cursor.path(Keywords.P2P, Keywords.NODES).merge(entry);
-		// Publication is part of launch: make it durable and queryable immediately.
+		// Publication is part of launch: make it queryable immediately. The initial
+		// pre-listener root has already completed the startup durability barrier.
 		cursor.sync();
 
 		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
@@ -553,7 +565,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * of unscoped DATA_REQUEST messages.
 	 * Processing exceptions are contained at this message boundary. A request with an
 	 * ID receives an error result where possible; fire-and-forget message failures are
-	 * logged. In particular, a durability failure after an inbound lattice merge does
+	 * logged. In particular, a store-publication failure after an inbound lattice merge does
 	 * not impose a shutdown or retry policy on the node.
 	 *
 	 * @param message The incoming message
@@ -1146,7 +1158,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p>Navigates to the target path via {@code cursor.path()}, merges the
 	 * received value, then calls {@code cursor.sync()} to notify propagators. Network
-	 * delivery is first handed to a bounded dispatcher, so this synchronous durability
+	 * delivery is first handed to a bounded dispatcher, so this synchronous publication
 	 * work never blocks a shared Netty event-loop thread.
 	 *
 	 * <p>Payload format: [:LV [*path*] value]
@@ -1204,7 +1216,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (before == after || (before != null && before.equals(after))) return;
 
 		// Notify propagators that cursor state has changed. This is a synchronous
-		// primary-store checkpoint on the dispatcher thread, never on a Netty event loop.
+		// primary-store publication on the dispatcher thread, never on a Netty event loop.
 		cursor.sync();
 
 		// If P2P node data changed, update desired peers on connection managers
@@ -1385,20 +1397,70 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Periodic maintenance loop (#566): a backstop that sweeps closed connections from the
-	 * stats map even if the eager disconnect hook is missed or unavailable, so entries drain
-	 * within one sweep interval. Exits promptly on interrupt when the server closes.
+	 * Periodic maintenance loop: sweeps closed connections and checkpoints dirty
+	 * persistent stores. Reusing this loop keeps checkpoint policy in NodeServer
+	 * without adding another store-writer thread.
 	 */
 	private void maintenanceLoop() {
+		long checkpointInterval = config.getPersistInterval();
+		long waitInterval = (checkpointInterval > 0L)
+				? Math.min(CONNECTION_SWEEP_INTERVAL, checkpointInterval)
+				: CONNECTION_SWEEP_INTERVAL;
+		long now = Utils.getCurrentTimestamp();
+		long lastConnectionSweep = now;
+		long lastCheckpoint = now;
 		while (lifecycleState == LifecycleState.STARTING
 				|| lifecycleState == LifecycleState.RUNNING) {
 			try {
-				Thread.sleep(CONNECTION_SWEEP_INTERVAL);
+				synchronized (maintenanceSignal) {
+					if (lifecycleState == LifecycleState.STARTING
+							|| lifecycleState == LifecycleState.RUNNING) {
+						maintenanceSignal.wait(waitInterval);
+					}
+				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 				break;
 			}
-			sweepClosedConnections();
+			if (lifecycleState != LifecycleState.STARTING
+					&& lifecycleState != LifecycleState.RUNNING) break;
+			now = Utils.getCurrentTimestamp();
+			if (now - lastConnectionSweep >= CONNECTION_SWEEP_INTERVAL) {
+				sweepClosedConnections();
+				lastConnectionSweep = now;
+			}
+			if (checkpointInterval > 0L && now - lastCheckpoint >= checkpointInterval) {
+				lastCheckpoint = now;
+				checkpointDirtyStores();
+			}
+		}
+	}
+
+	/** Stops maintenance without interrupting a thread that may be forcing a file. */
+	private void stopMaintenance() throws IOException {
+		Thread maintenance = maintenanceThread;
+		if (maintenance == null) return;
+		synchronized (maintenanceSignal) {
+			maintenanceSignal.notifyAll();
+		}
+		try {
+			maintenance.join();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while stopping NodeServer maintenance",e);
+		}
+		maintenanceThread = null;
+	}
+
+	/** Completes periodic barriers independently for every dirty propagator store. */
+	private void checkpointDirtyStores() {
+		if (!config.isPersist()) return;
+		for (LatticePropagator propagator : propagators) {
+			try {
+				propagator.checkpoint();
+			} catch (IOException e) {
+				log.warn("Periodic lattice-store checkpoint failed; will retry", e);
+			}
 		}
 	}
 
@@ -1530,7 +1592,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p>The primary propagator only acquires the full value tree into its store.
 	 * NodeServer then merges through the authoritative root cursor and synchronously
-	 * checkpoints that merged root before it can be re-propagated.
+	 * publishes that merged root before it can be re-propagated.
 	 *
 	 * @param convex Convex connection to the peer node
 	 * @return CompletableFuture that completes with the current cursor value after merge
@@ -1542,7 +1604,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return propagators.get(0).pull(convex).thenApply(acquired -> {
 			mergePulledValue(acquired);
 			// Always sync the root, even for a dominated pull. Local application writes
-			// may not yet have been checkpointed, and the raw peer value must never become
+			// may not yet have been published, and the raw peer value must never become
 			// the persisted or announced root independently of the merged cursor.
 			cursor.sync();
 			return cursor.get();
@@ -1554,7 +1616,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p>The primary propagator acquires full value trees from every peer in
 	 * parallel. NodeServer merges all successful results through its root cursor,
-	 * then performs one synchronous checkpoint of the combined result.
+	 * then performs one synchronous publication of the combined result.
 	 *
 	 * @return true if all pulls completed successfully, false otherwise
 	 */
@@ -1581,7 +1643,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Merges one store-backed pull result into the authoritative root cursor without
-	 * propagating it. The caller checkpoints only after the root merge has completed.
+	 * propagating it. The caller publishes only after the root merge has completed.
 	 */
 	@SuppressWarnings("unchecked")
 	private void mergePulledValue(ACell acquired) {
@@ -1892,6 +1954,26 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
+	 * Completes a physical durability barrier for the primary store if root
+	 * publication has made it dirty since its last successful checkpoint.
+	 * Call {@link ALatticeCursor#sync()} first when the current cursor value has
+	 * not yet been published.
+	 *
+	 * @return true if a durability barrier was completed
+	 * @throws IOException If the barrier fails
+	 */
+	public boolean checkpoint() throws IOException {
+		if (!config.isPersist() || propagators.isEmpty()) return false;
+		return propagators.get(0).checkpoint();
+	}
+
+	private void removeShutdownHook() {
+		if (!shutdownHookRegistered) return;
+		Shutdown.removeHook(Shutdown.SERVER, shutdownHook);
+		shutdownHookRegistered = false;
+	}
+
+	/**
 	 * Persists final state during JVM shutdown, before Etch closes its files.
 	 * Called by the {@link Shutdown} hook at {@link Shutdown#SERVER} priority.
 	 */
@@ -1927,10 +2009,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Stop maintenance immediately, even if draining the dispatcher later times out.
 		// Connection state itself is retained until the dispatcher has stopped because
 		// the current message may still update it.
-		if (maintenanceThread != null) {
-			maintenanceThread.interrupt();
-			maintenanceThread = null;
-		}
+		stopMaintenance();
 
 		// Incomplete remote values have not been merged and are safe to cancel. Wait
 		// for their Acquirors before any caller may close the propagator stores.
@@ -1943,14 +2022,32 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// #566: the dispatcher can no longer add per-connection state.
 		connectionStats.clear();
 
-		// Final sync: trigger all propagators with current value and wait for drain.
+		// Drain every propagator and release its network resources before performing
+		// the final store-only durability work.
 		V snapshot = cursor.get();
 		for (LatticePropagator p : propagators) {
 			p.triggerAndClose(snapshot);
 			p.getConnectionManager().close();
 		}
 
+		IOException checkpointFailure = null;
+		if (config.isPersist()) {
+			for (LatticePropagator p : propagators) {
+				try {
+					p.persist(snapshot);
+				} catch (IOException e) {
+					if (checkpointFailure == null) {
+						checkpointFailure = e;
+					} else {
+						checkpointFailure.addSuppressed(e);
+					}
+				}
+			}
+		}
+
 		lifecycleState = LifecycleState.STOPPED;
+		removeShutdownHook();
 		log.debug("NodeServer closed");
+		if (checkpointFailure != null) throw checkpointFailure;
 	}
 }

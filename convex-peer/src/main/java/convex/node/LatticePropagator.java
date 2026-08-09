@@ -108,13 +108,11 @@ public class LatticePropagator implements Closeable {
 	 */
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
 
-	/**
-	 * Controls whether setRootData is called after announce.
-	 * Positive = persist enabled; zero or negative = disabled.
-	 * This does NOT affect announce (which always runs for delta tracking
-	 * and store-backed refs).
-	 */
-	private long persistInterval = 30_000L;
+	/** Whether snapshots publish the store root after announcement. */
+	private volatile boolean persistenceEnabled = true;
+
+	/** Whether root publication has changed the persistent store since its last checkpoint. */
+	private boolean dirty;
 
 	/**
 	 * Cursor holding the last value announced to this propagator's store.
@@ -201,14 +199,13 @@ public class LatticePropagator implements Closeable {
 	// ========== Configuration ==========
 
 	/**
-	 * Sets the persist interval. Positive enables setRootData after announce;
-	 * zero or negative disables it. This does NOT affect announce (which always
-	 * runs for delta tracking).
+	 * Enables or disables root publication. Announcement still runs when disabled
+	 * because it provides delta tracking and store-backed references.
 	 *
-	 * @param intervalMs Interval in milliseconds (0 or negative to disable)
+	 * @param enabled true to publish roots
 	 */
-	public void setPersistInterval(long intervalMs) {
-		this.persistInterval = intervalMs;
+	public void setPersistenceEnabled(boolean enabled) {
+		this.persistenceEnabled = enabled;
 	}
 
 	// ========== Accessors ==========
@@ -478,7 +475,7 @@ public class LatticePropagator implements Closeable {
 	 * </ol>
 	 *
 	 * <p>Announce always runs (for delta tracking and store-backed refs).
-	 * setRootData is gated by {@link #persistInterval}. Broadcast is gated by
+	 * setRootData is gated by the persistence setting. Broadcast is gated by
 	 * peer existence and minimum delay. The returned value is the sole handoff
 	 * back to a synchronous caller; the pull merge callback is not invoked.
 	 *
@@ -504,8 +501,9 @@ public class LatticePropagator implements Closeable {
 			value = Cells.announce(value, noveltyHandler, store);
 
 			// 2. Set root data for restore (if persist enabled)
-			if (persistInterval > 0) {
+			if (persistenceEnabled) {
 				store.setRootData(value);
+				dirty = true;
 			}
 
 			// 3. Broadcast to peers (only if peers exist and delay elapsed)
@@ -575,7 +573,8 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Explicitly persists a value to the store. Used for forced persistence
-	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of persistInterval.
+	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of the automatic
+	 * root-publication setting.
 	 *
 	 * @param value The value to persist
 	 * @throws IOException If persistence or its durability barrier fails
@@ -586,8 +585,27 @@ public class LatticePropagator implements Closeable {
 		synchronized (writeLock) {
 			value = Cells.announce(value, r -> {}, store);
 			store.setRootData(value);
+			dirty = true;
 			store.flush();
+			dirty = false;
 			log.debug("Persisted lattice snapshot to store");
+		}
+	}
+
+	/**
+	 * Completes a durability barrier when this propagator has unpublished
+	 * persistent changes.
+	 *
+	 * @return true if a barrier was completed
+	 * @throws IOException If the barrier fails
+	 */
+	boolean checkpoint() throws IOException {
+		if (!store.isPersistent()) return false;
+		synchronized (writeLock) {
+			if (!dirty) return false;
+			store.flush();
+			dirty = false;
+			return true;
 		}
 	}
 

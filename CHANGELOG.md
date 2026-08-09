@@ -24,11 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auth: UCAN payload builders and the `signingDelegate` MCP tool now accept audiences using any valid DID method, while retaining `did:key` and hex public-key compatibility.
 - CLI: `key generate` no longer sends BIP39 mnemonics through stderr, where log collectors could capture them. Interactive use writes directly to the attached console; automation must select a new owner-only file with `--mnemonic-file`, or explicitly opt into stdout with `--mnemonic-file -`.
 - CLI: `key export` now gives raw seeds and encrypted PEM the same protected destination handling: an attached console interactively, or an explicit new owner-only file / stdout selection for automation. Raw seed remains the default export format.
+- NodeServer: persistent lattice stores now complete a clean checkpoint after initial publication, periodically while dirty (30 seconds by default), on explicit `checkpoint()`, and during orderly shutdown. Ordinary `cursor.sync()` remains a buffered store-publication operation.
+- Peer: consensus state persistence remains buffered during normal operation and completes one durability checkpoint during orderly shutdown, for Etch v1, v2 and opt-in v3 stores.
 
 ### Fixed
 
 - Etch: `AStore` now exposes an explicit durability barrier, and successful Etch v3 flushes publish directly reopenable clean checkpoints while ordinary lattice cursor sync remains buffered. Mutations after a checkpoint correctly return the file to `OPEN`, so later checkpoints include their complete logical file extent (#650).
 - Etch: closed encrypted stores and maintenance readers now promptly release their global shutdown registrations and wipe file-scoped keys and reusable cipher state, including state created on worker threads; online-GC cutover preserves ownership of the successor's live cipher resources (#686).
+- NodeServer: shutdown now signals and joins the periodic maintenance thread without interrupting an in-flight file force, preventing the interrupt from closing the Etch channel before the final checkpoint.
 - `Call` transactions decoded from their network encoding no longer fail with an internal error on execution: the lazily-decoded argument list was never populated on the execution path, so every Call submitted over the wire errored instead of invoking the actor function.
 - REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
 - REST API: seed-returning MCP tools and the legacy JSON `transact` endpoint now refuse remote cleartext HTTP by default. Loopback development remains available, and rejected requests that already carried sensitive key material recommend key rotation.

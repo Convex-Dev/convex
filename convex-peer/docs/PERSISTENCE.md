@@ -31,8 +31,8 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 8. **A NodeServer with no propagator is purely in-memory** — `cursor.sync()` is a no-op.
    The cursor works fine but nothing is persisted or broadcast.
 9. **Durability is explicit policy** — `AStore.flush()` is the physical durability
-   barrier. Periodic, startup and orderly-shutdown checkpoints are tracked in #687;
-   broadcast remains best-effort.
+   barrier. NodeServer checkpoints after initial publication, periodically while dirty,
+   and during orderly shutdown; broadcast remains best-effort.
 
 ## Architecture
 
@@ -263,22 +263,23 @@ public void close() {
     closeAndAwaitInboundAcquirors();    // no worker can still touch a store
     stopInboundDispatcher();           // drain complete ordered work
 
-    // Final sync + wait for all propagators to drain and stop
+    // Drain propagators and release their network resources
     V snapshot = cursor.get();
     for (LatticePropagator p : propagators) {
         p.triggerAndClose(snapshot);  // trigger, drain queue, stop thread
+        p.getConnectionManager().close();
     }
-    // Primary propagator's merge callback fires during drain,
-    // so cursor has store-backed refs after close.
-
+    // Re-publish the final snapshot and complete each persistent store barrier.
+    for (LatticePropagator p : propagators) p.persist(snapshot);
 }
 ```
 
 Incomplete values are safe to cancel because they have not crossed the complete-value
 gateway into lattice merge code. `close()` waits for each Acquiror's actual termination,
 not merely cancellation of its future, before propagator stores may be closed. Each
-propagator's `triggerAndClose()` then ensures the queued value is processed (including
-the merge callback for primary) before the thread stops.
+propagator's `triggerAndClose()` then ensures queued work is drained before the thread
+stops. Final store-only persistence runs after network resources are released and any
+failure is returned by `close()`.
 
 ## Persistence Lifecycle
 
@@ -297,6 +298,7 @@ public void launch() {
 	// Seed the store-backed announced view before opening the listener
 	ACell announced = propagators.get(0).processSnapshot(cursor.get());
 	cursor.set((V) announced);
+	propagators.get(0).checkpoint();
 
     // Start propagators, network server, etc.
     ...
@@ -316,16 +318,18 @@ managers before rethrowing the original error. `launch()` therefore either retur
 running node or throws with the node stopped; the same instance may be retried after
 the store problem is resolved.
 
-### Running: Sync Triggers
+### Running: Publication and Checkpoints
 
-Sync can be triggered by:
+Publication can be triggered by:
 - **App explicitly** — `cursor.sync()` after a batch of writes
 - **Incoming merge** — if autoSync policy is enabled
-- **Periodic timer** — configurable interval (default 30s), as safety net
-- **Shutdown** — final persist in each propagator's `close()`
 
-The periodic timer ensures eventual persistence even without explicit sync calls.
-It is a safety net, not the primary mechanism.
+Successful root publication marks the owning propagator store dirty. NodeServer's
+existing maintenance loop calls `checkpoint()` on dirty persistent stores at the
+configured `persistInterval` (default 30 seconds). Clean and volatile stores are
+skipped. A failed periodic barrier leaves the store dirty and is retried at the next
+interval. Callers needing immediate crash durability call `cursor.sync()` followed by
+`node.checkpoint()`.
 
 ### Node Configurations
 
@@ -747,6 +751,8 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 - **Acquire Then Merge** — the owning propagator store acquires every missing cell
   before NodeServer attempts one merge
 - **Root-Only Periodic Sync** — propagator broadcasts root cell hash, peers detect divergence, acquire missing data
+- **Durability Checkpoints** — startup barrier before listener exposure, coalesced
+  periodic dirty-store barriers, explicit `checkpoint()`, and observable final barriers
 
 ### Remaining
 
@@ -759,9 +765,6 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 - Extract `APropagator<T>` base from `BeliefPropagator` and `LatticePropagator`
 - Shared: background loop, trigger queue, delta encoding, broadcast
 - Separate: message format, merge semantics
-
-**Periodic Durability Checkpoints** — dirty-store periodic flush plus startup and
-orderly-shutdown barriers are tracked in #687
 
 ## Synchronous Publication Design
 
@@ -896,8 +899,6 @@ re-propagation boundary.
 - **Etch lock granularity** — narrow the class-level `synchronized` on Etch writes
   to a smaller per-region or per-write critical section. Current coarse lock will
   serialise concurrent caller-thread syncs.
-- **Durability policy (#687)** — flush dirty stores periodically, after initial
-  publication and during orderly shutdown; expose an explicit immediate checkpoint.
 
 ## Testing Strategy
 
