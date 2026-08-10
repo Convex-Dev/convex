@@ -59,6 +59,11 @@ public class UCAN {
 	// Header field keys
 	public static final AString ALG = Strings.intern("alg");
 	public static final AString UCV = Strings.intern("ucv");
+	/**
+	 * Exact Convex UCAN JWT profile version accepted by this implementation.
+	 * Profile versions are not range-negotiated: producers and consumers must
+	 * match this value exactly.
+	 */
 	public static final AString VERSION = Strings.intern("0.10.0");
 	private static final AString JWT_TYPE = Strings.intern("JWT");
 

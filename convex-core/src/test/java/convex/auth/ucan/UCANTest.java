@@ -21,6 +21,7 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 
 public class UCANTest {
 
@@ -110,12 +111,21 @@ public class UCANTest {
 
 	@Test
 	public void testSignJWTPayloadRequiresMatchingIssuerKey() {
+		AMap<AString,ACell> caveat=Maps.of(Strings.create("scope"),Strings.create("managed"));
+		AVector<ACell> capabilities=Vectors.of(Capability.create(
+			Strings.create("https://covia.ai/users/alice"),Strings.create("account/manage"),caveat));
+		AString proof=UCAN.createJWT(ROGUE_KP,ROOT_KP.getAccountKey(),FUTURE_EXPIRY,
+			capabilities,null);
 		AMap<AString, ACell> payload = UCAN.buildPayload(
 			ROOT_KP.getAccountKey(), Strings.create("did:web:covia.ai"),
-			FUTURE_EXPIRY, null, null, null, null);
+			FUTURE_EXPIRY, null, capabilities, Vectors.of(proof), null);
 
 		AString token = UCAN.signJWT(payload, ROOT_KP);
-		assertNotNull(UCANValidator.validateJWT(token, NOW, convex.auth.did.DIDVerifier.CONVEX));
+		UCAN parsed=UCANValidator.validateJWT(token,NOW,convex.auth.did.DIDVerifier.CONVEX);
+		assertNotNull(parsed);
+		assertEquals(Strings.create("did:web:covia.ai"),parsed.getAudience());
+		assertEquals(caveat,RT.getIn(parsed.getCapabilities().get(0),Capability.NB));
+		assertEquals(Vectors.of(proof),parsed.getProofs());
 		assertThrows(IllegalArgumentException.class, () -> UCAN.signJWT(payload, ROGUE_KP));
 	}
 

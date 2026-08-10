@@ -158,6 +158,24 @@ public class UCANAuthorityTest {
 	}
 
 	@Test
+	public void testNonExpiringChainAtMaximumHorizon() {
+		UCAN rootGrant=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,
+			caps(cap(NOTES,CRUD)),null);
+		UCAN delegated=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),(Long)null,
+			caps(cap(NOTES,READ)),Vectors.of(rootGrant.toMap()));
+
+		assertTrue(UCANValidator.isAuthorised(present(delegated),AGENT_B_DID,
+			NOTES_ITEM,READ,RootAuthorityPolicy.SELF_SOVEREIGN,Long.MAX_VALUE));
+
+		UCAN finiteRoot=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),EXPIRY,
+			caps(cap(NOTES,CRUD)),null);
+		UCAN finiteChain=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),(Long)null,
+			caps(cap(NOTES,READ)),Vectors.of(finiteRoot.toMap()));
+		assertFalse(UCANValidator.isAuthorised(present(finiteChain),AGENT_B_DID,
+			NOTES_ITEM,READ,RootAuthorityPolicy.SELF_SOVEREIGN,Long.MAX_VALUE));
+	}
+
+	@Test
 	public void testEscalationRefused() {
 		// ROOT grants A read over notes ONLY. A tries to delegate B top over everything
 		// ROOT owns — signatures, linkage and root identity are all genuine.
