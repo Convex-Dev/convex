@@ -5,42 +5,35 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.11-SNAPSHOT] - Unreleased
+## [0.8.11] - 2026-08-10
 
 ### Added
 
-- DLFS: `Files.move` now performs atomic same-drive file and directory moves while preserving the moved node and its update time; `Files.copy` performs structurally shared file copies and standard shallow directory copies with a new target update time. The provider-specific `DLFSOption.RECURSIVE` enables atomic whole-subtree copies and is accepted for moves.
-- Core: new allocation-free SipHash-2-4 implementation with 128-bit byte-key, primitive-key and zero-copy byte-range entry points in `convex.core.crypto.siphash`.
-- Etch: version-3 stores can now be created and cleanly reopened with plaintext, AES-256-CTR or ChaCha20 data, optional encrypted indexes, per-file random salts and header-MAC key verification. Cipher policy and opaque caller secret material are supplied through immutable `EtchConfig` values. Dirty v3 files continue to fail fast under normal access; `EtchMaintenanceReader` permits bounded read-only inspection, and `etch repair --into <destination>` reconstructs a fresh store from independently validated cells while preserving the source.
-- Etch: immutable compiled `EtchConfig` values can now be constructed from strict JSON-style maps or typed parameters and supplied when creating or opening Etch instances and stores. Peer JSON5 configuration accepts `peer.etch`, so `etch: {version: 3}` opts new `peer start` and `peer genesis` stores into v3 while an existing store continues to use the format recorded in its own header, with a warning when it differs from the requested creation policy. Encrypted peer stores resolve their public-key hint through the configured PKCS12 keystore and derive a domain-separated master secret from that key. Public file-format values are available from `EtchConstants` for external readers and tooling.
-- x402 payments (CAD042): new `convex-x402` module implementing the x402 v2 payment protocol with Convex as the settlement network, using pre-signed transactions in CVM coin or CAD29 fungible tokens as the `exact` payment scheme. The REST API can now act as an x402 facilitator (`/x402/verify`, `/x402/settle`, `/x402/supported`) and payment-gate any route via the `rest.x402` config section, settling payments against its own peer with sub-second finality; an `X402Client` pays x402 demands with locally-signed transactions, so keys never leave the payer. Embedding services can gate routes on their own Javalin apps with custom payment policies (`X402Policy`) — fixed price per call, credit accounts topped up by payment, or per-request pricing — with well-defined replay and retry semantics. Gates can offer several payment options per charge and accept foreign x402 kinds (e.g. USDC on Base) by routing them to external facilitators via `RemoteFacilitator`.
-
-- GUI: Hacker Tools now includes a keyring-backed JWT / UCAN builder for EdDSA access tokens and Convex UCAN delegations to any valid DID, with standard and optional claim fields, readable validity times and decoded output inspection.
-- GUI: generated keys, keyring entries and keyed account overviews now show their canonical `did:key` identifier, with a copy action on account-key identicons.
-- CLI: new `convex eval` and `convex repl` commands for headless Convex Lisp evaluation — one-shot scriptable evaluation (arguments or piped standard input) and an interactive REPL. Both run against an ephemeral local in-memory instance by default, needing no setup, keys or network, or against any peer targeted with `--host`.
-- CLI: new `convex mcp` command running an MCP (Model Context Protocol) server on the standard stdio transport, so local MCP clients such as AI agents can query and transact against an ephemeral local instance or any peer targeted with `--host`. Offers `query`, `transact` (signed with the locally configured key), `getBalance`, `resolveCNS` and `status` tools; `--query` restricts the server to read-only tools.
+- Opt-in Etch v3 stores with crash-consistent headers, plaintext or AES-256-CTR / ChaCha20 data, independently configurable index encryption, per-file salts and verified keys. `peer.etch` configures new stores while existing stores retain their recorded format; maintenance inspection and copy-out repair tooling is included.
+- New `convex-x402` module implementing CAD042 / x402 v2 exact payments in CVM coin or CAD29 tokens, with REST facilitator endpoints, route gates, local payer signing, replay protection, flexible policies and external-facilitator support.
+- New `convex eval` and `convex repl` commands for scriptable or interactive Convex Lisp, using an effortless ephemeral local instance by default or any peer selected with `--host`.
+- New `convex mcp` stdio server with query, signed transaction, balance, CNS and status tools; `--query` offers a read-only mode.
+- Hacker Tools now builds and inspects EdDSA JWTs and Convex UCAN delegations. Key views also expose canonical, copyable `did:key` identifiers.
+- Allocation-free SipHash-2-4 with byte-key, primitive-key and zero-copy byte-range APIs.
+- DLFS gains atomic same-drive moves, structurally shared copies and `DLFSOption.RECURSIVE` for whole-subtree copy and move operations.
 
 ### Changed
 
-- Convex UCAN authority tokens now support the explicit `exp: null` form for non-expiring authority. Generic JWT validation permissively treats `exp: null` as an omitted optional expiry, and proof links use UCAN 1.0 execution-time validity rather than requiring child validity windows to fit within their proofs.
-- UCAN JWT transport now requires the exact Convex `0.10.0` profile: an EdDSA JWT with `typ: "JWT"`, a 64-byte signature, DID-shaped `iss`/`aud`, `ucv: "0.10.0"`, an explicit integer or null `exp`, and vector `att`/`prf` claims. Older hand-minted UCAN JWTs that omit this profile no longer parse. Migrate key-audience issuance to `UCAN.createJWT`/`toJWT`; for custodial issuance to an arbitrary DID such as `did:web`, use `UCAN.buildPayload` followed by `UCAN.signJWT`.
-- Auth: UCAN payload builders and the `signingDelegate` MCP tool now accept audiences using any valid DID method, while retaining `did:key` and hex public-key compatibility.
-- CLI: `key generate` no longer sends BIP39 mnemonics through stderr, where log collectors could capture them. Interactive use writes directly to the attached console; automation must select a new owner-only file with `--mnemonic-file`, or explicitly opt into stdout with `--mnemonic-file -`.
-- CLI: `key export` now gives raw seeds and encrypted PEM the same protected destination handling: an attached console interactively, or an explicit new owner-only file / stdout selection for automation. Raw seed remains the default export format.
-- NodeServer: persistent lattice stores now complete a clean checkpoint after initial publication, periodically while dirty (30 seconds by default), on explicit `checkpoint()`, and during orderly shutdown. Ordinary `cursor.sync()` remains a buffered store-publication operation.
-- Peer: consensus state persistence remains buffered during normal operation and completes one durability checkpoint during orderly shutdown, for Etch v1, v2 and opt-in v3 stores.
+- UCAN authority supports explicit `exp: null`; generic JWT validation treats it as an omitted optional expiry, and proof validity follows UCAN 1.0 execution-time semantics.
+- Convex UCAN JWTs now use the strict `0.10.0` profile and accept any valid DID audience. Hand-minted tokens must include `ucv`, explicit `exp`, and vector `att` / `prf` claims; use `UCAN.createJWT` or `buildPayload` plus `signJWT`.
+- `key generate` and `key export` protect secret output through the attached console or an explicit owner-only file, with deliberate stdout opt-in for automation.
+- Persistent lattice and peer stores keep the fast buffered write path, add periodic checkpoints, and complete a clean checkpoint during orderly shutdown across Etch v1, v2 and v3.
 
 ### Fixed
 
-- Index keys and DLFS path components now remain distinct through the standard 255-byte filesystem name limit instead of silently aliasing after 32 bytes; extended Index depths use canonical VLQ encoding with stack-safe cold paths for adversarial radix tries (#631, #689).
-- DLFS file writes and truncations now advance the file node's update time, so newer content wins replication conflicts and NIO modification times reflect content changes.
-- Etch: `AStore` now exposes an explicit durability barrier, and successful Etch v3 flushes publish directly reopenable clean checkpoints while ordinary lattice cursor sync remains buffered. Mutations after a checkpoint correctly return the file to `OPEN`, so later checkpoints include their complete logical file extent (#650).
-- Etch: closed encrypted stores and maintenance readers now promptly release their global shutdown registrations and wipe file-scoped keys and reusable cipher state, including state created on worker threads; online-GC cutover preserves ownership of the successor's live cipher resources (#686).
-- NodeServer: shutdown now signals and joins the periodic maintenance thread without interrupting an in-flight file force, preventing the interrupt from closing the Etch channel before the final checkpoint.
-- `Call` transactions decoded from their network encoding no longer fail with an internal error on execution: the lazily-decoded argument list was never populated on the execution path, so every Call submitted over the wire errored instead of invoking the actor function.
-- REST API: named `did:web` documents now resolve CNS account aliases and scoped `convex.did` records; deactivated registry records return HTTP 410 with DID document metadata (#618).
-- REST API: seed-returning MCP tools and the legacy JSON `transact` endpoint now refuse remote cleartext HTTP by default. Loopback development remains available, and rejected requests that already carried sensitive key material recommend key rotation.
-- JSON readers no longer throw `NumberFormatException` for non-integer numbers of 19 or more characters (long decimals, exponent notation, JSON5 hex literals): the integer fast path now falls through to the double parser as intended.
+- Index keys and DLFS path components remain distinct through the standard 255-byte filesystem name limit; extended depths use canonical VLQ encoding and stack-safe cold paths (#631, #689).
+- DLFS writes and truncations advance file update times, giving replication conflicts and NIO modification times the right content ordering.
+- Etch checkpoints now publish directly reopenable v3 stores, track later mutations correctly, release encrypted resources promptly and preserve cipher ownership through online GC (#650, #686).
+- NodeServer shutdown cleanly joins periodic maintenance before the final checkpoint.
+- Network-decoded `Call` transactions now populate their argument list and invoke the target function correctly.
+- Named `did:web` documents resolve CNS aliases and scoped records; deactivated records return HTTP 410 with DID metadata (#618).
+- Seed-returning MCP tools and legacy JSON transactions protect remote cleartext HTTP by default while preserving loopback development.
+- JSON readers correctly handle long decimals, exponent notation and JSON5 hexadecimal values outside the integer fast path.
 
 ## [0.8.10] - 2026-07-25
 
