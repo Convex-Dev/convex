@@ -24,14 +24,14 @@ This module provides `ConvexJSON`, a lightweight client that talks to any Convex
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-java</artifactId>
-    <version>0.8.10</version>
+    <version>0.8.11</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-java:0.8.10'
+implementation 'world.convex:convex-java:0.8.11'
 ```
 
 ## Quick Start

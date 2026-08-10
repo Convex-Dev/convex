@@ -40,14 +40,14 @@ is intentionally minimal and extensible — easy to layer applications and UI on
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-social</artifactId>
-    <version>0.8.10</version>
+    <version>0.8.11</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-social:0.8.10'
+implementation 'world.convex:convex-social:0.8.11'
 ```
 
 ## Usage

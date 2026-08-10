@@ -40,14 +40,14 @@ It exposes the filesystem in three ways:
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-dlfs</artifactId>
-    <version>0.8.10</version>
+    <version>0.8.11</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-dlfs:0.8.10'
+implementation 'world.convex:convex-dlfs:0.8.11'
 ```
 
 ## Usage
