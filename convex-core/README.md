@@ -21,14 +21,14 @@ The foundational library for the [Convex](https://convex.world) decentralised ne
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-core</artifactId>
-    <version>0.8.10</version>
+    <version>0.8.11</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-core:0.8.10'
+implementation 'world.convex:convex-core:0.8.11'
 ```
 
 ## Usage
