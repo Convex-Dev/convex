@@ -11,6 +11,7 @@ import convex.core.util.FileUtils;
 import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 import convex.peer.API;
+import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
@@ -79,6 +80,16 @@ public class EtchMixin extends AMixin {
 	/** Opens the configured Etch path with an already compiled configuration. */
 	public EtchStore getEtchStore(EtchConfig config) {
 		return getEtchStore(etchStoreFilename,config);
+	}
+
+	/** Returns true only when the Etch path was supplied explicitly on argv. */
+	public boolean isEtchFileSpecified() {
+		ParseResult result=cli().commandLine().getParseResult();
+		while (result!=null) {
+			if (result.hasMatchedOption("--etch")) return true;
+			result=result.subcommand();
+		}
+		return false;
 	}
 
 	/** Returns the configured Etch path without attempting a normal store open. */

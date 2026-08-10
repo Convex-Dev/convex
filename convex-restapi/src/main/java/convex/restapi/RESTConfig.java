@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import convex.auth.did.DID;
 import convex.core.crypto.util.Multikey;
@@ -13,6 +14,7 @@ import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
@@ -557,7 +559,13 @@ public class RESTConfig extends PeerConfig {
 	 */
 	@Override
 	public HashMap<Keyword, Object> toLegacy() {
-		HashMap<Keyword, Object> legacy = super.toLegacy();
+		return toLegacy(null);
+	}
+
+	/** Converts peer and REST policy with runtime Etch key resolution. */
+	@Override
+	public HashMap<Keyword, Object> toLegacy(Function<AccountKey,byte[]> etchKeyFunction) {
+		HashMap<Keyword, Object> legacy = super.toLegacy(etchKeyFunction);
 		// Preserve the typed configuration across the legacy Peer launch boundary.
 		// RESTServer consumes this object directly instead of reconstructing nested
 		// REST, MCP and authentication policy from flattened keys.

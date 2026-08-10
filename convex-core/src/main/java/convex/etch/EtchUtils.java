@@ -107,8 +107,9 @@ public class EtchUtils {
 	}
 
 	/**
-	 * Performs automatic GC recovery using compiled Etch configuration. The
-	 * configuration is applied consistently to the live file and every GC target.
+	 * Performs automatic GC recovery using compiled Etch configuration. File
+	 * headers remain authoritative; configuration supplies key resolution and may
+	 * explicitly permit recovery across lifecycle files of different versions.
 	 * All participating non-empty files are authenticated before recovery mutates
 	 * any marker, store or sibling file.
 	 *
@@ -268,6 +269,7 @@ public class EtchUtils {
 	private static void validateRecoveryFiles(File base, List<File> targets,
 			EtchConfig config) throws IOException {
 		LinkedHashSet<File> files=new LinkedHashSet<>();
+		LinkedHashSet<Short> versions=new LinkedHashSet<>();
 		if (base.isFile()) files.add(base.getCanonicalFile());
 		for (File target:targets) {
 			if (target.isFile()) files.add(target.getCanonicalFile());
@@ -282,7 +284,8 @@ public class EtchUtils {
 				try {
 					header=AEtchHeader.open(mapper,candidate.getName(),masterKey);
 					masterKey=null; // borrowed caller-owned array is not retained
-					Etch.resolveExistingConfig(header,config,candidate);
+					Etch.resolveExistingConfig(header,config);
+					versions.add(header.version());
 					long physicalEnd=data.length();
 					long storedEnd=header.storedLength();
 					if ((storedEnd<0L)||(storedEnd>physicalEnd)) {
@@ -307,6 +310,14 @@ public class EtchUtils {
 					if (header!=null) header.destroy();
 				}
 			}
+		}
+		if (versions.size()>1) {
+			if ((config==null)||!versions.contains(config.getVersion())) {
+				throw new IOException("Etch GC recovery files use mixed versions "+versions
+						+"; supply an explicit matching Etch version to force cross-version recovery");
+			}
+			warn("Etch GC recovery explicitly allowing mixed file versions {} under configured v{}",
+					versions,config.getVersion());
 		}
 	}
 

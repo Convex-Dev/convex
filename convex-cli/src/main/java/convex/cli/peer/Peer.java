@@ -12,7 +12,9 @@ import picocli.CommandLine.ScopeType;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.function.Function;
 
+import convex.core.data.AccountKey;
 
 /**
  *
@@ -45,11 +47,16 @@ public class Peer extends ATopCommand {
 	 * @return Launch config map (empty if no config file specified)
 	 */
 	public HashMap<Keyword,Object> loadPeerConfig() {
+		return loadPeerConfig(null);
+	}
+
+	/** Loads peer configuration with runtime Etch key resolution. */
+	public HashMap<Keyword,Object> loadPeerConfig(Function<AccountKey,byte[]> etchKeyFunction) {
 		HashMap<Keyword,Object> result=new HashMap<>();
 		if ((configFilename==null)||configFilename.isBlank()) return result;
 		try {
 			RESTConfig pc=RESTConfig.load(configFilename.trim());
-			result.putAll(pc.toLegacy());
+			result.putAll(pc.toLegacy(etchKeyFunction));
 			inform("Loaded peer config from: "+configFilename);
 		} catch (IOException e) {
 			throw new CLIError(ExitCodes.CONFIG,"Unable to read peer config file: "+configFilename,e);

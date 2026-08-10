@@ -124,7 +124,7 @@ public final class EtchMaintenanceReader implements AutoCloseable {
 					file.getName(),true);
 			masterKey=AEtchHeader.resolveKey(mapper,file.getName(),requestedConfig);
 			header=AEtchHeader.open(mapper,file.getName(),masterKey);
-			EtchConfig config=Etch.resolveExistingConfig(header,requestedConfig,file);
+			EtchConfig config=Etch.resolveExistingConfig(header,requestedConfig);
 			long logicalEnd=header.storedLength();
 			if ((logicalEnd<0L)||(logicalEnd>physicalEnd)) {
 				throw new IOException("Etch stored length is outside the physical file: stored="

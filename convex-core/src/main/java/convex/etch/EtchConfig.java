@@ -383,6 +383,16 @@ public final class EtchConfig {
 				fileCipher,fileIndexEncrypted,keyFunction);
 	}
 
+	/**
+	 * Adapts creation policy to an existing file. File-format options are supplied
+	 * separately from its header; runtime chain policy and any key resolver remain
+	 * caller-controlled.
+	 */
+	EtchConfig forExistingFile(short fileVersion, MappingMode compatibleMapping) {
+		return new EtchConfig(fileVersion,compatibleMapping,buildChains,null,
+				CipherMode.NONE,false,keyFunction);
+	}
+
 	/** Returns a copy of this compiled configuration with the supplied hint. */
 	public EtchConfig withPublicKeyHint(AccountKey hint) {
 		return new EtchConfig(version,mappingMode,buildChains,hint,cipherMode,

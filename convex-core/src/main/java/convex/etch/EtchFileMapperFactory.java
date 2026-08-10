@@ -39,14 +39,26 @@ final class EtchFileMapperFactory {
 	static AFileMapper createExisting(FileChannel channel, EtchConfig requestedConfig,
 			String fileName, boolean readOnly) throws IOException {
 		Short version=probeVersion(channel);
-		EtchConfig.MappingMode mappingMode;
-		if (requestedConfig!=null) {
-			mappingMode=requestedConfig.getMappingMode();
-		} else {
-			mappingMode=(version==null)?EtchConfig.MappingMode.MAPPED_BYTE_BUFFER
-					:defaultMapping(version);
-		}
+		EtchConfig.MappingMode mappingMode=(version==null)
+				?EtchConfig.MappingMode.MAPPED_BYTE_BUFFER
+				:existingMapping(version,requestedConfig);
 		return create(channel,mappingMode,channel.size(),fileName,readOnly);
+	}
+
+	/** Selects a compatible runtime mapper for an existing file. */
+	static EtchConfig.MappingMode existingMapping(short fileVersion,
+			EtchConfig requestedConfig) {
+		if (requestedConfig!=null) {
+			EtchConfig.MappingMode requested=requestedConfig.getMappingMode();
+			try {
+				validate(fileVersion,requested);
+				return requested;
+			} catch (IllegalArgumentException e) {
+				// Creation policy must not prevent opening an existing file. For
+				// example, v1 always falls back from FFM to MappedByteBuffer.
+			}
+		}
+		return defaultMapping(fileVersion);
 	}
 
 	private static Short probeVersion(FileChannel channel) throws IOException {

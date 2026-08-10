@@ -41,6 +41,36 @@ import convex.core.exceptions.StoreException;
  */
 public class EtchGCLifecycleTest {
 
+	@Test
+	public void testMixedVersionRecoveryRequiresExplicitVersion() throws IOException {
+		File base=File.createTempFile("etch-gc-mixed-version",".etch");
+		base.deleteOnExit();
+		File target=new File(base.getCanonicalPath()+"~");
+		target.deleteOnExit();
+		try (EtchStore ignored=EtchStore.create(base,
+				EtchConfig.create(EtchConstants.VERSION_2))) {
+			// Initial clean base.
+		}
+		AVector<ACell> expected=tree(90_000);
+		try (EtchStore abandoned=EtchStore.create(target,
+				EtchConfig.create(EtchConstants.VERSION_3))) {
+			abandoned.setRootData(expected);
+		}
+
+		assertThrows(IOException.class,()->{
+			try (EtchStore ignored=EtchStore.create(base)) {
+				// Must fail before returning a store.
+			}
+		});
+		assertTrue(target.exists(),"Rejected recovery must not mutate its target");
+
+		try (EtchStore recovered=EtchStore.create(base,
+				EtchConfig.create(EtchConstants.VERSION_3))) {
+			assertEquals(EtchConstants.VERSION_2,recovered.getEtch().getVersion());
+			assertEquals(expected,recovered.getRootData());
+		}
+	}
+
 	/**
 	 * Creates a distinct non-embedded string for the given seed.
 	 */

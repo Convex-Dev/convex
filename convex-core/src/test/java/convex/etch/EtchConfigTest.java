@@ -176,18 +176,37 @@ public class EtchConfigTest {
 	}
 
 	@Test
-	public void testVersionMismatchReleasesFile() throws IOException {
+	public void testExistingFileVersionOverridesCreationPolicy() throws IOException {
 		File file=File.createTempFile("etch-config-mismatch", ".etch");
 		file.deleteOnExit();
-		Etch configured=Etch.create(file,EtchConfig.create(EtchConstants.VERSION_1));
+		EtchConfig original=EtchConfig.create(EtchConstants.VERSION_1);
+		Etch configured=Etch.create(file,original);
 		configured.close();
 
-		assertThrows(IOException.class,
-				() -> Etch.create(file,EtchConfig.create(EtchConstants.VERSION_2)));
+		// The requested v3 policy applies only when creating a new file. The v1
+		// header wins on reopen, including its mandatory mapper compatibility.
+		EtchConfig creationPolicy=EtchConfig.create(EtchConstants.VERSION_3);
+		try (EtchStore reopened=new EtchStore(Etch.create(file,creationPolicy))) {
+			assertEquals(EtchConstants.VERSION_1,reopened.getEtch().getVersion());
+			assertEquals(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+					reopened.getEtch().getConfig().getMappingMode());
+		}
+	}
 
-		// A failed configured open must release its channel and exclusive lock.
-		Etch reopened=Etch.create(file);
-		assertEquals(EtchConstants.VERSION_1,reopened.getVersion());
-		reopened.close();
+	@Test
+	public void testExistingV3HeaderOverridesLegacyCreationPolicy() throws IOException {
+		File file=File.createTempFile("etch-config-existing-v3", ".etch");
+		file.deleteOnExit();
+		try (EtchStore created=EtchStore.create(file,
+				EtchConfig.create(EtchConstants.VERSION_3))) {
+			created.flush();
+		}
+
+		try (EtchStore reopened=EtchStore.create(file,
+				EtchConfig.create(EtchConstants.VERSION_1))) {
+			assertEquals(EtchConstants.VERSION_3,reopened.getEtch().getVersion());
+			assertEquals(EtchConfig.CipherMode.NONE,
+					reopened.getEtch().getConfig().getCipherMode());
+		}
 	}
 }

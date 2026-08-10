@@ -90,6 +90,37 @@ public class EtchV3IntegrationTest {
 	}
 
 	@Test
+	public void testExistingHeaderOverridesConfiguredV3FormatOptions() throws Exception {
+		File file=tempFile("etch-v3-existing-options");
+		AccountKey fileHint=AccountKey.wrap(sequence(0x40,AccountKey.LENGTH));
+		AccountKey configuredHint=AccountKey.wrap(sequence(0x60,AccountKey.LENGTH));
+		AString value=value("existing-options");
+		EtchConfig createConfig=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				true,EtchConfig.CipherMode.AES_256_CTR,true,fileHint,
+				hint->SECRET.clone());
+		try (EtchStore store=EtchStore.create(file,createConfig)) {
+			store.setRootData(value);
+			store.flush();
+		}
+
+		AccountKey[] resolvedHint=new AccountKey[1];
+		EtchConfig creationPolicy=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,
+				false,EtchConfig.CipherMode.CHACHA20,false,configuredHint,hint->{
+					resolvedHint[0]=hint;
+					return SECRET.clone();
+				});
+		try (EtchStore reopened=EtchStore.create(file,creationPolicy)) {
+			EtchConfig actual=reopened.getEtch().getConfig();
+			assertEquals(value,reopened.getRootData());
+			assertEquals(EtchConfig.CipherMode.AES_256_CTR,actual.getCipherMode());
+			assertTrue(actual.isIndexEncrypted());
+			assertEquals(fileHint,actual.getPublicKeyHint());
+			assertEquals(fileHint,resolvedHint[0]);
+			assertFalse(actual.isBuildChains(),"Runtime-only policy remains caller-controlled");
+		}
+	}
+
+	@Test
 	public void testCleanReadOnlyReopenDoesNotRewriteHeader() throws Exception {
 		File file=tempFile("etch-v3-clean-generation");
 		EtchConfig config=EtchConfig.create(EtchConstants.VERSION_3);

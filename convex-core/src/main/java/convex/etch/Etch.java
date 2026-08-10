@@ -155,7 +155,7 @@ public class Etch {
 										+ dataFile);
 					}
 				}
-				effectiveConfig = resolveExistingConfig(resolvedHeader, requestedConfig, dataFile);
+				effectiveConfig = resolveExistingConfig(resolvedHeader, requestedConfig);
 			}
 
 			this.config = effectiveConfig;
@@ -298,13 +298,14 @@ public class Etch {
 	}
 
 	/**
-	 * Create or open an Etch instance using compiled configuration. For an existing
-	 * file, the configured version must match the file header.
+	 * Create or open an Etch instance using compiled configuration. Configuration
+	 * selects the format for a new file. An existing file's header remains
+	 * authoritative for its version, cipher, index policy and public-key hint.
 	 *
 	 * @param file   File with which to create the Etch instance
 	 * @param config compiled Etch configuration
 	 * @return Etch instance
-	 * @throws IOException If an IO error occurs or the file version conflicts
+	 * @throws IOException If an IO error occurs
 	 */
 	public static Etch create(File file, EtchConfig config) throws IOException {
 		if (config == null)
@@ -318,15 +319,19 @@ public class Etch {
 		return new Etch(file, config);
 	}
 
-	static EtchConfig resolveExistingConfig(AEtchHeader resolvedHeader, EtchConfig requestedConfig, File dataFile)
+	static EtchConfig resolveExistingConfig(AEtchHeader resolvedHeader, EtchConfig requestedConfig)
 			throws IOException {
 		short fileVersion = resolvedHeader.version();
-		if ((requestedConfig != null) && (requestedConfig.getVersion() != fileVersion)) {
-			throw new IOException("Configured Etch version " + requestedConfig.getVersion()
-					+ " does not match file version " + fileVersion + ": " + dataFile);
+		EtchConfig basis;
+		if (requestedConfig==null) {
+			basis=EtchConfig.create(fileVersion);
+		} else {
+			EtchConfig.MappingMode mapping=EtchFileMapperFactory.existingMapping(
+					fileVersion,requestedConfig);
+			basis=requestedConfig.forExistingFile(fileVersion,mapping);
 		}
 		if (!(resolvedHeader instanceof EtchV3Header v3Header)) {
-			return (requestedConfig == null) ? EtchConfig.create(fileVersion) : requestedConfig;
+			return basis;
 		}
 
 		EtchConfig.CipherMode fileCipher;
@@ -335,7 +340,6 @@ public class Etch {
 		} catch (IllegalArgumentException e) {
 			throw new IOException("Unsupported Etch v3 file cipher: " + v3Header.cipherId(), e);
 		}
-		EtchConfig basis = (requestedConfig == null) ? EtchConfig.create(fileVersion) : requestedConfig;
 		AccountKey fileHint = v3Header.publicKeyHint();
 		return basis.withV3FileOptions(fileCipher, v3Header.isIndexEncrypted(), fileHint);
 	}
