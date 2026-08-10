@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DLFS: `Files.move` now performs atomic same-drive file and directory moves while preserving the moved node and its update time; `Files.copy` performs structurally shared file copies and standard shallow directory copies with a new target update time. The provider-specific `DLFSOption.RECURSIVE` enables atomic whole-subtree copies and is accepted for moves.
 - Core: new allocation-free SipHash-2-4 implementation with 128-bit byte-key, primitive-key and zero-copy byte-range entry points in `convex.core.crypto.siphash`.
 - Etch: version-3 stores can now be created and cleanly reopened with plaintext, AES-256-CTR or ChaCha20 data, optional encrypted indexes, per-file random salts and header-MAC key verification. Cipher policy and opaque caller secret material are supplied through immutable `EtchConfig` values. Dirty v3 files continue to fail fast under normal access; `EtchMaintenanceReader` permits bounded read-only inspection, and `etch repair --into <destination>` reconstructs a fresh store from independently validated cells while preserving the source.
 - Etch: immutable compiled `EtchConfig` values can now be constructed from strict JSON-style maps or typed parameters and supplied when creating or opening Etch instances and stores. Peer JSON5 configuration accepts `peer.etch`, so `etch: {version: 3}` opts new `peer start` and `peer genesis` stores into v3 while an existing store continues to use the format recorded in its own header, with a warning when it differs from the requested creation policy. Encrypted peer stores resolve their public-key hint through the configured PKCS12 keystore and derive a domain-separated master secret from that key. Public file-format values are available from `EtchConstants` for external readers and tooling.
@@ -29,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DLFS file writes and truncations now advance the file node's update time, so newer content wins replication conflicts and NIO modification times reflect content changes.
 - Etch: `AStore` now exposes an explicit durability barrier, and successful Etch v3 flushes publish directly reopenable clean checkpoints while ordinary lattice cursor sync remains buffered. Mutations after a checkpoint correctly return the file to `OPEN`, so later checkpoints include their complete logical file extent (#650).
 - Etch: closed encrypted stores and maintenance readers now promptly release their global shutdown registrations and wipe file-scoped keys and reusable cipher state, including state created on worker threads; online-GC cutover preserves ownership of the successor's live cipher resources (#686).
 - NodeServer: shutdown now signals and joins the periodic maintenance thread without interrupting an in-flight file force, preventing the interrupt from closing the Etch channel before the final checkpoint.

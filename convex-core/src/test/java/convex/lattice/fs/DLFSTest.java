@@ -49,11 +49,6 @@ public class DLFSTest {
 	@Test
 	public void testUnsupportedProviderOperationsFailHonestly() throws Exception {
 		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
-		Path a=fs.getPath("/a");
-		Path b=fs.getPath("/b");
-		Files.write(a,new byte[] {1});
-		assertThrows(UnsupportedOperationException.class,()->Files.copy(a,b));
-		assertThrows(UnsupportedOperationException.class,()->Files.move(a,b));
 		assertThrows(UnsupportedOperationException.class,()->fs.getPathMatcher("glob:*.txt"));
 		fs.close();
 		assertFalse(fs.isOpen());
@@ -390,6 +385,47 @@ public class DLFSTest {
 		});
 		
 		assertFalse(Files.exists(file));
+	}
+
+	@Test
+	public void testContentMutationsUpdateFileTimestamp() throws IOException {
+		DLFileSystem fs=DLFS.createLocal();
+		DLPath file=fs.getPath("/timestamped");
+
+		fs.setTimestamp(CVMLong.create(100));
+		Files.createFile(file);
+		assertEquals(100,DLFSNode.getUTime(fs.getNode(file)).longValue());
+
+		fs.setTimestamp(CVMLong.create(200));
+		Files.write(file,new byte[] {1,2,3});
+		assertEquals(200,DLFSNode.getUTime(fs.getNode(file)).longValue());
+		assertEquals(200,Files.getLastModifiedTime(file).toMillis());
+
+		fs.setTimestamp(CVMLong.create(300));
+		try (SeekableByteChannel channel=Files.newByteChannel(file,StandardOpenOption.WRITE)) {
+			channel.truncate(1);
+		}
+		assertEquals(300,DLFSNode.getUTime(fs.getNode(file)).longValue());
+		assertEquals(300,Files.getLastModifiedTime(file).toMillis());
+	}
+
+	@Test
+	public void testNewerContentWriteWinsReplicationConflict() throws IOException {
+		DLFileSystem older=DLFS.createLocal();
+		DLPath olderPath=older.getPath("/conflict");
+		older.setTimestamp(CVMLong.create(100));
+		Files.write(olderPath,new byte[] {1},StandardOpenOption.CREATE,StandardOpenOption.WRITE);
+
+		DLFileSystem newer=older.clone();
+		DLPath newerPath=newer.getPath("/conflict");
+		older.setTimestamp(CVMLong.create(200));
+		Files.write(olderPath,new byte[] {2});
+		newer.setTimestamp(CVMLong.create(300));
+		Files.write(newerPath,new byte[] {3});
+
+		older.replicate(newer);
+		assertArrayEquals(new byte[] {3},Files.readAllBytes(olderPath));
+		assertEquals(300,DLFSNode.getUTime(older.getNode(olderPath)).longValue());
 	}
 	
 	@Test 

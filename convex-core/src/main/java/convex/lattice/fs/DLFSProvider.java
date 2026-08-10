@@ -14,6 +14,7 @@ import java.nio.file.NotDirectoryException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
@@ -21,6 +22,7 @@ import java.nio.file.spi.FileSystemProvider;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 
 import convex.core.util.SoftCache;
@@ -111,12 +113,48 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public void copy(Path source, Path target, CopyOption... options) throws IOException {
-		throw new UnsupportedOperationException("DLFS provider copy is not implemented");
+		DLPath src=DLFS.checkPath(source);
+		DLPath dst=DLFS.checkPath(target);
+		DLFileSystem fs=src.getFileSystem();
+		if (dst.getFileSystem()!=fs) {
+			throw new ProviderMismatchException("DLFS copy requires paths on the same drive");
+		}
+		Objects.requireNonNull(options,"Copy options");
+		boolean recursive=false;
+		for (CopyOption option:options) {
+			Objects.requireNonNull(option,"Copy option");
+			if (option==DLFSOption.RECURSIVE) {
+				recursive=true;
+			} else {
+				throw new UnsupportedOperationException("Unsupported DLFS copy option: "+option);
+			}
+		}
+		fs.copy(src,dst,recursive);
 	}
 
 	@Override
 	public void move(Path source, Path target, CopyOption... options) throws IOException {
-		throw new UnsupportedOperationException("DLFS provider move is not implemented");
+		DLPath src=DLFS.checkPath(source);
+		DLPath dst=DLFS.checkPath(target);
+		DLFileSystem fs=src.getFileSystem();
+		if (dst.getFileSystem()!=fs) {
+			throw new ProviderMismatchException("DLFS move requires paths on the same drive");
+		}
+		Objects.requireNonNull(options,"Move options");
+		boolean atomic=false;
+		CopyOption unsupported=null;
+		for (CopyOption option:options) {
+			Objects.requireNonNull(option,"Move option");
+			if (option==StandardCopyOption.ATOMIC_MOVE) {
+				atomic=true;
+			} else if (option!=DLFSOption.RECURSIVE) {
+				unsupported=option;
+			}
+		}
+		if (!atomic && unsupported!=null) {
+			throw new UnsupportedOperationException("Unsupported DLFS move option: "+unsupported);
+		}
+		fs.move(src,dst);
 	}
 
 	@Override

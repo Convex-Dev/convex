@@ -250,6 +250,25 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	public abstract void delete(DLPath dlp) throws IOException;
 
+	/**
+	 * Copies a node within this drive.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @param recursive true to copy a complete directory subtree
+	 * @throws IOException if the copy cannot be completed
+	 */
+	public abstract void copy(DLPath source, DLPath target, boolean recursive) throws IOException;
+
+	/**
+	 * Moves a node within this drive.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @throws IOException if the move cannot be completed
+	 */
+	public abstract void move(DLPath source, DLPath target) throws IOException;
+
 	public abstract Hash getRootHash();
 
 	public Hash getNodeHash(DLPath p) {

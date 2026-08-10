@@ -1,11 +1,14 @@
 package convex.lattice.fs.impl;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
@@ -151,6 +154,67 @@ public class DLFSLocal extends DLFileSystem {
 
 		// Drop the live entry and record a tombstone in the parent directory
 		rootCursor.updateAndGet(rootNode->DLFSNode.deleteNode(rootNode,p,getTimestamp()));
+	}
+
+	@Override
+	public synchronized void copy(DLPath source, DLPath target, boolean recursive) throws IOException {
+		DLPath src=source.toAbsolutePath().normalize();
+		DLPath dst=target.toAbsolutePath().normalize();
+		if (src.getNameCount()==0) throw new FileSystemException(src.toString(),dst.toString(),"Cannot copy the DLFS root");
+		if (dst.getNameCount()==0) throw new FileAlreadyExistsException(dst.toString());
+
+		CVMLong utime=getTimestamp();
+		try {
+			rootCursor.updateAndGet(root->{
+				AVector<ACell> sourceNode=DLFSNode.navigate(root,src);
+				if (sourceNode==null) throw new UncheckedIOException(new NoSuchFileException(src.toString()));
+				if (src.equals(dst)) return root;
+				if (DLFSNode.navigate(root,dst)!=null) throw new UncheckedIOException(new FileAlreadyExistsException(dst.toString()));
+				requireDirectory(root,dst.getParent());
+
+				AVector<ACell> copiedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
+				if (DLFSNode.isDirectory(sourceNode)&&!recursive) {
+					copiedNode=copiedNode.assoc(DLFSNode.POS_DIR,Index.none());
+					if (copiedNode.count()>DLFSNode.NODE_LENGTH) copiedNode=copiedNode.slice(0,DLFSNode.NODE_LENGTH);
+				}
+				return DLFSNode.updateNode(root,dst,copiedNode,utime);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+	}
+
+	@Override
+	public synchronized void move(DLPath source, DLPath target) throws IOException {
+		DLPath src=source.toAbsolutePath().normalize();
+		DLPath dst=target.toAbsolutePath().normalize();
+		if (src.getNameCount()==0) throw new FileSystemException(src.toString(),dst.toString(),"Cannot move the DLFS root");
+		if (dst.getNameCount()==0) throw new FileAlreadyExistsException(dst.toString());
+
+		CVMLong utime=getTimestamp();
+		try {
+			rootCursor.updateAndGet(root->{
+				AVector<ACell> sourceNode=DLFSNode.navigate(root,src);
+				if (sourceNode==null) throw new UncheckedIOException(new NoSuchFileException(src.toString()));
+				if (src.equals(dst)) return root;
+				if (DLFSNode.isDirectory(sourceNode)&&dst.startsWith(src)) {
+					throw new UncheckedIOException(new FileSystemException(src.toString(),dst.toString(),"Cannot move a directory into itself"));
+				}
+				if (DLFSNode.navigate(root,dst)!=null) throw new UncheckedIOException(new FileAlreadyExistsException(dst.toString()));
+				requireDirectory(root,dst.getParent());
+
+				AVector<ACell> updated=DLFSNode.deleteNode(root,src,utime);
+				return DLFSNode.updateNode(updated,dst,sourceNode,utime);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+	}
+
+	private static void requireDirectory(AVector<ACell> rootNode, DLPath path) {
+		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
+		if (node==null) throw new UncheckedIOException(new NoSuchFileException(path.toString()));
+		if (!DLFSNode.isDirectory(node)) throw new UncheckedIOException(new NotDirectoryException(path.toString()));
 	}
 
 	@Override
