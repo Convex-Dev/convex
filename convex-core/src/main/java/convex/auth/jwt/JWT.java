@@ -22,6 +22,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
@@ -55,6 +56,7 @@ public class JWT {
 
 	// Common claim keys
 	public static final AString ALG = Strings.intern("alg");
+	public static final AString TYP = Strings.intern("typ");
 	public static final AString KID = Strings.intern("kid");
 	public static final AString SUB = Strings.intern("sub");
 	public static final AString EXP = Strings.intern("exp");
@@ -256,15 +258,17 @@ public class JWT {
 	public boolean validateClaims(AString expectedIssuer, AString expectedAudience) {
 		if (claims == null) return false;
 
-		// Check expiry
-		ACell expCell = claims.get(EXP);
-		if (expCell != null) {
-			try {
-				long exp = Long.parseLong(expCell.toString());
-				long nowSecs = System.currentTimeMillis() / 1000;
-				if (nowSecs > exp) return false;
-			} catch (NumberFormatException e) {
-				return false;
+		// Treat exp:null permissively as an omitted optional claim. Any non-null
+		// value must be an RFC 7519 NumericDate, and the token is no longer valid
+		// at the expiry instant itself.
+		if (claims.containsKey(EXP)) {
+			ACell expCell = claims.get(EXP);
+			if (expCell != null) {
+				if (!(expCell instanceof ANumeric numeric)) return false;
+				double exp = numeric.doubleValue();
+				if (!Double.isFinite(exp)) return false;
+				double nowSecs = System.currentTimeMillis() / 1000.0;
+				if (nowSecs >= exp) return false;
 			}
 		}
 

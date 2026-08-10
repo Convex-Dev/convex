@@ -46,7 +46,7 @@ public class UCANTest {
 		assertNotNull(token.getNonce());
 		assertNotNull(token.getSignature());
 		assertNotNull(token.getPayload());
-		assertEquals(FUTURE_EXPIRY, token.getExpiry());
+		assertEquals(Long.valueOf(FUTURE_EXPIRY), token.getExpiry());
 		assertNull(token.getNotBefore());
 		assertEquals(0, token.getCapabilities().count());
 		assertEquals(0, token.getProofs().count());
@@ -165,6 +165,32 @@ public class UCANTest {
 	}
 
 	@Test
+	public void testCreateNonExpiringToken() {
+		UCAN token=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,null,null);
+
+		assertTrue(token.getPayload().containsKey(UCAN.EXP));
+		assertNull(token.getPayload().get(UCAN.EXP));
+		assertNull(token.getExpiry());
+		assertTrue(token.verifySignature());
+		assertNotNull(UCANValidator.validate(token,NOW));
+
+		UCAN parsed=UCAN.parse(token.toMap());
+		assertNotNull(parsed);
+		assertTrue(parsed.getPayload().containsKey(UCAN.EXP));
+		assertNull(parsed.getExpiry());
+		assertNotNull(UCANValidator.validate(parsed,NOW));
+	}
+
+	@Test
+	public void testNonExpiringTokenStillHonoursNotBefore() {
+		UCAN token=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,
+			Long.valueOf(NOW+600),null,null);
+
+		assertNull(UCANValidator.validate(token,NOW));
+		assertNotNull(UCANValidator.validate(token,NOW+600));
+	}
+
+	@Test
 	public void testParseMalformed() {
 		assertNull(UCAN.parse(null));
 		assertNull(UCAN.parse(Maps.empty()));
@@ -190,8 +216,19 @@ public class UCANTest {
 	}
 
 	@Test
+	public void testMissingExpiryFails() {
+		UCAN valid=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),FUTURE_EXPIRY,null,null);
+		AMap<AString,ACell> payload=valid.getPayload().dissoc(UCAN.EXP);
+		UCAN missing=UCAN.fromPayload(payload,ROOT_KP.sign(
+			convex.core.data.Ref.get(payload).getEncoding()));
+
+		assertFalse(payload.containsKey(UCAN.EXP));
+		assertNull(UCANValidator.validate(missing,NOW));
+	}
+
+	@Test
 	public void testNotBeforeFails() {
-		long futureNbf = NOW + 3600; // 1 hour in the future
+		long futureNbf = NOW + 600; // 10 minutes in the future, before expiry
 		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
 			FUTURE_EXPIRY, futureNbf, null, null);
 
@@ -290,7 +327,7 @@ public class UCANTest {
 	}
 
 	@Test
-	public void testExpiryNarrowing() {
+	public void testProofsMayHaveDifferentValidityPeriods() {
 		long shortExpiry = NOW + 600;  // 10 minutes
 		long longExpiry = NOW + 7200;  // 2 hours
 
@@ -298,30 +335,29 @@ public class UCANTest {
 		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
 			shortExpiry, null, null);
 
-		// Agent A tries to create longer-lived sub-delegation (violates narrowing)
+		// Agent A creates a longer-lived sub-delegation. Both links are valid now.
 		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
-		UCAN badChild = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
+		UCAN child = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
 			longExpiry, null, proofs);
 
-		// Should fail: child.exp (longExpiry) > proof.exp (shortExpiry)
-		assertNull(UCANValidator.validate(badChild, NOW));
+		assertNotNull(UCANValidator.validate(child, NOW));
 	}
 
 	@Test
-	public void testExpiryNarrowingValid() {
-		long longExpiry = NOW + 7200;
-		long shortExpiry = NOW + 600;
+	public void testFiniteAndNonExpiringProofCombinations() {
+		UCAN finiteRoot=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),FUTURE_EXPIRY,null,null);
+		UCAN unboundedChild=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),
+			(Long)null,null,Vectors.of(finiteRoot.toMap()));
+		assertNotNull(UCANValidator.validate(unboundedChild,NOW));
 
-		// Root grants long-lived token
-		UCAN rootToken = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
-			longExpiry, null, null);
+		UCAN unboundedRoot=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,null,null);
+		UCAN finiteChild=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY,null,Vectors.of(unboundedRoot.toMap()));
+		assertNotNull(UCANValidator.validate(finiteChild,NOW));
 
-		// Agent A creates shorter-lived sub-delegation (OK)
-		AVector<ACell> proofs = Vectors.of(rootToken.toMap());
-		UCAN goodChild = UCAN.create(AGENT_A_KP, AGENT_B_KP.getAccountKey(),
-			shortExpiry, null, proofs);
-
-		assertNotNull(UCANValidator.validate(goodChild, NOW));
+		UCAN bothUnboundedChild=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),
+			(Long)null,null,Vectors.of(unboundedRoot.toMap()));
+		assertNotNull(UCANValidator.validate(bothUnboundedChild,NOW));
 	}
 
 	// ===== Capability Builder Tests =====
@@ -396,6 +432,8 @@ public class UCANTest {
 			Capability.create(Strings.create("dlfs://test/drives/home"), Strings.create("dlfs/read"))
 		);
 		UCAN original = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, caps, null);
+		assertFalse(original.getPayload().containsKey(UCAN.UCV),
+			"The native token carries its version in the native header");
 
 		// Encode as JWT
 		AString jwt = original.toJWT(ROOT_KP);
@@ -405,10 +443,63 @@ public class UCANTest {
 		// Decode from JWT
 		UCAN decoded = UCAN.fromJWT(jwt);
 		assertNotNull(decoded, "Should parse valid JWT UCAN");
+		assertEquals(UCAN.VERSION,decoded.getPayload().get(UCAN.UCV));
 		assertEquals(original.getIssuer(), decoded.getIssuer());
 		assertEquals(original.getAudience(), decoded.getAudience());
 		assertEquals(original.getExpiry(), decoded.getExpiry());
 		assertEquals(1, decoded.getCapabilities().count());
+	}
+
+	@Test
+	public void testNonExpiringJWTRoundTrip() {
+		AString jwt=UCAN.createJWT(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,null,null);
+		UCAN decoded=UCAN.fromJWT(jwt);
+
+		assertNotNull(decoded);
+		assertTrue(decoded.getPayload().containsKey(UCAN.EXP));
+		assertNull(decoded.getExpiry());
+		assertNotNull(UCANValidator.validateJWT(jwt,NOW));
+		assertTrue(JWT.parse(jwt).validateClaims((String)null,null),
+			"Generic JWT validation treats exp:null permissively as omitted");
+	}
+
+	@Test
+	public void testJWTMissingExpiryFails() {
+		AMap<AString,ACell> payload=UCAN.buildPayload(ROOT_KP.getAccountKey(),
+			AGENT_A_KP.getAccountKey(),FUTURE_EXPIRY,null,null,null,null)
+			.assoc(UCAN.UCV,UCAN.VERSION).dissoc(UCAN.EXP);
+		assertThrows(IllegalArgumentException.class,()->UCAN.signJWT(payload,ROOT_KP));
+		AString jwt=JWT.signPublic(payload,ROOT_KP);
+
+		assertNull(UCAN.parseJWT(jwt));
+		assertNull(UCAN.fromJWT(jwt));
+		assertNull(UCANValidator.validateJWT(jwt,NOW));
+	}
+
+	@Test
+	public void testOrdinaryJWTIsNotUCAN() {
+		AMap<AString,ACell> claims=Maps.of(
+			UCAN.ISS,UCAN.toDIDKey(ROOT_KP.getAccountKey()),
+			UCAN.AUD,UCAN.toDIDKey(AGENT_A_KP.getAccountKey()));
+		AString jwt=JWT.signPublic(claims,ROOT_KP);
+
+		assertTrue(JWT.parse(jwt).validateClaims((String)null,null));
+		assertNull(UCAN.parseJWT(jwt));
+		assertNull(UCAN.fromJWT(jwt));
+		assertNull(UCANValidator.validateJWT(jwt,NOW));
+	}
+
+	@Test
+	public void testUnsupportedUCANJWTVersionRejectedEverywhere() {
+		AMap<AString,ACell> payload=UCAN.buildPayload(ROOT_KP.getAccountKey(),
+			AGENT_A_KP.getAccountKey(),FUTURE_EXPIRY,null,null,null,null)
+			.assoc(UCAN.UCV,Strings.create("1.0.0"));
+		AString jwt=JWT.signPublic(payload,ROOT_KP);
+
+		assertThrows(IllegalArgumentException.class,()->UCAN.signJWT(payload,ROOT_KP));
+		assertNull(UCAN.parseJWT(jwt));
+		assertNull(UCAN.fromJWT(jwt));
+		assertNull(UCANValidator.validateJWT(jwt,NOW));
 	}
 
 	@Test
@@ -469,6 +560,21 @@ public class UCANTest {
 	}
 
 	@Test
+	public void testJWTChainUsesExecutionTimeValidity() {
+		AString finiteRoot=UCAN.createJWT(ROOT_KP,AGENT_A_KP.getAccountKey(),
+			NOW+600,null,null);
+		AString unboundedChild=UCAN.createJWT(AGENT_A_KP,AGENT_B_KP.getAccountKey(),
+			(Long)null,null,Vectors.of(finiteRoot));
+		assertNotNull(UCANValidator.validateJWT(unboundedChild,NOW));
+
+		AString unboundedRoot=UCAN.createJWT(ROOT_KP,AGENT_A_KP.getAccountKey(),
+			(Long)null,null,null);
+		AString finiteChild=UCAN.createJWT(AGENT_A_KP,AGENT_B_KP.getAccountKey(),
+			FUTURE_EXPIRY,null,Vectors.of(unboundedRoot));
+		assertNotNull(UCANValidator.validateJWT(finiteChild,NOW));
+	}
+
+	@Test
 	public void testJWTChainLinkMismatch() {
 		// Root -> Agent A
 		AString rootJwt = UCAN.createJWT(ROOT_KP, AGENT_A_KP.getAccountKey(), FUTURE_EXPIRY, null, null);
@@ -498,7 +604,8 @@ public class UCANTest {
 	/** A JWT claiming {@code iss=spoofedIssuer} but actually signed by {@code signer} (kid = signer's key). */
 	private static AString forgeIssuer(AccountKey spoofedIssuer, AKeyPair signer, AccountKey aud,
 			long exp, AVector<ACell> caps) {
-		AMap<AString, ACell> claims = UCAN.buildPayload(spoofedIssuer, aud, exp, null, caps, null, null);
+		AMap<AString, ACell> claims = UCAN.buildPayload(spoofedIssuer, aud, exp, null, caps, null, null)
+			.assoc(UCAN.UCV,UCAN.VERSION);
 		return JWT.signPublic(claims, signer); // signs with `signer`; kid header = signer's key
 	}
 
@@ -581,6 +688,12 @@ public class UCANTest {
 		UCAN token = UCAN.create(ROOT_KP, AGENT_A_KP.getAccountKey(),
 			FUTURE_EXPIRY, Vectors.empty(), Vectors.empty());
 		assertTrue(UCANValidator.checkTemporalBounds(token, NOW));
+	}
+
+	@Test
+	public void testCheckTemporalBoundsNonExpiring() {
+		UCAN token=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),(Long)null,null,null);
+		assertTrue(UCANValidator.checkTemporalBounds(token,NOW));
 	}
 
 	@Test

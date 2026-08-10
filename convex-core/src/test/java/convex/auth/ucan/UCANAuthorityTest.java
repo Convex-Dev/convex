@@ -144,6 +144,20 @@ public class UCANAuthorityTest {
 	}
 
 	@Test
+	public void testExpiredProofRejectedAtExecutionTime() {
+		UCAN rootGrant=UCAN.create(ROOT_KP,AGENT_A_KP.getAccountKey(),NOW+10,
+			caps(cap(NOTES,CRUD)),null);
+		UCAN delegated=UCAN.create(AGENT_A_KP,AGENT_B_KP.getAccountKey(),(Long)null,
+			caps(cap(NOTES,READ)),Vectors.of(rootGrant.toMap()));
+
+		AVector<ACell> proofs=present(delegated);
+		assertTrue(UCANValidator.isAuthorised(proofs,AGENT_B_DID,NOTES_ITEM,READ,
+			RootAuthorityPolicy.SELF_SOVEREIGN,NOW));
+		assertFalse(UCANValidator.isAuthorised(proofs,AGENT_B_DID,NOTES_ITEM,READ,
+			RootAuthorityPolicy.SELF_SOVEREIGN,NOW+10));
+	}
+
+	@Test
 	public void testEscalationRefused() {
 		// ROOT grants A read over notes ONLY. A tries to delegate B top over everything
 		// ROOT owns — signatures, linkage and root identity are all genuine.
@@ -341,6 +355,7 @@ public class UCANAuthorityTest {
 		State state = InitTest.STATE;
 		AString heroDID = Strings.create("did:convex:" + InitTest.HERO.longValue());
 		AMap<AString, ACell> claims = Maps.of(
+			UCAN.UCV, UCAN.VERSION,
 			UCAN.ISS, heroDID,
 			UCAN.AUD, AGENT_A_DID,
 			UCAN.EXP, CVMLong.create(EXPIRY),

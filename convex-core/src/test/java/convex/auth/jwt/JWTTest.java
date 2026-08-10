@@ -25,6 +25,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
 public class JWTTest {
@@ -371,6 +372,27 @@ public class JWTTest {
 		assertNotNull(parsed);
 		assertTrue(parsed.verifyRS256((RSAPublicKey) kp.getPublic()));
 		assertFalse(parsed.validateClaims((String) null, null), "Expired token should fail validation");
+	}
+
+	@Test public void testValidateClaimsExpiryShapeAndBoundary() {
+		AKeyPair kp=AKeyPair.createSeeded(678L);
+
+		JWT absent=JWT.parse(JWT.signPublic(Maps.of("sub","alice"),kp));
+		assertTrue(absent.validateClaims((String)null,null),"exp is optional for an ordinary JWT");
+
+		JWT explicitNull=JWT.parse(JWT.signPublic(Maps.of(JWT.EXP,null),kp));
+		assertTrue(explicitNull.validateClaims((String)null,null),"exp:null is treated as omitted");
+
+		JWT numericString=JWT.parse(JWT.signPublic(Maps.of(JWT.EXP,Strings.create("4102444800")),kp));
+		assertFalse(numericString.validateClaims((String)null,null),"A numeric string is not a JSON number");
+
+		long currentSecond=System.currentTimeMillis()/1000;
+		JWT atBoundary=JWT.parse(JWT.signPublic(Maps.of(JWT.EXP,CVMLong.create(currentSecond)),kp));
+		assertFalse(atBoundary.validateClaims((String)null,null),"A JWT expires at the exp instant");
+
+		JWT fractional=JWT.parse(JWT.signPublic(Maps.of(JWT.EXP,
+			CVMDouble.create(System.currentTimeMillis()/1000.0+60.5)),kp));
+		assertTrue(fractional.validateClaims((String)null,null),"NumericDate may have a fractional part");
 	}
 
 	@Test public void testValidateClaimsWrongIssuer() throws Exception {
