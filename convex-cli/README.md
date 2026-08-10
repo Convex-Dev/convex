@@ -13,6 +13,12 @@ convex --version
 # Get help
 convex --help
 
+# Try Convex Lisp instantly (no network needed)
+convex eval "(+ 1 2)"
+
+# Interactive Convex Lisp REPL
+convex repl
+
 # Start a local test network
 convex local start
 ```
@@ -85,7 +91,7 @@ convex key generate
 ```
 
 This outputs:
-1. A BIP39 mnemonic phrase (12 words) - **back this up securely!**
+1. A BIP39 mnemonic phrase (12 words), written directly to the attached console - **back this up securely!**
 2. The public key (32-byte hex)
 
 You'll be prompted for:
@@ -98,6 +104,20 @@ BIP39 mnemonic generated with 12 words:
 evidence expand family claw crack dawn name salmon resource leg once curious
 Generated key pair with public key: 0x021efb3ff24898dffb30c9c7e490e86b2d0cb7a87c974a51894354532ff4670f
 ```
+
+The mnemonic is not written to stdout or stderr by default, so redirecting or
+capturing ordinary command output will not capture it. To save it directly,
+specify a new file; Convex restricts the file to its owner and refuses to
+overwrite an existing path:
+
+```bash
+convex key generate --mnemonic-file ~/convex-recovery.txt
+```
+
+Non-interactive BIP39 generation requires an explicit mnemonic destination.
+Use `--mnemonic-file -` only when the mnemonic must be written to stdout, for
+example when piping it to a secret manager. In this explicit mode each mnemonic
+line is followed by its matching public-key line on stdout.
 
 ### List Keys
 
@@ -114,10 +134,25 @@ convex key import --type=bip39 --text='evidence expand family claw crack dawn na
 
 ### Export a Key
 
-Export as seed (hex) or mnemonic for backup:
+Raw Ed25519 seed is the default, lossless export format. Interactive use writes
+it directly to the attached console:
 ```bash
-convex key export --key 021efb --type=seed
-convex key export --key 021efb --type=bip39
+convex key export --key 021efb
+```
+
+For automation, select a new owner-only file or explicitly opt into stdout.
+Existing files are never overwritten:
+
+```bash
+convex key export --key 021efb --output-file ~/convex-seed.txt
+convex key export --key 021efb --output-file -
+```
+
+Encrypted PEM is available when a passphrase-protected interchange format is
+more suitable:
+
+```bash
+convex key export --key 021efb --type=pem --output-file ~/convex-key.pem
 ```
 
 ### Environment Variables
@@ -129,7 +164,85 @@ export CONVEX_KEY_PASSWORD=secret       # Key encryption password
 export CONVEX_KEYSTORE=~/my-keys.pfx    # Custom keystore location
 ```
 
-## Use Case 3: Query and Transact
+## Use Case 3: Try Convex Lisp (eval and repl)
+
+Evaluate Convex Lisp directly from the terminal. By default both commands run
+against an ephemeral local in-memory instance — no network, keys or setup
+required — making them ideal for learning the language, scripting and agent
+tooling.
+
+### One-shot evaluation
+
+```bash
+# Evaluate a form and print the result
+convex eval "(+ 1 2)"
+# 3
+
+# Each argument is evaluated in sequence; state persists between them
+convex eval "(def x 10)" "(* x x)"
+# 10
+# 100
+
+# Pipe a script via standard input
+echo "(def a 3) (+ a a)" | convex eval
+cat script.cvx | convex eval -
+```
+
+Errors print a message on stderr and exit with a non-zero code, so `eval` is
+safe to use in scripts and CI.
+
+### Interactive REPL
+
+```bash
+convex repl
+```
+
+Evaluates each form you enter and prints the result. Multi-line forms are
+supported (the prompt changes until the form closes). Exit with `quit` or
+Ctrl-D (Ctrl-Z then Enter on Windows).
+
+Tip: for line editing and input history, wrap the REPL with
+[`rlwrap`](https://github.com/hanslub42/rlwrap): `rlwrap convex repl`.
+
+### Evaluating against a real network
+
+Both commands accept the standard client options. With `--host`, forms are
+executed on the targeted network — as transactions by default (requiring
+`--address` and `--key`), or as read-only queries with `--query`:
+
+```bash
+# REPL against a local test network
+convex repl --host localhost -a 11 --key 021efb
+
+# Read-only queries against any network, no key needed
+convex eval --query "(balance #11)" --host localhost -a 11
+```
+
+### MCP server for AI agents
+
+`convex mcp` runs an [MCP (Model Context Protocol)](https://modelcontextprotocol.io)
+server on stdin/stdout, so local MCP clients — Claude Code, Claude Desktop and
+other agent tools — can run Convex queries and transactions through a standard
+interface. Like `eval` and `repl`, it targets an ephemeral local instance by
+default, or any peer specified with `--host`.
+
+Tools offered: `query`, `transact`, `getBalance`, `resolveCNS` and `status`.
+With `--query` the server is read-only and `transact` is not offered. On a
+remote target, transactions sign with the local keystore: start the server
+with `--address` and `--key` (plus `--keypass` or `CONVEX_KEY_PASSWORD`,
+since an MCP client cannot answer interactive prompts).
+
+Example Claude Code registration:
+
+```bash
+# Sandboxed local instance (safe default)
+claude mcp add convex -- convex mcp
+
+# Read-only against a real network
+claude mcp add convex-live -- convex mcp --host peer.convex.live --query
+```
+
+## Use Case 4: Query and Transact
 
 Interact with any Convex network: read state with queries (free), modify state with transactions (requires signed account).
 
@@ -191,7 +304,7 @@ convex account fund -a 1234 1000000000 --host localhost
 
 Note: The faucet is disabled on production networks like Protonet.
 
-## Use Case 4: Running a Production Peer
+## Use Case 5: Running a Production Peer
 
 Operate a peer node that participates in Convex consensus. Peers validate transactions, maintain state, and serve client requests.
 
@@ -276,6 +389,9 @@ convex
     import    Import key from mnemonic/seed
     export    Export key
 
+  eval        Evaluate Convex Lisp (local instance by default)
+  repl        Interactive Convex Lisp REPL
+  mcp         MCP server on stdio for AI agent clients
   query       Execute read-only query
   transact    Execute transaction
   status      Check peer/network status

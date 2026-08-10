@@ -12,7 +12,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.cvm.Keywords;
 import convex.core.init.Init;
-import convex.etch.EtchStore;
+import convex.core.store.AStore;
 import convex.peer.API;
 import convex.peer.PeerException;
 import convex.peer.Server;
@@ -44,6 +44,7 @@ public class PeerGenesis extends APeerCommand {
 	@Override
 	public void execute() throws InterruptedException {
 		storeMixin.ensureKeyStore();
+		HashMap<Keyword,Object> peerConfig=loadPeerConfig();
 
 		// Key for controller. Used for genesis / governance in non-strict mode
 		// Otherwise peer key can be used
@@ -54,8 +55,7 @@ public class PeerGenesis extends APeerCommand {
 			return;
 		}
 		
-		EtchStore etch=etchMixin.getEtchStore();
-		try {
+		try (AStore store=openPeerStore(peerConfig)) {
 
 			// Key for initial peer. Needed for genesis start
 			AKeyPair peerKey = specifiedPeerKey();
@@ -84,8 +84,8 @@ public class PeerGenesis extends APeerCommand {
 
 			inform("Testing genesis state peer initialisation");
 
-			HashMap<Keyword,Object> config=new HashMap<>();
-			config.put(Keywords.STORE, etch);
+			HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
+			config.put(Keywords.STORE, store);
 			config.put(Keywords.STATE, genesisState);
 			config.put(Keywords.KEYPAIR, peerKey);
 			Server s=API.launchPeer(config); 
@@ -93,8 +93,6 @@ public class PeerGenesis extends APeerCommand {
 			informSuccess("Convex genesis succeeded!");
 		}  catch (PeerException e) {
 			throw new CLIError("Peer genesis failed: "+e.getMessage(),e);
-		} finally {
-			etch.close();
 		}
 	}
 }

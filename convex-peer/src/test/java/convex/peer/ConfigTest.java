@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +22,10 @@ import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
+import convex.etch.EtchConfig;
+import convex.etch.EtchConfig.CipherMode;
+import convex.etch.EtchConfig.MappingMode;
+import convex.etch.EtchConstants;
 import convex.etch.EtchStore;
 
 public class ConfigTest {
@@ -31,6 +37,53 @@ public class ConfigTest {
 		assertNotNull(store);
 		
 		assertTrue(store.getFile().exists());
+		store.close();
+	}
+
+	@Test public void testConfiguredEtchStore() throws Exception {
+		byte[] secret=new byte[32];
+		for (int i=0;i<secret.length;i++) secret[i]=(byte)i;
+		EtchConfig etchConfig=EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
+				CipherMode.AES_256_CTR,true,null,hint->secret.clone());
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,"temp");
+		config.put(Keywords.ETCH_CONFIG,etchConfig);
+
+		try (EtchStore store=Config.checkStore(config)) {
+			assertEquals(EtchConstants.VERSION_3,store.getEtch().getConfig().getVersion());
+			assertEquals(CipherMode.AES_256_CTR,store.getEtch().getConfig().getCipherMode());
+			assertTrue(store.getEtch().getConfig().isIndexEncrypted());
+		}
+	}
+
+	@Test public void testInvalidEtchConfigFailsClosed() {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,"temp");
+		config.put(Keywords.ETCH_CONFIG,"not compiled");
+		assertThrows(IOException.class,()->Config.checkStore(config));
+	}
+
+	@Test public void testWrongEtchKeyIsNotReplacedByTemporaryStore() throws Exception {
+		File file=File.createTempFile("peer-encrypted", ".etch");
+		file.deleteOnExit();
+		EtchConfig correct=encryptedConfig((byte)0x40);
+		try (EtchStore store=EtchStore.create(file,correct)) {
+			store.flush();
+		}
+		long length=file.length();
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,file.getPath());
+		config.put(Keywords.ETCH_CONFIG,encryptedConfig((byte)0x41));
+		assertThrows(IOException.class,()->Config.checkStore(config));
+		assertEquals(length,file.length());
+	}
+
+	private static EtchConfig encryptedConfig(byte first) {
+		byte[] secret=new byte[32];
+		secret[0]=first;
+		return EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
+				CipherMode.AES_256_CTR,true,null,hint->secret.clone());
 	}
 	
 	@Test public void testKeypair() throws ConfigException {

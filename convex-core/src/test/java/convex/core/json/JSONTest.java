@@ -32,6 +32,7 @@ import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -272,6 +273,45 @@ public class JSONTest {
 		assertEquals(CVMDouble.NaN,JSON.parseJSON5(" NaN"));
 
 
+	}
+
+	/**
+	 * Regression test for #664: the integer fast path threw NumberFormatException
+	 * for non-integer number tokens of 19+ characters, so the double parser was
+	 * never reached.
+	 */
+	@Test
+	public void testNonIntegerNumbers() {
+		// Original report
+		assertEquals(CVMDouble.create(0.471946),JSON.parse("0.471946"));
+		assertEquals(Maps.of("value",CVMDouble.create(0.471946)),JSON.parse("{\"value\":0.471946}"));
+
+		// Negative decimals and exponent notation
+		assertEquals(CVMDouble.create(-0.471946),JSON.parse("-0.471946"));
+		assertEquals(CVMDouble.create(1e5),JSON.parse("1e5"));
+		assertEquals(CVMDouble.create(-2.5e-3),JSON.parse("-2.5E-3"));
+
+		// 19-20 character tokens hit the long->big-integer fallback branch
+		assertEquals(CVMDouble.create(1234567890.12345678),JSON.parse("1234567890.12345678"));
+		assertEquals(CVMDouble.create(1.234567890123456789),JSON.parse("1.234567890123456789"));
+
+		// Longer tokens went straight to the big integer parser
+		assertEquals(CVMDouble.create(0.47194612345678901234),JSON.parse("0.47194612345678901234"));
+		assertEquals(CVMDouble.create(-1234567890.12345678e3),JSON.parse("-1234567890.12345678e3"));
+
+		// Same paths for JSON5
+		assertEquals(CVMDouble.create(1.234567890123456789),JSON.parseJSON5("1.234567890123456789"));
+		assertEquals(CVMDouble.create(0.47194612345678901234),JSON.parseJSON5("0.47194612345678901234"));
+
+		// JSON5 hex literals longer than the long fast path reach the hex parser
+		assertEquals(AInteger.parse(new BigInteger("1234567890ABCDEF12",16).toString()),
+				JSON.parseJSON5("0x1234567890ABCDEF12"));
+
+		// Genuine big integers still parse exactly
+		assertEquals(CVMBigInteger.parse("123456789012345678901"),JSON.parse("123456789012345678901"));
+
+		// Invalid numbers are still parse errors, not NumberFormatExceptions
+		assertThrows(ParseException.class,()->JSON.parse("1.2.3"));
 	}
 
 	/**

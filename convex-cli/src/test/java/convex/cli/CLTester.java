@@ -3,8 +3,11 @@ package convex.cli;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -46,8 +49,26 @@ public class CLTester {
 		return tester;
 	}
 	
-	/** 
-	 * Run a CLI instance asynchronously. 
+	/**
+	 * Run a CLI instance with the given standard input, e.g. for commands that
+	 * read piped input. Tests run sequentially in one JVM, so swapping System.in
+	 * for the duration of the run is safe.
+	 * @param input Standard input for the command
+	 * @param args CLI arguments
+	 * @return CLTester containing the output
+	 */
+	public static CLTester runWithInput(String input, String... args) {
+		InputStream oldIn=System.in;
+		try {
+			System.setIn(new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8)));
+			return run(args);
+		} finally {
+			System.setIn(oldIn);
+		}
+	}
+
+	/**
+	 * Run a CLI instance asynchronously.
 	 * @param args CLI arguments
 	 * @return CLTester to receive the output
 	 */

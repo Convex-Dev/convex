@@ -108,13 +108,11 @@ public class LatticePropagator implements Closeable {
 	 */
 	private final LatestUpdateQueue<ACell> triggerQueue = new LatestUpdateQueue<>();
 
-	/**
-	 * Controls whether setRootData is called after announce.
-	 * Positive = persist enabled; zero or negative = disabled.
-	 * This does NOT affect announce (which always runs for delta tracking
-	 * and store-backed refs).
-	 */
-	private long persistInterval = 30_000L;
+	/** Whether snapshots publish the store root after announcement. */
+	private volatile boolean persistenceEnabled = true;
+
+	/** Whether root publication has changed the persistent store since its last checkpoint. */
+	private boolean dirty;
 
 	/**
 	 * Cursor holding the last value announced to this propagator's store.
@@ -134,14 +132,14 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Last value that was triggered (used for periodic root sync). Volatile
-	 * because it may be written by the caller's thread (synchronous commit
+	 * because it may be written by the caller's thread (synchronous publication
 	 * path) and read by the background propagation thread.
 	 */
 	private volatile ACell lastTriggeredValue;
 
 	/**
 	 * Timestamp of last broadcast. Volatile for cross-thread visibility — the
-	 * caller's thread (synchronous commit path) and the background propagation
+	 * caller's thread (synchronous publication path) and the background propagation
 	 * thread may both read and write this.
 	 */
 	private volatile long lastBroadcastTime = 0L;
@@ -167,8 +165,7 @@ public class LatticePropagator implements Closeable {
 	 * propagator is the sole live writer of {@code setRootData} on its store
 	 * (see {@code PERSISTENCE.md} — sole-writer invariant), and pipelines
 	 * must not interleave: an older snapshot's {@code setRootData} landing
-	 * after a newer snapshot's would silently demote the root pointer and
-	 * break the durability promise of {@code cursor.sync()}. {@link
+	 * after a newer snapshot's would silently demote the published root. {@link
 	 * #processSnapshot} and {@link #persist} both acquire this lock so the
 	 * caller's thread (sync hook), the background propagation thread (pull,
 	 * drain), and explicit persistence calls run their full pipelines
@@ -202,14 +199,13 @@ public class LatticePropagator implements Closeable {
 	// ========== Configuration ==========
 
 	/**
-	 * Sets the persist interval. Positive enables setRootData after announce;
-	 * zero or negative disables it. This does NOT affect announce (which always
-	 * runs for delta tracking).
+	 * Enables or disables root publication. Announcement still runs when disabled
+	 * because it provides delta tracking and store-backed references.
 	 *
-	 * @param intervalMs Interval in milliseconds (0 or negative to disable)
+	 * @param enabled true to publish roots
 	 */
-	public void setPersistInterval(long intervalMs) {
-		this.persistInterval = intervalMs;
+	public void setPersistenceEnabled(boolean enabled) {
+		this.persistenceEnabled = enabled;
 	}
 
 	// ========== Accessors ==========
@@ -460,9 +456,7 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Background-thread wrapper around {@link #processSnapshot}. IOException
-	 * is logged rather than propagated — the background path is best-effort
-	 * (callers who need durability errors should call {@link #processSnapshot}
-	 * directly).
+	 * is logged rather than propagated — the background path is best-effort.
 	 */
 	private void processSnapshotSafe(ACell value) {
 		try {
@@ -476,24 +470,24 @@ public class LatticePropagator implements Closeable {
 	 * Processes a single lattice value through the full output pipeline:
 	 * <ol>
 	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
-	 *   <li>Set root data — anchor for restore (if persist enabled)</li>
+	 *   <li>Publish root data — anchor for restore (if persist enabled)</li>
 	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
 	 * </ol>
 	 *
 	 * <p>Announce always runs (for delta tracking and store-backed refs).
-	 * setRootData is gated by {@link #persistInterval}. Broadcast is gated by
+	 * setRootData is gated by the persistence setting. Broadcast is gated by
 	 * peer existence and minimum delay. The returned value is the sole handoff
 	 * back to a synchronous caller; the pull merge callback is not invoked.
 	 *
 	 * <p>Callable from any thread. The background propagation loop calls this
-	 * for queued triggers; for synchronous commit, NodeServer's sync callback
+	 * for queued triggers; for synchronous publication, NodeServer's sync callback
 	 * calls this directly on the caller's thread for the primary propagator.
 	 * Pipelines are serialised by {@link #writeLock} — see field javadoc for
 	 * the sole-writer invariant.
 	 *
 	 * @param value Snapshot to process (must not be null)
 	 * @return The announced (store-backed) value
-	 * @throws IOException If announce or setRootData fails
+	 * @throws IOException If announce or root publication fails
 	 */
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
@@ -507,8 +501,9 @@ public class LatticePropagator implements Closeable {
 			value = Cells.announce(value, noveltyHandler, store);
 
 			// 2. Set root data for restore (if persist enabled)
-			if (persistInterval > 0) {
+			if (persistenceEnabled) {
 				store.setRootData(value);
+				dirty = true;
 			}
 
 			// 3. Broadcast to peers (only if peers exist and delay elapsed)
@@ -578,21 +573,39 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Explicitly persists a value to the store. Used for forced persistence
-	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of persistInterval.
+	 * (e.g. {@link NodeServer#persistSnapshot}) regardless of the automatic
+	 * root-publication setting.
 	 *
 	 * @param value The value to persist
+	 * @throws IOException If persistence or its durability barrier fails
 	 */
-	void persist(ACell value) {
+	void persist(ACell value) throws IOException {
 		if (value == null) return;
 		if (!store.isPersistent()) return;
 		synchronized (writeLock) {
-			try {
-				value = Cells.announce(value, r -> {}, store);
-				store.setRootData(value);
-				log.debug("Persisted lattice snapshot to store");
-			} catch (IOException e) {
-				log.warn("Error persisting lattice snapshot", e);
-			}
+			value = Cells.announce(value, r -> {}, store);
+			store.setRootData(value);
+			dirty = true;
+			store.flush();
+			dirty = false;
+			log.debug("Persisted lattice snapshot to store");
+		}
+	}
+
+	/**
+	 * Completes a durability barrier when this propagator has unpublished
+	 * persistent changes.
+	 *
+	 * @return true if a barrier was completed
+	 * @throws IOException If the barrier fails
+	 */
+	boolean checkpoint() throws IOException {
+		if (!store.isPersistent()) return false;
+		synchronized (writeLock) {
+			if (!dirty) return false;
+			store.flush();
+			dirty = false;
+			return true;
 		}
 	}
 

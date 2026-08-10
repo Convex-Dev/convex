@@ -235,9 +235,12 @@ public class AdversarialDataTest {
 		}
 		
 		{ // Two colliding children at max depth
-			Index c1=Index.create(Blobs.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef00"),CVMLong.ONE);
-			Index c2=Index.create(Blobs.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef11"),CVMLong.ONE);
-			invalidTest(Index.unsafeCreate(64, null, new Ref[] {c1.getRef(),c2.getRef()}, 3, 2)); 
+			byte[] keyBytes=new byte[256];
+			Index c1=Index.create(Blob.create(keyBytes),CVMLong.ONE);
+			keyBytes=keyBytes.clone();
+			keyBytes[255]=1;
+			Index c2=Index.create(Blob.create(keyBytes),CVMLong.ONE);
+			invalidTest(Index.unsafeCreate(Index.MAX_DEPTH, null, new Ref[] {c1.getRef(),c2.getRef()}, 3, 2));
 		}
 	
 	}

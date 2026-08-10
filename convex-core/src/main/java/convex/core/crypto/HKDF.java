@@ -7,7 +7,12 @@ import org.bouncycastle.crypto.params.HKDFParameters;
 /**
  * HKDF (HMAC-based Extract-and-Expand Key Derivation Function) as per RFC 5869.
  *
- * Uses SHA-256 as the underlying hash function via BouncyCastle.
+ * <p>Uses SHA-256 as the underlying hash function via Bouncy Castle. In RFC
+ * notation, extract computes {@code PRK = HMAC(salt, IKM)} and expand computes
+ * {@code T(i) = HMAC(PRK, T(i-1) || info || I2OSP(i, 1))}. The final term is
+ * the mandatory one-byte expansion-block counter: {@code 0x01} for the first
+ * block, {@code 0x02} for the second, and so on. Bouncy Castle appends these
+ * counters internally; callers must not include them in {@code info}.</p>
  */
 public class HKDF {
 

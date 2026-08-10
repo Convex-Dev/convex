@@ -581,9 +581,24 @@ see [#636](https://github.com/Convex-Dev/convex/issues/636), gated on a Java 25
 baseline.)
 
 **Automatic recovery — implemented (July 2026, phase 3e)**: `EtchStore.create(file)`
-calls `EtchUtils.recover(file)` before mapping anything. Recovery reconciles every
-GC-related on-disk state, with detailed operator-facing log messages, and is idempotent
-(a crash mid-recovery leaves a state the next run recognises and resumes):
+calls `EtchUtils.recover(file)` before mapping anything. Configured stores use
+`EtchStore.create(file, config)` and carry the same compiled configuration through
+recovery, direct opens and GC targets; a v3 target gets its own fresh file salt.
+Recovery reconciles every GC-related on-disk state, with detailed operator-facing log
+messages, and is idempotent (an interruption mid-recovery leaves a state the next run
+recognises and resumes).
+
+Recovery metadata is not trusted. When GC residue exists, every participating non-empty
+Etch file is header-validated and, for encrypted v3, authenticated with the caller's
+configuration before the first marker deletion, rollback, file deletion or adoption.
+A wrong key or mismatched file policy therefore changes none of the source, target or
+marker files. This is a bounded header-only preflight, not a body scan.
+
+Normal v3 opening also requires every participating file to be cleanly closed. A process
+crash leaves v3 files in the `OPEN` state, so ordinary `EtchStore.create` stops before
+changing the GC layout; the caller must deliberately select the unsafe maintenance and
+repair workflow. V1 and v2 have no clean-close state and retain their historical
+best-effort rollback behaviour:
 
 - **Completed cutovers are adopted.** The marker-named current file is installed as
   `<file>` after the superseded original is **deleted**. This deletion is the disk
@@ -606,10 +621,12 @@ GC-related on-disk state, with detailed operator-facing log messages, and is ide
   store over the *source* file so parents visited before their children (index order is
   hash order) can resolve their descent.
 
-Crash safety, therefore: the original file is never modified during a cycle except by
-roll-back (which only adds entries and monotonically merges flags), a completed cutover
-is adopted idempotently, and an interrupted cycle is rolled back rather than discarded —
-writes made during the cycle survive a crash up to the usual unflushed-tail window.
+For v1 and v2, the original file is never modified during a cycle except by roll-back
+(which only adds entries and monotonically merges flags), a completed cutover is adopted
+idempotently, and an interrupted cycle is rolled back rather than discarded. For v3,
+an unclean process crash instead stops automatic reconciliation before any mutation;
+the explicitly selected repair workflow determines what can be recovered from the
+synced root and validated physical tail.
 
 Automatic deletion is limited to files whose retained content is *verifiably* elsewhere:
 superseded originals and intermediates after a hard-gated cutover, and targets whose

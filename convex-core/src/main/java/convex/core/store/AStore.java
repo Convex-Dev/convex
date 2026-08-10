@@ -119,12 +119,25 @@ public abstract class AStore implements Closeable {
 	}
 
 	/**
-	 * Sets the root data for this Store
+	 * Sets the logical root data for this Store after ensuring its reachable tree
+	 * is persisted in the store. This operation does not itself promise that a
+	 * persistent store has completed a physical durability barrier; callers that
+	 * require that guarantee must subsequently call {@link #flush()}.
+	 *
 	 * @param data Root data to set
 	 * @return Ref to written root data
 	 * @throws IOException In case of store IO error
 	 */
 	public abstract <T extends ACell> Ref<T> setRootData(T data) throws IOException;
+
+	/**
+	 * Completes this store's durability barrier. On a persistent store, successful
+	 * return confirms that all store operations completed before the barrier are
+	 * recoverable after restart. Volatile stores complete this as a no-op.
+	 *
+	 * @throws IOException If the durability barrier fails
+	 */
+	public abstract void flush() throws IOException;
 
 	/**
 	 * Closes this store and frees associated resources

@@ -57,6 +57,19 @@ public class BigIntegerTest {
 		assertFalse(b.isCanonical());
 		assertEquals(a.hashCode(),b.hashCode());
 	}
+
+	/**
+	 * Regression test for #664: parse must return null for non-integer strings,
+	 * not throw NumberFormatException
+	 */
+	@Test public void testParseNonInteger() {
+		assertNull(CVMBigInteger.parse("0.5"));
+		assertNull(CVMBigInteger.parse("xyz"));
+		assertNull(CVMBigInteger.parse(""));
+
+		assertNull(AInteger.parse("0.47194612345678901234")); // >20 chars, straight to big integer parse
+		assertNull(AInteger.parse("1.234567890123456789")); // 19-20 chars, long->big-integer fallback
+	}
 	
 	@Test public void testZero() throws BadFormatException {
 		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0});

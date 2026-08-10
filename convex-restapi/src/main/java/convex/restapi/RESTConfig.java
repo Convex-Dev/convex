@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import convex.auth.did.DID;
 import convex.core.crypto.util.Multikey;
@@ -13,6 +14,7 @@ import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
@@ -65,6 +67,13 @@ public class RESTConfig extends PeerConfig {
 	public static final AString TRUSTED_PROXIES = Strings.intern("trustedProxies");
 	public static final AString MAX_CONCURRENT_REQUESTS = Strings.intern("maxConcurrentRequests");
 	public static final AString MAX_REQUEST_BYTES = Strings.intern("maxRequestBytes");
+
+	// ========== x402 config keys (rest.x402.*) ==========
+
+	public static final AString X402 = Strings.intern("x402");
+	public static final AString FACILITATOR = Strings.intern("facilitator");
+	public static final AString PAY_TO = Strings.intern("payTo");
+	public static final AString ROUTES = Strings.intern("routes");
 
 	// ========== Public query lane keys (rest.query.*) ==========
 
@@ -319,6 +328,51 @@ public class RESTConfig extends PeerConfig {
 		return getLong(getQuerySection(), MAX_JUICE, PublicQueryService.MAX_QUERY_JUICE);
 	}
 
+	// ========== x402 typed accessors ==========
+
+	/**
+	 * Whether x402 payment support is enabled (CAD042).
+	 * @return true if x402 is explicitly enabled (default: false)
+	 */
+	public boolean isX402Enabled() {
+		ACell value=getSection(REST).get(X402);
+		AMap<AString,ACell> section=RT.castMap(value);
+		if (section!=null) value=section.get(ENABLED);
+		if (value==null) return false;
+		if (value instanceof CVMBool enabled) return enabled.booleanValue();
+		throw new IllegalArgumentException("rest.x402 must be a boolean or an object with a boolean enabled field");
+	}
+
+	/**
+	 * Whether the x402 facilitator endpoints are served when x402 is enabled.
+	 * @return true unless explicitly disabled (default: true)
+	 */
+	public boolean isX402FacilitatorEnabled() {
+		return getBool(getX402Section(), FACILITATOR, true);
+	}
+
+	/**
+	 * Gets the default recipient address for x402-gated routes.
+	 * @return payTo address string, or null if not configured
+	 */
+	public AString getX402PayTo() {
+		return RT.ensureString(getX402Section().get(PAY_TO));
+	}
+
+	/**
+	 * Gets the configured x402 gated routes.
+	 * @return Vector of route config objects, or empty vector if none
+	 */
+	public convex.core.data.AVector<ACell> getX402Routes() {
+		convex.core.data.AVector<ACell> v=RT.ensureVector(getX402Section().get(ROUTES));
+		return (v!=null) ? v : Vectors.empty();
+	}
+
+	private AMap<AString,ACell> getX402Section() {
+		AMap<AString,ACell> s = RT.castMap(getSection(REST).get(X402));
+		return (s!=null) ? s : Maps.empty();
+	}
+
 	private AMap<AString,ACell> getQuerySection() {
 		AMap<AString,ACell> q = RT.castMap(getSection(REST).get(QUERY));
 		return (q!=null) ? q : Maps.empty();
@@ -376,10 +430,15 @@ public class RESTConfig extends PeerConfig {
 	}
 
 	/**
-	 * Whether seed-based MCP tools may be used over cleartext HTTP (#554).
+	 * Whether seed-based REST and MCP operations may be used over cleartext HTTP (#554).
 	 * @return true if HTTP seeds are allowed (default: false — HTTPS or loopback required)
 	 */
 	public boolean isHttpSeedsAllowed() {
+		AMap<AString,ACell> restSection=getSection(REST);
+		if (restSection.containsKey(ALLOW_HTTP_SEEDS)) {
+			return getBool(restSection,ALLOW_HTTP_SEEDS,false);
+		}
+		// Backwards compatibility with the original MCP-only option.
 		return getBool(getSection(MCP), ALLOW_HTTP_SEEDS, false);
 	}
 
@@ -500,7 +559,13 @@ public class RESTConfig extends PeerConfig {
 	 */
 	@Override
 	public HashMap<Keyword, Object> toLegacy() {
-		HashMap<Keyword, Object> legacy = super.toLegacy();
+		return toLegacy(null);
+	}
+
+	/** Converts peer and REST policy with runtime Etch key resolution. */
+	@Override
+	public HashMap<Keyword, Object> toLegacy(Function<AccountKey,byte[]> etchKeyFunction) {
+		HashMap<Keyword, Object> legacy = super.toLegacy(etchKeyFunction);
 		// Preserve the typed configuration across the legacy Peer launch boundary.
 		// RESTServer consumes this object directly instead of reconstructing nested
 		// REST, MCP and authentication policy from flattened keys.
@@ -520,7 +585,7 @@ public class RESTConfig extends PeerConfig {
 		// MCP security options (#552, #554)
 		java.util.Set<String> origins = getAllowedOrigins();
 		if (origins != null) legacy.put(Keywords.ALLOWED_ORIGINS, origins);
-		if (getSection(MCP).containsKey(ALLOW_HTTP_SEEDS)) {
+		if (getSection(REST).containsKey(ALLOW_HTTP_SEEDS)||getSection(MCP).containsKey(ALLOW_HTTP_SEEDS)) {
 			legacy.put(Keywords.ALLOW_HTTP_SEEDS, isHttpSeedsAllowed());
 		}
 

@@ -1,0 +1,38 @@
+{
+  "name": "getBalance",
+  "title": "Get Balance",
+  "description": "Get the CVM coin balance of an account (in copper, 1 CVM = 1,000,000,000 copper), or a fungible token balance if 'token' is given. Defaults to the configured account if 'address' is omitted.",
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": true
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "Account address to check, e.g. '#13'. Defaults to the configured account."
+      },
+      "token": {
+        "type": "string",
+        "description": "Optional fungible token actor address, e.g. '#1234'. If given, returns the token balance instead of the coin balance."
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "number",
+        "description": "Account address queried"
+      },
+      "balance": {
+        "description": "Balance in copper (or token units if 'token' was given)"
+      },
+      "token": {
+        "type": "number",
+        "description": "Token actor address, if a token balance was queried"
+      }
+    }
+  }
+}

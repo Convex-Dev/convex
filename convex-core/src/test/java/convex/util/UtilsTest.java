@@ -51,6 +51,23 @@ public class UtilsTest {
 		assertThrows(IllegalArgumentException.class,()->
 			Utils.toHexChar(16));
 	}
+
+	@Test
+	public void testRoundUpToAlignment() {
+		assertEquals(0L,Utils.roundUpToAlignment(0L,1L));
+		assertEquals(0L,Utils.roundUpToAlignment(0L,8L));
+		assertEquals(8L,Utils.roundUpToAlignment(1L,8L));
+		assertEquals(8L,Utils.roundUpToAlignment(7L,8L));
+		assertEquals(8L,Utils.roundUpToAlignment(8L,8L));
+		assertEquals(16L,Utils.roundUpToAlignment(9L,8L));
+		assertEquals(20L,Utils.roundUpToAlignment(11L,10L));
+		assertEquals(Long.MAX_VALUE-7L,Utils.roundUpToAlignment(Long.MAX_VALUE-7L,8L));
+
+		assertThrows(IllegalArgumentException.class,()->Utils.roundUpToAlignment(-1L,8L));
+		assertThrows(IllegalArgumentException.class,()->Utils.roundUpToAlignment(1L,0L));
+		assertThrows(IllegalArgumentException.class,()->Utils.roundUpToAlignment(1L,-8L));
+		assertThrows(ArithmeticException.class,()->Utils.roundUpToAlignment(Long.MAX_VALUE,8L));
+	}
 	
 
 	@Test

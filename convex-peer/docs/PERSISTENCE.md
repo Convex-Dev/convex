@@ -10,9 +10,9 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
 2. **No automatic sync on cursor write** — apps write to the cursor without triggering
    any I/O. Sync is a separate, explicit action.
 3. **Apps trigger sync when ready** — `cursor.sync()` guarantees the cursor is synced
-   with the level below (parent cursor or, at root, the sync callback). Sync propagates
-   up the cursor hierarchy to the root. May block if the sync callback does blocking work
-   (e.g. synchronous persistence).
+   with the level below (parent cursor or, at root, the sync callback). At the root it
+   publishes the current value and reachable cells to the primary store, but does not
+   force a physical durability barrier.
 4. **Automatic sync is configurable policy** — periodic sync, on-incoming-merge, or
    manual-only. Controlled by NodeServer configuration.
 5. **Propagators handle ALL output** — persistence IS propagation (to disk instead of to
@@ -30,8 +30,9 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
    to reclaim cell data that can be reloaded from the store on demand.
 8. **A NodeServer with no propagator is purely in-memory** — `cursor.sync()` is a no-op.
    The cursor works fine but nothing is persisted or broadcast.
-9. **Shutdown guarantees persistence, not broadcast** — `close()` ensures each propagator
-   persists its final state. Broadcast to peers is best-effort during operation.
+9. **Durability is explicit policy** — `AStore.flush()` is the physical durability
+   barrier. NodeServer checkpoints after initial publication, periodically while dirty,
+   and during orderly shutdown; broadcast remains best-effort.
 
 ## Architecture
 
@@ -83,7 +84,7 @@ secondary propagators asynchronously. Explicit pulls follow the same root-owned 
 ```java
 ACell acquired = propagators.get(0).pull(peer).join(); // acquisition only
 cursor.merge(acquired);                               // authoritative root merge
-cursor.sync();                                        // persist and re-propagate merged root
+cursor.sync();                                        // publish and re-propagate merged root
 ```
 
 The propagator has no knowledge of cursors or lattices. It returns the store-backed
@@ -95,7 +96,7 @@ snapshot unless the caller supplies an already filtered value.
 
 | Index | Role | Filter | Peers | Store | Purpose |
 |-------|------|--------|-------|-------|---------|
-| 0 | **Primary** | None | None (or local) | EtchStore | Synchronous persistence, restore and pull acquisition. Store-backs cursor. |
+| 0 | **Primary** | None | None (or local) | EtchStore | Synchronous publication, restore and pull acquisition. Store-backs cursor. |
 | 1+ | **Public** | Yes (strip private) | Untrusted | Own store | Public data broadcast. Security boundary. |
 | 1+ | **Backup** | None | Trusted | Own store | Full replication to trusted peers. |
 
@@ -169,16 +170,14 @@ node.getCursor().set(newValue, :myKey);
 
 ```java
 // App decides it's time to sync
-cursor.sync();  // returns after the primary persistence pipeline completes
+cursor.sync();  // returns after the primary publication pipeline completes
 ```
 
-`sync()` is the synchronous logical-checkpoint boundary. A successful return confirms
-that the primary store accepted the root update; it does not imply a physical Etch
-`flush()`, which is a separate operator policy. A primary announce or root-write
-failure is reported to this caller as `StoreException`. The in-memory cursor is not
-rolled back, and NodeServer does not choose a recovery policy. A failed call provides
-no root-publication confirmation, so the operator must treat the persisted root as
-unconfirmed.
+`sync()` is a synchronous publication boundary. A successful return confirms that
+the primary store contains the root and its reachable cells and that the returned
+value is store-backed. It does not call `AStore.flush()` and therefore does not promise
+crash durability. An announce or root-publication failure is reported as
+`StoreException`; the in-memory cursor is not rolled back.
 
 NodeServer hooks a sync callback on the `RootLatticeCursor` at construction time.
 When `cursor.sync()` is called, the callback processes the primary propagator on the
@@ -195,7 +194,7 @@ cursor.onSync(value -> {
 });
 ```
 
-The primary announce, persistence and broadcast pipeline completes before sync returns.
+The primary announce, root-publication and broadcast pipeline completes before sync returns.
 Each secondary propagator processes its queued value independently.
 
 The callback returns the primary propagator's announced value to
@@ -239,13 +238,13 @@ When a peer sends a `LATTICE_VALUE` message:
    the target path via `cursor.path(path)` and merges via `target.merge(value)` — the
    cursor chain handles sub-lattice resolution, signing boundaries, and null-lattice
    bubble-up automatically.
-4. Calls `cursor.sync()` — this synchronously commits to the primary store and queues
+4. Calls `cursor.sync()` — this synchronously publishes to the primary store and queues
    secondary propagation.
 
 `LATTICE_VALUE` is fire-and-forget, so there is no application sync caller for a
-durability exception. NodeServer contains and logs the exception at the inbound-message
-boundary. The accepted merge remains in memory, durability is unconfirmed, and the
-node stays running for operator-directed recovery.
+publication exception. NodeServer contains and logs the exception at the inbound-message
+boundary. The accepted merge remains in memory and the node stays running for
+operator-directed recovery.
 
 NodeServer also supports explicit pull via `pull()` (query all connected peers)
 or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives
@@ -264,22 +263,23 @@ public void close() {
     closeAndAwaitInboundAcquirors();    // no worker can still touch a store
     stopInboundDispatcher();           // drain complete ordered work
 
-    // Final sync + wait for all propagators to drain and stop
+    // Drain propagators and release their network resources
     V snapshot = cursor.get();
     for (LatticePropagator p : propagators) {
         p.triggerAndClose(snapshot);  // trigger, drain queue, stop thread
+        p.getConnectionManager().close();
     }
-    // Primary propagator's merge callback fires during drain,
-    // so cursor has store-backed refs after close.
-
+    // Re-publish the final snapshot and complete each persistent store barrier.
+    for (LatticePropagator p : propagators) p.persist(snapshot);
 }
 ```
 
 Incomplete values are safe to cancel because they have not crossed the complete-value
 gateway into lattice merge code. `close()` waits for each Acquiror's actual termination,
 not merely cancellation of its future, before propagator stores may be closed. Each
-propagator's `triggerAndClose()` then ensures the queued value is processed (including
-the merge callback for primary) before the thread stops.
+propagator's `triggerAndClose()` then ensures queued work is drained before the thread
+stops. Final store-only persistence runs after network resources are released and any
+failure is returned by `close()`.
 
 ## Persistence Lifecycle
 
@@ -298,6 +298,7 @@ public void launch() {
 	// Seed the store-backed announced view before opening the listener
 	ACell announced = propagators.get(0).processSnapshot(cursor.get());
 	cursor.set((V) announced);
+	propagators.get(0).checkpoint();
 
     // Start propagators, network server, etc.
     ...
@@ -311,22 +312,24 @@ snapshot before opening the listener. Fresh and restored nodes can therefore ans
 when persistence is enabled. No application-side initial `sync()` is required.
 
 For a publicly advertised node, launch is not complete until its signed NodeInfo has
-passed the same synchronous checkpoint. If that checkpoint fails after the listener
+passed the same synchronous publication boundary. If publication fails after the listener
 has opened, NodeServer closes the listener, dispatcher, propagators and connection
 managers before rethrowing the original error. `launch()` therefore either returns a
 running node or throws with the node stopped; the same instance may be retried after
 the store problem is resolved.
 
-### Running: Sync Triggers
+### Running: Publication and Checkpoints
 
-Sync can be triggered by:
+Publication can be triggered by:
 - **App explicitly** — `cursor.sync()` after a batch of writes
 - **Incoming merge** — if autoSync policy is enabled
-- **Periodic timer** — configurable interval (default 30s), as safety net
-- **Shutdown** — final persist in each propagator's `close()`
 
-The periodic timer ensures eventual persistence even without explicit sync calls.
-It is a safety net, not the primary mechanism.
+Successful root publication marks the owning propagator store dirty. NodeServer's
+existing maintenance loop calls `checkpoint()` on dirty persistent stores at the
+configured `persistInterval` (default 30 seconds). Clean and volatile stores are
+skipped. A failed periodic barrier leaves the store dirty and is retried at the next
+interval. Callers needing immediate crash durability call `cursor.sync()` followed by
+`node.checkpoint()`.
 
 ### Node Configurations
 
@@ -357,7 +360,8 @@ Propagator[primary] store    Propagator[public] store     Propagator[backup] sto
 ```
 
 Each propagator's store receives `Cells.announce()` for delta tracking and
-`store.setRootData()` for restore. Stores also serve as security boundaries
+`store.setRootData()` for restore. Explicit checkpoints additionally call
+`store.flush()` for physical durability. Stores also serve as security boundaries
 for `DATA_REQUEST` from peers.
 
 ### Propagator Internals
@@ -662,10 +666,9 @@ propagators; `launch()` remains forbidden so store users or ordered consumers ca
 overlap a replacement lifecycle. Once the blocking operation returns, calling `close()`
 again completes the same shutdown safely.
 
-A primary-store error during `cursor.sync()` throws to the calling context. The
-memory-first cursor value is retained and the persisted root must be treated as
-unconfirmed. NodeServer does not impose a shutdown or retry policy; the operator
-decides how to recover.
+A primary-store publication error during `cursor.sync()` throws to the calling
+context. The memory-first cursor value is retained. NodeServer does not impose a
+shutdown or retry policy; the operator decides how to recover.
 
 Sync tuning (LatticePropagator):
 
@@ -743,11 +746,13 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 
 ### Completed ✓
 
-- **Core Persistence** — `Cells.announce()` + `store.setRootData()`, restore in `launch()`, final persist in `close()`
+- **Core Publication** — `Cells.announce()` + `store.setRootData()`, restore in `launch()` and explicit durable `persistSnapshot()`
 - **Explicit Sync API** — `cursor.sync()` triggers propagators via callback, incoming merges call `cursor.sync()`, periodic auto-sync
 - **Acquire Then Merge** — the owning propagator store acquires every missing cell
   before NodeServer attempts one merge
 - **Root-Only Periodic Sync** — propagator broadcasts root cell hash, peers detect divergence, acquire missing data
+- **Durability Checkpoints** — startup barrier before listener exposure, coalesced
+  periodic dirty-store barriers, explicit `checkpoint()`, and observable final barriers
 
 ### Remaining
 
@@ -761,20 +766,18 @@ Phases 1–4 are complete and tested. Remaining work is listed below.
 - Shared: background loop, trigger queue, delta encoding, broadcast
 - Separate: message format, merge semantics
 
-**Synchronous Commit** — see the implemented sync design below
-
-## Synchronous Commit Design
+## Synchronous Publication Design
 
 ### Previous Problem
 
 The earlier sync callback offered the snapshot to propagators and returned immediately.
-The propagator's background thread later announced cells, persisted root data, and
-called the merge callback. Thus `sync()` returned before persistence completed,
+The propagator's background thread later announced cells, published root data, and
+called the merge callback. Thus `sync()` returned before publication completed,
 store-backed refs arrived asynchronously, and tests needed `Thread.sleep`.
 
-### Design: Synchronous Commit via Sync Callback
+### Design: Synchronous Publication via Sync Callback
 
-The existing `RootLatticeCursor.onSync` hook already supports synchronous commit:
+The existing `RootLatticeCursor.onSync` hook already supports synchronous publication:
 the callback runs on the caller's thread and the returned value is CASed back into
 the cursor (with lattice-merge fallback on concurrent write). No second cursor is
 needed — the single-cursor design plus CAS-or-merge gives the required guarantee.
@@ -785,10 +788,9 @@ Only the **primary propagator** runs synchronously on the caller's thread. Secon
 propagators (public, backup) keep their existing async broadcast loop.
 
 Rationale:
-- Primary is the checkpoint anchor — `sync()` returning means it accepted the logical root update.
-- Physical Etch flush is a separate operator policy (see issue #650).
-- Secondaries are best-effort broadcast; their latency does not affect the primary checkpoint.
-- Caller's thread does **one** store write (primary), not N. Bounded cost.
+- Primary is the publication anchor — `sync()` returning means its root and cells are available from the store.
+- Secondaries are best-effort broadcast; their latency does not affect primary publication.
+- Ordinary sync does not force storage, keeping update latency independent of the durability policy.
 
 #### Sync Flow
 
@@ -799,7 +801,7 @@ Caller's thread (inside the `onSync` callback) runs the primary's full pipeline:
 4. For each secondary propagator: `triggerBroadcast(value)` — async fan-out
 5. Return `announced` — `RootLatticeCursor.sync()` CASes it back, merge fallback handles concurrent app writes
 
-Steps 1-4 are exposed as `processSnapshot`, which is callable on any thread and is
+Steps 1-3 are exposed as `processSnapshot`, which is callable on any thread and is
 invoked directly from the sync callback for the primary.
 
 The primary's background thread still exists for non-sync triggers:
@@ -849,12 +851,11 @@ variable. No cross-thread novelty handoff.
 on its store, and pipelines through the propagator must not interleave.
 `processSnapshot` and `persist` both acquire a propagator-internal `writeLock` so
 the caller's thread (sync hook), the background propagation thread (pull, drain),
-and explicit `NodeServer.persistSnapshot` calls run their full announce +
-setRootData + broadcast sequences sequentially. Without this, an older snapshot's
+and explicit `NodeServer.persistSnapshot` calls run their full store-writing sequences
+sequentially. Without this, an older snapshot's
 setRootData could land *after* a newer snapshot's — Etch's class-level
 `synchronized` only orders the individual root-pointer write, not the surrounding
-pipeline — silently demoting the root pointer and breaking the durability promise
-of `sync()`.
+pipeline — silently demoting the published root.
 
 EtchStore today serialises all writes on a class-level `synchronized` (`Etch.java:321`).
 Multiple caller threads syncing concurrently will contend on the propagator's
@@ -871,12 +872,10 @@ preserved for cells that overlap.
 
 If announce or `setRootData` throws, the exception propagates to the `sync()` caller.
 The memory-first cursor value remains available. Because `AStore.setRootData()` does
-not specify transactional rollback for every failure point, the persisted root is
-unconfirmed: it may still be the previous root, but callers must not infer that solely
-from the exception. NodeServer stays running; shutdown, replacement, inspection or a
-later explicit sync are operator policy. A successful `sync()` confirms that the
-primary store accepted the root update, not that Etch physically flushed it; a thrown
-`sync()` confirms only that the checkpoint did not complete successfully.
+not specify transactional rollback for every failure point, the published root is
+unconfirmed. NodeServer stays running; replacement, inspection or a later explicit
+sync are operator policy. Physical durability errors belong to explicit or scheduled
+`flush()` checkpoints, not cursor sync.
 
 #### Pull Path Uses the Root Sync Boundary
 
@@ -889,10 +888,10 @@ re-propagation boundary.
 
 ### Benefits
 
-- `sync()` guarantees primary persistence before returning
+- `sync()` guarantees primary store publication before returning
 - Store-backed refs immediate — no OOM from lingering strong refs
 - No `Thread.sleep` in tests
-- Caller-visible durability errors
+- Caller-visible publication errors
 - Per-propagator novelty preserves store boundaries and is ready for filtered views
 
 ### Follow-ups (deferred)

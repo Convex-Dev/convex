@@ -21,6 +21,7 @@ import picocli.CommandLine.Command;
 		EtchValidate.class,
 		EtchGC.class,
 		EtchMigrate.class,
+		EtchRepair.class,
 		EtchRecover.class,
 		CommandLine.HelpCommand.class
 	},

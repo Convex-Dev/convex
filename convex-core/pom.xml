@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.10</version>
+		<version>0.8.11-SNAPSHOT</version>
 	</parent>
 
 	<properties>
@@ -82,10 +82,12 @@
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-surefire-plugin</artifactId>
 						<configuration>
-							<systemPropertyVariables>
-								<!-- Maven builds on JDK 22+ must exercise the versioned backend. -->
-								<convex.etch.requireFFM>true</convex.etch.requireFFM>
-							</systemPropertyVariables>
+							<!--
+								Maven builds on JDK 22+ must exercise the versioned backend.
+								Use a file so m2e does not copy this Maven-only guard into
+								ordinary Eclipse JUnit launch configurations.
+							-->
+							<systemPropertiesFile>${project.basedir}/src/test/resources/surefire-jdk22.properties</systemPropertiesFile>
 						</configuration>
 					</plugin>
 				</plugins>

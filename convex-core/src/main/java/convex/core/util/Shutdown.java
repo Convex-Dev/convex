@@ -1,6 +1,5 @@
 package convex.core.util;
 
-import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -46,18 +45,26 @@ public class Shutdown {
 			hookSet.put(r, r);
 		}
 
-		public synchronized void runHooks() {
-			// System.out.println("Running shutdown hooks at level: "+level);
-			Collection<Runnable> hooks=hookSet.keySet();
-			hooks.stream().forEach(r->{
+		public synchronized void removeHook(Runnable r) {
+			hookSet.remove(r);
+		}
+
+		public void runHooks() {
+			Runnable[] hooks;
+			synchronized (this) {
+				hooks=hookSet.keySet().toArray(Runnable[]::new);
+				hookSet.clear();
+			}
+			// Clear the registry before invoking callbacks. A callback may therefore
+			// safely deregister itself while it closes its resource.
+			for (Runnable r:hooks) {
 				try {
 					r.run();
 				} catch (Throwable t) {
 					t.printStackTrace();
 					// Otherwise ignore. This is the same as what the JVM shutdown does
 				}
- 			});
-			hookSet.clear();
+			}
 		}
 
 	}
@@ -78,6 +85,19 @@ public class Shutdown {
 	public static void addHook(int priority,Runnable shutdownTask) {
 		Group g=order.computeIfAbsent(priority, Group::new);
 		g.addHook(shutdownTask);
+	}
+
+	/**
+	 * Removes a previously registered shutdown task by identity. Empty priority
+	 * groups are deliberately retained: removing them from the concurrent map
+	 * could race with another registration into the same group.
+	 *
+	 * @param priority priority used for registration
+	 * @param shutdownTask exact Runnable instance supplied to {@link #addHook}
+	 */
+	public static void removeHook(int priority, Runnable shutdownTask) {
+		Group g=order.get(priority);
+		if (g!=null) g.removeHook(shutdownTask);
 	}
 
 	/**

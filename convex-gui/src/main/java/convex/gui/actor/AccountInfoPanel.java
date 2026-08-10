@@ -6,9 +6,11 @@ import java.awt.Dimension;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
+import convex.auth.did.DID;
 import convex.core.cvm.State;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.lang.RT;
 import convex.core.text.Text;
@@ -54,7 +56,9 @@ public class AccountInfoPanel extends JPanel {
 		
 		sb.append("Account:        " + actor.toString() + "\n");
 		sb.append("\n");
-		sb.append("Account Key:    " + as.getAccountKey() + "\n");
+		AccountKey accountKey=as.getAccountKey();
+		sb.append("Account Key:    " + accountKey + "\n");
+		if (accountKey!=null) sb.append("Key DID:        " + DID.forKey(accountKey) + "\n");
 		sb.append("Sequence:       " + as.getSequence() + "\n");
 		sb.append("Balance:        " + Text.toFriendlyBalance(as.getBalance()) + "\n");
 		sb.append("Mem. Allowance: " + Text.toFriendlyNumber(as.getMemory()) + "\n");

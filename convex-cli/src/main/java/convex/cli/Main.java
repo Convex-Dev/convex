@@ -9,7 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.account.Account;
+import convex.cli.client.Eval;
+import convex.cli.client.Mcp;
 import convex.cli.client.Query;
+import convex.cli.client.Repl;
 import convex.cli.client.Status;
 import convex.cli.client.Transact;
 import convex.cli.desktop.Desktop;
@@ -36,7 +39,7 @@ import picocli.CommandLine.ScopeType;
  * This is the main `convex` command and root for child commands.
  */
 @Command(name = "convex",
-		subcommands = { Account.class, Dlfs.class, Key.class, Local.class, Peer.class, Query.class, Status.class, Desktop.class,
+		subcommands = { Account.class, Dlfs.class, Eval.class, Key.class, Local.class, Mcp.class, Peer.class, Query.class, Repl.class, Status.class, Desktop.class,
 		Etch.class, Transact.class, CommandLine.HelpCommand.class },
 		usageHelpAutoWidth = true, 
 		sortOptions = true, 

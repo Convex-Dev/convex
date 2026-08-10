@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -17,6 +19,7 @@ import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.JSON;
+import convex.etch.EtchConfig;
 
 /**
  * Typed configuration wrapper for Convex peer settings.
@@ -35,7 +38,11 @@ import convex.core.util.JSON;
  * <h2>Config File Format (JSON5)</h2>
  * <pre>{@code
  * {
- *   "peer": { "port": 18888, "keypair": "abcdef...", ... },
+ *   "peer": {
+ *     "port": 18888,
+ *     "store": "~/.convex/peer.etch",
+ *     "etch": { "version": 3 }
+ *   },
  *   "auth": { "tokenExpiry": 86400, "publicAccess": true, ... }
  * }
  * }</pre>
@@ -55,6 +62,7 @@ public class PeerConfig {
 	public static final AString PORT = Strings.intern("port");
 	public static final AString KEYPAIR = Strings.intern("keypair");
 	public static final AString STORE = Strings.intern("store");
+	public static final AString ETCH = Strings.intern("etch");
 	public static final AString URL = Strings.intern("url");
 	public static final AString RESTORE = Strings.intern("restore");
 	public static final AString PERSIST = Strings.intern("persist");
@@ -156,6 +164,31 @@ public class PeerConfig {
 	}
 
 	/**
+	 * Compiles the optional Etch creation policy. The resulting value is immutable
+	 * and existing files continue to derive their format from their own headers.
+	 *
+	 * @return compiled Etch configuration, or {@code null} when omitted
+	 */
+	public EtchConfig getEtchConfig() {
+		return getEtchConfig(null);
+	}
+
+	/**
+	 * Compiles the optional Etch creation policy with a runtime key resolver.
+	 * The resolver is invoked only for encrypted v3 creation or opening.
+	 *
+	 * @param keyFunction function resolving the header public-key hint
+	 * @return compiled Etch configuration, or {@code null} when omitted
+	 */
+	public EtchConfig getEtchConfig(Function<AccountKey,byte[]> keyFunction) {
+		ACell value=getSection(PEER).get(ETCH);
+		if (value==null) return null;
+		AMap<AString,ACell> etch=RT.castMap(value);
+		if (etch==null) throw new IllegalArgumentException("peer.etch must be an object");
+		return EtchConfig.fromMap(etch,keyFunction);
+	}
+
+	/**
 	 * Get the peer public URL.
 	 * @return URL string, or null if not configured
 	 */
@@ -249,6 +282,16 @@ public class PeerConfig {
 	 * @return Legacy config map suitable for {@code API.launchPeer()}
 	 */
 	public HashMap<Keyword, Object> toLegacy() {
+		return toLegacy(null);
+	}
+
+	/**
+	 * Converts this configuration while attaching runtime Etch key resolution.
+	 *
+	 * @param etchKeyFunction function resolving encrypted Etch keys
+	 * @return legacy peer launch configuration
+	 */
+	public HashMap<Keyword, Object> toLegacy(Function<AccountKey,byte[]> etchKeyFunction) {
 		HashMap<Keyword, Object> legacy = new HashMap<>();
 
 		// Peer section
@@ -263,6 +306,8 @@ public class PeerConfig {
 		mapLong(peer, OUTGOING_CONNECTIONS, legacy, Keywords.OUTGOING_CONNECTIONS);
 		mapLong(peer, TIMEOUT, legacy, Keywords.TIMEOUT);
 		mapLong(peer, POLL_DELAY, legacy, Keywords.POLL_DELAY);
+		EtchConfig etchConfig=getEtchConfig(etchKeyFunction);
+		if (etchConfig!=null) legacy.put(Keywords.ETCH_CONFIG,etchConfig);
 
 		// Keypair — convert seed hex to AKeyPair
 		String seed = getKeypairSeed();

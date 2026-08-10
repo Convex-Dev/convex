@@ -61,6 +61,8 @@ public class HackerTools extends AbstractGUI {
 
 	private SignaturePanel signaturePanel;
 
+	private JWTBuilderPanel jwtBuilderPanel;
+
 	private DLFSPanel dataPanel=new DLFSPanel(createToolsDrive());
 
 	/**
@@ -76,9 +78,11 @@ public class HackerTools extends AbstractGUI {
 		messagePanel = new MessageFormatPanel();
 		signerPanel = new SignerPanel();
 		signaturePanel = new SignaturePanel();
+		jwtBuilderPanel = new JWTBuilderPanel();
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("TX Builder", signerPanel);
+		tabs.add("JWT / UCAN",jwtBuilderPanel);
 		tabs.add("Signatures", signaturePanel);
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("KeyRing", new KeyRingPanel());

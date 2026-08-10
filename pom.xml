@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.10</version>
+	<version>0.8.11-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -20,6 +20,7 @@
 		<module>convex-benchmarks</module>
 		<module>convex-observer</module>
 		<module>convex-java</module>
+		<module>convex-x402</module>
 		<module>convex-restapi</module>
 		<module>convex-dlfs</module>
 		<module>convex-social</module>
@@ -34,7 +35,7 @@
 		     and JDK 25. This target is independent from the build and test JDK. -->
 		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<logback.version>1.5.38</logback.version>
+		<logback.version>1.6.0</logback.version>
 		<jmh.version>1.37</jmh.version>
 		<junit.version>6.1.2</junit.version>
 		<slf4j.version>2.0.18</slf4j.version>
@@ -42,7 +43,7 @@
 		<netty.version>4.2.16.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2026-07-25T11:32:16Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-07-25T11:42:38Z</project.build.outputTimestamp>
 		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
 		     notice in test output (at the cost of hiding e.g. multiple-provider warnings). -->
 		<argLine>
@@ -50,6 +51,16 @@
 			-Dslf4j.internal.verbosity=ERROR
 		</argLine>
 	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-lang3</artifactId>
+				<version>3.20.0</version>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<licenses>
 		<license>
@@ -76,7 +87,7 @@
 	<distributionManagement>
 		<snapshotRepository>
 			<id>central</id>
-			<url>https://central.sonatype.org/repository/maven-snapshots/</url>
+			<url>https://central.sonatype.com/repository/maven-snapshots/</url>
 		</snapshotRepository>
 	</distributionManagement>
 
@@ -195,7 +206,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jar-plugin</artifactId>
-					<version>3.5.0</version>
+					<version>3.5.1</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>

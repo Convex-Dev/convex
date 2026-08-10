@@ -12,10 +12,13 @@ import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
+import convex.etch.EtchConfig;
+import convex.etch.EtchConstants;
 
 public class PeerConfigTest {
 
@@ -68,6 +71,40 @@ public class PeerConfigTest {
 	public void testStorePath() {
 		PeerConfig config = PeerConfig.parse("{\"peer\": {\"store\": \"/tmp/peer.etch\"}}");
 		assertEquals("/tmp/peer.etch", config.getStorePath());
+	}
+
+	@Test
+	public void testEtchConfigDefaultsToAbsent() {
+		PeerConfig config=PeerConfig.parse("{}");
+		assertNull(config.getEtchConfig());
+		assertNull(config.toLegacy().get(Keywords.ETCH_CONFIG));
+	}
+
+	@Test
+	public void testEtchV3CreationPolicy() {
+		PeerConfig config=PeerConfig.parse("{peer:{etch:{version:3}}}");
+		EtchConfig etch=config.getEtchConfig();
+		assertEquals(EtchConstants.VERSION_3,etch.getVersion());
+		assertEquals(EtchConfig.CipherMode.NONE,etch.getCipherMode());
+		assertEquals(etch,config.toLegacy().get(Keywords.ETCH_CONFIG));
+	}
+
+	@Test
+	public void testEtchConfigMustBeObject() {
+		PeerConfig config=PeerConfig.parse("{peer:{etch:3}}");
+		assertThrows(IllegalArgumentException.class,config::getEtchConfig);
+	}
+
+	@Test
+	public void testEncryptedEtchConfigAcceptsRuntimeResolver() {
+		AccountKey hint=AccountKey.dummy("e3c0");
+		PeerConfig config=PeerConfig.parse("{peer:{etch:{version:3,cipher:'aes-256-ctr',"
+				+"encryptIndex:true,publicKeyHint:'"+hint.toHexString()+"'}}}");
+		assertThrows(IllegalArgumentException.class,config::getEtchConfig);
+		EtchConfig etch=config.getEtchConfig(ignored->new byte[32]);
+		assertEquals(EtchConfig.CipherMode.AES_256_CTR,etch.getCipherMode());
+		assertTrue(etch.isIndexEncrypted());
+		assertEquals(hint,etch.getPublicKeyHint());
 	}
 
 	@Test

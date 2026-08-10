@@ -547,8 +547,16 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			me = null;
 		}
 
-		// Read depth byte, mask, and children
-		int depth = 0xFF & ds.data[ds.pos++];
+		// Historical depths are a single byte and stay on the direct fast path.
+		// Extended depths use the same canonical VLQ Count encoding.
+		int firstDepthByte = 0xFF & ds.data[ds.pos];
+		long depth;
+		if (firstDepthByte < 128) {
+			ds.pos++;
+			depth = firstDepthByte;
+		} else {
+			depth = readVLQCount(ds);
+		}
 		if (depth >= Index.MAX_DEPTH) {
 			if (depth == Index.MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
 			throw new BadFormatException("Excessive depth!");

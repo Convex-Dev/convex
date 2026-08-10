@@ -32,11 +32,13 @@ import convex.core.cvm.transactions.Transactions;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Transaction;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
@@ -212,7 +214,16 @@ public class TransactionTest extends ACVMTest {
 		ResultContext rc2=s.applyTransaction(t2);
 		assertCVMEquals(7,rc2.getResult());
 
-		
+		// A Call decoded from its encoding must execute identically. Regression:
+		// decoded Calls NPEd on apply because the lazy args field was never populated.
+		try {
+			Call t3=(Call) convex.core.message.Message.create(Format.encodeMultiCell(t2,true)).getPayload(null);
+			ResultContext rc3=s.applyTransaction(t3);
+			assertCVMEquals(7,rc3.getResult());
+		} catch (BadFormatException | convex.core.exceptions.PartialMessageException e) {
+			throw new AssertionError("Call transaction failed to re-decode",e);
+		}
+
 		// We expect a short call transaction to be completely encoded
 		assertTrue(Cells.isCompletelyEncoded(t1));
 		

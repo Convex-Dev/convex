@@ -5,6 +5,36 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.11] - 2026-08-10
+
+### Added
+
+- Opt-in Etch v3 stores with crash-consistent headers, plaintext or AES-256-CTR / ChaCha20 data, independently configurable index encryption, per-file salts and verified keys. `peer.etch` configures new stores while existing stores retain their recorded format; maintenance inspection and copy-out repair tooling is included.
+- New `convex-x402` module implementing CAD042 / x402 v2 exact payments in CVM coin or CAD29 tokens, with REST facilitator endpoints, route gates, local payer signing, replay protection, flexible policies and external-facilitator support.
+- New `convex eval` and `convex repl` commands for scriptable or interactive Convex Lisp, using an effortless ephemeral local instance by default or any peer selected with `--host`.
+- New `convex mcp` stdio server with query, signed transaction, balance, CNS and status tools; `--query` offers a read-only mode.
+- Hacker Tools now builds and inspects EdDSA JWTs and Convex UCAN delegations. Key views also expose canonical, copyable `did:key` identifiers.
+- Allocation-free SipHash-2-4 with byte-key, primitive-key and zero-copy byte-range APIs.
+- DLFS gains atomic same-drive moves, structurally shared copies and `DLFSOption.RECURSIVE` for whole-subtree copy and move operations.
+
+### Changed
+
+- UCAN authority supports explicit `exp: null`; generic JWT validation treats it as an omitted optional expiry, and proof validity follows UCAN 1.0 execution-time semantics.
+- Convex UCAN JWTs now use the strict `0.10.0` profile and accept any valid DID audience. Hand-minted tokens must include `ucv`, explicit `exp`, and vector `att` / `prf` claims; use `UCAN.createJWT` or `buildPayload` plus `signJWT`.
+- `key generate` and `key export` protect secret output through the attached console or an explicit owner-only file, with deliberate stdout opt-in for automation.
+- Persistent lattice and peer stores keep the fast buffered write path, add periodic checkpoints, and complete a clean checkpoint during orderly shutdown across Etch v1, v2 and v3.
+
+### Fixed
+
+- Index keys and DLFS path components remain distinct through the standard 255-byte filesystem name limit; extended depths use canonical VLQ encoding and stack-safe cold paths (#631, #689).
+- DLFS writes and truncations advance file update times, giving replication conflicts and NIO modification times the right content ordering.
+- Etch checkpoints now publish directly reopenable v3 stores, track later mutations correctly, release encrypted resources promptly and preserve cipher ownership through online GC (#650, #686).
+- NodeServer shutdown cleanly joins periodic maintenance before the final checkpoint.
+- Network-decoded `Call` transactions now populate their argument list and invoke the target function correctly.
+- Named `did:web` documents resolve CNS aliases and scoped records; deactivated records return HTTP 410 with DID metadata (#618).
+- Seed-returning MCP tools and legacy JSON transactions protect remote cleartext HTTP by default while preserving loopback development.
+- JSON readers correctly handle long decimals, exponent notation and JSON5 hexadecimal values outside the integer fast path.
+
 ## [0.8.10] - 2026-07-25
 
 ### Added
@@ -181,7 +211,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - UCANValidator: `checkTemporalBounds` for post-ingress re-validation of `nbf`/`exp` outside the parse path
 - UCANValidator: `parseTransportUCANsWithBearer` helper merging proof chain and bearer token in a single call
-- NodeServer: synchronous commit on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning only after primary durability; secondaries remain async; persistence errors propagate to the caller (#569)
+- NodeServer: synchronous publication on the primary propagator — `cursor.sync()` runs announce + setRootData + broadcast on the caller's thread, returning after primary store publication; secondaries remain async; publication errors propagate to the caller (#569)
 
 ### Changed
 

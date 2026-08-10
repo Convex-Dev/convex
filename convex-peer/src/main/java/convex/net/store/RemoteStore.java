@@ -55,6 +55,11 @@ public class RemoteStore extends ACachedStore {
 	}
 
 	@Override
+	public void flush() throws IOException {
+		// This incomplete remote store currently makes no durability claim.
+	}
+
+	@Override
 	public void close() {
 		convex.close();
 	}

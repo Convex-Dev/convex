@@ -22,7 +22,7 @@ import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.cvm.Keywords;
 import convex.core.init.Init;
-import convex.etch.EtchStore;
+import convex.core.store.AStore;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
@@ -96,7 +96,7 @@ public class PeerStart extends APeerCommand {
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer controller.")
 	private String controllerAddress;
 	
-	private AKeyPair findPeerKey(EtchStore store, HashMap<Keyword,Object> config) {
+	private AKeyPair findPeerKey(AStore store, HashMap<Keyword,Object> config) {
 		// First check user supplied peer key. If we have it, use it
 		AKeyPair kp=specifiedPeerKey();
 		if (kp!=null) return kp;
@@ -138,11 +138,9 @@ public class PeerStart extends APeerCommand {
 		Server server=null;
 
 		storeMixin.ensureKeyStore();
-		try (EtchStore store = etchMixin.getEtchStore()) {
-			// Config file (if any) provides base values; explicit CLI options take precedence
-			HashMap<Keyword,Object> config=new HashMap<>();
-			Peer group=peerGroup();
-			if (group!=null) config.putAll(group.loadPeerConfig());
+		// Config file (if any) provides base values; explicit CLI options take precedence.
+		HashMap<Keyword,Object> config=loadPeerConfig();
+		try (AStore store = openPeerStore(config)) {
 
 			AKeyPair peerKey;
 			AKeyPair genesisKey=null;

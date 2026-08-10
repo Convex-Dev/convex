@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.ErrorCodes;
 import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
@@ -72,7 +73,11 @@ public class Call extends ATransaction {
 
 	@Override
 	public Context apply(Context ctx) {
-		return ctx.actorCall(target, offer, functionName, args.toCellArray());
+		// A Call decoded from its encoding has a null args field until getArgs()
+		// populates it, so the field must not be read directly here
+		AVector<ACell> as = RT.ensureVector(getArgs());
+		if (as == null) return ctx.withError(ErrorCodes.FORMAT, "Call transaction args must be a Vector");
+		return ctx.actorCall(target, offer, functionName, as.toCellArray());
 	}
 
 	@Override

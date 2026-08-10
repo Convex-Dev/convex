@@ -245,6 +245,16 @@ public class RESTConfigTest {
 		assertFalse(RESTConfig.parse("{auth:{publicAccess:false}}").isPublicAccess());
 	}
 
+	@Test
+	public void testHttpSeedsRequireExplicitDevelopmentOverride() {
+		assertFalse(RESTConfig.parse("{}").isHttpSeedsAllowed());
+		assertTrue(RESTConfig.parse("{rest:{allowHttpSeeds:true}}").isHttpSeedsAllowed());
+		// Retain compatibility with the original MCP-scoped setting.
+		assertTrue(RESTConfig.parse("{mcp:{allowHttpSeeds:true}}").isHttpSeedsAllowed());
+		// The REST-scoped setting is canonical when both are present.
+		assertFalse(RESTConfig.parse("{rest:{allowHttpSeeds:false},mcp:{allowHttpSeeds:true}}").isHttpSeedsAllowed());
+	}
+
 	// ========== toLegacy ==========
 
 	@Test

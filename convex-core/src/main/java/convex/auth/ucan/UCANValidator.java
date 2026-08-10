@@ -21,9 +21,14 @@ import convex.core.lang.RT;
  * {@link #validateJWT(AString, long, DIDVerifier)}, threaded through
  * {@link #parseTransportUCANs(AVector, DIDVerifier)}) — signature at every hop via an
  * injected {@link DIDVerifier}, temporal bounds, and chain linkage
- * (proof.aud == token.iss) with temporal narrowing (token.exp ≤ proof.exp). Passing
+ * (proof.aud == token.iss). Passing
  * integrity means "genuine and chain-consistent" — it does NOT mean the token grants
  * anything. Enforcement must go through the authority layer.</p>
+ *
+ * <p>Temporal validity deliberately follows UCAN 1.0 execution-time semantics:
+ * proofs in a chain may have different validity periods, but every link must be valid
+ * when the authority is exercised. This supersedes the v0.10.0 requirement that a
+ * child's complete validity window be contained within its proof's window.</p>
  *
  * <p><b>Authority</b> ({@link #capabilitiesFor(AVector, AString, AString, AString,
  * RootAuthorityPolicy, long)}, {@link #isAuthorised}) — per requested resource + ability:
@@ -76,18 +81,13 @@ public class UCANValidator {
 		if (!verifiesSafely(verifier, token.getIssuer(), token.getSigningMessage(),
 				signatureBlob(token))) return null;
 
-		// 2. Check expiry
-		if (token.getExpiry() <= nowSeconds) return null;
-
-		// 3. Check not-before
-		Long nbf = token.getNotBefore();
-		if (nbf != null && nbf > nowSeconds) return null;
+		// 2. Check required expiry shape and temporal bounds
+		if (!checkTemporalBounds(token,nowSeconds)) return null;
 
 		// 4. Validate proof chain
 		AVector<ACell> proofs = token.getProofs();
 		if (proofs != null && proofs.count() > 0) {
 			AString tokenIss = token.getIssuer();
-			long tokenExp = token.getExpiry();
 
 			for (long i = 0; i < proofs.count(); i++) {
 				ACell proofCell = proofs.get(i);
@@ -106,8 +106,6 @@ public class UCANValidator {
 				AString proofAud = proof.getAudience();
 				if (proofAud == null || !proofAud.equals(tokenIss)) return null;
 
-				// Temporal narrowing: token.exp must be ≤ proof.exp
-				if (tokenExp > proof.getExpiry()) return null;
 			}
 		}
 
@@ -138,8 +136,8 @@ public class UCANValidator {
 	 * maps), and are recursively validated. The verifier receives the JWT signing input
 	 * (base64url {@code header.payload} as UTF-8 bytes) — it is encoding-agnostic, always
 	 * getting exactly the bytes that were signed. The verification key is bound to the
-	 * {@code iss} claim; the attacker-controlled {@code kid} and {@code alg} headers are
-	 * ignored.</p>
+	 * {@code iss} claim; the attacker-controlled {@code kid} header is ignored. The
+	 * header algorithm and UCAN profile claims are checked before verification.</p>
 	 *
 	 * @param jwtString JWT-encoded UCAN string
 	 * @param nowSeconds Current time in unix seconds
@@ -150,7 +148,7 @@ public class UCANValidator {
 		if (jwtString == null || verifier == null) return null;
 
 		JWT parsed = JWT.parse(jwtString);
-		if (parsed == null) return null;
+		if (!UCAN.isValidJWT(parsed)) return null;
 		AMap<AString, ACell> claims = parsed.getClaims();
 		if (claims == null) return null;
 
@@ -167,18 +165,13 @@ public class UCANValidator {
 			return null;
 		}
 
-		// Check expiry
-		if (token.getExpiry() <= nowSeconds) return null;
-
-		// Check not-before
-		Long nbf = token.getNotBefore();
-		if (nbf != null && nbf > nowSeconds) return null;
+		// Check required expiry shape and temporal bounds
+		if (!checkTemporalBounds(token,nowSeconds)) return null;
 
 		// Validate proof chain (proofs are JWT strings)
 		AVector<ACell> proofs = token.getProofs();
 		if (proofs != null && proofs.count() > 0) {
 			AString tokenIss = token.getIssuer();
-			long tokenExp = token.getExpiry();
 
 			for (long i = 0; i < proofs.count(); i++) {
 				AString proofJwt = RT.ensureString(proofs.get(i));
@@ -192,8 +185,6 @@ public class UCANValidator {
 				AString proofAud = proof.getAudience();
 				if (proofAud == null || !proofAud.equals(tokenIss)) return null;
 
-				// Temporal narrowing: token.exp must be ≤ proof.exp
-				if (tokenExp > proof.getExpiry()) return null;
 			}
 		}
 
@@ -233,7 +224,9 @@ public class UCANValidator {
 	 */
 	public static boolean checkTemporalBounds(UCAN token, long nowSeconds) {
 		if (token == null) return false;
-		if (token.getExpiry() <= nowSeconds) return false;
+		if (!token.hasValidExpiry()) return false;
+		Long expiry=token.getExpiry();
+		if (expiry!=null && expiry <= nowSeconds) return false;
 		Long nbf = token.getNotBefore();
 		if (nbf != null && nbf > nowSeconds) return false;
 		return true;
@@ -334,8 +327,7 @@ public class UCANValidator {
 	 * <p>For each token presented to {@code audience}, a capability is included iff:</p>
 	 * <ol>
 	 *   <li><b>Coverage (cheap, first):</b> the capability {@link Capability#covers}
-	 *       the requested resource + ability, and the token's temporal bounds still hold
-	 *       (chain temporal narrowing was already enforced at ingress);</li>
+	 *       the requested resource + ability, and the token's temporal bounds still hold;</li>
 	 *   <li><b>Delegation attenuation, per hop:</b> walking the token's {@code prf} chain
 	 *       to its root, every proof's {@code att} must contain a capability covering the
 	 *       request — a delegate can never hold more than it was granted;</li>
@@ -484,7 +476,7 @@ public class UCANValidator {
 				if (!coversSafely(cap, requestWith, requestCan)) continue;
 				AString grantWith = RT.ensureString(cap.get(Capability.WITH));
 				AVector<ACell> path = Vectors.of(cap);
-				if (!chainAuthorised(token, requestWith, requestCan, grantWith, policy, path,
+				if (!chainAuthorised(token, requestWith, requestCan, grantWith, policy, nowSeconds, path,
 						pathPredicate)) continue;
 				result = result.conj(cap);
 				if (shortCircuit) return result;
@@ -500,7 +492,7 @@ public class UCANValidator {
 	 * root exists.
 	 */
 	private static boolean chainAuthorised(UCAN token, AString requestWith, AString requestCan,
-			AString grantWith, RootAuthorityPolicy policy, AVector<ACell> path,
+			AString grantWith, RootAuthorityPolicy policy, long nowSeconds, AVector<ACell> path,
 			Predicate<AVector<ACell>> pathPredicate) {
 		AVector<ACell> prfs = token.getProofs();
 		if (prfs == null || prfs.isEmpty()) {
@@ -515,7 +507,7 @@ public class UCANValidator {
 		long n = prfs.count();
 		for (long i = 0; i < n; i++) {
 			UCAN proof = parseProof(prfs.get(i));
-			if (proof == null) continue;
+			if (!checkTemporalBounds(proof,nowSeconds)) continue;
 			// Per-hop attenuation: try every covering capability because each one may carry
 			// different caveats and therefore represents a distinct authorisation path.
 			AVector<ACell> att = proof.getCapabilities();
@@ -524,7 +516,7 @@ public class UCANValidator {
 				AMap<AString, ACell> cap = RT.castMap(att.get(j));
 				if (cap == null || !coversSafely(cap, requestWith, requestCan)) continue;
 				AVector<ACell> proofPath = Vectors.of(cap).concat(path);
-				if (chainAuthorised(proof, requestWith, requestCan, grantWith, policy,
+				if (chainAuthorised(proof, requestWith, requestCan, grantWith, policy, nowSeconds,
 						proofPath, pathPredicate)) return true;
 			}
 		}

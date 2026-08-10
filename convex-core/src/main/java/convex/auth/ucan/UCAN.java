@@ -26,9 +26,11 @@ import convex.core.lang.RT;
  *
  * <p>Tokens are native CVM values encoded via CAD3. Signatures are Ed25519
  * over the Ref encoding of the payload (matching the SignedData pattern) —
- * pure Convex data end-to-end. A standard JWT encoding is also supported for
- * transport interoperability (see {@link #toJWT} / {@link #fromJWT}); note the
- * JWT signature covers the base64url signing input, not the CAD3 encoding.</p>
+ * pure Convex data end-to-end. A JWT envelope is also supported for Convex
+ * transport (see {@link #toJWT} / {@link #fromJWT}); this is a versioned Convex
+ * UCAN profile rather than a claim of wire compatibility with every UCAN
+ * specification. Its signature covers the base64url signing input, not the CAD3
+ * encoding.</p>
  *
  * <p>Token structure:</p>
  * <pre>
@@ -57,11 +59,18 @@ public class UCAN {
 	// Header field keys
 	public static final AString ALG = Strings.intern("alg");
 	public static final AString UCV = Strings.intern("ucv");
+	/**
+	 * Exact Convex UCAN JWT profile version accepted by this implementation.
+	 * Profile versions are not range-negotiated: producers and consumers must
+	 * match this value exactly.
+	 */
+	public static final AString VERSION = Strings.intern("0.10.0");
+	private static final AString JWT_TYPE = Strings.intern("JWT");
 
 	// Fixed header value
 	public static final AMap<AString, ACell> HEADER_VALUE = Maps.of(
 		ALG, Strings.intern("EdDSA"),
-		UCV, Strings.create("0.10.0")
+		UCV, VERSION
 	);
 
 	private static final SecureRandom RANDOM = new SecureRandom();
@@ -87,23 +96,22 @@ public class UCAN {
 	 */
 	public static UCAN create(AKeyPair issuerKP, AccountKey audience, long expiry,
 			AVector<ACell> capabilities, AVector<ACell> proofs) {
-		AString issDID = toDIDKey(issuerKP.getAccountKey());
-		AString audDID = toDIDKey(audience);
-		AString nonce = generateNonce();
+		return create(issuerKP,audience,Long.valueOf(expiry),capabilities,proofs);
+	}
 
-		AMap<AString, ACell> payload = Maps.of(
-			ISS, issDID,
-			AUD, audDID,
-			EXP, CVMLong.create(expiry),
-			NNC, nonce,
-			ATT, (capabilities != null) ? capabilities : Vectors.empty(),
-			PRF, (proofs != null) ? proofs : Vectors.empty()
-		);
-
-		Blob message = Ref.get(payload).getEncoding();
-		ASignature sig = issuerKP.sign(message);
-
-		return new UCAN(payload, sig);
+	/**
+	 * Create and sign a UCAN token with an optional expiry.
+	 *
+	 * @param issuerKP Issuer's key pair
+	 * @param audience Audience's public key
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param capabilities Capabilities vector
+	 * @param proofs Proof tokens vector
+	 * @return New signed UCAN token
+	 */
+	public static UCAN create(AKeyPair issuerKP, AccountKey audience, Long expiry,
+			AVector<ACell> capabilities, AVector<ACell> proofs) {
+		return create(issuerKP,audience,expiry,null,capabilities,proofs);
 	}
 
 	/**
@@ -119,23 +127,27 @@ public class UCAN {
 	 */
 	public static UCAN create(AKeyPair issuerKP, AccountKey audience, long expiry,
 			long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs) {
-		AString issDID = toDIDKey(issuerKP.getAccountKey());
-		AString audDID = toDIDKey(audience);
-		AString nonce = generateNonce();
+		return create(issuerKP,audience,Long.valueOf(expiry),Long.valueOf(notBefore),capabilities,proofs);
+	}
 
-		AMap<AString, ACell> payload = Maps.of(
-			ISS, issDID,
-			AUD, audDID,
-			EXP, CVMLong.create(expiry),
-			NBF, CVMLong.create(notBefore),
-			NNC, nonce,
-			ATT, (capabilities != null) ? capabilities : Vectors.empty(),
-			PRF, (proofs != null) ? proofs : Vectors.empty()
-		);
-
+	/**
+	 * Create a UCAN token with optional expiry and not-before times.
+	 *
+	 * @param issuerKP Issuer's key pair
+	 * @param audience Audience's public key
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param notBefore Not-before time in Unix seconds, or null to omit
+	 * @param capabilities Capabilities vector
+	 * @param proofs Proof tokens vector
+	 * @return New signed UCAN token
+	 */
+	public static UCAN create(AKeyPair issuerKP, AccountKey audience, Long expiry,
+			Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs) {
+		if (issuerKP==null) throw new IllegalArgumentException("Issuer key pair cannot be null");
+		AMap<AString, ACell> payload=buildPayload(issuerKP.getAccountKey(),audience,expiry,
+			notBefore,capabilities,proofs,null);
 		Blob message = Ref.get(payload).getEncoding();
 		ASignature sig = issuerKP.sign(message);
-
 		return new UCAN(payload, sig);
 	}
 
@@ -154,14 +166,115 @@ public class UCAN {
 	 */
 	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AccountKey audience,
 			long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		return buildPayload(issuerKey,audience,Long.valueOf(expiry),notBefore,capabilities,proofs,facts);
+	}
+
+	/**
+	 * Build a UCAN payload with an optional expiry.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audience Audience's public key
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param notBefore Not-before time in Unix seconds (null to omit)
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AccountKey audience,
+			Long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		if (audience == null) throw new IllegalArgumentException("Audience key cannot be null");
+		return buildPayload(issuerKey, toDIDKey(audience), expiry, notBefore,
+			capabilities, proofs, facts);
+	}
+
+	/**
+	 * Build a UCAN payload for an audience identified by any valid DID method.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in unix seconds
+	 * @param notBefore Not-before time in unix seconds (null to omit)
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		return buildPayload(issuerKey,audienceDID,Long.valueOf(expiry),notBefore,
+			capabilities,proofs,facts);
+	}
+
+	/**
+	 * Build a UCAN payload for any DID audience with an optional expiry.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param notBefore Not-before time in Unix seconds (null to omit)
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			Long expiry, Long notBefore, AVector<ACell> capabilities, AVector<ACell> proofs, ACell facts) {
+		return buildPayload(issuerKey, audienceDID, expiry, notBefore, generateNonce(),
+			capabilities, proofs, facts);
+	}
+
+	/**
+	 * Build a UCAN payload with an explicit nonce.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in Unix seconds
+	 * @param notBefore Not-before time in Unix seconds (null to omit)
+	 * @param nonce Application nonce
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			long expiry, Long notBefore, AString nonce, AVector<ACell> capabilities,
+			AVector<ACell> proofs, ACell facts) {
+		return buildPayload(issuerKey,audienceDID,Long.valueOf(expiry),notBefore,nonce,
+			capabilities,proofs,facts);
+	}
+
+	/**
+	 * Build a UCAN payload with an explicit nonce and optional expiry.
+	 *
+	 * @param issuerKey Issuer's public key
+	 * @param audienceDID Audience DID
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param notBefore Not-before time in Unix seconds (null to omit)
+	 * @param nonce Application nonce
+	 * @param capabilities Capabilities vector (null for empty)
+	 * @param proofs Proof tokens vector (null for empty)
+	 * @param facts Facts value (null to omit)
+	 * @return Payload map ready for signing
+	 */
+	public static AMap<AString, ACell> buildPayload(AccountKey issuerKey, AString audienceDID,
+			Long expiry, Long notBefore, AString nonce, AVector<ACell> capabilities,
+			AVector<ACell> proofs, ACell facts) {
+		if (issuerKey == null) throw new IllegalArgumentException("Issuer key cannot be null");
+		AString audDID = requireDID(audienceDID, "Audience");
+		if (expiry != null && expiry <= 0) throw new IllegalArgumentException("Expiry must be positive");
+		if (expiry != null && notBefore != null && notBefore >= expiry) {
+			throw new IllegalArgumentException("Not-before must be before expiry");
+		}
+		if (nonce == null || nonce.isEmpty()) {
+			throw new IllegalArgumentException("Nonce cannot be empty");
+		}
 		AString issDID = toDIDKey(issuerKey);
-		AString audDID = toDIDKey(audience);
-		AString nonce = generateNonce();
 
 		AMap<AString, ACell> payload = Maps.of(
 			ISS, issDID,
 			AUD, audDID,
-			EXP, CVMLong.create(expiry),
+			EXP, (expiry==null)?null:CVMLong.create(expiry),
 			NNC, nonce,
 			ATT, (capabilities != null) ? capabilities : Vectors.empty(),
 			PRF, (proofs != null) ? proofs : Vectors.empty()
@@ -175,6 +288,31 @@ public class UCAN {
 		}
 
 		return payload;
+	}
+
+	private static AString requireDID(AString value, String name) {
+		if (value == null || value.isEmpty()) {
+			throw new IllegalArgumentException(name+" DID cannot be empty");
+		}
+		try {
+			DID did = DID.fromString(value.toString());
+			if (did.getMethod().isEmpty() || did.getID().isEmpty()) {
+				throw new IllegalArgumentException(name+" must be a valid DID");
+			}
+			return value;
+		} catch (RuntimeException ex) {
+			throw new IllegalArgumentException(name+" must be a valid DID", ex);
+		}
+	}
+
+	private static boolean isDID(AString value) {
+		if (value == null || value.isEmpty()) return false;
+		try {
+			DID did = DID.fromString(value.toString());
+			return !did.getMethod().isEmpty() && !did.getID().isEmpty();
+		} catch (RuntimeException ex) {
+			return false;
+		}
 	}
 
 	/**
@@ -228,26 +366,35 @@ public class UCAN {
 	}
 
 	/**
-	 * Get the audience DID string (did:key:z6Mk...).
+	 * Get the audience DID string.
 	 */
 	public AString getAudience() {
 		return RT.ensureString(payload.get(AUD));
 	}
 
 	/**
-	 * Get the audience's AccountKey, decoded from the did:key.
-	 * Returns null if the DID is malformed.
+	 * Get the audience's AccountKey, decoded from a did:key audience.
+	 * Returns null for other DID methods or if the DID is malformed.
 	 */
 	public AccountKey getAudienceKey() {
 		return fromDIDKey(getAudience());
 	}
 
 	/**
-	 * Get the expiry time in unix seconds.
+	 * Get the expiry time in Unix seconds.
+	 *
+	 * @return Expiry time, or null if this token explicitly never expires
 	 */
-	public long getExpiry() {
-		CVMLong exp = (CVMLong) payload.get(EXP);
-		return (exp != null) ? exp.longValue() : 0;
+	public Long getExpiry() {
+		CVMLong exp = RT.ensureLong(payload.get(EXP));
+		return (exp != null) ? exp.longValue() : null;
+	}
+
+	/** Returns true if the required expiry claim is present and is an integer or null. */
+	boolean hasValidExpiry() {
+		if (!payload.containsKey(EXP)) return false;
+		ACell exp=payload.get(EXP);
+		return (exp==null)||(exp instanceof CVMLong);
 	}
 
 	/**
@@ -356,7 +503,7 @@ public class UCAN {
 	 * Encode this UCAN as a JWT string (EdDSA signed).
 	 *
 	 * <p>The JWT payload carries the UCAN payload fields (iss, aud, exp, att, prf, etc.)
-	 * directly as JWT claims. The header includes {@code "ucv"} to identify it as a
+	 * directly as JWT claims. The payload includes {@code "ucv"} to identify it as a
 	 * UCAN token. Proof tokens in {@code prf} are recursively encoded as JWT strings.</p>
 	 *
 	 * <p>Note: the JWT signature is over the base64url header+payload (standard JWT),
@@ -367,6 +514,32 @@ public class UCAN {
 	 * @return JWT-encoded UCAN string
 	 */
 	public AString toJWT(AKeyPair issuerKP) {
+		return signJWT(payload, issuerKP);
+	}
+
+	/**
+	 * Sign a pre-built UCAN payload as a JWT, requiring the did:key issuer to
+	 * match the signing key.
+	 *
+	 * @param payload UCAN payload
+	 * @param issuerKP Issuer key pair
+	 * @return JWT-encoded UCAN
+	 */
+	public static AString signJWT(AMap<AString, ACell> payload, AKeyPair issuerKP) {
+		if (payload == null) throw new IllegalArgumentException("UCAN payload is required");
+		if (issuerKP == null) throw new IllegalArgumentException("Issuer key pair is required");
+		if (payload.containsKey(UCV) && !VERSION.equals(payload.get(UCV))) {
+			throw new IllegalArgumentException("Unsupported UCAN JWT version");
+		}
+		payload=payload.assoc(UCV,VERSION);
+		if (!isValidJWTPayload(payload)) {
+			throw new IllegalArgumentException("Invalid UCAN JWT payload");
+		}
+		AccountKey claimedKey = DID.keyFromDID(RT.ensureString(payload.get(ISS)));
+		if (claimedKey == null || !claimedKey.equals(issuerKP.getAccountKey())) {
+			throw new IllegalArgumentException(
+				"UCAN did:key issuer does not match the signing key");
+		}
 		return JWT.signPublic(payload, issuerKP);
 	}
 
@@ -381,6 +554,21 @@ public class UCAN {
 	 * @return JWT-encoded UCAN string
 	 */
 	public static AString createJWT(AKeyPair issuerKP, AccountKey audience, long expiry,
+			AVector<ACell> capabilities, AVector<ACell> proofs) {
+		return createJWT(issuerKP,audience,Long.valueOf(expiry),capabilities,proofs);
+	}
+
+	/**
+	 * Create a JWT-encoded UCAN with an optional expiry.
+	 *
+	 * @param issuerKP Issuer's key pair
+	 * @param audience Audience's public key
+	 * @param expiry Expiry time in Unix seconds, or null for a non-expiring token
+	 * @param capabilities Capabilities vector
+	 * @param proofs Proof JWT strings, or null
+	 * @return JWT-encoded UCAN string
+	 */
+	public static AString createJWT(AKeyPair issuerKP, AccountKey audience, Long expiry,
 			AVector<ACell> capabilities, AVector<ACell> proofs) {
 		UCAN ucan = create(issuerKP, audience, expiry, capabilities, proofs);
 		return ucan.toJWT(issuerKP);
@@ -398,7 +586,7 @@ public class UCAN {
 	public static UCAN fromJWT(AString jwtString) {
 		if (jwtString == null) return null;
 		JWT parsed = JWT.parse(jwtString);
-		if (parsed == null) return null;
+		if (!isValidJWT(parsed)) return null;
 
 		AMap<AString, ACell> claims = parsed.getClaims();
 		if (claims == null) return null;
@@ -432,12 +620,34 @@ public class UCAN {
 	public static UCAN parseJWT(AString jwtString) {
 		if (jwtString == null) return null;
 		JWT parsed = JWT.parse(jwtString);
-		if (parsed == null) return null;
+		if (!isValidJWT(parsed)) return null;
 
 		AMap<AString, ACell> claims = parsed.getClaims();
 		if (claims == null) return null;
 
 		ASignature sig = ASignature.fromBlob(Blob.wrap(parsed.getSignatureBytes()));
 		return new UCAN(claims, sig);
+	}
+
+	/** Returns true when a parsed JWT uses the supported Convex UCAN JWT profile. */
+	static boolean isValidJWT(JWT parsed) {
+		if (parsed == null || !"EdDSA".equals(parsed.getAlgorithm())) return false;
+		if (parsed.getSignatureBytes().length != Ed25519Signature.SIGNATURE_LENGTH) return false;
+		if (!JWT_TYPE.equals(RT.ensureString(parsed.getHeader().get(JWT.TYP)))) {
+			return false;
+		}
+		return isValidJWTPayload(parsed.getClaims());
+	}
+
+	private static boolean isValidJWTPayload(AMap<AString, ACell> claims) {
+		if (claims == null || !VERSION.equals(claims.get(UCV))) return false;
+		if (!isDID(RT.ensureString(claims.get(ISS)))) return false;
+		if (!isDID(RT.ensureString(claims.get(AUD)))) return false;
+		if (!claims.containsKey(EXP)) return false;
+		ACell exp = claims.get(EXP);
+		if (exp != null && !(exp instanceof CVMLong)) return false;
+		if (claims.containsKey(NBF) && !(claims.get(NBF) instanceof CVMLong)) return false;
+		if (!(claims.get(ATT) instanceof AVector)) return false;
+		return claims.get(PRF) instanceof AVector;
 	}
 }

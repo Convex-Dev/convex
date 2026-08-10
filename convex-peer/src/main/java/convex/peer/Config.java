@@ -20,6 +20,7 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
+import convex.etch.EtchConfig;
 import convex.etch.EtchStore;
 
 /**
@@ -132,28 +133,35 @@ public class Config {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends AStore> T checkStore(Map<Keyword, Object> config) throws IOException {
+		EtchConfig etchConfig=checkEtchConfig(config);
 		Object o=config.get(Keywords.STORE);
 		if (o instanceof AStore) return (T)o;
 		
 		if ((o instanceof String)||(o instanceof AString)) {
 			String fname=o.toString();
 			if ("memory".equals(fname)) {
+				if (etchConfig!=null) {
+					throw new IOException(Keywords.ETCH_CONFIG+" cannot configure an in-memory store");
+				}
 				return (T) new MemoryStore();
 			}
 			if ("temp".equals(fname)) {
-				return (T) EtchStore.createTemp();
+				return (T) ((etchConfig==null)?EtchStore.createTemp():EtchStore.createTemp(etchConfig));
 			}
 			File f=FileUtils.getFile(fname);
 			if (f.exists()) {
-				try {
-					return (T) EtchStore.create(f);
-				} catch (IOException e) {
-					return null;
-				}
+				return (T) ((etchConfig==null)?EtchStore.create(f):EtchStore.create(f,etchConfig));
 			}
 		}
 		
 		return null;
+	}
+
+	private static EtchConfig checkEtchConfig(Map<Keyword,Object> config) throws IOException {
+		Object value=config.get(Keywords.ETCH_CONFIG);
+		if (value==null) return null;
+		if (value instanceof EtchConfig etchConfig) return etchConfig;
+		throw new IOException("Unexpected type for "+Keywords.ETCH_CONFIG+": "+Utils.getClassName(value));
 	}
 	
 	/**
@@ -220,9 +228,11 @@ public class Config {
 		try {
 			store=checkStore(config);
 			if (store!=null) return store;
-			store=(T) EtchStore.createTemp("tempPeerStore");
+			EtchConfig etchConfig=checkEtchConfig(config);
+			store=(T) ((etchConfig==null)?EtchStore.createTemp("tempPeerStore")
+					:EtchStore.createTemp("tempPeerStore",etchConfig));
 		} catch (IOException e) {
-			throw new ConfigException("Unable to configure temporary store due to IO error",e);
+			throw new ConfigException("Unable to configure store due to IO error",e);
 		}
 		config.put(Keywords.STORE, store);
 		return store;

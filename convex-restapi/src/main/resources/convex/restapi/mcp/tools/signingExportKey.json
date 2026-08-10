@@ -1,7 +1,7 @@
 {
   "name": "signingExportKey",
   "title": "Export Key (Signing Service)",
-  "description": "Export (reveal) the private seed for a stored key. Elevated: first call returns confirmUrl, retry with confirmToken.",
+  "description": "Export (reveal) the private seed for a stored key over HTTPS. Elevated: first call returns confirmUrl, retry with confirmToken.",
   "annotations": {
     "readOnlyHint": true,
     "openWorldHint": false

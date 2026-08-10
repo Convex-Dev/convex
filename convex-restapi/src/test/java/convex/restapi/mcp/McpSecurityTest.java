@@ -21,6 +21,7 @@ import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
+import convex.restapi.SeedTransport;
 
 /**
  * Tests for MCP endpoint security controls: Origin validation (#552) and
@@ -40,10 +41,14 @@ public class McpSecurityTest {
 		// Loopback clients are exempt (local development), IPv4 and IPv6
 		assertTrue(McpAPI.isSecureSeedTransport("http", null, "127.0.0.1"));
 		assertTrue(McpAPI.isSecureSeedTransport("http", null, "::1"));
+		// A local reverse proxy must preserve a cleartext client-facing scheme.
+		assertFalse(McpAPI.isSecureSeedTransport("http", "http", "127.0.0.1"));
 		// Cleartext HTTP from a remote address is refused
 		assertFalse(McpAPI.isSecureSeedTransport("http", null, "203.0.113.7"));
 		assertFalse(McpAPI.isSecureSeedTransport("http", "http", "203.0.113.7"));
 		assertFalse(McpAPI.isSecureSeedTransport("http", null, null));
+		assertTrue(SeedTransport.rejectedIncomingMessage().contains("key rotation is suggested"));
+		assertFalse(SeedTransport.rejectedOutputMessage().contains("rotation"));
 	}
 
 	// ===== #552: Origin allow-list =====

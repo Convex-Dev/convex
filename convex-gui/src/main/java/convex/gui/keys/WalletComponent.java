@@ -15,8 +15,10 @@ import javax.swing.JPopupMenu;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.data.AccountKey;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DropdownMenu;
@@ -58,7 +60,7 @@ public class WalletComponent extends BaseListComponent {
 		//addressLabel.setFont(Toolkit.MONO_FONT);
 		// cPanel.add(addressLabel,"span");
 		
-		infoLabel = new CodeLabel(getInfoString());
+		infoLabel = new CodeLabel(getInfoString(walletEntry));
 		infoLabel.setFont(Toolkit.SMALL_MONO_FONT);
 		cPanel.add(infoLabel,"dock center");
 		//add(cPanel,"dock center"); // add to MigLayout
@@ -162,7 +164,7 @@ public class WalletComponent extends BaseListComponent {
 	private void doUpdate() {
 		// TODO Auto-generated method stub
 		resetTooltipText(lockButton);
-		infoLabel.setText(getInfoString());
+		infoLabel.setText(getInfoString(walletEntry));
 		Icon icon=walletEntry.isLocked()? Toolkit.LOCKED_ICON:Toolkit.UNLOCKED_ICON;
 		
 		this.lockButton.setIcon(icon);
@@ -178,9 +180,11 @@ public class WalletComponent extends BaseListComponent {
 		}
 	}
 
-	private String getInfoString() {
+	static String getInfoString(AWalletEntry walletEntry) {
 		StringBuilder sb=new StringBuilder();
-		sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
+		AccountKey publicKey=walletEntry.getPublicKey();
+		sb.append("Public Key: " + publicKey+"\n");
+		if (publicKey!=null) sb.append("Key DID:    " + DID.forKey(publicKey)+"\n");
 		// sb.append("Status:     " + (walletEntry.isLocked()?"Locked":"Unlocked")+"\n");
 		sb.append("Source:     " + walletEntry.getSource());
 		

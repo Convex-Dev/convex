@@ -23,7 +23,7 @@
         "properties": {
           "aud": {
             "type": "string",
-            "description": "Delegate's did:key string or hex public key"
+            "description": "Delegate's DID string or hex Ed25519 public key"
           },
           "exp": {
             "type": "integer",
