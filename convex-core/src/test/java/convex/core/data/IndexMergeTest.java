@@ -93,7 +93,7 @@ public class IndexMergeTest {
 	// ---- Key generation: biased prefixes to exercise aligned / disjoint / nested cases ----
 
 	static ABlob randomKey(Random r) {
-		int len = 1 + r.nextInt(40); // 1..40 bytes (spans < and > MAX_DEPTH = 64 hex digits)
+		int len = 1 + r.nextInt(40); // common short-key merge path
 		byte[] bs = new byte[len];
 		r.nextBytes(bs);
 		// Squeeze the leading bytes into a small alphabet so keys share prefixes (and some nest).

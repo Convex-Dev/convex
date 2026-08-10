@@ -1,5 +1,9 @@
 package convex.dlfs;
 
+import java.nio.charset.StandardCharsets;
+
+import convex.lattice.fs.DLFS;
+
 /**
  * Shared validation for externally supplied DLFS drive names and relative paths.
  *
@@ -11,7 +15,7 @@ final class DLFSPathValidator {
 
 	static final int MAX_DRIVE_NAME_LENGTH = 128;
 	static final int MAX_PATH_LENGTH = 4096;
-	static final int MAX_COMPONENT_LENGTH = 255;
+	static final int MAX_COMPONENT_LENGTH = DLFS.MAX_NAME_LENGTH;
 	static final int MAX_PATH_COMPONENTS = 256;
 
 	private DLFSPathValidator() {}
@@ -45,7 +49,7 @@ final class DLFSPathValidator {
 			if (component.equals(".") || component.equals("..")) {
 				throw new IllegalArgumentException("Dot path components are not allowed");
 			}
-			if (component.length() > MAX_COMPONENT_LENGTH) {
+			if (component.getBytes(StandardCharsets.UTF_8).length > MAX_COMPONENT_LENGTH) {
 				throw new IllegalArgumentException("Path component is too long");
 			}
 			for (int i = 0; i < component.length(); i++) {

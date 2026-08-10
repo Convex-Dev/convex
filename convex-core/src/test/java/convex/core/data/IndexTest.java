@@ -12,11 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.AbstractMap;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.Spliterator;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +34,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.store.NullStore;
 import convex.test.Samples;
 
 public class IndexTest {
@@ -417,10 +420,16 @@ public class IndexTest {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Test 
 	public void testBigKeys() {
-		Blob ks=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef");
-		Blob k=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-		Blob k2=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef22");
-		Blob k3=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef3333");
+		byte[] keyBytes=new byte[255];
+		Blob ks=Blob.create(Arrays.copyOf(keyBytes,254));
+		Blob k=Blob.create(keyBytes);
+		byte[] longer=Arrays.copyOf(keyBytes,256);
+		longer[255]=0x22;
+		Blob k2=Blob.create(longer);
+		longer=Arrays.copyOf(keyBytes,257);
+		longer[255]=0x33;
+		longer[256]=0x33;
+		Blob k3=Blob.create(longer);
 		
 		Index m=Index.of(k, CVMLong.ONE);
 		assertEquals(k.hexLength(),m.getDepth());
@@ -460,6 +469,87 @@ public class IndexTest {
 		assertEquals(m2.slice(1,2),Index.of(k3,3));
 		
 		doIndexTests(m2);
+	}
+
+	@Test
+	public void testExtendedKeyDistinction() throws InvalidDataException, BadFormatException {
+		byte[] aBytes=new byte[255];
+		byte[] bBytes=aBytes.clone();
+		bBytes[254]=1;
+		Blob a=Blob.create(aBytes);
+		Blob b=Blob.create(bBytes);
+		Index<Blob,CVMLong> m=Index.of(a,1,b,2);
+
+		assertEquals(2,m.count());
+		assertEquals(509,m.getDepth());
+		assertEquals(CVMLong.ONE,m.get(a));
+		assertEquals(CVMLong.create(2),m.get(b));
+		m.validate();
+
+		Blob encoding=Cells.encode(m);
+		assertEquals((byte)0x83,encoding.byteAt(3));
+		assertEquals((byte)0x7D,encoding.byteAt(4));
+		CAD3Encoder decoder=new CAD3Encoder(NullStore.INSTANCE);
+		Index<?,?> decoded=(Index<?,?>)decoder.decode(encoding);
+		assertEquals(509,decoded.getDepth());
+		assertEquals(encoding,Cells.encode(decoded));
+
+		byte[] nonCanonical=encoding.getBytes();
+		nonCanonical[3]=(byte)0x80;
+		nonCanonical[4]=0;
+		assertThrows(BadFormatException.class,() -> decoder.decode(Blob.create(nonCanonical)));
+		byte[] excessive=encoding.getBytes();
+		excessive[3]=(byte)0x83;
+		excessive[4]=(byte)0x7E; // MAX_DEPTH is invalid for a multi-entry node
+		assertThrows(BadFormatException.class,() -> decoder.decode(Blob.create(excessive)));
+
+		Index<Blob,CVMLong> shallow=Index.of(Blob.fromHex("10"),1,Blob.fromHex("11"),2);
+		assertEquals((byte)1,Cells.encode(shallow).byteAt(3)); // historical one-byte form
+	}
+
+	@Test
+	public void testMaximumDepthIndexStackSafety() throws InterruptedException, InvalidDataException {
+		byte[] zeroBytes=new byte[255];
+		Blob zero=Blob.create(zeroBytes);
+		Index<Blob,CVMLong> built=Index.of(zero,-1);
+		// One divergent key at every nibble makes a 510-level comb trie. Insert
+		// deepest-first so constructing the hostile fixture itself is stack-safe.
+		for (int digit=Index.MAX_DEPTH-1;digit>=0;digit--) {
+			byte[] keyBytes=zeroBytes.clone();
+			int byteIndex=digit>>>1;
+			keyBytes[byteIndex]=(byte)(((digit&1)==0) ? 0x10 : 0x01);
+			built=built.assoc(Blob.create(keyBytes),CVMLong.create(digit));
+		}
+		assertEquals(Index.MAX_DEPTH+1,built.count());
+		built.validate();
+
+		Index<Blob,CVMLong> index=built;
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		Thread worker=new Thread(null,() -> {
+			try {
+				assertEquals(CVMLong.create(-1),index.get(zero));
+				assertEquals(zero,index.entryAt(0).getKey());
+
+				Index<Blob,CVMLong> updated=index.assoc(zero,CVMLong.create(999));
+				assertEquals(CVMLong.create(999),updated.get(zero));
+				assertEquals(Index.MAX_DEPTH,updated.dissoc(zero).count());
+
+				long[] visited=new long[1];
+				index.forEach((k,v) -> visited[0]++);
+				assertEquals(index.count(),visited[0]);
+				assertEquals(index.count(),index.reduceEntries((n,e) -> n+1,0L));
+				assertTrue(index.containsValue(CVMLong.create(Index.MAX_DEPTH-1)));
+				assertEquals(Index.MAX_DEPTH,index.filterValues(v -> v.longValue()>=0).count());
+
+				Index<Blob,CVMLong> merged=index.mergeDifferences(updated,(a,b) -> b);
+				assertEquals(updated,merged);
+			} catch (Throwable t) {
+				failure.set(t);
+			}
+		},"index-max-depth",512*1024);
+		worker.start();
+		worker.join();
+		if (failure.get()!=null) throw new AssertionError("Maximum-depth Index operation failed",failure.get());
 	}
 
 	@Test

@@ -1,8 +1,10 @@
 package convex.core.data;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -31,13 +33,21 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex<K, V> {
+	/**
+	 * Maximum depth handled with the original recursive algorithms. Keeping this
+	 * at the historical Index limit means ordinary keys take exactly the old path;
+	 * explicit stacks are reserved for extended-depth indexes.
+	 */
+	private static final int MAX_RECURSIVE_DEPTH=64;
+
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Ref<Index>[] EMPTY_CHILDREN = new Ref[0];
 	
 	/**
-	 *  Maximum depth of index, in hex digits
+	 * Maximum depth of an Index key, in hex digits. This permits keys up to
+	 * 255 bytes, matching the common filesystem NAME_MAX boundary.
 	 */
-	public static final int MAX_DEPTH=64;
+	public static final int MAX_DEPTH=510;
 	
 	/**
 	 *  Maximum usable size of keys, in bytes
@@ -76,6 +86,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * Not part of the encoding. Nodes with an entry use the entry key directly.
 	 */
 	private ABlob cachedPrefix;
+
+	/** Exact encoding length cache used by the extended-depth stack-safe path. */
+	private int cachedEncodingLength=-1;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
@@ -156,30 +169,27 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public MapEntry<K, V> getEntry(K key) {
 		if (key==null) return null;
 		long kl = key.hexLength();
-		long pl = depth;
-		if (kl < pl) return null; // key is too short to start with current prefix
+		Index<K,V> node=this;
+		while (true) {
+			long pl = node.depth;
+			if (kl < pl) return null; // key is too short to start with current prefix
 
-		if (kl == pl) {
-			if (entryKeyMatch(key,entry)) return entry; // we matched this key exactly!
-			if (pl<MAX_DEPTH) return null; // entry definitely does not exist
+			if (kl == pl) {
+				if (entryKeyMatch(key,node.entry)) return node.entry;
+				if (pl<MAX_DEPTH) return null;
+			}
+
+			// At maximum depth all longer keys sharing the first 255 bytes alias.
+			if (pl==MAX_DEPTH) {
+				return entryKeyMatch(key,node.entry) ? node.entry : null;
+			}
+
+			int digit = key.getHexDigit(pl);
+			Index<K,V> child=node.getChild(digit);
+			if (child == null) return null;
+			if (child.depth <= pl) return null; // malformed: descent must make progress
+			node=child;
 		}
-
-		// key length is longer than current prefix
-		// if we are max depth, return entry iff matches up to full depth
-		if (pl==MAX_DEPTH) {
-			// entryKeyMatch is bounds-safe even if the entry key is shorter than MAX_DEPTH
-			// (possible in malformed encodings), unlike a raw hexMatch over MAX_DEPTH digits
-			if (entryKeyMatch(key,entry)) return entry;
-			return null;
-		}
-
-		// key exceeds current prefix, so need to go to next branch of tree
-		int digit = key.getHexDigit(pl);
-		Index<K, V> cc = getChild(digit);
-
-		if (cc == null) return null;
-		if (cc.depth <= pl) return null; // malformed: child depth must increase, bounds descent
-		return cc.getEntry(key);
 	}
 
 	/**
@@ -228,6 +238,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public Index<K, V> dissoc(K k) {
+		if (depth>MAX_RECURSIVE_DEPTH) return dissocDeep(k);
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
 			if (entryKeyMatch(k,entry)) {
@@ -263,6 +274,58 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K,V> r=this.withChild(digit, oldChild, newChild);
 		
 		return r;
+	}
+
+	/** Extended-depth dissociation without a key-controlled Java call stack. */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private Index<K,V> dissocDeep(K k) {
+		Index<K,V>[] parents=(Index<K,V>[])new Index[MAX_DEPTH+1];
+		Index<K,V>[] oldChildren=(Index<K,V>[])new Index[MAX_DEPTH+1];
+		byte[] childDigits=new byte[MAX_DEPTH+1];
+		int pathLength=0;
+		long kl=effectiveLength(k);
+		Index<K,V> node=this;
+		Index<K,V> result;
+
+		while (true) {
+			if (node.count<=1) {
+				result=(node.count==1&&entryKeyMatch(k,node.entry)) ? empty() : node;
+				break;
+			}
+			long pDepth=node.depth;
+			if (kl<pDepth) {
+				result=node;
+				break;
+			}
+			if (kl==pDepth) {
+				if (!entryKeyMatch(k,node.entry)) {
+					result=node;
+				} else if (node.children.length==1) {
+					result=(Index<K,V>)node.children[0].getValue();
+				} else {
+					result=new Index(node.depth,null,node.children,node.mask,node.count-1);
+				}
+				break;
+			}
+
+			int childDigit=k.getHexDigit(pDepth);
+			Index<K,V> oldChild=node.getChild(childDigit);
+			if (oldChild==null||oldChild.depth<=pDepth) {
+				result=node;
+				break;
+			}
+			parents[pathLength]=node;
+			oldChildren[pathLength]=oldChild;
+			childDigits[pathLength]=(byte)childDigit;
+			pathLength++;
+			node=oldChild;
+		}
+
+		for (int i=pathLength-1;i>=0;i--) {
+			Index<K,V> parent=parents[i];
+			result=parent.withChild(childDigits[i]&0xFF,oldChildren[i],result);
+		}
+		return result;
 	}
 
 	/**
@@ -349,6 +412,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	protected void accumulateEntries(Collection<Entry<K, V>> h) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) h.add(entryAt(i));
+			return;
+		}
 		for (int i = 0; i < children.length; i++) {
 			children[i].getValue().accumulateEntries(h);
 		}
@@ -357,6 +424,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	protected void accumulateKeySet(Set<K> h) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) h.add(entryAt(i).getKey());
+			return;
+		}
 		for (int i = 0; i < children.length; i++) {
 			children[i].getValue().accumulateKeySet(h);
 		}
@@ -365,6 +436,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	protected void accumulateValues(java.util.List<V> al) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) al.add(entryAt(i).getValue());
+			return;
+		}
 		// add this entry first, since we want lexicographic order
 		if (entry != null) al.add(entry.getValue());
 		for (int i = 0; i < children.length; i++) {
@@ -374,6 +449,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) {
+				MapEntry<K,V> me=entryAt(i);
+				action.accept(me.getKey(),me.getValue());
+			}
+			return;
+		}
 		if (entry != null) action.accept(entry.getKey(), entry.getValue());
 		for (int i = 0; i < children.length; i++) {
 			children[i].getValue().forEach(action);
@@ -403,6 +485,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
+		// Preserve the original allocation-free recursive path for all historical
+		// Index depths. Extended-depth tries use an explicit stack below.
+		if (depth>MAX_RECURSIVE_DEPTH) return assocEntryDeep(e,match);
 
 		if (count == 0L) return create(e);
 		if (count == 1L) {
@@ -493,6 +578,102 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
+	 * Extended-depth association. This is deliberately a cold path: the arrays are
+	 * allocated only after descent passes the historical 32-byte Index limit.
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private Index<K,V> assocEntryDeep(MapEntry<K,V> e, long match) {
+		ACell maybeValidKey=e.getKey();
+		if (!(maybeValidKey instanceof ABlobLike)) return null;
+		ABlobLike<?> k=(ABlobLike)maybeValidKey;
+		long newKeyLength=effectiveLength(k);
+
+		Index<K,V>[] parents=(Index<K,V>[])new Index[MAX_DEPTH+1];
+		Index<K,V>[] oldChildren=(Index<K,V>[])new Index[MAX_DEPTH+1];
+		byte[] childDigits=new byte[MAX_DEPTH+1];
+		int pathLength=0;
+		Index<K,V> node=this;
+		Index<K,V> result;
+
+		while (true) {
+			if (node.count==0L) {
+				result=create(e);
+				break;
+			}
+			if (node.count==1L) {
+				assert node.mask==(short)0;
+				if (node.entry.keyEquals(e)) {
+					result=(node.entry==e) ? node : create(e);
+					break;
+				}
+			}
+
+			ABlobLike<?> prefix=node.getPrefix();
+			long plen=effectiveLength(prefix);
+			long pDepth=Math.min(node.depth,plen);
+			if (match>pDepth) match=pDepth;
+			if (match>newKeyLength) match=newKeyLength;
+			long mkl=match+k.hexMatch(prefix,match,Math.min(newKeyLength,pDepth)-match);
+
+			if (mkl<node.depth) {
+				if (mkl>=plen) return null;
+				if (mkl==newKeyLength) {
+					int splitDigit=prefix.getHexDigit(mkl);
+					short splitMask=(short)(1<<splitDigit);
+					result=new Index<K,V>(mkl,e,new Ref[] { node.getRef() },splitMask,node.count+1);
+				} else {
+					Index<K,V> branch1=node;
+					Index<K,V> branch2=create(e);
+					int d1=prefix.getHexDigit(mkl);
+					int d2=k.getHexDigit(mkl);
+					if (d1>d2) {
+						Index<K,V> temp=branch1;
+						branch1=branch2;
+						branch2=temp;
+					}
+					Ref[] newChildren=new Ref[] { branch1.getRef(),branch2.getRef() };
+					short newMask=(short)((1<<d1)|(1<<d2));
+					result=new Index<K,V>(mkl,null,newChildren,newMask,node.count+1L);
+				}
+				break;
+			}
+
+			assert newKeyLength>=node.depth;
+			if (newKeyLength==node.depth) {
+				if (node.entry==null) {
+					result=new Index<K,V>(node.depth,e,(Ref[])node.children,node.mask,node.count+1);
+				} else if (node.entry==e) {
+					result=node;
+				} else {
+					result=new Index<K,V>(node.depth,e,(Ref[])node.children,node.mask,node.count);
+				}
+				break;
+			}
+
+			int childDigit=k.getHexDigit(node.depth);
+			Index<K,V> oldChild=node.getChild(childDigit);
+			if (oldChild==null) {
+				if (Bits.indexForDigit(childDigit,node.mask)>=0) return null;
+				result=node.withChild(childDigit,null,create(e));
+				break;
+			}
+			if (oldChild.depth<=node.depth) return null;
+			parents[pathLength]=node;
+			oldChildren[pathLength]=oldChild;
+			childDigits[pathLength]=(byte)childDigit;
+			pathLength++;
+			match=node.depth;
+			node=oldChild;
+		}
+
+		for (int i=pathLength-1;i>=0;i--) {
+			Index<K,V> parent=parents[i];
+			result=parent.withChild(childDigits[i]&0xFF,oldChildren[i],result);
+		}
+		return result;
+	}
+
+	/**
 	 * Updates this Index with a new child.
 	 * 
 	 * Either oldChild or newChild may be null. Empty maps are treated as null.
@@ -554,6 +735,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) initial=func.apply(initial,entryAt(i).getValue());
+			return initial;
+		}
 		if (entry != null) initial = func.apply(initial, entry.getValue());
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
@@ -564,6 +749,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K, V>, ? extends R> func, R initial) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) initial=func.apply(initial,entryAt(i));
+			return initial;
+		}
 		if (entry != null) initial = func.apply(initial, entry);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
@@ -574,6 +763,14 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	
 	@Override
 	public Index<K, V> filterValues(Predicate<V> pred) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			Index<K,V> result=this;
+			for (long i=0;i<count;i++) {
+				MapEntry<K,V> me=entryAt(i);
+				if (!pred.test(me.getValue())) result=result.dissoc(me.getKey());
+			}
+			return result;
+		}
 		Index<K, V> r=this;
 		for (int i=0; i<16; i++) {
 			if (r==null) break; // might be null from dissoc
@@ -622,8 +819,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			}
 		}
 
-		// We only have a meaningful depth if more than one entry
-		bs[pos++] = (byte)depth;
+		// We only have a meaningful depth if more than one entry. Preserve the
+		// historical one-byte fast path; extended depths use canonical VLQ.
+		if (depth < 128) {
+			bs[pos++] = (byte)depth;
+		} else {
+			pos = Format.writeVLQCount(bs,pos,depth);
+		}
 		
 		// write mask
 		pos = Utils.writeShort(bs,pos,mask);
@@ -654,6 +856,82 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override
 	public int estimatedEncodingSize() {
 		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
+	}
+
+	@Override
+	public int getEncodingLength() {
+		if (depth<=MAX_RECURSIVE_DEPTH) return super.getEncodingLength();
+		if (encoding!=null) return encoding.size();
+		int result=cachedEncodingLength;
+		if (result>=0) return result;
+		return computeDeepEncodingLengths();
+	}
+
+	/**
+	 * Computes Index encoding lengths bottom-up, preventing embedding checks from
+	 * recursively walking an extended radix spine. Only used beyond the historical
+	 * depth limit.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private int computeDeepEncodingLengths() {
+		int rootLength=-1;
+		ArrayList<Index> nodes=new ArrayList<>();
+		ArrayDeque<Index> pending=new ArrayDeque<>();
+		IdentityHashMap<Index,Boolean> seen=new IdentityHashMap<>();
+		pending.push(this);
+		while (!pending.isEmpty()) {
+			Index node=pending.pop();
+			if (node.cachedEncodingLength>=0||seen.put(node,Boolean.TRUE)!=null) continue;
+			nodes.add(node);
+			for (Ref<Index> childRef : (Ref<Index>[])node.children) {
+				ACell child=childRef.getValue();
+				if (child instanceof Index) pending.push((Index)child);
+			}
+		}
+		nodes.sort((a,b) -> Long.compare(b.depth,a.depth));
+
+		for (int i=0;i<nodes.size();i++) {
+			Index node=nodes.get(i);
+			int length=1+Format.getVLQCountLength(node.count); // tag and count
+			if (node.count==1) {
+				length+=node.entry.getKeyRef().getEncodingLength();
+				length+=node.entry.getValueRef().getEncodingLength();
+			} else if (node.count>1) {
+				length++; // entry marker
+				if (node.entry!=null) {
+					length+=node.entry.getKeyRef().getEncodingLength();
+					length+=node.entry.getValueRef().getEncodingLength();
+				}
+				length+=Format.getVLQCountLength(node.depth)+2; // depth and mask
+				for (Ref<Index> childRef : (Ref<Index>[])node.children) {
+					ACell child=childRef.getValue();
+					if (child instanceof Index) {
+						int childLength=((Index)child).getEncodingLength();
+						length+=(childLength<=Format.MAX_EMBEDDED_LENGTH)
+								? childLength : Ref.INDIRECT_ENCODING_LENGTH;
+					} else {
+						length+=childRef.getEncodingLength();
+					}
+				}
+			}
+			if (node==this) {
+				rootLength=length; // publish only after descendant hashes are ready
+			} else {
+				node.cachedEncodingLength=length;
+			}
+			// Cache the corresponding Ref flag now, so actual encoding only nests the
+			// few genuinely embedded levels rather than rediscovering the whole spine.
+			if (node!=this) node.isEmbedded();
+		}
+		// Non-embedded refs need child hashes while the parent is encoded. Prepare
+		// descendants bottom-up as well; otherwise hashing would recreate the same
+		// key-controlled call chain even though embedding lengths are cached.
+		for (int i=0;i<nodes.size();i++) {
+			Index node=nodes.get(i);
+			if (node!=this) node.getHash();
+		}
+		cachedEncodingLength=rootLength;
+		return rootLength;
 	}
 	
 	@Override
@@ -781,20 +1059,27 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public MapEntry<K, V> entryAt(long ix) {
-		if (entry != null) {
-			if (ix == 0L) return entry;
-			ix -= 1;
+		Index<K,V> node=this;
+		while (true) {
+			if (node.entry != null) {
+				if (ix == 0L) return node.entry;
+				ix--;
+			}
+			Index<K,V> next=null;
+			for (int i = 0; i < node.children.length; i++) {
+				ACell cell = node.children[i].getValue();
+				if (!(cell instanceof Index)) continue; // malformed child, treat as empty
+				Index<K,V> child=(Index<K,V>)cell;
+				long cc=child.count();
+				if (ix < cc) {
+					next=child;
+					break;
+				}
+				ix-=cc;
+			}
+			if (next==null) throw new IndexOutOfBoundsException((int)ix);
+			node=next;
 		}
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			ACell cell = children[i].getValue();
-			if (!(cell instanceof Index)) continue; // malformed child, treat as empty
-			Index<K, V> c = (Index<K, V>) cell;
-			long cc = c.count();
-			if (ix < cc) return c.entryAt(ix);
-			ix -= cc;
-		}
-		throw new IndexOutOfBoundsException((int)ix);
 	}
 
 	/**
@@ -877,6 +1162,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public boolean containsValue(ACell value) {
+		if (depth>MAX_RECURSIVE_DEPTH) {
+			for (long i=0;i<count;i++) {
+				if (Cells.equals(value,entryAt(i).getValue())) return true;
+			}
+			return false;
+		}
 		if ((entry!=null)&&Cells.equals(value, entry.getValue())) return true;
 		for (Ref<Index<K,V>> cr : children) {
 			if (cr.getValue().containsValue(value)) return true;
@@ -966,7 +1257,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 */
 	static <K extends ABlobLike<?>, V extends ACell> Index<K, V> mergeNode(Index<K, V> a, Index<K, V> b, MergeFunction<V> func) {
 		if (a == b) return a;                                // shared structure: O(1), no alloc, no hashing
-		if (a.getRef().equals(b.getRef())) return a;          // equal encoded structure: no child resolution
+		Hash ah=a.cachedHash();
+		Hash bh=b.cachedHash();
+		if (ah!=null&&bh!=null&&ah.equals(bh)) return a;      // equal known structure: no child resolution
+		if (a.depth>MAX_RECURSIVE_DEPTH||b.depth>MAX_RECURSIVE_DEPTH) return mergeDeep(a,b,func);
 		if (a.count == 0) return applySide(b, func, false);  // a empty: all of b is right-side
 		if (b.count == 0) return applySide(a, func, true);   // b empty: all of a is left-side
 
@@ -1084,6 +1378,21 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/** Apply {@code func} to every entry of a node as a single side (other side null). Returns the same node if unchanged. */
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> applySide(Index<K, V> node, MergeFunction<V> func, boolean left) {
 		if (node.count == 0) return node;
+		if (node.depth>MAX_RECURSIVE_DEPTH) {
+			Index<K,V> result=node;
+			for (long i=0;i<node.count;i++) {
+				MapEntry<K,V> me=node.entryAt(i);
+				V oldValue=me.getValue();
+				V newValue=left ? func.merge(me.getKey(),oldValue,null)
+						: func.merge(me.getKey(),null,oldValue);
+				if (newValue==null) {
+					result=result.dissoc(me.getKey());
+				} else if (!Utils.equals(oldValue,newValue)) {
+					result=result.assoc(me.getKey(),newValue);
+				}
+			}
+			return result;
+		}
 		MapEntry<K, V> ne = singleEntry(node.entry, func, left);
 		Index<K, V>[] kids = null;
 		int m = node.mask & 0xFFFF;
@@ -1102,6 +1411,49 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			kids = collectKids(node);
 		}
 		return rebuild(node.depth, ne, kids);
+	}
+
+	/**
+	 * Stack-safe ordered merge for extended-depth subtries. The structural merge
+	 * remains the fast path; this bounded fallback is reached only beyond the old
+	 * 32-byte key limit.
+	 */
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K,V> mergeDeep(
+			Index<K,V> a, Index<K,V> b, MergeFunction<V> func) {
+		Index<K,V> result=a;
+		long ai=0;
+		long bi=0;
+		while (ai<a.count||bi<b.count) {
+			MapEntry<K,V> ae=(ai<a.count) ? a.entryAt(ai) : null;
+			MapEntry<K,V> be=(bi<b.count) ? b.entryAt(bi) : null;
+			if (ae!=null&&be!=null&&keyMatch(ae.getKey(),be.getKey())) {
+				V av=ae.getValue();
+				V bv=be.getValue();
+				if (!Utils.equals(av,bv)) {
+					V nv=func.merge(ae.getKey(),av,bv);
+					if (nv==null) result=result.dissoc(ae.getKey());
+					else if (!Utils.equals(av,nv)) result=result.assoc(ae.getKey(),nv);
+				}
+				ai++;
+				bi++;
+				continue;
+			}
+
+			boolean takeA=(be==null)||(ae!=null&&ae.getKey().compareTo(be.getKey().toBlob())<0);
+			MapEntry<K,V> me=takeA ? ae : be;
+			V oldValue=me.getValue();
+			V nv=takeA ? func.merge(me.getKey(),oldValue,null)
+					: func.merge(me.getKey(),null,oldValue);
+			if (takeA) {
+				if (nv==null) result=result.dissoc(me.getKey());
+				else if (!Utils.equals(oldValue,nv)) result=result.assoc(me.getKey(),nv);
+				ai++;
+			} else {
+				if (nv!=null) result=result.assoc(me.getKey(),nv);
+				bi++;
+			}
+		}
+		return result;
 	}
 
 	/** Snapshot a node's children into a digit-indexed array of size 16 (absent digits are null). */

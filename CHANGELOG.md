@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Index keys and DLFS path components now remain distinct through the standard 255-byte filesystem name limit instead of silently aliasing after 32 bytes; extended Index depths use canonical VLQ encoding with stack-safe cold paths for adversarial radix tries (#631, #689).
 - DLFS file writes and truncations now advance the file node's update time, so newer content wins replication conflicts and NIO modification times reflect content changes.
 - Etch: `AStore` now exposes an explicit durability barrier, and successful Etch v3 flushes publish directly reopenable clean checkpoints while ordinary lattice cursor sync remains buffered. Mutations after a checkpoint correctly return the file to `OPEN`, so later checkpoints include their complete logical file extent (#650).
 - Etch: closed encrypted stores and maintenance readers now promptly release their global shutdown registrations and wipe file-scoped keys and reusable cipher state, including state created on worker threads; online-GC cutover preserves ownership of the successor's live cipher resources (#686).

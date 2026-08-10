@@ -15,6 +15,8 @@ import convex.lattice.fs.impl.DLFSLocal;
  * Static API for DLFS
  */
 public class DLFS {
+	/** Maximum UTF-8 byte length of one path component. */
+	public static final int MAX_NAME_LENGTH=255;
 
 	private static final DLFSProvider PROVIDER=new DLFSProvider();
 	
@@ -91,12 +93,13 @@ public class DLFS {
 	public static AString checkName(String name) {
 		if (name==null) return null;
 		if (name.isEmpty()) return null;
-		return Strings.create(name);
+		return checkName(Strings.create(name));
 	}
 
 	public static AString checkName(AString name) {
 		if (name==null) return null;
 		if (name.isEmpty()) return null;
+		if (name.count()>MAX_NAME_LENGTH) return null;
 		return name;
 	}
 

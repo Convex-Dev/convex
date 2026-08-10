@@ -182,6 +182,27 @@ public class DLFSTest {
 		assertThrows(InvalidPathException.class,()->fs.getPath("foo//bar"));
 		assertThrows(InvalidPathException.class,()->fs.getPath(".//.."));
 	}
+
+	@Test
+	public void testMaximumLengthNamesRemainDistinct() throws IOException {
+		DLFileSystem fs=DLFS.createLocal();
+		String prefix="a".repeat(DLFS.MAX_NAME_LENGTH-1);
+		Path first=fs.getPath("/"+prefix+"x");
+		Path second=fs.getPath("/"+prefix+"y");
+		Files.writeString(first,"first");
+		Files.writeString(second,"second");
+		assertEquals("first",Files.readString(first));
+		assertEquals("second",Files.readString(second));
+
+		String utf8Name="€".repeat(DLFS.MAX_NAME_LENGTH/3);
+		Path utf8=fs.getPath("/"+utf8Name);
+		Files.writeString(utf8,"utf8");
+		assertEquals("utf8",Files.readString(utf8));
+
+		assertThrows(InvalidPathException.class,
+				() -> fs.getPath("/"+"a".repeat(DLFS.MAX_NAME_LENGTH+1)));
+		assertThrows(InvalidPathException.class,() -> fs.getPath("/"+utf8Name+"€"));
+	}
 	
 	@Test public void testNormalize() throws URISyntaxException {
 		DLFileSystem fs=DLFS.createLocal();
