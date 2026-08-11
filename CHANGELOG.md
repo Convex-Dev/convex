@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Ed25519 JWT signing accepts explicit verification-method key IDs, while self-contained verification recognises bare multikey, `did:key` and multikey-fragment DID URL forms.
+
 ### Changed
 
 - Lattice value messages support efficient post-merge acknowledgements through an optional request ID, while normal gossip remains fire-and-forget.

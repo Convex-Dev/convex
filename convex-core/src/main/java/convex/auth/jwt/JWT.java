@@ -159,7 +159,8 @@ public class JWT {
 
 	/**
 	 * Verify this JWT as a self-issued EdDSA token, taking the public key from the
-	 * {@code kid} header (multikey format).
+	 * {@code kid} header. Supported forms are a bare multikey, a {@code did:key}
+	 * identifier, or a DID URL whose fragment is the multikey.
 	 *
 	 * <p><b>SECURITY WARNING:</b> this trusts the {@code kid} header to supply the
 	 * verification key, so a valid result only proves "signed by whoever is named in
@@ -176,7 +177,7 @@ public class JWT {
 			if (!"EdDSA".equals(getAlgorithm())) return false;
 			String kid = getKeyID();
 			if (kid == null) return false;
-			AccountKey publicKey = Multikey.decodePublicKey(kid);
+			AccountKey publicKey = decodeKeyID(kid);
 			if (publicKey == null) return false;
 			return verifyEdDSA(publicKey);
 		} catch (Exception e) {
@@ -427,6 +428,26 @@ public class JWT {
 	 */
 	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair) {
 		AString kid = Multikey.encodePublicKey(keyPair.getAccountKey());
+		return signPublic(claimData,keyPair,kid);
+	}
+
+	/**
+	 * Build and sign a public-key (Ed25519 / EdDSA) JSON Web Token with an
+	 * explicit key identifier.
+	 *
+	 * <p>The identifier is copied unchanged into the {@code kid} header. It may
+	 * therefore be a verification-method DID URL such as
+	 * {@code did:web:example.com:user:alice#z6Mk...}. This method does not assert
+	 * that the identifier is bound to the signing key; DID resolution and identity
+	 * binding remain the verifier's responsibility.</p>
+	 *
+	 * @param claimData Claims to embed in the JWT payload
+	 * @param keyPair Key pair used to produce the Ed25519 signature
+	 * @param kid Key identifier to place in the JOSE header
+	 * @return The encoded JWT string containing header, payload, and signature
+	 */
+	public static AString signPublic(AMap<AString,ACell> claimData, AKeyPair keyPair, AString kid) {
+		if (kid==null) throw new IllegalArgumentException("JWT kid cannot be null");
 		AMap<AString,ACell> headerMap = HEADER_EDDSA_BASE.assoc(Strings.create("kid"), kid);
 		AString headerString = claims(headerMap);
 		AString base64Header = encode(headerString);
@@ -437,6 +458,22 @@ public class JWT {
 		ASignature signature = keyPair.sign(Blob.wrap(toSign.getBytes()));
 		AString encodedSig = encode(signature.getBytes());
 		return toSign.append(".").append(encodedSig);
+	}
+
+	/**
+	 * Extracts an embedded public multikey from the supported {@code kid} forms.
+	 * This is key extraction only, not DID resolution or verification-method
+	 * authorisation.
+	 */
+	private static AccountKey decodeKeyID(String kid) {
+		int fragment=kid.indexOf('#');
+		if (fragment>=0) {
+			if (fragment==kid.length()-1 || kid.indexOf('#',fragment+1)>=0) return null;
+			kid=kid.substring(fragment+1);
+		} else if (kid.startsWith("did:key:")) {
+			kid=kid.substring("did:key:".length());
+		}
+		return Multikey.decodePublicKey(kid);
 	}
 
 	// ========== Static verification methods (backward compat, delegate to instance) ==========
@@ -459,7 +496,8 @@ public class JWT {
 	/**
 	 * Verify an EdDSA (Ed25519) JWT and return the claims if valid.
 	 *
-	 * Extracts the public key from the {@code kid} header parameter (multikey format),
+	 * Extracts the public key from the {@code kid} header parameter (a bare multikey,
+	 * {@code did:key} identifier, or DID URL with a multikey fragment),
 	 * verifies the Ed25519 signature, and returns the parsed claims map.
 	 *
 	 * <p><b>SECURITY WARNING:</b> the {@code kid} header is sender-controlled, so this only
