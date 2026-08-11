@@ -169,7 +169,7 @@ public class DLFileChannel implements SeekableByteChannel {
 	 * @return
 	 * @throws NoSuchFileException
 	 */
-	private ABlob getData() throws NoSuchFileException {
+	private ABlob getData() throws IOException {
 		AVector<ACell> node=getNode();
 		return DLFSNode.getData(node);
 	}
@@ -179,7 +179,7 @@ public class DLFileChannel implements SeekableByteChannel {
 	 * @return
 	 * @throws NoSuchFileException
 	 */
-	private AVector<ACell> getNode() throws NoSuchFileException {
+	private AVector<ACell> getNode() throws IOException {
 		AVector<ACell> node= fileSystem.getNode(path);
 		if (node==null) throw new NoSuchFileException(path.toString());
 		return node;

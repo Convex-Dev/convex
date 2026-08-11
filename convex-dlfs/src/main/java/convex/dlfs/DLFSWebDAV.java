@@ -786,11 +786,11 @@ public class DLFSWebDAV {
 	}
 
 	private static String calculateETag(Path path) {
-		if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof convex.lattice.fs.DLPath dlp) {
-			convex.core.data.Hash hash = dlfs.getNodeHash(dlp);
-			if (hash != null) return "\"" + hash.toHexString() + "\"";
-		}
 		try {
+			if (path.getFileSystem() instanceof DLFileSystem dlfs && path instanceof convex.lattice.fs.DLPath dlp) {
+				convex.core.data.Hash hash = dlfs.getNodeHash(dlp);
+				if (hash != null) return "\"" + hash.toHexString() + "\"";
+			}
 			BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
 			return "W/\"" + attrs.size() + "-" + attrs.lastModifiedTime().toMillis() + "\"";
 		} catch (IOException e) {

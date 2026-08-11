@@ -24,6 +24,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSCorruptionException;
 import convex.lattice.fs.DLFSLattice;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFSProvider;
@@ -39,7 +40,7 @@ public class DLFSLocal extends DLFileSystem {
 	ALatticeCursor<AVector<ACell>> rootCursor;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
-		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
+		super(dlfsProvider,uriPath,initialTimestamp(rootNode));
 		this.rootCursor=Cursors.createLattice(DLFSLattice.INSTANCE, rootNode);
 	}
 
@@ -51,7 +52,7 @@ public class DLFSLocal extends DLFileSystem {
 	 * @param cursor Lattice cursor pointing to the DLFS tree
 	 */
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ALatticeCursor<AVector<ACell>> cursor) {
-		super(dlfsProvider, uriPath, DLFSNode.getUTime(cursor.get()));
+		super(dlfsProvider, uriPath, initialTimestamp(cursor.get()));
 		this.rootCursor =  cursor;
 	}
 
@@ -70,10 +71,9 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	public AVector<ACell> getNode(DLPath path) {
+	public AVector<ACell> getNode(DLPath path) throws IOException {
 		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> result=DLFSNode.navigate(rootNode,path);
-		return result;
+		return DLFSNode.resolveNode(rootNode,path);
 	}
 
 	@Override
@@ -83,10 +83,10 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
+	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) throws IOException {
 		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> result=DLFSNode.navigate(rootNode,dir);
-		return DLDirectoryStream.create(dir,result,filter);
+		Index<?,?> entries=DLFSNode.resolveDirectoryEntries(rootNode,dir);
+		return DLDirectoryStream.create(dir,entries,filter);
 	}
 
 	@Override
@@ -102,15 +102,11 @@ public class DLFSLocal extends DLFileSystem {
 		DLPath parent=dir.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(dir.toString());
 		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
+		AVector<ACell> parentNode=DLFSNode.resolveValidPath(rootNode, parent);
 		if (parentNode==null) {
 			throw new NoSuchFileException(parent.toString());
 		}
-		// A live entry blocks creation; a tombstoned name is absent from live entries, so it is free.
-		AVector<ACell> existing = DLFSNode.getDirectoryEntries(parentNode).get(name);
-		if (existing != null) {
-			throw new FileAlreadyExistsException(dir.toString());
-		}
+		requireAbsent(parentNode,name,dir);
 		updateNode(dir,DLFSNode.createDirectory(getTimestamp()));
 		return dir;
 	}
@@ -122,14 +118,11 @@ public class DLFSLocal extends DLFileSystem {
 		DLPath parent=path.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(path.toString()); // trying to create root
 		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
+		AVector<ACell> parentNode=DLFSNode.resolveValidPath(rootNode, parent);
 		if (parentNode==null) {
 			throw new NoSuchFileException(parent.toString(), null, "Parent directory does not exist");
 		}
-		AVector<ACell> oldNode=DLFSNode.getDirectoryEntries(parentNode).get(name);
-		if (oldNode!=null) {
-			throw new FileAlreadyExistsException(name.toString());
-		}
+		requireAbsent(parentNode,name,path);
 		AVector<ACell> newNode=DLFSNode.createEmptyFile(getTimestamp());
 		updateNode(path,newNode);
 		return newNode;
@@ -143,17 +136,23 @@ public class DLFSLocal extends DLFileSystem {
 			throw new IOException("Can't delete DLFS Root node");
 		}
 
-		// Check file actually exists
-		AVector<ACell> node=getNode(p);
-		if (node==null) throw new NoSuchFileException(p.toString());
-
-		// A directory can only be deleted if it has no live children
-		if (DLFSNode.isDirectory(node) && !DLFSNode.isEmpty(node)) {
-			throw new DirectoryNotEmptyException(p.toString());
+		try {
+			rootCursor.updateAndGet(rootNode->{
+				AVector<ACell> parent=resolveValidUnchecked(rootNode,p.getParent());
+				if (parent==null) throw new UncheckedIOException(new NoSuchFileException(p.toString()));
+				ACell raw=DLFSNode.getRawEntry(DLFSNode.getDirectoryEntries(parent),p.getCVMFileName());
+				if (raw==null) throw new UncheckedIOException(new NoSuchFileException(p.toString()));
+				if (raw instanceof AVector<?> vector) {
+					ACell contents=(vector.count()>DLFSNode.POS_DIR)?vector.get(DLFSNode.POS_DIR):null;
+					if (contents instanceof Index<?,?> entries && !entries.isEmpty()) {
+						throw new UncheckedIOException(new DirectoryNotEmptyException(p.toString()));
+					}
+				}
+				return DLFSNode.deleteNode(rootNode,p,getTimestamp());
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
 		}
-
-		// Drop the live entry and record a tombstone in the parent directory
-		rootCursor.updateAndGet(rootNode->DLFSNode.deleteNode(rootNode,p,getTimestamp()));
 	}
 
 	@Override
@@ -166,11 +165,11 @@ public class DLFSLocal extends DLFileSystem {
 		CVMLong utime=getTimestamp();
 		try {
 			rootCursor.updateAndGet(root->{
-				AVector<ACell> sourceNode=DLFSNode.navigate(root,src);
+				AVector<ACell> sourceNode=resolveNodeUnchecked(root,src);
 				if (sourceNode==null) throw new UncheckedIOException(new NoSuchFileException(src.toString()));
 				if (src.equals(dst)) return root;
-				if (DLFSNode.navigate(root,dst)!=null) throw new UncheckedIOException(new FileAlreadyExistsException(dst.toString()));
-				requireDirectory(root,dst.getParent());
+				AVector<ACell> targetParent=requireDirectory(root,dst.getParent());
+				requireAbsentUnchecked(targetParent,dst.getCVMFileName(),dst);
 
 				AVector<ACell> copiedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
 				if (DLFSNode.isDirectory(sourceNode)&&!recursive) {
@@ -194,14 +193,14 @@ public class DLFSLocal extends DLFileSystem {
 		CVMLong utime=getTimestamp();
 		try {
 			rootCursor.updateAndGet(root->{
-				AVector<ACell> sourceNode=DLFSNode.navigate(root,src);
+				AVector<ACell> sourceNode=resolveValidUnchecked(root,src);
 				if (sourceNode==null) throw new UncheckedIOException(new NoSuchFileException(src.toString()));
 				if (src.equals(dst)) return root;
 				if (DLFSNode.isDirectory(sourceNode)&&dst.startsWith(src)) {
 					throw new UncheckedIOException(new FileSystemException(src.toString(),dst.toString(),"Cannot move a directory into itself"));
 				}
-				if (DLFSNode.navigate(root,dst)!=null) throw new UncheckedIOException(new FileAlreadyExistsException(dst.toString()));
-				requireDirectory(root,dst.getParent());
+				AVector<ACell> targetParent=requireDirectory(root,dst.getParent());
+				requireAbsentUnchecked(targetParent,dst.getCVMFileName(),dst);
 
 				AVector<ACell> updated=DLFSNode.deleteNode(root,src,utime);
 				return DLFSNode.updateNode(updated,dst,sourceNode,utime);
@@ -211,22 +210,36 @@ public class DLFSLocal extends DLFileSystem {
 		}
 	}
 
-	private static void requireDirectory(AVector<ACell> rootNode, DLPath path) {
-		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
+	private static AVector<ACell> requireDirectory(AVector<ACell> rootNode, DLPath path) {
+		AVector<ACell> node=resolveValidUnchecked(rootNode,path);
 		if (node==null) throw new UncheckedIOException(new NoSuchFileException(path.toString()));
 		if (!DLFSNode.isDirectory(node)) throw new UncheckedIOException(new NotDirectoryException(path.toString()));
+		return node;
 	}
 
 	@Override
-	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
-		rootCursor.updateAndGet(rootNode->DLFSNode.updateNode(rootNode,dir,newNode,getTimestamp()));
+	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) throws IOException {
+		if (newNode!=null && !DLFSNode.isValidNodeShallow(newNode)) throw new IllegalArgumentException("Invalid replacement DLFS node");
+		try {
+			rootCursor.updateAndGet(rootNode->{
+				DLPath parent=dir.toAbsolutePath().normalize().getParent();
+				if (parent!=null) {
+					AVector<ACell> parentNode=resolveValidUnchecked(rootNode,parent);
+					if (parentNode==null) throw new UncheckedIOException(new NoSuchFileException(parent.toString()));
+					if (!DLFSNode.isDirectory(parentNode)) throw new UncheckedIOException(new NotDirectoryException(parent.toString()));
+				}
+				return DLFSNode.updateNode(rootNode,dir,newNode,getTimestamp());
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
 		return newNode;
 	}
 
 	@Override
 	protected void checkAccess(DLPath path) throws IOException {
 		AVector<ACell> rootNode=rootCursor.get();
-		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
+		AVector<ACell> node=DLFSNode.resolveNode(rootNode,path);
 		if (node==null) {
 			throw new NoSuchFileException(path.toString());
 		}
@@ -255,5 +268,47 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public DLFSLocal clone() {
 		return new DLFSLocal(provider(), uriPath, rootCursor.get());
+	}
+
+	private static CVMLong initialTimestamp(AVector<ACell> rootNode) {
+		if (rootNode!=null && rootNode.count()>DLFSNode.POS_UTIME) {
+			ACell value=rootNode.get(DLFSNode.POS_UTIME);
+			if (value instanceof CVMLong timestamp) return timestamp;
+		}
+		return CVMLong.ZERO;
+	}
+
+	private static void requireAbsent(AVector<ACell> parent, AString name, DLPath path) throws IOException {
+		ACell existing=DLFSNode.getRawEntry(DLFSNode.getDirectoryEntries(parent),name);
+		if (existing==null) return;
+		if (!(existing instanceof AVector<?> vector)) throw new DLFSCorruptionException(path.toString(),"Stored value is not a DLFS node");
+		@SuppressWarnings("unchecked")
+		AVector<ACell> node=(AVector<ACell>)vector;
+		if (!DLFSNode.isValidNodeShallow(node)) throw new DLFSCorruptionException(path.toString(),"Malformed existing DLFS node");
+		throw new FileAlreadyExistsException(path.toString());
+	}
+
+	private static void requireAbsentUnchecked(AVector<ACell> parent, AString name, DLPath path) {
+		try {
+			requireAbsent(parent,name,path);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	private static AVector<ACell> resolveNodeUnchecked(AVector<ACell> root, DLPath path) {
+		try {
+			return DLFSNode.resolveNode(root,path);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	private static AVector<ACell> resolveValidUnchecked(AVector<ACell> root, DLPath path) {
+		try {
+			return DLFSNode.resolveValidPath(root,path);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 }
