@@ -60,6 +60,7 @@ import convex.lattice.LatticeContext;
 import convex.lattice.P2PLattice;
 import convex.lattice.cursor.ACursor;
 import convex.lattice.cursor.PathCursor;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 import convex.net.impl.netty.NettyServer;
@@ -1695,6 +1696,141 @@ public class NodeServerTest {
 			}
 			assertEquals("NodeServer inbound dispatcher", lattice.mergeThread);
 			assertFalse(lattice.mergeThread.startsWith("convex-netty"));
+		}
+	}
+
+	@Test
+	public void testPullPathDoesNotPullSibling() throws Exception {
+		Keyword regionA=Keyword.create("region-a");
+		Keyword regionB=Keyword.create("region-b");
+		KeyedLattice lattice=KeyedLattice.create(
+				regionA,MaxLattice.create(),regionB,MaxLattice.create());
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			allowPrimaryInbound(source);
+			source.launch();
+			target.launch();
+			source.getCursor().path(regionA).merge(CVMLong.create(111));
+			source.getCursor().path(regionB).merge(CVMLong.create(222));
+			source.getCursor().sync();
+
+			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+				assertEquals(CVMLong.create(111),
+						target.pullPath(peer,regionA).get(5,TimeUnit.SECONDS));
+				assertNull(target.getCursor().get(regionB));
+			}
+		}
+	}
+
+	@Test
+	public void testConcurrentPullPathsUseIndependentResults() throws Exception {
+		Keyword regionA=Keyword.create("region-a");
+		Keyword regionB=Keyword.create("region-b");
+		KeyedLattice lattice=KeyedLattice.create(
+				regionA,MaxLattice.create(),regionB,MaxLattice.create());
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			allowPrimaryInbound(source);
+			source.launch();
+			target.launch();
+			source.getCursor().path(regionA).merge(CVMLong.create(111));
+			source.getCursor().path(regionB).merge(CVMLong.create(222));
+			source.getCursor().sync();
+
+			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+				CompletableFuture<ACell> a=target.pullPath(peer,regionA);
+				CompletableFuture<ACell> b=target.pullPath(peer,regionB);
+				assertEquals(CVMLong.create(111),a.get(5,TimeUnit.SECONDS));
+				assertEquals(CVMLong.create(222),b.get(5,TimeUnit.SECONDS));
+			}
+		}
+	}
+
+	@Test
+	public void testPullPathAcquiresIndirectValue() throws Exception {
+		Keyword region=Keyword.create("region");
+		KeyedLattice lattice=KeyedLattice.create(region,SetLattice.create());
+		Blob branch=Blobs.createRandom(400);
+		ASet<ACell> expected=Sets.of(branch);
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			allowPrimaryInbound(source);
+			source.launch();
+			target.launch();
+			source.getCursor().path(region).merge(expected);
+			source.getCursor().sync();
+
+			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+				assertEquals(expected,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
+				assertNotNull(target.getStore().refForHash(branch.getHash()));
+			}
+		}
+	}
+
+	@Test
+	public void testPullPathAbsentAndRejectedValues() throws Exception {
+		Keyword absent=Keyword.create("absent");
+		Keyword rejected=Keyword.create("rejected");
+		KeyedLattice sourceLattice=KeyedLattice.create(
+				absent,MaxLattice.create(),rejected,SetLattice.create());
+		KeyedLattice targetLattice=KeyedLattice.create(
+				absent,MaxLattice.create(),rejected,MaxLattice.create());
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(sourceLattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(targetLattice,new MemoryStore())) {
+			allowPrimaryInbound(source);
+			source.launch();
+			target.launch();
+			target.getCursor().path(rejected).merge(CVMLong.create(7));
+			target.getCursor().sync();
+			source.getCursor().path(rejected).merge(Sets.of(CVMLong.ONE));
+			source.getCursor().sync();
+
+			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+				assertNull(target.pullPath(peer,absent).get(5,TimeUnit.SECONDS));
+				assertEquals(CVMLong.create(7),
+						target.pullPath(peer,rejected).get(5,TimeUnit.SECONDS));
+			}
+		}
+	}
+
+	@Test
+	public void testPullNestedPath() throws Exception {
+		Keyword outer=Keyword.create("outer");
+		Keyword inner=Keyword.create("inner");
+		KeyedLattice lattice=KeyedLattice.create(
+				outer,KeyedLattice.create(inner,MaxLattice.create()));
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			allowPrimaryInbound(source);
+			source.launch();
+			target.launch();
+			source.getCursor().path(outer,inner).merge(CVMLong.create(42));
+			source.getCursor().sync();
+
+			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+				assertEquals(CVMLong.create(42),
+						target.pullPath(peer,outer,inner).get(5,TimeUnit.SECONDS));
+			}
+		}
+	}
+
+	@Test
+	public void testLatticeQueryRejectsNonVectorPath() throws Exception {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+
+		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			AVector<?> payload=Vectors.create(
+					MessageTag.LATTICE_QUERY,null,Keyword.create("not-a-vector"));
+			Result result=peer.request(Message.create(MessageType.LATTICE_QUERY,payload))
+					.get(5,TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.ARGUMENT,result.getErrorCode());
 		}
 	}
 

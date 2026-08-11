@@ -418,6 +418,31 @@ public class MessageTest {
 		assertTrue(conn.isTrusted());
 	}
 
+	@Test public void testChallengeWithID() {
+		Message challenge=Message.createChallenge(1,KP.signData(CVMLong.ONE));
+		Message retagged=challenge.withID(CVMLong.create(2));
+		assertNotNull(retagged);
+		assertEquals(CVMLong.create(2),retagged.getRequestID());
+	}
+
+	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {
+		LocalConnection conn = LocalConnection.create(m -> true);
+		int count=10_000;
+		java.util.Set<CVMLong> ids=java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+		java.util.stream.IntStream.range(0,count).parallel()
+				.forEach(i -> ids.add(conn.nextRequestID()));
+
+		assertEquals(count,ids.size());
+		for (long i=0;i<count;i++) {
+			assertTrue(ids.contains(CVMLong.create(i)));
+		}
+
+		LocalConnection independent=LocalConnection.create(m -> true);
+		assertEquals(CVMLong.ZERO,independent.nextRequestID(),
+				"Each originating connection has an independent ID space");
+	}
+
 	/**
 	 * Generic tests for any valid message
 	 * @param m Message to test

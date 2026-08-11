@@ -27,6 +27,7 @@ import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
@@ -166,7 +167,7 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
-		return message(Message.createChallenge(getNextID(), data));
+		return request(Message.createChallenge((CVMLong)null, data));
 	}
 
 	@Override

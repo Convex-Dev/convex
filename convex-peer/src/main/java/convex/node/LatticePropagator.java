@@ -24,12 +24,12 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.LatestUpdateQueue;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
 
@@ -627,6 +627,22 @@ public class LatticePropagator implements Closeable {
 	 * @return CompletableFuture that completes with the acquired value
 	 */
 	public CompletableFuture<ACell> pull(Convex peer) {
+		return pullPath(peer);
+	}
+
+	/**
+	 * Pulls one path of a peer's latest lattice value into this propagator's
+	 * store. Path selection scopes transfer and storage work; it is not an
+	 * access-control boundary.
+	 *
+	 * <p>The caller must not mutate {@code path} while the returned operation is
+	 * outstanding.</p>
+	 *
+	 * @param peer Convex connection to the peer node
+	 * @param path path within the peer's announced lattice value
+	 * @return future completing with the acquired value, or {@code null} when absent
+	 */
+	public CompletableFuture<ACell> pullPath(Convex peer, ACell... path) {
 		if (peer == null) {
 			return CompletableFuture.failedFuture(new IllegalArgumentException("Peer cannot be null"));
 		}
@@ -637,12 +653,11 @@ public class LatticePropagator implements Closeable {
 					throw new RuntimeException("Peer is not connected");
 				}
 
-				// 1. Query peer for their root lattice value
-				CVMLong queryId = CVMLong.create(System.currentTimeMillis());
-				AVector<?> queryPayload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, Vectors.empty());
+				AVector<?> queryPayload = Vectors.create(
+						MessageTag.LATTICE_QUERY, null, Vectors.create(path));
 				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
 
-				CompletableFuture<Result> resultFuture = peer.message(queryMessage);
+				CompletableFuture<Result> resultFuture = peer.request(queryMessage);
 				Result result = resultFuture.get(10, TimeUnit.SECONDS);
 
 				if (result.isError()) {
@@ -664,14 +679,14 @@ public class LatticePropagator implements Closeable {
 					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
 				}
 
-				log.debug("Acquired pulled value from peer: {}", peer.getHostAddress());
+				log.debug("Acquired pulled lattice path from peer: {}", peer.getHostAddress());
 				return acquired;
 
 			} catch (Exception e) {
-				log.warn("Pull failed from peer: {}", peer.getHostAddress(), e);
-				throw new RuntimeException("Pull failed from peer", e);
+				log.warn("Lattice pull failed from peer: {}", peer.getHostAddress(), e);
+				throw new RuntimeException("Lattice pull failed from peer", e);
 			}
-		});
+		},ThreadUtils.getVirtualExecutor());
 	}
 
 	/**

@@ -14,6 +14,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.net.impl.netty.NettyConnection;
@@ -109,14 +110,14 @@ public class ConvexRemote extends AConvexConnected {
 
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
-		Message m=Message.createTransaction(getNextID(), signed);
-		return message(m);
+		Message m=Message.createTransaction((CVMLong)null, signed);
+		return request(m);
 	}
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address)  {
-		Message m=Message.createQuery(getNextID(), query,address);
-		return message(m);
+		Message m=Message.createQuery((CVMLong)null, query,address);
+		return request(m);
 	}
 
 	@Override
@@ -133,14 +134,14 @@ public class ConvexRemote extends AConvexConnected {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		Message m=Message.createStatusRequest(getNextID());
-		return message(m);
+		Message m=Message.createStatusRequest((CVMLong)null);
+		return request(m);
 	}
 
 	@Override
 	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
-		Message m=Message.createChallenge(getNextID(), data);
-		return message(m);
+		Message m=Message.createChallenge((CVMLong)null, data);
+		return request(m);
 	}
 
 	@Override

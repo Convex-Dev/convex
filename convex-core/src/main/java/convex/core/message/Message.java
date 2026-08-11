@@ -108,7 +108,11 @@ public class Message {
 	}
 
 	public static Message createChallenge(long id, SignedData<ACell> challenge) {
-		AVector<?> v=Vectors.create(MessageTag.CHALLENGE,CVMLong.create(id),challenge);
+		return createChallenge(CVMLong.create(id),challenge);
+	}
+
+	public static Message createChallenge(CVMLong id, SignedData<ACell> challenge) {
+		AVector<?> v=Vectors.create(MessageTag.CHALLENGE,id,challenge);
 		return create(MessageType.CHALLENGE, v);
 	}
 
@@ -499,7 +503,8 @@ public class Message {
 				case DATA_REQUEST:
 				case LATTICE_VALUE:
 				case LATTICE_QUERY:
-				case PING: {
+				case PING:
+				case CHALLENGE: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 
@@ -657,12 +662,20 @@ public class Message {
 	}
 	
 	public static Message createQuery(long id, ACell code, Address address) {
-		AVector<?> v=Vectors.create(MessageTag.QUERY,CVMLong.create(id),code,address);
+		return createQuery(CVMLong.create(id),code,address);
+	}
+
+	public static Message createQuery(CVMLong id, ACell code, Address address) {
+		AVector<?> v=Vectors.create(MessageTag.QUERY,id,code,address);
 		return create(MessageType.QUERY,v);
 	}
 
 	public static Message createTransaction(long id, SignedData<ATransaction> signed) {
-		AVector<?> v=Vectors.create(MessageTag.TRANSACT,CVMLong.create(id),signed);
+		return createTransaction(CVMLong.create(id),signed);
+	}
+
+	public static Message createTransaction(CVMLong id, SignedData<ATransaction> signed) {
+		AVector<?> v=Vectors.create(MessageTag.TRANSACT,id,signed);
 		return create(MessageType.TRANSACT,v);
 	}
 	
@@ -672,8 +685,11 @@ public class Message {
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 */
 	public static Message createStatusRequest(long id) {
-		CVMLong idPayload = CVMLong.create(id);
-		AVector<?> v=Vectors.create(MessageTag.STATUS_REQUEST,idPayload);
+		return createStatusRequest(CVMLong.create(id));
+	}
+
+	public static Message createStatusRequest(CVMLong id) {
+		AVector<?> v=Vectors.create(MessageTag.STATUS_REQUEST,id);
 		return create(MessageType.STATUS,v);
 	}
 
@@ -683,7 +699,11 @@ public class Message {
 	 * @return PING message
 	 */
 	public static Message createPing(long id) {
-		return create(MessageType.PING, Vectors.of(MessageTag.PING, CVMLong.create(id)));
+		return createPing(CVMLong.create(id));
+	}
+
+	public static Message createPing(CVMLong id) {
+		return create(MessageType.PING, Vectors.of(MessageTag.PING, id));
 	}
 
 	/**

@@ -12,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
@@ -198,9 +197,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		new ConcurrentHashMap<>();
 	private final Object acquisitionLifecycleLock = new Object();
 	private boolean acceptingAcquisitions;
-
-	/** Negative request IDs reserved for NodeServer acquisition sessions. */
-	private final AtomicLong nextDataRequestID = new AtomicLong(-1L);
 
 	/** Bounds acquisition sessions independently of the bounded merge dispatcher queue. */
 	private final Semaphore acquisitionPermits;
@@ -886,7 +882,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		ACell id = payload.get(1);
-		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
+		ACell pathValue=payload.count()>2?payload.get(2):null;
+		AVector<?> pathVector = RT.ensureVector(pathValue);
+		if ((pathValue!=null)&&(pathVector==null)) {
+			message.returnResult(Result.create(id,
+					Strings.create("LATTICE_QUERY path must be a vector"),ErrorCodes.ARGUMENT));
+			return;
+		}
 
 		// Query and later DATA_REQUEST resolution use the same capability-bound
 		// propagator view. Falling back to the primary would cross a store boundary.
@@ -1146,7 +1148,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				new IOException("Lattice source connection is closed"));
 		}
 
-		CVMLong id = CVMLong.create(nextDataRequestID.getAndDecrement());
+		ACell id = connection.nextRequestID();
 		CompletableFuture<Result> future = new CompletableFuture<>();
 		ConcurrentHashMap<ACell, CompletableFuture<Result>> byID =
 			pendingDataRequests.computeIfAbsent(connection, c -> new ConcurrentHashMap<>());
@@ -1644,6 +1646,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// the persisted or announced root independently of the merged cursor.
 			cursor.sync();
 			return cursor.get();
+		});
+	}
+
+	/**
+	 * Pulls one path from a peer and merges it at the same local cursor path.
+	 * Path selection reduces transfer and storage work; it does not grant or
+	 * enforce visibility independently of the selected propagator.
+	 *
+	 * <p>The caller must not mutate {@code path} while the returned operation is
+	 * outstanding.</p>
+	 *
+	 * @param convex Convex connection to the peer node
+	 * @param path path within both peer and local lattice roots
+	 * @return future completing with the local value at the path after the merge
+	 */
+	public CompletableFuture<ACell> pullPath(Convex convex, ACell... path) {
+		if (propagators.isEmpty()) {
+			return CompletableFuture.failedFuture(new IllegalStateException("No propagators configured"));
+		}
+		return propagators.get(0).pullPath(convex,path).thenApply(acquired -> {
+			ALatticeCursor<ACell> target=cursor.path(path);
+			ACell before=target.get();
+			boolean accepted=(acquired==null)||mergeIncoming(target,acquired);
+			ACell after=target.get();
+
+			// Publish any pending local writes even when this pull was absent,
+			// rejected or dominated, matching root pull semantics.
+			cursor.sync();
+
+			boolean changed=accepted&&(before!=after)
+					&&((before==null)||!before.equals(after));
+			if (changed&&(path.length>0)&&Keywords.P2P.equals(path[0])) {
+				maybeUpdateDesiredPeers();
+			}
+			return target.get();
 		});
 	}
 

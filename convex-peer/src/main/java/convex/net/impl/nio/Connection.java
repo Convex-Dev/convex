@@ -73,11 +73,6 @@ public class Connection extends AConnection {
 	final ByteChannel channel;
 
 	/**
-	 * Counter for IDs of all messages sent from this Connection
-	 */
-	private long idCounter = 0;
-	
-	/**
 	 * Timestamp of last connection activity
 	 */
 	private long lastActivity;
@@ -300,7 +295,7 @@ public class Connection extends AConnection {
 	 *
 	 */
 	public long sendChallenge(SignedData<ACell> challenge) throws IOException {
-		long id = ++idCounter;
+		long id = nextRequestID().longValue();
 		boolean sent = sendObject(challenge);
 		return (sent) ? id : -1;
 	}
@@ -607,6 +602,6 @@ public class Connection extends AConnection {
 	}
 
 	public long getNextID() {
-		return ++idCounter;
+		return nextRequestID().longValue();
 	}
 }

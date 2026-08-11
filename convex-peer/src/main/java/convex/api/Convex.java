@@ -105,8 +105,9 @@ public abstract class Convex implements AutoCloseable {
 
 	
 	/**
-	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result.
-	 * AtomicLong for thread-safe access from concurrent transact/query calls.
+	 * Fallback counter for connectionless clients such as {@link ConvexDirect} and
+	 * HTTP transports. Persistent binary connections override ID allocation with
+	 * their physical {@link convex.core.message.AConnection} counter.
 	 */
 	private final AtomicLong idCounter=new AtomicLong(0);
 
@@ -742,6 +743,22 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> message(Message message);
 
 	/**
+	 * Sends a message expecting a correlated result. Connection-oriented clients
+	 * override this to allocate the ID from the physical originating connection.
+	 *
+	 * @param message semantic request message with a replaceable ID slot
+	 * @return future for the correlated result
+	 */
+	public CompletableFuture<Result> request(Message message) {
+		Message request=message.withID(CVMLong.create(getNextID()));
+		if (request==null) {
+			return CompletableFuture.failedFuture(
+					new IllegalArgumentException("Message type does not support request IDs"));
+		}
+		return message(request);
+	}
+
+	/**
 	 * Non-blocking fire-and-forget message send. Returns false immediately if
 	 * the message cannot be queued (buffer full, connection closed).
 	 *
@@ -847,8 +864,8 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future completing with the peer's timestamp, or null on error
 	 */
 	public CompletableFuture<CVMLong> ping() {
-		Message m = Message.createPing(getNextID());
-		return message(m).thenApply(r -> {
+		Message m = Message.createPing((CVMLong)null);
+		return request(m).thenApply(r -> {
 			if (r == null || r.isError()) return null;
 			return RT.ensureLong(r.getValue());
 		});
