@@ -217,7 +217,7 @@ public class OAuthTest extends ARESTTest {
 	@Test
 	public void testNoProvidersConfigured() {
 		OAuthService oauth = server.getOAuthService();
-		assertNotNull(oauth, "OAuthService should always be created");
+		assertNotNull(oauth, "OAuthService should be available on demand");
 		assertTrue(oauth.getConfiguredProviders().isEmpty(),
 			"Test environment should have no OAuth providers configured");
 		assertFalse(oauth.isConfigured(Provider.GOOGLE));

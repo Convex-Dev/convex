@@ -16,23 +16,27 @@ confirm that you have the right to contribute the code and agree to these terms.
 ## Prerequisites
 
 - **Java 21+** (JDK; 25 recommended, matching CI)
-- **Maven 3.7+**
+- The checked-in Maven wrapper downloads the pinned Maven version. A separate
+  Maven installation is unnecessary.
 
-Maven is not vendored via a wrapper, so install a compatible version yourself.
+Commands below use the Unix/Git Bash spelling. In Windows PowerShell, replace
+`./mvnw` with `.\mvnw.cmd` and keep the remaining arguments unchanged.
 
 ## Building
 
-A full build with local install:
+A fast incremental compile and test run:
 
 ```bash
-mvn clean install
+./mvnw -B -T1C test
 ```
 
 To build a single module and its dependencies:
 
 ```bash
-mvn install -pl convex-core -am
+./mvnw -B -T1C test -pl convex-core -am
 ```
+
+Avoid `clean` while iterating; use it for the final verification below.
 
 > **IDE note:** some IDEs (including Eclipse) don't automatically pick up the ANTLR4
 > generated sources. If you see unresolved parser classes, add
@@ -44,20 +48,20 @@ mvn install -pl convex-core -am
 Run the whole test suite:
 
 ```bash
-mvn test
+./mvnw -B test
 ```
 
 Run the tests for a single module (much faster while iterating):
 
 ```bash
-mvn test -pl convex-core
+./mvnw -B -T1C test -pl convex-core
 ```
 
 If the module depends on changes in other modules you haven't installed yet, add `-am`
 to build those first:
 
 ```bash
-mvn test -pl convex-restapi -am
+./mvnw -B -T1C test -pl convex-restapi -am
 ```
 
 Tests **must pass headless** (no GUI / no `$DISPLAY`), because CI runs on a headless
@@ -87,7 +91,7 @@ external services.
 
 Before opening a PR, please make sure:
 
-- [ ] The full build passes locally: `mvn clean install`.
+- [ ] The full build passes locally: `./mvnw -B clean install`.
 - [ ] New behaviour is covered by tests, and all tests pass headless.
 - [ ] The branch targets `develop`.
 - [ ] User-visible changes are noted in the `[Unreleased]` section of

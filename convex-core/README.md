@@ -61,7 +61,7 @@ ACell result = ctx.getResult();  // Returns 6
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn install -pl convex-core -am
+./mvnw -B -T1C install -pl convex-core -am
 ```
 
 **Note:** ANTLR4 generates parser code during the build. If your IDE shows errors, add `target/generated-sources/antlr4` as a source directory.

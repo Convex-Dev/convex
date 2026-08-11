@@ -802,7 +802,7 @@ a full online GC cycle under concurrent load and verifies the result end-to-end.
 with:
 
 ```
-mvn -pl convex-core test-compile exec:java -Dexec.classpathScope=test \
+./mvnw -B -pl convex-core test-compile exec:java -Dexec.classpathScope=test \
     -Dexec.mainClass=convex.core.examples.EtchGCExample
 ```
 

@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Lattice value messages support efficient post-merge acknowledgements through an optional request ID, while normal gossip remains fire-and-forget.
+- Peer and lattice-node launch configuration now resolves encrypted Etch stores from their header key hint by default, records the configured identity as the hint for new encrypted stores, and supports an explicit runtime key resolver for external secret providers.
+
 ### Fixed
 
 ## [0.8.11] - 2026-08-10

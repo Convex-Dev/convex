@@ -96,30 +96,32 @@ public class PeerStart extends APeerCommand {
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer controller.")
 	private String controllerAddress;
 	
-	private AKeyPair findPeerKey(AStore store, HashMap<Keyword,Object> config) {
-		// First check user supplied peer key. If we have it, use it
-		AKeyPair kp=specifiedPeerKey();
-		if (kp!=null) return kp;
-
-		// if user specified a --peer-key, but it wasn't found in keystore
+	AKeyPair findPeerKey(AStore store, HashMap<Keyword,Object> config) {
 		String specifiedKey=peerKeyMixin.getPublicKey();
+		Object configKeyPair=config.get(Keywords.KEYPAIR);
 		if (specifiedKey!=null) {
-			throw new CLIError(ExitCodes.CONFIG,"Peer key not found in Store: "+specifiedKey);
+			if (configKeyPair instanceof AKeyPair) return (AKeyPair)configKeyPair;
+			throw new CLIError(ExitCodes.CONFIG,"Peer key not found in keystore: "+specifiedKey);
 		}
 
 		// Key pair from config file, if provided
-		Object configKeyPair=config.get(Keywords.KEYPAIR);
 		if (configKeyPair instanceof AKeyPair) {
 			inform("Using peer key from config file");
 			return (AKeyPair)configKeyPair;
 		}
 
-		// In strict mode, we insist on a peer key
-		paranoia("--peer-key not specified");
-		
-		log.debug("--peer-key not available, attempting to infer from store");
+		log.debug("Peer key not explicitly configured, attempting to infer from store");
 		try {
 			List<AccountKey> peerList=API.listPeers(store);
+			AKeyPair hintedKey=getHintedEtchKey();
+			if ((hintedKey!=null)&&peerList.contains(hintedKey.getAccountKey())) {
+				inform("Using peer key identified by the Etch publicKeyHint");
+				return hintedKey;
+			}
+
+			// In strict mode, an authenticated Etch hint for an actual stored Peer is
+			// sufficient; otherwise require an explicit peer identity.
+			paranoia("--peer-key not specified");
 			if (peerList.size()==0) {
 				throw new CLIError(ExitCodes.CONFIG,"No peers configured in Etch store "+store+". Consider using `convex peer create` or `convex peer genesis` first.");
 			} else if (peerList.size()>1) {
@@ -140,20 +142,24 @@ public class PeerStart extends APeerCommand {
 		storeMixin.ensureKeyStore();
 		// Config file (if any) provides base values; explicit CLI options take precedence.
 		HashMap<Keyword,Object> config=loadPeerConfig();
+		AKeyPair genesisKey=null;
+		if (genesis!=null&&(!genesis.isEmpty())) {
+			// Resolve the test identity before opening Etch so a new encrypted file
+			// receives the correct public-key hint.
+			paranoia("Shouldn't use Genesis Seed in strict security mode! Consider key compromised!");
+			Blob seed=Blob.parse(genesis);
+			if ((seed==null)||(seed.count()!=32)) {
+				throw new CLIError(ExitCodes.DATAERR,"Genesis seed must be a 32 byte hex blob");
+			}
+			genesisKey=AKeyPair.create(seed);
+			setConfiguredPeerKey(config,genesisKey);
+			informWarning("Using test genesis seed: "+seed);
+		}
 		try (AStore store = openPeerStore(config)) {
 
 			AKeyPair peerKey;
-			AKeyPair genesisKey=null;
-			if (genesis!=null&&(!genesis.isEmpty())) {
-				// Using a genesis seed for testing
-				paranoia("Shouldn't use Genesis Seed in strict security mode! Consider key compromised!");
-				Blob seed=Blob.parse(genesis);
-				if ((seed==null)||(seed.count()!=32)) {
-					throw new CLIError(ExitCodes.DATAERR,"Genesis seed must be a 32 byte hex blob");
-				}
-				peerKey = AKeyPair.create(seed);
-				genesisKey=peerKey;
-				informWarning("Using test genesis seed: "+seed);
+			if (genesisKey!=null) {
+				peerKey=genesisKey;
 			} else {
 				peerKey=findPeerKey(store,config);
 				if (peerKey==null) {

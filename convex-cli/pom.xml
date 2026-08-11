@@ -30,6 +30,10 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
+					<!-- CLI tests manipulate process-wide input and launch local peers.
+					     Separate JVMs provide safe class-level parallelism. -->
+					<forkCount>2</forkCount>
+					<reuseForks>true</reuseForks>
 					<environmentVariables>
 						<NO_COLOR>1</NO_COLOR>
 					</environmentVariables>

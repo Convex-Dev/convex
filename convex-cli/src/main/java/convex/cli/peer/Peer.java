@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.function.Function;
 
 import convex.core.data.AccountKey;
+import convex.peer.Config;
 
 /**
  *
@@ -53,16 +54,18 @@ public class Peer extends ATopCommand {
 	/** Loads peer configuration with runtime Etch key resolution. */
 	public HashMap<Keyword,Object> loadPeerConfig(Function<AccountKey,byte[]> etchKeyFunction) {
 		HashMap<Keyword,Object> result=new HashMap<>();
-		if ((configFilename==null)||configFilename.isBlank()) return result;
-		try {
-			RESTConfig pc=RESTConfig.load(configFilename.trim());
-			result.putAll(pc.toLegacy(etchKeyFunction));
-			inform("Loaded peer config from: "+configFilename);
-		} catch (IOException e) {
-			throw new CLIError(ExitCodes.CONFIG,"Unable to read peer config file: "+configFilename,e);
-		} catch (RuntimeException e) {
-			throw new CLIError(ExitCodes.CONFIG,"Unable to parse peer config file: "+configFilename+" ("+e.getMessage()+")",e);
+		if ((configFilename!=null)&&!configFilename.isBlank()) {
+			try {
+				RESTConfig pc=RESTConfig.load(configFilename.trim());
+				result.putAll(pc.toLegacy(etchKeyFunction));
+				inform("Loaded peer config from: "+configFilename);
+			} catch (IOException e) {
+				throw new CLIError(ExitCodes.CONFIG,"Unable to read peer config file: "+configFilename,e);
+			} catch (RuntimeException e) {
+				throw new CLIError(ExitCodes.CONFIG,"Unable to parse peer config file: "+configFilename+" ("+e.getMessage()+")",e);
+			}
 		}
+		if (etchKeyFunction!=null) result.put(Config.ETCH_KEY_RESOLVER,etchKeyFunction);
 		return result;
 	}
 

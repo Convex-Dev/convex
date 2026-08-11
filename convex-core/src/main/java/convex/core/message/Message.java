@@ -437,6 +437,7 @@ public class Message {
 			case TRANSACT:
 			case QUERY:
 			case DATA_REQUEST:
+			case LATTICE_VALUE:
 			case LATTICE_QUERY:
 			case PING:
 			case CHALLENGE:{
@@ -496,6 +497,7 @@ public class Message {
 				case TRANSACT: 
 				case QUERY:
 				case DATA_REQUEST:
+				case LATTICE_VALUE:
 				case LATTICE_QUERY:
 				case PING: {
 					ACell o=getPayload();

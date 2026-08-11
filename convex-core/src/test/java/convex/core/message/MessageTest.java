@@ -142,6 +142,18 @@ public class MessageTest {
 		Message m=Message.createQuery(0, Symbols.STAR_BALANCE, Address.ZERO);
 		doMessageTest(m);
 	}
+
+	@Test public void testLatticeValueID() throws BadFormatException {
+		AVector<?> payload=Vectors.of(MessageTag.LATTICE_VALUE,12,Vectors.empty(),42);
+		Message m=Message.create(MessageType.LATTICE_VALUE,payload);
+		assertEquals(CVMLong.create(12),m.getRequestID());
+		assertEquals(CVMLong.create(13),m.withID(CVMLong.create(13)).getRequestID());
+		doMessageTest(m);
+
+		Message fireAndForget=Message.create(MessageType.LATTICE_VALUE,
+			Vectors.of(MessageTag.LATTICE_VALUE,null,Vectors.empty(),42));
+		assertNull(fireAndForget.getRequestID());
+	}
 	
 	@Test public void testTransact() throws BadFormatException {
 		ATransaction tx=Invoke.create(Address.create(134564), 124334, Symbols.STAR_BALANCE);

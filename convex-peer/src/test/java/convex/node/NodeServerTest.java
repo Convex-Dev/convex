@@ -906,16 +906,19 @@ public class NodeServerTest {
 					sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
 					CompletableFuture<ACell> primaryAnnounce = primary.nextAnnounce();
 
+					CVMLong mergeID = CVMLong.create(80);
 					AVector<?> payload = Vectors.create(
-						MessageTag.LATTICE_VALUE, Vectors.empty(), remoteValue);
+						MessageTag.LATTICE_VALUE, mergeID, Vectors.empty(), remoteValue);
 					// Encode only the protocol root. The large Blob remains an indirect
 					// reference and must be requested from the source propagator store.
 					Message partial = Message.create(
 						MessageType.LATTICE_VALUE, payload, payload.getEncoding());
-					assertTrue(source.trySend(partial));
+					CompletableFuture<Result> mergeResult = source.message(partial);
 
 					assertTrue(sourceStore.requested.await(5, TimeUnit.SECONDS),
 						"receiver should request the missing branch on the same connection");
+					assertFalse(mergeResult.isDone(),
+						"LATTICE_VALUE result must wait for acquisition and merge");
 					assertTrue(receiver.getLocalValue().isEmpty(),
 						"partial data must never reach the lattice cursor");
 					assertNull(primaryStore.refForHash(missingBranch.getHash()),
@@ -924,6 +927,10 @@ public class NodeServerTest {
 						"the withheld branch should not appear before its response arrives");
 
 					sourceStore.release.countDown();
+					Result result = mergeResult.get(5, TimeUnit.SECONDS);
+					assertEquals(mergeID, result.getID());
+					assertFalse(result.isError());
+					assertNull(result.getValue(), "successful merge acknowledgement should be empty");
 					assertEquals(remoteValue, primaryAnnounce.get(5, TimeUnit.SECONDS));
 					assertEquals(remoteValue, receiver.getLocalValue());
 					assertNotNull(ingressStore.refForHash(missingBranch.getHash()),
@@ -974,7 +981,7 @@ public class NodeServerTest {
 			sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
 
 			AVector<?> payload = Vectors.create(
-				MessageTag.LATTICE_VALUE, Vectors.empty(), remoteValue);
+				MessageTag.LATTICE_VALUE, null, Vectors.empty(), remoteValue);
 			Message partial = Message.create(
 				MessageType.LATTICE_VALUE, payload, payload.getEncoding());
 			assertTrue(source.trySend(partial));
@@ -1463,7 +1470,7 @@ public class NodeServerTest {
 	}
 
 	private static Message latticeValue(ACell value, AConnection conn) {
-		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, Vectors.empty(), value);
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, Vectors.empty(), value);
 		return Message.create(MessageType.LATTICE_VALUE, payload).withConnection(conn);
 	}
 
@@ -1643,14 +1650,16 @@ public class NodeServerTest {
 				CompletableFuture<ACell> announced = propagator.nextAnnounce();
 
 				AVector<ACell> emptyPath = Vectors.empty();
-				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, CVMLong.create(42));
+				CVMLong mergeID = CVMLong.create(81);
+				AVector<?> payload = Vectors.create(
+					MessageTag.LATTICE_VALUE, mergeID, emptyPath, CVMLong.create(42));
 				Message msg = Message.create(MessageType.LATTICE_VALUE, payload);
-				// Fire-and-forget: LATTICE_VALUE has no request ID, no response expected
-				convex.message(msg);
-
-				// Wait on the propagator's announce signal (no sleep-polling).
-				// Keep connection open: closing too early can drop unsent data.
-				announced.get(10, TimeUnit.SECONDS);
+				Result result = convex.message(msg).get(10, TimeUnit.SECONDS);
+				assertEquals(mergeID, result.getID());
+				assertFalse(result.isError());
+				assertNull(result.getValue());
+				assertTrue(announced.isDone(),
+					"merge acknowledgement must follow synchronous publication");
 			} finally {
 				convex.close();
 			}
@@ -1680,12 +1689,32 @@ public class NodeServerTest {
 			CompletableFuture<ACell> announced = node.getPropagator().nextAnnounce();
 			try (ConvexRemote convex = ConvexRemote.connect(node.getHostAddress())) {
 				AVector<?> payload = Vectors.create(
-					MessageTag.LATTICE_VALUE, Vectors.empty(), CVMLong.create(42));
+					MessageTag.LATTICE_VALUE, null, Vectors.empty(), CVMLong.create(42));
 				convex.message(Message.create(MessageType.LATTICE_VALUE, payload));
 				announced.get(10, TimeUnit.SECONDS);
 			}
 			assertEquals("NodeServer inbound dispatcher", lattice.mergeThread);
 			assertFalse(lattice.mergeThread.startsWith("convex-netty"));
+		}
+	}
+
+	/** A correlated lattice update must fail promptly when its merge is rejected. */
+	@Test
+	public void testRejectedLatticeValueReturnsError() throws Exception {
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+
+		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			CVMLong mergeID = CVMLong.create(83);
+			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, mergeID,
+				Vectors.empty(), Strings.create("not-an-integer"));
+			Result result = convex.message(Message.create(MessageType.LATTICE_VALUE, payload))
+				.get(5, TimeUnit.SECONDS);
+
+			assertEquals(mergeID, result.getID());
+			assertTrue(result.isError());
+			assertEquals(CVMLong.ZERO, maxNodeServer.getLocalValue());
 		}
 	}
 
@@ -1719,19 +1748,16 @@ public class NodeServerTest {
 			LatticePropagator propagator = node.getPropagator();
 			try (ConvexRemote convex = ConvexRemote.connect(node.getHostAddress())) {
 				AVector<?> payload = Vectors.create(
-					MessageTag.LATTICE_VALUE, Vectors.empty(), CVMLong.create(42));
+					MessageTag.LATTICE_VALUE, CVMLong.create(82), Vectors.empty(), CVMLong.create(42));
 				Message value = Message.create(MessageType.LATTICE_VALUE, payload);
 
 				CompletableFuture<ACell> firstAnnounce = propagator.nextAnnounce();
-				convex.message(value);
+				assertFalse(convex.message(value).get(10, TimeUnit.SECONDS).isError());
 				firstAnnounce.get(10, TimeUnit.SECONDS);
 				assertEquals(launchWrites + 1, testStore.rootWrites.get());
 
 				CompletableFuture<ACell> replayAnnounce = propagator.nextAnnounce();
-				convex.message(value);
-				// Same channel plus single ordered dispatcher: the ping response proves
-				// the replay was processed before these assertions.
-				convex.ping().get(10, TimeUnit.SECONDS);
+				assertFalse(convex.message(value).get(10, TimeUnit.SECONDS).isError());
 				assertEquals(launchWrites + 1, testStore.rootWrites.get());
 				assertFalse(replayAnnounce.isDone());
 			}

@@ -31,4 +31,4 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn -B clean install
+        run: ./mvnw -B clean install

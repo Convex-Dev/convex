@@ -79,6 +79,66 @@ public class ConfigTest {
 		assertEquals(length,file.length());
 	}
 
+	@Test public void testExistingEncryptedStoreUsesConfiguredPeerKey() throws Exception {
+		AKeyPair keyPair=AKeyPair.generate();
+		File file=File.createTempFile("peer-key-default", ".etch");
+		file.deleteOnExit();
+		EtchConfig encrypted=EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
+				CipherMode.AES_256_CTR,true,keyPair.getAccountKey(),Config.etchKeyResolver(keyPair));
+		try (EtchStore store=EtchStore.create(file,encrypted)) {
+			store.flush();
+		}
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,file.getPath());
+		config.put(Keywords.KEYPAIR,keyPair);
+		try (EtchStore store=Config.checkStore(config)) {
+			assertEquals(keyPair.getAccountKey(),store.getEtch().getConfig().getPublicKeyHint());
+			assertEquals(CipherMode.AES_256_CTR,store.getEtch().getConfig().getCipherMode());
+		}
+	}
+
+	@Test public void testConfiguredStorePathIsCreated() throws Exception {
+		File file=File.createTempFile("configured-peer-store", ".etch");
+		assertTrue(file.delete());
+		file.deleteOnExit();
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,file.getPath());
+		try (EtchStore store=Config.checkStore(config)) {
+			assertEquals(file.getCanonicalFile(),store.getFile().getCanonicalFile());
+		}
+	}
+
+	@Test public void testExplicitEtchResolverOverridesPeerKeyDefault() throws Exception {
+		AKeyPair peerKey=AKeyPair.generate();
+		AccountKey storageKey=AccountKey.dummy("57a9");
+		byte[] secret=new byte[32];
+		secret[0]=0x5a;
+		File file=File.createTempFile("peer-explicit-resolver", ".etch");
+		file.deleteOnExit();
+		EtchConfig encrypted=EtchConfig.createV3(MappingMode.MAPPED_BYTE_BUFFER,true,
+				CipherMode.CHACHA20,true,storageKey,ignored->secret.clone());
+		try (EtchStore store=EtchStore.create(file,encrypted)) {
+			store.flush();
+		}
+
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE,file.getPath());
+		config.put(Keywords.KEYPAIR,peerKey);
+		config.put(Config.ETCH_KEY_RESOLVER,
+				(java.util.function.Function<AccountKey,byte[]>)(ignored->secret.clone()));
+		try (EtchStore store=Config.checkStore(config)) {
+			assertEquals(storageKey,store.getEtch().getConfig().getPublicKeyHint());
+			assertEquals(CipherMode.CHACHA20,store.getEtch().getConfig().getCipherMode());
+		}
+	}
+
+	@Test public void testInvalidEtchResolverFailsClosed() {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Config.ETCH_KEY_RESOLVER,"not a resolver");
+		assertThrows(IOException.class,()->Config.getEtchConfig(config));
+	}
+
 	private static EtchConfig encryptedConfig(byte first) {
 		byte[] secret=new byte[32];
 		secret[0]=first;

@@ -34,6 +34,21 @@ NodeServer manages a list of propagators that handle persistence and broadcast t
    barrier. NodeServer checkpoints after initial publication, periodically while dirty,
    and during orderly shutdown; broadcast remains best-effort.
 
+### Opening encrypted Etch stores
+
+Store identity and secret resolution belong to peer or lattice-node startup,
+not to `NodeServer` or the Etch file format. High-level launchers should pass
+their store path, optional `EtchConfig` creation policy and identity `AKeyPair`
+through `convex.peer.Config`. Its default Etch resolver derives the standard
+master key from that identity, verifies any existing header `publicKeyHint`,
+and supplies the full identity key as the hint for a new encrypted file.
+
+Applications backed by a keystore, hardware device or other secret provider
+may set the runtime-only `Config.ETCH_KEY_RESOLVER` function. That explicit
+resolver wins over identity-key derivation and is deliberately not a JSON5
+field. Existing Etch headers remain authoritative; the serialised `peer.etch`
+section is only a creation policy.
+
 ## Architecture
 
 ```
@@ -241,10 +256,13 @@ When a peer sends a `LATTICE_VALUE` message:
 4. Calls `cursor.sync()` — this synchronously publishes to the primary store and queues
    secondary propagation.
 
-`LATTICE_VALUE` is fire-and-forget, so there is no application sync caller for a
-publication exception. NodeServer contains and logs the exception at the inbound-message
-boundary. The accepted merge remains in memory and the node stays running for
-operator-directed recovery.
+`LATTICE_VALUE` uses `[:LV id path value]`. A null ID is fire-and-forget. With a
+non-null ID, NodeServer returns an empty successful `Result` only after the merge and,
+when it changed the cursor, synchronous primary publication. Rejected merges and
+publication failures return an error where the request ID is available. For
+fire-and-forget publication failures, NodeServer contains and logs the exception at the
+inbound-message boundary; the accepted merge remains in memory and the node stays
+running for operator-directed recovery.
 
 NodeServer also supports explicit pull via `pull()` (query all connected peers)
 or `pull(Convex)` (query a specific peer). Pull sends a `LATTICE_QUERY`, receives
@@ -919,7 +937,7 @@ re-propagation boundary.
 ## Verification
 
 ```bash
-pushd C:/Users/mike_/git/convex && mvn test -pl convex-peer -Dtest=NodeServerPersistenceTest
-pushd C:/Users/mike_/git/convex && mvn test -pl convex-peer -Dtest=NodeServerTest
-pushd C:/Users/mike_/git/convex && mvn test -pl convex-dlfs
+pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-peer -Dtest=NodeServerPersistenceTest
+pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-peer -Dtest=NodeServerTest
+pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-dlfs
 ```

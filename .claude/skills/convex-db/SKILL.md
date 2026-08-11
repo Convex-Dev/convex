@@ -153,8 +153,8 @@ Run from the repository root — see the `build-convex` skill.
 
 ```bash
 # Build (-am also builds convex-core, which this depends on)
-./mvnw -B clean install -DskipTests -pl convex-db -am
+./mvnw -B -T1C install -pl convex-db -am
 
 # Run tests
-./mvnw -B test -pl convex-db -am
+./mvnw -B -T1C test -pl convex-db -am
 ```

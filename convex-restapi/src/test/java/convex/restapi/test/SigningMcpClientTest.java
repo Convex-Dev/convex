@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -70,6 +71,12 @@ public class SigningMcpClientTest extends ARESTTest {
 				.requestTimeout(Duration.ofSeconds(10))
 				.build();
 		mcpAlice.initialize();
+	}
+
+	@AfterAll
+	public void closeClients() {
+		if (mcpAlice!=null) mcpAlice.close();
+		if (mcpNoAuth!=null) mcpNoAuth.close();
 	}
 
 	// ===== Protocol-level tests =====

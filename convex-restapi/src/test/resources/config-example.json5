@@ -32,6 +32,16 @@
 		// Omit or set null for default temporary file-backed store.
 		// "store": "/path/to/peer.etch",
 
+		// Optional Etch creation policy. Existing files retain the format in their header.
+		// Encryption uses the configured peer key by default and records its public key
+		// as the lookup hint; keystore-backed launchers may resolve the same hint externally.
+		// "etch": {
+		// 	"version": 3,
+		// 	"cipher": "aes-256-ctr", // or "chacha20"
+		// 	"encryptIndex": true,
+		// 	// "publicKeyHint": "full 64-character public key override",
+		// },
+
 		// Public URL for this peer (used for peer discovery and DID documents).
 		// "url": "peer.convex.live",
 

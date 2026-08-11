@@ -27,7 +27,7 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 
 `NodeServer<V>` is the main implementation for serving and propagating lattice state. It handles:
 
-- **LATTICE_VALUE** (`[:LV [*path*] value]`) — Receive a value at a path, validate via sub-lattice, merge atomically, broadcast delta to propagators
+- **LATTICE_VALUE** (`[:LV id [*path*] value]`) — Receive and atomically merge a value at a path; a non-null ID requests a post-merge Result
 - **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
 - **DATA_REQUEST** (`[:DR id hash1 hash2 ...]`) — Serve content-addressable data from the store
 - **PING** — Liveness check
@@ -66,7 +66,7 @@ Current `MessageType` enum (16 types):
 | 11 | GOODBYE | Connection shutdown `[:BYE message?]` |
 | 12 | STATUS | Request peer status |
 | 13 | UNKNOWN | Unrecognised message type |
-| 14 | LATTICE_VALUE | Lattice delta `[:LV [*path*] value]` |
+| 14 | LATTICE_VALUE | Lattice delta `[:LV id [*path*] value]`; null ID is fire-and-forget |
 | 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]` |
 | 16 | PING | Connectivity check `[:PING id]` |
 
@@ -457,7 +457,7 @@ Messages are currently split between `NodeServer` (lattice operations) and `Serv
 
 | Message | Handler | Notes |
 |---------|---------|-------|
-| LATTICE_VALUE | `processLatticeValue()` → `cursor.path(path).merge(value)` | Navigate to target, merge via cursor |
+| LATTICE_VALUE | `processLatticeValue()` → `cursor.path(path).merge(value)` | Navigate, merge, then respond when ID is non-null |
 | LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
 | DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
 | PING | `processPing()` | Respond with RESULT |

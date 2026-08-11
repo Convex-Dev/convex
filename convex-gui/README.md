@@ -53,7 +53,7 @@ This is expected for an unsigned build; signed/notarised installers are tracked 
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn install
+./mvnw -B -T1C install
 java -jar convex-integration/target/convex.jar desktop
 ```
 

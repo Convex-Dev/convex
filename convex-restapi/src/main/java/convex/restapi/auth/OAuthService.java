@@ -52,7 +52,6 @@ public class OAuthService {
 	private static final long JWKS_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 	private final RESTServer restServer;
-	private final HttpClient httpClient;
 
 	// Pending auth state: state token → PendingAuth
 	private final ConcurrentHashMap<String, PendingAuth> pendingAuths = new ConcurrentHashMap<>();
@@ -135,9 +134,17 @@ public class OAuthService {
 
 	public OAuthService(RESTServer restServer) {
 		this.restServer = restServer;
-		this.httpClient = HttpClient.newBuilder()
-			.followRedirects(HttpClient.Redirect.NORMAL)
-			.build();
+	}
+
+	private static HttpClient getHttpClient() {
+		return HttpClientHolder.INSTANCE;
+	}
+
+	/** OAuth is optional, so defer its shared connection pool until an exchange is attempted. */
+	private static final class HttpClientHolder {
+		private static final HttpClient INSTANCE=HttpClient.newBuilder()
+				.followRedirects(HttpClient.Redirect.NORMAL)
+				.build();
 	}
 
 	// ========== Provider configuration ==========
@@ -341,7 +348,7 @@ public class OAuthService {
 				reqBuilder.header("Accept", "application/json");
 			}
 
-			HttpResponse<String> response = httpClient.send(reqBuilder.build(),
+			HttpResponse<String> response = getHttpClient().send(reqBuilder.build(),
 				HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() != 200) {
@@ -417,7 +424,7 @@ public class OAuthService {
 				.GET()
 				.build();
 
-			HttpResponse<String> response = httpClient.send(request,
+			HttpResponse<String> response = getHttpClient().send(request,
 				HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() != 200) {
@@ -449,7 +456,7 @@ public class OAuthService {
 				.GET()
 				.build();
 
-			HttpResponse<String> response = httpClient.send(request,
+			HttpResponse<String> response = getHttpClient().send(request,
 				HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() != 200) return null;

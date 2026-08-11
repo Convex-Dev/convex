@@ -523,7 +523,7 @@ public class LatticePropagator implements Closeable {
 					novelty.add(value);
 				}
 				AVector<ACell> emptyPath = Vectors.empty();
-				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
 				novelty.add(payload);
 				Blob deltaData = Format.encodeDelta(novelty);
 				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
@@ -554,7 +554,7 @@ public class LatticePropagator implements Closeable {
 
 		try {
 			AVector<ACell> emptyPath = Vectors.empty();
-			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, emptyPath, value);
+			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
 			// Root-only sync still needs a complete protocol envelope. Its lattice
 			// value is encoded as an indirect ref; the receiver acquires missing
 			// branches from this propagator store before attempting a merge.

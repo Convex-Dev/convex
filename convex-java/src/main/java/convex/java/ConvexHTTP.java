@@ -6,7 +6,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
@@ -48,9 +47,7 @@ public class ConvexHTTP extends convex.api.Convex {
 	protected ConvexHTTP(Address address, AKeyPair keyPair, URI uri) {
 		super(address, keyPair);
 		this.uri = uri;
-		this.httpClient = HttpClient.newBuilder()
-				.connectTimeout(Duration.ofSeconds(30))
-				.build();
+		this.httpClient = HTTPClients.getDefault();
 	}
 	
 	public static ConvexHTTP connect(URI uri,Address address, AKeyPair keyPair) {
@@ -227,7 +224,7 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public void close() {
-		// nothing to do?
+		// The process-wide HTTP client and its connection pool are shared.
 	}
 
 	@Override

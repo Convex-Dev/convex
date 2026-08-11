@@ -118,7 +118,10 @@ public enum MessageType {
 	/**
 	 * Lattice value message, announcement of a changed lattice value
 	 * 
-	 * Payload is: [:LV [*path*] value]
+	 * Payload is: [:LV id [*path*] value]
+	 *
+	 * A null ID makes the message fire-and-forget. A non-null ID requests a
+	 * Result after the receiving NodeServer has merged the value.
 	 */
 	LATTICE_VALUE(14),
 	

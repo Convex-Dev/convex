@@ -157,7 +157,7 @@ Consistent with the Convex project convention: decentralised, organised, behavio
 5. Include at least one `docs.convex.world` link
 6. Add registration in `McpPrompts.registerAll()`
 7. Add test coverage in `McpPromptsTest`
-8. Verify with `mvn test -pl convex-restapi -Dtest=McpPromptsTest`
+8. Verify with `./mvnw -B test -pl convex-restapi -Dtest=McpPromptsTest`
 
 ## Testing
 

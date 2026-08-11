@@ -102,6 +102,32 @@
 			</activation>
 			<build>
 				<plugins>
+					<!-- Maven Central requires source and Javadoc artifacts. Keep them
+					     out of ordinary local/CI builds and attach them for releases. -->
+					<plugin>
+						<artifactId>maven-source-plugin</artifactId>
+						<executions><execution><id>attach-sources</id></execution></executions>
+					</plugin>
+					<plugin>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<executions><execution><id>attach-javadocs</id></execution></executions>
+					</plugin>
+
+					<!-- Central publishing is a build extension, so merely declaring it
+					     in the normal build forces resolution on every Maven command. -->
+					<plugin>
+						<groupId>org.sonatype.central</groupId>
+						<artifactId>central-publishing-maven-plugin</artifactId>
+						<version>0.11.0</version>
+						<extensions>true</extensions>
+						<configuration>
+							<publishingServerId>central</publishingServerId>
+							<checksums>all</checksums>
+							<!-- <waitUntil>published</waitUntil> -->
+							<autoPublish>true</autoPublish>
+						</configuration>
+					</plugin>
+
 					<!-- This adds GPG signing for all artifacts -->
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
@@ -148,29 +174,6 @@
 				</executions>
 			</plugin>
 			
-			<!-- Actually activate the spurce / javadoc plugins for every module -->
-		    <plugin>
-		      <artifactId>maven-source-plugin</artifactId>
-		      <executions><execution><id>attach-sources</id></execution></executions>
-		    </plugin>
-		    <plugin>
-		      <artifactId>maven-javadoc-plugin</artifactId>
-		      <executions><execution><id>attach-javadocs</id></execution></executions>
-		    </plugin>
-
-		    <plugin>
-  		        <groupId>org.sonatype.central</groupId>
-				<artifactId>central-publishing-maven-plugin</artifactId>
-				<version>0.11.0</version>
- 				<extensions>true</extensions>
-				<configuration>
-					<publishingServerId>central</publishingServerId>
-					<checksums>all</checksums>
-					<!-- <waitUntil>published</waitUntil> -->
-					<autoPublish>true</autoPublish> 
-				</configuration>
-			</plugin>
-
 			<plugin>
 				<groupId>org.cyclonedx</groupId>
 				<artifactId>cyclonedx-maven-plugin</artifactId>

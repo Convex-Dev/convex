@@ -54,14 +54,15 @@ Once you have downloaded the latest source of Convex, you can now compile the su
 To do this you need to execute the `Maven` command:
 
 .terminal command
-    mvn install
+    ./mvnw install
 
 or
 
 .terminal command
-    mvn package
+    ./mvnw package
 
-If you wish to build without running the tests you can append the option `-DskipTests`
+Both commands run the tests. On Windows PowerShell, use `.\mvnw.cmd` in place
+of `./mvnw`.
 
 
 After building and installing the maven dependencies you should eventually see the following lines

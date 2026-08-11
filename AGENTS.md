@@ -9,13 +9,14 @@ Convex is a lattice-based decentralised network and execution platform built as 
 
 ## Build System
 
-Maven 3.7+ multi-module project structure. Builds on Java 21+ (CI and Docker use JDK 25); artifacts target Java 21 bytecode.
+Maven multi-module project using the checked-in Maven 3.9.12 wrapper. Builds on
+Java 21+ (CI and Docker use JDK 25); artifacts target Java 21 bytecode.
 
 See BUILD.md for detailed build and release instructions.
 
-Quick start:
+Fast local build:
 ```bash
-mvn clean install          # Full build with local install
+./mvnw -B -T1C test
 ```
 
 ## Agent Tooling
@@ -73,7 +74,7 @@ change falls into, and when a version gate is mandatory. See the
 Do not report work as complete on the strength of a compile. Run what CI runs:
 
 ```bash
-mvn -B clean install
+./mvnw -B clean install
 ```
 
 Scope it down while iterating with `-pl <module> -am`, but a full run is the

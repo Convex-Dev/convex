@@ -54,17 +54,17 @@ public class PeerGenesis extends APeerCommand {
 			showUsage();
 			return;
 		}
+
+		AKeyPair peerKey=(AKeyPair)peerConfig.get(Keywords.KEYPAIR);
+		if (peerKey==null) peerKey=specifiedPeerKey();
+		if (peerKey==null) {
+			paranoia("--peer-key must be specified in strict mode");
+			peerKey=genesisKey;
+			inform("Using genesis key for first peer: "+genesisKey.getAccountKey());
+		}
+		setConfiguredPeerKey(peerConfig,peerKey);
 		
 		try (AStore store=openPeerStore(peerConfig)) {
-
-			// Key for initial peer. Needed for genesis start
-			AKeyPair peerKey = specifiedPeerKey();
-			if (peerKey==null) {
-				paranoia("--peer-key must be specified in strict mode");
-				peerKey=genesisKey;
-				inform("Using genesis key for first peer: "+genesisKey.getAccountKey());
-			}
-			
 			AccountKey govKey=AccountKey.parse(governanceKey);
 			if (govKey==null) {
 				paranoia("--governance-key must be specified in strict security mode");

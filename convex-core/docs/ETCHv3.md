@@ -719,6 +719,28 @@ derived master key is
 The derivation is application policy rather than an on-disk v3 field; other
 applications may resolve the same 32-byte master-key contract differently.
 
+#### Convex peer CLI key resolution
+
+The Convex peer CLI always attaches a PKCS12 resolver when opening a file-backed
+peer store. If the Etch header has a non-zero `publicKeyHint`, the CLI first
+uses an already configured matching peer key, then looks up the full public key
+in the keystore. If the hint is unset, it falls back to the explicitly supplied
+`--peer-key` or configured peer key. Failure to identify or load a key stops the
+encrypted store from opening. When creating a new encrypted file with no
+explicit hint, the CLI records the full public key of the selected peer.
+
+The CLI passes the selected private 32-byte Ed25519 seed to
+`EtchKeyDerivation.deriveMasterKey` and wipes its temporary seed copy after
+derivation. `--storepass` verifies and unlocks the PKCS12 keystore, while
+`--peer-keypass` unlocks the selected private-key entry; neither password is
+input to the Etch KDF. A header hint is likewise only a key identifier and is
+not KDF input.
+
+For an existing store, the file header supplies its version, cipher, index
+encryption flag and public-key hint. A configured `peer.etch` object is a
+creation policy, not an instruction to reinterpret an existing file. The CLI
+warns if the requested policy differs from the opened file.
+
 V3 uses HKDF-SHA-256 with `fileSalt` and fixed Etch context labels to derive
 only two file-scoped keys:
 

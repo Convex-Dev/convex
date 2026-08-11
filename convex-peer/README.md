@@ -82,7 +82,7 @@ Result result = conn.query("*balance*", address).get();
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn install -pl convex-peer -am
+./mvnw -B -T1C install -pl convex-peer -am
 ```
 
 ## License
