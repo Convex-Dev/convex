@@ -712,54 +712,6 @@ public class DLFSWebDAV {
 	}
 
 	/**
-	 * Resolves the Destination header to a filesystem path.
-	 * Destination must be within the same drive.
-	 */
-	private Path resolveDestination(Context ctx) {
-		String destHeader = ctx.header("Destination");
-		if (destHeader == null) return null;
-		try {
-			java.net.URI destURI = java.net.URI.create(destHeader);
-			String destPath = destURI.getPath();
-			if (destPath == null) return null;
-
-			// Strip the /dlfs/ prefix
-			if (destPath.startsWith(ROUTE)) {
-				destPath = destPath.substring(ROUTE.length());
-			} else if (destPath.startsWith(ROUTE_BARE)) {
-				destPath = destPath.substring(ROUTE_BARE.length());
-				if (destPath.startsWith("/")) destPath = destPath.substring(1);
-			} else {
-				return null;
-			}
-
-			if (destPath.endsWith("/")) destPath = destPath.substring(0, destPath.length() - 1);
-			if (destPath.isEmpty()) return null;
-
-			// Parse drive name from destination
-			int slash = destPath.indexOf('/');
-			String destDrive;
-			String destFile;
-			if (slash < 0) {
-				destDrive = destPath;
-				destFile = "";
-			} else {
-				destDrive = destPath.substring(0, slash);
-				destFile = destPath.substring(slash + 1);
-			}
-
-			FileSystem fs = driveManager.getDrive(getIdentity(ctx), destDrive);
-			if (fs == null) return null;
-
-			Path root = fs.getRootDirectories().iterator().next();
-			if (destFile.isEmpty()) return root;
-			return fs.getPath("/" + destFile);
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
 	 * Reads basic file attributes, returning null if the path does not exist
 	 * or is not a regular file/directory.
 	 */

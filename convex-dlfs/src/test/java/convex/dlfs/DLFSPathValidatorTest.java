@@ -19,4 +19,21 @@ public class DLFSPathValidatorTest {
 		assertThrows(IllegalArgumentException.class,
 				() -> DLFSPathValidator.canonicalRelativePath(unicode+"€"));
 	}
+
+	@Test
+	public void testRejectsNonCanonicalPaths() {
+		for (String path : new String[] {
+			"/absolute",
+			".",
+			"..",
+			"public/../secret",
+			"public/./file",
+			"public//file",
+			"public\\file",
+			"public/"+(char)0+"file"
+		}) {
+			assertThrows(IllegalArgumentException.class,
+					() -> DLFSPathValidator.canonicalRelativePath(path), path);
+		}
+	}
 }
