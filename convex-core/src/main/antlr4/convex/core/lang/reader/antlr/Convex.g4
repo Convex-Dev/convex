@@ -104,7 +104,12 @@ quoted: QUOTING form;
 
 string: STRING;
 
-commented: COMMENTED form;
+// Each #_ discards one following form. If another #_ follows, its discarded
+// form is consumed first and the outer marker still requires a form of its own.
+commented
+	: COMMENTED form
+	| COMMENTED commented form
+	;
 
 /*  =========================================
  *  Lexer stuff below here

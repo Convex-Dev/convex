@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consecutive CVX reader discard markers (`#_`) each discard one following form, matching cumulative Clojure reader behaviour (#264).
 - DLFS distinguishes missing paths from corrupt stored nodes, preserves access to readable branches, supports safe entry replacement or deletion for recovery, and rejects malformed replicated subtrees.
 
 ## [0.8.11] - 2026-08-10
