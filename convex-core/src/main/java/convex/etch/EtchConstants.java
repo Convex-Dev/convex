@@ -1,6 +1,7 @@
 package convex.etch;
 
 import convex.core.data.AccountKey;
+import convex.core.data.AArrayBlob;
 import convex.core.data.Hash;
 
 /**
@@ -107,6 +108,22 @@ public final class EtchConstants {
 	public static final int ROOT_INDEX_SIZE=1<<16;
 	public static final int SECOND_LEVEL_INDEX_SIZE=1<<8;
 	public static final int DEEP_INDEX_SIZE=1<<4;
+
+	/** Returns the number of slots in an index block at the given radix level. */
+	static int indexSize(int level) {
+		if (level==0) return ROOT_INDEX_SIZE;
+		if (level==1) return SECOND_LEVEL_INDEX_SIZE;
+		return DEEP_INDEX_SIZE;
+	}
+
+	/** Returns the Etch radix digit selected from a hash key at a given level. */
+	static int indexDigit(AArrayBlob key, int level) {
+		if (level==0) return key.shortAt(0)&0xffff;
+		if (level==1) return key.byteAt(2)&0xff;
+		int byteIndex=(level+4)/2;
+		int value=key.byteAt(byteIndex);
+		return (((level&1)==0)?(value>>4):value)&0xf;
+	}
 
 	public static final long POINTER_TYPE_MASK=0xC000000000000000L;
 	public static final long POINTER_PLAIN=0x0000000000000000L;

@@ -405,7 +405,7 @@ public class Etch {
 
 		int isize = indexSize(level);
 		int mask = isize - 1;
-		final int digit = getDigit(key, level);
+		final int digit = EtchConstants.indexDigit(key, level);
 
 		long slotValue = readSlot(indexPosition, digit);
 		long type = slotType(slotValue);
@@ -449,7 +449,7 @@ public class Etch {
 			int nextLevel = level + 1;
 			// Note: temp should contain key from checkMatchingKey!
 			byte[] temp = writeScratch;
-			int nextDigitOfCollided = getDigit(Blob.wrap(temp, 0, KEY_SIZE), nextLevel);
+			int nextDigitOfCollided = EtchConstants.indexDigit(Blob.wrap(temp, 0, KEY_SIZE), nextLevel);
 			long newIndexPosition = appendLeafIndex(nextLevel, nextDigitOfCollided, slotValue);
 
 			// put index pointer into this index block, setting flags for index node
@@ -495,7 +495,7 @@ public class Etch {
 
 			// first we build a new next level index block, containing our new data
 			long newDataPointer = appendData(key, ref);
-			int nextDigit = getDigit(key, nextLevel);
+			int nextDigit = EtchConstants.indexDigit(key, nextLevel);
 			long newIndexPos = appendLeafIndex(nextLevel, nextDigit, newDataPointer);
 
 			// for each element in chain, rewrite existing data to new index block. i is the
@@ -579,7 +579,7 @@ public class Etch {
 
 	private void rewriteExistingData(long indexPosition, int level, long dp, AArrayBlob key) throws IOException {
 		// index into existing key data to get current digit
-		int digit = getDigit(key, level);
+		int digit = EtchConstants.indexDigit(key, level);
 
 		long currentSlot = readSlot(indexPosition, digit);
 		long type = currentSlot & POINTER_TYPE_MASK;
@@ -1041,7 +1041,7 @@ public class Etch {
 		}
 		int isize = indexSize(level);
 		int mask = isize - 1;
-		int digit = getDigit(key, level);
+		int digit = EtchConstants.indexDigit(key, level);
 		long slotValue = readSlot(indexPosition, digit);
 
 		long type = (slotValue & POINTER_TYPE_MASK);
@@ -1094,17 +1094,6 @@ public class Etch {
 	 * @param level Level of Etch store index to get digit for
 	 * @return
 	 */
-	private int getDigit(AArrayBlob key, int level) {
-		if (level == 0)
-			return key.shortAt(0) & 0xffff;
-		if (level == 1)
-			return key.byteAt(2) & 0xFF;
-		int bi = (level + 4) / 2; // level 2,3 maps to 3 etc.
-		boolean hi = (level & 1) == 0; // we want high byte if even
-		byte v = key.byteAt(bi);
-		return (hi ? (v >> 4) : v) & 0xf;
-	}
-
 	/**
 	 * Gets the index block size for a given level
 	 * 
@@ -1112,11 +1101,7 @@ public class Etch {
 	 * @return Index block size as number of entries
 	 */
 	public int indexSize(int level) {
-		if (level == 0)
-			return ROOT_INDEX_SIZE;
-		if (level == 1)
-			return SECOND_LEVEL_INDEX_SIZE;
-		return DEEP_INDEX_SIZE;
+		return EtchConstants.indexSize(level);
 	}
 
 	/**

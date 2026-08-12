@@ -9,13 +9,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-import convex.core.crypto.Hashing;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.exceptions.BadFormatException;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 
@@ -30,8 +27,6 @@ import convex.core.util.Utils;
  * the fully verified root tree is promoted to persisted status.</p>
  */
 public final class EtchRebuilder {
-	private static final int RECORD_HEADER_SIZE=KEY_SIZE+LABEL_SIZE+ENCODING_LENGTH_SIZE;
-	private static final int MAX_RECORD_SIZE=RECORD_HEADER_SIZE+Format.LIMIT_ENCODING_LENGTH;
 	private static final int SCAN_WINDOW_SIZE=1<<20;
 	private static final int MAX_PROBLEMS=100;
 
@@ -122,7 +117,7 @@ public final class EtchRebuilder {
 		private final EtchStore destination;
 		private final HashSet<Long> visitedIndexes=new HashSet<>();
 		private final ArrayList<String> problems=new ArrayList<>();
-		private final byte[] recordHeader=new byte[RECORD_HEADER_SIZE];
+		private final EtchRecordVerifier verifier;
 		private long indexProblems;
 		private long indexedRecordsAccepted;
 		private long scannedRecordsAccepted;
@@ -132,6 +127,7 @@ public final class EtchRebuilder {
 		private RebuildState(EtchMaintenanceReader source, EtchStore destination) {
 			this.source=source;
 			this.destination=destination;
+			this.verifier=new EtchRecordVerifier(source,destination);
 		}
 
 		private void walkIndex(int level, long indexPosition) {
@@ -144,7 +140,7 @@ public final class EtchRebuilder {
 				return;
 			}
 
-			int slotCount=indexSize(level);
+			int slotCount=EtchConstants.indexSize(level);
 			int blockLength=slotCount*POINTER_SIZE;
 			long blockEnd;
 			try {
@@ -196,7 +192,7 @@ public final class EtchRebuilder {
 				}
 				long end;
 				try {
-					end=Math.addExact(pointer,(long)indexSize(level+1)*POINTER_SIZE);
+					end=Math.addExact(pointer,(long)EtchConstants.indexSize(level+1)*POINTER_SIZE);
 				} catch (ArithmeticException e) {
 					indexProblem("Overflowing child-index pointer: "+pointer);
 					return false;
@@ -205,7 +201,7 @@ public final class EtchRebuilder {
 					indexProblem("Child index exceeds physical EOF: "+pointer);
 					return false;
 				}
-			} else if (pointer>source.getPhysicalFileEnd()-RECORD_HEADER_SIZE) {
+			} else if (pointer>source.getPhysicalFileEnd()-EtchRecordVerifier.RECORD_HEADER_SIZE) {
 				indexProblem("Data pointer has no complete record header: "+pointer);
 				return false;
 			}
@@ -215,12 +211,12 @@ public final class EtchRebuilder {
 		private void scanBody() {
 			long position=source.getBodyStart();
 			long physicalEnd=source.getPhysicalFileEnd();
-			byte[] raw=new byte[SCAN_WINDOW_SIZE+MAX_RECORD_SIZE];
+			byte[] raw=new byte[SCAN_WINDOW_SIZE+EtchRecordVerifier.MAX_RECORD_SIZE];
 			byte[] clear=new byte[raw.length];
 
 			while (position<physicalEnd) {
 				int startSpan=(int)Math.min(SCAN_WINDOW_SIZE,physicalEnd-position);
-				int readLength=(int)Math.min((long)startSpan+MAX_RECORD_SIZE,
+				int readLength=(int)Math.min((long)startSpan+EtchRecordVerifier.MAX_RECORD_SIZE,
 						physicalEnd-position);
 				try {
 					source.readRaw(position,raw,0,readLength);
@@ -240,24 +236,21 @@ public final class EtchRebuilder {
 				int offset=0;
 				while (offset<startSpan) {
 					int available=readLength-offset;
-					if (available<RECORD_HEADER_SIZE) break;
+					if (available<EtchRecordVerifier.RECORD_HEADER_SIZE) break;
 					int encodingLength=Utils.readShort(clear,offset+KEY_SIZE+LABEL_SIZE);
-					int recordLength=RECORD_HEADER_SIZE+encodingLength;
-					if ((encodingLength<=0)||(encodingLength>Format.LIMIT_ENCODING_LENGTH)
+					int recordLength=EtchRecordVerifier.RECORD_HEADER_SIZE+encodingLength;
+					if ((encodingLength<=0)||(encodingLength>convex.core.data.Format.LIMIT_ENCODING_LENGTH)
 							||(recordLength>available)
-							||!plausibleTag(clear[offset+RECORD_HEADER_SIZE])) {
+							||!plausibleTag(clear[offset+EtchRecordVerifier.RECORD_HEADER_SIZE])) {
 						offset++;
 						continue;
 					}
 
 					Hash stored=Hash.wrap(clear,offset);
-					Blob encoding=Blob.wrap(clear,offset+RECORD_HEADER_SIZE,encodingLength);
-					if (!stored.equals(Hashing.sha3(encoding))) {
-						offset++;
-						continue;
-					}
-					if (copyEncoding(stored,Blob.create(clear,
-							offset+RECORD_HEADER_SIZE,encodingLength))) {
+					Blob encoding=Blob.create(clear,
+							offset+EtchRecordVerifier.RECORD_HEADER_SIZE,encodingLength);
+					EtchRecordVerifier.Result result=verifier.verify(position+offset,stored,encoding);
+					if (result.isValid()&&copyVerified(result.verified())) {
 						scannedRecordsAccepted++;
 						offset+=recordLength;
 					} else {
@@ -271,37 +264,23 @@ public final class EtchRebuilder {
 		}
 
 		private void tryRecoverRecord(long position, boolean indexed) {
-			try {
-				source.readData(position,recordHeader,0,recordHeader.length);
-				int length=Utils.readShort(recordHeader,KEY_SIZE+LABEL_SIZE);
-				if ((length<=0)||(length>Format.LIMIT_ENCODING_LENGTH)) {
-					indexProblem("Invalid indexed record length at "+position+": "+length);
-					return;
-				}
-				byte[] encodingBytes=new byte[length];
-				source.readData(position+RECORD_HEADER_SIZE,encodingBytes,0,length);
-				Hash stored=Hash.wrap(recordHeader,0);
-				Blob encoding=Blob.wrap(encodingBytes);
-				if (!stored.equals(Hashing.sha3(encoding))||!copyEncoding(stored,encoding)) {
-					indexProblem("Invalid indexed record at "+position);
-					return;
-				}
-				if (indexed) indexedRecordsAccepted++;
-			} catch (IOException | RuntimeException | Error e) {
-				if (e instanceof VirtualMachineError fatal) throw fatal;
-				indexProblem("Cannot recover indexed record at "+position+": "+e.getMessage());
+			EtchRecordVerifier.Result result=verifier.verify(position,source.getPhysicalFileEnd());
+			if (!result.isValid()) {
+				indexProblem("Invalid indexed record at "+position+": "+result.failure().message());
+				return;
 			}
+			if (!copyVerified(result.verified())) {
+				indexProblem("Cannot copy indexed record at "+position);
+				return;
+			}
+			if (indexed) indexedRecordsAccepted++;
 		}
 
-		private boolean copyEncoding(Hash expectedHash, Blob encoding) {
+		private boolean copyVerified(EtchRecordVerifier.Verified verified) {
 			try {
-				ACell cell=destination.decode(encoding);
-				if (!expectedHash.equals(Hash.get(cell))) return false;
-				Blob canonical=(cell==null)?Blob.NULL_ENCODING:cell.getEncoding();
-				if (!canonical.equals(encoding)) return false;
-				destination.storeTopRef(Ref.get(cell),Ref.STORED,null);
+				destination.storeTopRef(Ref.get(verified.cell()),Ref.STORED,null);
 				return true;
-			} catch (BadFormatException | IOException | RuntimeException | Error e) {
+			} catch (IOException | RuntimeException | Error e) {
 				if (e instanceof VirtualMachineError fatal) throw fatal;
 				return false;
 			}
@@ -355,12 +334,6 @@ public final class EtchRebuilder {
 		private void problem(String message) {
 			if (problems.size()<MAX_PROBLEMS) problems.add(message);
 		}
-	}
-
-	private static int indexSize(int level) {
-		if (level==0) return ROOT_INDEX_SIZE;
-		if (level==1) return SECOND_LEVEL_INDEX_SIZE;
-		return DEEP_INDEX_SIZE;
 	}
 
 	private static boolean plausibleTag(byte tag) {

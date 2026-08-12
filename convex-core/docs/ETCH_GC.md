@@ -669,6 +669,13 @@ Three subcommands alongside `etch info`, `etch validate` etc. in `convex-cli`, a
 wrappers over the tested machinery. Offline operation is enforced by Etch's exclusive
 file lock.
 
+`convex etch validate -e <store.etch>` performs the strict offline check: it walks the
+selected logical index, validates pointer and collision-chain structure, independently
+hashes and decodes each bounded CAD3 record, and confirms that the selected root's
+branch tree is complete. Aggregate counts are exact while `--max-failures` bounds only
+the diagnostic detail retained and printed. These checks are maintenance-only and add
+no hashing or decoding work to normal Etch reads.
+
 ```
 convex etch gc -e <store.etch> [--output <out.etch>]
 ```

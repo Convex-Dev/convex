@@ -3,9 +3,11 @@ package convex.cli.etch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
 import org.junit.jupiter.api.Test;
 
@@ -135,5 +137,42 @@ public class EtchCLITest {
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals("123",tester.getOutput().trim());
 
+	}
+
+	@Test
+	public void testStrictValidateCommand() throws IOException {
+		File file=Helpers.createTempFile("strictValidateCli", ".db");
+		convex.core.data.AString root=convex.core.data.Strings.create(
+				"Strict CLI validation root. ".repeat(12));
+		convex.etch.EtchStore store=convex.etch.EtchStore.create(file);
+		store.setRootData(root);
+		store.flush();
+		store.close();
+
+		CLTester tester=CLTester.run("etch", "validate", "--etch", file.getCanonicalPath());
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		assertTrue(tester.getOutput().contains("strict validation completed with 0 error(s)"));
+
+		long position;
+		try (convex.etch.EtchMaintenanceReader reader=
+				convex.etch.EtchMaintenanceReader.openUnsafe(file)) {
+			long slot=reader.getIndexStart()
+					+(root.getHash().shortAt(0)&0xffffL)*convex.etch.EtchConstants.POINTER_SIZE;
+			position=reader.readIndexSlot(slot)&~convex.etch.EtchConstants.POINTER_TYPE_MASK;
+		}
+		try (RandomAccessFile data=new RandomAccessFile(file,"rw")) {
+			long encoding=position+convex.etch.EtchConstants.KEY_SIZE
+					+convex.etch.EtchConstants.LABEL_SIZE
+					+convex.etch.EtchConstants.ENCODING_LENGTH_SIZE;
+			data.seek(encoding);
+			int value=data.readUnsignedByte();
+			data.seek(encoding);
+			data.writeByte(value^1);
+		}
+
+		tester=CLTester.run("etch", "validate", "--etch", file.getCanonicalPath(),
+				"--max-failures", "1");
+		assertEquals(ExitCodes.ERROR,tester.getResult());
+		assertTrue(tester.getOutput().contains("strict validation completed with 2 error(s)"));
 	}
 }
