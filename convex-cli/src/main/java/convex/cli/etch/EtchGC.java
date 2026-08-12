@@ -51,6 +51,7 @@ public class EtchGC extends AEtchCommand {
 			throw new CLIError("IO error during Etch GC: "+e.getMessage(), e);
 		} finally {
 			store.close();
+			closeKeyContexts();
 		}
 	}
 
@@ -98,7 +99,8 @@ public class EtchGC extends AEtchCommand {
 		}
 		long before=store.getEtch().getDataLength();
 
-		EtchStore dest=EtchStore.create(outFile);
+		EtchStore dest=EtchStore.create(outFile,
+				destinationConfig(store.getEtch().getConfig(),true));
 		try {
 			ACell root=store.getRootData();
 			if (root!=null) {

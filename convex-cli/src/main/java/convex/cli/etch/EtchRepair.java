@@ -34,7 +34,9 @@ public class EtchRepair extends AEtchCommand {
 		File source=etchMixin.getEtchFile();
 		File destination=FileUtils.getFile(destFilename);
 		try {
-			EtchRebuilder.Result result=EtchRebuilder.rebuild(source,destination);
+			EtchRebuilder.Result result=EtchRebuilder.rebuildConfigured(
+					source,sourceConfig(),destination,
+					sourcePolicy->destinationConfig(sourcePolicy,true));
 			println("Etch repair status:      "+result.status());
 			println("Selected source root:    "+result.sourceRoot());
 			println("Indexed records accepted: "+Text.toFriendlyNumber(result.indexedRecordsAccepted()));
@@ -54,6 +56,8 @@ public class EtchRepair extends AEtchCommand {
 			}
 		} catch (IOException e) {
 			throw new CLIError("Etch repair failed: "+e.getMessage(),e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }

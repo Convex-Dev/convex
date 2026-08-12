@@ -33,7 +33,7 @@ public class EtchValidate extends AEtchCommand {
 		}
 
 		try {
-			Report report=EtchStrictValidator.validate(file,null,
+			Report report=EtchStrictValidator.validate(file,sourceConfig(),
 					new EtchStrictValidator.Options(detailLimit));
 			for (Problem problem:report.problems()) {
 				String location=(problem.position()<0)?"":" at "+problem.position();
@@ -65,6 +65,8 @@ public class EtchValidate extends AEtchCommand {
 			throw new CLIError("Etch file corrupt: "+file,e);
 		} catch (IOException e) {
 			throw new CLIError("IO error validating Etch store: "+file,e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }

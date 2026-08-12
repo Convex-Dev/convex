@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -79,6 +80,30 @@ public final class EtchRebuilder {
 	 */
 	public static Result rebuild(File source, EtchConfig sourceConfig, File destination,
 			EtchConfig destinationConfig) throws IOException {
+		return rebuild(source,sourceConfig,destination,destinationConfig,null);
+	}
+
+	/**
+	 * Rebuilds with a destination policy compiled after the source header has
+	 * been authenticated. This lets maintenance front ends preserve omitted
+	 * source policy while supplying an independent destination key resolver.
+	 *
+	 * @param source existing source, opened exclusively and never modified
+	 * @param sourceConfig source options including any required key function
+	 * @param destination absent or empty destination file
+	 * @param destinationConfig function receiving the effective source policy
+	 * @return reconstruction result
+	 */
+	public static Result rebuildConfigured(File source, EtchConfig sourceConfig,
+			File destination, Function<EtchConfig,EtchConfig> destinationConfig)
+			throws IOException {
+		return rebuild(source,sourceConfig,destination,null,
+				Objects.requireNonNull(destinationConfig,"destinationConfig"));
+	}
+
+	private static Result rebuild(File source, EtchConfig sourceConfig, File destination,
+			EtchConfig destinationConfig,
+			Function<EtchConfig,EtchConfig> destinationConfigFunction) throws IOException {
 		Objects.requireNonNull(source,"source");
 		Objects.requireNonNull(destination,"destination");
 		File sourceFile=source.getCanonicalFile();
@@ -93,8 +118,10 @@ public final class EtchRebuilder {
 
 		try (EtchMaintenanceReader reader=EtchMaintenanceReader.openExclusive(
 				sourceFile,sourceConfig)) {
-			EtchConfig outputConfig=(destinationConfig==null)
-					?reader.getConfig():destinationConfig;
+			EtchConfig outputConfig=(destinationConfigFunction!=null)
+					?Objects.requireNonNull(destinationConfigFunction.apply(reader.getConfig()),
+							"destination configuration function result")
+					:((destinationConfig==null)?reader.getConfig():destinationConfig);
 			EtchStore destinationStore=new EtchStore(Etch.create(destinationFile,outputConfig));
 			RebuildState state=new RebuildState(reader,destinationStore);
 			try {

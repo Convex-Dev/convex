@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ed25519 JWT signing accepts explicit verification-method key IDs, while self-contained verification recognises bare multikey, `did:key` and multikey-fragment DID URL forms.
 - Lattice nodes can pull and merge a selected cursor path without transferring unrelated sibling regions.
 - Etch gains offline strict validation of index structure, canonical CAD3 records, content hashes and root-tree completeness, shared with copy-out repair.
+- Etch CLI maintenance commands open encrypted v3 stores through protected key files, standard input or header-hinted keystores, and support explicit cipher, index and rekeying policy for fresh migration destinations.
 
 ### Changed
 

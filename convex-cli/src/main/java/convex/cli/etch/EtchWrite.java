@@ -45,6 +45,8 @@ public class EtchWrite extends AEtchCommand{
 			informSuccess("Data saved with hash: "+h);
 		} catch (IOException e) {
 			throw new CLIError("Unable to write to store",e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }
