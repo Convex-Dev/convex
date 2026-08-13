@@ -181,10 +181,15 @@ Only after confirming the GitHub Release is live:
 
 ```bash
 git checkout master
-./mvnw -B deploy -Prelease
+./mvnw deploy -Prelease
 ```
 
 This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. The command returns only after Central confirms publication. It requires a GPG signing key and Maven Central credentials configured locally.
+
+Run this local publishing command interactively: GPG needs to open pinentry for the
+signing-key passphrase. Do not add Maven's `-B` batch flag, which prevents that
+prompt. Unattended CI publishing must provide signing credentials through its
+secret environment rather than command-line properties.
 
 ### 9. Prepare next development version
 
