@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Lattice value messages support efficient post-merge acknowledgements through an optional request ID, while normal gossip remains fire-and-forget.
 - Peer and lattice-node launch configuration now resolves encrypted Etch stores from their header key hint by default, records the configured identity as the hint for new encrypted stores, and supports an explicit runtime key resolver for external secret providers.
-- `Symmetric` now emits a versioned AES-GCM authenticated ciphertext envelope and explicitly rejects ciphertext from its former unauthenticated AES-CBC format.
+- The experimental `Symmetric` helper now uses authenticated AES-GCM and explicitly rejects ciphertext from its former unauthenticated AES-CBC implementation. Its ciphertext representation is not a stable storage or interchange format.
 
 ### Fixed
 

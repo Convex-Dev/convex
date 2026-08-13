@@ -17,11 +17,17 @@ import convex.core.exceptions.Panic;
 import convex.core.util.Utils;
 
 /**
- * Symmetric authenticated encryption using AES-GCM.
+ * Experimental symmetric authenticated encryption using AES-GCM.
  *
- * <p>The encoded form is {@code CVXAESG1 || nonce || ciphertext || tag}. The
- * versioned prefix prevents ciphertext produced by the former unauthenticated
- * AES-CBC implementation from being silently reinterpreted.</p>
+ * @apiNote This API and its ciphertext representation are experimental. The
+ *          representation may change without compatibility or migration support
+ *          between releases. Do not use it as a persistent storage or interchange
+ *          format.
+ * @implNote The current representation is
+ *           {@code CVXAESG1 || nonce || ciphertext || tag}. This layout is an
+ *           implementation detail, not a stable Convex format. Its identifying
+ *           prefix prevents ciphertext produced by the former unauthenticated
+ *           AES-CBC implementation from being silently reinterpreted.
  */
 public class Symmetric {
 	private static final String SYMMETRIC_ENCRYPTION_ALGO = "AES/GCM/NoPadding";
@@ -38,7 +44,8 @@ public class Symmetric {
 	 * 
 	 * @param key  AES secret key
 	 * @param data String to encrypt
-	 * @return Encrypted representation of the given string
+	 * @return Encrypted representation of the given string in the experimental
+	 *         ciphertext format
 	 */
 	public static byte[] encrypt(SecretKey key, String data) {
 		if (data==null) throw new IllegalArgumentException("Data cannot be null");
@@ -51,7 +58,8 @@ public class Symmetric {
 	 * 
 	 * @param key Secret encryption key
 	 * @param data Data to encrypt
-	 * @return Encrypted representation of the given byte array data
+	 * @return Encrypted representation of the given byte array data in the
+	 *         experimental ciphertext format
 	 */
 	public static byte[] encrypt(SecretKey key, byte[] data) {
 		validateKey(key);
