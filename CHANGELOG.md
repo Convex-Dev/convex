@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Lattice root sync advertises only values already available from its serving store, while inbound acquisition now resolves lazy missing references correctly and rejects malformed data responses.
 - Consecutive CVX reader discard markers (`#_`) each discard one following form, matching cumulative Clojure reader behaviour (#264).
 - DLFS distinguishes missing paths from corrupt stored nodes, preserves access to readable branches, supports safe entry replacement or deletion for recovery, and rejects malformed replicated subtrees.
 

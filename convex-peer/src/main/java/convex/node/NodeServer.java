@@ -1097,7 +1097,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
 			}
 			AVector<?> payload = RT.ensureVector(message.getPayload());
-			if (payload == null || payload.count() < 4 || payload.get(3) == null) {
+			// Root sync may encode the value as an unresolved indirect ref, so this
+			// guard must remain structural and must not dereference payload.get(3).
+			if (payload == null || payload.count() < 4) {
 				throw new BadFormatException("Invalid LATTICE_VALUE message format");
 			}
 
@@ -1105,8 +1107,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				return CompletableFuture.completedFuture(
 					completeLatticeMessage(message, acquisitionStore));
 			} catch (MissingDataException e) {
-				Hash rootHash = payload.get(3).getHash();
-				return acquireHash(connection, acquisitionStore, rootHash)
+				// Re-dereferencing the payload can repeat the same exception. Acquire
+				// the precise missing ref and iterate until the value is complete.
+				return acquireHash(connection, acquisitionStore, e.getMissingHash())
 					.thenCompose(value -> acquireLatticeMessage(
 						message, acquisitionStore, connection));
 			}

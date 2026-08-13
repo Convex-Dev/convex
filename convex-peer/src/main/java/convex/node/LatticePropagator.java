@@ -131,13 +131,6 @@ public class LatticePropagator implements Closeable {
 	private final Root<ACell> announcedCursor = new Root<>();
 
 	/**
-	 * Last value that was triggered (used for periodic root sync). Volatile
-	 * because it may be written by the caller's thread (synchronous publication
-	 * path) and read by the background propagation thread.
-	 */
-	private volatile ACell lastTriggeredValue;
-
-	/**
 	 * Timestamp of last broadcast. Volatile for cross-thread visibility — the
 	 * caller's thread (synchronous publication path) and the background propagation
 	 * thread may both read and write this.
@@ -319,9 +312,6 @@ public class LatticePropagator implements Closeable {
 		}
 
 		running = true;
-		// Preserve a snapshot seeded by NodeServer launch (or retained across a
-		// restart) so query service is available as soon as the listener opens.
-		lastTriggeredValue = announcedCursor.get();
 		lastBroadcastTime = 0L;
 		lastRootSyncTime = 0L;
 		broadcastCount.set(0L);
@@ -405,7 +395,6 @@ public class LatticePropagator implements Closeable {
 	public void triggerBroadcast(ACell value) {
 		if (!running) return;
 		if (value == null) return;
-		lastTriggeredValue = value;
 		triggerQueue.offer(value);
 	}
 
@@ -436,7 +425,7 @@ public class LatticePropagator implements Closeable {
 
 				// Periodic root sync only while running
 				if (running) {
-					maybePerformRootSync(lastTriggeredValue, Utils.getCurrentTimestamp());
+					maybePerformRootSync(Utils.getCurrentTimestamp());
 				}
 
 			} catch (InterruptedException e) {
@@ -492,9 +481,6 @@ public class LatticePropagator implements Closeable {
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
-			// Track latest snapshot for periodic root sync (used by background thread)
-			lastTriggeredValue = value;
-
 			// 1. Announce to store (writes cells, collects novelty for delta)
 			ArrayList<ACell> novelty = new ArrayList<>();
 			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
@@ -547,26 +533,35 @@ public class LatticePropagator implements Closeable {
 	/**
 	 * Performs periodic root-only sync broadcast for divergence detection.
 	 */
-	private void maybePerformRootSync(ACell value, long currentTime) {
-		if (value == null) return;
+	private void maybePerformRootSync(long currentTime) {
 		if (currentTime < lastRootSyncTime + ROOT_SYNC_INTERVAL) return;
 		if (connectionManager.getPeers().isEmpty()) return;
 
 		try {
-			AVector<ACell> emptyPath = Vectors.empty();
-			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
-			// Root-only sync still needs a complete protocol envelope. Its lattice
-			// value is encoded as an indirect ref; the receiver acquires missing
-			// branches from this propagator store before attempting a merge.
-			Blob rootData = payload.getEncoding();
-			Message message = Message.create(MessageType.LATTICE_VALUE, payload, rootData);
+			Message message = createRootSyncMessage();
+			if (message == null) return;
 			connectionManager.broadcast(message);
 			lastRootSyncTime = currentTime;
 			rootSyncCount++;
-			log.debug("Sent root sync ({} bytes)", rootData.count());
+			log.debug("Sent root sync ({} bytes)", message.getMessageData().count());
 		} catch (Exception e) {
 			log.warn("Error during root sync broadcast", e);
 		}
+	}
+
+	/**
+	 * Creates a root sync for the last value successfully announced to this
+	 * propagator's serving store. A triggered value is deliberately not externally
+	 * visible until {@link Cells#announce(ACell, Consumer, AStore)} has completed.
+	 */
+	Message createRootSyncMessage() {
+		ACell value = announcedCursor.get();
+		if (value == null) return null;
+		AVector<ACell> emptyPath = Vectors.empty();
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
+		// The value may be encoded as an indirect ref; DATA_REQUEST resolution is
+		// safe because announcedCursor advances only after the store is populated.
+		return Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
 	}
 
 	// ========== Explicit Persistence ==========

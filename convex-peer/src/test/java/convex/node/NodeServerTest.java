@@ -964,7 +964,9 @@ public class NodeServerTest {
 		try {
 			Blob missingBranch = Blobs.createRandom(400);
 			ASet<ACell> remoteValue = Cells.persist(Sets.of(missingBranch), sourceStore);
-			ingressStore.blockedHash = remoteValue.getHash();
+			// Acquisition should target the precise missing leaf reported by decoding,
+			// without dereferencing the incomplete lattice value a second time.
+			ingressStore.blockedHash = missingBranch.getHash();
 
 			NodeConfig config = NodeConfig.create(Maps.of(
 				NodeConfig.PORT, CVMLong.ZERO,

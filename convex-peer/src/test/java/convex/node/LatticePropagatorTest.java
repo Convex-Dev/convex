@@ -8,7 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +22,16 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -169,6 +177,65 @@ public class LatticePropagatorTest {
 		ACell merged = server2.getLocalValue();
 		assertEquals(expected, RT.getIn(merged, dataKeyword, expectedHash),
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
+	}
+
+	/** A queued value must not be advertised until announce has populated the store. */
+	@Test
+	public void testRootSyncUsesLastAnnouncedValue() throws Exception {
+		Blob announced = Blobs.createRandom(400);
+		Blob pending = Blobs.createRandom(400);
+		try (BlockingAnnounceStore store = new BlockingAnnounceStore(pending.getHash())) {
+			LatticePropagator propagator = new LatticePropagator(store);
+			try {
+				propagator.processSnapshot(announced);
+				propagator.start();
+				CompletableFuture<ACell> nextAnnounce = propagator.nextAnnounce();
+				propagator.triggerBroadcast(pending);
+				assertTrue(store.blocked.await(5, TimeUnit.SECONDS));
+
+				assertEquals(announced.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()),
+					"root sync must retain the last store-backed value while announce is incomplete");
+				assertNotNull(store.refForHash(announced.getHash()));
+
+				store.release.countDown();
+				assertEquals(pending, nextAnnounce.get(5, TimeUnit.SECONDS));
+				assertEquals(pending.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()));
+				assertNotNull(store.refForHash(pending.getHash()));
+			} finally {
+				store.release.countDown();
+				propagator.close();
+			}
+		}
+	}
+
+	private static Hash rootSyncValueHash(Message message) {
+		AVector<?> payload = message.getPayload();
+		return payload.getRef(3).getHash();
+	}
+
+	static final class BlockingAnnounceStore extends MemoryStore {
+		final Hash blockedHash;
+		final CountDownLatch blocked = new CountDownLatch(1);
+		final CountDownLatch release = new CountDownLatch(1);
+
+		BlockingAnnounceStore(Hash blockedHash) {
+			this.blockedHash = blockedHash;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,
+				Consumer<Ref<ACell>> noveltyHandler) {
+			if (blockedHash.equals(ref.getHash())) {
+				blocked.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IllegalStateException("Interrupted while controlling announce", e);
+				}
+			}
+			return super.storeTopRef(ref, status, noveltyHandler);
+		}
 	}
 
 	/**
