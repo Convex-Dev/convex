@@ -39,10 +39,9 @@ estimate against a local network before submitting.
 ## Price
 
 Juice price lives in the CVM state and is readable from CVM code as
-`*juice-price*`. In the implementation the genesis price is **10**
-(`Constants.INITIAL_JUICE_PRICE`); CAD007 currently says 2 — that divergence
-is an open question, tracked in #697. A live network's price is whatever its
-genesis state carries.
+`*juice-price*`. The genesis price is **10** (`Constants.INITIAL_JUICE_PRICE`,
+set 2024 and what Protonet runs; CAD007 was aligned to match in #697). A live
+network's price is whatever its genesis state carries.
 
 CAD007 also specifies **dynamic pricing** — the price rising under sustained
 load and decaying towards a hard floor of 1 — but this is not yet implemented:
