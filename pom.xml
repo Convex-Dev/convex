@@ -122,6 +122,11 @@
 						<extensions>true</extensions>
 						<configuration>
 							<publishingServerId>central</publishingServerId>
+							<!-- convex-integration is reactor assembly/test plumbing. It builds
+							     convex.jar but is not a consumer-facing Maven component. -->
+							<excludeArtifacts>
+								<excludeArtifact>convex-integration</excludeArtifact>
+							</excludeArtifacts>
 							<checksums>all</checksums>
 							<autoPublish>true</autoPublish>
 							<waitUntil>published</waitUntil>
@@ -178,14 +183,9 @@
 				<groupId>org.cyclonedx</groupId>
 				<artifactId>cyclonedx-maven-plugin</artifactId>
 				<version>2.9.3</version>
-				<executions>
-					<execution>
-						<phase>deploy</phase>
-						<goals>
-							<goal>makeAggregateBom</goal>
-						</goals>
-					</execution>
-				</executions>
+				<!-- Invoked explicitly by the GitHub release workflow. Do not bind this
+				     to deploy: Central requires signatures for every attached artifact,
+				     while the aggregate SBOM is distributed with the GitHub release. -->
 				<configuration>
 					<projectType>library</projectType>
 					<schemaVersion>1.4</schemaVersion>
@@ -196,7 +196,10 @@
 					<includeSystemScope>true</includeSystemScope>
 					<includeTestScope>false</includeTestScope>
 					<includeLicenseText>false</includeLicenseText>
-					<outputReactorProjects>true</outputReactorProjects>
+					<!-- Publish one aggregate SBOM with the GitHub release. Per-module
+					     SBOM attachments add redundant Central artifacts and signatures. -->
+					<outputReactorProjects>false</outputReactorProjects>
+					<skipAttach>true</skipAttach>
 					<outputFormat>json</outputFormat>
 					<outputName>CycloneDX-Sbom</outputName>
 					<verbose>false</verbose>
