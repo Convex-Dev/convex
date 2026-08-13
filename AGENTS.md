@@ -71,15 +71,24 @@ change falls into, and when a version gate is mandatory. See the
 
 ## Verifying Changes
 
-Do not report work as complete on the strength of a compile. Run what CI runs:
+Match verification effort to the scope and risk of the change:
 
-```bash
-./mvnw -B clean install
-```
+- Documentation, comments and other non-executable changes: inspect the diff and
+  run only relevant formatting or rendering checks, if any.
+- Changes isolated to one module: run that module's tests with
+  `./mvnw -B -T1C test -pl <module> -am`.
+- Cross-module, build-system, protocol or release changes: run the full
+  `./mvnw -B clean install` build.
 
-Scope it down while iterating with `-pl <module> -am`, but a full run is the
-bar for "done". If tests fail, say so and quote the failure — never describe a
-red build as passing.
+Use narrower tests while iterating. A full local build is not required for every
+routine change merely because CI will run one. Always report which checks were
+run and their result. If tests fail, say so and quote the failure — never
+describe a red build as passing.
+
+External CI is asynchronous. After pushing, report its URL and observed status,
+but do not poll, watch or wait for CI workflows to finish unless the user
+explicitly asks for monitoring in the current task. A request to finish or fix
+the code does not by itself imply waiting for external CI.
 
 ## Module Structure
 
