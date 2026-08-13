@@ -123,8 +123,8 @@
 						<configuration>
 							<publishingServerId>central</publishingServerId>
 							<checksums>all</checksums>
-							<!-- <waitUntil>published</waitUntil> -->
 							<autoPublish>true</autoPublish>
+							<waitUntil>published</waitUntil>
 						</configuration>
 					</plugin>
 

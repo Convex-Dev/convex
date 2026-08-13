@@ -19,15 +19,15 @@ import convex.core.util.Utils;
 /**
  * Experimental symmetric authenticated encryption using AES-GCM.
  *
- * @apiNote This API and its ciphertext representation are experimental. The
- *          representation may change without compatibility or migration support
- *          between releases. Do not use it as a persistent storage or interchange
- *          format.
- * @implNote The current representation is
- *           {@code CVXAESG1 || nonce || ciphertext || tag}. This layout is an
- *           implementation detail, not a stable Convex format. Its identifying
- *           prefix prevents ciphertext produced by the former unauthenticated
- *           AES-CBC implementation from being silently reinterpreted.
+ * <p><b>API note:</b> This API and its ciphertext representation are experimental.
+ * The representation may change without compatibility or migration support between
+ * releases. Do not use it as a persistent storage or interchange format.</p>
+ *
+ * <p><b>Implementation note:</b> The current representation is
+ * {@code CVXAESG1 || nonce || ciphertext || tag}. This layout is an implementation
+ * detail, not a stable Convex format. Its identifying prefix prevents ciphertext
+ * produced by the former unauthenticated AES-CBC implementation from being silently
+ * reinterpreted.</p>
  */
 public class Symmetric {
 	private static final String SYMMETRIC_ENCRYPTION_ALGO = "AES/GCM/NoPadding";

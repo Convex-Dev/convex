@@ -184,7 +184,7 @@ git checkout master
 ./mvnw -B deploy -Prelease
 ```
 
-This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. Requires GPG signing key and Maven Central credentials configured locally.
+This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. The command returns only after Central confirms publication. It requires a GPG signing key and Maven Central credentials configured locally.
 
 ### 9. Prepare next development version
 
