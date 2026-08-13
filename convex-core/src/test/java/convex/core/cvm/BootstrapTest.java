@@ -5,13 +5,16 @@ import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cpos.Block;
 import convex.core.data.ACell;
+import convex.core.data.Keyword;
 import convex.core.data.SignedData;
+import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
@@ -77,11 +80,12 @@ public class BootstrapTest {
 		assertSame(scheduled.getSchedule(), migrated.getSchedule());
 		assertSame(scheduled.getGlobals(), migrated.getGlobals());
 
-		// Within #8: exactly the five bindings and their :static metadata added
+		// Within #8: exactly six additions — the five CoreFn bindings with their
+		// :static metadata, plus the char? Lisp definition (#92) with its :doc
 		AccountStatus pre = scheduled.getAccount(Core.CORE_ADDRESS);
 		AccountStatus post = migrated.getAccount(Core.CORE_ADDRESS);
-		assertEquals(pre.getEnvironment().count() + 5, post.getEnvironment().count());
-		assertEquals(pre.getMetadata().count() + 5, post.getMetadata().count());
+		assertEquals(pre.getEnvironment().count() + 6, post.getEnvironment().count());
+		assertEquals(pre.getMetadata().count() + 6, post.getMetadata().count());
 		assertSame(Core.SCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.SCHEDULE_UPGRADE));
 		assertSame(Core.UNSCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.UNSCHEDULE_UPGRADE));
 		assertSame(Core.GENSYM, post.getEnvironmentValue(Symbols.GENSYM));
@@ -92,6 +96,11 @@ public class BootstrapTest {
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.GENSYM).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.CAT).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.SPLICE).get(Keywords.STATIC));
+		// char? is a state-resident closure, not a CoreFn, and carries :doc but not :static
+		Symbol charQ = Symbol.create("char?");
+		assertNotNull(post.getEnvironmentValue(charQ));
+		assertNotNull(post.getMetadata().get(charQ).get(Keyword.create("doc")));
+		assertNull(post.getMetadata().get(charQ).get(Keywords.STATIC));
 		assertEquals(pre.getBalance(), post.getBalance());
 		assertEquals(pre.getSequence(), post.getSequence());
 

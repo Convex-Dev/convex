@@ -113,7 +113,10 @@ public class Migrations {
 	 * upgrades to be scheduled on-chain, macros to introduce hygienic bindings, and
 	 * raw concatenation and positional overwrite of BlobLike values — their
 	 * {@code :doc} metadata is applied by the metadata step below; and</li>
-	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
+	 * <li>applies the known fixes and additions: #92 ({@code char?} type predicate,
+	 * added as a state-resident Lisp definition — deliberately NOT a new core
+	 * definition code, per the standing rule in UPGRADE.md on codes beyond 505),
+	 * #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
 	 * #621 ({@code owns?} map form in {@code convex.asset}), #620 ({@code offer} in
 	 * {@code asset.multi-token}), #622 ({@code offer} receiver normalisation plus the

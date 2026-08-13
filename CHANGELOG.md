@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- CVM: `char?` type predicate for Character values (v1 protocol, #92).
+
 ### Changed
 
 ### Fixed

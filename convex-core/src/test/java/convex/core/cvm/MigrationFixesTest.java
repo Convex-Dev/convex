@@ -14,6 +14,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Symbol;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
@@ -322,6 +323,30 @@ public class MigrationFixesTest {
 			assertEquals(eval(UPGRADED, viaCat), eval(UPGRADED, "(splice " + dst + " " + off + " " + src + ")"),
 					"splice/cat+slice divergence for " + java.util.Arrays.toString(c));
 		}
+	}
+
+	@Test
+	public void testCharQ() {
+		// char? is NOT part of the genesis environment; the v1 upgrade installs it (#92)
+		assertTrue(evalErrors(GENESIS, "(char? \\a)"));
+
+		// Character values, whether literal or produced by the char cast
+		assertEquals(CVMBool.TRUE, eval(UPGRADED, "(char? \\a)"));
+		assertEquals(CVMBool.TRUE, eval(UPGRADED, "(char? (char 97))"));
+
+		// Any non-Character value is false, never an error
+		assertEquals(CVMBool.FALSE, eval(UPGRADED, "(char? 97)"));
+		assertEquals(CVMBool.FALSE, eval(UPGRADED, "(char? \"a\")"));
+		assertEquals(CVMBool.FALSE, eval(UPGRADED, "(char? nil)"));
+		assertEquals(CVMBool.FALSE, eval(UPGRADED, "(char? :a)"));
+		assertEquals(CVMBool.FALSE, eval(UPGRADED, "(char? 'a)"));
+
+		// Exactly one argument required
+		assertTrue(evalErrors(UPGRADED, "(char?)"));
+		assertTrue(evalErrors(UPGRADED, "(char? \\a \\b)"));
+
+		// :doc metadata installed by the migration
+		assertEquals(CVMBool.TRUE, eval(UPGRADED, "(boolean (:doc (lookup-meta 'char?)))"));
 	}
 
 	@Test
