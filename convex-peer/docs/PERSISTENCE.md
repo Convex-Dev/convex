@@ -286,8 +286,12 @@ public void close() {
         p.triggerAndClose(snapshot);  // trigger, drain queue, stop thread
         p.getConnectionManager().close();
     }
-    // Re-publish the final snapshot and complete each persistent store barrier.
-    for (LatticePropagator p : propagators) p.persist(snapshot);
+    // Complete each persistent store barrier using that propagator's final view.
+    if (persist) {
+        for (LatticePropagator p : propagators) {
+            p.persist(p.getLastAnnouncedValue());
+        }
+    }
 }
 ```
 
@@ -304,25 +308,29 @@ failure is returned by `close()`.
 
 ```java
 public void launch() {
-    // Restore from propagators[0] (primary) store
-    if (!propagators.isEmpty()) {
-        ACell restored = propagators.get(0).getStore().getRootData();
-        if (restored != null) {
-            cursor.set((V) restored);
-        }
+    // Restore every propagator's working view; only primary is authoritative.
+    for (int i = 0; i < propagators.size(); i++) {
+        ACell restored = propagators.get(i).restore();
+        if ((i == 0) && (restored != null)) cursor.set((V) restored);
     }
 
-	// Seed the store-backed announced view before opening the listener
-	ACell announced = propagators.get(0).processSnapshot(cursor.get());
-	cursor.set((V) announced);
-	propagators.get(0).checkpoint();
+    // Seed every store-backed announced view before opening the listener.
+    ACell announced = propagators.get(0).processSnapshot(cursor.get());
+    cursor.set((V) announced);
+    for (int i = 1; i < propagators.size(); i++) {
+        propagators.get(i).processSnapshot(announced);
+    }
+    if (persist) {
+        for (LatticePropagator p : propagators) p.checkpoint();
+    }
 
     // Start propagators, network server, etc.
     ...
 }
 ```
 
-The primary propagator's store holds the full unfiltered value as root data.
+The primary propagator's store holds its authoritative outbound view as root data
+(normally the full value because the primary normally uses the identity filter).
 On startup, NodeServer restores this into the cursor, then processes the current
 snapshot before opening the listener. Fresh and restored nodes can therefore answer
 `LATTICE_QUERY` immediately, with store-backed refs and a recovery root established
@@ -613,7 +621,8 @@ cursor.sync():                         Propagator processing:
   │◄──────────────────────────────────── return announced value
   │
   │                                    propagators[1] (public):
-  ├──► trigger(value) ────queue──►       filter(value)
+  ├──► trigger(value) ────queue──►       reconcile(own, value)
+  │                                      filter(reconciled)
   │                                      announce(filtered)
   │                                      setRootData(filtered)
   │                                      broadcast(delta)
@@ -706,22 +715,17 @@ A primary-store publication error during `cursor.sync()` throws to the calling
 context. The memory-first cursor value is retained. NodeServer does not impose a
 shutdown or retry policy; the operator decides how to recover.
 
-Sync tuning (LatticePropagator):
+Current propagation timing (`LatticePropagator` constants):
 
-| Parameter | Default | Description |
+| Constant | Value | Description |
 |-----------|---------|-------------|
-| `broadcastInterval` | 100ms | Minimum delay between delta broadcasts |
-| `rebroadcastInterval` | 1000ms | Periodic delta re-push |
-| `rootSyncInterval` | 30000ms | Periodic root-only sync (Tier 2) |
+| `ROOT_SYNC_INTERVAL` | 30 s | Periodic root-only sync for divergence detection |
 
-### Trade-offs by Use Case
-
-| Use Case | Delta Interval | Root Sync Interval | Notes |
-|----------|----------------|-------------------|-------|
-| High-speed trading | 10ms | 5s | Low latency, higher overhead |
-| Standard operations | 100ms | 30s | Balanced (recommended) |
-| Low-bandwidth IoT | 1000ms | 300s | Conserve bandwidth |
-| Eventually consistent | 500ms | 120s | Relaxed consistency |
+Background snapshot triggers are coalesced before processing, but every processed
+snapshot is broadcast: explicit sync must not silently discard a rapid follow-up delta.
+The root-sync timing is a fixed implementation constant, not operator configuration.
+There is no separate periodic delta re-push; the root-only sync provides eventual
+divergence detection and missing data is acquired on demand.
 
 ## Interaction with Lattice Apps
 
@@ -937,16 +941,16 @@ re-propagation boundary.
   to a smaller per-region or per-write critical section. Current coarse lock will
   serialise concurrent caller-thread syncs.
 
-## Testing Strategy
+## Additional Resilience Testing
 
-### Unit Tests
+Useful fault-injection coverage beyond the ordinary unit suite:
 
 1. **Delta loss simulation** — drop random broadcast messages, verify full sync recovers
 2. **Network partition** — split network, update both sides, verify convergence after reunion
 3. **New node join** — add fresh node, verify it syncs to current state
 4. **Missing data** — send delta referencing non-existent cells, verify acquisition
 
-### Integration Tests
+Useful longer-running integration coverage:
 
 1. **3-node network** — verify all nodes converge after updates
 2. **Rolling restart** — restart nodes one-by-one, verify no data loss
@@ -956,7 +960,6 @@ re-propagation boundary.
 ## Verification
 
 ```bash
-pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-peer -Dtest=NodeServerPersistenceTest
-pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-peer -Dtest=NodeServerTest
-pushd C:/Users/mike_/git/convex && ./mvnw -B test -pl convex-dlfs
+./mvnw -B test -pl convex-peer
+./mvnw -B test -pl convex-dlfs -am
 ```

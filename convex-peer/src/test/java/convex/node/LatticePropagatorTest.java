@@ -187,6 +187,28 @@ public class LatticePropagatorTest {
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
 	}
 
+	/** Consecutive explicit syncs must each propagate rather than drop the latter delta. */
+	@Test
+	public void testConsecutiveSyncsEachBroadcast() throws Exception {
+		Keyword dataKeyword = Keyword.intern("data");
+		ACell first = CVMLong.create(4301);
+		ACell second = CVMLong.create(4302);
+		@SuppressWarnings("unchecked")
+		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
+
+		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
+		server1.getCursor().sync();
+		server1.getCursor().assoc(dataKeyword,
+			values.assoc(first.getHash(), first).assoc(second.getHash(), second));
+		server1.getCursor().sync();
+
+		Convex connection = server1.getPropagator().getPeers().iterator().next();
+		connection.ping().get(5, TimeUnit.SECONDS);
+		assertEquals(2L, server1.getPropagator().getBroadcastCount(),
+			"a rapid follow-up sync must not be lost behind the broadcast throttle");
+		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));
+	}
+
 	/** A queued value must not be advertised until announce has populated the store. */
 	@Test
 	public void testRootSyncUsesLastAnnouncedValue() throws Exception {

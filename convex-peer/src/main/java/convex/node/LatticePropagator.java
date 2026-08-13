@@ -74,11 +74,6 @@ public class LatticePropagator implements Closeable {
 	private static final Logger log = LoggerFactory.getLogger(LatticePropagator.class.getName());
 
 	/**
-	 * Minimum delay between successive broadcasts to avoid flooding (milliseconds)
-	 */
-	public static final long MIN_BROADCAST_DELAY = 50L;
-
-	/**
 	 * Interval between root-only sync broadcasts (milliseconds).
 	 * Provides a lightweight periodic sync mechanism for divergence detection.
 	 */
@@ -553,7 +548,7 @@ public class LatticePropagator implements Closeable {
 	 * <ol>
 	 *   <li>Announce to store — writes cells, collects novelty for delta encoding</li>
 	 *   <li>Publish root data — anchor for restore (if persist enabled)</li>
-	 *   <li>Broadcast delta to peers (if peers exist and delay elapsed)</li>
+	 *   <li>Broadcast delta to peers (if peers exist)</li>
 	 * </ol>
 	 *
 	 * <p>Announce always runs (for delta tracking and store-backed refs).
@@ -601,10 +596,9 @@ public class LatticePropagator implements Closeable {
 				dirty = true;
 			}
 
-			// 3. Broadcast to peers (only if peers exist and delay elapsed)
-			long currentTime = Utils.getCurrentTimestamp();
-			if (!connectionManager.getPeers().isEmpty()
-					&& currentTime >= lastBroadcastTime + MIN_BROADCAST_DELAY) {
+			// 3. Broadcast to peers. Background triggers are already coalesced by
+			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
+			if (!connectionManager.getPeers().isEmpty()) {
 				// Ensure the lattice root is available before the protocol envelope.
 				// Format.encodeDelta decodes its final list element as the message root,
 				// so the LATTICE_VALUE vector itself must be last. Encoding only the
@@ -623,7 +617,7 @@ public class LatticePropagator implements Closeable {
 				Blob deltaData = Format.encodeDelta(novelty);
 				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
 				connectionManager.broadcast(message);
-				lastBroadcastTime = currentTime;
+				lastBroadcastTime = Utils.getCurrentTimestamp();
 				broadcastCount.incrementAndGet();
 			}
 
