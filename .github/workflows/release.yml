@@ -53,6 +53,19 @@ jobs:
       - name: Build with tests
         run: ./mvnw -B clean install
 
+      # Keep the tag workflow self-contained: the ordinary Build workflow runs
+      # independently and must not be the only guard for Central-bound artifacts.
+      - name: Verify release artifacts
+        run: ./mvnw -B -Prelease -DskipTests package
+
+      - name: Smoke test release version
+        run: |
+          JAR_VERSION=$(java -jar convex-integration/target/convex.jar --version)
+          if [ "$JAR_VERSION" != "${{ github.ref_name }}" ]; then
+            echo "::error::Built convex.jar reports ${JAR_VERSION}, expected ${{ github.ref_name }}."
+            exit 1
+          fi
+
       # Aggregate SBOM (CycloneDX; plugin configuration in the parent pom) and a
       # checksum for the uberjar operators download from the release page
       - name: Generate SBOM and checksum
