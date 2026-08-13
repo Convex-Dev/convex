@@ -48,7 +48,7 @@ This is expected for an unsigned build; signed/notarised installers are tracked 
 
 ## Building from Source
 
-**Requirements:** Java 21+, Maven 3.7+
+**Requirements:** Java 21+ (Maven is provided by the checked-in wrapper, `./mvnw`)
 
 ```bash
 git clone https://github.com/Convex-Dev/convex.git

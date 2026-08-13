@@ -68,7 +68,7 @@ cd convex
 
 ## License
 
-Copyright 2018-2025 The Convex Foundation and Contributors
+Copyright 2018-2026 The Convex Foundation and Contributors
 
 Code in convex-core is provided under the [Convex Public License](../LICENSE.md).
 

@@ -36,7 +36,7 @@ existing one:
 (*registry*/update 'my.name #NEW-TARGET)
 
 ;; Change who controls a name
-(*registry*/change-control 'my.name #NEW-CONTROLLER)
+(*registry*/control 'my.name #NEW-CONTROLLER)
 ```
 
 These are transactions (they change state). Notes:
@@ -49,6 +49,9 @@ These are transactions (they change state). Notes:
   `(*registry*/create 'my.name target controller metadata)`.
 - Note `(*registry*/register {:name "..."})` is unrelated — it registers
   metadata for the *caller's own account*, not a CNS name.
+- The registry also defines `change-control`, but it is the scoped `:callable`
+  SPI variant (path taken from `*scope*`) — not called directly with a symbol;
+  use `control`.
 
 ## CNS in Code
 

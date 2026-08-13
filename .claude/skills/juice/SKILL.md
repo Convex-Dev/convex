@@ -39,19 +39,19 @@ estimate against a local network before submitting.
 ## Price
 
 Juice price lives in the CVM state and is readable from CVM code as
-`*juice-price*`. It moves with network load:
+`*juice-price*`. In the implementation the genesis price is **10**
+(`Constants.INITIAL_JUICE_PRICE`); CAD007 currently says 2 — that divergence
+is an open question, tracked in #697. A live network's price is whatever its
+genesis state carries.
 
-- Rises when sustained load exceeds `JUICE_PER_SECOND` (100,000,000)
-- Decays towards its floor when load is lighter — roughly a six-second half
-  life at zero load
-- Has a hard minimum of **1**; juice is never free
+CAD007 also specifies **dynamic pricing** — the price rising under sustained
+load and decaying towards a hard floor of 1 — but this is not yet implemented:
+nothing updates `*juice-price*` after genesis, so treat the price as constant
+today. Implementation is tracked in #408 / #423.
 
-The genesis price is 2 and the scale factor is 1.125. Governance may update the
-scale factor and throughput constant.
-
-This is the cryptoeconomic defence: sustaining an attack means paying
-exponentially rising prices, and a burst while prices are low can only delay
-confirmation, not exclude legitimate transactions.
+Dynamic pricing is the intended cryptoeconomic defence: sustaining an attack
+would mean paying exponentially rising prices, so a burst while prices are low
+could only delay confirmation, not exclude legitimate transactions.
 
 ## Pricing New Operations
 

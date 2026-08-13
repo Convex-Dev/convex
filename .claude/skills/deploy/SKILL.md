@@ -45,7 +45,8 @@ A typical actor deployment:
 ## After Deployment
 
 1. Note the returned address for the user
-2. Optionally register a CNS name: `(call #9 (cns-update 'my.actor.name *address*))`
+2. Optionally register a CNS name: `(*registry*/create 'my.actor.name #NEW-ADDR)`
+   — needs control of the parent namespace; see the `cns` skill
 3. Test by calling a `^:callable` function: `(call #NEW-ADDR (get-count))`
 
 ## Workflow

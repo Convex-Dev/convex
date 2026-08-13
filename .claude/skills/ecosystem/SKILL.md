@@ -31,10 +31,11 @@ unless you have confirmed the repository is present alongside this one.
 
 ## Module Map
 
-The 13 Maven modules are listed in `AGENTS.md` with their purposes, and each
+The 14 Maven modules are listed in `AGENTS.md` with their purposes, and each
 has its own `README.md`. In short: `convex-core` holds the CVM, consensus and
-Etch; `convex-peer` the networking; `convex-cli`, `convex-gui` and
-`convex-restapi` the interfaces; `convex-p2p` bundles the node server.
+Etch; `convex-peer` the networking, including the `NodeServer`; `convex-cli`,
+`convex-gui` and `convex-restapi` the interfaces; `convex-p2p` the P2P node
+stack, whose `P2PNode` runs a `NodeServer`.
 
 ## Client Libraries
 

@@ -33,13 +33,14 @@ applies an upgrade**. Everything pinned to LIVE follows automatically.
 
 ## What v1 Contains
 
-The bootstrap (installing `schedule-upgrade` / `unschedule-upgrade`) plus
-fixes that could not ship any other way, because a naive fix would move the
-genesis hash:
+The bootstrap — installing `schedule-upgrade` / `unschedule-upgrade` plus the
+new core functions `gensym`, `cat`, `splice` and `char?` (#92) — and fixes
+that could not ship any other way, because a naive fix would move the genesis
+hash:
 
 | Migration | Fixes |
 |-----------|-------|
-| `v1-core.cvx` | `update` / `update-in` variadic arities (#533); quasiquote of sets/maps, `~false`, `define` double-evaluation, `call` arity (#598) |
+| `v1-core.cvx` | `update` / `update-in` variadic arities (#533); quasiquote of sets/maps, `~false`, `define` double-evaluation, `call` arity (#598); macro hygiene for `dotimes` / `for` / `for-loop` / `switch` (#602) |
 | `v1-trust.cvx` | `trusted?` now fails closed against defective monitors (#623) |
 | `v1-fungible.cvx` | `add-mint` `:max-supply` defaults to unlimited rather than 0 (#528) |
 | `v1-asset.cvx`, `v1-box.cvx`, `v1-delegate.cvx`, `v1-metadata.cvx`, `v1-multi-token.cvx`, `v1-nft-basic.cvx`, `v1-nft-simple.cvx` | library fixes (#600, #620, #621, #622, #623) |
@@ -72,6 +73,15 @@ the change unconditional locally and run `SnapshotStateTest`: if the replay hash
 moves, recorded history exercised the old semantics and the gate is mandatory;
 if not, it ships unconditionally with no permanent branch. Branches are
 permanent — replay from genesis needs every historical semantics.
+
+**Adding a core function** means a new core definition code, registered with
+`regNonGenesis` and installed by a migration — never into genesis. Standing
+rule (amended 2026-08-13): no release adds a code beyond 506 unless it ships,
+in the same release, at minimum a 506-style in-definition version gate —
+fail-first below the introducing version, before arity checking or any other
+work (`char?`, code 506, is the model). Once v1 has activated on the live
+network, full versioned materialisation is required instead. Rationale: the
+decode-skew policy in `UPGRADE.md`.
 
 **Tier 3 — encodings.** Decoding happens outside any state context, so it
 **cannot** branch on version. Decoders stay permissive of all historical forms

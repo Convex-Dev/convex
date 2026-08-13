@@ -89,8 +89,8 @@ The bootstrap mechanism and v1 migration are implemented. Genesis remains byte-i
 
 | Concern | Status | Location |
 | ------- | ------ | -------- |
-| Pre-transaction hook point | **Present** — `prepareBlock` runs block-number bump → time update → scheduled transactions, in order, before block transactions | `convex-core/.../cvm/State.java:250` (`prepareBlock`), `:182` (`applyBlock`) |
-| Monotonic consensus clock | **Present** — `applyTimeUpdate` advances the clock and already performs threshold-crossing logic (memory-pool growth) | `State.java:269` |
+| Pre-transaction hook point | **Present** — `prepareBlock` runs block-number bump → time update → scheduled transactions, in order, before block transactions | `convex-core/.../cvm/State.java:254` (`prepareBlock`), `:186` (`applyBlock`) |
+| Monotonic consensus clock | **Present** — `applyTimeUpdate` advances the clock and already performs threshold-crossing logic (memory-pool growth) | `State.java:336` |
 | Governance accounts | **Present** — genesis system accounts occupy addresses below the core library: `FOUNDATION` #2, `GOVERNANCE` #6, `ADMIN` #7; core library at `CORE_ADDRESS` #8 | `init/Init.java:41-53` |
 | Protocol globals | **Implemented** — protocol watermark at index 6 and upgrade vector at index 7; absent values read as version 0 and an empty vector | `cvm/State.java` |
 | Genesis wiring | **Preserved** — historical genesis carries neither new global; fresh networks may explicitly start at a supported version | `init/Init.java`, `peer/Config.java` |
@@ -197,8 +197,8 @@ Because migrations bind to versions by position, the pending region is managed s
 
 The applied prefix is **immutable forever**. Applying an upgrade changes nothing in the vector — the watermark simply advances over the entry, a single `Long` update, preserving maximal structural sharing. The triggering block of a historical upgrade is not stored: it is derivable by replay, and the activation timestamp is the operationally meaningful datum. The format itself can be evolved by an upgrade, like everything else in state.
 
-- Add `State.getProtocolVersion()` (the watermark; absent global → 0) and an upgrade-vector accessor (absent → empty), mirroring the existing `GLOBAL_*` accessors (`State.java:812`, `:901`).
-- This resolves the `// TODO: move to actor?` on `State.java:83`: the values stay in globals — consensus-critical, always present, native to read — rather than in any account's environment.
+- Add `State.getProtocolVersion()` (the watermark; absent global → 0) and an upgrade-vector accessor (absent → empty), mirroring the existing `GLOBAL_*` accessors (implemented: `getProtocolVersion()` at `State.java:1003`).
+- This resolved the former `// TODO: move to actor?` beside the globals constants in `State.java`: the values stay in globals — consensus-critical, always present, native to read — rather than in any account's environment.
 
 **Genesis is never touched — on any network.** `Init` and `INITIAL_GLOBALS` remain exactly as they are (6 globals); every network, new or existing, starts at version `0` via the absent-reads-as-default rule, and adopts the mechanism **fully on-chain**:
 
@@ -258,7 +258,7 @@ public class Migrations {
 
 ### Activation in `prepareBlock`
 
-The upgrade step is the **first** action in `prepareBlock` (`State.java:250`), ahead of the block-number bump, so the entire block — time update, scheduled and ordinary transactions alike — executes under the new transition function:
+The upgrade step is the **first** action in `prepareBlock` (`State.java:254`), ahead of the block-number bump, so the entire block — time update, scheduled and ordinary transactions alike — executes under the new transition function:
 
 ```java
 private State prepareBlock(Block b) {
@@ -432,7 +432,7 @@ Ordered so each step is independently testable and the genesis-affecting change 
 4. ✅ **`applyUpgrades` in `prepareBlock`**, including withdrawal on missing or failing migrations.
 5. ✅ **v1 bootstrap migration** — installs the scheduling core bindings *and* fixes all bugs known at genesis (#533 `update`/`update-in`, #528 `add-mint`), so 0→1 brings a network fully up to date in one step; adopted fully on-chain. A single fix is never its own protocol version.
 6. ✅ **Peer consensus freeze** (full freeze of executor + propagator) and **operator early-warning** on detection of an unsupported scheduled upgrade.
-7. **Versioned core-definition materialisation** — deferred by the gate 3 decision (2026-07-17): implementing it against the already-shipped codes 501–505 would itself create mixed-release skew during rollout, so it is not part of 0.8.9. It becomes mandatory in the same release as the first core code beyond 505 (standing rule; see the decode-skew policy above).
+7. **Versioned core-definition materialisation** — deferred by the gate 3 decision (2026-07-17): implementing it against the already-shipped codes 501–505 would itself create mixed-release skew during rollout, so it is not part of 0.8.9. It becomes mandatory for the first core code added after v1 activates on the live network; until then, any code beyond 506 must ship at minimum a 506-style in-definition version gate (standing rule as amended 2026-08-13; see the decode-skew policy above).
 8. ✅ **Best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597)) — a peer that cannot apply a scheduled upgrade sheds its own stake at a randomised instant in a pre-activation window, gated on `:auto-manage` and guarded against removing the last viable peer. ✅ **Forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595)) — stage (i) confirmation clamp (safety) and stage (ii) out-of-window demotion (liveness). See `CONSENSUS.md`.
 9. ✅ **Real bug fixes carried by v1**: [#533](https://github.com/Convex-Dev/convex/issues/533) (`update`/`update-in`) and [#528](https://github.com/Convex-Dev/convex/issues/528) (`add-mint`) are fixed via the v1 migration rather than naive code changes, validated against the statically-built upgraded state. [#354](https://github.com/Convex-Dev/convex/issues/354) (a `schedule` design question) and [#208](https://github.com/Convex-Dev/convex/issues/208) (a macro-call compiler regression) are not clean migration fixes and remain open.
 
@@ -477,7 +477,7 @@ No Protonet scheduling, deployment or read-only rehearsal is implied merely by c
 
 1. **Release health:** `develop` passes the clean reactor on JDK 21 and 25. In particular, Etch in-place GC must preserve a populated root while retaining the all-zero/unset root as valid for a genuinely fresh store.
 2. **Local protocol evidence:** the focused pre/post suites and `RehearseNetworkUpgrade` pass with identical hashes across repeated runs. This may run continuously in CI.
-3. **Core-definition policy call — decided 2026-07-17.** Step 7 is not required for 0.8.9: the decode-skew window for shipped codes 501–505 is accepted operationally, and a standing rule replaces the open question — any release adding a core code beyond 505 must ship versioned materialisation alongside it (full rationale in the decode-skew policy above). Gate 5/6 evidence must additionally confirm, via attestation and the verifier reports, that no materially-staked peer still runs a release below 0.8.8.
+3. **Core-definition policy call — decided 2026-07-17.** Step 7 is not required for 0.8.9: the decode-skew window for shipped codes 501–505 is accepted operationally, and a standing rule replaces the open question — any release adding a core code beyond 505 must ship versioned materialisation alongside it (full rationale in the decode-skew policy above; rule since amended 2026-08-13 — a 506-style in-definition gate suffices until v1 activates). Gate 5/6 evidence must additionally confirm, via attestation and the verifier reports, that no materially-staked peer still runs a release below 0.8.8.
 4. **Release call — HOLD:** only after an explicit decision, finish the release checklist/changelog and build the candidate artifacts. Do not infer this from green tests.
 5. **Live read-only rehearsal — HOLD:** when the 0.8.9 candidate is ready, run `VerifyNetworkUpgrade` against `peer.convex.live` and independently operated peer endpoints. Require exact local replay or an explicitly reviewed warning, identical migrated hashes across machines/JDKs, and a valid fail-closed footprint report.
 6. **Rolling software deployment — HOLD:** deploy the release without changing `Migrations.LIVE_VERSION` and without scheduling v1. Start with a non-staked/low-risk peer, preserve Etch/configuration/key backups, replay from genesis, and compare the exact state position/hash before continuing peer by peer. As each peer comes up, confirm its public service endpoints: `/mcp` completes the MCP handshake and `/openapi` serves a populated spec — this closes [#648](https://github.com/Convex-Dev/convex/issues/648) for `peer.convex.live`, and includes checking the reverse proxy routes both paths (deployment environment, not just the release).
@@ -525,7 +525,7 @@ is self-disabled as a duplicate of `CoreGenesisTest`; it activates automatically
 
 Remaining before first production use:
 
-- **Core-definition policy (plan step 7) — decided 2026-07-17**: the decode-skew window for the shipped codes 501–505 is accepted operationally for the bootstrap; versioned materialisation is deferred and becomes mandatory in the same release as any future core code beyond 505. See the decode-skew section for the rationale and the standing rule.
+- **Core-definition policy (plan step 7) — decided 2026-07-17**: the decode-skew window for the shipped codes 501–505 is accepted operationally for the bootstrap; versioned materialisation is deferred; under the standing rule as amended 2026-08-13, any future core code beyond 506 requires at minimum a 506-style in-definition version gate, and full versioned materialisation becomes mandatory once v1 has activated on the live network. See the decode-skew section for the rationale and the standing rule.
 - **0.8.9 evidence package** — green JDK 21/25 CI, deterministic local rehearsal hashes, complete release notes, and (once explicitly authorised) matching read-only Protonet verifier reports from independent endpoints.
 
 Now implemented: **forward block-timestamp handling** ([#595](https://github.com/Convex-Dev/convex/issues/595) — stage (i) confirmation clamp and stage (ii) out-of-window demotion, see `CONSENSUS.md`) and **best-efforts stake withdrawal** ([#597](https://github.com/Convex-Dev/convex/issues/597) — randomised pre-activation window, never-last-peer guard, gated on `:auto-manage`).
