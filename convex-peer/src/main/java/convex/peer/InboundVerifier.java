@@ -18,6 +18,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
@@ -43,7 +44,6 @@ class InboundVerifier {
 
 	private final Server server;
 	private final SecureRandom random = new SecureRandom();
-	private final AtomicLong idCounter = new AtomicLong();
 	private final AtomicLong verifiedCount = new AtomicLong();
 
 	/**
@@ -51,7 +51,9 @@ class InboundVerifier {
 	 * by {@link #handleResult(Message)} when the client's RESULT arrives.
 	 * Also serves as CAS guard — at most one verification per connection.
 	 */
-	private final ConcurrentHashMap<AConnection, CompletableFuture<Message>> active = new ConcurrentHashMap<>();
+	private record PendingVerification(CVMLong id, CompletableFuture<Message> future) {}
+
+	private final ConcurrentHashMap<AConnection, PendingVerification> active = new ConcurrentHashMap<>();
 
 	InboundVerifier(Server server) {
 		this.server = server;
@@ -69,8 +71,10 @@ class InboundVerifier {
 		if (!conn.supportsMessage()) return;
 		if (active.containsKey(conn)) return;
 
+		CVMLong id=conn.nextRequestID();
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
-		if (active.putIfAbsent(conn, resultFuture) != null) return;
+		PendingVerification pending=new PendingVerification(id,resultFuture);
+		if (active.putIfAbsent(conn, pending) != null) return;
 
 		try { Thread.startVirtualThread(() -> {
 			try {
@@ -84,7 +88,6 @@ class InboundVerifier {
 
 				SignedData<ACell> signed = Message.signChallenge(kp, token, null, networkID);
 
-				long id = idCounter.incrementAndGet();
 				Message challengeMsg = Message.createChallenge(id, signed);
 				if (!conn.sendMessage(challengeMsg)) return;
 
@@ -138,9 +141,14 @@ class InboundVerifier {
 		if (active.isEmpty()) return false;
 		AConnection conn = m.getConnection();
 		if (conn == null) return false;
-		CompletableFuture<Message> cf = active.get(conn);
-		if (cf == null) return false;
-		cf.complete(m);
+		PendingVerification pending = active.get(conn);
+		if (pending == null) return false;
+		try {
+			if (!pending.id().equals(m.getResultID())) return false;
+		} catch (BadFormatException e) {
+			return false;
+		}
+		pending.future().complete(m);
 		return true;
 	}
 }

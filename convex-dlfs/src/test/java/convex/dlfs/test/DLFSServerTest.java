@@ -237,6 +237,46 @@ public class DLFSServerTest {
 	}
 
 	@Test
+	void testEncodedTraversalRejectedForWebDavPaths() throws Exception {
+		var fs = server.getDriveManager().getDrive(null, "test");
+		java.nio.file.Files.createDirectories(fs.getPath("/traversal-source"));
+		java.nio.file.Files.writeString(fs.getPath("/traversal-secret.txt"), "secret");
+		String traversal = driveURL + "traversal-source/%2e%2e/traversal-secret.txt";
+
+		for (String method : new String[] { "GET", "HEAD", "DELETE", "PROPFIND" }) {
+			HttpRequest request = HttpRequest.newBuilder(URI.create(traversal))
+				.method(method, HttpRequest.BodyPublishers.noBody())
+				.build();
+			assertEquals(400, client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode(), method);
+		}
+
+		HttpRequest put = HttpRequest.newBuilder(URI.create(traversal))
+			.PUT(HttpRequest.BodyPublishers.ofString("overwritten"))
+			.build();
+		assertEquals(400, client.send(put, HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertEquals("secret", java.nio.file.Files.readString(fs.getPath("/traversal-secret.txt")));
+	}
+
+	@Test
+	void testEncodedTraversalRejectedForMoveAndCopyDestinations() throws Exception {
+		var fs = server.getDriveManager().getDrive(null, "test");
+		java.nio.file.Files.createDirectories(fs.getPath("/destination-source"));
+		java.nio.file.Files.writeString(fs.getPath("/destination-source/source.txt"), "source");
+		String source = driveURL + "destination-source/source.txt";
+		String destination = driveURL + "destination-source/%2e%2e/escaped.txt";
+
+		for (String method : new String[] { "MOVE", "COPY" }) {
+			HttpRequest request = HttpRequest.newBuilder(URI.create(source))
+				.method(method, HttpRequest.BodyPublishers.noBody())
+				.header("Destination", destination)
+				.build();
+			assertEquals(409, client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode(), method);
+			assertTrue(java.nio.file.Files.exists(fs.getPath("/destination-source/source.txt")));
+			assertFalse(java.nio.file.Files.exists(fs.getPath("/escaped.txt")));
+		}
+	}
+
+	@Test
 	void testDirectoryMoveFailsWithoutPartialMutation() throws Exception {
 		String source = driveURL + "move-directory-source/";
 		HttpRequest create = HttpRequest.newBuilder(URI.create(source))

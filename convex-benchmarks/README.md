@@ -21,7 +21,7 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 
 ```bash
 cd convex
-mvn clean install -pl convex-benchmarks -am
+./mvnw -B -T1C install -pl convex-benchmarks -am
 ```
 
 ### Execute

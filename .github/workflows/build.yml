@@ -31,4 +31,11 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn -B clean install
+        run: ./mvnw -B clean install
+
+      # Sources and Javadocs are attached only under the release profile. Verify
+      # them on the release JDK so ordinary green builds cannot hide publishing
+      # failures. Tests have already run above on both supported JDKs.
+      - name: Verify release artifacts
+        if: matrix.java == '25'
+        run: ./mvnw -B -Prelease -DskipTests package

@@ -162,7 +162,7 @@ you specifically need the binary transport.
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn install -pl convex-java -am
+./mvnw -B -T1C install -pl convex-java -am
 ```
 
 ## Resources

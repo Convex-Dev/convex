@@ -719,6 +719,57 @@ derived master key is
 The derivation is application policy rather than an on-disk v3 field; other
 applications may resolve the same 32-byte master-key contract differently.
 
+#### Convex peer CLI key resolution
+
+The Convex peer CLI always attaches a PKCS12 resolver when opening a file-backed
+peer store. If the Etch header has a non-zero `publicKeyHint`, the CLI first
+uses an already configured matching peer key, then looks up the full public key
+in the keystore. If the hint is unset, it falls back to the explicitly supplied
+`--peer-key` or configured peer key. Failure to identify or load a key stops the
+encrypted store from opening. When creating a new encrypted file with no
+explicit hint, the CLI records the full public key of the selected peer.
+
+The CLI passes the selected private 32-byte Ed25519 seed to
+`EtchKeyDerivation.deriveMasterKey` and wipes its temporary seed copy after
+derivation. `--storepass` verifies and unlocks the PKCS12 keystore, while
+`--peer-keypass` unlocks the selected private-key entry; neither password is
+input to the Etch KDF. A header hint is likewise only a key identifier and is
+not KDF input.
+
+For an existing store, the file header supplies its version, cipher, index
+encryption flag and public-key hint. A configured `peer.etch` object is a
+creation policy, not an instruction to reinterpret an existing file. The CLI
+warns if the requested policy differs from the opened file.
+
+#### Etch maintenance CLI key resolution
+
+The `convex etch` inspection and maintenance commands use the same
+header-first rule. A plaintext or legacy store opens without consulting any
+secret provider. For an encrypted v3 store the selected plaintext header's
+`publicKeyHint` is used to find a Convex key in `--keystore`; `--etch-key` may
+select a different alias or prefix explicitly. `--etch-keypass` unlocks that
+entry. The standard Ed25519-to-Etch derivation above is then applied.
+
+An opaque 32-byte master key may instead be supplied with
+`--etch-key-file <path>`; the file may contain exactly 32 raw bytes or 64 hex
+digits. Use an owner-only file. `--etch-key-file -` reads the same material
+from standard input, and interactive operation can request it through a hidden
+console prompt. Raw key material is never accepted as an argument value. The
+equivalent destination options are `--into-key`, `--into-keypass` and
+`--into-key-file`; source and destination resolution contexts are independent
+and their temporary master-key arrays are wiped when the command completes.
+
+`etch gc --output` and `etch repair --into` preserve the source version,
+cipher, index-encryption setting, public-key hint and master key by default.
+Their fresh files always receive independent v3 salts. Explicit destination
+key options rekey the output. `etch migrate --into` retains the normal v2
+default for a new destination, or accepts a fresh creation policy through
+`--into-version`, `--into-cipher`, `--[no-]into-encrypt-index` and
+`--into-public-key-hint`. An existing destination's authenticated header is
+always authoritative; these options never reinterpret its format. Cipher
+changes, encryption/plaintext conversion and rekeying are therefore performed
+as migration into a fresh path.
+
 V3 uses HKDF-SHA-256 with `fileSalt` and fixed Etch context labels to derive
 only two file-scoped keys:
 

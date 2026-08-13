@@ -130,8 +130,10 @@ docker run convexlive/convex peer start
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn clean install
+./mvnw -B -T1C install
 ```
+
+See [BUILD.md](BUILD.md) for test, final-verification and release commands.
 
 ### Running Convex
 

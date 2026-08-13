@@ -18,6 +18,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.message.LocalConnection;
 import convex.core.message.Message;
@@ -103,27 +104,27 @@ public class ConvexLocal extends AConvexConnected {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		Message m=Message.createStatusRequest(getNextID());
-		return message(m);
+		Message m=Message.createStatusRequest((CVMLong)null);
+		return request(m);
 	}
 
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		maybeUpdateSequence(signed);
-		Message m=Message.createTransaction(getNextID(),signed);
-		return message(m);
+		Message m=Message.createTransaction((CVMLong)null,signed);
+		return request(m);
 	}
 
 	@Override
 	protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
-		Message m=Message.createChallenge(getNextID(), data);
-		return message(m);
+		Message m=Message.createChallenge((CVMLong)null, data);
+		return request(m);
 	}
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		Message m=Message.createQuery(getNextID(),query,address);
-		return message(m);
+		Message m=Message.createQuery((CVMLong)null,query,address);
+		return request(m);
 	}
 
 	@Override

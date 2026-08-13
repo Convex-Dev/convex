@@ -19,7 +19,6 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
@@ -91,10 +90,7 @@ public final class Acquiror implements AutoCloseable {
 
 	private static DataSource remoteSource(ConvexRemote source) {
 		Objects.requireNonNull(source, "Remote acquisition source");
-		return hashes -> {
-			CVMLong id = CVMLong.create(source.getNextID());
-			return source.message(Message.createDataRequest(id, hashes));
-		};
+		return hashes -> source.request(Message.createDataRequest(null, hashes));
 	}
 
 	public static Acquiror create(Hash hash, AStore store, ConvexRemote source) {
@@ -202,12 +198,18 @@ public final class Acquiror implements AutoCloseable {
 
 		AVector<?> values = RT.ensureVector(result.getValue());
 		if (values == null) throw new BadFormatException("Expected vector in acquisition result");
+		if (values.count() != requested.length) {
+			throw new BadFormatException("Acquisition response count does not match request: "
+				+ values.count() + " != " + requested.length);
+		}
 
-		for (int i = 0; i < values.count(); i++) {
+		for (int i = 0; i < requested.length; i++) {
 			ACell value = values.get(i);
 			if (value == null) {
-				Hash missingHash = (i < requested.length) ? requested[i] : hash;
-				throw new MissingDataException(store, missingHash);
+				throw new MissingDataException(store, requested[i]);
+			}
+			if (!requested[i].equals(value.getHash())) {
+				throw new BadFormatException("Acquisition response hash mismatch at index " + i);
 			}
 			// DATA response cells may themselves be partial. Store the top cell and
 			// let the normal missing-reference loop request its absent branches.

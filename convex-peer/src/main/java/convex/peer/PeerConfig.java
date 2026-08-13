@@ -306,17 +306,32 @@ public class PeerConfig {
 		mapLong(peer, OUTGOING_CONNECTIONS, legacy, Keywords.OUTGOING_CONNECTIONS);
 		mapLong(peer, TIMEOUT, legacy, Keywords.TIMEOUT);
 		mapLong(peer, POLL_DELAY, legacy, Keywords.POLL_DELAY);
-		EtchConfig etchConfig=getEtchConfig(etchKeyFunction);
-		if (etchConfig!=null) legacy.put(Keywords.ETCH_CONFIG,etchConfig);
 
 		// Keypair — convert seed hex to AKeyPair
+		AKeyPair keyPair=null;
 		String seed = getKeypairSeed();
 		if (seed != null) {
 			Blob seedBlob = Blob.parse(seed);
 			if (seedBlob != null && seedBlob.count() == AKeyPair.SEED_LENGTH) {
-				legacy.put(Keywords.KEYPAIR, AKeyPair.create(seedBlob));
+				keyPair=AKeyPair.create(seedBlob);
+				legacy.put(Keywords.KEYPAIR,keyPair);
 			}
 		}
+
+		Function<AccountKey,byte[]> effectiveResolver=etchKeyFunction;
+		boolean defaultResolver=false;
+		if ((effectiveResolver==null)&&(keyPair!=null)) {
+			effectiveResolver=Config.etchKeyResolver(keyPair);
+			defaultResolver=true;
+		}
+		EtchConfig etchConfig=getEtchConfig(effectiveResolver);
+		if (defaultResolver&&(etchConfig!=null)
+				&&(etchConfig.getCipherMode()!=EtchConfig.CipherMode.NONE)
+				&&(etchConfig.getPublicKeyHint()==null)) {
+			etchConfig=etchConfig.withPublicKeyHint(keyPair.getAccountKey());
+		}
+		if (etchConfig!=null) legacy.put(Keywords.ETCH_CONFIG,etchConfig);
+		if (etchKeyFunction!=null) legacy.put(Config.ETCH_KEY_RESOLVER,etchKeyFunction);
 
 		return legacy;
 	}

@@ -9,6 +9,7 @@ import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import convex.api.Convex;
 import convex.core.cvm.State;
@@ -27,6 +28,7 @@ import convex.peer.Server;
  * We can't test much of the GUI easily in unit tests, but we can at least test
  * that the GUI component tree is initialised correctly and consistently.
  */
+@ExtendWith(GUIFixtureExtension.class)
 public class GUITest {
 	
 	public static Server SERVER;
@@ -58,6 +60,14 @@ public class GUITest {
 		assumeFalse(GraphicsEnvironment.isHeadless());
 	}
 
+	static synchronized void closeFixture() {
+		if (manager==null) return;
+		manager.close();
+		manager=null;
+		CONVEX=null;
+		SERVER=null;
+	}
+
 	/**
 	 * Manager is the root panel of the GUI. A lot of other stuff is built in its
 	 * constructor.
@@ -81,9 +91,13 @@ public class GUITest {
 		java.io.File tempDb = java.io.File.createTempFile("dlfs-guitest-", ".db");
 		tempDb.deleteOnExit();
 		DLFSBrowser browser=new DLFSBrowser(tempDb);
-		DLFileSystem drive=browser.getDrive("demo");
-		assertNotNull(drive);
-		assertEquals(0,drive.getRoot().getNameCount());
+		try {
+			DLFileSystem drive=browser.getDrive("demo");
+			assertNotNull(drive);
+			assertEquals(0,drive.getRoot().getNameCount());
+		} finally {
+			browser.close();
+		}
 	}
 	
 	@Test

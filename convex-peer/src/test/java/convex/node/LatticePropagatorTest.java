@@ -3,12 +3,18 @@ package convex.node;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,16 +25,26 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AVector;
+import convex.core.data.ASet;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Ref;
+import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
+import convex.lattice.LatticeContext;
+import convex.lattice.generic.LWWLattice;
+import convex.lattice.generic.SetLattice;
 
 /**
  * Tests for automatic lattice propagation using LatticePropagator.
@@ -169,6 +185,250 @@ public class LatticePropagatorTest {
 		ACell merged = server2.getLocalValue();
 		assertEquals(expected, RT.getIn(merged, dataKeyword, expectedHash),
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
+	}
+
+	/** Consecutive explicit syncs must each propagate rather than drop the latter delta. */
+	@Test
+	public void testConsecutiveSyncsEachBroadcast() throws Exception {
+		Keyword dataKeyword = Keyword.intern("data");
+		ACell first = CVMLong.create(4301);
+		ACell second = CVMLong.create(4302);
+		@SuppressWarnings("unchecked")
+		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
+
+		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
+		server1.getCursor().sync();
+		server1.getCursor().assoc(dataKeyword,
+			values.assoc(first.getHash(), first).assoc(second.getHash(), second));
+		server1.getCursor().sync();
+
+		Convex connection = server1.getPropagator().getPeers().iterator().next();
+		connection.ping().get(5, TimeUnit.SECONDS);
+		assertEquals(2L, server1.getPropagator().getBroadcastCount(),
+			"a rapid follow-up sync must not be lost behind the broadcast throttle");
+		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));
+	}
+
+	/** A queued value must not be advertised until announce has populated the store. */
+	@Test
+	public void testRootSyncUsesLastAnnouncedValue() throws Exception {
+		Blob announced = Blobs.createRandom(400);
+		Blob pending = Blobs.createRandom(400);
+		try (BlockingAnnounceStore store = new BlockingAnnounceStore(pending.getHash())) {
+			LatticePropagator propagator = new LatticePropagator(store);
+			try {
+				propagator.processSnapshot(announced);
+				propagator.start();
+				CompletableFuture<ACell> nextAnnounce = propagator.nextAnnounce();
+				propagator.triggerBroadcast(pending);
+				assertTrue(store.blocked.await(5, TimeUnit.SECONDS));
+
+				assertEquals(announced.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()),
+					"root sync must retain the last store-backed value while announce is incomplete");
+				assertNotNull(store.refForHash(announced.getHash()));
+
+				store.release.countDown();
+				assertEquals(pending, nextAnnounce.get(5, TimeUnit.SECONDS));
+				assertEquals(pending.getHash(), rootSyncValueHash(propagator.createRootSyncMessage()));
+				assertNotNull(store.refForHash(pending.getHash()));
+			} finally {
+				store.release.countDown();
+				propagator.close();
+			}
+		}
+	}
+
+	private static Hash rootSyncValueHash(Message message) {
+		AVector<?> payload = message.getPayload();
+		return payload.getRef(3).getHash();
+	}
+
+	/** Filtering belongs to the propagator and runs before its store boundary. */
+	@Test
+	public void testFilterRunsBeforeAnnounce() throws Exception {
+		CVMLong visible = CVMLong.create(101);
+		Blob hidden = Blobs.createRandom(400);
+		SetLattice<ACell> setLattice = SetLattice.create();
+		try (MemoryStore publicStore = new MemoryStore()) {
+			LatticePropagator propagator = new LatticePropagator(publicStore, setLattice,
+				value -> value.exclude(hidden));
+			ASet<ACell> full = Sets.of(visible, hidden);
+
+			ACell announced = propagator.processSnapshot(full);
+
+			assertEquals(Sets.of(visible), announced);
+			assertSame(announced, propagator.getLastAnnouncedValue());
+			assertNull(publicStore.refForHash(hidden.getHash()),
+				"a filtered cell must never cross the propagator's store boundary");
+		}
+	}
+
+	/** Snapshot reconciliation is directional: the propagator's current value is own. */
+	@Test
+	public void testSnapshotMergePrefersPropagatorOwnValueOnTie() throws Exception {
+		LWWLattice<CVMLong> lww = LWWLattice.create(value -> 1L);
+		try (MemoryStore viewStore = new MemoryStore()) {
+			LatticePropagator propagator = new LatticePropagator(viewStore, lww, value -> value);
+			CVMLong own = CVMLong.create(10_001);
+			CVMLong other = CVMLong.create(10_002);
+
+			ACell first = propagator.processSnapshot(own);
+			ACell second = propagator.processSnapshot(other);
+
+			assertSame(own, first);
+			assertSame(first, second,
+				"equal-timestamp input must not replace the propagator's existing own value");
+			assertSame(first, viewStore.getRootData());
+		}
+	}
+
+	/** Equivalent foreign-store values retain the propagator's store-local refs. */
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testSnapshotMergeRetainsPropagatorStoreRefIdentity() throws Exception {
+		SetLattice<Blob> setLattice = SetLattice.create();
+		Blob source = Blobs.createRandom(400);
+		try (MemoryStore viewStore = new MemoryStore();
+				MemoryStore foreignStore = new MemoryStore()) {
+			LatticePropagator propagator = new LatticePropagator(viewStore, setLattice,
+				value -> value);
+			ASet<Blob> localInput = Sets.of(source);
+			ASet<Blob> local = (ASet<Blob>) propagator.processSnapshot(localInput);
+			Blob foreignBlob = foreignStore.decode(source.getEncoding());
+			ASet<Blob> foreign = convex.core.data.Cells.announce(
+				Sets.of(foreignBlob), r -> {}, foreignStore);
+
+			assertEquals(local, foreign);
+			assertNotSame(local, foreign);
+			assertSame(local, propagator.processSnapshot(foreign),
+				"equivalent input from another store must not replace local refs");
+			assertSame(local, viewStore.getRootData());
+		}
+	}
+
+	/** The primary publishes the authoritative snapshot rather than retaining an old tie. */
+	@Test
+	public void testPrimarySnapshotReplacesEqualTimestampPublication() throws Exception {
+		LWWLattice<CVMLong> lww = LWWLattice.create(value -> 1L);
+		try (MemoryStore primaryStore = new MemoryStore()) {
+			LatticePropagator propagator = new LatticePropagator(primaryStore, lww,
+				value -> value);
+			propagator.configure(lww, LatticeContext.EMPTY, true);
+			CVMLong old = CVMLong.create(10_011);
+			CVMLong authoritative = CVMLong.create(10_012);
+
+			propagator.processSnapshot(old);
+			assertSame(authoritative, propagator.processSnapshot(authoritative));
+			assertSame(authoritative, primaryStore.getRootData());
+		}
+	}
+
+	/** Inbound staging remains complete; filtering applies only on publication. */
+	@Test
+	public void testInboundWorkingValueMergesBeforeNextSnapshot() throws Exception {
+		SetLattice<ACell> setLattice = SetLattice.create();
+		CVMLong initial = CVMLong.create(301);
+		CVMLong incoming = CVMLong.create(302);
+		CVMLong primaryUpdate = CVMLong.create(303);
+		Blob hidden = Blobs.createRandom(400);
+		try (MemoryStore viewStore = new MemoryStore()) {
+			LatticePropagator propagator = new LatticePropagator(viewStore, setLattice,
+				value -> value.exclude(hidden));
+			propagator.processSnapshot(Sets.of(initial));
+
+			ACell staged = propagator.mergeInbound(new ACell[0], Sets.of(incoming, hidden));
+			assertEquals(Sets.of(initial, incoming, hidden), staged,
+				"inbound staging must retain data until primary reconciliation");
+			assertNull(viewStore.refForHash(hidden.getHash()),
+				"staging must not announce inbound data to the outbound store");
+
+			ACell announced = propagator.processSnapshot(Sets.of(initial, primaryUpdate));
+			assertEquals(Sets.of(initial, incoming, primaryUpdate), announced,
+				"the outbound filter applies after pending inbound reconciliation");
+			assertNull(viewStore.refForHash(hidden.getHash()));
+		}
+	}
+
+	/** A persistent secondary restores its own subset before primary reconciliation. */
+	@Test
+	public void testRestoredWorkingViewSurvivesNextSnapshot() throws Exception {
+		SetLattice<ACell> setLattice = SetLattice.create();
+		CVMLong pending = CVMLong.create(311);
+		CVMLong primary = CVMLong.create(312);
+		try (EtchStore viewStore = EtchStore.createTemp("propagator-view-restore")) {
+			LatticePropagator first = new LatticePropagator(viewStore, setLattice, value -> value);
+			first.processSnapshot(Sets.of(pending));
+			first.checkpoint();
+
+			LatticePropagator restored = new LatticePropagator(viewStore, setLattice, value -> value);
+			assertEquals(Sets.of(pending), restored.restore());
+			assertEquals(Sets.of(pending, primary), restored.processSnapshot(Sets.of(primary)),
+				"restored propagator state must be own during primary reconciliation");
+		}
+	}
+
+	/** Filtering is invariant across launch, normal sync fan-out and orderly close. */
+	@Test
+	public void testNodeLifecycleKeepsSecondaryStoreFiltered() throws Exception {
+		SetLattice<ACell> setLattice = SetLattice.create();
+		CVMLong initialVisible = CVMLong.create(201);
+		CVMLong laterVisible = CVMLong.create(202);
+		Blob hidden = Blobs.createRandom(400);
+		try (MemoryStore primaryStore = new MemoryStore();
+				MemoryStore publicStore = new MemoryStore();
+				NodeServer<ASet<ACell>> node = new NodeServer<>(
+					setLattice, primaryStore, NodeConfig.port(-1))) {
+			LatticePropagator primary = new LatticePropagator(primaryStore, setLattice,
+				value -> value);
+			LatticePropagator publicView = new LatticePropagator(publicStore, setLattice,
+				value -> value.exclude(hidden));
+			node.addPropagator(primary);
+			node.addPropagator(publicView);
+			node.getCursor().set(Sets.of(initialVisible, hidden));
+
+			node.launch();
+
+			assertEquals(Sets.of(initialVisible), publicView.getLastAnnouncedValue(),
+				"launch must initialise the secondary's filtered query view");
+			assertNull(publicStore.refForHash(hidden.getHash()));
+
+			CompletableFuture<ACell> nextPublicAnnounce = publicView.nextAnnounce();
+			node.getCursor().updateAndGet(value -> value.include(laterVisible));
+			node.getCursor().sync();
+			assertEquals(Sets.of(initialVisible, laterVisible),
+				nextPublicAnnounce.get(5, TimeUnit.SECONDS));
+			assertNull(publicStore.refForHash(hidden.getHash()));
+
+			node.close();
+			assertEquals(Sets.of(initialVisible, laterVisible), publicStore.getRootData(),
+				"orderly close must persist the filtered view, not the primary snapshot");
+			assertNull(publicStore.refForHash(hidden.getHash()));
+		}
+	}
+
+	static final class BlockingAnnounceStore extends MemoryStore {
+		final Hash blockedHash;
+		final CountDownLatch blocked = new CountDownLatch(1);
+		final CountDownLatch release = new CountDownLatch(1);
+
+		BlockingAnnounceStore(Hash blockedHash) {
+			this.blockedHash = blockedHash;
+		}
+
+		@Override
+		public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,
+				Consumer<Ref<ACell>> noveltyHandler) {
+			if (blockedHash.equals(ref.getHash())) {
+				blocked.countDown();
+				try {
+					release.await();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IllegalStateException("Interrupted while controlling announce", e);
+				}
+			}
+			return super.storeTopRef(ref, status, noveltyHandler);
+		}
 	}
 
 	/**

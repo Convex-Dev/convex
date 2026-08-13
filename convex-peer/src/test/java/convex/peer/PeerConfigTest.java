@@ -108,6 +108,26 @@ public class PeerConfigTest {
 	}
 
 	@Test
+	public void testEncryptedEtchDefaultsToConfiguredPeerKey() {
+		String seed="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+		AKeyPair keyPair=AKeyPair.create(convex.core.data.Blob.parse(seed));
+		PeerConfig config=PeerConfig.parse("{peer:{keypair:'"+seed+"',etch:{version:3,"
+				+"cipher:'aes-256-ctr',encryptIndex:true}}}");
+		HashMap<Keyword,Object> legacy=config.toLegacy();
+		EtchConfig etch=(EtchConfig)legacy.get(Keywords.ETCH_CONFIG);
+		assertEquals(keyPair.getAccountKey(),etch.getPublicKeyHint());
+		assertTrue(etch.hasKeyFunction());
+	}
+
+	@Test
+	public void testRuntimeResolverIsAvailableWithoutCreationPolicy() {
+		java.util.function.Function<AccountKey,byte[]> resolver=ignored->new byte[32];
+		HashMap<Keyword,Object> legacy=PeerConfig.parse("{}").toLegacy(resolver);
+		assertSame(resolver,legacy.get(Config.ETCH_KEY_RESOLVER));
+		assertNull(legacy.get(Keywords.ETCH_CONFIG));
+	}
+
+	@Test
 	public void testPeerUrl() {
 		PeerConfig config = PeerConfig.parse("{\"peer\": {\"url\": \"peer.convex.live\"}}");
 		assertEquals("peer.convex.live", config.getPeerUrl());

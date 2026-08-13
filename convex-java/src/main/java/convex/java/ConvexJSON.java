@@ -4,7 +4,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -41,9 +40,7 @@ public class ConvexJSON {
 
 	private ConvexJSON(String peerServerURL) {
 		this.url = peerServerURL;
-		this.httpClient = HttpClient.newBuilder()
-				.connectTimeout(Duration.ofSeconds(30))
-				.build();
+		this.httpClient = HTTPClients.getDefault();
 	}
 
 	/**

@@ -72,7 +72,12 @@ public class RootLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 			if (compareAndSet(current, synced)) return synced;
 			// Concurrent write: fall back to lattice merge
 			if (lattice == null) throw new IllegalStateException("Concurrent write during sync with no lattice to resolve merge");
-			return merge(synced);
+			merge(synced);
+			// The concurrent value remains pending in the cursor, with current/local
+			// state in the directional merge's own position. Return only the exact
+			// value completed by this callback: this is the snapshot the caller can
+			// rely on as published and store-backed.
+			return synced;
 		} finally {
 			syncLock.unlock();
 		}

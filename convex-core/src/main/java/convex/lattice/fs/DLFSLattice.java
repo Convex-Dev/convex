@@ -47,7 +47,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	public AVector<ACell> merge(AVector<ACell> ownValue, AVector<ACell> otherValue) {
 		// Handle null cases
 		if (ownValue == null) {
-			return checkForeign(otherValue) ? otherValue : zero();
+			return DLFSNode.isValidTree(otherValue) ? otherValue : zero();
 		}
 		if (otherValue == null) {
 			return ownValue;
@@ -66,7 +66,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		// Context timestamp is not used for DLFS merge — the merge is deterministic from
 		// the input nodes — so this behaves identically to the no-context overload.
 		if (ownValue == null) {
-			return checkForeign(otherValue) ? otherValue : zero();
+			return DLFSNode.isValidTree(otherValue) ? otherValue : zero();
 		}
 		if (otherValue == null) {
 			return ownValue;
@@ -89,7 +89,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	 * cleanly and {@code own} is intact, so falling closed to it is safe.</p>
 	 */
 	private AVector<ACell> safeMerge(AVector<ACell> own, AVector<ACell> other) {
-		if (!checkForeign(other)) return own;
+		if (!DLFSNode.isValidNodeShallow(other)) return own;
 		try {
 			return DLFSNode.merge(own, other);
 		} catch (RuntimeException | StackOverflowError e) {
@@ -108,7 +108,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public boolean checkForeign(AVector<ACell> value) {
-		return DLFSNode.isValidNodeShallow(value);
+		return DLFSNode.isValidTree(value);
 	}
 
 	@Override

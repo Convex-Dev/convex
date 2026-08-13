@@ -1,93 +1,72 @@
 package convex.cli.etch;
 
+import java.io.File;
 import java.io.IOException;
 
 import convex.cli.CLIError;
-import convex.cli.Main;
-import convex.core.data.ACell;
-import convex.core.data.Blob;
-import convex.core.data.Hash;
-import convex.core.data.Ref;
 import convex.core.text.Text;
 import convex.etch.EtchCorruptionError;
-import convex.etch.EtchStore;
-import convex.etch.EtchUtils.FullValidator;
-import convex.core.exceptions.*;
+import convex.etch.EtchStrictValidator;
+import convex.etch.EtchStrictValidator.Problem;
+import convex.etch.EtchStrictValidator.Report;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 @Command(name="validate",
-mixinStandardHelpOptions=true,
-description="Validates an Etch store")
-public class EtchValidate extends AEtchCommand{
-	
+		mixinStandardHelpOptions=true,
+		description="Strictly validates an Etch store offline")
+public class EtchValidate extends AEtchCommand {
+
 	@Option(names={"-m", "--max-failures"},
-			description="Maximum number of failures to recognise before abort.")
+			description="Maximum number of failure details to print (all failures are still counted).")
 	private Long maxFailures;
-	
-	public class ValidateVisitor extends FullValidator {
-		protected Main cli;
-		public long failures=0;
-		public long encoded=0;
-
-		public ValidateVisitor(Main cli) {
-			this.cli=cli;
-		}
-
-		@Override
-		public void visitHash(convex.etch.Etch e, Hash h) {
-			try {
-				Ref<ACell> r=e.read(h);
-				ACell cell=(r==null)?null:r.getValue();
-				if (cell==null) {
-					fail("Missing cell for hash "+h);
-					return;
-				}
-				cell.validate();
-
-				Blob encoding =cell.getEncoding();
-				encoded+=encoding.count();
-			} catch (IOException | InvalidDataException e1) {
-				fail("Failed to validate cell "+h+" cause:" + e1);
-			}
-		}
-		
-		@Override
-		public void fail(String msg) {
-			cli.inform(msg);
-			failures++;
-			if ((maxFailures!=null)&&(failures>=maxFailures)) throw new CLIError("Max Failures exceeded");
-		}
-	}
 
 	@Override
 	public void execute() {
-		EtchStore store=store();
-		try (store) {
-			ValidateVisitor visitor=new ValidateVisitor(cli());
-			convex.etch.Etch etch=store.getEtch();
-			etch.visitIndex(visitor);
-			
-			long fails=visitor.failures;
-			if (fails>0) throw new CLIError("Etch validation failed!");
-			
-			long len=etch.getDataLength();
-			long cellCount=visitor.values;
-			
-			cli().println("Etch validation completed with "+fails+" error(s)");
-			cli().println("Index nodes:              "+Text.toFriendlyNumber(visitor.indexPtrs));
-			cli().println("Cells:                    "+Text.toFriendlyNumber(cellCount));
-			cli().println("Empty:                    "+Text.toFriendlyNumber(visitor.empty));
-			cli().println("Database size:            "+Text.toFriendlyNumber(len));
-			if (cellCount>0) {
-				cli().println("Avg. Encoding Length:     "+Text.toFriendlyDecimal(((double)visitor.encoded)/cellCount));
-				cli().println("Storage per Cell (bytes): "+Text.toFriendlyDecimal(((double)len)/cellCount));
+		File file=etchMixin.getEtchFile();
+		int detailLimit=100;
+		if (maxFailures!=null) {
+			if ((maxFailures<0)||(maxFailures>Integer.MAX_VALUE)) {
+				throw new CLIError("Invalid maximum failure detail count: "+maxFailures);
+			}
+			detailLimit=maxFailures.intValue();
+		}
+
+		try {
+			Report report=EtchStrictValidator.validate(file,sourceConfig(),
+					new EtchStrictValidator.Options(detailLimit));
+			for (Problem problem:report.problems()) {
+				String location=(problem.position()<0)?"":" at "+problem.position();
+				cli().inform(problem.kind()+location+": "+problem.message());
 			}
 
+			cli().println("Etch strict validation completed with "
+					+report.failureCount()+" error(s)");
+			cli().println("Index blocks:             "+Text.toFriendlyNumber(report.indexBlocks()));
+			cli().println("Index pointers:           "+Text.toFriendlyNumber(report.indexPointers()));
+			cli().println("Cells:                    "+Text.toFriendlyNumber(report.records()));
+			cli().println("Empty slots:              "+Text.toFriendlyNumber(report.emptySlots()));
+			cli().println("Logical database size:    "+Text.toFriendlyNumber(report.logicalBytes()));
+			if (!report.isValid()) {
+				cli().println("Malformed entries:        "+Text.toFriendlyNumber(report.malformedEntries()));
+				cli().println("Hash mismatches:          "+Text.toFriendlyNumber(report.hashMismatches()));
+				cli().println("CAD3 failures:            "+Text.toFriendlyNumber(report.canonicalFailures()));
+				cli().println("Missing root hashes:      "+Text.toFriendlyNumber(report.missingRootHashes()));
+				cli().println("I/O failures:             "+Text.toFriendlyNumber(report.ioFailures()));
+			}
+			if (report.records()>0) {
+				cli().println("Avg. Encoding Length:     "+Text.toFriendlyDecimal(
+						((double)report.encodingBytes())/report.records()));
+				cli().println("Storage per Cell (bytes): "+Text.toFriendlyDecimal(
+						((double)report.logicalBytes())/report.records()));
+			}
+			if (!report.isValid()) throw new CLIError("Etch strict validation failed");
 		} catch (EtchCorruptionError e) {
-			throw new CLIError("Etch file corrupt: "+store,e);
+			throw new CLIError("Etch file corrupt: "+file,e);
 		} catch (IOException e) {
-			throw new CLIError("IO Error traversing etch store: "+store,e);
+			throw new CLIError("IO error validating Etch store: "+file,e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }

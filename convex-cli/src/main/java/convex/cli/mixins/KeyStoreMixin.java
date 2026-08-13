@@ -201,6 +201,24 @@ public class KeyStoreMixin extends AMixin {
 	 * @return Keypair instance, or null if not found
 	 */
 	public AKeyPair loadKeyFromStore(String publicKey, Supplier<char[]> passFunction) {
+		return loadKeyFromStore(publicKey,passFunction,true);
+	}
+
+	/**
+	 * Loads a keypair from the configured keystore without creating a missing
+	 * keystore. This is appropriate for read-only key resolution, where silently
+	 * creating an empty store would conceal a configuration error.
+	 *
+	 * @param publicKey public-key alias or prefix
+	 * @param passFunction key-entry password supplier
+	 * @return keypair, or {@code null} when the keystore or key is absent
+	 */
+	public AKeyPair loadExistingKeyFromStore(String publicKey, Supplier<char[]> passFunction) {
+		return loadKeyFromStore(publicKey,passFunction,false);
+	}
+
+	private AKeyPair loadKeyFromStore(String publicKey, Supplier<char[]> passFunction,
+			boolean createStore) {
 		if (publicKey == null)
 			return null;
 	
@@ -208,7 +226,8 @@ public class KeyStoreMixin extends AMixin {
 		if (publicKey==null) return null;		
 
 		try {
-			KeyStore keyStore = ensureKeyStore();
+			KeyStore keyStore = createStore?ensureKeyStore():loadKeyStore();
+			if (keyStore==null) return null;
 
 			String found = null;
 			Enumeration<String> aliases = keyStore.aliases();

@@ -39,6 +39,7 @@ public class EtchRecover extends AEtchCommand {
 			throw new CLIError("IO error reading recovered Etch store: "+e.getMessage(), e);
 		} finally {
 			store.close();
+			closeKeyContexts();
 		}
 	}
 }

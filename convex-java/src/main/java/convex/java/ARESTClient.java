@@ -4,7 +4,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 
@@ -25,9 +24,7 @@ public class ARESTClient {
 	public ARESTClient(URI host,String basePath) {
 		this.host = host;
 		this.baseURI = host.resolve(basePath);
-		this.httpClient = HttpClient.newBuilder()
-				.connectTimeout(Duration.ofSeconds(30))
-				.build();
+		this.httpClient = HTTPClients.getDefault();
 	}
 
 	public URI getHost() {

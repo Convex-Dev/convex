@@ -41,7 +41,8 @@ public class EtchMigrate extends AEtchCommand {
 				throw new CLIError("Source and destination are the same file: "+destFile);
 			}
 
-			EtchStore dest=EtchStore.create(destFile);
+			EtchStore dest=EtchStore.create(destFile,
+					destinationConfig(source.getEtch().getConfig(),false));
 			try {
 				long count=EtchUtils.migrate(source, dest);
 				if (setRoot) {
@@ -66,6 +67,7 @@ public class EtchMigrate extends AEtchCommand {
 			throw new CLIError("IO error during Etch migration: "+e.getMessage(), e);
 		} finally {
 			source.close();
+			closeKeyContexts();
 		}
 	}
 }

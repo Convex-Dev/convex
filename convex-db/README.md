@@ -310,13 +310,13 @@ convex.db.psql        - PostgreSQL wire protocol server
 ## Building
 
 ```bash
-mvn clean install -pl convex-db
+./mvnw -B -T1C install -pl convex-db -am
 ```
 
 ## Running Tests
 
 ```bash
-mvn test -pl convex-db
+./mvnw -B -T1C test -pl convex-db -am
 ```
 
 ## Examples

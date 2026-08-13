@@ -230,17 +230,7 @@ public class DLFSBrowser extends AbstractGUI {
 		fileMenu.add(Toolkit.makeMenu("Change Store...", this::promptChangeStore));
 		fileMenu.addSeparator();
 		fileMenu.add(Toolkit.makeMenu("Explore Node...", () -> {
-			DLFileSystem drive = getCurrentDrive();
-			if (drive == null) return;
-			Path p = panel.getSelectedPath();
-			if (p instanceof DLPath) {
-				AVector<ACell> node = drive.getNode((DLPath) p);
-				if (node != null) {
-					StateExplorer.explore(node);
-				} else {
-					StateExplorer.explore(drive.getNode(drive.getRoot()));
-				}
-			}
+			panel.exploreSelectedNode();
 			panel.refreshView();
 		}));
 		fileMenu.add(Toolkit.makeMenu("New Folder...", () -> panel.promptNewFolder()));

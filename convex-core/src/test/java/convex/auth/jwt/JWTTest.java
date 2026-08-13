@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.util.Multikey;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -119,6 +120,60 @@ public class JWTTest {
 
 		String decodedClaims = new String(JWT.decodeRaw(payloadB64));
 		assertEquals(JWT.claims(claims).toString(), decodedClaims);
+	}
+
+	@Test public void testSignPublicWithVerificationMethodDIDURL() {
+		AKeyPair kp=AKeyPair.createSeeded(12345L);
+		AString multikey=Multikey.encodePublicKey(kp.getAccountKey());
+		AString kid=Strings.create("did:web:venue.example:u:alice#").append(multikey);
+		AMap<AString,ACell> claims=Maps.of("sub","did:web:venue.example:u:alice");
+
+		AString token=JWT.signPublic(claims,kp,kid);
+		JWT parsed=JWT.parse(token);
+
+		assertNotNull(parsed);
+		assertEquals(kid.toString(),parsed.getKeyID());
+		assertNotNull(JWT.verifyPublic(token));
+		assertNotNull(JWT.verifyPublic(token,kp.getAccountKey()));
+		assertThrows(IllegalArgumentException.class,()->JWT.signPublic(claims,kp,null));
+	}
+
+	@Test public void testVerifyPublicAcceptsDidKeyForms() {
+		AKeyPair kp=AKeyPair.createSeeded(2468L);
+		AString multikey=Multikey.encodePublicKey(kp.getAccountKey());
+		AMap<AString,ACell> claims=Maps.of("sub","alice");
+		AString didKey=Strings.create("did:key:").append(multikey);
+		AString verificationMethod=didKey.append("#").append(multikey);
+
+		assertNotNull(JWT.verifyPublic(JWT.signPublic(claims,kp,didKey)));
+		assertNotNull(JWT.verifyPublic(JWT.signPublic(claims,kp,verificationMethod)));
+	}
+
+	@Test public void testExplicitKidDoesNotClaimIdentityBinding() {
+		AKeyPair signer=AKeyPair.createSeeded(1357L);
+		AKeyPair other=AKeyPair.createSeeded(9753L);
+		AMap<AString,ACell> claims=Maps.of("sub","did:web:venue.example:u:alice");
+
+		AString namedKid=Strings.create("did:web:venue.example:u:alice#key-1");
+		AString namedToken=JWT.signPublic(claims,signer,namedKid);
+		assertNull(JWT.verifyPublic(namedToken),"A named verification method requires DID resolution");
+		assertNotNull(JWT.verifyPublic(namedToken,signer.getAccountKey()),"Trusted-key verification ignores kid");
+
+		AString mismatchedKid=Strings.create("did:web:venue.example:u:alice#")
+			.append(Multikey.encodePublicKey(other.getAccountKey()));
+		AString mismatchedToken=JWT.signPublic(claims,signer,mismatchedKid);
+		assertNull(JWT.verifyPublic(mismatchedToken),"Sender-controlled kid must not bind the signer to a DID");
+		assertNotNull(JWT.verifyPublic(mismatchedToken,signer.getAccountKey()));
+	}
+
+	@Test public void testVerifyPublicRejectsMalformedKeyIDs() {
+		AKeyPair kp=AKeyPair.createSeeded(8642L);
+		AMap<AString,ACell> claims=Maps.of("sub","alice");
+
+		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:key:"))));
+		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#"))));
+		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#not-a-multikey"))));
+		assertNull(JWT.verifyPublic(JWT.signPublic(claims,kp,Strings.create("did:web:example.com#one#two"))));
 	}
 
 	@Test public void testBuildAccessTokenClaims() {

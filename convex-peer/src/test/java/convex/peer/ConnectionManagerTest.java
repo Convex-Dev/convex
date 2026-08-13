@@ -3,10 +3,12 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -169,6 +171,24 @@ public class ConnectionManagerTest {
 		assertFalse(r.isError(), "PING should not be an error: " + r);
 		assertNotNull(r.getValue(), "Result value should not be null");
 		assertTrue(r.getValue() instanceof CVMLong, "Result value should be a CVMLong timestamp");
+	}
+
+	@Test
+	public void testConnectionAllocatesRequestIDs() throws Exception {
+		ConvexLocal convex = network.CONVEX;
+		Message template=Message.createPing((CVMLong)null);
+
+		CompletableFuture<Result> first=convex.request(template);
+		CompletableFuture<Result> second=convex.request(template);
+		Result r1=first.get(5,TimeUnit.SECONDS);
+		Result r2=second.get(5,TimeUnit.SECONDS);
+
+		assertFalse(r1.isError());
+		assertFalse(r2.isError());
+		assertNotNull(r1.getID());
+		assertNotNull(r2.getID());
+		assertNotEquals(r1.getID(),r2.getID());
+		assertNull(template.getRequestID(),"Request template must remain unstamped");
 	}
 
 	// ===== PING round-trip tests =====

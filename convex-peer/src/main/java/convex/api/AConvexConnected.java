@@ -71,7 +71,9 @@ public abstract class AConvexConnected extends Convex {
 		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
 
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
-		awaiting.put(resultID, cf);
+		if (awaiting.putIfAbsent(resultID, cf)!=null) {
+			throw new IllegalStateException("Duplicate outstanding request ID: "+resultID);
+		}
 
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -173,6 +175,13 @@ public abstract class AConvexConnected extends Convex {
 	}
 
 	@Override
+	protected long getNextID() {
+		AConnection conn=connection;
+		if (conn==null) throw new IllegalStateException("Connection is closed");
+		return conn.nextRequestID().longValue();
+	}
+
+	@Override
 	protected void setVerifiedPeer(AccountKey key) {
 		super.setVerifiedPeer(key);
 		AConnection c = connection;
@@ -185,7 +194,24 @@ public abstract class AConvexConnected extends Convex {
 		if (conn==null) {
 			return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
 		}
+		return send(conn,m);
+	}
 
+	@Override
+	public CompletableFuture<Result> request(Message m) {
+		AConnection conn=connection;
+		if (conn==null) {
+			return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
+		}
+		Message request=m.withID(conn.nextRequestID());
+		if (request==null) {
+			return CompletableFuture.failedFuture(
+					new IllegalArgumentException("Message type does not support request IDs"));
+		}
+		return send(conn,request);
+	}
+
+	private CompletableFuture<Result> send(AConnection conn, Message m) {
 		ACell id=m.getRequestID();
 		try {
 			if (id==null) {
@@ -225,6 +251,8 @@ public abstract class AConvexConnected extends Convex {
 		}
 		connection = null;
 		verifiedPeer = null;
+		awaiting.forEach((id,future) -> future.completeExceptionally(
+				new IllegalStateException("Connection closed")));
 		awaiting.clear();
 	}
 }

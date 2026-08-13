@@ -217,9 +217,9 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * Implementation for delegation by DLFSProvider
 	 * @return Directory stream
 	 */
-	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
+	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) throws IOException;
 
-	DLFSFileAttributes getFileAttributes(DLPath path) throws java.nio.file.NoSuchFileException {
+	DLFSFileAttributes getFileAttributes(DLPath path) throws IOException {
 		AVector<ACell> node=getNode(path);
 		if (node==null) {
 			throw new java.nio.file.NoSuchFileException(path.toString());
@@ -232,7 +232,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * @param path Path for which to obtain DLFSNode
 	 * @return DLFS node, or null if does not exist
 	 */
-	public abstract AVector<ACell> getNode(DLPath path);
+	public abstract AVector<ACell> getNode(DLPath path) throws IOException;
 
 	/**
 	 * Implementation for delegation by DLFSProvider, create a directory
@@ -271,7 +271,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	public abstract Hash getRootHash();
 
-	public Hash getNodeHash(DLPath p) {
+	public Hash getNodeHash(DLPath p) throws IOException {
 		AVector<ACell> node=getNode(p);
 		if (node==null) return null;
 		return Cells.getHash(node);
@@ -291,7 +291,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * @param newNode NEw node to put in place
 	 * @return The new node
 	 */
-	public abstract AVector<ACell> updateNode(DLPath path, AVector<ACell> newNode);
+	public abstract AVector<ACell> updateNode(DLPath path, AVector<ACell> newNode) throws IOException;
 	
 
 	/**
@@ -300,7 +300,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 */
 	public abstract void merge(AVector<ACell> other);
 
-	public void replicate(DLFileSystem other) {
+	public void replicate(DLFileSystem other) throws IOException {
 		merge(other.getNode(other.getRoot()));
 	}
 

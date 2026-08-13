@@ -4,6 +4,27 @@
 
 Convex main repository is structured as a multi-module Maven project.
 
+## Fast local iteration
+
+Use the Maven wrapper so local builds use the repository's pinned Maven
+version. Avoid `clean` while iterating: it deliberately discards every compiled
+class and generated source across all modules.
+
+Commands below use the Unix/Git Bash wrapper spelling. In Windows PowerShell,
+replace `./mvnw` with `.\mvnw.cmd` and keep the remaining arguments unchanged.
+
+```bash
+# Compile and test one changed module plus its dependencies
+./mvnw -B -T1C test -pl convex-peer -am
+
+# Incrementally compile and test the complete reactor
+./mvnw -B -T1C test
+```
+
+Reserve `./mvnw -B clean install` for final verification and releases. Ordinary
+builds do not generate source/Javadoc jars or load Maven Central publishing;
+`-Prelease` enables those release-only artifacts and services.
+
 ## CI Workflows
 
 Three GitHub Actions workflows handle continuous integration:
@@ -35,7 +56,7 @@ Requires two secrets configured in the GitHub repository:
 ### 1. Ensure clean build
 
 ```bash
-mvn -B clean install
+./mvnw -B clean install
 ```
 
 All tests must pass, including headless (no GUI) — the CI server runs on headless Linux.
@@ -66,11 +87,11 @@ The `pull --ff-only` on both branches ensures you're not merging a stale local d
 ### 4. Set version
 
 ```bash
-mvn versions:set -DnewVersion='0.8.4' -DgenerateBackupPoms=false
+./mvnw -B versions:set -DnewVersion='0.8.4' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for Release 0.8.4"
 ```
 
-`mvn versions:set` only rewrites `pom.xml` files — stage those explicitly rather than `git add -A`, which would sweep in any unrelated working-tree changes (stray `.env` files, editor scratch files, partial WIP).
+`./mvnw versions:set` only rewrites `pom.xml` files — stage those explicitly rather than `git add -A`, which would sweep in any unrelated working-tree changes (stray `.env` files, editor scratch files, partial WIP).
 
 As part of the same version-bump commit, also update:
 
@@ -98,7 +119,7 @@ As part of the same version-bump commit, also update:
 carries the snapshot version. Smoke-testing it would validate the wrong artifact:
 
 ```bash
-mvn -B clean install
+./mvnw -B clean install
 java -jar convex-integration/target/convex.jar --version
 ```
 
@@ -160,17 +181,17 @@ Only after confirming the GitHub Release is live:
 
 ```bash
 git checkout master
-mvn deploy -Prelease
+./mvnw -B deploy -Prelease
 ```
 
-This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. Requires GPG signing key and Maven Central credentials configured locally.
+This signs all artifacts with GPG and uploads to Maven Central via the Sonatype Central Publishing plugin. The command returns only after Central confirms publication. It requires a GPG signing key and Maven Central credentials configured locally.
 
 ### 9. Prepare next development version
 
 ```bash
 git checkout develop
 git merge master --no-ff
-mvn versions:set -DnewVersion='0.8.5-SNAPSHOT' -DgenerateBackupPoms=false
+./mvnw -B versions:set -DnewVersion='0.8.5-SNAPSHOT' -DgenerateBackupPoms=false
 git add pom.xml '**/pom.xml' && git commit -m "Prepare for next development cycle (0.8.5-SNAPSHOT)"
 ```
 

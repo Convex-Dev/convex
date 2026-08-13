@@ -18,6 +18,8 @@ public class EtchClear extends AEtchCommand{
 			informSuccess("Etch data cleared in: "+store);
 		} catch (IOException e) {
 			throw new CLIError("IO Error accessing Etch database",e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }

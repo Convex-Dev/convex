@@ -96,7 +96,7 @@ where possible so the private key never leaves the client.
 ```bash
 git clone https://github.com/Convex-Dev/convex.git
 cd convex
-mvn install -pl convex-restapi -am
+./mvnw -B -T1C install -pl convex-restapi -am
 ```
 
 ## License

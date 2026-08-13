@@ -22,11 +22,9 @@ COPY convex-observer/pom.xml convex-observer/
 COPY convex-integration/pom.xml convex-integration/
 RUN mvn dependency:go-offline -B || true
 
-# Copy source and build. Tests are skipped: every imaged commit is already
-# tested by CI on the same JDK (build.yml on push, release.yml on tag), and the
-# reproducible-build configuration makes this rebuild equivalent.
+# Copy source, build and test on the same JDK used by CI.
 COPY . .
-RUN mvn -B clean install -DskipTests
+RUN mvn -B clean install
 
 #######################################
 # Run stage

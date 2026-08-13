@@ -196,6 +196,18 @@ public class ANTLRTest {
 		assertThrows(ParseException.class,()->readAll("1 2 ("));
 	}
 
+	@Test public void testCommentedForms() {
+		assertEquals(Vectors.of(1,3),read("[1 #_ 2 3]"));
+
+		// Each consecutive #_ discards one subsequent form.
+		assertEquals(Vectors.of(1),read("[#_ #_ :foo :bar 1]"));
+		assertEquals(Vectors.of(1),read("[#_ #_ #_ :foo :bar :baz 1]"));
+		assertEquals(Lists.of(Keywords.BAZ),readAll("#_ #_ :foo :bar :baz"));
+
+		// Two discard markers require two complete forms.
+		assertThrows(ParseException.class,()->readAll("#_ #_ :foo"));
+	}
+
 	@Test public void testParseErrors() {
 		assertParseError("1 2");
 		assertParseError("1.0e0.1234");

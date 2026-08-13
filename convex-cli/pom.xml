@@ -2,7 +2,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.11</version>
+		<version>0.8.12-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -30,6 +30,10 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
+					<!-- CLI tests manipulate process-wide input and launch local peers.
+					     Separate JVMs provide safe class-level parallelism. -->
+					<forkCount>2</forkCount>
+					<reuseForks>true</reuseForks>
 					<environmentVariables>
 						<NO_COLOR>1</NO_COLOR>
 					</environmentVariables>

@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AArrayBlob;
@@ -33,6 +34,7 @@ import convex.lattice.fs.DLPath;
  * Smoke tests for convex-gui infrastructure classes.
  * These test pure logic and data models — no GUI/Swing interactions required.
  */
+@ExtendWith(GUIFixtureExtension.class)
 public class SmokeTest {
 
 	// ========== StateModel ==========
@@ -372,48 +374,57 @@ public class SmokeTest {
 	@Test
 	public void testCursorBackedDriveCreation() throws IOException {
 		convex.gui.dlfs.DLFSBrowser browser = createTempBrowser();
+		try {
+			// Demo drive should exist from constructor
+			List<String> driveNames = browser.listDrives();
+			assertTrue(driveNames.contains("demo"), "Demo drive should exist");
 
-		// Demo drive should exist from constructor
-		List<String> driveNames = browser.listDrives();
-		assertTrue(driveNames.contains("demo"), "Demo drive should exist");
-
-		DLFileSystem demo = browser.getDrive("demo");
-		assertNotNull(demo);
-		assertTrue(demo.isOpen());
-		assertTrue(Files.isDirectory(demo.getRoot().resolve("models")));
+			DLFileSystem demo = browser.getDrive("demo");
+			assertNotNull(demo);
+			assertTrue(demo.isOpen());
+			assertTrue(Files.isDirectory(demo.getRoot().resolve("models")));
+		} finally {
+			browser.close();
+		}
 	}
 
 	@Test
 	public void testCreateAndDeleteDrive() throws IOException {
 		convex.gui.dlfs.DLFSBrowser browser = createTempBrowser();
+		try {
+			assertTrue(browser.createDrive("test1"));
+			assertFalse(browser.createDrive("test1"), "Duplicate create should fail");
 
-		assertTrue(browser.createDrive("test1"));
-		assertFalse(browser.createDrive("test1"), "Duplicate create should fail");
+			DLFileSystem drive = browser.getDrive("test1");
+			assertNotNull(drive);
+			assertTrue(drive.isOpen());
 
-		DLFileSystem drive = browser.getDrive("test1");
-		assertNotNull(drive);
-		assertTrue(drive.isOpen());
-
-		assertTrue(browser.deleteDrive("test1"));
-		assertNull(browser.getDrive("test1"));
-		assertFalse(browser.deleteDrive("test1"), "Double delete should fail");
+			assertTrue(browser.deleteDrive("test1"));
+			assertNull(browser.getDrive("test1"));
+			assertFalse(browser.deleteDrive("test1"), "Double delete should fail");
+		} finally {
+			browser.close();
+		}
 	}
 
 	@Test
 	public void testDriveIsolation() throws IOException {
 		convex.gui.dlfs.DLFSBrowser browser = createTempBrowser();
+		try {
+			browser.createDrive("a");
+			browser.createDrive("b");
 
-		browser.createDrive("a");
-		browser.createDrive("b");
+			DLFileSystem driveA = browser.getDrive("a");
+			DLFileSystem driveB = browser.getDrive("b");
 
-		DLFileSystem driveA = browser.getDrive("a");
-		DLFileSystem driveB = browser.getDrive("b");
+			// Write to drive A
+			Files.createDirectory(driveA.getRoot().resolve("only-in-a"));
 
-		// Write to drive A
-		Files.createDirectory(driveA.getRoot().resolve("only-in-a"));
-
-		// Drive B should not have it
-		assertFalse(Files.exists(driveB.getRoot().resolve("only-in-a")));
+			// Drive B should not have it
+			assertFalse(Files.exists(driveB.getRoot().resolve("only-in-a")));
+		} finally {
+			browser.close();
+		}
 	}
 
 	// ========== DecimalAmountField.getNumberFormat ==========

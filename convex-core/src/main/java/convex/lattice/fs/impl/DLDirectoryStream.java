@@ -7,11 +7,10 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.Index;
-import convex.lattice.fs.DLFSNode;
+import convex.core.data.MapEntry;
+import convex.lattice.fs.DLFSCorruptionException;
 import convex.lattice.fs.DLPath;
 
 public class DLDirectoryStream implements DirectoryStream<Path> {
@@ -29,7 +28,12 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 		private void prepare() {
 			if (prepared) return;
 			while (pos<dirs.count()) {
-				DLPath candidate=base.resolve(dirs.entryAt(pos++).getKey());
+				MapEntry<?,?> entry=dirs.entryAt(pos++);
+				if (!(entry.getKey() instanceof AString name)) {
+					throw new DirectoryIteratorException(new DLFSCorruptionException(base.toString(),
+						"Directory contains a non-string name"));
+				}
+				DLPath candidate=base.resolve(name);
 				try {
 					if (filter==null || filter.accept(candidate)) {
 						next=candidate;
@@ -62,13 +66,13 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 
 	}
 
-	private Index<AString, AVector<ACell>> dirs;
+	private Index<?,?> dirs;
 	private DLPath base;
 	private Filter<? super Path> filter;
 	private boolean open=true;
 	private boolean iterated=false;
 
-	public DLDirectoryStream(DLPath base, Index<AString, AVector<ACell>> dirs, Filter<? super Path> filter) {
+	public DLDirectoryStream(DLPath base, Index<?,?> dirs, Filter<? super Path> filter) {
 		this.base=base;
 		this.dirs=dirs;
 		this.filter=filter;
@@ -87,8 +91,7 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 		return new DIterator();
 	}
 
-	public static DLDirectoryStream create(DLPath base, AVector<ACell> dirNode, Filter<? super Path> filter) {
-		Index<AString, AVector<ACell>> dirs = DLFSNode.getDirectoryEntries(dirNode);
+	public static DLDirectoryStream create(DLPath base, Index<?,?> dirs, Filter<? super Path> filter) {
 		if (dirs==null) return null;
 		return new DLDirectoryStream(base,dirs,filter);
 	}

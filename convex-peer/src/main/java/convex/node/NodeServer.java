@@ -12,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import org.slf4j.Logger;
@@ -199,9 +198,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final Object acquisitionLifecycleLock = new Object();
 	private boolean acceptingAcquisitions;
 
-	/** Negative request IDs reserved for NodeServer acquisition sessions. */
-	private final AtomicLong nextDataRequestID = new AtomicLong(-1L);
-
 	/** Bounds acquisition sessions independently of the bounded merge dispatcher queue. */
 	private final Semaphore acquisitionPermits;
 
@@ -344,7 +340,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				propagators.add(primary);
 			}
 
-			for (LatticePropagator p : propagators) {
+			for (int i = 0; i < propagators.size(); i++) {
+				LatticePropagator p = propagators.get(i);
+				p.configure(lattice, mergeContext, i == 0);
 				p.setPersistenceEnabled(config.isPersist());
 			}
 
@@ -356,22 +354,31 @@ public class NodeServer<V extends ACell> implements Closeable {
 					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
 			}
 
-			// Restore from primary propagator's store if configured
+			// Restore each propagator's own persisted view. The primary restores the
+			// authoritative cursor; secondary working views are later reconciled with
+			// the freshly projected primary without discarding pending subset state.
 			if (config.isRestore() && !propagators.isEmpty()) {
-				ACell restored = propagators.get(0).restore();
-				if (restored != null) {
-					cursor.set((V) restored);
-					log.info("Restored lattice value from store");
+				for (int i = 0; i < propagators.size(); i++) {
+					ACell restored = propagators.get(i).restore();
+					if (restored != null && i == 0) {
+						cursor.set((V) restored);
+						log.info("Restored lattice value from primary store");
+					}
 				}
 			}
 
-			// Seed the primary's announced, store-backed view before opening the network.
-			// A fresh or restored node can answer LATTICE_QUERY immediately without an
-			// application-side sync solely to initialise query service.
+			// Seed every propagator's announced, store-backed view before opening the
+			// network. Each secondary applies its own filter before touching its store,
+			// so a fresh node can immediately serve every configured capability view.
 			if (!propagators.isEmpty()) {
 				ACell announced = propagators.get(0).processSnapshot(cursor.get());
 				cursor.set((V) announced);
-				if (config.isPersist()) propagators.get(0).checkpoint();
+				for (int i = 1; i < propagators.size(); i++) {
+					propagators.get(i).processSnapshot(announced);
+				}
+				if (config.isPersist()) {
+					for (LatticePropagator p : propagators) p.checkpoint();
+				}
 			}
 
 			// Create and launch network server unless port is negative (local-only mode)
@@ -587,6 +594,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			recordMergeReject(conn, stats);
 			log.warn("Rejected lattice value after acquisition failure: {}",
 				acquisitionFailure.getMessage());
+			returnLatticeResult(message, Result.fromException(acquisitionFailure));
 			return;
 		}
 
@@ -644,8 +652,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 				if (owner == null) {
 					recordMergeReject(conn, stats);
 					log.warn("Rejected LATTICE_VALUE on an unassigned connection");
+					returnLatticeResult(message, Result.error(ErrorCodes.TRUST,
+						"Lattice access requires an operator-assigned propagator connection"));
 				} else if (acquired) {
-					processLatticeValue(message);
+					processLatticeValue(message, owner);
 				} else {
 					prepareLatticeValue(message, owner, stats);
 				}
@@ -883,7 +893,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		ACell id = payload.get(1);
-		AVector<?> pathVector = RT.ensureVector(payload.count() > 2 ? payload.get(2) : null);
+		ACell pathValue=payload.count()>2?payload.get(2):null;
+		AVector<?> pathVector = RT.ensureVector(pathValue);
+		if ((pathValue!=null)&&(pathVector==null)) {
+			message.returnResult(Result.create(id,
+					Strings.create("LATTICE_QUERY path must be a vector"),ErrorCodes.ARGUMENT));
+			return;
+		}
 
 		// Query and later DATA_REQUEST resolution use the same capability-bound
 		// propagator view. Falling back to the primary would cross a store boundary.
@@ -935,6 +951,15 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ErrorCodes.TRUST));
 	}
 
+	/** Returns a correlated lattice result only when the sender supplied an ID. */
+	private void returnLatticeResult(Message message, Result result) {
+		ACell id = message.getRequestID();
+		if (id == null || message.getConnection() == null) return;
+		if (!message.returnMessage(Message.createResult(result.withID(id)))) {
+			log.debug("Unable to return lattice result: Peer send buffer is full");
+		}
+	}
+
 	private void processChallenge(Message message) {
 		message.respondToChallenge(mergeContext.getSigningKey(), null);
 	}
@@ -970,12 +995,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ConnectionStats stats) throws BadFormatException {
 		try {
 			Message complete = completeLatticeMessage(message, owner.getStore());
-			processLatticeValue(complete);
+			processLatticeValue(complete, owner);
 		} catch (MissingDataException e) {
 			beginLatticeAcquisition(message, owner, stats);
 		} catch (IOException e) {
 			recordMergeReject(message.getConnection(), stats);
 			log.warn("Unable to persist inbound lattice value in its propagator store", e);
+			returnLatticeResult(message, Result.fromException(e));
 		}
 	}
 
@@ -986,10 +1012,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private Message completeLatticeMessage(Message message, AStore acquisitionStore)
 			throws BadFormatException, IOException {
 		AVector<?> payload = RT.ensureVector(message.getPayload());
-		if (payload == null || payload.count() < 3) {
+		if (payload == null || payload.count() < 4) {
 			throw new BadFormatException("Invalid LATTICE_VALUE message format");
 		}
-		ACell value = payload.get(2);
+		ACell value = payload.get(3);
 		if (value == null) throw new BadFormatException("LATTICE_VALUE message missing value");
 
 		// Persist into the quarantine/ingress store, then independently prove that
@@ -1005,7 +1031,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
 		}
 
-		AVector<?> completePayload = Vectors.create(payload.get(0), payload.get(1), complete);
+		AVector<?> completePayload = Vectors.create(
+			payload.get(0), payload.get(1), payload.get(2), complete);
 		return Message.create(MessageType.LATTICE_VALUE, completePayload)
 			.withConnection(message.getConnection());
 	}
@@ -1025,6 +1052,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (!acquisitionPermits.tryAcquire()) {
 			recordMergeReject(connection, stats);
 			log.warn("Rejected incomplete lattice value: acquisition capacity exhausted");
+			returnLatticeResult(message, Result.error(ErrorCodes.LOAD,
+				"Lattice acquisition capacity exhausted"));
 			return;
 		}
 
@@ -1079,7 +1108,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
 			}
 			AVector<?> payload = RT.ensureVector(message.getPayload());
-			if (payload == null || payload.count() < 3 || payload.get(2) == null) {
+			// Root sync may encode the value as an unresolved indirect ref, so this
+			// guard must remain structural and must not dereference payload.get(3).
+			if (payload == null || payload.count() < 4) {
 				throw new BadFormatException("Invalid LATTICE_VALUE message format");
 			}
 
@@ -1087,8 +1118,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				return CompletableFuture.completedFuture(
 					completeLatticeMessage(message, acquisitionStore));
 			} catch (MissingDataException e) {
-				Hash rootHash = payload.get(2).getHash();
-				return acquireHash(connection, acquisitionStore, rootHash)
+				// Re-dereferencing the payload can repeat the same exception. Acquire
+				// the precise missing ref and iterate until the value is complete.
+				return acquireHash(connection, acquisitionStore, e.getMissingHash())
 					.thenCompose(value -> acquireLatticeMessage(
 						message, acquisitionStore, connection));
 			}
@@ -1130,7 +1162,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 				new IOException("Lattice source connection is closed"));
 		}
 
-		CVMLong id = CVMLong.create(nextDataRequestID.getAndDecrement());
+		ACell id = connection.nextRequestID();
 		CompletableFuture<Result> future = new CompletableFuture<>();
 		ConcurrentHashMap<ACell, CompletableFuture<Result>> byID =
 			pendingDataRequests.computeIfAbsent(connection, c -> new ConcurrentHashMap<>());
@@ -1161,28 +1193,32 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * delivery is first handed to a bounded dispatcher, so this synchronous publication
 	 * work never blocks a shared Netty event-loop thread.
 	 *
-	 * <p>Payload format: [:LV [*path*] value]
+	 * <p>Payload format: [:LV id [*path*] value]
 	 *
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
 	 */
-	private void processLatticeValue(Message message) throws BadFormatException {
+	private void processLatticeValue(Message message, LatticePropagator owner) throws BadFormatException {
 		AConnection conn = message.getConnection();
 		ConnectionStats stats = statsFor(conn);
 
 		AVector<?> payload = RT.ensureVector(message.getPayload());
-		if (payload == null || payload.count() < 2) {
+		if (payload == null || payload.count() < 4) {
 			log.warn("Invalid LATTICE_VALUE message format");
 			recordMergeReject(conn, stats);
+			returnLatticeResult(message, Result.error(ErrorCodes.ARGUMENT,
+				"Invalid LATTICE_VALUE format"));
 			return;
 		}
 
-		ACell pathCell = payload.get(1);
-		ACell value = payload.count() > 2 ? payload.get(2) : null;
+		ACell pathCell = payload.get(2);
+		ACell value = payload.get(3);
 
 		if (value == null) {
 			log.warn("LATTICE_VALUE message missing value");
 			recordMergeReject(conn, stats);
+			returnLatticeResult(message, Result.error(ErrorCodes.ARGUMENT,
+				"LATTICE_VALUE message missing value"));
 			return;
 		}
 
@@ -1190,6 +1226,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// the synchronous dispatcher merge runs.
 		if (!withinInboundSizeLimit(value)) {
 			recordMergeReject(conn, stats);
+			returnLatticeResult(message, Result.error(ErrorCodes.MEMORY,
+				"LATTICE_VALUE exceeds the inbound size limit"));
 			return;
 		}
 
@@ -1203,6 +1241,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// nothing to sync or propagate.
 		if (!mergeIncoming(target, value)) {
 			recordMergeReject(conn, stats);
+			returnLatticeResult(message, Result.error(ErrorCodes.ARGUMENT,
+				"Lattice merge rejected"));
 			return;
 		}
 
@@ -1213,15 +1253,39 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Lattice merges conventionally preserve identity on no-op; equals is the
 		// defensive fallback for implementations that return an equivalent value.
 		ACell after = target.get();
-		if (before == after || (before != null && before.equals(after))) return;
+		boolean changed = before != after && (before == null || !before.equals(after));
+		if (changed) {
+			// Keep the ingress propagator's subset current until the accepted primary
+			// value is projected back through normal fan-out. Merge remains the sole
+			// validation mechanism; this is only replica/view bookkeeping.
+			try {
+				owner.mergeInbound(path, value);
+			} catch (RuntimeException e) {
+				// The authoritative merge has already succeeded. A failed staging
+				// optimisation must not reject it; fan-out below reconstructs the view.
+				log.debug("Unable to stage accepted inbound value in propagator view: {}",
+					e.getMessage());
+			}
 
-		// Notify propagators that cursor state has changed. This is a synchronous
-		// primary-store publication on the dispatcher thread, never on a Netty event loop.
-		cursor.sync();
+			// Notify propagators that cursor state has changed. This is a synchronous
+			// primary-store publication on the dispatcher thread, never on a Netty event loop.
+			cursor.sync();
 
-		// If P2P node data changed, update desired peers on connection managers
-		if (path.length > 0 && Keywords.P2P.equals(path[0])) {
-			maybeUpdateDesiredPeers();
+			// If P2P node data changed, update desired peers on connection managers
+			if (path.length > 0 && Keywords.P2P.equals(path[0])) {
+				maybeUpdateDesiredPeers();
+			}
+		}
+
+		// The response is deliberately empty: completion is the acknowledgement, and
+		// returning the merged value would duplicate a potentially large lattice tree.
+		// Check the ID before constructing anything so normal fire-and-forget gossip
+		// retains an allocation-free response path.
+		ACell id = message.getRequestID();
+		if (id != null && conn != null) {
+			if (!message.returnMessage(Message.createResult(id, null, null))) {
+				log.debug("Unable to return lattice result: Peer send buffer is full");
+			}
 		}
 	}
 
@@ -1608,6 +1672,41 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// the persisted or announced root independently of the merged cursor.
 			cursor.sync();
 			return cursor.get();
+		});
+	}
+
+	/**
+	 * Pulls one path from a peer and merges it at the same local cursor path.
+	 * Path selection reduces transfer and storage work; it does not grant or
+	 * enforce visibility independently of the selected propagator.
+	 *
+	 * <p>The caller must not mutate {@code path} while the returned operation is
+	 * outstanding.</p>
+	 *
+	 * @param convex Convex connection to the peer node
+	 * @param path path within both peer and local lattice roots
+	 * @return future completing with the local value at the path after the merge
+	 */
+	public CompletableFuture<ACell> pullPath(Convex convex, ACell... path) {
+		if (propagators.isEmpty()) {
+			return CompletableFuture.failedFuture(new IllegalStateException("No propagators configured"));
+		}
+		return propagators.get(0).pullPath(convex,path).thenApply(acquired -> {
+			ALatticeCursor<ACell> target=cursor.path(path);
+			ACell before=target.get();
+			boolean accepted=(acquired==null)||mergeIncoming(target,acquired);
+			ACell after=target.get();
+
+			// Publish any pending local writes even when this pull was absent,
+			// rejected or dominated, matching root pull semantics.
+			cursor.sync();
+
+			boolean changed=accepted&&(before!=after)
+					&&((before==null)||!before.equals(after));
+			if (changed&&(path.length>0)&&Keywords.P2P.equals(path[0])) {
+				maybeUpdateDesiredPeers();
+			}
+			return target.get();
 		});
 	}
 
@@ -2034,7 +2133,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (config.isPersist()) {
 			for (LatticePropagator p : propagators) {
 				try {
-					p.persist(snapshot);
+					// triggerAndClose has already filtered, reconciled and announced the
+					// final view. Persist that capability-safe value, never the unfiltered
+					// authoritative snapshot passed to a secondary propagator.
+					p.persist(p.getLastAnnouncedValue());
 				} catch (IOException e) {
 					if (checkpointFailure == null) {
 						checkpointFailure = e;

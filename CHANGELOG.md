@@ -5,6 +5,29 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.12] - 2026-08-13
+
+### Added
+
+- Ed25519 JWT signing accepts explicit verification-method key IDs, while self-contained verification recognises bare multikey, `did:key` and multikey-fragment DID URL forms.
+- Lattice propagators can own filtered outbound views, preserving store-local refs and complete pending inbound merges while excluding filtered cells from announced roots across startup, replication, restore and shutdown.
+- Lattice nodes can pull and merge a selected cursor path without transferring unrelated sibling regions.
+- Etch gains offline strict validation of index structure, canonical CAD3 records, content hashes and root-tree completeness, shared with copy-out repair.
+- Etch CLI maintenance commands open encrypted v3 stores through protected key files, standard input or header-hinted keystores, and support explicit cipher, index and rekeying policy for fresh migration destinations.
+
+### Changed
+
+- Lattice value messages support efficient post-merge acknowledgements through an optional request ID, while normal gossip remains fire-and-forget.
+- Peer and lattice-node launch configuration now resolves encrypted Etch stores from their header key hint by default, records the configured identity as the hint for new encrypted stores, and supports an explicit runtime key resolver for external secret providers.
+- The experimental `Symmetric` helper now uses authenticated AES-GCM and explicitly rejects ciphertext from its former unauthenticated AES-CBC implementation. Its ciphertext representation is not a stable storage or interchange format.
+
+### Fixed
+
+- Lattice root sync advertises only values already available from its serving store, while inbound acquisition now resolves lazy missing references correctly and rejects malformed data responses.
+- Lattice propagation no longer drops a rapid follow-up delta behind its former 50 ms broadcast throttle; background updates remain coalesced before processing.
+- Consecutive CVX reader discard markers (`#_`) each discard one following form, matching cumulative Clojure reader behaviour (#264).
+- DLFS distinguishes missing paths from corrupt stored nodes, preserves access to readable branches, supports safe entry replacement or deletion for recovery, and rejects malformed replicated subtrees.
+
 ## [0.8.11] - 2026-08-10
 
 ### Added

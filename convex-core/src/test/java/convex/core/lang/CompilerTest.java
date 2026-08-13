@@ -116,6 +116,7 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Vectors.of(1, 3), eval("[1 #_2 3]"));
 		assertEquals(Vectors.of(1, 3), eval("[1 #_(+ 3 4) #_ 8 3]"));
 		assertEquals(Vectors.of(1, 3), eval("[1 #_(+ 3 #_4) 3]"));
+		assertEquals(Vectors.of(1, 3), eval("[1 #_ #_ :foo :bar 3]"));
 
 		// Comments only -> no form to execute!
 		assertThrows(ParseException.class, () -> step("; No code here to run!"));

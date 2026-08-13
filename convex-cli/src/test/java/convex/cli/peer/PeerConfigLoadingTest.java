@@ -10,6 +10,7 @@ import java.io.StringWriter;
 import java.security.KeyStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,11 +22,14 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.cvm.Keywords;
 import convex.core.data.AString;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.etch.EtchConfig;
 import convex.etch.EtchConstants;
 import convex.etch.EtchStore;
+import convex.peer.Config;
 import convex.restapi.RESTConfig;
 
 /** Verifies that CLI peer launch preserves nested REST runtime policy. */
@@ -165,6 +169,66 @@ class PeerConfigLoadingTest {
 			assertEquals(EtchConfig.CipherMode.AES_256_CTR,
 					etchStore.getEtch().getConfig().getCipherMode());
 			assertEquals(expected,etchStore.getRootData());
+		}
+	}
+
+	@Test
+	void existingEncryptedStoreUsesHeaderHintWithoutEtchPolicy() throws Exception {
+		Path keyFile=temporaryDirectory.resolve("hinted-peer-keys.pfx");
+		char[] storePassword="store-secret".toCharArray();
+		char[] keyPassword="key-secret".toCharArray();
+		AKeyPair keyPair=AKeyPair.generate();
+		KeyStore keys=PFXTools.createStore(keyFile.toFile(),storePassword);
+		PFXTools.setKeyPair(keys,keyPair,keyPassword);
+		PFXTools.saveStore(keys,keyFile.toFile(),storePassword);
+
+		Path store=storePath("hinted-existing-v3");
+		EtchConfig encrypted=EtchConfig.createV3(EtchConfig.MappingMode.MAPPED_BYTE_BUFFER,true,
+				EtchConfig.CipherMode.CHACHA20,true,keyPair.getAccountKey(),
+				Config.etchKeyResolver(keyPair));
+		var expected=Maps.of(keyPair.getAccountKey(),Strings.create("stored peer data"));
+		try (EtchStore created=EtchStore.create(store.toFile(),encrypted)) {
+			created.setRootData(expected);
+			created.flush();
+		}
+
+		Path file=temporaryDirectory.resolve("store-only.json5");
+		String path=store.toAbsolutePath().toString().replace('\\','/');
+		Files.writeString(file,"{peer:{store:'"+path+"'}}");
+		String[] options={"--config",file.toString(),"--keystore",keyFile.toString(),
+				"--storepass",new String(storePassword),"--peer-keypass",new String(keyPassword),
+				"--strict-security"};
+		ParsedCommand parsed=parse("start",options);
+		HashMap<Keyword,Object> launchConfig=parsed.command().loadPeerConfig();
+		try (AStore opened=parsed.command().openPeerStore(launchConfig)) {
+			EtchStore etchStore=(EtchStore)opened;
+			assertEquals(keyPair.getAccountKey(),etchStore.getEtch().getConfig().getPublicKeyHint());
+			assertEquals(expected,etchStore.getRootData());
+			AKeyPair selected=((PeerStart)parsed.command()).findPeerKey(opened,launchConfig);
+			assertEquals(keyPair.getAccountKey(),selected.getAccountKey());
+		}
+	}
+
+	@Test
+	void newEncryptedStoreDefaultsHintToExplicitPeerKey() throws Exception {
+		Path keyFile=temporaryDirectory.resolve("default-hint-keys.pfx");
+		char[] storePassword="store-secret".toCharArray();
+		char[] keyPassword="key-secret".toCharArray();
+		AKeyPair keyPair=AKeyPair.generate();
+		KeyStore keys=PFXTools.createStore(keyFile.toFile(),storePassword);
+		PFXTools.setKeyPair(keys,keyPair,keyPassword);
+		PFXTools.saveStore(keys,keyFile.toFile(),storePassword);
+
+		Path store=storePath("default-hint-v3");
+		Path file=config(store,"{version:3,cipher:'aes-256-ctr',encryptIndex:true}");
+		String[] options={"--config",file.toString(),"--keystore",keyFile.toString(),
+				"--storepass",new String(storePassword),"--peer-keypass",new String(keyPassword),
+				"--peer-key",keyPair.getAccountKey().toHexString()};
+		ParsedCommand parsed=parse("start",options);
+		try (AStore opened=parsed.command().openPeerStore(parsed.command().loadPeerConfig())) {
+			EtchConfig actual=((EtchStore)opened).getEtch().getConfig();
+			assertEquals(keyPair.getAccountKey(),actual.getPublicKeyHint());
+			assertEquals(EtchConfig.CipherMode.AES_256_CTR,actual.getCipherMode());
 		}
 	}
 

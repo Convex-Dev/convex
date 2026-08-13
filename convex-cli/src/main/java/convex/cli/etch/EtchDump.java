@@ -40,6 +40,8 @@ public class EtchDump extends AEtchCommand{
 			store.getEtch().visitIndex(new DumpVisitor());
 		} catch (IOException e) {
 			throw new CLIError("IO Error traversing Etch store",e);
+		} finally {
+			closeKeyContexts();
 		}
 	}
 }

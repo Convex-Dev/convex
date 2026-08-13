@@ -20,7 +20,7 @@ Instead, use one of the private channels below:
 Please include as much of the following as you can:
 
 - A description of the vulnerability and its impact.
-- Affected module(s) and version (`mvn -version`, release tag, or commit hash).
+- Affected module(s) and version (`./mvnw -version`, release tag, or commit hash).
 - Step-by-step reproduction instructions or a proof-of-concept.
 - Any suggested mitigation, if you have one.
 

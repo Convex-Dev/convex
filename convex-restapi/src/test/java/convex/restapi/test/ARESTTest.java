@@ -8,6 +8,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -21,6 +23,7 @@ import convex.peer.Server;
 import convex.restapi.RESTConfig;
 import convex.restapi.RESTServer;
 
+@ExtendWith(RESTFixtureExtension.class)
 public abstract class ARESTTest {
 	protected static RESTServer server;
 	protected static int port;
@@ -52,6 +55,22 @@ public abstract class ARESTTest {
 			KP=s.getKeyPair();
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
+		}
+	}
+
+	static synchronized void closeFixture() {
+		RESTServer rs=server;
+		if (rs==null) return;
+		Server peer=rs.getServer();
+		server=null;
+		try {
+			rs.close();
+		} finally {
+			if (peer!=null) peer.close();
+			httpClient.shutdownNow();
+			HOST_PATH=null;
+			API_PATH=null;
+			KP=null;
 		}
 	}
 	

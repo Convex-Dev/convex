@@ -356,6 +356,45 @@ convex peer start \
 | `--no-tray` | Disable the system tray icon |
 | `--state` | Directory for persistent state |
 
+### Encrypted Etch v3 stores
+
+Etch encryption is opt-in. Configure it in the peer JSON5 file; the default
+store format remains Etch v2 and the default Etch v3 cipher is `none`.
+
+```json5
+{
+  peer: {
+    store: "/var/lib/convex/peer.etch",
+    etch: {
+      version: 3,
+      cipher: "aes-256-ctr",
+      encryptIndex: true,
+      publicKeyHint: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  }
+}
+```
+
+The Convex CLI always makes its PKCS12 key resolver available when opening a
+peer store. `publicKeyHint` identifies an Ed25519 key pair in that keystore. If
+the configured peer key already matches the hint, the CLI uses it directly;
+otherwise it looks up the hinted key. It derives a separate 32-byte Etch master
+key from the selected private seed with HKDF-SHA-256, and Etch then derives
+file-specific cipher and header-authentication keys. The public key, the hint
+and the keystore passwords are not encryption-key material.
+
+Use `--keystore` and `--storepass` to select and unlock the keystore, and
+`--peer-keypass` to unlock the selected peer key. If `publicKeyHint` is absent,
+the CLI falls back to `--peer-key`; opening an encrypted store fails if neither
+identifies a key. For a new encrypted store without an explicit hint, the full
+public key of the configured peer is recorded automatically. Existing stores
+always retain the version, cipher, index and hint recorded in their header. A
+different `peer.etch` policy applies only when creating a new store and produces
+a warning when it differs from an existing file.
+
+The derivation and key-lifetime contract is specified in
+[Etch v3: Caller key material and verification](../convex-core/docs/ETCHv3.md#caller-key-material-and-verification).
+
 ## Global Options
 
 These options work with most commands:

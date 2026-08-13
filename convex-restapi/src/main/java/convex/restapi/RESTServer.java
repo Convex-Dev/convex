@@ -154,7 +154,6 @@ public class RESTServer implements Closeable {
 		this.confirmationService = (restConfig.isMcpEnabled() && restConfig.isSigningEnabled()
 				&& restConfig.isElevatedEnabled())
 				? new ConfirmationService() : null;
-		this.oauthService = new OAuthService(this);
 	}
 	
 	protected ChainAPI chainAPI;
@@ -172,7 +171,7 @@ public class RESTServer implements Closeable {
 	protected AuthMiddleware authMiddleware;
 	protected SigningService signingService;
 	protected ConfirmationService confirmationService;
-	protected OAuthService oauthService;
+	protected volatile OAuthService oauthService;
 	protected ConfirmAPI confirmAPI;
 	protected AuthPage authPage;
 	protected final long faucetMax;
@@ -220,7 +219,16 @@ public class RESTServer implements Closeable {
 	}
 
 	public OAuthService getOAuthService() {
-		return oauthService;
+		OAuthService service=oauthService;
+		if (service!=null) return service;
+		synchronized (this) {
+			service=oauthService;
+			if (service==null) {
+				service=new OAuthService(this);
+				oauthService=service;
+			}
+		}
+		return service;
 	}
 
 	private void addAPIRoutes(RoutesConfig routes) {

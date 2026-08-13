@@ -72,7 +72,7 @@ import convex.social.Social;
  * <p>{@code :p2p} keeps the shape core gave it — a {@link KeyedLattice} containing
  * {@code :nodes} — so the registry is addressed as {@code [:p2p :nodes]} on every root.
  * That matters because lattice paths are wire-visible: a {@code LATTICE_VALUE} message
- * carries {@code [:LV [*path*] value]} and the receiver merges at that literal path.
+ * carries {@code [:LV id [*path*] value]} and the receiver merges at that literal path.
  * {@code NodeServer.publishNodeInfo} writes to exactly that path and works unchanged.
  *
  * <h2>Relationship to {@code convex.lattice.P2PLattice}</h2>

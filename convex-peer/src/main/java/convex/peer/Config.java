@@ -4,8 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
@@ -13,6 +15,7 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.Migrations;
 import convex.core.cvm.State;
 import convex.core.data.AString;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -21,12 +24,20 @@ import convex.core.store.MemoryStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.etch.EtchConfig;
+import convex.etch.EtchKeyDerivation;
 import convex.etch.EtchStore;
 
 /**
  * Static tools and utilities for Peer configuration
  */
 public class Config {
+
+	/**
+	 * Runtime-only launch option for resolving an Etch master key from the
+	 * public-key hint in a v3 header. This is deliberately separate from the
+	 * serialisable {@code peer.etch} creation policy.
+	 */
+	public static final Keyword ETCH_KEY_RESOLVER=Keyword.intern("etch-key-resolver");
 	
 	/**
 	 * Size of default server socket receive buffer
@@ -133,35 +144,107 @@ public class Config {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends AStore> T checkStore(Map<Keyword, Object> config) throws IOException {
-		EtchConfig etchConfig=checkEtchConfig(config);
+		EtchConfig requested=checkConfiguredEtchConfig(config);
 		Object o=config.get(Keywords.STORE);
 		if (o instanceof AStore) return (T)o;
 		
 		if ((o instanceof String)||(o instanceof AString)) {
 			String fname=o.toString();
 			if ("memory".equals(fname)) {
-				if (etchConfig!=null) {
+				if (requested!=null) {
 					throw new IOException(Keywords.ETCH_CONFIG+" cannot configure an in-memory store");
 				}
 				return (T) new MemoryStore();
 			}
+			EtchConfig etchConfig=getEtchConfig(config);
 			if ("temp".equals(fname)) {
 				return (T) ((etchConfig==null)?EtchStore.createTemp():EtchStore.createTemp(etchConfig));
 			}
 			File f=FileUtils.getFile(fname);
-			if (f.exists()) {
-				return (T) ((etchConfig==null)?EtchStore.create(f):EtchStore.create(f,etchConfig));
-			}
+			return (T) ((etchConfig==null)?EtchStore.create(f):EtchStore.create(f,etchConfig));
 		}
 		
 		return null;
 	}
 
-	private static EtchConfig checkEtchConfig(Map<Keyword,Object> config) throws IOException {
+	private static EtchConfig checkConfiguredEtchConfig(Map<Keyword,Object> config) throws IOException {
 		Object value=config.get(Keywords.ETCH_CONFIG);
 		if (value==null) return null;
 		if (value instanceof EtchConfig etchConfig) return etchConfig;
 		throw new IOException("Unexpected type for "+Keywords.ETCH_CONFIG+": "+Utils.getClassName(value));
+	}
+
+	/**
+	 * Gets the effective Etch configuration for a peer or lattice-node store.
+	 * Explicit runtime resolution wins; otherwise a configured peer key supplies
+	 * the natural resolver. With neither, the configured creation policy is
+	 * returned unchanged.
+	 *
+	 * @param config runtime launch configuration
+	 * @return effective Etch configuration, or {@code null} for ordinary defaults
+	 * @throws IOException if a configured value has an invalid type
+	 */
+	@SuppressWarnings("unchecked")
+	public static EtchConfig getEtchConfig(Map<Keyword,Object> config) throws IOException {
+		EtchConfig etchConfig=checkConfiguredEtchConfig(config);
+		Object keyValue=config.get(Keywords.KEYPAIR);
+		AKeyPair keyPair=(keyValue instanceof AKeyPair kp)?kp:null;
+		Object resolverValue=config.get(ETCH_KEY_RESOLVER);
+		Function<AccountKey,byte[]> resolver=null;
+		if (resolverValue!=null) {
+			if (!(resolverValue instanceof Function<?,?>)) {
+				throw new IOException("Unexpected type for "+ETCH_KEY_RESOLVER+": "
+						+Utils.getClassName(resolverValue));
+			}
+			resolver=(Function<AccountKey,byte[]>)resolverValue;
+		} else if ((etchConfig!=null)&&etchConfig.hasKeyFunction()) {
+			resolver=etchConfig.getKeyFunction();
+		} else if (keyPair!=null) {
+			resolver=etchKeyResolver(keyPair);
+		}
+		if ((keyPair!=null)&&(etchConfig!=null)
+				&&(etchConfig.getCipherMode()!=EtchConfig.CipherMode.NONE)
+				&&(etchConfig.getPublicKeyHint()==null)) {
+			etchConfig=etchConfig.withPublicKeyHint(keyPair.getAccountKey());
+		}
+		if (resolver==null) return etchConfig;
+		if (etchConfig==null) etchConfig=EtchConfig.create();
+		return etchConfig.withKeyFunction(resolver);
+	}
+
+	/**
+	 * Creates the standard resolver backed by one Ed25519 key pair. A non-null
+	 * hint must identify that key; the private seed is copied only long enough to
+	 * derive the Etch master key and is then wiped.
+	 *
+	 * @param keyPair peer or lattice-node identity key
+	 * @return Etch master-key resolver
+	 */
+	public static Function<AccountKey,byte[]> etchKeyResolver(AKeyPair keyPair) {
+		AccountKey publicKey=keyPair.getAccountKey();
+		return hint -> {
+			if ((hint!=null)&&!hint.equals(publicKey)) {
+				throw new IllegalArgumentException("Etch publicKeyHint "+hint
+						+" does not match configured key "+publicKey);
+			}
+			return deriveEtchMasterKey(keyPair);
+		};
+	}
+
+	/**
+	 * Derives the standard Etch master key from an Ed25519 key pair without
+	 * retaining its private-seed copy.
+	 *
+	 * @param keyPair source identity key
+	 * @return newly allocated 32-byte Etch master key
+	 */
+	public static byte[] deriveEtchMasterKey(AKeyPair keyPair) {
+		byte[] seed=keyPair.getSeed().getBytes();
+		try {
+			return EtchKeyDerivation.deriveMasterKey(seed);
+		} finally {
+			Arrays.fill(seed,(byte)0);
+		}
 	}
 	
 	/**
@@ -228,7 +311,7 @@ public class Config {
 		try {
 			store=checkStore(config);
 			if (store!=null) return store;
-			EtchConfig etchConfig=checkEtchConfig(config);
+			EtchConfig etchConfig=getEtchConfig(config);
 			store=(T) ((etchConfig==null)?EtchStore.createTemp("tempPeerStore")
 					:EtchStore.createTemp("tempPeerStore",etchConfig));
 		} catch (IOException e) {

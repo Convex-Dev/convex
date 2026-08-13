@@ -122,7 +122,7 @@ connection manager, and a background thread. The pipeline is:
 
 The message protocol has two relevant types:
 
-- **`LATTICE_VALUE`** `[:LV [path...] value]` — push a value (optionally at a path)
+- **`LATTICE_VALUE`** `[:LV id [path...] value]` — push a value; null ID is fire-and-forget
 - **`LATTICE_QUERY`** `[:LQ id [path...]]` — request a value at a path
 
 Both carry a **path vector**. `NodeServer` already handles path-based queries: it calls

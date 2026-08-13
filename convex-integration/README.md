@@ -18,7 +18,7 @@ convex-integration/target/convex.jar
 
 ```bash
 cd convex
-mvn clean install
+./mvnw -B -T1C install
 ```
 
 The JAR is created during the standard Maven build process.
@@ -42,7 +42,7 @@ See the [CLI documentation](../convex-cli/README.md) for full command reference.
 Run live integration tests against a running network:
 
 ```bash
-mvn verify -Pintegration-tests
+./mvnw -B verify -Pintegration-tests
 ```
 
 ## License

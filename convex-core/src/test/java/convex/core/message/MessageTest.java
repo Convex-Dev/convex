@@ -142,6 +142,18 @@ public class MessageTest {
 		Message m=Message.createQuery(0, Symbols.STAR_BALANCE, Address.ZERO);
 		doMessageTest(m);
 	}
+
+	@Test public void testLatticeValueID() throws BadFormatException {
+		AVector<?> payload=Vectors.of(MessageTag.LATTICE_VALUE,12,Vectors.empty(),42);
+		Message m=Message.create(MessageType.LATTICE_VALUE,payload);
+		assertEquals(CVMLong.create(12),m.getRequestID());
+		assertEquals(CVMLong.create(13),m.withID(CVMLong.create(13)).getRequestID());
+		doMessageTest(m);
+
+		Message fireAndForget=Message.create(MessageType.LATTICE_VALUE,
+			Vectors.of(MessageTag.LATTICE_VALUE,null,Vectors.empty(),42));
+		assertNull(fireAndForget.getRequestID());
+	}
 	
 	@Test public void testTransact() throws BadFormatException {
 		ATransaction tx=Invoke.create(Address.create(134564), 124334, Symbols.STAR_BALANCE);
@@ -404,6 +416,31 @@ public class MessageTest {
 
 		conn.setTrustedKey(KP.getAccountKey());
 		assertTrue(conn.isTrusted());
+	}
+
+	@Test public void testChallengeWithID() {
+		Message challenge=Message.createChallenge(1,KP.signData(CVMLong.ONE));
+		Message retagged=challenge.withID(CVMLong.create(2));
+		assertNotNull(retagged);
+		assertEquals(CVMLong.create(2),retagged.getRequestID());
+	}
+
+	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {
+		LocalConnection conn = LocalConnection.create(m -> true);
+		int count=10_000;
+		java.util.Set<CVMLong> ids=java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+		java.util.stream.IntStream.range(0,count).parallel()
+				.forEach(i -> ids.add(conn.nextRequestID()));
+
+		assertEquals(count,ids.size());
+		for (long i=0;i<count;i++) {
+			assertTrue(ids.contains(CVMLong.create(i)));
+		}
+
+		LocalConnection independent=LocalConnection.create(m -> true);
+		assertEquals(CVMLong.ZERO,independent.nextRequestID(),
+				"Each originating connection has an independent ID space");
 	}
 
 	/**

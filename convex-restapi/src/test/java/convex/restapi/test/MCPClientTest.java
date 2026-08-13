@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -53,6 +54,11 @@ public class MCPClientTest extends ARESTTest {
 		Map<String, Object> acct = callToolOK("createAccount",
 				Map.of("accountKey", testPublicKey, "faucet", "1000000000"));
 		testAddr = ((Number) acct.get("address")).intValue();
+	}
+
+	@AfterAll
+	public void closeClient() {
+		if (mcp!=null) mcp.close();
 	}
 
 	// ===== Helpers =====
