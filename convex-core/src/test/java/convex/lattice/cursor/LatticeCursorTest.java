@@ -4,6 +4,7 @@ import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -22,6 +23,9 @@ import convex.core.data.AHashMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -30,6 +34,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
@@ -509,6 +514,64 @@ public class LatticeCursorTest {
 		assertTrue(secondSnapshot.get().contains(concurrentValue),
 			"Waiting sync caller must capture the root after the preceding sync completes");
 		assertTrue(root.get().contains(concurrentValue), "Concurrent root update must survive both syncs");
+	}
+
+	/**
+	 * A sync publishes one immutable snapshot. A write racing that publication belongs
+	 * to the next snapshot: it must survive in the cursor, but must not be included in
+	 * the store-backed value returned by this sync.
+	 */
+	@Test
+	public void testConcurrentRootWriteDoesNotChangePublishedSyncResult() {
+		SetLattice<CVMLong> lattice = SetLattice.create();
+		ASet<CVMLong> published = Sets.of(CVMLong.ONE);
+		ASet<CVMLong> concurrent = published.include(CVMLong.TWO);
+		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(lattice, published);
+
+		root.onSync(snapshot -> {
+			assertSame(published, snapshot);
+			root.set(concurrent);
+			return snapshot;
+		});
+
+		ASet<CVMLong> result = root.sync();
+
+		assertSame(published, result,
+			"sync must return the exact snapshot completed by its publication callback");
+		assertSame(concurrent, root.get(),
+			"the concurrent local write must remain pending in the authoritative cursor");
+	}
+
+	/**
+	 * When publication returns an equivalent value backed by another store, a
+	 * concurrent local value remains the merge's own argument. This preserves its
+	 * exact object/ref identity instead of importing equivalent foreign refs.
+	 */
+	@Test
+	public void testConcurrentRootWriteRetainsOwnRefIdentity() throws Exception {
+		SetLattice<Blob> lattice = SetLattice.create();
+		Blob source = Blobs.createRandom(400);
+		try (MemoryStore localStore = new MemoryStore();
+				MemoryStore foreignStore = new MemoryStore()) {
+			ASet<Blob> local = Cells.announce(Sets.of(source), r -> {}, localStore);
+			Blob foreignBlob = foreignStore.decode(source.getEncoding());
+			ASet<Blob> foreign = Cells.announce(Sets.of(foreignBlob), r -> {}, foreignStore);
+
+			assertEquals(local, foreign);
+			assertNotSame(local, foreign);
+
+			RootLatticeCursor<ASet<Blob>> root = Cursors.createLattice(lattice, Sets.empty());
+			root.onSync(snapshot -> {
+				root.set(local);
+				return foreign;
+			});
+
+			ASet<Blob> result = root.sync();
+
+			assertSame(foreign, result, "sync returns the value actually published");
+			assertSame(local, root.get(),
+				"current local state must be own so an equivalent foreign value cannot replace its refs");
+		}
 	}
 
 	@Test

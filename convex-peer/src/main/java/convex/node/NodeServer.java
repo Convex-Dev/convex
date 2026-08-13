@@ -340,7 +340,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 				propagators.add(primary);
 			}
 
-			for (LatticePropagator p : propagators) {
+			for (int i = 0; i < propagators.size(); i++) {
+				LatticePropagator p = propagators.get(i);
+				p.configure(lattice, mergeContext, i == 0);
 				p.setPersistenceEnabled(config.isPersist());
 			}
 
@@ -352,22 +354,31 @@ public class NodeServer<V extends ACell> implements Closeable {
 					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
 			}
 
-			// Restore from primary propagator's store if configured
+			// Restore each propagator's own persisted view. The primary restores the
+			// authoritative cursor; secondary working views are later reconciled with
+			// the freshly projected primary without discarding pending subset state.
 			if (config.isRestore() && !propagators.isEmpty()) {
-				ACell restored = propagators.get(0).restore();
-				if (restored != null) {
-					cursor.set((V) restored);
-					log.info("Restored lattice value from store");
+				for (int i = 0; i < propagators.size(); i++) {
+					ACell restored = propagators.get(i).restore();
+					if (restored != null && i == 0) {
+						cursor.set((V) restored);
+						log.info("Restored lattice value from primary store");
+					}
 				}
 			}
 
-			// Seed the primary's announced, store-backed view before opening the network.
-			// A fresh or restored node can answer LATTICE_QUERY immediately without an
-			// application-side sync solely to initialise query service.
+			// Seed every propagator's announced, store-backed view before opening the
+			// network. Each secondary applies its own filter before touching its store,
+			// so a fresh node can immediately serve every configured capability view.
 			if (!propagators.isEmpty()) {
 				ACell announced = propagators.get(0).processSnapshot(cursor.get());
 				cursor.set((V) announced);
-				if (config.isPersist()) propagators.get(0).checkpoint();
+				for (int i = 1; i < propagators.size(); i++) {
+					propagators.get(i).processSnapshot(announced);
+				}
+				if (config.isPersist()) {
+					for (LatticePropagator p : propagators) p.checkpoint();
+				}
 			}
 
 			// Create and launch network server unless port is negative (local-only mode)
@@ -644,7 +655,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 					returnLatticeResult(message, Result.error(ErrorCodes.TRUST,
 						"Lattice access requires an operator-assigned propagator connection"));
 				} else if (acquired) {
-					processLatticeValue(message);
+					processLatticeValue(message, owner);
 				} else {
 					prepareLatticeValue(message, owner, stats);
 				}
@@ -984,7 +995,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			ConnectionStats stats) throws BadFormatException {
 		try {
 			Message complete = completeLatticeMessage(message, owner.getStore());
-			processLatticeValue(complete);
+			processLatticeValue(complete, owner);
 		} catch (MissingDataException e) {
 			beginLatticeAcquisition(message, owner, stats);
 		} catch (IOException e) {
@@ -1187,7 +1198,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
 	 */
-	private void processLatticeValue(Message message) throws BadFormatException {
+	private void processLatticeValue(Message message, LatticePropagator owner) throws BadFormatException {
 		AConnection conn = message.getConnection();
 		ConnectionStats stats = statsFor(conn);
 
@@ -1244,6 +1255,18 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell after = target.get();
 		boolean changed = before != after && (before == null || !before.equals(after));
 		if (changed) {
+			// Keep the ingress propagator's subset current until the accepted primary
+			// value is projected back through normal fan-out. Merge remains the sole
+			// validation mechanism; this is only replica/view bookkeeping.
+			try {
+				owner.mergeInbound(path, value);
+			} catch (RuntimeException e) {
+				// The authoritative merge has already succeeded. A failed staging
+				// optimisation must not reject it; fan-out below reconstructs the view.
+				log.debug("Unable to stage accepted inbound value in propagator view: {}",
+					e.getMessage());
+			}
+
 			// Notify propagators that cursor state has changed. This is a synchronous
 			// primary-store publication on the dispatcher thread, never on a Netty event loop.
 			cursor.sync();
@@ -2110,7 +2133,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (config.isPersist()) {
 			for (LatticePropagator p : propagators) {
 				try {
-					p.persist(snapshot);
+					// triggerAndClose has already filtered, reconciled and announced the
+					// final view. Persist that capability-safe value, never the unfiltered
+					// authoritative snapshot passed to a secondary propagator.
+					p.persist(p.getLastAnnouncedValue());
 				} catch (IOException e) {
 					if (checkpointFailure == null) {
 						checkpointFailure = e;

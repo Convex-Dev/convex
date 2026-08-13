@@ -32,6 +32,11 @@ import convex.core.util.LatestUpdateQueue;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.lattice.cursor.Root;
+import convex.lattice.ALattice;
+import convex.lattice.LatticeContext;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.cursor.RootLatticeCursor;
 
 /**
  * Self-contained component for propagating lattice values.
@@ -43,21 +48,22 @@ import convex.lattice.cursor.Root;
  *
  * <p>A LatticePropagator owns:
  * <ul>
- *   <li>An {@link AStore} — for delta tracking (announce/novelty detection),
- *       persistence (setRootData), and security boundary (DATA_REQUEST resolution).</li>
+	 *   <li>An {@link AStore} — for delta tracking (announce/novelty detection),
+	 *       persistence (setRootData), and scoped DATA_REQUEST resolution.</li>
  *   <li>A {@link LatticeConnectionManager} — outbound peer connections and broadcast.</li>
  *   <li>A background thread — event-driven processing loop with periodic root sync.</li>
  * </ul>
  *
- * <p>The propagator has no knowledge of cursors or lattices. Values are pushed in
- * via {@link #triggerBroadcast(ACell)}. For synchronous snapshots the caller owns
- * installation of the returned value. Pull operations only acquire store-backed
- * values; NodeServer owns merge and re-propagation through its root cursor.
+ * <p>Values are pushed in via {@link #triggerBroadcast(ACell)}. Each propagator owns
+ * its filter and lattice-aware working view, while NodeServer owns the authoritative
+ * root cursor. For synchronous primary snapshots the caller owns installation of the
+ * returned value. Pull operations only acquire store-backed values; NodeServer owns
+ * authoritative merge and re-propagation through its root cursor.
  *
- * <p>The store also serves as the <b>security boundary</b>: peer connections are configured
- * with the propagator's store, so DATA_REQUEST from peers can only resolve data that
- * exists in that store. A public propagator with a filtered input and a MemoryStore
- * cannot leak private data.
+	 * <p>The store also scopes peer capabilities: peer connections are configured with
+	 * the propagator's store, so DATA_REQUEST from peers can only resolve data that exists
+	 * there. The filter governs outbound publication; independently acquired inbound cells
+	 * may already exist in the store and remain an operator access-policy concern.
  *
  * <p>Designed so the peer {@code BeliefPropagator} can eventually compose or extend
  * this class. Belief is an ACell; belief broadcast uses the same delta encoding
@@ -80,8 +86,8 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Store for delta tracking (novelty detection via announce), persistence
-	 * (setRootData), and security boundary for peer data resolution. Missing data requests 
-	 * vs announced value should be routed here.
+	 * (setRootData), and peer data resolution. Missing data requests for an announced
+	 * value should be routed here.
 	 */
 	private final AStore store;
 
@@ -89,6 +95,24 @@ public class LatticePropagator implements Closeable {
 	 * Connection manager for outbound peer connections and broadcast.
 	 */
 	private final LatticeConnectionManager connectionManager;
+
+	/** Lattice used to reconcile this propagator's own subset with new snapshots. */
+	private ALattice<ACell> lattice;
+
+	/** Merge context shared with the owning NodeServer. */
+	private LatticeContext mergeContext = LatticeContext.EMPTY;
+
+	/** Projection applied before any value crosses this propagator's store boundary. */
+	private LatticeFilter<ACell> filter = value -> value;
+
+	/**
+	 * This propagator's current logical view. It may contain accepted inbound values
+	 * which have not yet appeared in a later projection from the authoritative root.
+	 */
+	private RootLatticeCursor<ACell> workingCursor;
+
+	/** Primary publication replaces its view from the authoritative cursor. */
+	private boolean primary;
 
 	/**
 	 * Background propagation thread
@@ -125,8 +149,8 @@ public class LatticePropagator implements Closeable {
 	 * uses the same store.
 	 *
 	 * <p>Each propagator owns its own announced cursor. This keeps query and data
-	 * access scoped to one store. Automatic per-propagator filtering is not yet
-	 * integrated; callers must not expose an unfiltered store as a public view.
+	 * access scoped to one store. Filtering and working-view reconciliation complete
+	 * before this cursor advances.
 	 */
 	private final Root<ACell> announcedCursor = new Root<>();
 
@@ -187,6 +211,40 @@ public class LatticePropagator implements Closeable {
 	 */
 	public LatticePropagator(AStore store) {
 		this(store, new LatticeConnectionManager(store));
+	}
+
+	/**
+	 * Creates a propagator which owns a lattice projection and reconciles later
+	 * snapshots with its current view using current/propagator state as {@code own}.
+	 */
+	@SuppressWarnings("unchecked")
+	public <V extends ACell> LatticePropagator(AStore store, ALattice<V> lattice,
+			LatticeFilter<V> filter) {
+		this(store, new LatticeConnectionManager(store), lattice, filter);
+	}
+
+	/** Creates a filtered propagator with an explicitly configured connection manager. */
+	@SuppressWarnings("unchecked")
+	public <V extends ACell> LatticePropagator(AStore store,
+			LatticeConnectionManager connectionManager, ALattice<V> lattice,
+			LatticeFilter<V> filter) {
+		this(store, connectionManager);
+		if (lattice == null) throw new IllegalArgumentException("Lattice must not be null");
+		if (filter == null) throw new IllegalArgumentException("Lattice filter must not be null");
+		this.lattice = (ALattice<ACell>) lattice;
+		this.filter = (LatticeFilter<ACell>) filter;
+	}
+
+	/** Configures the lattice semantics supplied by the owning node before launch. */
+	@SuppressWarnings("unchecked")
+	void configure(ALattice<?> lattice, LatticeContext context, boolean primary) {
+		synchronized (writeLock) {
+			if (running) throw new IllegalStateException("Cannot configure a running propagator");
+			this.lattice = (ALattice<ACell>) lattice;
+			this.mergeContext = (context != null) ? context : LatticeContext.EMPTY;
+			this.primary = primary;
+			if (workingCursor != null) workingCursor.setContext(this.mergeContext);
+		}
 	}
 
 	// ========== Configuration ==========
@@ -254,6 +312,8 @@ public class LatticePropagator implements Closeable {
 
 	/**
 	 * Restores the last persisted value from this propagator's store.
+	 * The restored value also becomes this propagator's working view, ready for
+	 * directional reconciliation with the next primary projection.
 	 *
 	 * @return The restored value, or null if no persisted value exists
 	 *         or the store is not persistent
@@ -261,7 +321,13 @@ public class LatticePropagator implements Closeable {
 	public ACell restore() {
 		if (!store.isPersistent()) return null;
 		try {
-			return store.getRootData();
+			ACell restored = store.getRootData();
+			if (restored != null) {
+				synchronized (writeLock) {
+					workingCursor = Cursors.createLattice(lattice, restored, mergeContext);
+				}
+			}
+			return restored;
 		} catch (IOException e) {
 			log.warn("Error restoring lattice value from store", e);
 			return null;
@@ -398,6 +464,33 @@ public class LatticePropagator implements Closeable {
 		triggerQueue.offer(value);
 	}
 
+	/**
+	 * Stages an accepted inbound value in this propagator's own working view before
+	 * the authoritative root is fanned back out. Current view state is the
+	 * directional merge's {@code own} value. Inbound state remains complete here;
+	 * this propagator's filter applies only when the reconciled view is published.
+	 *
+	 * <p>No store publication occurs here. NodeServer publishes the authoritative
+	 * root synchronously, then its normal fan-out causes this propagator to reconcile
+	 * and announce the resulting subset.</p>
+	 */
+	ACell mergeInbound(ACell[] path, ACell value) {
+		synchronized (writeLock) {
+			if (lattice == null) return workingCursor == null ? null : workingCursor.get();
+			if (workingCursor == null) {
+				ACell zero = lattice.zero();
+				workingCursor = Cursors.createLattice(lattice, zero, mergeContext);
+			}
+
+			// Work on a fork so a rejecting lattice leaves the working view unchanged.
+			ALatticeCursor<ACell> staged = workingCursor.fork();
+			staged.path(path).merge(value);
+			ACell merged = staged.get();
+			workingCursor.set(merged);
+			return merged;
+		}
+	}
+
 	// ========== Propagation Loop ==========
 
 	/**
@@ -481,10 +574,26 @@ public class LatticePropagator implements Closeable {
 	public ACell processSnapshot(ACell value) throws IOException {
 		CompletableFuture<ACell> announceFuture;
 		synchronized (writeLock) {
+			// Primary input is already authoritative. A secondary instead keeps its
+			// established view as own, preserving local refs and pending inbound values.
+			if ((workingCursor != null) && !primary && (lattice != null)) {
+				value = lattice.merge(mergeContext, workingCursor.get(), value);
+			}
+
+			// Filtering is outbound-only: pending inbound state participates in the
+			// reconciliation above, then projection precedes every outbound operation.
+			value = filter.filter(value);
+			if (value == null) throw new IllegalArgumentException("Lattice filter returned null");
+
 			// 1. Announce to store (writes cells, collects novelty for delta)
 			ArrayList<ACell> novelty = new ArrayList<>();
 			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
 			value = Cells.announce(value, noveltyHandler, store);
+			if (workingCursor == null) {
+				workingCursor = Cursors.createLattice(lattice, value, mergeContext);
+			} else {
+				workingCursor.set(value);
+			}
 
 			// 2. Set root data for restore (if persist enabled)
 			if (persistenceEnabled) {
