@@ -38,9 +38,6 @@
 ;; binding is now a fresh `gensym`, fixing the capture. `switch` additionally referenced
 ;; its binding from code constructed inside an unquote; the gensym is captured in an
 ;; expand-time `let` and threaded to both the binding site and those constructed refs.
-;;
-;; Adds #92: `char?` type predicate, as a state-resident Lisp definition (see the
-;; comment at the definition for why it is not a native CorePred).
 
 (defn update
   ^{:doc {:description "Update a value in a associative data structure by applying a function."
@@ -216,20 +213,3 @@
               (>= i n) (cons 'cond v)
               (recur (assoc v i (list '= (get v i) g))
                      (+ i 2))))))))
-
-;; Adds #92: `char?` type predicate, completing the family alongside `double?`,
-;; `long?`, `str?` etc. Defined in Lisp rather than as a native CorePred: a new
-;; core definition code beyond 505 would reopen the pre-activation decode-skew
-;; window (see UPGRADE.md, standing rule of 2026-07-17), whereas a state-resident
-;; closure is plain CVM data, decodable and executable identically by every
-;; release. `(char x)` returns `x` unchanged only for a Character (a Long or Blob
-;; casts to a *different* Character value; anything else fails the cast), so
-;; equality under the cast is exactly the Character type test.
-(defn char?
-  ^{:doc {:description "Returns `true` if the argument is a value of Character type, `false` otherwise."
-          :examples    [{:code "(char? \\a)"}
-                        {:code "(char? 97)"}]
-          :signature   [{:params [x]
-                         :return Boolean}]}}
-  [x]
-  (try (= x (char x)) false))

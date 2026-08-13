@@ -345,8 +345,19 @@ public class MigrationFixesTest {
 		assertTrue(evalErrors(UPGRADED, "(char?)"));
 		assertTrue(evalErrors(UPGRADED, "(char? \\a \\b)"));
 
-		// :doc metadata installed by the migration
+		// :static and :doc metadata installed by the migration
+		assertEquals(CVMBool.TRUE, eval(UPGRADED, "(boolean (:static (lookup-meta 'char?)))"));
 		assertEquals(CVMBool.TRUE, eval(UPGRADED, "(boolean (:doc (lookup-meta 'char?)))"));
+
+		// Version gate: the raw CoreFn cell exists on any release carrying code 506,
+		// but applying it before v1 activation must fail (:CAST, as on a release
+		// without the code), never execute — the UPGRADE.md decode-skew mitigation
+		Context gate = Context.create(GENESIS, Init.GENESIS_ADDRESS)
+				.invoke(convex.core.lang.Core.CHAR_Q, convex.core.data.prim.CVMChar.create('a'));
+		assertTrue(gate.isExceptional(), "char? must not execute before v1 activation");
+		Context live = Context.create(UPGRADED, Init.GENESIS_ADDRESS)
+				.invoke(convex.core.lang.Core.CHAR_Q, convex.core.data.prim.CVMChar.create('a'));
+		assertEquals(CVMBool.TRUE, live.getResult());
 	}
 
 	@Test

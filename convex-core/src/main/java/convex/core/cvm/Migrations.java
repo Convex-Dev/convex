@@ -108,15 +108,14 @@ public class Migrations {
 	 *
 	 * <ol>
 	 * <li>installs the {@code schedule-upgrade} / {@code unschedule-upgrade} /
-	 * {@code gensym} / {@code cat} / {@code splice} core bindings (CoreFn singletons,
-	 * marked {@code :static}; these cannot be defined in Lisp), enabling future
-	 * upgrades to be scheduled on-chain, macros to introduce hygienic bindings, and
-	 * raw concatenation and positional overwrite of BlobLike values — their
-	 * {@code :doc} metadata is applied by the metadata step below; and</li>
-	 * <li>applies the known fixes and additions: #92 ({@code char?} type predicate,
-	 * added as a state-resident Lisp definition — deliberately NOT a new core
-	 * definition code, per the standing rule in UPGRADE.md on codes beyond 505),
-	 * #533 ({@code update} / {@code update-in} in core),
+	 * {@code gensym} / {@code cat} / {@code splice} / {@code char?} core bindings
+	 * (CoreFn singletons, marked {@code :static}; these cannot be defined in Lisp),
+	 * enabling future upgrades to be scheduled on-chain, macros to introduce
+	 * hygienic bindings, raw concatenation and positional overwrite of BlobLike
+	 * values, and the Character type predicate (#92; version-gated, executable only
+	 * from v1 — see UPGRADE.md on code 506) — their {@code :doc} metadata is
+	 * applied by the metadata step below; and</li>
+	 * <li>applies the known fixes: #533 ({@code update} / {@code update-in} in core),
 	 * #600 (core docstring corrections), #528 ({@code add-mint} in {@code convex.fungible}),
 	 * #621 ({@code owns?} map form in {@code convex.asset}), #620 ({@code offer} in
 	 * {@code asset.multi-token}), #622 ({@code offer} receiver normalisation plus the
@@ -171,6 +170,7 @@ public class Migrations {
 			env = env.assoc(Symbols.GENSYM, Core.GENSYM);
 			env = env.assoc(Symbols.CAT, Core.CAT);
 			env = env.assoc(Symbols.SPLICE, Core.SPLICE);
+			env = env.assoc(Symbols.CHAR_Q, Core.CHAR_Q);
 
 			AHashMap<Symbol, AHashMap<ACell, ACell>> meta = core.getMetadata();
 			// :static only here; full metadata including :doc is applied by META_FIXES,
@@ -181,6 +181,7 @@ public class Migrations {
 			meta = meta.assoc(Symbols.GENSYM, staticMeta);
 			meta = meta.assoc(Symbols.CAT, staticMeta);
 			meta = meta.assoc(Symbols.SPLICE, staticMeta);
+			meta = meta.assoc(Symbols.CHAR_Q, staticMeta);
 
 			State s = preState.putAccount(Core.CORE_ADDRESS, core.withEnvironment(env).withMetadata(meta));
 
