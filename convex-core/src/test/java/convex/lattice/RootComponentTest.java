@@ -3,7 +3,7 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
@@ -14,11 +14,19 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.Blobs;
 import convex.core.data.RefSoft;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
-import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.SetLattice;
 
 public class RootComponentTest {
+	private static final class FlushStore extends MemoryStore {
+		private boolean flushed;
+
+		@Override
+		public void flush() {
+			flushed=true;
+		}
+	}
 
 	@Test
 	public void testLocalStorePersistenceDoesNotMoveCursor() throws Exception {
@@ -39,12 +47,12 @@ public class RootComponentTest {
 	}
 
 	@Test
-	public void testDisabledPersistenceFailsExplicitly() throws Exception {
-		try (EtchStore store=EtchStore.createTemp("root-component-disabled")) {
-			RootComponent<ASet<ACell>> root=new RootComponent<>(
-				Cursors.createLattice(SetLattice.create()),store,false);
+	public void testFlushDelegatesToStore() throws Exception {
+		FlushStore store=new FlushStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
 
-			assertThrows(IllegalStateException.class,root::persist);
-		}
+		root.flush();
+
+		assertTrue(store.flushed);
 	}
 }

@@ -23,25 +23,12 @@ import convex.lattice.cursor.Cursors;
 public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	private final AStore store;
-	private final boolean persistenceEnabled;
 
 	/** Creates a store-backed root around an existing cursor. */
 	public RootComponent(ALatticeCursor<V> cursor, AStore store) {
-		this(cursor,store,true);
-	}
-
-	/**
-	 * Creates a root around an existing cursor with explicit persistence policy.
-	 *
-	 * @param cursor Root lattice cursor
-	 * @param store Store available to the application host
-	 * @param persistenceEnabled true to persist delegated values
-	 */
-	public RootComponent(ALatticeCursor<V> cursor, AStore store, boolean persistenceEnabled) {
 		super(cursor);
 		if (store==null) throw new IllegalArgumentException("Root store must not be null");
 		this.store=store;
-		this.persistenceEnabled=persistenceEnabled;
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -59,16 +46,17 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		return store;
 	}
 
-	/** Returns whether delegated store persistence is enabled. */
-	public boolean isPersistenceEnabled() {
-		return persistenceEnabled;
+	/**
+	 * Flushes the underlying store using its own durability semantics.
+	 *
+	 * @throws IOException If the store flush fails
+	 */
+	public void flush() throws IOException {
+		store.flush();
 	}
 
 	@Override
 	protected <T extends ACell> T persist(T value) throws IOException {
-		if (!persistenceEnabled) {
-			throw new IllegalStateException("Store persistence is disabled for this root component");
-		}
 		return Cells.persist(value,store);
 	}
 }

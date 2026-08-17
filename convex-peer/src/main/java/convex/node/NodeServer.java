@@ -248,7 +248,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
-		this.rootComponent = new RootComponent<>(cursor,store,this.config.isPersist());
+		this.rootComponent = new RootComponent<>(cursor,store);
 
 		// Hook sync callback: synchronous publication on the primary propagator,
 		// async fan-out to secondaries.
