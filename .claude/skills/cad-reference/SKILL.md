@@ -55,6 +55,8 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | CAD | Slug | Covers |
 |-----|------|--------|
 | 010 | `transactions` | Transaction format and lifecycle |
+| 051 | `cpos` | **Convergent Proof of Stake** — consensus levels, belief merge |
+| 050 | `network_upgrade` | Network upgrades and protocol versions — see the `protocol-versions` skill |
 | 015 | `peercomms` | Peer communication protocol |
 | 017 | `peerops` | Peer operations |
 | 018 | `scheduler` | Scheduled execution |
@@ -66,6 +68,8 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | CAD | Slug | Covers |
 |-----|------|--------|
 | 047 | `etch` | Etch storage format — see the `etch` skill |
+| 048 | `stores` | Lattice store abstraction — roots, persistence status |
+| 049 | `etch_gc` | Etch garbage collection and migration — see the `etch` skill |
 | 024 | `data_lattice` | Data lattice |
 | 035 | `cursors` | Lattice cursors |
 | 036 | `lattice_node` | Lattice node |

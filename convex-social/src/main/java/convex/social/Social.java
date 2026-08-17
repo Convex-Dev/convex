@@ -3,8 +3,10 @@ package convex.social;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.cvm.Keywords;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
@@ -25,8 +27,8 @@ import convex.lattice.generic.OwnerLattice;
  * Social social = Social.create(myKeyPair);
  * social.user(myKeyPair.getAccountKey()).feed().post("Hello!");
  *
- * // Connected to a root lattice cursor (e.g. from NodeServer)
- * Social social = Social.connect(rootCursor, myKeyPair);
+ * // Connected beneath a hosted application component
+ * Social social = Social.connect(application, myKeyPair);
  *
  * // Fork for batch operations
  * Social forked = social.fork();
@@ -54,7 +56,8 @@ import convex.lattice.generic.OwnerLattice;
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>
  */
-public class Social extends ALatticeComponent<ACell> {
+public class Social extends ALatticeComponent<
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
 
 	/**
 	 * Keyword for the social section in a node's root lattice.
@@ -71,9 +74,13 @@ public class Social extends ALatticeComponent<ACell> {
 	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
 		OwnerLattice.create(SocialLattice.INSTANCE);
 
-	@SuppressWarnings("unchecked")
-	Social(ALatticeCursor<?> cursor) {
-		super((ALatticeCursor<ACell>) cursor);
+	Social(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		super(cursor);
+	}
+
+	Social(ALatticeComponent<?> parent,
+			ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		super(parent,cursor);
 	}
 
 	/**
@@ -84,7 +91,8 @@ public class Social extends ALatticeComponent<ACell> {
 	 */
 	public static Social create(AKeyPair keyPair) {
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		ALatticeCursor<?> cursor = Cursors.createLattice(SOCIAL_LATTICE);
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor =
+			Cursors.createLattice(SOCIAL_LATTICE);
 		cursor.withContext(ctx);
 		return new Social(cursor);
 	}
@@ -101,9 +109,39 @@ public class Social extends ALatticeComponent<ACell> {
 	 */
 	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		ALatticeCursor<?> socialCursor = rootCursor.path(KEY_SOCIAL);
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			rootCursor.path(KEY_SOCIAL);
 		socialCursor.withContext(ctx);
 		return new Social(socialCursor);
+	}
+
+	/**
+	 * Connects to the {@code :social} region beneath a containing component.
+	 * Component-level policy such as persistence delegates through the supplied
+	 * parent while cursor operations remain scoped to the social path.
+	 *
+	 * @param parent Containing lattice component
+	 * @param keyPair Key pair for signing updates
+	 * @return Social instance connected beneath the parent component
+	 */
+	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
+		Social social=connect(parent);
+		social.cursor.setContext(LatticeContext.create(null,keyPair));
+		return social;
+	}
+
+	/**
+	 * Connects to the {@code :social} region beneath a containing component,
+	 * inheriting its live lattice context and persistence policy.
+	 *
+	 * @param parent Containing application component
+	 * @return Social region component
+	 */
+	public static Social connect(ALatticeComponent<?> parent) {
+		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			parent.cursor().path(KEY_SOCIAL);
+		return new Social(parent,socialCursor);
 	}
 
 	/**
@@ -119,7 +157,7 @@ public class Social extends ALatticeComponent<ACell> {
 	public SocialUser user(AccountKey ownerKey) {
 		ALatticeCursor<Index<Keyword, ACell>> userCursor =
 			cursor.path(ownerKey, Keywords.VALUE);
-		return new SocialUser(userCursor, ownerKey);
+		return new SocialUser(this,userCursor,ownerKey);
 	}
 
 	/**
@@ -129,7 +167,7 @@ public class Social extends ALatticeComponent<ACell> {
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(cursor.fork());
+		return new Social(parent(),cursor.fork());
 	}
 
 }

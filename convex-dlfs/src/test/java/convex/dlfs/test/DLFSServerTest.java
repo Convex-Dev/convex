@@ -6,12 +6,18 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ABlob;
 import convex.dlfs.DLFSServer;
+import convex.dlfs.DLFSWebDAV;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLFileSystem;
 
 /**
  * Basic HTTP tests for the DLFS WebDAV server with multi-drive support.
@@ -24,9 +30,14 @@ public class DLFSServerTest {
 	/** Base URL for the pre-seeded "test" drive */
 	private static String driveURL;
 
+	@Test
+	void testCanonicalMountPathIsExposed() {
+		assertEquals("/dlfs/", DLFSWebDAV.MOUNT_PATH);
+	}
+
 	@BeforeAll
 	static void setUp() {
-		server = DLFSServer.create(null); // no auth for basic tests
+		server = DLFSServer.createEphemeral(); // no auth for basic tests
 		// Pre-seed a "test" drive for anonymous user
 		server.getDriveManager().createDrive(null, "test");
 		server.start(0); // random port
@@ -113,6 +124,59 @@ public class DLFSServerTest {
 				.build();
 		HttpResponse<String> getResp = client.send(getReq, HttpResponse.BodyHandlers.ofString());
 		assertEquals("v2", getResp.body());
+	}
+
+	@Test
+	void testCopyAboveRequestLimitOverwritesAndSharesBlobData() throws Exception {
+		try (DLFSServer copyServer=DLFSServer.createEphemeral().setMaxRequestSize(1024)) {
+			copyServer.getDriveManager().createDrive(null,"copy-test");
+			DLFileSystem fs=(DLFileSystem)copyServer.getDriveManager().getDrive(null,"copy-test");
+			Path source=fs.getPath("/source.bin");
+			Path target=fs.getPath("/target.bin");
+			Files.write(source,new byte[2048]);
+			Files.write(target,new byte[] {1});
+			ABlob sourceData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)source));
+
+			copyServer.start(0);
+			String sourceURL="http://localhost:"+copyServer.getPort()+"/dlfs/copy-test/source.bin";
+			String targetURL="http://localhost:"+copyServer.getPort()+"/dlfs/copy-test/target.bin";
+			HttpRequest copy=HttpRequest.newBuilder(URI.create(sourceURL))
+				.method("COPY",HttpRequest.BodyPublishers.noBody())
+				.header("Destination",targetURL)
+				.build();
+
+			HttpResponse<String> response=client.send(copy,HttpResponse.BodyHandlers.ofString());
+			assertEquals(204,response.statusCode());
+			ABlob targetData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)target));
+			assertSame(sourceData,targetData,"WebDAV COPY should structurally share immutable blob data");
+		}
+	}
+
+	@Test
+	void testMoveAboveRequestLimitOverwritesAndSharesBlobData() throws Exception {
+		try (DLFSServer moveServer=DLFSServer.createEphemeral().setMaxRequestSize(1024)) {
+			moveServer.getDriveManager().createDrive(null,"move-test");
+			DLFileSystem fs=(DLFileSystem)moveServer.getDriveManager().getDrive(null,"move-test");
+			Path source=fs.getPath("/source.bin");
+			Path target=fs.getPath("/target.bin");
+			Files.write(source,new byte[2048]);
+			Files.write(target,new byte[] {1});
+			ABlob sourceData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)source));
+
+			moveServer.start(0);
+			String sourceURL="http://localhost:"+moveServer.getPort()+"/dlfs/move-test/source.bin";
+			String targetURL="http://localhost:"+moveServer.getPort()+"/dlfs/move-test/target.bin";
+			HttpRequest move=HttpRequest.newBuilder(URI.create(sourceURL))
+				.method("MOVE",HttpRequest.BodyPublishers.noBody())
+				.header("Destination",targetURL)
+				.build();
+
+			HttpResponse<String> response=client.send(move,HttpResponse.BodyHandlers.ofString());
+			assertEquals(204,response.statusCode());
+			assertFalse(Files.exists(source));
+			ABlob targetData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)target));
+			assertSame(sourceData,targetData,"WebDAV MOVE should structurally share immutable blob data");
+		}
 	}
 
 	@Test
@@ -277,7 +341,7 @@ public class DLFSServerTest {
 	}
 
 	@Test
-	void testDirectoryMoveFailsWithoutPartialMutation() throws Exception {
+	void testDirectoryMoveIsStructural() throws Exception {
 		String source = driveURL + "move-directory-source/";
 		HttpRequest create = HttpRequest.newBuilder(URI.create(source))
 			.method("MKCOL", HttpRequest.BodyPublishers.noBody()).build();
@@ -286,8 +350,10 @@ public class DLFSServerTest {
 		HttpRequest move = HttpRequest.newBuilder(URI.create(source))
 			.method("MOVE", HttpRequest.BodyPublishers.noBody())
 			.header("Destination", driveURL + "move-directory-target/").build();
-		assertEquals(501, client.send(move, HttpResponse.BodyHandlers.ofString()).statusCode());
-		assertEquals(200, client.send(HttpRequest.newBuilder(URI.create(source)).GET().build(),
+		assertEquals(201, client.send(move, HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(source)).GET().build(),
+			HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertEquals(200, client.send(HttpRequest.newBuilder(URI.create(driveURL + "move-directory-target/")).GET().build(),
 			HttpResponse.BodyHandlers.ofString()).statusCode());
 	}
 
@@ -332,7 +398,7 @@ public class DLFSServerTest {
 
 	@Test
 	void testRequestSizeLimit() throws Exception {
-		try (DLFSServer limited = DLFSServer.create(null).setMaxRequestSize(8)) {
+		try (DLFSServer limited = DLFSServer.createEphemeral().setMaxRequestSize(8)) {
 			limited.getDriveManager().createDrive(null, "limited");
 			limited.start(0);
 			String url = "http://localhost:" + limited.getPort() + "/dlfs/limited/large.txt";

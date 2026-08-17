@@ -77,11 +77,11 @@ public class BootstrapTest {
 		assertSame(scheduled.getSchedule(), migrated.getSchedule());
 		assertSame(scheduled.getGlobals(), migrated.getGlobals());
 
-		// Within #8: exactly the five bindings and their :static metadata added
+		// Within #8: exactly the six CoreFn bindings and their :static metadata added
 		AccountStatus pre = scheduled.getAccount(Core.CORE_ADDRESS);
 		AccountStatus post = migrated.getAccount(Core.CORE_ADDRESS);
-		assertEquals(pre.getEnvironment().count() + 5, post.getEnvironment().count());
-		assertEquals(pre.getMetadata().count() + 5, post.getMetadata().count());
+		assertEquals(pre.getEnvironment().count() + 6, post.getEnvironment().count());
+		assertEquals(pre.getMetadata().count() + 6, post.getMetadata().count());
 		assertSame(Core.SCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.SCHEDULE_UPGRADE));
 		assertSame(Core.UNSCHEDULE_UPGRADE, post.getEnvironmentValue(Symbols.UNSCHEDULE_UPGRADE));
 		assertSame(Core.GENSYM, post.getEnvironmentValue(Symbols.GENSYM));
@@ -92,6 +92,8 @@ public class BootstrapTest {
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.GENSYM).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.CAT).get(Keywords.STATIC));
 		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.SPLICE).get(Keywords.STATIC));
+		assertSame(Core.CHAR_Q, post.getEnvironmentValue(Symbols.CHAR_Q));
+		assertEquals(CVMBool.TRUE, post.getMetadata().get(Symbols.CHAR_Q).get(Keywords.STATIC));
 		assertEquals(pre.getBalance(), post.getBalance());
 		assertEquals(pre.getSequence(), post.getSequence());
 

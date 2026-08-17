@@ -1,5 +1,7 @@
 package convex.p2p;
 
+import java.io.IOException;
+
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -11,12 +13,13 @@ import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
- * A single P2P user's owned area of the lattice.
+ * Convenience facade over a single P2P user's independently located components.
  *
  * <p>Obtained from {@link P2PNode#p2p(AccountKey)}. {@link #cursor()} returns a cursor
  * rooted at that user's identity slot — {@code [:id <userKey> :value]} — already through
- * the signing boundary. It is scoped to this one user: no other user's data is reachable
- * from it, and this component holds no handle to the wider lattice root.
+ * the signing boundary. {@link #identity()} and {@link #node()} expose the two
+ * path-specific components. This facade deliberately is not an
+ * {@link ALatticeComponent}: it aggregates two disjoint lattice locations.
  *
  * <pre>{@code
  * P2PUser me = node.p2p();
@@ -50,15 +53,15 @@ import convex.lattice.cursor.ALatticeCursor;
  * <p>So {@code p2p(someoneElse)} is a perfectly good <em>read</em> view, and writing it
  * is simply a mistake the lattice does not need to prevent.
  */
-public class P2PUser extends ALatticeComponent<ACell> {
+public class P2PUser {
 
-	private final ALatticeCursor<ACell> nodeCursor;
+	private final P2PIdentity identity;
+	private final P2PNodeRecord node;
 	private final AccountKey userKey;
 
-	private P2PUser(ALatticeCursor<ACell> identityCursor, ALatticeCursor<ACell> nodeCursor,
-			AccountKey userKey) {
-		super(identityCursor);
-		this.nodeCursor = nodeCursor;
+	private P2PUser(P2PIdentity identity, P2PNodeRecord node, AccountKey userKey) {
+		this.identity=identity;
+		this.node=node;
 		this.userKey = userKey;
 	}
 
@@ -77,9 +80,42 @@ public class P2PUser extends ALatticeComponent<ACell> {
 		if (userKey == null) throw new IllegalArgumentException("User key must not be null");
 
 		return new P2PUser(
-			rootCursor.path(P2PLattice.KEY_ID, userKey, Keywords.VALUE),
-			rootCursor.path(P2PLattice.KEY_P2P, P2PLattice.KEY_NODES, userKey, Keywords.VALUE),
-			userKey);
+			new P2PIdentity(null,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
+			new P2PNodeRecord(null,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
+				userKey,Keywords.VALUE),userKey),userKey);
+	}
+
+	/**
+	 * Creates a user facade beneath a containing application component.
+	 * Persistence and other containing policy delegate through the parent.
+	 *
+	 * @param parent Containing application component
+	 * @param userKey P2P user key
+	 * @return Hosted P2P user facade
+	 */
+	public static P2PUser create(ALatticeComponent<?> parent, AccountKey userKey) {
+		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+		if (userKey==null) throw new IllegalArgumentException("User key must not be null");
+		ALatticeCursor<?> rootCursor=parent.cursor();
+		return new P2PUser(
+			new P2PIdentity(parent,rootCursor.path(P2PLattice.KEY_ID,userKey,Keywords.VALUE),userKey),
+			new P2PNodeRecord(parent,rootCursor.path(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES,
+				userKey,Keywords.VALUE),userKey),userKey);
+	}
+
+	/** Returns the path-specific identity component. */
+	public P2PIdentity identity() {
+		return identity;
+	}
+
+	/** Returns the path-specific node-record component. */
+	public P2PNodeRecord node() {
+		return node;
+	}
+
+	/** Compatibility shortcut for {@code identity().cursor()}. */
+	public ALatticeCursor<ACell> cursor() {
+		return identity.cursor();
 	}
 
 	/**
@@ -103,7 +139,7 @@ public class P2PUser extends ALatticeComponent<ACell> {
 	 * @return Cursor at this user's NodeInfo record
 	 */
 	public ALatticeCursor<ACell> nodeCursor() {
-		return nodeCursor;
+		return node.cursor();
 	}
 
 	/**
@@ -111,9 +147,8 @@ public class P2PUser extends ALatticeComponent<ACell> {
 	 *
 	 * @return The IdentityInfo map, or null if this user has published none
 	 */
-	@SuppressWarnings("unchecked")
 	public AHashMap<Keyword, ACell> getIdentity() {
-		return (AHashMap<Keyword, ACell>) cursor.get();
+		return identity.getIdentity();
 	}
 
 	/**
@@ -124,7 +159,7 @@ public class P2PUser extends ALatticeComponent<ACell> {
 	 * @throws IllegalStateException if no signing key is available in context
 	 */
 	public void setIdentity(AHashMap<Keyword, ACell> identity) {
-		cursor.set(identity);
+		this.identity.setIdentity(identity);
 	}
 
 	/**
@@ -137,7 +172,17 @@ public class P2PUser extends ALatticeComponent<ACell> {
 	 * @throws IllegalStateException if no signing key is available in context
 	 */
 	public void setIdentity(AString name, AVector<ACell> nodes, long timestamp) {
-		setIdentity(P2PLattice.createIdentity(name, nodes, null, timestamp));
+		identity.setIdentity(name,nodes,timestamp);
+	}
+
+	/** Synchronises identity changes to this facade's live parent path. */
+	public void sync() {
+		identity.sync();
+	}
+
+	/** Persists the current identity value without moving either cursor. */
+	public ACell persist() throws IOException {
+		return identity.persist();
 	}
 
 	/**
@@ -151,6 +196,6 @@ public class P2PUser extends ALatticeComponent<ACell> {
 	 * @return Forked P2PUser
 	 */
 	public P2PUser fork() {
-		return new P2PUser(cursor.fork(), nodeCursor, userKey);
+		return new P2PUser(identity.fork(),node,userKey);
 	}
 }

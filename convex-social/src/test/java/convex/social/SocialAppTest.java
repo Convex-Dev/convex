@@ -2,6 +2,7 @@ package convex.social;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
@@ -26,6 +28,21 @@ import convex.lattice.generic.OwnerLattice;
  * Tests for the cursor-based Social application API.
  */
 public class SocialAppTest {
+
+	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
+
+		private int persistCount;
+
+		TestRoot(KeyedLattice lattice) {
+			super(Cursors.createLattice(lattice));
+		}
+
+		@Override
+		protected <T extends ACell> T persist(T value) {
+			persistCount++;
+			return value;
+		}
+	}
 
 	@Test
 	public void testStandalonePostAndRead() {
@@ -218,6 +235,52 @@ public class SocialAppTest {
 	}
 
 	@Test
+	public void testComponentPersistenceDelegatesToContainingRoot() throws IOException {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		Social social=Social.connect(root,kp);
+		Feed feed=social.user(kp.getAccountKey()).feed();
+		feed.post("Persist through component parents");
+
+		Index<Blob, ACell> before=feed.cursor().get();
+		Index<Blob, ACell> persisted=feed.persist();
+
+		assertSame(before,persisted);
+		assertSame(before,feed.cursor().get());
+		assertEquals(1,root.persistCount);
+	}
+
+	@Test
+	public void testComponentConnectionInheritsRootContext() {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		root.cursor().setContext(LatticeContext.create(null,kp));
+		Social social=Social.connect(root);
+
+		social.user(kp.getAccountKey()).feed().post("Inherited context");
+
+		assertEquals(1,social.user(kp.getAccountKey()).feed().count());
+	}
+
+	@Test
+	public void testForkRetainsComponentPersistenceParent() throws IOException {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		Social social=Social.connect(root,kp);
+		Social fork=social.fork();
+		Feed forkFeed=fork.user(kp.getAccountKey()).feed();
+		forkFeed.post("Persisted but not synced");
+
+		forkFeed.persist();
+
+		assertEquals(1,root.persistCount);
+		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
+	}
+
+	@Test
 	public void testFeedAuthor() {
 		AKeyPair kp = AKeyPair.generate();
 		Social social = Social.create(kp);
@@ -379,14 +442,9 @@ public class SocialAppTest {
 
 		// But the SignedData is signed by Alice, not Bob
 		// Extract raw OwnerLattice map and verify the signer
-		@SuppressWarnings("unchecked")
-		AHashMap<ACell, ACell> ownerMap = (AHashMap<ACell, ACell>) social.cursor().get();
-		ACell bobEntry = ownerMap.get(bob.getAccountKey());
-		assertNotNull(bobEntry, "Forged entry exists in local state");
-		assertTrue(bobEntry instanceof SignedData<?>);
-
-		@SuppressWarnings("unchecked")
-		SignedData<Index<Keyword, ACell>> bobSigned = (SignedData<Index<Keyword, ACell>>) bobEntry;
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.cursor().get();
+		SignedData<Index<Keyword, ACell>> bobSigned = ownerMap.get(bob.getAccountKey());
+		assertNotNull(bobSigned, "Forged entry exists in local state");
 		assertEquals(alice.getAccountKey(), bobSigned.getAccountKey(),
 			"Forged entry is signed by Alice (the attacker), not Bob (the victim)");
 	}

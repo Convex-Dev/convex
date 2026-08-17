@@ -52,10 +52,12 @@ public class P2PNode implements Closeable {
 	private static final Logger log = LoggerFactory.getLogger(P2PNode.class.getName());
 
 	private final NodeServer<Index<Keyword, ACell>> server;
+	private final P2PApplication application;
 	private final AKeyPair keyPair;
 
 	private P2PNode(NodeServer<Index<Keyword, ACell>> server, AKeyPair keyPair) {
 		this.server = server;
+		this.application=P2PApplication.connect(server.getRootComponent());
 		this.keyPair = keyPair;
 	}
 
@@ -116,7 +118,7 @@ public class P2PNode implements Closeable {
 	 * @return View of that user's owned area
 	 */
 	public P2PUser p2p(AccountKey userKey) {
-		return P2PUser.create(server.getCursor(), userKey);
+		return application.p2p(userKey);
 	}
 
 	/**
@@ -167,7 +169,16 @@ public class P2PNode implements Closeable {
 	 * @return Root lattice cursor
 	 */
 	public ALatticeCursor<Index<Keyword, ACell>> getCursor() {
-		return server.getCursor();
+		return application.cursor();
+	}
+
+	/**
+	 * Gets the root-level P2P application component.
+	 *
+	 * @return P2P application hosted by this node
+	 */
+	public P2PApplication getApplication() {
+		return application;
 	}
 
 	/**

@@ -1,8 +1,11 @@
 package convex.node;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -45,11 +48,12 @@ import convex.peer.AConnectionManager;
  * a connection or address is already known, use {@link #addPeer(AccountKey, Convex)}
  * or {@link #addPeer(AccountKey, InetSocketAddress)}.
  *
- * <p>Each connection has this manager's {@link AStore} set on it and serves reverse
- * DATA_REQUEST messages only from that store. Registering a peer with this manager
- * is therefore an operator-granted read capability for data announced by the owning
- * propagator. The manager deliberately does not decide whether membership should be
- * public, verified or otherwise restricted; that is deployment policy.
+ * <p>When a key pair is configured, newly opened connections remain in a limbo set
+ * until challenge/response proves the expected remote identity. Limbo connections
+ * cannot participate in propagation and have no access to the manager's store. A
+ * successful challenge atomically promotes the connection to the active set, grants
+ * reverse DATA_REQUEST access and applies the trusted receive limit. Without a key
+ * pair, connections are admitted unverified as an explicit local policy choice.
  *
  * <p>Extends {@link AConnectionManager} for shared connection infrastructure.
  *
@@ -84,6 +88,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * reconnects peers whose connections have dropped.
 	 */
 	private final ConcurrentHashMap<AccountKey, DesiredPeer> desiredPeers = new ConcurrentHashMap<>();
+
+	/** Connections awaiting a successful identity challenge. */
+	private final ConcurrentHashMap<AccountKey, PendingConnection> pendingConnections = new ConcurrentHashMap<>();
+
+	/** Serialises admission, removal and replacement across pending and active maps. */
+	private final Object connectionLock = new Object();
 
 	/**
 	 * Store set on peer connections. Determines what data peers can resolve
@@ -141,12 +151,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 		this.untrustedMessageLimit = untrustedLimit;
 		this.trustedMessageLimit = trustedLimit;
 
-		// Apply a configuration change to existing remote connections without
-		// accidentally promoting a connection whose verified key does not match its slot.
-		connections.forEach((peerKey, convex) -> {
-			AccountKey verifiedKey = convex.getVerifiedPeer();
-			configureReceiveLimit(convex, verifiedKey != null && verifiedKey.equals(peerKey));
-		});
+		// Apply a configuration change to existing remote connections without racing
+		// promotion or accidentally granting a pending connection the trusted tier.
+		synchronized (connectionLock) {
+			connections.forEach((peerKey, convex) -> {
+				AccountKey verifiedKey = convex.getVerifiedPeer();
+				configureReceiveLimit(convex, verifiedKey != null && verifiedKey.equals(peerKey));
+			});
+			pendingConnections.forEach((peerKey, pending) -> configureReceiveLimit(pending.connection, false));
+		}
 	}
 
 	private static void validateMessageLimit(int limit) {
@@ -196,6 +209,20 @@ public class LatticeConnectionManager extends AConnectionManager {
 		log.debug("LatticeConnectionManager closed");
 	}
 
+	@Override
+	public void closeAllConnections() {
+		List<PendingConnection> pending;
+		synchronized (connectionLock) {
+			pending = new ArrayList<>(pendingConnections.values());
+			pendingConnections.clear();
+			super.closeAllConnections();
+		}
+		for (PendingConnection pc : pending) {
+			pc.admission.completeExceptionally(new IllegalStateException("Connection manager closed"));
+			closeSilently(pc.connection);
+		}
+	}
+
 	// ========== Peer Management ==========
 
 	/**
@@ -235,22 +262,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 *
 	 * @param peerKey AccountKey of the peer
 	 * @param convex Live connection to the peer
+	 * @return Future completed when the connection is admitted, or exceptionally
+	 *         when identity verification fails
 	 */
-	public void addPeer(AccountKey peerKey, Convex convex) {
+	public CompletableFuture<Convex> addPeer(AccountKey peerKey, Convex convex) {
 		if (peerKey == null || convex == null) {
 			log.warn("Attempted to add peer with null key or connection");
-			return;
+			return CompletableFuture.failedFuture(
+				new IllegalArgumentException("Peer key and connection must not be null"));
 		}
-		configureStoreAccess(convex);
-		AccountKey verifiedKey = convex.getVerifiedPeer();
-		boolean alreadyVerified = verifiedKey != null && verifiedKey.equals(peerKey);
-		configureReceiveLimit(convex, alreadyVerified);
-		AKeyPair kp = this.keyPair;
-		if (kp != null && !alreadyVerified) {
-			convex.setKeyPair(kp);
-			tryVerifyPeer(convex, peerKey);
-		}
-		connections.put(peerKey, convex);
 
 		InetSocketAddress addr = convex.getHostAddress();
 		if (addr != null) {
@@ -258,7 +278,85 @@ public class LatticeConnectionManager extends AConnectionManager {
 		} else {
 			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
 		}
-		log.debug("Added peer with connection: {} at {}", peerKey, addr);
+		return beginAdmission(peerKey, convex);
+	}
+
+	private CompletableFuture<Convex> beginAdmission(AccountKey peerKey, Convex convex) {
+		AccountKey verifiedKey = convex.getVerifiedPeer();
+		if (verifiedKey != null && !verifiedKey.equals(peerKey)) {
+			SecurityException failure = new SecurityException(
+				"Connection is verified as " + verifiedKey + ", not expected peer " + peerKey);
+			closeSilently(convex);
+			return CompletableFuture.failedFuture(failure);
+		}
+
+		AKeyPair kp = this.keyPair;
+		if (verifiedKey != null || kp == null) {
+			return admitConnection(peerKey, convex, verifiedKey != null);
+		}
+
+		configureLimbo(convex);
+		convex.setKeyPair(kp);
+		PendingConnection pending = new PendingConnection(convex);
+		PendingConnection replaced;
+		synchronized (connectionLock) {
+			if (!desiredPeers.containsKey(peerKey)) {
+				closeSilently(convex);
+				return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before verification"));
+			}
+			replaced = pendingConnections.put(peerKey, pending);
+		}
+		if (replaced != null && replaced.connection != convex) {
+			replaced.admission.completeExceptionally(new IllegalStateException("Connection replaced while awaiting verification"));
+			closeSilently(replaced.connection);
+		}
+
+		log.debug("Holding connection to {} in limbo pending identity verification", peerKey);
+		try {
+			CompletableFuture<AccountKey> verification = convex.verifyPeer(peerKey);
+			if (verification == null) throw new IllegalStateException("Peer verification returned no future");
+			verification.whenComplete((result, ex) -> {
+				try {
+					if (ex != null) {
+						failVerification(peerKey, pending, ex);
+					} else if (!peerKey.equals(result) || !peerKey.equals(convex.getVerifiedPeer())) {
+						failVerification(peerKey, pending,
+							new SecurityException("Peer failed identity challenge for " + peerKey));
+					} else {
+						promoteVerified(peerKey, pending);
+					}
+				} catch (Exception callbackFailure) {
+					failVerification(peerKey, pending, callbackFailure);
+				}
+			});
+		} catch (Exception startFailure) {
+			failVerification(peerKey, pending, startFailure);
+		}
+		return pending.admission;
+	}
+
+	private CompletableFuture<Convex> admitConnection(AccountKey peerKey, Convex convex, boolean trusted) {
+		Convex replaced;
+		PendingConnection pending;
+		synchronized (connectionLock) {
+			if (!desiredPeers.containsKey(peerKey)) {
+				closeSilently(convex);
+				return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before admission"));
+			}
+			configureStoreAccess(convex);
+			configureReceiveLimit(convex, trusted);
+			replaced = connections.put(peerKey, convex);
+			pending = pendingConnections.remove(peerKey);
+		}
+		if (replaced != null && replaced != convex) closeSilently(replaced);
+		if (pending != null && pending.connection != convex) {
+			pending.admission.completeExceptionally(new IllegalStateException("Connection replaced by admitted peer"));
+			closeSilently(pending.connection);
+		}
+		resetFailure(peerKey);
+		log.debug("Admitted {} connection to peer {} at {}", trusted ? "verified" : "unverified",
+			peerKey, convex.getHostAddress());
+		return CompletableFuture.completedFuture(convex);
 	}
 
 	/**
@@ -270,6 +368,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setDataRequestHandler(this::handleDataRequest);
+		}
+	}
+
+	/** Revokes manager-owned capabilities while a connection awaits admission. */
+	private void configureLimbo(Convex convex) {
+		configureReceiveLimit(convex, false);
+		if (convex instanceof AConvexConnected connected) {
+			connected.setDataRequestHandler(null);
 		}
 	}
 
@@ -300,11 +406,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void removePeer(AccountKey peerKey) {
 		if (peerKey == null) return;
-		desiredPeers.remove(peerKey);
-		Convex removed = connections.remove(peerKey);
+		Convex removed;
+		PendingConnection pending;
+		synchronized (connectionLock) {
+			desiredPeers.remove(peerKey);
+			removed = connections.remove(peerKey);
+			pending = pendingConnections.remove(peerKey);
+		}
 		if (removed != null) {
 			closeSilently(removed);
 			log.debug("Removed peer: {}", peerKey);
+		}
+		if (pending != null) {
+			pending.admission.completeExceptionally(new IllegalStateException("Peer removed while awaiting verification"));
+			closeSilently(pending.connection);
+			log.debug("Removed pending peer: {}", peerKey);
 		}
 	}
 
@@ -372,6 +488,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return running;
 	}
 
+	/**
+	 * Returns the number of open connections awaiting identity verification.
+	 * These connections are not visible to propagation and cannot serve store data.
+	 */
+	public int getPendingConnectionCount() {
+		return pendingConnections.size();
+	}
+
+	/** Returns true when a peer connection is held in verification limbo. */
+	public boolean isVerificationPending(AccountKey peerKey) {
+		return peerKey != null && pendingConnections.containsKey(peerKey);
+	}
+
 	// ========== Maintenance Loop ==========
 
 	private void maintenanceLoop() {
@@ -396,6 +525,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	void maintainConnections() {
 		pruneDeadConnections();
+		pruneDeadPendingConnections();
 
 		long now = System.currentTimeMillis();
 
@@ -403,7 +533,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			AccountKey peerKey = entry.getKey();
 			DesiredPeer desired = entry.getValue();
 
-			if (connections.containsKey(peerKey)) continue;
+			synchronized (connectionLock) {
+				if (connections.containsKey(peerKey) || pendingConnections.containsKey(peerKey)) continue;
+			}
 			if (now < desired.nextRetryTime) continue;
 
 			InetSocketAddress target = resolveTransport(desired);
@@ -414,20 +546,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 				// after connect would leave a race in which the remote endpoint could send a
 				// protocol-sized frame before its identity challenge has even started.
 				Convex convex = ConvexRemote.connect(target, untrustedMessageLimit);
-				configureStoreAccess(convex);
-				AKeyPair kp = this.keyPair;
-				if (kp != null) {
-					convex.setKeyPair(kp);
-					tryVerifyPeer(convex, peerKey);
+				synchronized (connectionLock) {
+					if (desiredPeers.get(peerKey) != desired) {
+						closeSilently(convex);
+						continue;
+					}
 				}
-				connections.put(peerKey, convex);
-				desired.failCount = 0;
-				desired.nextRetryTime = 0;
-				log.info("Connected to peer {} at {} (verified={})",
-					peerKey, target, convex.getVerifiedPeer() != null);
+				beginAdmission(peerKey, convex);
+				log.debug("Opened connection to peer {} at {}; awaiting admission", peerKey, target);
 			} catch (Exception e) {
-				desired.failCount++;
-				desired.nextRetryTime = now + calculateBackoff(desired.failCount);
+				recordFailure(desired, now);
 				log.debug("Failed to connect to peer {} (attempt {}): {}",
 					peerKey, desired.failCount, e.getMessage());
 			}
@@ -467,19 +595,73 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Verification ==========
 
-	private void tryVerifyPeer(Convex convex, AccountKey peerKey) {
-		convex.verifyPeer(peerKey).whenComplete((result, ex) -> {
-			if (result != null) {
-				// verifyPeer(expectedKey) has validated the signed response and stored the
-				// verified key on this exact connection. Only now may it use the larger tier.
-				configureReceiveLimit(convex, result.equals(peerKey));
-				log.debug("Verified peer: {} at {}", peerKey, convex.getHostAddress());
-			} else if (ex != null) {
-				log.debug("Peer verification not available for {}: {}", peerKey, ex.getMessage());
-			} else {
-				log.debug("Peer verification failed for {}", peerKey);
+	private void promoteVerified(AccountKey peerKey, PendingConnection pending) {
+		Convex replaced;
+		synchronized (connectionLock) {
+			if (pendingConnections.get(peerKey) != pending || !desiredPeers.containsKey(peerKey)
+					|| !pending.connection.isConnected()) {
+				failVerification(peerKey, pending,
+					new IllegalStateException("Verified connection is no longer eligible for admission"));
+				return;
 			}
-		});
+			configureStoreAccess(pending.connection);
+			configureReceiveLimit(pending.connection, true);
+			replaced = connections.put(peerKey, pending.connection);
+			pendingConnections.remove(peerKey, pending);
+		}
+		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
+		resetFailure(peerKey);
+		pending.admission.complete(pending.connection);
+		log.info("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
+	}
+
+	private void failVerification(AccountKey peerKey, PendingConnection pending, Throwable failure) {
+		boolean removed;
+		DesiredPeer desired;
+		synchronized (connectionLock) {
+			removed = pendingConnections.remove(peerKey, pending);
+			desired = removed ? desiredPeers.get(peerKey) : null;
+		}
+		if (!removed) return;
+		pending.admission.completeExceptionally(failure);
+		closeSilently(pending.connection);
+		if (desired != null) recordFailure(desired, System.currentTimeMillis());
+		log.debug("Rejected peer {} after failed identity challenge: {}", peerKey, failure.getMessage());
+	}
+
+	private void pruneDeadPendingConnections() {
+		for (Map.Entry<AccountKey, PendingConnection> entry : pendingConnections.entrySet()) {
+			PendingConnection pending = entry.getValue();
+			if (!pending.connection.isConnected()) {
+				failVerification(entry.getKey(), pending,
+					new IllegalStateException("Connection closed while awaiting identity verification"));
+			}
+		}
+	}
+
+	private void resetFailure(AccountKey peerKey) {
+		DesiredPeer desired = desiredPeers.get(peerKey);
+		if (desired == null) return;
+		synchronized (desired) {
+			desired.failCount = 0;
+			desired.nextRetryTime = 0;
+		}
+	}
+
+	private static void recordFailure(DesiredPeer desired, long now) {
+		synchronized (desired) {
+			desired.failCount++;
+			desired.nextRetryTime = now + calculateBackoff(desired.failCount);
+		}
+	}
+
+	private static final class PendingConnection {
+		final Convex connection;
+		final CompletableFuture<Convex> admission = new CompletableFuture<>();
+
+		PendingConnection(Convex connection) {
+			this.connection = connection;
+		}
 	}
 
 	// ========== DesiredPeer ==========
@@ -495,8 +677,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 		public final AString version;
 		public final long timestamp;
 
-		int failCount = 0;
-		long nextRetryTime = 0;
+		volatile int failCount = 0;
+		volatile long nextRetryTime = 0;
 
 		private DesiredPeer(AccountKey peerKey, AVector<AString> transports,
 				AString type, AString version, long timestamp) {

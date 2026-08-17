@@ -49,6 +49,7 @@ import convex.core.data.Vectors;
 import convex.lattice.ALattice;
 import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.RootComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -62,7 +63,7 @@ import convex.peer.Config;
  *
  * This server handles binary protocol communication for syncing lattice values
  * with other nodes in the network. It provides a lightweight alternative to
- * the full Peer Server, focused specifically on lattice value synchronization.
+ * the full Peer Server, focused specifically on lattice value synchronisation.
  *
  * The server uses the binary protocol (VLQ-encoded message lengths followed by
  * message data) to exchange and merge lattice values with peer nodes.
@@ -76,7 +77,7 @@ import convex.peer.Config;
  * Features:
  * - Automatic delta-based broadcasting of lattice updates to peers
  * - Efficient novelty detection using store announcement mechanism
- * - Manual sync capabilities for on-demand synchronization
+ * - Manual sync capabilities for on-demand synchronisation
  * - Support for hierarchical lattice paths
  *
  * @param <V> The type of lattice values managed by this node server
@@ -99,6 +100,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Cursor for the current local lattice value
 	 */
 	private final RootLatticeCursor<V> cursor;
+
+	/** Generic application root owned by this server. */
+	private final RootComponent<V> rootComponent;
+	/** True once this server has installed and frozen its root publication policy. */
+	private boolean rootPublicationConfigured;
 
 	/**
 	 * Network server instance for handling connections
@@ -243,7 +249,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.inboundQueue = new ArrayBlockingQueue<>(this.config.getInboundQueueSize());
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
-		this.cursor = Cursors.createLattice(lattice);
+		this.mergeContext = LatticeContext.EMPTY.withMaxFutureTimestampSkew(
+			this.config.getMaxFutureTimestampSkew());
+		this.cursor = Cursors.createLattice(lattice, lattice.zero(), mergeContext);
+		this.rootComponent = new RootComponent<>(cursor,store);
 
 		// Hook sync callback: synchronous publication on the primary propagator,
 		// async fan-out to secondaries.
@@ -260,22 +269,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// The returned (announced/store-backed) value is CASed back into the
 		// cursor by RootLatticeCursor.sync(), with lattice-merge fallback if a
 		// concurrent app write changed the cursor during the announce.
-		this.cursor.onSync(value -> {
-			if (propagators.isEmpty()) return value;
-			ACell announced;
-			try {
-				announced = propagators.get(0).processSnapshot(value);
-			} catch (IOException e) {
-				throw new StoreException("NodeServer sync failed: persistence error", e);
-			}
-			for (int i = 1; i < propagators.size(); i++) {
-				propagators.get(i).triggerBroadcast(value);
-			}
-			@SuppressWarnings("unchecked")
-			V typed = (V) announced;
-			return typed;
-		});
-
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;
 
@@ -338,6 +331,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 				}
 				LatticePropagator primary = new LatticePropagator(store, connectionManager);
 				propagators.add(primary);
+			}
+
+			// The application root uses local store publication before launch. Once the
+			// primary exists, atomically install and freeze the network host policy.
+			if (!rootPublicationConfigured) {
+				rootComponent.setPublicationPolicy(this::publishApplicationRoot);
+				rootComponent.freezePublicationPolicy();
+				rootPublicationConfigured=true;
 			}
 
 			for (int i = 0; i < propagators.size(); i++) {
@@ -1835,6 +1836,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
+	 * Gets the generic root component for applications hosted by this server.
+	 *
+	 * <p>Application branches should attach to this component rather than depend
+	 * on NodeServer directly. Persistence delegates to the server's primary store;
+	 * syncing the component publishes through the root cursor's normal pipeline.</p>
+	 *
+	 * @return Root application component
+	 */
+	public RootComponent<V> getRootComponent() {
+		return rootComponent;
+	}
+
+	/**
 	 * Sets the merge context used for all lattice merge operations.
 	 * The context carries signing keys and owner verification through the
 	 * lattice hierarchy (e.g. OwnerLattice, SignedLattice).
@@ -1854,9 +1868,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public synchronized void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
 		requireNewLifecycle("setMergeContext");
-		this.mergeContext = context;
+		long configuredSkew=config.getMaxFutureTimestampSkew();
+		long effectiveSkew=config.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
+			?configuredSkew:context.getMaxFutureTimestampSkew(configuredSkew);
+		this.mergeContext = context.withMaxFutureTimestampSkew(effectiveSkew);
 		// Propagate to lattice cursor so path-navigated cursors inherit it
-		cursor.setContext(context);
+		cursor.setContext(mergeContext);
 	}
 
 	/**
@@ -1972,7 +1989,29 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public synchronized void addPropagator(LatticePropagator propagator) {
 		if (propagator == null) throw new IllegalArgumentException("Propagator must not be null");
 		requireNewLifecycle("addPropagator");
+		if (propagators.isEmpty() && propagator.getStore()!=store) {
+			throw new IllegalArgumentException(
+				"Primary propagator must use the NodeServer host store");
+		}
 		propagators.add(propagator);
+	}
+
+	private V publishApplicationRoot(V value) {
+		if (propagators.isEmpty()) {
+			throw new IllegalStateException("NodeServer has no primary publication pipeline");
+		}
+		ACell announced;
+		try {
+			announced=propagators.get(0).processSnapshot(value);
+		} catch (IOException e) {
+			throw new StoreException("NodeServer sync failed: persistence error",e);
+		}
+		for (int i=1; i<propagators.size(); i++) {
+			propagators.get(i).triggerBroadcast(value);
+		}
+		@SuppressWarnings("unchecked")
+		V typed=(V)announced;
+		return typed;
 	}
 
 	/**

@@ -53,19 +53,26 @@ public class DLFSNode {
 	 * side is kept unchanged; names present on both are merged recursively. No instrumentation —
 	 * a purely-live change can never be a tombstone conflict, so the live merge needs none.
 	 */
-	private static final MergeFunction<AVector<ACell>> CHILD_MERGE = new MergeFunction<AVector<ACell>>() {
+	private static final class ChildMerge implements MergeFunction<AVector<ACell>> {
+		private final long maximumTimestamp;
+
+		private ChildMerge(long maximumTimestamp) {
+			this.maximumTimestamp=maximumTimestamp;
+		}
+
 		@Override
 		public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
 			if (cb==null) return ca;
-			if (!isValidNodeShallow(cb)) throw new IllegalArgumentException("Malformed foreign DLFS child");
-			if (ca==null) {
-				if (!isValidTree(cb)) throw new IllegalArgumentException("Malformed foreign DLFS subtree");
-				return cb;
+			if (!isValidNodeShallow(cb) || getUTime(cb).longValue()>maximumTimestamp) {
+				throw new IllegalArgumentException("Malformed or future-dated foreign DLFS child");
 			}
+			if (ca==null) return cb;
 			if (!isValidNodeShallow(ca)) throw new IllegalArgumentException("Malformed own DLFS child");
-			return DLFSNode.merge(ca,cb);
+			return DLFSNode.merge(ca,cb,this);
 		}
-	};
+	}
+
+	private static final ChildMerge UNBOUNDED_CHILD_MERGE=new ChildMerge(Long.MAX_VALUE);
 
 
 	
@@ -499,9 +506,29 @@ public class DLFSNode {
 	 * @return Merged node
 	 */
 	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b) {
+		return merge(a,b,Long.MAX_VALUE);
+	}
+
+	/**
+	 * Merges two nodes while refusing incoming updates beyond a host-supplied
+	 * timestamp bound. Validation is deliberately limited to the merge frontier;
+	 * conforming DLFS writers maintain descendant timestamps no later than their
+	 * ancestors.
+	 */
+	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b, long maximumTimestamp) {
+		ChildMerge childMerge=(maximumTimestamp==Long.MAX_VALUE)
+			?UNBOUNDED_CHILD_MERGE:new ChildMerge(maximumTimestamp);
+		return merge(a,b,childMerge);
+	}
+
+	private static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b, ChildMerge childMerge) {
+		long maximumTimestamp=childMerge.maximumTimestamp;
 		if (a.equals(b)) return a;
 		CVMLong timeA=getUTime(a);
 		CVMLong timeB=getUTime(b);
+		if (timeB.longValue()>maximumTimestamp) {
+			throw new IllegalArgumentException("Future-dated foreign DLFS node");
+		}
 
 		// Deterministic merge time: max of input node timestamps
 		CVMLong mergeTime = timeA.longValue() >= timeB.longValue() ? timeA : timeB;
@@ -520,7 +547,7 @@ public class DLFSNode {
 			}
 
 			// Live-entry merge needs no instrumentation: a purely-live change is never a conflict.
-			Index<AString, AVector<ACell>> mergedDir = contA.mergeDifferences(contB, CHILD_MERGE);
+			Index<AString, AVector<ACell>> mergedDir = contA.mergeDifferences(contB, childMerge);
 
 			// Common case: no deletions anywhere, so no live-vs-dead conflict is possible.
 			if (tombA.isEmpty() && tombB.isEmpty()) {
@@ -536,6 +563,9 @@ public class DLFSNode {
 			Index<AString, CVMLong> mergedTomb = tombA.mergeDifferences(tombB, new MergeFunction<CVMLong>() {
 				@Override
 				public CVMLong merge(CVMLong ta, CVMLong tb) {
+					if (tb!=null && tb.longValue()>maximumTimestamp) {
+						throw new IllegalArgumentException("Future-dated foreign DLFS tombstone");
+					}
 					if (ta==null) return tb;
 					if (tb==null) return ta;
 					return ta.longValue()>=tb.longValue()?ta:tb;

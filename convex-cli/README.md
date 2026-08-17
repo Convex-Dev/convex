@@ -333,7 +333,7 @@ convex transact "(create-peer 0x7e66429ca... 1000000000000)" -a 11 --key 021efb
 ### 3. Start the Peer
 
 ```bash
-convex peer start --peer-key 7e66429ca --port 18888
+convex peer start --peer-key 7e66429ca --peer-port 18888
 ```
 
 ### Peer Options
@@ -341,20 +341,20 @@ convex peer start --peer-key 7e66429ca --port 18888
 ```bash
 convex peer start \
   --peer-key 7e66429ca \
-  --port 18888 \
-  --bind 0.0.0.0 \
-  --api-port 8080 \
-  --state /var/convex/state
+  --peer-port 18888 \
+  --api-port 8080
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--peer-key` | Public key of peer's key pair |
-| `--port` | Binary protocol port (default: 18888) |
-| `--bind` | Bind address (default: localhost) |
+| `--peer-port` | Local port for the peer to listen on (default: 18888; 0 for a random port) |
 | `--api-port` | REST API port (default: 8080) |
 | `--no-tray` | Disable the system tray icon |
-| `--state` | Directory for persistent state |
+| `-c, --config` | Peer configuration file (JSON5) |
+
+The peer's Etch store location is configured with the `peer.store` key in the
+JSON5 configuration file (see below), not a command-line option.
 
 ### Encrypted Etch v3 stores
 
@@ -427,6 +427,8 @@ convex
     list      List keys in keystore
     import    Import key from mnemonic/seed
     export    Export key
+    sign      Sign data using a key from the store
+    delete    Delete key(s) from the keystore
 
   eval        Evaluate Convex Lisp (local instance by default)
   repl        Interactive Convex Lisp REPL
@@ -437,11 +439,29 @@ convex
 
   local       Local test network
     start     Start local network
+    gui       Start local network with the peer manager GUI
 
   peer        Peer operations
     start     Start a peer node
     genesis   Create genesis peer
     create    Create peer on network
+    list      List peers in current store
+    backup    Backup stored data for a peer
+
+  etch        Manage an Etch database
+    dump      Dump Etch data to an exported format (CSV by default)
+    info      Show summary data about the Etch database
+    read      Read data values from the Etch store
+    write     Write data values to the Etch store
+    clear     Clear the Etch root data (does not collect garbage)
+    validate  Strictly validate an Etch store offline
+    gc        Garbage collect an Etch store
+    migrate   Migrate a source Etch store into a destination store
+    repair    Repair a possibly corrupt Etch store into a fresh file
+    recover   Run GC recovery for an Etch store file
+
+  dlfs        Operate a DLFS (Data Lattice File System) server
+    start     Start a DLFS WebDAV server with lattice replication
 
   desktop     Launch GUI application
 

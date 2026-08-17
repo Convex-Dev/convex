@@ -26,6 +26,8 @@ import convex.lattice.generic.IndexLattice;
  * - Conflicts are resolved by timestamp (newer wins)
  */
 public class DLFSLattice extends ALattice<AVector<ACell>> {
+	/** Default accepted lead over the receiving host's clock. */
+	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
 
 	/**
 	 * Singleton instance of DLFSLattice
@@ -47,7 +49,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 	public AVector<ACell> merge(AVector<ACell> ownValue, AVector<ACell> otherValue) {
 		// Handle null cases
 		if (ownValue == null) {
-			return DLFSNode.isValidTree(otherValue) ? otherValue : zero();
+			return DLFSNode.isValidNodeShallow(otherValue) ? otherValue : null;
 		}
 		if (otherValue == null) {
 			return ownValue;
@@ -63,10 +65,12 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public AVector<ACell> merge(LatticeContext context, AVector<ACell> ownValue, AVector<ACell> otherValue) {
-		// Context timestamp is not used for DLFS merge — the merge is deterministic from
-		// the input nodes — so this behaves identically to the no-context overload.
+		if (context==null) context=LatticeContext.EMPTY;
+		long now=context.currentTimestampValue();
+		long skew=context.getMaxFutureTimestampSkew(DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
+		long maximumTimestamp=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
 		if (ownValue == null) {
-			return DLFSNode.isValidTree(otherValue) ? otherValue : zero();
+			return isAcceptableRoot(otherValue,maximumTimestamp) ? otherValue : null;
 		}
 		if (otherValue == null) {
 			return ownValue;
@@ -74,7 +78,12 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		if (Utils.equals(ownValue, otherValue)) {
 			return ownValue;
 		}
-		return safeMerge(ownValue, otherValue);
+		return safeMerge(ownValue, otherValue,maximumTimestamp);
+	}
+
+	private boolean isAcceptableRoot(AVector<ACell> value, long maximumTimestamp) {
+		return DLFSNode.isValidNodeShallow(value)
+			&& DLFSNode.getUTime(value).longValue()<=maximumTimestamp;
 	}
 
 	/**
@@ -100,6 +109,16 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 		}
 	}
 
+	private AVector<ACell> safeMerge(AVector<ACell> own, AVector<ACell> other,
+			long maximumTimestamp) {
+		if (!isAcceptableRoot(other,maximumTimestamp)) return own;
+		try {
+			return DLFSNode.merge(own, other, maximumTimestamp);
+		} catch (RuntimeException | StackOverflowError e) {
+			return own;
+		}
+	}
+
 	@Override
 	public AVector<ACell> zero() {
 		// Zero value is an empty directory
@@ -108,7 +127,7 @@ public class DLFSLattice extends ALattice<AVector<ACell>> {
 
 	@Override
 	public boolean checkForeign(AVector<ACell> value) {
-		return DLFSNode.isValidTree(value);
+		return DLFSNode.isValidNodeShallow(value);
 	}
 
 	@Override

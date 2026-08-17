@@ -25,6 +25,7 @@ public class DLFileChannel implements SeekableByteChannel {
 	private boolean isOpen=true;
 	private boolean readOnly=true;
 	private long position=0;
+	private int bytesUntilPersist=DLFileSystem.BLOB_PERSIST_INTERVAL;
 	private DLPath path;
 	private DLFileSystem fileSystem;
 	
@@ -100,31 +101,39 @@ public class DLFileChannel implements SeekableByteChannel {
 		// Coordinate writes from distinct channels with filesystem-level mutations.
 		synchronized(fileSystem) {
 			checkOpen();
-			long pos=position;
-			AVector<ACell> node=getNode();
-			ABlob data = DLFSNode.getData(node);
-			if (data==null) throw new NoSuchFileException(path.toString());
-			
-			if (data.count()<pos) {
-				// extend file with zeros to start at new position
-				// Sparse zero blob uses structural sharing, so this is cheap
-				data=data.append(Blobs.createZero(pos-data.count()));
+			int written=src.remaining();
+			while (src.hasRemaining()) {
+				int n=Math.min(src.remaining(),bytesUntilPersist);
+				ByteBuffer part=src.slice();
+				part.limit(n);
+				Blob blob=Blob.fromByteBuffer(part);
+
+				long pos=position;
+				AVector<ACell> node=getNode();
+				ABlob data=DLFSNode.getData(node);
+				if (data==null) throw new NoSuchFileException(path.toString());
+				if (data.count()<pos) {
+					// Sparse zero blob uses structural sharing, so this is cheap.
+					data=data.append(Blobs.createZero(pos-data.count()));
+				}
+
+				ABlob newData=data.replaceSlice(pos,blob);
+				boolean persist=(n==bytesUntilPersist);
+				if (persist) newData=fileSystem.persistBlob(newData);
+
+				if (newData!=data) {
+					AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA,newData)
+						.assoc(DLFSNode.POS_UTIME,fileSystem.getTimestamp());
+					updateNode(newNode);
+				}
+
+				position=pos+n;
+				src.position(src.position()+n);
+				bytesUntilPersist=persist
+					? DLFileSystem.BLOB_PERSIST_INTERVAL
+					: bytesUntilPersist-n;
 			}
-			
-			Blob b=Blob.fromByteBuffer(src);
-			long n=b.count();
-			ABlob newData=data.replaceSlice(pos,b);
-			
-			// position after replaced slice
-			position=pos+n;
-			
-			if (newData!=data) {
-				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData)
-					.assoc(DLFSNode.POS_UTIME,fileSystem.getTimestamp());
-				updateNode(newNode);
-			}
-			
-			return (int)n;
+			return written;
 		}
 	}
 

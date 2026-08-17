@@ -3,6 +3,7 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.function.BiPredicate;
 
@@ -107,5 +108,15 @@ public class LatticeContextTest {
 			.withSigningKey(null)
 			.withOwnerVerifier(null);
 		assertSame(LatticeContext.EMPTY, empty);
+	}
+
+	@Test
+	public void testFutureTimestampSkewPolicyIsImmutableAndValidated() {
+		LatticeContext original=LatticeContext.create(CVMLong.create(1000),null);
+		LatticeContext configured=original.withMaxFutureTimestampSkew(30_000L);
+		assertEquals(30_000L,configured.getMaxFutureTimestampSkew(1L));
+		assertEquals(1L,original.getMaxFutureTimestampSkew(1L));
+		assertSame(original.getTimestamp(),configured.getTimestamp());
+		assertThrows(IllegalArgumentException.class,()->original.withMaxFutureTimestampSkew(-1L));
 	}
 }

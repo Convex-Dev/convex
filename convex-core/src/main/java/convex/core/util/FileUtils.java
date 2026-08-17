@@ -114,20 +114,12 @@ public class FileUtils {
 	}
 	
 	/**
-	 * Gets the absolute Pile for a given file name. Interprets leading "~" as user home directory.
+	 * Gets the absolute path for a given file name. Interprets leading "~" as user home directory.
 	 * @param pathName Path as a string
 	 * @return Path instance representing the given absolute path
 	 */
 	public static Path getPath(String pathName) {
-		if (pathName.startsWith("~")) {
-			pathName=System.getProperty("user.home")+pathName.substring(1);
-		} else {
-			// ensure an absolute path
-			if (!pathName.startsWith(File.separator)) {
-				pathName=File.separator+pathName;
-			}
-		}
-		return new File(pathName).toPath();
+		return getFile(pathName).toPath();
 	}
 
 

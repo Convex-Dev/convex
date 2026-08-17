@@ -26,8 +26,8 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public class Follows extends ALatticeComponent<AHashMap<ACell, ACell>> {
 
-	Follows(ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
-		super(cursor);
+	Follows(SocialUser parent, ALatticeCursor<AHashMap<ACell, ACell>> cursor) {
+		super(parent,cursor);
 	}
 
 	/**

@@ -4,13 +4,16 @@ Authentication and authorisation for the DLFS MCP and WebDAV endpoints.
 
 ## Authentication
 
-DLFS uses Ed25519 JWT bearer tokens for identity. When a key pair is provided
-to `DLFSServer.create()`, the `AuthMiddleware` extracts the caller's DID from
-the `Authorization: Bearer <jwt>` header on every request.
+DLFS uses Ed25519 JWT bearer tokens for identity. When a `PeerAuth` policy is
+provided to `DLFSServer.createAuthenticated()`, the `AuthMiddleware` extracts
+the caller's DID from the `Authorization: Bearer <jwt>` header on every request.
+`createWithAudience(routes, keyPair)` is a convenience for the common
+did:key-audience policy.
 
-Each authenticated user gets their own drive namespace. Anonymous callers
-(no token) share a separate anonymous namespace. The same identity model
-applies to both WebDAV and MCP endpoints.
+`DLFSDriveManager.createRouter()` maps authenticated identities, and optionally
+anonymous requests, to owner-scoped lattice components. Unmounted identities fail
+closed. Explicitly ephemeral managers instead provide detached namespaces. The
+same identity model applies to both WebDAV and MCP endpoints.
 
 ### JWT Format
 
@@ -31,8 +34,8 @@ By default, each user has full access to their own drives. No UCAN or
 capability token is needed — the caller's DID (from the JWT) is used to
 resolve drives in the `DLFSDriveManager`.
 
-Supplying a server key pair enables `requireAuthForWrites` for both WebDAV and MCP
-by default. Mutating WebDAV operations (PUT, DELETE, MKCOL, MOVE, COPY) return 401
+Supplying an authentication policy enables `requireAuthForWrites` for both WebDAV
+and MCP by default. Mutating WebDAV operations (PUT, DELETE, MKCOL, MOVE, COPY) return 401
 without a valid JWT; mutating MCP tools return an authentication error. Applications
 can configure both surfaces together with `DLFSServer.setRequireAuthForWrites(...)`
 before starting the server.

@@ -40,7 +40,7 @@ public class DescendedCursor<P extends ACell, V extends ACell> extends ALatticeC
 	DescendedCursor(ALatticeCursor<P> parent, ACell[] keys, int start, int end, ALattice<V> lattice, LatticeContext context) {
 		super(lattice, context, null);
 		this.parent = parent;
-		this.pathKeys = (start == 0 && end == keys.length) ? keys : copyRange(keys, start, end);
+		this.pathKeys=copyRange(keys,start,end);
 		this.pathCursor = new PathCursor<>(parent, pathKeys, parent.getLattice());
 	}
 

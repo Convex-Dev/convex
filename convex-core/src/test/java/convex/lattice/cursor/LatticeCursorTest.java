@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,6 +40,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
@@ -49,6 +52,22 @@ import convex.lattice.kv.KVDatabase;
  * These tests serve as usage examples for the lattice cursor API.
  */
 public class LatticeCursorTest {
+
+	@Test
+	public void testDescendedCursorOwnsPathArray() {
+		KeyedLattice lattice=KeyedLattice.create(
+			Keywords.FOO,MaxLattice.INSTANCE,
+			Keywords.BAR,MaxLattice.INSTANCE);
+		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(lattice);
+		ACell[] path={Keywords.FOO};
+		ALatticeCursor<AInteger> cursor=root.path(path);
+		path[0]=Keywords.BAR;
+
+		cursor.set(CVMLong.create(3));
+
+		assertEquals(CVMLong.create(3),root.get().get(Keywords.FOO));
+		assertNull(root.get().get(Keywords.BAR));
+	}
 
 	// ===== Standard cursor operation tests =====
 
@@ -65,6 +84,33 @@ public class LatticeCursorTest {
 		RootLatticeCursor<AInteger> root = Cursors.createLattice(lattice, null);
 		ALatticeCursor<AInteger> fork = root.fork();
 		doIntCursorTest(fork);
+	}
+
+	/**
+	 * A completed update on a long-lived fork must be visible when another thread
+	 * creates a fresh cursor on that same fork. The futures provide the
+	 * cross-thread hand-off without relying on timing.
+	 */
+	@Test
+	public void testForkPathReadAfterCommitAcrossThreads() throws Exception {
+		MapLattice<Keyword,ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
+		RootLatticeCursor<AHashMap<Keyword,ASet<CVMLong>>> root =
+				Cursors.createLattice(lattice, Maps.empty());
+		ALatticeCursor<AHashMap<Keyword,ASet<CVMLong>>> fork = root.fork();
+
+		try (ExecutorService writer = Executors.newSingleThreadExecutor();
+				ExecutorService reader = Executors.newSingleThreadExecutor()) {
+			for (long i = 1; i <= 1_000; i++) {
+				CVMLong committed = CVMLong.create(i);
+				writer.submit(() -> fork.<ASet<CVMLong>>path(Keywords.FOO)
+						.updateAndGet(values -> values.include(committed))).get();
+
+				ASet<CVMLong> observed = reader.submit(() ->
+						fork.<ASet<CVMLong>>path(Keywords.FOO).get()).get();
+				assertTrue(observed.contains(committed),
+						() -> "Fresh cursor did not observe completed update " + committed);
+			}
+		}
 	}
 
 	/**

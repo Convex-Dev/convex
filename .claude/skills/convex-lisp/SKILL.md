@@ -103,6 +103,11 @@ network still at version 0 differs:
 - quasiquote of a set or map containing an unquote yields a call form, `~false`
   does not unquote, `define` evaluates its value twice, and `call` with too
   many arguments silently does nothing
+- `dotimes`, `for`, `for-loop` and `switch` can capture user variables in their
+  expansions (#602) — v1 rebinds them hygienically
+- `gensym`, `cat` and `splice` do not exist (`:UNDECLARED`), and `char?` fails
+  `:CAST` rather than `:UNDECLARED` — it is installed but version-gated, so do
+  not read its pre-v1 failure as a missing function
 
-If you hit one of these, it is a known genesis bug fixed by v1 — not something
+If you hit one of these, it is a known genesis gap fixed by v1 — not something
 to work around in new code.

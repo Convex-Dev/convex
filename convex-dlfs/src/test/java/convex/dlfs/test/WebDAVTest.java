@@ -33,7 +33,7 @@ public class WebDAVTest {
 
 	@BeforeAll
 	static void setUp() {
-		server = DLFSServer.create(null);
+		server = DLFSServer.createEphemeral();
 		server.getDriveManager().createDrive(null, "webdav");
 		server.start(0);
 		baseURL = "http://localhost:" + server.getPort() + "/dlfs/";

@@ -27,10 +27,9 @@ import convex.peer.API;
 import convex.peer.Server;
 
 /**
- * Benchmark for applying transactions to CVM state. This is measuring the end-to-end time for processing
- * transactions themselves on the CVM.
- *
- * Skips stuff around transactions, block overhead, signatures etc.
+ * Benchmark for transactions and queries submitted through a local in-process
+ * peer, measuring end-to-end confirmation time including block handling and
+ * signatures.
  */
 public class LocalPeerBenchmark {
 

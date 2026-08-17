@@ -9,11 +9,21 @@ Performance benchmarking suite for [Convex](https://convex.world) using the JMH 
 | Benchmark | Description |
 |-----------|-------------|
 | `CVMBenchmark` | Convex Virtual Machine execution performance |
+| `CVMQueryBenchmark` | CVM query evaluation throughput and thread scaling (standalone probe, not JMH) |
+| `EvalBenchmark` | CVM evaluation of compiled forms |
+| `OpBenchmark` | Execution of low-level CVM ops |
+| `BigBlockBenchmark` | Applying a large block of signed transactions to state |
+| `MapBenchmark` | Immutable map update operations |
+| `ListDataBenchmark` | Immutable list append operations |
+| `EncodingBenchmark` | Data encoding and decoding |
+| `ReaderBenchmark` | Convex Lisp reader parsing performance |
 | `EtchBenchmark` | Etch database read/write throughput |
 | `EtchConcurrentBenchmark` | Fixed-work concurrent Etch throughput and reopen verification |
 | `HashBenchmark` | Cryptographic hashing operations |
 | `SignatureBenchmark` | Ed25519 signature generation and verification |
-| `DataStructureBenchmark` | Immutable data structure operations |
+| `LatencyBenchmark` | Round-trip transaction latency on a small local peer network |
+| `LocalPeerBenchmark` | Transactions and queries through a local in-process peer |
+| `ThreadCoordinationBenchmark` | Inter-thread queue handoff overhead |
 
 ## Running Benchmarks
 

@@ -7,6 +7,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
@@ -41,9 +42,10 @@ public class DLFSWebDAV {
 	/** Maximum children returned by one PROPFIND response. */
 	public static final int MAX_DIRECTORY_ENTRIES = 10_000;
 
-	private static final String ROUTE = "/dlfs/";
-	private static final String ROUTE_BARE = "/dlfs";
-	private static final String ROUTE_PATH = ROUTE + "<path>";
+	/** Canonical WebDAV mount path, including its trailing slash. */
+	public static final String MOUNT_PATH = "/dlfs/";
+	private static final String ROUTE_BARE = MOUNT_PATH.substring(0, MOUNT_PATH.length() - 1);
+	private static final String ROUTE_PATH = MOUNT_PATH + "<path>";
 
 	private final DLFSDriveManager driveManager;
 	private boolean requireAuthForWrites = false;
@@ -90,14 +92,14 @@ public class DLFSWebDAV {
 	 */
 	public void addRoutes(RoutesConfig routes) {
 		routes.get(ROUTE_PATH, this::handleGet);
-		routes.get(ROUTE, this::handleGet);
+		routes.get(MOUNT_PATH, this::handleGet);
 		routes.put(ROUTE_PATH, this::handlePut);
 		routes.delete(ROUTE_PATH, this::handleDelete);
 		routes.head(ROUTE_PATH, this::handleHead);
-		routes.head(ROUTE, this::handleHead);
+		routes.head(MOUNT_PATH, this::handleHead);
 		routes.head(ROUTE_BARE, this::handleHead);
 		routes.options(ROUTE_PATH, this::handleOptions);
-		routes.options(ROUTE, this::handleOptions);
+		routes.options(MOUNT_PATH, this::handleOptions);
 		routes.options(ROUTE_BARE, this::handleOptions);
 
 		// Root-level DAV discovery (Windows WebClient sends OPTIONS / then PROPFIND /)
@@ -121,7 +123,7 @@ public class DLFSWebDAV {
 	 */
 	private static void addDLFSMethod(RoutesConfig routes, HandlerType method, Handler handler) {
 		routes.addHttpHandler(method, ROUTE_BARE, handler);
-		routes.addHttpHandler(method, ROUTE, handler);
+		routes.addHttpHandler(method, MOUNT_PATH, handler);
 		routes.addHttpHandler(method, ROUTE_PATH, handler);
 	}
 
@@ -156,8 +158,8 @@ public class DLFSWebDAV {
 		// Fall back to URI extraction
 		if (pathParam == null || pathParam.isEmpty()) {
 			String uri = ctx.req().getRequestURI();
-			if (uri.startsWith(ROUTE) && uri.length() > ROUTE.length()) {
-				pathParam = uri.substring(ROUTE.length());
+			if (uri.startsWith(MOUNT_PATH) && uri.length() > MOUNT_PATH.length()) {
+				pathParam = uri.substring(MOUNT_PATH.length());
 				pathParam = java.net.URLDecoder.decode(pathParam, java.nio.charset.StandardCharsets.UTF_8);
 			} else {
 				return new DrivePath(null, null); // drive listing
@@ -355,9 +357,10 @@ public class DLFSWebDAV {
 
 		// Drive-level delete (empty file path)
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
-			boolean deleted = driveManager.deleteDrive(getIdentity(ctx), dp.driveName());
+			String identity=getIdentity(ctx);
+			boolean deleted = driveManager.deleteDrive(identity, dp.driveName());
 			if (deleted) {
-				driveManager.sync();
+				driveManager.sync(identity);
 				ctx.status(204);
 			} else {
 				ctx.status(404).result("Not Found");
@@ -501,10 +504,11 @@ public class DLFSWebDAV {
 
 		// Drive-level creation (empty file path)
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
-			boolean created = driveManager.createDrive(getIdentity(ctx), dp.driveName());
+			String identity=getIdentity(ctx);
+			boolean created = driveManager.createDrive(identity, dp.driveName());
 			if (created) {
-				driveManager.sync();
-				ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/");
+				driveManager.sync(identity);
+				ctx.header("Location", MOUNT_PATH + encodePathComponent(dp.driveName()) + "/");
 				ctx.status(201);
 			} else {
 				ctx.status(405).result("Method Not Allowed: drive already exists");
@@ -523,7 +527,7 @@ public class DLFSWebDAV {
 			prepareMutation(path);
 			Files.createDirectory(path);
 			syncDrive(ctx, dp);
-			ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
+			ctx.header("Location", MOUNT_PATH + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
 			ctx.status(201);
 		} catch (FileAlreadyExistsException e) {
 			ctx.status(405).result("Method Not Allowed: resource already exists");
@@ -545,10 +549,11 @@ public class DLFSWebDAV {
 				ctx.status(400).result("Bad Request: missing or invalid Destination header");
 				return;
 			}
-			boolean renamed = driveManager.renameDrive(getIdentity(ctx), dp.driveName(), destDp.driveName());
+			String identity=getIdentity(ctx);
+			boolean renamed = driveManager.renameDrive(identity, dp.driveName(), destDp.driveName());
 			if (renamed) {
-				driveManager.sync();
-				ctx.header("Location", ROUTE + encodePathComponent(destDp.driveName()) + "/");
+				driveManager.sync(identity);
+				ctx.header("Location", MOUNT_PATH + encodePathComponent(destDp.driveName()) + "/");
 				ctx.status(201);
 			} else {
 				ctx.status(409).result("Conflict: source drive not found or target already exists");
@@ -577,10 +582,6 @@ public class DLFSWebDAV {
 			ctx.status(404).result("Not Found");
 			return;
 		}
-		if (!Files.isRegularFile(source)) {
-			ctx.status(501).result("Directory MOVE is not implemented");
-			return;
-		}
 		if (source.equals(dest)) {
 			ctx.status(204);
 			return;
@@ -597,17 +598,11 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		long sourceSize = Files.size(source);
-		if (sourceSize > maxFileSize) {
-			ctx.status(413).result("Source file is too large to move");
-			return;
-		}
-		FileSystem fs = source.getFileSystem();
-		synchronized (fs) {
-			byte[] data = Files.readAllBytes(source);
-			writeCompleteFile(dest, data);
-			prepareMutation(source);
-			Files.delete(source);
+		prepareMutation(dest);
+		if (destExists) {
+			Files.move(source,dest,StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			Files.move(source,dest);
 		}
 
 		syncDrive(ctx, dp);
@@ -658,13 +653,12 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		long sourceSize = Files.size(source);
-		if (sourceSize > maxFileSize) {
-			ctx.status(413).result("Source file is too large to copy");
-			return;
+		prepareMutation(dest);
+		if (destExists) {
+			Files.copy(source,dest,StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			Files.copy(source,dest);
 		}
-		byte[] data = Files.readAllBytes(source);
-		writeCompleteFile(dest, data);
 
 		syncDrive(ctx, dp);
 		ctx.status(destExists ? 204 : 201);
@@ -689,8 +683,8 @@ public class DLFSWebDAV {
 
 			// Strip the /dlfs/ prefix
 			String remainder;
-			if (destPath.startsWith(ROUTE)) {
-				remainder = destPath.substring(ROUTE.length());
+			if (destPath.startsWith(MOUNT_PATH)) {
+				remainder = destPath.substring(MOUNT_PATH.length());
 			} else if (destPath.startsWith(ROUTE_BARE)) {
 				remainder = destPath.substring(ROUTE_BARE.length());
 				if (remainder.startsWith("/")) remainder = remainder.substring(1);

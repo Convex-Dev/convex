@@ -16,6 +16,7 @@ import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.Collections;
 import java.util.Set;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -34,6 +35,9 @@ import convex.lattice.fs.impl.DLFSFileAttributes;
  * - An efficient method of cloning the Drive with an immutable snapshot
  */
 public abstract class DLFileSystem extends FileSystem implements Cloneable {
+
+	/** Number of streamed bytes between opportunities to persist blob data. */
+	public static final int BLOB_PERSIST_INTERVAL = 16 * 1024 * 1024;
 
 	static final String SEP = "/";
 
@@ -214,6 +218,22 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	}
 
 	/**
+	 * Gives the hosting application an opportunity to persist streamed blob data.
+	 *
+	 * <p>The default implementation is an identity operation. Store-backed DLFS
+	 * adapters may override this to replace direct references with store-backed
+	 * references. This method does not update or sync the filesystem cursor: the
+	 * caller installs the returned value as part of its current logical write.</p>
+	 *
+	 * @param data Blob data to persist
+	 * @return Persisted data, potentially containing store-backed references
+	 * @throws IOException If persistence fails
+	 */
+	public ABlob persistBlob(ABlob data) throws IOException {
+		return data;
+	}
+
+	/**
 	 * Implementation for delegation by DLFSProvider
 	 * @return Directory stream
 	 */
@@ -261,6 +281,20 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public abstract void copy(DLPath source, DLPath target, boolean recursive) throws IOException;
 
 	/**
+	 * Copies a node within this drive, optionally replacing an existing target.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @param recursive true to copy a complete directory subtree
+	 * @param replaceExisting true to replace an existing target
+	 * @throws IOException if the copy cannot be completed
+	 */
+	public void copy(DLPath source, DLPath target, boolean recursive, boolean replaceExisting) throws IOException {
+		if (replaceExisting) throw new UnsupportedOperationException("Replacing an existing DLFS target is not supported");
+		copy(source,target,recursive);
+	}
+
+	/**
 	 * Moves a node within this drive.
 	 *
 	 * @param source source path
@@ -268,6 +302,19 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * @throws IOException if the move cannot be completed
 	 */
 	public abstract void move(DLPath source, DLPath target) throws IOException;
+
+	/**
+	 * Moves a node within this drive, optionally replacing an existing target.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @param replaceExisting true to replace an existing target
+	 * @throws IOException if the move cannot be completed
+	 */
+	public void move(DLPath source, DLPath target, boolean replaceExisting) throws IOException {
+		if (replaceExisting) throw new UnsupportedOperationException("Replacing an existing DLFS target is not supported");
+		move(source,target);
+	}
 
 	public abstract Hash getRootHash();
 

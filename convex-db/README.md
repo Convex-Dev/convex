@@ -172,51 +172,53 @@ For direct programmatic access without SQL overhead.
 
 ```java
 SQLDatabase db = SQLDatabase.create("mydb", keyPair);
-LatticeTables tables = db.tables();
+SQLSchema schema = db.tables();
 
 // Create table with column names
-tables.createTable("users", new String[]{"id", "name", "email"});
+schema.createTable("users", new String[]{"id", "name", "email"});
 
 // Check existence
-boolean exists = tables.tableExists("users");
+boolean exists = schema.tableExists("users");
 
 // List tables
-String[] names = tables.getTableNames();
+String[] names = schema.getTableNames();
 
 // Drop table
-tables.dropTable("users");
+schema.dropTable("users");
 ```
 
 ### Row Operations
 
 ```java
-// Insert - primary key can be CVMLong, AString, or ABlob
-ACell key = CVMLong.create(1);
+// Insert - the first column is the primary key (CVMLong, AString, or ABlob)
 AVector<ACell> values = Vectors.of(
     CVMLong.create(1),
     Strings.create("Alice"),
     Strings.create("alice@example.com")
 );
-tables.insert("users", key, values);
+schema.insert("users", values);
+
+// Insert with auto-conversion from Java values (first value is the primary key)
+schema.insert("users", 2, "Bob", "bob@example.com");
 
 // Select by key
-AVector<ACell> row = tables.selectByKey("users", key);
+AVector<ACell> row = schema.selectByKey("users", CVMLong.create(1));
 
 // Select all rows
-Index<ABlob, AVector<ACell>> allRows = tables.selectAll("users");
+Index<ABlob, AVector<ACell>> allRows = schema.selectAll("users");
 
 // Delete by key
-tables.deleteByKey("users", key);
+schema.deleteByKey("users", CVMLong.create(1));
 ```
 
 ### Schema Information
 
 ```java
 // Get column names
-String[] columns = tables.getColumnNames("users");
+String[] columns = schema.getColumnNames("users");
 
 // Get column count
-int count = tables.getColumnCount("users");
+int count = schema.getColumnCount("users");
 ```
 
 ## Replication
@@ -235,7 +237,7 @@ Tables support lattice-based replication with conflict-free merging.
 // Node 1: Create and populate
 SQLDatabase db1 = SQLDatabase.create("shared", keyPair1);
 db1.tables().createTable("data", new String[]{"id", "value"});
-db1.tables().insert("data", key, values);
+db1.tables().insert("data", 1, "hello");  // first column is the primary key
 
 // Node 2: Create same structure
 SQLDatabase db2 = SQLDatabase.create("shared", keyPair2);

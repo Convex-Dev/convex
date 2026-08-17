@@ -3364,6 +3364,21 @@ public abstract class CoreTest extends ACVMTest {
 			assertCVMEquals(50L,ctx.getBalance(receiver));
 		}
 
+		{ // transfer to an Actor that passes a non-integer to accept: CAST error aborts the transfer (#378)
+			Context ctx=step("(deploy '(do (defn receive-coin ^{:callable true} [sender amount data] (accept nil))))");
+			Address receiver=(Address) ctx.getResult();
+
+			ctx=step(ctx,"(transfer "+receiver+" 100)");
+			assertCastError(ctx);
+		}
+
+		{ // receive-coin defined on a user account is inert: transfer credits in full (#378)
+			Context ctx=stepAs(VILLAIN, context(), "(defn receive-coin ^{:callable true} [sender amount data] (accept nil))");
+			long expectedBalance=ctx.getBalance(VILLAIN)+100;
+			ctx=step(ctx,"(transfer "+VILLAIN+" 100)");
+			assertCVMEquals(100L,ctx.getResult());
+			assertCVMEquals(expectedBalance,ctx.getBalance(VILLAIN));
+		}
 
 	}
 

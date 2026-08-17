@@ -1,0 +1,56 @@
+{
+  // Generic lattice host. Keep the key seed and store together across restarts.
+  node: {
+    // Maximum accepted lead over this host's clock for DLFS updates and tombstones.
+    maxFutureTimestampSkew: 30000,
+    port: 19888,
+    store: "dlfs.etch",
+    etch: {version: 3},
+
+    // A 32-byte Ed25519 seed in hex. Protect this file as a secret.
+    // keypair: "...",
+
+    // Set a reachable URL to publish this node in [:p2p :nodes]. For a local
+    // development network also set allowPrivateURL: true.
+    // url: "tcp://dlfs.example.org:19888",
+    // allowPrivateURL: false,
+
+    // Bootstrap entries pair transport addresses with expected node identities.
+    bootstrap: [
+      // {key: "<64 hex digits>", url: "tcp://seed.example.org:19888"},
+    ],
+  },
+
+  // Application policy. A custom path must start in a non-standard root region.
+  dlfs: {
+    path: ["fs"],
+    drive: "home",
+    mounts: [
+      // Anonymous requests and tokens signed by the node identity both reach
+      // the local owner's drives. A did:key identity may instead map to any
+      // explicitly configured replicated owner AccountKey.
+      {identity: null, owner: "node"},
+      {identity: "node", owner: "node"},
+      // {identity: "did:key:z...", owner: "<64 hex digits>"},
+    ],
+  },
+
+  // HTTP is loopback-only by default.
+  http: {
+    bind: "127.0.0.1",
+    port: 8080,
+    maxRequestBytes: 67108864,
+  },
+
+  security: {
+    // "deny" is the default. "public" exposes the complete primary lattice
+    // view to every inbound TCP connection; it is not a private-peer policy.
+    latticeInbound: "deny",
+
+    // "node-key" validates bearer tokens for mutations using the node identity.
+    // "deny" makes the HTTP service read-only; "none" is safe only on loopback
+    // unless allowUnauthenticatedHTTP is explicitly acknowledged.
+    writeAuthentication: "node-key",
+    allowUnauthenticatedHTTP: false,
+  },
+}

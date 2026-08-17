@@ -1,0 +1,102 @@
+package convex.lattice;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Random;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.ASet;
+import convex.core.data.Blobs;
+import convex.core.data.RefSoft;
+import convex.core.store.MemoryStore;
+import convex.etch.EtchStore;
+import convex.lattice.generic.SetLattice;
+
+public class RootComponentTest {
+	private static final class SetApplication extends ALatticeApplication<ASet<ACell>> {
+		SetApplication(RootComponent<ASet<ACell>> host) {
+			super(host);
+		}
+	}
+
+	private static final class FlushStore extends MemoryStore {
+		private boolean flushed;
+
+		@Override
+		public void flush() {
+			flushed=true;
+		}
+	}
+
+	@Test
+	public void testLocalStorePersistenceDoesNotMoveCursor() throws Exception {
+		try (EtchStore store=EtchStore.createTemp("root-component")) {
+			RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+			ABlob blob=Blobs.createRandom(new Random(1234),5000);
+			root.cursor().updateAndGet(values->values.include(blob));
+			ASet<ACell> before=root.cursor().get();
+
+			ASet<ACell> persisted=root.persist();
+
+			assertSame(before,root.cursor().get(),"store persistence must not move the cursor");
+			assertEquals(before,persisted);
+			ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
+			assertInstanceOf(RefSoft.class,persistedBlob.getRef(0));
+			assertSame(store,root.store());
+		}
+	}
+
+	@Test
+	public void testFlushDelegatesToStore() throws Exception {
+		FlushStore store=new FlushStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+
+		root.flush();
+
+		assertTrue(store.flushed);
+	}
+
+	@Test
+	public void testLocalSyncSelectsStoredRoot() throws Exception {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		ABlob blob=Blobs.createRandom(new Random(5678),5000);
+		root.cursor().updateAndGet(values->values.include(blob));
+
+		root.sync();
+
+		assertEquals(root.cursor().get(),store.getRootData());
+	}
+
+	@Test
+	public void testApplicationSharesHostedRoot() throws Exception {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		SetApplication application=new SetApplication(root);
+		ABlob blob=Blobs.createRandom(new Random(9012),5000);
+
+		assertSame(root.cursor(),application.cursor());
+		application.cursor().updateAndGet(values->values.include(blob));
+		application.sync();
+
+		assertEquals(application.cursor().get(),store.getRootData());
+	}
+
+	@Test
+	public void testPublicationPolicyCanBeConfiguredAndFrozen() {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		root.setPublicationPolicy(value->value);
+		root.freezePublicationPolicy();
+
+		assertThrows(IllegalStateException.class,
+			()->root.setPublicationPolicy(value->value));
+	}
+}

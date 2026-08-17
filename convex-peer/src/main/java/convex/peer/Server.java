@@ -1,14 +1,18 @@
 package convex.peer;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -54,6 +58,7 @@ import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
+import convex.etch.EtchStore;
 import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
@@ -89,6 +94,14 @@ public class Server implements Closeable {
 	public static final int DEFAULT_PORT = Constants.DEFAULT_PEER_PORT;
 	
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
+
+	/** Temporary Etch files awaiting deletion after their mappings are released. */
+	private static final Set<File> TEMPORARY_STORE_FILES=ConcurrentHashMap.newKeySet();
+
+	static {
+		// Runs after every Etch close hook, when a final GC can release Java 21 mappings.
+		Shutdown.addHook(Shutdown.TEMP_FILES,Server::cleanupTemporaryStoreFiles);
+	}
 
 	/**
 	 * Logger for protocol upgrade lifecycle events (scheduled upgrade warnings,
@@ -162,6 +175,15 @@ public class Server implements Closeable {
 	 */
 	private final AStore store;
 
+	/** True when this Server opened or created its store rather than receiving one. */
+	private final boolean ownsStore;
+
+	/** True when an owned Etch store is temporary and should be deleted on close. */
+	private final boolean deleteStoreOnClose;
+
+	/** Ensures an owned store is closed and retired exactly once. */
+	private final AtomicBoolean storeClosed=new AtomicBoolean();
+
 	/**
 	 * Configuration
 	 */
@@ -173,11 +195,17 @@ public class Server implements Closeable {
 	private AServer nio;
 
 	@SuppressWarnings("deprecation")
-	private Server(HashMap<Keyword, Object> config) throws ConfigException {
+	private Server(HashMap<Keyword, Object> config, boolean ownsStore,
+			boolean deleteStoreOnClose) throws ConfigException {
 		this.config = config;
+		this.ownsStore=ownsStore;
+		this.deleteStoreOnClose=deleteStoreOnClose;
 		
 		// Critical to ensure we have the store set up before anything else. Stuff might break badly otherwise!
 		this.store = Config.ensureStore(config);
+		if (deleteStoreOnClose&&(store instanceof EtchStore etchStore)) {
+			TEMPORARY_STORE_FILES.add(etchStore.getFile());
+		}
 		
 		if (Config.USE_NETTY_SERVER) {
 			this.nio=NettyServer.create(this);
@@ -356,7 +384,29 @@ public class Server implements Closeable {
 	 * @throws ConfigException If Peer configuration failed, possible multiple causes
 	 */
 	public static Server create(HashMap<Keyword, Object> config) throws ConfigException {
-		return new Server(new HashMap<>(config));
+		Object storeConfig=config.get(Keywords.STORE);
+		return create(config,isStoreOwned(storeConfig),isTemporaryStore(storeConfig));
+	}
+
+	/** Creates a Server after an earlier configuration step materialised its store. */
+	static Server create(HashMap<Keyword,Object> config, boolean ownsStore,
+			boolean deleteStoreOnClose) throws ConfigException {
+		return new Server(new HashMap<>(config),ownsStore,deleteStoreOnClose);
+	}
+
+	/** An actual store instance is borrowed; every other supported form is materialised here. */
+	static boolean isStoreOwned(Object storeConfig) {
+		return !(storeConfig instanceof AStore);
+	}
+
+	/** Default and explicit {@code temp} stores are disposable; file stores are persistent. */
+	static boolean isTemporaryStore(Object storeConfig) {
+		if (storeConfig==null) return true;
+		if ((storeConfig instanceof String)||(storeConfig instanceof AString)) {
+			return "temp".equals(storeConfig.toString());
+		}
+		// Config.ensureStore falls back to a temporary store for unsupported values.
+		return !(storeConfig instanceof AStore);
 	}
 
 	private void observeMessageReceived(Message m) {
@@ -787,7 +837,10 @@ public class Server implements Closeable {
 	@Override
 	public void close() {
 		
-		if (!isRunning) return; // already shut down
+		if (!isRunning) {
+			closeOwnedStore();
+			return;
+		}
 		log.debug("Peer shutdown starting for "+getPeerKey());
 		isLive=false;
 		isRunning = false;
@@ -831,9 +884,52 @@ public class Server implements Closeable {
 		}
 
 		nio.close();
-		// Note we don't do store.close(); because we don't own the store.
+		closeOwnedStore();
 		log.info("Peer shutdown complete for "+getPeerKey());
 		shutdownFuture.complete(Utils.getCurrentTimestamp());
+	}
+
+	/** Closes a materialised store, deleting its file only when it was temporary. */
+	private void closeOwnedStore() {
+		if (!ownsStore||!storeClosed.compareAndSet(false,true)) return;
+		File temporaryFile=(deleteStoreOnClose&&(store instanceof EtchStore etchStore))
+				?etchStore.getFile():null;
+		try {
+			store.close();
+		} finally {
+			if (temporaryFile!=null) {
+				if (!temporaryFile.exists()||temporaryFile.delete()) {
+					TEMPORARY_STORE_FILES.remove(temporaryFile);
+				} else {
+					// MappedByteBuffer stores on Windows may remain pinned until JVM exit.
+					temporaryFile.deleteOnExit();
+				}
+			}
+		}
+	}
+
+	/** Deletes closed temporary stores after Etch mappings have become unreachable. */
+	private static void cleanupTemporaryStoreFiles() {
+		if (deleteTemporaryStoreFiles()) return;
+
+		// Java 21 offers no supported deterministic MappedByteBuffer unmap. At JVM
+		// shutdown a single collection releases unreachable mappings before retrying.
+		System.gc();
+		deleteTemporaryStoreFiles();
+	}
+
+	/** @return True if every registered temporary store has been deleted. */
+	private static boolean deleteTemporaryStoreFiles() {
+		boolean deleted=true;
+		for (File file:TEMPORARY_STORE_FILES) {
+			if (!file.exists()||file.delete()) {
+				TEMPORARY_STORE_FILES.remove(file);
+			} else {
+				deleted=false;
+				file.deleteOnExit();
+			}
+		}
+		return deleted;
 	}
 
 	/**

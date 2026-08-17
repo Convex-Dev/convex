@@ -310,10 +310,11 @@ public class Config {
 		T store;
 		try {
 			store=checkStore(config);
-			if (store!=null) return store;
-			EtchConfig etchConfig=getEtchConfig(config);
-			store=(T) ((etchConfig==null)?EtchStore.createTemp("tempPeerStore")
-					:EtchStore.createTemp("tempPeerStore",etchConfig));
+			if (store==null) {
+				EtchConfig etchConfig=getEtchConfig(config);
+				store=(T) ((etchConfig==null)?EtchStore.createTemp("tempPeerStore")
+						:EtchStore.createTemp("tempPeerStore",etchConfig));
+			}
 		} catch (IOException e) {
 			throw new ConfigException("Unable to configure store due to IO error",e);
 		}

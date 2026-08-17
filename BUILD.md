@@ -27,15 +27,19 @@ builds do not generate source/Javadoc jars or load Maven Central publishing;
 
 ## CI Workflows
 
-Three GitHub Actions workflows handle continuous integration:
+Four GitHub Actions workflows handle continuous integration:
 
 ### Build (`build.yml`)
 
 Runs on every push to any branch, and on pull requests (including from forks). Builds the project and runs all tests. Superseded runs on the same branch/PR are cancelled automatically.
 
+### CodeQL (`codeql.yml`)
+
+Static security analysis for the Java codebase (tests run separately in `build.yml`). Runs on pushes and pull requests targeting `develop` and `master`, plus a weekly scheduled scan. Superseded analyses for the same ref are cancelled automatically.
+
 ### Release (`release.yml`)
 
-Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached. A follow-on `docker` job then builds and pushes `convexlive/convex:<version>` and `convexlive/convex:latest` to Docker Hub.
+Triggered when a version tag is pushed (e.g. `0.8.3`). Builds, tests, and creates a GitHub Release with `convex.jar` attached, together with its SHA-256 checksum, an SBOM and a signed build-provenance attestation (verifiable with `gh attestation verify convex.jar -R Convex-Dev/convex`). A follow-on `docker` job then builds and pushes `convexlive/convex:<version>` and `convexlive/convex:latest` to Docker Hub.
 
 (The Docker build must be a job inside this workflow: releases created with the workflow `GITHUB_TOKEN` do not fire `release: [published]` events, so a separate workflow triggered on release publication would never run.)
 
@@ -145,7 +149,8 @@ https://github.com/Convex-Dev/convex/releases
 
 Verify:
 - Release status is not draft/pre-release
-- `convex.jar` is attached as an asset
+- `convex.jar` is attached as an asset, along with its SHA-256 checksum (`convex.jar.sha256`) and the SBOM (`convex-<version>-sbom.json`)
+- Build provenance verifies against the downloaded jar: `gh attestation verify convex.jar -R Convex-Dev/convex`
 - Changelog content is correct (not the fallback "See CHANGELOG.md for details" — if that shows, the changelog section header didn't match the tag and the workflow should have failed; investigate).
 - Docker images pushed: `convexlive/convex:<version>` and a freshly-updated `latest` at https://hub.docker.com/r/convexlive/convex/tags
 

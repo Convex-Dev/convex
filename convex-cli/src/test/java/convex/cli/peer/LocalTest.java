@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.io.TempDir;
 
 import com.beust.jcommander.Strings;
 
@@ -45,6 +47,9 @@ import convex.peer.LaunchException;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class LocalTest {
+	@TempDir
+	static Path processTempDirectory;
+
 	private static final char[] KEYSTORE_PASSWORD = "localStorePassword".toCharArray();
 	private static final char[] KEY_PASSWORD = "localKeyPassword".toCharArray();
 
@@ -100,6 +105,9 @@ public class LocalTest {
 
 		List<String> cmd = new ArrayList<>();
 		cmd.add(javaCmd);
+		// The test force-terminates this child on Windows, where JVM shutdown hooks
+		// cannot run. Isolate all child temp files so JUnit removes them afterwards.
+		cmd.add("-Djava.io.tmpdir="+processTempDirectory.toAbsolutePath());
 		// Could add extra JVM arguments here
 		if (classpath!=null) {
 			cmd.add("-cp");

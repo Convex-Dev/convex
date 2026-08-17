@@ -7,10 +7,10 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.core.lang.Reader;
 
 /**
- * Benchmarks for hashing performance.
- * 
- * Included to test hashing algorithm performance, since this might be a
- * bottleneck in some scenarios.
+ * Benchmarks for Convex Lisp reader performance.
+ *
+ * Included to test parsing throughput, since reading source forms is on the
+ * path for transaction construction and REPL usage.
  */
 public class ReaderBenchmark {
 

@@ -38,15 +38,18 @@ using the store is stopped first — operating on a live store risks corruption.
 
 | Command | Effect |
 |---------|--------|
-| `etch gc` | Garbage collect: retains the root and everything reachable, discards the rest |
+| `etch gc` | Garbage collect: retains the root and everything reachable, discards the rest. In-place by default; `-o/--output <file>` collects into a fresh file instead |
 | `etch clear` | Clears the root data. Does *not* collect garbage |
 | `etch migrate --into <dest>` | Copy everything into another store; `--set-root` to set the destination root |
 | `etch repair --into <dest>` | Reconstruct a fresh store from independently validated cells; source unchanged |
 | `etch recover` | Adopt a completed GC cutover and roll forward — for a store interrupted mid-GC |
 | `etch write -c/--cvx <source>` | Write a CVM value into the store |
 
-`migrate` is the safe way to compact or relocate: it leaves the source intact,
-so prefer it to `gc` when the store matters and disk allows.
+To compact safely, prefer `gc -o <new-file>`: it collects into a fresh file and
+leaves the source unmodified (note: status levels above PERSISTED, e.g.
+ANNOUNCED, survive an in-place GC but not `--output`). Use `migrate` to copy
+into another (possibly non-empty) store, or to change the store's format
+version or encryption — see below.
 
 `repair` is the offline salvage path for a dirty or damaged source. It holds an
 exclusive source lock, scans through physical EOF, and writes only canonical
@@ -57,3 +60,21 @@ never replace the source with that output automatically.
 
 Recovering an interrupted GC is what `recover` is for — reach for it before
 concluding a store is lost.
+
+## Encrypted Stores (Etch v3)
+
+Etch format v3 supports encrypted stores — format spec in
+`convex-core/docs/ETCHv3.md`.
+
+**Opening** an encrypted store: any etch subcommand takes `--etch-key <alias>`
+(keystore key alias or public-key prefix, password via `--etch-keypass`) or
+`--etch-key-file <file>` (raw or hex 32-byte master key; `-` reads stdin).
+With neither, the v3 header's public-key hint selects a keystore key
+automatically, or an interactive session prompts for a hex key.
+
+**Converting** a store: `etch migrate` (and `gc -o`) accept destination
+options — `--into-version` (1, 2 or 3), `--into-cipher` (`none`,
+`aes-256-ctr` or `chacha20`), `--into-key` / `--into-key-file` /
+`--into-keypass` for the destination key, `--into-encrypt-index` (negatable)
+and `--into-public-key-hint`. Encryption options require version 3; without a
+destination key the resolved source key is reused.

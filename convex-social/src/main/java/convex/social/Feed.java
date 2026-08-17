@@ -30,8 +30,8 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 
 	private final AccountKey author;
 
-	Feed(ALatticeCursor<Index<Blob, ACell>> cursor, AccountKey author) {
-		super(cursor);
+	Feed(SocialUser parent, ALatticeCursor<Index<Blob, ACell>> cursor, AccountKey author) {
+		super(parent,cursor);
 		this.author = author;
 	}
 

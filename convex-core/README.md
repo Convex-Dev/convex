@@ -52,6 +52,7 @@ ACell result = ctx.getResult();  // Returns 6
 ## Documentation
 
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-core)
+- [Lattice application and component patterns](docs/LATTICE_APPLICATIONS.md)
 - [Java Examples](https://github.com/Convex-Dev/convex/tree/develop/convex-core/src/test/java/convex/core/examples) (see `RawCVM.java` for running CVM code directly)
 - [Convex Lisp Examples](https://github.com/Convex-Dev/convex/tree/develop/convex-core/src/test/resources/examples)
 - [Convex Documentation](https://docs.convex.world)
@@ -68,7 +69,7 @@ cd convex
 
 ## License
 
-Copyright 2018-2025 The Convex Foundation and Contributors
+Copyright 2018-2026 The Convex Foundation and Contributors
 
 Code in convex-core is provided under the [Convex Public License](../LICENSE.md).
 

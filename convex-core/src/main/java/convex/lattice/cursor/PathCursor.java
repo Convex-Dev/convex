@@ -34,7 +34,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	public PathCursor(ACursor<?> base, ACell... path) {
 		super((V) base.get(path));
 		this.base=(ACursor)base;
-		this.path=path;
+		this.path=path.clone();
 		this.baseLattice=null;
 		this.valueLattice=null;
 	}
@@ -43,7 +43,7 @@ public class PathCursor<V extends ACell> extends AForkableCursor<V> {
 	PathCursor(ACursor<?> base, ACell[] path, ALattice<?> baseLattice) {
 		super((V) base.get(path));
 		this.base=(ACursor)base;
-		this.path=path;
+		this.path=path.clone();
 		this.baseLattice=baseLattice;
 		this.valueLattice=(baseLattice != null && path.length > 0) ? baseLattice.path(path) : baseLattice;
 	}
