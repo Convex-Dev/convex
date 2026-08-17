@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CVM: `char?` type predicate for Character values (v1 protocol, #92).
 - Lattice applications: `ALatticeApplication` provides a root-level composition point over local or NodeServer-hosted `RootComponent` trees; DLFS adds a multi-owner `DLFSApplication`, physical `DLFSRegion` components, per-owner `DLFSDrives` and temporary forks; P2P exposes the same host-neutral application stack with path-specific identity and node-record components.
+- DLFS has a module-local standalone `convex.dlfs.Main` entry point that boots a complete NodeServer-hosted application stack without the Convex CLI.
 
 ### Changed
 

@@ -9,6 +9,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
@@ -32,6 +36,7 @@ import convex.dlfs.DLFSDrive;
 import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
+import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
 import convex.lattice.fs.DLFSNode;
@@ -44,6 +49,35 @@ public class DLFSComponentTest {
 
 	private static final Keyword KEY_DOCUMENTS=Keyword.intern("documents");
 	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
+
+	@Test
+	public void testCompleteNodeHostedServerStack() throws Exception {
+		AKeyPair keyPair=AKeyPair.generate();
+		try (EtchStore store=EtchStore.createTemp("dlfs-complete-stack");
+				NodeServer<Index<Keyword,ACell>> node=
+					new NodeServer<>(convex.lattice.Lattice.ROOT,store,NodeConfig.port(-1))) {
+			node.setMergeContext(LatticeContext.create(null,keyPair));
+			node.launch();
+
+			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(
+				node.getRootComponent(),convex.core.cvm.Keywords.FS);
+			DLFSDriveManager drives=new DLFSDriveManager(
+				application.drives(keyPair.getAccountKey()));
+			assertTrue(drives.createDrive(null,"home"));
+			Files.writeString(drives.getDrive(null,"home").getPath("/hello.txt"),"hello");
+			application.sync();
+
+			try (DLFSServer server=DLFSServer.create(drives)) {
+				server.start(0);
+				HttpRequest request=HttpRequest.newBuilder(URI.create(
+					"http://localhost:"+server.getPort()+"/dlfs/home/hello.txt")).build();
+				HttpResponse<String> response=HttpClient.newHttpClient().send(
+					request,HttpResponse.BodyHandlers.ofString());
+				assertEquals(200,response.statusCode());
+				assertEquals("hello",response.body());
+			}
+		}
+	}
 
 	private static final class CompositeDLFSApplication
 			extends DLFSApplication<Index<Keyword,ACell>> {

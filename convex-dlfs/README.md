@@ -54,12 +54,39 @@ implementation 'world.convex:convex-dlfs:0.8.12'
 
 ### Run a WebDAV server
 
-```java
-import convex.dlfs.DLFSServer;
+The module has a standalone entry point which composes the full NodeServer-hosted
+lattice application stack without the Convex CLI:
 
-// Explicitly detached, process-local storage for a quick demonstration
-DLFSServer server = DLFSServer.createEphemeral();
-server.getDriveManager().createDrive(null, "home");
+```bash
+java -cp convex.jar convex.dlfs.Main \
+  --http-port 8080 --node-port 19888 --drive home
+```
+
+This starts an unauthenticated, loopback-only example with a temporary Etch store
+and serves the
+drive at `http://localhost:8080/dlfs/home/`. The NodeServer hosts `Lattice.ROOT`,
+with DLFS attached at `:fs`, so root publication follows the real persistence and
+replication path. Inbound lattice access remains denied unless
+`--serve-inbound` is supplied explicitly. The example is intentionally temporary;
+embed the same stack to supply persistent storage, peer connections and operator
+policy.
+
+The equivalent programmatic setup is:
+
+```java
+EtchStore store = EtchStore.createTemp("convex-dlfs");
+AKeyPair keyPair = AKeyPair.generate();
+NodeServer node = new NodeServer(Lattice.ROOT, store, NodeConfig.port(19888));
+node.setMergeContext(LatticeContext.create(null, keyPair));
+node.launch();
+
+DLFSApplication app = DLFSApplication.connect(node.getRootComponent(), Keywords.FS);
+DLFSDriveManager drives = new DLFSDriveManager(
+    app.drives(keyPair.getAccountKey()));
+drives.createDrive(null, "home");
+app.sync();
+
+DLFSServer server = DLFSServer.create(drives);
 server.start(8080); // use 0 for a random port
 
 // Drives are now served under http://localhost:8080/dlfs/{drive}/{path}
