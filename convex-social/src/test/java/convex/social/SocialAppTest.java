@@ -2,6 +2,7 @@ package convex.social;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.lattice.ALatticeComponent;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
@@ -26,6 +28,21 @@ import convex.lattice.generic.OwnerLattice;
  * Tests for the cursor-based Social application API.
  */
 public class SocialAppTest {
+
+	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
+
+		private int persistCount;
+
+		TestRoot(KeyedLattice lattice) {
+			super(Cursors.createLattice(lattice));
+		}
+
+		@Override
+		protected <T extends ACell> T persist(T value) {
+			persistCount++;
+			return value;
+		}
+	}
 
 	@Test
 	public void testStandalonePostAndRead() {
@@ -215,6 +232,39 @@ public class SocialAppTest {
 		// Root cursor should have the data
 		ACell rootValue = rootCursor.get();
 		assertNotNull(rootValue, "Root cursor should contain data after post");
+	}
+
+	@Test
+	public void testComponentPersistenceDelegatesToContainingRoot() throws IOException {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		Social social=Social.connect(root,kp);
+		Feed feed=social.user(kp.getAccountKey()).feed();
+		feed.post("Persist through component parents");
+
+		Index<Blob, ACell> before=feed.cursor().get();
+		Index<Blob, ACell> persisted=feed.persist();
+
+		assertSame(before,persisted);
+		assertSame(before,feed.cursor().get());
+		assertEquals(1,root.persistCount);
+	}
+
+	@Test
+	public void testForkRetainsComponentPersistenceParent() throws IOException {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		Social social=Social.connect(root,kp);
+		Social fork=social.fork();
+		Feed forkFeed=fork.user(kp.getAccountKey()).feed();
+		forkFeed.post("Persisted but not synced");
+
+		forkFeed.persist();
+
+		assertEquals(1,root.persistCount);
+		assertEquals(0,social.user(kp.getAccountKey()).feed().count());
 	}
 
 	@Test

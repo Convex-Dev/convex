@@ -76,8 +76,44 @@ backup and trusted replication configuration.
 
 The `convex dlfs start --etch <file>` command uses a cursor-backed registry and requires
 a stable keystore key (`--key` or `--public-key`). This prevents a restart from silently
-selecting a different owner namespace. Registry mutations and file writes are persisted
+selecting a different owner. Registry mutations and file writes are persisted
 synchronously at the service `sync()` boundary.
+
+### Host DLFS in a lattice application
+
+`RootComponent` is the generic store-backed boundary for a lattice component
+hierarchy. A `NodeServer` exposes one for networked applications, while local
+applications can create one directly over any `AStore`. `DLFSRegion` represents
+a physical multi-owner DLFS region at any lattice path, `DLFSDrives` represents
+one owner's named drives, and `DLFSDrive` provides the corresponding NIO view.
+None of the DLFS components depends on `NodeServer`.
+
+```java
+KeyedLattice lattice = KeyedLattice.create(
+    Keyword.intern("documents"), DLFSRegion.LATTICE);
+NodeServer<Index<Keyword, ACell>> node =
+    new NodeServer<>(lattice, store, NodeConfig.port(0));
+node.launch();
+
+DLFSRegion region = DLFSRegion.connect(
+    node.getRootComponent(), Keyword.intern("documents"));
+DLFSDrives drives = region.drives(ownerKey);
+DLFSDrive home = drives.createDrive("home");
+Files.writeString(home.fileSystem().getPath("/hello.txt"), "Hello");
+drives.sync(); // publish the chosen application root
+```
+
+Large channel writes checkpoint blob data through the component hierarchy every
+16 MiB. This replaces eligible direct references with store-backed soft references,
+but does not sync the cursor or choose retained GC roots; those remain application
+policy. `fork()` on a region, drive collection or drive creates a temporary
+component which keeps the same persistence policy and only merges logical changes
+when explicitly synced.
+
+`DLFSDriveManager` remains the service-facing local routing and mapping layer. It
+can manage detached per-identity drives, or adapt one `DLFSDrives` component for
+WebDAV and MCP. Applications that span multiple physical regions or lattice roots
+choose and compose those mappings locally rather than encoding them into a region.
 
 Connect any WebDAV client, e.g.:
 

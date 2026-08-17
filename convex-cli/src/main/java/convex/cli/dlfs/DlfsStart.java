@@ -14,22 +14,19 @@ import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
-import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
 import convex.dlfs.DLFSDriveManager;
+import convex.dlfs.DLFSDrives;
+import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.cursor.ALatticeCursor;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import picocli.CommandLine.Command;
@@ -144,14 +141,15 @@ public class DlfsStart extends ACommand {
 		// Connect to remote peers
 		connectPeers(nodeServer);
 
-		// Navigate cursor to this owner's drives map: :fs → accountKey → :value
+		// Attach the user's drives component at :fs → accountKey → :value.
 		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
 		AccountKey accountKey = keyPair.getAccountKey();
-		ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesCursor = nodeServer.getCursor()
-			.path(Keywords.FS, accountKey, Keywords.VALUE);
+		DLFSRegion region=DLFSRegion.connect(nodeServer.getRootComponent(),Keywords.FS);
+		DLFSDrives drives=region.drives(accountKey);
 
-		// Create DLFSServer with drives backed by the lattice cursor
-		DLFSDriveManager driveManager=new DLFSDriveManager(drivesCursor);
+		// The bootstrap owns both infrastructure and app composition; DLFS branches
+		// themselves depend only on their containing lattice component.
+		DLFSDriveManager driveManager=new DLFSDriveManager(drives);
 		DLFSServer dlfsServer = DLFSServer.create(driveManager, keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.

@@ -26,8 +26,8 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	private final AccountKey ownerKey;
 
-	SocialUser(ALatticeCursor<Index<Keyword, ACell>> cursor, AccountKey ownerKey) {
-		super(cursor);
+	SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AccountKey ownerKey) {
+		super(parent,cursor);
 		this.ownerKey = ownerKey;
 	}
 
@@ -37,7 +37,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(cursor.path(SocialLattice.KEY_FEED), ownerKey);
+		return new Feed(this,cursor.path(SocialLattice.KEY_FEED),ownerKey);
 	}
 
 	/**
@@ -46,7 +46,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		return new Follows(cursor.path(SocialLattice.KEY_FOLLOWS));
+		return new Follows(this,cursor.path(SocialLattice.KEY_FOLLOWS));
 	}
 
 	// TODO: public Profile profile() { ... }

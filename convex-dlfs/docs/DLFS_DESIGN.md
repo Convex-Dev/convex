@@ -88,9 +88,13 @@ The cursor can be a `RootLatticeCursor` (standalone drive), a `DescendedCursor`
 | `DLFSLocal` | `convex-core/.../lattice/fs/impl/DLFSLocal.java` | Mutable filesystem (Java NIO) |
 | `DLFileSystem` | `convex-core/.../lattice/fs/DLFileSystem.java` | Abstract base with timestamp |
 | `DLFS` | `convex-core/.../lattice/fs/DLFS.java` | Factory methods |
+| `RootComponent` | `convex-core/.../lattice/RootComponent.java` | Generic store-backed application root and persistence policy |
+| `DLFSRegion` | `convex-dlfs/.../dlfs/DLFSRegion.java` | Physical multi-owner DLFS region at an arbitrary lattice path |
+| `DLFSDrives` | `convex-dlfs/.../dlfs/DLFSDrives.java` | One owner's map of named drives |
+| `DLFSDrive` | `convex-dlfs/.../dlfs/DLFSDrive.java` | Per-drive component and hosted NIO adapter |
 | `DLFSServer` | `convex-dlfs/.../dlfs/DLFSServer.java` | Javalin HTTP server lifecycle |
 | `DLFSWebDAV` | `convex-dlfs/.../dlfs/DLFSWebDAV.java` | WebDAV route handlers |
-| `DLFSDriveManager` | `convex-dlfs/.../dlfs/DLFSDriveManager.java` | Per-identity drive registry |
+| `DLFSDriveManager` | `convex-dlfs/.../dlfs/DLFSDriveManager.java` | Local drive routing, mapping and service adapter |
 | `PropfindResponse` | `convex-dlfs/.../dlfs/PropfindResponse.java` | RFC 4918 XML response builder |
 
 ## WebDAV Layer
@@ -157,7 +161,7 @@ Authentication is optional and controlled by the `AKeyPair` passed to
 1. `AuthMiddleware` extracts Ed25519 JWT bearer tokens from the `Authorization` header
 2. The token's `sub` claim provides the user identity as a DID string (`did:key:...`)
 3. `DLFSWebDAV.getIdentity()` reads this from the request context
-4. `DLFSDriveManager` uses the identity to namespace drives per user
+4. `DLFSDriveManager` uses the identity to route to that user's drives
 
 When a key pair is supplied, `requireAuthForWrites` is enabled by default. Mutating operations (PUT,
 DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operations
@@ -165,8 +169,13 @@ DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operati
 
 ### Drive Management
 
-`DLFSDriveManager` maintains a `ConcurrentHashMap<String, FileSystem>` keyed by
-`"{identity}:{driveName}"` (anonymous identity uses `":{driveName}"`).
+`DLFSDriveManager` is the local routing and service layer. In standalone mode it maintains a
+`ConcurrentHashMap<String, FileSystem>` keyed by `"{identity}:{driveName}"`
+(anonymous identity uses `":{driveName}"`). In hosted mode it adapts one owner's
+`DLFSDrives` component, whose lattice map is authoritative and whose cached
+`DLFSDrive` objects are local views only. A larger application may map identities
+to managers backed by different regions, servers or local roots without changing
+the physical `DLFSRegion` model.
 
 | Operation | Method | Semantics |
 |-----------|--------|-----------|
@@ -177,9 +186,9 @@ DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operati
 | Rename | `renameDrive(identity, old, new)` | Atomic under the manager lock |
 | Seed | `seedDrive(identity, name, fs)` | Unconditional `put` (for testing) |
 
-Currently drives are in-memory (`DLFS.createLocal()`). The drive manager is designed
-to be replaceable with a lattice cursor-backed implementation where each drive is a
-descended cursor into a `MapLattice<DLFSLattice>`.
+Standalone drives use `DLFS.createLocal()`. The hosted constructor accepts
+`DLFSDrives`; each drive is then a descended component and cursor into a
+`MapLattice<DLFSLattice>`.
 
 ### Request Flow
 
@@ -379,18 +388,39 @@ See [WebDAV Layer](#webdav-layer) above for the full HTTP server architecture.
 Since WebDAV and the GUI share the same `DLFSLocal` instances (backed by the same
 cursors), operations through either path are automatically consistent.
 
-### Network Sync via NodeServer
+### Hosted Components and Network Sync
 
-A `NodeServer` can host the drives lattice and propagate changes to peers:
+`RootComponent` is the generic store-backed application boundary in `convex-core`.
+It may be created directly over a local `AStore`, or exposed by `NodeServer` for a
+networked application. A physical `DLFSRegion` can be connected at the root or at
+any nested lattice path without depending on NodeServer:
 
 ```java
-NodeServer<V> node = new NodeServer<>(drivesLattice, store, port);
+KeyedLattice lattice = KeyedLattice.create(
+    Keyword.intern("documents"), DLFSRegion.LATTICE);
+NodeServer<Index<Keyword, ACell>> node =
+    new NodeServer<>(lattice, store, NodeConfig.port(0));
 node.launch();
 
-// Drives backed by cursors into the NodeServer's lattice
-// Changes propagate to peers via LatticePropagator
-node.sync();
+DLFSRegion region = DLFSRegion.connect(
+    node.getRootComponent(), Keyword.intern("documents"));
+DLFSDrives drives = region.drives(ownerKey);
+DLFSDrive drive = drives.createDrive("home");
+Files.writeString(drive.fileSystem().getPath("/data.txt"), "value");
+drives.sync();
 ```
+
+For a non-networked host, the same hierarchy starts with
+`RootComponent.create(DLFSRegion.LATTICE, store)` and may connect the region at
+the empty path.
+
+`DLFSDriveManager(DLFSDrives)` exposes one owner's drives to WebDAV and MCP and
+remains the place for local routing or mappings that span physical regions.
+The component hierarchy delegates store-only persistence to `RootComponent`, while
+`sync()` remains the explicit publication and replication boundary. Streamed blob
+writes install store-backed references every 16 MiB without moving the cursor or
+selecting retained GC roots. A region, drive collection or drive `fork()` is a
+temporary working component and only merges logical changes when explicitly synced.
 
 ## Production Readiness
 
@@ -409,7 +439,8 @@ node.sync();
 | DLFSBrowser GUI | ✅ Working (lifecycle managed) |
 | Standalone multi-drive management | ✅ Working in process (GUI + WebDAV) |
 | Cursor-backed drive registry | ✅ Atomic create/rename/delete with explicit sync |
-| DLFSBrowser with NodeServer | ⚠️ Etch-backed drive contents; persistent registry lifecycle incomplete |
+| Hosted DLFS components | ✅ Generic root parent, arbitrary region path, owner drive maps, temporary forks |
+| DLFSBrowser with NodeServer | ✅ Etch-backed drive contents and persistent registry |
 | Network replication via NodeServer | ⚠️ Basic (pull/push working, no signing) |
 
 ### DLFSBrowser
@@ -430,10 +461,12 @@ cursor-backed and registered in WebDAV automatically.
 ### Persistence
 
 Cursor-backed drive contents and registry operations persist through the NodeServer's
-`LatticePropagator` (EtchStore). `DLFSDriveManager.sync()` marks the explicit persistence
-boundary; ordinary in-memory mutations do not perform I/O. Cursor-backed manager mode
-currently represents one owner namespace. Standalone drives (via `DLFS.createLocal()`)
-remain entirely in-memory and need explicit persistence if required.
+`LatticePropagator` (EtchStore). `DLFSDriveManager.sync()` marks the explicit publication
+boundary. Streamed writes may persist immutable blob structure before this boundary so
+the store can replace direct references with soft references; this does not select GC
+roots. Cursor-backed manager mode currently adapts one owner's `DLFSDrives` component.
+Standalone drives (via `DLFS.createLocal()`) remain entirely in-memory and need explicit
+persistence if required.
 
 ## CAD045 Conformance
 

@@ -76,6 +76,11 @@ public class Social extends ALatticeComponent<ACell> {
 		super((ALatticeCursor<ACell>) cursor);
 	}
 
+	@SuppressWarnings("unchecked")
+	Social(ALatticeComponent<?> parent, ALatticeCursor<?> cursor) {
+		super(parent,(ALatticeCursor<ACell>) cursor);
+	}
+
 	/**
 	 * Creates a standalone Social instance with its own cursor.
 	 *
@@ -107,6 +112,23 @@ public class Social extends ALatticeComponent<ACell> {
 	}
 
 	/**
+	 * Connects to the {@code :social} region beneath a containing component.
+	 * Component-level policy such as persistence delegates through the supplied
+	 * parent while cursor operations remain scoped to the social path.
+	 *
+	 * @param parent Containing lattice component
+	 * @param keyPair Key pair for signing updates
+	 * @return Social instance connected beneath the parent component
+	 */
+	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
+		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		ALatticeCursor<?> socialCursor = parent.cursor().path(KEY_SOCIAL);
+		socialCursor.withContext(ctx);
+		return new Social(parent,socialCursor);
+	}
+
+	/**
 	 * Gets a user view by navigating through the owner/signing boundary.
 	 *
 	 * <p>The returned {@link SocialUser} wraps a cursor at the per-user
@@ -119,7 +141,7 @@ public class Social extends ALatticeComponent<ACell> {
 	public SocialUser user(AccountKey ownerKey) {
 		ALatticeCursor<Index<Keyword, ACell>> userCursor =
 			cursor.path(ownerKey, Keywords.VALUE);
-		return new SocialUser(userCursor, ownerKey);
+		return new SocialUser(this,userCursor,ownerKey);
 	}
 
 	/**
@@ -129,7 +151,7 @@ public class Social extends ALatticeComponent<ACell> {
 	 * @return Forked Social instance
 	 */
 	public Social fork() {
-		return new Social(cursor.fork());
+		return new Social(parent(),cursor.fork());
 	}
 
 }

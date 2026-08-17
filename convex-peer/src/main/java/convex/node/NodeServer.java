@@ -49,6 +49,7 @@ import convex.core.data.Vectors;
 import convex.lattice.ALattice;
 import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.RootComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.Root;
@@ -62,7 +63,7 @@ import convex.peer.Config;
  *
  * This server handles binary protocol communication for syncing lattice values
  * with other nodes in the network. It provides a lightweight alternative to
- * the full Peer Server, focused specifically on lattice value synchronization.
+ * the full Peer Server, focused specifically on lattice value synchronisation.
  *
  * The server uses the binary protocol (VLQ-encoded message lengths followed by
  * message data) to exchange and merge lattice values with peer nodes.
@@ -76,7 +77,7 @@ import convex.peer.Config;
  * Features:
  * - Automatic delta-based broadcasting of lattice updates to peers
  * - Efficient novelty detection using store announcement mechanism
- * - Manual sync capabilities for on-demand synchronization
+ * - Manual sync capabilities for on-demand synchronisation
  * - Support for hierarchical lattice paths
  *
  * @param <V> The type of lattice values managed by this node server
@@ -99,6 +100,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * Cursor for the current local lattice value
 	 */
 	private final RootLatticeCursor<V> cursor;
+
+	/** Generic application root owned by this server. */
+	private final RootComponent<V> rootComponent;
 
 	/**
 	 * Network server instance for handling connections
@@ -244,6 +248,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
 		this.cursor = Cursors.createLattice(lattice);
+		this.rootComponent = new RootComponent<>(cursor,store,this.config.isPersist());
 
 		// Hook sync callback: synchronous publication on the primary propagator,
 		// async fan-out to secondaries.
@@ -1832,6 +1837,19 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	public ALatticeCursor<V> getCursor() {
 		return cursor;
+	}
+
+	/**
+	 * Gets the generic root component for applications hosted by this server.
+	 *
+	 * <p>Application branches should attach to this component rather than depend
+	 * on NodeServer directly. Persistence delegates to the server's primary store;
+	 * syncing the component publishes through the root cursor's normal pipeline.</p>
+	 *
+	 * @return Root application component
+	 */
+	public RootComponent<V> getRootComponent() {
+		return rootComponent;
 	}
 
 	/**
