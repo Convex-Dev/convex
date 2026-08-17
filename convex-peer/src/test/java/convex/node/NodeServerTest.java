@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,7 +25,9 @@ import org.junit.jupiter.api.Test;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -2049,28 +2052,64 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
+		// Model a distinct outbound node connecting to this test server.
+		cm.setKeyPair(clientKey);
 		ConvexRemote verified = ConvexRemote.connect(maxNodeServer.getHostAddress(), 4096);
-		ConvexRemote unverified = ConvexRemote.connect(maxNodeServer.getHostAddress());
-		AccountKey wrongKey = AKeyPair.generate().getAccountKey();
 		try {
 			assertEquals(4096, verified.getMaxInboundMessageLength());
-			verified.setKeyPair(clientKey);
-			assertEquals(serverKey.getAccountKey(),
-				verified.verifyPeer(serverKey.getAccountKey()).get(5, TimeUnit.SECONDS));
-
-			cm.addPeer(serverKey.getAccountKey(), verified);
+			CompletableFuture<Convex> admitted = cm.addPeer(serverKey.getAccountKey(), verified);
+			assertSame(verified, admitted.get(5, TimeUnit.SECONDS));
+			assertTrue(cm.isConnected(serverKey.getAccountKey()));
 			assertEquals(8 * 1024 * 1024, verified.getMaxInboundMessageLength(),
 				"a connection verified for its manager slot should receive the trusted tier");
-
-			cm.addPeer(wrongKey, unverified);
-			assertEquals(4096, unverified.getMaxInboundMessageLength(),
-				"an unverified connection must be reduced to the public tier immediately");
 		} finally {
 			cm.removePeer(serverKey.getAccountKey());
-			cm.removePeer(wrongKey);
 			verified.close();
-			unverified.close();
 		}
+	}
+
+	/** A bootstrap connection remains capability-free until its challenge resolves. */
+	@Test
+	public void testPeerChallengeLimboAndPromotion() throws Exception {
+		LatticeConnectionManager cm = new LatticeConnectionManager(store);
+		cm.setKeyPair(AKeyPair.generate());
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+		ControlledVerificationConvex peer = new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
+		assertTrue(cm.isVerificationPending(peerKey));
+		assertEquals(1, cm.getPendingConnectionCount());
+		assertFalse(cm.isConnected(peerKey));
+		assertFalse(cm.getPeers().contains(peer));
+		assertNull(peer.getStore(), "limbo must not grant reverse store access");
+
+		peer.completeVerification(peerKey);
+		assertSame(peer, admission.get(5, TimeUnit.SECONDS));
+		assertFalse(cm.isVerificationPending(peerKey));
+		assertEquals(0, cm.getPendingConnectionCount());
+		assertSame(peer, cm.getConnection(peerKey));
+		assertSame(store, peer.getStore(), "promotion should grant the configured store capability");
+		cm.close();
+	}
+
+	/** A failed bootstrap challenge closes the socket without admitting it. */
+	@Test
+	public void testFailedPeerChallengeNeverEntersActiveSet() throws Exception {
+		LatticeConnectionManager cm = new LatticeConnectionManager(store);
+		cm.setKeyPair(AKeyPair.generate());
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+		ControlledVerificationConvex peer = new ControlledVerificationConvex();
+
+		CompletableFuture<Convex> admission = cm.addPeer(peerKey, peer);
+		peer.failVerification();
+		assertFalse(cm.isVerificationPending(peerKey));
+		assertTrue(admission.isCompletedExceptionally());
+		assertThrows(ExecutionException.class, () -> admission.get(5, TimeUnit.SECONDS));
+		assertFalse(cm.isConnected(peerKey));
+		assertFalse(cm.getPeers().contains(peer));
+		assertNull(peer.getStore());
+		assertFalse(peer.isConnected());
+		cm.close();
 	}
 
 	/**
@@ -2353,6 +2392,91 @@ public class NodeServerTest {
 			assertEquals(serverKP.getAccountKey(), result, "Should succeed with contextID");
 		} finally {
 			convex.close();
+		}
+	}
+
+	/** Deterministic connection whose identity challenge is completed by the test. */
+	private static final class ControlledVerificationConvex extends Convex {
+		private final CompletableFuture<AccountKey> verification = new CompletableFuture<>();
+		private volatile boolean connected = true;
+
+		ControlledVerificationConvex() {
+			super(null, null);
+		}
+
+		void completeVerification(AccountKey peerKey) {
+			setVerifiedPeer(peerKey);
+			verification.complete(peerKey);
+		}
+
+		void failVerification() {
+			verification.completeExceptionally(new SecurityException("Challenge rejected"));
+		}
+
+		@Override
+		public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
+			return verification;
+		}
+
+		@Override
+		public boolean isConnected() {
+			return connected;
+		}
+
+		@Override
+		public CompletableFuture<Result> transact(SignedData<ATransaction> signedTransaction) {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		public CompletableFuture<Result> messageRaw(Blob message) {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		public CompletableFuture<Result> message(Message message) {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore targetStore) {
+			return new CompletableFuture<>();
+		}
+
+		@Override
+		public CompletableFuture<Result> requestStatus() {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		protected CompletableFuture<Result> sendChallenge(SignedData<ACell> data) {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		public CompletableFuture<Result> query(ACell query, Address address) {
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+
+		@Override
+		public void close() {
+			connected = false;
+			verifiedPeer = null;
+		}
+
+		@Override
+		public String toString() {
+			return "Controlled verification connection";
+		}
+
+		@Override
+		public InetSocketAddress getHostAddress() {
+			return null;
+		}
+
+		@Override
+		public void reconnect() {
+			connected = true;
 		}
 	}
 }
