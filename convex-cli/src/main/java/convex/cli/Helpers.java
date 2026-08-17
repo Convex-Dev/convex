@@ -77,6 +77,7 @@ public class Helpers {
 	
 	public static File createTempKeystore(String name, char[] password) throws IOException, GeneralSecurityException {
 		File temp=File.createTempFile(name,".pfx");
+		temp.deleteOnExit();
 		PFXTools.createStore(temp, password);
 		return temp;
 	}

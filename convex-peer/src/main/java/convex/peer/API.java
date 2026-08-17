@@ -48,7 +48,8 @@ public class API {
 	 * <ul>
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
-	 * <li>:store (optional, AStore or String filename) - AStore instance. Defaults to the configured global store
+	 * <li>:store (optional, AStore or String filename) - A supplied AStore remains caller-owned;
+	 * stores opened from a filename or created by default are owned by the returned Server.
 	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Read only, used for key lookup if necessary.
 	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
 	 * <li>:source (optional, String or Socket Address) - URL for Peer to replicate initial State/Belief from.
@@ -74,13 +75,17 @@ public class API {
 		Config.ensureFlags(config);
 		Config.checkKeyStore(config);
 		
+		Object storeConfig=config.get(Keywords.STORE);
+		boolean ownsStore=Server.isStoreOwned(storeConfig);
+		boolean deleteStoreOnClose=Server.isTemporaryStore(storeConfig);
+
 		// Configure the store
 		Config.ensureStore(config);
 
 		Config.ensurePeerKey(config);
 		Config.ensureGenesisState(config);
 
-		Server server = Server.create(config);
+		Server server = Server.create(config,ownsStore,deleteStoreOnClose);
 		server.launch();
 		return server;
 	}

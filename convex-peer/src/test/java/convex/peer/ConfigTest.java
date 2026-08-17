@@ -22,6 +22,7 @@ import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchConfig;
 import convex.etch.EtchConfig.CipherMode;
 import convex.etch.EtchConfig.MappingMode;
@@ -180,6 +181,56 @@ public class ConfigTest {
 			// Fresh network defaults to the latest supported protocol version
 			assertEquals(Migrations.MAX_VERSION,p.getConsensusState().getProtocolVersion());
 			s.close();
+		}
+	}
+
+	@Test public void testServerOwnsImplicitTemporaryStore() throws Exception {
+		Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,AKeyPair.generate());
+		Server server=API.launchPeer(config);
+		EtchStore store=(EtchStore)server.getStore();
+		File file=store.getFile();
+		assertTrue(file.exists());
+
+		server.close();
+		assertThrows(IOException.class,store::flush);
+	}
+
+	@Test public void testServerDoesNotCloseCallerStore() throws Exception {
+		TrackingMemoryStore store=new TrackingMemoryStore();
+		Map<Keyword,Object> config=Config.of(
+				Keywords.KEYPAIR,AKeyPair.generate(),
+				Keywords.STORE,store);
+		Server server=API.launchPeer(config);
+
+		server.close();
+		assertEquals(0,store.closeCount);
+		store.close();
+		assertEquals(1,store.closeCount);
+	}
+
+	@Test public void testServerClosesButPreservesConfiguredStoreFile() throws Exception {
+		File file=File.createTempFile("owned-peer-store",".etch");
+		assertTrue(file.delete());
+		file.deleteOnExit();
+		Map<Keyword,Object> config=Config.of(
+				Keywords.KEYPAIR,AKeyPair.generate(),
+				Keywords.STORE,file.getPath());
+
+		Server server=API.launchPeer(config);
+		server.close();
+		assertTrue(file.exists());
+		try (EtchStore ignored=EtchStore.create(file)) {
+			// Reopening proves that Server.close released its owned file lock.
+		}
+	}
+
+	private static final class TrackingMemoryStore extends MemoryStore {
+		private int closeCount;
+
+		@Override
+		public void close() {
+			closeCount++;
+			super.close();
 		}
 	}
 

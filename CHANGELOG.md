@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DLFS drive deletion and rename retain lattice tombstones, preventing stale replicas from resurrecting deleted names (#647).
 - DLFS nodes reject incoming updates and tombstones more than 30 seconds ahead of the host clock by default; nodes can configure `maxFutureTimestampSkew`.
 - DLFS moves use the operation timestamp, so moved entries correctly supersede older destination tombstones after replication (#688).
+- Peer servers close stores they create while leaving caller-supplied stores open, and retire their temporary Etch files at shutdown.
 - `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory instead of the filesystem root (#701).
 
 ## [0.8.12] - 2026-08-13

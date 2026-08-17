@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.security.GeneralSecurityException;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 import convex.cli.CLTester;
@@ -33,6 +35,11 @@ public class KeyImportTest {
 			throw new Error(e);
 		}
 	}	
+
+	@AfterAll
+	static void deleteTemporaryKeystore() throws IOException {
+		Files.deleteIfExists(KEYSTORE_FILE.toPath());
+	}
 
 	@Test
 	public void testKeyImportPEM() throws GeneralSecurityException {
