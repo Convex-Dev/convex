@@ -5,32 +5,31 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.13-SNAPSHOT] - Unreleased
+## [0.8.13] - 2026-08-17
 
 ### Added
 
+- Lattice applications compose local or NodeServer-hosted component trees through `ALatticeApplication`, with multi-owner DLFS applications, per-owner drives and temporary forks, and the same host-neutral stack in P2P.
+- Standalone `convex.dlfs.Main` boots a complete NodeServer-hosted DLFS without the Convex CLI, configured in JSON5 for storage, identity, bootstrap peers, HTTP limits and exposure policy.
 - CVM: `char?` type predicate for Character values (v1 protocol, #92).
 - DLFS exposes its canonical WebDAV mount path as `DLFSWebDAV.MOUNT_PATH` for embedders (#699).
-- Lattice applications: `ALatticeApplication` provides a root-level composition point over local or NodeServer-hosted `RootComponent` trees; DLFS adds a multi-owner `DLFSApplication`, physical `DLFSRegion` components, per-owner `DLFSDrives` and temporary forks; P2P exposes the same host-neutral application stack with path-specific identity and node-record components.
-- DLFS has a module-local standalone `convex.dlfs.Main` entry point that boots a complete NodeServer-hosted application stack without the Convex CLI, with typed JSON5/`AMap` configuration for persistent storage and identity, lattice placement, identity-aware bootstrap peers, HTTP limits and explicit exposure policy.
 
 ### Changed
 
-- DLFS streamed writes persist blob data every 16 MiB through their hosting component, installing store-backed references without implicitly syncing the cursor or selecting GC roots.
-- DLFS same-drive and WebDAV moves are structural operations that stamp the moved node with the operation time and support replacement without materialising file data on heap.
-- DLFS WebDAV/MCP transport now requires explicit drive routing, distinguishes ephemeral storage in its factories, and accepts authentication policy independently from lattice application ownership.
-- Replicated DLFS services should upgrade every serving instance before deleting or renaming drives: older releases accept the valid empty-file drive tombstone but do not hide it from drive listings.
-- Lattice peer connections configured with a node key remain isolated from propagation and store access until challenge-response verifies the expected remote identity.
-- Lattice root publication is configured and frozen by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
+- DLFS streamed writes persist blob data incrementally, keeping large uploads off heap.
+- DLFS moves are structural operations, supporting replacement without materialising file data.
+- DLFS WebDAV/MCP transport takes explicit drive routing, and accepts authentication policy independently of lattice application ownership.
+- Lattice peer connections configured with a node key stay isolated from propagation and store access until challenge-response verifies the remote identity.
+- Lattice root publication is configured by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
 
 ### Fixed
 
-- DLFS WebDAV `COPY` structurally shares same-drive file blobs instead of materialising source contents on heap, preventing out-of-memory failures for large files.
-- DLFS drive deletion and rename retain lattice tombstones, preventing stale replicas from resurrecting deleted names (#647).
-- DLFS nodes reject incoming updates and tombstones more than 30 seconds ahead of the host clock by default; nodes can configure `maxFutureTimestampSkew`.
+- DLFS WebDAV `COPY` structurally shares same-drive blobs, preventing out-of-memory failures on large files.
+- DLFS drive deletion and rename retain lattice tombstones, so stale replicas cannot resurrect deleted names (#647).
 - DLFS moves use the operation timestamp, so moved entries correctly supersede older destination tombstones after replication (#688).
-- Peer servers close stores they create while leaving caller-supplied stores open, and retire their temporary Etch files at shutdown.
-- `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory instead of the filesystem root (#701).
+- DLFS nodes reject updates more than 30 seconds ahead of the host clock, configurable through `maxFutureTimestampSkew`.
+- Peer servers close only the stores they create, leaving caller-supplied stores open, and retire temporary Etch files at shutdown.
+- `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory (#701).
 
 ## [0.8.12] - 2026-08-13
 
