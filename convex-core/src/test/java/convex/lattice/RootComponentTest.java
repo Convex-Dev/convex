@@ -3,6 +3,7 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Random;
 
@@ -14,6 +15,7 @@ import convex.core.data.ASet;
 import convex.core.data.Blobs;
 import convex.core.data.RefSoft;
 import convex.etch.EtchStore;
+import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.SetLattice;
 
 public class RootComponentTest {
@@ -33,6 +35,16 @@ public class RootComponentTest {
 			ABlob persistedBlob=(ABlob)persisted.getRef(0).getValue();
 			assertInstanceOf(RefSoft.class,persistedBlob.getRef(0));
 			assertSame(store,root.store());
+		}
+	}
+
+	@Test
+	public void testDisabledPersistenceFailsExplicitly() throws Exception {
+		try (EtchStore store=EtchStore.createTemp("root-component-disabled")) {
+			RootComponent<ASet<ACell>> root=new RootComponent<>(
+				Cursors.createLattice(SetLattice.create()),store,false);
+
+			assertThrows(IllegalStateException.class,root::persist);
 		}
 	}
 }

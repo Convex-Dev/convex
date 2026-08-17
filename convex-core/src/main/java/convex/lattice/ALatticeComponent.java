@@ -29,8 +29,8 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Creates a standalone root component with no component parent.
 	 *
-	 * <p>Persistence is a no-op unless the root component overrides
-	 * {@link #persist(ACell)}.</p>
+	 * <p>Persistence fails unless the component overrides
+	 * {@link #persist(ACell)} with a concrete storage policy.</p>
 	 *
 	 * @param cursor Cursor wrapped by this component
 	 */
@@ -71,9 +71,10 @@ public abstract class ALatticeComponent<V extends ACell> {
 	/**
 	 * Persists a value using the policy supplied by the containing component.
 	 *
-	 * <p>The default implementation delegates to the parent component. A root
-	 * component with no parent returns the value unchanged. Hosting components
-	 * may override this method to persist into an underlying store.</p>
+	 * <p>The default implementation delegates to the parent component. A component
+	 * with no parent and no concrete storage policy fails rather than pretending
+	 * that the value was persisted. Hosting components may override this method to
+	 * persist into an underlying store.</p>
 	 *
 	 * <p>Persistence does not update or sync this component's cursor. Callers
 	 * that need store-backed references in their working state must install the
@@ -85,7 +86,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * @throws IOException If persistence fails
 	 */
 	protected <T extends ACell> T persist(T value) throws IOException {
-		if (parent==null) return value;
+		if (parent==null) {
+			throw new IllegalStateException("No store-backed component available for persistence");
+		}
 		return parent.persist(value);
 	}
 

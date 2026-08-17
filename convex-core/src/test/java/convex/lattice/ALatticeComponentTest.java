@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -63,12 +64,12 @@ public class ALatticeComponentTest {
 	}
 
 	@Test
-	public void testStandalonePersistenceIsIdentity() throws IOException {
+	public void testStandalonePersistenceFailsWithoutStore() {
 		TestComponent component=new TestComponent(createCursor());
 		Blob value=Blob.fromHex("cafebabe");
 		component.add(value);
 
-		assertSame(component.cursor().get(),component.persist());
+		assertThrows(IllegalStateException.class,component::persist);
 	}
 
 	@Test

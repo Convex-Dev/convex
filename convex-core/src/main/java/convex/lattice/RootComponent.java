@@ -66,7 +66,9 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	@Override
 	protected <T extends ACell> T persist(T value) throws IOException {
-		if (!persistenceEnabled) return value;
+		if (!persistenceEnabled) {
+			throw new IllegalStateException("Store persistence is disabled for this root component");
+		}
 		return Cells.persist(value,store);
 	}
 }
