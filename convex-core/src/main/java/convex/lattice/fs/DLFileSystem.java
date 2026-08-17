@@ -303,6 +303,19 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 */
 	public abstract void move(DLPath source, DLPath target) throws IOException;
 
+	/**
+	 * Moves a node within this drive, optionally replacing an existing target.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @param replaceExisting true to replace an existing target
+	 * @throws IOException if the move cannot be completed
+	 */
+	public void move(DLPath source, DLPath target, boolean replaceExisting) throws IOException {
+		if (replaceExisting) throw new UnsupportedOperationException("Replacing an existing DLFS target is not supported");
+		move(source,target);
+	}
+
 	public abstract Hash getRootHash();
 
 	public Hash getNodeHash(DLPath p) throws IOException {

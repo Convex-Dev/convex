@@ -19,16 +19,19 @@ import convex.core.util.Utils;
  */
 public class LatticeContext {
 
-	public static final LatticeContext EMPTY = new LatticeContext(null, null, null);
+	public static final LatticeContext EMPTY = new LatticeContext(null, null, null, null);
 
 	private final CVMLong timestamp;
 	private final AKeyPair signingKey;
 	private final BiPredicate<ACell, AccountKey> ownerVerifier;
+	private final Long maxFutureTimestampSkew;
 
-	private LatticeContext(CVMLong timestamp, AKeyPair signingKey, BiPredicate<ACell, AccountKey> ownerVerifier) {
+	private LatticeContext(CVMLong timestamp, AKeyPair signingKey,
+			BiPredicate<ACell, AccountKey> ownerVerifier, Long maxFutureTimestampSkew) {
 		this.timestamp = timestamp;
 		this.signingKey = signingKey;
 		this.ownerVerifier = ownerVerifier;
+		this.maxFutureTimestampSkew = maxFutureTimestampSkew;
 	}
 
 	/**
@@ -40,7 +43,7 @@ public class LatticeContext {
 	 */
 	public static LatticeContext create(CVMLong timestamp, AKeyPair signingKey) {
 		if (timestamp == null && signingKey == null) return EMPTY;
-		return new LatticeContext(timestamp, signingKey, null);
+		return new LatticeContext(timestamp, signingKey, null, null);
 	}
 
 	/**
@@ -53,7 +56,7 @@ public class LatticeContext {
 	 */
 	public static LatticeContext create(CVMLong timestamp, AKeyPair signingKey, BiPredicate<ACell, AccountKey> ownerVerifier) {
 		if (timestamp == null && signingKey == null && ownerVerifier == null) return EMPTY;
-		return new LatticeContext(timestamp, signingKey, ownerVerifier);
+		return new LatticeContext(timestamp, signingKey, ownerVerifier, null);
 	}
 
 	/**
@@ -68,7 +71,7 @@ public class LatticeContext {
 	 * @return Context snapshot with the supplied timestamp
 	 */
 	public LatticeContext withTimestamp(CVMLong timestamp) {
-		return create(timestamp, signingKey, ownerVerifier);
+		return create(timestamp, signingKey, ownerVerifier, maxFutureTimestampSkew);
 	}
 
 	/**
@@ -83,7 +86,7 @@ public class LatticeContext {
 	 * @return Context snapshot with the supplied signing key
 	 */
 	public LatticeContext withSigningKey(AKeyPair signingKey) {
-		return create(timestamp, signingKey, ownerVerifier);
+		return create(timestamp, signingKey, ownerVerifier, maxFutureTimestampSkew);
 	}
 
 	/**
@@ -98,7 +101,26 @@ public class LatticeContext {
 	 * @return Context snapshot with the supplied owner verifier
 	 */
 	public LatticeContext withOwnerVerifier(BiPredicate<ACell, AccountKey> ownerVerifier) {
-		return create(timestamp, signingKey, ownerVerifier);
+		return create(timestamp, signingKey, ownerVerifier, maxFutureTimestampSkew);
+	}
+
+	/**
+	 * Creates a context snapshot with a maximum accepted future timestamp skew.
+	 * Lattices that use wall-clock ordering may apply this as inbound-adoption
+	 * policy; other lattices ignore it.
+	 *
+	 * @param skewMillis non-negative future skew allowance in milliseconds
+	 * @return Context snapshot carrying the supplied allowance
+	 */
+	public LatticeContext withMaxFutureTimestampSkew(long skewMillis) {
+		if (skewMillis<0) throw new IllegalArgumentException("Future timestamp skew must not be negative");
+		return create(timestamp, signingKey, ownerVerifier, skewMillis);
+	}
+
+	private static LatticeContext create(CVMLong timestamp, AKeyPair signingKey,
+			BiPredicate<ACell, AccountKey> ownerVerifier, Long maxFutureTimestampSkew) {
+		if (timestamp==null && signingKey==null && ownerVerifier==null && maxFutureTimestampSkew==null) return EMPTY;
+		return new LatticeContext(timestamp,signingKey,ownerVerifier,maxFutureTimestampSkew);
 	}
 
 	/**
@@ -157,6 +179,18 @@ public class LatticeContext {
 	 */
 	public long currentTimestampValue() {
 		return (timestamp != null) ? timestamp.longValue() : Utils.getCurrentTimestamp();
+	}
+
+	/**
+	 * Gets the configured maximum future timestamp skew, or a lattice-specific
+	 * default when this context does not override it.
+	 *
+	 * @param defaultValue lattice-specific default in milliseconds
+	 * @return non-negative future skew allowance in milliseconds
+	 */
+	public long getMaxFutureTimestampSkew(long defaultValue) {
+		if (defaultValue<0) throw new IllegalArgumentException("Default future timestamp skew must not be negative");
+		return (maxFutureTimestampSkew!=null)?maxFutureTimestampSkew:defaultValue;
 	}
 
 	/**

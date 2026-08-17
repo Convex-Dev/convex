@@ -582,10 +582,6 @@ public class DLFSWebDAV {
 			ctx.status(404).result("Not Found");
 			return;
 		}
-		if (!Files.isRegularFile(source)) {
-			ctx.status(501).result("Directory MOVE is not implemented");
-			return;
-		}
 		if (source.equals(dest)) {
 			ctx.status(204);
 			return;
@@ -602,17 +598,11 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		long sourceSize = Files.size(source);
-		if (sourceSize > maxFileSize) {
-			ctx.status(413).result("Source file is too large to move");
-			return;
-		}
-		FileSystem fs = source.getFileSystem();
-		synchronized (fs) {
-			byte[] data = Files.readAllBytes(source);
-			writeCompleteFile(dest, data);
-			prepareMutation(source);
-			Files.delete(source);
+		prepareMutation(dest);
+		if (destExists) {
+			Files.move(source,dest,StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			Files.move(source,dest);
 		}
 
 		syncDrive(ctx, dp);

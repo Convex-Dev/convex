@@ -69,6 +69,9 @@ public class NodeConfig {
 	/** Time allowed for the ordered inbound dispatcher to drain during shutdown. */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT = Strings.intern("inboundShutdownTimeout");
 
+	/** Maximum accepted wall-clock lead for timestamp-ordered lattice values. */
+	public static final AString MAX_FUTURE_TIMESTAMP_SKEW = Strings.intern("maxFutureTimestampSkew");
+
 	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
@@ -84,6 +87,9 @@ public class NodeConfig {
 
 	/** Default time allowed for accepted inbound work to finish during shutdown. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT = 10_000L;
+
+	/** Default wall-clock lead accepted from timestamp-ordered lattice values. */
+	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
 
 	// ========== Instance ==========
 
@@ -261,6 +267,22 @@ public class NodeConfig {
 		long value = (v != null) ? v.longValue() : DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
 		if (value <= 0) {
 			throw new IllegalArgumentException(INBOUND_SHUTDOWN_TIMEOUT + " must be positive: " + value);
+		}
+		return value;
+	}
+
+	/**
+	 * Gets the maximum accepted lead over this node's clock for lattice values
+	 * that use wall-clock conflict ordering. Zero requires timestamps no later
+	 * than the local clock.
+	 *
+	 * @return non-negative future timestamp allowance in milliseconds
+	 */
+	public long getMaxFutureTimestampSkew() {
+		CVMLong v = RT.ensureLong(config.get(MAX_FUTURE_TIMESTAMP_SKEW));
+		long value = (v != null) ? v.longValue() : DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW;
+		if (value < 0) {
+			throw new IllegalArgumentException(MAX_FUTURE_TIMESTAMP_SKEW + " must not be negative: " + value);
 		}
 		return value;
 	}

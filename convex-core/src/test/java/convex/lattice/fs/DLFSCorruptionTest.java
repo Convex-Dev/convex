@@ -119,7 +119,7 @@ public class DLFSCorruptionTest {
 	}
 
 	@Test
-	public void testForeignMalformedDescendantIsRejected() {
+	public void testForeignTreeValidationIsExplicitAndMergeIsFrontierBounded() {
 		AVector<ACell> corrupt=Vectors.of(Strings.create("broken"));
 		AVector<ACell> branch=DLFSNode.createDirectory(TS).assoc(DLFSNode.POS_DIR,
 			Index.of(Strings.create("deep"),corrupt));
@@ -128,9 +128,12 @@ public class DLFSCorruptionTest {
 		AVector<ACell> own=DLFSNode.createDirectory(TS).assoc(DLFSNode.POS_DIR,
 			Index.of(Strings.create("local"),file(1)));
 
-		assertFalse(DLFSLattice.INSTANCE.checkForeign(foreign));
-		assertSame(own,DLFSLattice.INSTANCE.merge(own,foreign));
-		assertTrue(DLFSNode.isEmpty(DLFSLattice.INSTANCE.merge(null,foreign)));
+		assertTrue(DLFSLattice.INSTANCE.checkForeign(foreign),
+			"normal inbound checks are intentionally bounded to the merge frontier");
+		assertFalse(DLFSNode.isValidTree(foreign),"callers may explicitly audit a complete tree");
+		AVector<ACell> merged=DLFSLattice.INSTANCE.merge(own,foreign);
+		assertSame(branch,DLFSNode.getDirectoryEntries(merged).get(Strings.create("branch")));
+		assertSame(foreign,DLFSLattice.INSTANCE.merge(null,foreign));
 	}
 
 	private static AVector<ACell> file(int value) {

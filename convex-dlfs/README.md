@@ -73,6 +73,7 @@ drive and inbound switches remain useful as development overrides.
 {
   node: {
     port: 19888,
+    maxFutureTimestampSkew: 30000,
     store: "dlfs.etch",
     etch: {version: 3},
     keypair: "<32-byte Ed25519 seed hex>",
@@ -97,6 +98,11 @@ drive and inbound switches remain useful as development overrides.
   },
 }
 ```
+
+`node.maxFutureTimestampSkew` is the maximum accepted lead, in milliseconds, for
+timestamp-ordered DLFS updates and tombstones received from another replica. It
+defaults to 30 seconds; lower it only when participating hosts have tighter clock
+synchronisation.
 
 Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
 manager challenges that identity after connecting and keeps an unverified connection

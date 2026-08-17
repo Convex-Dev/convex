@@ -144,20 +144,16 @@ public class DLFSProvider extends FileSystemProvider {
 			throw new ProviderMismatchException("DLFS move requires paths on the same drive");
 		}
 		Objects.requireNonNull(options,"Move options");
-		boolean atomic=false;
-		CopyOption unsupported=null;
+		boolean replaceExisting=false;
 		for (CopyOption option:options) {
 			Objects.requireNonNull(option,"Move option");
-			if (option==StandardCopyOption.ATOMIC_MOVE) {
-				atomic=true;
-			} else if (option!=DLFSOption.RECURSIVE) {
-				unsupported=option;
+			if (option==StandardCopyOption.REPLACE_EXISTING) {
+				replaceExisting=true;
+			} else if (option!=StandardCopyOption.ATOMIC_MOVE && option!=DLFSOption.RECURSIVE) {
+				throw new UnsupportedOperationException("Unsupported DLFS move option: "+option);
 			}
 		}
-		if (!atomic && unsupported!=null) {
-			throw new UnsupportedOperationException("Unsupported DLFS move option: "+unsupported);
-		}
-		fs.move(src,dst);
+		fs.move(src,dst,replaceExisting);
 	}
 
 	@Override

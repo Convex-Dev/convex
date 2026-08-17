@@ -17,12 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - DLFS streamed writes persist blob data every 16 MiB through their hosting component, installing store-backed references without implicitly syncing the cursor or selecting GC roots.
+- DLFS same-drive and WebDAV moves are structural operations that stamp the moved node with the operation time and support replacement without materialising file data on heap.
 - DLFS WebDAV/MCP transport now requires explicit drive routing, distinguishes ephemeral storage in its factories, and accepts authentication policy independently from lattice application ownership.
+- Replicated DLFS services should upgrade every serving instance before deleting or renaming drives: older releases accept the valid empty-file drive tombstone but do not hide it from drive listings.
+- Lattice peer connections configured with a node key remain isolated from propagation and store access until challenge-response verifies the expected remote identity.
 - Lattice root publication is configured and frozen by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
 
 ### Fixed
 
 - DLFS WebDAV `COPY` structurally shares same-drive file blobs instead of materialising source contents on heap, preventing out-of-memory failures for large files.
+- DLFS drive deletion and rename retain lattice tombstones, preventing stale replicas from resurrecting deleted names (#647).
+- DLFS nodes reject incoming updates and tombstones more than 30 seconds ahead of the host clock by default; nodes can configure `maxFutureTimestampSkew`.
+- DLFS moves use the operation timestamp, so moved entries correctly supersede older destination tombstones after replication (#688).
 - `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory instead of the filesystem root (#701).
 
 ## [0.8.12] - 2026-08-13

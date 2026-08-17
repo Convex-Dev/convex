@@ -196,12 +196,16 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized void move(DLPath source, DLPath target) throws IOException {
+		move(source,target,false);
+	}
+
+	@Override
+	public synchronized void move(DLPath source, DLPath target, boolean replaceExisting) throws IOException {
 		DLPath src=source.toAbsolutePath().normalize();
 		DLPath dst=target.toAbsolutePath().normalize();
 		if (src.getNameCount()==0) throw new FileSystemException(src.toString(),dst.toString(),"Cannot move the DLFS root");
 		if (dst.getNameCount()==0) throw new FileAlreadyExistsException(dst.toString());
 
-		CVMLong utime=getTimestamp();
 		try {
 			rootCursor.updateAndGet(root->{
 				AVector<ACell> sourceNode=resolveValidUnchecked(root,src);
@@ -211,14 +215,50 @@ public class DLFSLocal extends DLFileSystem {
 					throw new UncheckedIOException(new FileSystemException(src.toString(),dst.toString(),"Cannot move a directory into itself"));
 				}
 				AVector<ACell> targetParent=requireDirectory(root,dst.getParent());
-				requireAbsentUnchecked(targetParent,dst.getCVMFileName(),dst);
+				AString targetName=dst.getCVMFileName();
+				AVector<ACell> targetNode=resolveValidUnchecked(root,dst);
+				if (targetNode!=null) {
+					if (!replaceExisting) requireAbsentUnchecked(targetParent,targetName,dst);
+					if (DLFSNode.isDirectory(targetNode)&&!DLFSNode.isEmpty(targetNode)) {
+						throw new UncheckedIOException(new DirectoryNotEmptyException(dst.toString()));
+					}
+				}
+				CVMLong targetTomb=DLFSNode.getTombstones(targetParent).get(targetName);
+				CVMLong utime=nextMutationTimestamp(getTimestamp(),DLFSNode.getUTime(sourceNode),
+					(targetNode==null)?null:DLFSNode.getUTime(targetNode),targetTomb);
+				AVector<ACell> movedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
 
 				AVector<ACell> updated=DLFSNode.deleteNode(root,src,utime);
-				return DLFSNode.updateNode(updated,dst,sourceNode,utime);
+				return DLFSNode.updateNode(updated,dst,movedNode,utime);
 			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
 		}
+	}
+
+	private CVMLong nextMutationTimestamp(CVMLong requested, CVMLong... observed) {
+		long now=rootCursor.getContext().currentTimestampValue();
+		long skew=rootCursor.getContext().getMaxFutureTimestampSkew(
+			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
+		long limit=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
+		long result=requested.longValue();
+		if (result>limit) throw futureTimestamp("DLFS mutation timestamp is too far in the future: "+result);
+		for (CVMLong timestamp:observed) {
+			if (timestamp==null) continue;
+			long stored=timestamp.longValue();
+			if (stored>limit) throw futureTimestamp("DLFS timestamp is too far in the future: "+stored);
+			if (stored>=result) {
+				if (stored==Long.MAX_VALUE || stored+1>limit) {
+					throw futureTimestamp("No acceptable timestamp remains for the DLFS mutation");
+				}
+				result=stored+1;
+			}
+		}
+		return CVMLong.create(result);
+	}
+
+	private static UncheckedIOException futureTimestamp(String reason) {
+		return new UncheckedIOException(new FileSystemException(null,null,reason));
 	}
 
 	private static AVector<ACell> requireDirectory(AVector<ACell> rootNode, DLPath path) {

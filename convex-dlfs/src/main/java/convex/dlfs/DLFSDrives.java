@@ -11,14 +11,19 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSLattice;
+import convex.lattice.fs.DLFSNode;
 import convex.lattice.generic.MapLattice;
 
 /** Component representing all named drives belonging to one owner. */
 public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVector<ACell>>> {
+	/** State of a drive registry entry. */
+	public enum DriveStatus { LIVE, DELETED, UNTRACKED }
 
 	/** Lattice definition for one owner's map of named DLFS drives. */
 	public static final MapLattice<AString, AVector<ACell>> LATTICE=
@@ -59,7 +64,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
 		AString name=Strings.create(driveName);
 		AHashMap<AString,AVector<ACell>> registry=cursor.get();
-		if (registry==null || registry.get(name)==null) return null;
+		if (registry==null || status(registry.get(name))!=DriveStatus.LIVE) return null;
 		return drives.compute(name,(key,existing)->{
 			if (existing!=null && existing.isOpen()) return existing;
 			return new DLFSDrive(this,key,cursor.path(key));
@@ -72,11 +77,17 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		AString name=Strings.create(driveName);
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
 			if (registry==null) registry=Maps.empty();
-			if (registry.containsKey(name) || registry.count()>=maximumDrives) return registry;
-			return registry.assoc(name,DLFSLattice.INSTANCE.zero());
+			AVector<ACell> existing=registry.get(name);
+			DriveStatus status=status(existing);
+			if (status==DriveStatus.LIVE) return registry;
+			if (existing!=null && status!=DriveStatus.DELETED) return registry;
+			if (liveCount(registry)>=maximumDrives) return registry;
+			return registry.assoc(name,DLFSNode.createDirectory(nextMutationTimestamp(existing)));
 		});
-		if ((previous!=null && previous.containsKey(name))
-				|| (previous!=null && previous.count()>=maximumDrives)) return null;
+		AVector<ACell> old=(previous==null)?null:previous.get(name);
+		if (status(old)==DriveStatus.LIVE
+				|| (old!=null && status(old)!=DriveStatus.DELETED)
+				|| (previous!=null && liveCount(previous)>=maximumDrives)) return null;
 		return drive(driveName);
 	}
 
@@ -90,10 +101,13 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		AString name=Strings.create(driveName);
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
-			if (registry==null || !registry.containsKey(name)) return registry;
-			return registry.dissoc(name);
+			if (registry==null) return null;
+			AVector<ACell> root=registry.get(name);
+			if (status(root)!=DriveStatus.LIVE) return registry;
+			CVMLong deletionTime=nextMutationTimestamp(root);
+			return registry.assoc(name,DLFSNode.createEmptyFile(deletionTime));
 		});
-		boolean deleted=previous!=null && previous.containsKey(name);
+		boolean deleted=previous!=null && status(previous.get(name))==DriveStatus.LIVE;
 		if (deleted) closeCached(name);
 		return deleted;
 	}
@@ -106,12 +120,21 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		AString oldKey=Strings.create(oldName);
 		AString newKey=Strings.create(newName);
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
-			if (registry==null || registry.containsKey(newKey)) return registry;
+			if (registry==null) return null;
 			AVector<ACell> root=registry.get(oldKey);
-			if (root==null) return registry;
-			return registry.assoc(newKey,root).dissoc(oldKey);
+			if (status(root)!=DriveStatus.LIVE) return registry;
+			AVector<ACell> target=registry.get(newKey);
+			DriveStatus targetStatus=status(target);
+			if (targetStatus==DriveStatus.LIVE || (target!=null && targetStatus!=DriveStatus.DELETED)) return registry;
+			CVMLong operationTime=nextMutationTimestamp(root,target);
+			AVector<ACell> movedRoot=root.assoc(DLFSNode.POS_UTIME,operationTime);
+			AVector<ACell> tombstone=DLFSNode.createEmptyFile(operationTime);
+			return registry.assoc(newKey,movedRoot).assoc(oldKey,tombstone);
 		});
-		if (previous==null || previous.get(oldKey)==null || previous.containsKey(newKey)) return false;
+		if (previous==null || status(previous.get(oldKey))!=DriveStatus.LIVE) return false;
+		AVector<ACell> oldTarget=previous.get(newKey);
+		DriveStatus targetStatus=status(oldTarget);
+		if (targetStatus==DriveStatus.LIVE || (oldTarget!=null && targetStatus!=DriveStatus.DELETED)) return false;
 		closeCached(oldKey);
 		closeCached(newKey);
 		return true;
@@ -122,9 +145,56 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		AHashMap<AString,AVector<ACell>> registry=cursor.get();
 		if (registry==null || registry.isEmpty()) return List.of();
 		List<String> result=new ArrayList<>((int)Math.min(Integer.MAX_VALUE,registry.count()));
-		for (AString name: registry.keySet()) result.add(name.toString());
+		for (AString name: registry.keySet()) {
+			if (status(registry.get(name))==DriveStatus.LIVE) result.add(name.toString());
+		}
 		result.sort(String::compareTo);
 		return result;
+	}
+
+	/** Returns whether a name is live, deleted, or has never been tracked. */
+	public DriveStatus driveStatus(String driveName) {
+		if (!DLFSPathValidator.isValidDriveName(driveName)) return DriveStatus.UNTRACKED;
+		AHashMap<AString,AVector<ACell>> registry=cursor.get();
+		return status((registry==null)?null:registry.get(Strings.create(driveName)));
+	}
+
+	private static DriveStatus status(AVector<ACell> root) {
+		if (root==null) return DriveStatus.UNTRACKED;
+		if (!DLFSNode.isValidNodeShallow(root)) return DriveStatus.UNTRACKED;
+		if (DLFSNode.isDirectory(root)) return DriveStatus.LIVE;
+		if (DLFSNode.isRegularFile(root)
+				&& DLFSNode.getData(root).count()==0
+				&& DLFSNode.getMetadata(root)==null) return DriveStatus.DELETED;
+		return DriveStatus.UNTRACKED;
+	}
+
+	private static long liveCount(AHashMap<AString,AVector<ACell>> registry) {
+		long count=0;
+		for (AString name:registry.keySet()) {
+			if (status(registry.get(name))==DriveStatus.LIVE) count++;
+		}
+		return count;
+	}
+
+	private CVMLong nextMutationTimestamp(AVector<ACell>... roots) {
+		LatticeContext context=cursor.getContext();
+		long now=context.currentTimestampValue();
+		long skew=context.getMaxFutureTimestampSkew(DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
+		long limit=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
+		long result=now;
+		for (AVector<ACell> root:roots) {
+			if (root==null || !DLFSNode.isValidNodeShallow(root)) continue;
+			long stored=DLFSNode.getUTime(root).longValue();
+			if (stored>limit) throw new IllegalStateException("DLFS drive timestamp is too far in the future: "+stored);
+			if (stored>=result) {
+				if (stored==Long.MAX_VALUE || stored+1>limit) {
+					throw new IllegalStateException("No acceptable timestamp remains for the DLFS drive mutation");
+				}
+				result=stored+1;
+			}
+		}
+		return CVMLong.create(result);
 	}
 
 	private void closeCached(AString name) {

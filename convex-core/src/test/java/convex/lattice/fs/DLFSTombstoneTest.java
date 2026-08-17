@@ -163,4 +163,29 @@ public class DLFSTombstoneTest {
 			assertSame(own, lat.merge((LatticeContext) null, own, bad), "context merge must also fail safe");
 		}
 	}
+
+	@Test
+	public void testFutureUpdatesAndTombstonesAreRejectedAtMergeFrontier() {
+		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
+			.withMaxFutureTimestampSkew(30);
+		AVector<ACell> own=DLFSNode.createDirectory(CVMLong.create(900));
+
+		AVector<ACell> tooFar=DLFSNode.createDirectory(CVMLong.create(1_031));
+		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,tooFar));
+		AVector<ACell> boundary=DLFSNode.createDirectory(CVMLong.create(1_030));
+		assertSame(boundary,DLFSLattice.INSTANCE.merge(context,own,boundary));
+
+		AVector<ACell> futureChild=DLFSNode.createEmptyFile(CVMLong.create(1_031));
+		AVector<ACell> hiddenChild=DLFSNode.createDirectory(CVMLong.create(1_000)).assoc(
+			DLFSNode.POS_DIR,Index.of(Strings.create("future"),futureChild));
+		assertSame(own,DLFSLattice.INSTANCE.merge(context,own,hiddenChild));
+
+		AVector<ACell> live=DLFSNode.createEmptyFile(CVMLong.create(900));
+		AVector<ACell> ownWithFile=DLFSNode.createDirectory(CVMLong.create(900)).assoc(
+			DLFSNode.POS_DIR,Index.of(Strings.create("deleted"),live));
+		AVector<ACell> futureDelete=DLFSNode.deleteNode(ownWithFile,
+			new DLPath(null,new AString[] {Strings.create("deleted")},false),CVMLong.create(1_031))
+			.assoc(DLFSNode.POS_UTIME,CVMLong.create(1_000));
+		assertSame(ownWithFile,DLFSLattice.INSTANCE.merge(context,ownWithFile,futureDelete));
+	}
 }

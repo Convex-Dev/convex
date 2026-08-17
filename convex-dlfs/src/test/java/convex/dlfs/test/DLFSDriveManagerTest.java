@@ -3,8 +3,10 @@ package convex.dlfs.test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -22,8 +24,10 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.etch.EtchStore;
 import convex.lattice.cursor.ALatticeCursor;
+import convex.lattice.LatticeContext;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.cursor.RootLatticeCursor;
 import convex.lattice.fs.DLFSLattice;
@@ -94,25 +98,127 @@ public class DLFSDriveManagerTest {
 		Files.writeString(manager.getDrive(null, "before").getPath("/data"), "kept");
 
 		assertTrue(manager.renameDrive(null, "before", "after"));
-		assertNull(cursor.get().get(Strings.create("before")));
+		AVector<ACell> renameTombstone=cursor.get().get(Strings.create("before"));
+		assertTrue(DLFSNode.isRegularFile(renameTombstone));
 		assertNotNull(cursor.get().get(Strings.create("after")));
 		assertEquals("kept", Files.readString(manager.getDrive(null, "after").getPath("/data")));
 
 		assertTrue(manager.deleteDrive(null, "after"));
-		assertFalse(cursor.get().containsKey(Strings.create("after")));
+		AVector<ACell> deleteTombstone=cursor.get().get(Strings.create("after"));
+		assertTrue(DLFSNode.isRegularFile(deleteTombstone));
 		assertTrue(new DLFSDriveManager(cursor).listDrives(null).isEmpty());
 	}
 
 	@Test
-	public void testCursorBackedRegistryDiscoversExternalDrive() {
+	public void testDriveDeleteAndRenameDoNotResurrectFromStaleReplica() throws Exception {
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> deleted=Cursors.createLattice(lattice);
+		DLFSDriveManager deleteManager=new DLFSDriveManager(deleted);
+		assertTrue(deleteManager.createDrive(null,"home"));
+		AHashMap<AString,AVector<ACell>> staleHome=deleted.get();
+		assertTrue(deleteManager.deleteDrive(null,"home"));
+		deleted.merge(staleHome);
+		assertNull(deleteManager.getDrive(null,"home"));
+		assertTrue(deleteManager.listDrives(null).isEmpty());
+
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> renamed=Cursors.createLattice(lattice);
+		DLFSDriveManager renameManager=new DLFSDriveManager(renamed);
+		assertTrue(renameManager.createDrive(null,"before"));
+		Files.writeString(renameManager.getDrive(null,"before").getPath("/data"),"kept");
+		AHashMap<AString,AVector<ACell>> staleBefore=renamed.get();
+		assertTrue(renameManager.renameDrive(null,"before","after"));
+		renamed.merge(staleBefore);
+		assertNull(renameManager.getDrive(null,"before"));
+		assertEquals("kept",Files.readString(renameManager.getDrive(null,"after").getPath("/data")));
+	}
+
+	@Test
+	public void testDeletedDriveCanBeRecreatedWithNewerTimestamp() {
+		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		assertTrue(manager.createDrive(null,"home"));
+		assertTrue(manager.deleteDrive(null,"home"));
+		CVMLong deletionTime=DLFSNode.getUTime(cursor.get().get(Strings.create("home")));
+		assertTrue(manager.createDrive(null,"home"));
+		AVector<ACell> recreated=cursor.get().get(Strings.create("home"));
+		assertTrue(DLFSNode.isDirectory(recreated));
+		assertTrue(DLFSNode.getUTime(recreated).longValue()>deletionTime.longValue());
+	}
+
+	@Test
+	public void testTombstonesDoNotConsumeLiveDriveLimit() {
+		DLFSDrives drives=DLFSDrives.create();
+		assertNotNull(drives.createDrive("first",1));
+		assertTrue(drives.deleteDrive("first"));
+		assertNotNull(drives.createDrive("second",1));
+		assertEquals(List.of("second"),drives.driveNames());
+	}
+
+	@Test
+	public void testDriveMutationRefusesDistantFutureTimestamp() {
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		AString home=Strings.create("home");
+		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
+			home,DLFSNode.createDirectory(CVMLong.create(1_031)));
+		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
+			.withMaxFutureTimestampSkew(30);
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=
+			Cursors.createLattice(lattice,initial,context);
+		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+
+		assertThrows(IllegalStateException.class,()->manager.deleteDrive(null,"home"));
+		assertNotNull(manager.getDrive(null,"home"));
+	}
+
+	@Test
+	public void testDriveMergeRejectsDistantFutureTombstones() {
+		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
+		AString home=Strings.create("home");
+		AString untracked=Strings.create("untracked");
+		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
+			home,DLFSNode.createDirectory(CVMLong.create(900)));
+		LatticeContext context=LatticeContext.create(CVMLong.create(1_000),null)
+			.withMaxFutureTimestampSkew(30);
+		RootLatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=
+			Cursors.createLattice(lattice,initial,context);
+
+		AHashMap<AString,AVector<ACell>> foreign=convex.core.data.Maps.of(
+			home,DLFSNode.createEmptyFile(CVMLong.create(1_031)),
+			untracked,DLFSNode.createEmptyFile(CVMLong.create(1_031)));
+		cursor.merge(foreign);
+
+		assertTrue(DLFSNode.isDirectory(cursor.get().get(home)));
+		assertNull(cursor.get().get(untracked));
+	}
+
+	@Test
+	public void testCursorBackedRegistryDiscoversMergedUntrackedDrive() {
 		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager manager=new DLFSDriveManager(cursor);
 		AString remote=Strings.create("remote");
 
-		cursor.updateAndGet(drives->drives.assoc(remote, DLFSNode.createDirectory(convex.core.data.prim.CVMLong.ZERO)));
+		cursor.merge(convex.core.data.Maps.of(
+			remote,DLFSNode.createDirectory(convex.core.data.prim.CVMLong.ZERO)));
 
 		assertEquals(List.of("remote"), manager.listDrives(null));
 		assertNotNull(manager.getDrive(null, "remote"));
+	}
+
+	@Test
+	public void testClosingCachedFileSystemDoesNotChangeRegistryState() throws Exception {
+		DLFSDrives drives=DLFSDrives.create();
+		DLFSDriveManager manager=new DLFSDriveManager(drives);
+		assertTrue(manager.createDrive(null,"home"));
+		FileSystem first=manager.getDrive(null,"home");
+		AHashMap<AString,AVector<ACell>> registry=drives.cursor().get();
+
+		first.close();
+		FileSystem reopened=manager.getDrive(null,"home");
+
+		assertNotSame(first,reopened);
+		assertTrue(reopened.isOpen());
+		assertEquals(registry,drives.cursor().get());
+		assertEquals(List.of("home"),manager.listDrives(null));
 	}
 
 	@Test

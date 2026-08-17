@@ -153,6 +153,33 @@ public class DLFSServerTest {
 	}
 
 	@Test
+	void testMoveAboveRequestLimitOverwritesAndSharesBlobData() throws Exception {
+		try (DLFSServer moveServer=DLFSServer.createEphemeral().setMaxRequestSize(1024)) {
+			moveServer.getDriveManager().createDrive(null,"move-test");
+			DLFileSystem fs=(DLFileSystem)moveServer.getDriveManager().getDrive(null,"move-test");
+			Path source=fs.getPath("/source.bin");
+			Path target=fs.getPath("/target.bin");
+			Files.write(source,new byte[2048]);
+			Files.write(target,new byte[] {1});
+			ABlob sourceData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)source));
+
+			moveServer.start(0);
+			String sourceURL="http://localhost:"+moveServer.getPort()+"/dlfs/move-test/source.bin";
+			String targetURL="http://localhost:"+moveServer.getPort()+"/dlfs/move-test/target.bin";
+			HttpRequest move=HttpRequest.newBuilder(URI.create(sourceURL))
+				.method("MOVE",HttpRequest.BodyPublishers.noBody())
+				.header("Destination",targetURL)
+				.build();
+
+			HttpResponse<String> response=client.send(move,HttpResponse.BodyHandlers.ofString());
+			assertEquals(204,response.statusCode());
+			assertFalse(Files.exists(source));
+			ABlob targetData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)target));
+			assertSame(sourceData,targetData,"WebDAV MOVE should structurally share immutable blob data");
+		}
+	}
+
+	@Test
 	void testGetNotFound() throws Exception {
 		HttpRequest req = HttpRequest.newBuilder()
 				.uri(URI.create(driveURL + "nonexistent.txt"))
@@ -314,7 +341,7 @@ public class DLFSServerTest {
 	}
 
 	@Test
-	void testDirectoryMoveFailsWithoutPartialMutation() throws Exception {
+	void testDirectoryMoveIsStructural() throws Exception {
 		String source = driveURL + "move-directory-source/";
 		HttpRequest create = HttpRequest.newBuilder(URI.create(source))
 			.method("MKCOL", HttpRequest.BodyPublishers.noBody()).build();
@@ -323,8 +350,10 @@ public class DLFSServerTest {
 		HttpRequest move = HttpRequest.newBuilder(URI.create(source))
 			.method("MOVE", HttpRequest.BodyPublishers.noBody())
 			.header("Destination", driveURL + "move-directory-target/").build();
-		assertEquals(501, client.send(move, HttpResponse.BodyHandlers.ofString()).statusCode());
-		assertEquals(200, client.send(HttpRequest.newBuilder(URI.create(source)).GET().build(),
+		assertEquals(201, client.send(move, HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertEquals(404, client.send(HttpRequest.newBuilder(URI.create(source)).GET().build(),
+			HttpResponse.BodyHandlers.ofString()).statusCode());
+		assertEquals(200, client.send(HttpRequest.newBuilder(URI.create(driveURL + "move-directory-target/")).GET().build(),
 			HttpResponse.BodyHandlers.ofString()).statusCode());
 	}
 

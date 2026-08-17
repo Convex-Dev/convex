@@ -249,7 +249,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.inboundQueue = new ArrayBlockingQueue<>(this.config.getInboundQueueSize());
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
-		this.cursor = Cursors.createLattice(lattice);
+		this.mergeContext = LatticeContext.EMPTY.withMaxFutureTimestampSkew(
+			this.config.getMaxFutureTimestampSkew());
+		this.cursor = Cursors.createLattice(lattice, lattice.zero(), mergeContext);
 		this.rootComponent = new RootComponent<>(cursor,store);
 
 		// Hook sync callback: synchronous publication on the primary propagator,
@@ -1866,9 +1868,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public synchronized void setMergeContext(LatticeContext context) {
 		if (context == null) throw new IllegalArgumentException("Use LatticeContext.EMPTY instead of null");
 		requireNewLifecycle("setMergeContext");
-		this.mergeContext = context;
+		long configuredSkew=config.getMaxFutureTimestampSkew();
+		long effectiveSkew=config.getMap().containsKey(NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW)
+			?configuredSkew:context.getMaxFutureTimestampSkew(configuredSkew);
+		this.mergeContext = context.withMaxFutureTimestampSkew(effectiveSkew);
 		// Propagate to lattice cursor so path-navigated cursors inherit it
-		cursor.setContext(context);
+		cursor.setContext(mergeContext);
 	}
 
 	/**
