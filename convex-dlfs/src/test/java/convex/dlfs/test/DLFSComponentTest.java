@@ -120,7 +120,7 @@ public class DLFSComponentTest {
 				DLFSApplication.open(store,hostKey);
 			Index<Keyword,ACell> before=application.cursor().get();
 
-			assertSame(application.drives(hostKey.getAccountKey()),
+			assertNotSame(application.drives(hostKey.getAccountKey()),
 				application.drives(hostKey.getAccountKey()));
 			assertNotSame(application.drives(hostKey.getAccountKey()).cursor(),
 				application.drives(otherOwner).cursor());

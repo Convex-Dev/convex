@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - CVM: `char?` type predicate for Character values (v1 protocol, #92).
-- Lattice applications: `ALatticeApplication` provides a root-level composition point over local or NodeServer-hosted `RootComponent` trees; DLFS adds a multi-owner `DLFSApplication`, physical `DLFSRegion` components, per-owner `DLFSDrives` and temporary forks.
+- Lattice applications: `ALatticeApplication` provides a root-level composition point over local or NodeServer-hosted `RootComponent` trees; DLFS adds a multi-owner `DLFSApplication`, physical `DLFSRegion` components, per-owner `DLFSDrives` and temporary forks; P2P exposes the same host-neutral application stack with path-specific identity and node-record components.
 
 ### Changed
 
 - DLFS streamed writes persist blob data every 16 MiB through their hosting component, installing store-backed references without implicitly syncing the cursor or selecting GC roots.
 - DLFS WebDAV/MCP transport now requires explicit drive routing, distinguishes ephemeral storage in its factories, and accepts authentication policy independently from lattice application ownership.
+- Lattice root publication is configured and frozen by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
 
 ### Fixed
 

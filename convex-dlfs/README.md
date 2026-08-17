@@ -133,10 +133,11 @@ components for multiple owners. Local identity-to-owner and cross-region mapping
 remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
 lifecycle.
 
-The application does not own or close its root or store. It retains one long-lived
-`DLFSDrives` component per requested owner, including cached NIO views. Isolated work uses
-`app.drives(owner).fork()` or `app.drives(owner).drive(name).fork()` and
-explicitly syncs the temporary component when its changes should merge back.
+The application does not own or close its root or store. Owner components are cheap
+views and are not retained globally; long-lived services keep the `DLFSDrives`
+components they route, which also retains their cached NIO views. Isolated work uses
+`app.drives(owner).fork()` or `app.drives(owner).drive(name).fork()` and explicitly
+syncs the temporary component when its changes should merge back.
 
 Large channel writes checkpoint blob data through the component hierarchy every
 16 MiB. This replaces eligible direct references with store-backed soft references,

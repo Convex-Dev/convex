@@ -15,9 +15,9 @@ import convex.lattice.cursor.RootLatticeCursor;
  *
  * <p>A root component supplies store-only persistence to its descendants and
  * hosts the root cursor's sync policy. Standalone roots publish their current
- * value as the store root on {@link #sync()}. A network host may replace that
- * handler with a replication pipeline. Neither operation performs a durability
- * barrier or owns the store lifecycle.</p>
+ * value as the store root on {@link #sync()}. Network infrastructure may configure
+ * a replication pipeline before freezing host configuration. Neither operation
+ * performs a durability barrier or owns the store lifecycle.</p>
  *
  * <p>The same component can wrap a cursor owned by a networked NodeServer or
  * own a standalone local lattice cursor backed by any {@link AStore}.</p>
@@ -28,6 +28,8 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 
 	private final AStore store;
 	private final RootLatticeCursor<V> rootCursor;
+	private volatile Function<V,V> publicationPolicy;
+	private boolean publicationPolicyFrozen;
 
 	/** Creates a store-backed host around an existing root cursor. */
 	public RootComponent(RootLatticeCursor<V> cursor, AStore store) {
@@ -35,7 +37,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 		if (store==null) throw new IllegalArgumentException("Root store must not be null");
 		this.store=store;
 		this.rootCursor=cursor;
-		rootCursor.onSync(this::storeRoot);
+		rootCursor.onSync(this::publishRoot);
 	}
 
 	/** Creates a standalone local root at the lattice's zero value. */
@@ -79,17 +81,34 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/**
-	 * Replaces the synchronous root publication handler.
+	 * Configures the synchronous root publication policy.
 	 *
 	 * <p>This is a host integration point. Application components call
 	 * {@link #sync()} without knowing whether the root is local, replicated or
 	 * otherwise hosted. The handler must return the exact published value to install
 	 * back into the root cursor, usually with store-backed references.</p>
 	 *
-	 * @param handler Root publication handler, or null to disable publication
+	 * <p>Until a policy is configured, sync publishes to this component's store.
+	 * Host infrastructure may install a replication pipeline during configuration
+	 * and then call {@link #freezePublicationPolicy()} before application work begins.</p>
+	 *
+	 * @param policy Root publication policy
+	 * @throws IllegalStateException If host publication configuration is frozen
 	 */
-	public void onSync(Function<V,V> handler) {
-		rootCursor.onSync(handler);
+	public synchronized void setPublicationPolicy(Function<V,V> policy) {
+		if (publicationPolicyFrozen) {
+			throw new IllegalStateException("Root publication policy is frozen");
+		}
+		if (policy==null) throw new IllegalArgumentException("Root publication policy must not be null");
+		publicationPolicy=policy;
+	}
+
+	/**
+	 * Freezes host publication configuration against later replacement.
+	 * Application state may continue to sync normally after this boundary.
+	 */
+	public synchronized void freezePublicationPolicy() {
+		publicationPolicyFrozen=true;
 	}
 
 	/**
@@ -104,6 +123,11 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	@Override
 	protected <T extends ACell> T persist(T value) throws IOException {
 		return Cells.persist(value,store);
+	}
+
+	private V publishRoot(V value) {
+		Function<V,V> policy=publicationPolicy;
+		return (policy==null)?storeRoot(value):policy.apply(value);
 	}
 
 	private V storeRoot(V value) {

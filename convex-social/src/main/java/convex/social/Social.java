@@ -27,8 +27,8 @@ import convex.lattice.generic.OwnerLattice;
  * Social social = Social.create(myKeyPair);
  * social.user(myKeyPair.getAccountKey()).feed().post("Hello!");
  *
- * // Connected to a root lattice cursor (e.g. from NodeServer)
- * Social social = Social.connect(rootCursor, myKeyPair);
+ * // Connected beneath a hosted application component
+ * Social social = Social.connect(application, myKeyPair);
  *
  * // Fork for batch operations
  * Social forked = social.fork();
@@ -125,11 +125,22 @@ public class Social extends ALatticeComponent<
 	 * @return Social instance connected beneath the parent component
 	 */
 	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
+		Social social=connect(parent);
+		social.cursor.setContext(LatticeContext.create(null,keyPair));
+		return social;
+	}
+
+	/**
+	 * Connects to the {@code :social} region beneath a containing component,
+	 * inheriting its live lattice context and persistence policy.
+	 *
+	 * @param parent Containing application component
+	 * @return Social region component
+	 */
+	public static Social connect(ALatticeComponent<?> parent) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
 		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
 			parent.cursor().path(KEY_SOCIAL);
-		socialCursor.withContext(ctx);
 		return new Social(parent,socialCursor);
 	}
 

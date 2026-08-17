@@ -103,6 +103,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/** Generic application root owned by this server. */
 	private final RootComponent<V> rootComponent;
+	/** True once this server has installed and frozen its root publication policy. */
+	private boolean rootPublicationConfigured;
 
 	/**
 	 * Network server instance for handling connections
@@ -265,22 +267,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// The returned (announced/store-backed) value is CASed back into the
 		// cursor by RootLatticeCursor.sync(), with lattice-merge fallback if a
 		// concurrent app write changed the cursor during the announce.
-		this.rootComponent.onSync(value -> {
-			if (propagators.isEmpty()) return value;
-			ACell announced;
-			try {
-				announced = propagators.get(0).processSnapshot(value);
-			} catch (IOException e) {
-				throw new StoreException("NodeServer sync failed: persistence error", e);
-			}
-			for (int i = 1; i < propagators.size(); i++) {
-				propagators.get(i).triggerBroadcast(value);
-			}
-			@SuppressWarnings("unchecked")
-			V typed = (V) announced;
-			return typed;
-		});
-
 		// Initialize receive action for handling incoming messages
 		this.receiveAction = this::handleIncomingMessage;
 
@@ -343,6 +329,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 				}
 				LatticePropagator primary = new LatticePropagator(store, connectionManager);
 				propagators.add(primary);
+			}
+
+			// The application root uses local store publication before launch. Once the
+			// primary exists, atomically install and freeze the network host policy.
+			if (!rootPublicationConfigured) {
+				rootComponent.setPublicationPolicy(this::publishApplicationRoot);
+				rootComponent.freezePublicationPolicy();
+				rootPublicationConfigured=true;
 			}
 
 			for (int i = 0; i < propagators.size(); i++) {
@@ -1990,7 +1984,29 @@ public class NodeServer<V extends ACell> implements Closeable {
 	public synchronized void addPropagator(LatticePropagator propagator) {
 		if (propagator == null) throw new IllegalArgumentException("Propagator must not be null");
 		requireNewLifecycle("addPropagator");
+		if (propagators.isEmpty() && propagator.getStore()!=store) {
+			throw new IllegalArgumentException(
+				"Primary propagator must use the NodeServer host store");
+		}
 		propagators.add(propagator);
+	}
+
+	private V publishApplicationRoot(V value) {
+		if (propagators.isEmpty()) {
+			throw new IllegalStateException("NodeServer has no primary publication pipeline");
+		}
+		ACell announced;
+		try {
+			announced=propagators.get(0).processSnapshot(value);
+		} catch (IOException e) {
+			throw new StoreException("NodeServer sync failed: persistence error",e);
+		}
+		for (int i=1; i<propagators.size(); i++) {
+			propagators.get(i).triggerBroadcast(value);
+		}
+		@SuppressWarnings("unchecked")
+		V typed=(V)announced;
+		return typed;
 	}
 
 	/**

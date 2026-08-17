@@ -169,35 +169,44 @@ try (P2PNode node = P2PNode.create(store, NodeConfig.port(18888), keyPair)) {
     node.serveAllInbound();   // intentionally public single-view node
     node.launch();
 
-    // Modify this user's P2P area through a cursor, then push it back
+    P2PApplication app = node.getApplication();
+
+    // Modify this user's identity component, then publish the application root
     P2PUser me = node.p2p(keyPair.getAccountKey());   // or node.p2p()
-    me.cursor().set(P2PLattice.createIdentity(Strings.create("alice"), null, null, ts));
-    me.sync();
+    me.identity().setIdentity(Strings.create("alice"), null, ts);
+    app.sync();
 }
 ```
 
+`P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
+host-neutral lattice application component; it can also be connected directly to a
+standalone `RootComponent` for local use.
+
 ### The user area API
 
-`node.p2p(userID).cursor()` returns a cursor at that user's identity slot
-(`[:id <userKey> :value]`), already through the signing boundary — the application reads
-and writes plain values and never touches `SignedData`:
+One user has data in two independent regions. `P2PIdentity` represents
+`[:id <userKey> :value]`; `P2PNodeRecord` represents
+`[:p2p :nodes <userKey> :value]`. Both are path-specific components already through
+the signing boundary. `P2PUser` is a convenience facade that contains them rather
+than pretending the two paths are one component:
 
 ```java
 P2PUser me = node.p2p();              // own area, using the node's key pair
-me.cursor().set(identityMap);         // signed on write
-me.sync();                            // pushed to the lattice root
+me.identity().setIdentity(identityMap); // signed on write
+me.identity().sync();                 // merge this working path
 
-me.nodeCursor()                       // [:p2p :nodes <userKey> :value], same deal
+me.node().cursor()                    // independent node-record component
 
 P2PUser draft = me.fork();            // batch edits, isolated
 draft.cursor().set(...);
 draft.sync();                         // merged back under LWW
+node.getApplication().sync();         // publish the complete root
 ```
 
-The cursor is scoped to one user: no other user's data is reachable through it, and the
-component holds no handle to the wider lattice root. `node.p2p(someoneElse)` is a
-readable view of their published area; writing it is a mistake the lattice does not need
-to prevent (see [Owner binding](#owner-binding) above).
+Each component cursor is scoped to one user and one region; no other user's data is
+reachable through it. `node.p2p(someoneElse)` is a readable facade over their
+published components; writing it is a mistake the lattice does not need to prevent
+(see [Owner binding](#owner-binding) above).
 
 Or run a node standalone:
 

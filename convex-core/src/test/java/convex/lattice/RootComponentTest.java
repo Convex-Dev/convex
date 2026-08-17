@@ -3,6 +3,7 @@ package convex.lattice;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
@@ -86,5 +87,16 @@ public class RootComponentTest {
 		application.sync();
 
 		assertEquals(application.cursor().get(),store.getRootData());
+	}
+
+	@Test
+	public void testPublicationPolicyCanBeConfiguredAndFrozen() {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		root.setPublicationPolicy(value->value);
+		root.freezePublicationPolicy();
+
+		assertThrows(IllegalStateException.class,
+			()->root.setPublicationPolicy(value->value));
 	}
 }

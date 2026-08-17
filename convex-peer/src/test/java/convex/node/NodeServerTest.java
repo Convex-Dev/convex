@@ -1216,6 +1216,26 @@ public class NodeServerTest {
 			() -> maxNodeServer.setMergeContext(LatticeContext.EMPTY));
 	}
 
+	@Test
+	public void testRootComponentSyncPersistsBeforeLaunch() throws Exception {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		maxNodeServer.getCursor().set(CVMLong.create(42));
+
+		maxNodeServer.getRootComponent().sync();
+
+		assertEquals(CVMLong.create(42),store.getRootData());
+	}
+
+	@Test
+	public void testCustomPrimaryMustUseHostStore() {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
+		try (AStore otherStore=new MemoryStore()) {
+			LatticePropagator otherPrimary=new LatticePropagator(otherStore);
+			assertThrows(IllegalArgumentException.class,
+				()->maxNodeServer.addPropagator(otherPrimary));
+		}
+	}
+
 	/**
 	 * Lifecycle state is explicit, and configuration freezes atomically when the
 	 * first launch begins. Latches hold launch inside its initial root checkpoint;

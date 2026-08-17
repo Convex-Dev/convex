@@ -61,6 +61,18 @@ public class CursorTest {
 		doIntCursorTest(pc);
 	}
 
+	@Test public void testPathCursorOwnsPathArray() {
+		Root<ACell> root=Cursors.create(Maps.of(Symbols.FOO,1,Symbols.BAR,2));
+		ACell[] path={Symbols.FOO};
+		PathCursor<AInteger> cursor=new PathCursor<>(root,path);
+		path[0]=Symbols.BAR;
+
+		cursor.set(CVMLong.create(3));
+
+		assertEquals(CVMLong.create(3),root.get(Symbols.FOO));
+		assertEquals(CVMLong.create(2),root.get(Symbols.BAR));
+	}
+
 	@Test public void testVectorPathCursor() {
 		Root<AInteger> root=Cursors.of(Maps.of(Symbols.BAR,null));
 		PathCursor<AVector<AInteger>> vpc=new PathCursor<>(root,Symbols.BAR);

@@ -103,12 +103,16 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Syncs this component's cursor back to its parent.
+	 * Synchronises this component's cursor through its immediate cursor boundary.
 	 *
-	 * <p>For forked cursors, this merges local changes into the parent using
-	 * lattice merge semantics. A sync that reaches a hosted root may also invoke
-	 * its synchronous persistence and publication policy. A physical durability
-	 * barrier remains a separate host operation.</p>
+	 * <p>For a forked cursor this merges local changes into the cursor it was forked
+	 * from; it does not necessarily publish the complete application root. Call
+	 * the containing {@link ALatticeApplication application's} {@code sync()} when
+	 * the merged state should cross the host publication boundary.</p>
+	 *
+	 * <p>A sync invoked on an application or another live path reaches the hosted
+	 * root and runs its synchronous persistence and publication policy. Physical
+	 * durability remains the separate application {@code flush()} operation.</p>
 	 */
 	public void sync() {
 		cursor.sync();

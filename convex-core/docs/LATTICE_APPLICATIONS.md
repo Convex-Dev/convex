@@ -1,26 +1,44 @@
 # Lattice Application Patterns
 
-Best practices for building applications on the Convex Data Lattice using cursor-based state management. Uses `convex-social` as the reference implementation throughout.
+Best practices for building applications on the Convex Data Lattice using typed
+components over cursor-based state. `convex-dlfs`, `convex-p2p` and
+`convex-social` provide concrete examples.
 
 For cursor internals and the cursor class hierarchy, see [LATTICE_CURSOR_DESIGN.md](LATTICE_CURSOR_DESIGN.md).
 
 ## Architecture Overview
 
-A lattice application has four layers:
+A hosted lattice application has five layers:
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Application API          Social, Feed, Follows │  Domain-specific wrappers
+│  Domain components        DLFSDrive, Social     │  One component per path
 ├─────────────────────────────────────────────────┤
-│  Cursor Chain             path(), fork(), sync()│  Navigation + atomic writes
+│  Application component    ALatticeApplication   │  Region composition
 ├─────────────────────────────────────────────────┤
-│  Lattice Hierarchy        KeyedLattice, Owner…  │  Merge semantics + type info
+│  Root component           RootComponent         │  Persistence + publication
 ├─────────────────────────────────────────────────┤
-│  Node Infrastructure      NodeServer, pull()    │  Networking + persistence
+│  Cursor/lattice           path(), fork(), merge │  State + merge semantics
+├─────────────────────────────────────────────────┤
+│  Optional host runtime    NodeServer             │  Replication + lifecycle
 └─────────────────────────────────────────────────┘
 ```
 
-Applications never call lattice merge directly. They navigate cursors, read and write values, and let the cursor chain handle signing, type safety, and merge propagation.
+`RootComponent` is the developer-facing lattice host. It always has an `AStore`
+and owns the root publication policy, but does not own the store lifecycle. A
+standalone root publishes to that store. `NodeServer` can host the same root and
+configures its replication pipeline before launch completes; application branches
+do not know that a `NodeServer` exists.
+
+`ALatticeApplication` is the root-level composition point. It shares the hosted
+root cursor and attaches independently located regions beneath itself. A domain
+`ALatticeComponent` represents one specific lattice path. A convenience facade
+that spans unrelated paths should contain multiple components rather than claim
+to be a component itself.
+
+Applications never call lattice merge directly. They navigate typed components
+and cursors, read and write values, and let the cursor chain handle signing, type
+safety and merge propagation.
 
 ## Designing the Lattice
 
@@ -115,9 +133,51 @@ This is how a node opts in to hosting your application's data. The keyword (`:so
 
 ## Building the Application Layer
 
-### The wrapper pattern
+### Compose from a generic host
 
-Each level of the data model gets a thin wrapper class that holds a cursor and exposes domain operations:
+Keep application code independent of storage and networking implementations:
+
+```java
+public final class MyApplication
+        extends ALatticeApplication<Index<Keyword, ACell>> {
+
+    private final Social social;
+    private final DLFSRegion files;
+
+    private MyApplication(RootComponent<Index<Keyword, ACell>> host) {
+        super(host);
+        social = Social.connect(this);
+        files = DLFSRegion.connect(this, Keyword.intern("documents"));
+    }
+
+    public static MyApplication connect(
+            RootComponent<Index<Keyword, ACell>> host) {
+        return new MyApplication(host);
+    }
+}
+```
+
+The same application can be attached to a local store-backed root or to a root
+hosted by network infrastructure:
+
+```java
+RootComponent<Index<Keyword, ACell>> local =
+    RootComponent.open(applicationLattice, store);
+MyApplication app = MyApplication.connect(local);
+
+NodeServer<Index<Keyword, ACell>> node =
+    new NodeServer<>(applicationLattice, store, config);
+MyApplication networked = MyApplication.connect(node.getRootComponent());
+node.launch();
+```
+
+The caller owns and closes `store` and `node`. Components are views and own
+neither resource.
+
+### One component, one path
+
+Each level of the data model gets an `ALatticeComponent` subclass that holds a
+cursor at exactly one path and exposes domain operations:
 
 ```
 Social          → cursor at OwnerLattice level
@@ -129,27 +189,40 @@ Social          → cursor at OwnerLattice level
 Each wrapper navigates one level deeper via `cursor.path(key)`:
 
 ```java
-public class Social {
-    private final ALatticeCursor<?> cursor;  // at OwnerLattice
+public class Social extends ALatticeComponent<
+        AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
 
     public SocialUser user(AccountKey ownerKey) {
-        // path() crosses: OwnerLattice → SignedLattice → SocialLattice
         ALatticeCursor<Index<Keyword, ACell>> userCursor =
             cursor.path(ownerKey, Keywords.VALUE);
-        return new SocialUser(userCursor, ownerKey);
+        return new SocialUser(this, userCursor, ownerKey);
     }
 }
 
-public class SocialUser {
-    private final ALatticeCursor<Index<Keyword, ACell>> cursor;  // at SocialLattice
+public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
+
+    SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor,
+            AccountKey ownerKey) {
+        super(parent, cursor);
+    }
 
     public Feed feed() {
-        return new Feed(cursor.path(SocialLattice.KEY_FEED), ownerKey);
+        return new Feed(this, cursor.path(SocialLattice.KEY_FEED), ownerKey);
     }
 }
 ```
 
-The cursor chain handles signing transparently — `Feed` doesn't know about `SignedData` at all.
+The component parent supplies containing application policy, including persistence.
+The cursor parent supplies logical navigation and synchronisation. These relationships
+are deliberately separate: a fork keeps the same component parent while its cursor
+synchronises to the live cursor it was forked from. The cursor chain also handles
+signing transparently—`Feed` does not know about `SignedData` at all.
+
+Do not retain caller-controlled path arrays; component and cursor constructors must
+take an owned copy. Long-lived application and region components are appropriate.
+Owner/session views should be retained by the service that routes them, or recreated
+cheaply on demand rather than accumulated in an unbounded global cache. Forked
+components are normally temporary working views.
 
 ### Writing through cursors
 
@@ -212,7 +285,9 @@ Rules for record design:
 
 ## Fork/Sync for Batch Operations
 
-Fork creates an independent working copy. Sync merges changes back using lattice semantics (always succeeds). This enables:
+Fork creates an independent working copy. Sync merges changes back through the
+fork's immediate logical cursor parent using lattice semantics (always succeeds).
+That is separate from publishing and durability. This enables:
 
 - **Batch writes** — multiple updates with a single signing pass
 - **Speculative changes** — try operations locally, sync only if successful
@@ -224,47 +299,64 @@ Social forked = social.fork();
 forked.user(myKey).feed().post("Post 1");
 forked.user(myKey).feed().post("Post 2");
 forked.user(myKey).feed().post("Post 3");
-forked.sync();  // one merge, one sign
+forked.sync();  // merge into the live Social component
+app.sync();     // publish the complete hosted root
+app.flush();    // optional physical durability barrier
 ```
 
-Application wrappers should expose fork/sync if batch operations are a use case:
+Domain components should expose `fork()` with their exact component type when batch
+operations are a use case. `sync()` is inherited from `ALatticeComponent`:
 
 ```java
-public class Social {
+public class Social extends ALatticeComponent<
+        AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
     public Social fork() {
-        return new Social(cursor.fork());
-    }
-
-    public void sync() {
-        cursor.sync();
+        return new Social(parent(), cursor.fork());
     }
 }
 ```
 
 See [LATTICE_CURSOR_DESIGN.md § sync() vs CAS-based merge()](LATTICE_CURSOR_DESIGN.md#sync-vs-cas-based-merge) for details on how sync handles concurrent modifications.
 
-## Connecting to Node Infrastructure
+### Persistence, publication and durability
 
-Applications can run standalone (own cursor) or connected to a node (shared root cursor):
+The three boundaries have intentionally different meanings:
 
-```java
-// Standalone — creates its own root cursor
-Social social = Social.create(myKeyPair);
+| Operation | Meaning | Moves a cursor? |
+|-----------|---------|-----------------|
+| `component.persist()` | Write reachable cells through the host store and return the store-backed value | No |
+| `component.sync()` | Merge through its cursor parent; at the root, run host publication policy | Yes, where merge/publication selects a value |
+| `application.flush()` | Pass through to the underlying store's physical durability barrier | No |
 
-// Connected — navigates from a node's root cursor
-Social social = Social.connect(nodeServer.getCursor(), myKeyPair);
+Incremental blob writers may call the protected persistence mechanism at intervals
+to replace eligible direct references with store-backed soft references and relieve
+memory pressure. They must explicitly install the returned value in working state.
+Persistence neither selects a retained root nor grants permission to garbage collect;
+those are application policy.
+
+## Connecting to Host Infrastructure
+
+Application and region components accept components, not `NodeServer`, propagators
+or stores. This keeps the ownership direction clear:
+
+```text
+runtime/bootstrap owns RootComponent and resource lifecycle
+        ↓
+ALatticeApplication composes root-level regions
+        ↓
+ALatticeComponent subclasses provide path-specific domain APIs
 ```
 
-The connected pattern is how applications participate in the lattice network. Writes propagate up through the cursor chain to the node's root, where `LatticePropagator` broadcasts deltas to peers.
+For a local process, construct or open a `RootComponent` over any `AStore`. For a
+networked process, obtain the same abstraction from `NodeServer.getRootComponent()`.
+The application code is identical after that point. `NodeServer` must use the root
+component's store as its primary serving store, so published roots never contain
+references unavailable to that primary.
 
-```java
-public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
-    LatticeContext ctx = LatticeContext.create(null, keyPair);
-    ALatticeCursor<?> socialCursor = rootCursor.path(KEY_SOCIAL);
-    socialCursor.withContext(ctx);
-    return new Social(socialCursor);
-}
-```
+Host publication configuration is a lifecycle concern. A root defaults to local
+store publication, allowing useful pre-launch sync. Network infrastructure installs
+and freezes its publication policy during launch; application code cannot silently
+replace that policy later.
 
 ### LatticeContext
 
@@ -389,12 +481,14 @@ assertEquals("Hello!", SocialPost.getText(feed.getPost(key)));
 Test that writes propagate to the root cursor:
 
 ```java
-KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-ALatticeCursor<?> rootCursor = Cursors.createLattice(root);
-Social social = Social.connect(rootCursor, kp);
+KeyedLattice lattice = Lattice.ROOT.addLattice(
+    Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
+RootComponent<Index<Keyword, ACell>> root = RootComponent.create(lattice, store);
+root.cursor().setContext(LatticeContext.create(null, kp));
+Social social = Social.connect(root);
 
 social.user(kp.getAccountKey()).feed().post("Propagated");
-assertNotNull(rootCursor.get(), "Write should propagate to root");
+assertNotNull(root.cursor().get(), "Write should propagate to root");
 ```
 
 ### 3. Fork/sync tests
@@ -435,11 +529,17 @@ When building a new lattice application:
 - [ ] Implement `zero()` returning the correct empty container type
 - [ ] Wrap with `OwnerLattice` if per-user ownership is needed
 - [ ] Register under a keyword in the root `KeyedLattice`
-- [ ] Build wrapper classes: one per level, holding a cursor, exposing domain operations
+- [ ] Derive an `ALatticeApplication` as the root-level region composition point
+- [ ] Build `ALatticeComponent` subclasses: one lattice path per component
+- [ ] Keep multi-path conveniences as facades containing path-specific components
+- [ ] Accept `RootComponent`, not `NodeServer` or `AStore`, in application factories
 - [ ] Use `updateAndGet` for writes — rely on auto-initialisation, no null guards
 - [ ] Use `cursor.path(key)` for navigation — signing is transparent
-- [ ] Expose `fork()`/`sync()` on top-level wrapper for batch operations
-- [ ] Provide `create()` (standalone) and `connect()` (node-attached) factory methods
+- [ ] Return exact component types from `fork()`; inherit `sync()`
+- [ ] Treat component sync, application publication and store flush as distinct boundaries
+- [ ] Delegate `persist()` through component parents without moving cursors
+- [ ] Let the routing/service layer retain bounded owner or session components
+- [ ] Provide local `open()` and host-neutral `connect(RootComponent)` factories
 - [ ] Include `:timestamp` in all LWW-merged records
 - [ ] Tombstone instead of delete
 - [ ] Write adversarial tests for `OwnerLattice.merge` forgery rejection

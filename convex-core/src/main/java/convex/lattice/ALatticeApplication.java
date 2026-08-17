@@ -49,6 +49,9 @@ public abstract class ALatticeApplication<V extends ACell> extends ALatticeCompo
 	/**
 	 * Requests the host store's physical durability barrier.
 	 *
+	 * <p>Call {@link #sync()} first when working state must become the selected,
+	 * published root. Flush deliberately does not move or merge any cursor.</p>
+	 *
 	 * @throws IOException If the store flush fails
 	 */
 	public void flush() throws IOException {

@@ -38,6 +38,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
+import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
@@ -49,6 +50,22 @@ import convex.lattice.kv.KVDatabase;
  * These tests serve as usage examples for the lattice cursor API.
  */
 public class LatticeCursorTest {
+
+	@Test
+	public void testDescendedCursorOwnsPathArray() {
+		KeyedLattice lattice=KeyedLattice.create(
+			Keywords.FOO,MaxLattice.INSTANCE,
+			Keywords.BAR,MaxLattice.INSTANCE);
+		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(lattice);
+		ACell[] path={Keywords.FOO};
+		ALatticeCursor<AInteger> cursor=root.path(path);
+		path[0]=Keywords.BAR;
+
+		cursor.set(CVMLong.create(3));
+
+		assertEquals(CVMLong.create(3),root.get().get(Keywords.FOO));
+		assertNull(root.get().get(Keywords.BAR));
+	}
 
 	// ===== Standard cursor operation tests =====
 

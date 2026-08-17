@@ -88,6 +88,16 @@ public class P2PUserTest {
 			P2PLattice.getIdentity(region, KEY).get(P2PLattice.ID_NAME));
 	}
 
+	@Test
+	public void testUserPersistenceDelegatesThroughApplication() throws Exception {
+		P2PUser me=node.p2p(KEY);
+		me.setIdentity(Strings.create("persisted"),null,1000L);
+
+		ACell persisted=me.persist();
+
+		assertEquals(me.cursor().get(),persisted);
+	}
+
 	@SuppressWarnings("unchecked")
 	private static AHashMap<ACell, SignedData<ACell>> ownerMap(ACell value) {
 		return (AHashMap<ACell, SignedData<ACell>>) value;

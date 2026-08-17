@@ -252,6 +252,19 @@ public class SocialAppTest {
 	}
 
 	@Test
+	public void testComponentConnectionInheritsRootContext() {
+		AKeyPair kp=AKeyPair.generate();
+		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
+		TestRoot root=new TestRoot(lattice);
+		root.cursor().setContext(LatticeContext.create(null,kp));
+		Social social=Social.connect(root);
+
+		social.user(kp.getAccountKey()).feed().post("Inherited context");
+
+		assertEquals(1,social.user(kp.getAccountKey()).feed().count());
+	}
+
+	@Test
 	public void testForkRetainsComponentPersistenceParent() throws IOException {
 		AKeyPair kp=AKeyPair.generate();
 		KeyedLattice lattice=Lattice.ROOT.addLattice(Social.KEY_SOCIAL,Social.SOCIAL_LATTICE);
