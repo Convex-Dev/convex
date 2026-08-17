@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
@@ -17,12 +20,16 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.RefSoft;
 import convex.core.crypto.AKeyPair;
+import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDrive;
+import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
 import convex.dlfs.DLFSRegion;
 import convex.lattice.LatticeContext;
@@ -36,6 +43,18 @@ import convex.node.NodeServer;
 public class DLFSComponentTest {
 
 	private static final Keyword KEY_DOCUMENTS=Keyword.intern("documents");
+	private static final Keyword KEY_ARCHIVE=Keyword.intern("archive");
+
+	private static final class CompositeDLFSApplication
+			extends DLFSApplication<Index<Keyword,ACell>> {
+
+		private final DLFSRegion archive;
+
+		CompositeDLFSApplication(RootComponent<Index<Keyword,ACell>> host) {
+			super(host,KEY_DOCUMENTS);
+			this.archive=DLFSRegion.connect(this,KEY_ARCHIVE);
+		}
+	}
 
 	@Test
 	public void testRegionAtArbitraryRootPath() throws Exception {
@@ -44,17 +63,90 @@ public class DLFSComponentTest {
 		try (EtchStore store=EtchStore.createTemp("dlfs-components");
 				NodeServer<Index<Keyword,ACell>> server=new NodeServer<>(lattice,store,NodeConfig.port(-1))) {
 			server.setMergeContext(LatticeContext.create(null,keyPair));
-			DLFSRegion region=DLFSRegion.connect(server.getRootComponent(),KEY_DOCUMENTS);
-			DLFSDrives drives=region.drives(keyPair.getAccountKey());
-			DLFSDrive drive=drives.createDrive("home");
+			server.launch();
+			DLFSApplication<Index<Keyword,ACell>> application=DLFSApplication.connect(
+				server.getRootComponent(),KEY_DOCUMENTS);
+			DLFSDrive drive=application.drives(keyPair.getAccountKey()).createDrive("home");
 			assertNotNull(drive);
 
 			Files.writeString(drive.fileSystem().getPath("/hello.txt"),"component path");
+			application.sync();
 
 			assertEquals("component path",Files.readString(drive.fileSystem().getPath("/hello.txt")));
 			assertNotNull(server.getCursor().get().get(KEY_DOCUMENTS));
-			assertEquals(java.util.List.of("home"),drives.driveNames());
+			assertEquals(java.util.List.of("home"),
+				application.drives(keyPair.getAccountKey()).driveNames());
+			assertEquals(server.getCursor().get(),store.getRootData());
 		}
+	}
+
+	@Test
+	public void testLocalApplicationStackSurvivesRestart() throws Exception {
+		AKeyPair keyPair=AKeyPair.generate();
+		EtchStore store=EtchStore.createTemp("dlfs-application");
+		File storeFile=store.getFile();
+		try (store) {
+			DLFSApplication<Index<Keyword,ACell>> application=
+				DLFSApplication.open(store,keyPair);
+			DLFSDriveManager driveManager=new DLFSDriveManager(
+				application.drives(keyPair.getAccountKey()));
+			assertNotNull(application.dlfs());
+			assertTrue(driveManager.createDrive(null,"home"));
+			Files.writeString(driveManager.getDrive(null,"home")
+				.getPath("/hello.txt"),"local application");
+
+			application.sync();
+			application.flush();
+			assertEquals(application.cursor().get(),store.getRootData());
+		}
+
+		try (EtchStore reopened=EtchStore.create(storeFile)) {
+			DLFSApplication<Index<Keyword,ACell>> application=
+				DLFSApplication.open(reopened,keyPair);
+			DLFSDriveManager driveManager=new DLFSDriveManager(
+				application.drives(keyPair.getAccountKey()));
+			assertEquals(java.util.List.of("home"),driveManager.listDrives(null));
+			assertEquals("local application",Files.readString(
+				driveManager.getDrive(null,"home").getPath("/hello.txt")));
+		}
+	}
+
+	@Test
+	public void testApplicationIsNotOwnerScoped() throws Exception {
+		AKeyPair hostKey=AKeyPair.generate();
+		AccountKey otherOwner=AKeyPair.generate().getAccountKey();
+		try (EtchStore store=EtchStore.createTemp("dlfs-multi-owner-application")) {
+			DLFSApplication<Index<Keyword,ACell>> application=
+				DLFSApplication.open(store,hostKey);
+			Index<Keyword,ACell> before=application.cursor().get();
+
+			assertSame(application.drives(hostKey.getAccountKey()),
+				application.drives(hostKey.getAccountKey()));
+			assertNotSame(application.drives(hostKey.getAccountKey()).cursor(),
+				application.drives(otherOwner).cursor());
+			assertSame(before,application.cursor().get(),
+				"looking up an owner component must not write signed state");
+		}
+	}
+
+	@Test
+	public void testApplicationCanComposeMultipleRegions() throws Exception {
+		AKeyPair keyPair=AKeyPair.generate();
+		KeyedLattice lattice=KeyedLattice.create(
+			KEY_DOCUMENTS,DLFSRegion.LATTICE,
+			KEY_ARCHIVE,DLFSRegion.LATTICE);
+		MemoryStore store=new MemoryStore();
+		RootComponent<Index<Keyword,ACell>> root=RootComponent.create(lattice,store);
+		root.cursor().setContext(LatticeContext.create(null,keyPair));
+		CompositeDLFSApplication application=new CompositeDLFSApplication(root);
+
+		assertNotNull(application.drives(keyPair.getAccountKey()).createDrive("live"));
+		assertNotNull(application.archive.drives(keyPair.getAccountKey()).createDrive("history"));
+		application.sync();
+
+		Index<Keyword,ACell> stored=store.getRootData();
+		assertNotNull(stored.get(KEY_DOCUMENTS));
+		assertNotNull(stored.get(KEY_ARCHIVE));
 	}
 
 	@Test

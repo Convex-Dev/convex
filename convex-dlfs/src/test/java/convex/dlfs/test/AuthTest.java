@@ -51,7 +51,7 @@ public class AuthTest {
 		clientKeyPair = AKeyPair.generate();
 		expectedAudience = DID.forKey(serverKeyPair.getAccountKey()).toString();
 
-		server = DLFSServer.create(serverKeyPair);
+		server = DLFSServer.createEphemeralWithAudience(serverKeyPair);
 		// Pre-seed a drive for anonymous read tests
 		server.getDriveManager().createDrive(null, "auth");
 		server.start(0);

@@ -106,8 +106,9 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 * Syncs this component's cursor back to its parent.
 	 *
 	 * <p>For forked cursors, this merges local changes into the parent using
-	 * lattice merge semantics. Persistence, publication and propagation are
-	 * separate application responsibilities.</p>
+	 * lattice merge semantics. A sync that reaches a hosted root may also invoke
+	 * its synchronous persistence and publication policy. A physical durability
+	 * barrier remains a separate host operation.</p>
 	 */
 	public void sync() {
 		cursor.sync();

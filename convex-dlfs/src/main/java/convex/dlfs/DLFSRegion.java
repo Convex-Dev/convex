@@ -1,12 +1,13 @@
 package convex.dlfs;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.cursor.ALatticeCursor;
@@ -26,10 +27,11 @@ public final class DLFSRegion extends ALatticeComponent<
 	public static final OwnerLattice<AHashMap<AString,AVector<ACell>>> LATTICE=
 		OwnerLattice.create(DLFSDrives.LATTICE);
 
+	private final ConcurrentHashMap<AccountKey,DLFSDrives> owners=new ConcurrentHashMap<>();
+
 	private DLFSRegion(ALatticeComponent<?> parent,
 			ALatticeCursor<AHashMap<ACell,SignedData<AHashMap<AString,AVector<ACell>>>>> cursor) {
 		super(parent,cursor);
-		cursor.updateAndGet(value->value==null?Maps.empty():value);
 	}
 
 	/** Connects a physical DLFS region at an arbitrary lattice path. */
@@ -43,9 +45,11 @@ public final class DLFSRegion extends ALatticeComponent<
 	/** Gets the signed drive-map component belonging to an owner. */
 	public DLFSDrives drives(AccountKey owner) {
 		if (owner==null) throw new IllegalArgumentException("Owner key must not be null");
-		ALatticeCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
-			cursor.path(owner,Keywords.VALUE);
-		return new DLFSDrives(this,drivesCursor);
+		return owners.computeIfAbsent(owner,key->{
+			ALatticeCursor<AHashMap<AString,AVector<ACell>>> drivesCursor=
+				cursor.path(key,Keywords.VALUE);
+			return new DLFSDrives(this,drivesCursor);
+		});
 	}
 
 	/** Creates an isolated temporary region component. */

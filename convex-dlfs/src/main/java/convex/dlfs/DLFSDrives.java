@@ -29,7 +29,6 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	DLFSDrives(ALatticeComponent<?> parent,
 			ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor) {
 		super(parent,cursor);
-		cursor.updateAndGet(value->value==null?Maps.empty():value);
 	}
 
 	/** Creates a standalone, in-memory set of drives for one owner. */

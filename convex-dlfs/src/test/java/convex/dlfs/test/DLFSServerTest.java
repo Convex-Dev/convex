@@ -26,7 +26,7 @@ public class DLFSServerTest {
 
 	@BeforeAll
 	static void setUp() {
-		server = DLFSServer.create(null); // no auth for basic tests
+		server = DLFSServer.createEphemeral(); // no auth for basic tests
 		// Pre-seed a "test" drive for anonymous user
 		server.getDriveManager().createDrive(null, "test");
 		server.start(0); // random port
@@ -332,7 +332,7 @@ public class DLFSServerTest {
 
 	@Test
 	void testRequestSizeLimit() throws Exception {
-		try (DLFSServer limited = DLFSServer.create(null).setMaxRequestSize(8)) {
+		try (DLFSServer limited = DLFSServer.createEphemeral().setMaxRequestSize(8)) {
 			limited.getDriveManager().createDrive(null, "limited");
 			limited.start(0);
 			String url = "http://localhost:" + limited.getPort() + "/dlfs/limited/large.txt";

@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.auth.did.DID;
 import convex.cli.ACommand;
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
@@ -19,9 +20,9 @@ import convex.core.data.Strings;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
+import convex.dlfs.DLFSApplication;
 import convex.dlfs.DLFSDriveManager;
 import convex.dlfs.DLFSDrives;
-import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.gui.utils.Toolkit;
 import convex.gui.utils.TrayManager;
@@ -144,13 +145,13 @@ public class DlfsStart extends ACommand {
 		// Attach the user's drives component at :fs → accountKey → :value.
 		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
 		AccountKey accountKey = keyPair.getAccountKey();
-		DLFSRegion region=DLFSRegion.connect(nodeServer.getRootComponent(),Keywords.FS);
-		DLFSDrives drives=region.drives(accountKey);
-
-		// The bootstrap owns both infrastructure and app composition; DLFS branches
-		// themselves depend only on their containing lattice component.
-		DLFSDriveManager driveManager=new DLFSDriveManager(drives);
-		DLFSServer dlfsServer = DLFSServer.create(driveManager, keyPair);
+		DLFSApplication<?> application=DLFSApplication.connect(
+			nodeServer.getRootComponent(),Keywords.FS);
+		DLFSDrives ownerDrives=application.drives(accountKey);
+		DLFSDriveManager driveManager=DLFSDriveManager.createRouter()
+			.mountAnonymous(ownerDrives)
+			.mount(DID.forKey(accountKey).toString(),ownerDrives);
+		DLFSServer dlfsServer = DLFSServer.createWithAudience(driveManager,keyPair);
 		// The CLI currently exposes shared anonymous drives on the loopback-only server.
 		// Authentication-aware per-user drive provisioning is a separate product concern.
 		dlfsServer.setRequireAuthForWrites(false);
@@ -163,7 +164,7 @@ public class DlfsStart extends ACommand {
 				}
 				inform("Drive '" + driveName + "' connected to lattice at :fs/" + accountKey.toHexString(6) + ".../" + driveName);
 			}
-			driveManager.sync();
+			application.sync();
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
@@ -190,6 +191,11 @@ public class DlfsStart extends ACommand {
 				nodeServer.close();
 			} catch (Exception e) {
 				log.warn("Error closing NodeServer", e);
+			}
+			try {
+				application.flush();
+			} catch (Exception e) {
+				log.warn("Error flushing DLFS store",e);
 			}
 			store.close();
 		};

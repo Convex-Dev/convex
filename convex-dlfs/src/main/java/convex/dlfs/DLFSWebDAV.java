@@ -355,9 +355,10 @@ public class DLFSWebDAV {
 
 		// Drive-level delete (empty file path)
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
-			boolean deleted = driveManager.deleteDrive(getIdentity(ctx), dp.driveName());
+			String identity=getIdentity(ctx);
+			boolean deleted = driveManager.deleteDrive(identity, dp.driveName());
 			if (deleted) {
-				driveManager.sync();
+				driveManager.sync(identity);
 				ctx.status(204);
 			} else {
 				ctx.status(404).result("Not Found");
@@ -501,9 +502,10 @@ public class DLFSWebDAV {
 
 		// Drive-level creation (empty file path)
 		if (dp.filePath() == null || dp.filePath().isEmpty()) {
-			boolean created = driveManager.createDrive(getIdentity(ctx), dp.driveName());
+			String identity=getIdentity(ctx);
+			boolean created = driveManager.createDrive(identity, dp.driveName());
 			if (created) {
-				driveManager.sync();
+				driveManager.sync(identity);
 				ctx.header("Location", ROUTE + encodePathComponent(dp.driveName()) + "/");
 				ctx.status(201);
 			} else {
@@ -545,9 +547,10 @@ public class DLFSWebDAV {
 				ctx.status(400).result("Bad Request: missing or invalid Destination header");
 				return;
 			}
-			boolean renamed = driveManager.renameDrive(getIdentity(ctx), dp.driveName(), destDp.driveName());
+			String identity=getIdentity(ctx);
+			boolean renamed = driveManager.renameDrive(identity, dp.driveName(), destDp.driveName());
 			if (renamed) {
-				driveManager.sync();
+				driveManager.sync(identity);
 				ctx.header("Location", ROUTE + encodePathComponent(destDp.driveName()) + "/");
 				ctx.status(201);
 			} else {

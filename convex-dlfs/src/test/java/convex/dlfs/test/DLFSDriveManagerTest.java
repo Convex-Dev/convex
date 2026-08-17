@@ -60,6 +60,33 @@ public class DLFSDriveManagerTest {
 	}
 
 	@Test
+	public void testRoutesIdentitiesToIndependentComponents() {
+		DLFSDrives alice=DLFSDrives.create();
+		DLFSDrives bob=DLFSDrives.create();
+		DLFSDriveManager manager=DLFSDriveManager.createRouter()
+			.mount("did:example:alice",alice)
+			.mount("did:example:bob",bob);
+
+		assertTrue(manager.createDrive("did:example:alice","home"));
+		assertTrue(manager.createDrive("did:example:bob","work"));
+
+		assertEquals(List.of("home"),manager.listDrives("did:example:alice"));
+		assertEquals(List.of("work"),manager.listDrives("did:example:bob"));
+		assertNull(manager.getDrive("did:example:alice","work"));
+		assertNull(manager.getDrive("did:example:bob","home"));
+	}
+
+	@Test
+	public void testRouterFailsClosedForUnmountedIdentity() {
+		DLFSDriveManager manager=DLFSDriveManager.createRouter()
+			.mount("did:example:alice",DLFSDrives.create());
+
+		assertFalse(manager.createDrive("did:example:bob","home"));
+		assertEquals(List.of(),manager.listDrives("did:example:bob"));
+		assertNull(manager.getDrive("did:example:bob","home"));
+	}
+
+	@Test
 	public void testCursorBackedRenameAndDeleteChangeCanonicalRegistry() throws Exception {
 		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager manager=new DLFSDriveManager(cursor);

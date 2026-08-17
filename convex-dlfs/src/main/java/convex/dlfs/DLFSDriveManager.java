@@ -2,6 +2,7 @@ package convex.dlfs;
 
 import java.nio.file.FileSystem;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,28 +20,48 @@ import convex.lattice.fs.DLFS;
  * from JWT authentication) and a drive name. Drives are created on demand via
  * {@link #createDrive} and resolved by name via {@link #getDrive}.
  *
- * <p>The no-argument form maps identities and names to in-memory
- * {@code DLFS.createLocal()} instances. The component-backed form adapts one
- * owner's {@link DLFSDrives} value and keeps {@link FileSystem} objects only as
- * local views. Applications may compose managers to route across multiple
- * physical regions or roots.
+ * <p>{@link #createRouter()} fails closed for unmounted identities, while
+ * {@link #createEphemeral()} maps identities and names to in-memory
+ * {@code DLFS.createLocal()} instances. Applications may
+ * {@link #mount(String, DLFSDrives) mount} identities onto owner components from
+ * any physical region or hosted root. FileSystem objects remain local views;
+ * only component values enter the lattice.
  */
 public class DLFSDriveManager {
 	/** Conservative per-identity bound for the in-process drive registry. */
 	public static final int MAX_DRIVES_PER_IDENTITY = 256;
+	private static final Object ANONYMOUS_IDENTITY=new Object();
 
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
-	private final DLFSDrives componentDrives;
+	private final ConcurrentHashMap<Object,DLFSDrives> componentRoutes=new ConcurrentHashMap<>();
+	private final boolean ephemeralFallback;
 
-	/** Creates a standalone in-memory drive registry. */
-	public DLFSDriveManager() {
-		this.componentDrives=null;
+	private DLFSDriveManager(boolean ephemeralFallback) {
+		this.ephemeralFallback=ephemeralFallback;
 	}
 
 	/**
-	 * Creates a cursor-backed registry for one anonymous/local owner's drives.
-	 * Authenticated multi-owner routing requires a distinct manager at each owner's
-	 * drives cursor and is intentionally not inferred here.
+	 * Creates an explicit component router. Unmounted identities expose no drives
+	 * and cannot mutate process-local state.
+	 *
+	 * @return Empty routing manager
+	 */
+	public static DLFSDriveManager createRouter() {
+		return new DLFSDriveManager(false);
+	}
+
+	/**
+	 * Creates a standalone in-memory drive registry for tests and demonstrations.
+	 *
+	 * @return Ephemeral drive manager
+	 */
+	public static DLFSDriveManager createEphemeral() {
+		return new DLFSDriveManager(true);
+	}
+
+	/**
+	 * Creates a manager with one cursor-backed drive collection mounted for
+	 * anonymous requests. Additional identities may be mounted independently.
 	 *
 	 * @param drivesCursor Cursor over a {@code MapLattice<AString, DLFSLattice>}
 	 */
@@ -49,14 +70,47 @@ public class DLFSDriveManager {
 	}
 
 	/**
-	 * Creates a manager routed to one owner's component-backed drives. Blob
-	 * persistence delegates through the component's physical region and root.
+	 * Creates a manager with one owner's component-backed drives mounted for
+	 * anonymous requests. Blob persistence delegates through the component's
+	 * physical region, application and root.
 	 *
 	 * @param drives Component representing this owner's drives
 	 */
 	public DLFSDriveManager(DLFSDrives drives) {
+		this(false);
+		mount(null,drives);
+	}
+
+	/**
+	 * Mounts an external identity onto one owner-scoped drive component.
+	 *
+	 * <p>The identity is local service policy and need not equal the lattice owner
+	 * key. A null identity maps anonymous requests. Mounting the same component
+	 * repeatedly is idempotent; remapping an existing identity to another component
+	 * fails explicitly.</p>
+	 *
+	 * @param identity External identity, or null for anonymous requests
+	 * @param drives Owner-scoped component to route to
+	 * @return This manager
+	 */
+	public DLFSDriveManager mount(String identity, DLFSDrives drives) {
 		if (drives==null) throw new IllegalArgumentException("DLFS drives must not be null");
-		this.componentDrives=drives;
+		Object key=identityKey(identity);
+		DLFSDrives existing=componentRoutes.putIfAbsent(key,drives);
+		if (existing!=null && existing!=drives) {
+			throw new IllegalStateException("DLFS identity is already mounted: "+identityLabel(identity));
+		}
+		return this;
+	}
+
+	/**
+	 * Mounts anonymous requests onto one owner-scoped drive component.
+	 *
+	 * @param drives Owner-scoped component to expose anonymously
+	 * @return This manager
+	 */
+	public DLFSDriveManager mountAnonymous(DLFSDrives drives) {
+		return mount(null,drives);
 	}
 
 	/**
@@ -78,12 +132,13 @@ public class DLFSDriveManager {
 	 */
 	public FileSystem getDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return null;
-		if (componentDrives!=null) return getCursorDrive(identity, driveName);
+		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
+		if (componentDrives!=null) return getCursorDrive(componentDrives,driveName);
+		if (!ephemeralFallback) return null;
 		return drives.get(driveKey(identity, driveName));
 	}
 
-	private FileSystem getCursorDrive(String identity, String driveName) {
-		if (identity!=null) return null;
+	private FileSystem getCursorDrive(DLFSDrives componentDrives, String driveName) {
 		DLFSDrive drive=componentDrives.drive(driveName);
 		return (drive==null)?null:drive.fileSystem();
 	}
@@ -97,15 +152,16 @@ public class DLFSDriveManager {
 	 */
 	public synchronized boolean createDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
-		if (componentDrives!=null) return createCursorDrive(identity, driveName);
+		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
+		if (componentDrives!=null) return createCursorDrive(componentDrives,driveName);
+		if (!ephemeralFallback) return false;
 		String key = driveKey(identity, driveName);
 		if (listDrives(identity).size() >= MAX_DRIVES_PER_IDENTITY) return false;
 		FileSystem existing = drives.putIfAbsent(key, DLFS.createLocal());
 		return existing == null;
 	}
 
-	private boolean createCursorDrive(String identity, String driveName) {
-		if (identity!=null) return false;
+	private boolean createCursorDrive(DLFSDrives componentDrives, String driveName) {
 		return componentDrives.createDrive(driveName,MAX_DRIVES_PER_IDENTITY)!=null;
 	}
 
@@ -118,12 +174,13 @@ public class DLFSDriveManager {
 	 */
 	public synchronized boolean deleteDrive(String identity, String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
-		if (componentDrives!=null) return deleteCursorDrive(identity, driveName);
+		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
+		if (componentDrives!=null) return deleteCursorDrive(componentDrives,driveName);
+		if (!ephemeralFallback) return false;
 		return drives.remove(driveKey(identity, driveName)) != null;
 	}
 
-	private boolean deleteCursorDrive(String identity, String driveName) {
-		if (identity!=null) return false;
+	private boolean deleteCursorDrive(DLFSDrives componentDrives, String driveName) {
 		return componentDrives.deleteDrive(driveName);
 	}
 
@@ -134,7 +191,9 @@ public class DLFSDriveManager {
 	 * @return List of drive names owned by this identity
 	 */
 	public List<String> listDrives(String identity) {
-		if (componentDrives!=null) return listCursorDrives(identity);
+		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
+		if (componentDrives!=null) return componentDrives.driveNames();
+		if (!ephemeralFallback) return List.of();
 		String prefix = identityPrefix(identity);
 		List<String> result = new ArrayList<>();
 		for (String key : drives.keySet()) {
@@ -144,11 +203,6 @@ public class DLFSDriveManager {
 		}
 		result.sort(String::compareTo);
 		return result;
-	}
-
-	private List<String> listCursorDrives(String identity) {
-		if (identity!=null) return List.of();
-		return componentDrives.driveNames();
 	}
 
 	/**
@@ -161,7 +215,9 @@ public class DLFSDriveManager {
 	 */
 	public synchronized boolean renameDrive(String identity, String oldName, String newName) {
 		if (!DLFSPathValidator.isValidDriveName(oldName) || !DLFSPathValidator.isValidDriveName(newName)) return false;
-		if (componentDrives!=null) return renameCursorDrive(identity, oldName, newName);
+		DLFSDrives componentDrives=componentRoutes.get(identityKey(identity));
+		if (componentDrives!=null) return renameCursorDrive(componentDrives,oldName,newName);
+		if (!ephemeralFallback) return false;
 		if (oldName.equals(newName)) return getDrive(identity, oldName) != null;
 		String oldKey = driveKey(identity, oldName);
 		String newKey = driveKey(identity, newName);
@@ -176,17 +232,26 @@ public class DLFSDriveManager {
 		return true;
 	}
 
-	private boolean renameCursorDrive(String identity, String oldName, String newName) {
-		if (identity!=null) return false;
+	private boolean renameCursorDrive(DLFSDrives componentDrives, String oldName, String newName) {
 		return componentDrives.renameDrive(oldName,newName);
 	}
 
 	/**
-	 * Synchronises cursor-backed registry changes to the cursor's parent or root
-	 * callback. Standalone registries have no persistence boundary and do nothing.
+	 * Synchronises every mounted component to its parent or hosted root. Detached
+	 * identities have no persistence boundary and do nothing.
 	 */
 	public void sync() {
-		if (componentDrives!=null) componentDrives.sync();
+		for (DLFSDrives mounted:new HashSet<>(componentRoutes.values())) mounted.sync();
+	}
+
+	/**
+	 * Synchronises only the component mounted for one identity.
+	 *
+	 * @param identity External identity, or null for anonymous requests
+	 */
+	public void sync(String identity) {
+		DLFSDrives mounted=componentRoutes.get(identityKey(identity));
+		if (mounted!=null) mounted.sync();
 	}
 
 	/**
@@ -201,8 +266,11 @@ public class DLFSDriveManager {
 			throw new IllegalArgumentException("Invalid drive name: " + driveName);
 		}
 		if (fs == null) throw new IllegalArgumentException("Drive filesystem cannot be null");
-		if (componentDrives!=null) {
-			throw new UnsupportedOperationException("Cannot seed a cursor-backed drive registry with a detached filesystem");
+		if (componentRoutes.containsKey(identityKey(identity))) {
+			throw new UnsupportedOperationException("Cannot seed a mounted identity with a detached filesystem");
+		}
+		if (!ephemeralFallback) {
+			throw new UnsupportedOperationException("Cannot seed an unmounted identity on a routing manager");
 		}
 		drives.put(driveKey(identity, driveName), fs);
 	}
@@ -214,5 +282,13 @@ public class DLFSDriveManager {
 	private static String identityPrefix(String identity) {
 		if (identity == null) return ":";
 		return identity + ":";
+	}
+
+	private static Object identityKey(String identity) {
+		return (identity==null)?ANONYMOUS_IDENTITY:identity;
+	}
+
+	private static String identityLabel(String identity) {
+		return (identity==null)?"<anonymous>":identity;
 	}
 }

@@ -1,10 +1,6 @@
 package convex.dlfs;
 
 import java.io.Closeable;
-import java.nio.file.FileSystem;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -21,14 +17,17 @@ import io.javalin.Javalin;
 import io.javalin.config.RoutesConfig;
 
 /**
- * Standalone DLFS WebDAV server with multi-drive support.
+ * WebDAV and MCP transport for locally routed DLFS drives.
  *
  * <p>Creates a lightweight Javalin HTTP server with a {@link DLFSWebDAV}
  * handler and optional Ed25519 JWT bearer token authentication via
  * {@link AuthMiddleware}.
  *
- * <p>Each authenticated user gets their own set of named drives. Drives
- * appear as top-level directories under {@code /dlfs/}.
+ * <p>The supplied {@link DLFSDriveManager} determines which identities reach
+ * which detached or lattice-backed drive collections. Drives appear as
+ * top-level directories under {@code /dlfs/}. This server owns only its HTTP
+ * lifecycle; application sync, durability and store lifecycle remain bootstrap
+ * policy.</p>
  */
 public class DLFSServer implements Closeable {
 	/** Default bind host: DLFS is private/local unless an application explicitly exposes it. */
@@ -42,62 +41,83 @@ public class DLFSServer implements Closeable {
 	private final DLFSWebDAV webdav;
 	private final McpServer mcpServer;
 	private final DlfsMcpTools mcpTools;
-	private final AKeyPair keyPair;
+	private final PeerAuth peerAuth;
 	private String bindHost = DEFAULT_BIND_HOST;
 	private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
 	private Javalin app;
 
-	private DLFSServer(DLFSDriveManager driveManager, AKeyPair keyPair) {
+	private DLFSServer(DLFSDriveManager driveManager, PeerAuth peerAuth) {
 		this.driveManager = driveManager;
-		this.keyPair = keyPair;
+		this.peerAuth = peerAuth;
 		this.webdav = new DLFSWebDAV(driveManager);
-		// A configured authentication key should never silently leave mutations open.
-		this.webdav.setRequireAuthForWrites(keyPair != null);
+		// Configured authentication should never silently leave mutations open.
+		this.webdav.setRequireAuthForWrites(peerAuth != null);
 		this.mcpServer = new McpServer(Maps.of(
 			"name", "dlfs-mcp",
 			"title", "DLFS MCP",
 			"version", Utils.getVersion()
 		));
-		this.mcpTools = new DlfsMcpTools(driveManager).setRequireAuthForWrites(keyPair != null);
+		this.mcpTools = new DlfsMcpTools(driveManager).setRequireAuthForWrites(peerAuth != null);
 		mcpTools.registerAll(mcpServer);
 	}
 
 	/**
-	 * Creates a DLFS server with a fresh drive manager.
+	 * Creates an unauthenticated DLFS transport over application-supplied routing.
 	 *
-	 * @param keyPair Ed25519 key pair for auth (null for no auth)
+	 * @param driveManager Local identity and drive routing policy
 	 * @return New DLFSServer instance
 	 */
-	public static DLFSServer create(AKeyPair keyPair) {
-		return new DLFSServer(new DLFSDriveManager(), keyPair);
-	}
-
-	/**
-	 * Creates a DLFS server using an application-supplied drive manager.
-	 *
-	 * @param driveManager Drive registry and filesystem view manager
-	 * @param keyPair Ed25519 key pair for auth (null for no auth)
-	 * @return New DLFSServer instance
-	 */
-	public static DLFSServer create(DLFSDriveManager driveManager, AKeyPair keyPair) {
+	public static DLFSServer create(DLFSDriveManager driveManager) {
 		if (driveManager==null) throw new IllegalArgumentException("Drive manager cannot be null");
-		return new DLFSServer(driveManager, keyPair);
+		return new DLFSServer(driveManager,null);
 	}
 
 	/**
-	 * Creates a DLFS server with a single filesystem exposed as a named drive.
-	 * Useful for backwards-compatible testing with a single drive.
+	 * Creates an authenticated DLFS transport over application-supplied routing.
 	 *
-	 * @param fs        The filesystem to serve
-	 * @param driveName The drive name to use
-	 * @param identity  The owner identity (null for anonymous)
-	 * @param keyPair   Ed25519 key pair for auth (null for no auth)
+	 * @param driveManager Local identity and drive routing policy
+	 * @param peerAuth Authentication verifier and audience policy
 	 * @return New DLFSServer instance
 	 */
-	public static DLFSServer create(FileSystem fs, String driveName, String identity, AKeyPair keyPair) {
-		DLFSDriveManager dm = new DLFSDriveManager();
-		dm.seedDrive(identity, driveName, fs);
-		return new DLFSServer(dm, keyPair);
+	public static DLFSServer createAuthenticated(DLFSDriveManager driveManager, PeerAuth peerAuth) {
+		if (driveManager==null) throw new IllegalArgumentException("Drive manager cannot be null");
+		if (peerAuth==null) throw new IllegalArgumentException("Authentication policy cannot be null");
+		return new DLFSServer(driveManager,peerAuth);
+	}
+
+	/**
+	 * Creates an authenticated DLFS transport whose audience is the supplied key.
+	 *
+	 * <p>The key configures HTTP authentication only. It is not implicitly used as
+	 * a lattice signing key; bootstrap code may choose the same key for both roles.</p>
+	 *
+	 * @param driveManager Local identity and drive routing policy
+	 * @param audienceKey Key defining the accepted authentication audience
+	 * @return New DLFSServer instance
+	 */
+	public static DLFSServer createWithAudience(DLFSDriveManager driveManager,
+			AKeyPair audienceKey) {
+		if (audienceKey==null) throw new IllegalArgumentException("Authentication audience key cannot be null");
+		return createAuthenticated(driveManager,PeerAuth.createWithDIDAudience(audienceKey));
+	}
+
+	/**
+	 * Creates an explicitly process-local server for tests and demonstrations.
+	 *
+	 * @return Unauthenticated server with a detached in-memory drive registry
+	 */
+	public static DLFSServer createEphemeral() {
+		return create(DLFSDriveManager.createEphemeral());
+	}
+
+	/**
+	 * Creates an explicitly process-local authenticated server.
+	 *
+	 * @param audienceKey Key defining the accepted authentication audience
+	 * @return Authenticated server with a detached in-memory drive registry
+	 */
+	public static DLFSServer createEphemeralWithAudience(AKeyPair audienceKey) {
+		return createWithAudience(DLFSDriveManager.createEphemeral(),audienceKey);
 	}
 
 	/**
@@ -128,8 +148,7 @@ public class DLFSServer implements Closeable {
 				ctx.status(400).result("Bad Request: " + e.getMessage()));
 
 			// Wire auth middleware if key pair provided (with audience checking)
-			if (keyPair != null) {
-				PeerAuth peerAuth = PeerAuth.createWithDIDAudience(keyPair);
+			if (peerAuth != null) {
 				AuthMiddleware auth = new AuthMiddleware(peerAuth);
 				routes.before(auth.handler());
 			}
@@ -225,46 +244,4 @@ public class DLFSServer implements Closeable {
 		}
 	}
 
-	/**
-	 * Launches a standalone DLFS WebDAV server for local testing.
-	 *
-	 * <p>Usage: {@code java convex.dlfs.DLFSServer [port]}
-	 * <p>Default port is 8080. No authentication required.
-	 * <p>Seeds a "home" drive with a test.txt file.
-	 */
-	public static void main(String[] args) {
-		int port = 8080;
-		if (args.length > 0) {
-			try {
-				port = Integer.parseInt(args[0]);
-			} catch (NumberFormatException e) {
-				System.err.println("Usage: DLFSServer [port]");
-				System.exit(1);
-			}
-		}
-
-		DLFSServer server = DLFSServer.create(null);
-
-		// Seed a "home" drive with a demo file
-		DLFSDriveManager dm = server.getDriveManager();
-		dm.createDrive(null, "home");
-		FileSystem homeFs = dm.getDrive(null, "home");
-		try {
-			Path testFile = homeFs.getPath("/test.txt");
-			Files.write(testFile, "Hello from DLFS!\n".getBytes(),
-					StandardOpenOption.CREATE,
-					StandardOpenOption.WRITE);
-		} catch (Exception e) {
-			System.err.println("Warning: could not seed demo file: " + e.getMessage());
-		}
-
-		server.start(port);
-
-		System.out.println("DLFS WebDAV server running on http://localhost:" + server.getPort() + "/dlfs/");
-		System.out.println("Drive 'home' seeded with test.txt");
-		System.out.println("No authentication required.");
-		System.out.println("Press Ctrl+C to stop.");
-
-		Runtime.getRuntime().addShutdownHook(new Thread(server::close));
-	}
 }

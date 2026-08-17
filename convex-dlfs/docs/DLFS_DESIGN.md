@@ -16,7 +16,7 @@ built on Convex immutable data structures with Java NIO compatibility.
 │          (Javalin HTTP + WebDAV protocol)                    │
 │  - URL routing: /dlfs/{drive}/{path}                         │
 │  - JWT authentication (Ed25519 bearer tokens)                │
-│  - DLFSDriveManager: per-identity drive registry             │
+│  - DLFSDriveManager: local identity-to-component routing     │
 │  - PropfindResponse: RFC 4918 XML responses                  │
 └──────────────────────┬───────────────────────────────────────┘
                        │  java.nio.file API
@@ -89,6 +89,8 @@ The cursor can be a `RootLatticeCursor` (standalone drive), a `DescendedCursor`
 | `DLFileSystem` | `convex-core/.../lattice/fs/DLFileSystem.java` | Abstract base with timestamp |
 | `DLFS` | `convex-core/.../lattice/fs/DLFS.java` | Factory methods |
 | `RootComponent` | `convex-core/.../lattice/RootComponent.java` | Generic store-backed application root and persistence policy |
+| `ALatticeApplication` | `convex-core/.../lattice/ALatticeApplication.java` | Root-level application composition and durability boundary |
+| `DLFSApplication` | `convex-dlfs/.../dlfs/DLFSApplication.java` | Application component composing DLFS at a configured path |
 | `DLFSRegion` | `convex-dlfs/.../dlfs/DLFSRegion.java` | Physical multi-owner DLFS region at an arbitrary lattice path |
 | `DLFSDrives` | `convex-dlfs/.../dlfs/DLFSDrives.java` | One owner's map of named drives |
 | `DLFSDrive` | `convex-dlfs/.../dlfs/DLFSDrive.java` | Per-drive component and hosted NIO adapter |
@@ -106,12 +108,14 @@ and any HTTP client.
 ### Server Stack
 
 ```
-DLFSServer
+DLFSServer (transport lifecycle only)
   ├── Javalin (HTTP framework, virtual threads via Jetty)
-  ├── AuthMiddleware (Ed25519 JWT bearer tokens)
-  └── DLFSWebDAV (route handlers)
-        └── DLFSDriveManager (per-identity drive registry)
-              └── DLFSLocal instances (one per identity + drive name)
+  ├── AuthMiddleware (optional Ed25519 JWT bearer tokens)
+  ├── DLFSWebDAV (route handlers)
+  └── DlfsMcpTools
+        └── DLFSDriveManager (local routing policy)
+              ├── identity → DLFSDrives component → DLFSDrive NIO view
+              └── explicit ephemeral fallback for tests/demos only
 ```
 
 `DLFSServer` owns the Javalin lifecycle. It binds to loopback by default, applies a
@@ -119,6 +123,27 @@ bounded request size, wires authentication middleware (optional), registers WebD
 routes, and configures Jetty with minimal platform threads (1 acceptor + 1 selector)
 since request handling uses virtual threads. Cross-origin access is not enabled by
 default.
+
+### Application Component Stack
+
+The developer-facing lattice application stack is independent of HTTP and of the
+particular host implementation:
+
+```
+RootComponent<V>                  store persistence, root publication, flush
+└── ALatticeApplication<V>        complete-root application composition
+    └── DLFSApplication<V>        configured DLFS region path
+        └── DLFSRegion            physical multi-owner lattice region
+            └── DLFSDrives        long-lived component for one owner
+                └── DLFSDrive     named drive plus local NIO view
+```
+
+A local bootstrap obtains the root with `RootComponent.open(...)` (usually through
+`DLFSApplication.open(...)`). A networked bootstrap obtains the same root abstraction
+from `NodeServer.getRootComponent()`. No application branch depends on `NodeServer`.
+`sync()` publishes logical state through the host policy; `flush()` is the separate
+store durability barrier. `DLFSDriveManager` is outside this ownership tree because
+it is service routing policy and may map identities across several regions or roots.
 
 ### URL Structure
 
@@ -155,27 +180,29 @@ MOVE/COPY currently returns 501 rather than performing a partial operation.
 
 ### Authentication
 
-Authentication is optional and controlled by the `AKeyPair` passed to
-`DLFSServer.create()`. When a key pair is provided:
+Authentication is optional and controlled by the `PeerAuth` passed to
+`DLFSServer.createAuthenticated()`. `createWithAudience()` derives the standard
+did:key audience policy from an `AKeyPair`. When authentication is configured:
 
 1. `AuthMiddleware` extracts Ed25519 JWT bearer tokens from the `Authorization` header
 2. The token's `sub` claim provides the user identity as a DID string (`did:key:...`)
 3. `DLFSWebDAV.getIdentity()` reads this from the request context
 4. `DLFSDriveManager` uses the identity to route to that user's drives
 
-When a key pair is supplied, `requireAuthForWrites` is enabled by default. Mutating operations (PUT,
+When authentication is configured, `requireAuthForWrites` is enabled by default. Mutating operations (PUT,
 DELETE, MKCOL, MOVE, COPY) return 401 if no valid token is present. Read operations
 (GET, HEAD, PROPFIND) are always allowed.
 
 ### Drive Management
 
-`DLFSDriveManager` is the local routing and service layer. In standalone mode it maintains a
-`ConcurrentHashMap<String, FileSystem>` keyed by `"{identity}:{driveName}"`
-(anonymous identity uses `":{driveName}"`). In hosted mode it adapts one owner's
-`DLFSDrives` component, whose lattice map is authoritative and whose cached
-`DLFSDrive` objects are local views only. A larger application may map identities
-to managers backed by different regions, servers or local roots without changing
-the physical `DLFSRegion` model.
+`DLFSDriveManager` is the local routing and service layer. `createRouter()` fails
+closed for unmounted identities. `mount(identity, drives)` and
+`mountAnonymous(drives)` route requests to an owner's `DLFSDrives` component,
+whose lattice map is authoritative and whose cached `DLFSDrive` objects are local
+views only. One manager may therefore span owners, physical regions and hosted
+roots without changing the physical `DLFSRegion` model. `createEphemeral()` is the
+explicit test/demo mode; it maintains a process-local
+`ConcurrentHashMap<String, FileSystem>` keyed by `"{identity}:{driveName}"`.
 
 | Operation | Method | Semantics |
 |-----------|--------|-----------|
@@ -402,20 +429,21 @@ NodeServer<Index<Keyword, ACell>> node =
     new NodeServer<>(lattice, store, NodeConfig.port(0));
 node.launch();
 
-DLFSRegion region = DLFSRegion.connect(
+DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(
     node.getRootComponent(), Keyword.intern("documents"));
-DLFSDrives drives = region.drives(ownerKey);
+DLFSDrives drives = app.drives(ownerKey);
 DLFSDrive drive = drives.createDrive("home");
 Files.writeString(drive.fileSystem().getPath("/data.txt"), "value");
-drives.sync();
+app.sync();
 ```
 
-For a non-networked host, the same hierarchy starts with
-`RootComponent.create(DLFSRegion.LATTICE, store)` and may connect the region at
-the empty path.
+For a non-networked host, `DLFSApplication.open(store, keyPair)` restores the
+standard root and connects its DLFS region at `:fs`.
 
-`DLFSDriveManager(DLFSDrives)` exposes one owner's drives to WebDAV and MCP and
-remains the place for local routing or mappings that span physical regions.
+`DLFSDriveManager.mount(identity, drives)` exposes owner components to WebDAV and
+MCP and remains the place for local mappings that span owners, physical regions
+or hosted roots. `DLFSServer` owns transport only and never owns the application,
+host or store lifecycle.
 The component hierarchy delegates store-only persistence to `RootComponent`, while
 `sync()` remains the explicit publication and replication boundary. Streamed blob
 writes install store-backed references every 16 MiB without moving the cursor or
@@ -464,7 +492,7 @@ Cursor-backed drive contents and registry operations persist through the NodeSer
 `LatticePropagator` (EtchStore). `DLFSDriveManager.sync()` marks the explicit publication
 boundary. Streamed writes may persist immutable blob structure before this boundary so
 the store can replace direct references with soft references; this does not select GC
-roots. Cursor-backed manager mode currently adapts one owner's `DLFSDrives` component.
+roots. Mounted manager routes may adapt multiple owners' `DLFSDrives` components.
 Standalone drives (via `DLFS.createLocal()`) remain entirely in-memory and need explicit
 persistence if required.
 

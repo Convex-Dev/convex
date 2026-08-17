@@ -56,18 +56,20 @@ implementation 'world.convex:convex-dlfs:0.8.12'
 
 ```java
 import convex.dlfs.DLFSServer;
-import convex.core.crypto.AKeyPair;
 
-// Pass a key pair to require Ed25519 JWT auth, or null for no auth
-DLFSServer server = DLFSServer.create(AKeyPair.generate());
+// Explicitly detached, process-local storage for a quick demonstration
+DLFSServer server = DLFSServer.createEphemeral();
+server.getDriveManager().createDrive(null, "home");
 server.start(8080); // use 0 for a random port
 
 // Drives are now served under http://localhost:8080/dlfs/{drive}/{path}
 ```
 
 The server binds to `127.0.0.1` by default. Calling `setBindHost(...)` is an explicit
-decision to expose it on another interface. A configured key pair enables JWT
-validation and requires authentication for mutating WebDAV requests by default.
+decision to expose it on another interface. `createEphemeralWithAudience(keyPair)`
+adds JWT validation and requires authentication for mutations. Production code
+normally supplies an explicitly configured `DLFSDriveManager` to `create(...)` or
+`createWithAudience(...)` instead of using detached ephemeral storage.
 
 DLFS is currently a robust-core project rather than a finished storage product. In
 particular, the standalone drive registry is process-local, directory MOVE/COPY and
@@ -81,27 +83,60 @@ synchronously at the service `sync()` boundary.
 
 ### Host DLFS in a lattice application
 
-`RootComponent` is the generic store-backed boundary for a lattice component
-hierarchy. A `NodeServer` exposes one for networked applications, while local
-applications can create one directly over any `AStore`. `DLFSRegion` represents
-a physical multi-owner DLFS region at any lattice path, `DLFSDrives` represents
-one owner's named drives, and `DLFSDrive` provides the corresponding NIO view.
-None of the DLFS components depends on `NodeServer`.
+`DLFSApplication` extends the general `ALatticeApplication` component over the
+complete hosted lattice root. It composes a physical, multi-owner `DLFSRegion`
+at any configured path and may be extended with other lattice facilities such
+as P2P discovery. The stack accepts a generic `RootComponent` and has no
+dependency on `NodeServer`.
+
+```java
+// Local: restore or create the standard :fs region in any AStore
+DLFSApplication app = DLFSApplication.open(store, myKeyPair);
+DLFSDriveManager myDrives = new DLFSDriveManager(
+    app.drives(myKeyPair.getAccountKey()));
+myDrives.createDrive(null, "home");
+FileSystem home = myDrives.getDrive(null, "home");
+Files.writeString(home.getPath("/hello.txt"), "Hello");
+app.sync();  // select and persist the current lattice root
+app.flush(); // separate physical durability barrier
+
+DLFSServer server = DLFSServer.create(myDrives);
+server.start(0);
+```
+
+Networked bootstrap supplies the host; the DLFS component API is unchanged:
 
 ```java
 KeyedLattice lattice = KeyedLattice.create(
     Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeServer<Index<Keyword, ACell>> node =
     new NodeServer<>(lattice, store, NodeConfig.port(0));
+node.setMergeContext(LatticeContext.create(null, myKeyPair));
 node.launch();
 
-DLFSRegion region = DLFSRegion.connect(
+DLFSApplication networkedApp = DLFSApplication.connect(
     node.getRootComponent(), Keyword.intern("documents"));
-DLFSDrives drives = region.drives(ownerKey);
-DLFSDrive home = drives.createDrive("home");
-Files.writeString(home.fileSystem().getPath("/hello.txt"), "Hello");
-drives.sync(); // publish the chosen application root
+DLFSDrives ownerDrives = networkedApp.drives(myKeyPair.getAccountKey());
+DLFSDriveManager routes = DLFSDriveManager.createRouter()
+    .mountAnonymous(ownerDrives)
+    .mount(DID.forKey(myKeyPair.getAccountKey()).toString(), ownerDrives);
+routes.createDrive(null, "home");
+networkedApp.sync();
+
+DLFSServer networkedServer = DLFSServer.createWithAudience(routes, myKeyPair);
+networkedServer.start(0);
 ```
+
+The component hierarchy is `RootComponent` → `DLFSApplication` → `DLFSRegion`
+→ `DLFSDrives` → `DLFSDrive`. The application is not owner-scoped: it can obtain
+components for multiple owners. Local identity-to-owner and cross-region mappings
+remain `DLFSDriveManager` routing policy; the HTTP server owns no lattice or store
+lifecycle.
+
+The application does not own or close its root or store. It retains one long-lived
+`DLFSDrives` component per requested owner, including cached NIO views. Isolated work uses
+`app.drives(owner).fork()` or `app.drives(owner).drive(name).fork()` and
+explicitly syncs the temporary component when its changes should merge back.
 
 Large channel writes checkpoint blob data through the component hierarchy every
 16 MiB. This replaces eligible direct references with store-backed soft references,
@@ -111,9 +146,10 @@ component which keeps the same persistence policy and only merges logical change
 when explicitly synced.
 
 `DLFSDriveManager` remains the service-facing local routing and mapping layer. It
-can manage detached per-identity drives, or adapt one `DLFSDrives` component for
-WebDAV and MCP. Applications that span multiple physical regions or lattice roots
-choose and compose those mappings locally rather than encoding them into a region.
+can manage explicitly detached per-identity drives, or route identities to multiple
+`DLFSDrives` components for WebDAV and MCP. Applications that span physical regions
+or lattice roots choose and compose those mappings locally rather than encoding
+them into a region.
 
 Connect any WebDAV client, e.g.:
 

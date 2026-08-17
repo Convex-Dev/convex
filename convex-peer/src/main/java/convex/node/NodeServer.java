@@ -265,7 +265,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// The returned (announced/store-backed) value is CASed back into the
 		// cursor by RootLatticeCursor.sync(), with lattice-merge fallback if a
 		// concurrent app write changed the cursor during the announce.
-		this.cursor.onSync(value -> {
+		this.rootComponent.onSync(value -> {
 			if (propagators.isEmpty()) return value;
 			ACell announced;
 			try {

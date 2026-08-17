@@ -19,6 +19,12 @@ import convex.etch.EtchStore;
 import convex.lattice.generic.SetLattice;
 
 public class RootComponentTest {
+	private static final class SetApplication extends ALatticeApplication<ASet<ACell>> {
+		SetApplication(RootComponent<ASet<ACell>> host) {
+			super(host);
+		}
+	}
+
 	private static final class FlushStore extends MemoryStore {
 		private boolean flushed;
 
@@ -54,5 +60,31 @@ public class RootComponentTest {
 		root.flush();
 
 		assertTrue(store.flushed);
+	}
+
+	@Test
+	public void testLocalSyncSelectsStoredRoot() throws Exception {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		ABlob blob=Blobs.createRandom(new Random(5678),5000);
+		root.cursor().updateAndGet(values->values.include(blob));
+
+		root.sync();
+
+		assertEquals(root.cursor().get(),store.getRootData());
+	}
+
+	@Test
+	public void testApplicationSharesHostedRoot() throws Exception {
+		MemoryStore store=new MemoryStore();
+		RootComponent<ASet<ACell>> root=RootComponent.create(SetLattice.create(),store);
+		SetApplication application=new SetApplication(root);
+		ABlob blob=Blobs.createRandom(new Random(9012),5000);
+
+		assertSame(root.cursor(),application.cursor());
+		application.cursor().updateAndGet(values->values.include(blob));
+		application.sync();
+
+		assertEquals(application.cursor().get(),store.getRootData());
 	}
 }

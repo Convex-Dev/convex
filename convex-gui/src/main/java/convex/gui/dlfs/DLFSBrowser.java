@@ -518,7 +518,7 @@ public class DLFSBrowser extends AbstractGUI {
 
 	private void startWebDAV() {
 		try {
-			webdavServer = DLFSServer.create(null);
+			webdavServer = DLFSServer.createEphemeral();
 			// Seed all existing lattice-backed drives
 			for (Map.Entry<String, DLFSLocal> entry : drives.entrySet()) {
 				webdavServer.getDriveManager().seedDrive(null, entry.getKey(), entry.getValue());
