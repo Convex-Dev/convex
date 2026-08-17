@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,6 +84,33 @@ public class LatticeCursorTest {
 		RootLatticeCursor<AInteger> root = Cursors.createLattice(lattice, null);
 		ALatticeCursor<AInteger> fork = root.fork();
 		doIntCursorTest(fork);
+	}
+
+	/**
+	 * A completed update on a long-lived fork must be visible when another thread
+	 * creates a fresh cursor on that same fork. The futures provide the
+	 * cross-thread hand-off without relying on timing.
+	 */
+	@Test
+	public void testForkPathReadAfterCommitAcrossThreads() throws Exception {
+		MapLattice<Keyword,ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
+		RootLatticeCursor<AHashMap<Keyword,ASet<CVMLong>>> root =
+				Cursors.createLattice(lattice, Maps.empty());
+		ALatticeCursor<AHashMap<Keyword,ASet<CVMLong>>> fork = root.fork();
+
+		try (ExecutorService writer = Executors.newSingleThreadExecutor();
+				ExecutorService reader = Executors.newSingleThreadExecutor()) {
+			for (long i = 1; i <= 1_000; i++) {
+				CVMLong committed = CVMLong.create(i);
+				writer.submit(() -> fork.<ASet<CVMLong>>path(Keywords.FOO)
+						.updateAndGet(values -> values.include(committed))).get();
+
+				ASet<CVMLong> observed = reader.submit(() ->
+						fork.<ASet<CVMLong>>path(Keywords.FOO).get()).get();
+				assertTrue(observed.contains(committed),
+						() -> "Fresh cursor did not observe completed update " + committed);
+			}
+		}
 	}
 
 	/**

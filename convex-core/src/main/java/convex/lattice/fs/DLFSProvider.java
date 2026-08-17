@@ -121,15 +121,18 @@ public class DLFSProvider extends FileSystemProvider {
 		}
 		Objects.requireNonNull(options,"Copy options");
 		boolean recursive=false;
+		boolean replaceExisting=false;
 		for (CopyOption option:options) {
 			Objects.requireNonNull(option,"Copy option");
 			if (option==DLFSOption.RECURSIVE) {
 				recursive=true;
+			} else if (option==StandardCopyOption.REPLACE_EXISTING) {
+				replaceExisting=true;
 			} else {
 				throw new UnsupportedOperationException("Unsupported DLFS copy option: "+option);
 			}
 		}
-		fs.copy(src,dst,recursive);
+		fs.copy(src,dst,recursive,replaceExisting);
 	}
 
 	@Override

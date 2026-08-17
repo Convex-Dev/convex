@@ -157,6 +157,11 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized void copy(DLPath source, DLPath target, boolean recursive) throws IOException {
+		copy(source,target,recursive,false);
+	}
+
+	@Override
+	public synchronized void copy(DLPath source, DLPath target, boolean recursive, boolean replaceExisting) throws IOException {
 		DLPath src=source.toAbsolutePath().normalize();
 		DLPath dst=target.toAbsolutePath().normalize();
 		if (src.getNameCount()==0) throw new FileSystemException(src.toString(),dst.toString(),"Cannot copy the DLFS root");
@@ -169,7 +174,13 @@ public class DLFSLocal extends DLFileSystem {
 				if (sourceNode==null) throw new UncheckedIOException(new NoSuchFileException(src.toString()));
 				if (src.equals(dst)) return root;
 				AVector<ACell> targetParent=requireDirectory(root,dst.getParent());
-				requireAbsentUnchecked(targetParent,dst.getCVMFileName(),dst);
+				AVector<ACell> targetNode=resolveNodeUnchecked(root,dst);
+				if (targetNode!=null) {
+					if (!replaceExisting) requireAbsentUnchecked(targetParent,dst.getCVMFileName(),dst);
+					if (DLFSNode.isDirectory(targetNode)&&!DLFSNode.isEmpty(targetNode)) {
+						throw new UncheckedIOException(new DirectoryNotEmptyException(dst.toString()));
+					}
+				}
 
 				AVector<ACell> copiedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
 				if (DLFSNode.isDirectory(sourceNode)&&!recursive) {

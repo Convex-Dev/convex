@@ -6,12 +6,18 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ABlob;
 import convex.dlfs.DLFSServer;
+import convex.dlfs.DLFSWebDAV;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLFileSystem;
 
 /**
  * Basic HTTP tests for the DLFS WebDAV server with multi-drive support.
@@ -23,6 +29,11 @@ public class DLFSServerTest {
 	private static String baseURL;
 	/** Base URL for the pre-seeded "test" drive */
 	private static String driveURL;
+
+	@Test
+	void testCanonicalMountPathIsExposed() {
+		assertEquals("/dlfs/", DLFSWebDAV.MOUNT_PATH);
+	}
 
 	@BeforeAll
 	static void setUp() {
@@ -113,6 +124,32 @@ public class DLFSServerTest {
 				.build();
 		HttpResponse<String> getResp = client.send(getReq, HttpResponse.BodyHandlers.ofString());
 		assertEquals("v2", getResp.body());
+	}
+
+	@Test
+	void testCopyAboveRequestLimitOverwritesAndSharesBlobData() throws Exception {
+		try (DLFSServer copyServer=DLFSServer.createEphemeral().setMaxRequestSize(1024)) {
+			copyServer.getDriveManager().createDrive(null,"copy-test");
+			DLFileSystem fs=(DLFileSystem)copyServer.getDriveManager().getDrive(null,"copy-test");
+			Path source=fs.getPath("/source.bin");
+			Path target=fs.getPath("/target.bin");
+			Files.write(source,new byte[2048]);
+			Files.write(target,new byte[] {1});
+			ABlob sourceData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)source));
+
+			copyServer.start(0);
+			String sourceURL="http://localhost:"+copyServer.getPort()+"/dlfs/copy-test/source.bin";
+			String targetURL="http://localhost:"+copyServer.getPort()+"/dlfs/copy-test/target.bin";
+			HttpRequest copy=HttpRequest.newBuilder(URI.create(sourceURL))
+				.method("COPY",HttpRequest.BodyPublishers.noBody())
+				.header("Destination",targetURL)
+				.build();
+
+			HttpResponse<String> response=client.send(copy,HttpResponse.BodyHandlers.ofString());
+			assertEquals(204,response.statusCode());
+			ABlob targetData=DLFSNode.getData(fs.getNode((convex.lattice.fs.DLPath)target));
+			assertSame(sourceData,targetData,"WebDAV COPY should structurally share immutable blob data");
+		}
 	}
 
 	@Test

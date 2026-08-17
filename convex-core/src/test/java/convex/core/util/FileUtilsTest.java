@@ -70,6 +70,19 @@ public class FileUtilsTest {
 		assertEquals(expected.getPath(), path.toFile().getPath());
 	}
 
+	@Test public void testRelativePathResolvesAgainstWorkingDirectory() {
+		Path relative = Path.of("dev", "venue.json");
+		Path expected = relative.toAbsolutePath();
+
+		assertEquals(expected, FileUtils.getPath(relative.toString()));
+		assertEquals(FileUtils.getFile(relative.toString()).toPath(), FileUtils.getPath(relative.toString()));
+	}
+
+	@Test public void testAbsolutePathIsPreserved() {
+		Path absolute = TEMP.resolve("config.json").toAbsolutePath();
+		assertEquals(absolute, FileUtils.getPath(absolute.toString()));
+	}
+
 	@Test public void testFileOps() throws IOException {
 		Path DIR=FileUtils.ensureFilePath(TEMP.resolve("testOps/foo.bar")).getParent();
 		assertTrue(Files.exists(DIR));

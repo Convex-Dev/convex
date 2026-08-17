@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - CVM: `char?` type predicate for Character values (v1 protocol, #92).
+- DLFS exposes its canonical WebDAV mount path as `DLFSWebDAV.MOUNT_PATH` for embedders (#699).
 - Lattice applications: `ALatticeApplication` provides a root-level composition point over local or NodeServer-hosted `RootComponent` trees; DLFS adds a multi-owner `DLFSApplication`, physical `DLFSRegion` components, per-owner `DLFSDrives` and temporary forks; P2P exposes the same host-neutral application stack with path-specific identity and node-record components.
 - DLFS has a module-local standalone `convex.dlfs.Main` entry point that boots a complete NodeServer-hosted application stack without the Convex CLI, with typed JSON5/`AMap` configuration for persistent storage and identity, lattice placement, identity-aware bootstrap peers, HTTP limits and explicit exposure policy.
 
@@ -20,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Lattice root publication is configured and frozen by host infrastructure, while `sync()` publication and store `flush()` durability remain explicit, separate boundaries.
 
 ### Fixed
+
+- DLFS WebDAV `COPY` structurally shares same-drive file blobs instead of materialising source contents on heap, preventing out-of-memory failures for large files.
+- `FileUtils.getPath` and its file-loading callers resolve relative paths against the process working directory instead of the filesystem root (#701).
 
 ## [0.8.12] - 2026-08-13
 

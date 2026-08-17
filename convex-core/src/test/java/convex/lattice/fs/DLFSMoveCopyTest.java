@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -118,6 +119,28 @@ public class DLFSMoveCopyTest {
 		assertEquals(Strings.create("directory metadata"),DLFSNode.getMetadata(fs.getNode(target)));
 		assertEquals(CVMLong.create(200),DLFSNode.getUTime(fs.getNode(target)));
 		assertTrue(Files.exists(source.resolve("child.txt")));
+	}
+
+	@Test
+	public void testReplaceExistingCopySharesContent() throws IOException {
+		DLFSLocal fs=DLFS.create();
+		fs.setTimestamp(CVMLong.create(100));
+		DLPath source=(DLPath)Files.write(fs.getPath("/source.bin"),new byte[] {7,8,9});
+		DLPath target=(DLPath)Files.write(fs.getPath("/target.bin"),new byte[] {1,2,3});
+		AVector<ACell> sourceNode=fs.getNode(source);
+
+		fs.setTimestamp(CVMLong.create(200));
+		Files.copy(source,target,StandardCopyOption.REPLACE_EXISTING);
+		AVector<ACell> copy=fs.getNode(target);
+
+		assertSame(DLFSNode.getData(sourceNode),DLFSNode.getData(copy));
+		assertEquals(CVMLong.create(200),DLFSNode.getUTime(copy));
+		assertArrayEquals(new byte[] {7,8,9},Files.readAllBytes(target));
+
+		DLPath directory=(DLPath)Files.createDirectory(fs.getPath("/directory"));
+		Files.write(directory.resolve("child"),new byte[] {1});
+		assertThrows(DirectoryNotEmptyException.class,
+			()->Files.copy(source,directory,StandardCopyOption.REPLACE_EXISTING));
 	}
 
 	@Test

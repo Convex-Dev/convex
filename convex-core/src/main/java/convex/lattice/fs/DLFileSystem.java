@@ -281,6 +281,20 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	public abstract void copy(DLPath source, DLPath target, boolean recursive) throws IOException;
 
 	/**
+	 * Copies a node within this drive, optionally replacing an existing target.
+	 *
+	 * @param source source path
+	 * @param target target path
+	 * @param recursive true to copy a complete directory subtree
+	 * @param replaceExisting true to replace an existing target
+	 * @throws IOException if the copy cannot be completed
+	 */
+	public void copy(DLPath source, DLPath target, boolean recursive, boolean replaceExisting) throws IOException {
+		if (replaceExisting) throw new UnsupportedOperationException("Replacing an existing DLFS target is not supported");
+		copy(source,target,recursive);
+	}
+
+	/**
 	 * Moves a node within this drive.
 	 *
 	 * @param source source path
