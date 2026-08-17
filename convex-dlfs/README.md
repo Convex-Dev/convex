@@ -59,17 +59,82 @@ lattice application stack without the Convex CLI:
 
 ```bash
 java -cp convex.jar convex.dlfs.Main \
-  --http-port 8080 --node-port 19888 --drive home
+  --config dlfs-config.json5
 ```
 
-This starts an unauthenticated, loopback-only example with a temporary Etch store
-and serves the
-drive at `http://localhost:8080/dlfs/home/`. The NodeServer hosts `Lattice.ROOT`,
-with DLFS attached at `:fs`, so root publication follows the real persistence and
-replication path. Inbound lattice access remains denied unless
-`--serve-inbound` is supplied explicitly. The example is intentionally temporary;
-embed the same stack to supply persistent storage, peer connections and operator
-policy.
+`DLFSConfig` parses JSON5 directly into an immutable Convex `AMap` and provides typed
+views over four sections: the generic lattice `node`, `dlfs` application policy,
+the local `http` transport and explicit `security` decisions. See the packaged
+[`config-example.json5`](src/main/resources/convex/dlfs/config-example.json5) for a
+commented example. `CONVEX_DLFS_CONFIG` may supply the file path; the old port,
+drive and inbound switches remain useful as development overrides.
+
+```json5
+{
+  node: {
+    port: 19888,
+    store: "dlfs.etch",
+    etch: {version: 3},
+    keypair: "<32-byte Ed25519 seed hex>",
+    url: "tcp://dlfs.example.org:19888",
+    bootstrap: [
+      {key: "<remote AccountKey hex>", url: "tcp://seed.example.org:19888"},
+    ],
+  },
+  dlfs: {
+    path: ["fs"],
+    drive: "home",
+    mounts: [
+      {identity: null, owner: "node"},
+      {identity: "node", owner: "node"},
+      // {identity: "did:key:z...", owner: "<replicated AccountKey hex>"},
+    ],
+  },
+  http: {bind: "127.0.0.1", port: 8080, maxRequestBytes: 67108864},
+  security: {
+    latticeInbound: "deny",
+    writeAuthentication: "node-key",
+  },
+}
+```
+
+Bootstrap entries pair a TCP address with its expected `AccountKey`; the connection
+manager challenges that identity after connecting and keeps an unverified connection
+under the conservative message-size cap. Verification failure is not yet a fatal
+transport error, so this is identity-aware bootstrap rather than a private trust
+boundary. Bootstrap contacts are not a separate DLFS concept: the same `NodeServer`
+connection and lattice propagation path carries `:p2p` discovery data and DLFS state.
+Bootstrap configures the outbound side only; the remote node must separately grant an
+inbound lattice view.
+
+The default configuration remains a zero-setup, loopback-only example with a
+temporary Etch store and an ephemeral node key. Configure both `node.store` and
+`node.keypair` before relying on identity or data across restarts. The key seed makes
+the config file a secret. An encrypted `node.etch` policy therefore requires a
+persistent key and records its public key as the store hint.
+
+Inbound lattice access defaults to `deny`. Setting `latticeInbound: "public"`
+exposes the complete primary lattice view to every inbound connection; it is not a
+private-peer allowlist. HTTP binds to `127.0.0.1` by default. A non-loopback listener
+with `writeAuthentication: "none"` is rejected unless
+`allowUnauthenticatedHTTP: true` explicitly acknowledges the risk. `"node-key"`
+validates bearer tokens for mutations using the stable node identity, while
+`"deny"` makes the service read-only.
+
+For a current two-node local replication setup, give each process a stable and distinct
+key, store, port and `tcp://127.0.0.1:...` URL, set `node.allowPrivateURL: true`, list the
+other node under `node.bootstrap`, use the same `dlfs.path`, and explicitly set
+`latticeInbound: "public"` on both. This is suitable for a controlled local network,
+not an Internet-facing private deployment. A replicated remote owner remains hidden
+until `dlfs.mounts` maps a local HTTP identity to that owner's key.
+
+The NodeServer normally hosts `Lattice.ROOT`, with DLFS attached at `:fs`, so root
+publication follows the real persistence and replication path. `dlfs.path` may place
+the region under a custom, otherwise unused top-level region, for example
+`["applications", "documents"]`. `dlfs.mounts` is deliberately local service policy:
+it maps anonymous, the symbolic local `"node"` DID, or an explicit `did:key` identity
+to the local owner (`owner: "node"`) or any replicated owner `AccountKey`. Replication
+never makes another user's drives automatically visible over HTTP.
 
 The equivalent programmatic setup is:
 
@@ -100,8 +165,9 @@ normally supplies an explicitly configured `DLFSDriveManager` to `create(...)` o
 
 DLFS is currently a robust-core project rather than a finished storage product. In
 particular, the standalone drive registry is process-local, directory MOVE/COPY and
-DAV locking are not implemented, and operators remain responsible for persistence,
-backup and trusted replication configuration.
+DAV locking are not implemented, and region-selective peer choice, immediate bootstrap
+synchronisation and mutually authenticated private lattice views still need stronger
+orchestration. Operators remain responsible for backup and trusted replication policy.
 
 The `convex dlfs start --etch <file>` command uses a cursor-backed registry and requires
 a stable keystore key (`--key` or `--public-key`). This prevents a restart from silently
