@@ -10,8 +10,9 @@ import convex.lattice.cursor.ALatticeCursor;
  *
  * <p>A lattice component provides domain-specific access to a section of
  * lattice state. It wraps an {@link ALatticeCursor} and may have a parent
- * component representing the containing application region. The component
- * hierarchy therefore mirrors the cursor path hierarchy.</p>
+ * component representing its containing application policy. This relationship
+ * need not be the cursor's logical parent: a fork, for example, keeps the same
+ * containing component while its cursor synchronises to the original cursor.</p>
  *
  * <p>Implementations should create appropriate domain-specific getters
  * and setters rather than exposing raw {@code get()} / {@code set()}
@@ -50,7 +51,7 @@ public abstract class ALatticeComponent<V extends ACell> {
 	}
 
 	/**
-	 * Returns the containing component, if this is a nested component.
+	 * Returns the containing policy component, if this is a nested component.
 	 *
 	 * @return Parent component, or {@code null} for a standalone root
 	 */

@@ -3,8 +3,10 @@ package convex.social;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.SignedData;
 import convex.core.cvm.Keywords;
 import convex.lattice.ALatticeComponent;
 import convex.lattice.LatticeContext;
@@ -54,7 +56,8 @@ import convex.lattice.generic.OwnerLattice;
  * KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
  * }</pre>
  */
-public class Social extends ALatticeComponent<ACell> {
+public class Social extends ALatticeComponent<
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> {
 
 	/**
 	 * Keyword for the social section in a node's root lattice.
@@ -71,14 +74,13 @@ public class Social extends ALatticeComponent<ACell> {
 	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
 		OwnerLattice.create(SocialLattice.INSTANCE);
 
-	@SuppressWarnings("unchecked")
-	Social(ALatticeCursor<?> cursor) {
-		super((ALatticeCursor<ACell>) cursor);
+	Social(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		super(cursor);
 	}
 
-	@SuppressWarnings("unchecked")
-	Social(ALatticeComponent<?> parent, ALatticeCursor<?> cursor) {
-		super(parent,(ALatticeCursor<ACell>) cursor);
+	Social(ALatticeComponent<?> parent,
+			ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
+		super(parent,cursor);
 	}
 
 	/**
@@ -89,7 +91,8 @@ public class Social extends ALatticeComponent<ACell> {
 	 */
 	public static Social create(AKeyPair keyPair) {
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		ALatticeCursor<?> cursor = Cursors.createLattice(SOCIAL_LATTICE);
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor =
+			Cursors.createLattice(SOCIAL_LATTICE);
 		cursor.withContext(ctx);
 		return new Social(cursor);
 	}
@@ -106,7 +109,8 @@ public class Social extends ALatticeComponent<ACell> {
 	 */
 	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		ALatticeCursor<?> socialCursor = rootCursor.path(KEY_SOCIAL);
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			rootCursor.path(KEY_SOCIAL);
 		socialCursor.withContext(ctx);
 		return new Social(socialCursor);
 	}
@@ -123,7 +127,8 @@ public class Social extends ALatticeComponent<ACell> {
 	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
 		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
 		LatticeContext ctx = LatticeContext.create(null, keyPair);
-		ALatticeCursor<?> socialCursor = parent.cursor().path(KEY_SOCIAL);
+		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
+			parent.cursor().path(KEY_SOCIAL);
 		socialCursor.withContext(ctx);
 		return new Social(parent,socialCursor);
 	}

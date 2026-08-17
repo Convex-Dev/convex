@@ -429,14 +429,9 @@ public class SocialAppTest {
 
 		// But the SignedData is signed by Alice, not Bob
 		// Extract raw OwnerLattice map and verify the signer
-		@SuppressWarnings("unchecked")
-		AHashMap<ACell, ACell> ownerMap = (AHashMap<ACell, ACell>) social.cursor().get();
-		ACell bobEntry = ownerMap.get(bob.getAccountKey());
-		assertNotNull(bobEntry, "Forged entry exists in local state");
-		assertTrue(bobEntry instanceof SignedData<?>);
-
-		@SuppressWarnings("unchecked")
-		SignedData<Index<Keyword, ACell>> bobSigned = (SignedData<Index<Keyword, ACell>>) bobEntry;
+		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.cursor().get();
+		SignedData<Index<Keyword, ACell>> bobSigned = ownerMap.get(bob.getAccountKey());
+		assertNotNull(bobSigned, "Forged entry exists in local state");
 		assertEquals(alice.getAccountKey(), bobSigned.getAccountKey(),
 			"Forged entry is signed by Alice (the attacker), not Bob (the victim)");
 	}

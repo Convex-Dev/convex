@@ -24,7 +24,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	private final AString name;
 	private final HostedFileSystem fileSystem;
 
-	DLFSDrive(DLFSDrives parent, AString name, ALatticeCursor<AVector<ACell>> cursor) {
+	DLFSDrive(ALatticeComponent<?> parent, AString name, ALatticeCursor<AVector<ACell>> cursor) {
 		super(parent,cursor);
 		this.name=name;
 		this.fileSystem=new HostedFileSystem(this);
@@ -51,7 +51,7 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	 * {@link #sync()} to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
-		return new DLFSDrive((DLFSDrives)parent(),name,cursor.fork());
+		return new DLFSDrive(parent(),name,cursor.fork());
 	}
 
 	private ABlob persistData(ABlob data) throws IOException {
