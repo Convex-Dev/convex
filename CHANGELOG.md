@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DLFS cursor-level embedders can supply their host store to `DLFS.connect` or `DLFS.open`, so NIO `Files.copy` and output-stream writes persist blob branches incrementally instead of retaining files larger than the JVM heap (#702).
+- DLFS mutations use the caller's timestamp exactly instead of advancing it from observed state; equal-timestamp merge-back preserves the current local (`own`) value, including live names competing with stale tombstones (#703).
+
 ## [0.8.13] - 2026-08-17
 
 ### Added

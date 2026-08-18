@@ -13,7 +13,6 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.ALatticeComponent;
-import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFSLattice;
@@ -82,7 +81,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			if (status==DriveStatus.LIVE) return registry;
 			if (existing!=null && status!=DriveStatus.DELETED) return registry;
 			if (liveCount(registry)>=maximumDrives) return registry;
-			return registry.assoc(name,DLFSNode.createDirectory(nextMutationTimestamp(existing)));
+			return registry.assoc(name,DLFSNode.createDirectory(mutationTimestamp()));
 		});
 		AVector<ACell> old=(previous==null)?null:previous.get(name);
 		if (status(old)==DriveStatus.LIVE
@@ -104,7 +103,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			if (registry==null) return null;
 			AVector<ACell> root=registry.get(name);
 			if (status(root)!=DriveStatus.LIVE) return registry;
-			CVMLong deletionTime=nextMutationTimestamp(root);
+			CVMLong deletionTime=mutationTimestamp();
 			return registry.assoc(name,DLFSNode.createEmptyFile(deletionTime));
 		});
 		boolean deleted=previous!=null && status(previous.get(name))==DriveStatus.LIVE;
@@ -126,7 +125,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			AVector<ACell> target=registry.get(newKey);
 			DriveStatus targetStatus=status(target);
 			if (targetStatus==DriveStatus.LIVE || (target!=null && targetStatus!=DriveStatus.DELETED)) return registry;
-			CVMLong operationTime=nextMutationTimestamp(root,target);
+			CVMLong operationTime=mutationTimestamp();
 			AVector<ACell> movedRoot=root.assoc(DLFSNode.POS_UTIME,operationTime);
 			AVector<ACell> tombstone=DLFSNode.createEmptyFile(operationTime);
 			return registry.assoc(newKey,movedRoot).assoc(oldKey,tombstone);
@@ -177,24 +176,13 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		return count;
 	}
 
-	private CVMLong nextMutationTimestamp(AVector<ACell>... roots) {
-		LatticeContext context=cursor.getContext();
-		long now=context.currentTimestampValue();
-		long skew=context.getMaxFutureTimestampSkew(DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
-		long limit=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
-		long result=now;
-		for (AVector<ACell> root:roots) {
-			if (root==null || !DLFSNode.isValidNodeShallow(root)) continue;
-			long stored=DLFSNode.getUTime(root).longValue();
-			if (stored>limit) throw new IllegalStateException("DLFS drive timestamp is too far in the future: "+stored);
-			if (stored>=result) {
-				if (stored==Long.MAX_VALUE || stored+1>limit) {
-					throw new IllegalStateException("No acceptable timestamp remains for the DLFS drive mutation");
-				}
-				result=stored+1;
-			}
-		}
-		return CVMLong.create(result);
+	/**
+	 * Returns the caller-controlled write timestamp without modification.
+	 * Ordering distinct mutations is the responsibility of the application which
+	 * owns the lattice context.
+	 */
+	private CVMLong mutationTimestamp() {
+		return cursor.getContext().currentTimestamp();
 	}
 
 	private void closeCached(AString name) {

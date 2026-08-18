@@ -16,7 +16,6 @@ import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.Collections;
 import java.util.Set;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -80,7 +79,8 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	}
 	
 	/**
-	 * Sets the timestamp of this DLFS drive
+	 * Sets the exact timestamp of this DLFS drive. No ordering or monotonicity
+	 * policy is applied.
 	 * @param newTimestamp New timestamp
 	 */
 	public final void setTimestamp(CVMLong newTimestamp) {
@@ -88,27 +88,27 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	}
 	
 	/**
-	 * Updates the timestamp of this DLFS drive to the maximum of the given timestamp or it's current time stamp
-	 * @param newTimestamp Potential new timestamp
-	 * @return The new timestamp value, or the original one if unchanged
+	 * Replaces the drive timestamp with the supplied value.
+	 *
+	 * <p>No monotonic adjustment is performed. Timestamp ordering is application
+	 * policy: callers must supply the exact timestamp appropriate for the next
+	 * mutation.</p>
+	 *
+	 * @param newTimestamp New timestamp
+	 * @return The supplied timestamp as a CVM value
 	 */
 	public synchronized CVMLong updateTimestamp(long newTimestamp) {
-		if (newTimestamp>timestamp.longValue()) {
-			timestamp=CVMLong.create(newTimestamp);
-		}
+		timestamp=CVMLong.create(newTimestamp);
 		return timestamp;
 	}
 	
 	/**
-	 * Updates the timestamp of the drive to the current system timestamp
+	 * Replaces the drive timestamp with a snapshot of the current system time.
+	 * Equal or earlier clock readings are retained exactly; this method does not
+	 * implement a logical clock.
 	 */
 	public synchronized CVMLong updateTimestamp() {
-		long current=timestamp.longValue();
-		long now=Utils.getCurrentTimestamp();
-		// Wall-clock resolution is commonly one millisecond. Ensure successive local
-		// logical mutations never receive an accidental tie within the same tick.
-		long next=(now>current)?now:((current<Long.MAX_VALUE)?current+1:current);
-		timestamp=CVMLong.create(next);
+		timestamp=CVMLong.create(Utils.getCurrentTimestamp());
 		return timestamp;
 	}
 
@@ -215,22 +215,6 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 			while (source.hasRemaining()) channel.write(source);
 		}
 		return created;
-	}
-
-	/**
-	 * Gives the hosting application an opportunity to persist streamed blob data.
-	 *
-	 * <p>The default implementation is an identity operation. Store-backed DLFS
-	 * adapters may override this to replace direct references with store-backed
-	 * references. This method does not update or sync the filesystem cursor: the
-	 * caller installs the returned value as part of its current logical write.</p>
-	 *
-	 * @param data Blob data to persist
-	 * @return Persisted data, potentially containing store-backed references
-	 * @throws IOException If persistence fails
-	 */
-	public ABlob persistBlob(ABlob data) throws IOException {
-		return data;
 	}
 
 	/**

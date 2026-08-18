@@ -12,7 +12,10 @@ Java NIO implementation and a DAV class 1 server for access from ordinary file c
 DLFS stores a whole filesystem as an immutable Convex lattice value. Because the
 underlying data structures support recursive lattice merges, independent replicas can
 be reconciled using timestamp and tombstone rules. Equal-timestamp conflicts are
-directional, so applications must supply a sound mutation timestamp policy.
+directional: the current local (`own`) value wins. Applications own the mutation clock
+and must supply a sound timestamp policy; DLFS never advances a timestamp from observed
+state. Reusing a timestamp is valid for local updates, while operations which must be
+ordered across replicas require caller-supplied timestamps expressing that order.
 
 It exposes the filesystem in three ways:
 
@@ -238,12 +241,24 @@ components they route, which also retains their cached NIO views. Isolated work 
 `app.drives(owner).fork()` or `app.drives(owner).drive(name).fork()` and explicitly
 syncs the temporary component when its changes should merge back.
 
-Large channel writes checkpoint blob data through the component hierarchy every
-16 MiB. This replaces eligible direct references with store-backed soft references,
-but does not sync the cursor or choose retained GC roots; those remain application
-policy. `fork()` on a region, drive collection or drive creates a temporary
-component which keeps the same persistence policy and only merges logical changes
-when explicitly synced.
+Large channel writes checkpoint blob data through the host `AStore` every 16 MiB.
+The component hierarchy supplies that store to the same `DLFSLocal` implementation
+used by lower-level cursor embedders. This replaces eligible direct references with
+store-backed soft references, but does not sync the cursor or choose retained GC
+roots; those remain application policy. `fork()` on a region, drive collection or
+drive creates a temporary component which keeps the same store and only merges
+logical changes when explicitly synced.
+
+Lower-level embedders that deliberately open a drive from an `ALatticeCursor`
+instead of the component hierarchy must supply the host store explicitly:
+
+```java
+DLFSLocal drive = DLFS.connect(drivesCursor, driveName, store);
+```
+
+The store is not owned or closed by the filesystem. It should be the same store
+used to publish the containing lattice root. The two-argument cursor overload has
+no physical persistence policy and therefore keeps file data on heap.
 
 `DLFSDriveManager` remains the service-facing local routing and mapping layer. It
 can manage explicitly detached per-identity drives, or route identities to multiple

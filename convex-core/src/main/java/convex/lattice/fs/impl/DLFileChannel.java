@@ -27,14 +27,14 @@ public class DLFileChannel implements SeekableByteChannel {
 	private long position=0;
 	private int bytesUntilPersist=DLFileSystem.BLOB_PERSIST_INTERVAL;
 	private DLPath path;
-	private DLFileSystem fileSystem;
+	private DLFSLocal fileSystem;
 	
-	private DLFileChannel(DLFileSystem fs, DLPath path) {
+	private DLFileChannel(DLFSLocal fs, DLPath path) {
 		this.fileSystem=fs;
 		this.path=path;
 	}
 	
-	public static DLFileChannel create(DLFileSystem fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
+	static DLFileChannel create(DLFSLocal fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
 		AVector<ACell> node= fs.getNode(path);
 		
 		boolean append=false;
@@ -119,7 +119,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 				ABlob newData=data.replaceSlice(pos,blob);
 				boolean persist=(n==bytesUntilPersist);
-				if (persist) newData=fileSystem.persistBlob(newData);
+				if (persist) newData=fileSystem.checkpointBlob(newData);
 
 				if (newData!=data) {
 					AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA,newData)

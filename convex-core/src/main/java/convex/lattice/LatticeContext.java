@@ -163,7 +163,9 @@ public class LatticeContext {
 	 *
 	 * <p>Returns the explicit timestamp when the driver supplied one (giving full determinism
 	 * — tests inject a fixed value); this boundary is the single place a wall-clock is read,
-	 * and only as the fallback when no timestamp was supplied (standalone use).</p>
+	 * and only as the fallback when no timestamp was supplied (standalone use). The returned
+	 * value is exact: this context does not compare with application state or implement a
+	 * monotonic logical clock.</p>
 	 *
 	 * @return the write/merge timestamp to stamp new values with
 	 */

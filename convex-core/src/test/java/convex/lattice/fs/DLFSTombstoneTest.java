@@ -111,6 +111,24 @@ public class DLFSTombstoneTest {
 		assertEquals(a.getRootHash(), b.getRootHash());
 	}
 
+	/** Equal timestamps preserve the first/own state, whether live or deleted. */
+	@Test
+	public void testEqualTimestampLiveDeleteConflictFavoursOwn() {
+		CVMLong timestamp=CVMLong.create(100);
+		DLPath path=new DLPath(null,new AString[] {Strings.create("x")},false);
+		AVector<ACell> live=DLFSNode.updateNode(DLFSNode.createDirectory(timestamp),path,
+			DLFSNode.createEmptyFile(timestamp),timestamp);
+		AVector<ACell> deleted=DLFSNode.deleteNode(live,path,timestamp);
+
+		AVector<ACell> liveOwn=DLFSNode.merge(live,deleted);
+		assertTrue(DLFSNode.getDirectoryEntries(liveOwn).containsKey(Strings.create("x")));
+		assertTrue(DLFSNode.getTombstones(liveOwn).isEmpty());
+
+		AVector<ACell> deletedOwn=DLFSNode.merge(deleted,live);
+		assertFalse(DLFSNode.getDirectoryEntries(deletedOwn).containsKey(Strings.create("x")));
+		assertEquals(timestamp,DLFSNode.getTombstones(deletedOwn).get(Strings.create("x")));
+	}
+
 	/** Merge order does not matter: bidirectional replication converges to one canonical tree. */
 	@Test
 	public void testMergeConverges() throws IOException {

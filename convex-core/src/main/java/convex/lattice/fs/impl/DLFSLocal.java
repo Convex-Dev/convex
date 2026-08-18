@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
 import java.util.Set;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -21,6 +22,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
+import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.fs.DLFS;
@@ -38,10 +40,12 @@ public class DLFSLocal extends DLFileSystem {
 
 	// Cursor for filesystem root node. This may be a path into a bigger lattice
 	ALatticeCursor<AVector<ACell>> rootCursor;
+	private final AStore store;
 
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
 		super(dlfsProvider,uriPath,initialTimestamp(rootNode));
-		this.rootCursor=Cursors.createLattice(DLFSLattice.INSTANCE, rootNode);
+		this.rootCursor=Cursors.createLattice(DLFSLattice.INSTANCE,rootNode);
+		this.store=null;
 	}
 
 	/**
@@ -52,8 +56,9 @@ public class DLFSLocal extends DLFileSystem {
 	 * @param cursor Lattice cursor pointing to the DLFS tree
 	 */
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, ALatticeCursor<AVector<ACell>> cursor) {
-		super(dlfsProvider, uriPath, initialTimestamp(cursor.get()));
-		this.rootCursor =  cursor;
+		super(dlfsProvider,uriPath,initialTimestamp(cursor.get()));
+		this.rootCursor=cursor;
+		this.store=null;
 	}
 
 	/**
@@ -62,8 +67,58 @@ public class DLFSLocal extends DLFileSystem {
 	 */
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
 			ALatticeCursor<AVector<ACell>> cursor, CVMLong timestamp) {
-		super(dlfsProvider, uriPath, timestamp);
+		super(dlfsProvider,uriPath,timestamp);
 		this.rootCursor=cursor;
+		this.store=null;
+	}
+
+	/**
+	 * Creates a cursor-backed view using the supplied host store when non-null.
+	 * Intended for component adapters which may also operate detached from a host.
+	 */
+	protected DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+		this(dlfsProvider,uriPath,cursor,initialTimestamp(cursor.get()),store);
+	}
+
+	private DLFSLocal(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, CVMLong timestamp, AStore store) {
+		super(dlfsProvider,uriPath,timestamp);
+		this.rootCursor=cursor;
+		this.store=store;
+	}
+
+	/**
+	 * Creates a cursor-backed view with incremental blob persistence in the
+	 * supplied store. The caller retains ownership of the store.
+	 *
+	 * @param dlfsProvider DLFS provider
+	 * @param uriPath URI path (may be null)
+	 * @param cursor Cursor pointing to the DLFS tree
+	 * @param store Store used for streamed blob persistence
+	 * @return Store-backed filesystem view
+	 */
+	public static DLFSLocal create(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, AStore store) {
+		if (store==null) throw new IllegalArgumentException("DLFS persistence store must not be null");
+		return new DLFSLocal(dlfsProvider,uriPath,cursor,initialTimestamp(cursor.get()),store);
+	}
+
+	/**
+	 * Creates a store-backed cursor view using a root timestamp captured by the
+	 * caller. The caller retains ownership of the store.
+	 *
+	 * @param dlfsProvider DLFS provider
+	 * @param uriPath URI path (may be null)
+	 * @param cursor Cursor pointing to the DLFS tree
+	 * @param timestamp Timestamp captured from the drive root
+	 * @param store Store used for streamed blob persistence
+	 * @return Store-backed filesystem view
+	 */
+	public static DLFSLocal create(DLFSProvider dlfsProvider, String uriPath,
+			ALatticeCursor<AVector<ACell>> cursor, CVMLong timestamp, AStore store) {
+		if (store==null) throw new IllegalArgumentException("DLFS persistence store must not be null");
+		return new DLFSLocal(dlfsProvider,uriPath,cursor,timestamp,store);
 	}
 
 	public static DLFSLocal create(DLFSProvider provider) {
@@ -79,6 +134,8 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public CVMLong getTimestamp() {
 		CVMLong ctxTs = rootCursor.getContext().getTimestamp();
+		// Consume caller time exactly. Stored node/tombstone times must never be used
+		// to manufacture a later local mutation timestamp.
 		return (ctxTs != null) ? ctxTs : super.getTimestamp();
 	}
 
@@ -93,6 +150,14 @@ public class DLFSLocal extends DLFileSystem {
 	public SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException {
 		path=path.normalize();
 		return DLFileChannel.create(this,options,path);
+	}
+
+	/**
+	 * Checkpoints immutable blob branches into this filesystem's store, if any.
+	 * Package-private because this is solely part of the channel write protocol.
+	 */
+	ABlob checkpointBlob(ABlob data) throws IOException {
+		return (store==null)?data:Cells.persist(data,store);
 	}
 
 	@Override
@@ -223,9 +288,7 @@ public class DLFSLocal extends DLFileSystem {
 						throw new UncheckedIOException(new DirectoryNotEmptyException(dst.toString()));
 					}
 				}
-				CVMLong targetTomb=DLFSNode.getTombstones(targetParent).get(targetName);
-				CVMLong utime=nextMutationTimestamp(getTimestamp(),DLFSNode.getUTime(sourceNode),
-					(targetNode==null)?null:DLFSNode.getUTime(targetNode),targetTomb);
+				CVMLong utime=getTimestamp();
 				AVector<ACell> movedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
 
 				AVector<ACell> updated=DLFSNode.deleteNode(root,src,utime);
@@ -234,31 +297,6 @@ public class DLFSLocal extends DLFileSystem {
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
 		}
-	}
-
-	private CVMLong nextMutationTimestamp(CVMLong requested, CVMLong... observed) {
-		long now=rootCursor.getContext().currentTimestampValue();
-		long skew=rootCursor.getContext().getMaxFutureTimestampSkew(
-			DLFSLattice.DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW);
-		long limit=(now>Long.MAX_VALUE-skew)?Long.MAX_VALUE:now+skew;
-		long result=requested.longValue();
-		if (result>limit) throw futureTimestamp("DLFS mutation timestamp is too far in the future: "+result);
-		for (CVMLong timestamp:observed) {
-			if (timestamp==null) continue;
-			long stored=timestamp.longValue();
-			if (stored>limit) throw futureTimestamp("DLFS timestamp is too far in the future: "+stored);
-			if (stored>=result) {
-				if (stored==Long.MAX_VALUE || stored+1>limit) {
-					throw futureTimestamp("No acceptable timestamp remains for the DLFS mutation");
-				}
-				result=stored+1;
-			}
-		}
-		return CVMLong.create(result);
-	}
-
-	private static UncheckedIOException futureTimestamp(String reason) {
-		return new UncheckedIOException(new FileSystemException(null,null,reason));
 	}
 
 	private static AVector<ACell> requireDirectory(AVector<ACell> rootNode, DLPath path) {
@@ -308,7 +346,10 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public DLFSLocal fork() {
-		return new DLFSLocal(provider(), uriPath, rootCursor.fork());
+		ALatticeCursor<AVector<ACell>> cursor=rootCursor.fork();
+		return (store==null)
+			?new DLFSLocal(provider(),uriPath,cursor)
+			:create(provider(),uriPath,cursor,store);
 	}
 
 	@Override
@@ -318,7 +359,10 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public DLFSLocal clone() {
-		return new DLFSLocal(provider(), uriPath, rootCursor.get());
+		AVector<ACell> root=rootCursor.get();
+		if (store==null) return new DLFSLocal(provider(),uriPath,root);
+		ALatticeCursor<AVector<ACell>> cursor=Cursors.createLattice(DLFSLattice.INSTANCE,root);
+		return create(provider(),uriPath,cursor,store);
 	}
 
 	private static CVMLong initialTimestamp(AVector<ACell> rootNode) {

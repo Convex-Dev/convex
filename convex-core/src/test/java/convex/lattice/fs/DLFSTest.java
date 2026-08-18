@@ -93,12 +93,17 @@ public class DLFSTest {
 	}
 
 	@Test
-	public void testLocalTimestampAdvanceIsStrictlyMonotonic() {
+	public void testLocalTimestampUpdatesAreExact() {
 		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
-		long future=System.currentTimeMillis()+10_000;
-		fs.setTimestamp(CVMLong.create(future));
-		assertEquals(future+1,fs.updateTimestamp().longValue());
-		assertEquals(future+2,fs.updateTimestamp().longValue());
+		assertEquals(123,fs.updateTimestamp(123).longValue());
+		assertEquals(100,fs.updateTimestamp(100).longValue(),
+			"the filesystem must not ratchet a caller-supplied timestamp");
+		fs.setTimestamp(CVMLong.create(Long.MAX_VALUE));
+		long before=System.currentTimeMillis();
+		long actual=fs.updateTimestamp().longValue();
+		long after=System.currentTimeMillis();
+		assertTrue(actual>=before && actual<=after,
+			"the no-argument helper must retain the wall-clock reading exactly");
 	}
 
 	private static void writeAfter(CountDownLatch start, DLFileSystem fs, DLPath path, byte[] value) {

@@ -212,11 +212,12 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 }
 ```
 
-The component parent supplies containing application policy, including persistence.
-The cursor parent supplies logical navigation and synchronisation. These relationships
-are deliberately separate: a fork keeps the same component parent while its cursor
-synchronises to the live cursor it was forked from. The cursor chain also handles
-signing transparently—`Feed` does not know about `SignedData` at all.
+The component parent supplies containing application policy and internal access to
+the host `AStore`. The cursor parent supplies logical navigation and synchronisation.
+These relationships are deliberately separate: a fork keeps the same component
+parent while its cursor synchronises to the live cursor it was forked from. The
+cursor chain also handles signing transparently—`Feed` does not know about
+`SignedData` at all.
 
 Do not retain caller-controlled path arrays; component and cursor constructors must
 take an owned copy. Long-lived application and region components are appropriate.
@@ -328,11 +329,11 @@ The three boundaries have intentionally different meanings:
 | `component.sync()` | Merge through its cursor parent; at the root, run host publication policy | Yes, where merge/publication selects a value |
 | `application.flush()` | Pass through to the underlying store's physical durability barrier | No |
 
-Incremental blob writers may call the protected persistence mechanism at intervals
-to replace eligible direct references with store-backed soft references and relieve
-memory pressure. They must explicitly install the returned value in working state.
-Persistence neither selects a retained root nor grants permission to garbage collect;
-those are application policy.
+Incremental blob writers use the host `AStore` at intervals to replace eligible
+direct references with store-backed soft references and relieve memory pressure.
+They must explicitly install the returned value in working state. Persistence
+neither selects a retained root nor grants permission to garbage collect; those are
+application policy.
 
 ## Connecting to Host Infrastructure
 
@@ -366,13 +367,21 @@ The `LatticeContext` carries the write/merge context: a **signing key pair** (+ 
 // signing only
 LatticeContext ctx = LatticeContext.create(null, myKeyPair);
 
-// signing + write clock — needed for stamp-on-write regions; refresh per write
-// batch so LWW sees fresh timestamps (the pattern DLFSAdapter uses)
+// signing + write clock — needed for stamp-on-write regions; refresh at the
+// cadence chosen by the application
 LatticeContext ctx = LatticeContext.create(CVMLong.create(System.currentTimeMillis()), myKeyPair);
 cursor.withContext(ctx);
 ```
 
 A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. (The same context timestamp is what `DLFSLocal` reads for node write times.)
+
+The context is an immutable caller-owned snapshot. Lattice components consume its
+timestamp exactly: they must not increment it, compare it with stored values to invent
+a later value, or otherwise implement a hidden logical clock. The application decides
+when to install a new context. Reusing a timestamp deliberately creates a tie; a local
+update is the current (`own`) merge operand and therefore wins that tie against an older
+snapshot. When operations must be ordered across replicas—especially delete followed by
+recreate—the application must supply timestamps expressing that order.
 
 ## Security Model
 

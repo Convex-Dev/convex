@@ -30,6 +30,21 @@ import convex.lattice.fs.impl.DLFSLocal;
 public class DLFSMoveCopyTest {
 
 	@Test
+	public void testMoveUsesConfiguredTimestampWithoutRatcheting() throws IOException {
+		DLFSLocal fs=DLFS.create();
+		fs.setTimestamp(CVMLong.create(200));
+		DLPath source=(DLPath)Files.write(fs.getPath("/source"),new byte[] {1});
+
+		fs.setTimestamp(CVMLong.create(100));
+		DLPath target=fs.getPath("/target");
+		Files.move(source,target);
+
+		assertEquals(CVMLong.create(100),DLFSNode.getUTime(fs.getNode(target)));
+		assertEquals(CVMLong.create(100),
+			DLFSNode.getTombstones(fs.getNode(fs.getRoot())).get(Strings.create("source")));
+	}
+
+	@Test
 	public void testFileMovePreservesNodeAndUpdatesDirectories() throws IOException {
 		DLFSLocal fs=DLFS.create();
 		fs.setTimestamp(CVMLong.create(10));
