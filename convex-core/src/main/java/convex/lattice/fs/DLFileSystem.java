@@ -1,8 +1,8 @@
 package convex.lattice.fs;
 
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
@@ -20,8 +20,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
-import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 import convex.lattice.fs.impl.DLDirectoryStream;
 import convex.lattice.fs.impl.DLFSFileAttributes;
 
@@ -43,7 +41,6 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	private static final Set<String> SUPPORTED_FILE_ATTRIBUTE_SET = Collections.singleton("basic");
 
 	protected final DLFSProvider provider;
-	private CVMLong timestamp; 
 	private volatile boolean open = true;
 	
 	// Singleton root / empty paths
@@ -52,10 +49,9 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	protected final String uriPath;
 	
-	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath, CVMLong timestamp) {
+	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath) {
 		this.provider=dlfsProvider;
 		this.uriPath=uriPath;
-		this.timestamp=timestamp;
 	}
 
 	@Override
@@ -68,50 +64,6 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 		open = false;
 	}
 	
-	/**
-	 * Gets the timestamp of this DLFS drive, used to mark new writes.
-	 * Subclasses may override to consult a cursor's {@link convex.lattice.LatticeContext}.
-	 *
-	 * @return Current timestamp as a CVM integer
-	 */
-	public CVMLong getTimestamp() {
-		return timestamp;
-	}
-	
-	/**
-	 * Sets the exact timestamp of this DLFS drive. No ordering or monotonicity
-	 * policy is applied.
-	 * @param newTimestamp New timestamp
-	 */
-	public final void setTimestamp(CVMLong newTimestamp) {
-		timestamp=newTimestamp;
-	}
-	
-	/**
-	 * Replaces the drive timestamp with the supplied value.
-	 *
-	 * <p>No monotonic adjustment is performed. Timestamp ordering is application
-	 * policy: callers must supply the exact timestamp appropriate for the next
-	 * mutation.</p>
-	 *
-	 * @param newTimestamp New timestamp
-	 * @return The supplied timestamp as a CVM value
-	 */
-	public synchronized CVMLong updateTimestamp(long newTimestamp) {
-		timestamp=CVMLong.create(newTimestamp);
-		return timestamp;
-	}
-	
-	/**
-	 * Replaces the drive timestamp with a snapshot of the current system time.
-	 * Equal or earlier clock readings are retained exactly; this method does not
-	 * implement a logical clock.
-	 */
-	public synchronized CVMLong updateTimestamp() {
-		timestamp=CVMLong.create(Utils.getCurrentTimestamp());
-		return timestamp;
-	}
-
 	@Override
 	public boolean isOpen() {
 		return open;
@@ -223,7 +175,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 */
 	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) throws IOException;
 
-	DLFSFileAttributes getFileAttributes(DLPath path) throws IOException {
+	public DLFSFileAttributes getFileAttributes(DLPath path) throws IOException {
 		AVector<ACell> node=getNode(path);
 		if (node==null) {
 			throw new java.nio.file.NoSuchFileException(path.toString());

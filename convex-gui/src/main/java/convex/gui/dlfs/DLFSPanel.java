@@ -168,8 +168,6 @@ public class DLFSPanel {
 		ThreadUtils.runVirtual("dlfs-monitor", () -> {
 			try {
 				while (!closed && dlfs.isOpen() && dlfs == fileSystem) {
-					dlfs.updateTimestamp();
-
 					// Check if lattice state changed (e.g. via WebDAV)
 					Hash currentHash = dlfs.getRootHash();
 					if (currentHash != null && !currentHash.equals(lastRootHash)) {

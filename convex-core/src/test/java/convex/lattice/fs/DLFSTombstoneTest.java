@@ -27,12 +27,15 @@ import convex.lattice.fs.impl.DLFSLocal;
  * tombstones (name to deletion timestamp) in the optional POS_TOMBS index.
  */
 public class DLFSTombstoneTest {
+	private static void setContextTime(DLFSLocal fs, long timestamp) {
+		fs.getCursor().setContext(fs.getCursor().getContext().withTimestamp(CVMLong.create(timestamp)));
+	}
 
 	/** A directory node carries the POS_TOMBS element if and only if it has tombstones. */
 	@Test
 	public void testCanonicalNodeShape() throws IOException {
 		DLFSLocal fs = DLFS.create();
-		fs.setTimestamp(CVMLong.create(100));
+		setContextTime(fs,100);
 		DLPath root = fs.getRoot();
 		Path f = Files.createFile(root.resolve("f.txt"));
 
@@ -42,7 +45,7 @@ public class DLFSTombstoneTest {
 		assertTrue(DLFSNode.getTombstones(r0).isEmpty());
 
 		// Delete records a tombstone with the deletion timestamp; node grows to 5 elements
-		fs.setTimestamp(CVMLong.create(200));
+		setContextTime(fs,200);
 		Files.delete(f);
 		AVector<ACell> r1 = fs.getNode(root);
 		assertEquals(5L, r1.count());
@@ -53,7 +56,7 @@ public class DLFSTombstoneTest {
 		assertFalse(Files.exists(f));
 
 		// Recreating clears the tombstone, returning the node to canonical 4-element form
-		fs.setTimestamp(CVMLong.create(300));
+		setContextTime(fs,300);
 		Files.createFile(root.resolve("f.txt"));
 		AVector<ACell> r2 = fs.getNode(root);
 		assertEquals(DLFSNode.NODE_LENGTH, r2.count());
@@ -68,13 +71,13 @@ public class DLFSTombstoneTest {
 		DLFSLocal b = DLFS.create();
 
 		// A holds a fresh file created at t=200
-		a.setTimestamp(CVMLong.create(200));
+		setContextTime(a,200);
 		Files.write(a.getPath("/x"), new byte[] { 9 });
 
 		// B created then deleted the same name earlier: it holds only a tombstone at t=100
-		b.setTimestamp(CVMLong.create(50));
+		setContextTime(b,50);
 		Files.write(b.getPath("/x"), new byte[] { 1 });
-		b.setTimestamp(CVMLong.create(100));
+		setContextTime(b,100);
 		Files.delete(b.getPath("/x"));
 
 		a.replicate(b);
@@ -93,13 +96,13 @@ public class DLFSTombstoneTest {
 		DLFSLocal b = DLFS.create();
 
 		// A holds a file created at t=100
-		a.setTimestamp(CVMLong.create(100));
+		setContextTime(a,100);
 		Files.write(a.getPath("/y"), new byte[] { 9 });
 
 		// B deleted the name at t=200
-		b.setTimestamp(CVMLong.create(50));
+		setContextTime(b,50);
 		Files.write(b.getPath("/y"), new byte[] { 1 });
-		b.setTimestamp(CVMLong.create(200));
+		setContextTime(b,200);
 		Files.delete(b.getPath("/y"));
 
 		a.replicate(b);
@@ -135,16 +138,16 @@ public class DLFSTombstoneTest {
 		DLFSLocal a = DLFS.create();
 		DLFSLocal b = DLFS.create();
 
-		a.setTimestamp(CVMLong.create(10));
+		setContextTime(a,10);
 		Files.createDirectory(a.getPath("/d"));
 		Files.write(a.getPath("/d/keep"), new byte[] { 1 });
 		Files.write(a.getPath("/gone"), new byte[] { 2 });
 
 		b.replicate(a); // both share the baseline
 
-		a.setTimestamp(CVMLong.create(20));
+		setContextTime(a,20);
 		Files.delete(a.getPath("/gone"));       // A deletes gone
-		b.setTimestamp(CVMLong.create(20));
+		setContextTime(b,20);
 		Files.write(b.getPath("/d/added"), new byte[] { 3 }); // B adds a file concurrently
 
 		a.replicate(b);

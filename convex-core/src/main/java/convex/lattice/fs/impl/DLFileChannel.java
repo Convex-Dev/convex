@@ -123,7 +123,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 				if (newData!=data) {
 					AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA,newData)
-						.assoc(DLFSNode.POS_UTIME,fileSystem.getTimestamp());
+						.assoc(DLFSNode.POS_UTIME,fileSystem.currentTimestamp());
 					updateNode(newNode);
 				}
 
@@ -207,7 +207,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			ABlob newData=data.slice(0, newSize);
 			if (newData!=data) {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData)
-					.assoc(DLFSNode.POS_UTIME,fileSystem.getTimestamp());
+					.assoc(DLFSNode.POS_UTIME,fileSystem.currentTimestamp());
 				updateNode(newNode);
 			}
 			position=0;

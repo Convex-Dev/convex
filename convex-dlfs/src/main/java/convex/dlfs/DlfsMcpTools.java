@@ -139,7 +139,7 @@ public class DlfsMcpTools {
 	}
 
 	private static void prepareMutation(FileSystem fs) {
-		if (fs instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.updateTimestamp();
+		DLFSDriveManager.prepareMutation(fs);
 	}
 
 	private static void sync(FileSystem fs) {

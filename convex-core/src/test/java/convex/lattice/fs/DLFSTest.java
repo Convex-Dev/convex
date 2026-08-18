@@ -43,6 +43,7 @@ import convex.core.data.prim.CVMLong;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
+import convex.lattice.fs.impl.DLFSLocal;
 
 public class DLFSTest {
 
@@ -93,17 +94,16 @@ public class DLFSTest {
 	}
 
 	@Test
-	public void testLocalTimestampUpdatesAreExact() {
-		DLFileSystem fs=(DLFileSystem)DLFS.createLocal();
-		assertEquals(123,fs.updateTimestamp(123).longValue());
-		assertEquals(100,fs.updateTimestamp(100).longValue(),
-			"the filesystem must not ratchet a caller-supplied timestamp");
-		fs.setTimestamp(CVMLong.create(Long.MAX_VALUE));
-		long before=System.currentTimeMillis();
-		long actual=fs.updateTimestamp().longValue();
-		long after=System.currentTimeMillis();
-		assertTrue(actual>=before && actual<=after,
-			"the no-argument helper must retain the wall-clock reading exactly");
+	public void testMutationTimestampComesFromCursorContext() throws IOException {
+		DLFSLocal fs=DLFS.createLocal();
+		DLPath path=fs.getPath("/context-time");
+		setDriveTimes(123,fs);
+		Files.write(path,new byte[] {1});
+		assertEquals(123,DLFSNode.getUTime(fs.getNode(path)).longValue());
+		setDriveTimes(100,fs);
+		Files.write(path,new byte[] {2});
+		assertEquals(100,DLFSNode.getUTime(fs.getNode(path)).longValue(),
+			"DLFS must use the caller's exact context timestamp without ratcheting");
 	}
 
 	private static void writeAfter(CountDownLatch start, DLFileSystem fs, DLPath path, byte[] value) {
@@ -415,19 +415,19 @@ public class DLFSTest {
 
 	@Test
 	public void testContentMutationsUpdateFileTimestamp() throws IOException {
-		DLFileSystem fs=DLFS.createLocal();
+		DLFSLocal fs=(DLFSLocal) DLFS.createLocal();
 		DLPath file=fs.getPath("/timestamped");
 
-		fs.setTimestamp(CVMLong.create(100));
+		setDriveTimes(100,fs);
 		Files.createFile(file);
 		assertEquals(100,DLFSNode.getUTime(fs.getNode(file)).longValue());
 
-		fs.setTimestamp(CVMLong.create(200));
+		setDriveTimes(200,fs);
 		Files.write(file,new byte[] {1,2,3});
 		assertEquals(200,DLFSNode.getUTime(fs.getNode(file)).longValue());
 		assertEquals(200,Files.getLastModifiedTime(file).toMillis());
 
-		fs.setTimestamp(CVMLong.create(300));
+		setDriveTimes(300,fs);
 		try (SeekableByteChannel channel=Files.newByteChannel(file,StandardOpenOption.WRITE)) {
 			channel.truncate(1);
 		}
@@ -437,16 +437,16 @@ public class DLFSTest {
 
 	@Test
 	public void testNewerContentWriteWinsReplicationConflict() throws IOException {
-		DLFileSystem older=DLFS.createLocal();
+		DLFSLocal older=DLFS.createLocal();
 		DLPath olderPath=older.getPath("/conflict");
-		older.setTimestamp(CVMLong.create(100));
+		setDriveTimes(100,older);
 		Files.write(olderPath,new byte[] {1},StandardOpenOption.CREATE,StandardOpenOption.WRITE);
 
-		DLFileSystem newer=older.clone();
+		DLFSLocal newer=older.clone();
 		DLPath newerPath=newer.getPath("/conflict");
-		older.setTimestamp(CVMLong.create(200));
+		setDriveTimes(200,older);
 		Files.write(olderPath,new byte[] {2});
-		newer.setTimestamp(CVMLong.create(300));
+		setDriveTimes(300,newer);
 		Files.write(newerPath,new byte[] {3});
 
 		older.replicate(newer);
@@ -502,8 +502,8 @@ public class DLFSTest {
 	}
 	
 	@Test public void testReplication() throws IOException {
-		DLFileSystem driveA=DLFS.createLocal();
-		DLFileSystem driveB=DLFS.createLocal();
+		DLFSLocal driveA=DLFS.createLocal();
+		DLFSLocal driveB=DLFS.createLocal();
 		
 		long TS=1000;
 		{ // create two files, check timestamp
@@ -553,11 +553,11 @@ public class DLFSTest {
 		setDriveTimes(TS+5,driveA,driveB);
 		driveB.replicate(driveA);
 		assertTrue(Files.isRegularFile(driveB.getPath("conflict"))); // should prefer current value at same timestamp
-		// With deterministic merge, timestamp is max of merged nodes (TS+4), not drive timestamp (TS+5)
+		// With deterministic merge, timestamp is max of merged nodes (TS+4), not context time (TS+5)
 		assertEquals(TS+4,Files.getLastModifiedTime(driveB.getPath("/")).toMillis());
 
 		// Delete conflicting file, should make a tombstone!
-		// Note: Delete uses current drive timestamp (TS+5, not TS+6)
+		// Note: Delete uses the current context timestamp (TS+5, not TS+6)
 		Files.delete(driveA.getPath("conflict"));
 
 		// Replicate back to A, should get same root hash with no conflicts
@@ -570,15 +570,18 @@ public class DLFSTest {
 		setDriveTimes(TS+7,driveA,driveB);
 		driveA.replicate(driveB);
 		driveB.replicate(driveA);
-		// With deterministic merge, timestamp is max of nodes (TS+5 from tombstone), not drive timestamp
+		// With deterministic merge, timestamp is max of nodes (TS+5 from tombstone), not context time
 		assertEquals(TS+5,Files.getLastModifiedTime(driveA.getPath("/")).toMillis());
 		assertEquals(driveA.getRootHash(),driveB.getRootHash());
 	}
 
-	private void setDriveTimes(long time, DLFileSystem... drives) {
-		CVMLong utime=CVMLong.create(time);
-		for (DLFileSystem d: drives) {
-			d.setTimestamp(utime);
+	private void setDriveTimes(long time, DLFSLocal... drives) {
+		setDriveTimes(CVMLong.create(time),drives);
+	}
+
+	private void setDriveTimes(CVMLong utime, DLFSLocal... drives) {
+		for (DLFSLocal d: drives) {
+			d.getCursor().setContext(d.getCursor().getContext().withTimestamp(utime));
 		}
 	}
 
@@ -604,8 +607,8 @@ public class DLFSTest {
 		assertTrue(DLFSNode.getDirectoryEntries(zero).isEmpty(), "Zero directory should be empty");
 		
 		// Test merge with zero
-		DLFileSystem fs1 = DLFS.createLocal();
-		fs1.setTimestamp(CVMLong.create(1000));
+		DLFSLocal fs1 = DLFS.createLocal();
+		setDriveTimes(1000,fs1);
 		Path file1 = Files.createFile(fs1.getPath("file1"));
 		try (OutputStream os = Files.newOutputStream(file1)) {
 			os.write(new byte[] {1, 2, 3});
@@ -624,8 +627,8 @@ public class DLFSTest {
 		assertEquals(node1, lattice.merge(null, node1), "Merge from null should return other value");
 		
 		// Test merge of two different filesystem trees (rsync-like behavior)
-		DLFileSystem fs2 = DLFS.createLocal();
-		fs2.setTimestamp(CVMLong.create(2000));
+		DLFSLocal fs2 = DLFS.createLocal();
+		setDriveTimes(2000,fs2);
 		
 		// Create different files in fs2
 		Path file2 = Files.createFile(fs2.getPath("file2"));
@@ -661,8 +664,8 @@ public class DLFSTest {
 		assertTrue(DLFSNode.isRegularFile(mergedNode3), "file3 should be a regular file");
 		
 		// Test timestamp-based conflict resolution (newer wins)
-		DLFileSystem fs3 = DLFS.createLocal();
-		fs3.setTimestamp(CVMLong.create(3000));
+		DLFSLocal fs3 = DLFS.createLocal();
+		setDriveTimes(3000,fs3);
 		Path conflictFile = Files.createFile(fs3.getPath("file1")); // Same name as file1
 		try (OutputStream os = Files.newOutputStream(conflictFile)) {
 			os.write(new byte[] {10, 11, 12}); // Different content
@@ -711,8 +714,8 @@ public class DLFSTest {
 		
 		// Create two different filesystem nodes for testing
 		// Both nodes will have a shared "sharedDir" directory entry for path testing
-		DLFileSystem fs1 = DLFS.createLocal();
-		fs1.setTimestamp(CVMLong.create(1000));
+		DLFSLocal fs1 = DLFS.createLocal();
+		setDriveTimes(1000,fs1);
 		Path file1 = Files.createFile(fs1.getPath("file1"));
 		try (OutputStream os = Files.newOutputStream(file1)) {
 			os.write(new byte[] {1, 2, 3});
@@ -724,8 +727,8 @@ public class DLFSTest {
 		}
 		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
 		
-		DLFileSystem fs2 = DLFS.createLocal();
-		fs2.setTimestamp(CVMLong.create(2000));
+		DLFSLocal fs2 = DLFS.createLocal();
+		setDriveTimes(2000,fs2);
 		Path file2 = Files.createFile(fs2.getPath("file2"));
 		try (OutputStream os = Files.newOutputStream(file2)) {
 			os.write(new byte[] {4, 5, 6});
@@ -761,16 +764,16 @@ public class DLFSTest {
 		DLFSLattice lattice = DLFSLattice.INSTANCE;
 
 		// Create two filesystems with conflicting files at different timestamps
-		DLFileSystem fs1 = DLFS.createLocal();
-		fs1.setTimestamp(CVMLong.create(1000));
+		DLFSLocal fs1 = DLFS.createLocal();
+		setDriveTimes(1000,fs1);
 		Path file1 = Files.createFile(fs1.getPath("conflict.txt"));
 		try (OutputStream os = Files.newOutputStream(file1)) {
 			os.write(new byte[] {1, 2, 3});
 		}
 		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
 
-		DLFileSystem fs2 = DLFS.createLocal();
-		fs2.setTimestamp(CVMLong.create(2000));
+		DLFSLocal fs2 = DLFS.createLocal();
+		setDriveTimes(2000,fs2);
 		Path file2 = Files.createFile(fs2.getPath("conflict.txt"));
 		try (OutputStream os = Files.newOutputStream(file2)) {
 			os.write(new byte[] {4, 5, 6});
@@ -809,8 +812,8 @@ public class DLFSTest {
 
 		// Test 4: Verify DirectoryEntriesLattice passes context through
 		// Create two filesystems with subdirectories
-		DLFileSystem fs3 = DLFS.createLocal();
-		fs3.setTimestamp(CVMLong.create(1000));
+		DLFSLocal fs3 = DLFS.createLocal();
+		setDriveTimes(1000,fs3);
 		Path dir1 = Files.createDirectory(fs3.getPath("subdir"));
 		Path file3 = Files.createFile(dir1.resolve("file.txt"));
 		try (OutputStream os = Files.newOutputStream(file3)) {
@@ -818,8 +821,8 @@ public class DLFSTest {
 		}
 		AVector<ACell> node3 = fs3.getNode(fs3.getRoot());
 
-		DLFileSystem fs4 = DLFS.createLocal();
-		fs4.setTimestamp(CVMLong.create(2000));
+		DLFSLocal fs4 = DLFS.createLocal();
+		setDriveTimes(2000,fs4);
 		Path dir2 = Files.createDirectory(fs4.getPath("subdir"));
 		Path file4 = Files.createFile(dir2.resolve("other.txt"));
 		try (OutputStream os = Files.newOutputStream(file4)) {
@@ -855,16 +858,16 @@ public class DLFSTest {
 	@Test
 	public void testCursorMergeWithLattice() throws IOException {
 		// Create two filesystem trees manually
-		DLFileSystem fs1 = DLFS.createLocal();
-		fs1.setTimestamp(CVMLong.create(1000));
+		DLFSLocal fs1 = DLFS.createLocal();
+		setDriveTimes(1000,fs1);
 		Path file1 = Files.createFile(fs1.getPath("fileA.txt"));
 		try (OutputStream os = Files.newOutputStream(file1)) {
 			os.write(new byte[] {1, 2, 3});
 		}
 		AVector<ACell> node1 = fs1.getNode(fs1.getRoot());
 
-		DLFileSystem fs2 = DLFS.createLocal();
-		fs2.setTimestamp(CVMLong.create(2000));
+		DLFSLocal fs2 = DLFS.createLocal();
+		setDriveTimes(2000,fs2);
 		Path file2 = Files.createFile(fs2.getPath("fileB.txt"));
 		try (OutputStream os = Files.newOutputStream(file2)) {
 			os.write(new byte[] {4, 5, 6});
@@ -907,7 +910,7 @@ public class DLFSTest {
 
 		// NOTE: This demonstrates how DLFSLocal.merge() SHOULD work:
 		// Instead of:
-		//   rootCursor.updateAndGet(rootNode -> DLFSNode.merge(rootNode, other, getTimestamp()))
+		//   rootCursor.updateAndGet(rootNode -> DLFSNode.merge(rootNode, other, contextTimestamp))
 		// It should be:
 		//   rootCursor.updateAndGet(rootNode -> DLFSLattice.INSTANCE.merge(LatticeContext.EMPTY, rootNode, other))
 	}
@@ -925,8 +928,8 @@ public class DLFSTest {
 	@Test
 	public void testEqualTimestampUpdatesInARowAreLWW() throws IOException {
 		CVMLong t = CVMLong.create(1000);
-		DLFileSystem drive = DLFS.createLocal();
-		drive.setTimestamp(t);
+		DLFSLocal drive = DLFS.createLocal();
+		setDriveTimes(t,drive);
 		DLPath path = drive.getPath("f.txt");
 
 		// Update 1: f.txt = {1}
@@ -961,35 +964,35 @@ public class DLFSTest {
 	 * not the drive's current timestamp for new operations.
 	 */
 	@Test
-	public void testMergeShouldUseNodeTimestampsNotDriveTimestamp() throws IOException {
-		DLFileSystem driveA = DLFS.createLocal();
-		DLFileSystem driveB = DLFS.createLocal();
+	public void testMergeShouldUseNodeTimestampsNotMutationContext() throws IOException {
+		DLFSLocal driveA = DLFS.createLocal();
+		DLFSLocal driveB = DLFS.createLocal();
 
 		// Create files at time 2000 in both drives
-		driveA.setTimestamp(CVMLong.create(2000));
+		setDriveTimes(2000,driveA);
 		Files.createFile(driveA.getPath("fileA.txt"));
 
-		driveB.setTimestamp(CVMLong.create(2000));
+		setDriveTimes(2000,driveB);
 		Files.createFile(driveB.getPath("fileB.txt"));
 
-		// Now set driveA's current timestamp to 1000 (EARLIER than the files that exist)
-		// This is a valid scenario: the drive's "current time" can be set to anything
-		driveA.setTimestamp(CVMLong.create(1000));
+		// Now set driveA's context timestamp to 1000 (EARLIER than the files that exist).
+		// This is valid: the driving application may supply any context timestamp.
+		setDriveTimes(1000,driveA);
 
 		// Record root timestamp before merge
 		AVector<ACell> rootBeforeMerge = driveA.getNode(driveA.getRoot());
 		CVMLong timeBeforeMerge = DLFSNode.getUTime(rootBeforeMerge);
 		assertEquals(2000L, timeBeforeMerge.longValue(), "Root should be at time 2000 before merge");
 
-		// Merge: should use timestamps FROM the nodes (2000), NOT drive timestamp (1000)
+		// Merge uses timestamps FROM the nodes (2000), not the mutation context (1000).
 		driveA.replicate(driveB);
 
 		AVector<ACell> rootAfterMerge = driveA.getNode(driveA.getRoot());
 		CVMLong timeAfterMerge = DLFSNode.getUTime(rootAfterMerge);
 
-		// Root should still be at 2000 (max of node timestamps), not drive timestamp (1000)
+		// Root remains at 2000 (max of node timestamps), not context time (1000).
 		assertEquals(2000L, timeAfterMerge.longValue(),
-		    "Merge should use node timestamps (2000), not drive timestamp (1000)");
+		    "Merge should use node timestamps (2000), not mutation context time (1000)");
 	}
 
 	/**

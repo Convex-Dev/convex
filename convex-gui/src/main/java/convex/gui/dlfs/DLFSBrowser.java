@@ -308,7 +308,6 @@ public class DLFSBrowser extends AbstractGUI {
 					String name = entry.getKey().toString();
 					ALatticeCursor<AVector<ACell>> driveCursor = drivesCursor.path(entry.getKey());
 					DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
-					driveFS.updateTimestamp();
 					drives.put(name, driveFS);
 				}
 				log.info("Restored {} drives from store: {}", drives.size(), file);
@@ -386,7 +385,6 @@ public class DLFSBrowser extends AbstractGUI {
 		driveCursor.set(DLFSNode.createDirectory(CVMLong.ZERO));
 
 		DLFSLocal driveFS = new DLFSLocal(DLFS.provider(), name, driveCursor);
-		driveFS.updateTimestamp();
 		drives.put(name, driveFS);
 
 		// Register in WebDAV if running
@@ -591,7 +589,6 @@ public class DLFSBrowser extends AbstractGUI {
 
 	static void populateDemoDrive(DLFileSystem drive) {
 		if (drive == null) return;
-		drive.updateTimestamp();
 		DLPath p = drive.getRoot();
 		try {
 			Files.createDirectory(p.resolve("training"));
@@ -616,7 +613,6 @@ public class DLFSBrowser extends AbstractGUI {
 	 */
 	public static DLFileSystem createDemoDrive() {
 		DLFileSystem drive = DLFS.createLocal();
-		drive.updateTimestamp();
 		DLPath p = drive.getRoot();
 		try {
 			Files.createDirectory(p.resolve("training"));

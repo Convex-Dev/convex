@@ -373,7 +373,7 @@ LatticeContext ctx = LatticeContext.create(CVMLong.create(System.currentTimeMill
 cursor.withContext(ctx);
 ```
 
-A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. (The same context timestamp is what `DLFSLocal` reads for node write times.)
+A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. DLFS node writes also resolve time exclusively through the driving cursor's context: `DLFileSystem` and `DLFSLocal` do not hold or advance a separate timestamp.
 
 The context is an immutable caller-owned snapshot. Lattice components consume its
 timestamp exactly: they must not increment it, compare it with stored values to invent

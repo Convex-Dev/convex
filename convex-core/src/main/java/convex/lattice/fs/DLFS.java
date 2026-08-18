@@ -7,7 +7,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -38,8 +37,7 @@ public class DLFS {
 	 * @return A new local DLFS filesystem
 	 */
 	public static DLFSLocal create() {
-		return new DLFSLocal(PROVIDER, null,
-			Cursors.createLattice(DLFSLattice.INSTANCE));
+		return new DLFSLocal(PROVIDER,null,Cursors.createLattice(DLFSLattice.INSTANCE));
 	}
 
 	/**
@@ -124,13 +122,12 @@ public class DLFS {
 		ALatticeCursor<AVector<ACell>> cursor=parent.path(driveName);
 		AVector<ACell> root=cursor.get();
 		if (root==null) return null;
-		CVMLong timestamp=DLFSNode.getUTime(root);
 		return (store==null)
-			?new DLFSLocal(PROVIDER,driveName.toString(),cursor,timestamp)
-			:DLFSLocal.create(PROVIDER,driveName.toString(),cursor,timestamp,store);
+			?new DLFSLocal(PROVIDER,driveName.toString(),cursor)
+			:DLFSLocal.create(PROVIDER,driveName.toString(),cursor,store);
 	}
 
-	public static DLFileSystem createLocal() {
+	public static DLFSLocal createLocal() {
 		return create();
 	}
 

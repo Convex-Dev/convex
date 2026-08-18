@@ -222,8 +222,7 @@ public class DLFSWebDAV {
 	}
 
 	private static void prepareMutation(Path path) {
-		FileSystem fs = path.getFileSystem();
-		if (fs instanceof DLFileSystem dlfs) dlfs.updateTimestamp();
+		DLFSDriveManager.prepareMutation(path.getFileSystem());
 	}
 
 	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {

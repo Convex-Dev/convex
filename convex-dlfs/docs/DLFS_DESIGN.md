@@ -298,20 +298,21 @@ Applications that need field-level or custom metadata convergence should place a
 lattice value in the metadata slot and perform that merge at their application boundary;
 DLFS itself guarantees only whole-slot last-write-wins behaviour.
 
-### Two Timestamps
+### Mutation and Merge Timestamps
 
 | Timestamp | Source | Used For |
 |-----------|--------|----------|
-| **Drive timestamp** | `DLFileSystem.getTimestamp()` | Creating new files, directories, tombstones |
+| **Mutation timestamp** | `DLFSLocal.getCursor().getContext().currentTimestamp()` | Creating new files, directories, tombstones |
 | **Merge timestamp** | `max(getUTime(a), getUTime(b))` | Conflict resolution during merge |
 
-These are deliberately separate. The drive timestamp is set by the application
-(`LatticeContext`, `setTimestamp()`, or `updateTimestamp()`) and is consumed exactly.
-`updateTimestamp()` takes one wall-clock snapshot; it does not enforce monotonicity.
-DLFS never increments a requested timestamp or derives a later mutation time from
-stored nodes or tombstones. The application owns the clock and its refresh cadence.
+These are deliberately separate. The application supplies mutation time through the
+cursor's `LatticeContext`; neither `DLFileSystem` nor `DLFSLocal` stores or updates a
+separate clock. DLFS consumes the context timestamp exactly and never derives a later
+mutation time from stored nodes or tombstones. The application owns the clock and its
+refresh cadence. An empty context uses `LatticeContext.currentTimestamp()`'s standalone
+wall-clock fallback.
 The merge timestamp is always derived from the data being merged—never from the
-drive's current time.
+current application context.
 
 ## API
 
@@ -328,8 +329,8 @@ DLFSLocal drive = DLFS.connect(parent, Strings.create("myDrive"));
 // Store-backed cursor drive — large NIO writes persist incrementally
 DLFSLocal storedDrive = DLFS.connect(parent, Strings.create("storedDrive"), store);
 
-// Legacy (delegates to create())
-DLFileSystem drive = DLFS.createLocal();
+// Alias for a standalone local drive
+DLFSLocal drive = DLFS.createLocal();
 ```
 
 ### Java NIO Filesystem
@@ -338,7 +339,8 @@ Standard Java NIO operations work transparently:
 
 ```java
 DLFSLocal drive = DLFS.create();
-drive.updateTimestamp();
+drive.getCursor().setContext(
+    drive.getCursor().getContext().withTimestamp(operationTimestamp));
 
 Path file = Files.createFile(drive.getPath("readme.txt"));
 Files.write(file, "hello".getBytes());
@@ -380,10 +382,12 @@ DLFSLocal driveA = DLFS.create();
 DLFSLocal driveB = DLFS.create();
 
 // Make changes to both
-driveA.updateTimestamp();
+driveA.getCursor().setContext(
+    driveA.getCursor().getContext().withTimestamp(timestampA));
 Files.createFile(driveA.getPath("fileA.txt"));
 
-driveB.updateTimestamp();
+driveB.getCursor().setContext(
+    driveB.getCursor().getContext().withTimestamp(timestampB));
 Files.createFile(driveB.getPath("fileB.txt"));
 
 // Merge B into A — both files present after merge

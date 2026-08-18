@@ -238,7 +238,7 @@ public class DLFSNode {
 			if (!(current instanceof AVector<?> vector)) throw corruption(path,"Stored value is not a DLFS node");
 			@SuppressWarnings("unchecked")
 			AVector<ACell> node=(AVector<ACell>)vector;
-			if (!isValidNodeShallow(node)) throw corruption(path,"Malformed node on mutation path at component "+i);
+			if (!isValidNodeShallow(node)) throw corruption(path,"Malformed node on mutation path at position "+i);
 			if (i==n) return node;
 			Index<AString,AVector<ACell>> entries=getDirectoryEntries(node);
 			if (entries==null) return null;
