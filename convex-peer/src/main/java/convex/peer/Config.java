@@ -108,9 +108,25 @@ public class Config {
 	public static final int QUERY_QUEUE_SIZE = 10000;
 	
 	/**
-	 * Default timeout in milliseconds for client transactions
+	 * Default timeout in milliseconds for client transactions.
+	 *
+	 * <p>This bounds how long a client waits for a transaction result, so it must
+	 * accommodate the slowest machine the client runs on, not the fastest. It is not
+	 * a latency target: a transaction normally confirms in tens of milliseconds, and
+	 * a value near that would turn ordinary scheduling delay into a spurious
+	 * {@code :TIMEOUT} result.</p>
 	 */
-	public static final long DEFAULT_CLIENT_TIMEOUT = 8000;
+	public static final long DEFAULT_CLIENT_TIMEOUT = 20000;
+
+	/**
+	 * Default timeout in milliseconds for internal waits: establishing a connection,
+	 * and offering to a bounded queue before shedding load.
+	 *
+	 * <p>Deliberately separate from {@link #DEFAULT_CLIENT_TIMEOUT}. These bound
+	 * backpressure rather than a user-visible result, so they should stay short even
+	 * when clients are given longer to wait.</p>
+	 */
+	public static final long DEFAULT_INTERNAL_TIMEOUT = 8000;
 
 	/**
 	 * Size of incoming Belief queue

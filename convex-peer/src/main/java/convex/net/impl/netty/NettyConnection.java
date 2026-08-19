@@ -96,7 +96,7 @@ public class NettyConnection extends AConnection {
 			Bootstrap b = new Bootstrap();
 			b.group(getEventLoopGroup());
 			b.channel(NioSocketChannel.class);
-			b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) Config.DEFAULT_CLIENT_TIMEOUT);
+			b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) Config.DEFAULT_INTERNAL_TIMEOUT);
 			b.option(ChannelOption.SO_KEEPALIVE, true);
 			b.option(ChannelOption.WRITE_BUFFER_WATER_MARK,
 				new WriteBufferWaterMark(32 * 1024, 64 * 1024));
@@ -191,7 +191,7 @@ public class NettyConnection extends AConnection {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
 		try {
-			boolean queued = outbound.offer(m, Config.DEFAULT_CLIENT_TIMEOUT,
+			boolean queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT,
 				TimeUnit.MILLISECONDS);
 			if (queued) flushPending();
 			return queued;

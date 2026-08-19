@@ -132,7 +132,7 @@ public class TransactionHandler extends AThreadedComponent {
 	 */
 	public boolean offerTransactionBlocking(Message m) {
 		try {
-			return txMessageQueue.offer(m, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			return txMessageQueue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			return false;

@@ -50,7 +50,7 @@ public class QueryHandler extends AThreadedComponent {
 	 */
 	public boolean offerQueryBlocking(Message m) {
 		try {
-			return queryQueue.offer(m, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			return queryQueue.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			return false;

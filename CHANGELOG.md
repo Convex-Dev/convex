@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The default client transaction timeout is raised from 8 to 20 seconds, so ordinary scheduling delay on a loaded machine no longer surfaces as a spurious `:TIMEOUT` result. Connection establishment and internal queue backpressure keep the previous 8 second bound under the new `Config.DEFAULT_INTERNAL_TIMEOUT`.
 - `LatticeContext` is now an extensible application policy: timestamps and signing can be resolved dynamically after one root installation, and delegated overrides replace individual capabilities. Owned data is authored through `signAs`, one authorisation rule shared with merge-time owner verification, so a wallet or key-store backed policy can write for any identity it holds and a write that no peer would accept fails locally instead.
 
 - Singleton `Ref` constants moved off `Ref` to break class initialisation cycles: `Ref.NULL_VALUE` is now `RefDirect.NULL_VALUE`, and `Ref.TRUE_VALUE` / `Ref.FALSE_VALUE` are now `Refs.TRUE_VALUE` / `Refs.FALSE_VALUE`. `ErrorMessages.INVALID_NUMERIC` moved to `ErrorValue.INVALID_NUMERIC`, and `ARecord.DEFAULT_VALUE` is now internal to the `Record` type descriptor.
