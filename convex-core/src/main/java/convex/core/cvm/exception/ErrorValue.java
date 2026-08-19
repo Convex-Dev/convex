@@ -31,6 +31,9 @@ import convex.core.data.Strings;
 public class ErrorValue extends AThrowable {
 
 	private static final HashMap<Keyword,ErrorValue> defaultErrors= new HashMap<>();
+
+	/** Shared error for a numeric operation with no representable result */
+	public static final ErrorValue INVALID_NUMERIC = create(ErrorCodes.ARGUMENT,"Invalid numeric result");
 	
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();

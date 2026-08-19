@@ -13,8 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `LatticeContext` is now an extensible application policy: timestamps and signing can be resolved dynamically after one root installation, and delegated overrides replace individual capabilities. Owned data is authored through `signAs`, one authorisation rule shared with merge-time owner verification, so a wallet or key-store backed policy can write for any identity it holds and a write that no peer would accept fails locally instead.
 
+- Singleton `Ref` constants moved off `Ref` to break class initialisation cycles: `Ref.NULL_VALUE` is now `RefDirect.NULL_VALUE`, and `Ref.TRUE_VALUE` / `Ref.FALSE_VALUE` are now `Refs.TRUE_VALUE` / `Refs.FALSE_VALUE`. `ErrorMessages.INVALID_NUMERIC` moved to `ErrorValue.INVALID_NUMERIC`, and `ARecord.DEFAULT_VALUE` is now internal to the `Record` type descriptor.
+
 ### Fixed
 
+- Class initialisation cycles in core removed, each of which could deadlock two threads initialising the two ends at once: `Ref` built its own `RefDirect` subclass and read `CVMBool`, and `ARecord` constructed a `Block`. `convex.tools.ClassInitCycles` reports any that reappear.
 - Merging signed data for an owner this node cannot sign for retains the local value, rather than aborting the whole merge or attaching a non-owner signature. Merges converge the owners a node holds keys for and leave the rest to their owners.
 - Signing and timestamping a lattice write happen once per logical write, not once per compare-and-set attempt, so contention no longer multiplies calls into a wallet, key store or remote signer.
 - DLFS cursor-level embedders can supply their host store to `DLFS.connect` or `DLFS.open`, so NIO `Files.copy` and output-stream writes persist blob branches incrementally instead of retaining files larger than the JVM heap (#702).

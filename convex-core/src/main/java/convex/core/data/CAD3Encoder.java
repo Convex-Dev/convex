@@ -377,7 +377,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
 		for (int i = 0; i < numChildren; i++) {
 			Ref<ABlob> ref = readRef(ds);
-			if (ref == Ref.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
+			if (ref == RefDirect.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
 			children[i] = ref;
 		}
 		return new BlobTree(children, shift, count);

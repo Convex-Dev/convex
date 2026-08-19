@@ -8,6 +8,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
+import convex.core.data.RefDirect;
 import convex.core.data.Symbol;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -63,7 +64,7 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Def<T> create(ACell key) {
-		return new Def<T>(Ref.get(key), (Ref<AOp<T>>) Ref.NULL_VALUE);
+		return new Def<T>(Ref.get(key), (Ref<AOp<T>>) RefDirect.NULL_VALUE);
 	}
 
 	public static <T extends ACell> Def<T> create(String key, AOp<T> op) {

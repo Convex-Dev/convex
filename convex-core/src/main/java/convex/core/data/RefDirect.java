@@ -32,6 +32,17 @@ public class RefDirect<T extends ACell> extends Ref<T> {
      * @param status Status for the Ref
      * @return New Direct Ref
      */
+	/**
+	 * Ref for null value. Important because we can't persist this, since null
+	 * collides with the result of an empty soft reference.
+	 *
+	 * <p>Held here rather than on {@link Ref} because creating it constructs a
+	 * {@code RefDirect}, and {@code Ref} initialisation building its own subclass is a
+	 * cycle. {@code Ref.get} reads this, so it must also stay clear of anything that
+	 * reads {@code CVMBool} — see {@link Refs}.</p>
+	 */
+	public static final RefDirect<?> NULL_VALUE = create(null, Hash.NULL_HASH, Ref.INTERNAL_FLAGS);
+
 	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		int flags=status&Ref.STATUS_MASK;
 		return new RefDirect<T>(value, hash, flags);
@@ -45,7 +56,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> RefDirect<T> create(T value) {
-		if (value==null) return (RefDirect<T>) Ref.NULL_VALUE;
+		if (value==null) return (RefDirect<T>) NULL_VALUE;
 		return create(value, null, UNKNOWN);
 	}
 
@@ -100,7 +111,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		super.validate();
 		if (isEmbedded() != Cells.isEmbedded(value)) throw new InvalidDataException("Embedded flag is wrong!", this);
 		if (value == null) {
-			if (this != Ref.NULL_VALUE) throw new InvalidDataException("Null Ref not singleton!", this);
+			if (this != NULL_VALUE) throw new InvalidDataException("Null Ref not singleton!", this);
 		}
 	}
 

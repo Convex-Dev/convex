@@ -1,5 +1,7 @@
 package convex.core.store;
 
+import convex.core.data.RefDirect;
+import convex.core.data.Refs;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Objects;
@@ -41,7 +43,7 @@ public class MemoryStore extends AStore {
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		Ref<T> ref = (Ref<T>) hashRefs.get(hash);
 		if (ref!=null) return ref;
-		if (hash==Hash.NULL_HASH) return (Ref<T>) Ref.NULL_VALUE;
+		if (hash==Hash.NULL_HASH) return (Ref<T>) RefDirect.NULL_VALUE;
 		return null;
 	}
 	
@@ -84,7 +86,7 @@ public class MemoryStore extends AStore {
 		}
 
 		final T o=ref.getValue();
-		if (o==null) return (Ref<T>) Ref.NULL_VALUE;
+		if (o==null) return (Ref<T>) RefDirect.NULL_VALUE;
 
 		ACell cell = (ACell) o;
 		boolean embedded=cell.isEmbedded();
