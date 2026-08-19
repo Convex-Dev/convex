@@ -31,27 +31,19 @@ import convex.lattice.cursor.ALatticeCursor;
  *
  * <p>Navigating {@code :value} crosses {@code SignedLattice}'s write boundary, so the
  * cursor chain contains a {@code SignedCursor}. That cursor projects the unsigned value
- * on read and re-signs on write with the signing key from its {@code LatticeContext}.
- * Applications read and write plain values and never touch {@code SignedData}.
- * {@link #sync()} pushes the result up to the root (and, on a launched node, into
- * persistence and propagation).
+ * on read and signs on write through its {@code LatticeContext}, which is asked for a
+ * signer authorised for the owner the path selected. Applications read and write plain
+ * values and never touch {@code SignedData}. {@link #sync()} pushes the result up to
+ * the root (and, on a launched node, into persistence and propagation).
  *
- * <h2>Writing another user's area</h2>
+ * <h2>Writing an owned area</h2>
  *
- * <p>Nothing here stops an application writing a slot it cannot properly sign — the
- * cursor signs with whatever key its context holds, and a direct write is not a merge,
- * so {@code OwnerLattice.verifyOwner} never sees it. That is deliberate. Enforcement
- * belongs at the <em>merge</em> boundary, where untrusted data arrives: a slot signed by
- * a non-owner is rejected by every peer, and a node that keeps sending them trips
- * {@code NodeServer}'s per-connection circuit-breaker and has its connection closed.
- *
- * <p>An application that corrupts its own subtree has only harmed itself — owner-keying
- * means it can wedge no slot but its own, and the damage does not propagate. Policing
- * local writes would buy nothing at the boundary that matters, and would wrongly block a
- * node that legitimately holds keys for more than one identity.
- *
- * <p>So {@code p2p(someoneElse)} is a perfectly good <em>read</em> view, and writing it
- * is simply a mistake the lattice does not need to prevent.
+ * <p>{@code p2p(someoneElse)} is always a valid read view. A write succeeds only when
+ * the context signing policy can supply a signer authorised for that user — the same
+ * rule {@code OwnerLattice} applies to data arriving on merge, so a write that would
+ * be rejected by every peer fails here instead of entering local state. A wallet or
+ * key-store-backed context can therefore manage several identities without treating
+ * one as primary.
  */
 public class P2PUser {
 
@@ -69,7 +61,7 @@ public class P2PUser {
 	 * Creates a user view over a P2P root cursor.
 	 *
 	 * <p>Both cursors inherit the root cursor's {@code LatticeContext} live, so writes
-	 * are signed with whatever key the node was configured with.
+	 * request {@code userKey} from that policy when signed.
 	 *
 	 * @param rootCursor Cursor at the {@link P2PLattice#ROOT} level
 	 * @param userKey The P2P user's account key
@@ -156,7 +148,7 @@ public class P2PUser {
 	 * to push it up to the lattice root.
 	 *
 	 * @param identity IdentityInfo map, typically from {@link P2PLattice#createIdentity}
-	 * @throws IllegalStateException if no signing key is available in context
+	 * @throws IllegalStateException if the user's signer is unavailable in context
 	 */
 	public void setIdentity(AHashMap<Keyword, ACell> identity) {
 		this.identity.setIdentity(identity);
@@ -169,7 +161,7 @@ public class P2PUser {
 	 * @param name Display name (may be null)
 	 * @param nodes Node keys this user operates (may be null)
 	 * @param timestamp Timestamp in millis, used for LWW ordering
-	 * @throws IllegalStateException if no signing key is available in context
+	 * @throws IllegalStateException if the user's signer is unavailable in context
 	 */
 	public void setIdentity(AString name, AVector<ACell> nodes, long timestamp) {
 		identity.setIdentity(name,nodes,timestamp);

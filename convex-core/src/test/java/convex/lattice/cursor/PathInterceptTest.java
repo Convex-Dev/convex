@@ -39,7 +39,7 @@ public class PathInterceptTest {
 	/** Identity update-override cursor; counts writes that pass through it. */
 	static class IdCursor extends AUpdateCursor<ACell, ACell> {
 		IdCursor(ACursor<ACell> base, ALattice<ACell> lattice, LatticeContext ctx) { super(base, lattice, ctx); }
-		@Override protected ACell updateOnWrite(ACell current, ACell value) { TAPS.incrementAndGet(); return value; }
+		@Override protected ACell prepareWrite(ACell value) { TAPS.incrementAndGet(); return value; }
 		// view inherited (identity)
 		@Override public ACell merge(ACell other) {
 			return base.updateAndGet(current -> lattice.merge(getContext(), current, other));

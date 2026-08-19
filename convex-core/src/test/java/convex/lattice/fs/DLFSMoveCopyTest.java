@@ -18,6 +18,7 @@ import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,11 +26,35 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.LatticeContext;
 import convex.lattice.fs.impl.DLFSLocal;
 
 public class DLFSMoveCopyTest {
 	private static void setContextTime(DLFSLocal fs, long timestamp) {
 		fs.getCursor().setContext(fs.getCursor().getContext().withTimestamp(CVMLong.create(timestamp)));
+	}
+
+	@Test
+	public void testLogicalMutationResolvesDynamicTimestampOnce() throws IOException {
+		DLFSLocal fs=DLFS.create();
+		AtomicLong clock=new AtomicLong(100);
+		fs.getCursor().setContext(new LatticeContext() {
+			@Override public CVMLong currentTimestamp() {
+				return CVMLong.create(clock.incrementAndGet());
+			}
+		});
+
+		DLPath source=(DLPath)Files.createDirectory(fs.getPath("/source"));
+		assertEquals(101L,DLFSNode.getUTime(fs.getNode(source)).longValue());
+		assertEquals(101L,DLFSNode.getUTime(fs.getNode(fs.getRoot())).longValue());
+		assertEquals(101L,clock.get(),"one policy resolution for create");
+
+		DLPath target=fs.getPath("/target");
+		Files.move(source,target);
+		assertEquals(102L,DLFSNode.getUTime(fs.getNode(target)).longValue());
+		assertEquals(102L,
+			DLFSNode.getTombstones(fs.getNode(fs.getRoot())).get(Strings.create("source")).longValue());
+		assertEquals(102L,clock.get(),"one policy resolution for move");
 	}
 
 	@Test

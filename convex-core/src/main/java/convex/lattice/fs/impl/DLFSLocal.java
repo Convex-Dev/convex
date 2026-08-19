@@ -146,7 +146,8 @@ public class DLFSLocal extends DLFileSystem {
 			throw new NoSuchFileException(parent.toString());
 		}
 		requireAbsent(parentNode,name,dir);
-		updateNode(dir,DLFSNode.createDirectory(currentTimestamp()));
+		CVMLong operationTime=currentTimestamp();
+		updateNode(dir,DLFSNode.createDirectory(operationTime),operationTime);
 		return dir;
 	}
 	
@@ -162,8 +163,9 @@ public class DLFSLocal extends DLFileSystem {
 			throw new NoSuchFileException(parent.toString(), null, "Parent directory does not exist");
 		}
 		requireAbsent(parentNode,name,path);
-		AVector<ACell> newNode=DLFSNode.createEmptyFile(currentTimestamp());
-		updateNode(path,newNode);
+		CVMLong operationTime=currentTimestamp();
+		AVector<ACell> newNode=DLFSNode.createEmptyFile(operationTime);
+		updateNode(path,newNode,operationTime);
 		return newNode;
 	}
 	
@@ -175,6 +177,7 @@ public class DLFSLocal extends DLFileSystem {
 			throw new IOException("Can't delete DLFS Root node");
 		}
 
+		CVMLong operationTime=currentTimestamp();
 		try {
 			rootCursor.updateAndGet(rootNode->{
 				AVector<ACell> parent=resolveValidUnchecked(rootNode,p.getParent());
@@ -187,7 +190,7 @@ public class DLFSLocal extends DLFileSystem {
 						throw new UncheckedIOException(new DirectoryNotEmptyException(p.toString()));
 					}
 				}
-				return DLFSNode.deleteNode(rootNode,p,currentTimestamp());
+				return DLFSNode.deleteNode(rootNode,p,operationTime);
 			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
@@ -245,6 +248,7 @@ public class DLFSLocal extends DLFileSystem {
 		if (src.getNameCount()==0) throw new FileSystemException(src.toString(),dst.toString(),"Cannot move the DLFS root");
 		if (dst.getNameCount()==0) throw new FileAlreadyExistsException(dst.toString());
 
+		CVMLong operationTime=currentTimestamp();
 		try {
 			rootCursor.updateAndGet(root->{
 				AVector<ACell> sourceNode=resolveValidUnchecked(root,src);
@@ -262,11 +266,10 @@ public class DLFSLocal extends DLFileSystem {
 						throw new UncheckedIOException(new DirectoryNotEmptyException(dst.toString()));
 					}
 				}
-				CVMLong utime=currentTimestamp();
-				AVector<ACell> movedNode=sourceNode.assoc(DLFSNode.POS_UTIME,utime);
+				AVector<ACell> movedNode=sourceNode.assoc(DLFSNode.POS_UTIME,operationTime);
 
-				AVector<ACell> updated=DLFSNode.deleteNode(root,src,utime);
-				return DLFSNode.updateNode(updated,dst,movedNode,utime);
+				AVector<ACell> updated=DLFSNode.deleteNode(root,src,operationTime);
+				return DLFSNode.updateNode(updated,dst,movedNode,operationTime);
 			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();
@@ -282,6 +285,12 @@ public class DLFSLocal extends DLFileSystem {
 
 	@Override
 	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) throws IOException {
+		return updateNode(dir,newNode,currentTimestamp());
+	}
+
+	/** Updates a node using one timestamp already resolved for the logical operation. */
+	synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode,
+			CVMLong operationTime) throws IOException {
 		if (newNode!=null && !DLFSNode.isValidNodeShallow(newNode)) throw new IllegalArgumentException("Invalid replacement DLFS node");
 		try {
 			rootCursor.updateAndGet(rootNode->{
@@ -291,7 +300,7 @@ public class DLFSLocal extends DLFileSystem {
 					if (parentNode==null) throw new UncheckedIOException(new NoSuchFileException(parent.toString()));
 					if (!DLFSNode.isDirectory(parentNode)) throw new UncheckedIOException(new NotDirectoryException(parent.toString()));
 				}
-				return DLFSNode.updateNode(rootNode,dir,newNode,currentTimestamp());
+				return DLFSNode.updateNode(rootNode,dir,newNode,operationTime);
 			});
 		} catch (UncheckedIOException e) {
 			throw e.getCause();

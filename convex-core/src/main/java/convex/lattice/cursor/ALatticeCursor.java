@@ -86,9 +86,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 	/**
 	 * Sets this cursor's local context override and returns this cursor.
 	 * Passing null clears the override, restoring inheritance from the parent.
-	 * A non-null context is a complete replacement: individual fields do not
-	 * inherit. To preserve selected values from the current effective context,
-	 * explicitly snapshot it with methods such as
+	 * A non-null context is a complete policy replacement. To override one
+	 * capability while delegating all others to the current effective policy,
+	 * use methods such as
 	 * {@link LatticeContext#withTimestamp(convex.core.data.prim.CVMLong)}.
 	 * @param context New local context override, or null to inherit
 	 * @return This cursor with updated context
@@ -108,8 +108,9 @@ public abstract class ALatticeCursor<V extends ACell> extends AForkableCursor<V>
 
 	/**
 	 * Creates an independent fork for isolated modifications.
-	 * Changes don't affect the parent until {@link #sync()}. The fork snapshots this
-	 * cursor's effective context for its own writes. If the parent has advanced,
+	 * Changes don't affect the parent until {@link #sync()}. The fork captures this
+	 * cursor's effective context policy for its own writes; a dynamic policy remains
+	 * dynamic. If the parent has advanced,
 	 * sync merges using the parent's current effective context.
 	 *
 	 * @return A new forked cursor with local storage

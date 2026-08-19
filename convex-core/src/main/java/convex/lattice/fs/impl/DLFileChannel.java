@@ -16,6 +16,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
 import convex.lattice.fs.DLPath;
@@ -102,6 +103,7 @@ public class DLFileChannel implements SeekableByteChannel {
 		synchronized(fileSystem) {
 			checkOpen();
 			int written=src.remaining();
+			CVMLong operationTime=fileSystem.currentTimestamp();
 			while (src.hasRemaining()) {
 				int n=Math.min(src.remaining(),bytesUntilPersist);
 				ByteBuffer part=src.slice();
@@ -123,8 +125,8 @@ public class DLFileChannel implements SeekableByteChannel {
 
 				if (newData!=data) {
 					AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA,newData)
-						.assoc(DLFSNode.POS_UTIME,fileSystem.currentTimestamp());
-					updateNode(newNode);
+						.assoc(DLFSNode.POS_UTIME,operationTime);
+					updateNode(newNode,operationTime);
 				}
 
 				position=pos+n;
@@ -138,10 +140,14 @@ public class DLFileChannel implements SeekableByteChannel {
 	}
 
 	protected AVector<ACell> updateNode(AVector<ACell> newNode) throws IOException {
+		return updateNode(newNode,fileSystem.currentTimestamp());
+	}
+
+	private AVector<ACell> updateNode(AVector<ACell> newNode, CVMLong operationTime) throws IOException {
 		if (readOnly) {
 			throw new NonWritableChannelException();
 		}
-		return fileSystem.updateNode(path, newNode);
+		return fileSystem.updateNode(path,newNode,operationTime);
 	}
 
 	@Override
@@ -206,9 +212,10 @@ public class DLFileChannel implements SeekableByteChannel {
 			long newSize=Math.min(size, data.count());
 			ABlob newData=data.slice(0, newSize);
 			if (newData!=data) {
+				CVMLong operationTime=fileSystem.currentTimestamp();
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData)
-					.assoc(DLFSNode.POS_UTIME,fileSystem.currentTimestamp());
-				updateNode(newNode);
+					.assoc(DLFSNode.POS_UTIME,operationTime);
+				updateNode(newNode,operationTime);
 			}
 			position=0;
 		}

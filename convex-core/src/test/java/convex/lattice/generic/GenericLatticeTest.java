@@ -15,6 +15,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
@@ -121,23 +122,79 @@ public class GenericLatticeTest {
 		assertEquals(true, result.checkSignature());
 	}
 
+	/**
+	 * A merge that synthesises a new value (rather than selecting one of its inputs)
+	 * must sign the result as the owner. With an authorised signer it converges.
+	 */
 	@Test
-	public void testSignedLatticeContextFallback() {
+	public void testSignedLatticeSynthesisWithAuthorisedSigner() {
 		AKeyPair kp = AKeyPair.generate();
+		AccountKey owner = kp.getAccountKey();
+		SignedLattice<ASet<CVMLong>> sl =
+			SignedLattice.<ASet<CVMLong>>create(SetLattice.create()).withOwner(owner);
 
-		// Create signed lattice with keypair set on instance (old style)
-		SignedLattice<AInteger> sl = SignedLattice.<AInteger>create(MaxLattice.create());
-		sl.setKeyPair(kp);
+		SignedData<ASet<CVMLong>> sd1 = kp.signData(Sets.of(CVMLong.ONE));
+		SignedData<ASet<CVMLong>> sd2 = kp.signData(Sets.of(CVMLong.TWO));
 
-		// Create signed values
-		SignedData<AInteger> sd1 = kp.signData(CVMLong.create(10));
-		SignedData<AInteger> sd2 = kp.signData(CVMLong.create(20));
+		SignedData<ASet<CVMLong>> result =
+			sl.merge(LatticeContext.create(null, kp), sd1, sd2);
 
-		// Merge with empty context - should fall back to instance keypair
-		SignedData<AInteger> result = sl.merge(LatticeContext.EMPTY, sd1, sd2);
-
-		assertEquals(CVMLong.create(20), result.getValue());
+		assertEquals(Sets.of(CVMLong.ONE, CVMLong.TWO), result.getValue());
+		assertEquals(owner, result.getAccountKey());
 		assertEquals(true, result.checkSignature());
+	}
+
+	/**
+	 * The same merge without an authorised signer must retain the own value rather
+	 * than mis-signing it or throwing: a merge of validly signed data may not fail
+	 * merely because this node cannot author the result on the owner's behalf.
+	 */
+	@Test
+	public void testSignedLatticeSynthesisKeepsOwnWithoutSigner() {
+		AKeyPair owner = AKeyPair.generate();
+		AKeyPair stranger = AKeyPair.generate();
+		SignedLattice<ASet<CVMLong>> sl = SignedLattice.<ASet<CVMLong>>create(SetLattice.create())
+			.withOwner(owner.getAccountKey());
+
+		SignedData<ASet<CVMLong>> sd1 = owner.signData(Sets.of(CVMLong.ONE));
+		SignedData<ASet<CVMLong>> sd2 = owner.signData(Sets.of(CVMLong.TWO));
+
+		// No signer at all
+		assertSame(sd1, sl.merge(LatticeContext.EMPTY, sd1, sd2));
+		// A signer, but not one authorised for this owner
+		assertSame(sd1, sl.merge(LatticeContext.create(null, stranger), sd1, sd2));
+		// The unowned two-argument merge cannot synthesise either
+		assertSame(sd1, sl.merge(sd1, sd2));
+	}
+
+	/**
+	 * An OwnerLattice merge over a synthesising value lattice converges the owners it
+	 * can author and retains the rest, rather than aborting the whole merge.
+	 */
+	@Test
+	public void testOwnerLatticeMergePartialSynthesis() {
+		AKeyPair alice = AKeyPair.generate();
+		AKeyPair bob = AKeyPair.generate();
+		OwnerLattice<ASet<CVMLong>> lattice = OwnerLattice.create(SetLattice.create());
+
+		AHashMap<ACell, SignedData<ASet<CVMLong>>> own = Maps.of(
+			alice.getAccountKey(), alice.signData(Sets.of(CVMLong.ONE)),
+			bob.getAccountKey(), bob.signData(Sets.of(CVMLong.ONE)));
+		AHashMap<ACell, SignedData<ASet<CVMLong>>> other = Maps.of(
+			alice.getAccountKey(), alice.signData(Sets.of(CVMLong.TWO)),
+			bob.getAccountKey(), bob.signData(Sets.of(CVMLong.TWO)));
+
+		// This node holds Alice's key only
+		AHashMap<ACell, SignedData<ASet<CVMLong>>> merged =
+			lattice.merge(LatticeContext.create(null, alice), own, other);
+
+		SignedData<ASet<CVMLong>> aliceSlot = merged.get(alice.getAccountKey());
+		assertEquals(Sets.of(CVMLong.ONE, CVMLong.TWO), aliceSlot.getValue());
+		assertEquals(alice.getAccountKey(), aliceSlot.getAccountKey());
+
+		SignedData<ASet<CVMLong>> bobSlot = merged.get(bob.getAccountKey());
+		assertEquals(Sets.of(CVMLong.ONE), bobSlot.getValue(), "Bob's slot is retained, not mis-signed");
+		assertEquals(bob.getAccountKey(), bobSlot.getAccountKey());
 	}
 
 	@Test

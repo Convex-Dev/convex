@@ -28,6 +28,23 @@ import convex.lattice.generic.OwnerLattice;
  * Tests for the cursor-based Social application API.
  */
 public class SocialAppTest {
+	private static LatticeContext wallet(AKeyPair primary,AKeyPair... additional) {
+		return new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return primary;
+			}
+
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				if (accountKey==null || accountKey.equals(primary.getAccountKey())) {
+					return primary.signData(value);
+				}
+				for (AKeyPair keyPair:additional) {
+					if (accountKey.equals(keyPair.getAccountKey())) return keyPair.signData(value);
+				}
+				return null;
+			}
+		};
+	}
 
 	private static class TestRoot extends ALatticeComponent<Index<Keyword, ACell>> {
 
@@ -84,7 +101,7 @@ public class SocialAppTest {
 	public void testReply() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
-		Social social = Social.create(alice);
+		Social social=Social.create(wallet(alice,bob));
 
 		Feed aliceFeed = social.user(alice.getAccountKey()).feed();
 		Blob parentKey = aliceFeed.post("Original post");
@@ -118,7 +135,7 @@ public class SocialAppTest {
 	public void testFollowAndUnfollow() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
-		Social social = Social.create(alice);
+		Social social=Social.create(alice);
 
 		Follows follows = social.user(alice.getAccountKey()).follows();
 
@@ -185,7 +202,7 @@ public class SocialAppTest {
 	public void testForkAndSyncMultipleUsers() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
-		Social social = Social.create(alice);
+		Social social=Social.create(wallet(alice,bob));
 
 		// Alice posts
 		social.user(alice.getAccountKey()).feed().post("Alice original");
@@ -425,27 +442,20 @@ public class SocialAppTest {
 	}
 
 	/**
-	 * Cursor-level test: Alice can write to Bob's feed locally (local state
-	 * is always trusted), but the data is signed by Alice's key — which means
-	 * it will be rejected when merged with any other node.
+	 * The owner-aware signing boundary must reject a local write when the context
+	 * cannot provide the requested owner's key.
 	 */
 	@Test
-	public void testForgeryVisibleLocallySignedByWrongKey() {
+	public void testWrongKeyCannotSignOwnerPath() {
 		AKeyPair alice = AKeyPair.generate();
 		AKeyPair bob = AKeyPair.generate();
 
 		Social social = Social.create(alice);
 
-		// Alice posts to Bob's feed — locally succeeds (cursor doesn't check ownership)
-		Blob forgedKey = social.user(bob.getAccountKey()).feed().post("Forged!");
-		assertEquals(1, social.user(bob.getAccountKey()).feed().count());
+		assertThrows(IllegalStateException.class,
+			()->social.user(bob.getAccountKey()).feed().post("Forged!"));
 
-		// But the SignedData is signed by Alice, not Bob
-		// Extract raw OwnerLattice map and verify the signer
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.cursor().get();
-		SignedData<Index<Keyword, ACell>> bobSigned = ownerMap.get(bob.getAccountKey());
-		assertNotNull(bobSigned, "Forged entry exists in local state");
-		assertEquals(alice.getAccountKey(), bobSigned.getAccountKey(),
-			"Forged entry is signed by Alice (the attacker), not Bob (the victim)");
+		assertNull(ownerMap.get(bob.getAccountKey()));
 	}
 }

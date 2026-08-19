@@ -74,6 +74,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public DLFSDrive createDrive(String driveName, long maximumDrives) {
 		if (!DLFSPathValidator.isValidDriveName(driveName) || maximumDrives<1) return null;
 		AString name=Strings.create(driveName);
+		CVMLong operationTime=mutationTimestamp();
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
 			if (registry==null) registry=Maps.empty();
 			AVector<ACell> existing=registry.get(name);
@@ -81,7 +82,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			if (status==DriveStatus.LIVE) return registry;
 			if (existing!=null && status!=DriveStatus.DELETED) return registry;
 			if (liveCount(registry)>=maximumDrives) return registry;
-			return registry.assoc(name,DLFSNode.createDirectory(mutationTimestamp()));
+			return registry.assoc(name,DLFSNode.createDirectory(operationTime));
 		});
 		AVector<ACell> old=(previous==null)?null:previous.get(name);
 		if (status(old)==DriveStatus.LIVE
@@ -99,12 +100,12 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 	public boolean deleteDrive(String driveName) {
 		if (!DLFSPathValidator.isValidDriveName(driveName)) return false;
 		AString name=Strings.create(driveName);
+		CVMLong operationTime=mutationTimestamp();
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
 			if (registry==null) return null;
 			AVector<ACell> root=registry.get(name);
 			if (status(root)!=DriveStatus.LIVE) return registry;
-			CVMLong deletionTime=mutationTimestamp();
-			return registry.assoc(name,DLFSNode.createEmptyFile(deletionTime));
+			return registry.assoc(name,DLFSNode.createEmptyFile(operationTime));
 		});
 		boolean deleted=previous!=null && status(previous.get(name))==DriveStatus.LIVE;
 		if (deleted) closeCached(name);
@@ -118,6 +119,7 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 		if (oldName.equals(newName)) return drive(oldName)!=null;
 		AString oldKey=Strings.create(oldName);
 		AString newKey=Strings.create(newName);
+		CVMLong operationTime=mutationTimestamp();
 		AHashMap<AString,AVector<ACell>> previous=cursor.getAndUpdate(registry->{
 			if (registry==null) return null;
 			AVector<ACell> root=registry.get(oldKey);
@@ -125,7 +127,6 @@ public final class DLFSDrives extends ALatticeComponent<AHashMap<AString, AVecto
 			AVector<ACell> target=registry.get(newKey);
 			DriveStatus targetStatus=status(target);
 			if (targetStatus==DriveStatus.LIVE || (target!=null && targetStatus!=DriveStatus.DELETED)) return registry;
-			CVMLong operationTime=mutationTimestamp();
 			AVector<ACell> movedRoot=root.assoc(DLFSNode.POS_UTIME,operationTime);
 			AVector<ACell> tombstone=DLFSNode.createEmptyFile(operationTime);
 			return registry.assoc(newKey,movedRoot).assoc(oldKey,tombstone);

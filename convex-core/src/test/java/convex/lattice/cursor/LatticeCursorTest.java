@@ -415,7 +415,7 @@ public class LatticeCursorTest {
 		ALatticeCursor<ASet<CVMLong>> configured = root.setContext(ctx);
 		assertEquals(ctx, configured.getContext());
 
-		// Fork snapshots context
+		// Fork captures the effective context policy
 		ALatticeCursor<ASet<CVMLong>> fork = configured.fork();
 		assertEquals(ctx, fork.getContext());
 	}

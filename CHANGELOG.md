@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `LatticeContext` is now an extensible application policy: timestamps and signing can be resolved dynamically after one root installation, and delegated overrides replace individual capabilities. Owned data is authored through `signAs`, one authorisation rule shared with merge-time owner verification, so a wallet or key-store backed policy can write for any identity it holds and a write that no peer would accept fails locally instead.
+
 ### Fixed
 
+- Merging signed data for an owner this node cannot sign for retains the local value, rather than aborting the whole merge or attaching a non-owner signature. Merges converge the owners a node holds keys for and leave the rest to their owners.
+- Signing and timestamping a lattice write happen once per logical write, not once per compare-and-set attempt, so contention no longer multiplies calls into a wallet, key store or remote signer.
 - DLFS cursor-level embedders can supply their host store to `DLFS.connect` or `DLFS.open`, so NIO `Files.copy` and output-stream writes persist blob branches incrementally instead of retaining files larger than the JVM heap (#702).
 - DLFS mutations use the driving cursor's `LatticeContext` timestamp exactly; filesystem-level timestamp setters have been removed, and equal-timestamp merge-back preserves the current local (`own`) value, including live names competing with stale tombstones (#703).
 

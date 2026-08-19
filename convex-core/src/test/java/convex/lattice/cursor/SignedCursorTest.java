@@ -2,6 +2,8 @@ package convex.lattice.cursor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -38,6 +40,57 @@ import convex.lattice.generic.SignedLattice;
  * </ul>
  */
 public class SignedCursorTest {
+
+	/**
+	 * A contended write must sign once, not once per compare-and-set attempt: the
+	 * signing policy may reach a wallet, key store or remote signer.
+	 */
+	@Test
+	public void testContendedWriteSignsOnce() {
+		AtomicInteger signs=new AtomicInteger();
+		LatticeContext counting=new LatticeContext() {
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				signs.incrementAndGet();
+				return KP_ALICE.signData(value);
+			}
+		};
+		RootLatticeCursor<SignedData<AInteger>> base=Cursors.createLattice(
+			SignedLattice.create(MaxLattice.INSTANCE),
+			KP_ALICE.signData((AInteger)CVMLong.ONE),counting);
+		SignedCursor<AInteger> cursor=SignedCursor.create(base,MaxLattice.INSTANCE,null);
+
+		// Displace the base value on the first attempt only, forcing exactly one CAS retry
+		AtomicInteger attempts=new AtomicInteger();
+		AInteger result=cursor.updateAndGet(current -> {
+			if (attempts.getAndIncrement()==0) base.set(KP_ALICE.signData((AInteger)CVMLong.TWO));
+			return CVMLong.create(99);
+		});
+
+		assertEquals(2,attempts.get(),"the update function was retried");
+		assertEquals(CVMLong.create(99),result);
+		assertEquals(1,signs.get(),"one signature for one logical write");
+	}
+
+	/** An unchanged write keeps the existing signature and never asks for a new one. */
+	@Test
+	public void testUnchangedWriteDoesNotSign() {
+		AtomicInteger signs=new AtomicInteger();
+		LatticeContext counting=new LatticeContext() {
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				signs.incrementAndGet();
+				return KP_ALICE.signData(value);
+			}
+		};
+		SignedData<AInteger> initial=KP_ALICE.signData((AInteger)CVMLong.ONE);
+		RootLatticeCursor<SignedData<AInteger>> base=Cursors.createLattice(
+			SignedLattice.create(MaxLattice.INSTANCE),initial,counting);
+		SignedCursor<AInteger> cursor=SignedCursor.create(base,MaxLattice.INSTANCE,null);
+
+		cursor.set(CVMLong.create(1));
+
+		assertEquals(0,signs.get(),"no re-signing for an unchanged value");
+		assertSame(initial,base.get(),"the stored cell is untouched");
+	}
 
 	static final AKeyPair KP_ALICE = AKeyPair.createSeeded(1001);
 	static final AKeyPair KP_BOB = AKeyPair.createSeeded(1002);
@@ -221,6 +274,34 @@ public class SignedCursorTest {
 		SignedData<AInteger> updated = root.get().get(ALICE);
 		assertTrue(updated.checkSignature(), "Updated value should be properly signed");
 		assertEquals(CVMLong.create(20), updated.getValue());
+	}
+
+	@Test
+	public void testOwnerPathRequestsNonPrimarySigner() {
+		OwnerLattice<AInteger> ownerLattice=OwnerLattice.create(MaxLattice.INSTANCE);
+		AHashMap<ACell,SignedData<AInteger>> initial=Maps.of(
+			ALICE,KP_ALICE.signData((AInteger)CVMLong.ONE),
+			BOB,KP_BOB.signData((AInteger)CVMLong.TWO));
+		LatticeContext wallet=new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return KP_ALICE;
+			}
+
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				if (accountKey!=null && accountKey.equals(BOB)) return KP_BOB.signData(value);
+				return super.sign(accountKey,value);
+			}
+		};
+		RootLatticeCursor<AHashMap<ACell,SignedData<AInteger>>> root=
+			Cursors.createLattice(ownerLattice,initial,wallet);
+
+		root.<SignedData<AInteger>>path(BOB).<AInteger>path(Keywords.VALUE)
+			.set(CVMLong.create(99));
+
+		SignedData<AInteger> updated=root.get().get(BOB);
+		assertEquals(BOB,updated.getAccountKey());
+		assertTrue(updated.checkSignature());
+		assertEquals(CVMLong.create(99),updated.getValue());
 	}
 
 	/**
@@ -465,6 +546,31 @@ public class SignedCursorTest {
 		root.merge(Maps.of(ALICE, KP_ALICE.signData((AInteger) CVMLong.create(5))));
 		assertEquals(CVMLong.create(15), root.get().get(ALICE).getValue(),
 			"MaxLattice should keep larger value");
+	}
+
+	@Test
+	public void testOwnerMergeSynthesisRequestsNonPrimarySigner() {
+		OwnerLattice<ASet<CVMLong>> ownerLattice=OwnerLattice.create(SetLattice.create());
+		LatticeContext wallet=new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return KP_ALICE;
+			}
+
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				if (accountKey!=null && accountKey.equals(BOB)) return KP_BOB.signData(value);
+				return super.sign(accountKey,value);
+			}
+		};
+		AHashMap<ACell,SignedData<ASet<CVMLong>>> own=Maps.of(
+			BOB,KP_BOB.signData(Sets.of(CVMLong.ONE)));
+		AHashMap<ACell,SignedData<ASet<CVMLong>>> other=Maps.of(
+			BOB,KP_BOB.signData(Sets.of(CVMLong.TWO)));
+
+		SignedData<ASet<CVMLong>> merged=ownerLattice.merge(wallet,own,other).get(BOB);
+
+		assertEquals(BOB,merged.getAccountKey());
+		assertEquals(Sets.of(CVMLong.ONE,CVMLong.TWO),merged.getValue());
+		assertTrue(merged.checkSignature());
 	}
 
 	/**
@@ -714,7 +820,7 @@ public class SignedCursorTest {
 	// =========================================================================
 
 	/**
-	 * Descended cursors inherit their parent's effective context and forks snapshot it.
+	 * Descended cursors inherit their parent's effective context and forks capture it.
 	 * setContext() mutates the cursor's local context override.
 	 */
 	@Test

@@ -33,6 +33,7 @@ import convex.core.data.AString;
 import convex.core.data.Hash;
 import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 /**
@@ -1113,6 +1114,36 @@ public class Utils {
 	 */
 	public static long getCurrentTimestamp() {
 		return Instant.now().toEpochMilli();
+	}
+
+	/**
+	 * Most recently created current-timestamp cell. Read and written without
+	 * synchronisation: a race merely creates an equal cell, never a wrong one.
+	 *
+	 * <p>Deliberately left at its default {@code null} rather than a constant such as
+	 * {@code CVMLong.ZERO}. Initialising it would make {@code Utils} class
+	 * initialisation depend on {@code CVMLong}, and {@code CVMLong} initialisation
+	 * already reaches {@code Utils} via {@code Ref} and {@code Hash} — a cycle which
+	 * deadlocks whenever two threads enter the two ends at once.</p>
+	 */
+	private static volatile CVMLong currentTimestampCell;
+
+	/**
+	 * Gets the current system timestamp as a CVM value, reusing the previously
+	 * created cell while still within the same millisecond.
+	 *
+	 * <p>Callers commonly stamp many values per millisecond, so the cached cell
+	 * avoids repeatedly allocating and encoding an identical value.</p>
+	 *
+	 * @return Current timestamp as a CVM Long
+	 */
+	public static CVMLong getCurrentTimestampCell() {
+		long now=getCurrentTimestamp();
+		CVMLong cached=currentTimestampCell;
+		if (cached!=null && cached.longValue()==now) return cached;
+		CVMLong result=CVMLong.create(now);
+		currentTimestampCell=result;
+		return result;
 	}
 
 	private static final long startupTimestamp=getCurrentTimestamp();

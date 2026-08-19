@@ -138,10 +138,6 @@ public class DlfsMcpTools {
 		return fs.getPath("/" + canonical);
 	}
 
-	private static void prepareMutation(FileSystem fs) {
-		DLFSDriveManager.prepareMutation(fs);
-	}
-
 	private static void sync(FileSystem fs) {
 		if (fs instanceof convex.lattice.fs.DLFileSystem dlfs) dlfs.sync();
 	}
@@ -492,7 +488,6 @@ public class DlfsMcpTools {
 					return McpProtocol.toolError("Content is too large for MCP write");
 				}
 				boolean isNew = !Files.exists(path);
-				prepareMutation(access.fs());
 				if (access.fs() instanceof convex.lattice.fs.DLFileSystem dlfs) {
 					dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, bytes);
 				} else {
@@ -530,7 +525,6 @@ public class DlfsMcpTools {
 
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
-				prepareMutation(access.fs());
 				Files.createDirectory(path);
 				sync(access.fs());
 				return McpProtocol.toolSuccess(Maps.of("created", CVMBool.TRUE));
@@ -560,7 +554,6 @@ public class DlfsMcpTools {
 
 			Path path = resolvePath(access.fs(), pathCell.toString());
 			try {
-				prepareMutation(access.fs());
 				Files.delete(path);
 				sync(access.fs());
 				return McpProtocol.toolSuccess(Maps.of("deleted", CVMBool.TRUE));

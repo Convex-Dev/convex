@@ -10,11 +10,8 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.fs.DLFS;
-import convex.lattice.fs.impl.DLFSLocal;
 
 /**
  * Local routing and service adapter for named DLFS drives.
@@ -38,14 +35,6 @@ public class DLFSDriveManager {
 	private final ConcurrentHashMap<String, FileSystem> drives = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Object,DLFSDrives> componentRoutes=new ConcurrentHashMap<>();
 	private final boolean ephemeralFallback;
-
-	/** Refreshes the application-owned timestamp context for one service mutation. */
-	static void prepareMutation(FileSystem fs) {
-		if (!(fs instanceof DLFSLocal dlfs)) return;
-		ALatticeCursor<AVector<ACell>> cursor=dlfs.getCursor();
-		CVMLong timestamp=CVMLong.create(Utils.getCurrentTimestamp());
-		cursor.setContext(cursor.getContext().withTimestamp(timestamp));
-	}
 
 	private DLFSDriveManager(boolean ephemeralFallback) {
 		this.ephemeralFallback=ephemeralFallback;

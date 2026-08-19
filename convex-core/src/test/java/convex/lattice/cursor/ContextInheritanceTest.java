@@ -3,6 +3,8 @@ package convex.lattice.cursor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -19,7 +21,7 @@ import convex.lattice.generic.MapLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
 
-/** Tests live context inheritance for cursor views and snapshots for forks. */
+/** Tests context-policy inheritance for cursor views and forks. */
 public class ContextInheritanceTest {
 
 	@Test
@@ -44,26 +46,32 @@ public class ContextInheritanceTest {
 	}
 
 	@Test
-	public void testWithMethodCreatesCompleteChildSnapshot() {
+	public void testWithMethodOverridesOneLivePolicyCapability() {
 		MapLattice<Keyword, ASet<CVMLong>> lattice = MapLattice.create(SetLattice.create());
 		RootLatticeCursor<AHashMap<Keyword, ASet<CVMLong>>> root =
 			Cursors.createLattice(lattice, Maps.empty());
 		ALatticeCursor<ASet<CVMLong>> child = root.path(Keywords.FOO);
 
-		AKeyPair originalKey = AKeyPair.generate();
-		LatticeContext original = LatticeContext.create(CVMLong.create(1000), originalKey);
-		root.setContext(original);
+		AKeyPair originalKey=AKeyPair.generate();
+		AKeyPair replacementKey=AKeyPair.generate();
+		AtomicReference<AKeyPair> activeKey=new AtomicReference<>(originalKey);
+		LatticeContext dynamic=new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return activeKey.get();
+			}
+		};
+		root.setContext(dynamic);
 
-		LatticeContext snapshot = child.getContext().withTimestamp(CVMLong.create(1500));
-		child.setContext(snapshot);
+		LatticeContext override=child.getContext().withTimestamp(CVMLong.create(1500));
+		child.setContext(override);
+		activeKey.set(replacementKey);
 
-		AKeyPair replacementKey = AKeyPair.generate();
-		LatticeContext laterParent = LatticeContext.create(CVMLong.create(2000), replacementKey);
+		LatticeContext laterParent=LatticeContext.create(CVMLong.create(2000),originalKey);
 		root.setContext(laterParent);
 
-		assertSame(snapshot, child.getContext());
+		assertSame(override,child.getContext());
 		assertEquals(CVMLong.create(1500), child.getContext().getTimestamp());
-		assertSame(originalKey, child.getContext().getSigningKey());
+		assertSame(replacementKey,child.getContext().getSigningKey());
 
 		child.setContext(null);
 		assertSame(laterParent, child.getContext());
@@ -85,7 +93,7 @@ public class ContextInheritanceTest {
 	}
 
 	@Test
-	public void testForkSnapshotsEffectiveContext() {
+	public void testForkRetainsEffectiveContextPolicy() {
 		RootLatticeCursor<ASet<CVMLong>> root = Cursors.createLattice(SetLattice.create(), Sets.empty());
 		LatticeContext atFork = LatticeContext.create(CVMLong.create(1000), null);
 		root.setContext(atFork);
