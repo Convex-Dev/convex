@@ -10,6 +10,9 @@
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
+		<!-- All Bouncycastle modules move together. 1.85.2 is a bcprov-only patch:
+		     bcpkix and bcutil have no such release, so taking it would run a
+		     mismatched set in the signing path. Wait for a coordinated release. -->
 		<bc.version>1.85</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
