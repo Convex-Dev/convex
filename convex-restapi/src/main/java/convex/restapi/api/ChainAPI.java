@@ -100,7 +100,11 @@ public class ChainAPI extends ABaseAPI {
 
 	private ConcurrentLimit faucetLimit=new ConcurrentLimit(10);
 	private ConcurrentLimit identiconLimit=new ConcurrentLimit(10);
-	private ConcurrentLimit transactLimit=new ConcurrentLimit(2);
+
+	// Bounded server-wide and per client. A permit is held for the whole consensus
+	// wait, so a single caller must not be able to take the entire allowance.
+	private ConcurrentLimit transactLimit=new ConcurrentLimit(
+		restServer.getTransactLimit(),restServer.getTransactLimitPerClient());
 	
 	@Override
 	public void addRoutes(RoutesConfig routes) {

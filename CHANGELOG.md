@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client), so a well-resourced peer can serve more.
+
 ### Changed
+
+- The REST `/transact` concurrency cap rises from 2 server-wide to 10000 server-wide with 100 per client. A permit is held for the whole consensus wait, so the previous cap meant two slow transactions could stall every other caller. Request handling runs on virtual threads, so a waiting request is cheap and the higher ceiling is affordable; the per-client bound keeps one caller from taking the whole allowance.
 
 ### Fixed
 
