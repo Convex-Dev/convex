@@ -84,7 +84,7 @@ class QueryWatchAPITest extends ARESTTest {
 			CVMLong initialTimestamp=initialResult.getIn("value");
 
 			Result transaction=convex.transactSync("(+ 1 2)");
-			assertTrue(!transaction.isError(),()->"Transaction failed: "+transaction);
+			assertSucceeded(transaction);
 
 			SseEvent changed=readAsync(reader);
 			assertEquals("result",changed.type());

@@ -95,7 +95,7 @@ public class ConvexHTTPTest extends ARESTTest {
 		ConvexHTTP convex=connect();
 		
 		Result r=convex.requestStatusSync();
-		assertFalse(r.isError(), ()->"Error in status request: " + r);
+		assertSucceeded(r);
 		assertNotNull(r.getValue(), "Status result should have a value");
 		assertTrue(r.getValue() instanceof convex.core.data.AMap, 
 			"Status result should be a map but got: " + Utils.getClassName(r.getValue()));

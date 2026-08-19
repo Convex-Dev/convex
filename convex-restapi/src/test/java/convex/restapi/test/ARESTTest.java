@@ -9,8 +9,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -98,6 +102,30 @@ public abstract class ARESTTest {
 		return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 	}
 	
+	/**
+	 * Asserts that a transaction or query succeeded, reporting a client timeout as
+	 * what it is rather than as a failure of the code under test.
+	 *
+	 * <p>A {@code :TIMEOUT} means this client stopped waiting, not that the network
+	 * rejected anything — the transaction may still be in flight and may still land.
+	 * It is a statement about how loaded the host is, so it must not be conflated
+	 * with a transaction that genuinely failed. Asserting on {@code isError()} alone
+	 * conflates the two, and the resulting message sends the reader looking for a
+	 * consensus bug that is not there.</p>
+	 *
+	 * @param r Result to check
+	 */
+	protected static void assertSucceeded(Result r) {
+		if (ErrorCodes.TIMEOUT.equals(r.getErrorCode())) {
+			// Deliberately does not quote a duration: the client's timeout may have been
+			// overridden, and a wrong number here would misdirect whoever reads this.
+			fail("Timed out waiting for a transaction result. This means the host was too"
+				+" slow, not that the code under test is wrong; the transaction may still"
+				+" be in flight and may still land. Result: "+r);
+		}
+		assertFalse(r.isError(),()->"Transaction failed: "+r);
+	}
+
 	protected ConvexHTTP connect() {
 		try {
 			URI uri=new URI(HOST_PATH);

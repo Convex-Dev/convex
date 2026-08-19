@@ -67,7 +67,7 @@ class LogWatchAPITest extends ARESTTest {
 			try (InputStream input=response.body()) {
 				CompletableFuture<SseEvent> received=CompletableFuture.supplyAsync(()->readLogEvent(input));
 				Result result=convex.transactSync("(call ["+actor+" :USD] (emit))");
-				assertTrue(!result.isError(),()->"Scoped log transaction failed: "+result);
+				assertSucceeded(result);
 
 				SseEvent event=received.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
 				assertEquals("log",event.type());
