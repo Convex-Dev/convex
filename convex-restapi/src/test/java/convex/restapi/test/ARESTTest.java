@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import convex.api.Convex;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -10,7 +11,6 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -64,9 +64,6 @@ public abstract class ARESTTest {
 		if (rs==null) return;
 		Server peer=rs.getServer();
 		server=null;
-		ConvexHTTP gc=genesisClient;
-		genesisClient=null;
-		if (gc!=null) gc.close();
 		try {
 			rs.close();
 		} finally {
@@ -128,41 +125,18 @@ public abstract class ARESTTest {
 	 * @throws InterruptedException if interrupted while awaiting consensus
 	 */
 	protected static synchronized Address newAccount() throws InterruptedException {
-		ConvexHTTP convex=genesisClient();
+		// The server's own faucet client is the one instance authorised on this
+		// account. Going through it means every transaction on the account is issued
+		// by a single Convex, whose cached sequence is therefore always correct - a
+		// second client would compute the same next sequence and be rejected.
+		Convex convex=server.getFaucet();
+		if (convex==null) throw new IllegalStateException("Faucet not enabled: cannot create test accounts");
 		AccountKey pubKey=CLIENT_KP.getAccountKey();
-		String code="(let [a (deploy '(do (set-controller *caller*) (set-key "+pubKey+")))] (transfer a 1000000000) a)";
-		Result r=convex.transactSync(code);
-		if (r.isError()&&ErrorCodes.SEQUENCE.equals(r.getErrorCode())) {
-			// The REST server's faucet transacts as this same account through its own
-			// client, so our cached sequence can be stale. transactSync clears the cache
-			// on error, so a single retry re-queries and succeeds.
-			r=convex.transactSync(code);
-		}
+		Result r=convex.transactSync("(let [a (deploy '(do (set-controller *caller*) (set-key "+pubKey+")))] (transfer a 1000000000) a)");
 		if (r.isError()) throw new IllegalStateException("Unable to create test account: "+r);
 		Address a=r.getValue();
 		if (a==null) throw new IllegalStateException("Test account creation returned no address: "+r);
 		return a;
-	}
-
-	/**
-	 * The single genesis-authorised client, used for all test account creation.
-	 *
-	 * <p>{@link convex.api.Convex} caches an account's sequence number per client
-	 * instance. Two clients transacting as the same account each believe they own the
-	 * next sequence, so one is rejected with a SEQUENCE error. Funding new accounts
-	 * must therefore go through exactly one client rather than a fresh one per call.</p>
-	 */
-	private static ConvexHTTP genesisClient;
-
-	private static synchronized ConvexHTTP genesisClient() {
-		if (genesisClient==null) {
-			try {
-				genesisClient=ConvexHTTP.connect(new URI(HOST_PATH),Init.GENESIS_ADDRESS,KP);
-			} catch (URISyntaxException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		}
-		return genesisClient;
 	}
 
 	/**
