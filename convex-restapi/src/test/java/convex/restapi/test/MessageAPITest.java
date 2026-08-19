@@ -89,7 +89,7 @@ public class MessageAPITest extends ARESTTest {
 	public void testQueryViaMessage() throws Exception {
 		Message msg = Message.createQuery(1, "(+ 2 3)", Init.GENESIS_ADDRESS);
 		Result r = postMessage(msg);
-		assertFalse(r.isError(), () -> "Query error: " + r);
+		assertSucceeded(r);
 		assertEquals(CVMLong.create(5), r.getValue());
 	}
 
@@ -97,7 +97,7 @@ public class MessageAPITest extends ARESTTest {
 	public void testStatusViaMessage() throws Exception {
 		Message msg = Message.createStatusRequest(1);
 		Result r = postMessage(msg);
-		assertFalse(r.isError(), () -> "Status error: " + r);
+		assertSucceeded(r);
 		assertNotNull(r.getValue());
 	}
 
@@ -109,7 +109,7 @@ public class MessageAPITest extends ARESTTest {
 		SignedData<ATransaction> signed = KP.signData((ATransaction) tx);
 		Message msg = Message.createTransaction(1, signed);
 		Result r = postMessage(msg);
-		assertFalse(r.isError(), () -> "Transaction error: " + r);
+		assertSucceeded(r);
 		assertEquals(CVMLong.create(30), r.getValue());
 	}
 

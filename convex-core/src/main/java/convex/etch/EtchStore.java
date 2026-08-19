@@ -1,5 +1,6 @@
 package convex.etch;
 
+import convex.core.data.RefDirect;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
@@ -564,7 +565,7 @@ public class EtchStore extends ACachedStore {
 			return (Ref<T>) existing;
 
 		if (hash == Hash.NULL_HASH)
-			return (Ref<T>) Ref.NULL_VALUE;
+			return (Ref<T>) RefDirect.NULL_VALUE;
 		try {
 			return readStoreRef(hash);
 		} catch (IOException e) {
@@ -652,7 +653,7 @@ public class EtchStore extends ACachedStore {
 
 		// Quick handling for null
 		if (cell == null)
-			return (Ref<T>) Ref.NULL_VALUE;
+			return (Ref<T>) RefDirect.NULL_VALUE;
 
 		// check store for existing ref first.
 		boolean embedded = cell.isEmbedded();

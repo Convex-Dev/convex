@@ -1,6 +1,5 @@
 package convex.lattice.generic;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
@@ -16,35 +15,69 @@ import convex.lattice.cursor.SignedCursor;
 /**
  * Lattice node representing signed Data.
  *
- * Merges that produce new values will fail if no keypair is set.
+ * <p>A merge that <em>selects</em> one of its inputs needs no signature: the winner
+ * is stored with the signature it arrived with. A merge that <em>synthesises</em> a
+ * new value (because the inner lattice combined both inputs) must sign the result as
+ * this node's owner. When the context signing policy cannot do that — the usual case
+ * for another owner's data — the merge keeps the own value rather than producing an
+ * entry no peer would accept. Convergence for that owner is then the owner's to
+ * complete; see the class documentation on {@link ALattice} for why a merge must not
+ * fail on data it merely cannot author.</p>
  *
  * @param <V> Type of signed lattice value
  */
 public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
-	
-	protected final ALattice<V> valueNode;
-	private AKeyPair keyPair;
 
-	private SignedLattice(ALattice<V> valueNode) {
+	protected final ALattice<V> valueNode;
+
+	/** Owner identity for values at this position, or null when unknown. */
+	private final ACell owner;
+
+	private SignedLattice(ALattice<V> valueNode, ACell owner) {
 		this.valueNode=valueNode;
+		this.owner=owner;
 	}
-	
+
 	public static <V extends ACell> SignedLattice<V> create(ALattice<V> childNode) {
-		return new SignedLattice<>(childNode);
+		return new SignedLattice<>(childNode,null);
 	}
-	
+
+	/**
+	 * Returns a view bound to a specific owner identity, whose signer the context
+	 * signing policy is asked for when a value must be authored at this position.
+	 *
+	 * @param owner Owner identity (an AccountKey, or an indirect identity such as an
+	 *              Address or DID resolved by the context's owner verifier)
+	 * @return Owner-bound view of this lattice
+	 */
+	public SignedLattice<V> withOwner(ACell owner) {
+		if (Utils.equals(owner,this.owner)) return this;
+		return new SignedLattice<>(valueNode,owner);
+	}
+
 	@Override
 	public SignedData<V> merge(SignedData<V> ownValue, SignedData<V> otherValue) {
-		// Delegate to context-aware merge with fallback context
-		LatticeContext ctx = (keyPair != null)
-			? LatticeContext.create(null, keyPair)
-			: LatticeContext.EMPTY;
-		return merge(ctx, ownValue, otherValue);
+		// No context: signature synthesis is unavailable, so this merge can only select
+		return merge(LatticeContext.EMPTY, ownValue, otherValue);
 	}
 
 	@Override
 	public SignedData<V> merge(LatticeContext context, SignedData<V> ownValue, SignedData<V> otherValue) {
+		return merge(context,owner,ownValue,otherValue);
+	}
+
+	/**
+	 * Context-aware merge for values owned by a specific identity.
+	 *
+	 * @param context Context supplying the signing policy
+	 * @param owner Owner identity for this position, or null when unknown
+	 * @param ownValue Established value, preferred by directional tie-breaks
+	 * @param otherValue Value to merge in, possibly received from an untrusted source
+	 * @return Merged signed value
+	 */
+	public SignedData<V> merge(LatticeContext context, ACell owner,
+			SignedData<V> ownValue, SignedData<V> otherValue) {
 		if (otherValue==null) return ownValue;
 
 		// If we don't have a value, use other as long as signature is correct
@@ -68,31 +101,17 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 		if (Utils.equals(a, m)) return ownValue;
 		if (Utils.equals(b, m)) return otherValue;
 
-		return sign(context, m);
+		// A synthesised value must be signed as this owner. If we cannot author it,
+		// retain the own value: never store, or propagate, a slot signed by a
+		// non-owner, and never abort an otherwise valid merge over it.
+		SignedData<V> signed=context.signAs(owner,m);
+		return (signed!=null)?signed:ownValue;
 	}
 
 	@Override
 	public boolean checkForeign(SignedData<V> otherValue) {
 		if (otherValue==null) return false;
 		return otherValue.checkSignature();
-	}
-
-	private SignedData<V> sign(LatticeContext context, V m) {
-		// Try to get keypair from context first, fall back to instance variable
-		AKeyPair kp = context.getSigningKey();
-		if (kp == null) kp = getKeyPair();
-
-		if (kp==null) throw new IllegalStateException("Unable to sign new lattice value");
-
-		return kp.signData(m);
-	}
-
-	public AKeyPair getKeyPair() {
-		return keyPair;
-	}
-	
-	public void setKeyPair(AKeyPair keyPair) {
-		this.keyPair=keyPair;
 	}
 
 	@Override
@@ -137,7 +156,16 @@ public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 	public AUpdateCursor<?, ?> createPathCursor(ALatticeCursor<?> base, ACell key, LatticeContext context) {
 		// Only called when isWriteBoundary(key) is true, i.e. key is :value.
 		ALattice<V> inner = path(key); // valueNode
-		return SignedCursor.create((ALatticeCursor<SignedData<V>>) base, inner, context);
+		return SignedCursor.create((ALatticeCursor<SignedData<V>>) base,inner,context,owner);
+	}
+
+	/**
+	 * Gets the owner identity this lattice authors values for, if known.
+	 *
+	 * @return Owner identity, or null
+	 */
+	public ACell getOwner() {
+		return owner;
 	}
 
 }

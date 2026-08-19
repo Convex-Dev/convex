@@ -212,11 +212,12 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 }
 ```
 
-The component parent supplies containing application policy, including persistence.
-The cursor parent supplies logical navigation and synchronisation. These relationships
-are deliberately separate: a fork keeps the same component parent while its cursor
-synchronises to the live cursor it was forked from. The cursor chain also handles
-signing transparently—`Feed` does not know about `SignedData` at all.
+The component parent supplies containing application policy and internal access to
+the host `AStore`. The cursor parent supplies logical navigation and synchronisation.
+These relationships are deliberately separate: a fork keeps the same component
+parent while its cursor synchronises to the live cursor it was forked from. The
+cursor chain also handles signing transparently—`Feed` does not know about
+`SignedData` at all.
 
 Do not retain caller-controlled path arrays; component and cursor constructors must
 take an owned copy. Long-lived application and region components are appropriate.
@@ -328,11 +329,11 @@ The three boundaries have intentionally different meanings:
 | `component.sync()` | Merge through its cursor parent; at the root, run host publication policy | Yes, where merge/publication selects a value |
 | `application.flush()` | Pass through to the underlying store's physical durability barrier | No |
 
-Incremental blob writers may call the protected persistence mechanism at intervals
-to replace eligible direct references with store-backed soft references and relieve
-memory pressure. They must explicitly install the returned value in working state.
-Persistence neither selects a retained root nor grants permission to garbage collect;
-those are application policy.
+Incremental blob writers use the host `AStore` at intervals to replace eligible
+direct references with store-backed soft references and relieve memory pressure.
+They must explicitly install the returned value in working state. Persistence
+neither selects a retained root nor grants permission to garbage collect; those are
+application policy.
 
 ## Connecting to Host Infrastructure
 
@@ -360,19 +361,49 @@ replace that policy later.
 
 ### LatticeContext
 
-The `LatticeContext` carries the write/merge context: a **signing key pair** (+ verification policy) and a **timestamp** — the single write clock. Set it on the cursor before any writes that cross a `SignedCursor` boundary (which needs the key) or a `StampedCursor` / stamp-on-write region (which needs the timestamp):
+The `LatticeContext` is the application's **write/merge policy**: who signs, what time
+it is, and which signers are authorised for which owners. It is an abstract class, so a
+policy can be fixed (deterministic tests) or resolve dynamically from an application
+clock, wallet or key store. Install it once on the application or root cursor and every
+descendant inherits it live:
 
 ```java
-// signing only
-LatticeContext ctx = LatticeContext.create(null, myKeyPair);
+// one in-memory key, runtime clock
+cursor.setContext(LatticeContext.create(null, myKeyPair));
 
-// signing + write clock — needed for stamp-on-write regions; refresh per write
-// batch so LWW sees fresh timestamps (the pattern DLFSAdapter uses)
-LatticeContext ctx = LatticeContext.create(CVMLong.create(System.currentTimeMillis()), myKeyPair);
-cursor.withContext(ctx);
+// fixed clock as well — fully deterministic, typically for tests
+cursor.setContext(LatticeContext.create(CVMLong.create(1000), myKeyPair));
+
+// an application policy: several identities, an application clock
+cursor.setContext(new LatticeContext() {
+    @Override public CVMLong currentTimestamp() { return myClock.now(); }
+    @Override public <T extends ACell> SignedData<T> sign(AccountKey account, T value) {
+        return myWallet.signWith(account, value);   // null if unavailable
+    }
+});
 ```
 
-A write through `SignedCursor` with no key pair throws `IllegalStateException`; likewise a write through a `StampedCursor` with no timestamp in the context. (The same context timestamp is what `DLFSLocal` reads for node write times.)
+A dynamic policy installed on a shared cursor must be thread-safe. The `with...` methods
+(`withTimestamp`, `withSigningKey`, `withOwnerVerifier`, `withMaxFutureTimestampSkew`)
+override one capability and delegate the rest, so a fixed timestamp does not freeze a
+dynamic signing policy.
+
+**Time.** `currentTimestamp()` resolves the write clock; with no fixed timestamp it
+returns runtime time. Lattice components consume the resolved value exactly: they must
+not increment it, compare it with stored values to invent a later value, or otherwise
+implement a hidden logical clock. One logical write resolves the clock once, even when
+it retries under contention. DLFS node writes resolve time exclusively this way:
+`DLFileSystem` and `DLFSLocal` do not hold or advance a separate timestamp. Reusing a
+timestamp deliberately creates a tie; a local update is the current (`own`) merge
+operand and therefore wins that tie against an older snapshot.
+
+**Signing.** `signAs(owner, value)` is the single rule for authoring owned data, and it
+is exactly the rule `verifyOwner` applies to data arriving on merge. An owner that is an
+`AccountKey` requires that key; an indirect owner (Address, DID) is resolved by the
+owner verifier, which is lenient when none is installed. A write through a `SignedCursor`
+that the policy cannot author throws `IllegalStateException`, so a slot no peer would
+accept never reaches local state. When operations must be ordered across replicas—especially delete followed by
+recreate—the application must supply timestamps expressing that order.
 
 ## Security Model
 
@@ -380,11 +411,18 @@ A write through `SignedCursor` with no key pair throws `IllegalStateException`; 
 
 `OwnerLattice` maps owner keys to `SignedData<V>`. During **network merge** (node-to-node replication), it verifies that the signer key matches the owner key. Forgeries — data signed by key A placed under key B — are silently rejected.
 
-### What cursors don't protect
+### One rule, both boundaries
 
-Cursors trust local writes. If Alice's code writes to Bob's slot locally, the cursor chain signs the data with Alice's key and stores it. The forgery is only detected when this data is merged with another node via `OwnerLattice.merge(context, ...)`.
+The same authorisation rule runs when a value is authored and when one arrives. If
+Alice's node writes to Bob's slot, the `SignedCursor` asks the context for a signer
+authorised for Bob; with no such key the write throws and nothing is stored. A merge
+that must *synthesise* a new value for an owner the node cannot sign for keeps the own
+value instead — a merge of validly signed data never fails just because this node cannot
+author the result on someone else's behalf, and never attaches a non-owner signature.
 
-This is by design: local state is trusted (it's your own node), network state is verified.
+Local state is still trusted in the sense that matters: nothing polices *what* an owner
+writes into their own slot. What is enforced is that a slot is only ever written in a
+form a peer would accept.
 
 ### Testing security
 

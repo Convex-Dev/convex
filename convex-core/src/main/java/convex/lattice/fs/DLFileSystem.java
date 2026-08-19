@@ -1,8 +1,8 @@
 package convex.lattice.fs;
 
 import java.io.IOException;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
@@ -16,13 +16,10 @@ import java.nio.file.attribute.UserPrincipalLookupService;
 import java.util.Collections;
 import java.util.Set;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
-import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 import convex.lattice.fs.impl.DLDirectoryStream;
 import convex.lattice.fs.impl.DLFSFileAttributes;
 
@@ -44,7 +41,6 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	private static final Set<String> SUPPORTED_FILE_ATTRIBUTE_SET = Collections.singleton("basic");
 
 	protected final DLFSProvider provider;
-	private CVMLong timestamp; 
 	private volatile boolean open = true;
 	
 	// Singleton root / empty paths
@@ -53,10 +49,9 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	protected final String uriPath;
 	
-	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath, CVMLong timestamp) {
+	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath) {
 		this.provider=dlfsProvider;
 		this.uriPath=uriPath;
-		this.timestamp=timestamp;
 	}
 
 	@Override
@@ -69,49 +64,6 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 		open = false;
 	}
 	
-	/**
-	 * Gets the timestamp of this DLFS drive, used to mark new writes.
-	 * Subclasses may override to consult a cursor's {@link convex.lattice.LatticeContext}.
-	 *
-	 * @return Current timestamp as a CVM integer
-	 */
-	public CVMLong getTimestamp() {
-		return timestamp;
-	}
-	
-	/**
-	 * Sets the timestamp of this DLFS drive
-	 * @param newTimestamp New timestamp
-	 */
-	public final void setTimestamp(CVMLong newTimestamp) {
-		timestamp=newTimestamp;
-	}
-	
-	/**
-	 * Updates the timestamp of this DLFS drive to the maximum of the given timestamp or it's current time stamp
-	 * @param newTimestamp Potential new timestamp
-	 * @return The new timestamp value, or the original one if unchanged
-	 */
-	public synchronized CVMLong updateTimestamp(long newTimestamp) {
-		if (newTimestamp>timestamp.longValue()) {
-			timestamp=CVMLong.create(newTimestamp);
-		}
-		return timestamp;
-	}
-	
-	/**
-	 * Updates the timestamp of the drive to the current system timestamp
-	 */
-	public synchronized CVMLong updateTimestamp() {
-		long current=timestamp.longValue();
-		long now=Utils.getCurrentTimestamp();
-		// Wall-clock resolution is commonly one millisecond. Ensure successive local
-		// logical mutations never receive an accidental tie within the same tick.
-		long next=(now>current)?now:((current<Long.MAX_VALUE)?current+1:current);
-		timestamp=CVMLong.create(next);
-		return timestamp;
-	}
-
 	@Override
 	public boolean isOpen() {
 		return open;
@@ -218,28 +170,12 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	}
 
 	/**
-	 * Gives the hosting application an opportunity to persist streamed blob data.
-	 *
-	 * <p>The default implementation is an identity operation. Store-backed DLFS
-	 * adapters may override this to replace direct references with store-backed
-	 * references. This method does not update or sync the filesystem cursor: the
-	 * caller installs the returned value as part of its current logical write.</p>
-	 *
-	 * @param data Blob data to persist
-	 * @return Persisted data, potentially containing store-backed references
-	 * @throws IOException If persistence fails
-	 */
-	public ABlob persistBlob(ABlob data) throws IOException {
-		return data;
-	}
-
-	/**
 	 * Implementation for delegation by DLFSProvider
 	 * @return Directory stream
 	 */
 	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) throws IOException;
 
-	DLFSFileAttributes getFileAttributes(DLPath path) throws IOException {
+	public DLFSFileAttributes getFileAttributes(DLPath path) throws IOException {
 		AVector<ACell> node=getNode(path);
 		if (node==null) {
 			throw new java.nio.file.NoSuchFileException(path.toString());

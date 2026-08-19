@@ -387,13 +387,13 @@ public class DLFSServerTest {
 	}
 
 	@Test
-	void testMutationAdvancesTimestamp() throws Exception {
+	void testMutationUsesDynamicContextTimestamp() throws Exception {
 		String path = driveURL + "timestamped.txt";
 		client.send(HttpRequest.newBuilder(URI.create(path))
 			.PUT(HttpRequest.BodyPublishers.ofString("time")).build(), HttpResponse.BodyHandlers.ofString());
 		var fs = server.getDriveManager().getDrive(null, "test");
 		long timestamp = java.nio.file.Files.getLastModifiedTime(fs.getPath("/timestamped.txt")).toMillis();
-		assertTrue(timestamp > 0, "External mutations must not remain at the zero timestamp");
+		assertTrue(timestamp > 0,"The default context policy supplies runtime time");
 	}
 
 	@Test

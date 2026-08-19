@@ -26,7 +26,10 @@ import convex.core.util.MergeFunction;
 public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V> {
 
 	// TODO: need a better default value?
-	public static final ARecord<Keyword,ACell> DEFAULT_VALUE=Block.create(0, Vectors.empty());
+	// Note: the default record value lives on the Record type descriptor, not here.
+	// Constructing a Block in this class's static initialiser made initialising this
+	// base class initialise its own subclass, whose superclass chain leads straight
+	// back here. See convex.tools.ClassInitCycles.
 
 	protected final byte tag;
 

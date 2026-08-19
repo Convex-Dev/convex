@@ -221,14 +221,8 @@ public class DLFSWebDAV {
 		}
 	}
 
-	private static void prepareMutation(Path path) {
-		FileSystem fs = path.getFileSystem();
-		if (fs instanceof DLFileSystem dlfs) dlfs.updateTimestamp();
-	}
-
 	private boolean writeCompleteFile(Path path, byte[] data) throws IOException {
 		if (data.length > maxFileSize) return false;
-		prepareMutation(path);
 		if (path.getFileSystem() instanceof DLFileSystem dlfs) {
 			dlfs.writeAllBytes((convex.lattice.fs.DLPath) path, data);
 		} else {
@@ -375,7 +369,6 @@ public class DLFSWebDAV {
 		}
 
 		try {
-			prepareMutation(path);
 			Files.delete(path);
 			syncDrive(ctx, dp);
 			ctx.status(204);
@@ -524,7 +517,6 @@ public class DLFSWebDAV {
 		}
 
 		try {
-			prepareMutation(path);
 			Files.createDirectory(path);
 			syncDrive(ctx, dp);
 			ctx.header("Location", MOUNT_PATH + encodePathComponent(dp.driveName()) + "/" + encodePath(dp.filePath()) + "/");
@@ -598,7 +590,6 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		prepareMutation(dest);
 		if (destExists) {
 			Files.move(source,dest,StandardCopyOption.REPLACE_EXISTING);
 		} else {
@@ -653,7 +644,6 @@ public class DLFSWebDAV {
 			return;
 		}
 
-		prepareMutation(dest);
 		if (destExists) {
 			Files.copy(source,dest,StandardCopyOption.REPLACE_EXISTING);
 		} else {

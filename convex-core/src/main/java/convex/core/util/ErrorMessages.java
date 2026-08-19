@@ -65,7 +65,9 @@ public class ErrorMessages {
 		return ErrorValue.create(ErrorCodes.NOBODY,"Account does not exist: "+address);
 	}
 	
-	public static ErrorValue INVALID_NUMERIC = ErrorValue.create(ErrorCodes.ARGUMENT,"Invalid numeric result");
+	// INVALID_NUMERIC now lives on ErrorValue, where the error values belong. Building
+	// one here made this class of message Strings initialise ErrorValue, which reaches
+	// back here - a class initialisation cycle. See convex.tools.ClassInitCycles.
 
 	public static String badTagMessage(byte tag) {
 		return "Unrecognised tag byte 0x"+Utils.toHexString(tag);

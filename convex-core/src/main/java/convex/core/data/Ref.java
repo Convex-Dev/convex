@@ -137,14 +137,11 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public static final int INVALID = -1;
 
-	/**
-	 * Ref for null value. Important because we can't persist this, since null
-	 * collides with the result of an empty soft reference.
-	 */
-	public static final RefDirect<?> NULL_VALUE = RefDirect.create(null, Hash.NULL_HASH, INTERNAL_FLAGS);
-
-	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, INTERNAL_FLAGS);
-	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, INTERNAL_FLAGS);
+	// Note: the singleton Refs for null, true and false live in Refs, not here.
+	// Creating them in this class's static initialiser would make Ref initialisation
+	// construct RefDirect (its own subclass) and read CVMBool, and both of those
+	// initialise Ref in turn - a cycle that deadlocks two threads entering it at
+	// different points. See convex.tools.ClassInitCycles.
 
 	/**
 	 * Length of an external Reference encoding. Will be a tag byte plus the Hash length
@@ -331,7 +328,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> get(T value) {
-		if (value==null) return (Ref<T>) NULL_VALUE;
+		if (value==null) return (Ref<T>) RefDirect.NULL_VALUE;
 		return value.getRef();
 	}
 
@@ -729,7 +726,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	@SuppressWarnings("unchecked")
 	public static final <T extends ACell> Ref<T> nil() {
-		return (Ref<T>)NULL_VALUE;
+		return (Ref<T>)RefDirect.NULL_VALUE;
 	}
 
 	public boolean isInternal() {

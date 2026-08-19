@@ -5,13 +5,28 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import convex.core.data.prim.CVMBool;
 import convex.core.store.AStore;
 import convex.core.util.Trees;
 
 /**
- * Static utilities for working with Refs
+ * Static utilities and singleton values for working with Refs.
+ *
+ * <p>The boolean singleton Refs below deliberately live here rather than on
+ * {@link Ref}. Creating them requires {@link CVMBool}, whose own initialisation
+ * interns a Ref and so initialises {@code Ref}; holding them on {@code Ref} therefore
+ * put a cycle in the class initialisation graph — a deadlock for two threads entering
+ * it at different points. Nothing on that path initialises this class, so the cycle is
+ * broken. {@link RefDirect#NULL_VALUE} is separate for the same reason: {@code Ref.get}
+ * needs it, so it must not sit behind a class that reads {@code CVMBool}.</p>
  */
 public class Refs {
+
+	/** Ref for the canonical true value */
+	public static final RefDirect<CVMBool> TRUE_VALUE = RefDirect.create(CVMBool.TRUE, Hash.TRUE_HASH, Ref.INTERNAL_FLAGS);
+
+	/** Ref for the canonical false value */
+	public static final RefDirect<CVMBool> FALSE_VALUE = RefDirect.create(CVMBool.FALSE, Hash.FALSE_HASH, Ref.INTERNAL_FLAGS);
 	
 	/**
 	 * Visit all Refs in a tree of Refs, in depth first order.

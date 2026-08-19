@@ -13,9 +13,11 @@ import convex.core.data.AVector;
 import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.dlfs.DLFSServer;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.impl.DLFSLocal;
 import convex.lattice.fs.DLPath;
 
 /**
@@ -51,7 +53,9 @@ public final class DLFSWebDAVLargeFileSmoke {
 
 			ABlob sparse=Blobs.createZero(fileSize);
 			if (!(sparse instanceof BlobTree)) throw new AssertionError("Expected a BlobTree source");
-			CVMLong timestamp=fs.updateTimestamp();
+			DLFSLocal local=(DLFSLocal)fs;
+			CVMLong timestamp=CVMLong.create(Utils.getCurrentTimestamp());
+			local.getCursor().setContext(local.getCursor().getContext().withTimestamp(timestamp));
 			AVector<ACell> sourceNode=DLFSNode.createEmptyFile(timestamp)
 				.assoc(DLFSNode.POS_DATA,sparse);
 			fs.updateNode(source,sourceNode);

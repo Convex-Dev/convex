@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CountDownLatch;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +25,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
@@ -198,6 +200,60 @@ public class DLFSCursorTest {
 		SignedData<?> aliceSigned = dlfsSlot.get(ak);
 		assertNotNull(aliceSigned, "Owner's signed slot should exist");
 		assertTrue(aliceSigned.checkSignature(), "Signature must be valid");
+	}
+
+	@Test
+	public void testEqualTimestampRecreateSurvivesConcurrentRootSync() throws Exception {
+		CVMLong timestamp=CVMLong.create(1_000);
+		AKeyPair keyPair=AKeyPair.createSeeded(703);
+		AccountKey owner=keyPair.getAccountKey();
+		AString driveName=Strings.create("sync-race");
+		Keyword dlfsKey=Keyword.intern("dlfs");
+		OwnerLattice<?> owners=OwnerLattice.create(MapLattice.create(DLFSLattice.INSTANCE));
+		KeyedLattice rootLattice=KeyedLattice.create(dlfsKey,owners);
+		LatticeContext context=LatticeContext.create(timestamp,keyPair);
+		RootLatticeCursor<Index<Keyword,ACell>> root=Cursors.createLattice(
+			rootLattice,(Index<Keyword,ACell>)Index.EMPTY,context);
+		ALatticeCursor<?> region=root.path(dlfsKey);
+		region.setContext(context);
+		DLFSLocal fileSystem=DLFS.connect(region.path(owner,Keywords.VALUE),driveName);
+		Path path=fileSystem.getPath("/recreated");
+		Files.write(path,new byte[] {1});
+		Files.delete(path);
+
+		CountDownLatch snapshotTaken=new CountDownLatch(1);
+		CountDownLatch continueSync=new CountDownLatch(1);
+		root.onSync(snapshot->{
+			snapshotTaken.countDown();
+			try {
+				continueSync.await();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("Interrupted while holding root sync snapshot",e);
+			}
+			return snapshot;
+		});
+
+		AtomicReference<Throwable> failure=new AtomicReference<>();
+		Thread syncThread=Thread.ofVirtual().start(()->{
+			try {
+				root.sync();
+			} catch (Throwable t) {
+				failure.set(t);
+			}
+		});
+		snapshotTaken.await();
+
+		// The local update clears the equal-time tombstone while sync still holds
+		// the older deleted snapshot. On CAS failure, current/local is the own value.
+		Files.write(path,new byte[] {2});
+		continueSync.countDown();
+		syncThread.join();
+
+		assertNull(failure.get());
+		assertTrue(Files.exists(path));
+		assertEquals(2,Files.readAllBytes(path)[0]);
+		assertEquals(timestamp,DLFSNode.getUTime(fileSystem.getNode((DLPath)path)));
 	}
 
 	/**

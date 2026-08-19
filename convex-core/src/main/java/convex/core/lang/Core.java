@@ -2217,7 +2217,7 @@ public class Core {
 			}
 			
 			ANumeric result = RT.plus(args);
-			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
+			if (result==null) return context.withError(ErrorValue.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -2235,7 +2235,7 @@ public class Core {
 				if (context.isExceptional()) return context; // not not exceptional, might be something else
 			}
 			ANumeric result = RT.minus(args);
-			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
+			if (result==null) return context.withError(ErrorValue.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -2261,7 +2261,7 @@ public class Core {
 			}
 
 			ANumeric result = RT.multiply(args);
-			if (result == null) return context.withError(ErrorMessages.INVALID_NUMERIC);
+			if (result == null) return context.withError(ErrorValue.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -2323,7 +2323,7 @@ public class Core {
 				int badVal=RT.findNonNumeric(args);
 				if (badVal<0) {
 					// this can happen for the minimum big integer value only
-					return context.withError(ErrorMessages.INVALID_NUMERIC);
+					return context.withError(ErrorValue.INVALID_NUMERIC);
 				}
 				return context.withCastError(badVal,args, Types.NUMBER);
 			}

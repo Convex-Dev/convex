@@ -3,6 +3,7 @@ package convex.lattice;
 import java.io.IOException;
 
 import convex.core.data.ACell;
+import convex.core.store.AStore;
 import convex.lattice.cursor.ALatticeCursor;
 
 /**
@@ -57,6 +58,19 @@ public abstract class ALatticeComponent<V extends ACell> {
 	 */
 	protected final ALatticeComponent<?> parent() {
 		return parent;
+	}
+
+	/**
+	 * Returns the physical store supplied by the containing host, if any.
+	 *
+	 * <p>This is an internal component resource: application factories should
+	 * continue to accept components rather than stores. Standalone components
+	 * which are not attached to a {@link RootComponent} return {@code null}.</p>
+	 *
+	 * @return Host store, or {@code null} when this component is not store-backed
+	 */
+	protected AStore store() {
+		return (parent==null)?null:parent.store();
 	}
 
 	/**

@@ -14,6 +14,8 @@ import convex.core.data.Format;
 import convex.core.data.List;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.RefDirect;
+import convex.core.data.Refs;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
@@ -34,9 +36,9 @@ public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
 
 	private static final Ref<ACell> OPCODE = new ByteFlag(CVMTag.OPCODE_CONSTANT).getRef();
 
-	public static final Constant<?> NULL = new Constant<>(Ref.NULL_VALUE);
-	public static final Constant<CVMBool> TRUE = new Constant<>(Ref.TRUE_VALUE);
-	public static final Constant<CVMBool> FALSE = new Constant<>(Ref.FALSE_VALUE);
+	public static final Constant<?> NULL = new Constant<>(RefDirect.NULL_VALUE);
+	public static final Constant<CVMBool> TRUE = new Constant<>(Refs.TRUE_VALUE);
+	public static final Constant<CVMBool> FALSE = new Constant<>(Refs.FALSE_VALUE);
 	
 	public static final Constant<StringShort> EMPTY_STRING = new Constant<>(Strings.EMPTY_REF);
 	

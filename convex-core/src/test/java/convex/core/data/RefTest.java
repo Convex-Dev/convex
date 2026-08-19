@@ -180,7 +180,7 @@ public class RefTest {
 	@Test
 	public void testEmbedded() {
 		assertTrue(Ref.get(RT.cvm(1L)).isEmbedded()); // a primitive
-		assertTrue(Ref.NULL_VALUE.isEmbedded()); // singleton null ref
+		assertTrue(RefDirect.NULL_VALUE.isEmbedded()); // singleton null ref
 		assertTrue(List.EMPTY_REF.isEmbedded()); // singleton null ref
 		assertFalse(Blob.create(new byte[Format.MAX_EMBEDDED_LENGTH]).getRef().isEmbedded()); // too big to embed
 		assertTrue(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
@@ -190,7 +190,7 @@ public class RefTest {
 	@Test
 	public void testPersistEmbeddedNull() throws InvalidDataException, IOException {
 		Ref<ACell> nr = Ref.get(null);
-		assertSame(Ref.NULL_VALUE, nr);
+		assertSame(RefDirect.NULL_VALUE, nr);
 		assertSame(nr, nr.persist(Samples.TEST_STORE));
 		nr.validate();
 		assertTrue(nr.isEmbedded());
@@ -424,7 +424,7 @@ public class RefTest {
 	@Test
 	public void testNullRef() {
 		Ref<?> nullRef = Ref.get(null);
-		assertSame(Ref.NULL_VALUE,nullRef);
+		assertSame(RefDirect.NULL_VALUE,nullRef);
 		assertNotNull(nullRef);
 		assertSame(nullRef.getHash(), Hash.NULL_HASH);
 		assertTrue(nullRef.isEmbedded());

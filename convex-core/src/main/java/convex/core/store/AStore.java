@@ -1,5 +1,6 @@
 package convex.core.store;
 
+import convex.core.data.RefDirect;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Consumer;
@@ -113,7 +114,7 @@ public abstract class AStore implements Closeable {
 		// data, but remain distinguishable through getRootHash().
 		if ((ref==null) && ((Hash.UNSET_HASH.equals(h)) ||
 				(Hash.EMPTY_HASH.equals(h)) || (Hash.NULL_HASH.equals(h)))) {
-			return (Ref<T>) Ref.NULL_VALUE;
+			return (Ref<T>) RefDirect.NULL_VALUE;
 		}
 		return ref;
 	}

@@ -1,17 +1,21 @@
 package convex.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.function.BiPredicate;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 
 /**
@@ -86,14 +90,14 @@ public class LatticeContextTest {
 		assertSame(originalKey, withOwnerVerifier.getSigningKey());
 		assertSame(replacementVerifier, withOwnerVerifier.getOwnerVerifier());
 
-		// Immutable snapshots leave the source context unchanged.
+		// Delegated overrides leave the source policy unchanged.
 		assertSame(originalTimestamp, original.getTimestamp());
 		assertSame(originalKey, original.getSigningKey());
 		assertSame(originalVerifier, original.getOwnerVerifier());
 	}
 
 	@Test
-	public void testWithMethodsCanClearFieldsAndCanonicaliseEmpty() {
+	public void testWithMethodsCanClearFixedOverrides() {
 		LatticeContext ctx = LatticeContext.create(
 			CVMLong.create(1000),
 			AKeyPair.generate(),
@@ -107,7 +111,52 @@ public class LatticeContextTest {
 		LatticeContext empty = withoutTimestamp
 			.withSigningKey(null)
 			.withOwnerVerifier(null);
-		assertSame(LatticeContext.EMPTY, empty);
+		assertNotSame(LatticeContext.EMPTY,empty);
+		assertNull(empty.getTimestamp());
+		assertNull(empty.getSigningKey());
+		assertNull(empty.getOwnerVerifier());
+		assertNotNull(empty.currentTimestamp());
+	}
+
+	@Test
+	public void testTimestampOverrideKeepsDynamicSigningPolicy() {
+		AKeyPair first=AKeyPair.generate();
+		AKeyPair second=AKeyPair.generate();
+		AtomicReference<AKeyPair> activeKey=new AtomicReference<>(first);
+		LatticeContext dynamic=new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return activeKey.get();
+			}
+		};
+		LatticeContext fixedTime=dynamic.withTimestamp(CVMLong.create(123));
+
+		assertEquals(first.getAccountKey(),fixedTime.sign(CVMLong.ONE).getAccountKey());
+		activeKey.set(second);
+		assertEquals(second.getAccountKey(),fixedTime.sign(CVMLong.TWO).getAccountKey());
+		assertEquals(CVMLong.create(123),fixedTime.currentTimestamp());
+	}
+
+	@Test
+	public void testSigningCanSelectNonPrimaryAccount() {
+		AKeyPair primary=AKeyPair.generate();
+		AKeyPair secondary=AKeyPair.generate();
+		LatticeContext wallet=new LatticeContext() {
+			@Override public AKeyPair getSigningKey() {
+				return primary;
+			}
+
+			@Override public <T extends ACell> SignedData<T> sign(AccountKey accountKey,T value) {
+				if (accountKey!=null && accountKey.equals(secondary.getAccountKey())) {
+					return secondary.signData(value);
+				}
+				return super.sign(accountKey,value);
+			}
+		};
+
+		assertEquals(primary.getAccountKey(),wallet.sign(CVMLong.ONE).getAccountKey());
+		assertEquals(secondary.getAccountKey(),
+			wallet.sign(secondary.getAccountKey(),CVMLong.TWO).getAccountKey());
+		assertNull(wallet.sign(AKeyPair.generate().getAccountKey(),CVMLong.ZERO));
 	}
 
 	@Test

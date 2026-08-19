@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -136,13 +135,35 @@ public class DLFSDriveManagerTest {
 	public void testDeletedDriveCanBeRecreatedWithNewerTimestamp() {
 		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
 		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		cursor.setContext(LatticeContext.create(CVMLong.create(100),null));
 		assertTrue(manager.createDrive(null,"home"));
+		cursor.setContext(LatticeContext.create(CVMLong.create(200),null));
 		assertTrue(manager.deleteDrive(null,"home"));
 		CVMLong deletionTime=DLFSNode.getUTime(cursor.get().get(Strings.create("home")));
+		cursor.setContext(LatticeContext.create(CVMLong.create(300),null));
 		assertTrue(manager.createDrive(null,"home"));
 		AVector<ACell> recreated=cursor.get().get(Strings.create("home"));
 		assertTrue(DLFSNode.isDirectory(recreated));
-		assertTrue(DLFSNode.getUTime(recreated).longValue()>deletionTime.longValue());
+		assertEquals(CVMLong.create(200),deletionTime);
+		assertEquals(CVMLong.create(300),DLFSNode.getUTime(recreated));
+	}
+
+	@Test
+	public void testEqualTimestampLocalRegistryMutationRemainsOwn() {
+		ALatticeCursor<AHashMap<AString, AVector<ACell>>> cursor=createCursor();
+		cursor.setContext(LatticeContext.create(CVMLong.create(100),null));
+		DLFSDriveManager manager=new DLFSDriveManager(cursor);
+		assertTrue(manager.createDrive(null,"home"));
+		assertTrue(manager.deleteDrive(null,"home"));
+		AHashMap<AString,AVector<ACell>> deleted=cursor.get();
+
+		assertTrue(manager.createDrive(null,"home"));
+		assertEquals(CVMLong.create(100),
+			DLFSNode.getUTime(cursor.get().get(Strings.create("home"))));
+
+		cursor.merge(deleted);
+		assertNotNull(manager.getDrive(null,"home"),
+			"the local recreated drive is own and must win an equal-timestamp stale tombstone");
 	}
 
 	@Test
@@ -155,7 +176,7 @@ public class DLFSDriveManagerTest {
 	}
 
 	@Test
-	public void testDriveMutationRefusesDistantFutureTimestamp() {
+	public void testDriveMutationUsesExactContextTimestamp() {
 		MapLattice<AString, AVector<ACell>> lattice=MapLattice.create(DLFSLattice.INSTANCE);
 		AString home=Strings.create("home");
 		AHashMap<AString,AVector<ACell>> initial=convex.core.data.Maps.of(
@@ -166,8 +187,10 @@ public class DLFSDriveManagerTest {
 			Cursors.createLattice(lattice,initial,context);
 		DLFSDriveManager manager=new DLFSDriveManager(cursor);
 
-		assertThrows(IllegalStateException.class,()->manager.deleteDrive(null,"home"));
-		assertNotNull(manager.getDrive(null,"home"));
+		assertTrue(manager.deleteDrive(null,"home"));
+		AVector<ACell> tombstone=cursor.get().get(home);
+		assertEquals(CVMLong.create(1_000),DLFSNode.getUTime(tombstone),
+			"local mutation must not ratchet against the stored timestamp");
 	}
 
 	@Test

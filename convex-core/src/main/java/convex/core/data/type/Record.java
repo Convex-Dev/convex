@@ -1,9 +1,11 @@
 package convex.core.data.type;
 
+import convex.core.cpos.Block;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
+import convex.core.data.Vectors;
 
 /**
  * Type that represents any CVM collection
@@ -30,9 +32,19 @@ public class Record extends AStandardType<ARecord> {
 		return "Record";
 	}
 
+	/**
+	 * Holder so the default record is built on first use rather than when this type
+	 * descriptor is initialised. {@code Record.INSTANCE} is reached very early through
+	 * {@link Types}, and constructing a record during that initialisation would put
+	 * this class on the record hierarchy's initialisation path.
+	 */
+	private static final class Default {
+		static final ARecord VALUE = Block.create(0, Vectors.empty());
+	}
+
 	@Override
 	public ARecord defaultValue() {
-		return ARecord.DEFAULT_VALUE;
+		return Default.VALUE;
 	}
 
 	@Override

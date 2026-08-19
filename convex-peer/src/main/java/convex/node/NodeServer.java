@@ -702,7 +702,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private boolean offerInboundBlocking(Message message) {
 		if (!acceptingInbound) return false;
 		try {
-			boolean offered = inboundQueue.offer(message, Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+			boolean offered = inboundQueue.offer(message, Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 			if (offered && !acceptingInbound) {
 				inboundQueue.remove(message);
 				return false;
@@ -1169,7 +1169,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			pendingDataRequests.computeIfAbsent(connection, c -> new ConcurrentHashMap<>());
 		byID.put(id, future);
 
-		future.orTimeout(Config.DEFAULT_CLIENT_TIMEOUT, TimeUnit.MILLISECONDS);
+		future.orTimeout(Config.DEFAULT_INTERNAL_TIMEOUT, TimeUnit.MILLISECONDS);
 		future.whenComplete((result, error) -> {
 			byID.remove(id);
 			if (byID.isEmpty()) pendingDataRequests.remove(connection, byID);

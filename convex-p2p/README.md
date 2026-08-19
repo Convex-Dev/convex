@@ -56,17 +56,25 @@ tests.
 ### Owner binding
 
 Both populated regions are `OwnerLattice`s keyed by `AccountKey`, so a user can only
-write their own slot. Two sharp edges are worth knowing, both pinned by tests:
+write their own slot. Three points are pinned by tests:
 
-**Owner checks run on merge, not on write — deliberately.** `LatticeContext.verifyOwner`
-is called from `OwnerLattice`'s context-aware merge, so it catches everything arriving
-from a peer. A *direct* local `cursor().set(..)` is not a merge and is not policed. An
-app that writes a slot it cannot properly sign has corrupted only its own subtree:
-owner-keying means it can wedge no slot but its own, peers discard the bad slot on
-merge, and a node that keeps sending them trips `NodeServer`'s per-connection
-circuit-breaker (`maxConsecutiveRejects`) and loses the connection. Guarding local
-writes would buy nothing at the boundary that matters, and would wrongly block a node
-that legitimately holds keys for more than one identity.
+**One authorisation rule, applied at both boundaries.** `LatticeContext.signAs` decides
+whether this node may author a value for an owner, and it is the same rule
+`LatticeContext.verifyOwner` applies to data arriving from a peer. An owner that is an
+`AccountKey` requires that key; an indirect owner (Address, DID) is resolved by the
+installed owner verifier, and stays lenient when there is none.
+
+**Owner paths request their signer on write.** A direct local write through a signed
+owner path asks the installed `LatticeContext` for a signer authorised for that owner.
+A key-store-backed policy can supply any accessible identity, whether or not it is the
+primary key; without one the write throws rather than storing a slot no peer would
+accept.
+
+**A merge never fails over an owner you cannot author.** Most merges select one of the
+two signed values and need no signature. When the inner lattice synthesises a genuinely
+new value, `SignedLattice` signs it as the owner if it can and otherwise keeps the own
+value — so merging a peer's data converges the owners this node holds keys for and
+leaves the others to their owners, instead of aborting the whole merge.
 
 **The two-argument merge skips the check entirely.** `merge(own, other)` does not verify
 the signer against the owner key — only the context-aware overload does. Every real path

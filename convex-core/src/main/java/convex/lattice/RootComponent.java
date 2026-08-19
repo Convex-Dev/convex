@@ -70,6 +70,7 @@ public final class RootComponent<V extends ACell> extends ALatticeComponent<V> {
 	}
 
 	/** Returns the host store without implying ownership of its lifecycle. */
+	@Override
 	public AStore store() {
 		return store;
 	}

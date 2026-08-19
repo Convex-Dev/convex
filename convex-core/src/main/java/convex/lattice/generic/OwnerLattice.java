@@ -102,13 +102,16 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 				return signedLattice.merge(context, a, b);
 			}
 			public SignedData<V> merge(Object key, SignedData<V> a, SignedData<V> b) {
+				ACell ownerKey=(key instanceof ACell cell)?cell:null;
 				// Verify signer key is valid for this owner
-				if (b != null && key instanceof ACell ownerKey) {
+				if (b != null && ownerKey != null) {
 					if (!context.verifyOwner(ownerKey, b.getAccountKey())) {
 						return a; // reject: signer not authorised for this owner
 					}
 				}
-				return signedLattice.merge(context, a, b);
+				// Owner-bound merge: a synthesised value is authored as this owner or
+				// not at all, so the own value is retained rather than mis-signed
+				return signedLattice.merge(context, ownerKey, a, b);
 			}
 		};
 
@@ -144,8 +147,9 @@ public class OwnerLattice<V extends ACell> extends ALattice<AHashMap<ACell, Sign
 	public <T extends ACell> ALattice<T> path(ACell childKey) {
 		// For OwnerLattice, child paths are owner keys
 		// Each owner's value is a SignedData<V>, which uses SignedLattice
-		// Return the SignedLattice for child nodes
-		return (ALattice<T>) signedLattice;
+		// Return an owner-bound SignedLattice, so a write or a synthesised merge
+		// below this key is authored as that owner or not at all
+		return (ALattice<T>) signedLattice.withOwner(childKey);
 	}
 
 }

@@ -11,7 +11,7 @@ import convex.lattice.LatticeContext;
 /**
  * Abstract base for cursors that override <em>update semantics</em>: every value
  * written through the cursor is funnelled through a single
- * {@link #updateOnWrite(ACell, ACell) update-on-write} function before it is stored.
+ * {@link #prepareWrite(ACell) prepare-on-write} function before it is stored.
  *
  * <p>This is the shared machinery behind two quite different cursors:</p>
  * <ul>
@@ -26,16 +26,29 @@ import convex.lattice.LatticeContext;
  * <p>All eight atomic operations, {@code compareAndSet} and {@code sync} are
  * implemented here in terms of two hooks:</p>
  * <ul>
- *   <li>{@link #updateOnWrite(ACell, ACell)} — <b>the</b> point every write funnels
- *       through. Sees the current stored cell, so an unchanged write can be a no-op
- *       (skipping an expensive re-sign / re-stamp). This is where write-time
- *       preconditions are enforced (it may consult {@link #getContext()} and may throw).</li>
+ *   <li>{@link #prepareWrite(ACell)} — <b>the</b> point every write funnels through:
+ *       it authors the cell to store for a new view value. This is where write-time
+ *       preconditions are enforced (it may consult {@link #getContext()} and may
+ *       throw).</li>
  *   <li>{@link #view(ACell)} — how a stored cell reads back as a view value. Identity
  *       by default (the stored type <em>is</em> the view type); only a type-changing
  *       boundary overrides it.</li>
  * </ul>
  *
- * <p><b>Update vs merge.</b> {@code updateOnWrite} governs <em>writes</em>, not
+ * <p><b>Preparing is done once, not once per CAS attempt.</b> The atomic operations
+ * are implemented over an {@code AtomicReference}-style retry loop, whose update
+ * function is re-invoked on every contended CAS failure. Authoring a cell can be
+ * expensive and can reach outside the JVM — signing may consult a wallet, key store
+ * or remote signer — so this class never calls {@link #prepareWrite} from inside the
+ * loop more than once per distinct value: a write of a fixed value prepares exactly
+ * once however often it retries. A write whose value is computed from the current
+ * one re-prepares only when a retry actually computes a different value.</p>
+ *
+ * <p>A write that does not change the view is not a write at all: the stored cell is
+ * kept as it is, so an unchanged value keeps its existing signature or timestamp and
+ * {@link #prepareWrite} is never called. That rule is uniform across subclasses.</p>
+ *
+ * <p><b>Update vs merge.</b> {@code prepareWrite} governs <em>writes</em>, not
  * convergence. {@link #merge} is deliberately abstract: a merge either <em>selects</em>
  * an existing value (LWW/stamping — store the winner as-is, no re-stamp) or
  * <em>synthesises</em> a new one (signing — merge the unsigned values, then re-sign).
@@ -61,19 +74,19 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	}
 
 	/**
-	 * The update-on-write function: given the current stored cell and the new view
-	 * value, return the cell to store. This is the single point every write funnels
-	 * through — stamp here, sign here, enforce write preconditions here.
+	 * The prepare-on-write function: authors the cell to store for a new, non-null
+	 * view value. This is the single point every write funnels through — stamp here,
+	 * sign here, enforce write preconditions here.
 	 *
-	 * <p>Implementations should return {@code current} unchanged when the value did
-	 * not change, so an unchanged write skips expensive re-encoding even if object
-	 * identity differs. Both {@code current} and {@code value} may be null.</p>
+	 * <p>Never called for a null value, nor for a write that leaves the view
+	 * unchanged; both are handled before it. It is called at most once per distinct
+	 * value written, so it may safely be expensive, but it must be free of side
+	 * effects beyond authoring the returned cell.</p>
 	 *
-	 * @param current Current stored cell (may be null)
-	 * @param value New view value being written (may be null)
+	 * @param value New view value being written (never null)
 	 * @return Stored cell to write
 	 */
-	protected abstract S updateOnWrite(S current, V value);
+	protected abstract S prepareWrite(V value);
 
 	/**
 	 * Reads the view value from a stored cell. Identity by default — the stored type
@@ -86,6 +99,27 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	@SuppressWarnings("unchecked")
 	protected V view(S stored) {
 		return (V)(ACell) stored;
+	}
+
+	/**
+	 * One prepared write, reused across CAS retries. Keeps the cost of authoring a
+	 * cell proportional to the number of distinct values written, not to contention.
+	 */
+	private final class PreparedWrite {
+		private V value;
+		private S stored;
+		private boolean present;
+
+		/** Applies a write of {@code newValue} over the current stored cell. */
+		S apply(S current, V newValue) {
+			// Unchanged write: keep the current cell, so its signature or stamp stands
+			if (Utils.equals(newValue, view(current))) return current;
+			if (present && Utils.equals(newValue, value)) return stored;
+			value = newValue;
+			stored = (newValue == null) ? null : prepareWrite(newValue);
+			present = true;
+			return stored;
+		}
 	}
 
 	@Override
@@ -107,32 +141,38 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 
 	@Override
 	public void set(V newValue) {
-		base.getAndUpdate(s -> updateOnWrite(s, newValue));
+		PreparedWrite write = new PreparedWrite();
+		base.getAndUpdate(s -> write.apply(s, newValue));
 	}
 
 	@Override
 	public V getAndSet(V newValue) {
-		return view(base.getAndUpdate(s -> updateOnWrite(s, newValue)));
+		PreparedWrite write = new PreparedWrite();
+		return view(base.getAndUpdate(s -> write.apply(s, newValue)));
 	}
 
 	@Override
 	public V getAndUpdate(UnaryOperator<V> updateFunction) {
-		return view(base.getAndUpdate(s -> updateOnWrite(s, updateFunction.apply(view(s)))));
+		PreparedWrite write = new PreparedWrite();
+		return view(base.getAndUpdate(s -> write.apply(s, updateFunction.apply(view(s)))));
 	}
 
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
-		return view(base.updateAndGet(s -> updateOnWrite(s, updateFunction.apply(view(s)))));
+		PreparedWrite write = new PreparedWrite();
+		return view(base.updateAndGet(s -> write.apply(s, updateFunction.apply(view(s)))));
 	}
 
 	@Override
 	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
-		return view(base.getAndUpdate(s -> updateOnWrite(s, accumulatorFunction.apply(view(s), x))));
+		PreparedWrite write = new PreparedWrite();
+		return view(base.getAndUpdate(s -> write.apply(s, accumulatorFunction.apply(view(s), x))));
 	}
 
 	@Override
 	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
-		return view(base.updateAndGet(s -> updateOnWrite(s, accumulatorFunction.apply(view(s), x))));
+		PreparedWrite write = new PreparedWrite();
+		return view(base.updateAndGet(s -> write.apply(s, accumulatorFunction.apply(view(s), x))));
 	}
 
 	/**
@@ -150,13 +190,13 @@ public abstract class AUpdateCursor<V extends ACell, S extends ACell> extends AL
 	public boolean compareAndSet(V expected, V newValue) {
 		S cur = base.get();
 		if (!Utils.equals(expected, view(cur))) return false;
-		return base.compareAndSet(cur, updateOnWrite(cur, newValue));
+		return base.compareAndSet(cur, new PreparedWrite().apply(cur, newValue));
 	}
 
 	/**
 	 * Converge an external value into the stored cell. Abstract: a subclass either
 	 * <em>selects</em> a winner (store as-is, no re-application of
-	 * {@link #updateOnWrite}) or <em>synthesises</em> a new value (re-apply it).
+	 * {@link #prepareWrite}) or <em>synthesises</em> a new value (re-apply it).
 	 *
 	 * @param other Value to merge
 	 * @return The merged view value

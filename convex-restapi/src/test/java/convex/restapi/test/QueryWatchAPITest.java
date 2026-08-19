@@ -75,7 +75,7 @@ class QueryWatchAPITest extends ARESTTest {
 
 		HttpResponse<InputStream> response=httpClient.send(request,HttpResponse.BodyHandlers.ofInputStream());
 		assertEquals(200,response.statusCode());
-		try (InputStream input=response.body(); ConvexHTTP convex=connect()) {
+		try (InputStream input=response.body(); ConvexHTTP convex=newClient()) {
 			SseReader reader=new SseReader(input);
 			SseEvent initial=readAsync(reader);
 			assertEquals("result",initial.type());
@@ -84,7 +84,7 @@ class QueryWatchAPITest extends ARESTTest {
 			CVMLong initialTimestamp=initialResult.getIn("value");
 
 			Result transaction=convex.transactSync("(+ 1 2)");
-			assertTrue(!transaction.isError(),()->"Transaction failed: "+transaction);
+			assertSucceeded(transaction);
 
 			SseEvent changed=readAsync(reader);
 			assertEquals("result",changed.type());

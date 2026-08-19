@@ -14,9 +14,10 @@ import convex.lattice.LatticeContext;
  * sync operations on top.</p>
  *
  * <p>Modifications to a forked cursor don't affect the parent until {@link #sync()}
- * is called. A fork snapshots its resolved context for local writes. If the parent
- * changed since the fork, sync merges the local fork value with the parent using the
- * parent's current effective context.</p>
+ * is called. A fork captures its resolved context policy for local writes, so a
+ * dynamic policy continues to resolve dynamically. If the parent changed since the
+ * fork, sync merges the local fork value with the parent using the parent's current
+ * effective context.</p>
  *
  * <h3>Concurrent writes during sync</h3>
  * <p>{@link #sync()} is safe to call while other threads are writing to the fork.
@@ -40,7 +41,7 @@ public class ForkedLatticeCursor<V extends ACell> extends ALatticeCursor<V> {
 	 * @param parent The parent cursor to fork from
 	 * @param lattice The lattice defining merge semantics
 	 * @param currentValue The value at the time of fork
-	 * @param context Resolved merge-context snapshot captured at fork time
+	 * @param context Resolved context policy captured at fork time
 	 */
 	ForkedLatticeCursor(ALatticeCursor<V> parent, ALattice<V> lattice, V currentValue, LatticeContext context) {
 		super(lattice, null, currentValue);

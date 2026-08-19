@@ -139,21 +139,23 @@ A lattice may need to **transform values on write** at a boundary — sign them,
 
 ### `AUpdateCursor<V, S>`
 
-The shared concept is **update-on-write**: every write is funnelled through one function before it is stored. `AUpdateCursor` wraps a `base` cursor holding the *stored* type `S`, presents the *view* type `V`, and implements all eight atomic operations (`set`, `getAndSet`, `getAndUpdate`, `updateAndGet`, accumulate, `compareAndSet`) plus `sync()` in terms of two hooks:
+The shared concept is **prepare-on-write**: every write is funnelled through one function that authors the cell to store. `AUpdateCursor` wraps a `base` cursor holding the *stored* type `S`, presents the *view* type `V`, and implements all eight atomic operations (`set`, `getAndSet`, `getAndUpdate`, `updateAndGet`, accumulate, `compareAndSet`) plus `sync()` in terms of two hooks:
 
-- `updateOnWrite(S current, V value) → S` — **the** write funnel. Sees `current`, so an unchanged write is a no-op (skips an expensive re-sign / re-stamp); may consult `context` and may throw to enforce a precondition.
+- `prepareWrite(V value) → S` — **the** write funnel. Authors the stored cell for a new view value; may consult `context` and may throw to enforce a precondition.
 - `view(S) → V` — how a stored cell reads back. **Identity by default** — the stored type *is* the view type; only a type-changing boundary overrides it.
 
-`merge` is **abstract**: convergence either *selects* an existing value (store as-is) or *synthesises* a new one (re-apply `updateOnWrite`), so each cursor states which rather than inheriting a default that silently does the wrong thing. `compareAndSet` is single-shot value-equality (across a type-changing boundary a reference CAS is impossible).
+Two rules are uniform, so no subclass restates them. A write that leaves the view unchanged keeps the current cell — `prepareWrite` is not called, and an unchanged value keeps its existing signature or timestamp. And **preparing happens once per logical write, not once per CAS attempt**: the atomic operations run over a retry loop that re-invokes its update function under contention, while authoring a cell can reach outside the JVM (signing may consult a wallet, key store or remote signer). A write of a fixed value prepares exactly once however often it retries; a write computed from the current value re-prepares only if a retry genuinely computes a different value.
+
+`merge` is **abstract**: convergence either *selects* an existing value (store as-is) or *synthesises* a new one (author it through `prepareWrite`), so each cursor states which rather than inheriting a default that silently does the wrong thing. `compareAndSet` is single-shot value-equality (across a type-changing boundary a reference CAS is impossible).
 
 Two instances — a same-type **update override** and a type-changing **view boundary**:
 
-| Cursor | `S` | `updateOnWrite` | `view` | `merge` | shape |
-|--------|-----|-----------------|--------|---------|-------|
+| Cursor | `S` | `prepareWrite` | `view` | `merge` | shape |
+|--------|-----|----------------|--------|---------|-------|
 | `StampedCursor<V>` | `V` | **stamp** (inject timestamp) | identity (inherited) | select — no re-stamp | same-type, transparent |
-| `SignedCursor<V>` | `SignedData<V>` | **sign** (throws with no key) | `getValue` (`:value` child) | synthesise — re-sign | type-changing, key-consuming (`:value`) |
+| `SignedCursor<V>` | `SignedData<V>` | **sign** as the bound owner | `getValue` (`:value` child) | synthesise — re-sign | type-changing, key-consuming (`:value`) |
 
-`StampedCursor` never changes the view: the cell keeps every field, timestamp included; it only changes how a write lands. `SignedCursor` is a genuine envelope boundary and the signing **enforcement point**: reads always work; writes sign via the `LatticeContext` key and throw `IllegalStateException` if none is available.
+`StampedCursor` never changes the view: the cell keeps every field, timestamp included; it only changes how a write lands. `SignedCursor` is a genuine envelope boundary and the signing **enforcement point**: reads always work; a write asks `LatticeContext.signAs` for a signer authorised for the owner the path selected, and throws `IllegalStateException` if there is none. That is the same authorisation rule `OwnerLattice` applies to data arriving on merge, so a slot is never written locally in a form a peer would reject.
 
 ### Lattice-declared boundaries
 
@@ -165,7 +167,7 @@ Two instances — a same-type **update override** and a type-changing **view bou
 | `createPathCursor(base, key, ctx)` | build the update cursor (only when the gate fires) | `null` |
 | `consumesPathKey(key)` | virtual key consumed (`:value`) vs transparent (stamp) | `true` |
 
-`SignedLattice` returns `true`/`SignedCursor` for `:value` (consuming); `StampingLattice` returns `true`/`StampedCursor` for any key (transparent). Forking below a boundary gives local storage of the *view* type; the boundary re-applies `updateOnWrite` on `sync()`.
+`SignedLattice` returns `true`/`SignedCursor` for `:value` (consuming); `StampingLattice` returns `true`/`StampedCursor` for any key (transparent). Forking below a boundary gives local storage of the *view* type; the boundary re-applies `prepareWrite` on `sync()`.
 
 ## Examples
 
@@ -251,7 +253,7 @@ Cursor writes use `assoc(key, value)` and `assocIn(value, keys...)` rather than 
 
 ### Update cursors (`AUpdateCursor`)
 
-Some writes need work on the way through — a stamp injected, or a `SignedData` re-signed (it is immutable, so `assocIn` cannot write through it). `AUpdateCursor` factors this into one `updateOnWrite` funnel, so both an update override (stamping) and a view boundary (signing) share one implementation and only the funnel — and, for the type-changing case, the `view` projection — differ. Code above and below is unaware of it. Forking below gives local storage of the (view) value; `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent re-applies `updateOnWrite`.
+Some writes need work on the way through — a stamp injected, or a `SignedData` re-signed (it is immutable, so `assocIn` cannot write through it). `AUpdateCursor` factors this into one `prepareWrite` funnel, so both an update override (stamping) and a view boundary (signing) share one implementation and only the funnel — and, for the type-changing case, the `view` projection — differ. Code above and below is unaware of it. Forking below gives local storage of the (view) value; `ForkedLatticeCursor` works unchanged because `sync()` calls `parent.updateAndGet()`, and the parent re-applies `prepareWrite`.
 
 ### Multi-key collapsing
 

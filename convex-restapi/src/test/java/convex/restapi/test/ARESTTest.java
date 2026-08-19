@@ -1,5 +1,6 @@
 package convex.restapi.test;
 
+import convex.api.Convex;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -8,8 +9,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -97,6 +102,30 @@ public abstract class ARESTTest {
 		return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 	}
 	
+	/**
+	 * Asserts that a transaction or query succeeded, reporting a client timeout as
+	 * what it is rather than as a failure of the code under test.
+	 *
+	 * <p>A {@code :TIMEOUT} means this client stopped waiting, not that the network
+	 * rejected anything — the transaction may still be in flight and may still land.
+	 * It is a statement about how loaded the host is, so it must not be conflated
+	 * with a transaction that genuinely failed. Asserting on {@code isError()} alone
+	 * conflates the two, and the resulting message sends the reader looking for a
+	 * consensus bug that is not there.</p>
+	 *
+	 * @param r Result to check
+	 */
+	protected static void assertSucceeded(Result r) {
+		if (ErrorCodes.TIMEOUT.equals(r.getErrorCode())) {
+			// Deliberately does not quote a duration: the client's timeout may have been
+			// overridden, and a wrong number here would misdirect whoever reads this.
+			fail("Timed out waiting for a transaction result. This means the host was too"
+				+" slow, not that the code under test is wrong; the transaction may still"
+				+" be in flight and may still land. Result: "+r);
+		}
+		assertFalse(r.isError(),()->"Transaction failed: "+r);
+	}
+
 	protected ConvexHTTP connect() {
 		try {
 			URI uri=new URI(HOST_PATH);
@@ -107,13 +136,47 @@ public abstract class ARESTTest {
 		}
 	}
 	
-	protected ConvexHTTP newClient() throws InterruptedException {
-		ConvexHTTP convex=connect();
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
+	/**
+	 * Creates a fresh funded account controlled by {@link #CLIENT_KP}.
+	 *
+	 * <p><b>Tests must not transact as the genesis account.</b> The REST server's own
+	 * faucet and {@code /createAccount} endpoints transact as the peer controller,
+	 * which is that same account, and every test class here shares one peer. A test
+	 * transacting as genesis therefore competes with the server, and with every other
+	 * test class, for one sequence number. {@code /transaction/prepare} reads the
+	 * sequence from consensus, so any transaction still in flight — including one that
+	 * already timed out client-side but has not been cancelled — leaves the prepared
+	 * transaction stale, and it is rejected with a SEQUENCE error in some unrelated
+	 * test. Accounts are cheap: give each test that transacts its own.</p>
+	 *
+	 * @return Address of the newly created account
+	 * @throws InterruptedException if interrupted while awaiting consensus
+	 */
+	protected static synchronized Address newAccount() throws InterruptedException {
+		// The server's own faucet client is the one instance authorised on this
+		// account. Going through it means every transaction on the account is issued
+		// by a single Convex, whose cached sequence is therefore always correct - a
+		// second client would compute the same next sequence and be rejected.
+		Convex convex=server.getFaucet();
+		if (convex==null) throw new IllegalStateException("Faucet not enabled: cannot create test accounts");
 		AccountKey pubKey=CLIENT_KP.getAccountKey();
 		Result r=convex.transactSync("(let [a (deploy '(do (set-controller *caller*) (set-key "+pubKey+")))] (transfer a 1000000000) a)");
+		if (r.isError()) throw new IllegalStateException("Unable to create test account: "+r);
 		Address a=r.getValue();
+		if (a==null) throw new IllegalStateException("Test account creation returned no address: "+r);
+		return a;
+	}
+
+	/**
+	 * Creates a client bound to a fresh account of its own. Preferred over
+	 * {@link #connect()} for anything that transacts — see {@link #newAccount()}.
+	 *
+	 * @return Client bound to a new funded account
+	 * @throws InterruptedException if interrupted while awaiting consensus
+	 */
+	protected ConvexHTTP newClient() throws InterruptedException {
+		Address a=newAccount();
+		ConvexHTTP convex=connect();
 		convex.setAddress(a);
 		convex.setKeyPair(CLIENT_KP);
 		return convex;

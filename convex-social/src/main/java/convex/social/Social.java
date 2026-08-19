@@ -90,10 +90,19 @@ public class Social extends ALatticeComponent<
 	 * @return New Social instance
 	 */
 	public static Social create(AKeyPair keyPair) {
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		return create(LatticeContext.create(null,keyPair));
+	}
+
+	/**
+	 * Creates a standalone Social instance using an application policy.
+	 *
+	 * @param context Context supplying signing and timestamp policy
+	 * @return New Social instance
+	 */
+	public static Social create(LatticeContext context) {
 		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor =
 			Cursors.createLattice(SOCIAL_LATTICE);
-		cursor.withContext(ctx);
+		cursor.setContext(context);
 		return new Social(cursor);
 	}
 
@@ -108,10 +117,14 @@ public class Social extends ALatticeComponent<
 	 * @return Social instance connected to the root cursor
 	 */
 	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
-		LatticeContext ctx = LatticeContext.create(null, keyPair);
+		return connect(rootCursor,LatticeContext.create(null,keyPair));
+	}
+
+	/** Connects to an existing root cursor using an application context policy. */
+	public static Social connect(ALatticeCursor<?> rootCursor,LatticeContext context) {
 		ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> socialCursor =
 			rootCursor.path(KEY_SOCIAL);
-		socialCursor.withContext(ctx);
+		socialCursor.setContext(context);
 		return new Social(socialCursor);
 	}
 
@@ -148,8 +161,9 @@ public class Social extends ALatticeComponent<
 	 * Gets a user view by navigating through the owner/signing boundary.
 	 *
 	 * <p>The returned {@link SocialUser} wraps a cursor at the per-user
-	 * {@link SocialLattice} level. Writes are automatically signed using
-	 * the key pair from the context.</p>
+	 * {@link SocialLattice} level. Writes are automatically signed by the context's
+	 * signing policy, which is asked for a signer authorised for {@code ownerKey} —
+	 * not necessarily its primary account.</p>
 	 *
 	 * @param ownerKey The user's account key (Ed25519 public key)
 	 * @return SocialUser for the specified owner

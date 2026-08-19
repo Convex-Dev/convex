@@ -47,7 +47,7 @@ class LogWatchAPITest extends ARESTTest {
 
 	@Test
 	void streamsAddressEventAndScopeMatchAsJSON() throws Exception {
-		try (ConvexHTTP convex=connect()) {
+		try (ConvexHTTP convex=newClient()) {
 			Result deployed=convex.transactSync(
 				"(deploy '(defn emit ^:callable [] (log :LOG-WATCH-TEST 100)))");
 			Address actor=deployed.getValue();
@@ -67,7 +67,7 @@ class LogWatchAPITest extends ARESTTest {
 			try (InputStream input=response.body()) {
 				CompletableFuture<SseEvent> received=CompletableFuture.supplyAsync(()->readLogEvent(input));
 				Result result=convex.transactSync("(call ["+actor+" :USD] (emit))");
-				assertTrue(!result.isError(),()->"Scoped log transaction failed: "+result);
+				assertSucceeded(result);
 
 				SseEvent event=received.get(TIMEOUT.toMillis(),TimeUnit.MILLISECONDS);
 				assertEquals("log",event.type());

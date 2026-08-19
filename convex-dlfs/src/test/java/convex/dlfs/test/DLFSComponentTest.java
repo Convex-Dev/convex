@@ -21,6 +21,7 @@ import java.nio.file.StandardOpenOption;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Keywords;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -28,6 +29,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.RefSoft;
+import convex.core.data.Strings;
 import convex.core.crypto.AKeyPair;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -39,8 +41,11 @@ import convex.dlfs.DLFSRegion;
 import convex.dlfs.DLFSServer;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
+import convex.lattice.cursor.Cursors;
+import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
@@ -226,6 +231,48 @@ public class DLFSComponentTest {
 			assertEquals(megabyte[0],data.byteAt(16L*megabyte.length));
 			assertEquals(megabyte[megabyte.length-1],data.byteAt(data.count()-1));
 			assertEquals(DLFileSystem.BLOB_PERSIST_INTERVAL,16*megabyte.length);
+		}
+	}
+
+	@Test
+	public void testFilesCopyPersistsCursorBackedBlobDataIncrementally() throws Exception {
+		long copySize=Long.getLong("convex.dlfs.copyTestBytes",20L*1024*1024);
+		if (copySize<=DLFileSystem.BLOB_PERSIST_INTERVAL) {
+			throw new IllegalArgumentException("Copy test size must cross the blob persistence interval");
+		}
+		Path source=Files.createTempFile("dlfs-copy-source",".bin");
+		try {
+			byte[] megabyte=new byte[1024*1024];
+			for (int i=0; i<megabyte.length; i++) megabyte[i]=(byte)i;
+			try (var channel=Files.newByteChannel(source,StandardOpenOption.WRITE)) {
+				long remaining=copySize;
+				while (remaining>0) {
+					int count=(int)Math.min(remaining,megabyte.length);
+					ByteBuffer buffer=ByteBuffer.wrap(megabyte,0,count);
+					while (buffer.hasRemaining()) channel.write(buffer);
+					remaining-=count;
+				}
+			}
+
+			AKeyPair keyPair=AKeyPair.generate();
+			try (EtchStore store=EtchStore.createTemp("dlfs-files-copy")) {
+				var root=Cursors.createLattice(DLFSRegion.LATTICE);
+				root.setContext(LatticeContext.create(null,keyPair));
+				var drives=root.path(keyPair.getAccountKey(),Keywords.VALUE);
+				try (var fileSystem=DLFS.connect(drives,Strings.create("large"),store)) {
+					Path target=fileSystem.getPath("/copy.bin");
+
+					Files.copy(source,target);
+
+					assertEquals(copySize,Files.size(target));
+					AVector<ACell> fileNode=fileSystem.getNode((DLPath)target);
+					ABlob data=DLFSNode.getData(fileNode);
+					assertInstanceOf(RefSoft.class,data.getRef(0),
+						"completed blob branches should be reclaimable through Etch");
+				}
+			}
+		} finally {
+			Files.deleteIfExists(source);
 		}
 	}
 }

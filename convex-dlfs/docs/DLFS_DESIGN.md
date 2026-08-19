@@ -233,8 +233,9 @@ HTTP request
 
 File operations go through the NIO filesystem abstraction. Whole-file replacements
 use `DLFileSystem.writeAllBytes` so truncate and write form one filesystem-locked
-mutation. Each external mutation advances the local timestamp and calls `sync()`;
-PUT also supports ETag-based `If-Match` and `If-None-Match` preconditions.
+mutation. Each external transport mutation refreshes the caller-managed timestamp and
+calls `sync()`; PUT also supports ETag-based `If-Match` and `If-None-Match`
+preconditions. DLFS itself does not advance that timestamp.
 
 ### Content-Type Detection
 
@@ -270,10 +271,12 @@ deterministically as `max(getUTime(a), getUTime(b))` — no external timestamp n
   (deleted child name → deletion timestamp), held as an optional 5th node element that
   is present only when non-empty (the default node stays 4 elements). Live entries and
   tombstones are merged independently, then reconciled: a tombstone whose timestamp is
-  newer than (or equal to) a live child deletes it; a newer creation resurrects the name.
-- **Directional ties**: unequal files with equal timestamps prefer `a`. Merge is
+  newer than a live child deletes it; a newer creation resurrects the name.
+- **Directional ties**: equal-timestamp conflicts prefer `a`, the current local (`own`)
+  value. This includes unequal files and live-versus-tombstone conflicts. Merge is
   therefore intentionally not fully commutative; callers must preserve own/foreign
-  direction and avoid accidental timestamp ties.
+  direction. A local mutation replaces equal-timestamp local state and must remain
+  `own` when an older snapshot is merged back.
 - **Idempotency**: `merge(a, a) == a`.
 
 ### Metadata Contract
@@ -295,16 +298,21 @@ Applications that need field-level or custom metadata convergence should place a
 lattice value in the metadata slot and perform that merge at their application boundary;
 DLFS itself guarantees only whole-slot last-write-wins behaviour.
 
-### Two Timestamps
+### Mutation and Merge Timestamps
 
 | Timestamp | Source | Used For |
 |-----------|--------|----------|
-| **Drive timestamp** | `DLFileSystem.getTimestamp()` | Creating new files, directories, tombstones |
+| **Mutation timestamp** | `DLFSLocal.getCursor().getContext().currentTimestamp()` | Creating new files, directories, tombstones |
 | **Merge timestamp** | `max(getUTime(a), getUTime(b))` | Conflict resolution during merge |
 
-These are deliberately separate. The drive timestamp is set by the application
-(`setTimestamp()` or `updateTimestamp()`). The merge timestamp is always derived from
-the data being merged — never from the drive's current time.
+These are deliberately separate. The application supplies mutation time through the
+cursor's `LatticeContext`; neither `DLFileSystem` nor `DLFSLocal` stores or updates a
+separate clock. DLFS consumes the context timestamp exactly and never derives a later
+mutation time from stored nodes or tombstones. The application owns the clock and its
+refresh cadence. An empty context uses `LatticeContext.currentTimestamp()`'s standalone
+wall-clock fallback.
+The merge timestamp is always derived from the data being merged—never from the
+current application context.
 
 ## API
 
@@ -314,12 +322,15 @@ the data being merged — never from the drive's current time.
 // Standalone drive with its own lattice cursor
 DLFSLocal drive = DLFS.create();
 
-// Connected drive — path into a parent lattice cursor
+// Connected drive — path into a parent lattice cursor, heap-backed file data
 ALatticeCursor<?> parent = Cursors.createLattice(MapLattice.create(DLFSLattice.INSTANCE));
 DLFSLocal drive = DLFS.connect(parent, Strings.create("myDrive"));
 
-// Legacy (delegates to create())
-DLFileSystem drive = DLFS.createLocal();
+// Store-backed cursor drive — large NIO writes persist incrementally
+DLFSLocal storedDrive = DLFS.connect(parent, Strings.create("storedDrive"), store);
+
+// Alias for a standalone local drive
+DLFSLocal drive = DLFS.createLocal();
 ```
 
 ### Java NIO Filesystem
@@ -328,7 +339,8 @@ Standard Java NIO operations work transparently:
 
 ```java
 DLFSLocal drive = DLFS.create();
-drive.updateTimestamp();
+drive.getCursor().setContext(
+    drive.getCursor().getContext().withTimestamp(operationTimestamp));
 
 Path file = Files.createFile(drive.getPath("readme.txt"));
 Files.write(file, "hello".getBytes());
@@ -370,10 +382,12 @@ DLFSLocal driveA = DLFS.create();
 DLFSLocal driveB = DLFS.create();
 
 // Make changes to both
-driveA.updateTimestamp();
+driveA.getCursor().setContext(
+    driveA.getCursor().getContext().withTimestamp(timestampA));
 Files.createFile(driveA.getPath("fileA.txt"));
 
-driveB.updateTimestamp();
+driveB.getCursor().setContext(
+    driveB.getCursor().getContext().withTimestamp(timestampB));
 Files.createFile(driveB.getPath("fileB.txt"));
 
 // Merge B into A — both files present after merge
@@ -401,8 +415,9 @@ MapLattice<AString, AVector<ACell>> drivesLattice = MapLattice.create(DLFSLattic
 ALatticeCursor<AHashMap<AString, AVector<ACell>>> drivesRoot =
     Cursors.createLattice(drivesLattice);
 
-// Connect a named drive — initialises with zero value if absent
-DLFSLocal drive = DLFS.connect(drivesRoot, Strings.create("myDrive"));
+// Connect a named drive — initialises with zero value if absent and uses the
+// containing application's store for incremental blob persistence
+DLFSLocal drive = DLFS.connect(drivesRoot, Strings.create("myDrive"), store);
 
 // File operations automatically update the cursor, which propagates
 // up through the lattice hierarchy
@@ -444,11 +459,12 @@ standard root and connects its DLFS region at `:fs`.
 MCP and remains the place for local mappings that span owners, physical regions
 or hosted roots. `DLFSServer` owns transport only and never owns the application,
 host or store lifecycle.
-The component hierarchy delegates store-only persistence to `RootComponent`, while
-`sync()` remains the explicit publication and replication boundary. Streamed blob
-writes install store-backed references every 16 MiB without moving the cursor or
-selecting retained GC roots. A region, drive collection or drive `fork()` is a
-temporary working component and only merges logical changes when explicitly synced.
+The component hierarchy exposes its root `AStore` internally to each drive's
+`DLFSLocal` adapter, while `sync()` remains the explicit publication and replication
+boundary. Streamed blob writes install store-backed references every 16 MiB without
+moving the cursor or selecting retained GC roots. A region, drive collection or
+drive `fork()` is a temporary working component and only merges logical changes when
+explicitly synced.
 
 ## Production Readiness
 
@@ -488,13 +504,17 @@ cursor-backed and registered in WebDAV automatically.
 
 ### Persistence
 
-Cursor-backed drive contents and registry operations persist through the NodeServer's
-`LatticePropagator` (EtchStore). `DLFSDriveManager.sync()` marks the explicit publication
-boundary. Streamed writes may persist immutable blob structure before this boundary so
-the store can replace direct references with soft references; this does not select GC
-roots. Mounted manager routes may adapt multiple owners' `DLFSDrives` components.
-Standalone drives (via `DLFS.createLocal()`) remain entirely in-memory and need explicit
-persistence if required.
+Component-backed drives obtain the root component's `AStore`; cursor-level embedders
+get the same incremental blob persistence by passing that store to
+`DLFS.connect(parent, name, store)` or `DLFS.open(parent, name, store)`. Both paths
+therefore use `DLFSLocal` and `Cells.persist` rather than separate persistence
+adapters. `DLFSDriveManager.sync()` marks the explicit publication boundary.
+Persisting immutable blob structure before that boundary replaces direct references
+with soft references but does not select a GC root. The filesystem neither owns nor
+closes the supplied store.
+Mounted manager routes may adapt multiple owners' `DLFSDrives` components.
+Standalone drives (via `DLFS.createLocal()`) and the two-argument cursor factories
+remain entirely in-memory and need explicit persistence if required.
 
 ## CAD045 Conformance
 
@@ -505,7 +525,7 @@ DLFS follows the lattice application best practices defined in CAD045:
 | **Lattice layer** | `DLFSLattice` extends `ALattice<AVector<ACell>>` with recursive directory merge via `IndexLattice` |
 | **Pure functions** | `DLFSNode` — all merge/navigate/update operations are pure, deterministic, and side-effect-free |
 | **Cursor-backed mutability** | `DLFSLocal` wraps `ALatticeCursor<AVector<ACell>>`; all writes via `cursor.updateAndGet()` |
-| **Factory methods** | `DLFS.create()` (standalone), `DLFS.connect(parent, name)` (node-attached) |
+| **Factory methods** | `DLFS.create()` (standalone), `DLFS.connect(parent, name, store)` (store-backed cursor), component-backed `DLFSDrive.fileSystem()` |
 | **Fork/sync** | `DLFileSystem.fork()` → `ForkedLatticeCursor` for isolated batch operations; `sync()` merges back |
 | **Lattice merge** | `DLFSLocal.merge()` delegates to `rootCursor.merge()` using lattice semantics |
 | **Foreign validation** | `DLFSLattice.checkForeign()` validates node structure (vector length, timestamp type) |

@@ -238,7 +238,7 @@ public class DLFSNode {
 			if (!(current instanceof AVector<?> vector)) throw corruption(path,"Stored value is not a DLFS node");
 			@SuppressWarnings("unchecked")
 			AVector<ACell> node=(AVector<ACell>)vector;
-			if (!isValidNodeShallow(node)) throw corruption(path,"Malformed node on mutation path at component "+i);
+			if (!isValidNodeShallow(node)) throw corruption(path,"Malformed node on mutation path at position "+i);
 			if (i==n) return node;
 			Index<AString,AVector<ACell>> entries=getDirectoryEntries(node);
 			if (entries==null) return null;
@@ -577,16 +577,22 @@ public class DLFSNode {
 				}
 			});
 
-			// Reconcile: a name both live and tombstoned resolves by timestamp.
+			// Reconcile: a name both live and tombstoned resolves by timestamp. On a
+			// tie, preserve the first (own/current) operand, consistently with other
+			// DLFS node conflicts. This is load-bearing for a local update merged with
+			// an equal-timestamp stale snapshot.
 			for (AString name : tombTouched) {
 				AVector<ACell> live = mergedDir.get(name);
 				if (live==null) continue;
 				CVMLong death = mergedTomb.get(name);
 				if (death==null) continue;
-				if (death.longValue() >= getUTime(live).longValue()) {
-					mergedDir = mergedDir.dissoc(name);   // deletion wins (tombstone preferred on tie)
+				long deathTime=death.longValue();
+				long liveTime=getUTime(live).longValue();
+				boolean ownDeleted=tombA.get(name)!=null;
+				if ((deathTime>liveTime)||((deathTime==liveTime)&&ownDeleted)) {
+					mergedDir = mergedDir.dissoc(name);   // newer deletion, or own deletion on tie
 				} else {
-					mergedTomb = mergedTomb.dissoc(name);  // newer create/modify wins
+					mergedTomb = mergedTomb.dissoc(name);  // newer live value, or own live value on tie
 				}
 			}
 

@@ -94,8 +94,8 @@ public class LatticeKV {
 
 	// ========== Internal Helpers ==========
 
-	// #561: time comes from the cursor's LatticeContext (driver/test supplied), never from
-	// the system clock directly — so writes are deterministic when a timestamp is injected.
+	// #561: resolve time through the cursor policy. The default policy uses runtime
+	// time; applications and tests may supply a fixed or otherwise dynamic clock.
 	private CVMLong now() {
 		return cursor.getContext().currentTimestamp();
 	}

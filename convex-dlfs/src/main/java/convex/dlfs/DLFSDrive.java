@@ -2,7 +2,6 @@ package convex.dlfs;
 
 import java.io.IOException;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -15,9 +14,9 @@ import convex.lattice.fs.impl.DLFSLocal;
 /**
  * Component for one named DLFS drive.
  *
- * <p>The component supplies domain and persistence policy to a local NIO
- * adapter. {@link #fork()} creates a temporary working component whose changes
- * remain isolated until explicitly synced.</p>
+ * <p>The component supplies its cursor and host store to a local NIO adapter.
+ * {@link #fork()} creates a temporary working component whose changes remain
+ * isolated until explicitly synced.</p>
  */
 public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implements AutoCloseable {
 
@@ -46,16 +45,12 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 	}
 
 	/**
-	 * Creates an isolated temporary drive component. Persistence still delegates
-	 * through the containing component hierarchy, while logical changes require explicit
-	 * {@link #sync()} to reach the long-lived drive cursor.
+	 * Creates an isolated temporary drive component. The filesystem still uses the
+	 * containing host's store, while logical changes require explicit {@link #sync()}
+	 * to reach the long-lived drive cursor.
 	 */
 	public DLFSDrive fork() {
 		return new DLFSDrive(parent(),name,cursor.fork());
-	}
-
-	private ABlob persistData(ABlob data) throws IOException {
-		return persist(data);
 	}
 
 	@Override
@@ -63,18 +58,13 @@ public final class DLFSDrive extends ALatticeComponent<AVector<ACell>> implement
 		fileSystem.close();
 	}
 
-	/** NIO boundary which routes blob persistence back through its component. */
+	/** NIO boundary retaining component-aware fork behaviour. */
 	private static final class HostedFileSystem extends DLFSLocal {
 		private final DLFSDrive drive;
 
 		HostedFileSystem(DLFSDrive drive) {
-			super(DLFS.provider(),drive.name(),drive.cursor());
+			super(DLFS.provider(),drive.name(),drive.cursor(),drive.store());
 			this.drive=drive;
-		}
-
-		@Override
-		public ABlob persistBlob(ABlob data) throws IOException {
-			return drive.persistData(data);
 		}
 
 		@Override
