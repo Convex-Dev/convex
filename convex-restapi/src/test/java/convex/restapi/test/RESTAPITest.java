@@ -64,6 +64,10 @@ public class RESTAPITest extends ARESTTest {
 	}
 	
 	@Test public void testTxPrepareSubmit() throws IOException, InterruptedException, BadFormatException {
+		// Own account: prepare reads the sequence from consensus, so sharing an account
+		// with the server's faucet or another test class makes this racy. See newAccount().
+		Address addr=newAccount();
+
 		{ // should be a bad request with non-parseable/missing fields
 			HttpResponse<String> res = post(API_PATH+"/transaction/prepare", "");
 			assertEquals(400, res.statusCode());
@@ -81,7 +85,7 @@ public class RESTAPITest extends ARESTTest {
 
 		{ // prepare should work
 			AMap<AString,ACell> req=Maps.of(
-					"address",Init.GENESIS_ADDRESS,
+					"address",addr,
 					"source","(* 2 3)");
 			
 			String tx=JSON.toStringPretty(req);
@@ -103,10 +107,10 @@ public class RESTAPITest extends ARESTTest {
 			Blob hash=Blob.parse(responseMap.getIn(Strings.HASH));
 			assertNotNull(hash);
 			
-			ASignature sig=KP.sign(hash);
+			ASignature sig=CLIENT_KP.sign(hash);
 
 			AMap<AString,ACell> sub=Maps.of(
-					"accountKey", KP.getAccountKey(),
+					"accountKey", CLIENT_KP.getAccountKey(),
 					"hash",hash.toCVMHexString(),
 					"data",data.toCVMHexString(),
 					"sig",sig.toCVMHexString());
@@ -200,8 +204,9 @@ public class RESTAPITest extends ARESTTest {
 				"Response should contain parse error: "+res.body());
 		}
 
-		{ // should execute successfully on genesis account
-			String tx=JSON.toStringPretty(Maps.of("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
+		{ // should execute successfully on an account of this test's own
+			Address txAddr=newAccount();
+			String tx=JSON.toStringPretty(Maps.of("address",txAddr,"source","(* 2 3)","seed",CLIENT_KP.getSeed()));
 			HttpResponse<String> res = post(API_PATH+"/transact", tx);
 			assertEquals(200, res.statusCode());
 
@@ -324,11 +329,8 @@ public class RESTAPITest extends ARESTTest {
 	}
 	
 	@Test public void testBlock() throws Exception {
-		// Create convex instance
-		URI uri = new URI(HOST_PATH);
-		ConvexHTTP convex = ConvexHTTP.connect(uri, Init.GENESIS_ADDRESS, KP);
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
+		// Own account, so a transaction in flight elsewhere cannot invalidate this one
+		ConvexHTTP convex = newClient();
 		
 		// Submit a transaction
 		convex.core.Result result = convex.transactSync("(+ 2 3)");

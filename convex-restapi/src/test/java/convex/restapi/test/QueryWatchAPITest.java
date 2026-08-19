@@ -75,7 +75,7 @@ class QueryWatchAPITest extends ARESTTest {
 
 		HttpResponse<InputStream> response=httpClient.send(request,HttpResponse.BodyHandlers.ofInputStream());
 		assertEquals(200,response.statusCode());
-		try (InputStream input=response.body(); ConvexHTTP convex=connect()) {
+		try (InputStream input=response.body(); ConvexHTTP convex=newClient()) {
 			SseReader reader=new SseReader(input);
 			SseEvent initial=readAsync(reader);
 			assertEquals("result",initial.type());

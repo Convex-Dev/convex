@@ -10,6 +10,7 @@ import java.time.Duration;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
@@ -63,6 +64,9 @@ public abstract class ARESTTest {
 		if (rs==null) return;
 		Server peer=rs.getServer();
 		server=null;
+		ConvexHTTP gc=genesisClient;
+		genesisClient=null;
+		if (gc!=null) gc.close();
 		try {
 			rs.close();
 		} finally {
@@ -107,13 +111,70 @@ public abstract class ARESTTest {
 		}
 	}
 	
-	protected ConvexHTTP newClient() throws InterruptedException {
-		ConvexHTTP convex=connect();
-		convex.setAddress(Init.GENESIS_ADDRESS);
-		convex.setKeyPair(KP);
+	/**
+	 * Creates a fresh funded account controlled by {@link #CLIENT_KP}.
+	 *
+	 * <p><b>Tests must not transact as the genesis account.</b> The REST server's own
+	 * faucet and {@code /createAccount} endpoints transact as the peer controller,
+	 * which is that same account, and every test class here shares one peer. A test
+	 * transacting as genesis therefore competes with the server, and with every other
+	 * test class, for one sequence number. {@code /transaction/prepare} reads the
+	 * sequence from consensus, so any transaction still in flight — including one that
+	 * already timed out client-side but has not been cancelled — leaves the prepared
+	 * transaction stale, and it is rejected with a SEQUENCE error in some unrelated
+	 * test. Accounts are cheap: give each test that transacts its own.</p>
+	 *
+	 * @return Address of the newly created account
+	 * @throws InterruptedException if interrupted while awaiting consensus
+	 */
+	protected static synchronized Address newAccount() throws InterruptedException {
+		ConvexHTTP convex=genesisClient();
 		AccountKey pubKey=CLIENT_KP.getAccountKey();
-		Result r=convex.transactSync("(let [a (deploy '(do (set-controller *caller*) (set-key "+pubKey+")))] (transfer a 1000000000) a)");
+		String code="(let [a (deploy '(do (set-controller *caller*) (set-key "+pubKey+")))] (transfer a 1000000000) a)";
+		Result r=convex.transactSync(code);
+		if (r.isError()&&ErrorCodes.SEQUENCE.equals(r.getErrorCode())) {
+			// The REST server's faucet transacts as this same account through its own
+			// client, so our cached sequence can be stale. transactSync clears the cache
+			// on error, so a single retry re-queries and succeeds.
+			r=convex.transactSync(code);
+		}
+		if (r.isError()) throw new IllegalStateException("Unable to create test account: "+r);
 		Address a=r.getValue();
+		if (a==null) throw new IllegalStateException("Test account creation returned no address: "+r);
+		return a;
+	}
+
+	/**
+	 * The single genesis-authorised client, used for all test account creation.
+	 *
+	 * <p>{@link convex.api.Convex} caches an account's sequence number per client
+	 * instance. Two clients transacting as the same account each believe they own the
+	 * next sequence, so one is rejected with a SEQUENCE error. Funding new accounts
+	 * must therefore go through exactly one client rather than a fresh one per call.</p>
+	 */
+	private static ConvexHTTP genesisClient;
+
+	private static synchronized ConvexHTTP genesisClient() {
+		if (genesisClient==null) {
+			try {
+				genesisClient=ConvexHTTP.connect(new URI(HOST_PATH),Init.GENESIS_ADDRESS,KP);
+			} catch (URISyntaxException e) {
+				throw Utils.sneakyThrow(e);
+			}
+		}
+		return genesisClient;
+	}
+
+	/**
+	 * Creates a client bound to a fresh account of its own. Preferred over
+	 * {@link #connect()} for anything that transacts — see {@link #newAccount()}.
+	 *
+	 * @return Client bound to a new funded account
+	 * @throws InterruptedException if interrupted while awaiting consensus
+	 */
+	protected ConvexHTTP newClient() throws InterruptedException {
+		Address a=newAccount();
+		ConvexHTTP convex=connect();
 		convex.setAddress(a);
 		convex.setKeyPair(CLIENT_KP);
 		return convex;

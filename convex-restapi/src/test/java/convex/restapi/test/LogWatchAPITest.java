@@ -47,7 +47,7 @@ class LogWatchAPITest extends ARESTTest {
 
 	@Test
 	void streamsAddressEventAndScopeMatchAsJSON() throws Exception {
-		try (ConvexHTTP convex=connect()) {
+		try (ConvexHTTP convex=newClient()) {
 			Result deployed=convex.transactSync(
 				"(deploy '(defn emit ^:callable [] (log :LOG-WATCH-TEST 100)))");
 			Address actor=deployed.getValue();
