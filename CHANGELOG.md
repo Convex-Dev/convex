@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client), so a well-resourced peer can serve more.
+- REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client, 0 to disable), so a well-resourced peer can serve more. Clients are identified by direct socket address and forwarded client-address headers are never consulted, since a limit keyed on a caller-supplied header is trivially bypassed. Behind a reverse proxy, set `transact-limit-client` to 0 and let the proxy apply per-client policy, which it can do against the true client address; the server-wide cap still bounds total load.
 
 ### Changed
 

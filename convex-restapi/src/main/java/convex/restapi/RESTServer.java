@@ -102,7 +102,21 @@ public class RESTServer implements Closeable {
 	/** Config key: maximum concurrent transaction requests server-wide. */
 	public static final Keyword K_TRANSACT_LIMIT=Keyword.intern("transact-limit");
 
-	/** Config key: maximum concurrent transaction requests from any one client. */
+	/**
+	 * Config key: maximum concurrent transaction requests from any one client, or 0 to
+	 * apply no per-client bound.
+	 *
+	 * <p>Clients are identified by direct socket address; forwarded client-address
+	 * headers are never consulted, since they are set by the caller and a limit keyed
+	 * on them would be bypassed by sending a different value.</p>
+	 *
+	 * <p>Behind a reverse proxy every caller therefore shares the proxy's address and
+	 * this degenerates into a second server-wide bound. Set it to 0 there. That is not
+	 * a workaround: the proxy holds the true client address, so per-client policy
+	 * belongs to it, and proxies enforce exactly this — nginx {@code limit_conn} keyed
+	 * on {@code $binary_remote_addr}, HAProxy stick tables, and equivalents. The
+	 * server-wide cap continues to bound total load either way.</p>
+	 */
 	public static final Keyword K_TRANSACT_LIMIT_CLIENT=Keyword.intern("transact-limit-client");
 
 	/**
@@ -164,7 +178,8 @@ public class RESTServer implements Closeable {
 		}
 
 		this.transactLimit=positiveConfig(K_TRANSACT_LIMIT,DEFAULT_TRANSACT_LIMIT);
-		this.transactLimitPerClient=positiveConfig(K_TRANSACT_LIMIT_CLIENT,DEFAULT_TRANSACT_LIMIT_CLIENT);
+		// 0 is meaningful here (no per-client bound), so it must not be read as absent
+		this.transactLimitPerClient=nonNegativeConfig(K_TRANSACT_LIMIT_CLIENT,DEFAULT_TRANSACT_LIMIT_CLIENT);
 
 		AKeyPair kp = server.getKeyPair();
 		if ((kp != null) && restConfig.isMcpEnabled() && restConfig.isSigningEnabled()) {
@@ -211,6 +226,16 @@ public class RESTServer implements Closeable {
 		if (o instanceof Number n) {
 			int value=n.intValue();
 			if (value>0) return value;
+		}
+		return defaultValue;
+	}
+
+	/** Reads a setting where 0 is a meaningful value, not an absent one. */
+	private int nonNegativeConfig(Keyword key, int defaultValue) {
+		Object o=getConfig().get(key);
+		if (o instanceof Number n) {
+			int value=n.intValue();
+			if (value>=0) return value;
 		}
 		return defaultValue;
 	}
