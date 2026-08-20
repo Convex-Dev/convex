@@ -38,7 +38,11 @@ public class SQLTable extends ALatticeComponent<AVector<ACell>> {
 	static final int POS_LIVE_COUNT = 3;
 
 	SQLTable(ALatticeCursor<AVector<ACell>> cursor) {
-		super(cursor);
+		this(null,cursor);
+	}
+
+	SQLTable(ALatticeComponent<?> parent,ALatticeCursor<AVector<ACell>> cursor) {
+		super(parent,cursor);
 	}
 
 	// ========== Static State Factories ==========

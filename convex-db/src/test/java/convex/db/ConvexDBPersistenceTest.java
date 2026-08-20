@@ -15,6 +15,11 @@ import java.sql.Statement;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.db.calcite.ConvexType;
@@ -36,7 +41,7 @@ public class ConvexDBPersistenceTest {
 	private static final String DB_NAME = "persist_test";
 	private static final String TABLE_NAME = "t";
 
-	private NodeServer<?> server;
+	private NodeServer<AHashMap<AString,Index<Keyword,ACell>>> server;
 	private EtchStore store;
 	private File etchFile;
 
@@ -64,7 +69,7 @@ public class ConvexDBPersistenceTest {
 		}
 		server = ConvexDB.createNodeServer(store);
 		server.launch();
-		ConvexDB cdb = ConvexDB.connect(server.getCursor());
+		ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
 		cdb.database(DB_NAME); // ensure database path exists
 		cdb.register(DB_NAME);
 		return cdb;

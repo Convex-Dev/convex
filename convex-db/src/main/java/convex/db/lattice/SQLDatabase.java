@@ -57,7 +57,13 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 
 	private SQLDatabase(ALatticeCursor<Index<Keyword, ACell>> cursor,
 			AString dbName, AKeyPair keyPair, ACell ownerKey) {
-		super(cursor);
+		this(null,cursor,dbName,keyPair,ownerKey);
+	}
+
+	private SQLDatabase(ALatticeComponent<?> parent,
+			ALatticeCursor<Index<Keyword, ACell>> cursor,
+			AString dbName, AKeyPair keyPair, ACell ownerKey) {
+		super(parent,cursor);
 		this.dbName = dbName;
 		this.keyPair = keyPair;
 		this.ownerKey = ownerKey;
@@ -108,6 +114,24 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	}
 
 	/**
+	 * Connects to a database nested beneath a ConvexDB component.
+	 * Component policy delegates through the ConvexDB parent.
+	 *
+	 * @param parent Containing ConvexDB component
+	 * @param name Database name to connect to
+	 * @return New SQLDatabase in the component hierarchy
+	 */
+	public static SQLDatabase connect(ConvexDB parent,String name) {
+		if (parent==null) throw new IllegalArgumentException("Parent ConvexDB must not be null");
+		AString dbName=Strings.create(name);
+		ALatticeCursor<Index<Keyword,ACell>> cursor=parent.cursor().path(dbName);
+		if (cursor.get()==null) {
+			cursor.set(ConvexDB.DATABASE_LATTICE.zero());
+		}
+		return new SQLDatabase(parent,cursor,dbName,null,null);
+	}
+
+	/**
 	 * Creates a forked copy of this database for transaction isolation.
 	 * The fork reads from a snapshot at fork time; writes accumulate locally.
 	 * Call {@link #sync()} on the fork to merge changes back into the parent.
@@ -116,7 +140,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Forked SQLDatabase instance
 	 */
 	public SQLDatabase fork() {
-		return new SQLDatabase(cursor.fork(), dbName, keyPair, ownerKey);
+		return new SQLDatabase(parent(),cursor.fork(),dbName,keyPair,ownerKey);
 	}
 
 	/**
@@ -125,7 +149,7 @@ public class SQLDatabase extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return SQLSchema instance for this database
 	 */
 	public SQLSchema tables() {
-		return new SQLSchema(cursor.path(ConvexDB.KEY_TABLES));
+		return new SQLSchema(this,cursor.path(ConvexDB.KEY_TABLES));
 	}
 
 	/**
