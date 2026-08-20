@@ -1,17 +1,13 @@
 package convex.core.crypto;
 
-import java.math.BigInteger;
 import java.util.Arrays;
 
 import org.bouncycastle.crypto.AsymmetricCipherKeyPair;
 import org.bouncycastle.crypto.InvalidCipherTextException;
-import org.bouncycastle.crypto.digests.SHA512Digest;
 import org.bouncycastle.crypto.hpke.HPKE;
 import org.bouncycastle.crypto.hpke.HPKEContext;
 import org.bouncycastle.crypto.hpke.HPKEContextWithEncapsulation;
-import org.bouncycastle.crypto.params.X25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters;
-import org.bouncycastle.math.ec.rfc8032.Ed25519;
 
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -48,8 +44,6 @@ public final class ECIES {
 
 	private static final int ENCAPSULATED_KEY_LENGTH = 32;
 	private static final byte[] EMPTY = new byte[0];
-	private static final BigInteger CURVE_25519_PRIME = BigInteger.ONE.shiftLeft(255).subtract(BigInteger.valueOf(19));
-
 	private ECIES() {
 	}
 
@@ -67,7 +61,7 @@ public final class ECIES {
 		if (recipient == null) throw new IllegalArgumentException("Recipient AccountKey must not be null");
 		if (plaintext == null) throw new IllegalArgumentException("Plaintext must not be null");
 
-		return encryptHPKE(convertPublicKey(recipient), plaintext, EMPTY, EMPTY, null);
+		return encryptHPKE(Ed25519X25519.publicKey(recipient), plaintext, EMPTY, EMPTY, null);
 	}
 
 	/** HPKE encryption path with injectable inputs for RFC 9180 vectors. */
@@ -119,7 +113,7 @@ public final class ECIES {
 	 */
 	public static Decryptor createDecryptor(AKeyPair recipient) {
 		if (recipient == null) throw new IllegalArgumentException("Recipient key pair must not be null");
-		return new Decryptor(convertKeyPair(recipient));
+		return new Decryptor(Ed25519X25519.keyPair(recipient));
 	}
 
 	/**
@@ -133,7 +127,7 @@ public final class ECIES {
 		if (recipientSeed.count() != AKeyPair.SEED_LENGTH) {
 			throw new IllegalArgumentException("Recipient seed must be 32 bytes");
 		}
-		return new Decryptor(convertSeedKeyPair(recipientSeed));
+		return new Decryptor(Ed25519X25519.keyPair(recipientSeed));
 	}
 
 	/**
@@ -196,75 +190,4 @@ public final class ECIES {
 				HPKE.aead_AES_GCM128);
 	}
 
-	/** Converts a validated Ed25519 AccountKey to its X25519 public key. */
-	static X25519PublicKeyParameters convertPublicKey(AccountKey accountKey) {
-		byte[] edwardsKey = accountKey.getBytes();
-		if (!Ed25519.validatePublicKeyFull(edwardsKey, 0)) {
-			throw new IllegalArgumentException("Recipient AccountKey is not a valid Ed25519 public key");
-		}
-
-		// Ed25519 encodes y in little-endian form, with the sign of x in the top bit.
-		// The Edwards-to-Montgomery birational map is u = (1 + y) / (1 - y).
-		edwardsKey[31] &= 0x7f;
-		BigInteger y = littleEndianToBigInteger(edwardsKey);
-		BigInteger denominator = BigInteger.ONE.subtract(y).mod(CURVE_25519_PRIME);
-		BigInteger u = BigInteger.ONE.add(y)
-				.multiply(denominator.modInverse(CURVE_25519_PRIME))
-				.mod(CURVE_25519_PRIME);
-		return new X25519PublicKeyParameters(bigIntegerToLittleEndian(u), 0);
-	}
-
-	/** Converts an Ed25519 seed/key pair to the matching X25519 key pair. */
-	static AsymmetricCipherKeyPair convertKeyPair(AKeyPair keyPair) {
-		return convertSeedKeyPair(keyPair.getSeed());
-	}
-
-	private static AsymmetricCipherKeyPair convertSeedKeyPair(Blob seed) {
-		byte[] scalar = convertSeed(seed);
-		try {
-			X25519PrivateKeyParameters privateKey = new X25519PrivateKeyParameters(scalar);
-			return new AsymmetricCipherKeyPair(privateKey.generatePublicKey(), privateKey);
-		} finally {
-			Arrays.fill(scalar, (byte) 0);
-		}
-	}
-
-	private static byte[] convertSeed(Blob seed) {
-		byte[] seedBytes = seed.getBytes();
-		byte[] hash = new byte[64];
-		SHA512Digest digest = new SHA512Digest();
-		try {
-			digest.update(seedBytes, 0, seedBytes.length);
-			digest.doFinal(hash, 0);
-		} finally {
-			// Do not retain the seed in temporary storage after deriving the X25519 key.
-			Arrays.fill(seedBytes, (byte) 0);
-		}
-
-		// Match libsodium: SHA-512 the Ed25519 seed, take 32 bytes, then clamp for X25519.
-		byte[] scalar = Arrays.copyOf(hash, 32);
-		Arrays.fill(hash, (byte) 0);
-		scalar[0] &= (byte) 248;
-		scalar[31] &= (byte) 127;
-		scalar[31] |= (byte) 64;
-		return scalar;
-	}
-
-	private static BigInteger littleEndianToBigInteger(byte[] littleEndian) {
-		byte[] bigEndian = new byte[littleEndian.length];
-		for (int i = 0; i < littleEndian.length; i++) {
-			bigEndian[bigEndian.length - 1 - i] = littleEndian[i];
-		}
-		return new BigInteger(1, bigEndian);
-	}
-
-	private static byte[] bigIntegerToLittleEndian(BigInteger value) {
-		byte[] bigEndian = value.toByteArray();
-		byte[] littleEndian = new byte[ENCAPSULATED_KEY_LENGTH];
-		int length = Math.min(bigEndian.length, littleEndian.length);
-		for (int i = 0; i < length; i++) {
-			littleEndian[i] = bigEndian[bigEndian.length - 1 - i];
-		}
-		return littleEndian;
-	}
 }

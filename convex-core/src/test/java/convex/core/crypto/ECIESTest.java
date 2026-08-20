@@ -1,6 +1,5 @@
 package convex.core.crypto;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -138,23 +137,6 @@ public class ECIESTest {
 		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor((Blob) null));
 		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor(Blob.EMPTY));
 		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor(RECIPIENT).decrypt(null));
-	}
-
-	@Test
-	public void testLibsodiumKeyConversion() {
-		// Seed and expected secret conversion from libsodium's ed25519_convert test.
-		Blob seed = Blob.fromHex("421151a459faeade3d247115f94aedae42318124095afabe4d1451a559faedee");
-		AKeyPair ed25519KeyPair = AKeyPair.create(seed);
-		byte[] expectedSecret = Utils.hexToBytes(
-				"8052030376d47112be7f73ed7a019293dd12ad910b654455798b4667d73de166");
-
-		AsymmetricCipherKeyPair converted = ECIES.convertKeyPair(ed25519KeyPair);
-		byte[] convertedSecret = ((X25519PrivateKeyParameters) converted.getPrivate()).getEncoded();
-		byte[] publicFromSecret = ((X25519PublicKeyParameters) converted.getPublic()).getEncoded();
-		byte[] publicFromAccountKey = ECIES.convertPublicKey(ed25519KeyPair.getAccountKey()).getEncoded();
-
-		assertArrayEquals(expectedSecret, convertedSecret);
-		assertArrayEquals(publicFromSecret, publicFromAccountKey);
 	}
 
 	@Test
