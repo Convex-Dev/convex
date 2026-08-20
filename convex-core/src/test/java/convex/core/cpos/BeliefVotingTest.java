@@ -334,8 +334,44 @@ public class BeliefVotingTest {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Test public void testVariableConsensusLevelsInMerge() throws Exception {
+		SignedData<Block> block=bl(1);
+
+		// Missing levels contribute no confirmation at those levels. These Orders
+		// provide raw ordering and proposal, so consensus can advance but finality cannot.
+		SignedData<Order>[] shortOrders=new SignedData[6];
+		for (int i=0; i<shortOrders.length; i++) {
+			shortOrders[i]=or(i,TS,new long[] {1,1},block);
+		}
+		Belief shortBelief=Belief.create(shortOrders);
+		Order shortResult=BeliefMerge.create(shortBelief,kps[0],TS,initialState).merge().getOrder(keys[0]);
+		assertEquals(1,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_PROPOSAL));
+		assertEquals(1,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS));
+		assertEquals(0,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Surplus levels do not extend the configured main-network consensus depth.
+		SignedData<Order>[] extraOrders=new SignedData[6];
+		for (int i=0; i<extraOrders.length; i++) {
+			extraOrders[i]=or(i,TS,new long[] {1,1,1,1,0,0},block);
+		}
+		Belief extraBelief=Belief.create(extraOrders);
+		Order extraResult=BeliefMerge.create(extraBelief,kps[0],TS,initialState).merge().getOrder(keys[0]);
+		assertEquals(1,extraResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+		assertEquals(6,extraResult.getConsensusPoints().length);
+	}
+
+	@SuppressWarnings("unchecked")
 	private SignedData<Order> or(int peer, long ts, int pp, int cp, SignedData<Block>... blks) {
 		Order o=Order.create(pp, cp, blks).withTimestamp(TS);
+		return kps[peer].signData(o);
+	}
+
+	@SafeVarargs
+	private final SignedData<Order> or(int peer, long ts, long[] consensusPoints, SignedData<Block>... blks) {
+		Order o=Order.create(Vectors.of(
+				CVMLong.create(ts),
+				Vectors.createLongs(consensusPoints),
+				Vectors.create(blks)));
 		return kps[peer].signData(o);
 	}
 

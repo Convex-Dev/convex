@@ -17,7 +17,12 @@ public class CPoSConstants {
 	 */
 	public static final double CONSENSUS_THRESHOLD = 0.67;
 	/**
-	 * Number of consensus levels (blocks, proposed, consensus, finality)
+	 * Number of consensus levels used by the Convex main network protocol
+	 * (ordering, proposal, consensus, finality).
+	 *
+	 * <p>Encoded Orders may supply fewer or additional levels. Consensus uses
+	 * this configured prefix: missing confirmation levels contribute zero and
+	 * surplus levels are ignored.</p>
 	 */
 	public static final int CONSENSUS_LEVELS = 4;
 	public static final int CONSENSUS_LEVEL_PROPOSAL = CONSENSUS_LEVELS - 3;

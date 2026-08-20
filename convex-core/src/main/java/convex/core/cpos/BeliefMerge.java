@@ -494,7 +494,7 @@ public class BeliefMerge {
 	 * out-of-window Block scanned forward from the floor, wherever it sits.</p>
 	 */
 	private Order clampToTimeHorizon(Order order, long finalisedFloor) {
-		long[] cps = order.getConsensusPoints(); // a mutable clone
+		long[] cps = order.getConsensusPoints(CPoSConstants.CONSENSUS_LEVELS);
 		AVector<SignedData<Block>> blocks = order.getBlocks();
 		long n = blocks.count();
 		long limit = getTimestamp() + CPoSConstants.MAX_BLOCK_FORWARD;
