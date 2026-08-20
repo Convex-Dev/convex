@@ -41,6 +41,31 @@ public class ECIESTest {
 	}
 
 	@Test
+	public void testReusableDecryptor() throws BadFormatException {
+		ECIES.Decryptor decryptor = ECIES.createDecryptor(RECIPIENT);
+
+		for (int i = 0; i < 10; i++) {
+			Blob plaintext = Blob.wrap(("message " + i).getBytes(StandardCharsets.UTF_8));
+			Blob encrypted = ECIES.encrypt(RECIPIENT.getAccountKey(), plaintext);
+			assertEquals(plaintext, decryptor.decrypt(encrypted));
+		}
+
+		Blob invalid = ECIES.encrypt(AKeyPair.createSeeded(7331).getAccountKey(), Blob.SINGLE_A);
+		assertThrows(BadFormatException.class, () -> decryptor.decrypt(invalid));
+
+		Blob encrypted = ECIES.encrypt(RECIPIENT.getAccountKey(), Blob.SINGLE_A);
+		assertEquals(Blob.SINGLE_A, decryptor.decrypt(encrypted));
+	}
+
+	@Test
+	public void testReusableDecryptorFromSeed() throws BadFormatException {
+		ECIES.Decryptor decryptor = ECIES.createDecryptor(RECIPIENT.getSeed());
+		Blob encrypted = ECIES.encrypt(RECIPIENT.getAccountKey(), Blob.SINGLE_A);
+
+		assertEquals(Blob.SINGLE_A, decryptor.decrypt(encrypted));
+	}
+
+	@Test
 	public void testEmptyPlaintext() throws BadFormatException {
 		Blob encrypted = ECIES.encrypt(RECIPIENT.getAccountKey(), Blob.EMPTY);
 
@@ -109,6 +134,10 @@ public class ECIESTest {
 		assertThrows(IllegalArgumentException.class, () -> ECIES.decrypt(RECIPIENT, null));
 		assertThrows(IllegalArgumentException.class, () -> ECIES.decrypt((Blob) null, Blob.EMPTY));
 		assertThrows(IllegalArgumentException.class, () -> ECIES.decrypt(Blob.EMPTY, Blob.EMPTY));
+		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor((AKeyPair) null));
+		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor((Blob) null));
+		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor(Blob.EMPTY));
+		assertThrows(IllegalArgumentException.class, () -> ECIES.createDecryptor(RECIPIENT).decrypt(null));
 	}
 
 	@Test

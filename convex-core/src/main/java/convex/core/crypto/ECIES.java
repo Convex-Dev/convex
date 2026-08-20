@@ -103,10 +103,63 @@ public final class ECIES {
 	 *                            another key, or fails authentication
 	 */
 	public static Blob decrypt(AKeyPair recipient, Blob envelope) throws BadFormatException {
+		return createDecryptor(recipient).decrypt(envelope);
+	}
+
+	/**
+	 * Creates a reusable decryptor for scanning multiple encrypted Blobs.
+	 *
+	 * <p>The decryptor retains only the derived X25519 key, not the supplied
+	 * AKeyPair, its Ed25519 seed, or any processed message. A fresh HPKE context
+	 * is still created for each Blob because every message has a distinct
+	 * encapsulated key.</p>
+	 *
+	 * @param recipient Recipient key pair
+	 * @return Reusable decryptor for the recipient
+	 */
+	public static Decryptor createDecryptor(AKeyPair recipient) {
 		if (recipient == null) throw new IllegalArgumentException("Recipient key pair must not be null");
-		if (envelope == null) throw new IllegalArgumentException("Encrypted Blob must not be null");
-		if (envelope.count() < OVERHEAD) throw new BadFormatException("ECIES Blob is too short");
-		return decryptHPKE(convertKeyPair(recipient), envelope, EMPTY, EMPTY);
+		return new Decryptor(convertKeyPair(recipient));
+	}
+
+	/**
+	 * Creates a reusable decryptor directly from a 32-byte Ed25519 seed.
+	 *
+	 * @param recipientSeed Recipient's 32-byte Ed25519 seed
+	 * @return Reusable decryptor for the recipient
+	 */
+	public static Decryptor createDecryptor(Blob recipientSeed) {
+		if (recipientSeed == null) throw new IllegalArgumentException("Recipient seed must not be null");
+		if (recipientSeed.count() != AKeyPair.SEED_LENGTH) {
+			throw new IllegalArgumentException("Recipient seed must be 32 bytes");
+		}
+		return new Decryptor(convertSeedKeyPair(recipientSeed));
+	}
+
+	/**
+	 * Reusable recipient state for decrypting multiple independent ECIES Blobs.
+	 * This class is immutable and safe to share between readers.
+	 */
+	public static final class Decryptor {
+
+		private final AsymmetricCipherKeyPair recipientKey;
+
+		private Decryptor(AsymmetricCipherKeyPair recipientKey) {
+			this.recipientKey = recipientKey;
+		}
+
+		/**
+		 * Decrypts one ECIES Blob. Failed authentication does not affect later calls.
+		 *
+		 * @param envelope HPKE encrypted Blob
+		 * @return Decrypted plaintext Blob
+		 * @throws BadFormatException If the envelope is malformed or fails authentication
+		 */
+		public Blob decrypt(Blob envelope) throws BadFormatException {
+			if (envelope == null) throw new IllegalArgumentException("Encrypted Blob must not be null");
+			if (envelope.count() < OVERHEAD) throw new BadFormatException("ECIES Blob is too short");
+			return decryptHPKE(recipientKey, envelope, EMPTY, EMPTY);
+		}
 	}
 
 	/** HPKE decryption path with injectable inputs for RFC 9180 vectors. */
@@ -135,11 +188,7 @@ public final class ECIES {
 	 *                            another seed, or fails authentication
 	 */
 	public static Blob decrypt(Blob recipientSeed, Blob envelope) throws BadFormatException {
-		if (recipientSeed == null) throw new IllegalArgumentException("Recipient seed must not be null");
-		if (recipientSeed.count() != AKeyPair.SEED_LENGTH) {
-			throw new IllegalArgumentException("Recipient seed must be 32 bytes");
-		}
-		return decrypt(AKeyPair.create(recipientSeed), envelope);
+		return createDecryptor(recipientSeed).decrypt(envelope);
 	}
 
 	private static HPKE createHPKE() {
@@ -167,7 +216,11 @@ public final class ECIES {
 
 	/** Converts an Ed25519 seed/key pair to the matching X25519 key pair. */
 	static AsymmetricCipherKeyPair convertKeyPair(AKeyPair keyPair) {
-		byte[] scalar = convertSeed(keyPair.getSeed());
+		return convertSeedKeyPair(keyPair.getSeed());
+	}
+
+	private static AsymmetricCipherKeyPair convertSeedKeyPair(Blob seed) {
+		byte[] scalar = convertSeed(seed);
 		try {
 			X25519PrivateKeyParameters privateKey = new X25519PrivateKeyParameters(scalar);
 			return new AsymmetricCipherKeyPair(privateKey.generatePublicKey(), privateKey);
@@ -180,8 +233,13 @@ public final class ECIES {
 		byte[] seedBytes = seed.getBytes();
 		byte[] hash = new byte[64];
 		SHA512Digest digest = new SHA512Digest();
-		digest.update(seedBytes, 0, seedBytes.length);
-		digest.doFinal(hash, 0);
+		try {
+			digest.update(seedBytes, 0, seedBytes.length);
+			digest.doFinal(hash, 0);
+		} finally {
+			// Do not retain the seed in temporary storage after deriving the X25519 key.
+			Arrays.fill(seedBytes, (byte) 0);
+		}
 
 		// Match libsodium: SHA-512 the Ed25519 seed, take 32 bytes, then clamp for X25519.
 		byte[] scalar = Arrays.copyOf(hash, 32);
