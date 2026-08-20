@@ -1,5 +1,7 @@
 package convex.core.message;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;
@@ -82,6 +84,118 @@ public class Message {
 		Message m = create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
 		m.messageData=Format.encodeDataResult(result);		
 		return m;
+	}
+
+	/**
+	 * Creates one unsolicited DATA message containing independently addressable
+	 * cells. The cells are encoded once as multi-cell children of a {@code :DATA}
+	 * envelope; receivers may stage them before a later composite root arrives.
+	 *
+	 * @param cells non-embedded cells to send
+	 * @param maxMessageLength maximum encoded message body length
+	 * @return bounded DATA message
+	 */
+	public static Message createDataMessage(List<? extends ACell> cells, int maxMessageLength) {
+		if (cells.isEmpty()) throw new IllegalArgumentException("DATA message requires at least one cell");
+		if (cells.size()>CPoSConstants.MISSING_LIMIT) {
+			throw new IllegalArgumentException("Too many cells in DATA message: "+cells.size());
+		}
+
+		ACell[] values=new ACell[cells.size()+1];
+		values[0]=MessageTag.DATA;
+		ArrayList<ACell> delta=new ArrayList<>(cells.size()+1);
+		for (int i=0; i<cells.size(); i++) {
+			ACell cell=cells.get(i);
+			if (cell==null || cell.isEmbedded()) {
+				throw new IllegalArgumentException("DATA cells must be non-null and non-embedded");
+			}
+			values[i+1]=cell;
+			delta.add(cell);
+		}
+		AVector<?> payload=Vectors.create(values);
+		delta.add(payload);
+		Blob data=Format.encodeDelta(delta,maxMessageLength);
+		return create(MessageType.DATA,payload,data);
+	}
+
+	/**
+	 * Partitions cells into DATA messages whose encoded bodies do not exceed the
+	 * supplied limit. Embedded cells are omitted because their encodings already
+	 * travel inside their nearest non-embedded parent.
+	 *
+	 * @param cells cells to partition
+	 * @param maxMessageLength maximum encoded body length for each batch
+	 * @return bounded DATA messages in input order
+	 */
+	public static List<Message> createDataMessages(List<? extends ACell> cells, int maxMessageLength) {
+		return createDataMessages(cells,maxMessageLength,CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	/**
+	 * Partitions cells into a bounded number of DATA message bytes. The total
+	 * limit bounds transient encoded materialisation for one propagation attempt;
+	 * cells beyond the budget are deliberately left for pull-based recovery.
+	 *
+	 * @param cells cells to partition
+	 * @param maxMessageLength maximum encoded body length for each batch
+	 * @param maxTotalLength maximum combined encoded body length to materialise
+	 * @return bounded DATA messages in input order
+	 */
+	public static List<Message> createDataMessages(List<? extends ACell> cells,
+			int maxMessageLength, long maxTotalLength) {
+		if (maxMessageLength<1 || maxMessageLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("DATA message limit must be between 1 and "
+				+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxMessageLength);
+		}
+		if (maxTotalLength<1 || maxTotalLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("DATA materialisation limit must be between 1 and "
+				+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxTotalLength);
+		}
+		ArrayList<Message> messages=new ArrayList<>();
+		ArrayList<ACell> batch=new ArrayList<>();
+		long totalLength=0;
+		for (ACell cell:cells) {
+			if (cell==null || cell.isEmbedded()) continue;
+			batch.add(cell);
+			boolean tooMany=batch.size()>CPoSConstants.MISSING_LIMIT;
+			boolean tooLarge=!tooMany && dataMessageLength(batch)>maxMessageLength;
+			if (tooMany || tooLarge) {
+				batch.remove(batch.size()-1);
+				if (batch.isEmpty()) {
+					throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "
+						+maxMessageLength+" bytes");
+				}
+				long messageLength=dataMessageLength(batch);
+				if (totalLength+messageLength>maxTotalLength) return messages;
+				Message message=createDataMessage(batch,maxMessageLength);
+				messages.add(message);
+				totalLength+=messageLength;
+				batch=new ArrayList<>();
+				batch.add(cell);
+				if (dataMessageLength(batch)>maxMessageLength) {
+					throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "
+						+maxMessageLength+" bytes");
+				}
+			}
+		}
+		if (!batch.isEmpty()) {
+			long messageLength=dataMessageLength(batch);
+			if (totalLength+messageLength<=maxTotalLength) {
+				messages.add(createDataMessage(batch,maxMessageLength));
+			}
+		}
+		return messages;
+	}
+
+	private static long dataMessageLength(List<? extends ACell> cells) {
+		ACell[] values=new ACell[cells.size()+1];
+		values[0]=MessageTag.DATA;
+		for (int i=0; i<cells.size(); i++) values[i+1]=cells.get(i);
+		AVector<?> payload=Vectors.create(values);
+		ArrayList<ACell> delta=new ArrayList<>(cells.size()+1);
+		delta.addAll(cells);
+		delta.add(payload);
+		return Format.getDeltaEncodingLength(delta);
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {
@@ -356,6 +470,7 @@ public class Message {
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
 				if (MessageTag.BYE.equals(mt)) return MessageType.GOODBYE;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
+				if (MessageTag.DATA.equals(mt)) return MessageType.DATA;
 				if (MessageTag.DATA_REQUEST.equals(mt)) return MessageType.DATA_REQUEST;
 				if (MessageTag.LATTICE_VALUE.equals(mt)) return MessageType.LATTICE_VALUE;
 				if (MessageTag.LATTICE_QUERY.equals(mt)) return MessageType.LATTICE_QUERY;

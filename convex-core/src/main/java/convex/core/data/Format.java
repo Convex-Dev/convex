@@ -626,10 +626,23 @@ public class Format {
 	 * @return Encoded multi-cell blob containing the given cells
 	 */
 	public static Blob encodeDelta(java.util.List<ACell> cells) {
+		return encodeDelta(cells, CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	/**
+	 * Gets the exact encoded length of a delta message without allocating its
+	 * backing byte array.
+	 *
+	 * @param cells Cells to encode
+	 * @return exact encoded length in bytes
+	 */
+	public static long getDeltaEncodingLength(java.util.List<? extends ACell> cells) {
 		int n=cells.size();
-		int ml=0;
+		long ml=0;
 		for (int i=0; i<n; i++) {
-			int clen=cells.get(i).getEncodingLength();
+			ACell cell=cells.get(i);
+			if (cell==null) throw new IllegalArgumentException("Null cell in delta");
+			int clen=cell.getEncodingLength();
 			ml+=clen;
 			
 			if (i<(n-1)) {
@@ -637,6 +650,29 @@ public class Format {
 				ml+=Format.getVLQCountLength(clen);
 			}
 		}
+		return ml;
+	}
+
+	/**
+	 * Encodes a list of cells as a delta message without exceeding a caller-selected
+	 * message-body limit. The limit is checked before allocation.
+	 *
+	 * @param cells Cells to encode
+	 * @param maxLength Maximum encoded body length in bytes
+	 * @return Encoded multi-cell blob containing the given cells
+	 */
+	public static Blob encodeDelta(java.util.List<ACell> cells, long maxLength) {
+		if (maxLength<1 || maxLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Delta limit must be between 1 and "
+				+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxLength);
+		}
+		long longLength=getDeltaEncodingLength(cells);
+		if (longLength>maxLength) {
+			throw new IllegalArgumentException("Delta message too long: "+longLength
+				+" (limit "+maxLength+")");
+		}
+		int ml=Utils.checkedInt(longLength);
+		int n=cells.size();
 		
 		byte[] msg=new byte[ml];
 		int ix=0;

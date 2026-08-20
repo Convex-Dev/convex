@@ -57,6 +57,12 @@ public class NodeConfig {
 	/** Maximum encoded inbound network message size in bytes (Long, default 4 MiB). */
 	public static final AString MAX_MESSAGE_SIZE = Strings.intern("maxMessageSize");
 
+	/** Maximum encoded outbound lattice delta chunk size in bytes. */
+	public static final AString MAX_DELTA_MESSAGE_SIZE = Strings.intern("maxDeltaMessageSize");
+
+	/** Maximum combined encoded bytes materialised for one outbound lattice delta. */
+	public static final AString MAX_DELTA_BROADCAST_SIZE = Strings.intern("maxDeltaBroadcastSize");
+
 	/** Maximum encoded message size from a cryptographically verified Peer. */
 	public static final AString MAX_TRUSTED_MESSAGE_SIZE = Strings.intern("maxTrustedMessageSize");
 
@@ -65,6 +71,9 @@ public class NodeConfig {
 
 	/** Capacity of the bounded inbound processing queue (Long, default 1024). */
 	public static final AString INBOUND_QUEUE_SIZE = Strings.intern("inboundQueueSize");
+
+	/** Maximum encoded bytes retained by the inbound processing queue. */
+	public static final AString MAX_INBOUND_QUEUE_BYTES = Strings.intern("maxInboundQueueBytes");
 
 	/** Time allowed for the ordered inbound dispatcher to drain during shutdown. */
 	public static final AString INBOUND_SHUTDOWN_TIMEOUT = Strings.intern("inboundShutdownTimeout");
@@ -75,6 +84,9 @@ public class NodeConfig {
 	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
+	/** Default eager delta working set: four public-size chunks, capped by protocol. */
+	public static final int DEFAULT_MAX_DELTA_BROADCAST_SIZE = 16 * 1024 * 1024;
+
 	/** Verified Peers may use the full protocol message allowance. */
 	public static final int DEFAULT_MAX_TRUSTED_MESSAGE_SIZE =
 		(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
@@ -84,6 +96,9 @@ public class NodeConfig {
 
 	/** Default number of decoded messages awaiting lattice processing. */
 	public static final int DEFAULT_INBOUND_QUEUE_SIZE = 1024;
+
+	/** Default encoded bytes awaiting lattice processing. */
+	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES = 16 * 1024 * 1024;
 
 	/** Default time allowed for accepted inbound work to finish during shutdown. */
 	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT = 10_000L;
@@ -227,6 +242,34 @@ public class NodeConfig {
 	}
 
 	/**
+	 * Gets the maximum encoded body size used for outbound lattice delta chunks.
+	 * This is independent of the complete inbound value-size policy. It defaults
+	 * to the conservative public frame limit advertised by this node.
+	 *
+	 * @return maximum outbound delta chunk size in bytes
+	 */
+	public int getMaxDeltaMessageSize() {
+		return getMessageSize(MAX_DELTA_MESSAGE_SIZE, getMaxMessageSize());
+	}
+
+	/**
+	 * Gets the total encoded-byte budget for one eager lattice propagation.
+	 * This bounds novelty references plus DATA message bodies independently of
+	 * the size of the complete lattice value in the store.
+	 */
+	public int getMaxDeltaBroadcastSize() {
+		int messageLimit=getMaxDeltaMessageSize();
+		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_DELTA_BROADCAST_SIZE);
+		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+		int value=getMessageSize(MAX_DELTA_BROADCAST_SIZE,defaultValue);
+		if (value<messageLimit) {
+			throw new IllegalArgumentException(MAX_DELTA_BROADCAST_SIZE
+				+" must be at least "+MAX_DELTA_MESSAGE_SIZE+": "+value+" < "+messageLimit);
+		}
+		return value;
+	}
+
+	/**
 	 * Gets the encoded-message limit used after an outbound Peer's AccountKey has
 	 * passed challenge/response verification. Unverified connections always remain
 	 * subject to {@link #getMaxMessageSize()}.
@@ -253,6 +296,19 @@ public class NodeConfig {
 	 */
 	public int getInboundQueueSize() {
 		return getPositiveInt(INBOUND_QUEUE_SIZE, DEFAULT_INBOUND_QUEUE_SIZE);
+	}
+
+	/** Gets the encoded-byte capacity of the inbound dispatcher queue. */
+	public int getMaxInboundQueueBytes() {
+		int messageLimit=getMaxMessageSize();
+		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_INBOUND_QUEUE_BYTES);
+		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+		int value=getMessageSize(MAX_INBOUND_QUEUE_BYTES,defaultValue);
+		if (value<messageLimit) {
+			throw new IllegalArgumentException(MAX_INBOUND_QUEUE_BYTES
+				+" must be at least "+MAX_MESSAGE_SIZE+": "+value+" < "+messageLimit);
+		}
+		return value;
 	}
 
 	/**

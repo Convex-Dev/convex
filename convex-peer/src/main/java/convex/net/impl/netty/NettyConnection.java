@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -16,6 +17,7 @@ import convex.core.data.Vectors;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
+import convex.core.util.Utils;
 import convex.core.message.AConnection;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
@@ -54,6 +56,11 @@ public class NettyConnection extends AConnection {
 	 */
 	private final ArrayBlockingQueue<Message> outbound =
 		new ArrayBlockingQueue<>(Config.OUTBOUND_QUEUE_SIZE);
+	private final Object outboundCapacity=new Object();
+	private long outboundBytes;
+
+	/** Latest small priority root, coalesced independently of the bulk queue. */
+	private final AtomicReference<Message> priorityOutbound=new AtomicReference<>();
 
 	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
@@ -158,7 +165,8 @@ public class NettyConnection extends AConnection {
 				@Override
 				public void channelInactive(ChannelHandlerContext ctx) {
 					// Clear queue to wake any threads blocked on offer(timeout)
-					client.outbound.clear();
+					client.clearOutbound();
+					client.priorityOutbound.set(null);
 					ctx.fireChannelInactive();
 				}
 			},
@@ -190,12 +198,26 @@ public class NettyConnection extends AConnection {
 	public boolean sendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
+		int bytes=Utils.checkedInt(m.getMessageData().count());
+		boolean reserved=false;
 		try {
+			reserved=reserveOutbound(bytes,Config.DEFAULT_INTERNAL_TIMEOUT);
+			if (!reserved) return false;
+			if (!ch.isActive()) {
+				releaseOutbound(bytes);
+				return false;
+			}
 			boolean queued = outbound.offer(m, Config.DEFAULT_INTERNAL_TIMEOUT,
 				TimeUnit.MILLISECONDS);
+			if (!queued) releaseOutbound(bytes);
+			if (queued && !ch.isActive() && outbound.remove(m)) {
+				releaseOutbound(bytes);
+				queued=false;
+			}
 			if (queued) flushPending();
 			return queued;
 		} catch (InterruptedException e) {
+			if (reserved) releaseOutbound(bytes);
 			Thread.currentThread().interrupt();
 			return false;
 		}
@@ -208,9 +230,40 @@ public class NettyConnection extends AConnection {
 	public boolean trySendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
+		int bytes=Utils.checkedInt(m.getMessageData().count());
+		try {
+			if (!reserveOutbound(bytes,0)) return false;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+		if (!ch.isActive()) {
+			releaseOutbound(bytes);
+			return false;
+		}
 		boolean queued = outbound.offer(m);
+		if (!queued) releaseOutbound(bytes);
+		if (queued && !ch.isActive() && outbound.remove(m)) {
+			releaseOutbound(bytes);
+			queued=false;
+		}
 		if (queued) flushPending();
 		return queued;
+	}
+
+	@Override
+	public boolean trySendPriorityMessage(Message m) {
+		Channel ch=channel;
+		if (ch==null || !ch.isActive()) return false;
+		long size=m.getMessageData().count();
+		if (size>Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT) return trySendMessage(m);
+		priorityOutbound.set(m);
+		if (!ch.isActive()) {
+			priorityOutbound.compareAndSet(m,null);
+			return false;
+		}
+		flushPending();
+		return true;
 	}
 
 	/**
@@ -235,13 +288,52 @@ public class NettyConnection extends AConnection {
 		if (ch == null) return;
 		int count = 0;
 		while (ch.isWritable() && ch.isActive()) {
-			Message m = outbound.poll();
+			Message m=priorityOutbound.getAndSet(null);
+			if (m==null) {
+				m = outbound.poll();
+				if (m!=null) releaseOutbound(Utils.checkedInt(m.getMessageData().count()));
+			}
 			if (m == null) break;
 			ch.write(m);
 			count++;
 		}
 		if (count > 0) {
 			ch.flush();
+		}
+	}
+
+	private boolean reserveOutbound(int bytes, long timeoutMillis) throws InterruptedException {
+		long remaining=TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+		long deadline=System.nanoTime()+remaining;
+		synchronized (outboundCapacity) {
+			while (!hasOutboundCapacity(bytes)) {
+				if (remaining<=0) return false;
+				TimeUnit.NANOSECONDS.timedWait(outboundCapacity,remaining);
+				remaining=deadline-System.nanoTime();
+			}
+			outboundBytes+=bytes;
+			return true;
+		}
+	}
+
+	private boolean hasOutboundCapacity(int bytes) {
+		if (bytes<0) return false;
+		if (outboundBytes==0) return bytes<=convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+		return outboundBytes+bytes<=Config.OUTBOUND_QUEUE_BYTE_LIMIT;
+	}
+
+	private void releaseOutbound(int bytes) {
+		synchronized (outboundCapacity) {
+			outboundBytes-=bytes;
+			if (outboundBytes<0) outboundBytes=0;
+			outboundCapacity.notifyAll();
+		}
+	}
+
+	private void clearOutbound() {
+		Message message;
+		while ((message=outbound.poll())!=null) {
+			releaseOutbound(Utils.checkedInt(message.getMessageData().count()));
 		}
 	}
 

@@ -782,6 +782,15 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
+	 * Non-blocking send for a small replaceable consensus/control root. The
+	 * default has ordinary non-blocking semantics; connected transports may
+	 * coalesce it ahead of bulk data.
+	 */
+	public boolean trySendPriority(Message msg) {
+		return trySend(msg);
+	}
+
+	/**
 	 * Attempts to resolve a CNS name
 	 *
 	 * @param cnsName CNS name to resolve

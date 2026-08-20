@@ -4,11 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +41,8 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -52,6 +59,8 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.AConnection;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
@@ -519,5 +528,66 @@ public class ServerTest {
 				convex.core.message.Message.createBelief(server.getBelief()));
 		}
 		// No exception, no blocking — bounded queue works
+	}
+
+	@Test
+	public void testBeliefDeltaUsesBoundedDataAheadMessages() {
+		Belief belief=network.SERVER.getBelief();
+		ArrayList<ACell> novelty=new ArrayList<>();
+		for (int i=0; i<6; i++) novelty.add(Blobs.createRandom(600));
+		int limit=Math.max(1024,belief.getEncodingLength()+100);
+
+		List<Message> messages=BeliefPropagator.createPartialBeliefMessages(
+			belief,novelty,limit);
+
+		assertTrue(messages.size()>1);
+		for (Message message:messages) assertTrue(message.getMessageData().count()<=limit);
+		for (int i=0; i<messages.size()-1; i++) {
+			assertEquals(MessageType.DATA,messages.get(i).getType());
+		}
+		assertEquals(MessageType.BELIEF,messages.get(messages.size()-1).getType());
+
+		ArrayList<ACell> boundedNovelty=new ArrayList<>();
+		for (int i=0; i<20; i++) boundedNovelty.add(Blobs.createRandom(600));
+		List<Message> bounded=BeliefPropagator.createPartialBeliefMessages(
+			belief,boundedNovelty,limit,2200);
+		assertTrue(bounded.stream().mapToLong(m -> m.getMessageData().count()).sum()<=2200);
+	}
+
+	@Test
+	public void testBeliefDeltaMaterialisationConfig() {
+		assertEquals(16 * 1024 * 1024,Config.getBeliefDeltaBroadcastSize(Map.of()));
+		Map<Keyword,Object> configured=Map.of(
+			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,1024,
+			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,4096);
+		assertEquals(4096,Config.getBeliefDeltaBroadcastSize(configured));
+		Map<Keyword,Object> invalid=Map.of(
+			Config.MAX_BELIEF_DELTA_MESSAGE_SIZE,4096,
+			Config.MAX_BELIEF_DELTA_BROADCAST_SIZE,1024);
+		assertThrows(IllegalArgumentException.class,
+			() -> Config.getBeliefDeltaBroadcastSize(invalid));
+	}
+
+	@Test
+	public void testQuickBeliefUpdateIsOwnOrderRootOnly() throws Exception {
+		Message quick=network.SERVER.getBeliefPropagator().createQuickUpdateMessage();
+		assertNotNull(quick);
+		assertEquals(MessageType.BELIEF,quick.getType());
+		assertTrue(quick.getPayload() instanceof SignedData<?>);
+		assertTrue(quick.getMessageData().count()<=Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+	}
+
+	@Test
+	public void testPeerStagesDataAheadCells() throws Exception {
+		Server server=network.SERVER;
+		Blob value=Blobs.createRandom(400);
+		Message sent=Message.createDataMessage(List.of(value),1024);
+		Message incoming=Message.create(sent.getMessageData());
+		CompletableFuture<Message> staged=new CompletableFuture<>();
+		server.getBeliefPropagator().setDataStageObserver(staged::complete);
+
+		assertNull(server.deliverMessage(incoming));
+		assertSame(incoming,staged.get(5,TimeUnit.SECONDS));
+		assertNotNull(server.getStore().refForHash(value.getHash()));
 	}
 }

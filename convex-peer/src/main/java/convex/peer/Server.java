@@ -25,6 +25,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
@@ -54,6 +55,7 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
@@ -169,6 +171,7 @@ public class Server implements Closeable {
 	 */
 	private final Predicate<Message> txnRetry = transactionHandler::offerTransactionBlocking;
 	private final Predicate<Message> queryRetry = queryHandler::offerQueryBlocking;
+	private final Predicate<Message> beliefRetry = propagator::queueBeliefBlocking;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -550,10 +553,11 @@ public class Server implements Closeable {
 				if (queryHandler.offerQuery(m)) return null;
 				return queryRetry;
 
-			// Protocol messages — always accepted, handled inline
+			// Belief and DATA preserve wire order on the bounded propagator queue.
 			case BELIEF:
-				processBelief(m);
-				return null;
+				return processBelief(m)?null:beliefRetry;
+			case DATA:
+				return processData(m)?null:beliefRetry;
 			case CHALLENGE:
 				processChallenge(m);
 				return null;
@@ -594,6 +598,34 @@ public class Server implements Closeable {
 				// best effort
 			}
 			return null;
+		}
+	}
+
+	/** Queues DATA with Beliefs so staging preserves per-connection wire order off the I/O thread. */
+	private boolean processData(Message message) {
+		AConnection conn=message.getConnection();
+		if (conn!=null && !conn.isTrusted()) {
+			inboundVerifier.maybeStart(conn);
+			returnError(message,ErrorCodes.TRUST,Strings.create("DATA requires a verified Peer"));
+			return true;
+		}
+		return propagator.queueBelief(message);
+	}
+
+	/** Stages a previously authorised DATA message on the Belief propagator thread. */
+	void stageData(Message message) throws IOException, convex.core.exceptions.BadFormatException {
+		AVector<?> payload=RT.ensureVector(message.getPayload());
+		if (payload==null || payload.count()<2
+				|| payload.count()>CPoSConstants.MISSING_LIMIT+1
+				|| !MessageTag.DATA.equals(payload.get(0))) {
+			throw new convex.core.exceptions.BadFormatException("Invalid DATA message format");
+		}
+		for (long i=1; i<payload.count(); i++) {
+			ACell cell=payload.get(i);
+			if (cell==null || cell.isEmbedded()) {
+				throw new convex.core.exceptions.BadFormatException("DATA message contains invalid cell");
+			}
+			Cells.store(cell,store);
 		}
 	}
 
@@ -768,17 +800,16 @@ public class Server implements Closeable {
 	 * best-effort queue and trigger server-initiated verification.
 	 * @param m Belief message to process
 	 */
-	protected void processBelief(Message m) {
+	protected boolean processBelief(Message m) {
 		AConnection conn=m.getConnection();
 		if (conn==null || conn.isTrusted()) {
 			// Trusted or local (ConvexLocal) — main queue
-			if (!propagator.queueBelief(m)) {
-				log.warn("Incoming belief queue full");
-			}
+			return propagator.queueBelief(m);
 		} else {
 			// Untrusted inbound — best-effort queue, trigger verification
 			propagator.queueUntrustedBelief(m);
 			inboundVerifier.maybeStart(conn);
+			return true;
 		}
 	}
 

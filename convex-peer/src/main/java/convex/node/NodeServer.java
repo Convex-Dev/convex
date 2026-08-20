@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -21,6 +20,7 @@ import convex.api.Acquiror;
 import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -33,7 +33,9 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.StoreException;
 import convex.core.lang.RT;
 import convex.core.message.AConnection;
+import convex.core.message.BoundedMessageQueue;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
@@ -159,7 +161,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private volatile LifecycleState lifecycleState = LifecycleState.NEW;
 
 	/** Bounded handoff from Netty event loops to the lattice processing thread. */
-	private final ArrayBlockingQueue<Message> inboundQueue;
+	private final BoundedMessageQueue inboundQueue;
 
 	/** Pre-allocated backpressure retry returned when {@link #inboundQueue} is full. */
 	private final Predicate<Message> inboundRetry = this::offerInboundBlocking;
@@ -246,7 +248,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.lattice = lattice;
 		this.store = store;
 		this.config = (config != null) ? config : NodeConfig.create();
-		this.inboundQueue = new ArrayBlockingQueue<>(this.config.getInboundQueueSize());
+		this.inboundQueue = new BoundedMessageQueue(this.config.getInboundQueueSize(),
+			this.config.getMaxInboundQueueBytes());
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
 		this.port = this.config.getPort();
 		this.mergeContext = LatticeContext.EMPTY.withMaxFutureTimestampSkew(
@@ -345,6 +348,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 				LatticePropagator p = propagators.get(i);
 				p.configure(lattice, mergeContext, i == 0);
 				p.setPersistenceEnabled(config.isPersist());
+				p.setMaxDeltaMessageSize(config.getMaxDeltaMessageSize());
+				p.setMaxDeltaBroadcastSize(config.getMaxDeltaBroadcastSize());
 			}
 
 			// Outbound sockets begin at the public/untrusted cap. Their connection manager
@@ -661,6 +666,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 					prepareLatticeValue(message, owner, stats);
 				}
 				break;
+			case DATA:
+				if (owner == null) {
+					recordMergeReject(conn, stats);
+					log.warn("Rejected DATA on an unassigned connection");
+				} else {
+					processData(message,owner,stats);
+				}
+				break;
 			case DATA_REQUEST:
 				if (owner == null) {
 					rejectUnscopedDataRequest(message);
@@ -686,6 +699,33 @@ public class NodeServer<V extends ACell> implements Closeable {
 				// best effort
 			}
 		}
+	}
+
+	/**
+	 * Stages a bounded batch of independently addressable cells in the connection's
+	 * capability-scoped propagator store. DATA messages never merge or publish a
+	 * root; a later LATTICE_VALUE either uses the staged cells or pulls anything
+	 * that was dropped in transit.
+	 */
+	private void processData(Message message, LatticePropagator owner,
+			ConnectionStats stats) throws BadFormatException, IOException {
+		AConnection conn=message.getConnection();
+		AVector<?> payload=RT.ensureVector(message.getPayload());
+		if (payload==null || payload.count()<2
+				|| payload.count()>CPoSConstants.MISSING_LIMIT+1
+				|| !MessageTag.DATA.equals(payload.get(0))) {
+			recordMergeReject(conn,stats);
+			throw new BadFormatException("Invalid DATA message format");
+		}
+		for (long i=1; i<payload.count(); i++) {
+			ACell cell=payload.get(i);
+			if (cell==null || cell.isEmbedded()) {
+				recordMergeReject(conn,stats);
+				throw new BadFormatException("DATA message contains invalid cell");
+			}
+			Cells.store(cell,owner.getStore());
+		}
+		recordNonMergeAccept(stats);
 	}
 
 	/**
@@ -812,6 +852,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private synchronized void stopInboundDispatcher() throws IOException {
 		acceptingInbound = false;
 		inboundRunning = false;
+		inboundQueue.signalAll();
 		Thread thread = inboundThread;
 		if (thread == null) return;
 		long timeout = config.getInboundShutdownTimeout();
@@ -1599,6 +1640,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (stats == null) return;
 		stats.mergesAccepted++;
 		stats.consecutiveRejects = 0;
+	}
+
+	/** Records a valid non-merge protocol message without inflating merge metrics. */
+	private void recordNonMergeAccept(ConnectionStats stats) {
+		if (stats != null) stats.consecutiveRejects=0;
 	}
 
 	/**

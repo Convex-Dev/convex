@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client, 0 to disable), so a well-resourced peer can serve more. Clients are identified by direct socket address and forwarded client-address headers are never consulted, since a limit keyed on a caller-supplied header is trivially bypassed. Behind a reverse proxy, set `transact-limit-client` to 0 and let the proxy apply per-client policy, which it can do against the true client address; the server-wide cap still bounds total load.
+- Lattice and CPoS propagation split oversized deltas into bounded `:DATA` batches followed by a root announcement. Per-message and total eager-materialisation limits are independently configurable with `maxDeltaMessageSize` / `maxDeltaBroadcastSize` and `:max-belief-delta-message-size` / `:max-belief-delta-broadcast-size`; complete inbound values retain their separate size policy.
 
 ### Changed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `RootComponent` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
+- Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
 
 ## [0.8.14] - 2026-08-19
 
