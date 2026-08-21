@@ -12,6 +12,7 @@ import java.security.KeyStore.PasswordProtection;
 import java.security.KeyStore.SecretKeyEntry;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.UnrecoverableKeyException;
 
 import javax.crypto.SecretKey;
@@ -28,6 +29,16 @@ import convex.core.util.FileUtils;
 public class PFXTools {
 
 	public static final String KEYSTORE_TYPE="PKCS12";
+
+	/**
+	 * Length in bytes of the random salt used for password-based key derivation.
+	 */
+	private static final int SALT_LENGTH=20;
+
+	/**
+	 * Source of randomness for key derivation salts
+	 */
+	private static final SecureRandom SRAND=new SecureRandom();
 
 	/**
 	 * Creates a new PKCS12 key store.
@@ -137,7 +148,10 @@ public class PFXTools {
 		
 		// See https://neilmadden.blog/2017/11/17/java-keystores-the-gory-details/
 		SecretKeyEntry keyEntry=new SecretKeyEntry(secretKeySeed);
-		byte[] salt=new byte[20];
+		// Salt must be freshly random for each entry: a fixed salt would let one precomputed
+		// PBKDF2 table attack the passphrase on every key store Convex has ever written.
+		byte[] salt=new byte[SALT_LENGTH];
+		SRAND.nextBytes(salt);
 		
 		PasswordProtection protection= new PasswordProtection(keyPassword,
                 "PBEWithHmacSHA512AndAES_128",

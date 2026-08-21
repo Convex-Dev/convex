@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `RootComponent` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
 - Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
 
+### Security
+
+- PKCS12 key stores now protect each key entry with a freshly generated random salt for password-based key derivation. Every entry was previously written with a fixed all-zero salt, so a single precomputed PBKDF2 table would have applied to every key store Convex has ever written. Existing key stores still open, since the salt is stored in the file itself; an entry is re-salted when it is next written.
+
 ## [0.8.14] - 2026-08-19
 
 ### Changed
