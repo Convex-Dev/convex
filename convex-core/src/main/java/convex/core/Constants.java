@@ -163,7 +163,12 @@ public class Constants {
 	 */
 	public static final boolean OMIT_VALIDATION_STACKTRACES = false;
 
-	public static final int PBE_ITERATIONS = 100000;
+	/**
+	 * Iteration count for password-based key derivation protecting key store entries,
+	 * following OWASP guidance for PBKDF2-HMAC-SHA512. The count is recorded in each
+	 * key store, so raising it affects only entries written from now on.
+	 */
+	public static final int PBE_ITERATIONS = 220000;
 	
 	public static final String DEFAULT_KEYSTORE_FILENAME = "~/.convex/keystore.pfx";
 

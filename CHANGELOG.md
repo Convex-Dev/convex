@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - PKCS12 key stores now protect each key entry with a freshly generated random salt for password-based key derivation. Every entry was previously written with a fixed all-zero salt, so a single precomputed PBKDF2 table would have applied to every key store Convex has ever written. Existing key stores still open, since the salt is stored in the file itself; an entry is re-salted when it is next written.
+- Password-based key derivation for key store entries now runs 220,000 PBKDF2-HMAC-SHA512 iterations, up from 100,000, following current OWASP guidance. The count is recorded in each key store, so existing entries keep their own count until they are next written. Unlocking a key costs roughly 140ms rather than 65ms.
 
 ## [0.8.14] - 2026-08-19
 

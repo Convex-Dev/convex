@@ -41,6 +41,11 @@ public class PFXTest {
 	 */
 	private static final Blob PBKDF2_OID=Blob.fromHex("06092A864886F70D01050C");
 
+	/**
+	 * Key derivation parameters as actually written to a PKCS12 file
+	 */
+	private record KDFParams(Blob salt, int iterations) {}
+
 	@Test public void testNewStore() throws IOException, GeneralSecurityException {
 		File f=File.createTempFile("temp-keystore", "pfx");
 		char[] PASS="test".toCharArray();
@@ -72,18 +77,26 @@ public class PFXTest {
 	}
 
 	@Test public void testKeySaltIsRandom() throws IOException, GeneralSecurityException {
-		ArrayList<Blob> salts=pbkdf2Salts(storeWithHeroKey());
-		assertEquals(1,salts.size());
+		ArrayList<KDFParams> params=pbkdf2Params(storeWithHeroKey());
+		assertEquals(1,params.size());
 
-		Blob salt=salts.get(0);
+		Blob salt=params.get(0).salt();
 		assertEquals(SALT_LENGTH,salt.count());
 		assertNotEquals(Blob.create(new byte[SALT_LENGTH]),salt);
 
 		// A second store for the same key and passphrases must not reuse the salt, otherwise
 		// one precomputed PBKDF2 table would attack every key store we write
-		ArrayList<Blob> salts2=pbkdf2Salts(storeWithHeroKey());
-		assertEquals(1,salts2.size());
-		assertNotEquals(salt,salts2.get(0));
+		ArrayList<KDFParams> params2=pbkdf2Params(storeWithHeroKey());
+		assertEquals(1,params2.size());
+		assertNotEquals(salt,params2.get(0).salt());
+	}
+
+	@Test public void testIterationCount() throws IOException, GeneralSecurityException {
+		// Confirms the requested protection parameters reach the file, rather than the
+		// key store falling back to a default iteration count
+		ArrayList<KDFParams> params=pbkdf2Params(storeWithHeroKey());
+		assertEquals(1,params.size());
+		assertEquals(Constants.PBE_ITERATIONS,params.get(0).iterations());
 	}
 
 	@Test public void testLegacyZeroSaltStore() throws IOException, GeneralSecurityException {
@@ -97,10 +110,12 @@ public class PFXTest {
 		SecretKey seed=new SecretKeySpec(kp.getSeed().getBytes(), "Ed25519");
 		ks.setEntry(alias, new SecretKeyEntry(seed), new PasswordProtection(KEY_PASS,
 				"PBEWithHmacSHA512AndAES_128",
-				new PBEParameterSpec(new byte[SALT_LENGTH], Constants.PBE_ITERATIONS)));
+				new PBEParameterSpec(new byte[SALT_LENGTH], 100000)));
 		PFXTools.saveStore(ks, f, STORE_PASS);
 
-		assertEquals(Blob.create(new byte[SALT_LENGTH]),pbkdf2Salts(f).get(0));
+		KDFParams params=pbkdf2Params(f).get(0);
+		assertEquals(Blob.create(new byte[SALT_LENGTH]),params.salt());
+		assertEquals(100000,params.iterations());
 		assertEquals(kp.getSeed(),PFXTools.getKeyPair(PFXTools.loadStore(f, STORE_PASS), alias, KEY_PASS).getSeed());
 	}
 
@@ -116,19 +131,28 @@ public class PFXTest {
 	}
 
 	/**
-	 * Extracts the PBKDF2 salts protecting the key entries in a PKCS12 file.
+	 * Extracts the PBKDF2 parameters protecting the key entries in a PKCS12 file.
 	 */
-	private static ArrayList<Blob> pbkdf2Salts(File f) throws IOException {
+	private static ArrayList<KDFParams> pbkdf2Params(File f) throws IOException {
 		byte[] bs=Files.readAllBytes(f.toPath());
 		int oidLength=(int)PBKDF2_OID.count();
-		ArrayList<Blob> salts=new ArrayList<>();
+		ArrayList<KDFParams> params=new ArrayList<>();
 		for (int i=0; i+oidLength<=bs.length; i++) {
 			if (!PBKDF2_OID.equals(Blob.wrap(bs,i,oidLength))) continue;
 			int p=i+oidLength;
 			assertEquals(0x30,bs[p]&0xFF); // PBKDF2-params SEQUENCE
 			assertEquals(0x04,bs[p+2]&0xFF); // salt OCTET STRING
-			salts.add(Blob.create(bs,p+4,bs[p+3]&0xFF));
+			int saltLength=bs[p+3]&0xFF;
+			Blob salt=Blob.create(bs,p+4,saltLength);
+
+			int q=p+4+saltLength;
+			assertEquals(0x02,bs[q]&0xFF); // iterationCount INTEGER
+			int countLength=bs[q+1]&0xFF;
+			int iterations=0;
+			for (int j=0; j<countLength; j++) iterations=(iterations<<8)|(bs[q+2+j]&0xFF);
+
+			params.add(new KDFParams(salt,iterations));
 		}
-		return salts;
+		return params;
 	}
 }
