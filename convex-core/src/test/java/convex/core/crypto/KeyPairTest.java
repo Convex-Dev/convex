@@ -110,4 +110,13 @@ public class KeyPairTest {
 		assertThrows(BadFormatException.class,()->AKeyPair.createFromPKCS8(wrong));
 	}
 
+
+	@Test
+	public void testInsufficientKeyMaterial() {
+		// Should report the problem, not fail on an internal negative array index
+		IllegalArgumentException e=assertThrows(IllegalArgumentException.class,
+				()->AKeyPair.create(new byte[16]));
+		assertTrue(e.getMessage().contains("16"),e.getMessage());
+	}
+
 }

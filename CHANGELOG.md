@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `RootComponent` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
 - Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
+- The GUI passphrase strength estimate awards the documented 2 bits per character category used, rather than 1. The multiply sat inside `Integer.bitCount`, where doubling a bit mask cannot change the count.
 
 ### Security
 

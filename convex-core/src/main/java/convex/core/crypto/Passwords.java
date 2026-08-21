@@ -60,8 +60,9 @@ public class Passwords {
 			lastCategory=category;
 		}
 		
-		// 2 bits of entropy bonus per category used
-		entropy +=Integer.bitCount(catsUsed*PER_CAT);
+		// 2 bits of entropy bonus per category used. Note the multiply must be outside
+		// bitCount: multiplying the mask by a power of two does not change its bit count
+		entropy +=Integer.bitCount(catsUsed)*PER_CAT;
 		
 		return entropy;
 	}

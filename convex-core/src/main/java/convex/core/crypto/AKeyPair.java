@@ -125,6 +125,8 @@ public abstract class AKeyPair {
 	 */
 	public static AKeyPair create(byte[] keyMaterial) {
 		int n=keyMaterial.length;
+		if (n<SEED_LENGTH) throw new IllegalArgumentException(
+				"Insufficient key material: need at least "+SEED_LENGTH+" bytes but got "+n);
 		return create(Blob.wrap(keyMaterial,n-SEED_LENGTH,SEED_LENGTH));
 	}
 	
@@ -167,7 +169,8 @@ public abstract class AKeyPair {
 	 * @return A new key pair using the given seed
 	 */
 	public static AKeyPair create(Blob ed25519seed) {
-		if (ed25519seed.count()!=SEED_LENGTH) throw new IllegalArgumentException("seed must 32 bytes");
+		if (ed25519seed.count()!=SEED_LENGTH) throw new IllegalArgumentException(
+				"Ed25519 seed must be "+SEED_LENGTH+" bytes but was: "+ed25519seed.count());
 		return Providers.generate(ed25519seed);
 	}
 
@@ -331,7 +334,7 @@ public abstract class AKeyPair {
 	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
 	        return result;
 		} catch (IOException e ) {
-			throw new GeneralSecurityException("IO filure in secure operation",e);
+			throw new GeneralSecurityException("IO failure in secure operation",e);
 		}
 	}
 

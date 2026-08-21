@@ -55,7 +55,7 @@ public class PEMTools {
 			writer.writeObject(generator);
 			writer.close();
 		} catch (IOException | OperatorCreationException e) {
-			throw new GeneralSecurityException("cannot encrypt private key to PEM: " + e);
+			throw new GeneralSecurityException("Cannot encrypt private key to PEM", e);
 		} 
 		return stringWriter.toString();
 	}
@@ -88,7 +88,7 @@ public class PEMTools {
 			// public key field, whose bytes would otherwise be mistaken for the seed
 			return AKeyPair.createFromPKCS8(privateKeyInfo.getEncoded());
 		} catch (IOException | PKCSException e) {
-			throw new BadFormatException("cannot decrypt password from PEM ", e);
+			throw new BadFormatException("Cannot decrypt private key from PEM", e);
 		}
 	}
 
@@ -105,7 +105,7 @@ public class PEMTools {
 			}
 			return null;
 		} catch (IOException e) {
-			throw new BadFormatException("cannot read PEM",e);
+			throw new BadFormatException("Cannot read PEM", e);
 		}
 	}
 

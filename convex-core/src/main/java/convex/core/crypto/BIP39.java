@@ -523,24 +523,22 @@ public class BIP39 {
 	 */
 	public static int[] parsePath(String path) {
 		if (path==null) return null;
-		try {
-			String[] es=path.split("/");
-			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
-			
-			int n=es.length-1;
-			int[] proposedPath=new int[n];
-			for (int i=0; i<n; i++) {
-				try {
-					Integer ix= Integer.parseInt(es[i+1]);
-					proposedPath[i]=ix;
-				} catch (NumberFormatException e) {
-					throw new Exception("<Bad derivation path, should be integer indexes 'm/44/888/1/0/123' >");
-				}
+		String[] es=path.split("/");
+
+		// Must start with 'm', e.g. m/44/888/1/0/123
+		if ((es.length==0)||!"m".equals(es[0])) return null;
+
+		int n=es.length-1;
+		int[] proposedPath=new int[n];
+		for (int i=0; i<n; i++) {
+			try {
+				proposedPath[i]=Integer.parseInt(es[i+1]);
+			} catch (NumberFormatException e) {
+				// Path elements must be integer indexes
+				return null;
 			}
-			return proposedPath;
-		} catch (Exception ex) {
-			return null;
 		}
+		return proposedPath;
 	}
 	
 }

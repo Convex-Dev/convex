@@ -41,7 +41,8 @@ public class Ed25519Signature extends ASignature {
 	 * @return Signature instance
 	 */
 	public static Ed25519Signature wrap(byte[] signature) {
-		if (signature.length!=SIGNATURE_LENGTH) throw new IllegalArgumentException("Bsd signature length for ED25519");
+		if (signature.length!=SIGNATURE_LENGTH) throw new IllegalArgumentException(
+				"Bad signature length for Ed25519: "+signature.length);
 		return new Ed25519Signature(signature);
 	}
 	
@@ -72,7 +73,7 @@ public class Ed25519Signature extends ASignature {
 	 */
 	public static Ed25519Signature read(ByteBuffer bb) throws BadFormatException {
 		byte count=bb.get();
-		if (count!=SIGNATURE_LENGTH) throw new BadFormatException("Expected count byte of signature wrong: "+Utils.toHexString(count));
+		if (count!=SIGNATURE_LENGTH) throw new BadFormatException("Bad count byte for Ed25519 signature: "+Utils.toHexString(count));
 		return readRaw(bb);
 	}
 	
