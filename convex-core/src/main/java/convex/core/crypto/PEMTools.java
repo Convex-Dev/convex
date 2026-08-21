@@ -20,14 +20,11 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEInputDecryptorProviderBuilder;
 import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 
+import convex.core.Constants;
+import convex.core.crypto.bc.BCProvider;
 import convex.core.exceptions.BadFormatException;
 
 public class PEMTools {
-	/**
-	 * Default iteration count for PBE. TODO: is this sane?
-	 */
-	private static final int PBE_ITERATIONS=65536;
-	
 	static {
 		// Ensure we have BC provider initialised etc.
 		Providers.init();
@@ -47,8 +44,12 @@ public class PEMTools {
 		JcaPEMWriter writer = new JcaPEMWriter(stringWriter);
 		
 		try {
-			JcePKCSPBEOutputEncryptorBuilder builder = new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.PBE_SHA1_RC2_128);
-			builder.setIterationCount(PBE_ITERATIONS); // TODO: double check requirements here?
+			// PBES2 with AES-256-CBC and PBKDF2-HMAC-SHA512, with a random salt supplied by the
+			// builder. The scheme is recorded in the PEM, so keys exported earlier still import.
+			JcePKCSPBEOutputEncryptorBuilder builder = new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.AES_256_CBC);
+			builder.setPRF(PKCS8Generator.PRF_HMACSHA512);
+			builder.setProvider(BCProvider.BC);
+			builder.setIterationCount(Constants.PBE_ITERATIONS);
 			OutputEncryptor encryptor = builder.build(password);
 			JcaPKCS8Generator generator = new JcaPKCS8Generator(privateKey, encryptor);
 			writer.writeObject(generator);
@@ -76,7 +77,10 @@ public class PEMTools {
 		try {
 			PKCS8EncryptedPrivateKeyInfo encryptedInfo = new PKCS8EncryptedPrivateKeyInfo(pemObject.getContent());
 
+			// Decrypt with BouncyCastle throughout: mixing a BC derived key with another
+			// provider's cipher fails on the key algorithm name
 			JcePKCSPBEInputDecryptorProviderBuilder inputBuilder = new JcePKCSPBEInputDecryptorProviderBuilder();
+			inputBuilder.setProvider(BCProvider.BC);
 			InputDecryptorProvider decryptor = inputBuilder.build(password);
 
 			PrivateKeyInfo privateKeyInfo = encryptedInfo.decryptPrivateKeyInfo(decryptor);

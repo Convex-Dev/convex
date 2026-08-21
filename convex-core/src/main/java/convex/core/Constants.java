@@ -164,9 +164,10 @@ public class Constants {
 	public static final boolean OMIT_VALIDATION_STACKTRACES = false;
 
 	/**
-	 * Iteration count for password-based key derivation protecting key store entries,
-	 * following OWASP guidance for PBKDF2-HMAC-SHA512. The count is recorded in each
-	 * key store, so raising it affects only entries written from now on.
+	 * Iteration count for password-based key derivation protecting private keys, in key
+	 * stores and exported PEM alike, following OWASP guidance for PBKDF2-HMAC-SHA512. The
+	 * count is recorded in the encrypted output, so raising it affects only keys written
+	 * from now on.
 	 */
 	public static final int PBE_ITERATIONS = 220000;
 	
