@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import javax.crypto.SecretKey;
+import javax.crypto.KeyGenerator;
 
 import org.junit.jupiter.api.Test;
 
@@ -72,6 +73,19 @@ public class SymmetricTest {
 	public void testEncoded() {
 		SecretKey k = Symmetric.createSecretKey();
 		byte[] encoded = k.getEncoded();
-		assertEquals(16, encoded.length);
+		assertEquals(32, encoded.length); // AES-256
 	}
+
+	@Test
+	public void testShorterKeyStillWorks() throws Exception {
+		// createSecretKey() now generates 256-bit keys, but any valid AES key length is
+		// accepted, so data encrypted under an older 128-bit key still decrypts
+		KeyGenerator kgen=KeyGenerator.getInstance("AES");
+		kgen.init(128);
+		SecretKey key=kgen.generateKey();
+
+		assertEquals(16,key.getEncoded().length);
+		assertEquals("legacy",Symmetric.decryptString(key,Symmetric.encrypt(key,"legacy")));
+	}
+
 }

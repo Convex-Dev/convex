@@ -17,7 +17,8 @@ public class AESGCM {
 	private static final String ALGORITHM = "AES/GCM/NoPadding";
 	private static final int NONCE_LENGTH = 12;
 	private static final int TAG_BITS = 128;
-	private static final int KEY_LENGTH = 32;
+	/** AES-256 key length, in bytes */
+	private static final int KEY_LENGTH_BYTES = 32;
 
 	/**
 	 * Encrypts plaintext using AES-256-GCM with a random nonce.
@@ -28,7 +29,7 @@ public class AESGCM {
 	 * @return nonce (12 bytes) || ciphertext || GCM tag (16 bytes)
 	 */
 	public static byte[] encrypt(byte[] key, byte[] plaintext) {
-		if (key == null || key.length != KEY_LENGTH) throw new IllegalArgumentException("Key must be 32 bytes");
+		if (key == null || key.length != KEY_LENGTH_BYTES) throw new IllegalArgumentException("Key must be 32 bytes");
 		if (plaintext == null) throw new IllegalArgumentException("Plaintext must not be null");
 
 		try {
@@ -60,7 +61,7 @@ public class AESGCM {
 	 * @throws RuntimeException if decryption or authentication fails
 	 */
 	public static byte[] decrypt(byte[] key, byte[] data) {
-		if (key == null || key.length != KEY_LENGTH) throw new IllegalArgumentException("Key must be 32 bytes");
+		if (key == null || key.length != KEY_LENGTH_BYTES) throw new IllegalArgumentException("Key must be 32 bytes");
 		if (data == null || data.length < NONCE_LENGTH) throw new IllegalArgumentException("Data too short");
 
 		try {
