@@ -14,6 +14,12 @@ import convex.core.util.Utils;
  */
 @SuppressWarnings("serial")
 public class BCProvider extends AProvider {
+	/**
+	 * Rough count of signature verifications, for diagnostic display only.
+	 * 
+	 * Deliberately not atomic. Verification is on the hottest consensus path, where a
+	 * contended counter would cost far more than an occasional lost increment is worth.
+	 */
 	public static long verificationCount=0;
 	
 	public static final BouncyCastleProvider BC=new BouncyCastleProvider();
