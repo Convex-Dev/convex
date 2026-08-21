@@ -9,6 +9,9 @@ import java.io.StringWriter;
 import java.security.SecureRandom;
 
 import org.bouncycastle.asn1.pkcs.PBES2Parameters;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.pkcs.PBKDF2Params;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
@@ -21,6 +24,7 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.crypto.bc.BCProvider;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Strings;
@@ -118,4 +122,28 @@ public class PEMToolsTest {
 		System.out.println(kp.getSeed());
 		System.out.println(PEMTools.encryptPrivateKeyToPEM(kp,"foo".toCharArray()));
 	}
+
+	@Test
+	public void testImportPKCS8v2PEM() throws Exception {
+		// RFC 8410 allows an optional public key field. Its bytes then sit at the end of
+		// the encoding, where a naive reader would look for the seed.
+		Providers.init();
+		PrivateKeyInfo v2=new PrivateKeyInfo(
+				new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+				new DEROctetString(KP.getSeed().getBytes()),
+				null,
+				KP.getAccountKey().getBytes());
+
+		JcePKCSPBEOutputEncryptorBuilder builder=new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.AES_256_CBC);
+		builder.setProvider(BCProvider.BC);
+		StringWriter sw=new StringWriter();
+		try (JcaPEMWriter writer=new JcaPEMWriter(sw)) {
+			writer.writeObject(new PKCS8Generator(v2,builder.build(PASS)));
+		}
+
+		AKeyPair imported=PEMTools.decryptPrivateKeyFromPEM(sw.toString(),PASS);
+		assertEquals(KP.getSeed(),imported.getSeed());
+		assertEquals(KP.getAccountKey(),imported.getAccountKey());
+	}
+
 }

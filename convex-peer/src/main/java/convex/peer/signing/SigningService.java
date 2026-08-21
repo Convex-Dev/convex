@@ -76,6 +76,7 @@ public class SigningService {
 	// HKDF info strings
 	private static final byte[] INFO_SECRET = "convex-signing-secret-v1".getBytes();
 	private static final byte[] INFO_KEY    = "convex-signing-service-v1".getBytes();
+	private static final byte[] INFO_LOOKUP = "convex-signing-lookup-v1".getBytes();
 
 	private final AKeyPair peerKeyPair;
 	private final ACursor<ACell> cursor;
@@ -393,7 +394,10 @@ public class SigningService {
 		if (keys == null) return null;
 
 		ABlob encrypted = keys.get(lookupHash);
-		if (encrypted == null) return null;
+		if (encrypted == null) {
+			// May predate the keyed lookup hash: migrate now, while we hold the passphrase
+			return migrateLegacyKey(identity, publicKey, passphrase, keys);
+		}
 
 		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
 		try {
@@ -404,17 +408,65 @@ public class SigningService {
 	}
 
 	/**
+	 * Reads an entry stored under the legacy unkeyed lookup hash, rewrites it under the
+	 * current scheme and drops the old entry. Returns null if there is no legacy entry.
+	 */
+	private byte[] migrateLegacyKey(AString identity, AccountKey publicKey, AString passphrase,
+			Index<Hash, ABlob> keys) {
+		Hash legacyHash = legacyLookupHash(identity, publicKey, passphrase);
+		ABlob encrypted = keys.get(legacyHash);
+		if (encrypted == null) return null;
+
+		byte[] seed;
+		byte[] legacyKey = legacyKeyWrappingKey(identity, publicKey, passphrase);
+		try {
+			seed = AESGCM.decrypt(legacyKey, encrypted.getBytes());
+		} finally {
+			Arrays.fill(legacyKey, (byte) 0);
+		}
+
+		ABlob rewrapped;
+		byte[] wrappingKey = deriveKeyWrappingKey(identity, publicKey, passphrase);
+		try {
+			rewrapped = Blob.wrap(AESGCM.encrypt(wrappingKey, seed));
+		} finally {
+			Arrays.fill(wrappingKey, (byte) 0);
+		}
+
+		rewriteKey(legacyHash, computeLookupHash(identity, publicKey, passphrase), rewrapped);
+		return seed;
+	}
+
+	/**
+	 * Moves one encrypted entry to a new lookup hash in a single update.
+	 */
+	private void rewriteKey(Hash from, Hash to, ABlob encrypted) {
+		cursor.updateAndGet(v -> {
+			@SuppressWarnings("unchecked")
+			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
+			@SuppressWarnings("unchecked")
+			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
+			if (keys == null) keys = Index.none();
+			keys = keys.dissoc(from).assoc(to, encrypted);
+			data = data.assoc(KEY_KEYS, keys);
+			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
+			return data;
+		});
+	}
+
+	/**
 	 * Removes an encrypted seed from the :keys index.
 	 */
 	void removeFromKeys(AString identity, AccountKey publicKey, AString passphrase) {
 		Hash lookupHash = computeLookupHash(identity, publicKey, passphrase);
+		Hash legacyHash = legacyLookupHash(identity, publicKey, passphrase);
 		cursor.updateAndGet(v -> {
 			@SuppressWarnings("unchecked")
 			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
 			@SuppressWarnings("unchecked")
 			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(KEY_KEYS);
 			if (keys == null) return v;
-			keys = keys.dissoc(lookupHash);
+			keys = keys.dissoc(lookupHash).dissoc(legacyHash);
 			data = data.assoc(KEY_KEYS, keys);
 			data = data.assoc(KEY_TIMESTAMP, CVMLong.create(System.currentTimeMillis()));
 			return data;
@@ -505,9 +557,34 @@ public class SigningService {
 	}
 
 	/**
-	 * Computes the lookup hash for a key: SHA-256(identity || publicKey || passphrase)
+	 * Canonical byte representation of a credential triple.
+	 *
+	 * Uses the CAD3 value ID of a vector, so field boundaries are explicit. Plain
+	 * concatenation lets a longer identity with a shorter passphrase produce the same
+	 * bytes as the reverse.
 	 */
-	static Hash computeLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
+	private static byte[] credentialBytes(AString identity, AccountKey publicKey, AString passphrase) {
+		return Vectors.of(identity, publicKey, passphrase).getHash().getBytes();
+	}
+
+	/**
+	 * Computes the lookup hash used as the :keys index key.
+	 *
+	 * Keyed with the peer-held encryptionSecret. An unkeyed hash would let anyone
+	 * holding a replica of this store brute-force the passphrase offline, since the
+	 * identity and public key are public information.
+	 */
+	Hash computeLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
+		checkInitialised();
+		return Hash.wrap(HKDF.derive256(encryptionSecret,
+				credentialBytes(identity, publicKey, passphrase), INFO_LOOKUP));
+	}
+
+	/**
+	 * Lookup hash used before the keyed scheme: SHA-256(identity || publicKey || passphrase).
+	 * Retained so that existing entries can still be found and migrated.
+	 */
+	static Hash legacyLookupHash(AString identity, AccountKey publicKey, AString passphrase) {
 		ABlob combined = identity.toBlob().append(publicKey).append(passphrase.toBlob());
 		return Hashing.sha256(combined);
 	}
@@ -521,9 +598,17 @@ public class SigningService {
 
 	/**
 	 * Derives the wrapping key for an individual signing key.
-	 * HKDF(encryptionSecret, salt: identity || publicKey || passphrase, info: "convex-signing-service-v1")
+	 * HKDF(encryptionSecret, salt: canonical credential bytes, info: "convex-signing-service-v1")
 	 */
 	byte[] deriveKeyWrappingKey(AString identity, AccountKey publicKey, AString passphrase) {
+		return HKDF.derive256(encryptionSecret,
+				credentialBytes(identity, publicKey, passphrase), INFO_KEY);
+	}
+
+	/**
+	 * Wrapping key for entries written before the credential bytes were canonicalised.
+	 */
+	byte[] legacyKeyWrappingKey(AString identity, AccountKey publicKey, AString passphrase) {
 		ABlob salt = identity.toBlob().append(publicKey).append(passphrase.toBlob());
 		return HKDF.derive256(encryptionSecret, salt.getBytes(), INFO_KEY);
 	}

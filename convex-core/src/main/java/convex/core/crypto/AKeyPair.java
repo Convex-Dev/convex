@@ -11,6 +11,7 @@ import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
@@ -18,7 +19,9 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.util.PrivateKeyFactory;
 
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
@@ -114,6 +117,9 @@ public abstract class AKeyPair {
 	/**
 	 * Creates a key pair using specific key material.
 	 * 
+	 * Note: this takes the trailing bytes as an Ed25519 seed and does not parse any
+	 * structure. Use {@link #createFromPKCS8(byte[])} for an encoded private key.
+	 * 
 	 * @param keyMaterial Bytes to use as key. Last 32 bytes will be used
 	 * @return New key pair
 	 */
@@ -122,6 +128,37 @@ public abstract class AKeyPair {
 		return create(Blob.wrap(keyMaterial,n-SEED_LENGTH,SEED_LENGTH));
 	}
 	
+	/**
+	 * Creates a key pair from a PKCS#8 encoded Ed25519 private key, as produced by
+	 * {@link java.security.PrivateKey#getEncoded()} or read from a PEM file.
+	 *
+	 * Unlike {@link #create(byte[])} this parses the DER structure, so it handles the
+	 * optional public key field permitted by RFC 8410 and rejects encodings for other
+	 * algorithms, rather than reinterpreting whichever bytes happen to come last.
+	 *
+	 * @param encoded PKCS#8 encoding of an Ed25519 private key
+	 * @return A new key pair using the encoded seed
+	 * @throws BadFormatException If this is not a valid Ed25519 private key encoding
+	 */
+	public static AKeyPair createFromPKCS8(byte[] encoded) throws BadFormatException {
+		AsymmetricKeyParameter param;
+		try {
+			param=PrivateKeyFactory.createKey(encoded);
+		} catch (IOException|IllegalArgumentException|ClassCastException e) {
+			throw new BadFormatException("Invalid PKCS#8 private key encoding",e);
+		}
+		if (!(param instanceof Ed25519PrivateKeyParameters)) {
+			throw new BadFormatException("Not an Ed25519 private key encoding");
+		}
+
+		byte[] seed=((Ed25519PrivateKeyParameters)param).getEncoded();
+		try {
+			return create(Blob.create(seed));
+		} finally {
+			Arrays.fill(seed,(byte)0);
+		}
+	}
+
 	/**
 	 * Create a key pair with the given Ed25519 seed. Public key is generated
 	 * automatically from the private key

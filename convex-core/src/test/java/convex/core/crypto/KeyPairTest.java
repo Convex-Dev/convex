@@ -6,9 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
+import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 
 import convex.core.data.Blob;
+import convex.core.data.AccountKey;
 import convex.core.data.Blobs;
+import convex.core.exceptions.BadFormatException;
 
 public class KeyPairTest {
 
@@ -64,4 +70,44 @@ public class KeyPairTest {
 			     	+ "4a7c15e9716ed28dc027beceea1ec40a",kp3.sign(msg3).toHexString());
 
 	}
+
+	/**
+	 * PKCS#8 encoding of an Ed25519 private key, with or without the optional public
+	 * key field permitted by RFC 8410.
+	 */
+	private static byte[] pkcs8(AKeyPair kp, boolean withPublicKey) throws Exception {
+		AlgorithmIdentifier alg=new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519);
+		DEROctetString seed=new DEROctetString(kp.getSeed().getBytes());
+		PrivateKeyInfo info=withPublicKey
+				?new PrivateKeyInfo(alg,seed,null,kp.getAccountKey().getBytes())
+				:new PrivateKeyInfo(alg,seed);
+		return info.getEncoded();
+	}
+
+	@Test
+	public void testCreateFromPKCS8() throws Exception {
+		AKeyPair kp=AKeyPair.createSeeded(4242);
+		assertEquals(kp.getSeed(),AKeyPair.createFromPKCS8(pkcs8(kp,false)).getSeed());
+
+		// With the public key present the trailing 32 bytes are the public key, so a
+		// parser reading from the end would silently produce a different key pair
+		byte[] v2=pkcs8(kp,true);
+		assertEquals(kp.getSeed(),AKeyPair.createFromPKCS8(v2).getSeed());
+		assertEquals(kp.getAccountKey(),AKeyPair.createFromPKCS8(v2).getAccountKey());
+		// The trailing 32 bytes really are the public key here, which is exactly what
+		// makes a "last 32 bytes" reading of this encoding wrong
+		assertEquals(kp.getAccountKey(),AccountKey.wrap(v2,v2.length-32));
+	}
+
+	@Test
+	public void testCreateFromPKCS8Rejects() throws Exception {
+		// Not a DER structure at all
+		assertThrows(BadFormatException.class,()->AKeyPair.createFromPKCS8(new byte[48]));
+
+		// Valid PKCS#8, wrong algorithm: must be rejected rather than reinterpreted
+		AlgorithmIdentifier x25519=new AlgorithmIdentifier(EdECObjectIdentifiers.id_X25519);
+		byte[] wrong=new PrivateKeyInfo(x25519,new DEROctetString(new byte[32])).getEncoded();
+		assertThrows(BadFormatException.class,()->AKeyPair.createFromPKCS8(wrong));
+	}
+
 }

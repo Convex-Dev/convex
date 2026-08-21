@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import convex.auth.jwt.JWT;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.AESGCM;
 import convex.core.crypto.util.Multikey;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -17,6 +18,8 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
@@ -626,4 +629,68 @@ public class SigningServiceTest {
 		assertThrows(IllegalArgumentException.class, () -> new SigningService(null, cursor));
 		assertThrows(IllegalArgumentException.class, () -> new SigningService(kp, null));
 	}
+
+	// ===== Lookup hash keying and legacy migration =====
+
+	@SuppressWarnings("unchecked")
+	private static Index<Hash, ABlob> keysIndex(ACursor<ACell> cursor) {
+		AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) cursor.get();
+		return (Index<Hash, ABlob>) data.get(SigningService.KEY_KEYS);
+	}
+
+	/** Writes an entry directly into the :keys index, as the pre-migration code did. */
+	private static void putLegacyKey(ACursor<ACell> cursor, Hash hash, ABlob value) {
+		cursor.updateAndGet(v -> {
+			@SuppressWarnings("unchecked")
+			AHashMap<Keyword, ACell> data = (AHashMap<Keyword, ACell>) v;
+			@SuppressWarnings("unchecked")
+			Index<Hash, ABlob> keys = (Index<Hash, ABlob>) data.get(SigningService.KEY_KEYS);
+			return data.assoc(SigningService.KEY_KEYS, keys.assoc(hash, value));
+		});
+	}
+
+	@Test
+	public void testLookupHashIsKeyedToService() {
+		AString identity = s("did:key:alice");
+		AString pass = s("mypass");
+		AccountKey pk = AKeyPair.generate().getAccountKey();
+
+		SigningService a = createService();
+		SigningService b = createService();
+
+		// Without the peer-held secret the hash cannot be recomputed, so a replica of the
+		// store gives no offline oracle for guessing the passphrase
+		assertNotEquals(a.computeLookupHash(identity, pk, pass), b.computeLookupHash(identity, pk, pass));
+		assertNotEquals(SigningService.legacyLookupHash(identity, pk, pass),
+				a.computeLookupHash(identity, pk, pass));
+	}
+
+	@Test
+	public void testLegacyEntryMigratesOnLoad() {
+		ACursor<ACell> cursor = new Root<>((ACell) null);
+		SigningService svc = createService(AKeyPair.generate(), cursor);
+
+		AString identity = s("did:key:alice");
+		AString pass = s("mypass");
+		AKeyPair kp = AKeyPair.generate();
+		AccountKey pk = kp.getAccountKey();
+		byte[] seed = kp.getSeed().getBytes();
+
+		// Store an entry exactly as the unkeyed scheme did
+		Hash legacyHash = SigningService.legacyLookupHash(identity, pk, pass);
+		byte[] legacyWrap = svc.legacyKeyWrappingKey(identity, pk, pass);
+		putLegacyKey(cursor, legacyHash, Blob.wrap(AESGCM.encrypt(legacyWrap, seed)));
+
+		Hash newHash = svc.computeLookupHash(identity, pk, pass);
+		assertNull(keysIndex(cursor).get(newHash));
+
+		// Loading finds the legacy entry and rewrites it under the keyed hash
+		assertArrayEquals(seed, svc.loadKey(identity, pk, pass));
+		assertNotNull(keysIndex(cursor).get(newHash), "Entry should be rewritten under the keyed hash");
+		assertNull(keysIndex(cursor).get(legacyHash), "Legacy entry should be removed");
+
+		// Still loads afterwards, now through the migrated entry
+		assertArrayEquals(seed, svc.loadKey(identity, pk, pass));
+	}
+
 }

@@ -84,9 +84,9 @@ public class PEMTools {
 			InputDecryptorProvider decryptor = inputBuilder.build(password);
 
 			PrivateKeyInfo privateKeyInfo = encryptedInfo.decryptPrivateKeyInfo(decryptor);
-			byte[] data=privateKeyInfo.getEncoded();
-			AKeyPair kp=AKeyPair.create(data);
-			return kp;
+			// Parse the DER rather than taking trailing bytes: RFC 8410 allows an optional
+			// public key field, whose bytes would otherwise be mistaken for the seed
+			return AKeyPair.createFromPKCS8(privateKeyInfo.getEncoded());
 		} catch (IOException | PKCSException e) {
 			throw new BadFormatException("cannot decrypt password from PEM ", e);
 		}
