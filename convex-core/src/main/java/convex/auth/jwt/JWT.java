@@ -2,6 +2,7 @@ package convex.auth.jwt;
 
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
@@ -229,8 +230,10 @@ public class JWT {
 	public boolean verifyHS256(byte[] secret) {
 		try {
 			if (!"HS256".equals(getAlgorithm())) return false;
-			AString expected = JWT.signHS256(Strings.create(signingInput), secret);
-			return expected.equals(Strings.wrap(encoder.encode(signatureBytes)));
+			// Compare the raw MAC in constant time. Comparing encoded forms with equals()
+			// leaks, through timing, how many leading bytes of a forged tag were correct.
+			byte[] expected = hmacSHA256(signingInput.getBytes(StandardCharsets.UTF_8), secret);
+			return MessageDigest.isEqual(expected, signatureBytes);
 		} catch (Exception e) {
 			return false;
 		}
@@ -387,12 +390,18 @@ public class JWT {
 	}
 
 	public static AString signHS256(ABlobLike<?> message, byte[] secret) {
+		return encode(hmacSHA256(message.getBytes(), secret));
+	}
+
+	/**
+	 * Computes the raw HMAC-SHA256 of a message, before base64url encoding.
+	 */
+	private static byte[] hmacSHA256(byte[] message, byte[] secret) {
 		try {
 			Mac mac = Mac.getInstance("HmacSHA256");
 			SecretKeySpec keySpec = new SecretKeySpec(secret, "HmacSHA256");
 			mac.init(keySpec);
-			byte[] rawSignature = mac.doFinal(message.getBytes());
-			return encode(rawSignature);
+			return mac.doFinal(message);
 		} catch (NoSuchAlgorithmException  e) {
 			throw new Error("HMAC algorithm failure", e);
 		} catch (InvalidKeyException e) {

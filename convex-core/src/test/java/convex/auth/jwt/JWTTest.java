@@ -12,6 +12,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
 import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
@@ -339,6 +340,29 @@ public class JWTTest {
 
 		// Wrong secret should fail
 		assertFalse(parsed.verifyHS256("wrong-secret-key-long-enough".getBytes()));
+	}
+
+	@Test public void testTamperedHS256Signature() {
+		byte[] secret = "test-secret-key-long-enough".getBytes();
+		AString jwtString = JWT.signSymmetric(Maps.of("sub", "bob"), Blob.wrap(secret));
+		String signingInput = JWT.parse(jwtString).getSigningInput();
+		Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+		byte[] sig = Base64.getUrlDecoder().decode(jwtString.toString().substring(signingInput.length() + 1));
+
+		// A tag differing in one bit must be rejected wherever the difference falls,
+		// including the final byte, which a comparison stopping at the first mismatch
+		// reaches only after examining all the rest
+		for (int i : new int[] { 0, sig.length / 2, sig.length - 1 }) {
+			byte[] tampered = sig.clone();
+			tampered[i] ^= 0x01;
+			JWT forged = JWT.parse(Strings.create(signingInput + "." + encoder.encodeToString(tampered)));
+			assertFalse(forged.verifyHS256(secret), "Tampered byte " + i + " should not verify");
+		}
+
+		// A truncated tag must be rejected rather than matching a prefix
+		JWT truncated = JWT.parse(Strings.create(
+				signingInput + "." + encoder.encodeToString(Arrays.copyOf(sig, sig.length - 1))));
+		assertFalse(truncated.verifyHS256(secret));
 	}
 
 	// ========== RS256 tests ==========
