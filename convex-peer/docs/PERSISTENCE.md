@@ -687,8 +687,11 @@ NodeConfig options:
 - **`maxMessageSize`** — maximum encoded inbound frame, enforced before full allocation (default: 4 MiB)
 - **`maxTrustedMessageSize`** — encoded frame limit after an outbound Peer's AccountKey is verified (default: protocol maximum, 50 MB)
 - **`maxInboundValueSize`** — maximum decoded lattice value accepted for merge (default: `maxMessageSize`)
+- **`maxDeltaMessageSize`** — maximum encoded outbound lattice delta or DATA-ahead chunk (default: `maxMessageSize`)
+- **`maxDeltaBroadcastSize`** — maximum combined encoded bodies materialised for one eager delta (default: 16 MiB, never below `maxDeltaMessageSize`)
 - **`maxConnections`** — simultaneous inbound connection cap (default: 256)
 - **`inboundQueueSize`** — bounded off-Netty processing queue capacity (default: 1024)
+- **`maxInboundQueueBytes`** — encoded-byte bound for that inbound queue (default: 16 MiB, never below `maxMessageSize`)
 - **`inboundShutdownTimeout`** — time allowed for accepted inbound work to drain during shutdown (default: 10 seconds)
 - **`maxConsecutiveRejects`** — bad-message circuit-breaker threshold (default: 100)
 
@@ -726,6 +729,10 @@ snapshot is broadcast: explicit sync must not silently discard a rapid follow-up
 The root-sync timing is a fixed implementation constant, not operator configuration.
 There is no separate periodic delta re-push; the root-only sync provides eventual
 divergence detection and missing data is acquired on demand.
+
+For the implementation details behind DATA batching, shared fan-out,
+materialisation budgets and isolation of slow receivers, see
+[Delta Propagation, Backpressure and Memory Bounds](PROPAGATION.md).
 
 ## Interaction with Lattice Apps
 

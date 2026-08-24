@@ -26,6 +26,10 @@ public class BCKeyPair extends AKeyPair {
 	 * Secret key in the specific format that Sodium expects, we wrap this complexity in this class
 	 */
 	protected final Ed25519PrivateKeyParameters priv;
+	/**
+	 * Rough count of signatures created, for diagnostic display only. Deliberately not
+	 * atomic, for the same reason as {@link BCProvider#verificationCount}.
+	 */
 	public static long signatureCount;
 
 	private BCKeyPair(AccountKey pk, AArrayBlob seed, Ed25519PrivateKeyParameters priv) {

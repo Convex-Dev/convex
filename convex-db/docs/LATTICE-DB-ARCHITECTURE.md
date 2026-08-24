@@ -1,21 +1,23 @@
-# Convex DB: Cursor Architecture
+# Convex DB: Component and Cursor Architecture
 
 ## Cursor Chain
 
 A SQL database is a tree of lattice cursors. Each component navigates to its
-section of the tree via `cursor.path(key)`, which creates a `PathCursor`.
+section of the tree via `cursor.path(key)`, which creates a descended cursor.
 
 ```
-NodeServer RootCursor          ← AtomicReference, persistence + network
+NodeServer RootComponent       ← persistence and publication policy
   │
-  └── path("mydb")             ← MapLattice: db name → database
+  └── ConvexDB / RootCursor    ← database-map application component
         │
-        └── path(:tables)      ← KeyedLattice: keyword → section
+        └── path("mydb")       ← MapLattice: db name → database
               │
-              └── path("users") ← TableStoreLattice: table name → table state
+              └── path(:tables) ← KeyedLattice: keyword → section
+                    │
+                    └── path("users") ← TableStoreLattice: table name → table state
 ```
 
-Each `path()` call creates a lightweight `PathCursor` that reads/writes through
+Each `path()` call creates a lightweight descended cursor that reads/writes through
 its parent. A `set()` or `updateAndGet()` at any level atomically propagates
 up the chain to the root `AtomicReference`. No copies, no extra work — just
 `assocIn` on the immutable tree and a `compareAndSet` at the root.
@@ -25,73 +27,45 @@ up the chain to the root `AtomicReference`. No copies, no extra work — just
 Each component extends `ALatticeComponent<V>`, wrapping one cursor in the chain:
 
 ```
-SQLDatabase     cursor: Index<Keyword, ACell>       path from db-map level
-  │
-  ├── schema()  cursor: Index<AString, AVector>     path(:tables)
-  │     │
-  │     └── getTable("users")
-  │           cursor: AVector<ACell>                path("users")
-  │
-  └── (future sections at same level as :tables)
+RootComponent   cursor: AHashMap<AString, Index>    hosted root
+  └── ConvexDB  cursor: AHashMap<AString, Index>    same cursor, application policy child
+        └── SQLDatabase cursor: Index<Keyword, ACell>   path(database-name)
+              └── SQLSchema cursor: Index<AString, AVector> path(:tables)
+                    └── SQLTable cursor: AVector<ACell>      path(table-name)
 ```
 
-`schema()` and `getTable()` each call `cursor.path(key)` to descend one level.
+`database()`, `tables()` and `getTable()` each call `cursor.path(key)` to descend one level.
 The returned component wraps the descended cursor. This is the same pattern as
 `SocialUser.feed()` and `SocialUser.follows()` in convex-social.
 
-## Why PathCursor Is Free
+The component-parent chain is deliberately separate from the cursor-parent chain.
+Calling `persist()` delegates from `SQLTable` through `SQLSchema`, `SQLDatabase`
+and `ConvexDB` to `RootComponent` without changing or synchronising any cursor. A fork keeps the
+same containing component parent while its forked cursor synchronises to the live
+cursor it came from.
 
-Currently `SQLSchema.insert()` does this manually:
+## Cursor Descent
 
-```java
-cursor.updateAndGet(store -> {
-    SQLTable table = SQLTable.wrap(store.get(tableName));
-    // ... modify rows ...
-    return store.assoc(tableName, table.withRows(rows, ts).getState());
-});
-```
+Each child component retains its descended cursor rather than repeatedly reading
+and associating through raw parent values. Its `updateAndGet` operation delegates
+the immutable update back through the cursor chain atomically. This encapsulates
+navigation and preserves the lattice type at every path without adding another
+copy of the application state.
 
-With `SQLTable` owning a `PathCursor`, the same insert becomes:
+## Transaction Forks
 
-```java
-cursor.updateAndGet(tableState -> {
-    // ... modify rows ...
-    return withRows(rows, ts).getState();
-});
-```
-
-These do **identical work**. The PathCursor's `updateAndGet` internally does
-`parent.updateAndGet(root -> root.assoc(key, fn(root.get(key))))` — exactly
-the manual `store.get(tableName)` + `store.assoc(tableName, ...)` that
-`SQLSchema` currently does by hand. Moving the cursor down one level just
-encapsulates the navigation; it doesn't add overhead.
-
-## Two-Level Fork: Database + Transaction
-
-The cursor chain has two fork boundaries, giving atomic transactions with
-cheap rollback:
+`ConvexDB.database()` returns a live path beneath the hosted database map. A
+transaction forks that `SQLDatabase`; this gives atomic commit and cheap rollback:
 
 ```
-NodeServer RootCursor              ← persistence + network
+RootCursor / ConvexDB              ← hosted database map
   │
-  └── SQLDatabase cursor           ← forked from root
-  │     sync() = persist to Etch + broadcast
-  │
-  └── Transaction cursor           ← forked from DB
+  └── SQLDatabase cursor           ← live database path
+        │
+        └── Transaction cursor     ← forked from SQLDatabase
         sync() = atomic merge into DB cursor
         (discard = rollback, DB unchanged)
 ```
-
-### Database level (`SQLDatabase`)
-
-The database wraps a **forked cursor** off the NodeServer root. All operations
-accumulate in this fork. `db.sync()` merges into the NodeServer cursor,
-triggering persistence (Etch write) and network broadcast.
-
-This means the database is always one step removed from persistence. You can
-do significant work — multiple transactions — before persisting.
-
-### Transaction level
 
 Each transaction forks from the database cursor. Within a transaction, all
 reads see the snapshot at fork time, and all writes accumulate locally.
@@ -106,28 +80,29 @@ reads see the snapshot at fork time, and all writes accumulate locally.
 
 ### Why this works
 
-Both levels are just `ForkedLatticeCursor` — a separate `AtomicReference` that
-snapshots the parent value at fork time. `sync()` calls
+The transaction uses a `ForkedLatticeCursor` — a separate `AtomicReference` that
+snapshots the database value at fork time. `sync()` calls
 `parent.merge(localValue)` which uses the lattice merge at each level of the
 tree. No locks, no conflict detection — the lattice algebra guarantees
 convergence.
 
 ```java
-// Open database (forks from NodeServer)
-SQLDatabase db = SQLDatabase.connect(server.getCursor(), "mydb");
+ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+SQLDatabase db = cdb.database("mydb");
 
 // Transaction 1
 SQLDatabase tx1 = db.fork();
-tx1.schema().getTable("users").insert(row1);
+tx1.tables().insert("users", row1);
 tx1.sync();  // merge into db cursor
 
 // Transaction 2
 SQLDatabase tx2 = db.fork();
-tx2.schema().getTable("users").insert(row2);
+tx2.tables().insert("users", row2);
 tx2.sync();  // merge into db cursor (both rows now visible)
 
-// Persist
-db.sync();   // push to NodeServer → Etch + network
+// Publish the hosted application root, then request physical durability
+cdb.sync();
+server.getRootComponent().flush();
 ```
 
 ## Lattice Merge at Each Level
@@ -150,26 +125,27 @@ convergence regardless of merge order.
 ## Target API
 
 ```java
-// Setup — db cursor is forked from NodeServer
-NodeServer<?> server = SQLDatabase.createNodeServer(store);
+// Setup — ConvexDB is attached to the NodeServer policy root
+var server = ConvexDB.createNodeServer(store);
 server.launch();
-SQLDatabase db = SQLDatabase.connect(server.getCursor(), "mydb");
+ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
+SQLDatabase db = cdb.database("mydb");
 
 // DDL (directly on db, outside transaction)
-db.schema().createTable("users", columns, types);
+db.tables().createTable("users", columns, types);
 
 // Transaction — fork from db
 SQLDatabase tx = db.fork();
-SQLTable users = tx.schema().getTable("users");
-users.insert(row1);
-users.insert(row2);
-users.deleteByKey(oldPk);
+tx.tables().insert("users", row1);
+tx.tables().insert("users", row2);
+tx.tables().deleteByKey("users", oldPk);
 tx.sync();    // commit: atomic merge into db cursor
 
-// Persist to storage
-db.sync();    // push to NodeServer → Etch + broadcast
+// Publish and flush through host policy
+cdb.sync();
+server.getRootComponent().flush();
 ```
 
-Each component owns its cursor. The two fork boundaries (NodeServer → DB,
-DB → transaction) give atomic transactions with free rollback and
-conflict-free concurrent merges.
+Each component owns its cursor and delegates application policy through its
+component parent. The transaction fork gives atomic commit, free rollback and
+conflict-free concurrent merges without confusing persistence with cursor sync.

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.AccountKey;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -129,6 +130,12 @@ public class LatticePropagator implements Closeable {
 
 	/** Whether snapshots publish the store root after announcement. */
 	private volatile boolean persistenceEnabled = true;
+
+	/** Maximum encoded body size for one outbound delta or DATA-ahead chunk. */
+	private volatile int maxDeltaMessageSize = NodeConfig.DEFAULT_MAX_MESSAGE_SIZE;
+
+	/** Maximum combined encoded bodies materialised for one eager delta broadcast. */
+	private volatile int maxDeltaBroadcastSize = NodeConfig.DEFAULT_MAX_DELTA_BROADCAST_SIZE;
 
 	/** Whether root publication has changed the persistent store since its last checkpoint. */
 	private boolean dirty;
@@ -252,6 +259,33 @@ public class LatticePropagator implements Closeable {
 	 */
 	public void setPersistenceEnabled(boolean enabled) {
 		this.persistenceEnabled = enabled;
+	}
+
+	/** Configures the encoded body limit for outbound delta chunks. */
+	public void setMaxDeltaMessageSize(int limit) {
+		if (limit<1 || limit>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Delta message limit must be between 1 and "
+				+CPoSConstants.MAX_MESSAGE_LENGTH+": "+limit);
+		}
+		this.maxDeltaMessageSize=limit;
+		if (maxDeltaBroadcastSize<limit) maxDeltaBroadcastSize=limit;
+	}
+
+	public int getMaxDeltaMessageSize() {
+		return maxDeltaMessageSize;
+	}
+
+	/** Configures the total encoded working-set limit for one eager delta. */
+	public void setMaxDeltaBroadcastSize(int limit) {
+		if (limit<maxDeltaMessageSize || limit>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Delta broadcast limit must be between "
+				+maxDeltaMessageSize+" and "+CPoSConstants.MAX_MESSAGE_LENGTH+": "+limit);
+		}
+		this.maxDeltaBroadcastSize=limit;
+	}
+
+	public int getMaxDeltaBroadcastSize() {
+		return maxDeltaBroadcastSize;
 	}
 
 	// ========== Accessors ==========
@@ -581,9 +615,10 @@ public class LatticePropagator implements Closeable {
 			if (value == null) throw new IllegalArgumentException("Lattice filter returned null");
 
 			// 1. Announce to store (writes cells, collects novelty for delta)
-			ArrayList<ACell> novelty = new ArrayList<>();
-			Consumer<Ref<ACell>> noveltyHandler = r -> novelty.add(r.getValue());
-			value = Cells.announce(value, noveltyHandler, store);
+			boolean hasPeers=!connectionManager.getPeers().isEmpty();
+			Cells.NoveltyCollector noveltyCollector=hasPeers
+				?new Cells.NoveltyCollector(maxDeltaBroadcastSize):null;
+			value = Cells.announce(value, noveltyCollector, store);
 			if (workingCursor == null) {
 				workingCursor = Cursors.createLattice(lattice, value, mergeContext);
 			} else {
@@ -596,39 +631,74 @@ public class LatticePropagator implements Closeable {
 				dirty = true;
 			}
 
-			// 3. Broadcast to peers. Background triggers are already coalesced by
-			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
-			if (!connectionManager.getPeers().isEmpty()) {
-				// Ensure the lattice root is available before the protocol envelope.
-				// Format.encodeDelta decodes its final list element as the message root,
-				// so the LATTICE_VALUE vector itself must be last. Encoding only the
-				// lattice value would lose the message tag and path on the wire.
-				// MemoryStore reports an embedded top-level value as novelty. Embedded
-				// cells are already inline in their parent and are invalid as trailing
-				// multi-cell children, so retain only independently addressable cells.
-				novelty.removeIf(ACell::isEmbedded);
-				if (!value.isEmbedded()
-						&& (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value))) {
-					novelty.add(value);
-				}
-				AVector<ACell> emptyPath = Vectors.empty();
-				AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
-				novelty.add(payload);
-				Blob deltaData = Format.encodeDelta(novelty);
-				Message message = Message.create(MessageType.LATTICE_VALUE, payload, deltaData);
-				connectionManager.broadcast(message);
-				lastBroadcastTime = Utils.getCurrentTimestamp();
-				broadcastCount.incrementAndGet();
-			}
-
+			// The store-backed root becomes externally visible before best-effort network
+			// encoding. A failed delta must therefore still be eligible for periodic
+			// root sync and must still complete the caller's publication future.
 			announcedCursor.set(value);
-
-			// Swap the announce future under the lock; complete it outside
 			announceFuture = nextAnnounceFuture;
 			nextAnnounceFuture = new CompletableFuture<>();
+
+			// 3. Broadcast to peers. Background triggers are already coalesced by
+			// LatestUpdateQueue; an explicitly processed snapshot must not be dropped.
+			if (hasPeers) {
+				try {
+					broadcastDelta(value,noveltyCollector.getCells());
+				} catch (RuntimeException e) {
+					log.warn("Unable to encode or queue lattice delta; periodic root sync will retry",e);
+				}
+			}
 		}
 		announceFuture.complete(value);
 		return value;
+	}
+
+	/** Sends one bounded delta, or DATA-ahead chunks followed by a root announcement. */
+	private void broadcastDelta(ACell value, ArrayList<ACell> novelty) {
+		// Embedded cells already travel inside their nearest non-embedded parent and
+		// are invalid as trailing multi-cell children.
+		novelty.removeIf(ACell::isEmbedded);
+		if (!value.isEmbedded()
+				&& (novelty.isEmpty() || !novelty.get(novelty.size() - 1).equals(value))) {
+			novelty.add(value);
+		}
+
+		AVector<ACell> emptyPath = Vectors.empty();
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
+		Message rootMessage = Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
+		if (rootMessage.getMessageData().count()>maxDeltaMessageSize) {
+			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; root sync will recover",
+				maxDeltaMessageSize);
+			return;
+		}
+		ArrayList<ACell> delta = new ArrayList<>(novelty.size()+1);
+		delta.addAll(novelty);
+		delta.add(payload);
+
+		List<Message> messages;
+		if (Format.getDeltaEncodingLength(delta)<=maxDeltaMessageSize) {
+			Blob deltaData=Format.encodeDelta(delta,maxDeltaMessageSize);
+			messages=List.of(Message.create(MessageType.LATTICE_VALUE,payload,deltaData));
+		} else {
+			try {
+				long dataBudget=maxDeltaBroadcastSize-rootMessage.getMessageData().count();
+				messages=(dataBudget>0)
+					?new ArrayList<>(Message.createDataMessages(
+						novelty,maxDeltaMessageSize,dataBudget))
+					:new ArrayList<>();
+				messages.add(rootMessage);
+			} catch (IllegalArgumentException e) {
+				// A single non-embedded cell may exceed an application-selected chunk
+				// limit. Announce the root only and let the receiver pull that branch.
+				messages=List.of(rootMessage);
+			}
+		}
+
+		var result=connectionManager.broadcastSequence(messages,rootMessage);
+		if (result.dropped()>0) {
+			log.debug("Dropped lattice delta for {} peer(s); root sync will recover",result.dropped());
+		}
+		lastBroadcastTime = Utils.getCurrentTimestamp();
+		broadcastCount.incrementAndGet();
 	}
 
 	// ========== Root Sync ==========

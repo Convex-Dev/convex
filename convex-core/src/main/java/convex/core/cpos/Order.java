@@ -1,5 +1,7 @@
 package convex.core.cpos;
 
+import java.util.Arrays;
+
 import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
@@ -131,15 +133,56 @@ public class Order extends ARecordGeneric {
 	
 	/**
 	 * Gets the Consensus Point of this Order for the specified level
+	 *
+	 * <p>Level zero is always the current Block count. Missing confirmation
+	 * levels are treated as zero, allowing an Order produced with fewer levels
+	 * than the current protocol configuration to participate without claiming
+	 * confirmation at levels it does not provide.</p>
+	 *
 	 * @param level Consensus level
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint(int level) {
-		return consensusPoints[level];
+		if (level<0) throw new IllegalArgumentException("Negative consensus level: "+level);
+		if (level==0) return getBlockCount();
+		if (level>=consensusPoints.length) return 0L;
+		long result=getBlockCount();
+		for (int i=1; i<=level; i++) {
+			long point=consensusPoints[i];
+			if (point<0) return 0L;
+			result=Math.min(result,point);
+		}
+		return result;
 	}
 	
+	/**
+	 * Gets the consensus points encoded in this Order.
+	 *
+	 * @return Copy of encoded consensus points, including any extension levels
+	 */
 	public long[] getConsensusPoints() {
 		long[] result=consensusPoints.clone();
+		return result;
+	}
+
+	/**
+	 * Gets the effective consensus points for a configured number of levels.
+	 * Missing confirmation levels are padded with zero and surplus encoded
+	 * levels are ignored. Level zero is always derived from the Block count.
+	 *
+	 * @param levelCount Number of consensus levels required by the protocol
+	 * @return Consensus points with exactly {@code levelCount} entries
+	 */
+	public long[] getConsensusPoints(int levelCount) {
+		if (levelCount<0) throw new IllegalArgumentException("Negative consensus level count: "+levelCount);
+		long[] result=new long[levelCount];
+		if (levelCount==0) return result;
+		result[0]=getBlockCount();
+		int supplied=Math.min(levelCount,consensusPoints.length);
+		for (int i=1; i<supplied; i++) {
+			long point=consensusPoints[i];
+			result[i]=(point<0)?0L:Math.min(result[i-1],point);
+		}
 		return result;
 	}
 
@@ -148,7 +191,7 @@ public class Order extends ARecordGeneric {
 	 * @return Proposal Point
 	 */
 	public long getProposalPoint() {
-		return consensusPoints[CPoSConstants.CONSENSUS_LEVEL_PROPOSAL];
+		return getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_PROPOSAL);
 	}
 	
 	/**
@@ -156,7 +199,7 @@ public class Order extends ARecordGeneric {
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint() {
-		return consensusPoints[CPoSConstants.CONSENSUS_LEVEL_CONSENSUS];
+		return getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS);
 	}
 	
 	/**
@@ -212,7 +255,7 @@ public class Order extends ARecordGeneric {
 		
 		// update consensus points if required
 		int n=consensusPoints.length;
-		if ((nblocks!=consensusPoints[0])||(nblocks<consensusPoints[n-1])) {
+		if ((n>0)&&((nblocks!=consensusPoints[0])||(nblocks<consensusPoints[n-1]))) {
 			long[] nc=consensusPoints.clone();
 			nc[0]=nblocks;
 			for (int i=1; i<n; i++) {
@@ -242,14 +285,16 @@ public class Order extends ARecordGeneric {
 	 * @return Updated Order, or this Order instance if no change.
 	 */
 	public Order withConsensusPoint(int level,long newPosition) {
-		if (consensusPoints[level]==newPosition) return this;
-		long[] cps=consensusPoints.clone();
+		if (level<=0) throw new IllegalArgumentException("Can't change consensus level: "+level);
+		if (newPosition<0) throw new IllegalArgumentException("Negative consensus point: "+newPosition);
+		long[] cps=getConsensusPoints(Math.max(consensusPoints.length,level+1));
+		if ((cps[level]==newPosition)&&(Arrays.equals(cps,consensusPoints))) return this;
 		cps[level]=newPosition;
-		switch (level) {
-			case 0: throw new IllegalArgumentException("Can't change number of blocks");
-			default: if (cps[level-1]<newPosition) {
-				throw new IllegalArgumentException("Can't set consensus level byond previous level");
-			}
+		if (cps[level-1]<newPosition) {
+			throw new IllegalArgumentException("Can't set consensus level beyond previous level");
+		}
+		for (int i=level+1; i<cps.length; i++) {
+			cps[i]=Math.min(cps[i],cps[i-1]);
 		}
 		return new Order(values.assoc(IX_CONSENSUS,Vectors.createLongs(cps)));
 	}
@@ -262,7 +307,12 @@ public class Order extends ARecordGeneric {
 	 */
 	public Order withConsensusPoints(long[] newPositions) {
 		long[] cps=newPositions.clone();
-		cps[0]=getBlockCount();
+		if (cps.length>0) cps[0]=getBlockCount();
+		for (int i=1; i<cps.length; i++) {
+			if ((cps[i]<0)||(cps[i]>cps[i-1])) {
+				throw new IllegalArgumentException("Invalid consensus point at level "+i+": "+cps[i]);
+			}
+		}
 		return new Order(values.assoc(IX_CONSENSUS,Vectors.createLongs(cps)));
 	}
 
@@ -297,16 +347,17 @@ public class Order extends ARecordGeneric {
 	public void validateStructure() throws InvalidDataException {
 		super.validateStructure();
 		long [] cps=getConsensusPoints();
-		if (cps[0]!=getBlockCount()) {
-			throw new InvalidDataException("Mimatch of block count with conesnsus points",this);
-		}
 		int n=cps.length;
-		if (cps[n-1]<0) {
-			throw new InvalidDataException("Negative final consensus point",this);
+		if (n==0) return; // no supplied levels means no confirmation claims
+		if (cps[0]!=getBlockCount()) {
+			throw new InvalidDataException("Mismatch of block count with consensus points",this);
 		}
-		for (int i=1; i<n; i++) {
-			if (cps[i]>cps[i-1]) {
-				throw new InvalidDataException("Consensus points not in expected order: "+cps,this);
+		for (int i=0; i<n; i++) {
+			if (cps[i]<0) {
+				throw new InvalidDataException("Negative consensus point at level "+i,this);
+			}
+			if ((i>0)&&(cps[i]>cps[i-1])) {
+				throw new InvalidDataException("Consensus points not in expected order: "+Arrays.toString(cps),this);
 			}
 		}
 	}
@@ -325,8 +376,22 @@ public class Order extends ARecordGeneric {
 	 * @return True if Orders are functionally equal, false otherwise
 	 */
 	public boolean consensusEquals(Order b) {
+		return consensusEquals(b,CPoSConstants.CONSENSUS_LEVELS);
+	}
+
+	/**
+	 * Tests if this Order is equivalent to another for a configured number of
+	 * consensus levels. Encoded levels beyond {@code levelCount} are ignored and
+	 * missing levels compare as zero.
+	 *
+	 * @param b Order to compare with
+	 * @param levelCount Number of consensus levels used by the protocol
+	 * @return True if Orders are functionally equal at the configured levels
+	 */
+	public boolean consensusEquals(Order b, int levelCount) {
 		if (b==null) return false; // definitely not equal
-		for (int i=0; i<CPoSConstants.CONSENSUS_LEVELS; i++) {
+		if (levelCount<0) throw new IllegalArgumentException("Negative consensus level count: "+levelCount);
+		for (int i=0; i<levelCount; i++) {
 			if (this.getConsensusPoint(i)!=b.getConsensusPoint(i)) return false;			
 		}
 		if (!this.getBlocks().equals(b.getBlocks())) return false;

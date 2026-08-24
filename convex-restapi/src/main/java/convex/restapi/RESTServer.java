@@ -99,6 +99,42 @@ public class RESTServer implements Closeable {
 	static final long DRAIN_SLACK_BYTES=65536L;
 	public static final Keyword K_FAUCET_MAX=Keyword.intern("faucet-max");
 
+	/** Config key: maximum concurrent transaction requests server-wide. */
+	public static final Keyword K_TRANSACT_LIMIT=Keyword.intern("transact-limit");
+
+	/**
+	 * Config key: maximum concurrent transaction requests from any one client, or 0 to
+	 * apply no per-client bound.
+	 *
+	 * <p>Clients are identified by direct socket address; forwarded client-address
+	 * headers are never consulted, since they are set by the caller and a limit keyed
+	 * on them would be bypassed by sending a different value.</p>
+	 *
+	 * <p>Behind a reverse proxy every caller therefore shares the proxy's address and
+	 * this degenerates into a second server-wide bound. Set it to 0 there. That is not
+	 * a workaround: the proxy holds the true client address, so per-client policy
+	 * belongs to it, and proxies enforce exactly this — nginx {@code limit_conn} keyed
+	 * on {@code $binary_remote_addr}, HAProxy stick tables, and equivalents. The
+	 * server-wide cap continues to bound total load either way.</p>
+	 */
+	public static final Keyword K_TRANSACT_LIMIT_CLIENT=Keyword.intern("transact-limit-client");
+
+	/**
+	 * Default cap on concurrent transaction requests server-wide.
+	 *
+	 * <p>A permit is held for as long as the transaction takes to reach consensus, so
+	 * this bounds how many callers can be waiting at once. Request handling runs on
+	 * virtual threads, so a waiting request is cheap and this can be generous; raise it
+	 * on a peer with the memory and bandwidth to serve more.</p>
+	 */
+	public static final int DEFAULT_TRANSACT_LIMIT=10000;
+
+	/**
+	 * Default cap on concurrent transaction requests from a single client, so that one
+	 * caller cannot consume the whole server-wide allowance.
+	 */
+	public static final int DEFAULT_TRANSACT_LIMIT_CLIENT=100;
+
 	private RESTServer(Server server, RESTConfig explicitConfig) {
 		this.server = server;
 		Object attachedConfig = server.getConfig().get(RESTConfig.CONFIG);
@@ -141,6 +177,10 @@ public class RESTServer implements Closeable {
 			this.faucetMax = Coin.GOLD;
 		}
 
+		this.transactLimit=positiveConfig(K_TRANSACT_LIMIT,DEFAULT_TRANSACT_LIMIT);
+		// 0 is meaningful here (no per-client bound), so it must not be read as absent
+		this.transactLimitPerClient=nonNegativeConfig(K_TRANSACT_LIMIT_CLIENT,DEFAULT_TRANSACT_LIMIT_CLIENT);
+
 		AKeyPair kp = server.getKeyPair();
 		if ((kp != null) && restConfig.isMcpEnabled() && restConfig.isSigningEnabled()) {
 			Root<ACell> cursor = new Root<>();
@@ -178,6 +218,42 @@ public class RESTServer implements Closeable {
 
 	public long getFaucetMax() {
 		return faucetMax;
+	}
+
+	/** Reads a positive integer setting, falling back to a default if absent or unusable. */
+	private int positiveConfig(Keyword key, int defaultValue) {
+		Object o=getConfig().get(key);
+		if (o instanceof Number n) {
+			int value=n.intValue();
+			if (value>0) return value;
+		}
+		return defaultValue;
+	}
+
+	/** Reads a setting where 0 is a meaningful value, not an absent one. */
+	private int nonNegativeConfig(Keyword key, int defaultValue) {
+		Object o=getConfig().get(key);
+		if (o instanceof Number n) {
+			int value=n.intValue();
+			if (value>=0) return value;
+		}
+		return defaultValue;
+	}
+
+	/**
+	 * Gets the cap on concurrent transaction requests server-wide.
+	 * @return Maximum concurrent transaction requests
+	 */
+	public int getTransactLimit() {
+		return transactLimit;
+	}
+
+	/**
+	 * Gets the cap on concurrent transaction requests from any one client.
+	 * @return Maximum concurrent transaction requests per client
+	 */
+	public int getTransactLimitPerClient() {
+		return transactLimitPerClient;
 	}
 
 	public McpServer getMcpServer() {
@@ -595,6 +671,10 @@ public class RESTServer implements Closeable {
 	}
 	
 	private final Convex convexFaucet;
+
+	private final int transactLimit;
+
+	private final int transactLimitPerClient;
 	/**
 	 * Shared local Convex faucet instance. SECURITY: has access to faucet funds. Don't allow external usage!
 	 * @return Local convex faucet instance

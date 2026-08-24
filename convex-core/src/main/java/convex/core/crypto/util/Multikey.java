@@ -30,7 +30,7 @@ public class Multikey {
 	}
 	
 	public static Blob decodeSecretKey(String sk) {
-		if (sk.charAt(0)!='z') throw new IllegalArgumentException("Expected 'z' at start of multibase key");
+		if (!sk.startsWith("z")) throw new IllegalArgumentException("Expected 'z' at start of multibase secret key");
 		
 		byte[] bs=Base58.decode(sk.substring(1)); // decode, skipping leading z
 		if (bs.length!=(32+2)) throw new IllegalArgumentException("Invalid Ed25519 secret key encoding length:" +bs.length);
@@ -41,7 +41,7 @@ public class Multikey {
 	}
 
 	public static AccountKey decodePublicKey(String pk) {
-		if (pk.charAt(0)!='z') throw new IllegalArgumentException("Expected 'z' at start of multibase key");
+		if (!pk.startsWith("z")) throw new IllegalArgumentException("Expected 'z' at start of multibase public key");
 		
 		byte[] bs=Base58.decode(pk.substring(1)); // decode, skipping leading z
 		if (bs.length!=(32+2)) throw new IllegalArgumentException("Invalid Ed25519 public key encoding length:" +bs.length);

@@ -1,8 +1,10 @@
 package convex.peer;
 
 import java.io.Closeable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.data.AccountKey;
 import convex.core.message.Message;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for connection managers that maintain outbound peer
@@ -188,5 +191,61 @@ public abstract class AConnectionManager implements Closeable {
 				peer.trySend(msg);
 			}
 		}
+	}
+
+	/**
+	 * Broadcasts one small replaceable priority root. The default Netty transport
+	 * coalesces this independently of bulk DATA so the latest own Order remains
+	 * eligible for transmission under propagation backpressure.
+	 *
+	 * @return number of connected peers that accepted the priority message
+	 */
+	public int broadcastPriority(Message message) {
+		int accepted=0;
+		for (Convex peer:connections.values()) {
+			if (peer!=null && peer.isConnected() && peer.trySendPriority(message)) accepted++;
+		}
+		return accepted;
+	}
+
+	/** Outcome of a non-blocking per-peer sequence broadcast. */
+	public record BroadcastResult(int peers, int complete, int fallback, int dropped) {}
+
+	/**
+	 * Broadcasts an ordered message sequence independently to every connected peer.
+	 * A full or slow peer queue stops only that peer's sequence; other peers continue.
+	 * When supplied, the fallback is attempted after a partial sequence so a receiver
+	 * can recover through its ordinary pull path.
+	 *
+	 * @param messages ordered messages to send
+	 * @param fallback message to try after a partial send, or null
+	 * @return aggregate enqueue outcome
+	 */
+	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
+		ArrayList<Convex> peers=new ArrayList<>(connections.values());
+		Utils.shuffle(peers);
+		int attempted=0;
+		int complete=0;
+		int fallbackCount=0;
+		int dropped=0;
+		for (Convex peer:peers) {
+			if (peer==null || !peer.isConnected()) continue;
+			attempted++;
+			boolean sent=true;
+			for (Message message:messages) {
+				if (!peer.trySend(message)) {
+					sent=false;
+					break;
+				}
+			}
+			if (sent) {
+				complete++;
+			} else if (fallback!=null && peer.trySend(fallback)) {
+				fallbackCount++;
+			} else {
+				dropped++;
+			}
+		}
+		return new BroadcastResult(attempted,complete,fallbackCount,dropped);
 	}
 }

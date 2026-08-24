@@ -113,6 +113,25 @@ public class UtilsTest {
 	}
 
 	@Test
+	public void testLittleEndianBigInteger() {
+		byte[] littleEndian = new byte[] { 0x34, 0x12, (byte) 0x80 };
+		BigInteger value = new BigInteger("801234", 16);
+
+		assertEquals(value, Utils.littleEndianToBigInteger(littleEndian));
+		assertArrayEquals(littleEndian, Utils.bigIntegerToLittleEndian(value, 3));
+		assertArrayEquals(new byte[] { 1, 0, 0, 0 }, Utils.bigIntegerToLittleEndian(BigInteger.ONE, 4));
+		assertEquals(BigInteger.ZERO, Utils.littleEndianToBigInteger(new byte[0]));
+		assertArrayEquals(new byte[0], Utils.bigIntegerToLittleEndian(BigInteger.ZERO, 0));
+
+		assertThrows(IllegalArgumentException.class,
+				() -> Utils.bigIntegerToLittleEndian(BigInteger.valueOf(-1), 1));
+		assertThrows(IllegalArgumentException.class,
+				() -> Utils.bigIntegerToLittleEndian(BigInteger.valueOf(256), 1));
+		assertThrows(IllegalArgumentException.class,
+				() -> Utils.bigIntegerToLittleEndian(BigInteger.ZERO, -1));
+	}
+
+	@Test
 	public void testHexVal() {
 		for (int i = -128; i <= 127; i++) {
 			char c = (char) i;

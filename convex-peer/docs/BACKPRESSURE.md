@@ -1,6 +1,7 @@
 # Server-Side Backpressure
 
-**See also:** [CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md) — client-side outbound backpressure
+**See also:** [CLIENT_BACKPRESSURE.md](CLIENT_BACKPRESSURE.md) — client-side outbound backpressure;
+[PROPAGATION.md](PROPAGATION.md) — peer delta fan-out and backpressure
 
 ## Overview
 

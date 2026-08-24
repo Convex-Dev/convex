@@ -36,7 +36,8 @@ public class Symmetric {
 	private static final int NONCE_LENGTH = 12;
 	private static final int TAG_LENGTH = 16;
 	private static final int TAG_BITS = TAG_LENGTH * Byte.SIZE;
-	private static final int KEY_LENGTH = 128;
+	/** AES-256 key length, in bits, as expected by KeyGenerator */
+	private static final int KEY_LENGTH_BITS = 256;
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
 	/**
@@ -147,7 +148,10 @@ public class Symmetric {
 	}
 
 	/**
-	 * Creates an AES secret key
+	 * Creates a random AES-256 secret key.
+	 * 
+	 * Encryption and decryption accept any valid AES key length, so keys generated
+	 * before this method produced 256-bit keys still work.
 	 * 
 	 * @return The generated SecretKey
 	 */
@@ -156,7 +160,7 @@ public class Symmetric {
 
 		try {
 			kgen = KeyGenerator.getInstance(SYMMETRIC_KEY_ALGORITHM);
-			kgen.init(KEY_LENGTH);
+			kgen.init(KEY_LENGTH_BITS);
 		} catch (NoSuchAlgorithmException e) {
 			throw new Panic("Key generator not initialised successfully", e);
 		}

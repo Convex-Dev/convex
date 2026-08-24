@@ -22,8 +22,9 @@ Fast local build:
 
 ## Agent Tooling
 
-Task-specific instructions live as skills in **`.claude/skills/`**, one
-directory per skill with a `SKILL.md` inside:
+Task-specific instructions use the Agent Skills open format. The canonical
+skill sources live in **`.claude/skills/`**, one directory per skill with a
+`SKILL.md` inside:
 
 - *Orientation* — `ecosystem`, `cad-reference`
 - *Working on Convex* — `build-convex`, `local-network`, `peer`, `etch`
@@ -34,10 +35,18 @@ directory per skill with a `SKILL.md` inside:
 `convex-lisp` holds the shared CVM conventions the others assume; read it
 before writing CVM source.
 
-Claude Code discovers these automatically. **Other agents should read the
-relevant `SKILL.md` directly** — they are plain Markdown and carry no
-tool-specific syntax beyond `$ARGUMENTS` placeholders for user input. Check for
-a skill covering your task before working out a procedure from scratch.
+Claude Code discovers the canonical files under `.claude/skills/`. Codex
+discovers matching forwarding entries under `.agents/skills/`; each entry points
+back to the canonical file so the workflow has one source of truth. Agents that
+do not support either discovery location should read the canonical `SKILL.md`
+directly. The files are plain Markdown and carry no tool-specific syntax beyond
+`$ARGUMENTS` placeholders for user input.
+
+When adding, renaming or removing a skill, update both discovery directories.
+Keep complete instructions and supporting resources only under `.claude/skills/`;
+the `.agents/skills/` entry should contain matching `name` and `description`
+frontmatter plus a link to the canonical `SKILL.md`. Check for a skill covering
+your task before working out a procedure from scratch.
 
 Convex MCP tooling (live query, transact and signing against a running network)
 is optional and configured per user, not in this repository. Without it, use the

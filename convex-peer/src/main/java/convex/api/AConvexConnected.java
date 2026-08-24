@@ -244,6 +244,13 @@ public abstract class AConvexConnected extends Convex {
 	}
 
 	@Override
+	public boolean trySendPriority(Message msg) {
+		AConnection conn=connection;
+		if (conn==null) return false;
+		return conn.trySendPriorityMessage(msg);
+	}
+
+	@Override
 	public void close() {
 		AConnection c = this.connection;
 		if (c != null) {

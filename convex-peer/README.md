@@ -115,6 +115,8 @@ of beliefs. The `convex-p2p` module builds its node server on it.
 
 ## Documentation
 
+- [Delta Propagation, Backpressure and Memory Bounds](docs/PROPAGATION.md)
+- [Lattice Persistence and Node Configuration](docs/PERSISTENCE.md)
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-peer)
 - [Convex Documentation](https://docs.convex.world)
 - [Running a Peer](https://docs.convex.world/docs/convex-peer)

@@ -5,6 +5,35 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.15] - 2026-08-24
+
+### Added
+
+- Minimal ECIES-style Blob encryption for an `AccountKey`, using RFC 9180 HPKE with X25519, HKDF-SHA256 and AES-128-GCM. Ciphertext Blobs use the compact `enc || ct` layout with 48 bytes of overhead; recipients decrypt with their `AKeyPair` or Ed25519 seed, with a reusable decryptor for efficient batch reads.
+- REST transaction concurrency is configurable via `transact-limit` (server-wide) and `transact-limit-client` (per client, 0 to disable), so a well-resourced peer can serve more. Clients are identified by direct socket address and forwarded client-address headers are never consulted, since a limit keyed on a caller-supplied header is trivially bypassed. Behind a reverse proxy, set `transact-limit-client` to 0 and let the proxy apply per-client policy, which it can do against the true client address; the server-wide cap still bounds total load.
+- Lattice and CPoS propagation split oversized deltas into bounded `:DATA` batches followed by a root announcement. Per-message and total eager-materialisation limits are independently configurable with `maxDeltaMessageSize` / `maxDeltaBroadcastSize` and `:max-belief-delta-message-size` / `:max-belief-delta-broadcast-size`; complete inbound values retain their separate size policy.
+
+### Changed
+
+- The REST `/transact` concurrency cap rises from 2 server-wide to 10000 server-wide with 100 per client. A permit is held for the whole consensus wait, so the previous cap meant two slow transactions could stall every other caller. Request handling runs on virtual threads, so a waiting request is cheap and the higher ceiling is affordable; the per-client bound keeps one caller from taking the whole allowance.
+
+### Fixed
+
+- Priority own-Order broadcasts now carry their novel cells inline when they fit the priority message limit, and novelty from a superseded priority message is folded into the next full Belief broadcast. Announcing the Order previously consumed announce-novelty without delivering it, so no later delta carried the new Block data and receivers fell back to status polling for every confirmation round — observed as ~1.5s median transaction confirmation on an otherwise idle local 5-peer network, restored to ~35ms by this fix.
+- A peer's confirmed consensus points no longer retreat during Belief merge. Recomputing levels from the current voting set could lower consensus and finality whenever a lagging copy of another peer's Order supplied the stake that tipped the 2/3 threshold; the peer then signed the receded Order and silently truncated already-executed state, so a client could transiently observe state missing a transaction whose result had already been reported. CAD051 requires that confirmed points never retreat; consensus and finality are now ratchets (proposal may still recede when switching proposals). The bounded delta propagation in this release made lagging Order copies routine, surfacing the latent defect and causing repeated truncate-and-replay churn under load.
+- Convex DB components now retain their containing application-policy hierarchy, so nested table persistence reaches a hosted `RootComponent` without moving cursors and database/schema forks keep the same persistence policy while synchronising only to their original cursor (#698).
+- Delta fan-out is isolated per peer so a full receiver queue cannot block healthy peers, queued bytes are bounded independently of message count, and a failed delta encoding no longer prevents the announced lattice root or publication future from advancing. CPoS prioritises a coalesced own-Order root ahead of best-effort full-Belief replication; root sync and pulls recover dropped data.
+- The GUI passphrase strength estimate awards the documented 2 bits per character category used, rather than 1. The multiply sat inside `Integer.bitCount`, where doubling a bit mask cannot change the count.
+
+### Security
+
+- PKCS12 key stores now protect each key entry with a freshly generated random salt for password-based key derivation. Every entry was previously written with a fixed all-zero salt, so a single precomputed PBKDF2 table would have applied to every key store Convex has ever written. Existing key stores still open, since the salt is stored in the file itself; an entry is re-salted when it is next written.
+- Password-based key derivation for key store entries now runs 220,000 PBKDF2-HMAC-SHA512 iterations, up from 100,000, following current OWASP guidance. The count is recorded in each key store, so existing entries keep their own count until they are next written. Unlocking a key costs roughly 140ms rather than 65ms.
+- PEM key export now encrypts with PBES2, using AES-256-CBC and PBKDF2-HMAC-SHA512 with a random salt, replacing PKCS#5 v1.5 with RC2 at 65,536 iterations. The scheme is recorded in the PEM, so keys exported earlier still import. A stock OpenSSL 3 reads the new files directly, whereas RC2 requires its legacy provider.
+- PEM key import parses the PKCS#8 structure through `AKeyPair.createFromPKCS8` instead of taking the trailing 32 bytes as the seed. RFC 8410 permits an optional public key field, and an encoding carrying one was previously imported as a silently different key pair; encodings for other algorithms are now rejected rather than reinterpreted.
+- The peer signing service derives its `:keys` lookup hash with HKDF keyed by the peer-held encryption secret, replacing an unsalted SHA-256 of identity, public key and passphrase. The old hash let anyone holding a replica of the store brute-force the passphrase offline. Credential inputs are also canonically encoded, so field boundaries cannot be shifted. Existing entries are rewritten to the new scheme on first successful load, when the passphrase is available.
+- Locking a wallet entry now blocks signing as well as key access. `HotWalletEntry.sign` previously ignored the lock entirely.
+
 ## [0.8.14] - 2026-08-19
 
 ### Changed

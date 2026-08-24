@@ -132,6 +132,18 @@ public abstract class AConnection {
 	public abstract boolean trySendMessage(Message msg);
 
 	/**
+	 * Sends a small, replaceable priority message without blocking. Queue-based
+	 * transports may coalesce an older unsent priority message so the latest
+	 * consensus/control root is not trapped behind bulk propagation data.
+	 *
+	 * @param msg small priority message
+	 * @return true if accepted for delivery
+	 */
+	public boolean trySendPriorityMessage(Message msg) {
+		return trySendMessage(msg);
+	}
+
+	/**
 	 * Returns the remote socket address associated with this connection, or null if
 	 * not available (e.g. for local connections).
 	 *

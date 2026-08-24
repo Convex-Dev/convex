@@ -133,11 +133,17 @@ public class Config {
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 200;
 
+	/** Maximum encoded bytes retained by the trusted Belief/DATA queue. */
+	public static final int BELIEF_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
+
 	/**
 	 * Size of bounded queue for Beliefs from unverified inbound connections.
 	 * Small — best-effort buffering during the brief verification round-trip.
 	 */
 	public static final int UNTRUSTED_BELIEF_QUEUE_SIZE = 10;
+
+	/** Maximum encoded bytes retained while an inbound Peer is unverified. */
+	public static final int UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT = 4 * 1024 * 1024;
 
 	/**
 	 * Maximum number of inbound client connections accepted by the server.
@@ -151,6 +157,54 @@ public class Config {
 	 * Absorbs brief bursts; backpressure kicks in when the queue fills.
 	 */
 	public static final int OUTBOUND_QUEUE_SIZE = 128;
+
+	/** Maximum ordinary encoded bytes queued per outbound Peer connection. */
+	public static final int OUTBOUND_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
+
+	/** A coalesced priority message must remain a small consensus/control root. */
+	public static final int PRIORITY_OUTBOUND_MESSAGE_LIMIT = 64 * 1024;
+
+	/** Peer configuration key for the maximum encoded belief delta chunk size. */
+	public static final Keyword MAX_BELIEF_DELTA_MESSAGE_SIZE = Keyword.intern("max-belief-delta-message-size");
+
+	/** Default belief delta chunk size. Large beliefs are sent as DATA-ahead batches. */
+	public static final int DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE = 4 * 1024 * 1024;
+
+	/** Peer configuration key for total eager Belief delta materialisation. */
+	public static final Keyword MAX_BELIEF_DELTA_BROADCAST_SIZE =
+		Keyword.intern("max-belief-delta-broadcast-size");
+
+	/** Default eager Belief delta working set. */
+	public static final int DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE = 16 * 1024 * 1024;
+
+	/** Gets and validates the application-specific belief delta chunk limit. */
+	public static int getBeliefDeltaMessageSize(Map<Keyword, Object> config) {
+		Object configured=config.get(MAX_BELIEF_DELTA_MESSAGE_SIZE);
+		int value=(configured==null)
+			? DEFAULT_MAX_BELIEF_DELTA_MESSAGE_SIZE
+			: Utils.toInt(configured);
+		if (value<1 || value>convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException(MAX_BELIEF_DELTA_MESSAGE_SIZE
+				+" must be between 1 and "+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH
+				+": "+value);
+		}
+		return value;
+	}
+
+	/** Gets and validates the total encoded-byte budget for one Belief broadcast. */
+	public static int getBeliefDeltaBroadcastSize(Map<Keyword, Object> config) {
+		int messageLimit=getBeliefDeltaMessageSize(config);
+		Object configured=config.get(MAX_BELIEF_DELTA_BROADCAST_SIZE);
+		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_BELIEF_DELTA_BROADCAST_SIZE);
+		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
+		int value=(configured==null)?defaultValue:Utils.toInt(configured);
+		if (value<messageLimit || value>convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException(MAX_BELIEF_DELTA_BROADCAST_SIZE
+				+" must be between "+messageLimit+" and "
+				+convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH+": "+value);
+		}
+		return value;
+	}
 
 	/**
 	 * Checks if the config specifies a valid store

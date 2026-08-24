@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.14</version>
+		<version>0.8.15-SNAPSHOT</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
@@ -16,7 +16,7 @@
 
 	<properties>
 		<json.simple.version>1.1.1</json.simple.version>
-		<javalin.version>7.2.2</javalin.version>
+		<javalin.version>7.2.3</javalin.version>
 	</properties>
 
 	<build>
@@ -119,7 +119,7 @@
 		<dependency>
 			<groupId>io.modelcontextprotocol.sdk</groupId>
 			<artifactId>mcp</artifactId>
-			<version>2.0.0</version>
+			<version>2.0.1</version>
 			<scope>test</scope>
 		</dependency>
 

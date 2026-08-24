@@ -334,8 +334,76 @@ public class BeliefVotingTest {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Test public void testVariableConsensusLevelsInMerge() throws Exception {
+		SignedData<Block> block=bl(1);
+
+		// Missing levels contribute no confirmation at those levels. These Orders
+		// provide raw ordering and proposal, so consensus can advance but finality cannot.
+		SignedData<Order>[] shortOrders=new SignedData[6];
+		for (int i=0; i<shortOrders.length; i++) {
+			shortOrders[i]=or(i,TS,new long[] {1,1},block);
+		}
+		Belief shortBelief=Belief.create(shortOrders);
+		Order shortResult=BeliefMerge.create(shortBelief,kps[0],TS,initialState).merge().getOrder(keys[0]);
+		assertEquals(1,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_PROPOSAL));
+		assertEquals(1,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS));
+		assertEquals(0,shortResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+
+		// Surplus levels do not extend the configured main-network consensus depth.
+		SignedData<Order>[] extraOrders=new SignedData[6];
+		for (int i=0; i<extraOrders.length; i++) {
+			extraOrders[i]=or(i,TS,new long[] {1,1,1,1,0,0},block);
+		}
+		Belief extraBelief=Belief.create(extraOrders);
+		Order extraResult=BeliefMerge.create(extraBelief,kps[0],TS,initialState).merge().getOrder(keys[0]);
+		assertEquals(1,extraResult.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+		assertEquals(6,extraResult.getConsensusPoints().length);
+	}
+
+	/**
+	 * CAD051: a peer's confirmed consensus points MUST never retreat. Recomputing
+	 * levels from the current voting set previously moved consensus and finality
+	 * DOWNWARD whenever a lagging copy of another peer's Order supplied the stake
+	 * tipping the 2/3 threshold. The peer then signed and published the receded
+	 * Order and truncated already-executed state, transiently un-reporting
+	 * transactions whose results had been delivered to clients.
+	 */
+	@SuppressWarnings("unchecked")
+	@Test public void testConsensusPointsNeverRetreat() throws Exception {
+		SignedData<Block>[] blocks=new SignedData[9];
+		for (int i=0; i<blocks.length; i++) blocks[i]=bl(i+1);
+		SignedData<Block>[] laggingBlocks=java.util.Arrays.copyOf(blocks,7);
+
+		// Peers 0-3 hold a fresh Order: 9 blocks, proposal 9, consensus 7, finality 6.
+		// Peers 4-5 are known only through lagging copies: 7 blocks, minimal confirmation.
+		SignedData<Order>[] orders=new SignedData[6];
+		for (int i=0; i<4; i++) orders[i]=or(i,TS,new long[] {9,9,7,6},blocks);
+		for (int i=4; i<6; i++) orders[i]=or(i,TS,new long[] {7,5,5,0},laggingBlocks);
+
+		Belief belief=Belief.create(orders);
+		Order merged=BeliefMerge.create(belief,kps[0],TS+100,initialState).merge().getOrder(keys[0]);
+
+		// The lagging Orders tip the stake threshold at every level, but confirmed
+		// levels are ratchets: consensus and finality must not move backwards.
+		assertEquals(9,merged.getBlockCount());
+		assertEquals(7,merged.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_CONSENSUS));
+		assertEquals(6,merged.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY));
+		// Proposal may legitimately recede to the stake-supported prefix
+		assertEquals(7,merged.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_PROPOSAL));
+	}
+
+	@SuppressWarnings("unchecked")
 	private SignedData<Order> or(int peer, long ts, int pp, int cp, SignedData<Block>... blks) {
 		Order o=Order.create(pp, cp, blks).withTimestamp(TS);
+		return kps[peer].signData(o);
+	}
+
+	@SafeVarargs
+	private final SignedData<Order> or(int peer, long ts, long[] consensusPoints, SignedData<Block>... blks) {
+		Order o=Order.create(Vectors.of(
+				CVMLong.create(ts),
+				Vectors.createLongs(consensusPoints),
+				Vectors.create(blks)));
 		return kps[peer].signData(o);
 	}
 

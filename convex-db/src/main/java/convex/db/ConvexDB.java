@@ -14,6 +14,7 @@ import convex.db.jdbc.ConvexDriver;
 import convex.db.lattice.SQLDatabase;
 import convex.db.lattice.TableStoreLattice;
 import convex.lattice.ALatticeComponent;
+import convex.lattice.RootComponent;
 import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
@@ -44,9 +45,10 @@ import convex.node.NodeServer;
  * db.tables().createTable("users", new String[]{"id", "name"});
  *
  * // With persistence
- * NodeServer&lt;?&gt; server = ConvexDB.createNodeServer(store);
+ * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
+ *     ConvexDB.createNodeServer(store);
  * server.launch();
- * ConvexDB cdb = ConvexDB.connect(server.getCursor());
+ * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
  * cdb.register();
  *
  * // JDBC access (after register)
@@ -107,7 +109,13 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	// ========== Instance ==========
 
 	private ConvexDB(ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
-		super(cursor);
+		this(null,cursor);
+	}
+
+	private ConvexDB(
+			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent,
+			ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>> cursor) {
+		super(parent,cursor);
 	}
 
 	/**
@@ -122,14 +130,33 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	}
 
 	/**
-	 * Connects to an existing cursor chain (e.g. from a {@link NodeServer}).
+	 * Connects directly to an existing cursor chain without a containing
+	 * component policy. This form is retained for standalone and compatibility
+	 * use; hosted applications should use {@link #connect(ALatticeComponent)}
+	 * with {@link NodeServer#getRootComponent()}.
 	 *
 	 * @param parent Parent lattice cursor at the database-map level
 	 * @return ConvexDB connected to the cursor chain
 	 */
-	@SuppressWarnings("unchecked")
 	public static ConvexDB connect(ALatticeCursor<?> parent) {
-		return new ConvexDB((ALatticeCursor<AHashMap<AString, Index<Keyword, ACell>>>) parent);
+		return new ConvexDB(parent.path());
+	}
+
+	/**
+	 * Connects to a containing component at the database-map level.
+	 *
+	 * <p>This is the preferred hosted form. Component policy such as persistence
+	 * delegates through the supplied parent, while cursor writes remain at the
+	 * same database-map position. A {@link RootComponent} obtained from a
+	 * {@link NodeServer} can be supplied directly.</p>
+	 *
+	 * @param parent Containing database-map component
+	 * @return ConvexDB connected to the component hierarchy
+	 */
+	public static ConvexDB connect(
+			ALatticeComponent<AHashMap<AString, Index<Keyword, ACell>>> parent) {
+		if (parent==null) throw new IllegalArgumentException("Parent component must not be null");
+		return new ConvexDB(parent,parent.cursor());
 	}
 
 	/**
@@ -140,15 +167,16 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * <p>Usage:
 	 * <pre>
 	 * EtchStore store = EtchStore.createTemp();
-	 * NodeServer&lt;?&gt; server = ConvexDB.createNodeServer(store);
+	 * NodeServer&lt;AHashMap&lt;AString, Index&lt;Keyword, ACell&gt;&gt;&gt; server =
+	 *     ConvexDB.createNodeServer(store);
 	 * server.launch();
-	 * ConvexDB cdb = ConvexDB.connect(server.getCursor());
+	 * ConvexDB cdb = ConvexDB.connect(server.getRootComponent());
 	 * </pre>
 	 *
 	 * @param store Store for persistence (e.g. {@code EtchStore.createTemp()})
 	 * @return NodeServer configured for SQL database lattice (local-only, no network)
 	 */
-	public static NodeServer<?> createNodeServer(AStore store) {
+	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) {
 		return new NodeServer<>(DATABASE_MAP_LATTICE, store, NodeConfig.port(-1));
 	}
 
@@ -161,7 +189,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return SQLDatabase connected to the cursor chain
 	 */
 	public SQLDatabase database(String name) {
-		return SQLDatabase.connect(cursor, name);
+		return SQLDatabase.connect(this,name);
 	}
 
 	/**

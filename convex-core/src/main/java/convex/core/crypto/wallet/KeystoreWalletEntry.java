@@ -58,7 +58,9 @@ public class KeystoreWalletEntry extends AWalletEntry {
 	}
 
 	public <R extends ACell> SignedData<R> sign(R message) {
-		return keyPair.signData(message);
+		AKeyPair kp=getKeyPair();
+		if (kp==null) throw new IllegalStateException("Wallet not unlocked!");
+		return kp.signData(message);
 	}
 
 	@Override

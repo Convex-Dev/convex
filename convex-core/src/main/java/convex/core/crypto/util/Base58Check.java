@@ -71,6 +71,11 @@ public class Base58Check
     {
         byte[] valueWithChecksum = decodePlain(encoded);
 
+        if (valueWithChecksum.length < CHECKSUM_SIZE)
+        {
+            throw new IllegalArgumentException("Base58 value is too short to contain a " + CHECKSUM_SIZE + " byte checksum");
+        }
+
         byte[] value = verifyAndRemoveChecksum(valueWithChecksum);
 
         if (value == null)

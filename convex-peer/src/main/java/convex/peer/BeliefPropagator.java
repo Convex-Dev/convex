@@ -1,11 +1,11 @@
 package convex.peer;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -24,13 +24,13 @@ import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Index;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.message.Message;
+import convex.core.message.BoundedMessageQueue;
 import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
@@ -85,13 +85,15 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Queue on which Beliefs messages are received from trusted connections
 	 */
 	// TODO: use config if provided
-	private ArrayBlockingQueue<Message> beliefQueue = new ArrayBlockingQueue<>(Config.BELIEF_QUEUE_SIZE);
+	private final BoundedMessageQueue beliefQueue = new BoundedMessageQueue(
+		Config.BELIEF_QUEUE_SIZE,Config.BELIEF_QUEUE_BYTE_LIMIT);
 
 	/**
 	 * Small bounded queue for Beliefs from unverified inbound connections.
 	 * Best-effort buffering during the brief verification round-trip.
 	 */
-	private ArrayBlockingQueue<Message> untrustedBeliefQueue = new ArrayBlockingQueue<>(Config.UNTRUSTED_BELIEF_QUEUE_SIZE);
+	private final BoundedMessageQueue untrustedBeliefQueue = new BoundedMessageQueue(
+		Config.UNTRUSTED_BELIEF_QUEUE_SIZE,Config.UNTRUSTED_BELIEF_QUEUE_BYTE_LIMIT);
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
@@ -111,7 +113,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Time of last full belief broadcast
 	 */
-	long lastFullBroadcastTime=0;
+	long lastFullBroadcastTime=-1;
 	
 	private long beliefBroadcastCount=0L;
 	
@@ -124,11 +126,20 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * @param beliefMessage Belief Message to queue
 	 * @return True if Belief is queued successfully
 	 */
-	public synchronized boolean queueBelief(Message beliefMessage) {
+	public boolean queueBelief(Message beliefMessage) {
 		if (log.isTraceEnabled()) {
 			log.trace("Belief queued "+server.getPort()+" : "+beliefMessage.getHash());
 		}
 		return beliefQueue.offer(beliefMessage);
+	}
+
+	boolean queueBeliefBlocking(Message message) {
+		try {
+			return beliefQueue.offer(message,Config.DEFAULT_INTERNAL_TIMEOUT,TimeUnit.MILLISECONDS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
 	}
 
 	/**
@@ -146,6 +157,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	private Consumer<SignedData<Order>> orderUpdateObserver;
 
 	private Consumer<Belief> beliefUpdateObserver;
+
+	/** Package-visible test/diagnostic hook fired after ordered DATA staging. */
+	private Consumer<Message> dataStageObserver;
 	
 	protected void loop() throws InterruptedException {
 
@@ -198,23 +212,31 @@ public class BeliefPropagator extends AThreadedComponent {
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 			lastBroadcastTime=ts;
 			try {
-				Message msg=null;
-				msg=createFullUpdateMessage();
-				lastFullBroadcastTime=ts;
-//				if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
-//					msg=createFullUpdateMessage();
-//					lastFullBroadcastTime=ts;
-//				} else {
-//					msg=createQuickUpdateMessage();
-//				}
-				
-				if (msg!=null) {
-					// Actually broadcast the message to outbound connected Peers
-					server.manager.broadcast(msg);
+				boolean fullDue=(lastFullBroadcastTime<0)
+					||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
+				boolean attempted=false;
+				if (fullDue) {
+					// Publish our own signed Order first. Full Belief announcement and
+					// delta encoding are best-effort work and must not delay our vote.
+					Message ownOrder=createQuickUpdateMessage();
+					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
+					List<Message> messages=createFullUpdateMessages();
+					lastFullBroadcastTime=ts;
+					if (!messages.isEmpty()) {
+						var result=server.manager.broadcastSequence(messages,null);
+						attempted|=result.peers()>0;
+						if (result.dropped()>0) {
+							log.debug("Dropped full Belief delta for {} peer(s); own Order and polling will recover",
+								result.dropped());
+						}
+					}
+				} else {
+					Message ownOrder=createQuickUpdateMessage();
+					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
+				}
+				if (attempted) {
 					beliefBroadcastCount++;
 					return true;
-				} else {
-					log.warn("Failed to create broadcast message in BeliefPropagator!");
 				}
 				
 			} catch (Exception e) {
@@ -363,6 +385,17 @@ public class BeliefPropagator extends AThreadedComponent {
 
 		boolean anyOrderChanged=false;
 		for (Message m: beliefMessages) {
+			if (m.getType()==MessageType.DATA) {
+				try {
+					server.stageData(m);
+					Consumer<Message> observer=dataStageObserver;
+					if (observer!=null) observer.accept(m);
+				} catch (Exception e) {
+					log.warn("Unable to stage peer DATA message",e);
+					server.getConnectionManager().alertBadMessage(m,"Invalid DATA message");
+				}
+				continue;
+			}
 			boolean changed=mergeBeliefMessage(newOrders,m);
 			if (changed) anyOrderChanged=true;
 		}
@@ -399,11 +432,11 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (orders.containsKey(key)) {
 							Order newOrder=so.getValue();
 							Order oldOrder=orders.get(key).getValue();
-							
-				
+
+
 							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
 							if (!replace) continue;
-						} 
+						}
 						
 						// TODO: check if Peer key is valid in current state?
 						
@@ -453,68 +486,103 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	protected Message createFullUpdateMessage() throws IOException {
-		ArrayList<ACell> novelty=new ArrayList<>();
-		
-		// At this point we know something updated our belief, so we want to rebroadcast
-		// belief to network
-		Consumer<Ref<ACell>> noveltyHandler = r -> {
-			ACell o = r.getValue();
-			novelty.add(o);
-			// System.out.println("Recording novelty: "+r.getHash()+ " "+o.getClass().getSimpleName());
-		};
+		List<Message> messages=createFullUpdateMessages();
+		return messages.isEmpty()?null:messages.get(messages.size()-1);
+	}
+
+	/** Creates a bounded DATA-ahead sequence ending in one Belief announcement. */
+	protected List<Message> createFullUpdateMessages() throws IOException {
+		int broadcastLimit=Config.getBeliefDeltaBroadcastSize(server.getConfig());
+		Cells.NoveltyCollector noveltyCollector=new Cells.NoveltyCollector(broadcastLimit);
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		belief=Cells.announce(belief, noveltyHandler, server.getStore());
+		belief=Cells.announce(belief, noveltyCollector, server.getStore());
 		lastFullBroadcastBelief=belief;
 
-		Message msg = createPartialBelief(belief, novelty);
-		long messageSize=msg.getMessageData().count();
-		if (messageSize>=CPoSConstants.MAX_MESSAGE_LENGTH*0.95) {
-			log.warn("Long Belief Delta message: "+messageSize);
-		}
-		return msg;
+		// Include cells already announced through quick own-Order updates: a receiver
+		// whose priority message was superseded would otherwise never see them in any
+		// delta. Sending them once more is idempotent for receivers that did.
+		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
+		quickNovelty.clear();
+		cells.addAll(noveltyCollector.getCells());
+
+		return createPartialBeliefMessages(belief,cells,
+			Config.getBeliefDeltaMessageSize(server.getConfig()),broadcastLimit);
 	}
 	
 	protected Message createQuickUpdateMessage() throws IOException {
-		ArrayList<ACell> novelty=new ArrayList<>();
-		
-		// At this point we know something updated our belief, so we want to rebroadcast
-		// belief to network
-		Consumer<Ref<ACell>> noveltyHandler = r -> {
-			ACell o = r.getValue();
-			novelty.add(o);
-			// System.out.println("Recording novelty: "+r.getHash()+ " "+o.getClass().getSimpleName());
-		};
+		return createOwnOrderMessage();
+	}
 
-		// persist the state of the Peer, announcing the new Belief
-		// (ensure we can handle missing data requests etc.)
+	/**
+	 * Creates the signed own-Order message used for priority consensus participation.
+	 *
+	 * <p>The message carries the Order's novel cells inline whenever they fit the
+	 * priority message limit, so receivers can merge the Order immediately. Announcing
+	 * here consumes announce-novelty for the whole Order tree — including new Blocks —
+	 * so a root-only message would leave later full broadcasts without that data and
+	 * force receivers onto status polling for every confirmation round (observed as
+	 * multi-second transaction confirmation on otherwise idle networks). When the
+	 * novelty exceeds the priority limit the root-only fallback still applies, and
+	 * full broadcasts plus polling recover as before.</p>
+	 */
+	private Message createOwnOrderMessage() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
-		SignedData<Order> order=belief.getOrders().get(key);
+		SignedData<Order> order=orders.get(key);
 		if (order==null) return null;
-		
-		order=Cells.announce(order, noveltyHandler, server.getStore());
-		
-		// Update belief orders with persisted version
-		orders=orders.assoc(key, order);
+		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+		order=Cells.announce(order,novelty,server.getStore());
+		orders=orders.assoc(key,order);
 		belief=belief.withOrders(orders);
-
-		Message msg = createPartialBelief(order, novelty);
-		long messageSize=msg.getMessageData().count();
-		if (messageSize>=CPoSConstants.MAX_MESSAGE_LENGTH*0.95) {
-			log.warn("Long Belief Delta message: "+messageSize);
+		if (novelty.getOmittedCount()>0) {
+			// More novelty than the quick path can carry: skip eager delivery. The
+			// collected tail still folds into the next full broadcast; polling
+			// recovers anything the collector had to omit.
+			addQuickNovelty(novelty.getCells());
+			return Message.create(MessageType.BELIEF,order,order.getEncoding());
 		}
-		return msg;
+		addQuickNovelty(novelty.getCells());
+		List<Message> messages=createPartialBeliefMessages(order,new ArrayList<>(quickNovelty),
+			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+		if (messages.size()==1) return messages.get(0);
+		return Message.create(MessageType.BELIEF,order,order.getEncoding());
+	}
+
+	/**
+	 * Cells announced through own-Order quick updates since the last full broadcast.
+	 * A priority message can be superseded before it is sent, yet announcing already
+	 * consumed these cells from every later delta — so quick deltas resend the whole
+	 * window and the next full broadcast folds it into its DATA-ahead sequence.
+	 * Bounded: on overflow eager delivery is abandoned and polling recovers.
+	 */
+	private final ArrayDeque<ACell> quickNovelty=new ArrayDeque<>();
+	private static final int QUICK_NOVELTY_CELL_LIMIT=1024;
+
+	private void addQuickNovelty(List<ACell> cells) {
+		for (ACell cell: cells) {
+			quickNovelty.addLast(cell);
+		}
+		while (quickNovelty.size()>QUICK_NOVELTY_CELL_LIMIT) {
+			quickNovelty.removeFirst();
+		}
 	}
 	
-	/**
-	 * Create a Belief message ready for broadcast including delta novelty
-	 * @param novelty Novel cells for transmission. 
-	 * @param belief Belief top level Cell to encode
-	 * @return Message instance
-	 */
-	private static Message createPartialBelief(ACell payload, List<ACell> novelty) {
+	/** Creates one bounded Belief delta, or DATA-ahead chunks followed by its root. */
+	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
+			int maxMessageLength) {
+		return createPartialBeliefMessages(payload,novelty,maxMessageLength,
+			(int)CPoSConstants.MAX_MESSAGE_LENGTH);
+	}
+
+	static List<Message> createPartialBeliefMessages(ACell payload, List<ACell> novelty,
+			int maxMessageLength, int maxBroadcastLength) {
+		if (maxBroadcastLength<maxMessageLength
+				|| maxBroadcastLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
+			throw new IllegalArgumentException("Belief broadcast limit must be between "
+				+maxMessageLength+" and "+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxBroadcastLength);
+		}
 		int n=novelty.size();
 		if (n==0) {
 			//log.warn("No novelty in Belief");
@@ -523,8 +591,29 @@ public class BeliefPropagator extends AThreadedComponent {
 			//log.warn("Last element not Belief out of "+novelty.size());
 			novelty.add(payload);
 		}
-		Blob data=Format.encodeDelta(novelty);
-		return Message.create(MessageType.BELIEF,payload,data);
+		novelty.removeIf(ACell::isEmbedded);
+		if (!payload.isEmbedded()
+				&& (novelty.isEmpty() || !payload.equals(novelty.get(novelty.size()-1)))) {
+			novelty.add(payload);
+		}
+		if (Format.getDeltaEncodingLength(novelty)<=maxMessageLength) {
+			Blob data=Format.encodeDelta(novelty,maxMessageLength);
+			return List.of(Message.create(MessageType.BELIEF,payload,data));
+		}
+		Message root=Message.create(MessageType.BELIEF,payload,payload.getEncoding());
+		if (root.getMessageData().count()>maxMessageLength) return List.of();
+		try {
+			long dataBudget=maxBroadcastLength-root.getMessageData().count();
+			ArrayList<Message> messages=(dataBudget>0)
+				?new ArrayList<>(Message.createDataMessages(novelty,maxMessageLength,dataBudget))
+				:new ArrayList<>();
+			messages.add(root);
+			return messages;
+		} catch (IllegalArgumentException e) {
+			// The root still lets the receiver detect divergence and pull a branch
+			// that cannot fit within this application's delta chunk limit.
+			return List.of(root);
+		}
 	}
 
 	private Belief lastFullBroadcastBelief;
@@ -545,6 +634,10 @@ public class BeliefPropagator extends AThreadedComponent {
 	 */
 	public void setOrderUpdateObserver(Consumer<SignedData<Order>> orderUpdateObserver) {
 		this.orderUpdateObserver = orderUpdateObserver;
+	}
+
+	void setDataStageObserver(Consumer<Message> observer) {
+		this.dataStageObserver=observer;
 	}
 	
 	/**

@@ -56,7 +56,8 @@ public class HotWalletEntry extends AWalletEntry {
 	}
 
 	public <R extends ACell> SignedData<R> sign(R message) {
-		return keyPair.signData(message);
+		// Via getKeyPair() so that signing observes the lock, as IWalletEntry specifies
+		return getKeyPair().signData(message);
 	}
 
 	@Override

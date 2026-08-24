@@ -5,11 +5,14 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.14</version>
+		<version>0.8.15-SNAPSHOT</version>
 	</parent>
 
 	<properties>
 		<antlr.version>4.13.2</antlr.version>
+		<!-- All Bouncycastle modules move together. 1.85.2 is a bcprov-only patch:
+		     bcpkix and bcutil have no such release, so taking it would run a
+		     mismatched set in the signing path. Wait for a coordinated release. -->
 		<bc.version>1.85</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>

@@ -278,25 +278,34 @@ public class NodeServerTest {
 	public void testProductionInboundDefaultsAndOverrides() {
 		NodeConfig defaults = NodeConfig.create();
 		assertEquals(4 * 1024 * 1024, defaults.getMaxMessageSize());
+		assertEquals(defaults.getMaxMessageSize(), defaults.getMaxDeltaMessageSize());
+		assertEquals(16 * 1024 * 1024, defaults.getMaxDeltaBroadcastSize());
 		assertEquals(convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH,
 			defaults.getMaxTrustedMessageSize());
 		assertEquals(defaults.getMaxMessageSize(), defaults.getMaxInboundValueSize());
 		assertEquals(256, defaults.getMaxConnections());
 		assertEquals(1024, defaults.getInboundQueueSize());
+		assertEquals(16 * 1024 * 1024, defaults.getMaxInboundQueueBytes());
 		assertEquals(10_000L, defaults.getInboundShutdownTimeout());
 		assertEquals(30_000L, defaults.getMaxFutureTimestampSkew());
 
 		NodeConfig configured = NodeConfig.create(Maps.of(
 			NodeConfig.MAX_MESSAGE_SIZE, CVMLong.create(8192),
+			NodeConfig.MAX_DELTA_MESSAGE_SIZE, CVMLong.create(16384),
+			NodeConfig.MAX_DELTA_BROADCAST_SIZE, CVMLong.create(32768),
 			NodeConfig.MAX_TRUSTED_MESSAGE_SIZE, CVMLong.create(65536),
 			NodeConfig.MAX_CONNECTIONS, CVMLong.create(12),
 			NodeConfig.INBOUND_QUEUE_SIZE, CVMLong.create(34),
+			NodeConfig.MAX_INBOUND_QUEUE_BYTES, CVMLong.create(65536),
 			NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(56),
 			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(78)));
 		assertEquals(8192, configured.getMaxMessageSize());
+		assertEquals(16384, configured.getMaxDeltaMessageSize());
+		assertEquals(32768, configured.getMaxDeltaBroadcastSize());
 		assertEquals(65536, configured.getMaxTrustedMessageSize());
 		assertEquals(12, configured.getMaxConnections());
 		assertEquals(34, configured.getInboundQueueSize());
+		assertEquals(65536, configured.getMaxInboundQueueBytes());
 		assertEquals(56, configured.getInboundShutdownTimeout());
 		assertEquals(78, configured.getMaxFutureTimestampSkew());
 
@@ -309,6 +318,14 @@ public class NodeServerTest {
 		NodeConfig invalidSkew = NodeConfig.create(Maps.of(
 			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(-1)));
 		assertThrows(IllegalArgumentException.class, invalidSkew::getMaxFutureTimestampSkew);
+		NodeConfig invalidDeltaBudget=NodeConfig.create(Maps.of(
+			NodeConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(4096),
+			NodeConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(2048)));
+		assertThrows(IllegalArgumentException.class,invalidDeltaBudget::getMaxDeltaBroadcastSize);
+		NodeConfig invalidInboundBytes=NodeConfig.create(Maps.of(
+			NodeConfig.MAX_MESSAGE_SIZE,CVMLong.create(4096),
+			NodeConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(2048)));
+		assertThrows(IllegalArgumentException.class,invalidInboundBytes::getMaxInboundQueueBytes);
 		NodeServer<AInteger> invalidTimeoutNode =
 			new NodeServer<>(MaxLattice.create(), store, invalidTimeout);
 		assertThrows(IllegalArgumentException.class, invalidTimeoutNode::launch,

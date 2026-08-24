@@ -187,6 +187,45 @@ public class LatticePropagatorTest {
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
 	}
 
+	/** Oversized novelty is staged as bounded DATA messages before one root merge. */
+	@Test
+	public void testOversizedDeltaIsChunkedWithoutBlockingOtherMessages() throws Exception {
+		Keyword dataKeyword=Keyword.intern("data");
+		@SuppressWarnings("unchecked")
+		Index<Hash,ACell> values=(Index<Hash,ACell>)Index.EMPTY;
+		for (int i=0; i<6; i++) {
+			Blob value=Blobs.createRandom(300);
+			values=values.assoc(value.getHash(),value);
+		}
+
+		server1.getPropagator().setMaxDeltaMessageSize(700);
+		server1.getCursor().assoc(dataKeyword,values);
+		server1.getCursor().sync();
+
+		Convex connection=server1.getPropagator().getPeers().iterator().next();
+		connection.ping().get(5,TimeUnit.SECONDS);
+		assertEquals(values,RT.getIn(server2.getLocalValue(),dataKeyword));
+		NodeServer.InboundStats inbound=server2.getInboundStats();
+		assertTrue(inbound.messagesReceived>1,
+			"chunked delta should arrive as DATA batches plus one root: "+inbound);
+		assertEquals(1L,inbound.mergesAccepted);
+	}
+
+	/** A delta encoding failure must not hide the newly announced root from recovery. */
+	@Test
+	public void testFailedDeltaStillAdvancesRootSyncAndAnnounceFuture() throws Exception {
+		Blob value=Blobs.createRandom(400);
+		CompletableFuture<ACell> announced=server1.getPropagator().nextAnnounce();
+		server1.getPropagator().setMaxDeltaMessageSize(1);
+		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
+
+		server1.getCursor().sync();
+
+		assertEquals(server1.getLocalValue(),announced.get(5,TimeUnit.SECONDS));
+		assertEquals(server1.getLocalValue().getHash(),
+			rootSyncValueHash(server1.getPropagator().createRootSyncMessage()));
+	}
+
 	/** Consecutive explicit syncs must each propagate rather than drop the latter delta. */
 	@Test
 	public void testConsecutiveSyncsEachBroadcast() throws Exception {
