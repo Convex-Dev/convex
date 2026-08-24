@@ -107,6 +107,7 @@ public class AccountKey extends AArrayBlob {
 
 	public boolean equals(AccountKey o) {
 		if (o == this) return true;
+		if (o == null) return false;
 		return Utils.arrayEquals(o.store, o.offset, this.store, this.offset, LENGTH);
 	}
 
