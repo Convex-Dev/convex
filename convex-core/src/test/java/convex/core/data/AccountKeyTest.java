@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Random;
@@ -50,6 +51,14 @@ public class AccountKeyTest {
 		// AccountKey has comparison equality with Blob
 		assertEquals(0, a.compareTo(b));
 		
-		BlobsTest.doBlobTests(a);			
+		BlobsTest.doBlobTests(a);
+	}
+
+	@Test
+	public void testEqualsNull() {
+		AccountKey a = AccountKey.fromHex(Blob.createRandom(new Random(), AccountKey.LENGTH).toHexString());
+
+		// equals(AccountKey) must not throw on a null argument
+		assertFalse(a.equals((AccountKey) null));
 	}
 }
