@@ -314,11 +314,25 @@ public class LatticePropagator implements Closeable {
 	 * Adds an outbound peer connection with known identity. The peer's store
 	 * is set to this propagator's store, establishing the security boundary.
 	 *
+	 * <p>Blocks (briefly) until the connection is actually admitted, or logs
+	 * a warning and returns on failure/timeout. {@link
+	 * LatticeConnectionManager#addPeer(AccountKey, Convex)} performs an
+	 * async identity-verification handshake before a connection is actually
+	 * admitted -- this method's own signature promises a void, best-effort
+	 * "the peer is now usable" contract, so the returned future must be
+	 * waited on here rather than discarded, or a caller that immediately
+	 * relies on the peer being admitted (e.g. broadcasting to it) would
+	 * silently race the handshake.
+	 *
 	 * @param peerKey AccountKey identifying the remote peer
 	 * @param peer Convex connection to the peer node
 	 */
 	public void addPeer(AccountKey peerKey, Convex peer) {
-		connectionManager.addPeer(peerKey, peer);
+		try {
+			connectionManager.addPeer(peerKey, peer).get(10, TimeUnit.SECONDS);
+		} catch (Exception e) {
+			log.warn("Peer admission did not complete for {}: {}", peerKey, e.getMessage());
+		}
 	}
 
 	/**

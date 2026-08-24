@@ -125,6 +125,85 @@ public class LatticePropagatorTest {
 	}
 
 	/**
+	 * Tests that {@code addPeer} actually waits for the async identity
+	 * -verification handshake to complete before returning, when a keypair
+	 * is configured (so the handshake is real, not the {@code kp == null}
+	 * synchronous-admission shortcut). Before this fix, the returned
+	 * CompletableFuture from LatticeConnectionManager.addPeer was discarded,
+	 * so addPeer() could return well before -- or even after a failed --
+	 * admission, with no way for the caller to know.
+	 */
+	@Test
+	public void testAddPeerWaitsForAdmission() throws Exception {
+		AStore storeA = new MemoryStore();
+		AStore storeB = new MemoryStore();
+		NodeServer<?> serverA = new NodeServer<>(lattice, storeA, NodeConfig.port(0));
+		NodeServer<?> serverB = new NodeServer<>(lattice, storeB, NodeConfig.port(0));
+		try {
+			AKeyPair keyA = AKeyPair.generate();
+			AKeyPair keyB = AKeyPair.generate();
+			serverA.setMergeContext(LatticeContext.create(CVMLong.create(System.currentTimeMillis()), keyA));
+			serverB.setMergeContext(LatticeContext.create(CVMLong.create(System.currentTimeMillis()), keyB));
+			serverA.setInboundPropagatorSelector(connection -> serverA.getPropagator());
+			serverB.setInboundPropagatorSelector(connection -> serverB.getPropagator());
+			serverA.launch();
+			serverB.launch();
+
+			AccountKey bKey = keyB.getAccountKey();
+			Convex peerB = ConvexRemote.connect(serverB.getHostAddress());
+
+			// Correct expected identity: admission must have genuinely
+			// completed by the time addPeer() returns, not merely started.
+			serverA.getPropagator().addPeer(bKey, peerB);
+			assertTrue(serverA.getPropagator().getConnectionManager().isConnected(bKey),
+				"addPeer should not return until the peer is actually admitted");
+		} finally {
+			serverA.close();
+			serverB.close();
+			storeA.close();
+			storeB.close();
+		}
+	}
+
+	/**
+	 * Tests that {@code addPeer} does not leave a wrong-identity connection
+	 * looking admitted: the verification handshake must actually run and
+	 * reject a mismatched expected key before addPeer() returns, rather
+	 * than the caller silently getting a connection object that was never
+	 * really verified.
+	 */
+	@Test
+	public void testAddPeerRejectsWrongIdentity() throws Exception {
+		AStore storeA = new MemoryStore();
+		AStore storeB = new MemoryStore();
+		NodeServer<?> serverA = new NodeServer<>(lattice, storeA, NodeConfig.port(0));
+		NodeServer<?> serverB = new NodeServer<>(lattice, storeB, NodeConfig.port(0));
+		try {
+			AKeyPair keyA = AKeyPair.generate();
+			AKeyPair keyB = AKeyPair.generate();
+			serverA.setMergeContext(LatticeContext.create(CVMLong.create(System.currentTimeMillis()), keyA));
+			serverB.setMergeContext(LatticeContext.create(CVMLong.create(System.currentTimeMillis()), keyB));
+			serverA.setInboundPropagatorSelector(connection -> serverA.getPropagator());
+			serverB.setInboundPropagatorSelector(connection -> serverB.getPropagator());
+			serverA.launch();
+			serverB.launch();
+
+			// Wrong expected identity: server B will never sign a challenge
+			// response matching keyA's own account key.
+			Convex peerB = ConvexRemote.connect(serverB.getHostAddress());
+			serverA.getPropagator().addPeer(keyA.getAccountKey(), peerB);
+
+			assertFalse(serverA.getPropagator().getConnectionManager().isConnected(keyA.getAccountKey()),
+				"addPeer must not admit a connection under the wrong expected identity");
+		} finally {
+			serverA.close();
+			serverB.close();
+			storeA.close();
+			storeB.close();
+		}
+	}
+
+	/**
 	 * Tests that automatic propagation broadcasts updates to connected peers.
 	 *
 	 * This test verifies that:
