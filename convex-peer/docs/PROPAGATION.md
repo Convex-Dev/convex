@@ -72,9 +72,15 @@ CPoS order publication.
 
 `BeliefPropagator` treats two outputs differently:
 
-- The local peer's latest signed `Order` is a small root-only BELIEF message. It
-  is offered to the per-connection priority slot and supersedes an older unsent
-  Order.
+- The local peer's latest signed `Order` is a small BELIEF message carrying the
+  Order's novel cells inline whenever they fit the priority message limit, so a
+  receiver can merge it immediately. It is offered to the per-connection
+  priority slot and supersedes an older unsent Order. Because announcing the
+  Order consumes announce-novelty whether or not the message is ultimately
+  sent, novelty carried by quick updates is retained and folded into the next
+  full Belief broadcast — a superseded priority message therefore delays eager
+  delivery by at most one full-broadcast interval rather than losing the cells
+  from every delta.
 - A full Belief is cross-replication. When due, its novelty is encoded once as a
   bounded DATA-ahead sequence ending in a BELIEF root, then offered
   independently to each peer.

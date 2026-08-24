@@ -1,6 +1,7 @@
 package convex.peer;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -431,11 +432,11 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (orders.containsKey(key)) {
 							Order newOrder=so.getValue();
 							Order oldOrder=orders.get(key).getValue();
-							
-				
+
+
 							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
 							if (!replace) continue;
-						} 
+						}
 						
 						// TODO: check if Peer key is valid in current state?
 						
@@ -499,7 +500,14 @@ public class BeliefPropagator extends AThreadedComponent {
 		belief=Cells.announce(belief, noveltyCollector, server.getStore());
 		lastFullBroadcastBelief=belief;
 
-		return createPartialBeliefMessages(belief,noveltyCollector.getCells(),
+		// Include cells already announced through quick own-Order updates: a receiver
+		// whose priority message was superseded would otherwise never see them in any
+		// delta. Sending them once more is idempotent for receivers that did.
+		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
+		quickNovelty.clear();
+		cells.addAll(noveltyCollector.getCells());
+
+		return createPartialBeliefMessages(belief,cells,
 			Config.getBeliefDeltaMessageSize(server.getConfig()),broadcastLimit);
 	}
 	
@@ -507,16 +515,58 @@ public class BeliefPropagator extends AThreadedComponent {
 		return createOwnOrderMessage();
 	}
 
-	/** Creates the root-only signed Order used for priority consensus participation. */
+	/**
+	 * Creates the signed own-Order message used for priority consensus participation.
+	 *
+	 * <p>The message carries the Order's novel cells inline whenever they fit the
+	 * priority message limit, so receivers can merge the Order immediately. Announcing
+	 * here consumes announce-novelty for the whole Order tree — including new Blocks —
+	 * so a root-only message would leave later full broadcasts without that data and
+	 * force receivers onto status polling for every confirmation round (observed as
+	 * multi-second transaction confirmation on otherwise idle networks). When the
+	 * novelty exceeds the priority limit the root-only fallback still applies, and
+	 * full broadcasts plus polling recover as before.</p>
+	 */
 	private Message createOwnOrderMessage() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=orders.get(key);
 		if (order==null) return null;
-		order=Cells.announce(order,null,server.getStore());
+		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+		order=Cells.announce(order,novelty,server.getStore());
 		orders=orders.assoc(key,order);
 		belief=belief.withOrders(orders);
+		if (novelty.getOmittedCount()>0) {
+			// More novelty than the quick path can carry: skip eager delivery. The
+			// collected tail still folds into the next full broadcast; polling
+			// recovers anything the collector had to omit.
+			addQuickNovelty(novelty.getCells());
+			return Message.create(MessageType.BELIEF,order,order.getEncoding());
+		}
+		addQuickNovelty(novelty.getCells());
+		List<Message> messages=createPartialBeliefMessages(order,new ArrayList<>(quickNovelty),
+			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+		if (messages.size()==1) return messages.get(0);
 		return Message.create(MessageType.BELIEF,order,order.getEncoding());
+	}
+
+	/**
+	 * Cells announced through own-Order quick updates since the last full broadcast.
+	 * A priority message can be superseded before it is sent, yet announcing already
+	 * consumed these cells from every later delta — so quick deltas resend the whole
+	 * window and the next full broadcast folds it into its DATA-ahead sequence.
+	 * Bounded: on overflow eager delivery is abandoned and polling recovers.
+	 */
+	private final ArrayDeque<ACell> quickNovelty=new ArrayDeque<>();
+	private static final int QUICK_NOVELTY_CELL_LIMIT=1024;
+
+	private void addQuickNovelty(List<ACell> cells) {
+		for (ACell cell: cells) {
+			quickNovelty.addLast(cell);
+		}
+		while (quickNovelty.size()>QUICK_NOVELTY_CELL_LIMIT) {
+			quickNovelty.removeFirst();
+		}
 	}
 	
 	/** Creates one bounded Belief delta, or DATA-ahead chunks followed by its root. */

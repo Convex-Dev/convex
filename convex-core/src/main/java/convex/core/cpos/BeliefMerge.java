@@ -133,7 +133,7 @@ public class BeliefMerge {
 
 			boolean shouldReplace=compareOrders(ac,bc);
 			if (shouldReplace) {
-				result=result.assocEntry(be); 
+				result=result.assocEntry(be);
 				continue;
 			}
 		}
@@ -210,6 +210,21 @@ public class BeliefMerge {
 
 		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
+		// CAD051: consensus points never retreat. Recomputing levels from the current
+		// voting set can produce a lower point when a lagging copy of another peer's
+		// Order supplies the stake that tips the threshold — but consensus achieved at
+		// a level is a ratchet, and the Blocks below our consensus point cannot change
+		// (inconsistent Orders are filtered from the voting set). The proposal level is
+		// deliberately not floored: switching proposals legitimately re-derives it for
+		// the new ordering. The floor against the previous level keeps the Order
+		// structurally valid in all cases.
+		for (int level=CPoSConstants.CONSENSUS_LEVEL_CONSENSUS; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
+			long prev=Math.min(myOrder.getConsensusPoint(level),consensusOrder.getConsensusPoint(level-1));
+			if (consensusOrder.getConsensusPoint(level)<prev) {
+				consensusOrder=consensusOrder.withConsensusPoint(level,prev);
+			}
+		}
+
 		// #595 stage (i): clamp our consensus points to our clock horizon, so we never
 		// confirm (and therefore never execute) a Block dated beyond our own clock plus
 		// the skew allowance. An honest 2/3 stake supermajority doing this prevents a
@@ -248,7 +263,7 @@ public class BeliefMerge {
 				// Update timestamp
 				long ts=getTimestamp();
 				Order myNewOrder=consensusOrder.withTimestamp(ts);
-			
+
 				// Only sign and update Order if it has changed
 				final SignedData<Order> signedOrder = sign(myNewOrder);
 				resultOrders = resultOrders.assoc(myAddress, signedOrder);
