@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +94,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/** Connections awaiting a successful identity challenge. */
 	private final ConcurrentHashMap<AccountKey, PendingConnection> pendingConnections = new ConcurrentHashMap<>();
+
+	/** Futures awaiting the next admitted connection for a desired peer. */
+	private final ConcurrentHashMap<AccountKey, CompletableFuture<Convex>> connectionWaiters =
+		new ConcurrentHashMap<>();
+
+	/** Wakes the single maintenance thread when desired-peer state changes. */
+	private final Semaphore maintenanceSignal = new Semaphore(0);
 
 	/** Serialises admission, removal and replacement across pending and active maps. */
 	private final Object connectionLock = new Object();
@@ -185,6 +195,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (running) return;
 		running = true;
 		maintenanceThread = Thread.ofVirtual().name("Lattice connection maintenance").start(this::maintenanceLoop);
+		maintenanceSignal.release();
 		log.debug("LatticeConnectionManager started");
 	}
 
@@ -194,6 +205,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	@Override
 	public void close() {
 		running = false;
+		maintenanceSignal.release();
 
 		if (maintenanceThread != null) {
 			maintenanceThread.interrupt();
@@ -212,14 +224,20 @@ public class LatticeConnectionManager extends AConnectionManager {
 	@Override
 	public void closeAllConnections() {
 		List<PendingConnection> pending;
+		List<CompletableFuture<Convex>> waiters;
 		synchronized (connectionLock) {
 			pending = new ArrayList<>(pendingConnections.values());
 			pendingConnections.clear();
+			waiters = new ArrayList<>(connectionWaiters.values());
+			connectionWaiters.clear();
 			super.closeAllConnections();
 		}
 		for (PendingConnection pc : pending) {
 			pc.admission.completeExceptionally(new IllegalStateException("Connection manager closed"));
 			closeSilently(pc.connection);
+		}
+		for (CompletableFuture<Convex> waiter : waiters) {
+			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 	}
 
@@ -239,6 +257,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return;
 		}
 		desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
+		maintenanceSignal.release();
 		log.debug("Added desired peer: {}", peerKey);
 	}
 
@@ -254,7 +273,53 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return;
 		}
 		desiredPeers.put(peerKey, DesiredPeer.create(peerKey, address));
+		maintenanceSignal.release();
 		log.debug("Added desired peer: {} at {}", peerKey, address);
+	}
+
+	/**
+	 * Declares a persistent peer at a known address and returns a future for its
+	 * next admitted connection. The maintenance thread is woken immediately; the
+	 * returned future spans retries and completes only after any configured identity
+	 * challenge succeeds.
+	 *
+	 * @param peerKey expected AccountKey of the remote node
+	 * @param address transport address to connect to
+	 * @return future completing with an admitted connection
+	 */
+	public CompletableFuture<Convex> connectPeer(AccountKey peerKey, InetSocketAddress address) {
+		if (peerKey == null || address == null) {
+			return CompletableFuture.failedFuture(
+				new IllegalArgumentException("Peer key and address must not be null"));
+		}
+		addPeer(peerKey,address);
+		return whenConnected(peerKey);
+	}
+
+	/**
+	 * Returns a future for the current or next admitted connection to a desired
+	 * peer. This is the deterministic signal for callers that must wait for
+	 * challenge/response and avoids polling the maintenance loop.
+	 *
+	 * @param peerKey desired peer identity
+	 * @return future completing with an admitted connection
+	 */
+	public CompletableFuture<Convex> whenConnected(AccountKey peerKey) {
+		if (peerKey == null) {
+			return CompletableFuture.failedFuture(
+				new IllegalArgumentException("Peer key must not be null"));
+		}
+		Convex connected=getConnection(peerKey);
+		if (connected!=null) return CompletableFuture.completedFuture(connected);
+
+		CompletableFuture<Convex> waiter=connectionWaiters.computeIfAbsent(
+			peerKey,k -> new CompletableFuture<>());
+		// Close the admission-before-registration race.
+		connected=getConnection(peerKey);
+		if (connected!=null && connectionWaiters.remove(peerKey,waiter)) {
+			waiter.complete(connected);
+		}
+		return waiter;
 	}
 
 	/**
@@ -278,7 +343,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		} else {
 			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
 		}
-		return beginAdmission(peerKey, convex);
+		CompletableFuture<Convex> admission=beginAdmission(peerKey, convex);
+		maintenanceSignal.release();
+		return admission;
 	}
 
 	private CompletableFuture<Convex> beginAdmission(AccountKey peerKey, Convex convex) {
@@ -354,9 +421,15 @@ public class LatticeConnectionManager extends AConnectionManager {
 			closeSilently(pending.connection);
 		}
 		resetFailure(peerKey);
+		completeConnectionWaiter(peerKey,convex);
 		log.debug("Admitted {} connection to peer {} at {}", trusted ? "verified" : "unverified",
 			peerKey, convex.getHostAddress());
 		return CompletableFuture.completedFuture(convex);
+	}
+
+	private void completeConnectionWaiter(AccountKey peerKey, Convex convex) {
+		CompletableFuture<Convex> waiter=connectionWaiters.remove(peerKey);
+		if (waiter!=null) waiter.complete(convex);
 	}
 
 	/**
@@ -408,10 +481,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (peerKey == null) return;
 		Convex removed;
 		PendingConnection pending;
+		CompletableFuture<Convex> waiter;
 		synchronized (connectionLock) {
 			desiredPeers.remove(peerKey);
 			removed = connections.remove(peerKey);
 			pending = pendingConnections.remove(peerKey);
+			waiter = connectionWaiters.remove(peerKey);
 		}
 		if (removed != null) {
 			closeSilently(removed);
@@ -421,6 +496,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			pending.admission.completeExceptionally(new IllegalStateException("Peer removed while awaiting verification"));
 			closeSilently(pending.connection);
 			log.debug("Removed pending peer: {}", peerKey);
+		}
+		if (waiter != null) {
+			waiter.completeExceptionally(new IllegalStateException("Peer removed before connection"));
 		}
 	}
 
@@ -444,28 +522,38 @@ public class LatticeConnectionManager extends AConnectionManager {
 	@SuppressWarnings("unchecked")
 	public void updateDesiredPeers(AHashMap<ACell, SignedData<ACell>> nodesMap, AccountKey ownKey) {
 		if (nodesMap == null) return;
+		AtomicBoolean changed=new AtomicBoolean(false);
 
 		for (Map.Entry<ACell, SignedData<ACell>> entry : nodesMap.entrySet()) {
-			AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
-			if (peerKey == null) continue;
-			if (peerKey.equals(ownKey)) continue;
+			try {
+				AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
+				if (peerKey == null || peerKey.equals(ownKey)) continue;
 
-			SignedData<ACell> signed = entry.getValue();
-			if (signed == null) continue;
+				SignedData<ACell> signed = entry.getValue();
+				if (signed == null || !(signed.getValue() instanceof AHashMap<?,?> rawInfo)) continue;
 
-			AHashMap<Keyword, ACell> nodeInfo = (AHashMap<Keyword, ACell>) signed.getValue();
-			if (nodeInfo == null) continue;
-
-			DesiredPeer updated = DesiredPeer.fromNodeInfo(peerKey, nodeInfo);
-			desiredPeers.merge(peerKey, updated, (existing, incoming) -> {
-				if (incoming.timestamp > existing.timestamp) {
-					incoming.failCount = existing.failCount;
-					incoming.nextRetryTime = existing.nextRetryTime;
-					return incoming;
-				}
-				return existing;
-			});
+				AHashMap<Keyword, ACell> nodeInfo = (AHashMap<Keyword, ACell>) rawInfo;
+				DesiredPeer updated = DesiredPeer.fromNodeInfo(peerKey, nodeInfo);
+				if (updated == null) continue;
+				desiredPeers.compute(peerKey, (key, existing) -> {
+					if (existing == null) {
+						changed.set(true);
+						return updated;
+					}
+					if (updated.timestamp > existing.timestamp) {
+						updated.failCount = existing.failCount;
+						updated.nextRetryTime = existing.nextRetryTime;
+						changed.set(true);
+						return updated;
+					}
+					return existing;
+				});
+			} catch (RuntimeException e) {
+				// One owner's malformed record must not suppress valid sibling entries.
+				log.debug("Ignoring malformed NodeInfo entry: {}",e.getMessage());
+			}
 		}
+		if (changed.get()) maintenanceSignal.release();
 	}
 
 	// ========== Accessors ==========
@@ -506,7 +594,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void maintenanceLoop() {
 		while (running) {
 			try {
-				Thread.sleep(MAINTENANCE_INTERVAL);
+				maintenanceSignal.tryAcquire(MAINTENANCE_INTERVAL,TimeUnit.MILLISECONDS);
+				if (!running) break;
+				maintenanceSignal.drainPermits();
 				maintainConnections();
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
@@ -611,6 +701,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
 		resetFailure(peerKey);
+		completeConnectionWaiter(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
 		log.info("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
 	}
@@ -689,13 +780,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 			this.timestamp = timestamp;
 		}
 
-		@SuppressWarnings("unchecked")
+		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static DesiredPeer fromNodeInfo(AccountKey peerKey, AHashMap<Keyword, ACell> nodeInfo) {
-			AVector<AString> transports = (AVector<AString>) nodeInfo.get(Keywords.TRANSPORTS);
+			AVector<?> rawTransports = RT.ensureVector(nodeInfo.get(Keywords.TRANSPORTS));
+			if (rawTransports == null) return null;
+			for (long i=0; i<rawTransports.count(); i++) {
+				if (RT.ensureString(rawTransports.get(i)) == null) return null;
+			}
+			AVector<AString> transports = (AVector) rawTransports;
 			AString type = RT.ensureString(nodeInfo.get(Keywords.TYPE));
 			AString version = RT.ensureString(nodeInfo.get(Keywords.VERSION));
 			CVMLong ts = RT.ensureLong(nodeInfo.get(Keywords.TIMESTAMP));
-			long timestamp = (ts != null) ? ts.longValue() : 0L;
+			if (ts == null) return null;
+			long timestamp = ts.longValue();
 			return new DesiredPeer(peerKey, transports, type, version, timestamp);
 		}
 

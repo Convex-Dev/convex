@@ -10,6 +10,7 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
@@ -40,8 +41,9 @@ public class NodeConfig {
 	/** Interval between periodic persistence runs in ms (Long, default 30000). */
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
-	/** Public URL for this node (AString). If set, node advertises itself in :p2p :nodes.
-	 *  Must be publicly reachable on the internet — never localhost or private addresses. */
+	/** Advertised URL for this node (AString). If set, node advertises itself in
+	 *  :p2p :nodes. Must be publicly reachable unless {@link #ALLOW_PRIVATE_URL} is
+	 *  deliberately enabled for a development network. */
 	public static final AString URL = Strings.intern("url");
 
 	/** Maximum memory size (bytes) of an inbound LATTICE_VALUE accepted for merge (#564). */
@@ -141,6 +143,23 @@ public class NodeConfig {
 	}
 
 	/**
+	 * Creates a configuration for an isolated local lattice network. The listener
+	 * binds to an OS-assigned port and advertises that resolved port on loopback.
+	 *
+	 * <p>This is intended for local development and in-process integration tests.
+	 * Private transport advertisement is deliberately enabled; production nodes
+	 * should configure an explicit publicly reachable {@link #URL} instead.</p>
+	 *
+	 * @return local-network configuration using an OS-assigned port
+	 */
+	public static NodeConfig localNetwork() {
+		return new NodeConfig(Maps.of(
+			PORT, CVMLong.ZERO,
+			URL, Strings.create("tcp://localhost:0"),
+			ALLOW_PRIVATE_URL, CVMBool.TRUE));
+	}
+
+	/**
 	 * Get the raw config map.
 	 * @return Underlying config map (never null)
 	 */
@@ -185,12 +204,39 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Get the public URL for this node.
+	 * Get the advertised URL for this node.
 	 * If set, the node will advertise itself in the {@code :p2p :nodes} lattice.
-	 * @return Public URL string, or null if not configured (private node)
+	 * @return advertised URL string, or null if not configured (private node)
 	 */
 	public AString getURL() {
 		return RT.ensureString(config.get(URL));
+	}
+
+	/**
+	 * Gets the transport URL to publish after the listener has bound. A configured
+	 * port of zero is replaced with the actual OS-assigned listener port, preserving
+	 * the remaining URI components.
+	 *
+	 * @param boundPort actual listener port, or null when no listener exists
+	 * @return resolved advertised URL, or null when no URL is configured
+	 */
+	public AString getAdvertisedURL(Integer boundPort) {
+		AString configured=getURL();
+		if (configured==null) return null;
+
+		try {
+			URI uri=new URI(configured.toString().trim());
+			if (uri.getPort()!=0) return configured;
+			if (boundPort==null || boundPort<=0) {
+				throw new IllegalStateException(
+					"A transport URL with port 0 requires a bound network listener");
+			}
+			URI resolved=new URI(uri.getScheme(),uri.getUserInfo(),uri.getHost(),boundPort,
+				uri.getPath(),uri.getQuery(),uri.getFragment());
+			return Strings.create(resolved.toString());
+		} catch (URISyntaxException e) {
+			throw new IllegalStateException("Invalid node URL configuration: "+configured,e);
+		}
 	}
 
 	/**

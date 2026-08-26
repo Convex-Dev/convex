@@ -433,6 +433,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// fails, launch must fail with every service stopped rather than returning an
 			// exception while a listener and background threads remain live.
 			publishNodeInfo();
+			// Restored registries and the freshly published own entry must drive the
+			// desired-peer view even before another network merge arrives.
+			maybeUpdateDesiredPeers();
 
 			lifecycleState = LifecycleState.RUNNING;
 			log.debug("NodeServer started successfully on port {}", port);
@@ -510,17 +513,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Publishes this node's info into the {@code :p2p :nodes} lattice if the node
-	 * is publicly accessible (URL configured) and has a signing key.
+	 * has an advertised URL configured and a signing key.
 	 *
 	 * <p>Only advertises when both conditions are met:
 	 * <ul>
-	 *   <li>A public URL is configured (never localhost or private addresses)</li>
+	 *   <li>An advertised URL is configured and passes the configured reachability policy</li>
 	 *   <li>A signing key is available in the merge context</li>
 	 * </ul>
 	 */
 	private void publishNodeInfo() {
-		// Only advertise if we have a public URL
-		AString url = config.getURL();
+		// Only advertise if we have a configured transport URL
+		AString url = config.getAdvertisedURL(port);
 		if (url == null) return;
 
 		// Only advertise if we have a signing key
@@ -1314,7 +1317,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			cursor.sync();
 
 			// If P2P node data changed, update desired peers on connection managers
-			if (path.length > 0 && Keywords.P2P.equals(path[0])) {
+			if (path.length == 0 || Keywords.P2P.equals(path[0])) {
 				maybeUpdateDesiredPeers();
 			}
 		}
@@ -1718,6 +1721,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// may not yet have been published, and the raw peer value must never become
 			// the persisted or announced root independently of the merged cursor.
 			cursor.sync();
+			maybeUpdateDesiredPeers();
 			return cursor.get();
 		});
 	}
@@ -1780,6 +1784,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// Persist and announce the combined root once, never an individual peer's
 			// pre-merge value.
 			cursor.sync();
+			maybeUpdateDesiredPeers();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull failed: {}", e.getMessage());

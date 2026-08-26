@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
+  The connecting node pushes only its own signed NodeInfo entry, allowing the remote
+  node to discover it, connect back and exchange application lattice updates in both
+  directions. `NodeConfig.localNetwork()` provides loopback NodeInfo publication with
+  OS-assigned ports for isolated development networks.
+
 ### Changed
 
 ### Fixed

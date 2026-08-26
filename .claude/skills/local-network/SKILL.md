@@ -63,19 +63,25 @@ and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 For a two-node lattice test:
 
 1. Give each node its own store and key pair.
-2. Use `NodeConfig.port(0)`, launch both nodes, and obtain their actual addresses
-   from `getHostAddress()`.
+2. Use `NodeConfig.localNetwork()`. It binds port `0`, then publishes the actual
+   OS-assigned loopback port in the node's signed `NodeInfo`.
 3. Set an inbound propagator policy before launch. `P2PNode.serveAllInbound()` is
    suitable for a deliberately public test node.
-4. Connect with `ConvexRemote.connect(remoteAddress)` and register the connection
-   on the local propagator with the remote node's account key. Connect both
-   directions when both nodes publish.
+4. Tell one node about the other with
+   `nodeA.connect(nodeBKey, nodeB.getNodeServer().getHostAddress())`. The future
+   completes after B proves its node key and A's own signed `[:p2p :nodes]`
+   record has been merged by B. B then discovers A from that path-scoped lattice
+   update and establishes the reverse authenticated connection automatically.
+   Use `nodeB.whenConnected(nodeAKey)` when a test must wait for that reverse
+   admission before publishing in both directions.
 5. After an application write, call the root application's `sync()` to publish
    the complete root.
-6. Wait on `receivingServer.pull(connection).get(timeout)`. Its future covers
-   acquisition, merge and root publication. `nextAnnounce()` only signals local
-   announcement, and a ping only establishes transport ordering; neither proves
-   that asynchronous acquisition of referenced cells has completed.
+6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
+   `nextAnnounce()` before publishing and re-arm it until the expected application
+   state is present. The announce signals completed acquisition, merge and root
+   publication. Use an explicit `receivingServer.pull(connection).get(timeout)`
+   only when the test is specifically about pull synchronisation. A ping only
+   establishes transport ordering and does not prove acquisition is complete.
 7. Close nodes before closing their stores.
 
 Treat a node key as its P2P/transport signer, not automatically as an

@@ -1,6 +1,10 @@
 # Convex Peer Network Design — PROPOSAL
 
-> **Status**: Design proposal. Sections marked **[EXISTS]** describe current implementation; sections marked **[PROPOSED]** describe new work. Items marked **[DECISION]** require further discussion.
+> **Status**: Design proposal with a partial implementation. Sections marked
+> **[EXISTS]** describe current implementation; sections marked **[PARTIAL]**
+> have a working vertical slice with remaining policy work; sections marked
+> **[PROPOSED]** describe new work. Items marked **[DECISION]** require further
+> discussion.
 
 ## 1. Overview
 
@@ -148,7 +152,7 @@ The genesis hash uniquely identifies a Convex network. Using it in the lattice p
 
 The `:convex` keyword at the root level is a namespace for Convex-native protocol state (consensus, peer status, governance). Application-level regions (`:data`, `:fs`, `:kv`, `:queue`) remain at their existing root-level paths.
 
-## 4. P2P Discovery Lattice [PROPOSED]
+## 4. P2P Discovery Lattice [PARTIAL]
 
 ### 4.1 Lattice Paths
 
@@ -200,7 +204,16 @@ On-chain `PeerStatus` (in global consensus state) is the **single source of trut
 
 The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain metadata** for operational convenience: multiple transport URIs, supported lattice regions, protocol version, and capabilities. This data propagates faster than on-chain updates (gossip vs. consensus finality) but has weaker guarantees (no finality, latest-timestamp-wins). It is always subordinate to the on-chain record.
 
-**Bootstrap path**: A new node reads the on-chain peer list (PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then pulls the P2P node registry to discover richer transport metadata. The on-chain URL is always the fallback when P2P metadata is unavailable.
+**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
+AccountKey and TCP address. After challenge/response verifies that endpoint, the
+connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
+post-merge acknowledgement. The receiving node ingests that NodeInfo and establishes
+the reverse persistent connection, enabling bidirectional lattice gossip.
+
+**Proposed on-chain bootstrap path**: A new node reads the on-chain peer list
+(PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then
+pulls the P2P node registry to discover richer transport metadata. The on-chain URL is
+the fallback when P2P metadata is unavailable.
 
 **Validation**: Nodes should validate P2P entries against on-chain state — reject NodeInfo from AccountKeys not registered on-chain, or from peers with zero stake. The on-chain PeerStatus is the trust anchor; the P2P lattice is a convenience cache.
 
@@ -216,7 +229,11 @@ When implemented, Kademlia routing state would be **node-local** (not propagated
 
 A node uses multiple strategies to discover and maintain connections, in order:
 
-1. **Configured peers** — Explicitly configured connection endpoints (bootstrap nodes, operator preferences). These are tried first and maintained persistently.
+1. **Configured peers** — Explicitly supplied connection endpoints (bootstrap
+   nodes, operator preferences). `P2PNode.connect` and
+   `LatticeConnectionManager.connectPeer` implement the one-peer case; configuration
+   file integration remains future work. Connections are authenticated and maintained
+   persistently.
 
 2. **On-chain peer registry** — `PeerStatus` entries in consensus state provide hostname/URL for staked peers. Used for bootstrapping and as fallback. `ConnectionManager` already uses stake-weighted random selection from this registry.
 
@@ -384,7 +401,7 @@ The challenge includes `networkId` (genesis hash) to prevent cross-network repla
 
 On reconnect, challenge/response is re-run (cheap: one Ed25519 sign + verify). The peer can restore session state (subscriptions, pending responses) keyed by AccountKey.
 
-## 8. Connection Management [PROPOSED]
+## 8. Connection Management [EXISTS + PROPOSED]
 
 ### 8.1 Connection Lifecycle
 
@@ -405,13 +422,19 @@ CONNECTING → CONNECTED → DISCONNECTED
 - Polls random peers for latest belief
 - Broadcasts messages to all live connections (shuffled order)
 
-### 8.3 Reconnection [PROPOSED]
+For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
+desired, pending and admitted connections. A configured node key keeps a socket in
+capability-free limbo until challenge/response succeeds. Desired peers are populated
+from signed `[:p2p :nodes]` records, and callers can await admission without polling.
+
+### 8.3 Reconnection [EXISTS — lattice nodes]
 
 Automatic reconnection with exponential backoff:
 
 - **Initial delay**: 1 second
 - **Max delay**: 30 seconds (exponential growth with jitter)
-- **Max retries**: Configurable (default: unlimited for configured peers, limited for discovered peers)
+- **Max retries**: Currently unlimited for desired lattice peers. Separate configured
+  and discovered retry policies remain proposed.
 
 Per message type:
 - **Transactions**: Fail-fast on disconnect. Caller must handle sequence number management.

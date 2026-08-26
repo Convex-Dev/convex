@@ -1084,6 +1084,33 @@ public class NodeServerTest {
 		}
 	}
 
+	/** A local-network config publishes the OS-assigned listener port, never port zero. */
+	@Test
+	public void testLocalNetworkPublicationUsesBoundPort() throws IOException, InterruptedException {
+		AKeyPair kp = AKeyPair.generate();
+		NodeServer<Index<Keyword, ACell>> server =
+			new NodeServer<>(Lattice.ROOT, store, NodeConfig.localNetwork());
+		server.setMergeContext(LatticeContext.create(null, kp));
+
+		try {
+			server.launch();
+			assertNotNull(server.getPort());
+			assertTrue(server.getPort() > 0);
+
+			@SuppressWarnings("unchecked")
+			AHashMap<ACell, SignedData<ACell>> nodes =
+				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
+					server.getCursor(),
+					new ACell[] { Keywords.P2P, Keywords.NODES }).get();
+			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
+			assertNotNull(info);
+			assertEquals(Strings.create("tcp://localhost:" + server.getPort()),
+				((AVector<?>) info.get(Keywords.TRANSPORTS)).get(0));
+		} finally {
+			server.close();
+		}
+	}
+
 	/**
 	 * Test that a NodeServer without URL does not publish NodeInfo.
 	 */

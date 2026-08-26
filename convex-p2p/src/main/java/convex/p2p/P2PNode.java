@@ -3,16 +3,28 @@ package convex.p2p;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Convex;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
+import convex.core.data.SignedData;
+import convex.core.data.Vectors;
+import convex.core.message.Message;
+import convex.core.message.MessageTag;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.etch.EtchStore;
 import convex.lattice.LatticeContext;
@@ -37,9 +49,11 @@ import convex.node.NodeServer;
  * infrastructure regions are the same either way. Since a node ignores regions it does
  * not serve, region sets need not match across a network.
  *
- * <p><b>Stub.</b> The current implementation is deliberately minimal: it wires up a
- * store, a signing key and a NodeServer, and exposes the root cursor. Peer discovery,
- * region subscription and replication policy are yet to be built on top.
+ * <p><b>Bootstrap discovery.</b> A node can be told about one authenticated peer with
+ * {@link #connect(AccountKey, InetSocketAddress)}. It pushes its own signed NodeInfo,
+ * allowing the remote node to discover it and establish the reverse connection.
+ * On-chain bootstrap, region subscription and bounded replication policy remain to
+ * be built on top.
  *
  * <p><b>Inbound policy.</b> A NodeServer denies all network lattice traffic until an
  * operator assigns inbound connections to a propagator. {@link #create} leaves that
@@ -161,6 +175,79 @@ public class P2PNode implements Closeable {
 		} else {
 			log.info("Convex P2P node started in local-only mode");
 		}
+	}
+
+	/**
+	 * Adds one bootstrap peer and establishes an authenticated persistent
+	 * connection to it.
+	 *
+	 * <p>After the remote endpoint proves {@code peerKey}, this node pushes only its
+	 * own signed {@code [:p2p :nodes]} entry and waits for the merge acknowledgement.
+	 * The remote node can then discover this node's advertised transport and open the
+	 * reverse connection needed for bidirectional lattice gossip. The node must have
+	 * published a NodeInfo record, normally through {@link NodeConfig#URL} or
+	 * {@link NodeConfig#localNetwork()}.</p>
+	 *
+	 * @param peerKey expected AccountKey of the bootstrap node
+	 * @param address bootstrap node's TCP address
+	 * @return future completing after connection admission and own-identity merge
+	 */
+	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
+		if (!server.isRunning()) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before connecting"));
+		}
+		return server.getPropagator().getConnectionManager().connectPeer(peerKey,address)
+			.thenCompose(peer -> pushOwnNodeInfo(peer).thenApply(ignored -> peer));
+	}
+
+	/**
+	 * Returns a future for the current or next authenticated connection to a node.
+	 * Useful when this node is expected to discover the peer from an incoming
+	 * NodeInfo update.
+	 *
+	 * @param peerKey expected remote node key
+	 * @return future completing with the admitted connection
+	 */
+	public CompletableFuture<Convex> whenConnected(AccountKey peerKey) {
+		if (server.getPropagator()==null) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before awaiting a peer"));
+		}
+		return server.getPropagator().getConnectionManager().whenConnected(peerKey);
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private CompletableFuture<Result> pushOwnNodeInfo(Convex peer) {
+		if (keyPair==null) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("Node has no signing key for its NodeInfo"));
+		}
+
+		ACell nodesValue=server.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
+		if (!(nodesValue instanceof AHashMap<?,?> rawNodes)) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				"Node has no published NodeInfo; configure NodeConfig.URL"));
+		}
+		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap) rawNodes;
+		AccountKey ownKey=keyPair.getAccountKey();
+		SignedData<ACell> signed=nodes.get(ownKey);
+		if (signed==null) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				"Node has no published NodeInfo; configure NodeConfig.URL"));
+		}
+
+		AHashMap<ACell,SignedData<ACell>> ownEntry=(AHashMap) Maps.of(ownKey,signed);
+		var payload=Vectors.create(MessageTag.LATTICE_VALUE,null,
+			Vectors.of(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES),ownEntry);
+		Message update=Message.create(MessageType.LATTICE_VALUE,payload);
+		return peer.request(update).thenApply(result -> {
+			if (result==null || result.isError()) {
+				throw new CompletionException(new IOException(
+					"Remote node rejected own NodeInfo update: "+result));
+			}
+			return result;
+		});
 	}
 
 	/**

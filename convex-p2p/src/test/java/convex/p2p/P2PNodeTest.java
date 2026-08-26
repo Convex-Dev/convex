@@ -22,7 +22,7 @@ import convex.node.NodeConfig;
 import convex.social.Social;
 
 /**
- * Tests for the P2PNode stub.
+ * Tests for P2PNode lifecycle and region composition.
  */
 public class P2PNodeTest {
 

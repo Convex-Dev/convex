@@ -9,8 +9,9 @@ that discover each other, exchange lattice values and converge on shared state â
 bundles the application regions those nodes serve, so one dependency gives you a
 complete node.
 
-> **Status: early stub.** The module scaffolding and entry point are in place;
-> discovery, region subscription and replication policy are still to be built.
+> **Status: early implementation.** Authenticated one-peer bootstrap and signed
+> NodeInfo discovery work over TCP. On-chain bootstrap, region-aware connection
+> selection, connection bounds and additional transports remain to be built.
 
 ## Lattice structure
 
@@ -185,6 +186,31 @@ try (P2PNode node = P2PNode.create(store, NodeConfig.port(18888), keyPair)) {
     app.sync();
 }
 ```
+
+For an isolated two-node network, use OS-assigned ports and tell only one node
+about the other:
+
+```java
+P2PNode alice = P2PNode.create(aliceStore, NodeConfig.localNetwork(), aliceKey)
+    .serveAllInbound();
+P2PNode bob = P2PNode.create(bobStore, NodeConfig.localNetwork(), bobKey)
+    .serveAllInbound();
+alice.launch();
+bob.launch();
+
+// Bob proves his key; Alice then pushes only her own signed NodeInfo entry.
+alice.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
+
+// Bob learns Alice's transport from that entry and connects back automatically.
+bob.whenConnected(aliceKey.getAccountKey()).join();
+
+// Subsequent application syncs gossip in both directions.
+alice.getApplication().sync();
+```
+
+`connect` completes after the bootstrap endpoint is authenticated and has
+acknowledged the path-scoped `[:p2p :nodes]` update. It does not send the whole
+application root as part of discovery.
 
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a
