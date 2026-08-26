@@ -49,6 +49,17 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 		return new Follows(this,cursor.path(SocialLattice.KEY_FOLLOWS));
 	}
 
+	/**
+	 * Creates an isolated working copy of this user's unsigned social value.
+	 * Multiple feed, profile and follow actions can be applied to the fork and
+	 * {@link #sync() synced} through the owner boundary as one signed value.
+	 *
+	 * @return isolated working copy for this user
+	 */
+	public SocialUser fork() {
+		return new SocialUser((Social) parent(),cursor.fork(),ownerKey);
+	}
+
 	// TODO: public Profile profile() { ... }
 
 	/**

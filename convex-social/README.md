@@ -75,6 +75,7 @@ implementation 'world.convex:convex-social:0.8.15'
 
 ```java
 import convex.social.Social;
+import convex.social.SocialUser;
 import convex.core.crypto.AKeyPair;
 
 AKeyPair keyPair = AKeyPair.generate();
@@ -83,11 +84,11 @@ AKeyPair keyPair = AKeyPair.generate();
 Social social = Social.create(keyPair);
 social.user(keyPair.getAccountKey()).feed().post("Hello!");
 
-// Fork for batch operations, then sync back
-Social forked = social.fork();
-forked.user(keyPair.getAccountKey()).feed().post("Post 1");
-forked.user(keyPair.getAccountKey()).feed().post("Post 2");
-forked.sync();
+// Fork inside one owner's signing boundary, then publish one signed user value
+SocialUser work = social.user(keyPair.getAccountKey()).fork();
+work.feed().post("Post 1");
+work.feed().post("Post 2");
+work.sync();
 ```
 
 ### Node integration

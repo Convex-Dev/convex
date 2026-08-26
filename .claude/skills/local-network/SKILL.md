@@ -60,7 +60,7 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
-For a two-node lattice test:
+For a small lattice network test:
 
 1. Give each node its own store and key pair.
 2. Use `NodeConfig.localNetwork()`. It binds port `0`, then publishes the actual
@@ -74,8 +74,16 @@ For a two-node lattice test:
    update and establishes the reverse authenticated connection automatically.
    Use `nodeB.whenConnected(nodeAKey)` when a test must wait for that reverse
    admission before publishing in both directions.
+   For three nodes, a useful discovery topology is to tell both leaves only
+   about one rendezvous node. Wait until its signed registry has reached both
+   leaves, then use `whenConnected` to prove the leaves discovered each other
+   without another configured endpoint.
 5. After an application write, call the root application's `sync()` to publish
    the complete root.
+   When batching several edits for one signed social owner, fork the
+   `SocialUser`, apply its feed and follow actions, sync that fork once, then
+   sync the application root. A `Social` fork is outside the owner boundary and
+   therefore still signs each user edit inside the unpublished fork.
 6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
    `nextAnnounce()` before publishing and re-arm it until the expected application
    state is present. The announce signals completed acquisition, merge and root
@@ -88,11 +96,19 @@ Treat a node key as its P2P/transport signer, not automatically as an
 application user's identity or signing key. For an `OwnerLattice` keyed by an
 indirect owner such as a DID, install a fail-closed owner verifier in the
 `LatticeContext`; without one, indirect owners use the compatibility-lenient
-fallback. Give identity-sensitive tests separate node keys, social DIDs and
-social signing keys. Cover `did:key`, `did:convex` and `did:web` with pinned
-local state or deterministic resolver fixtures—never depend on public web
-resolution in a unit test. `serveAllInbound()` controls network access and does
-not replace owner authorisation.
+fallback. Give identity-sensitive tests separate node keys and application
+owner/signing keys. The social cursor API currently accepts
+`AccountKey` owners, so use a separate application key and state that limitation
+explicitly. Once its DID migration lands, cover `did:key`, `did:convex` and
+`did:web` with pinned local state or deterministic resolver fixtures—never
+depend on public web resolution in a unit test. `serveAllInbound()` controls
+network access and does not replace owner authorisation.
+
+Remember that an `AccountKey` is a typed JVM view over a canonical 32-byte
+Blob. A key stored as ordinary CAD3 application data can therefore decode as a
+Blob. Domain readers should parse compatible Blob values with
+`AccountKey.parse` or `AccountKey.create`; do not use `instanceof AccountKey`
+as a wire-format validity check.
 
 The rules in `AGENTS.md` apply: never bind fixed ports and never sleep. Wait on
 futures, latches or another API whose contract represents the required state.

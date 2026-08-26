@@ -45,6 +45,8 @@ public class SocialHelpers {
 
 	/**
 	 * Gets the set of actively followed account keys from a user's follows map.
+	 * General CAD3 map keys decode to their canonical Blob representation, so
+	 * compatible 32-byte keys are restored to the {@link AccountKey} view.
 	 *
 	 * @param follows The follows map (key → {active, timestamp})
 	 * @return Set of actively followed AccountKeys
@@ -62,8 +64,9 @@ public class SocialHelpers {
 
 			if (value instanceof AHashMap<?,?> record) {
 				ACell active = ((AHashMap<Keyword, ACell>) record).get(SocialPost.ACTIVE);
-				if (CVMBool.TRUE.equals(active) && key instanceof AccountKey ak) {
-					result.add(ak);
+				AccountKey accountKey=AccountKey.parse(key);
+				if (CVMBool.TRUE.equals(active) && accountKey!=null) {
+					result.add(accountKey);
 				}
 			}
 		}

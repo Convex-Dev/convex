@@ -8,10 +8,12 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -216,6 +218,32 @@ public class SocialAppTest {
 		// Both users' posts visible in original
 		assertEquals(1, social.user(alice.getAccountKey()).feed().count());
 		assertEquals(1, social.user(bob.getAccountKey()).feed().count());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testUserForkBatchedValueSurvivesEncodingRoundTrip() throws Exception {
+		AKeyPair alice=AKeyPair.generate();
+		AKeyPair bob=AKeyPair.generate();
+		Social social=Social.create(alice);
+		SocialUser work=social.user(alice.getAccountKey()).fork();
+
+		Blob post=work.feed().post("Hello from Alice");
+		work.follows().follow(bob.getAccountKey());
+		assertEquals(0,social.user(alice.getAccountKey()).feed().count());
+		assertTrue(social.user(alice.getAccountKey()).follows().getActive().isEmpty());
+		work.sync();
+
+		SignedData<Index<Keyword,ACell>> signed=
+			(SignedData<Index<Keyword,ACell>>)social.cursor().get().get(alice.getAccountKey());
+		SignedData<Index<Keyword,ACell>> decoded=
+			(SignedData<Index<Keyword,ACell>>)CVMEncoder.INSTANCE.decodeMultiCell(
+				Format.encodeMultiCell(signed,true));
+
+		assertTrue(decoded.checkSignature());
+		assertNotNull(SocialLattice.getFeed(decoded.getValue()).get(post));
+		assertEquals(Set.of(bob.getAccountKey()),SocialHelpers.getActiveFollows(
+			SocialLattice.getFollows(decoded.getValue())));
 	}
 
 	@Test

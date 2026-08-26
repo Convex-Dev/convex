@@ -193,6 +193,35 @@ public class SocialLatticeTest {
 		assertFalse(active.contains(kp3.getAccountKey()));
 	}
 
+	@Test
+	public void testSignedOwnerCanAdvanceFromPostToMultipleFollows() {
+		AKeyPair alice=AKeyPair.generate();
+		AKeyPair receiver=AKeyPair.generate();
+		AKeyPair bob=AKeyPair.generate();
+		AKeyPair carol=AKeyPair.generate();
+
+		Index<Blob,ACell> feed=Index.<Blob,ACell>none().assoc(
+			SocialPost.createKey(1000L),SocialPost.createPost("Hello",1000L));
+		Index<Keyword,ACell> postOnly=Index.<Keyword,ACell>none()
+			.assoc(SocialLattice.KEY_FEED,feed);
+		AHashMap<ACell,ACell> follows=Maps.of(
+			bob.getAccountKey(),SocialPost.createFollowRecord(2000L,true),
+			carol.getAccountKey(),SocialPost.createFollowRecord(2001L,true));
+		Index<Keyword,ACell> complete=postOnly.assoc(SocialLattice.KEY_FOLLOWS,follows);
+
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own=
+			Maps.of(alice.getAccountKey(),alice.signData(postOnly));
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> update=
+			Maps.of(alice.getAccountKey(),alice.signData(complete));
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merged=Social.SOCIAL_LATTICE.merge(
+			LatticeContext.create(null,receiver),own,update);
+
+		assertEquals(complete,merged.get(alice.getAccountKey()).getValue());
+		assertEquals(Set.of(bob.getAccountKey(),carol.getAccountKey()),
+			SocialHelpers.getActiveFollows(
+				SocialLattice.getFollows(merged.get(alice.getAccountKey()).getValue())));
+	}
+
 	// ===== Owner Lattice Integration =====
 
 	@Test

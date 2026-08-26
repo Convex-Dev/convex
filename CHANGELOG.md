@@ -14,10 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   node to discover it, connect back and exchange application lattice updates in both
   directions. `NodeConfig.localNetwork()` provides loopback NodeInfo publication with
   OS-assigned ports for isolated development networks.
+- Social users support owner-scoped forks, allowing several feed and follow actions to
+  be published as one signed user value.
 
 ### Changed
 
 ### Fixed
+
+- Social follow enumeration recognises canonical 32-byte Blob keys after CAD3 decode,
+  so valid replicated follows are returned as `AccountKey` values.
 
 ## [0.8.15] - 2026-08-24
 
