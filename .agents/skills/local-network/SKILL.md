@@ -1,6 +1,6 @@
 ---
 name: local-network
-description: Run a local Convex test network for development. Use when testing changes against a live network, reproducing a peer issue, or when no remote network is configured.
+description: Run isolated local Convex networks and in-process lattice node networks for development. Use when testing against local peers, reproducing peer or P2P replication issues, exercising NodeServer or P2PNode sync, or when no remote network is configured.
 ---
 
 # Shared Convex skill

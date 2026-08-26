@@ -3,10 +3,23 @@
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex-social.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-social/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-social)
 
-A lattice-based, peer-to-peer social network built on Convex. Each user owns a
-cryptographically signed feed that only they can write to. Nodes selectively replicate
-feeds based on follow relationships, and timelines are built by merging followed feeds
-by timestamp.
+A lattice-based, peer-to-peer social network built on Convex. The module currently
+provides owner-signed feed and follow state plus timeline construction primitives.
+Automatic follow-driven replication is not yet wired into `P2PNode`; see
+[Social Lattice Design](docs/SOCIAL_DESIGN.md#current-status) for the current audit and
+proposed design.
+
+> **Identity status:** the current Java API uses `AccountKey` for both the social owner
+> and signing authority. The target schema uses canonical DIDs for owners, follows,
+> replies and timelines, with signing keys authorised separately through standard Convex
+> auth. The social value remains structurally mergeable beneath its owner signature.
+> Follows use a stamped LWP collection containing a DID-keyed map of LWW records, so
+> separate devices can update different targets without losing either edit. Unfollow is
+> represented by the winning inactive record for its target.
+> `did:key`, `did:convex` and `did:web` are all in scope; see
+> [DID Owner Boundary](docs/SOCIAL_DESIGN.md#did-owner-boundary).
+> A `did:key` user is stable and non-recoverable: losing its private key means creating
+> a new social user rather than replacing the key behind the existing DID.
 
 ## Overview
 
@@ -17,19 +30,27 @@ structure:
 SocialLattice (per-user, signed by owner):
   :feed    → IndexLattice<Blob, ACell>   8-byte timestamp keys, last-writer-wins per entry
   :profile → LWWLattice                  display name, bio, avatar, etc.
-  :follows → MapLattice<ACell, ACell>    followed key → {active, timestamp}
+  :follows → MapLattice<ACell, ACell>    current: followed AccountKey → {active, timestamp}
 ```
 
-Each user's data is wrapped in `SignedData` via an `OwnerLattice`, so only the owner's
-Ed25519 key can sign updates and foreign data is rejected during merge. The base layer
-is intentionally minimal and extensible — easy to layer applications and UI on top.
+That diagram is the implementation today. The target retains the structural social
+lattice and adds a stamped top-level `:following` LWP section. Its `:follows` child is a
+DID-keyed `MapLattice`, while LWW selects the later complete record for one target.
+
+Each user's complete data is wrapped in `SignedData` via an `OwnerLattice`, so the current
+account-key owner binding rejects updates signed by a different key. DID ownership will
+retain the concrete signer in `SignedData` while resolving its authority independently of
+the durable social identifier. Authorised owner devices can merge and re-sign structural
+changes; a relay cannot forge a synthesised owner value. The base layer is intentionally
+minimal and extensible — easy to layer applications and UI on top.
 
 ## Features
 
-- Owner-signed feeds — only the holder of the key can post
-- Follow-based selective replication between nodes
-- Timelines constructed by merging followed feeds by timestamp
-- Conflict-free merge of independently updated replicas (CRDT semantics)
+- Owner-signed feeds — only a key authorised for the owner can post
+- Signed follow/unfollow records with per-target LWW merge
+- Timeline helper for merging selected feeds by timestamp
+- Owner-scoped pull primitives through the P2P node substrate
+- Lattice merge semantics for independently updated replicas
 - Cursor-based Java API with `fork()` / `sync()` for batched operations
 
 ## Installation

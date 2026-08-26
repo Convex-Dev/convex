@@ -1,348 +1,448 @@
 # Social Lattice Design
 
-A peer-to-peer social network built on Convex lattice technology. Each user owns a
-cryptographically signed feed that only they can write to. Nodes selectively replicate
-feeds based on follow relationships, and timelines are constructed by merging followed
-feeds by timestamp.
+A peer-to-peer social network built from composable Convex lattice types. Each social
+owner has a structurally mergeable value beneath an authenticated signing boundary.
 
-The base layer is minimal and extensible — easy to layer applications and UI on top.
+> The current Java implementation uses `AccountKey` for identity and lacks automated
+> follow-driven replication. The target changes owners and follow targets to DIDs and
+> adds a top-level `:following` LWP section containing the per-target `:follows` map.
 
-## Lattice Architecture
+Normative basis: CAD024 governs the lattice composition and signing boundary; CAD043,
+CAD038 and CAD004 govern DID resolution, owner authorisation and key rotation.
 
-The social lattice composes standard Convex lattice primitives into a two-level structure:
+## Current Status
 
+Local follow lists work. `Follows.follow()`, `Follows.unfollow()` and
+`Follows.getActive()` update and read a `MapLattice` with per-target LWW records. The
+current inactive record already prevents an older active value from resurrecting.
+
+Following does not yet control replication:
+
+- owners and targets are `AccountKey`, not DID;
+- the follow map has no outer LWP section stamp;
+- `Follows` reads `System.currentTimeMillis()` instead of the `LatticeContext` clock;
+- follow records do not cache a validated target signer;
+- `SocialHelpers.computeFollowSet()` has no production caller;
+- `SocialHelpers.buildTimeline()` only merges feeds supplied by its caller;
+- `P2PNode` has no follow-aware inbound policy, so full-root push or pull may ingest all
+  social owners offered by a peer.
+
+`P2PSocialSyncTest` is a two-node smoke test for the current implementation. It proves
+signed full-root convergence, not DID auth or follow-directed acquisition.
+
+## Architecture
+
+```text
+Root KeyedLattice
+  :social -> OwnerLattice<SocialLattice>
+    <owner-did> -> SignedData<SocialValue> (authorised AccountKey)
+
+SocialValue
+  :feed     -> IndexLattice<post-key, LWW post record>
+  :profile  -> profile lattice
+  :following -> stamped LWP following section
+
+Following section
+  :timestamp -> collection write timestamp
+  :follows   -> MapLattice<target-did, LWW FollowRecord>
+
+FollowRecord
+  :timestamp        -> target-record edit timestamp
+  :active           -> boolean
+  :account-key      -> last validated target signer, optional
+  :resolver-version -> authenticated resolution reference, optional
+  :validated-at     -> validation time, optional
+  :valid-until      -> freshness bound, optional
 ```
-Root KeyedLattice (per-node)
-  :social → OwnerLattice<SocialLattice>
-                <owner-key-A> → SignedData<SocialLattice value>
-                <owner-key-B> → SignedData<SocialLattice value>
-                ...
 
-SocialLattice (per-user, signed by owner):
-  :feed    → IndexLattice<Blob, ACell>      8-byte timestamp keys, LWW per entry
-  :profile → LWWLattice                     display name, bio, avatar, etc.
-  :follows → MapLattice<ACell, ACell>       followed key → {active, timestamp}
+The `SocialLattice` merges its three sections independently. It is not a whole-value LWW
+register, and it is not an application action log.
+
+## DID Owner Boundary
+
+The social subject is a canonical base DID stored as `AString`. The concrete
+`AccountKey` in `SignedData` is an authentication method authorised for that DID, not the
+durable social identifier. The P2P node key is a separate transport/operator identity.
+
+The target API should use `DID` for users, follow targets, reply authors and timeline
+authors. DID URLs with paths, queries or fragments are rejected as owner keys. Do not
+silently identify two stored keys through `alsoKnownAs`.
+
+One fail-closed standard Convex owner verifier handles all supported methods:
+
+- `did:key` decodes to one immutable Ed25519 key;
+- numeric `did:convex` resolves against pinned CVM account state;
+- named `did:convex` resolves through authenticated CNS/registry state;
+- `did:web` resolves an authenticated DID document.
+
+An authenticated `did:key` in `alsoKnownAs` may prove the current signer for a
+`did:convex` or `did:web` subject. It does not change the social owner path or rewrite
+follow targets. A lost `did:key` requires creation of a new social user; users wanting
+key rotation should choose `did:convex` or `did:web`.
+
+The current `P2PNode` context does not install a fail-closed indirect-owner verifier.
+Changing owner map keys to DIDs without adding that verifier would be unsafe.
+
+### Structural merge beneath the signature
+
+`OwnerLattice` keeps one signed social value per DID. A merge may select one existing
+signed value, or its child `SocialLattice` may synthesise a structural combination.
+`SignedLattice` publishes a synthesis only when `LatticeContext.signAs(ownerDid, value)`
+can sign it with a key authorised for that DID.
+
+Consequently, multiple authorised owner devices may fork, edit different fields, merge
+their correctly signed states and re-sign the result. A relay without an owner key cannot
+forge the combined state; it retains an existing signed version until an authorised owner
+device republishes a merge. There is no requirement for one serial writer.
+
+## Following Section
+
+### Composition
+
+The target `:following` child is conceptually:
+
+```text
+StampingLattice(
+  LWPLattice(
+    KeyedLattice(
+      :timestamp -> Max/prefer-newer value
+      :follows   -> MapLattice(
+                      StampingLattice(LWWLattice(FollowRecord)))
+    ),
+    Following::timestamp
+  ),
+  Following::withTimestamp
+)
 ```
 
-### OwnerLattice
+LWP makes the collection with the higher timestamp the preferred `own` operand, then
+delegates to the inner keyed structure. It does not choose one complete set. The
+`:follows` map therefore preserves distinct targets from both replicas, while its LWW
+child selects the complete later record when both sides edit the same target.
 
-The `OwnerLattice` wraps each user's data in `SignedData` — only the owner's Ed25519 key
-can sign updates. This is the same pattern used by `:fs`, `:kv`, and `:queue` in
-convex-core. Foreign data (signed by a different key) is rejected during merge.
+No custom following-set lattice is needed for this merge. `KeyedLattice` handles the
+fixed wrapper fields and `MapLattice` handles arbitrary DID keys. Missing `:follows`
+children, missing target keys and a wholly absent `:following` value have the desired
+additive semantics.
 
-### Node Opt-In
+Foreign validation is distinct from missing-value merge semantics. The current LWP null
+fast path adopts `other` directly, and timestamp preference may reorder a newer foreign
+operand into the inner `own` position. Validate the complete following value at or above
+the LWP boundary, or harden generic LWP adoption/validation; do not assume every foreign
+child will be visited as the inner `other` operand. This concern still does not justify a
+custom social merge lattice.
 
-The social lattice is **not** part of convex-core's `Lattice.ROOT`. Nodes opt in by
-composing their root lattice to include `:social`:
+This gives the desired separation:
 
-```java
-KeyedLattice root = Lattice.ROOT.addLattice(Social.KEY_SOCIAL, Social.SOCIAL_LATTICE);
-```
+- Alice following Bob and Carol on separate devices merges to both records;
+- concurrent follow/unfollow of Bob resolves by Bob's record timestamp;
+- updating Bob's cached signer touches Bob's record, not Carol's;
+- updating the follow collection does not replace feed or profile state;
+- a newer feed or profile update does not replace the follow collection.
+
+Both the changed record and containing follow collection use a timestamp supplied by
+`LatticeContext`. One logical update should reuse one context timestamp at both levels.
+Application code must not call `System.currentTimeMillis()` or ratchet from stored state.
+Distinct exact-timestamp conflicts retain the receiver's own/current value as specified
+by CAD024; a later non-tied write resolves them.
+
+### Follow and unfollow
+
+`follow(targetDid)` writes the complete target record with `:active true`.
+`unfollow(targetDid)` writes a later complete record with `:active false`. The readable
+follow set is the set of target map keys whose winning record is active.
+
+The inactive record is intentionally retained. Because LWP delegates to `MapLattice`, a
+map key present only in an older replica survives structural merge. Removing Bob's entry
+would therefore allow the older active record to return. The inactive LWW record is the
+minimal per-target tombstone; no global action history is required.
+
+### Cached target signer
+
+A follow record may cache the most recently validated `AccountKey` for its target DID,
+together with a resolver version and freshness metadata. For an incoming Bob owner value:
+
+1. verify its `SignedData` signature;
+2. require the path owner to be Bob's canonical DID;
+3. reuse the cached key only if it matches the signer and remains acceptable under the
+   resolver policy;
+4. otherwise resolve Bob through standard Convex auth;
+5. if valid, write a newer Bob follow record containing the binding while preserving
+   its current `:active` value;
+6. reject or quarantine the value if resolution fails.
+
+Cache refresh and follow intent share one atomic LWW record, so refresh code must always
+start from the current merged record. It must not apply a stale copy which could reverse
+a concurrent follow/unfollow. Whether all freshness fields should be portable signed data
+or partly operator-local state remains an implementation decision.
 
 ## Feed
 
-### Key Format
+The current feed is an `IndexLattice<Blob, ACell>` with LWW post records. Distinct post
+keys union; a later edit/delete record for one post wins. The current 8-byte big-endian
+millisecond key sorts chronologically but can collide across authorised devices. The
+target should use a stable composite order key containing display time plus a unique
+content/device component.
 
-Feed entries are keyed by **8-byte big-endian timestamp Blobs**:
+A post record contains:
 
-```
-[8 bytes: milliseconds since epoch, big-endian]
-```
+| Key | Type | Required | Description |
+|---|---|---|---|
+| `:text` | AString | Yes | Post text |
+| `:timestamp` | CVMLong | Yes | Display/edit timestamp |
+| `:reply-to` | Blob | No | Parent post key |
+| `:reply-did` | AString | No | Canonical DID of the parent author |
+| `:media` | AVector\<Hash\> | No | Content references in `:data` |
+| `:tags` | ASet\<AString\> | No | Hashtags |
+| `:deleted` | CVMLong | No | LWW deletion marker |
 
-Big-endian encoding gives lexicographic = chronological ordering in `Index`, so feeds
-are naturally sorted by time. The single-writer guarantee (enforced by `OwnerLattice`)
-means timestamps are monotonic with no collision risk.
-
-`Index.slice()` enables efficient time-range queries for pagination without scanning the
-entire feed.
-
-### Post Format
-
-Each post is an `AHashMap<Keyword, ACell>`:
-
-| Key          | Type              | Required | Description                              |
-|--------------|-------------------|----------|------------------------------------------|
-| `:text`      | AString           | Yes      | Post text content                        |
-| `:timestamp` | CVMLong           | Yes      | Milliseconds since epoch                 |
-| `:reply-to`  | Blob (8 bytes)    | No       | Timestamp key of parent post             |
-| `:reply-did` | ABlob             | No       | Account key of parent post's author      |
-| `:media`     | AVector\<Hash\>   | No       | References to blobs in `:data` lattice   |
-| `:tags`      | ASet\<AString\>   | No       | Hashtags                                 |
-| `:deleted`   | CVMLong           | No       | Deletion timestamp (tombstone marker)    |
-
-### Merge Semantics
-
-The feed uses `IndexLattice<Blob, ACell>` with `LWWLattice` per entry:
-
-- **New posts** (different keys) — union; both kept
-- **Edited posts** (same key, different `:timestamp`) — LWW; latest version wins
-- **Deleted posts** — owner updates entry adding `:deleted` field; LWW resolves naturally
-- **Undelete** — owner updates again without `:deleted`; latest `:timestamp` wins
-
-Timeline construction filters out entries where `:deleted` is present.
+Timeline construction filters winning records with `:deleted`. As with unfollow, the
+marker prevents an older live version from returning.
 
 ## Profile
 
-A single LWW register (`LWWLattice.INSTANCE`):
+The current profile is one LWW record containing fields such as `:name`, `:bio`,
+`:avatar` and `:url`. If independent concurrent field edits are required, profile can use
+the same lattice-native pattern as follows: LWP around a structural map with LWW field
+records. That decision is independent of the follow design.
 
-| Key          | Type    | Description                          |
-|--------------|---------|--------------------------------------|
-| `:timestamp` | CVMLong | Last update time                     |
-| `:name`      | AString | Display name                         |
-| `:bio`       | AString | User bio                             |
-| `:avatar`    | Hash    | Reference to image in `:data` lattice|
-| `:url`       | AString | Website URL                          |
+## Follow-Driven Replication
 
-The entire profile is replaced atomically — the version with the latest `:timestamp` wins.
+Following, visibility, admission and retention are separate policies:
 
-## Follows
+| Term | Meaning |
+|---|---|
+| Desired | Owners the node currently intends to fetch |
+| Materialised | Owner values present in the readable replica cache |
+| Visible | Owners included in one local user's timeline |
+| Admitted | Incoming paths permitted to merge |
+| Served | Owner values exposed to a remote query or push view |
+| Retained | Cells still physically reachable in storage |
 
-`MapLattice<ACell, ACell>` with `LWWLattice` per value:
+For local social DIDs `L`, operator pins `P`, and active follows `F(u)`:
 
-```
-{<followed-account-key> {:timestamp 1708444800000 :active true}
- <another-account-key>  {:timestamp 1708445000000 :active false}}
-```
-
-The `:active` flag enables follow/unfollow toggling. `MapLattice` + LWW means the latest
-timestamped record for each followed key wins. This was chosen over `SetLattice` because
-sets are grow-only — they cannot represent unfollowing.
-
-## Lattice Propagation and Filtering
-
-### How Lattice Sync Works (Background)
-
-`LatticePropagator` handles the output pipeline for a lattice node. It owns a store, a
-connection manager, and a background thread. The pipeline is:
-
-1. **Announce** — write cells to store, collect novelty (cells the store hasn't seen)
-2. **Persist** — `setRootData()` for crash recovery
-3. **Merge callback** — feed store-backed refs back into the cursor
-4. **Broadcast** — delta-encode novelty and send `LATTICE_VALUE` to peers
-
-The message protocol has two relevant types:
-
-- **`LATTICE_VALUE`** `[:LV id [path...] value]` — push a value; null ID is fire-and-forget
-- **`LATTICE_QUERY`** `[:LQ id [path...]]` — request a value at a path
-
-Both carry a **path vector**. `NodeServer` already handles path-based queries: it calls
-`cursor.get(path)` for queries and `lattice.path(path)` + `PathCursor` for merges.
-
-### Path Resolution Through the Social Hierarchy
-
-Path-based access navigates through the lattice type hierarchy **and** the data structure:
-
-```
-Path: [:social <owner-key>]
-
-Lattice resolution (for merge semantics):
-  KeyedLattice.path(:social)     → OwnerLattice
-  OwnerLattice.path(<owner-key>) → SignedLattice
-  SignedLattice.path(:value)     → SocialLattice
-  SocialLattice.path(:feed)      → IndexLattice<Blob, ACell>
-
-Data resolution (for get/set):
-  cursor.get(:social, <owner-key>)
-    → RT.getIn(rootValue, [:social, <owner-key>])
-    → navigates Index → AHashMap → returns SignedData<SocialLattice value>
+```text
+desired = L union P union (union F(u) for u in L)
+timeline(u) = {u} union F(u)
 ```
 
-`OwnerLattice.path()` returns the same `SignedLattice` for all owner keys — it resolves
-the lattice *type*, not a per-owner view. The actual per-owner data selection happens
-via `RT.getIn()` navigating the map. This means path-based queries and merges at
-`[:social <owner-key>]` work correctly: the data is specific to that owner, and the merge
-semantics are the same `SignedLattice` for everyone.
+The desired union shares materialisation across local users; timeline selection remains
+per user. Only the desired set should drive remote acquisition. Following is one hop; do
+not recursively fetch every followed user's follows.
 
-### Pulling Feeds from Followed Accounts
+### Pull unit and controller
 
-A node that wants to replicate a specific user's feed sends a path-based `LATTICE_QUERY`:
-
-```
-LATTICE_QUERY: [:LQ <id> [:social <followed-key>]]
-```
-
-The responding node's `NodeServer.processLatticeQuery()` calls `cursor.get(:social,
-<followed-key>)`, which returns just that owner's `SignedData<SocialLattice>`. The
-requester then announces it to their store and merges at the same path via `PathCursor`.
-
-The pull flow for a social node:
-
-1. **Compute follow set** — `SocialHelpers.computeFollowSet()` unions active followed keys
-   across all local users
-2. **For each followed key**, send a path-based `LATTICE_QUERY` to connected peers
-3. **Merge response** at path `[:social <followed-key>]` — `NodeServer.mergePathWithAcquire()`
-   handles missing data recovery automatically
-4. **Trigger broadcast** — the merged value propagates to other connected peers
-
-This requires extending `LatticePropagator.pull()` to accept a path parameter. Currently
-it always sends an empty path (full root query). The extension is minimal:
+The initial safe pull unit is one complete signed owner slot:
 
 ```java
-// New method on LatticePropagator
-public CompletableFuture<ACell> pull(Convex peer, ACell... path) {
-    // Same as pull(peer) but with path in the LATTICE_QUERY payload
-    AVector<?> pathVector = Vectors.create(path);
-    AVector<?> queryPayload = Vectors.create(
-        MessageTag.LATTICE_QUERY, queryId, pathVector);
-    // ... rest is identical
-}
+nodeServer.pullPath(peer, Social.KEY_SOCIAL, followedDid);
 ```
 
-### Supporting Nodes That Pull Our Feeds
+Pulling below the signed `:value` boundary would return unsigned state. A
+`SocialReplicationController` in `convex-p2p` should own:
 
-When a peer sends a `LATTICE_QUERY` with path `[:social <owner-key>]`, `NodeServer`
-already handles it — no changes needed. `processLatticeQuery()`:
+- local DID and operator-pin sets;
+- the last desired set and each local user's visible set;
+- coalesced in-flight `(owner, peer)` pulls;
+- the standard DID resolver snapshot and validated target-key cache;
+- peer selection, failover and bounded retry;
+- last-seen owner hashes and refresh state;
+- owner, byte, concurrency and rate limits.
 
-1. Extracts the path vector from the message
-2. Calls `cursor.get(path)` to navigate into the local data
-3. Announces the result to the store (so `DATA_REQUEST` can resolve children)
-4. Returns the value via `RESULT`
+After a local follow/unfollow write and root `sync()`:
 
-Any node with social data can serve path-based queries out of the box.
+1. derive active follows from the merged LWP/LWW following value;
+2. recompute the desired set;
+3. schedule newly desired owners immediately;
+4. pull each owner path from a suitable peer;
+5. wait on the returned future for acquisition, merge and publication;
+6. retry another peer on absence or failure;
+7. stop refreshing owners which leave the desired set.
 
-### Push Filtering (Outbound)
+Do not use full-root `NodeServer.pull()` for steady-state social replication.
 
-For push (broadcast), the current `LatticePropagator` always broadcasts the full root
-value. For social, this means every connected peer receives every user's feed — wasteful.
+### Inbound and outbound policy
 
-`LatticeFilter` is defined for this purpose but not yet wired in:
+Selective ingestion also requires path-aware inbound admission. `LatticeFilter` only
+projects outbound data and `serveAllInbound()` exposes the full primary view. Production
+policy must:
 
-```java
-@FunctionalInterface
-public interface LatticeFilter<V extends ACell> {
-    V filter(V value);
-}
+- accept social values only at `[:social <owner-did>]` for an owner in the desired set;
+- validate the signature and DID-to-signer authorisation before merge;
+- use a cached target key only under its resolver-version/freshness policy;
+- reject unsolicited full-root social values;
+- keep P2P infrastructure regions under their own policy;
+- bind subsequent `DATA_REQUEST`s to the selected propagator store;
+- apply size, rate and concurrency limits before expensive acquisition.
+
+A remote follow claim never grants access. Outbound serving is separate: a filtered
+propagator with its own store may expose the chosen public owner view. Pull is simpler
+than constructing a personalised push propagator for each remote peer.
+
+### Unfollow and retention
+
+Previously acquired owner state is materialisation, not follow intent. Unfollow removes
+the owner from the timeline and desired set immediately, stops refresh, and causes later
+unsolicited values for that owner to be rejected when no other local user or pin requires
+it.
+
+The inactive LWW follow record remains in the author's signed `:following` section. The
+followed owner's already acquired social slot belongs to a separate materialisation cache:
+
+```text
+authored social root   durable signed state for local DIDs
+replica cache root     evictable signed slots for desired remote owners
+read view              lattice union of authored state and cache
+served view            explicit operator projection
 ```
 
-Integration into `LatticePropagator.processValue()` would apply the filter before
-broadcast, so only relevant data leaves the node. The unfiltered value is still persisted
-locally and fed to the merge callback.
-
-However, push filtering alone isn't sufficient for social — a node can't know which feeds
-each peer wants. The better model is **pull-dominant** with periodic push of metadata:
-
-1. **Push**: broadcast root hash or lightweight summary (periodic root sync already does
-   this every 30 seconds)
-2. **Pull**: peers detect divergence from root sync and pull specific paths they care about
-
-### Store as Security Boundary
-
-The store is the security boundary for outbound data. `DATA_REQUEST` messages from peers
-can only resolve cells that exist in the propagator's store. A node can run two
-propagators with different stores:
-
-```java
-// Primary propagator: full data, local persistence
-LatticePropagator primary = new LatticePropagator(persistentStore);
-
-// Public propagator: filtered data only
-LatticePropagator publicProp = new LatticePropagator(publicStore);
-```
-
-Cells not announced to the public store are invisible to peers connecting through it —
-even if they guess the hash. This is how nodes prevent leaking private/local-only data.
-
-### Summary: What Works Today vs. What Needs Extension
-
-| Capability | Status | Detail |
-|-----------|--------|--------|
-| Path-based `LATTICE_QUERY` processing | **Works** | `NodeServer.processLatticeQuery()` handles arbitrary paths |
-| Path-based `LATTICE_VALUE` merge | **Works** | `NodeServer.mergePathWithAcquire()` with sub-lattice resolution |
-| Path resolution through `KeyedLattice → OwnerLattice → SignedLattice` | **Works** | `lattice.path(path)` navigates the hierarchy correctly |
-| Missing data recovery | **Works** | Automatic retry with `acquireFromPeers()` |
-| Store-based security boundary | **Works** | `DATA_REQUEST` only resolves store contents |
-| Periodic root sync (divergence detection) | **Works** | Every 30 seconds via `maybePerformRootSync()` |
-| `LatticePropagator.pull()` with path | **Needs extension** | Currently always sends empty path (full root query) |
-| `LatticeFilter` integration | **Needs wiring** | Interface defined, not connected to `processValue()` |
-| Subscription model (peer interest) | **Future** | Peers declare which owner keys they want |
-
-The pull-based model is the natural fit for social: nodes pull feeds they follow, serve
-feeds they have when asked, and use periodic root sync for divergence detection. The
-protocol and merge infrastructure already support path-based operations — the main
-extension needed is adding a `path` parameter to `LatticePropagator.pull()`.
+After a grace period, an operator may remove an undesired owner from the cache root.
+Cache eviction must never be broadcast as deletion of somebody else's state. Reclaim
+unreachable cells only through a safe Etch GC/cutover procedure. A first milestone may
+provide logical trimming only: stop refresh and exclude the owner from timelines while
+old cells remain physically retained.
 
 ## Timeline Construction
 
-Timelines are built by K-way merging sorted `Index` iterators from followed feeds:
+Build a user's timeline from the feeds of `{user} union activeFollows(user)`:
 
-1. For each followed user's feed, reverse-iterate from a pagination cursor
-2. Maintain a max-heap of `(timestamp, author, entry)` cursors
-3. Pull `limit` entries from the heap, filtering out tombstoned posts
-4. **Complexity:** O(N log K) where N = page size, K = number of followed feeds
+1. reverse-iterate every selected feed from a stable pagination cursor;
+2. maintain a max-heap of `(display-time, post-key, author, entry)` cursors;
+3. emit up to the requested limit, advancing only the selected feed;
+4. filter deleted posts and use `(display-time, post-key)` as the next cursor.
 
-Pagination is cursor-based: pass the timestamp of the last entry on the current page as
-`beforeTimestamp` to fetch the next page.
+This is `O(N log K)` for page size `N` and `K` feeds. Materialisation may be shared by
+several local users, but timeline visibility remains per user.
 
-## Module Structure
+## Current and Target Components
 
-```
-convex-social/
-  pom.xml
-  docs/
-    SOCIAL_DESIGN.md                   This document
-  src/main/java/convex/social/
-    Social.java                        Lattice definition + KEY_SOCIAL constant
-    SocialLattice.java                 Per-user keyed lattice (:feed, :profile, :follows)
-    SocialPost.java                    Post and follow record construction helpers
-    SocialHelpers.java                 Timeline building, follow-set computation
-    TimelineEntry.java                 Record for merged timeline entries
-  src/test/java/convex/social/
-    SocialLatticeTest.java             Comprehensive tests (18 tests)
-```
+| Component | Current | Target |
+|---|---|---|
+| Owner key | `AccountKey` | Canonical DID `AString` with standard owner verifier |
+| Owner value | Whole `SignedData<SocialLattice>` | Same structural signing boundary, authorised by DID |
+| `SocialLattice` | Independent feed/profile/follow child merge | Retained with `:following` child |
+| Following | Top-level `:follows` map of `AccountKey` LWW records | Stamped LWP `:following` section containing a DID-keyed `:follows` map |
+| Follow record | Timestamp and active flag | Adds validated target key/version cache |
+| Follow clock | `System.currentTimeMillis()` | `LatticeContext` timestamp |
+| Replication | Full-root smoke sync; owner pull primitive exists | Desired-owner controller and inbound admission |
 
-### Dependencies
-
-- `convex-core` — lattice primitives, data structures, crypto
-- `convex-peer` — peer infrastructure (for future integration)
-
-### Key Classes
-
-| Class | Role |
-|-------|------|
-| `Social` | Static entry point. Defines `KEY_SOCIAL` and `SOCIAL_LATTICE` for node composition |
-| `SocialLattice` | `ALattice<Index<Keyword, ACell>>` — merges `:feed`, `:profile`, `:follows` by delegating to child lattices |
-| `SocialPost` | Helpers for creating posts, replies, follow records; extracting fields; checking deletion |
-| `SocialHelpers` | `buildTimeline()` for K-way merge; `getActiveFollows()` and `computeFollowSet()` for selective replication |
-| `TimelineEntry` | `record(AccountKey author, Blob postKey, long timestamp, AHashMap post)` |
+No custom following lattice is required for merging: `KeyedLattice` can route
+`:timestamp` to `MaxLattice` and `:follows` to the per-target map. The likely new
+implementation pieces are DID-aware follow record validation, standard DID resolver/cache
+integration and `SocialReplicationController`.
+Social remains an opt-in application region rather than part of `Lattice.ROOT`.
 
 ## Design Decisions
 
-### Why 8-byte timestamp keys (not composite)?
+### Why LWP around the follow set?
 
-Each feed has a single writer (the owner), so timestamps are monotonically increasing with
-no collision risk. An 8-byte key is simpler and gives the same chronological ordering as a
-composite key would. `Index` lexicographic ordering on big-endian longs = time ordering.
+LWP preserves lattice structure. It makes the newer collection preferred for unresolved
+conflicts and then delegates, so unique target records from older and newer values both
+survive. Whole-value LWW would discard a valid concurrent edit from the losing set.
 
-### Why tombstone deletion (not removal)?
+### Why LWW per target?
 
-Lattice merge is monotonic — you cannot remove data, only add. A tombstone (`:deleted`
-field with timestamp) fits naturally into LWW merge. The owner can also undelete by
-publishing a newer version without the field. Timeline construction filters tombstones at
-read time.
+Follow intent for one target is an atomic register. The later complete record should win,
+including its active flag and validated-key cache. Edits to different targets should not
+compete.
 
-### Why MapLattice for follows (not SetLattice)?
+### Why retain inactive records?
 
-`SetLattice` is grow-only — once a key is added, it can never be removed. Follow/unfollow
-requires a toggle, which `MapLattice<ACell, ACell>` with LWW per value provides via the
-`:active` boolean flag. The latest timestamped record wins.
+`MapLattice` is additive for unique keys. The inactive record is necessary evidence that
+an old active record has been superseded. It is bounded to one current record per target,
+not an unbounded action log.
 
-### Why not in Lattice.ROOT?
+### Why DIDs rather than account keys?
 
-Social is an application concern, not a core platform feature. Nodes that do not need
-social functionality should not carry the overhead. The `KeyedLattice.addLattice()` helper
-makes opt-in composition straightforward.
+The social identity can remain stable across authorised key rotation. `did:key` provides
+intentional immutable-key identity; `did:web` and `did:convex` provide rotation.
 
-## Extensibility
+## Correctness Invariants
 
-The base layer is deliberately minimal. Future extensions can be added as new keys in
-`SocialLattice` or as separate lattice sections:
+- Every owner and follow target is a canonical base DID.
+- Every admitted owner slot has a valid signature from a key authorised for that DID.
+- Node identity, social DID and social signing key are independent.
+- `:following` is LWP and delegates to a fixed `KeyedLattice` structure.
+- Its `:follows` child is a DID-keyed `MapLattice` with LWW records.
+- Disjoint target edits from different authorised devices survive merge.
+- The later complete record wins when two devices edit the same target.
+- Unfollow retains an inactive record; deleting the map entry is not a durable remove.
+- A cached-key refresh preserves the current `:active` value.
+- All write timestamps come from `LatticeContext`.
+- Exact timestamp ties follow CAD024 own/current preference.
+- Foreign following values are validated at or above LWP, including first adoption.
+- A synthesised structural merge is published only with an authorised owner signature.
+- Desired-set expansion is direct, bounded and based only on configured local owners.
+- An owner outside the desired set cannot enter through an unsolicited social value.
+- Pull completion, not sleep or ping, is the acquisition completion signal.
+- Query visibility, inbound admission and physical retention are tested separately.
 
-| Feature | Approach |
-|---------|----------|
-| **Reactions** | New `:reactions` key — `MapLattice<Blob, SetLattice>` (post-key to reaction set) |
-| **Media** | Posts reference hashes in the existing `:data` lattice via `:media` field |
-| **Threads** | Already supported — `:reply-to` + `:reply-did` fields enable thread traversal |
-| **Direct messages** | New `:messages` key with encrypted content |
-| **REST API** | Feed/profile/follows/timeline endpoints (convex-restapi extension) |
-| **Real-time updates** | Watch paths via existing `StateWatcher` for SSE push |
-| **Lists / circles** | Named follow groups for filtered timelines |
+## Test Plan
+
+Use in-process nodes with separate stores and `NodeConfig.port(0)`.
+
+1. **DID validation and auth:** canonical `did:key`, `did:convex` and `did:web`
+   owners/targets accept an authorised signer and reject malformed DIDs or other keys.
+   Use pinned CVM state and deterministic `did:web` fixtures.
+2. **Identity separation:** node keys differ from social owner/signing keys.
+3. **Disjoint merge:** two Alice devices follow different DIDs; both records survive in
+   either merge order.
+4. **Same-target LWW:** concurrent follow/unfollow records select the higher record
+   timestamp in either merge order.
+5. **Outer LWP:** the higher following-section stamp is preferred while unique older
+   target records survive structural merge.
+6. **Missing values:** absent `:following`, absent `:follows` and absent target entries
+   have identity/union semantics; malformed first adoption is rejected safely.
+7. **Section independence:** concurrent feed, profile and following edits all survive
+   according to their child lattices.
+8. **Tombstone:** late delivery of an older active record cannot undo an unfollow.
+9. **Cache update:** a newly validated target key updates the record without changing
+   its active state; stale or failed resolution is rejected.
+10. **Signed synthesis:** an authorised Alice context signs a structural merge; a relay
+    without Alice authority never emits an unsigned or wrongly signed synthesis.
+11. **Rotation:** `did:web` and `did:convex` retain their owner path across valid key
+    changes; lost `did:key` creates a new social user.
+12. **Selective pull:** following Bob but not Carol materialises Bob's slot only;
+    unfollow stops refresh and shared demand keeps Bob while still required elsewhere.
+13. **Retention:** cache eviction changes materialisation without asserting deletion of
+    the remote owner's data.
+
+Tests wait on pull, publication or lifecycle futures rather than sleeping.
+
+## Delivery Stages
+
+### Stage 0: Lattice and identity
+
+- replace account-key owner/target identifiers with canonical DIDs;
+- add the stamped `:following` LWP wrapper around its per-target LWW `:follows` map;
+- validate foreign following values at or above LWP, including first adoption;
+- move timestamps to `LatticeContext`;
+- add last-validated target key/version fields to follow records;
+- install fail-closed standard DID authorisation;
+- support authorised structural merge and re-signing for local owner contexts;
+- migrate or deliberately retire the account-key schema.
+
+### Stage 1: Selective acquisition
+
+- add `SocialReplicationController` with explicit peers;
+- derive desired owners from local active follow records;
+- pull only desired owner paths;
+- enforce path-aware inbound value admission;
+- build timelines from each local user's active records;
+- document logical-only retention.
+
+### Stage 2: Bounded materialisation
+
+- separate authored state from the remote replica cache;
+- evict owners no longer desired after a grace period;
+- expose desired/materialised/retained metrics;
+- verify Etch reclamation from retained roots.
+
+## Open Decisions
+
+- exact `:following` and follow-record cell encoding;
+- context clock policy for cross-device equal-timestamp avoidance;
+- which target-key cache metadata is replicated versus operator-local;
+- whether profile fields should adopt the same LWP/map/LWW composition;
+- composite post-key encoding for concurrent devices;
+- cache retention limits and eviction grace period.
