@@ -1012,7 +1012,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private void processLatticeQuery(Message message, LatticePropagator owner) throws BadFormatException {
 		AVector<?> payload = RT.ensureVector(message.getPayload());
-		if (payload == null || payload.count() < 2) {
+		if (payload == null || payload.count() != 3
+				|| !MessageTag.LATTICE_QUERY.equals(payload.get(0))) {
 			log.warn("Invalid LATTICE_QUERY message format");
 			Result error = Result.create(message.getRequestID(), Strings.create("Invalid LATTICE_QUERY format"), ErrorCodes.ARGUMENT);
 			message.returnResult(error);
@@ -1020,9 +1021,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		ACell id = payload.get(1);
-		ACell pathValue=payload.count()>2?payload.get(2):null;
+		ACell pathValue=payload.get(2);
 		AVector<?> pathVector = RT.ensureVector(pathValue);
-		if ((pathValue!=null)&&(pathVector==null)) {
+		if (pathVector==null) {
 			message.returnResult(Result.create(id,
 					Strings.create("LATTICE_QUERY path must be a vector"),ErrorCodes.ARGUMENT));
 			return;
@@ -1031,14 +1032,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// Query and later DATA_REQUEST resolution use the same capability-bound
 		// propagator view. Falling back to the primary would cross a store boundary.
 		Root<ACell> announced = owner.getAnnouncedCursor();
-		ACell valueAtPath = (pathVector != null && pathVector.count() > 0)
+		ACell valueAtPath = (pathVector.count() > 0)
 			? announced.get(pathVector.toCellArray())
 			: announced.get();
 
 		Result result = Result.create(id, valueAtPath);
 		message.returnResult(result);
-		log.debug("Responded to LATTICE_QUERY at path with length: {}",
-			(pathVector != null) ? pathVector.count() : 0);
+		log.debug("Responded to LATTICE_QUERY at path with length: {}",pathVector.count());
 	}
 
 	/**
@@ -1153,12 +1153,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private Message completeLatticeMessage(Message message, AStore acquisitionStore)
 			throws BadFormatException, IOException {
-		AVector<?> payload = RT.ensureVector(message.getPayload());
-		if (payload == null || payload.count() < 4) {
-			throw new BadFormatException("Invalid LATTICE_VALUE message format");
-		}
-		ACell value = payload.get(3);
-		if (value == null) throw new BadFormatException("LATTICE_VALUE message missing value");
+		LatticeValuePayload payload=parseLatticeValuePayload(message);
+		ACell value=payload.value();
 
 		// Prove completeness before either admission or persistence. Unverified
 		// connections are decoded storelessly, while verified acquisition may refer
@@ -1172,7 +1168,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
 		}
 
-		ACell[] path=extractPath(payload.get(2));
+		ACell[] path=extractPath(payload.path());
 		ACell admitted=ingressFilter.filter(path,value);
 		if (admitted==null) throw new BadFormatException("Inbound lattice value is not locally desired");
 		if (!withinInboundSizeLimit(admitted)) {
@@ -1181,7 +1177,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell complete=Cells.persist(admitted,acquisitionStore);
 
 		AVector<?> completePayload = Vectors.create(
-			payload.get(0), payload.get(1), payload.get(2), complete);
+			MessageTag.LATTICE_VALUE,payload.id(),payload.path(),complete);
 		return Message.create(MessageType.LATTICE_VALUE, completePayload)
 			.withConnection(message.getConnection());
 	}
@@ -1256,13 +1252,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			if (message.getType() != MessageType.LATTICE_VALUE) {
 				throw new BadFormatException("Missing data acquisition is only valid for LATTICE_VALUE");
 			}
-			AVector<?> payload = RT.ensureVector(message.getPayload());
-			// Root sync may encode the value as an unresolved indirect ref, so this
-			// guard must remain structural and must not dereference payload.get(3).
-			if (payload == null || payload.count() < 4) {
-				throw new BadFormatException("Invalid LATTICE_VALUE message format");
-			}
-
 			try {
 				return CompletableFuture.completedFuture(
 					completeLatticeMessage(message, acquisitionStore));
@@ -1342,7 +1331,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * delivery is first handed to a bounded dispatcher, so this synchronous publication
 	 * work never blocks a shared Netty event-loop thread.
 	 *
-	 * <p>Payload format: [:LV id [*path*] value]
+	 * <p>The confirmed payload is [:LV id [*path*] value]. The optimistic push
+	 * form [:LV [*path*] value] is normalised before this method.
 	 *
 	 * @param message The LATTICE_VALUE message
 	 * @throws BadFormatException If message format is invalid
@@ -1351,25 +1341,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		AConnection conn = message.getConnection();
 		ConnectionStats stats = statsFor(conn);
 
-		AVector<?> payload = RT.ensureVector(message.getPayload());
-		if (payload == null || payload.count() < 4) {
-			log.warn("Invalid LATTICE_VALUE message format");
-			recordMergeReject(conn, stats);
-			returnLatticeResult(message, Result.error(ErrorCodes.ARGUMENT,
-				"Invalid LATTICE_VALUE format"));
-			return;
-		}
-
-		ACell pathCell = payload.get(2);
-		ACell value = payload.get(3);
-
-		if (value == null) {
-			log.warn("LATTICE_VALUE message missing value");
-			recordMergeReject(conn, stats);
-			returnLatticeResult(message, Result.error(ErrorCodes.ARGUMENT,
-				"LATTICE_VALUE message missing value"));
-			return;
-		}
+		LatticeValuePayload payload=parseLatticeValuePayload(message);
+		ACell value=payload.value();
 
 		// #564: bound merge cost from untrusted peers — reject an oversized value before
 		// the synchronous dispatcher merge runs.
@@ -1381,7 +1354,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		// Navigate to target path and merge
-		ACell[] path = extractPath(pathCell);
+		ACell[] path = extractPath(payload.path());
 		ALatticeCursor<ACell> target = cursor.path(path);
 
 		ACell before = target.get();
@@ -1449,29 +1422,52 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Extracts path array from message path cell.
-	 *
-	 * @param pathCell Path cell from message (may be null, vector, or single key)
-	 * @return Array of path keys (empty array for root)
+	 * Parses and validates the optimistic and confirmed lattice-value envelopes.
+	 * The optimistic three-field form has no request ID and is normalised to a null ID.
 	 */
-	private ACell[] extractPath(ACell pathCell) {
-		if (pathCell == null) {
-			return new ACell[0]; // Empty path = root
+	private static LatticeValuePayload parseLatticeValuePayload(Message message)
+			throws BadFormatException {
+		AVector<?> payload=RT.ensureVector(message.getPayload());
+		if (payload==null || payload.count()==0
+				|| !MessageTag.LATTICE_VALUE.equals(payload.get(0))) {
+			throw new BadFormatException("Invalid LATTICE_VALUE message format");
 		}
 
-		AVector<?> pathVector = RT.ensureVector(pathCell);
-		if (pathVector != null) {
-			// Vector path
-			long pathLen = pathVector.count();
-			ACell[] path = new ACell[(int)pathLen];
-			for (long i = 0; i < pathLen; i++) {
-				path[(int)i] = pathVector.get(i);
+		long count=payload.count();
+		ACell id;
+		ACell pathCell;
+		ACell value;
+		if (count==4) {
+			id=payload.get(1);
+			if (id!=null && RT.ensureLong(id)==null) {
+				throw new BadFormatException("LATTICE_VALUE ID must be a long or nil");
 			}
-			return path;
+			pathCell=payload.get(2);
+			value=payload.get(3);
+		} else if (count==3) {
+			id=null;
+			pathCell=payload.get(1);
+			value=payload.get(2);
 		} else {
-			// Single key path
-			return new ACell[] { pathCell };
+			throw new BadFormatException("Invalid LATTICE_VALUE message format");
 		}
+
+		AVector<?> path=RT.ensureVector(pathCell);
+		if (path==null) throw new BadFormatException("LATTICE_VALUE path must be a vector");
+		if (value==null) throw new BadFormatException("LATTICE_VALUE message missing value");
+		return new LatticeValuePayload(id,path,value);
+	}
+
+	private record LatticeValuePayload(ACell id,AVector<?> path,ACell value) {}
+
+	/**
+	 * Extracts a path array from a validated message path vector.
+	 *
+	 * @param pathVector Path vector from a lattice protocol message
+	 * @return Array of path keys (empty for the root)
+	 */
+	private static ACell[] extractPath(AVector<?> pathVector) {
+		return pathVector.toCellArray();
 	}
 
 	/**

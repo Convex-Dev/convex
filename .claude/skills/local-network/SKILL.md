@@ -73,6 +73,14 @@ application concern.
 
 For a small lattice network test:
 
+> **CAD036 envelopes:** use `[:LV path value]` for an optimistic push with no
+> acknowledgement, and `[:LV id path value]` when the sender needs a Result after
+> merge. `Message.withID` upgrades the optimistic form without replacing its path.
+> Lattice gossip and root sync use the lean optimistic form. Every `:LV` and `:LQ`
+> path is a vector, with `[]` selecting the root; do not use nil, omitted or scalar
+> paths. A four-field `:LV` with a nil ID remains an accepted fire-and-forget wire
+> representation, but is not needed for new optimistic pushes.
+
 > **Security model:** P2P data is public, so `serveAllInbound()` may assign an
 > untrusted inbound connection to the public propagator view. Assignment is not
 > authentication and does not make the connection an outbound gossip route. An

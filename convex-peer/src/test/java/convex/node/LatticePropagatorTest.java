@@ -37,6 +37,7 @@ import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -301,7 +302,9 @@ public class LatticePropagatorTest {
 
 	private static Hash rootSyncValueHash(Message message) {
 		AVector<?> payload = message.getPayload();
-		return payload.getRef(3).getHash();
+		assertEquals(MessageTag.LATTICE_VALUE,payload.get(0));
+		assertEquals(3L,payload.count(),"root sync should be an optimistic push");
+		return payload.getRef(2).getHash();
 	}
 
 	/** Filtering belongs to the propagator and runs before its store boundary. */

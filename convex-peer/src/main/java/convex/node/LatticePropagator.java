@@ -663,7 +663,7 @@ public class LatticePropagator implements Closeable {
 		}
 
 		AVector<ACell> emptyPath = Vectors.empty();
-		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE,emptyPath,value);
 		Message rootMessage = Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());
 		if (rootMessage.getMessageData().count()>maxDeltaMessageSize) {
 			log.warn("Lattice root announcement exceeds delta message limit of {} bytes; root sync will recover",
@@ -731,7 +731,7 @@ public class LatticePropagator implements Closeable {
 		ACell value = announcedCursor.get();
 		if (value == null) return null;
 		AVector<ACell> emptyPath = Vectors.empty();
-		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, null, emptyPath, value);
+		AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE,emptyPath,value);
 		// The value may be encoded as an indirect ref; DATA_REQUEST resolution is
 		// safe because announcedCursor advances only after the store is populated.
 		return Message.create(MessageType.LATTICE_VALUE, payload, payload.getEncoding());

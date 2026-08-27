@@ -36,10 +36,10 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 
 `NodeServer<V>` is the main implementation for serving and propagating lattice state. It handles:
 
-- **LATTICE_VALUE** (`[:LV id [*path*] value]`) — Receive and atomically merge a value at a path; a non-null ID requests a post-merge Result
+- **LATTICE_VALUE** — `[:LV [*path*] value]` is an optimistic push; `[:LV id [*path*] value]` is a confirmed push returning a post-merge Result
 - **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
 - **DATA_REQUEST** (`[:DR id hash1 hash2 ...]`) — Serve content-addressable data from the store
-- **PING** — Liveness check
+- **PING** (`[:PING id]`) — Liveness check returning `Result(id, timestamp)`
 
 Key features:
 - **Authenticated missing data recovery** — verified source connections may resolve
@@ -81,9 +81,9 @@ Current `MessageType` enum (16 types):
 | 11 | GOODBYE | Connection shutdown `[:BYE message?]` |
 | 12 | STATUS | Request peer status |
 | 13 | UNKNOWN | Unrecognised message type |
-| 14 | LATTICE_VALUE | Lattice delta `[:LV id [*path*] value]`; null ID is fire-and-forget |
-| 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]` |
-| 16 | PING | Connectivity check `[:PING id]` |
+| 14 | LATTICE_VALUE | Optimistic push `[:LV [*path*] value]` or confirmed push `[:LV id [*path*] value]` |
+| 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]`; the path is always a vector |
+| 16 | PING | Connectivity check `[:PING id]`, returning `Result(id, timestamp)` |
 
 ### 2.5 Transport [EXISTS]
 
@@ -580,7 +580,7 @@ their lattice paths or record schemas.
 | LATTICE_VALUE | `processLatticeValue()` → `cursor.path(path).merge(value)` | Navigate, merge, then respond when ID is non-null |
 | LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
 | DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
-| PING | `processPing()` | Respond with RESULT |
+| PING | `processPing()` | Respond with `Result(id, timestamp)` |
 
 **Server** handles consensus and client-facing messages:
 

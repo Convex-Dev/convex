@@ -1774,6 +1774,56 @@ public class NodeServerTest {
 		}
 	}
 
+	@Test
+	public void testLatticeQueryRequiresExplicitPathVector() throws Exception {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+
+		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			AVector<?> payload=Vectors.create(
+				MessageTag.LATTICE_QUERY,CVMLong.create(84));
+			Result result=peer.message(Message.create(MessageType.LATTICE_QUERY,payload))
+				.get(5,TimeUnit.SECONDS);
+			assertEquals(ErrorCodes.ARGUMENT,result.getErrorCode());
+		}
+	}
+
+	@Test
+	public void testLatticeValueRejectsNonVectorPath() throws Exception {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+
+		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,
+				CVMLong.create(85),Keyword.create("not-a-vector"),CVMLong.create(42));
+			Result result=peer.message(Message.create(MessageType.LATTICE_VALUE,payload))
+				.get(5,TimeUnit.SECONDS);
+			assertTrue(result.isError());
+			assertEquals(ErrorCodes.FORMAT,result.getErrorCode());
+			assertEquals(CVMLong.ZERO,maxNodeServer.getLocalValue());
+		}
+	}
+
+	@Test
+	public void testOptimisticLatticeValuePush() throws Exception {
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+
+		CompletableFuture<ACell> announced=maxNodeServer.getPropagator().nextAnnounce();
+		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			AVector<?> payload=Vectors.create(
+				MessageTag.LATTICE_VALUE,Vectors.empty(),CVMLong.create(42));
+			Message optimistic=Message.create(MessageType.LATTICE_VALUE,payload);
+			assertNull(optimistic.getRequestID());
+			assertTrue(peer.trySend(optimistic));
+			assertEquals(CVMLong.create(42),announced.get(5,TimeUnit.SECONDS));
+			assertEquals(CVMLong.create(42),maxNodeServer.getLocalValue());
+		}
+	}
+
 	/** A correlated lattice update must fail promptly when its merge is rejected. */
 	@Test
 	public void testRejectedLatticeValueReturnsError() throws Exception {

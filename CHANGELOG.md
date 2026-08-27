@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CAD036 lattice paths now use one canonical vector representation. Lattice nodes
+  use `[:LV path value]` for optimistic pushes and `[:LV id path value]` for
+  confirmed pushes, and reject scalar, missing or ambiguous paths.
+
 ### Fixed
 
 - Social cached follow signers recognise canonical 32-byte Blob keys after CAD3 decode,

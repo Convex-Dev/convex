@@ -158,6 +158,14 @@ public class MessageTest {
 		Message fireAndForget=Message.create(MessageType.LATTICE_VALUE,
 			Vectors.of(MessageTag.LATTICE_VALUE,null,Vectors.empty(),42));
 		assertNull(fireAndForget.getRequestID());
+
+		Message optimistic=Message.create(MessageType.LATTICE_VALUE,
+			Vectors.of(MessageTag.LATTICE_VALUE,Vectors.empty(),42));
+		assertNull(optimistic.getRequestID());
+		Message upgraded=optimistic.withID(CVMLong.create(14));
+		assertEquals(Vectors.of(MessageTag.LATTICE_VALUE,14,Vectors.empty(),42),
+			upgraded.getPayload());
+		assertEquals(CVMLong.create(14),upgraded.getRequestID());
 	}
 	
 	@Test public void testTransact() throws BadFormatException {

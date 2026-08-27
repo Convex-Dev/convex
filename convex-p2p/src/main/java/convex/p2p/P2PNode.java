@@ -451,7 +451,7 @@ public class P2PNode implements Closeable {
 		}
 
 		AHashMap<ACell,SignedData<ACell>> ownEntry=(AHashMap) Maps.of(ownKey,signed);
-		var payload=Vectors.create(MessageTag.LATTICE_VALUE,null,
+		var payload=Vectors.create(MessageTag.LATTICE_VALUE,
 			Vectors.of(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES),ownEntry);
 		Message update=Message.create(MessageType.LATTICE_VALUE,payload);
 		return peer.request(update).thenApply(result -> {

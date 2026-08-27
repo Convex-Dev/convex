@@ -259,11 +259,14 @@ When a peer sends a `LATTICE_VALUE` message:
 4. Calls `cursor.sync()` — this synchronously publishes to the primary store and queues
    secondary propagation.
 
-`LATTICE_VALUE` uses `[:LV id path value]`. A null ID is fire-and-forget. With a
-non-null ID, NodeServer returns an empty successful `Result` only after the merge and,
-when it changed the cursor, synchronous primary publication. Rejected merges and
-publication failures return an error where the request ID is available. For
-fire-and-forget publication failures, NodeServer contains and logs the exception at the
+`LATTICE_VALUE` has two first-class forms. `[:LV path value]` is an optimistic push:
+the receiver attempts the merge but sends no acknowledgement. `[:LV id path value]` is
+a confirmed push: NodeServer returns an empty successful `Result` with the same ID only
+after the merge and, when it changed the cursor, synchronous primary publication.
+Four-field messages with a nil ID remain valid fire-and-forget messages for wire
+compatibility. Paths are always vectors and `[]` selects the root. Rejected confirmed
+pushes and publication failures return an error where the request ID is available. For
+optimistic-push publication failures, NodeServer contains and logs the exception at the
 inbound-message boundary; the accepted merge remains in memory and the node stays
 running for operator-directed recovery.
 

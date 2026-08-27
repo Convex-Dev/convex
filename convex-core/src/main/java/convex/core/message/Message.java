@@ -558,13 +558,19 @@ public class Message {
 	public ACell getRequestID() {
 		if (payload==null) return null; // not yet decoded, can't extract ID
 		switch (getType()) {
+			// The optimistic [:LV path value] form is necessarily unsolicited. Only
+			// the confirmed four-field form has an ID in position 1.
+			case LATTICE_VALUE: {
+				AVector<?> v=RT.ensureVector(getPayload());
+				if (v==null || v.count()!=4) return null;
+				return RT.ensureLong(v.get(1));
+			}
 
 			// ID in position 1
 			case STATUS:
 			case TRANSACT:
 			case QUERY:
 			case DATA_REQUEST:
-			case LATTICE_VALUE:
 			case LATTICE_QUERY:
 			case PING:
 			case CHALLENGE:{
@@ -618,13 +624,26 @@ public class Message {
 				// Result is a special record type
 				case RESULT: 
 					return Message.create(type, ((Result)getPayload()).withID(id));
+
+				// Adding an ID to an optimistic push upgrades it to a confirmed push
+				// without overwriting its path.
+				case LATTICE_VALUE: {
+					ACell o=getPayload();
+					if (!(o instanceof AVector)) return null;
+					AVector<ACell> v=(AVector<ACell>)o;
+					if (v.count()==4) return Message.create(type,v.assoc(1,id));
+					if (v.count()==3) {
+						return Message.create(type,Vectors.create(
+							v.get(0),id,v.get(1),v.get(2)));
+					}
+					return null;
+				}
 					
 				// Using a vector [key ID ...]
 				case STATUS: 
 				case TRANSACT: 
 				case QUERY:
 				case DATA_REQUEST:
-				case LATTICE_VALUE:
 				case LATTICE_QUERY:
 				case PING:
 				case CHALLENGE: {
