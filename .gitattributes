@@ -1,1 +1,9 @@
+# Line endings: store text as LF and check it out as LF on every platform,
+# regardless of core.autocrlf. Modern tools on Windows handle LF correctly.
+* text=auto eol=lf
+
+# Windows batch scripts are the one exception: cmd.exe wants CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 *.cvx linguist-language=clojure
