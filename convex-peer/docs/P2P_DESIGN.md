@@ -181,14 +181,18 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
 
 ```clojure
 ;; NodeInfo (wrapped in SignedData)
-{:transports  #{"tcp://peer.convex.world:18888"
+{:transports  ["tcp://peer.convex.world:18888"
                 "wss://peer.convex.world/ws"
-                "https://peer.convex.world"}
+                "https://peer.convex.world"]
  :timestamp   1708000000000       ;; monotonic, milliseconds
  :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
  :version     "0.8.3"             ;; protocol version
  :metadata    {...}}              ;; optional additional metadata
 ```
+
+`:transports` may be an empty vector. That is an explicit, signed statement that
+the node is identifiable but not directly dialable, as for an outbound-only node
+behind NAT. Private or guessed addresses must not be advertised as public transports.
 
 #### Merge Function
 
@@ -209,8 +213,11 @@ AccountKey and TCP address. After challenge/response verifies that endpoint, the
 connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
 post-merge acknowledgement. It then pulls and merges the bootstrap node's current
 announced root, so a late joiner receives existing configured regions without waiting
-for another publication. The receiving node ingests the new NodeInfo and establishes
-the reverse persistent connection, enabling bidirectional lattice gossip.
+for another publication. The receiving node independently challenges the connecting
+node over the same full-duplex socket. Only after the live connection proves the key
+of an admitted signed NodeInfo record is that physically inbound connection upgraded
+into an outbound propagation route. A node with empty `:transports` therefore supports
+bidirectional gossip without a reverse TCP connection.
 
 **Proposed on-chain bootstrap path**: A new node reads the on-chain peer list
 (PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then
@@ -375,9 +382,14 @@ On-chain `PeerStatus` is the authoritative peer registry. Its metadata includes 
 
 ### 7.1 Raw TCP (Peer-to-Peer) [EXISTS]
 
-No per-connection authentication needed. Every lattice value and consensus message is wrapped in **SignedData** — signed by the originating peer's Ed25519 key. Any recipient validates the signature against the AccountKey before accepting the merge. Invalid signatures are silently dropped.
+Every owner-authenticated lattice value is wrapped in **SignedData** and validated
+against its owner before merge. This end-to-end integrity does not, however, make a
+new TCP connection trusted or grant it routing and store capabilities.
 
-This is fundamental: SignedData provides **end-to-end** authentication independent of transport.
+An `AConnection` starts untrusted. Operator assignment may permit its inbound messages
+to one propagator view, but this is access policy rather than peer authentication. A
+connection receives trusted-peer limits or becomes an outbound propagation route only
+after challenge/response proves the live remote node key.
 
 ### 7.2 Ed25519 Challenge/Response [EXISTS]
 
@@ -399,7 +411,33 @@ Client                              Peer
 
 The challenge includes `networkId` (genesis hash) to prevent cross-network replay, and the token is server-generated random bytes.
 
-### 7.3 Re-authentication on Reconnect
+### 7.3 Inbound-to-outbound route upgrade [EXISTS]
+
+TCP is full-duplex regardless of which node opened the socket, but physical direction
+and logical capability are kept separate:
+
+```
+INBOUND / UNTRUSTED
+    │ operator assigns one inbound propagator view
+    │ signed NodeInfo is accepted for key K
+    │ live challenge/response proves K on this connection
+    ▼
+INBOUND / AUTHENTICATED / OUTBOUND-PROPAGATION ROUTE
+```
+
+`NodeServer` owns the physical inbound connection throughout. The explicit upgrade
+adds it to `LatticeConnectionManager`'s outbound broadcast routes; it does not turn it
+into a `Convex` client or transfer connection ownership. The upgrade method rejects an
+untrusted connection and a proven key with no admitted node identity. Disconnect
+revokes both the trust-bound route and all ordinary inbound per-connection state.
+
+Manager-owned outbound clients have the mirror behaviour. After authenticating their
+remote endpoint, they may deliver unsolicited reverse lattice messages into their
+owning propagator. This path does not consult the arbitrary-inbound selector because
+the manager already selected and authenticated that peer; it is still bounded by the
+normal NodeServer ingress queue and merge policy.
+
+### 7.4 Re-authentication on Reconnect
 
 On reconnect, challenge/response is re-run (cheap: one Ed25519 sign + verify). The peer can restore session state (subscriptions, pending responses) keyed by AccountKey.
 
@@ -428,6 +466,9 @@ For lattice nodes, `LatticeConnectionManager` separately maintains identity-keye
 desired, pending and admitted connections. A configured node key keeps a socket in
 capability-free limbo until challenge/response succeeds. Desired peers are populated
 from signed `[:p2p :nodes]` records, and callers can await admission without polling.
+It also keeps authenticated inbound connections in a separate upgraded-route map.
+Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
+only when no live manager-owned outbound client already serves the same peer key.
 
 ### 8.3 Reconnection [EXISTS — lattice nodes]
 
@@ -442,6 +483,26 @@ Per message type:
 - **Transactions**: Fail-fast on disconnect. Caller must handle sequence number management.
 - **Queries**: Fail-fast. Idempotent — caller can re-issue.
 - **Lattice subscriptions**: Auto-resubscribe on reconnect.
+
+### 8.4 NAT traversal [PARTIAL]
+
+The implemented first step supports an outbound-only leaf behind NAT:
+
+1. The leaf publishes signed NodeInfo with empty `:transports`.
+2. It opens and maintains an outbound TCP connection to a dialable node.
+3. The dialable node authenticates the leaf and upgrades that same inbound socket to
+   an outbound propagation route as described in §7.3.
+4. Both nodes send lattice deltas and missing-data requests over the one full-duplex
+   connection. No reverse dial, STUN or hole punching is required.
+
+This is sufficient when the leaf can keep at least one connection to a public node.
+Public relay/rendezvous nodes are tracked in
+[issue #710](https://github.com/Convex-Dev/convex/issues/710): they should maintain
+bounded, authenticated subscriptions for outbound-only nodes, provide redundant
+routes, and forward opaque signed lattice values without becoming an integrity trust
+anchor.
+Direct communication between two NATed nodes may later add ICE/STUN candidate exchange
+and hole punching, with relay fallback still required for CGNAT and symmetric NAT.
 
 ### 8.4 Transport Failover [PROPOSED]
 
@@ -518,7 +579,7 @@ SignedData is fundamental to all lattice operations. Every belief, every peer me
 
 | Transport | Confidentiality | Integrity | Authentication |
 |---|---|---|---|
-| TCP :18888 | None | SignedData per value | AccountKey in SignedData |
+| TCP :18888 | None | SignedData per value | Challenge/response for connection capabilities |
 | WSS :443 | TLS | TLS + SignedData | Challenge/response |
 | HTTPS :443 | TLS | TLS + SignedData | Challenge/response or bearer token |
 | SSE :443 | TLS | TLS + SignedData | Session ID + challenge/response |

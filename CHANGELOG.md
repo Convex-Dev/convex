@@ -11,8 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
   The connecting node pushes only its own signed NodeInfo entry, allowing the remote
-  node to discover it and connect back, then pulls and merges the bootstrap node's
-  current announced root so late joiners receive existing application state.
+  node to challenge it on the same full-duplex socket and explicitly upgrade that
+  inbound connection into an authenticated outbound propagation route, then pulls and
+  merges the bootstrap node's current announced root so late joiners receive existing
+  application state. Outbound-only nodes may publish an empty transport vector and
+  synchronise through that original connection without a listener or reverse dial.
   `NodeConfig.localNetwork()` provides loopback NodeInfo publication with OS-assigned
   ports for isolated development networks.
 - Social users support owner-scoped forks, allowing several feed and follow actions to
@@ -674,5 +677,4 @@ NOTE: Due to to an apparent issue in Maven Central, this release was only partia
 - Command Line Interface (CLI)
 - GUI Testing Interface
 - Benchmark Suites
-
 

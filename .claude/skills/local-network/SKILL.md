@@ -71,12 +71,13 @@ For a small lattice network test:
    `nodeA.connect(nodeBKey, nodeB.getNodeServer().getHostAddress())`. The future
    completes after B proves its node key, A's own signed `[:p2p :nodes]` record
    has been merged by B, and A has pulled and merged B's current announced root.
-   B discovers A from the path-scoped identity update and establishes the reverse
-   authenticated connection automatically. This full-root bootstrap makes a late
+   B discovers A from the path-scoped identity update, challenges A on the same
+   full-duplex socket, then explicitly upgrades that inbound connection to an
+   authenticated outbound propagation route. This full-root bootstrap makes a late
    join deterministic for the regions configured on A; it does not yet implement
    region subscriptions or follow-filtered ingestion.
-   Use `nodeB.whenConnected(nodeAKey)` when a test must wait for that reverse
-   admission before publishing in both directions.
+   Use `nodeB.whenInboundConnectionUpgraded(nodeAKey)` when a test must wait for
+   that distinct reverse-route capability before publishing in both directions.
    For three nodes, a useful discovery topology is to tell both leaves only
    about one rendezvous node. Wait until its signed registry has reached both
    leaves, then use `whenConnected` to prove the leaves discovered each other
@@ -84,6 +85,11 @@ For a small lattice network test:
    To test late joining, converge the initial nodes before creating the newcomer,
    tell only the newcomer about the rendezvous node, and require `connect()` itself
    to deliver the existing state without a manual rendezvous-node `sync()`.
+   To model a NATed late joiner, use `NodeConfig.port(-1)`: it starts no listener
+   and publishes signed NodeInfo with empty `:transports`. Do not call
+   `serveAllInbound()` on that leaf. Prove reverse propagation with an application
+   write made after the rendezvous node's upgrade future completes; a bootstrap pull
+   alone does not prove that the original outbound socket carries traffic both ways.
 5. After an application write, call the root application's `sync()` to publish
    the complete root.
    When batching several edits for one signed social owner, fork the

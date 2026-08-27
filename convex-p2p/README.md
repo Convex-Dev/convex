@@ -9,9 +9,10 @@ that discover each other, exchange lattice values and converge on shared state â
 bundles the application regions those nodes serve, so one dependency gives you a
 complete node.
 
-> **Status: early implementation.** Authenticated one-peer bootstrap and signed
-> NodeInfo discovery work over TCP. On-chain bootstrap, region-aware connection
-> selection, connection bounds and additional transports remain to be built.
+> **Status: early implementation.** Authenticated one-peer bootstrap, signed
+> NodeInfo discovery and outbound-only NAT leaf nodes work over TCP. Public relay
+> nodes, on-chain bootstrap, region-aware connection selection, connection bounds
+> and additional transports remain to be built.
 
 ## Lattice structure
 
@@ -202,8 +203,9 @@ bob.launch();
 // pulls and merges Bob's current announced root.
 alice.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
 
-// Bob learns Alice's transport from that entry and connects back automatically.
-bob.whenConnected(aliceKey.getAccountKey()).join();
+// Bob independently authenticates Alice on that same socket before upgrading it
+// from an inbound connection to an outbound propagation route.
+bob.whenInboundConnectionUpgraded(aliceKey.getAccountKey()).join();
 
 // Subsequent application changes gossip in both directions.
 alice.getApplication().sync();
@@ -214,6 +216,28 @@ acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
 node has pulled and merged the bootstrap node's current announced root. A node
 joining an established network therefore obtains its existing configured regions
 without waiting for another publication or periodic root sync.
+
+For a node behind NAT, use a local-only `NodeServer` configuration. It signs and
+publishes NodeInfo with an empty `:transports` vector, so other nodes know its identity
+without trying to dial it. The node's authenticated outbound connection remains
+full-duplex:
+
+```java
+P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey);
+dave.launch();
+dave.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
+
+// Bob may send lattice updates back through Dave's original outbound socket only
+// after Dave has answered Bob's independent challenge.
+bob.whenInboundConnectionUpgraded(daveKey.getAccountKey()).join();
+```
+
+This distinction is intentional. Assigning an inbound socket to a propagator permits
+the operator-selected inbound lattice view, but leaves the connection untrusted. It
+becomes an outbound gossip route only after challenge/response proves the node key and
+that key has an admitted signed NodeInfo record. A NAT leaf does not need
+`serveAllInbound()` merely to receive reverse traffic from a peer it connected to and
+authenticated; arbitrary incoming sockets remain denied by default.
 
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a
@@ -257,7 +281,9 @@ Inbound network lattice traffic is **denied by default**. A node serves queries 
 accepts values only once the operator assigns inbound connections to a propagator â€”
 either via `serveAllInbound()` for a public single-view node, or a custom policy set
 with `NodeServer.setInboundPropagatorSelector`. See `convex-peer`'s `NodeServer` for
-the full capability model.
+the full capability model. Operator assignment is not authentication and does not add
+the connection to outbound gossip. That separate upgrade requires live
+challenge/response plus an admitted node identity.
 
 ## License
 

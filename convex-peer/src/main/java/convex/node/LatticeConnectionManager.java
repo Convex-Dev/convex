@@ -11,6 +11,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,8 @@ import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.message.Message;
+import convex.core.message.AConnection;
+import convex.core.util.Utils;
 import convex.net.IPUtils;
 import convex.peer.AConnectionManager;
 
@@ -95,8 +98,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Connections awaiting a successful identity challenge. */
 	private final ConcurrentHashMap<AccountKey, PendingConnection> pendingConnections = new ConcurrentHashMap<>();
 
-	/** Futures awaiting the next admitted connection for a desired peer. */
+	/** Futures awaiting the next admitted manager-owned outbound connection. */
 	private final ConcurrentHashMap<AccountKey, CompletableFuture<Convex>> connectionWaiters =
+		new ConcurrentHashMap<>();
+
+	/**
+	 * Physically inbound connections explicitly upgraded to authenticated outbound
+	 * propagation routes. They remain owned by NodeServer and are never closed here.
+	 */
+	private final ConcurrentHashMap<AccountKey, AConnection> upgradedInboundRoutes =
+		new ConcurrentHashMap<>();
+
+	/** Futures awaiting the next authenticated inbound-to-outbound route upgrade. */
+	private final ConcurrentHashMap<AccountKey, CompletableFuture<AConnection>> upgradedRouteWaiters =
 		new ConcurrentHashMap<>();
 
 	/** Wakes the single maintenance thread when desired-peer state changes. */
@@ -116,6 +130,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * peer verification is skipped and connections are unverified.
 	 */
 	private volatile AKeyPair keyPair;
+
+	/** Delivery hook for reverse messages arriving on admitted outbound clients. */
+	private volatile BiConsumer<Convex, Message> peerMessageHandler;
 
 	/** Maintenance thread for reconnection. */
 	private Thread maintenanceThread;
@@ -143,6 +160,17 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void setKeyPair(AKeyPair keyPair) {
 		this.keyPair = keyPair;
+	}
+
+	/**
+	 * Sets the NodeServer delivery hook for unsolicited messages arriving on an
+	 * authenticated manager-owned outbound client. The handler is installed only
+	 * at admission; verification-limbo connections cannot reach it.
+	 *
+	 * @param handler handler receiving the owning client and message, or null
+	 */
+	public void setPeerMessageHandler(BiConsumer<Convex, Message> handler) {
+		this.peerMessageHandler = handler;
 	}
 
 	/**
@@ -225,11 +253,17 @@ public class LatticeConnectionManager extends AConnectionManager {
 	public void closeAllConnections() {
 		List<PendingConnection> pending;
 		List<CompletableFuture<Convex>> waiters;
+		List<CompletableFuture<AConnection>> routeWaiters;
 		synchronized (connectionLock) {
 			pending = new ArrayList<>(pendingConnections.values());
 			pendingConnections.clear();
 			waiters = new ArrayList<>(connectionWaiters.values());
 			connectionWaiters.clear();
+			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
+			upgradedRouteWaiters.clear();
+			// NodeServer owns these physical inbound connections. Closing this manager
+			// revokes only their logical outbound propagation capability.
+			upgradedInboundRoutes.clear();
 			super.closeAllConnections();
 		}
 		for (PendingConnection pc : pending) {
@@ -237,6 +271,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 			closeSilently(pc.connection);
 		}
 		for (CompletableFuture<Convex> waiter : waiters) {
+			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
+		}
+		for (CompletableFuture<AConnection> waiter : routeWaiters) {
 			waiter.completeExceptionally(new IllegalStateException("Connection manager closed"));
 		}
 	}
@@ -320,6 +357,87 @@ public class LatticeConnectionManager extends AConnectionManager {
 			waiter.complete(connected);
 		}
 		return waiter;
+	}
+
+	/**
+	 * Explicitly upgrades a physically inbound connection into an authenticated
+	 * outbound propagation route.
+	 *
+	 * <p>An operator-assigned inbound connection is not sufficient. The connection
+	 * must already carry a trusted key established by live challenge/response, and
+	 * that key must identify a desired peer learned from signed NodeInfo or explicit
+	 * operator configuration. This method never authenticates or assigns trust
+	 * itself.</p>
+	 *
+	 * @param connection authenticated inbound physical connection
+	 * @return the upgraded connection
+	 * @throws SecurityException if authentication or NodeInfo admission is absent
+	 */
+	public AConnection upgradeInboundConnection(AConnection connection) {
+		if (connection == null) throw new IllegalArgumentException("Connection must not be null");
+		AccountKey peerKey = connection.getTrustedKey();
+		if (peerKey == null) {
+			throw new SecurityException("Untrusted inbound connection cannot become an outbound route");
+		}
+		if (connection.isClosed()) {
+			throw new IllegalStateException("Closed inbound connection cannot become an outbound route");
+		}
+		if (!desiredPeers.containsKey(peerKey)) {
+			throw new SecurityException("Authenticated peer has no admitted node identity: " + peerKey);
+		}
+
+		upgradedInboundRoutes.put(peerKey, connection);
+		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.remove(peerKey);
+		if (waiter != null) waiter.complete(connection);
+		maintenanceSignal.release();
+		log.info("Upgraded authenticated inbound connection to outbound propagation route for {}", peerKey);
+		return connection;
+	}
+
+	/** Returns the live upgraded inbound route for a peer, or null. */
+	public AConnection getUpgradedInboundConnection(AccountKey peerKey) {
+		if (peerKey == null) return null;
+		AConnection connection = upgradedInboundRoutes.get(peerKey);
+		if (connection == null) return null;
+		if (connection.isClosed() || !peerKey.equals(connection.getTrustedKey())) {
+			upgradedInboundRoutes.remove(peerKey, connection);
+			return null;
+		}
+		return connection;
+	}
+
+	/** Returns true only for a live inbound connection promoted after authentication. */
+	public boolean hasUpgradedInboundConnection(AccountKey peerKey) {
+		return getUpgradedInboundConnection(peerKey) != null;
+	}
+
+	/**
+	 * Waits for the explicit authentication-driven upgrade of an inbound connection.
+	 * Unlike {@link #whenConnected(AccountKey)}, this never completes for an ordinary
+	 * untrusted inbound socket or for a manager-owned outbound client.
+	 */
+	public CompletableFuture<AConnection> whenInboundConnectionUpgraded(AccountKey peerKey) {
+		if (peerKey == null) {
+			return CompletableFuture.failedFuture(
+				new IllegalArgumentException("Peer key must not be null"));
+		}
+		AConnection upgraded = getUpgradedInboundConnection(peerKey);
+		if (upgraded != null) return CompletableFuture.completedFuture(upgraded);
+
+		CompletableFuture<AConnection> waiter = upgradedRouteWaiters.computeIfAbsent(
+			peerKey, key -> new CompletableFuture<>());
+		upgraded = getUpgradedInboundConnection(peerKey);
+		if (upgraded != null && upgradedRouteWaiters.remove(peerKey, waiter)) {
+			waiter.complete(upgraded);
+		}
+		return waiter;
+	}
+
+	/** Revokes an upgraded route without closing its NodeServer-owned connection. */
+	public void removeUpgradedInboundConnection(AConnection connection) {
+		if (connection == null) return;
+		upgradedInboundRoutes.entrySet().removeIf(entry -> entry.getValue() == connection);
+		maintenanceSignal.release();
 	}
 
 	/**
@@ -441,6 +559,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setDataRequestHandler(this::handleDataRequest);
+			connected.setUnsolicitedMessageHandler(message -> {
+				BiConsumer<Convex, Message> handler = peerMessageHandler;
+				if (handler != null) handler.accept(convex, message);
+			});
 		}
 	}
 
@@ -449,6 +571,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		configureReceiveLimit(convex, false);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setDataRequestHandler(null);
+			connected.setUnsolicitedMessageHandler(null);
 		}
 	}
 
@@ -482,11 +605,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 		Convex removed;
 		PendingConnection pending;
 		CompletableFuture<Convex> waiter;
+		CompletableFuture<AConnection> routeWaiter;
 		synchronized (connectionLock) {
 			desiredPeers.remove(peerKey);
 			removed = connections.remove(peerKey);
 			pending = pendingConnections.remove(peerKey);
 			waiter = connectionWaiters.remove(peerKey);
+			upgradedInboundRoutes.remove(peerKey);
+			routeWaiter = upgradedRouteWaiters.remove(peerKey);
 		}
 		if (removed != null) {
 			closeSilently(removed);
@@ -500,6 +626,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (waiter != null) {
 			waiter.completeExceptionally(new IllegalStateException("Peer removed before connection"));
 		}
+		if (routeWaiter != null) {
+			routeWaiter.completeExceptionally(new IllegalStateException("Peer removed before route upgrade"));
+		}
 	}
 
 	// ========== Desired Peer Management ==========
@@ -511,6 +640,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public Map<AccountKey, DesiredPeer> getDesiredPeers() {
 		return new HashMap<>(desiredPeers);
+	}
+
+	/** Returns whether signed NodeInfo or explicit operator configuration admits this peer. */
+	boolean isDesiredPeer(AccountKey peerKey) {
+		return peerKey != null && desiredPeers.containsKey(peerKey);
 	}
 
 	/**
@@ -589,6 +723,82 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return peerKey != null && pendingConnections.containsKey(peerKey);
 	}
 
+	/** Returns whether this manager has any outbound propagation route. */
+	public boolean hasPropagationRoutes() {
+		pruneDeadConnections();
+		pruneDeadUpgradedInboundConnections();
+		if (!connections.isEmpty()) return true;
+		return !upgradedInboundRoutes.isEmpty();
+	}
+
+	/**
+	 * Returns the number of peer identities reachable for outbound propagation.
+	 * A peer with both route forms is counted once.
+	 */
+	public int getPropagationRouteCount() {
+		pruneDeadConnections();
+		pruneDeadUpgradedInboundConnections();
+		java.util.HashSet<AccountKey> keys = new java.util.HashSet<>(connections.keySet());
+		keys.addAll(upgradedInboundRoutes.keySet());
+		return keys.size();
+	}
+
+	@Override
+	public void broadcast(Message message) {
+		super.broadcast(message);
+		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
+			if (getConnection(entry.getKey()) != null) continue;
+			AConnection route = getUpgradedInboundConnection(entry.getKey());
+			if (route != null) route.trySendMessage(message);
+		}
+	}
+
+	@Override
+	public int broadcastPriority(Message message) {
+		int accepted = super.broadcastPriority(message);
+		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
+			if (getConnection(entry.getKey()) != null) continue;
+			AConnection route = getUpgradedInboundConnection(entry.getKey());
+			if (route != null && route.trySendPriorityMessage(message)) accepted++;
+		}
+		return accepted;
+	}
+
+	@Override
+	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
+		BroadcastResult outbound = super.broadcastSequence(messages, fallback);
+		ArrayList<AConnection> routes = new ArrayList<>();
+		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
+			if (getConnection(entry.getKey()) != null) continue;
+			AConnection route = getUpgradedInboundConnection(entry.getKey());
+			if (route != null) routes.add(route);
+		}
+		Utils.shuffle(routes);
+
+		int attempted = outbound.peers();
+		int complete = outbound.complete();
+		int fallbackCount = outbound.fallback();
+		int dropped = outbound.dropped();
+		for (AConnection route : routes) {
+			attempted++;
+			boolean sent = true;
+			for (Message message : messages) {
+				if (!route.trySendMessage(message)) {
+					sent = false;
+					break;
+				}
+			}
+			if (sent) {
+				complete++;
+			} else if (fallback != null && route.trySendMessage(fallback)) {
+				fallbackCount++;
+			} else {
+				dropped++;
+			}
+		}
+		return new BroadcastResult(attempted, complete, fallbackCount, dropped);
+	}
+
 	// ========== Maintenance Loop ==========
 
 	private void maintenanceLoop() {
@@ -615,6 +825,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	void maintainConnections() {
 		pruneDeadConnections();
+		pruneDeadUpgradedInboundConnections();
 		pruneDeadPendingConnections();
 
 		long now = System.currentTimeMillis();
@@ -624,7 +835,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			DesiredPeer desired = entry.getValue();
 
 			synchronized (connectionLock) {
-				if (connections.containsKey(peerKey) || pendingConnections.containsKey(peerKey)) continue;
+				if (connections.containsKey(peerKey) || pendingConnections.containsKey(peerKey)
+						|| upgradedInboundRoutes.containsKey(peerKey)) continue;
 			}
 			if (now < desired.nextRetryTime) continue;
 
@@ -650,6 +862,14 @@ public class LatticeConnectionManager extends AConnectionManager {
 					peerKey, desired.failCount, e.getMessage());
 			}
 		}
+	}
+
+	private void pruneDeadUpgradedInboundConnections() {
+		upgradedInboundRoutes.entrySet().removeIf(entry -> {
+			AConnection connection = entry.getValue();
+			return connection == null || connection.isClosed()
+				|| !entry.getKey().equals(connection.getTrustedKey());
+		});
 	}
 
 	// ========== Transport Resolution ==========

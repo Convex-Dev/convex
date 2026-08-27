@@ -22,6 +22,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
@@ -185,11 +186,12 @@ public class P2PNode implements Closeable {
 	 * <p>After the remote endpoint proves {@code peerKey}, this node pushes only its
 	 * own signed {@code [:p2p :nodes]} entry and waits for the merge acknowledgement.
 	 * It then pulls and merges the remote node's current announced root. The remote
-	 * node can discover this node's advertised transport and open the reverse
-	 * connection needed for bidirectional lattice gossip, while a late joiner obtains
-	 * the existing configured regions immediately. The node must have published a
-	 * NodeInfo record, normally through {@link NodeConfig#URL} or
-	 * {@link NodeConfig#localNetwork()}.</p>
+	 * node then challenges this same physical connection. Once the initiating node
+	 * proves its signed NodeInfo key, the remote explicitly upgrades the inbound socket
+	 * into an authenticated outbound propagation route. This permits bidirectional
+	 * gossip even when this node publishes an empty {@code :transports} vector because
+	 * it is behind NAT. A late joiner also obtains the existing configured regions
+	 * immediately.</p>
 	 *
 	 * @param peerKey expected AccountKey of the bootstrap node
 	 * @param address bootstrap node's TCP address
@@ -223,6 +225,26 @@ public class P2PNode implements Closeable {
 		return server.getPropagator().getConnectionManager().whenConnected(peerKey);
 	}
 
+	/**
+	 * Waits until a physically inbound socket from {@code peerKey} has separately
+	 * passed challenge/response and been upgraded for outbound propagation.
+	 *
+	 * <p>This is intentionally distinct from {@link #whenConnected(AccountKey)},
+	 * which reports a manager-owned outbound client. An operator-assigned but
+	 * untrusted inbound connection never completes this future.</p>
+	 *
+	 * @param peerKey expected remote node key
+	 * @return future completing with the authenticated upgraded route
+	 */
+	public CompletableFuture<AConnection> whenInboundConnectionUpgraded(AccountKey peerKey) {
+		if (server.getPropagator()==null) {
+			return CompletableFuture.failedFuture(
+				new IllegalStateException("P2P node must be launched before awaiting a route upgrade"));
+		}
+		return server.getPropagator().getConnectionManager()
+			.whenInboundConnectionUpgraded(peerKey);
+	}
+
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	private CompletableFuture<Result> pushOwnNodeInfo(Convex peer) {
 		if (keyPair==null) {
@@ -233,14 +255,14 @@ public class P2PNode implements Closeable {
 		ACell nodesValue=server.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		if (!(nodesValue instanceof AHashMap<?,?> rawNodes)) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Node has no published NodeInfo; configure NodeConfig.URL"));
+				"Node has no published NodeInfo"));
 		}
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap) rawNodes;
 		AccountKey ownKey=keyPair.getAccountKey();
 		SignedData<ACell> signed=nodes.get(ownKey);
 		if (signed==null) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
-				"Node has no published NodeInfo; configure NodeConfig.URL"));
+				"Node has no published NodeInfo"));
 		}
 
 		AHashMap<ACell,SignedData<ACell>> ownEntry=(AHashMap) Maps.of(ownKey,signed);

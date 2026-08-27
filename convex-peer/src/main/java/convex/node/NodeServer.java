@@ -196,6 +196,17 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final ConcurrentHashMap<AConnection, LatticePropagator> inboundPropagators =
 		new ConcurrentHashMap<>();
 
+	/**
+	 * Manager-owned outbound connections carrying reverse messages from their
+	 * authenticated remote endpoint. Kept separate from operator-assigned inbound
+	 * connections so physical direction and capability origin remain explicit.
+	 */
+	private final ConcurrentHashMap<AConnection, LatticePropagator> outboundPropagators =
+		new ConcurrentHashMap<>();
+
+	/** Performs the explicit untrusted-inbound to authenticated-route upgrade. */
+	private final LatticeInboundVerifier inboundVerifier;
+
 	/** Pending reverse data requests, isolated by physical connection and request ID. */
 	private final ConcurrentHashMap<AConnection, ConcurrentHashMap<ACell, CompletableFuture<Result>>>
 		pendingDataRequests = new ConcurrentHashMap<>();
@@ -251,6 +262,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.inboundQueue = new BoundedMessageQueue(this.config.getInboundQueueSize(),
 			this.config.getMaxInboundQueueBytes());
 		this.acquisitionPermits = new Semaphore(this.config.getInboundQueueSize());
+		this.inboundVerifier = new LatticeInboundVerifier(this);
 		this.port = this.config.getPort();
 		this.mergeContext = LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
@@ -356,8 +368,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// promotes an individual socket to the trusted cap only after challenge/response
 			// proves the expected remote AccountKey.
 			for (LatticePropagator p : propagators) {
-				p.getConnectionManager().setInboundMessageLimits(
+				LatticeConnectionManager manager = p.getConnectionManager();
+				manager.setInboundMessageLimits(
 					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
+				manager.setPeerMessageHandler(
+					(peer, message) -> receiveFromManagedOutbound(p, peer, message));
 			}
 
 			// Restore each propagator's own persisted view. The primary restores the
@@ -387,6 +402,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 				}
 			}
 
+			// Outbound clients are also full-duplex lattice routes, so even a node with
+			// no listener needs the ordered inbound dispatcher for reverse messages.
+			startInboundDispatcher();
+
 			// Create and launch network server unless port is negative (local-only mode)
 			boolean localOnly = (port != null && port < 0);
 			if (!localOnly) {
@@ -408,7 +427,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 				if (port != null) {
 					networkServer.setPort(port);
 				}
-				startInboundDispatcher();
 				networkServer.launch();
 				port = networkServer.getPort();
 			}
@@ -461,6 +479,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		} catch (Throwable cleanupError) {
 			addCleanupFailure(failure, cleanupError);
 		}
+		inboundVerifier.close();
 
 		boolean acquisitionsStopped = false;
 		try {
@@ -490,6 +509,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (!acquisitionsStopped || !dispatcherStopped) return;
 
 		connectionStats.clear();
+		inboundPropagators.clear();
+		outboundPropagators.clear();
 
 		for (LatticePropagator p : propagators) {
 			try {
@@ -512,23 +533,23 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Publishes this node's info into the {@code :p2p :nodes} lattice if the node
-	 * has an advertised URL configured and a signing key.
+	 * Publishes this node's info into the {@code :p2p :nodes} lattice when a signing
+	 * key is configured.
 	 *
-	 * <p>Only advertises when both conditions are met:
-	 * <ul>
-	 *   <li>An advertised URL is configured and passes the configured reachability policy</li>
-	 *   <li>A signing key is available in the merge context</li>
-	 * </ul>
+	 * <p>A node without an advertised URL publishes an empty {@code :transports}
+	 * vector. It remains identifiable and may maintain outbound connections, but
+	 * other nodes cannot mistake it for a directly dialable endpoint.</p>
 	 */
 	private void publishNodeInfo() {
-		// Only advertise if we have a configured transport URL
-		AString url = config.getAdvertisedURL(port);
-		if (url == null) return;
+		// Generic NodeServers may host a scalar or an unrelated structural lattice.
+		// NodeInfo publication is meaningful only when this exact path is registered.
+		if (lattice.path(Keywords.P2P, Keywords.NODES) == null) return;
 
 		// Only advertise if we have a signing key
 		AKeyPair keyPair = mergeContext.getSigningKey();
 		if (keyPair == null) return;
+		AString url = config.getAdvertisedURL(port);
+		AVector<AString> transports = (url != null) ? Vectors.of(url) : Vectors.empty();
 
 		AString type = Strings.create("Convex Lattice Node");
 		String versionStr = Utils.getVersion();
@@ -537,7 +558,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// #561: stamp the published NodeInfo from the merge context (driver-supplied time),
 		// not from a system-clock read inside the lattice builder.
 		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
-			Vectors.of(url), type, version, null, mergeContext.currentTimestampValue());
+			transports, type, version, null, mergeContext.currentTimestampValue());
 
 		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
 
@@ -547,7 +568,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// pre-listener root has already completed the startup durability barrier.
 		cursor.sync();
 
-		log.info("Published NodeInfo: url={}, type={}, version={}", url, type, version);
+		log.info("Published NodeInfo: transports={}, type={}, version={}", transports, type, version);
 	}
 
 	/**
@@ -645,7 +666,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		try {
 			MessageType type = message.getType();
-			if (type == MessageType.RESULT && completeDataRequest(message, conn)) return;
+			if (type == MessageType.RESULT) {
+				if (inboundVerifier.handleResult(message)) return;
+				if (completeDataRequest(message, conn)) return;
+			}
 			switch (type) {
 			case PING:
 				processPing(message);
@@ -740,6 +764,35 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (!acceptingInbound) return inboundRejected;
 		if (inboundQueue.offer(message)) return null;
 		return inboundRetry;
+	}
+
+	/**
+	 * Admits a reverse message from an authenticated manager-owned outbound client.
+	 * This path is deliberately distinct from {@link #inboundPropagators}: the
+	 * manager's successful peer challenge grants this connection its owning view,
+	 * while an arbitrary inbound socket still requires operator assignment.
+	 */
+	private void receiveFromManagedOutbound(
+			LatticePropagator owner, Convex peer, Message message) {
+		AccountKey peerKey = peer.getVerifiedPeer();
+		AConnection connection = message.getConnection();
+		if (peerKey == null || connection == null
+				|| !peerKey.equals(connection.getTrustedKey())
+				|| owner.getConnectionManager().getConnection(peerKey) != peer) {
+			log.debug("Dropped reverse message from a connection without current outbound admission");
+			return;
+		}
+
+		LatticePropagator previous = outboundPropagators.putIfAbsent(connection, owner);
+		if (previous != null && previous != owner) {
+			log.warn("Dropped reverse message whose outbound connection changed propagator ownership");
+			return;
+		}
+		// The client transport has no server-style read-pause hook. Preserve the hard
+		// queue bound and rely on periodic root sync/request timeout for recovery.
+		if (deliverIncomingMessage(message) != null) {
+			log.debug("Dropped reverse lattice message because the inbound queue is full or stopping");
+		}
 	}
 
 	private boolean offerInboundBlocking(Message message) {
@@ -1322,6 +1375,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 			}
 		}
 
+		// Operator assignment admitted this physical inbound connection to a view,
+		// but did not authenticate it. Only after a valid lattice merge (normally the
+		// node's signed NodeInfo push) do we start the separate challenge which may
+		// explicitly upgrade it into an outbound propagation route.
+		if (conn != null && !outboundPropagators.containsKey(conn)) {
+			inboundVerifier.maybeStart(conn, owner);
+		}
+
 		// The response is deliberately empty: completion is the acknowledgement, and
 		// returning the merged value would duplicate a potentially large lattice tree.
 		// Check the ID before constructing anything so normal fire-and-forget gossip
@@ -1463,7 +1524,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Releases all inbound state held for a connection (#566). This is the single cleanup
-	 * sink for the inbound (untrusted) connection lifecycle, invoked from three places:
+	 * sink for the physical inbound lifecycle, including any authenticated outbound-route
+	 * upgrade, and is invoked from three places:
 	 * the network layer's disconnect hook when a connection closes (the eager path — see
 	 * {@code NettyServer}/{@code AServer#setDisconnectAction}), the circuit-breaker when it
 	 * closes an abusive connection, and the sweep backstops below. It is also where any
@@ -1475,8 +1537,13 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	void removeConnection(AConnection conn) {
 		if (conn == null) return;
+		inboundVerifier.forget(conn);
 		connectionStats.remove(conn);
 		inboundPropagators.remove(conn);
+		outboundPropagators.remove(conn);
+		for (LatticePropagator propagator : propagators) {
+			propagator.getConnectionManager().removeUpgradedInboundConnection(conn);
+		}
 		ConcurrentHashMap<ACell, CompletableFuture<Result>> pending = pendingDataRequests.remove(conn);
 		if (pending != null) {
 			IOException closed = new IOException("Lattice source connection closed during acquisition");
@@ -1498,6 +1565,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	void sweepClosedConnections() {
 		Set<AConnection> candidates = new java.util.HashSet<>(connectionStats.keySet());
 		candidates.addAll(inboundPropagators.keySet());
+		candidates.addAll(outboundPropagators.keySet());
 		candidates.addAll(pendingDataRequests.keySet());
 		candidates.addAll(activeAcquirors.keySet());
 		for (AConnection connection : candidates) {
@@ -1927,6 +1995,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 		cursor.setContext(mergeContext);
 	}
 
+	/** Signing key used for node-to-node challenge/response, or null. */
+	AKeyPair getSigningKey() {
+		return mergeContext.getSigningKey();
+	}
+
 	/**
 	 * Gets the port this server is listening on.
 	 *
@@ -2103,6 +2176,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return propagators.isEmpty() ? null : propagators.get(0);
 		}
 
+		// Reverse traffic on a manager-owned outbound client was admitted by that
+		// manager's successful remote-key challenge, not by inbound operator policy.
+		LatticePropagator outbound = outboundPropagators.get(connection);
+		if (outbound != null) return outbound;
+
 		LatticePropagator bound = inboundPropagators.get(connection);
 		if (bound != null) return bound;
 
@@ -2195,6 +2273,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (networkServer != null) {
 			networkServer.close();
 		}
+		inboundVerifier.close();
 		// Stop maintenance immediately, even if draining the dispatcher later times out.
 		// Connection state itself is retained until the dispatcher has stopped because
 		// the current message may still update it.
@@ -2210,6 +2289,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 		// #566: the dispatcher can no longer add per-connection state.
 		connectionStats.clear();
+		inboundPropagators.clear();
+		outboundPropagators.clear();
 
 		// Drain every propagator and release its network resources before performing
 		// the final store-only durability work.

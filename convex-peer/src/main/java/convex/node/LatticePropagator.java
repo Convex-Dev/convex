@@ -708,7 +708,7 @@ public class LatticePropagator implements Closeable {
 	 */
 	private void maybePerformRootSync(long currentTime) {
 		if (currentTime < lastRootSyncTime + ROOT_SYNC_INTERVAL) return;
-		if (connectionManager.getPeers().isEmpty()) return;
+		if (!connectionManager.hasPropagationRoutes()) return;
 
 		try {
 			Message message = createRootSyncMessage();

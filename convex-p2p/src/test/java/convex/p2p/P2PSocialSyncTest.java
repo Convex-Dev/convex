@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Set;
@@ -18,8 +19,11 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Vectors;
+import convex.core.message.AConnection;
 import convex.etch.EtchStore;
 import convex.node.NodeConfig;
 import convex.social.Feed;
@@ -76,22 +80,25 @@ public class P2PSocialSyncTest {
 			"Each node must listen on a separate OS-assigned port");
 
 		// Bob is the only configured rendezvous point. Alice and Carol each know only
-		// Bob; they push their own signed NodeInfo records and Bob connects back.
+		// Bob; they push their own signed NodeInfo records and Bob authenticates each
+		// inbound socket before upgrading it into a reverse propagation route.
 		Convex aliceToBob=aliceNode.connect(
 			bobNodeKeyPair.getAccountKey(),bobNode.getNodeServer().getHostAddress())
 			.get(5,TimeUnit.SECONDS);
-		Convex bobToAlice=bobNode.whenConnected(aliceNodeKeyPair.getAccountKey())
+		AConnection bobToAlice=bobNode.whenInboundConnectionUpgraded(
+			aliceNodeKeyPair.getAccountKey())
 			.get(5,TimeUnit.SECONDS);
 		Convex carolToBob=carolNode.connect(
 			bobNodeKeyPair.getAccountKey(),bobNode.getNodeServer().getHostAddress())
 			.get(5,TimeUnit.SECONDS);
-		Convex bobToCarol=bobNode.whenConnected(carolNodeKeyPair.getAccountKey())
+		AConnection bobToCarol=bobNode.whenInboundConnectionUpgraded(
+			carolNodeKeyPair.getAccountKey())
 			.get(5,TimeUnit.SECONDS);
 
 		assertEquals(bobNodeKeyPair.getAccountKey(),aliceToBob.getVerifiedPeer());
-		assertEquals(aliceNodeKeyPair.getAccountKey(),bobToAlice.getVerifiedPeer());
+		assertEquals(aliceNodeKeyPair.getAccountKey(),bobToAlice.getTrustedKey());
 		assertEquals(bobNodeKeyPair.getAccountKey(),carolToBob.getVerifiedPeer());
-		assertEquals(carolNodeKeyPair.getAccountKey(),bobToCarol.getVerifiedPeer());
+		assertEquals(carolNodeKeyPair.getAccountKey(),bobToCarol.getTrustedKey());
 		assertNotNull(bobNode.p2p(aliceNodeKeyPair.getAccountKey()).node().getNodeInfo(),
 			"Bob should learn Alice's signed node identity from the bootstrap push");
 		assertNotNull(bobNode.p2p(carolNodeKeyPair.getAccountKey()).node().getNodeInfo(),
@@ -205,11 +212,12 @@ public class P2PSocialSyncTest {
 			"Alice and Carol should converge");
 
 		// Dave is created and launched only after the original three-node network has
-		// converged. His local user value exists before joining, so one bootstrap must
-		// merge existing remote state without discarding his independently signed state.
+		// converged. He has no listener or advertised transport, modelling a node that
+		// can dial out through NAT but cannot accept a reverse connection. His local
+		// user value exists before joining, so one bootstrap must merge existing remote
+		// state without discarding his independently signed state.
 		daveStore=EtchStore.createTemp("p2p-social-dave");
-		daveNode=P2PNode.create(daveStore,NodeConfig.localNetwork(),daveNodeKeyPair)
-			.serveAllInbound();
+		daveNode=P2PNode.create(daveStore,NodeConfig.port(-1),daveNodeKeyPair);
 		Social daveSocial=Social.connect(daveNode.getApplication(),daveUserKeyPair);
 		SocialUser daveWork=daveSocial.user(daveUserKeyPair.getAccountKey()).fork();
 		Blob davePost=daveWork.feed().post("Hello from Dave");
@@ -218,8 +226,10 @@ public class P2PSocialSyncTest {
 		daveNode.launch();
 
 		assertNotEquals(daveNodeKeyPair.getAccountKey(),daveUserKeyPair.getAccountKey());
-		assertEquals(4,Set.of(aliceNode.getPort(),bobNode.getPort(),carolNode.getPort(),
-			daveNode.getPort()).size(),"Dave must use another OS-assigned port");
+		assertEquals(-1,daveNode.getPort(),"Dave must have no inbound listener");
+		assertEquals(Vectors.empty(),
+			daveNode.p2p().node().getNodeInfo().get(Keywords.TRANSPORTS),
+			"A non-dialable node must publish an explicit empty transport vector");
 
 		CompletableFuture<Void> aliceHasDave=awaitCondition(aliceNode,
 			() -> hasExpectedLateJoinState(aliceNode,aliceSocial,
@@ -239,10 +249,18 @@ public class P2PSocialSyncTest {
 		Convex daveToBob=daveNode.connect(
 			bobNodeKeyPair.getAccountKey(),bobNode.getNodeServer().getHostAddress())
 			.get(5,TimeUnit.SECONDS);
-		Convex bobToDave=bobNode.whenConnected(daveNodeKeyPair.getAccountKey())
+		AConnection bobToDave=bobNode.whenInboundConnectionUpgraded(
+			daveNodeKeyPair.getAccountKey())
 			.get(5,TimeUnit.SECONDS);
 		assertEquals(bobNodeKeyPair.getAccountKey(),daveToBob.getVerifiedPeer());
-		assertEquals(daveNodeKeyPair.getAccountKey(),bobToDave.getVerifiedPeer());
+		assertEquals(daveNodeKeyPair.getAccountKey(),bobToDave.getTrustedKey());
+		assertTrue(bobToDave.isTrusted());
+		assertNull(bobNode.getNodeServer().getPropagator().getConnectionManager()
+			.getConnection(daveNodeKeyPair.getAccountKey()),
+			"Bob must not create a reverse outbound client to non-dialable Dave");
+		assertTrue(bobNode.getNodeServer().getPropagator().getConnectionManager()
+			.hasUpgradedInboundConnection(daveNodeKeyPair.getAccountKey()),
+			"Bob should expose Dave only through the explicitly upgraded route");
 		assertNotNull(bobNode.p2p(daveNodeKeyPair.getAccountKey()).node().getNodeInfo(),
 			"Bob should acknowledge Dave's signed node identity before connect completes");
 		assertTrue(hasExpectedLateJoinState(daveNode,daveSocial,
@@ -251,12 +269,22 @@ public class P2PSocialSyncTest {
 
 		CompletableFuture.allOf(aliceHasDave,bobHasDave,carolHasDave,daveConverged)
 			.get(5,TimeUnit.SECONDS);
-		Convex daveToAlice=daveNode.whenConnected(aliceNodeKeyPair.getAccountKey())
+
+		// Prove reverse propagation, rather than merely Dave's bootstrap pull: Bob
+		// publishes a new signed user value after the route upgrade, and Dave receives
+		// it on the same TCP connection that Dave originally opened.
+		SocialUser bobAfterJoin=bobSocial.user(bobUserKeyPair.getAccountKey()).fork();
+		Blob bobAfterJoinPost=bobAfterJoin.feed().post("Hello to Dave through NAT");
+		bobAfterJoin.sync();
+		CompletableFuture<Void> aliceHasLaterBobPost=awaitCondition(aliceNode,
+			() -> bobPostPresent(aliceSocial,bobAfterJoinPost));
+		CompletableFuture<Void> carolHasLaterBobPost=awaitCondition(carolNode,
+			() -> bobPostPresent(carolSocial,bobAfterJoinPost));
+		CompletableFuture<Void> daveHasLaterBobPost=awaitCondition(daveNode,
+			() -> bobPostPresent(daveSocial,bobAfterJoinPost));
+		bobNode.getApplication().sync();
+		CompletableFuture.allOf(aliceHasLaterBobPost,carolHasLaterBobPost,daveHasLaterBobPost)
 			.get(5,TimeUnit.SECONDS);
-		Convex daveToCarol=daveNode.whenConnected(carolNodeKeyPair.getAccountKey())
-			.get(5,TimeUnit.SECONDS);
-		assertEquals(aliceNodeKeyPair.getAccountKey(),daveToAlice.getVerifiedPeer());
-		assertEquals(carolNodeKeyPair.getAccountKey(),daveToCarol.getVerifiedPeer());
 
 		assertExpectedLateJoinState(aliceSocial,alicePost,bobPost,carolPost,davePost);
 		assertExpectedLateJoinState(bobSocial,alicePost,bobPost,carolPost,davePost);
@@ -268,6 +296,10 @@ public class P2PSocialSyncTest {
 			"Alice and Carol should retain convergence after Dave joins");
 		assertEquals(aliceNode.getCursor().get(),daveNode.getCursor().get(),
 			"Dave should converge with the existing network");
+	}
+
+	private boolean bobPostPresent(Social social, Blob postID) {
+		return social.user(bobUserKeyPair.getAccountKey()).feed().getPost(postID)!=null;
 	}
 
 	private boolean hasExpectedLateJoinState(P2PNode node, Social social,

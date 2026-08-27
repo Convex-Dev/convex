@@ -1112,10 +1112,10 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test that a NodeServer without URL does not publish NodeInfo.
+	 * A P2P-capable NodeServer without a URL publishes a non-dialable identity.
 	 */
 	@Test
-	public void testNoPublicationWithoutURL() throws IOException, InterruptedException {
+	public void testEmptyTransportPublicationWithoutURL() throws IOException, InterruptedException {
 		AKeyPair kp = AKeyPair.generate();
 
 		// No URL configured
@@ -1130,13 +1130,16 @@ public class NodeServerTest {
 		try {
 			server.launch();
 
-			ACell nodes = PathCursor.create(
+			@SuppressWarnings("unchecked")
+			AHashMap<ACell, SignedData<ACell>> nodes =
+				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
 				server.getCursor(),
 				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
 
-			// Should be null (empty/zero) — no publication
-			assertTrue(nodes == null || (nodes instanceof AHashMap && ((AHashMap<?,?>) nodes).isEmpty()),
-				":p2p :nodes should be empty when no URL is configured");
+			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
+			assertNotNull(info);
+			assertEquals(Vectors.empty(), info.get(Keywords.TRANSPORTS),
+				"missing URL must be represented as an explicit empty transport vector");
 		} finally {
 			server.close();
 		}
@@ -1365,8 +1368,9 @@ public class NodeServerTest {
 	/** Minimal AConnection test double: records close(), never actually sends. */
 	static final class RecordingConnection extends AConnection {
 		volatile boolean closed = false;
+		final AtomicInteger sent = new AtomicInteger();
 		@Override public boolean sendMessage(Message msg) { return true; }
-		@Override public boolean trySendMessage(Message msg) { return true; }
+		@Override public boolean trySendMessage(Message msg) { sent.incrementAndGet(); return true; }
 		@Override public InetSocketAddress getRemoteAddress() { return new InetSocketAddress("192.0.2.1", 30000); }
 		@Override public boolean isClosed() { return closed; }
 		@Override public void close() { closed = true; }
@@ -2162,6 +2166,38 @@ public class NodeServerTest {
 		cm.close();
 	}
 
+	/** An inbound socket becomes an outbound route only after both trust and admission. */
+	@Test
+	public void testInboundRouteUpgradeRequiresAuthenticatedAdmittedIdentity() throws Exception {
+		LatticeConnectionManager cm = new LatticeConnectionManager(store);
+		AccountKey peerKey = AKeyPair.generate().getAccountKey();
+		RecordingConnection inbound = new RecordingConnection();
+
+		assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
+			"operator-visible inbound access must not imply authenticated route trust");
+		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
+
+		inbound.setTrustedKey(peerKey);
+		assertThrows(SecurityException.class, () -> cm.upgradeInboundConnection(inbound),
+			"a proven but unadmitted key must not become a propagation route");
+
+		cm.addPeer(peerKey);
+		CompletableFuture<AConnection> upgraded = cm.whenInboundConnectionUpgraded(peerKey);
+		assertSame(inbound, cm.upgradeInboundConnection(inbound));
+		assertSame(inbound, upgraded.get(5, TimeUnit.SECONDS));
+		assertTrue(cm.hasUpgradedInboundConnection(peerKey));
+		assertFalse(cm.isConnected(peerKey),
+			"the upgraded inbound route must remain distinct from outbound Convex clients");
+		assertEquals(1, cm.getPropagationRouteCount());
+
+		cm.broadcast(Message.createPing(1));
+		assertEquals(1, inbound.sent.get());
+		cm.removeUpgradedInboundConnection(inbound);
+		assertFalse(cm.hasUpgradedInboundConnection(peerKey));
+		assertEquals(0, cm.getPropagationRouteCount());
+		cm.close();
+	}
+
 	/**
 	 * Test that addPeer(AccountKey) adds a desired peer with no connection,
 	 * and addPeer(AccountKey, InetSocketAddress) creates a desired peer with transport.
@@ -2530,4 +2566,3 @@ public class NodeServerTest {
 		}
 	}
 }
-

@@ -37,7 +37,8 @@ import convex.lattice.generic.OwnerLattice;
  *   <li>{@code :timestamp} — {@code CVMLong} millis, used for LWW ordering</li>
  *   <li>{@code :transports} — {@code AVector<AString>} of public transport URIs
  *       (e.g. {@code "tcp://peer.example.com:18888"}, {@code "wss://peer.example.com:443"}).
- *       Must be publicly reachable — never localhost or private addresses.</li>
+ *       Advertised entries must be publicly reachable; an empty vector explicitly
+ *       identifies an outbound-only node with no dialable transport.</li>
  *   <li>{@code :type} — {@code AString} node software type (e.g. {@code "Convex Lattice Node"})</li>
  *   <li>{@code :version} — {@code AString} software version</li>
  *   <li>{@code :regions} — {@code AVector<AString>} region/location tags (optional)</li>
@@ -66,7 +67,7 @@ public class P2PLattice {
 	 * rather than read from the system clock here; a node stamps its published NodeInfo from
 	 * its {@code LatticeContext} (see {@code NodeServer.publishNodeInfo}).</p>
 	 *
-	 * @param transports Public transport URIs (must be publicly reachable, never localhost)
+	 * @param transports Public transport URIs, or empty for an outbound-only node
 	 * @param type Node software type (e.g. "Convex Lattice Node")
 	 * @param version Software version string
 	 * @param regions Region/location tags (may be null or empty)
