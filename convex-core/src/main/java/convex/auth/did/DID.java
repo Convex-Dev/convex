@@ -197,4 +197,36 @@ public class DID {
 			return null;
 		}
 	}
+
+	/** Returns true iff this is the canonical string form of a base DID. */
+	public static boolean isCanonicalBase(AString did) {
+		if (did==null) return false;
+		String text=did.toString();
+		if (!text.startsWith(DID_START)) return false;
+		int methodEnd=text.indexOf(':',DID_START.length());
+		if (methodEnd==DID_START.length() || methodEnd<0) return false;
+		for (int i=DID_START.length(); i<methodEnd; i++) {
+			char c=text.charAt(i);
+			if (!((c>='a'&&c<='z')||(c>='0'&&c<='9'))) return false;
+		}
+		int segmentLength=0;
+		for (int i=methodEnd+1; i<text.length(); i++) {
+			char c=text.charAt(i);
+			if (c==':') {
+				segmentLength=0;
+				continue;
+			}
+			if (c=='%') {
+				if (i+2>=text.length() || Character.digit(text.charAt(i+1),16)<0
+						|| Character.digit(text.charAt(i+2),16)<0) return false;
+				i+=2;
+				segmentLength++;
+				continue;
+			}
+			if (!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')
+					|| c=='.'||c=='-'||c=='_')) return false;
+			segmentLength++;
+		}
+		return segmentLength>0;
+	}
 }

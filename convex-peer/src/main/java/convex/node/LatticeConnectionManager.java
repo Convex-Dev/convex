@@ -75,6 +75,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Receive limit after challenge/response proves the expected remote AccountKey. */
 	private volatile int trustedMessageLimit = NodeConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
 
+	/** Hard cap for operator- and discovery-supplied desired peer identities. */
+	private volatile int maxDesiredPeers = NodeConfig.DEFAULT_MAX_DESIRED_PEERS;
+
 	// ========== Constants ==========
 
 	/** Interval between maintenance loop iterations (milliseconds). */
@@ -134,6 +137,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/** Delivery hook for reverse messages arriving on admitted outbound clients. */
 	private volatile BiConsumer<Convex, Message> peerMessageHandler;
 
+	/** Lifecycle hook for application protocols to initialise every admitted peer. */
+	private volatile BiConsumer<AccountKey,Convex> peerAdmissionHandler;
+
 	/** Maintenance thread for reconnection. */
 	private Thread maintenanceThread;
 
@@ -162,6 +168,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 		this.keyPair = keyPair;
 	}
 
+	/** Configures the hard desired-peer cap. Existing entries may not be truncated. */
+	public void setMaxDesiredPeers(int maxDesiredPeers) {
+		if (maxDesiredPeers <= 0) throw new IllegalArgumentException(
+			"Maximum desired peers must be positive");
+		synchronized (connectionLock) {
+			if (desiredPeers.size() > maxDesiredPeers) throw new IllegalStateException(
+				"Desired peer count already exceeds requested limit");
+			this.maxDesiredPeers=maxDesiredPeers;
+		}
+	}
+
+	/** Returns the configured hard desired-peer cap. */
+	public int getMaxDesiredPeers() {
+		return maxDesiredPeers;
+	}
+
 	/**
 	 * Sets the NodeServer delivery hook for unsolicited messages arriving on an
 	 * authenticated manager-owned outbound client. The handler is installed only
@@ -171,6 +193,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 */
 	public void setPeerMessageHandler(BiConsumer<Convex, Message> handler) {
 		this.peerMessageHandler = handler;
+	}
+
+	/** Sets a non-blocking hook invoked after each peer is admitted. */
+	public void setPeerAdmissionHandler(BiConsumer<AccountKey,Convex> handler) {
+		this.peerAdmissionHandler=handler;
 	}
 
 	/**
@@ -293,7 +320,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Attempted to add peer with null key");
 			return;
 		}
-		desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
+		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey),false)) {
+			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
+			return;
+		}
 		maintenanceSignal.release();
 		log.debug("Added desired peer: {}", peerKey);
 	}
@@ -309,7 +339,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Attempted to add peer with null key or address");
 			return;
 		}
-		desiredPeers.put(peerKey, DesiredPeer.create(peerKey, address));
+		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey,address),true)) {
+			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
+			return;
+		}
 		maintenanceSignal.release();
 		log.debug("Added desired peer: {} at {}", peerKey, address);
 	}
@@ -329,8 +362,25 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(
 				new IllegalArgumentException("Peer key and address must not be null"));
 		}
-		addPeer(peerKey,address);
+		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey,address),true)) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				"Desired peer limit of "+maxDesiredPeers+" reached"));
+		}
+		maintenanceSignal.release();
 		return whenConnected(peerKey);
+	}
+
+	private boolean putDesiredPeer(AccountKey peerKey, DesiredPeer desired, boolean replace) {
+		synchronized (connectionLock) {
+			DesiredPeer existing=desiredPeers.get(peerKey);
+			if (existing!=null) {
+				if (replace) desiredPeers.put(peerKey,desired);
+				return true;
+			}
+			if (desiredPeers.size()>=maxDesiredPeers) return false;
+			desiredPeers.put(peerKey,desired);
+			return true;
+		}
 	}
 
 	/**
@@ -456,10 +506,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 
 		InetSocketAddress addr = convex.getHostAddress();
-		if (addr != null) {
-			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k, addr));
-		} else {
-			desiredPeers.computeIfAbsent(peerKey, k -> DesiredPeer.create(k));
+		DesiredPeer desired=(addr!=null)
+			? DesiredPeer.create(peerKey,addr) : DesiredPeer.create(peerKey);
+		if (!putDesiredPeer(peerKey,desired,false)) {
+			return CompletableFuture.failedFuture(new IllegalStateException(
+				"Desired peer limit of "+maxDesiredPeers+" reached"));
 		}
 		CompletableFuture<Convex> admission=beginAdmission(peerKey, convex);
 		maintenanceSignal.release();
@@ -498,13 +549,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		log.debug("Holding connection to {} in limbo pending identity verification", peerKey);
 		try {
-			CompletableFuture<AccountKey> verification = convex.verifyPeer(peerKey);
+			CompletableFuture<AccountKey> verification = convex.verifyPeer(
+				peerKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT);
 			if (verification == null) throw new IllegalStateException("Peer verification returned no future");
 			verification.whenComplete((result, ex) -> {
 				try {
 					if (ex != null) {
 						failVerification(peerKey, pending, ex);
-					} else if (!peerKey.equals(result) || !peerKey.equals(convex.getVerifiedPeer())) {
+					} else if (result==null || !peerKey.equals(result)
+							|| convex.getVerifiedPeer()==null
+							|| !peerKey.equals(convex.getVerifiedPeer())) {
 						failVerification(peerKey, pending,
 							new SecurityException("Peer failed identity challenge for " + peerKey));
 					} else {
@@ -540,6 +594,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 		resetFailure(peerKey);
 		completeConnectionWaiter(peerKey,convex);
+		notifyAdmission(peerKey,convex);
 		log.debug("Admitted {} connection to peer {} at {}", trusted ? "verified" : "unverified",
 			peerKey, convex.getHostAddress());
 		return CompletableFuture.completedFuture(convex);
@@ -548,6 +603,16 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private void completeConnectionWaiter(AccountKey peerKey, Convex convex) {
 		CompletableFuture<Convex> waiter=connectionWaiters.remove(peerKey);
 		if (waiter!=null) waiter.complete(convex);
+	}
+
+	private void notifyAdmission(AccountKey peerKey,Convex convex) {
+		BiConsumer<AccountKey,Convex> handler=peerAdmissionHandler;
+		if (handler==null) return;
+		try {
+			handler.accept(peerKey,convex);
+		} catch (RuntimeException e) {
+			log.warn("Peer admission handler failed for {}",peerKey,e);
+		}
 	}
 
 	/**
@@ -661,27 +726,29 @@ public class LatticeConnectionManager extends AConnectionManager {
 		for (Map.Entry<ACell, SignedData<ACell>> entry : nodesMap.entrySet()) {
 			try {
 				AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
-				if (peerKey == null || peerKey.equals(ownKey)) continue;
+				if (peerKey == null || (ownKey!=null && peerKey.equals(ownKey))) continue;
 
 				SignedData<ACell> signed = entry.getValue();
-				if (signed == null || !(signed.getValue() instanceof AHashMap<?,?> rawInfo)) continue;
+				if (signed==null || !peerKey.equals(signed.getAccountKey())
+						|| !signed.checkSignature()) continue;
+				if (!(signed.getValue() instanceof AHashMap<?,?> rawInfo)) continue;
 
 				AHashMap<Keyword, ACell> nodeInfo = (AHashMap<Keyword, ACell>) rawInfo;
 				DesiredPeer updated = DesiredPeer.fromNodeInfo(peerKey, nodeInfo);
 				if (updated == null) continue;
-				desiredPeers.compute(peerKey, (key, existing) -> {
-					if (existing == null) {
+				synchronized (connectionLock) {
+					DesiredPeer existing=desiredPeers.get(peerKey);
+					if (existing==null) {
+						if (desiredPeers.size()>=maxDesiredPeers) continue;
+						desiredPeers.put(peerKey,updated);
 						changed.set(true);
-						return updated;
-					}
-					if (updated.timestamp > existing.timestamp) {
+					} else if (updated.timestamp > existing.timestamp) {
 						updated.failCount = existing.failCount;
 						updated.nextRetryTime = existing.nextRetryTime;
+						desiredPeers.put(peerKey,updated);
 						changed.set(true);
-						return updated;
 					}
-					return existing;
-				});
+				}
 			} catch (RuntimeException e) {
 				// One owner's malformed record must not suppress valid sibling entries.
 				log.debug("Ignoring malformed NodeInfo entry: {}",e.getMessage());
@@ -922,6 +989,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
 		resetFailure(peerKey);
 		completeConnectionWaiter(peerKey,pending.connection);
+		notifyAdmission(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
 		log.info("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
 	}

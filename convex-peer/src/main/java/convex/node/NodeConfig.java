@@ -71,6 +71,9 @@ public class NodeConfig {
 	/** Maximum simultaneous inbound network connections (Long, default 256). */
 	public static final AString MAX_CONNECTIONS = Strings.intern("maxConnections");
 
+	/** Maximum desired peers retained from configuration and discovery. */
+	public static final AString MAX_DESIRED_PEERS = Strings.intern("maxDesiredPeers");
+
 	/** Capacity of the bounded inbound processing queue (Long, default 1024). */
 	public static final AString INBOUND_QUEUE_SIZE = Strings.intern("inboundQueueSize");
 
@@ -95,6 +98,9 @@ public class NodeConfig {
 
 	/** Conservative public-node connection cap. */
 	public static final int DEFAULT_MAX_CONNECTIONS = 256;
+
+	/** Conservative cap on discovery-driven desired-peer state. */
+	public static final int DEFAULT_MAX_DESIRED_PEERS = 256;
 
 	/** Default number of decoded messages awaiting lattice processing. */
 	public static final int DEFAULT_INBOUND_QUEUE_SIZE = 1024;
@@ -333,6 +339,11 @@ public class NodeConfig {
 	 */
 	public int getMaxConnections() {
 		return getPositiveInt(MAX_CONNECTIONS, DEFAULT_MAX_CONNECTIONS);
+	}
+
+	/** Gets the maximum number of desired peers retained by each propagator. */
+	public int getMaxDesiredPeers() {
+		return getPositiveInt(MAX_DESIRED_PEERS, DEFAULT_MAX_DESIRED_PEERS);
 	}
 
 	/**

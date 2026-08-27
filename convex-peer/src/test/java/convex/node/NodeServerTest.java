@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -799,6 +801,52 @@ public class NodeServerTest {
 		}
 	}
 
+	/** Unverified public clients cannot pre-seed the propagator store with DATA. */
+	@Test
+	public void testUnverifiedDataDoesNotPersist() throws Exception {
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
+		allowPrimaryInbound(maxNodeServer);
+		maxNodeServer.launch();
+		Blob unsolicited=Blobs.createRandom(400);
+
+		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+			assertTrue(convex.trySend(Message.createDataMessage(
+				List.of(unsolicited),(int)CPoSConstants.MAX_MESSAGE_LENGTH)));
+
+			// A following request is an ordered-dispatch barrier; no timing wait is needed.
+			AVector<?> query=Vectors.create(MessageTag.LATTICE_QUERY,
+				CVMLong.create(701),Vectors.empty());
+			assertFalse(convex.message(Message.create(MessageType.LATTICE_QUERY,query))
+				.get(5,TimeUnit.SECONDS).isError());
+			assertNull(store.refForHash(unsolicited.getHash()));
+		}
+	}
+
+	/** Interest-policy rejection is observable and occurs before persistence. */
+	@Test
+	public void testIngressRejectionDoesNotPersist() throws Exception {
+		try (AStore ingressStore=new MemoryStore()) {
+			Blob unsolicited=Blobs.createRandom(400);
+			ASet<ACell> value=Sets.of(unsolicited);
+			try (NodeServer<ASet<ACell>> node=new NodeServer<>(
+					SetLattice.create(),ingressStore)) {
+				node.setInboundPropagatorSelector(connection -> node.getPropagator());
+				node.setIngressFilter((path,received) -> null);
+				node.launch();
+				try (ConvexRemote peer=ConvexRemote.connect(node.getHostAddress())) {
+					AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,
+						null,Vectors.empty(),value);
+					Result result=peer.request(Message.create(
+						MessageType.LATTICE_VALUE,payload)).get(5,TimeUnit.SECONDS);
+					assertEquals(ErrorCodes.FORMAT,result.getErrorCode());
+					assertEquals(1L,node.getInboundStats().mergesRejected);
+					assertTrue(node.getLocalValue().isEmpty());
+					assertNull(ingressStore.refForHash(unsolicited.getHash()));
+				}
+			}
+		}
+	}
+
 	/** An assigned listener connection reads only its selected propagator store. */
 	@Test
 	public void testInboundDataRequestUsesSelectedPropagatorStore() throws Exception {
@@ -905,12 +953,11 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * A partial lattice value is acquired entirely in its owning ingress
-	 * propagator store. The authoritative cursor and primary store remain
-	 * untouched until acquisition is complete and the ordered merge is accepted.
+	 * An unverified connection may submit a complete lattice value, but cannot
+	 * trigger missing-cell acquisition into any node store.
 	 */
 	@Test
-	public void testIncompleteValueAcquiredBeforePrimaryMerge() throws Exception {
+	public void testUnverifiedIncompleteValueDoesNotAcquire() throws Exception {
 		try (AStore primaryStore = new MemoryStore();
 				AStore ingressStore = new MemoryStore();
 				BlockingReadMemoryStore sourceStore = new BlockingReadMemoryStore()) {
@@ -921,7 +968,8 @@ public class NodeServerTest {
 
 			LatticePropagator primary = new LatticePropagator(primaryStore);
 			LatticePropagator ingress = new LatticePropagator(ingressStore);
-			try (NodeServer<ASet<ACell>> receiver = new NodeServer<>(SetLattice.create(), primaryStore)) {
+			try (NodeServer<ASet<ACell>> receiver = new NodeServer<>(
+					SetLattice.create(),primaryStore)) {
 				receiver.addPropagator(primary);
 				receiver.addPropagator(ingress);
 				receiver.setInboundPropagatorSelector(connection -> ingress);
@@ -931,39 +979,26 @@ public class NodeServerTest {
 				ConvexRemote source = ConvexRemote.connect(receiver.getHostAddress());
 				try {
 					sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
-					CompletableFuture<ACell> primaryAnnounce = primary.nextAnnounce();
-
-					CVMLong mergeID = CVMLong.create(80);
 					AVector<?> payload = Vectors.create(
-						MessageTag.LATTICE_VALUE, mergeID, Vectors.empty(), remoteValue);
+						MessageTag.LATTICE_VALUE, null, Vectors.empty(), remoteValue);
 					// Encode only the protocol root. The large Blob remains an indirect
-					// reference and must be requested from the source propagator store.
+					// reference which an unverified receiver must reject.
 					Message partial = Message.create(
 						MessageType.LATTICE_VALUE, payload, payload.getEncoding());
-					CompletableFuture<Result> mergeResult = source.message(partial);
-
-					assertTrue(sourceStore.requested.await(5, TimeUnit.SECONDS),
-						"receiver should request the missing branch on the same connection");
-					assertFalse(mergeResult.isDone(),
-						"LATTICE_VALUE result must wait for acquisition and merge");
+					assertTrue(source.trySend(partial));
+					// A correlated ping on the same ordered connection is the processing
+					// barrier; no timing poll or sleep is needed.
+					Result barrier=source.message(Message.createPing(81))
+						.get(5,TimeUnit.SECONDS);
+					assertFalse(barrier.isError());
+					assertEquals(1L,sourceStore.requested.getCount(),
+						"unverified input must not start missing-data acquisition");
 					assertTrue(receiver.getLocalValue().isEmpty(),
 						"partial data must never reach the lattice cursor");
 					assertNull(primaryStore.refForHash(missingBranch.getHash()),
 						"acquisition must not deposit unvalidated data in the primary store");
 					assertNull(ingressStore.refForHash(missingBranch.getHash()),
 						"the withheld branch should not appear before its response arrives");
-
-					sourceStore.release.countDown();
-					Result result = mergeResult.get(5, TimeUnit.SECONDS);
-					assertEquals(mergeID, result.getID());
-					assertFalse(result.isError());
-					assertNull(result.getValue(), "successful merge acknowledgement should be empty");
-					assertEquals(remoteValue, primaryAnnounce.get(5, TimeUnit.SECONDS));
-					assertEquals(remoteValue, receiver.getLocalValue());
-					assertNotNull(ingressStore.refForHash(missingBranch.getHash()),
-						"complete acquisition belongs to the ingress propagator store");
-					assertNotNull(primaryStore.refForHash(missingBranch.getHash()),
-						"only the accepted merged root may enter the primary checkpoint");
 				} finally {
 					sourceStore.release.countDown();
 					sourceManager.close();
@@ -1002,12 +1037,16 @@ public class NodeServerTest {
 			receiver = new NodeServer<>(SetLattice.create(), primaryStore, config);
 			receiver.addPropagator(primary);
 			receiver.addPropagator(ingress);
-			receiver.setInboundPropagatorSelector(connection -> ingress);
+			AKeyPair sourceKey=AKeyPair.generate();
+			receiver.setInboundPropagatorSelector(connection -> {
+				connection.setTrustedKey(sourceKey.getAccountKey());
+				return ingress;
+			});
 			receiver.launch();
 
 			sourceManager = new LatticeConnectionManager(sourceStore);
 			source = ConvexRemote.connect(receiver.getHostAddress());
-			sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
+			sourceManager.addPeer(sourceKey.getAccountKey(), source);
 
 			AVector<?> payload = Vectors.create(
 				MessageTag.LATTICE_VALUE, null, Vectors.empty(), remoteValue);
@@ -2277,6 +2316,36 @@ public class NodeServerTest {
 			"Own key should not be in desired peers");
 	}
 
+	/** Discovery and explicit additions share one hard desired-peer bound. */
+	@Test
+	public void testDesiredPeerLimit() throws Exception {
+		NodeConfig cfg=NodeConfig.create(Maps.of(
+			NodeConfig.MAX_DESIRED_PEERS,CVMLong.create(2)));
+		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,cfg);
+		maxNodeServer.launch();
+		LatticeConnectionManager cm=maxNodeServer.getPropagator().getConnectionManager();
+		assertEquals(2,cm.getMaxDesiredPeers());
+
+		@SuppressWarnings("unchecked")
+		AHashMap<ACell,SignedData<ACell>> nodes=
+			(AHashMap<ACell,SignedData<ACell>>)(AHashMap<?,?>)Maps.empty();
+		for (int i=0; i<3; i++) {
+			AKeyPair kp=AKeyPair.generate();
+			AHashMap<Keyword,ACell> info=Maps.of(
+				Keywords.TIMESTAMP,CVMLong.create(i+1),
+				Keywords.TRANSPORTS,Vectors.empty());
+			nodes=nodes.assoc(kp.getAccountKey(),kp.signData((ACell)info));
+		}
+		cm.updateDesiredPeers(nodes,null);
+		assertEquals(2,cm.getDesiredPeers().size());
+
+		CompletableFuture<Convex> rejected=cm.connectPeer(
+			AKeyPair.generate().getAccountKey(),new InetSocketAddress("localhost",1));
+		assertThrows(ExecutionException.class,
+			() -> rejected.get(5,TimeUnit.SECONDS));
+		assertEquals(2,cm.getDesiredPeers().size());
+	}
+
 	/**
 	 * Test that a dead connection is detected and pruned, and the desired
 	 * peer entry survives for reconnection.
@@ -2369,7 +2438,8 @@ public class NodeServerTest {
 
 		try {
 			AccountKey result = convex.verifyPeer(
-				serverKP.getAccountKey()).get(5, TimeUnit.SECONDS);
+				serverKP.getAccountKey(),Message.LATTICE_PEER_CHALLENGE_CONTEXT)
+				.get(5, TimeUnit.SECONDS);
 			assertEquals(serverKP.getAccountKey(), result, "Should return server key");
 			assertEquals(serverKP.getAccountKey(), convex.getVerifiedPeer());
 		} finally {
@@ -2396,7 +2466,8 @@ public class NodeServerTest {
 
 		try {
 			// null expectedKey — accept whoever responds
-			AccountKey result = convex.verifyPeer(null).get(5, TimeUnit.SECONDS);
+			AccountKey result = convex.verifyPeer(
+				null,Message.LATTICE_PEER_CHALLENGE_CONTEXT).get(5, TimeUnit.SECONDS);
 			assertEquals(serverKP.getAccountKey(), result, "Should discover server key");
 		} finally {
 			convex.close();
@@ -2423,7 +2494,8 @@ public class NodeServerTest {
 
 		try {
 			AccountKey result = convex.verifyPeer(
-				wrongKP.getAccountKey()).get(5, TimeUnit.SECONDS);
+				wrongKP.getAccountKey(),Message.LATTICE_PEER_CHALLENGE_CONTEXT)
+				.get(5, TimeUnit.SECONDS);
 			assertNull(result, "verifyPeer should fail for wrong server key");
 			assertNull(convex.getVerifiedPeer());
 		} finally {
@@ -2448,7 +2520,8 @@ public class NodeServerTest {
 
 		try {
 			AccountKey result = convex.verifyPeer(
-				AKeyPair.generate().getAccountKey()).get(5, TimeUnit.SECONDS);
+				AKeyPair.generate().getAccountKey(),Message.LATTICE_PEER_CHALLENGE_CONTEXT)
+				.get(5, TimeUnit.SECONDS);
 			assertNull(result, "verifyPeer should fail when server has no signing key");
 		} finally {
 			convex.close();
@@ -2456,7 +2529,7 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test that verifyPeer works with an optional contextID.
+	 * NodeServer signs only the lattice-route domain, never an arbitrary context.
 	 */
 	@Test
 	public void testChallengeResponseWithContext() throws Exception {
@@ -2475,7 +2548,7 @@ public class NodeServerTest {
 		try {
 			AccountKey result = convex.verifyPeer(
 				serverKP.getAccountKey(), contextID).get(5, TimeUnit.SECONDS);
-			assertEquals(serverKP.getAccountKey(), result, "Should succeed with contextID");
+			assertNull(result, "NodeServer must reject a different challenge context");
 		} finally {
 			convex.close();
 		}
@@ -2501,6 +2574,12 @@ public class NodeServerTest {
 
 		@Override
 		public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey) {
+			return verification;
+		}
+
+		@Override
+		public CompletableFuture<AccountKey> verifyPeer(AccountKey expectedKey, ACell contextID) {
+			assertEquals(Message.LATTICE_PEER_CHALLENGE_CONTEXT,contextID);
 			return verification;
 		}
 

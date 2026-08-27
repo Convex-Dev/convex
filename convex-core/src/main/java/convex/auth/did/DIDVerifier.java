@@ -1,8 +1,6 @@
 package convex.auth.did;
 
 import convex.core.crypto.ASignature;
-import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Address;
 import convex.core.cvm.State;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -58,11 +56,11 @@ public interface DIDVerifier {
 	 * @return Verifier bound to a snapshot of the given state
 	 */
 	static DIDVerifier forState(State state) {
-		if (state == null) return CONVEX;
-		return (did, message, signature) -> {
-			AccountKey key = DID.keyFromDID(did);
-			if (key == null) key = convexAccountKey(state, did);
-			return verifyWithKey(key, message, signature);
+		if (state==null) return CONVEX;
+		return (did,message,signature) -> {
+			AccountKey key=DID.keyFromDID(did);
+			if (key==null) key=DIDKeyAuthorizer.convexAccountKey(state,did);
+			return verifyWithKey(key,message,signature);
 		};
 	}
 
@@ -84,26 +82,6 @@ public interface DIDVerifier {
 			}
 			return first || other.verifies(did, message, signature);
 		};
-	}
-
-	/**
-	 * Resolve a canonical numeric {@code did:convex:N} to the account's key in the given
-	 * state. Returns null for named aliases, unknown accounts, or key-less (actor) accounts.
-	 */
-	private static AccountKey convexAccountKey(State state, AString did) {
-		if (did == null) return null;
-		String s = did.toString();
-		if (!s.startsWith("did:convex:")) return null;
-		try {
-			Address addr = Address.parse(s.substring("did:convex:".length()));
-			if (addr == null) return null; // named alias: needs CNS resolution, not resolvable here
-			AccountStatus as = state.getAccount(addr);
-			if (as == null) return null;
-			// Match-any over the account's authorised key set (currently a single key)
-			return as.getAccountKey();
-		} catch (Exception e) {
-			return null;
-		}
 	}
 
 	private static boolean verifyWithKey(AccountKey key, Blob message, Blob signature) {

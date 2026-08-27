@@ -128,9 +128,11 @@ with no peers. A node with no propagators is purely in-memory.
 
 The store accumulates all announced cells. When peers send `DATA_REQUEST` messages, they
 can only resolve cells that exist in the propagator's store. Outbound filtering prevents
-excluded cells being introduced by announcement, but it is not an inbound storage filter:
-cells acquired from a peer may already exist in that same store. Store assignment and peer
-access therefore remain operator policy.
+excluded cells being introduced by announcement. A configured path-aware ingress filter
+also validates or projects a complete `LATTICE_VALUE` before it is persisted and merged.
+Verified missing-cell acquisition can place immutable intermediate cells in the assigned
+store before that final admission decision, so physical reclamation remains a separate
+store concern. Store assignment and peer access therefore remain operator policy.
 
 Adding a peer to a propagator's connection manager is the operator's grant of read
 access to that store. The connection manager does not prescribe whether those peers
@@ -242,13 +244,15 @@ demand.
 ### Incoming Merge
 
 When a peer sends a `LATTICE_VALUE` message:
-1. NodeServer binds the physical connection to its operator-selected propagator and
-   attempts to persist the complete value in that propagator's store.
-2. If CAD branches are missing, NodeServer creates an `Acquiror` for that store. The
-   Acquiror owns its virtual worker and correlated reverse `DATA_REQUEST`. Decoded
-   response cells are stored as received and may themselves be partial; the normal
-   acquisition loop continues with their missing references.
-3. Only the completed value returns to the ordered dispatcher. NodeServer navigates to
+1. NodeServer binds the physical connection to its operator-selected propagator.
+   Unverified network input decodes without a store and must contain one complete value;
+   it cannot deposit cells merely by being decoded.
+2. A cryptographically verified connection may resolve missing CAD branches through an
+   `Acquiror` for that propagator store. The worker uses correlated reverse
+   `DATA_REQUEST` results. Verified propagation routes may also stage bounded
+   delta-ahead `DATA`; unverified connections cannot.
+3. The complete value is size-checked and passed through the configured path-aware
+   ingress admission/projection before persistence. Only then does NodeServer navigate to
    the target path via `cursor.path(path)` and merges via `target.merge(value)` — the
    cursor chain handles sub-lattice resolution, signing boundaries, and null-lattice
    bubble-up automatically.
@@ -634,10 +638,11 @@ cursor.sync():                         Propagator processing:
 ```
 
 Private cells are never introduced into the public store by outbound announcement.
-Inbound acquisition is deliberately unfiltered, however, and may place such cells in
-the same store. Operators must therefore treat connection membership and DATA_REQUEST
-access as a separate policy from outbound projection. The primary and backup propagators
-normally have all cells, so only trusted peers should connect to them.
+Complete inbound values pass the path-aware ingress filter before persistence and merge.
+Verified acquisition of missing branches may still place immutable intermediate cells in
+the same store before the completed value is projected. Operators must therefore treat
+connection membership, ingress admission and `DATA_REQUEST` access as separate policies
+from outbound projection. Unverified connections cannot trigger that acquisition path.
 
 ### Filter Interface
 
@@ -690,6 +695,7 @@ NodeConfig options:
 - **`maxDeltaMessageSize`** — maximum encoded outbound lattice delta or DATA-ahead chunk (default: `maxMessageSize`)
 - **`maxDeltaBroadcastSize`** — maximum combined encoded bodies materialised for one eager delta (default: 16 MiB, never below `maxDeltaMessageSize`)
 - **`maxConnections`** — simultaneous inbound connection cap (default: 256)
+- **`maxDesiredPeers`** — configured plus discovery-driven desired-peer cap (default: 256)
 - **`inboundQueueSize`** — bounded off-Netty processing queue capacity (default: 1024)
 - **`maxInboundQueueBytes`** — encoded-byte bound for that inbound queue (default: 16 MiB, never below `maxMessageSize`)
 - **`inboundShutdownTimeout`** — time allowed for accepted inbound work to drain during shutdown (default: 10 seconds)
@@ -704,7 +710,10 @@ The 4 MiB public limit also applies to connections initiated by NodeServer. TCP 
 bidirectional, so an outbound socket remains untrusted until its remote endpoint proves
 the AccountKey advertised for that Peer through challenge/response. Only successful
 verification promotes that individual connection to `maxTrustedMessageSize`; discovery,
-a signed NodeInfo, or merely opening the socket is not sufficient.
+a signed NodeInfo, or merely opening the socket is not sufficient. The signed challenge
+binds a random nonce, the expected responder key as audience and a fixed protocol
+context; the signed response binds the same nonce and context plus the challenger key as
+its audience. Both signatures are verified.
 
 Shutdown stops network admission, cancels and awaits incomplete-value Acquirors, then
 waits for the ordered dispatcher before taking the final persistence snapshot. If an

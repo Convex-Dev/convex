@@ -37,6 +37,7 @@ final class LatticeInboundVerifier {
 	private static final long TIMEOUT_MS = 5_000L;
 
 	private record PendingVerification(CVMLong id, LatticePropagator owner,
+			AccountKey claimedKey,
 			CompletableFuture<Message> future) {}
 
 	private final NodeServer<?> server;
@@ -49,13 +50,15 @@ final class LatticeInboundVerifier {
 	}
 
 	/** Starts at most one non-blocking authentication attempt per inbound connection. */
-	void maybeStart(AConnection connection, LatticePropagator owner) {
+	void maybeStart(AConnection connection, LatticePropagator owner, AccountKey claimedKey) {
 		if (connection == null || owner == null || connection.isClosed()
-				|| connection.isTrusted() || !connection.supportsMessage()) return;
+				|| connection.isTrusted() || !connection.supportsMessage()
+				|| claimedKey == null
+				|| !owner.getConnectionManager().isDesiredPeer(claimedKey)) return;
 
 		CVMLong id = connection.nextRequestID();
 		CompletableFuture<Message> resultFuture = new CompletableFuture<>();
-		PendingVerification pending = new PendingVerification(id, owner, resultFuture);
+		PendingVerification pending = new PendingVerification(id, owner, claimedKey, resultFuture);
 		if (active.putIfAbsent(connection, pending) != null) return;
 
 		try {
@@ -73,7 +76,8 @@ final class LatticeInboundVerifier {
 
 			Hash token = Blob.createRandom(random, 16).getHash();
 			AccountKey ownKey = keyPair.getAccountKey();
-			SignedData<ACell> signed = Message.signChallenge(keyPair, token, null, null);
+			SignedData<ACell> signed = Message.signChallenge(keyPair, token,
+				pending.claimedKey(), Message.LATTICE_PEER_CHALLENGE_CONTEXT);
 			if (!connection.sendMessage(Message.createChallenge(pending.id(), signed))) return;
 
 			Message resultMessage = pending.future().get(TIMEOUT_MS, TimeUnit.MILLISECONDS);
@@ -87,7 +91,8 @@ final class LatticeInboundVerifier {
 
 			Result result = resultMessage.toResult();
 			AccountKey remoteKey = Message.verifyChallengeResponse(
-				result, token, ownKey, null, null);
+				result, token, ownKey, Message.LATTICE_PEER_CHALLENGE_CONTEXT,
+				pending.claimedKey());
 			if (remoteKey == null) return;
 			LatticeConnectionManager manager = pending.owner().getConnectionManager();
 			if (!manager.isDesiredPeer(remoteKey)) {

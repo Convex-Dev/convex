@@ -4,20 +4,19 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-social/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-social)
 
 A lattice-based, peer-to-peer social network built on Convex. The module currently
-provides owner-signed feed and follow state plus timeline construction primitives.
-Automatic follow-driven replication is not yet wired into `P2PNode`; see
-[Social Lattice Design](docs/SOCIAL_DESIGN.md#current-status) for the current audit and
-proposed design.
+provides DID-owned feed and follow state plus timeline construction primitives.
+`P2PNode` wires direct-follow replication, DID signer validation and selective
+retention around this application lattice.
 
-> **Identity status:** the current Java API uses `AccountKey` for both the social owner
-> and signing authority. The target schema uses canonical DIDs for owners, follows,
-> replies and timelines, with signing keys authorised separately through standard Convex
-> auth. The social value remains structurally mergeable beneath its owner signature.
+> **Identity model:** canonical DIDs identify owners, follows, replies and timelines;
+> signing keys are authorised separately through standard Convex auth. The social value
+> remains structurally mergeable beneath its owner signature.
 > Follows use a stamped LWP collection containing a DID-keyed map of LWW records, so
 > separate devices can update different targets without losing either edit. Unfollow is
 > represented by the winning inactive record for its target.
-> `did:key`, `did:convex` and `did:web` are all in scope; see
-> [DID Owner Boundary](docs/SOCIAL_DESIGN.md#did-owner-boundary).
+> `did:key`, pinned `did:convex` and authenticated `did:web`/`alsoKnownAs` bindings are
+> supported through `DIDKeyAuthorizer`; see
+> [Social Lattice Design](docs/SOCIAL_DESIGN.md).
 > A `did:key` user is stable and non-recoverable: losing its private key means creating
 > a new social user rather than replacing the key behind the existing DID.
 
@@ -27,20 +26,16 @@ The social lattice composes standard Convex lattice primitives into a two-level
 structure:
 
 ```
-SocialLattice (per-user, signed by owner):
-  :feed    → IndexLattice<Blob, ACell>   8-byte timestamp keys, last-writer-wins per entry
-  :profile → LWWLattice                  display name, bio, avatar, etc.
-  :follows → MapLattice<ACell, ACell>    current: followed AccountKey → {active, timestamp}
+SocialLattice (per-user, signed by an authorised DID key):
+  :feed      → IndexLattice<Blob, ACell>    last-writer-wins per entry
+  :profile   → LWWLattice                   display name, bio, avatar, etc.
+  :following → LWPLattice
+    :follows → MapLattice<DID, LWW record>  active intent and cached validated signer
 ```
 
-That diagram is the implementation today. The target retains the structural social
-lattice and adds a stamped top-level `:following` LWP section. Its `:follows` child is a
-DID-keyed `MapLattice`, while LWW selects the later complete record for one target.
-
-Each user's complete data is wrapped in `SignedData` via an `OwnerLattice`, so the current
-account-key owner binding rejects updates signed by a different key. DID ownership will
-retain the concrete signer in `SignedData` while resolving its authority independently of
-the durable social identifier. Authorised owner devices can merge and re-sign structural
+Each user's complete data is wrapped in `SignedData` via an `OwnerLattice`. DID ownership
+retains the concrete signer in `SignedData` while resolving its authority independently
+of the durable social identifier. Authorised owner devices can merge and re-sign structural
 changes; a relay cannot forge a synthesised owner value. The base layer is intentionally
 minimal and extensible — easy to layer applications and UI on top.
 
@@ -76,16 +71,19 @@ implementation 'world.convex:convex-social:0.8.15'
 ```java
 import convex.social.Social;
 import convex.social.SocialUser;
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AString;
 
 AKeyPair keyPair = AKeyPair.generate();
+AString myDid = DID.forKey(keyPair.getAccountKey());
 
 // Standalone instance with its own cursor
 Social social = Social.create(keyPair);
-social.user(keyPair.getAccountKey()).feed().post("Hello!");
+social.user(myDid).feed().post("Hello!");
 
 // Fork inside one owner's signing boundary, then publish one signed user value
-SocialUser work = social.user(keyPair.getAccountKey()).fork();
+SocialUser work = social.user(myDid).fork();
 work.feed().post("Post 1");
 work.feed().post("Post 2");
 work.sync();
@@ -133,17 +131,21 @@ host without making the social branch depend on `NodeServer`:
 
 ```java
 P2PApplication application = node.getApplication();
-Social social = Social.connect(application);
-social.user(keyPair.getAccountKey()).feed().post("Hello");
+AKeyPair userKeyPair = AKeyPair.generate();
+AString myDid = DID.forKey(userKeyPair.getAccountKey());
+Social social = node.social(myDid, userKeyPair);
+social.user(myDid).feed().post("Hello");
 application.sync();
 ```
 
-`Social.connect(parent, keyPair)` is available when a child needs its own signing
-context. The raw-cursor overload remains a low-level standalone adapter.
+`P2PNode.social` also registers the DID as local, so its own slot and direct active
+follows form the default replicated social view. `Social.connect(parent, keyPair)` is
+available for lower-level hosting when follow-driven P2P policy is not required.
 
 ## Design
 
-See [docs/SOCIAL_DESIGN.md](docs/SOCIAL_DESIGN.md) for the full lattice architecture.
+See [docs/SOCIAL_DESIGN.md](docs/SOCIAL_DESIGN.md) for the full lattice architecture and
+[docs/FOLLOWING.md](docs/FOLLOWING.md) for the following encoding and merge rules.
 
 ## License
 

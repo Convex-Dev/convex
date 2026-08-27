@@ -12,21 +12,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
   The connecting node pushes only its own signed NodeInfo entry, allowing the remote
   node to challenge it on the same full-duplex socket and explicitly upgrade that
-  inbound connection into an authenticated outbound propagation route, then pulls and
-  merges the bootstrap node's current announced root so late joiners receive existing
-  application state. Outbound-only nodes may publish an empty transport vector and
+  inbound connection into an authenticated outbound propagation route, then pulls
+  `:p2p`, `:id` and currently desired social-owner paths so late joiners receive their
+  follow-filtered application state. Outbound-only nodes may publish an empty transport vector and
   synchronise through that original connection without a listener or reverse dial.
   `NodeConfig.localNetwork()` provides loopback NodeInfo publication with OS-assigned
   ports for isolated development networks.
 - Social users support owner-scoped forks, allowing several feed and follow actions to
   be published as one signed user value.
+- Social owners and follow targets are canonical DIDs, with `did:key`, pinned numeric
+  `did:convex`, and authenticated `did:web`/`alsoKnownAs` key authorisation. The
+  top-level `:following` value uses LWP over a DID-keyed `:follows` map with whole-record
+  LWW edits and a cached last-validated signer.
 
 ### Changed
 
 ### Fixed
 
-- Social follow enumeration recognises canonical 32-byte Blob keys after CAD3 decode,
-  so valid replicated follows are returned as `AccountKey` values.
+- Social cached follow signers recognise canonical 32-byte Blob keys after CAD3 decode,
+  while active follow identities remain DIDs.
+
+### Security
+
+- Lattice peer trust now requires a valid two-sided Ed25519 challenge/response binding
+  a random nonce, both node-key audiences and a fixed protocol context. An assigned
+  inbound socket remains an untrusted public route until that proof and an admitted
+  owner-signed NodeInfo both succeed.
+- Unverified connections can submit only complete, size-bounded lattice values and
+  cannot stage unsolicited `DATA` or trigger missing-cell acquisition. P2P social
+  ingress validates the complete signed owner slot and DID signer before persistence,
+  retains only local users, pins and direct follows, and bounds explicit plus discovered
+  desired peers with `maxDesiredPeers`.
 
 ## [0.8.15] - 2026-08-24
 
@@ -677,4 +693,3 @@ NOTE: Due to to an apparent issue in Maven Central, this release was only partia
 - Command Line Interface (CLI)
 - GUI Testing Interface
 - Benchmark Suites
-

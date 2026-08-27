@@ -5,6 +5,7 @@ import java.util.function.BiPredicate;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -197,6 +198,10 @@ public abstract class LatticeContext {
 	 */
 	public static AccountKey ownerAccountKey(ACell ownerKey) {
 		if (ownerKey instanceof AccountKey ak) return ak;
+		if (ownerKey instanceof AString did) {
+			AccountKey key=convex.auth.did.DID.keyFromDID(did);
+			if (key!=null) return key;
+		}
 		if (ownerKey instanceof ABlob blob && blob.count()==AccountKey.LENGTH) {
 			return AccountKey.create(blob);
 		}

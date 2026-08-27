@@ -62,6 +62,17 @@ and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
 For a small lattice network test:
 
+> **Security model:** P2P data is public, so `serveAllInbound()` may assign an
+> untrusted inbound connection to the public propagator view. Assignment is not
+> authentication and does not make the connection an outbound gossip route. An
+> unverified connection may submit only complete `LATTICE_VALUE` messages; path-aware
+> admission runs before persistence, unsolicited `DATA` is rejected, and missing-cell
+> acquisition is reserved for verified connections. P2PNode's default social policy
+> retains only local users, operator pins and direct active follows. The separate
+> inbound upgrade verifies both challenge signatures, a random nonce, responder and
+> challenger audiences, the fixed lattice-peer context and an admitted signed
+> NodeInfo. Desired peers and inbound connections are bounded by `NodeConfig`.
+
 1. Give each node its own store and key pair.
 2. Use `NodeConfig.localNetwork()`. It binds port `0`, then publishes the actual
    OS-assigned loopback port in the node's signed `NodeInfo`.
@@ -70,12 +81,12 @@ For a small lattice network test:
 4. Tell one node about the other with
    `nodeA.connect(nodeBKey, nodeB.getNodeServer().getHostAddress())`. The future
    completes after B proves its node key, A's own signed `[:p2p :nodes]` record
-   has been merged by B, and A has pulled and merged B's current announced root.
+   has been merged by B, and A has pulled and merged B's `:p2p`, `:id`, and
+   currently desired complete social-owner paths.
    B discovers A from the path-scoped identity update, challenges A on the same
    full-duplex socket, then explicitly upgrades that inbound connection to an
-   authenticated outbound propagation route. This full-root bootstrap makes a late
-   join deterministic for the regions configured on A; it does not yet implement
-   region subscriptions or follow-filtered ingestion.
+   authenticated outbound propagation route. The bootstrap never pulls a peer's
+   complete root and social admission remains follow-filtered.
    Use `nodeB.whenInboundConnectionUpgraded(nodeAKey)` when a test must wait for
    that distinct reverse-route capability before publishing in both directions.
    For three nodes, a useful discovery topology is to tell both leaves only
@@ -91,7 +102,7 @@ For a small lattice network test:
    write made after the rendezvous node's upgrade future completes; a bootstrap pull
    alone does not prove that the original outbound socket carries traffic both ways.
 5. After an application write, call the root application's `sync()` to publish
-   the complete root.
+   the node's filtered root view.
    When batching several edits for one signed social owner, fork the
    `SocialUser`, apply its feed and follow actions, sync that fork once, then
    sync the application root. A `Social` fork is outside the owner boundary and
@@ -109,12 +120,11 @@ application user's identity or signing key. For an `OwnerLattice` keyed by an
 indirect owner such as a DID, install a fail-closed owner verifier in the
 `LatticeContext`; without one, indirect owners use the compatibility-lenient
 fallback. Give identity-sensitive tests separate node keys and application
-owner/signing keys. The social cursor API currently accepts
-`AccountKey` owners, so use a separate application key and state that limitation
-explicitly. Once its DID migration lands, cover `did:key`, `did:convex` and
-`did:web` with pinned local state or deterministic resolver fixtures—never
-depend on public web resolution in a unit test. `serveAllInbound()` controls
-network access and does not replace owner authorisation.
+owner/signing keys. The social cursor API accepts canonical base DIDs and uses
+`DIDKeyAuthorizer` for the signer binding. Cover `did:key`, `did:convex` and
+`did:web` with pinned local state or deterministic resolver fixtures—never depend
+on public web resolution in a unit test. `serveAllInbound()` controls network
+access and does not replace DID owner authorisation.
 
 Remember that an `AccountKey` is a typed JVM view over a canonical 32-byte
 Blob. A key stored as ordinary CAD3 application data can therefore decode as a

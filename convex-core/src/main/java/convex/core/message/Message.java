@@ -46,6 +46,9 @@ import convex.core.util.Utils;
  * <p>Messages contain a payload, which can be any data value.</p>
  */
 public class Message {
+	/** Domain separator for authenticated lattice-node routes. */
+	public static final AString LATTICE_PEER_CHALLENGE_CONTEXT =
+		Strings.intern("convex-lattice-peer-v1");
 
 	private static final Message BYE_MESSAGE = Message.create(MessageType.GOODBYE,Vectors.create(MessageTag.BYE));
 
@@ -245,67 +248,71 @@ public class Message {
 	@SuppressWarnings("unchecked")
 	public void respondToChallenge(AKeyPair keyPair, Predicate<ACell> contextValidator) {
 		try {
-			if (keyPair == null) {
-				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("No signing key")));
-				return;
-			}
-
 			// Message payload is [tag, id, signedData]
 			AVector<ACell> msgPayload = getPayload();
-			if (msgPayload == null || msgPayload.count() < 3) {
+			if (msgPayload == null || msgPayload.count() != 3) {
 				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge format")));
 				return;
 			}
-			SignedData<ACell> signedData = (SignedData<ACell>) msgPayload.get(2);
-			if (signedData == null) {
+			ACell rawChallenge=msgPayload.get(2);
+			if (!(rawChallenge instanceof SignedData<?> rawSigned)) {
 				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Missing signed data")));
 				return;
 			}
-
-			AVector<ACell> challengeValues = (AVector<ACell>) signedData.getValue();
-			if (challengeValues == null) {
-				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge data")));
-				return;
-			}
-
-			long n = challengeValues.count();
-			if (n < 2 || n > 3) {
-				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Wrong element count")));
-				return;
-			}
-
-			// Verify challenge is addressed to this key (null targetKey = accept any)
-			ACell rawTarget = challengeValues.get(1);
-			if (rawTarget != null) {
-				AccountKey targetKey = RT.ensureAccountKey(rawTarget);
-				if (targetKey == null || !keyPair.getAccountKey().equals(targetKey)) {
-					returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Wrong target key")));
-					return;
-				}
-			}
-
-			// Optional contextID validation
-			ACell contextID = (n == 3) ? challengeValues.get(2) : null;
-			if (contextID != null && contextValidator != null && !contextValidator.test(contextID)) {
-				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Context mismatch")));
-				return;
-			}
-
-			ACell token = challengeValues.get(0);
-			AccountKey challengerKey = signedData.getAccountKey();
-
-			// Build response: [token, challengerKey, contextID?]
-			AVector<ACell> responseValues = (contextID != null)
-				? Vectors.of(token, challengerKey, contextID)
-				: Vectors.of(token, challengerKey);
-			SignedData<ACell> response = keyPair.signData(responseValues);
-			returnResult(Result.value(response));
+			returnResult(answerChallenge(keyPair,(SignedData<ACell>)rawSigned,contextValidator));
 		} catch (Exception e) {
 			try {
 				returnResult(Result.error(ErrorCodes.UNEXPECTED, Strings.create(e.getMessage())));
 			} catch (Exception e2) {
 				// best effort
 			}
+		}
+	}
+
+	/**
+	 * Validates and answers one signed possession challenge. This shared path is used
+	 * by both message-based and direct in-process transports.
+	 */
+	@SuppressWarnings("unchecked")
+	public static Result answerChallenge(AKeyPair keyPair,SignedData<ACell> signedData,
+			Predicate<ACell> contextValidator) {
+		try {
+			if (keyPair==null) return Result.error(ErrorCodes.TRUST,Strings.create("No signing key"));
+			if (signedData==null) return Result.error(ErrorCodes.FORMAT,Strings.create("Missing signed data"));
+			if (!signedData.checkSignature()) {
+				return Result.error(ErrorCodes.TRUST,Strings.create("Invalid challenge signature"));
+			}
+			ACell challenge=signedData.getValue();
+			if (!(challenge instanceof AVector<?> rawValues)) {
+				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge data"));
+			}
+			AVector<ACell> values=(AVector<ACell>)rawValues;
+			long n=values.count();
+			Hash token=(n>=1)?RT.ensureHash(values.get(0)):null;
+			if (n<2 || n>3 || token==null) {
+				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge elements"));
+			}
+
+			ACell rawTarget=values.get(1);
+			if (rawTarget!=null) {
+				AccountKey targetKey=RT.ensureAccountKey(rawTarget);
+				if (targetKey==null || !keyPair.getAccountKey().equals(targetKey)) {
+					return Result.error(ErrorCodes.TRUST,Strings.create("Wrong target key"));
+				}
+			}
+
+			ACell contextID=(n==3)?values.get(2):null;
+			if (contextValidator!=null && !contextValidator.test(contextID)) {
+				return Result.error(ErrorCodes.TRUST,Strings.create("Context mismatch"));
+			}
+
+			AccountKey challengerKey=signedData.getAccountKey();
+			AVector<ACell> responseValues=(contextID!=null)
+				?Vectors.of(token,challengerKey,contextID)
+				:Vectors.of(token,(ACell)challengerKey);
+			return Result.value(keyPair.signData(responseValues));
+		} catch (Exception e) {
+			return Result.error(ErrorCodes.UNEXPECTED,Strings.create(e.getMessage()));
 		}
 	}
 
@@ -342,6 +349,7 @@ public class Message {
 		ACell rv = result.getValue();
 		if (!(rv instanceof SignedData)) return null;
 		SignedData<ACell> response = (SignedData<ACell>) rv;
+		if (!response.checkSignature()) return null;
 		AccountKey remoteKey = response.getAccountKey();
 
 		if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
@@ -350,10 +358,10 @@ public class Message {
 		if (!(inner instanceof AVector)) return null;
 		AVector<ACell> values = (AVector<ACell>) inner;
 		long n = values.count();
-		if (n < 2 || n > 3) return null;
+		if (n != ((contextID == null) ? 2 : 3)) return null;
 		if (!token.equals(values.get(0))) return null;
 		if (!ownKey.equals(values.get(1))) return null;
-		if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
+		if (contextID != null && !Utils.equals(contextID, values.get(2))) return null;
 
 		return remoteKey;
 	}

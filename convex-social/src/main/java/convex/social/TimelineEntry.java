@@ -2,7 +2,7 @@ package convex.social;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AccountKey;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 
@@ -15,7 +15,7 @@ import convex.core.data.Keyword;
  * @param post The post content
  */
 public record TimelineEntry(
-	AccountKey author,
+	AString author,
 	Blob postKey,
 	long timestamp,
 	AHashMap<Keyword, ACell> post

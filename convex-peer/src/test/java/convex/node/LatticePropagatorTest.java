@@ -70,8 +70,22 @@ public class LatticePropagatorTest {
 		// Peer connections below use getHostAddress(), which reflects the actual ports.
 		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(0));
 		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(0));
-		server1.setInboundPropagatorSelector(connection -> server1.getPropagator());
-		server2.setInboundPropagatorSelector(connection -> server2.getPropagator());
+		AKeyPair nodeKey1=AKeyPair.generate();
+		AKeyPair nodeKey2=AKeyPair.generate();
+		server1.setMergeContext(LatticeContext.create(null,nodeKey1));
+		server2.setMergeContext(LatticeContext.create(null,nodeKey2));
+		// These propagation unit tests model routes after authentication. The
+		// challenge/response and inbound-upgrade paths are exercised separately by
+		// NodeServerTest and P2PSocialSyncTest; assigning the proven remote key here
+		// ensures DATA-ahead is never tested over an unverified connection.
+		server1.setInboundPropagatorSelector(connection -> {
+			connection.setTrustedKey(nodeKey2.getAccountKey());
+			return server1.getPropagator();
+		});
+		server2.setInboundPropagatorSelector(connection -> {
+			connection.setTrustedKey(nodeKey1.getAccountKey());
+			return server2.getPropagator();
+		});
 
 		// Launch both servers
 		server1.launch();
@@ -84,13 +98,15 @@ public class LatticePropagatorTest {
 			InetSocketAddress server1Address = server1.getHostAddress();
 			InetSocketAddress server2Address = server2.getHostAddress();
 
-			AccountKey key1 = AKeyPair.generate().getAccountKey();
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
-			server1.getPropagator().addPeer(key1, peer1to2);
+			server1.getPropagator().getConnectionManager()
+				.addPeer(nodeKey2.getAccountKey(),peer1to2)
+				.get(5,TimeUnit.SECONDS);
 
-			AccountKey key2 = AKeyPair.generate().getAccountKey();
 			Convex peer2to1 = ConvexRemote.connect(server1Address);
-			server2.getPropagator().addPeer(key2, peer2to1);
+			server2.getPropagator().getConnectionManager()
+				.addPeer(nodeKey1.getAccountKey(),peer2to1)
+				.get(5,TimeUnit.SECONDS);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to establish peer connections", e);
 		}
@@ -172,11 +188,11 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
+		CompletableFuture<ACell> received=server2.getPropagator().nextAnnounce();
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getCursor().sync();
 
-		Convex connection = server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5, TimeUnit.SECONDS);
+		received.get(5,TimeUnit.SECONDS);
 		assertEquals(1L, server1.getPropagator().getBroadcastCount(),
 			"source should send one delta broadcast");
 		NodeServer.InboundStats inbound = server2.getInboundStats();
@@ -199,11 +215,11 @@ public class LatticePropagatorTest {
 		}
 
 		server1.getPropagator().setMaxDeltaMessageSize(700);
+		CompletableFuture<ACell> received=server2.getPropagator().nextAnnounce();
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getCursor().sync();
 
-		Convex connection=server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5,TimeUnit.SECONDS);
+		received.get(5,TimeUnit.SECONDS);
 		assertEquals(values,RT.getIn(server2.getLocalValue(),dataKeyword));
 		NodeServer.InboundStats inbound=server2.getInboundStats();
 		assertTrue(inbound.messagesReceived>1,
@@ -234,6 +250,9 @@ public class LatticePropagatorTest {
 		ACell second = CVMLong.create(4302);
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
+		CompletableFuture<ACell> firstMerge=server2.getPropagator().nextAnnounce();
+		CompletableFuture<ACell> secondMerge=firstMerge.thenCompose(
+			ignored -> server2.getPropagator().nextAnnounce());
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
 		server1.getCursor().sync();
@@ -241,8 +260,7 @@ public class LatticePropagatorTest {
 			values.assoc(first.getHash(), first).assoc(second.getHash(), second));
 		server1.getCursor().sync();
 
-		Convex connection = server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5, TimeUnit.SECONDS);
+		secondMerge.get(5,TimeUnit.SECONDS);
 		assertEquals(2L, server1.getPropagator().getBroadcastCount(),
 			"a rapid follow-up sync must not be lost behind the broadcast throttle");
 		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));

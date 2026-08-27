@@ -2,7 +2,7 @@ package convex.social;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.ABlob;
+import convex.core.data.AString;
 import convex.core.data.ASet;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
@@ -20,7 +20,7 @@ import convex.core.util.Utils;
  *   <li>{@code :text} — AString (required)</li>
  *   <li>{@code :timestamp} — CVMLong millis since epoch (required)</li>
  *   <li>{@code :reply-to} — Blob, 8-byte key of parent post (optional)</li>
- *   <li>{@code :reply-did} — ABlob, owner key of parent author (optional)</li>
+	 *   <li>{@code :reply-did} — AString, stable DID of parent author (optional)</li>
  *   <li>{@code :media} — AVector of Hash refs to :data lattice (optional)</li>
  *   <li>{@code :tags} — ASet of AString hashtags (optional)</li>
  *   <li>{@code :deleted} — CVMLong, deletion timestamp (optional, tombstone)</li>
@@ -86,7 +86,7 @@ public class SocialPost {
 	 * @return Reply post as AHashMap
 	 */
 	public static AHashMap<Keyword, ACell> createReply(String text, long timestamp,
-			Blob parentKey, ABlob parentDid) {
+			Blob parentKey, AString parentDid) {
 		return Maps.of(
 			TEXT, Strings.create(text),
 			TIMESTAMP, CVMLong.create(timestamp),

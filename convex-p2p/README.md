@@ -10,9 +10,10 @@ bundles the application regions those nodes serve, so one dependency gives you a
 complete node.
 
 > **Status: early implementation.** Authenticated one-peer bootstrap, signed
-> NodeInfo discovery and outbound-only NAT leaf nodes work over TCP. Public relay
-> nodes, on-chain bootstrap, region-aware connection selection, connection bounds
-> and additional transports remain to be built.
+> NodeInfo discovery, bounded desired-peer state, follow-filtered social replication
+> and outbound-only NAT leaf nodes work over TCP. Public relay nodes, on-chain
+> bootstrap, region-aware connection selection and additional transports remain to
+> be built.
 
 ## Lattice structure
 
@@ -200,7 +201,7 @@ alice.launch();
 bob.launch();
 
 // Bob proves his key; Alice pushes only her own signed NodeInfo entry, then
-// pulls and merges Bob's current announced root.
+// pulls :p2p, :id and Alice's currently desired social-owner paths.
 alice.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
 
 // Bob independently authenticates Alice on that same socket before upgrading it
@@ -213,8 +214,9 @@ alice.getApplication().sync();
 
 `connect` completes after the bootstrap endpoint is authenticated and has
 acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
-node has pulled and merged the bootstrap node's current announced root. A node
-joining an established network therefore obtains its existing configured regions
+node has pulled and merged the bootstrap node's infrastructure regions and current
+desired social-owner slots. It never bootstraps from an unrestricted full root.
+A node joining an established network therefore obtains its follow-filtered view
 without waiting for another publication or periodic root sync.
 
 For a node behind NAT, use a local-only `NodeServer` configuration. It signs and
@@ -283,7 +285,17 @@ either via `serveAllInbound()` for a public single-view node, or a custom policy
 with `NodeServer.setInboundPropagatorSelector`. See `convex-peer`'s `NodeServer` for
 the full capability model. Operator assignment is not authentication and does not add
 the connection to outbound gossip. That separate upgrade requires live
-challenge/response plus an admitted node identity.
+challenge/response plus an admitted node identity. The challenge and response both
+have verified Ed25519 signatures and bind a random nonce, the opposite party's node
+key as audience, and the fixed `convex-lattice-peer-v1` context.
+
+An unverified assigned connection may submit complete `LATTICE_VALUE` messages, because
+the P2P data is public, but it cannot stage unsolicited `DATA` or trigger missing-cell
+acquisition. Complete values pass the configured path-aware ingress policy before
+persistence. The default social policy admits and publishes only locally registered
+social DIDs, explicit pins and their direct active follows; every social slot must have
+a valid signature from a key authorised for its DID. `maxConnections` bounds inbound
+sockets and `maxDesiredPeers` bounds explicit plus discovery-driven peers.
 
 ## License
 

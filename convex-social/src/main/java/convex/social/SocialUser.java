@@ -1,6 +1,8 @@
 package convex.social;
 
+import convex.auth.did.DID;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -24,11 +26,11 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 
-	private final AccountKey ownerKey;
+	private final AString ownerDid;
 
-	SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AccountKey ownerKey) {
+	SocialUser(Social parent, ALatticeCursor<Index<Keyword, ACell>> cursor, AString ownerDid) {
 		super(parent,cursor);
-		this.ownerKey = ownerKey;
+		this.ownerDid = ownerDid;
 	}
 
 	/**
@@ -37,7 +39,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Feed cursor wrapper
 	 */
 	public Feed feed() {
-		return new Feed(this,cursor.path(SocialLattice.KEY_FEED),ownerKey);
+		return new Feed(this,cursor.path(SocialLattice.KEY_FEED),ownerDid);
 	}
 
 	/**
@@ -46,7 +48,8 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return Follows cursor wrapper
 	 */
 	public Follows follows() {
-		return new Follows(this,cursor.path(SocialLattice.KEY_FOLLOWS));
+		return new Follows(this,cursor.path(
+			SocialLattice.KEY_FOLLOWING,SocialLattice.KEY_FOLLOWS));
 	}
 
 	/**
@@ -57,7 +60,7 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return isolated working copy for this user
 	 */
 	public SocialUser fork() {
-		return new SocialUser((Social) parent(),cursor.fork(),ownerKey);
+		return new SocialUser((Social) parent(),cursor.fork(),ownerDid);
 	}
 
 	// TODO: public Profile profile() { ... }
@@ -68,7 +71,12 @@ public class SocialUser extends ALatticeComponent<Index<Keyword, ACell>> {
 	 * @return The owner's Ed25519 public key
 	 */
 	public AccountKey getOwnerKey() {
-		return ownerKey;
+		return DID.keyFromDID(ownerDid);
+	}
+
+	/** Gets the stable social owner DID. */
+	public AString getOwnerDID() {
+		return ownerDid;
 	}
 
 }

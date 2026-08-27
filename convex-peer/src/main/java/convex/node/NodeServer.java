@@ -192,6 +192,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	private Function<AConnection, LatticePropagator> inboundPropagatorSelector;
 
+	/** Complete-value admission/projection applied before inbound persistence. */
+	private LatticeIngressFilter ingressFilter=(path,value) -> value;
+
+	/** Projection applied to the primary persisted and replicated view. */
+	private LatticeFilter<V> publicationFilter=value -> value;
+
 	/** Immutable connection-to-propagator capabilities established by operator policy. */
 	private final ConcurrentHashMap<AConnection, LatticePropagator> inboundPropagators =
 		new ConcurrentHashMap<>();
@@ -344,7 +350,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 				if (signingKey != null) {
 					connectionManager.setKeyPair(signingKey);
 				}
-				LatticePropagator primary = new LatticePropagator(store, connectionManager);
+				LatticePropagator primary = new LatticePropagator(
+					store,connectionManager,lattice,publicationFilter);
 				propagators.add(primary);
 			}
 
@@ -369,6 +376,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// proves the expected remote AccountKey.
 			for (LatticePropagator p : propagators) {
 				LatticeConnectionManager manager = p.getConnectionManager();
+				manager.setMaxDesiredPeers(config.getMaxDesiredPeers());
 				manager.setInboundMessageLimits(
 					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
 				manager.setPeerMessageHandler(
@@ -638,18 +646,22 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 
 		try {
-			// An assigned connection decodes only into its propagator store. An
-			// unassigned network connection uses storeless decoding so even a rejected
-			// message cannot deposit attacker-controlled cells in the primary store.
-			AStore decodeStore = (owner != null) ? owner.getStore() : ((conn == null) ? store : null);
+			// Unverified network input is decoded storelessly. This prevents DATA or
+			// incomplete values from depositing attacker-controlled cells before the
+			// dispatcher has applied authentication and interest policy.
+			AStore decodeStore = (conn == null)
+				? ((owner != null) ? owner.getStore() : store)
+				: ((owner != null && conn.isTrusted()) ? owner.getStore() : null);
 			message.getPayload(decodeStore);
 		} catch (MissingDataException e) {
-			if (!acquired && owner != null && conn != null) {
+			if (!acquired && owner != null && conn != null && conn.isTrusted()) {
 				beginLatticeAcquisition(message, owner, stats);
 				return;
 			}
 			recordDecodeError(conn, stats);
 			log.warn("Rejected incomplete inbound message: {}", e.getMessage());
+			returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,
+				"Only complete lattice values are accepted from unverified connections"));
 			return;
 		} catch (Exception e) {
 			// #566: an undecodable message counts against the connection and can trip the breaker.
@@ -694,7 +706,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 				}
 				break;
 			case DATA:
-				if (owner == null) {
+				if (conn != null && !conn.isTrusted()) {
+					recordMergeReject(conn, stats);
+					log.debug("Rejected unsolicited DATA from an unverified connection");
+				} else if (owner == null) {
 					recordMergeReject(conn, stats);
 					log.warn("Rejected DATA on an unassigned connection");
 				} else {
@@ -729,10 +744,10 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Stages a bounded batch of independently addressable cells in the connection's
-	 * capability-scoped propagator store. DATA messages never merge or publish a
-	 * root; a later LATTICE_VALUE either uses the staged cells or pulls anything
-	 * that was dropped in transit.
+	 * Stages a bounded batch of independently addressable cells for a local/internal
+	 * delivery path. Unsolicited DATA from an unverified network connection is
+	 * rejected by the dispatcher before this method. A verified propagation route
+	 * may stage bounded delta-ahead cells. DATA never merges or publishes a root.
 	 */
 	private void processData(Message message, LatticePropagator owner,
 			ConnectionStats stats) throws BadFormatException, IOException {
@@ -1059,7 +1074,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	private void processChallenge(Message message) {
-		message.respondToChallenge(mergeContext.getSigningKey(), null);
+		message.respondToChallenge(mergeContext.getSigningKey(),
+			Message.LATTICE_PEER_CHALLENGE_CONTEXT::equals);
 	}
 
 	/**
@@ -1090,12 +1106,22 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * allowing the ordered dispatcher to call lattice merge code.
 	 */
 	private void prepareLatticeValue(Message message, LatticePropagator owner,
-			ConnectionStats stats) throws BadFormatException {
+			ConnectionStats stats) {
 		try {
 			Message complete = completeLatticeMessage(message, owner.getStore());
 			processLatticeValue(complete, owner);
 		} catch (MissingDataException e) {
-			beginLatticeAcquisition(message, owner, stats);
+			AConnection connection=message.getConnection();
+			if (connection!=null && connection.isTrusted()) {
+				beginLatticeAcquisition(message, owner, stats);
+			} else {
+				recordDecodeError(connection,stats);
+				returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,
+					"Only complete lattice values are accepted from unverified connections"));
+			}
+		} catch (BadFormatException e) {
+			recordMergeReject(message.getConnection(),stats);
+			returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,e.getMessage()));
 		} catch (IOException e) {
 			recordMergeReject(message.getConnection(), stats);
 			log.warn("Unable to persist inbound lattice value in its propagator store", e);
@@ -1104,8 +1130,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Returns a message whose lattice value is known complete and persisted in the
-	 * supplied propagator store. This is the sole gateway into processLatticeValue.
+	 * Returns a message whose lattice value is known complete, admitted and persisted
+	 * in the supplied propagator store. This is the sole gateway into
+	 * processLatticeValue.
 	 */
 	private Message completeLatticeMessage(Message message, AStore acquisitionStore)
 			throws BadFormatException, IOException {
@@ -1116,18 +1143,25 @@ public class NodeServer<V extends ACell> implements Closeable {
 		ACell value = payload.get(3);
 		if (value == null) throw new BadFormatException("LATTICE_VALUE message missing value");
 
-		// Persist into the quarantine/ingress store, then independently prove that
-		// no missing descendant remains. Some stores deliberately retain a partial
-		// top Ref at STORED status instead of throwing during storeTopRef.
-		ACell complete = Cells.persist(value, acquisitionStore);
+		// Prove completeness before either admission or persistence. Unverified
+		// connections are decoded storelessly, while verified acquisition may refer
+		// only to cells obtained through correlated DATA_REQUEST results.
 		HashSet<Hash> missing = new HashSet<>();
-		Ref.get(complete).findMissing(missing, 1);
+		Ref.get(value).findMissing(missing, 1);
 		if (!missing.isEmpty()) {
 			throw new MissingDataException(acquisitionStore, missing.iterator().next());
 		}
-		if (!withinInboundSizeLimit(complete)) {
+		if (!withinInboundSizeLimit(value)) {
 			throw new BadFormatException("Acquired lattice value exceeds inbound size limit");
 		}
+
+		ACell[] path=extractPath(payload.get(2));
+		ACell admitted=ingressFilter.filter(path,value);
+		if (admitted==null) throw new BadFormatException("Inbound lattice value is not locally desired");
+		if (!withinInboundSizeLimit(admitted)) {
+			throw new BadFormatException("Projected lattice value exceeds inbound size limit");
+		}
+		ACell complete=Cells.persist(admitted,acquisitionStore);
 
 		AVector<?> completePayload = Vectors.create(
 			payload.get(0), payload.get(1), payload.get(2), complete);
@@ -1380,7 +1414,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		// node's signed NodeInfo push) do we start the separate challenge which may
 		// explicitly upgrade it into an outbound propagation route.
 		if (conn != null && !outboundPropagators.containsKey(conn)) {
-			inboundVerifier.maybeStart(conn, owner);
+			inboundVerifier.maybeStart(conn, owner, claimedNodeKey(path, value));
 		}
 
 		// The response is deliberately empty: completion is the acknowledgement, and
@@ -1393,6 +1427,24 @@ public class NodeServer<V extends ACell> implements Closeable {
 				log.debug("Unable to return lattice result: Peer send buffer is full");
 			}
 		}
+	}
+
+	/**
+	 * Extracts the single owner-bound node identity used to address an inbound
+	 * possession challenge. Arbitrary lattice traffic cannot choose the trusted
+	 * key: only a valid one-entry update at {@code [:p2p :nodes]} can do so.
+	 */
+	@SuppressWarnings("unchecked")
+	private AccountKey claimedNodeKey(ACell[] path, ACell value) {
+		if (path.length != 2 || !Keywords.P2P.equals(path[0])
+				|| !Keywords.NODES.equals(path[1])) return null;
+		if (!(value instanceof AHashMap<?,?> raw) || raw.count() != 1) return null;
+		AHashMap<ACell,ACell> nodes=(AHashMap<ACell,ACell>) raw;
+		java.util.Map.Entry<ACell,ACell> entry=nodes.entrySet().iterator().next();
+		AccountKey ownerKey=RT.ensureAccountKey(entry.getKey());
+		if (ownerKey==null || !(entry.getValue() instanceof SignedData<?> signed)) return null;
+		if (!ownerKey.equals(signed.getAccountKey()) || !signed.checkSignature()) return null;
+		return ownerKey;
 	}
 
 	/**
@@ -2118,6 +2170,20 @@ public class NodeServer<V extends ACell> implements Closeable {
 				"Primary propagator must use the NodeServer host store");
 		}
 		propagators.add(propagator);
+	}
+
+	/** Sets complete-value inbound admission/projection policy before launch. */
+	public synchronized void setIngressFilter(LatticeIngressFilter filter) {
+		requireNewLifecycle("setIngressFilter");
+		if (filter==null) throw new IllegalArgumentException("Ingress filter must not be null");
+		this.ingressFilter=filter;
+	}
+
+	/** Sets the primary persisted/replicated projection before launch. */
+	public synchronized void setPublicationFilter(LatticeFilter<V> filter) {
+		requireNewLifecycle("setPublicationFilter");
+		if (filter==null) throw new IllegalArgumentException("Publication filter must not be null");
+		this.publicationFilter=filter;
 	}
 
 	private V publishApplicationRoot(V value) {

@@ -53,8 +53,13 @@ public class LWPLattice<V extends ACell> extends ADelegatingLattice<V> {
 
 	@Override
 	public V merge(V own, V other) {
-		if (own == null) return other;
 		if (other == null) return own;
+		// Validate/sanitise the foreign operand while it is still in the child's
+		// foreign position. Timestamp preference may reorder it below, and must not
+		// accidentally turn an unvalidated foreign value into the child's own value.
+		V validated=inner.merge(inner.zero(),other);
+		if (!convex.core.util.Utils.equals(validated,other)) other=validated;
+		if (own == null) return other;
 
 		long ownTS = timestampFn.applyAsLong(own);
 		long otherTS = timestampFn.applyAsLong(other);
@@ -69,8 +74,10 @@ public class LWPLattice<V extends ACell> extends ADelegatingLattice<V> {
 
 	@Override
 	public V merge(LatticeContext context, V own, V other) {
-		if (own == null) return other;
 		if (other == null) return own;
+		V validated=inner.merge(context,inner.zero(),other);
+		if (!convex.core.util.Utils.equals(validated,other)) other=validated;
+		if (own == null) return other;
 
 		long ownTS = timestampFn.applyAsLong(own);
 		long otherTS = timestampFn.applyAsLong(other);

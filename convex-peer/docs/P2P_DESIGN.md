@@ -37,7 +37,8 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 - **PING** — Liveness check
 
 Key features:
-- **Automatic missing data recovery** — on `MissingDataException` during merge, acquires data from peers and retries
+- **Authenticated missing data recovery** — verified source connections may resolve
+  missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
 - **LatticePropagator** — manages gossip to connected peers (primary propagator at index 0)
@@ -57,9 +58,9 @@ Current `MessageType` enum (16 types):
 
 | Code | Type | Purpose |
 |------|------|---------|
-| 1 | CHALLENGE | Ed25519 auth challenge `[token, networkId, toPeer]` |
-| 2 | RESPONSE | Auth response `[token, networkId, fromPeer, challengeHash]` |
-| 3 | DATA | Content-addressable data relay |
+| 1 | CHALLENGE | Signed Ed25519 auth challenge `[nonce, responderKey, context]` |
+| 2 | RESPONSE | Legacy response tag; lattice challenges return a correlated RESULT |
+| 3 | DATA | Content-addressable delta data; unverified network DATA is rejected |
 | 4 | COMMAND | Control command to peer (trusted senders only) |
 | 5 | DATA_REQUEST | Request missing data by hash |
 | 6 | QUERY | Read-only CVM query `[:Q id form address?]` |
@@ -211,9 +212,10 @@ The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain meta
 **Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
 AccountKey and TCP address. After challenge/response verifies that endpoint, the
 connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
-post-merge acknowledgement. It then pulls and merges the bootstrap node's current
-announced root, so a late joiner receives existing configured regions without waiting
-for another publication. The receiving node independently challenges the connecting
+post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p` and
+`:id` regions plus each currently desired complete social-owner slot. A late joiner
+therefore receives its follow-filtered view without an unrestricted full-root pull or
+waiting for another publication. The receiving node independently challenges the connecting
 node over the same full-duplex socket. Only after the live connection proves the key
 of an admitted signed NodeInfo record is that physically inbound connection upgraded
 into an outbound propagation route. A node with empty `:transports` therefore supports
@@ -393,23 +395,25 @@ after challenge/response proves the live remote node key.
 
 ### 7.2 Ed25519 Challenge/Response [EXISTS]
 
-`CHALLENGE` (type 1) and `RESPONSE` (type 2) messages already exist for identity verification. The peer verifies that the connecting party possesses the private key for a claimed AccountKey:
+The lattice challenge protocol verifies that the connecting party possesses the private
+key for a claimed AccountKey:
 
 ```
-Client                              Peer
-  │                                   │
-  ├── CHALLENGE request ──────────────→
-  │                                   │
-  ←── CHALLENGE [token, networkId,    │
-  │               toPeer] ────────────┤
-  │                                   │
-  ├── RESPONSE [token, networkId,     │
-  │            fromPeer, sig] ────────→
-  │                                   │
-  ←── AUTHENTICATED ──────────────────┤
+Challenger                           Responder
+  │                                     │
+  ├── CHALLENGE Signed([nonce,           │
+  │       responderKey, context]) ──────→│
+  │                                     │
+  │←── RESULT Signed([nonce,             │
+  │       challengerKey, context]) ──────┤
+  │                                     │
+  └── AUTHENTICATED ROUTE                │
 ```
 
-The challenge includes `networkId` (genesis hash) to prevent cross-network replay, and the token is server-generated random bytes.
+The nonce is generated with `SecureRandom`. The responder key is the challenge audience,
+the challenger key is the response audience, and `convex-lattice-peer-v1` is the fixed
+domain context. Both signatures, the exact vector shape, nonce, audience and context are
+verified. A fresh challenge is required on every connection.
 
 ### 7.3 Inbound-to-outbound route upgrade [EXISTS]
 
@@ -465,7 +469,9 @@ CONNECTING → CONNECTED → DISCONNECTED
 For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
 desired, pending and admitted connections. A configured node key keeps a socket in
 capability-free limbo until challenge/response succeeds. Desired peers are populated
-from signed `[:p2p :nodes]` records, and callers can await admission without polling.
+from correctly owner-signed `[:p2p :nodes]` records, and callers can await admission
+without polling. Explicit and discovered desired peers share the configurable
+`maxDesiredPeers` cap (256 by default).
 It also keeps authenticated inbound connections in a separate upgraded-route map.
 Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
 only when no live manager-owned outbound client already serves the same peer key.

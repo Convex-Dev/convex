@@ -6,16 +6,20 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.auth.did.DID;
+import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -33,6 +37,7 @@ import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.social.Social;
 
 /**
  * A Convex peer-to-peer lattice node.
@@ -52,16 +57,19 @@ import convex.node.NodeServer;
  *
  * <p><b>Bootstrap discovery.</b> A node can be told about one authenticated peer with
  * {@link #connect(AccountKey, InetSocketAddress)}. It pushes its own signed NodeInfo,
- * then pulls and merges the bootstrap node's current root. This lets both existing
- * and late-joining nodes discover each other and synchronise the configured regions
- * without an additional publication trigger. On-chain bootstrap, region subscription
- * and bounded replication policy remain to be built on top.
+ * then pulls and merges the bootstrap node's {@code :p2p} and {@code :id} regions and
+ * each currently desired complete social-owner slot. This lets existing and
+ * late-joining nodes discover each other without accepting unrelated social owners.
+ * On-chain bootstrap and public relay discovery remain to be built on top.
  *
  * <p><b>Inbound policy.</b> A NodeServer denies all network lattice traffic until an
  * operator assigns inbound connections to a propagator. {@link #create} leaves that
  * policy unset (deny-by-default); use {@link #serveAllInbound()} for an intentionally
  * public single-view node, or set a custom policy via
  * {@link NodeServer#setInboundPropagatorSelector} before {@link #launch()}.
+ * Assignment permits zero-trust public access but does not authenticate or upgrade the
+ * connection. Complete social values still pass follow-aware DID admission before
+ * persistence.
  */
 public class P2PNode implements Closeable {
 
@@ -70,11 +78,22 @@ public class P2PNode implements Closeable {
 	private final NodeServer<Index<Keyword, ACell>> server;
 	private final P2PApplication application;
 	private final AKeyPair keyPair;
+	private final DIDKeyAuthorizer didAuthorizer;
+	private final SocialReplicationPolicy socialPolicy;
+	private final ConcurrentHashMap<Convex,CompletableFuture<Void>> initialisations=
+		new ConcurrentHashMap<>();
 
-	private P2PNode(NodeServer<Index<Keyword, ACell>> server, AKeyPair keyPair) {
+	@SuppressWarnings("unchecked")
+	private P2PNode(NodeServer<Index<Keyword, ACell>> server, AKeyPair keyPair,
+			DIDKeyAuthorizer didAuthorizer) {
 		this.server = server;
 		this.application=P2PApplication.connect(server.getRootComponent());
 		this.keyPair = keyPair;
+		this.didAuthorizer=didAuthorizer;
+		this.socialPolicy=new SocialReplicationPolicy(server,didAuthorizer);
+		server.setIngressFilter(socialPolicy::filterIngress);
+		server.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
+			new ACell[0],value));
 	}
 
 	/**
@@ -110,14 +129,39 @@ public class P2PNode implements Closeable {
 	 */
 	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair,
 			KeyedLattice root) {
+		return create(store,config,keyPair,root,DIDKeyAuthorizer.CONVEX);
+	}
+
+	/** Creates a node with an authenticated DID resolution policy. */
+	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair,
+			KeyedLattice root,DIDKeyAuthorizer didAuthorizer) {
 		if (store == null) throw new IllegalArgumentException("Store must not be null");
 		if (root == null) throw new IllegalArgumentException("Root lattice must not be null");
+		if (didAuthorizer == null) throw new IllegalArgumentException("DID authorizer must not be null");
 
 		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root, store, config);
-		if (keyPair != null) {
-			server.setMergeContext(LatticeContext.create(null, keyPair));
-		}
-		return new P2PNode(server, keyPair);
+		server.setMergeContext(LatticeContext.create(
+			null,keyPair,didAuthorizer::verifiesOwner));
+		return new P2PNode(server,keyPair,didAuthorizer);
+	}
+
+	/** Registers and opens this node's local {@code did:key} social user. */
+	public Social social(AKeyPair userKeyPair) {
+		if (userKeyPair==null) throw new IllegalArgumentException("User key pair must not be null");
+		return social(DID.forKey(userKeyPair.getAccountKey()),userKeyPair);
+	}
+
+	/** Registers a local stable DID with one currently authorised signing key. */
+	public Social social(AString did,AKeyPair userKeyPair) {
+		if (userKeyPair==null) throw new IllegalArgumentException("User key pair must not be null");
+		socialPolicy.addLocalUser(did,userKeyPair);
+		return Social.connect(application,LatticeContext.create(
+			null,userKeyPair,didAuthorizer::verifiesOwner));
+	}
+
+	/** Retains an additional social DID independently of local follow lists. */
+	public void pinSocial(AString did) {
+		socialPolicy.pin(did);
 	}
 
 	/**
@@ -154,6 +198,8 @@ public class P2PNode implements Closeable {
 	/**
 	 * Grants every inbound network connection the primary propagator view. Only
 	 * appropriate for an intentionally public node serving a single lattice view.
+	 * The connection remains untrusted unless the independent node-key challenge
+	 * succeeds, and the default social ingress filter remains in force.
 	 * Must be called before {@link #launch()}.
 	 *
 	 * @return this node, for chaining
@@ -171,6 +217,13 @@ public class P2PNode implements Closeable {
 	 */
 	public void launch() throws IOException, InterruptedException {
 		server.launch();
+		var manager=server.getPropagator().getConnectionManager();
+		manager.setPeerAdmissionHandler((peerKey,peer) -> initialisePeer(peer)
+			.exceptionally(error -> {
+				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
+				return null;
+			}));
+		for (Convex peer:manager.getPeers()) initialisePeer(peer);
 		Integer port = server.getPort();
 		if (port != null && port >= 0) {
 			log.info("Convex P2P node listening on port {}", port);
@@ -185,18 +238,18 @@ public class P2PNode implements Closeable {
 	 *
 	 * <p>After the remote endpoint proves {@code peerKey}, this node pushes only its
 	 * own signed {@code [:p2p :nodes]} entry and waits for the merge acknowledgement.
-	 * It then pulls and merges the remote node's current announced root. The remote
+	 * It then pulls and merges the remote node's infrastructure regions and currently
+	 * desired complete social-owner slots. The remote
 	 * node then challenges this same physical connection. Once the initiating node
 	 * proves its signed NodeInfo key, the remote explicitly upgrades the inbound socket
 	 * into an authenticated outbound propagation route. This permits bidirectional
 	 * gossip even when this node publishes an empty {@code :transports} vector because
-	 * it is behind NAT. A late joiner also obtains the existing configured regions
-	 * immediately.</p>
+	 * it is behind NAT. A late joiner obtains only its follow-filtered social view.</p>
 	 *
 	 * @param peerKey expected AccountKey of the bootstrap node
 	 * @param address bootstrap node's TCP address
 	 * @return future completing after connection admission, own-identity merge and
-	 *         local merge of the bootstrap node's announced root
+	 *         local merge of the bootstrap node's selective bootstrap paths
 	 */
 	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
 		if (!server.isRunning()) {
@@ -204,9 +257,32 @@ public class P2PNode implements Closeable {
 				new IllegalStateException("P2P node must be launched before connecting"));
 		}
 		return server.getPropagator().getConnectionManager().connectPeer(peerKey,address)
-			.thenCompose(peer -> pushOwnNodeInfo(peer)
-				.thenCompose(ignored -> server.pull(peer))
-				.thenApply(ignored -> peer));
+			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
+	}
+
+	private CompletableFuture<Void> initialisePeer(Convex peer) {
+		return initialisations.computeIfAbsent(peer,p -> {
+			CompletableFuture<Void> initialised=pushOwnNodeInfo(p)
+				.thenCompose(ignored -> pullBootstrap(p));
+			initialised.whenComplete((ignored,error) -> {
+				if (error!=null) initialisations.remove(p,initialised);
+			});
+			return initialised;
+		});
+	}
+
+	private CompletableFuture<Void> pullBootstrap(Convex peer) {
+		return server.pullPath(peer,P2PLattice.KEY_P2P)
+			.thenCompose(ignored -> server.pullPath(peer,P2PLattice.KEY_ID))
+			.thenCompose(ignored -> pullDesiredSocial(peer));
+	}
+
+	private CompletableFuture<Void> pullDesiredSocial(Convex peer) {
+		CompletableFuture<?>[] pulls=socialPolicy.desiredOwners().stream()
+			.map(did -> server.pullPath(peer,Social.KEY_SOCIAL,did)
+				.thenRun(() -> socialPolicy.cacheCurrentOwner(did)))
+			.toArray(CompletableFuture[]::new);
+		return CompletableFuture.allOf(pulls);
 	}
 
 	/**
