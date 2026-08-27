@@ -1,171 +1,185 @@
 # Lattice networking responsibilities
 
-This document is the implementation map for the `convex.node` package. CAD036
-defines the Lattice Node model, CAD015 defines messages and transport trust, and
-CAD038 defines signed application ownership at the merge boundary.
+This document maps the implementation in `convex.node` to CAD036. CAD015
+defines the underlying messages and transport, while each application lattice
+defines its own merge and authorisation rules.
 
-The essential rules are that the transport never interprets an application's
-lattice schema, and that a physical connection, permission to access a
-publication view, and permission to send outbound traffic are three different
-capabilities.
+The central boundary is simple:
 
-The transport challenge key and `LatticeContext` signing/owner policy are also
-separate configuration. A wrapper may deliberately bind them, but `NodeServer`
-never infers transport identity from an application signing key.
+- `NodeServer` hosts one authoritative lattice value.
+- The calling application constructs propagation policy groups.
+- Each `LatticePropagator` owns its routes, serving view and protocol work.
+- Attaching a propagator supplies a merge destination; it does not configure the
+  propagator.
 
-## Component ownership
+A node with no propagators is a valid local, store-backed lattice host.
+
+## Ownership
 
 | Component | Owns | Does not own |
 |---|---|---|
-| `NodeServer` | Supplied lattice root, listener lifecycle, bounded ordered inbound dispatch, connection-to-propagator assignment, acquisition orchestration | Application paths or records, discovery policy, lattice merge rules, outbound dialing, delta construction |
-| `LatticePropagator` | One filtered publication view, its store, announce/persist pipeline, delta and root broadcasts | Physical listener, peer identity policy |
-| `LatticeConnectionManager` | Bounded connection intent, outbound dialing and retry, remote node-key verification, authenticated outbound routes | Discovery schemas, inbound view assignment, root merge, application-owner verification |
-| `LatticeInboundVerifier` | Challenge/response for an application-admitted key and the explicit route-upgrade decision | Identity discovery, operator view assignment, application signatures |
-| `ALattice` / `LatticeContext` | Foreign-value validation, merge semantics and signer authorisation for application owners | Transport identity and routing |
-| `P2PNode` / `NodeDirectory` (`convex-p2p`) | `[:p2p :nodes]`, NodeInfo publication/validation, discovery translation and PoP metadata | Generic transport lifecycle and merge mechanics |
+| `NodeServer` | Authoritative lattice cursor, merge context, node store root, persistence barriers, listener lifecycle, attached-group lifecycle and update fan-out | Peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
+| `LatticeListener` | TCP acceptance and one immutable connection-to-group assignment | Per-connection protocol state, serving stores, trust or lattice merge |
+| `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
+| `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, ingress policy, challenge state, statistics and extension handler | Node persistence, peer discovery or application schemas |
+| `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
+| `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
+| Application wrapper | Construction, policy configuration, connection assignment, discovery translation and application handlers | Generic transport internals |
 
-One `NodeServer` may own several propagators. Propagator zero is the primary
-authoritative publication path; each additional propagator is a filtered
-capability view with its own store and connection manager.
+`LatticeListener` and `LatticeProtocolEndpoint` are package-private deliberately.
+Applications compose `NodeServer`, `LatticePropagator` and
+`LatticeConnectionManager`; they do not wire transport internals themselves.
 
-## Connection and route states
+## Application composition
 
-```text
-operator-configured or discovered node identity
-                       |
-                       v
-                 desired peer
-                       |
-                   dial socket
-                       |
-                       v
-             verification limbo
-          no store or message handler
-                       |
-       expected node key proves possession
-                       |
-                       v
-       authenticated manager-owned route
-       store access + reverse-message handler
+The application must configure every group before attaching it:
+
+```java
+NodeConfig nodeConfig = NodeConfig.port(0);
+NodeServer<MyValue> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
+node.setMergeContext(nodeContext);
+
+LatticePropagator publicGroup = new LatticePropagator(
+    servingStore, lattice, publicProjection, groupConfig);
+publicGroup.setMergeContext(groupContext);
+publicGroup.setTransportKeyPair(transportKey);
+publicGroup.setIngressFilter(ingressPolicy);
+publicGroup.setApplicationMessageHandler(extensionHandler);
+
+node.addPropagator(publicGroup);
+node.setInboundPropagatorSelector(connection -> publicGroup);
+node.launch();
 ```
 
-A socket accepted by `NodeServer` follows a distinct path:
+`NodeServer.addPropagator` does not copy the node lattice, context, key, filters,
+handlers or configuration. This prevents a generic host from silently inventing
+network policy. An application with several groups retains their references and
+selects the intended group explicitly for pulls and connection assignment.
+
+The node's listener settings and a group's protocol settings may use the same
+`NodeConfig` object for convenience, but that is an application choice rather
+than inheritance.
+
+## Connection capabilities
+
+Three capabilities remain separate:
+
+1. A physical socket exists.
+2. The application assigns an inbound socket to one publication group.
+3. A remote node proves possession of an expected key, permitting an
+   authenticated outbound route over that socket.
+
+Inbound assignment does not authenticate the remote. It only selects which
+bounded endpoint may handle public protocol messages. An unverified connection
+may submit a complete lattice value; it cannot trigger missing-cell acquisition.
+
+An assigned connection can later be upgraded:
 
 ```text
-physically inbound socket
+physical inbound socket
         |
-        +-- operator selector --> one immutable propagator view
+        +-- application selector --> one propagation group
         |
-        +-- challenge proves desired node key
+        +-- expected key proves possession for this challenge audience
                     |
                     v
-          explicitly upgraded outbound route
+          authenticated outbound route
 ```
 
-Operator assignment allows bounded inbound use of one view. It does not prove a
-remote identity and does not make the socket an outbound propagation route.
-Conversely, a manager-owned outbound connection is assigned to its manager's
-propagator only after admission.
+Manager-owned outbound connections follow their own admission path:
 
-## NodeServer launch phases
+```text
+bounded desired-peer intent
+        -> dialed socket in limbo
+        -> expected key proves possession
+        -> admitted manager-owned route
+```
 
-`NodeServer.launch()` is an orchestrator. Its named phases run in this order:
+Zero-trust connectivity is still useful. Public complete values can be checked
+by the application lattice regardless of route authentication. Trust controls
+route capability and partial-data acquisition; it never replaces signed lattice
+authorisation.
 
-1. Validate lifecycle and immutable configuration.
-2. Create the default primary propagator if the operator supplied none.
-3. Freeze the root publication policy and configure each propagator.
-4. Restore persisted views and seed every store before opening network input.
-5. Start the ordered dispatcher and optional listener.
-6. Start maintenance, propagation and connection managers.
-7. Report the generic transport as running.
+## Inbound pipeline
 
-Application wrappers run their own post-launch work. `P2PNode`, for example,
-publishes NodeInfo only after the listener has supplied its actual bound port.
+Once the listener assigns a socket, all work belongs to that group:
 
-Failure in any phase runs the launch-specific unwind path. Normal close first
-stops new admission, drains acquisitions and the ordered dispatcher, then drains
-propagators and completes configured durability barriers.
+1. The Netty event loop offers the message to the group's bounded queue.
+2. The endpoint decodes the message against the group's serving store only when
+   the connection is trusted; unverified values must already be complete.
+3. Protocol handlers deal with queries, values, DATA, challenges and application
+   extensions.
+4. The ingress filter admits or projects a complete value.
+5. The endpoint gives only `(path, completeValue)` to `NodeServer`.
+6. `NodeServer` performs the authoritative lattice merge and node-root
+   publication.
+7. The node schedules a non-blocking update for every attached group.
 
-## Inbound message pipeline
+`DATA` only materialises independently addressable cells in the selected serving
+store. It never merges a lattice root. `DATA_REQUEST` is scoped to the same
+store, so one group cannot expose another group's private or filtered cache.
 
-Every transport and full-duplex outbound client feeds the same ordered message
-pipeline:
+The correlated response to `LATTICE_VALUE` confirms the authoritative node
+merge and logical root publication. It does not wait for every propagation group
+to materialise or broadcast its view.
 
-1. **Bounded admission** — network event loops only offer to the bounded queue.
-2. **Capability selection** — the physical connection resolves to exactly one
-   propagator, or has no lattice capability.
-3. **Decode** — untrusted input is decoded storelessly. Trusted partial values
-   may acquire missing cells into the selected propagator's store.
-4. **Protocol dispatch** — query, value, data, challenge and application
-   messages follow separate handlers.
-5. **Merge boundary** — complete values pass ingress projection and the
-   path-specific lattice merge. Signed application ownership is checked here,
-   independently of transport trust.
-6. **Publication** — a changed authoritative root is synchronously announced by
-   the primary propagator; secondary views are then triggered.
-7. **Application notification** — an optional `InboundLatticeListener` observes
-   the accepted path and value. The transport attaches no meaning to either.
+## Publication pipeline
 
-`DATA` only stages independently addressable cells. It never merges or publishes
-a root. An untrusted connection may submit only a complete lattice value, so it
-cannot use missing-cell acquisition to write arbitrary cells into a store.
+Each group receives authoritative node snapshots independently. Its worker:
 
-## LatticeConnectionManager state
+1. reconciles the previous group view with the new node snapshot;
+2. applies the publication projection;
+3. announces the result into the group's serving store;
+4. updates the group's queryable announced cursor; and
+5. sends a bounded delta, or later a root sync, to its routes.
 
-The manager keeps four deliberately separate maps:
+The update queue may coalesce consecutive monotonic snapshots. The latest value
+must converge; there is no requirement for one network frame per application
+action. `nextAnnounce()` is the deterministic signal for callers that need to
+wait until a group has materialised its next served view.
 
-| State | Meaning |
-|---|---|
-| desired peers | Bounded node identities the manager should maintain; not a connection or trust assertion |
-| pending connections | Manager-owned sockets in challenge/response limbo |
-| active connections | Admitted manager-owned outbound clients |
-| upgraded inbound routes | Authenticated outbound capability over sockets physically owned by `NodeServer` |
+Attached groups never write the authoritative node store root. Their stores are
+serving and novelty boundaries. A separate persistent serving store is rebuilt
+from the node's authoritative value during launch.
 
-Broadcasts use active connections and upgraded inbound routes, once per remote
-identity. Closing the manager closes its own clients but only revokes upgraded
-capability on `NodeServer`-owned sockets.
+## Lifecycle and failure isolation
 
-`DesiredPeer` combines immutable dial metadata with private retry state. A
-discovery adapter may update transport metadata only with a newer revision.
-Application metadata such as node software, Point of Presence declarations and
-relay willingness stays in that application's directory; it is never copied into
-the connection manager.
+`NodeServer.launch()` performs these phases:
 
-## Application boundary
+1. freeze the node root-publication policy;
+2. restore and publish the authoritative node root;
+3. offer the initial value to each attached group independently;
+4. start every group independently;
+5. open the shared listener; and
+6. start node persistence maintenance.
 
-`NodeServer` has no built-in path constants and does not inspect a root's shape.
-It offers narrowly scoped integration points instead:
+There is no implicit/default group. A group that fails to materialise, start or
+receive a notification is logged and isolated; it cannot fail node publication
+or prevent another group from progressing.
 
-- `ALattice` and `LatticeContext` define validation and merge authority.
-- ingress and publication filters select complete values and stored views.
-- `InboundLatticeListener` observes a completed inbound merge.
-- `authenticateInboundRoute` starts transport possession proof for a key already
-  admitted by application policy.
-- the application-message handler receives complete extension messages without
-  giving them transport authority.
+Shutdown closes listener admission, asks every endpoint to drain, publishes the
+final authoritative root, drains each group and completes the node-store
+durability barrier. Each group cleanup is independent. Endpoint cleanup also
+continues after a timed-out acquisition so one stuck resource does not suppress
+the remaining cleanup steps.
 
-For P2P, `NodeDirectory` consumes these hooks: it recognises the node-registry
-path, validates NodeInfo, updates generic desired-peer transports and requests an
-inbound challenge. No reverse dependency from `convex-peer` to that schema is
-allowed.
+Failures of the node's own authoritative store or listener are still surfaced:
+those resources are the responsibility of `NodeServer`, not optional policy.
 
-## Naming guide
+## Naming
 
-- **desired** means the identity is admitted to the bounded reconnect set.
-- **pending** means a physical outbound connection exists but identity is not
-  yet admitted.
-- **active** means a manager-owned outbound client is admitted.
-- **assigned** means operator policy selected one inbound publication view.
-- **trusted** means live challenge/response proved possession of the expected
-  node key.
-- **upgraded** means an authenticated inbound socket was additionally installed
-  as an outbound route.
-- **owner-authorised** refers only to signed application data at lattice merge;
-  it is independent of all connection terms above.
+- **desired**: retained bounded intent to maintain a route to an identity.
+- **pending**: a manager-owned socket exists but admission is incomplete.
+- **assigned**: application policy selected one group for an inbound socket.
+- **trusted**: a live challenge proved possession of the expected transport key.
+- **upgraded**: an assigned inbound socket is also installed as an authenticated
+  outbound route.
+- **owner-authorised**: signed application data passed lattice validation; this
+  is independent of every transport term above.
 
 ## Extension rule
 
-New application protocols should compose the generic filters/listeners, enter
-through the complete-message application handler when needed, and use
-authenticated route APIs for outbound relay. They must not add application path
-constants, record parsers or discovery side effects inside `NodeServer`.
+Application protocols belong in application wrappers. Use ingress/publication
+filters, the post-merge listener, the extension-message handler and authenticated
+route APIs. Do not add application paths, record parsers, discovery side effects
+or connection policy to `NodeServer`.

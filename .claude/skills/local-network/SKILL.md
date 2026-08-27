@@ -60,16 +60,23 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
-`NodeServer` is the schema-independent CAD036 replication transport. It does not
-publish or interpret `NodeInfo`, inspect `:p2p` / `:social` paths, or implement
-discovery policy. `P2PNode` composes that transport; its `NodeDirectory` owns
+`NodeServer` is the schema-independent CAD036 authoritative lattice host. It
+owns merge, node-root persistence, the shared listener and isolated update
+notification, but does not publish or interpret `NodeInfo`, inspect `:p2p` /
+`:social` paths, or implement discovery policy. The calling application must
+construct and configure every `LatticePropagator` before attaching it; there is
+no implicit/default group. A zero-propagator node is a valid local persistent
+host. Each propagator owns its connection manager, transport identity, trust,
+bounded protocol endpoint, filters and serving store.
+
+`P2PNode` performs this composition; its `NodeDirectory` owns
 signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
 metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
 `P2PNode` also configures its node key explicitly as both its transport challenge
 identity and its signed `NodeInfo` owner. A generic `NodeServer` does not infer a
-transport key from `LatticeContext`; direct transport tests must call
-`setTransportKeyPair`. Social user DIDs and their account keys remain a separate
-application concern.
+transport key or propagator merge context from `LatticeContext`; direct tests
+must set these on the propagator itself before `addPropagator`. Social user DIDs
+and their account keys remain a separate application concern.
 
 For a small lattice network test:
 
@@ -91,6 +98,24 @@ For a small lattice network test:
 > inbound upgrade verifies both challenge signatures, a random nonce, responder and
 > challenger audiences, the fixed lattice-peer context and an admitted signed
 > NodeInfo. Desired peers and inbound connections are bounded by `NodeConfig`.
+
+For a direct `NodeServer` network test, the minimum composition is explicit:
+
+```java
+NodeConfig config = NodeConfig.localNetwork();
+NodeServer<V> node = new NodeServer<>(lattice, nodeStore, config);
+node.setMergeContext(nodeContext);
+LatticePropagator group = new LatticePropagator(
+    servingStore, lattice, value -> value, config);
+group.setMergeContext(groupContext);
+group.setTransportKeyPair(nodeKey);
+node.addPropagator(group);
+node.setInboundPropagatorSelector(connection -> group);
+node.launch();
+```
+
+Retain `group` and pass it to explicit pull/route APIs. Do not recover it from
+the node merely to treat the first group as a privileged "primary" group.
 
 1. Give each node its own store and key pair.
 2. Use `NodeConfig.localNetwork()`. The generic server binds port `0`; after it
@@ -129,15 +154,20 @@ For a small lattice network test:
    and need no application-root `sync()`. Include a wrong-key signature case before
    a valid message on the same ordered route when testing relay authentication.
 5. After an application write, call the root application's `sync()` to publish
-   the node's filtered root view.
+   the authoritative node root. This schedules each propagator independently;
+   its publication filter and serving-store materialisation run on that group's
+   worker.
    When batching several edits for one signed social owner, fork the
    `SocialUser`, apply its feed and follow actions, sync that fork once, then
    sync the application root. A `Social` fork is outside the owner boundary and
    therefore still signs each user edit inside the unpublished fork.
 6. Automatic gossip is fire-and-forget. To verify it without sleeping, capture
    `nextAnnounce()` before publishing and re-arm it until the expected application
-   state is present. The announce signals completed acquisition, merge and root
-   publication. Use an explicit `receivingServer.pull(connection).get(timeout)`
+   state is present. The announce signals that this propagation group has
+   materialised its served view after the authoritative merge and node-root
+   publication. `cursor.sync()` itself guarantees only the authoritative node
+   publication; do not assume it completed group fan-out. Use an explicit
+   `receivingServer.pull(group, connection).get(timeout)`
    only when the test is specifically about pull synchronisation. A ping only
    establishes transport ordering and does not prove acquisition is complete.
 7. Close nodes before closing their stores.

@@ -40,8 +40,9 @@ import convex.node.NodeServer;
  * NodeInfo update has been accepted by the lattice.</p>
  *
  * <p>It deliberately does not open sockets itself, mark connections trusted or
- * merge lattice values. Those remain connection-manager and NodeServer concerns.
- * Conversely, neither transport class knows the registry path or NodeInfo schema.</p>
+ * merge lattice values. Socket admission and trust remain propagation-group
+ * concerns; authoritative merge remains a NodeServer concern. Conversely, none
+ * of those generic transport classes knows the registry path or NodeInfo schema.</p>
  *
  * <p>The in-memory index is bounded by {@link NodeConfig#getMaxDesiredPeers()} and
  * additive/update-only. Lattice absence is not interpreted as revocation because
@@ -52,6 +53,7 @@ final class NodeDirectory {
 	private static final Logger log=LoggerFactory.getLogger(NodeDirectory.class);
 
 	private final NodeServer<?> server;
+	private final LatticePropagator propagator;
 	private final AKeyPair keyPair;
 	private final AccountKey ownKey;
 	private final ConcurrentHashMap<AccountKey,NodeRecord> records=
@@ -60,8 +62,9 @@ final class NodeDirectory {
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
 
-	NodeDirectory(NodeServer<?> server,AKeyPair keyPair) {
+	NodeDirectory(NodeServer<?> server,LatticePropagator propagator,AKeyPair keyPair) {
 		this.server=server;
+		this.propagator=propagator;
 		this.keyPair=keyPair;
 		this.ownKey=(keyPair==null) ? null : keyPair.getAccountKey();
 	}
@@ -140,13 +143,13 @@ final class NodeDirectory {
 			? singleValidatedOwner(value) : null;
 		refresh();
 		if (connection!=null && claimedKey!=null) {
-			server.authenticateInboundRoute(connection,propagator,claimedKey);
+			propagator.authenticateInboundRoute(connection,claimedKey);
 		}
 	}
 
 	/**
 	 * Rebuilds the bounded validated index from the merged registry and translates
-	 * accepted transport metadata into every configured publication view.
+	 * accepted transport metadata into this application's propagation group.
 	 */
 	@SuppressWarnings("unchecked")
 	synchronized void refresh() {
@@ -166,10 +169,8 @@ final class NodeDirectory {
 					&& remoteRecordCount()>=limit) continue;
 			records.put(peerKey,updated);
 			if (peerKey.equals(ownKey)) continue;
-			for (LatticePropagator view:server.getPropagators()) {
-				view.getConnectionManager().updateDiscoveredPeer(
-					peerKey,updated.transports(),updated.timestamp());
-			}
+			propagator.getConnectionManager().updateDiscoveredPeer(
+				peerKey,updated.transports(),updated.timestamp());
 		}
 	}
 

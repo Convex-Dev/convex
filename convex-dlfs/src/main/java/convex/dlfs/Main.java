@@ -21,6 +21,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeServer;
+import convex.node.LatticePropagator;
 
 /**
  * Standalone entry point demonstrating a complete NodeServer-hosted DLFS stack.
@@ -63,9 +64,15 @@ public final class Main {
 		KeyedLattice root=createRoot(regionPath);
 		NodeServer<Index<Keyword,ACell>> node=
 			new NodeServer<>(root,store,config.getNodeConfig());
-		node.setMergeContext(LatticeContext.create(null,keyPair));
+		LatticeContext context=LatticeContext.create(null,keyPair);
+		node.setMergeContext(context);
+		LatticePropagator propagator=new LatticePropagator(
+			store,root,value -> value,config.getNodeConfig());
+		propagator.setMergeContext(context);
+		propagator.setTransportKeyPair(keyPair);
+		node.addPropagator(propagator);
 		if (config.isPublicLatticeInbound()) {
-			node.setInboundPropagatorSelector(connection->node.getPropagator());
+			node.setInboundPropagatorSelector(connection->propagator);
 		}
 		try {
 			node.launch();
@@ -75,7 +82,7 @@ public final class Main {
 		}
 		for (DLFSConfig.BootstrapPeer peer:config.getBootstrapPeers()) {
 			if (!keyPair.getAccountKey().equals(peer.key())) {
-				node.getPropagator().getConnectionManager().addPeer(peer.key(),peer.address());
+				propagator.getConnectionManager().addPeer(peer.key(),peer.address());
 			}
 		}
 
@@ -133,7 +140,7 @@ public final class Main {
 		System.out.println("DLFS drive: http://"+config.getHTTPBindHost()+":"+server.getPort()+
 			"/dlfs/"+driveName+"/");
 		System.out.println("Lattice node port: "+node.getPort()+
-			(config.isPublicLatticeInbound()?" (public primary view)":" (inbound denied)"));
+			(config.isPublicLatticeInbound()?" (public propagation view)":" (inbound denied)"));
 		System.out.println("Bootstrap peers: "+config.getBootstrapPeers().size());
 		System.out.println("Store: "+config.getStorePath());
 		System.out.println("Press Ctrl+C to stop.");

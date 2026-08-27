@@ -52,7 +52,8 @@ import convex.peer.AConnectionManager;
  *       verification limbo.</li>
  *   <li>Active connections are admitted manager-owned outbound clients.</li>
  *   <li>Upgraded inbound routes are authenticated sockets physically owned by
- *       {@link NodeServer}; this manager owns only their outbound capability.</li>
+ *       the shared listener and assigned endpoint; this manager owns only their
+ *       outbound capability.</li>
  * </ol>
  *
  * <p>The {@code addPeer} overloads all create or retain desired-peer intent.
@@ -125,7 +126,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Physically inbound connections explicitly upgraded to authenticated outbound
-	 * propagation routes. They remain owned by NodeServer and are never closed here.
+	 * propagation routes. They remain owned by the listener/endpoint lifecycle and
+	 * are never closed here.
 	 */
 	private final ConcurrentHashMap<AccountKey, AConnection> upgradedInboundRoutes =
 		new ConcurrentHashMap<>();
@@ -188,7 +190,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		this.keyPair = keyPair;
 	}
 
-	/** Configures the hard desired-peer cap. Existing entries may not be truncated. */
+	/**
+	 * Configures the hard desired-peer cap. Existing entries are not truncated.
+	 *
+	 * @param maxDesiredPeers maximum retained peer identities
+	 */
 	public void setMaxDesiredPeers(int maxDesiredPeers) {
 		if (maxDesiredPeers <= 0) throw new IllegalArgumentException(
 			"Maximum desired peers must be positive");
@@ -199,15 +205,19 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
-	/** Returns the configured hard desired-peer cap. */
+	/**
+	 * Returns the configured hard desired-peer cap.
+	 *
+	 * @return maximum retained peer identities
+	 */
 	public int getMaxDesiredPeers() {
 		return maxDesiredPeers;
 	}
 
 	/**
-	 * Sets the NodeServer delivery hook for unsolicited messages arriving on an
-	 * authenticated manager-owned outbound client. The handler is installed only
-	 * at admission; verification-limbo connections cannot reach it.
+	 * Sets the owning propagation endpoint's delivery hook for unsolicited messages
+	 * arriving on an admitted manager-owned outbound client. The handler is installed
+	 * only at admission; verification-limbo connections cannot reach it.
 	 *
 	 * @param handler handler receiving the owning client and message, or null
 	 */
@@ -215,7 +225,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 		this.peerMessageHandler = handler;
 	}
 
-	/** Sets a non-blocking hook invoked after each peer is admitted. */
+	/**
+	 * Sets a non-blocking hook invoked after each manager-owned peer is admitted.
+	 * Handler failures are logged and do not undo admission.
+	 *
+	 * @param handler admission hook, or {@code null} for none
+	 */
 	public void setPeerAdmissionHandler(BiConsumer<AccountKey,Convex> handler) {
 		this.peerAdmissionHandler=handler;
 	}
@@ -225,6 +240,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Opening a socket or discovering routing metadata does not select the trusted
 	 * tier. Promotion occurs only after the live endpoint answers a challenge with
 	 * the AccountKey under which that Peer was registered.
+	 *
+	 * @param untrustedLimit maximum encoded bytes before verification
+	 * @param trustedLimit maximum encoded bytes after verification
 	 */
 	public void setInboundMessageLimits(int untrustedLimit, int trustedLimit) {
 		validateMessageLimit(untrustedLimit);
@@ -298,7 +316,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Revokes every logical route and closes only manager-owned physical clients.
-	 * Upgraded inbound sockets remain owned by {@link NodeServer}; clearing their
+	 * Upgraded inbound sockets remain owned by the propagator listener; clearing their
 	 * map entries removes this manager's outbound capability without closing them.
 	 */
 	@Override
@@ -313,8 +331,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 			connectionWaiters.clear();
 			routeWaiters = new ArrayList<>(upgradedRouteWaiters.values());
 			upgradedRouteWaiters.clear();
-			// NodeServer owns these physical inbound connections. Closing this manager
-			// revokes only their logical outbound propagation capability.
+			// The listener/endpoint owns these physical inbound connections. Closing
+			// this manager revokes only their logical outbound capability.
 			upgradedInboundRoutes.clear();
 			super.closeAllConnections();
 		}
@@ -339,7 +357,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * {@link #updateDiscoveredPeer(AccountKey, AVector, long)}) and connect
 	 * when transport info becomes available.
 	 *
-	 * @param peerKey AccountKey of the peer to connect to
+	 * @param peerKey key of the peer to connect to
 	 */
 	public void addPeer(AccountKey peerKey) {
 		if (peerKey == null) {
@@ -357,8 +375,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Declares intent to connect to a peer at a known address.
 	 *
-	 * @param peerKey AccountKey of the peer
-	 * @param address Network address to connect to
+	 * @param peerKey key of the peer
+	 * @param address network address to connect to
 	 */
 	public void addPeer(AccountKey peerKey, InetSocketAddress address) {
 		if (peerKey == null || address == null) {
@@ -456,6 +474,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 *
 	 * @param connection authenticated inbound physical connection
 	 * @return the upgraded connection
+	 * @throws IllegalArgumentException if {@code connection} is {@code null}
+	 * @throws IllegalStateException if the connection is closed
 	 * @throws SecurityException if authentication or desired-peer admission is absent
 	 */
 	public AConnection upgradeInboundConnection(AConnection connection) {
@@ -479,7 +499,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return connection;
 	}
 
-	/** Returns the live upgraded inbound route for a peer, or null. */
+	/**
+	 * Returns the live upgraded inbound route for a peer.
+	 *
+	 * @param peerKey remote node key
+	 * @return upgraded route, or {@code null} if none is live
+	 */
 	public AConnection getUpgradedInboundConnection(AccountKey peerKey) {
 		if (peerKey == null) return null;
 		AConnection connection = upgradedInboundRoutes.get(peerKey);
@@ -491,7 +516,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return connection;
 	}
 
-	/** Returns true only for a live inbound connection promoted after authentication. */
+	/**
+	 * Returns whether an inbound connection is live and promoted after authentication.
+	 *
+	 * @param peerKey remote node key
+	 * @return {@code true} if a promoted route is live
+	 */
 	public boolean hasUpgradedInboundConnection(AccountKey peerKey) {
 		return getUpgradedInboundConnection(peerKey) != null;
 	}
@@ -500,6 +530,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * Waits for the explicit authentication-driven upgrade of an inbound connection.
 	 * Unlike {@link #whenConnected(AccountKey)}, this never completes for an ordinary
 	 * untrusted inbound socket or for a manager-owned outbound client.
+	 *
+	 * @param peerKey remote node key
+	 * @return future completing with the upgraded route
 	 */
 	public CompletableFuture<AConnection> whenInboundConnectionUpgraded(AccountKey peerKey) {
 		if (peerKey == null) {
@@ -518,7 +551,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return waiter;
 	}
 
-	/** Revokes an upgraded route without closing its NodeServer-owned connection. */
+	/**
+	 * Revokes an upgraded route without closing its listener-owned connection.
+	 *
+	 * @param connection listener-owned connection whose route is revoked
+	 */
 	public void removeUpgradedInboundConnection(AConnection connection) {
 		if (connection == null) return;
 		upgradedInboundRoutes.entrySet().removeIf(entry -> entry.getValue() == connection);
@@ -528,11 +565,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== Manager-owned Outbound Admission ==========
 
 	/**
-	 * Registers a live connection to a peer.
+	 * Submits an existing live client for outbound admission.
 	 *
-	 * @param peerKey AccountKey of the peer
-	 * @param convex Live connection to the peer
-	 * @return Future completed when the connection is admitted, or exceptionally
+	 * @param peerKey expected remote node key
+	 * @param convex live client to admit
+	 * @return future completed when the connection is admitted, or exceptionally
 	 *         when identity verification fails
 	 */
 	public CompletableFuture<Convex> addPeer(AccountKey peerKey, Convex convex) {
@@ -705,7 +742,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Removes a peer from both the desired set and active connections.
 	 *
-	 * @param peerKey AccountKey of the peer to remove
+	 * @param peerKey key of the peer to remove
 	 */
 	public void removePeer(AccountKey peerKey) {
 		if (peerKey == null) return;
@@ -741,9 +778,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== Desired Peer Management ==========
 
 	/**
-	 * Gets a defensive copy of the desired peers map.
+	 * Returns a defensive copy of the desired-peer map.
 	 *
-	 * @return Map of AccountKey to DesiredPeer
+	 * @return map from remote node key to connection intent
 	 */
 	public Map<AccountKey, DesiredPeer> getDesiredPeers() {
 		return new HashMap<>(desiredPeers);
@@ -765,8 +802,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * @param peerKey expected remote node key
 	 * @param transports ordered transport URIs, possibly empty but not null
 	 * @param revision discovery-source revision used to reject stale replacement
-	 * @return true if the peer is present after the operation, false if the bound
-	 *         rejected a new peer or the arguments are invalid
+	 * @return {@code true} if the peer is present after the operation; {@code false}
+	 *         if the cap rejected a new peer or the arguments are invalid
 	 */
 	public boolean updateDiscoveredPeer(
 			AccountKey peerKey,AVector<AString> transports,long revision) {
@@ -795,18 +832,18 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== Accessors ==========
 
 	/**
-	 * Gets the store used by this connection manager.
+	 * Returns the store exposed for admitted peer data resolution.
 	 *
-	 * @return The store (security boundary for peer data resolution)
+	 * @return serving store
 	 */
 	public AStore getStore() {
 		return store;
 	}
 
 	/**
-	 * Checks if the maintenance thread is running.
+	 * Returns whether the maintenance thread is running.
 	 *
-	 * @return true if running
+	 * @return {@code true} if running
 	 */
 	public boolean isRunning() {
 		return running;
@@ -815,17 +852,28 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Returns the number of open connections awaiting identity verification.
 	 * These connections are not visible to propagation and cannot serve store data.
+	 *
+	 * @return pending connection count
 	 */
 	public int getPendingConnectionCount() {
 		return pendingConnections.size();
 	}
 
-	/** Returns true when a peer connection is held in verification limbo. */
+	/**
+	 * Returns whether a peer connection is held in verification limbo.
+	 *
+	 * @param peerKey expected remote node key
+	 * @return {@code true} if verification is pending
+	 */
 	public boolean isVerificationPending(AccountKey peerKey) {
 		return peerKey != null && pendingConnections.containsKey(peerKey);
 	}
 
-	/** Returns whether this manager has any outbound propagation route. */
+	/**
+	 * Returns whether this manager has any outbound propagation route.
+	 *
+	 * @return {@code true} if at least one route is live
+	 */
 	public boolean hasPropagationRoutes() {
 		pruneDeadConnections();
 		pruneDeadUpgradedInboundConnections();
@@ -836,6 +884,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 	/**
 	 * Returns the number of peer identities reachable for outbound propagation.
 	 * A peer with both route forms is counted once.
+	 *
+	 * @return live propagation route count
 	 */
 	public int getPropagationRouteCount() {
 		pruneDeadConnections();
@@ -1022,7 +1072,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
-	/** Revokes upgraded capabilities whose NodeServer-owned socket is no longer valid. */
+	/** Revokes upgraded capabilities whose listener-owned socket is no longer valid. */
 	private void pruneDeadUpgradedInboundConnections() {
 		upgradedInboundRoutes.entrySet().removeIf(entry -> {
 			AConnection connection = entry.getValue();
@@ -1178,7 +1228,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return new DesiredPeer(peerKey,transports,true,revision);
 		}
 
-		/** Creates operator-supplied intent with one TCP dial target. */
+		/**
+		 * Creates operator-supplied intent with one TCP dial target.
+		 *
+		 * @param peerKey expected remote node key
+		 * @param address TCP dial target
+		 * @return desired-peer intent
+		 */
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static DesiredPeer create(AccountKey peerKey, InetSocketAddress address) {
 			String uri = "tcp://" + address.getHostString() + ":" + address.getPort();
@@ -1186,7 +1242,12 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return new DesiredPeer(peerKey,transports,false,System.currentTimeMillis());
 		}
 
-		/** Creates intent whose transport must arrive through later directory data. */
+		/**
+		 * Creates intent whose transport must arrive through later directory data.
+		 *
+		 * @param peerKey expected remote node key
+		 * @return desired-peer intent without a dial target
+		 */
 		public static DesiredPeer create(AccountKey peerKey) {
 			return new DesiredPeer(peerKey,null,false,System.currentTimeMillis());
 		}

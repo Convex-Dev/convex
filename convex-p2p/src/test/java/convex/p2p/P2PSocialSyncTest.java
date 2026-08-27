@@ -165,7 +165,7 @@ public class P2PSocialSyncTest {
 			daveNodeKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 		assertEquals(bobNodeKey.getAccountKey(),daveToBob.getVerifiedPeer());
 		assertEquals(daveNodeKey.getAccountKey(),bobToDave.getTrustedKey());
-		assertNull(bobNode.getNodeServer().getPropagator().getConnectionManager()
+		assertNull(bobNode.propagationGroup().getConnectionManager()
 			.getConnection(daveNodeKey.getAccountKey()));
 
 		awaitCondition(daveNode,() -> knowsAllInitialNodes(daveNode)).get(5,TimeUnit.SECONDS);
@@ -233,7 +233,7 @@ public class P2PSocialSyncTest {
 	/** Waits on real root-announcement signals, never elapsed time. */
 	private static CompletableFuture<Void> awaitCondition(P2PNode node,BooleanSupplier condition) {
 		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
-		CompletableFuture<ACell> next=node.getNodeServer().getPropagator().nextAnnounce();
+		CompletableFuture<ACell> next=node.propagationGroup().nextAnnounce();
 		if (condition.getAsBoolean()) return CompletableFuture.completedFuture(null);
 		return next.thenCompose(value -> awaitCondition(node,condition));
 	}

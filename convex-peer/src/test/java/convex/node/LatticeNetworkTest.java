@@ -51,6 +51,9 @@ public class LatticeNetworkTest {
 	 */
 	private List<NodeServer<?>> nodeServers;
 
+	/** Explicit propagation-policy group owned by the application for each node. */
+	private List<LatticePropagator> propagators;
+
 	/**
 	 * List of stores for each NodeServer.
 	 */
@@ -78,6 +81,7 @@ public class LatticeNetworkTest {
 
 		// Initialize lists
 		nodeServers = new ArrayList<>(NETWORK_SIZE);
+		propagators = new ArrayList<>(NETWORK_SIZE);
 		stores = new ArrayList<>(NETWORK_SIZE);
 
 		// Create and launch NodeServers
@@ -87,8 +91,13 @@ public class LatticeNetworkTest {
 
 			// Port 0 = OS-assigned free port, avoiding bind collisions on busy CI
 			// runners; peer wiring below uses getHostAddress() (actual port).
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
-			server.setInboundPropagatorSelector(connection -> server.getPropagator());
+			NodeConfig config=NodeConfig.port(0);
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, config);
+			LatticePropagator propagator=new LatticePropagator(
+				store,commonLattice,value -> value,config);
+			server.addPropagator(propagator);
+			server.setInboundPropagatorSelector(connection -> propagator);
+			propagators.add(propagator);
 			nodeServers.add(server);
 
 			server.launch();
@@ -99,7 +108,7 @@ public class LatticeNetworkTest {
 
 		// Establish Convex peer connections between all servers
 		for (int i = 0; i < NETWORK_SIZE; i++) {
-			NodeServer<?> server = nodeServers.get(i);
+			LatticePropagator propagator = propagators.get(i);
 
 			for (int j = 0; j < NETWORK_SIZE; j++) {
 				if (i == j)
@@ -112,7 +121,7 @@ public class LatticeNetworkTest {
 				try {
 					AccountKey peerKey = AKeyPair.generate().getAccountKey();
 					Convex peerConnection = ConvexRemote.connect(otherAddress);
-					server.getPropagator().addPeer(peerKey, peerConnection);
+					propagator.addPeer(peerKey, peerConnection);
 				} catch (Exception e) {
 					throw new RuntimeException(
 							"Failed to create Convex peer connection from server " + i + " to server " + j, e);
@@ -133,6 +142,7 @@ public class LatticeNetworkTest {
 			server.close();
 		}
 		nodeServers.clear();
+		propagators.clear();
 
 		for (AStore store : stores) {
 			store.close();
@@ -159,13 +169,14 @@ public class LatticeNetworkTest {
 		// For each node, sync with all its peers
 		for (int i = 0; i < NETWORK_SIZE; i++) {
 			NodeServer<?> server = nodeServers.get(i);
-			Set<Convex> peers = server.getPropagator().getPeers();
+			LatticePropagator propagator = propagators.get(i);
+			Set<Convex> peers = propagator.getPeers();
 			
 			// For each peer, create a pull future
 			for (Convex peer : peers) {
 				if (peer != null && peer.isConnected()) {
 					// Use the pull method which returns a CompletableFuture
-					CompletableFuture<?> pullFuture = server.pull(peer);
+					CompletableFuture<?> pullFuture = server.pull(propagator,peer);
 					allSyncFutures.add(pullFuture);
 				}
 			}
@@ -207,4 +218,3 @@ public class LatticeNetworkTest {
 		}
 	}
 }
-

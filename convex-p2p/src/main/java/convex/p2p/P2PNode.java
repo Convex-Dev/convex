@@ -40,6 +40,8 @@ import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.LatticeConnectionManager;
+import convex.node.LatticePropagator;
 import convex.social.Social;
 
 /**
@@ -87,6 +89,7 @@ public class P2PNode implements Closeable {
 	private static final Logger log = LoggerFactory.getLogger(P2PNode.class.getName());
 
 	private final NodeServer<Index<Keyword, ACell>> server;
+	private final LatticePropagator propagator;
 	private final P2PApplication application;
 	private final AKeyPair keyPair;
 	private final DIDKeyAuthorizer didAuthorizer;
@@ -99,20 +102,22 @@ public class P2PNode implements Closeable {
 	private boolean launchStarted;
 
 	@SuppressWarnings("unchecked")
-	private P2PNode(NodeServer<Index<Keyword, ACell>> server, AKeyPair keyPair,
+	private P2PNode(NodeServer<Index<Keyword, ACell>> server,
+			LatticePropagator propagator,AKeyPair keyPair,
 			DIDKeyAuthorizer didAuthorizer) {
 		this.server = server;
+		this.propagator=propagator;
 		this.application=P2PApplication.connect(server.getRootComponent());
 		this.keyPair = keyPair;
 		this.didAuthorizer=didAuthorizer;
 		this.socialPolicy=new SocialReplicationPolicy(server,didAuthorizer);
-		this.nodeDirectory=new NodeDirectory(server,keyPair);
-		this.pointOfPresence=new PointOfPresence(server,keyPair,nodeDirectory);
-		server.setIngressFilter(socialPolicy::filterIngress);
-		server.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
+		this.nodeDirectory=new NodeDirectory(server,propagator,keyPair);
+		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,nodeDirectory);
+		propagator.setIngressFilter(socialPolicy::filterIngress);
+		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
 			new ACell[0],value));
-		server.setApplicationMessageHandler(pointOfPresence::handle);
-		server.setInboundLatticeListener(nodeDirectory::onAcceptedInbound);
+		propagator.setApplicationMessageHandler(pointOfPresence::handle);
+		propagator.setInboundLatticeListener(nodeDirectory::onAcceptedInbound);
 	}
 
 	/**
@@ -158,11 +163,19 @@ public class P2PNode implements Closeable {
 		if (root == null) throw new IllegalArgumentException("Root lattice must not be null");
 		if (didAuthorizer == null) throw new IllegalArgumentException("DID authorizer must not be null");
 
-		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root, store, config);
-		server.setTransportKeyPair(keyPair);
-		server.setMergeContext(LatticeContext.create(
-			null,keyPair,didAuthorizer::verifiesOwner));
-		return new P2PNode(server,keyPair,didAuthorizer);
+		NodeConfig effectiveConfig=(config==null) ? NodeConfig.create() : config;
+		LatticeContext mergeContext=LatticeContext.create(
+			null,keyPair,didAuthorizer::verifiesOwner);
+		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root,store,effectiveConfig);
+		server.setMergeContext(mergeContext);
+		LatticeConnectionManager manager=new LatticeConnectionManager(store);
+		LatticePropagator propagator=new LatticePropagator(
+			store,manager,root,value -> value,effectiveConfig);
+		propagator.setMergeContext(mergeContext);
+		propagator.setTransportKeyPair(keyPair);
+		P2PNode node=new P2PNode(server,propagator,keyPair,didAuthorizer);
+		server.addPropagator(propagator);
+		return node;
 	}
 
 	/** Registers and opens this node's local {@code did:key} social user. */
@@ -216,8 +229,9 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Grants every inbound network connection the primary propagator view. Only
-	 * appropriate for an intentionally public node serving a single lattice view.
+	 * Grants every inbound network connection this application's public propagation
+	 * group. This is appropriate only for an intentionally public node serving a
+	 * single lattice view.
 	 * The connection remains untrusted unless the independent node-key challenge
 	 * succeeds, and the default social ingress filter remains in force.
 	 * Must be called before {@link #launch()}.
@@ -225,7 +239,7 @@ public class P2PNode implements Closeable {
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		server.setInboundPropagatorSelector(connection -> server.getPropagator());
+		server.setInboundPropagatorSelector(connection -> propagator);
 		return this;
 	}
 
@@ -307,14 +321,16 @@ public class P2PNode implements Closeable {
 		nodeDirectory.validateLaunchConfiguration();
 		requireNew("launch");
 		launchStarted=true;
+		var manager=propagator.getConnectionManager();
+		// Admission is propagation policy, so the application installs it before
+		// NodeServer starts the already-configured group.
+		manager.setPeerAdmissionHandler((peerKey,peer) -> initialisePeer(peer)
+			.exceptionally(error -> {
+				log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
+				return null;
+			}));
 		server.launch();
 		try {
-			var manager=server.getPropagator().getConnectionManager();
-			manager.setPeerAdmissionHandler((peerKey,peer) -> initialisePeer(peer)
-				.exceptionally(error -> {
-					log.debug("Unable to initialise admitted peer {}: {}",peerKey,error.getMessage());
-					return null;
-				}));
 			nodeDirectory.publishOwnRecord();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
 			Integer port = server.getPort();
@@ -364,7 +380,7 @@ public class P2PNode implements Closeable {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before connecting"));
 		}
-		return server.getPropagator().getConnectionManager().connectPeer(peerKey,address)
+		return propagator.getConnectionManager().connectPeer(peerKey,address)
 			.thenCompose(peer -> initialisePeer(peer).thenApply(ignored -> peer));
 	}
 
@@ -380,15 +396,15 @@ public class P2PNode implements Closeable {
 	}
 
 	private CompletableFuture<Void> pullBootstrap(Convex peer) {
-		return server.pullPath(peer,P2PLattice.KEY_P2P)
+		return server.pullPath(propagator,peer,P2PLattice.KEY_P2P)
 			.thenRun(nodeDirectory::refresh)
-			.thenCompose(ignored -> server.pullPath(peer,P2PLattice.KEY_ID))
+			.thenCompose(ignored -> server.pullPath(propagator,peer,P2PLattice.KEY_ID))
 			.thenCompose(ignored -> pullDesiredSocial(peer));
 	}
 
 	private CompletableFuture<Void> pullDesiredSocial(Convex peer) {
 		CompletableFuture<?>[] pulls=socialPolicy.desiredOwners().stream()
-			.map(did -> server.pullPath(peer,Social.KEY_SOCIAL,did)
+			.map(did -> server.pullPath(propagator,peer,Social.KEY_SOCIAL,did)
 				.thenRun(() -> socialPolicy.cacheCurrentOwner(did)))
 			.toArray(CompletableFuture[]::new);
 		return CompletableFuture.allOf(pulls);
@@ -403,11 +419,11 @@ public class P2PNode implements Closeable {
 	 * @return future completing with the admitted connection
 	 */
 	public CompletableFuture<Convex> whenConnected(AccountKey peerKey) {
-		if (server.getPropagator()==null) {
+		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before awaiting a peer"));
 		}
-		return server.getPropagator().getConnectionManager().whenConnected(peerKey);
+		return propagator.getConnectionManager().whenConnected(peerKey);
 	}
 
 	/**
@@ -422,11 +438,11 @@ public class P2PNode implements Closeable {
 	 * @return future completing with the authenticated upgraded route
 	 */
 	public CompletableFuture<AConnection> whenInboundConnectionUpgraded(AccountKey peerKey) {
-		if (server.getPropagator()==null) {
+		if (!server.isRunning()) {
 			return CompletableFuture.failedFuture(
 				new IllegalStateException("P2P node must be launched before awaiting a route upgrade"));
 		}
-		return server.getPropagator().getConnectionManager()
+		return propagator.getConnectionManager()
 			.whenInboundConnectionUpgraded(peerKey);
 	}
 
@@ -488,6 +504,11 @@ public class P2PNode implements Closeable {
 	 */
 	public NodeServer<Index<Keyword, ACell>> getNodeServer() {
 		return server;
+	}
+
+	/** Package test hook for this wrapper's application-owned propagation group. */
+	LatticePropagator propagationGroup() {
+		return propagator;
 	}
 
 	/**

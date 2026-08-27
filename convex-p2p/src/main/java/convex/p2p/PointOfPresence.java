@@ -34,6 +34,7 @@ import convex.core.message.AConnection;
 import convex.core.message.Message;
 import convex.core.message.MessageType;
 import convex.node.LatticeConnectionManager;
+import convex.node.LatticePropagator;
 import convex.node.NodeServer;
 import convex.p2p.NodeDirectory.NodeRecord;
 
@@ -71,6 +72,7 @@ final class PointOfPresence {
 	private static final SecureRandom RANDOM=new SecureRandom();
 
 	private final NodeServer<?> server;
+	private final LatticePropagator propagator;
 	private final NodeDirectory directory;
 	private final AKeyPair keyPair;
 	private final AccountKey ownKey;
@@ -91,8 +93,10 @@ final class PointOfPresence {
 			}
 		};
 
-	PointOfPresence(NodeServer<?> server,AKeyPair keyPair,NodeDirectory directory) {
+	PointOfPresence(NodeServer<?> server,LatticePropagator propagator,AKeyPair keyPair,
+			NodeDirectory directory) {
 		this.server=server;
+		this.propagator=propagator;
 		this.keyPair=keyPair;
 		this.directory=directory;
 		this.ownKey=(keyPair==null) ? null : keyPair.getAccountKey();
@@ -145,7 +149,7 @@ final class PointOfPresence {
 		return route(parsed,path,message);
 	}
 
-	/** Handles one complete UNKNOWN application message on NodeServer's dispatcher. */
+	/** Handles one complete UNKNOWN application message on this propagator's endpoint. */
 	boolean handle(Message message) {
 		try {
 			if (message.getMessageData().count()>MAX_MESSAGE_SIZE) return false;
@@ -251,7 +255,7 @@ final class PointOfPresence {
 	}
 
 	private boolean route(Envelope envelope,AVector<AccountKey> path,Message message) {
-		LatticeConnectionManager manager=server.getPropagator().getConnectionManager();
+		LatticeConnectionManager manager=propagator.getConnectionManager();
 		Set<AccountKey> routes=manager.getAuthenticatedRouteKeys();
 		routes.removeAll(toSet(path));
 		AccountKey destination=envelope.destination();

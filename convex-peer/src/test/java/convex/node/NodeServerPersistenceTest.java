@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,6 +102,27 @@ public class NodeServerPersistenceTest {
 	private AStore primaryStore;
 	private AStore backupStore;
 
+	/** Attaches the explicit identity-view group used by replication tests. */
+	private static LatticePropagator addPropagationGroup(NodeServer<?> node) {
+		LatticePropagator propagator=new LatticePropagator(
+			node.getStore(),node.getLattice(),value -> value,node.getConfig());
+		node.addPropagator(propagator);
+		return propagator;
+	}
+
+	/** Exposes the configured group on every inbound test connection. */
+	private static LatticePropagator serveInbound(NodeServer<?> node) {
+		LatticePropagator propagator=addPropagationGroup(node);
+		node.setInboundPropagatorSelector(connection -> propagator);
+		return propagator;
+	}
+
+	/** Returns the one application-owned group expected by a replication fixture. */
+	private static LatticePropagator propagationGroup(NodeServer<?> node) {
+		assertEquals(1,node.getPropagators().size());
+		return node.getPropagators().get(0);
+	}
+
 	@BeforeEach
 	void createStores() throws IOException {
 		sharedPrimaryStore = new HookedEtchStore("node-persistence-primary");
@@ -160,7 +182,7 @@ public class NodeServerPersistenceTest {
 		InetSocketAddress backupAddr = backup.getHostAddress();
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(backupAddr);
-		primary.getPropagator().addPeer(peerKey, conn);
+		propagationGroup(primary).addPeer(peerKey, conn);
 	}
 
 	/**
@@ -173,11 +195,24 @@ public class NodeServerPersistenceTest {
 	 */
 	private void syncBackupFromPrimary() throws Exception {
 		// Sync primary so propagator has the latest value for query responses.
-		// Synchronous publication guarantees announce + setRootData complete before
-		// sync() returns — the announced cursor is up to date without forcing storage.
+		ACell expected=primary.getCursor().get();
+		CompletableFuture<ACell> announced=nextAnnouncement(
+			propagationGroup(primary),expected,16);
 		primary.getCursor().sync();
+		announced.get(5,TimeUnit.SECONDS);
 
 		pullBackupFromPrimary();
+	}
+
+	/** Waits on propagation signals for one exact authoritative snapshot. */
+	private static CompletableFuture<ACell> nextAnnouncement(
+			LatticePropagator propagator,ACell expected,int remaining) {
+		return propagator.nextAnnounce().thenCompose(value -> {
+			if (expected.equals(value)) return CompletableFuture.completedFuture(value);
+			if (remaining<=1) return CompletableFuture.failedFuture(
+				new AssertionError("Expected propagation snapshot did not arrive"));
+			return nextAnnouncement(propagator,expected,remaining-1);
+		});
 	}
 
 	/** Pulls the currently announced primary snapshot without syncing it first. */
@@ -185,11 +220,12 @@ public class NodeServerPersistenceTest {
 		InetSocketAddress primaryAddr = primary.getHostAddress();
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(primaryAddr);
+		LatticePropagator group=propagationGroup(backup);
 		try {
-			backup.getPropagator().addPeer(peerKey, conn);
-			assertTrue(backup.pull(), "Pull should complete");
+			group.addPeer(peerKey, conn);
+			assertTrue(backup.pull(group), "Pull should complete");
 		} finally {
-			backup.getPropagator().removePeer(peerKey);
+			group.removePeer(peerKey);
 			conn.close();
 		}
 	}
@@ -231,7 +267,8 @@ public class NodeServerPersistenceTest {
 		// Launch primary and backup
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
-		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
+		serveInbound(primary);
+		addPropagationGroup(backup);
 		primary.launch();
 		backup.launch();
 
@@ -357,7 +394,7 @@ public class NodeServerPersistenceTest {
 
 		// Restart primary
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
-		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
+		serveInbound(primary);
 		primary.launch();
 
 		// Verify restored
@@ -366,6 +403,7 @@ public class NodeServerPersistenceTest {
 
 		// Launch backup and sync from restarted primary
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		addPropagationGroup(backup);
 		backup.launch();
 		pullBackupFromPrimary();
 
@@ -384,7 +422,8 @@ public class NodeServerPersistenceTest {
 		// Launch both
 		primary = new NodeServer<>(Lattice.ROOT, primaryStore);
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
-		primary.setInboundPropagatorSelector(connection -> primary.getPropagator());
+		serveInbound(primary);
+		addPropagationGroup(backup);
 		primary.launch();
 		backup.launch();
 
@@ -404,6 +443,7 @@ public class NodeServerPersistenceTest {
 
 		// Restart backup — should restore value 300 from its own store
 		backup = new NodeServer<>(Lattice.ROOT, backupStore);
+		addPropagationGroup(backup);
 		backup.launch();
 		assertEquals(CVMLong.create(300), readDataValue(backup, 300),
 			"Backup should restore value 300 from its own store");
@@ -500,7 +540,7 @@ public class NodeServerPersistenceTest {
 
 	/**
 	 * A quiescent sync installs the exact store-backed root returned by the
-	 * primary propagator. Repeating the sync must reuse that same identity.
+	 * authoritative node store. Repeating the sync must reuse that same identity.
 	 */
 	@Test
 	public void testSyncConvergesToStableStoreBackedIdentity() throws Exception {
@@ -691,7 +731,8 @@ public class NodeServerPersistenceTest {
 				NodeConfig.PORT,CVMLong.create(-1),
 				NodeConfig.PERSIST_INTERVAL,CVMLong.create(20)));
 		primary=new NodeServer<>(Lattice.ROOT,primaryStore,config);
-		primary.addPropagator(new LatticePropagator(primaryStore));
+		primary.addPropagator(new LatticePropagator(
+			primaryStore,Lattice.ROOT,value -> value,config));
 		primary.launch();
 		CountDownLatch checkpointed=new CountDownLatch(1);
 		sharedPrimaryStore.setFlushCompleteHook(checkpointed::countDown);
@@ -821,20 +862,16 @@ public class NodeServerPersistenceTest {
 	}
 
 	/**
-	 * Sole-writer invariant: pipelines through the propagator must not
-	 * interleave. Two threads calling {@code processSnapshot} concurrently
-	 * (caller's sync hook plus background pull/drain) must run their full
-	 * announce + setRootData + broadcast sequences sequentially, so an older
-	 * snapshot's setRootData cannot land after a newer snapshot's and demote
-	 * the root pointer.
+	 * Sole-writer invariant: authoritative persistence pipelines through
+	 * NodeServer must not interleave. Propagators no longer write the node root.
 	 *
 	 * <p>The test instruments {@code setRootData} to dwell inside the pipeline
 	 * and count concurrent pipeline activity. With the propagator's writeLock,
 	 * max-in-flight is exactly 1; without it, the dwell would let a second
-	 * pipeline enter while the first is still executing.
+	 * persistence call enter while the first is still executing.
 	 */
 	@Test
-	public void testProcessSnapshotPipelinesAreSerialised() throws Exception {
+	public void testAuthoritativePersistencePipelinesAreSerialised() throws Exception {
 		AtomicInteger inFlight = new AtomicInteger();
 		AtomicInteger maxInFlight = new AtomicInteger();
 		AtomicInteger rootWrites = new AtomicInteger();
@@ -862,8 +899,6 @@ public class NodeServerPersistenceTest {
 				inFlight.decrementAndGet();
 			}
 		});
-		LatticePropagator prop = primary.getPropagator();
-
 		AtomicReference<Throwable> failure = new AtomicReference<>();
 
 		// Two distinct snapshots (lattice-ordered) for the two threads.
@@ -873,12 +908,12 @@ public class NodeServerPersistenceTest {
 		final ACell v2 = primary.getCursor().get();
 
 		Thread t1 = new Thread(() -> {
-			try { prop.processSnapshot(v1); }
+			try { primary.persistSnapshot(v1); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-A");
 		Thread t2 = new Thread(() -> {
 			secondStarted.countDown();
-			try { prop.processSnapshot(v2); }
+			try { primary.persistSnapshot(v2); }
 			catch (Throwable e) { failure.compareAndSet(null, e); }
 		}, "snapshot-B");
 
@@ -894,8 +929,8 @@ public class NodeServerPersistenceTest {
 		t1.join();
 		t2.join();
 
-		assertNull(failure.get(), "processSnapshot must not throw");
+		assertNull(failure.get(),"authoritative persistence must not throw");
 		assertEquals(1, maxInFlight.get(),
-			"processSnapshot pipelines must not overlap (writeLock invariant)");
+			"authoritative persistence pipelines must not overlap");
 	}
 }

@@ -46,7 +46,8 @@ Key features:
   missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
-- **LatticePropagator** — manages gossip to connected peers (primary propagator at index 0)
+- **LatticePropagator** — an application-configured propagation policy group
+  owning its routes, serving store, filters and protocol endpoint
 
 `NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
 refresh discovery state or apply social/PoP policy. `P2PNode` composes those concerns;
@@ -271,7 +272,9 @@ A node uses multiple strategies to discover and maintain connections, in order:
 
 Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry advertises which regions each peer serves, enabling efficient gossip targeting.
 
-This is already natural in the `NodeServer` model — propagators only transmit deltas for paths that have changed, and nodes only merge values for lattice types they have registered.
+This is natural in the `NodeServer` model: the application attaches propagators
+with the appropriate filtered views, while a node only merges values governed by
+its configured lattice.
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -547,23 +550,16 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 
 ### 9.1 Architecture
 
-`NodeServer` remains the unified schema-independent transport for lattice propagation,
-including any future consensus region. P2P policy stays above it:
+`NodeServer` remains the schema-independent authoritative lattice host and shared
+listener. The calling application constructs its propagation groups, while P2P
+policy stays above both layers:
 
 ```
 P2PNode / NodeDirectory (P2P schema, discovery and policy)
-└── NodeServer (generic lattice merge + propagate)
-    ├── LatticePropagator[0] — primary (peers, gossip)
-    ├── LatticePropagator[1..N] — additional propagators
-    ├── BeliefPropagator — consensus-specific timing (gradual migration)
-    │   ├── Currently: BELIEF messages
-    │   └── Future: LATTICE_VALUE at [:convex <genesis> :peers]
-    ├── ConnectionManager — outbound peer connections
-    │   └── Manages Convex clients, stake-weighted selection from on-chain PeerStatus
-    └── Transport
-        ├── NettyServer (TCP :18888)        [EXISTS] — peer binary protocol
-        ├── NettyServer (WSS :443)          [PROPOSED] — client binary protocol
-        └── Javalin (HTTPS + MCP)           [EXISTS] — web/API/MCP
+├── NodeServer (authoritative merge, persistence, listener and notifications)
+└── LatticePropagator (application-configured replication policy group)
+    ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)
+    └── LatticeConnectionManager (external routes and desired-peer bounds)
 ```
 
 ### 9.2 Message Routing

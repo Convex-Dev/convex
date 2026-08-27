@@ -5,6 +5,7 @@ import java.security.SecureRandom;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,13 +41,14 @@ final class LatticeInboundVerifier {
 			AccountKey claimedKey,
 			CompletableFuture<Message> future) {}
 
-	private final NodeServer<?> server;
+	/** Supplies the propagation group's transport identity at challenge time. */
+	private final Supplier<AKeyPair> keyPairSupplier;
 	private final SecureRandom random = new SecureRandom();
 	private final ConcurrentHashMap<AConnection, PendingVerification> active =
 		new ConcurrentHashMap<>();
 
-	LatticeInboundVerifier(NodeServer<?> server) {
-		this.server = server;
+	LatticeInboundVerifier(Supplier<AKeyPair> keyPairSupplier) {
+		this.keyPairSupplier = keyPairSupplier;
 	}
 
 	/** Starts at most one non-blocking authentication attempt per inbound connection. */
@@ -71,7 +73,7 @@ final class LatticeInboundVerifier {
 
 	private void verify(AConnection connection, PendingVerification pending) {
 		try {
-			AKeyPair keyPair = server.getTransportKeyPair();
+			AKeyPair keyPair = keyPairSupplier.get();
 			if (keyPair == null) return;
 
 			Hash token = Blob.createRandom(random, 16).getHash();
@@ -113,7 +115,7 @@ final class LatticeInboundVerifier {
 		}
 	}
 
-	/** Routes a correlated RESULT from the NodeServer dispatcher to its verifier. */
+	/** Routes a correlated RESULT from the owning propagator endpoint. */
 	boolean handleResult(Message message) {
 		if (active.isEmpty()) return false;
 		AConnection connection = message.getConnection();
@@ -129,7 +131,7 @@ final class LatticeInboundVerifier {
 		return true;
 	}
 
-	/** Cancels verification state when NodeServer observes physical disconnect. */
+	/** Cancels verification state when the propagator observes physical disconnect. */
 	void forget(AConnection connection) {
 		PendingVerification pending = active.remove(connection);
 		if (pending != null) {
@@ -138,7 +140,7 @@ final class LatticeInboundVerifier {
 		}
 	}
 
-	/** Cancels every pending attempt during NodeServer shutdown. */
+	/** Cancels every pending attempt during propagator shutdown. */
 	void close() {
 		for (AConnection connection : active.keySet()) forget(connection);
 	}

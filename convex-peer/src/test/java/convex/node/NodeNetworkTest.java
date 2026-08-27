@@ -57,6 +57,9 @@ public class NodeNetworkTest {
 	 * List of NodeServer instances in the network
 	 */
 	private List<NodeServer<?>> nodeServers;
+
+	/** Explicit propagation-policy group owned by the application for each node. */
+	private List<LatticePropagator> propagators;
 	
 	/**
 	 * List of stores for each NodeServer
@@ -84,6 +87,7 @@ public class NodeNetworkTest {
 		
 		// Initialize lists
 		nodeServers = new ArrayList<>(NETWORK_SIZE);
+		propagators = new ArrayList<>(NETWORK_SIZE);
 		stores = new ArrayList<>(NETWORK_SIZE);
 		
 		// Create and launch three NodeServers
@@ -95,8 +99,13 @@ public class NodeNetworkTest {
 			// Create NodeServer with the common lattice. Port 0 = OS-assigned free
 			// port, avoiding bind collisions on busy CI runners; peer wiring below
 			// uses getHostAddress() which reflects the actual port.
-			NodeServer<?> server = new NodeServer<>(commonLattice, store, NodeConfig.port(0));
-			server.setInboundPropagatorSelector(connection -> server.getPropagator());
+			NodeConfig config=NodeConfig.port(0);
+			NodeServer<?> server = new NodeServer<>(commonLattice, store, config);
+			LatticePropagator propagator=new LatticePropagator(
+				store,commonLattice,value -> value,config);
+			server.addPropagator(propagator);
+			server.setInboundPropagatorSelector(connection -> propagator);
+			propagators.add(propagator);
 			nodeServers.add(server);
 			
 			// Launch the server
@@ -110,7 +119,7 @@ public class NodeNetworkTest {
 		// Set up peer connections: make all servers peers of each other
 		// Create Convex connections between all servers
 		for (int i = 0; i < NETWORK_SIZE; i++) {
-			NodeServer<?> server = nodeServers.get(i);
+			LatticePropagator propagator = propagators.get(i);
 			
 			// Add all other servers as peers using Convex connections
 			for (int j = 0; j < NETWORK_SIZE; j++) {
@@ -120,7 +129,7 @@ public class NodeNetworkTest {
 					try {
 						Convex peerConnection = ConvexRemote.connect(otherAddress);
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
-						server.getPropagator().addPeer(peerKey, peerConnection);
+						propagator.addPeer(peerKey, peerConnection);
 					} catch (Exception e) {
 						throw new RuntimeException("Failed to create peer connection from server " + i + " to server " + j, e);
 					}
@@ -141,6 +150,7 @@ public class NodeNetworkTest {
 			server.close();
 		}
 		nodeServers.clear();
+		propagators.clear();
 		
 		// Close all stores
 		for (AStore store : stores) {
@@ -234,7 +244,7 @@ public class NodeNetworkTest {
 		// Peer connections should already be established by setUpNetwork
 		
 		// Call sync on the last server to sync with server 0
-		assertTrue(lastServer.pull(), "Pull should succeed");
+		assertTrue(lastServer.pull(propagators.get(NETWORK_SIZE - 1)), "Pull should succeed");
 		
 		// Verify the last server has the new data value at [:data valueHash] path via LATTICE_QUERY
 		InetSocketAddress lastServerAddress = lastServer.getHostAddress();
@@ -266,4 +276,3 @@ public class NodeNetworkTest {
 		}
 	}
 }
-

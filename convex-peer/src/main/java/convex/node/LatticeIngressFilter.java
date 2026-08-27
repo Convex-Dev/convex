@@ -8,5 +8,12 @@ import convex.core.data.ACell;
  */
 @FunctionalInterface
 public interface LatticeIngressFilter {
+	/**
+	 * Applies inbound admission policy to one complete value.
+	 *
+	 * @param path canonical path within the authoritative lattice; do not mutate
+	 * @param value complete inbound value
+	 * @return value to merge, or {@code null} to reject it
+	 */
 	ACell filter(ACell[] path, ACell value);
 }
