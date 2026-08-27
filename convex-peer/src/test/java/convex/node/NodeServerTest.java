@@ -28,7 +28,6 @@ import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
-import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.AccountKey;
 import convex.core.data.ACell;
@@ -62,9 +61,7 @@ import convex.core.store.MemoryStore;
 import convex.lattice.ALattice;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
-import convex.lattice.P2PLattice;
 import convex.lattice.cursor.ACursor;
-import convex.lattice.cursor.PathCursor;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MaxLattice;
 import convex.lattice.generic.SetLattice;
@@ -1079,140 +1076,6 @@ public class NodeServerTest {
 		}
 	}
 
-	// ===== P2P NodeInfo advertisement tests =====
-
-	/**
-	 * Test that a NodeServer with URL and signing key publishes NodeInfo
-	 * into the :p2p :nodes lattice on launch.
-	 */
-	@Test
-	public void testNodeInfoPublication() throws IOException, InterruptedException {
-		AKeyPair kp = AKeyPair.generate();
-
-		// Config with public URL
-		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.URL, Strings.create("tcp://peer.example.com:18888"),
-			NodeConfig.PORT, CVMLong.create(-1) // local-only, no network binding
-		));
-
-		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, cfg);
-		server.setMergeContext(LatticeContext.create(null, kp));
-
-		try {
-			server.launch();
-
-			// Read :p2p :nodes from cursor
-			@SuppressWarnings("unchecked")
-			AHashMap<ACell, SignedData<ACell>> nodes =
-				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
-					server.getCursor(),
-					new ACell[] { Keywords.P2P, Keywords.NODES }).get();
-
-			assertNotNull(nodes, ":p2p :nodes should be populated");
-
-			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
-			assertNotNull(info, "NodeInfo should exist for the server's key");
-			assertEquals(Strings.create("tcp://peer.example.com:18888"),
-				((AVector<?>) info.get(Keywords.TRANSPORTS)).get(0));
-			assertEquals(Strings.create("Convex Lattice Node"), info.get(Keywords.TYPE));
-			assertNotNull(info.get(Keywords.VERSION));
-			assertNotNull(info.get(Keywords.TIMESTAMP));
-		} finally {
-			server.close();
-		}
-	}
-
-	/** A local-network config publishes the OS-assigned listener port, never port zero. */
-	@Test
-	public void testLocalNetworkPublicationUsesBoundPort() throws IOException, InterruptedException {
-		AKeyPair kp = AKeyPair.generate();
-		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, NodeConfig.localNetwork());
-		server.setMergeContext(LatticeContext.create(null, kp));
-
-		try {
-			server.launch();
-			assertNotNull(server.getPort());
-			assertTrue(server.getPort() > 0);
-
-			@SuppressWarnings("unchecked")
-			AHashMap<ACell, SignedData<ACell>> nodes =
-				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
-					server.getCursor(),
-					new ACell[] { Keywords.P2P, Keywords.NODES }).get();
-			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
-			assertNotNull(info);
-			assertEquals(Strings.create("tcp://localhost:" + server.getPort()),
-				((AVector<?>) info.get(Keywords.TRANSPORTS)).get(0));
-		} finally {
-			server.close();
-		}
-	}
-
-	/**
-	 * A P2P-capable NodeServer without a URL publishes a non-dialable identity.
-	 */
-	@Test
-	public void testEmptyTransportPublicationWithoutURL() throws IOException, InterruptedException {
-		AKeyPair kp = AKeyPair.generate();
-
-		// No URL configured
-		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.PORT, CVMLong.create(-1)
-		));
-
-		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, cfg);
-		server.setMergeContext(LatticeContext.create(null, kp));
-
-		try {
-			server.launch();
-
-			@SuppressWarnings("unchecked")
-			AHashMap<ACell, SignedData<ACell>> nodes =
-				(AHashMap<ACell, SignedData<ACell>>) PathCursor.create(
-				server.getCursor(),
-				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
-
-			AHashMap<Keyword, ACell> info = P2PLattice.getNodeInfo(nodes, kp.getAccountKey());
-			assertNotNull(info);
-			assertEquals(Vectors.empty(), info.get(Keywords.TRANSPORTS),
-				"missing URL must be represented as an explicit empty transport vector");
-		} finally {
-			server.close();
-		}
-	}
-
-	/**
-	 * Test that a NodeServer without signing key does not publish NodeInfo.
-	 */
-	@Test
-	public void testNoPublicationWithoutKeyPair() throws IOException, InterruptedException {
-		// URL configured but no signing key (default EMPTY context)
-		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.URL, Strings.create("tcp://peer.example.com:18888"),
-			NodeConfig.PORT, CVMLong.create(-1)
-		));
-
-		NodeServer<Index<Keyword, ACell>> server =
-			new NodeServer<>(Lattice.ROOT, store, cfg);
-		// mergeContext stays LatticeContext.EMPTY — no signing key
-
-		try {
-			server.launch();
-
-			ACell nodes = PathCursor.create(
-				server.getCursor(),
-				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
-
-			assertTrue(nodes == null || (nodes instanceof AHashMap && ((AHashMap<?,?>) nodes).isEmpty()),
-				":p2p :nodes should be empty when no signing key is available");
-		} finally {
-			server.close();
-		}
-	}
-
 	// ===== #567: public URL validation =====
 
 	/**
@@ -1252,45 +1115,6 @@ public class NodeServerTest {
 		assertNull(NodeConfig.validatePublicURL("tcp://localhost:18888", true));
 		assertNull(NodeConfig.validatePublicURL("tcp://192.168.1.1:18888", true));
 		assertNotNull(NodeConfig.validatePublicURL("tcp://peer.example.com", true)); // still missing port
-	}
-
-	/**
-	 * launch() fails fast when a private URL is configured without the allowPrivateURL opt-out,
-	 * and succeeds (publishing) once the opt-out is set.
-	 */
-	@Test
-	public void testLaunchRejectsPrivateURL() throws IOException, InterruptedException {
-		AKeyPair kp = AKeyPair.generate();
-
-		NodeConfig badCfg = NodeConfig.create(Maps.of(
-			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
-			NodeConfig.PORT, CVMLong.create(-1)
-		));
-		NodeServer<Index<Keyword, ACell>> bad = new NodeServer<>(Lattice.ROOT, store, badCfg);
-		bad.setMergeContext(LatticeContext.create(null, kp));
-		try {
-			assertThrows(IllegalStateException.class, bad::launch);
-		} finally {
-			bad.close();
-		}
-
-		// With the opt-out, the same private URL launches and publishes
-		NodeConfig okCfg = NodeConfig.create(Maps.of(
-			NodeConfig.URL, Strings.create("tcp://localhost:18888"),
-			NodeConfig.ALLOW_PRIVATE_URL, convex.core.data.prim.CVMBool.TRUE,
-			NodeConfig.PORT, CVMLong.create(-1)
-		));
-		NodeServer<Index<Keyword, ACell>> ok = new NodeServer<>(Lattice.ROOT, store, okCfg);
-		ok.setMergeContext(LatticeContext.create(null, kp));
-		try {
-			ok.launch();
-			ACell nodes = PathCursor.create(
-				ok.getCursor(),
-				new ACell[] { Keywords.P2P, Keywords.NODES }).get();
-			assertNotNull(nodes, ":p2p :nodes should be populated when allowPrivateURL is set");
-		} finally {
-			ok.close();
-		}
 	}
 
 	/**
@@ -1478,12 +1302,10 @@ public class NodeServerTest {
 	@Test
 	public void testPublicationFailureAbortsLaunch() throws Exception {
 		FailingMemoryStore testStore = new FailingMemoryStore();
-		testStore.failOnRootWrite = 2; // initial seed succeeds; NodeInfo checkpoint fails
+		testStore.failOnRootWrite = 1; // generic initial root publication fails
 		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.URL, Strings.create("tcp://peer.example.com:18888"),
 			NodeConfig.PORT, CVMLong.ZERO));
 		NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(Lattice.ROOT, testStore, cfg);
-		node.setMergeContext(LatticeContext.create(null, AKeyPair.generate()));
 
 		try {
 			assertThrows(StoreException.class, node::launch);
@@ -2141,7 +1963,7 @@ public class NodeServerTest {
 			NodeConfig.MAX_TRUSTED_MESSAGE_SIZE, CVMLong.create(8 * 1024 * 1024)));
 
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKey));
+		maxNodeServer.setTransportKeyPair(serverKey);
 		maxNodeServer.launch();
 
 		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
@@ -2271,51 +2093,6 @@ public class NodeServerTest {
 		cm.removePeer(key2);
 	}
 
-	/**
-	 * Test updateDesiredPeers from NodeInfo-shaped data (simulating P2P lattice discovery).
-	 */
-	@Test
-	public void testUpdateDesiredPeersFromNodeInfo() throws Exception {
-		ALattice<AInteger> lattice = MaxLattice.create();
-		maxNodeServer = new NodeServer<>(lattice, store, NodeConfig.port(-1));
-		maxNodeServer.launch();
-
-		LatticeConnectionManager cm = maxNodeServer.getPropagator().getConnectionManager();
-
-		// Create a signed NodeInfo entry (simulating what P2PLattice produces)
-		AKeyPair peerKP = AKeyPair.generate();
-		AccountKey peerKey = peerKP.getAccountKey();
-		AccountKey ownKey = AKeyPair.generate().getAccountKey();
-
-		AHashMap<Keyword, ACell> nodeInfo = Maps.of(
-			Keywords.TRANSPORTS, Vectors.of(Strings.create("tcp://peer.example.com:18888")),
-			Keywords.TYPE, Strings.create("Convex Lattice Node"),
-			Keywords.VERSION, Strings.create("0.8.3"),
-			Keywords.TIMESTAMP, CVMLong.create(System.currentTimeMillis())
-		);
-
-		SignedData<ACell> signedInfo = peerKP.signData((ACell) nodeInfo);
-
-		@SuppressWarnings("unchecked")
-		AHashMap<ACell, SignedData<ACell>> nodesMap =
-			(AHashMap<ACell, SignedData<ACell>>) (AHashMap<?,?>) Maps.of(peerKey, signedInfo);
-
-		// Update desired peers
-		cm.updateDesiredPeers(nodesMap, ownKey);
-
-		// Verify
-		assertTrue(cm.getDesiredPeers().containsKey(peerKey),
-			"Peer from lattice should be in desired peers");
-		LatticeConnectionManager.DesiredPeer dp = cm.getDesiredPeers().get(peerKey);
-		assertNotNull(dp.transports, "Should have transports from NodeInfo");
-		assertEquals(Strings.create("Convex Lattice Node"), dp.type);
-		assertEquals(Strings.create("0.8.3"), dp.version);
-
-		// Own key should be skipped
-		assertFalse(cm.getDesiredPeers().containsKey(ownKey),
-			"Own key should not be in desired peers");
-	}
-
 	/** Discovery and explicit additions share one hard desired-peer bound. */
 	@Test
 	public void testDesiredPeerLimit() throws Exception {
@@ -2326,17 +2103,9 @@ public class NodeServerTest {
 		LatticeConnectionManager cm=maxNodeServer.getPropagator().getConnectionManager();
 		assertEquals(2,cm.getMaxDesiredPeers());
 
-		@SuppressWarnings("unchecked")
-		AHashMap<ACell,SignedData<ACell>> nodes=
-			(AHashMap<ACell,SignedData<ACell>>)(AHashMap<?,?>)Maps.empty();
 		for (int i=0; i<3; i++) {
-			AKeyPair kp=AKeyPair.generate();
-			AHashMap<Keyword,ACell> info=Maps.of(
-				Keywords.TIMESTAMP,CVMLong.create(i+1),
-				Keywords.TRANSPORTS,Vectors.empty());
-			nodes=nodes.assoc(kp.getAccountKey(),kp.signData((ACell)info));
+			cm.updateDiscoveredPeer(AKeyPair.generate().getAccountKey(),Vectors.empty(),i+1);
 		}
-		cm.updateDesiredPeers(nodes,null);
 		assertEquals(2,cm.getDesiredPeers().size());
 
 		CompletableFuture<Convex> rejected=cm.connectPeer(
@@ -2430,7 +2199,7 @@ public class NodeServerTest {
 
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.setTransportKeyPair(serverKP);
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
@@ -2458,7 +2227,7 @@ public class NodeServerTest {
 
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.setTransportKeyPair(serverKP);
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
@@ -2486,7 +2255,7 @@ public class NodeServerTest {
 
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.setTransportKeyPair(serverKP);
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
@@ -2504,15 +2273,19 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test that verifyPeer fails when the NodeServer has no signing key.
+	 * Test that an application signing key is not implicitly used as the transport
+	 * identity. Transport authentication must be configured explicitly.
 	 */
 	@Test
-	public void testChallengeResponseNoKey() throws Exception {
+	public void testChallengeResponseNoTransportKey() throws Exception {
+		AKeyPair applicationKP = AKeyPair.generate();
 		AKeyPair clientKP = AKeyPair.generate();
 
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
-		// No setMergeContext — default EMPTY context, no signing key
+		maxNodeServer.setMergeContext(LatticeContext.create(null, applicationKP));
+		// Deliberately no setTransportKeyPair: lattice signing authority must not
+		// leak into the connection-authentication role.
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();
@@ -2539,7 +2312,7 @@ public class NodeServerTest {
 
 		ALattice<AInteger> lattice = MaxLattice.create();
 		maxNodeServer = new NodeServer<>(lattice, store);
-		maxNodeServer.setMergeContext(LatticeContext.create(null, serverKP));
+		maxNodeServer.setTransportKeyPair(serverKP);
 		maxNodeServer.launch();
 
 		InetSocketAddress addr = maxNodeServer.getHostAddress();

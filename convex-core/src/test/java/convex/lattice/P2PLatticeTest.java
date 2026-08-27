@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -73,6 +74,20 @@ public class P2PLatticeTest {
 		assertNotNull(info.get(Keywords.TYPE));
 		assertNotNull(info.get(Keywords.VERSION));
 		assertNotNull(info.get(Keywords.TIMESTAMP));
+		assertEquals(Vectors.empty(),info.get(Keywords.POPS));
+		assertEquals(CVMBool.FALSE,info.get(Keywords.RELAY));
+	}
+
+	@Test
+	public void testNodeInfoPointsOfPresence() {
+		AccountKey first=AKeyPair.generate().getAccountKey();
+		AccountKey second=AKeyPair.generate().getAccountKey();
+		AHashMap<Keyword,ACell> info=P2PLattice.createNodeInfo(
+			Vectors.empty(),TEST_TYPE,Strings.create("0.8.3"),null,
+			Vectors.of(first,second),true,1000L);
+
+		assertEquals(Vectors.of(first,second),info.get(Keywords.POPS));
+		assertEquals(CVMBool.TRUE,info.get(Keywords.RELAY));
 	}
 
 	// ===== LWW merge =====

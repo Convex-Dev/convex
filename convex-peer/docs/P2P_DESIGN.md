@@ -21,6 +21,11 @@ The core design principle is **separation of the message protocol from the trans
 
 ## 2. Current Architecture [EXISTS]
 
+The implementation-level ownership, lifecycle and connection-state map for
+`NodeServer`, `LatticePropagator` and `LatticeConnectionManager` is maintained in
+[LATTICE_NETWORKING.md](LATTICE_NETWORKING.md). This proposal uses its terms
+`desired`, `pending`, `active`, `assigned`, `trusted` and `upgraded` precisely.
+
 ### 2.1 Lattice ROOT
 
 The global base lattice is defined by `Lattice.ROOT` (`KeyedLattice`). See [LATTICE_REGIONS.md](../../convex-core/docs/LATTICE_REGIONS.md) for the canonical region listing, types, and paths.
@@ -42,6 +47,11 @@ Key features:
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
 - **LatticePropagator** — manages gossip to connected peers (primary propagator at index 0)
+
+`NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
+refresh discovery state or apply social/PoP policy. `P2PNode` composes those concerns;
+its `NodeDirectory` translates validated `[:p2p :nodes]` records into the generic
+connection intent accepted by `LatticeConnectionManager`.
 
 ### 2.3 Consensus (Server + BeliefPropagator)
 
@@ -186,6 +196,8 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
                 "wss://peer.convex.world/ws"
                 "https://peer.convex.world"]
  :timestamp   1708000000000       ;; monotonic, milliseconds
+ :pops        [0xdef456...]        ;; node keys providing a return path
+ :relay       true                ;; willing to relay bounded signed messages
  :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
  :version     "0.8.3"             ;; protocol version
  :metadata    {...}}              ;; optional additional metadata
@@ -194,6 +206,9 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
 `:transports` may be an empty vector. That is an explicit, signed statement that
 the node is identifiable but not directly dialable, as for an outbound-only node
 behind NAT. Private or guessed addresses must not be advertised as public transports.
+`:pops` contains at most 16 unique remote node keys and `:relay` defaults to false
+when absent. These fields advertise routing intent; they do not authenticate or open
+a connection.
 
 #### Merge Function
 
@@ -469,9 +484,11 @@ CONNECTING → CONNECTED → DISCONNECTED
 For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
 desired, pending and admitted connections. A configured node key keeps a socket in
 capability-free limbo until challenge/response succeeds. Desired peers are populated
-from correctly owner-signed `[:p2p :nodes]` records, and callers can await admission
-without polling. Explicit and discovered desired peers share the configurable
-`maxDesiredPeers` cap (256 by default).
+through generic connection APIs; in the P2P application, `NodeDirectory` validates
+correctly owner-signed `[:p2p :nodes]` records and translates their transport fields.
+The connection manager itself never reads that lattice path or parses NodeInfo. Callers
+can await admission without polling. Explicit and discovered desired peers share the
+configurable `maxDesiredPeers` cap (256 by default).
 It also keeps authenticated inbound connections in a separate upgraded-route map.
 Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
 only when no live manager-owned outbound client already serves the same peer key.
@@ -490,7 +507,7 @@ Per message type:
 - **Queries**: Fail-fast. Idempotent — caller can re-issue.
 - **Lattice subscriptions**: Auto-resubscribe on reconnect.
 
-### 8.4 NAT traversal [PARTIAL]
+### 8.4 NAT traversal and Points of Presence [PARTIAL]
 
 The implemented first step supports an outbound-only leaf behind NAT:
 
@@ -501,12 +518,18 @@ The implemented first step supports an outbound-only leaf behind NAT:
 4. Both nodes send lattice deltas and missing-data requests over the one full-duplex
    connection. No reverse dial, STUN or hole punching is required.
 
-This is sufficient when the leaf can keep at least one connection to a public node.
-Public relay/rendezvous nodes are tracked in
-[issue #710](https://github.com/Convex-Dev/convex/issues/710): they should maintain
-bounded, authenticated subscriptions for outbound-only nodes, provide redundant
-routes, and forward opaque signed lattice values without becoming an integrity trust
-anchor.
+This is sufficient for lattice propagation when the leaf can keep at least one
+connection to a public node. The first Point of Presence layer is also implemented:
+a leaf advertises its PoP node keys in `:pops`, a willing node advertises `:relay true`,
+and the PoP forwards bounded point messages without replacing their end-to-end source
+signature. Private bodies use ECIES and outgoing relay hops use only authenticated
+node routes. See
+[Points of Presence](../../convex-p2p/docs/POINTS_OF_PRESENCE.md) for the current wire
+format, API and limits.
+
+Public relay deployment, discovery and operational policy remain tracked in
+[issue #710](https://github.com/Convex-Dev/convex/issues/710). A production relay
+service still needs redundant provider selection, abuse policy and monitoring.
 Direct communication between two NATed nodes may later add ICE/STUN candidate exchange
 and hole punching, with relay fallback still required for CGNAT and symmetric NAT.
 
@@ -520,30 +543,35 @@ If a peer advertises multiple transports in `[:p2p :nodes]`, `Convex.connect()` 
 
 On reconnect, if the current transport repeatedly fails, the next is tried.
 
-## 9. NodeServer as P2P Core [PROPOSED]
+## 9. Generic NodeServer beneath P2P [PROPOSED]
 
 ### 9.1 Architecture
 
-`NodeServer` becomes the unified core for all lattice propagation, including consensus:
+`NodeServer` remains the unified schema-independent transport for lattice propagation,
+including any future consensus region. P2P policy stays above it:
 
 ```
-NodeServer (lattice merge + propagate)
-├── LatticePropagator[0] — primary (peers, gossip)
-├── LatticePropagator[1..N] — additional propagators
-├── BeliefPropagator — consensus-specific timing (gradual migration)
-│   └── Currently: BELIEF messages
-│   └── Future: LATTICE_VALUE at [:convex <genesis> :peers]
-├── ConnectionManager — outbound peer connections
-│   └── Manages Convex clients, stake-weighted selection from on-chain PeerStatus
-└── Transport
-    ├── NettyServer (TCP :18888)           [EXISTS] — peer binary protocol
-    ├── NettyServer (WSS :443)             [PROPOSED] — client binary protocol
-    └── Javalin (HTTPS + MCP)              [EXISTS] — web/API/MCP
+P2PNode / NodeDirectory (P2P schema, discovery and policy)
+└── NodeServer (generic lattice merge + propagate)
+    ├── LatticePropagator[0] — primary (peers, gossip)
+    ├── LatticePropagator[1..N] — additional propagators
+    ├── BeliefPropagator — consensus-specific timing (gradual migration)
+    │   ├── Currently: BELIEF messages
+    │   └── Future: LATTICE_VALUE at [:convex <genesis> :peers]
+    ├── ConnectionManager — outbound peer connections
+    │   └── Manages Convex clients, stake-weighted selection from on-chain PeerStatus
+    └── Transport
+        ├── NettyServer (TCP :18888)        [EXISTS] — peer binary protocol
+        ├── NettyServer (WSS :443)          [PROPOSED] — client binary protocol
+        └── Javalin (HTTPS + MCP)           [EXISTS] — web/API/MCP
 ```
 
 ### 9.2 Message Routing
 
-Messages are currently split between `NodeServer` (lattice operations) and `Server` (consensus and client-facing). As more message types migrate to the lattice protocol, `NodeServer` will handle an increasing share.
+Messages are currently split between `NodeServer` (generic lattice operations) and
+`Server` (consensus and client-facing). As more message types migrate to the lattice
+protocol, `NodeServer` may transport an increasing share without acquiring knowledge of
+their lattice paths or record schemas.
 
 **NodeServer** handles lattice messages directly:
 

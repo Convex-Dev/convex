@@ -72,6 +72,8 @@ public class LatticePropagatorTest {
 		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(0));
 		AKeyPair nodeKey1=AKeyPair.generate();
 		AKeyPair nodeKey2=AKeyPair.generate();
+		server1.setTransportKeyPair(nodeKey1);
+		server2.setTransportKeyPair(nodeKey2);
 		server1.setMergeContext(LatticeContext.create(null,nodeKey1));
 		server2.setMergeContext(LatticeContext.create(null,nodeKey2));
 		// These propagation unit tests model routes after authentication. The
@@ -252,7 +254,9 @@ public class LatticePropagatorTest {
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		CompletableFuture<ACell> firstMerge=server2.getPropagator().nextAnnounce();
 		CompletableFuture<ACell> secondMerge=firstMerge.thenCompose(
-			ignored -> server2.getPropagator().nextAnnounce());
+			value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()))
+				? CompletableFuture.completedFuture(value)
+				: server2.getPropagator().nextAnnounce());
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
 		server1.getCursor().sync();

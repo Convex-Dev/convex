@@ -3,14 +3,15 @@ package convex.node;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 
 import org.slf4j.Logger;
@@ -20,17 +21,10 @@ import convex.api.AConvexConnected;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Keyword;
-import convex.core.data.SignedData;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
-import convex.core.cvm.Keywords;
-import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
@@ -41,27 +35,51 @@ import convex.net.IPUtils;
 import convex.peer.AConnectionManager;
 
 /**
- * Manages outbound peer connections for lattice propagation with identity-based
- * peer tracking and automatic reconnection.
+ * Maintains bounded connection intent and outbound routes for one
+ * {@link LatticePropagator}.
  *
- * <p>Peers are identified by {@link AccountKey} and tracked as {@link DesiredPeer}
- * entries that mirror the P2PLattice {@code NodeInfo} structure. The connection
- * manager maintains active connections to desired peers and automatically
- * reconnects with exponential backoff when connections drop.
+ * <p>This is a transport component. It does not read a lattice cursor or know
+ * the schema of any discovery application. A higher layer may translate its
+ * own validated discovery records into {@link #updateDiscoveredPeer} calls.</p>
  *
- * <p>The primary API is {@link #addPeer(AccountKey)} — declare intent to connect
- * and the manager handles lookup, connection, and reconnection. For cases where
- * a connection or address is already known, use {@link #addPeer(AccountKey, Convex)}
- * or {@link #addPeer(AccountKey, InetSocketAddress)}.
+ * <p>The manager owns four separate kinds of state. They must not be treated as
+ * interchangeable:</p>
+ *
+ * <ol>
+ *   <li>{@link DesiredPeer} entries are bounded connection <em>intent</em>, not
+ *       live sockets or trust assertions.</li>
+ *   <li>Pending connections are manager-owned outbound sockets held in identity
+ *       verification limbo.</li>
+ *   <li>Active connections are admitted manager-owned outbound clients.</li>
+ *   <li>Upgraded inbound routes are authenticated sockets physically owned by
+ *       {@link NodeServer}; this manager owns only their outbound capability.</li>
+ * </ol>
+ *
+ * <p>The {@code addPeer} overloads all create or retain desired-peer intent.
+ * {@link #addPeer(AccountKey)} waits for later discovery transport metadata,
+ * {@link #addPeer(AccountKey, InetSocketAddress)} supplies an operator transport,
+ * and {@link #addPeer(AccountKey, Convex)} begins admission of an already opened
+ * manager-owned client. {@link #connectPeer(AccountKey, InetSocketAddress)} is the
+ * deterministic connect-and-wait convenience API.</p>
  *
  * <p>When a key pair is configured, newly opened connections remain in a limbo set
  * until challenge/response proves the expected remote identity. Limbo connections
  * cannot participate in propagation and have no access to the manager's store. A
  * successful challenge atomically promotes the connection to the active set, grants
  * reverse DATA_REQUEST access and applies the trusted receive limit. Without a key
- * pair, connections are admitted unverified as an explicit local policy choice.
+ * pair, connections are admitted unverified as an explicit zero-trust transport
+ * policy; they do not appear in {@link #getAuthenticatedRouteKeys()}.</p>
  *
- * <p>Extends {@link AConnectionManager} for shared connection infrastructure.
+ * <p>Node-key admission protects routing and store-serving capabilities. It does
+ * not authorise application values: signed owner verification remains part of the
+ * lattice merge in accordance with CAD038.</p>
+ *
+ * <p><b>Threading.</b> Public calls, asynchronous challenge completions and the
+ * maintenance worker may race. Multi-map admission/removal transitions are
+ * serialised by one private lock; external futures, hooks and socket closes are
+ * completed outside that lock.</p>
+ *
+ * <p>Extends {@link AConnectionManager} for shared connection infrastructure.</p>
  *
  * @see DesiredPeer
  */
@@ -160,7 +178,9 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Sets the key pair used for challenge/response peer verification.
-	 * If set, the manager will attempt to verify peers on connection.
+	 * If set, subsequently admitted connections must verify the expected remote
+	 * node key. Changing this value is not retroactive: it neither upgrades nor
+	 * revokes clients which have already completed admission.
 	 *
 	 * @param keyPair Key pair for signing challenges, or null to disable verification
 	 */
@@ -202,7 +222,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	/**
 	 * Configures the two receive tiers for manager-owned outbound connections.
-	 * Opening a socket or discovering a signed NodeInfo does not select the trusted
+	 * Opening a socket or discovering routing metadata does not select the trusted
 	 * tier. Promotion occurs only after the live endpoint answers a challenge with
 	 * the AccountKey under which that Peer was registered.
 	 */
@@ -276,6 +296,11 @@ public class LatticeConnectionManager extends AConnectionManager {
 		log.debug("LatticeConnectionManager closed");
 	}
 
+	/**
+	 * Revokes every logical route and closes only manager-owned physical clients.
+	 * Upgraded inbound sockets remain owned by {@link NodeServer}; clearing their
+	 * map entries removes this manager's outbound capability without closing them.
+	 */
 	@Override
 	public void closeAllConnections() {
 		List<PendingConnection> pending;
@@ -305,12 +330,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 		}
 	}
 
-	// ========== Peer Management ==========
+	// ========== Desired Peer Intent ==========
 
 	/**
 	 * Declares intent to connect to a peer identified by AccountKey. The
 	 * connection manager will look up transport information from its known
-	 * desired peers (populated via {@link #updateDesiredPeers}) and connect
+	 * desired peers (which a discovery adapter may enrich via
+	 * {@link #updateDiscoveredPeer(AccountKey, AVector, long)}) and connect
 	 * when transport info becomes available.
 	 *
 	 * @param peerKey AccountKey of the peer to connect to
@@ -320,7 +346,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Attempted to add peer with null key");
 			return;
 		}
-		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey),false)) {
+		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey),false)) {
 			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
 			return;
 		}
@@ -339,7 +365,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			log.warn("Attempted to add peer with null key or address");
 			return;
 		}
-		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey,address),true)) {
+		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey,address),true)) {
 			log.warn("Ignoring desired peer {}: limit of {} reached",peerKey,maxDesiredPeers);
 			return;
 		}
@@ -362,7 +388,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 			return CompletableFuture.failedFuture(
 				new IllegalArgumentException("Peer key and address must not be null"));
 		}
-		if (!putDesiredPeer(peerKey,DesiredPeer.create(peerKey,address),true)) {
+		if (!registerDesiredPeerIntent(peerKey,DesiredPeer.create(peerKey,address),true)) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
 				"Desired peer limit of "+maxDesiredPeers+" reached"));
 		}
@@ -370,11 +396,18 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return whenConnected(peerKey);
 	}
 
-	private boolean putDesiredPeer(AccountKey peerKey, DesiredPeer desired, boolean replace) {
+	/** Adds bounded connection intent, optionally replacing only its dial metadata. */
+	private boolean registerDesiredPeerIntent(
+			AccountKey peerKey,DesiredPeer desired,boolean replace) {
 		synchronized (connectionLock) {
 			DesiredPeer existing=desiredPeers.get(peerKey);
 			if (existing!=null) {
-				if (replace) desiredPeers.put(peerKey,desired);
+				if (replace) {
+					// An operator-supplied address replaces only the dial target. Keep
+					// discovery revision metadata so stale discovery cannot overwrite it.
+					if (existing.discovered) desired=existing.withTransports(desired.transports);
+					desiredPeers.put(peerKey,desired);
+				}
 				return true;
 			}
 			if (desiredPeers.size()>=maxDesiredPeers) return false;
@@ -409,19 +442,21 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return waiter;
 	}
 
+	// ========== Authenticated Inbound Route Upgrade ==========
+
 	/**
 	 * Explicitly upgrades a physically inbound connection into an authenticated
 	 * outbound propagation route.
 	 *
 	 * <p>An operator-assigned inbound connection is not sufficient. The connection
 	 * must already carry a trusted key established by live challenge/response, and
-	 * that key must identify a desired peer learned from signed NodeInfo or explicit
+	 * that key must identify a desired peer learned from discovery or explicit
 	 * operator configuration. This method never authenticates or assigns trust
 	 * itself.</p>
 	 *
 	 * @param connection authenticated inbound physical connection
 	 * @return the upgraded connection
-	 * @throws SecurityException if authentication or NodeInfo admission is absent
+	 * @throws SecurityException if authentication or desired-peer admission is absent
 	 */
 	public AConnection upgradeInboundConnection(AConnection connection) {
 		if (connection == null) throw new IllegalArgumentException("Connection must not be null");
@@ -490,6 +525,8 @@ public class LatticeConnectionManager extends AConnectionManager {
 		maintenanceSignal.release();
 	}
 
+	// ========== Manager-owned Outbound Admission ==========
+
 	/**
 	 * Registers a live connection to a peer.
 	 *
@@ -508,16 +545,17 @@ public class LatticeConnectionManager extends AConnectionManager {
 		InetSocketAddress addr = convex.getHostAddress();
 		DesiredPeer desired=(addr!=null)
 			? DesiredPeer.create(peerKey,addr) : DesiredPeer.create(peerKey);
-		if (!putDesiredPeer(peerKey,desired,false)) {
+		if (!registerDesiredPeerIntent(peerKey,desired,false)) {
 			return CompletableFuture.failedFuture(new IllegalStateException(
 				"Desired peer limit of "+maxDesiredPeers+" reached"));
 		}
-		CompletableFuture<Convex> admission=beginAdmission(peerKey, convex);
+		CompletableFuture<Convex> admission=beginOutboundAdmission(peerKey, convex);
 		maintenanceSignal.release();
 		return admission;
 	}
 
-	private CompletableFuture<Convex> beginAdmission(AccountKey peerKey, Convex convex) {
+	/** Moves an opened manager-owned client through limbo into the active map. */
+	private CompletableFuture<Convex> beginOutboundAdmission(AccountKey peerKey, Convex convex) {
 		AccountKey verifiedKey = convex.getVerifiedPeer();
 		if (verifiedKey != null && !verifiedKey.equals(peerKey)) {
 			SecurityException failure = new SecurityException(
@@ -528,10 +566,10 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 		AKeyPair kp = this.keyPair;
 		if (verifiedKey != null || kp == null) {
-			return admitConnection(peerKey, convex, verifiedKey != null);
+			return installAdmittedOutbound(peerKey, convex, verifiedKey != null);
 		}
 
-		configureLimbo(convex);
+		restrictOutboundToLimbo(convex);
 		convex.setKeyPair(kp);
 		PendingConnection pending = new PendingConnection(convex);
 		PendingConnection replaced;
@@ -555,26 +593,28 @@ public class LatticeConnectionManager extends AConnectionManager {
 			verification.whenComplete((result, ex) -> {
 				try {
 					if (ex != null) {
-						failVerification(peerKey, pending, ex);
+						rejectPendingAdmission(peerKey, pending, ex);
 					} else if (result==null || !peerKey.equals(result)
 							|| convex.getVerifiedPeer()==null
 							|| !peerKey.equals(convex.getVerifiedPeer())) {
-						failVerification(peerKey, pending,
+						rejectPendingAdmission(peerKey, pending,
 							new SecurityException("Peer failed identity challenge for " + peerKey));
 					} else {
-						promoteVerified(peerKey, pending);
+						completeVerifiedAdmission(peerKey, pending);
 					}
 				} catch (Exception callbackFailure) {
-					failVerification(peerKey, pending, callbackFailure);
+					rejectPendingAdmission(peerKey, pending, callbackFailure);
 				}
 			});
 		} catch (Exception startFailure) {
-			failVerification(peerKey, pending, startFailure);
+			rejectPendingAdmission(peerKey, pending, startFailure);
 		}
 		return pending.admission;
 	}
 
-	private CompletableFuture<Convex> admitConnection(AccountKey peerKey, Convex convex, boolean trusted) {
+	/** Installs a client whose admission policy requires no further challenge. */
+	private CompletableFuture<Convex> installAdmittedOutbound(
+			AccountKey peerKey,Convex convex,boolean trusted) {
 		Convex replaced;
 		PendingConnection pending;
 		synchronized (connectionLock) {
@@ -582,7 +622,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				closeSilently(convex);
 				return CompletableFuture.failedFuture(new IllegalStateException("Peer was removed before admission"));
 			}
-			configureStoreAccess(convex);
+			grantOutboundCapabilities(convex);
 			configureReceiveLimit(convex, trusted);
 			replaced = connections.put(peerKey, convex);
 			pending = pendingConnections.remove(peerKey);
@@ -592,20 +632,22 @@ public class LatticeConnectionManager extends AConnectionManager {
 			pending.admission.completeExceptionally(new IllegalStateException("Connection replaced by admitted peer"));
 			closeSilently(pending.connection);
 		}
-		resetFailure(peerKey);
-		completeConnectionWaiter(peerKey,convex);
-		notifyAdmission(peerKey,convex);
+		resetRetryBackoff(peerKey);
+		completePeerWaiter(peerKey,convex);
+		notifyPeerAdmitted(peerKey,convex);
 		log.debug("Admitted {} connection to peer {} at {}", trusted ? "verified" : "unverified",
 			peerKey, convex.getHostAddress());
 		return CompletableFuture.completedFuture(convex);
 	}
 
-	private void completeConnectionWaiter(AccountKey peerKey, Convex convex) {
+	/** Completes the one-shot signal for the next admitted outbound client. */
+	private void completePeerWaiter(AccountKey peerKey, Convex convex) {
 		CompletableFuture<Convex> waiter=connectionWaiters.remove(peerKey);
 		if (waiter!=null) waiter.complete(convex);
 	}
 
-	private void notifyAdmission(AccountKey peerKey,Convex convex) {
+	/** Runs the optional post-admission hook without allowing it to undo admission. */
+	private void notifyPeerAdmitted(AccountKey peerKey,Convex convex) {
 		BiConsumer<AccountKey,Convex> handler=peerAdmissionHandler;
 		if (handler==null) return;
 		try {
@@ -620,7 +662,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	 * The explicit request handler is important: setting a client's local store alone
 	 * must never grant the remote endpoint read access to it.
 	 */
-	private void configureStoreAccess(Convex convex) {
+	private void grantOutboundCapabilities(Convex convex) {
 		convex.setStore(store);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setDataRequestHandler(this::handleDataRequest);
@@ -632,7 +674,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 	}
 
 	/** Revokes manager-owned capabilities while a connection awaits admission. */
-	private void configureLimbo(Convex convex) {
+	private void restrictOutboundToLimbo(Convex convex) {
 		configureReceiveLimit(convex, false);
 		if (convex instanceof AConvexConnected connected) {
 			connected.setDataRequestHandler(null);
@@ -707,54 +749,47 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return new HashMap<>(desiredPeers);
 	}
 
-	/** Returns whether signed NodeInfo or explicit operator configuration admits this peer. */
+	/** Returns whether discovery or explicit operator configuration admits this peer. */
 	boolean isDesiredPeer(AccountKey peerKey) {
 		return peerKey != null && desiredPeers.containsKey(peerKey);
 	}
 
 	/**
-	 * Updates the desired peer set from {@code [:p2p :nodes]} lattice data.
+	 * Adds or refreshes one peer translated by an external discovery adapter.
 	 *
-	 * @param nodesMap The merged OwnerLattice value at {@code [:p2p :nodes]}
-	 * @param ownKey This node's own AccountKey (skipped), or null
+	 * <p>The caller owns discovery validation and schema interpretation. This
+	 * transport layer accepts only the expected node key, ordered transport URIs
+	 * and a monotonically increasing revision. The operation is additive/update-only
+	 * and merely wakes maintenance; it never opens a socket on the caller's thread.</p>
+	 *
+	 * @param peerKey expected remote node key
+	 * @param transports ordered transport URIs, possibly empty but not null
+	 * @param revision discovery-source revision used to reject stale replacement
+	 * @return true if the peer is present after the operation, false if the bound
+	 *         rejected a new peer or the arguments are invalid
 	 */
-	@SuppressWarnings("unchecked")
-	public void updateDesiredPeers(AHashMap<ACell, SignedData<ACell>> nodesMap, AccountKey ownKey) {
-		if (nodesMap == null) return;
-		AtomicBoolean changed=new AtomicBoolean(false);
-
-		for (Map.Entry<ACell, SignedData<ACell>> entry : nodesMap.entrySet()) {
-			try {
-				AccountKey peerKey = RT.ensureAccountKey(entry.getKey());
-				if (peerKey == null || (ownKey!=null && peerKey.equals(ownKey))) continue;
-
-				SignedData<ACell> signed = entry.getValue();
-				if (signed==null || !peerKey.equals(signed.getAccountKey())
-						|| !signed.checkSignature()) continue;
-				if (!(signed.getValue() instanceof AHashMap<?,?> rawInfo)) continue;
-
-				AHashMap<Keyword, ACell> nodeInfo = (AHashMap<Keyword, ACell>) rawInfo;
-				DesiredPeer updated = DesiredPeer.fromNodeInfo(peerKey, nodeInfo);
-				if (updated == null) continue;
-				synchronized (connectionLock) {
-					DesiredPeer existing=desiredPeers.get(peerKey);
-					if (existing==null) {
-						if (desiredPeers.size()>=maxDesiredPeers) continue;
-						desiredPeers.put(peerKey,updated);
-						changed.set(true);
-					} else if (updated.timestamp > existing.timestamp) {
-						updated.failCount = existing.failCount;
-						updated.nextRetryTime = existing.nextRetryTime;
-						desiredPeers.put(peerKey,updated);
-						changed.set(true);
-					}
-				}
-			} catch (RuntimeException e) {
-				// One owner's malformed record must not suppress valid sibling entries.
-				log.debug("Ignoring malformed NodeInfo entry: {}",e.getMessage());
+	public boolean updateDiscoveredPeer(
+			AccountKey peerKey,AVector<AString> transports,long revision) {
+		if (peerKey==null || transports==null) return false;
+		for (long i=0; i<transports.count(); i++) {
+			if (transports.get(i)==null) return false;
+		}
+		boolean changed=false;
+		synchronized (connectionLock) {
+			DesiredPeer existing=desiredPeers.get(peerKey);
+			if (existing==null) {
+				if (desiredPeers.size()>=maxDesiredPeers) return false;
+				desiredPeers.put(peerKey,DesiredPeer.discovered(peerKey,transports,revision));
+				changed=true;
+			} else if (!existing.discovered || revision>existing.revision) {
+				DesiredPeer updated=DesiredPeer.discovered(peerKey,transports,revision);
+				updated.copyRetryState(existing);
+				desiredPeers.put(peerKey,updated);
+				changed=true;
 			}
 		}
-		if (changed.get()) maintenanceSignal.release();
+		if (changed) maintenanceSignal.release();
+		return true;
 	}
 
 	// ========== Accessors ==========
@@ -810,36 +845,76 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return keys.size();
 	}
 
+	/**
+	 * Returns the node keys currently reachable over routes that have proved the
+	 * remote key by challenge/response. This excludes configured, pending and
+	 * merely operator-assigned connections.
+	 *
+	 * @return defensive set of authenticated route identities
+	 */
+	public Set<AccountKey> getAuthenticatedRouteKeys() {
+		pruneDeadConnections();
+		pruneDeadUpgradedInboundConnections();
+		HashSet<AccountKey> keys=new HashSet<>();
+		for (Map.Entry<AccountKey,Convex> entry:connections.entrySet()) {
+			AccountKey key=entry.getKey();
+			Convex peer=entry.getValue();
+			if (peer!=null && peer.isConnected() && key.equals(peer.getVerifiedPeer())) {
+				keys.add(key);
+			}
+		}
+		for (Map.Entry<AccountKey,AConnection> entry:upgradedInboundRoutes.entrySet()) {
+			AccountKey key=entry.getKey();
+			AConnection route=getUpgradedInboundConnection(key);
+			if (route!=null) keys.add(key);
+		}
+		return keys;
+	}
+
+	/**
+	 * Non-blockingly sends one message to a specifically authenticated node route.
+	 * A manager-owned outbound connection is eligible only when its verified key
+	 * equals the requested peer; otherwise an independently upgraded inbound route
+	 * is tried.
+	 *
+	 * @param peerKey destination node key
+	 * @param message complete message to enqueue
+	 * @return true if an authenticated route accepted the message
+	 */
+	public boolean trySendAuthenticated(AccountKey peerKey,Message message) {
+		if (peerKey==null || message==null) return false;
+		Convex peer=getConnection(peerKey);
+		if (peer!=null && peerKey.equals(peer.getVerifiedPeer()) && peer.trySend(message)) {
+			return true;
+		}
+		AConnection route=getUpgradedInboundConnection(peerKey);
+		return route!=null && route.trySendMessage(message);
+	}
+
+	/** Broadcasts once per remote identity across both physical route forms. */
 	@Override
 	public void broadcast(Message message) {
 		super.broadcast(message);
-		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
-			if (getConnection(entry.getKey()) != null) continue;
-			AConnection route = getUpgradedInboundConnection(entry.getKey());
-			if (route != null) route.trySendMessage(message);
+		for (AConnection route : getSupplementalInboundRoutes()) {
+			route.trySendMessage(message);
 		}
 	}
 
+	/** Broadcasts a priority message once per remote identity. */
 	@Override
 	public int broadcastPriority(Message message) {
 		int accepted = super.broadcastPriority(message);
-		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
-			if (getConnection(entry.getKey()) != null) continue;
-			AConnection route = getUpgradedInboundConnection(entry.getKey());
-			if (route != null && route.trySendPriorityMessage(message)) accepted++;
+		for (AConnection route : getSupplementalInboundRoutes()) {
+			if (route.trySendPriorityMessage(message)) accepted++;
 		}
 		return accepted;
 	}
 
+	/** Sends a delta sequence with root fallback once per remote identity. */
 	@Override
 	public BroadcastResult broadcastSequence(List<Message> messages, Message fallback) {
 		BroadcastResult outbound = super.broadcastSequence(messages, fallback);
-		ArrayList<AConnection> routes = new ArrayList<>();
-		for (Map.Entry<AccountKey, AConnection> entry : upgradedInboundRoutes.entrySet()) {
-			if (getConnection(entry.getKey()) != null) continue;
-			AConnection route = getUpgradedInboundConnection(entry.getKey());
-			if (route != null) routes.add(route);
-		}
+		ArrayList<AConnection> routes = new ArrayList<>(getSupplementalInboundRoutes());
 		Utils.shuffle(routes);
 
 		int attempted = outbound.peers();
@@ -866,8 +941,24 @@ public class LatticeConnectionManager extends AConnectionManager {
 		return new BroadcastResult(attempted, complete, fallbackCount, dropped);
 	}
 
+	/**
+	 * Returns live upgraded-inbound routes which do not duplicate an active
+	 * manager-owned client for the same remote key. The manager-owned route wins so
+	 * every broadcast attempts at most one physical socket per identity.
+	 */
+	private List<AConnection> getSupplementalInboundRoutes() {
+		ArrayList<AConnection> routes=new ArrayList<>();
+		for (AccountKey peerKey:upgradedInboundRoutes.keySet()) {
+			if (getConnection(peerKey)!=null) continue;
+			AConnection route=getUpgradedInboundConnection(peerKey);
+			if (route!=null) routes.add(route);
+		}
+		return routes;
+	}
+
 	// ========== Maintenance Loop ==========
 
+	/** Runs reconnect maintenance on one virtual thread until {@link #close()}. */
 	private void maintenanceLoop() {
 		while (running) {
 			try {
@@ -905,7 +996,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 				if (connections.containsKey(peerKey) || pendingConnections.containsKey(peerKey)
 						|| upgradedInboundRoutes.containsKey(peerKey)) continue;
 			}
-			if (now < desired.nextRetryTime) continue;
+			if (!desired.isRetryDue(now)) continue;
 
 			InetSocketAddress target = resolveTransport(desired);
 			if (target == null) continue;
@@ -921,16 +1012,17 @@ public class LatticeConnectionManager extends AConnectionManager {
 						continue;
 					}
 				}
-				beginAdmission(peerKey, convex);
+				beginOutboundAdmission(peerKey, convex);
 				log.debug("Opened connection to peer {} at {}; awaiting admission", peerKey, target);
 			} catch (Exception e) {
-				recordFailure(desired, now);
+				recordRetryFailure(desired, now);
 				log.debug("Failed to connect to peer {} (attempt {}): {}",
-					peerKey, desired.failCount, e.getMessage());
+					peerKey, desired.getFailCount(), e.getMessage());
 			}
 		}
 	}
 
+	/** Revokes upgraded capabilities whose NodeServer-owned socket is no longer valid. */
 	private void pruneDeadUpgradedInboundConnections() {
 		upgradedInboundRoutes.entrySet().removeIf(entry -> {
 			AConnection connection = entry.getValue();
@@ -941,6 +1033,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Transport Resolution ==========
 
+	/** Returns the first supported TCP transport in one desired-node entry. */
 	static InetSocketAddress resolveTransport(DesiredPeer desired) {
 		AVector<AString> transports = desired.transports;
 		if (transports == null || transports.isEmpty()) return null;
@@ -964,6 +1057,7 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Backoff Calculation ==========
 
+	/** Calculates bounded exponential retry delay with full lower-half jitter. */
 	static long calculateBackoff(int failCount) {
 		long base = Math.min(MAX_BACKOFF_MS, INITIAL_BACKOFF_MS << Math.min(failCount - 1, 10));
 		long jitter = ThreadLocalRandom.current().nextLong(base / 2 + 1);
@@ -972,29 +1066,32 @@ public class LatticeConnectionManager extends AConnectionManager {
 
 	// ========== Verification ==========
 
-	private void promoteVerified(AccountKey peerKey, PendingConnection pending) {
+	/** Completes the limbo-to-active transition after the expected key was proved. */
+	private void completeVerifiedAdmission(AccountKey peerKey, PendingConnection pending) {
 		Convex replaced;
 		synchronized (connectionLock) {
 			if (pendingConnections.get(peerKey) != pending || !desiredPeers.containsKey(peerKey)
 					|| !pending.connection.isConnected()) {
-				failVerification(peerKey, pending,
+				rejectPendingAdmission(peerKey, pending,
 					new IllegalStateException("Verified connection is no longer eligible for admission"));
 				return;
 			}
-			configureStoreAccess(pending.connection);
+			grantOutboundCapabilities(pending.connection);
 			configureReceiveLimit(pending.connection, true);
 			replaced = connections.put(peerKey, pending.connection);
 			pendingConnections.remove(peerKey, pending);
 		}
 		if (replaced != null && replaced != pending.connection) closeSilently(replaced);
-		resetFailure(peerKey);
-		completeConnectionWaiter(peerKey,pending.connection);
-		notifyAdmission(peerKey,pending.connection);
+		resetRetryBackoff(peerKey);
+		completePeerWaiter(peerKey,pending.connection);
+		notifyPeerAdmitted(peerKey,pending.connection);
 		pending.admission.complete(pending.connection);
 		log.info("Verified and admitted peer {} at {}", peerKey, pending.connection.getHostAddress());
 	}
 
-	private void failVerification(AccountKey peerKey, PendingConnection pending, Throwable failure) {
+	/** Rejects one still-current limbo client and schedules its desired peer retry. */
+	private void rejectPendingAdmission(
+			AccountKey peerKey,PendingConnection pending,Throwable failure) {
 		boolean removed;
 		DesiredPeer desired;
 		synchronized (connectionLock) {
@@ -1004,36 +1101,34 @@ public class LatticeConnectionManager extends AConnectionManager {
 		if (!removed) return;
 		pending.admission.completeExceptionally(failure);
 		closeSilently(pending.connection);
-		if (desired != null) recordFailure(desired, System.currentTimeMillis());
+		if (desired != null) recordRetryFailure(desired, System.currentTimeMillis());
 		log.debug("Rejected peer {} after failed identity challenge: {}", peerKey, failure.getMessage());
 	}
 
+	/** Rejects limbo clients whose sockets closed before identity verification. */
 	private void pruneDeadPendingConnections() {
 		for (Map.Entry<AccountKey, PendingConnection> entry : pendingConnections.entrySet()) {
 			PendingConnection pending = entry.getValue();
 			if (!pending.connection.isConnected()) {
-				failVerification(entry.getKey(), pending,
+				rejectPendingAdmission(entry.getKey(), pending,
 					new IllegalStateException("Connection closed while awaiting identity verification"));
 			}
 		}
 	}
 
-	private void resetFailure(AccountKey peerKey) {
+	/** Clears retry state after successful admission. */
+	private void resetRetryBackoff(AccountKey peerKey) {
 		DesiredPeer desired = desiredPeers.get(peerKey);
 		if (desired == null) return;
-		synchronized (desired) {
-			desired.failCount = 0;
-			desired.nextRetryTime = 0;
-		}
+		desired.resetRetry();
 	}
 
-	private static void recordFailure(DesiredPeer desired, long now) {
-		synchronized (desired) {
-			desired.failCount++;
-			desired.nextRetryTime = now + calculateBackoff(desired.failCount);
-		}
+	/** Advances one desired peer's reconnect backoff after a dial/admission failure. */
+	private static void recordRetryFailure(DesiredPeer desired, long now) {
+		desired.recordFailure(now);
 	}
 
+	/** Manager-owned client and its caller-visible admission result while in limbo. */
 	private static final class PendingConnection {
 		final Convex connection;
 		final CompletableFuture<Convex> admission = new CompletableFuture<>();
@@ -1046,53 +1141,87 @@ public class LatticeConnectionManager extends AConnectionManager {
 	// ========== DesiredPeer ==========
 
 	/**
-	 * Describes a peer this node wants to maintain a connection to.
+	 * Bounded connection intent for one remote node identity.
+	 *
+	 * <p>Public fields are immutable transport metadata. Private mutable retry state
+	 * belongs to the maintenance loop and is preserved across newer discovery
+	 * revisions. Presence in this type is neither proof of identity nor proof that a
+	 * physical route currently exists.</p>
 	 */
 	public static class DesiredPeer {
 
+		/** Expected remote node key and map identity. */
 		public final AccountKey peerKey;
+		/** Ordered discovery or operator-supplied transport URIs. */
 		public final AVector<AString> transports;
-		public final AString type;
-		public final AString version;
-		public final long timestamp;
+		/** True when metadata came from an external discovery adapter. */
+		final boolean discovered;
+		/** Monotonic discovery revision, or local creation time for operator intent. */
+		public final long revision;
 
-		volatile int failCount = 0;
-		volatile long nextRetryTime = 0;
+		/** Consecutive dial or admission failures used only for reconnect scheduling. */
+		private int failCount = 0;
+		/** Earliest wall-clock time at which maintenance may retry this peer. */
+		private long nextRetryTime = 0;
 
-		private DesiredPeer(AccountKey peerKey, AVector<AString> transports,
-				AString type, AString version, long timestamp) {
+		private DesiredPeer(AccountKey peerKey,AVector<AString> transports,
+				boolean discovered,long revision) {
 			this.peerKey = peerKey;
 			this.transports = transports;
-			this.type = type;
-			this.version = version;
-			this.timestamp = timestamp;
+			this.discovered=discovered;
+			this.revision=revision;
 		}
 
-		@SuppressWarnings({"unchecked", "rawtypes"})
-		public static DesiredPeer fromNodeInfo(AccountKey peerKey, AHashMap<Keyword, ACell> nodeInfo) {
-			AVector<?> rawTransports = RT.ensureVector(nodeInfo.get(Keywords.TRANSPORTS));
-			if (rawTransports == null) return null;
-			for (long i=0; i<rawTransports.count(); i++) {
-				if (RT.ensureString(rawTransports.get(i)) == null) return null;
-			}
-			AVector<AString> transports = (AVector) rawTransports;
-			AString type = RT.ensureString(nodeInfo.get(Keywords.TYPE));
-			AString version = RT.ensureString(nodeInfo.get(Keywords.VERSION));
-			CVMLong ts = RT.ensureLong(nodeInfo.get(Keywords.TIMESTAMP));
-			if (ts == null) return null;
-			long timestamp = ts.longValue();
-			return new DesiredPeer(peerKey, transports, type, version, timestamp);
+		/** Creates intent translated by an external discovery adapter. */
+		private static DesiredPeer discovered(AccountKey peerKey,
+				AVector<AString> transports,long revision) {
+			return new DesiredPeer(peerKey,transports,true,revision);
 		}
 
+		/** Creates operator-supplied intent with one TCP dial target. */
 		@SuppressWarnings({"unchecked", "rawtypes"})
 		public static DesiredPeer create(AccountKey peerKey, InetSocketAddress address) {
 			String uri = "tcp://" + address.getHostString() + ":" + address.getPort();
 			AVector<AString> transports = (AVector) Vectors.of(Strings.create(uri));
-			return new DesiredPeer(peerKey, transports, null, null, System.currentTimeMillis());
+			return new DesiredPeer(peerKey,transports,false,System.currentTimeMillis());
 		}
 
+		/** Creates intent whose transport must arrive through later directory data. */
 		public static DesiredPeer create(AccountKey peerKey) {
-			return new DesiredPeer(peerKey, null, null, null, System.currentTimeMillis());
+			return new DesiredPeer(peerKey,null,false,System.currentTimeMillis());
+		}
+
+		/** Replaces only the dial target while preserving discovery revision metadata. */
+		private DesiredPeer withTransports(AVector<AString> transports) {
+			DesiredPeer updated=new DesiredPeer(peerKey,transports,discovered,revision);
+			updated.copyRetryState(this);
+			return updated;
+		}
+
+		/** Copies reconnect scheduling without exposing mutable state as metadata. */
+		private void copyRetryState(DesiredPeer source) {
+			synchronized (source) {
+				failCount=source.failCount;
+				nextRetryTime=source.nextRetryTime;
+			}
+		}
+
+		private synchronized boolean isRetryDue(long now) {
+			return now>=nextRetryTime;
+		}
+
+		private synchronized int getFailCount() {
+			return failCount;
+		}
+
+		private synchronized void resetRetry() {
+			failCount=0;
+			nextRetryTime=0;
+		}
+
+		private synchronized void recordFailure(long now) {
+			failCount++;
+			nextRetryTime=now+calculateBackoff(failCount);
 		}
 
 		@Override

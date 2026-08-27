@@ -88,6 +88,7 @@ a future) and signed transactions once an address and key pair are set.
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
 | `NodeServer` | Lattice node server (`convex.node`) for syncing lattice data regions |
 | `LatticePropagator` | Persists, filters and broadcasts lattice updates for a `NodeServer` |
+| `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
 
 ## Lattice Node
 
@@ -95,7 +96,8 @@ Alongside the consensus peer, this module provides a lightweight node server
 for lattice data regions — values that merge like CRDTs rather than passing
 through CPoS consensus. `NodeServer` (in `convex.node`) speaks the same binary
 protocol as the peer server, but exchanges and merges lattice values instead
-of beliefs. The `convex-p2p` module builds its node server on it.
+of beliefs. It never interprets application paths or records; the `convex-p2p`
+module layers node discovery, social selection and PoP routing on it.
 
 - **Construction** - Create a `NodeServer` with a lattice (defining merge
   semantics), a store and an optional `NodeConfig`, then call `launch()`.
@@ -115,6 +117,7 @@ of beliefs. The `convex-p2p` module builds its node server on it.
 
 ## Documentation
 
+- [Lattice Networking Responsibilities and Trust Boundaries](docs/LATTICE_NETWORKING.md)
 - [Delta Propagation, Backpressure and Memory Bounds](docs/PROPAGATION.md)
 - [Lattice Persistence and Node Configuration](docs/PERSISTENCE.md)
 - [Javadoc API Reference](https://javadoc.io/doc/world.convex/convex-peer)

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- P2P nodes can advertise Point of Presence node keys and explicit relay
+  willingness in signed NodeInfo. Opt-in PoP nodes forward bounded end-to-end
+  signed messages over authenticated routes; outbound-only nodes can exchange
+  public values or ECIES-encrypted private values through a shared PoP.
 - P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
   The connecting node pushes only its own signed NodeInfo entry, allowing the remote
   node to challenge it on the same full-duplex socket and explicitly upgrade that
@@ -34,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Point-message relays verify the invariant source signature, destination,
+  lifetime and path before forwarding, use authenticated routes only, and bound
+  message size, hops, fan-out, recent replay state and inbound rate.
 - Lattice peer trust now requires a valid two-sided Ed25519 challenge/response binding
   a random nonce, both node-key audiences and a fixed protocol context. An assigned
   inbound socket remains an untrusted public route until that proof and an admitted

@@ -27,6 +27,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
@@ -41,15 +42,8 @@ import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.Keywords;
 import convex.core.data.AccountKey;
-import convex.core.data.AHashMap;
-import convex.core.data.AString;
-import convex.core.data.Keyword;
-import convex.core.data.SignedData;
-import convex.core.data.Vectors;
 import convex.lattice.ALattice;
-import convex.lattice.P2PLattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.RootComponent;
 import convex.lattice.cursor.ALatticeCursor;
@@ -61,26 +55,40 @@ import convex.net.impl.netty.NettyServer;
 import convex.peer.Config;
 
 /**
- * A networked node server for Lattice networks.
+ * Replicates one application-supplied lattice over the Convex binary protocol.
  *
- * This server handles binary protocol communication for syncing lattice values
- * with other nodes in the network. It provides a lightweight alternative to
- * the full Peer Server, focused specifically on lattice value synchronisation.
+ * <p>This class is deliberately ignorant of the lattice's application schema.
+ * It never assumes that a path such as {@code :p2p}, {@code :social} or
+ * {@code :nodes} exists, and it never publishes or interprets application
+ * records. Its scope is the generic CAD036 transport: authoritative cursor,
+ * listener lifecycle, bounded ordered decode/merge pipeline, missing-cell
+ * acquisition and connection-to-publication-view assignment.</p>
  *
- * The server uses the binary protocol (VLQ-encoded message lengths followed by
- * message data) to exchange and merge lattice values with peer nodes.
+ * <p>Transport identity is also explicit. {@link #setTransportKeyPair(AKeyPair)}
+ * configures connection challenge/response; {@link LatticeContext} independently
+ * defines application merge and owner-signature policy. A wrapper may choose the
+ * same key for both roles, but this class never infers that relationship.</p>
+ *
+ * <p>Application modules compose behaviour through the supplied {@link ALattice},
+ * {@link LatticeContext}, ingress/publication filters and optional notification
+ * hooks. For example, node discovery belongs to {@code convex-p2p.P2PNode}, not
+ * this base transport.</p>
  *
  * <p><b>Inbound capability boundary.</b> Network lattice traffic is denied until
  * operator policy assigns its physical connection to exactly one propagator. That
  * propagator supplies both the query view and the acquisition store. Partial values
  * are acquired completely in that store before they enter the ordered merge path;
- * NodeServer never searches another propagator or falls back to the primary store.
+ * NodeServer never searches another propagator or falls back to the primary store.</p>
  *
- * Features:
- * - Automatic delta-based broadcasting of lattice updates to peers
- * - Efficient novelty detection using store announcement mechanism
- * - Manual sync capabilities for on-demand synchronisation
- * - Support for hierarchical lattice paths
+ * <p><b>Threading.</b> Application cursor updates may originate on caller
+ * threads. Primary publication is synchronous with cursor {@code sync()};
+ * secondary propagation is asynchronous. All accepted inbound messages pass
+ * through one bounded ordered dispatcher. Missing-cell acquisition runs on
+ * owned workers and re-enters that dispatcher only after completion.</p>
+ *
+ * <p>See the {@code convex.node} package documentation and
+ * {@code convex-peer/docs/LATTICE_NETWORKING.md} for the component, route and
+ * lifecycle state maps.</p>
  *
  * @param <V> The type of lattice values managed by this node server
  */
@@ -137,6 +145,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * no owner verification).
 	 */
 	private LatticeContext mergeContext = LatticeContext.EMPTY;
+
+	/**
+	 * Optional node key used only for transport challenge/response. It is separate
+	 * from the signing and owner-verification policy carried by {@link #mergeContext}.
+	 */
+	private AKeyPair transportKeyPair;
 
 	/**
 	 * Message receiver action for handling incoming lattice sync messages
@@ -198,6 +212,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/** Projection applied to the primary persisted and replicated view. */
 	private LatticeFilter<V> publicationFilter=value -> value;
 
+	/** Optional application protocol handler for complete UNKNOWN messages. */
+	private Predicate<Message> applicationMessageHandler;
+
+	/** Optional application observer for accepted inbound lattice values. */
+	private InboundLatticeListener inboundLatticeListener;
+
 	/** Immutable connection-to-propagator capabilities established by operator policy. */
 	private final ConcurrentHashMap<AConnection, LatticePropagator> inboundPropagators =
 		new ConcurrentHashMap<>();
@@ -253,6 +273,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	/** Stable identity required for prompt shutdown-hook deregistration. */
 	private final Runnable shutdownHook = this::shutdownPersist;
 	private boolean shutdownHookRegistered;
+
+	// ========== Construction and Lifecycle ==========
 
 	/**
 	 * Creates a new NodeServer with the specified lattice, store and configuration.
@@ -314,8 +336,34 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 * @throws IOException If an IO error occurs during launch
 	 * @throws InterruptedException If the operation is interrupted
 	 */
-	@SuppressWarnings("unchecked")
 	public synchronized void launch() throws IOException, InterruptedException {
+		validateLaunchRequest();
+		validateLaunchConfiguration();
+
+		lifecycleState = LifecycleState.STARTING;
+		try {
+			log.debug("Launching NodeServer on port {}", port);
+			createDefaultPrimaryPropagator();
+			configurePublicationPipeline();
+			configurePropagatorsForLaunch();
+			restorePersistedViews();
+			seedPublicationStores();
+			startInboundDispatcher();
+			launchNetworkListener();
+			startMaintenanceService();
+			registerShutdownPersistenceHook();
+			startPropagationServices();
+
+			lifecycleState = LifecycleState.RUNNING;
+			log.debug("NodeServer started successfully on port {}", port);
+		} catch (IOException | InterruptedException | RuntimeException | Error e) {
+			abortFailedLaunch(e);
+			throw e;
+		}
+	}
+
+	/** Rejects concurrent launch and relaunch while an earlier close is incomplete. */
+	private void validateLaunchRequest() {
 		if (lifecycleState == LifecycleState.RUNNING || lifecycleState == LifecycleState.STARTING) {
 			throw new IllegalStateException("NodeServer is already running");
 		}
@@ -323,151 +371,113 @@ public class NodeServer<V extends ACell> implements Closeable {
 			throw new IllegalStateException("NodeServer shutdown is incomplete; call close() again before launch");
 		}
 
-		// Validate close-time policy before opening any service. The config is
-		// immutable, so discovering an unusable timeout only during close() would
-		// leave the instance unable to complete its own shutdown.
+	}
+
+	/** Validates immutable settings before any listener or worker is started. */
+	private void validateLaunchConfiguration() {
+		// Discover an unusable close-time policy before opening resources.
 		config.getInboundShutdownTimeout();
 
-		// #567: validate a configured public URL before advertising it. Fail fast on a
-		// misconfigured (private/loopback/malformed) URL rather than silently polluting the
-		// [:p2p :nodes] registry with an unreachable address that peers waste reconnects on.
-		AString urlCfg = config.getURL();
-		if (urlCfg != null) {
-			String reason = NodeConfig.validatePublicURL(urlCfg.toString(), config.isAllowPrivateURL());
-			if (reason != null) {
-				throw new IllegalStateException("Invalid node URL configuration: " + reason);
+	}
+
+	/** Creates the conventional single primary publication view when none was supplied. */
+	private void createDefaultPrimaryPropagator() {
+		if (!propagators.isEmpty() || store == null) return;
+		LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
+		if (transportKeyPair != null) connectionManager.setKeyPair(transportKeyPair);
+		propagators.add(new LatticePropagator(
+			store,connectionManager,lattice,publicationFilter));
+	}
+
+	/** Installs the primary publication callback once and prevents later replacement. */
+	private void configurePublicationPipeline() {
+		if (rootPublicationConfigured) return;
+		rootComponent.setPublicationPolicy(this::publishApplicationRoot);
+		rootComponent.freezePublicationPolicy();
+		rootPublicationConfigured=true;
+	}
+
+	/** Applies immutable merge, persistence, size and reverse-delivery policy. */
+	private void configurePropagatorsForLaunch() {
+		for (int i = 0; i < propagators.size(); i++) {
+			LatticePropagator propagator = propagators.get(i);
+			propagator.configure(lattice, mergeContext, i == 0);
+			propagator.setPersistenceEnabled(config.isPersist());
+			propagator.setMaxDeltaMessageSize(config.getMaxDeltaMessageSize());
+			propagator.setMaxDeltaBroadcastSize(config.getMaxDeltaBroadcastSize());
+
+			LatticeConnectionManager manager = propagator.getConnectionManager();
+			if (transportKeyPair!=null) manager.setKeyPair(transportKeyPair);
+			manager.setMaxDesiredPeers(config.getMaxDesiredPeers());
+			manager.setInboundMessageLimits(
+				config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
+			manager.setPeerMessageHandler(
+				(peer, message) -> receiveFromManagedOutbound(propagator, peer, message));
+		}
+	}
+
+	/** Restores each private view and installs only the primary as authoritative root. */
+	@SuppressWarnings("unchecked")
+	private void restorePersistedViews() {
+		if (!config.isRestore()) return;
+		for (int i = 0; i < propagators.size(); i++) {
+			ACell restored = propagators.get(i).restore();
+			if (restored != null && i == 0) {
+				cursor.set((V) restored);
+				log.info("Restored lattice value from primary store");
 			}
 		}
+	}
 
-		lifecycleState = LifecycleState.STARTING;
-		try {
-			log.debug("Launching NodeServer on port {}", port);
+	/** Seeds store-backed views and completes the startup durability barrier. */
+	@SuppressWarnings("unchecked")
+	private void seedPublicationStores() throws IOException {
+		if (propagators.isEmpty()) return;
+		ACell announced = propagators.get(0).processSnapshot(cursor.get());
+		cursor.set((V) announced);
+		for (int i = 1; i < propagators.size(); i++) {
+			propagators.get(i).processSnapshot(announced);
+		}
+		if (config.isPersist()) {
+			for (LatticePropagator propagator : propagators) propagator.checkpoint();
+		}
+	}
 
-			// Create primary propagator if none have been added
-			if (propagators.isEmpty() && store != null) {
-				LatticeConnectionManager connectionManager = new LatticeConnectionManager(store);
-				AKeyPair signingKey = mergeContext.getSigningKey();
-				if (signingKey != null) {
-					connectionManager.setKeyPair(signingKey);
-				}
-				LatticePropagator primary = new LatticePropagator(
-					store,connectionManager,lattice,publicationFilter);
-				propagators.add(primary);
-			}
+	/** Opens the optional listener; outbound-only nodes still use the dispatcher. */
+	private void launchNetworkListener() throws IOException, InterruptedException {
+		if (port != null && port < 0) return;
+		if (networkServer == null) {
+			NettyServer nettyServer = new NettyServer(port);
+			nettyServer.setReceiveAction(receiveAction);
+			nettyServer.setMessageDelivery(this::deliverIncomingMessage);
+			nettyServer.setMaxClientConnections(config.getMaxConnections());
+			nettyServer.setMaxMessageLength(config.getMaxMessageSize());
+			nettyServer.setDisconnectAction(this::removeConnection);
+			networkServer = nettyServer;
+		}
+		if (port != null) networkServer.setPort(port);
+		networkServer.launch();
+		port = networkServer.getPort();
+	}
 
-			// The application root uses local store publication before launch. Once the
-			// primary exists, atomically install and freeze the network host policy.
-			if (!rootPublicationConfigured) {
-				rootComponent.setPublicationPolicy(this::publishApplicationRoot);
-				rootComponent.freezePublicationPolicy();
-				rootPublicationConfigured=true;
-			}
+	/** Starts periodic stale-connection metric pruning. */
+	private void startMaintenanceService() {
+		maintenanceThread = Thread.ofVirtual()
+			.name("NodeServer connection-stats maintenance")
+			.start(this::maintenanceLoop);
+	}
 
-			for (int i = 0; i < propagators.size(); i++) {
-				LatticePropagator p = propagators.get(i);
-				p.configure(lattice, mergeContext, i == 0);
-				p.setPersistenceEnabled(config.isPersist());
-				p.setMaxDeltaMessageSize(config.getMaxDeltaMessageSize());
-				p.setMaxDeltaBroadcastSize(config.getMaxDeltaBroadcastSize());
-			}
+	/** Registers orderly persistence before Etch shutdown hooks close their files. */
+	private void registerShutdownPersistenceHook() {
+		Shutdown.addHook(Shutdown.SERVER, shutdownHook);
+		shutdownHookRegistered = true;
+	}
 
-			// Outbound sockets begin at the public/untrusted cap. Their connection manager
-			// promotes an individual socket to the trusted cap only after challenge/response
-			// proves the expected remote AccountKey.
-			for (LatticePropagator p : propagators) {
-				LatticeConnectionManager manager = p.getConnectionManager();
-				manager.setMaxDesiredPeers(config.getMaxDesiredPeers());
-				manager.setInboundMessageLimits(
-					config.getMaxMessageSize(), config.getMaxTrustedMessageSize());
-				manager.setPeerMessageHandler(
-					(peer, message) -> receiveFromManagedOutbound(p, peer, message));
-			}
-
-			// Restore each propagator's own persisted view. The primary restores the
-			// authoritative cursor; secondary working views are later reconciled with
-			// the freshly projected primary without discarding pending subset state.
-			if (config.isRestore() && !propagators.isEmpty()) {
-				for (int i = 0; i < propagators.size(); i++) {
-					ACell restored = propagators.get(i).restore();
-					if (restored != null && i == 0) {
-						cursor.set((V) restored);
-						log.info("Restored lattice value from primary store");
-					}
-				}
-			}
-
-			// Seed every propagator's announced, store-backed view before opening the
-			// network. Each secondary applies its own filter before touching its store,
-			// so a fresh node can immediately serve every configured capability view.
-			if (!propagators.isEmpty()) {
-				ACell announced = propagators.get(0).processSnapshot(cursor.get());
-				cursor.set((V) announced);
-				for (int i = 1; i < propagators.size(); i++) {
-					propagators.get(i).processSnapshot(announced);
-				}
-				if (config.isPersist()) {
-					for (LatticePropagator p : propagators) p.checkpoint();
-				}
-			}
-
-			// Outbound clients are also full-duplex lattice routes, so even a node with
-			// no listener needs the ordered inbound dispatcher for reverse messages.
-			startInboundDispatcher();
-
-			// Create and launch network server unless port is negative (local-only mode)
-			boolean localOnly = (port != null && port < 0);
-			if (!localOnly) {
-				if (networkServer == null) {
-					NettyServer nettyServer = new NettyServer(port);
-					// Set the receive action for handling incoming messages
-					nettyServer.setReceiveAction(receiveAction);
-					// Use Netty's per-channel backpressure contract: event-loop threads only
-					// enqueue; decode, merge, persistence and responses run on our dispatcher.
-					nettyServer.setMessageDelivery(this::deliverIncomingMessage);
-					nettyServer.setMaxClientConnections(config.getMaxConnections());
-					nettyServer.setMaxMessageLength(config.getMaxMessageSize());
-					networkServer = nettyServer;
-					// #566: release per-connection stats eagerly when a connection closes. The
-					// periodic sweep remains as a backstop for transports without a close signal.
-					networkServer.setDisconnectAction(this::removeConnection);
-				}
-
-				if (port != null) {
-					networkServer.setPort(port);
-				}
-				networkServer.launch();
-				port = networkServer.getPort();
-			}
-
-			// #566: periodic sweep of closed connections from the inbound stats map, so an idle
-			// node drains dead entries without relying on inbound traffic or a network close hook.
-			maintenanceThread = Thread.ofVirtual()
-					.name("NodeServer connection-stats maintenance")
-					.start(this::maintenanceLoop);
-
-			// Register shutdown hook to persist before Etch closes its files
-			Shutdown.addHook(Shutdown.SERVER, shutdownHook);
-			shutdownHookRegistered = true;
-
-			// Start all propagator threads and connection managers
-			for (LatticePropagator p : propagators) {
-				p.getConnectionManager().start();
-				p.start();
-			}
-
-			// Publication is part of the launch contract. If synchronous publication
-			// fails, launch must fail with every service stopped rather than returning an
-			// exception while a listener and background threads remain live.
-			publishNodeInfo();
-			// Restored registries and the freshly published own entry must drive the
-			// desired-peer view even before another network merge arrives.
-			maybeUpdateDesiredPeers();
-
-			lifecycleState = LifecycleState.RUNNING;
-			log.debug("NodeServer started successfully on port {}", port);
-		} catch (IOException | InterruptedException | RuntimeException | Error e) {
-			abortFailedLaunch(e);
-			throw e;
+	/** Starts each connection manager before its owning propagation worker. */
+	private void startPropagationServices() {
+		for (LatticePropagator propagator : propagators) {
+			propagator.getConnectionManager().start();
+			propagator.start();
 		}
 	}
 
@@ -536,73 +546,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		removeShutdownHook();
 	}
 
+	/** Retains unwind failures without replacing the launch failure seen by the caller. */
 	private static void addCleanupFailure(Throwable failure, Throwable cleanupError) {
 		if (cleanupError != failure) failure.addSuppressed(cleanupError);
 	}
 
-	/**
-	 * Publishes this node's info into the {@code :p2p :nodes} lattice when a signing
-	 * key is configured.
-	 *
-	 * <p>A node without an advertised URL publishes an empty {@code :transports}
-	 * vector. It remains identifiable and may maintain outbound connections, but
-	 * other nodes cannot mistake it for a directly dialable endpoint.</p>
-	 */
-	private void publishNodeInfo() {
-		// Generic NodeServers may host a scalar or an unrelated structural lattice.
-		// NodeInfo publication is meaningful only when this exact path is registered.
-		if (lattice.path(Keywords.P2P, Keywords.NODES) == null) return;
-
-		// Only advertise if we have a signing key
-		AKeyPair keyPair = mergeContext.getSigningKey();
-		if (keyPair == null) return;
-		AString url = config.getAdvertisedURL(port);
-		AVector<AString> transports = (url != null) ? Vectors.of(url) : Vectors.empty();
-
-		AString type = Strings.create("Convex Lattice Node");
-		String versionStr = Utils.getVersion();
-		AString version = Strings.create(versionStr != null ? versionStr : "unknown");
-
-		// #561: stamp the published NodeInfo from the merge context (driver-supplied time),
-		// not from a system-clock read inside the lattice builder.
-		AHashMap<Keyword, ACell> nodeInfo = P2PLattice.createNodeInfo(
-			transports, type, version, null, mergeContext.currentTimestampValue());
-
-		AHashMap<ACell, SignedData<ACell>> entry = P2PLattice.createSignedEntry(keyPair, nodeInfo);
-
-		// Navigate to :p2p :nodes and merge the signed entry
-		cursor.path(Keywords.P2P, Keywords.NODES).merge(entry);
-		// Publication is part of launch: make it queryable immediately. The initial
-		// pre-listener root has already completed the startup durability barrier.
-		cursor.sync();
-
-		log.info("Published NodeInfo: transports={}, type={}, version={}", transports, type, version);
-	}
-
-	/**
-	 * Updates desired peers on all propagator connection managers from the
-	 * current {@code [:p2p :nodes]} lattice value. Called when an incoming
-	 * LATTICE_VALUE changes P2P data.
-	 */
-	@SuppressWarnings("unchecked")
-	private void maybeUpdateDesiredPeers() {
-		try {
-			ACell nodesValue = cursor.get(Keywords.P2P, Keywords.NODES);
-			if (nodesValue == null) return;
-
-			AKeyPair kp = mergeContext.getSigningKey();
-			AccountKey ownKey = (kp != null) ? kp.getAccountKey() : null;
-
-			AHashMap<ACell, SignedData<ACell>> nodesMap =
-				(AHashMap<ACell, SignedData<ACell>>) nodesValue;
-
-			for (LatticePropagator p : propagators) {
-				p.getConnectionManager().updateDesiredPeers(nodesMap, ownKey);
-			}
-		} catch (Exception e) {
-			log.debug("Error updating desired peers from P2P lattice: {}", e.getMessage());
-		}
-	}
+	// ========== Ordered Inbound Pipeline ==========
 
 	/**
 	 * Handles an incoming message from a peer node.
@@ -617,129 +566,191 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 */
 	void handleIncomingMessage(Message message) {
 		log.debug("Received message from peer: {}", message);
+		InboundMessageContext context=prepareInboundMessage(message);
+		if (context==null) return;
 
-		AConnection conn = message.getConnection();
-		ConnectionStats stats = statsFor(conn);
+		try {
+			dispatchDecodedMessage(message,context);
+		} catch (Exception e) {
+			returnHandlerFailure(message,e);
+		}
+	}
+
+	/** Immutable facts established before protocol-specific dispatch begins. */
+	private record InboundMessageContext(AConnection connection,ConnectionStats stats,
+			LatticePropagator owner,boolean acquired) {}
+
+	/**
+	 * Completes the common inbound pre-dispatch pipeline: account for the frame,
+	 * resume any asynchronous acquisition, bind the connection capability and decode
+	 * with the store access appropriate to its trust state.
+	 *
+	 * @return dispatch context, or null when the message was rejected or rescheduled
+	 */
+	private InboundMessageContext prepareInboundMessage(Message message) {
+		AConnection connection = message.getConnection();
+		ConnectionStats stats = statsFor(connection);
 		Throwable acquisitionFailure = acquisitionFailures.remove(message);
 		LatticePropagator acquiredOwner = acquiredMessages.remove(message);
 		boolean acquired = acquiredOwner != null;
 		if (!acquired && acquisitionFailure == null) recordReceived(stats);
 		if (acquisitionFailure != null) {
-			if (acquisitionFailure instanceof VirtualMachineError fatal
-					&& !(fatal instanceof StackOverflowError)) {
-				throw fatal;
-			}
-			recordMergeReject(conn, stats);
-			log.warn("Rejected lattice value after acquisition failure: {}",
-				acquisitionFailure.getMessage());
-			returnLatticeResult(message, Result.fromException(acquisitionFailure));
-			return;
+			rejectAcquisitionFailure(message,connection,stats,acquisitionFailure);
+			return null;
 		}
 
 		LatticePropagator owner;
 		try {
-			owner = acquired ? acquiredOwner : resolveInboundPropagator(conn);
+			owner = acquired ? acquiredOwner : resolveInboundPropagator(connection);
 		} catch (Exception e) {
-			recordDecodeError(conn, stats);
+			recordDecodeError(connection, stats);
 			log.warn("Rejected inbound connection ownership: {}", e.getMessage());
-			return;
+			return null;
 		}
+		if (!decodeOrAcquire(message,connection,owner,acquired,stats)) return null;
+		return new InboundMessageContext(connection,stats,owner,acquired);
+	}
 
+	/** Handles a failed missing-cell worker back on the ordered dispatcher. */
+	private void rejectAcquisitionFailure(Message message,AConnection connection,
+			ConnectionStats stats,Throwable failure) {
+		if (failure instanceof VirtualMachineError fatal
+				&& !(fatal instanceof StackOverflowError)) {
+			throw fatal;
+		}
+		recordMergeReject(connection,stats);
+		log.warn("Rejected lattice value after acquisition failure: {}",failure.getMessage());
+		returnLatticeResult(message,Result.fromException(failure));
+	}
+
+	/**
+	 * Decodes one complete message, or starts bounded missing-cell acquisition for a
+	 * trusted partial lattice value. Untrusted network input always decodes
+	 * storelessly and therefore cannot deposit cells before admission.
+	 */
+	private boolean decodeOrAcquire(Message message,AConnection connection,
+			LatticePropagator owner,boolean acquired,ConnectionStats stats) {
 		try {
-			// Unverified network input is decoded storelessly. This prevents DATA or
-			// incomplete values from depositing attacker-controlled cells before the
-			// dispatcher has applied authentication and interest policy.
-			AStore decodeStore = (conn == null)
+			AStore decodeStore = (connection == null)
 				? ((owner != null) ? owner.getStore() : store)
-				: ((owner != null && conn.isTrusted()) ? owner.getStore() : null);
+				: ((owner != null && connection.isTrusted()) ? owner.getStore() : null);
 			message.getPayload(decodeStore);
+			return true;
 		} catch (MissingDataException e) {
-			if (!acquired && owner != null && conn != null && conn.isTrusted()) {
+			if (!acquired && owner != null && connection != null && connection.isTrusted()) {
 				beginLatticeAcquisition(message, owner, stats);
-				return;
+				return false;
 			}
-			recordDecodeError(conn, stats);
+			recordDecodeError(connection, stats);
 			log.warn("Rejected incomplete inbound message: {}", e.getMessage());
 			returnLatticeResult(message,Result.error(ErrorCodes.FORMAT,
 				"Only complete lattice values are accepted from unverified connections"));
-			return;
+			return false;
 		} catch (Exception e) {
-			// #566: an undecodable message counts against the connection and can trip the breaker.
-			recordDecodeError(conn, stats);
+			recordDecodeError(connection, stats);
 			log.warn("Failed to decode incoming message: {}", e.getMessage());
 			try {
-				ACell id = message.getRequestID(); // safe: returns null if undecoded
+				ACell id = message.getRequestID();
 				message.returnMessage(Message.createResult(Result.fromException(e).withID(id)));
 			} catch (Exception e2) {
 				// best effort -- connection may be bad
 			}
-			return;
+			return false;
 		}
+	}
 
-		try {
-			MessageType type = message.getType();
-			if (type == MessageType.RESULT) {
-				if (inboundVerifier.handleResult(message)) return;
-				if (completeDataRequest(message, conn)) return;
-			}
-			switch (type) {
+	/** Dispatches a fully decoded message without changing its capability context. */
+	private void dispatchDecodedMessage(Message message,InboundMessageContext context)
+			throws BadFormatException, IOException {
+		MessageType type = message.getType();
+		if (type == MessageType.RESULT) {
+			if (inboundVerifier.handleResult(message)) return;
+			if (completeDataRequest(message,context.connection())) return;
+		}
+		switch (type) {
 			case PING:
 				processPing(message);
 				break;
 			case LATTICE_QUERY:
-				if (owner == null) {
+				if (context.owner() == null) {
 					rejectUnscopedLatticeRequest(message);
 				} else {
-					processLatticeQuery(message, owner);
+					processLatticeQuery(message,context.owner());
 				}
 				break;
 			case LATTICE_VALUE:
-				if (owner == null) {
-					recordMergeReject(conn, stats);
-					log.warn("Rejected LATTICE_VALUE on an unassigned connection");
-					returnLatticeResult(message, Result.error(ErrorCodes.TRUST,
-						"Lattice access requires an operator-assigned propagator connection"));
-				} else if (acquired) {
-					processLatticeValue(message, owner);
-				} else {
-					prepareLatticeValue(message, owner, stats);
-				}
+				dispatchLatticeValue(message,context);
 				break;
 			case DATA:
-				if (conn != null && !conn.isTrusted()) {
-					recordMergeReject(conn, stats);
-					log.debug("Rejected unsolicited DATA from an unverified connection");
-				} else if (owner == null) {
-					recordMergeReject(conn, stats);
-					log.warn("Rejected DATA on an unassigned connection");
-				} else {
-					processData(message,owner,stats);
-				}
+				dispatchData(message,context);
 				break;
 			case DATA_REQUEST:
-				if (owner == null) {
+				if (context.owner() == null) {
 					rejectUnscopedDataRequest(message);
 				} else {
-					processDataRequest(message, owner);
+					processDataRequest(message,context.owner());
 				}
 				break;
 			case CHALLENGE:
 				processChallenge(message);
 				break;
+			case UNKNOWN:
+				dispatchApplicationMessage(message,context);
+				break;
 			default:
 				log.debug("Unhandled message type: {}", type);
 				break;
-			}
-		} catch (Exception e) {
-			log.warn("Error handling message: {}", e.getMessage());
-			try {
-				ACell id = message.getRequestID();
-				if (id != null) {
-					message.returnResult(Result.fromException(e));
-				}
-			} catch (Exception e2) {
-				// best effort
-			}
+		}
+	}
+
+	/** Applies the distinct first-pass and post-acquisition lattice-value paths. */
+	private void dispatchLatticeValue(Message message,InboundMessageContext context)
+			throws BadFormatException {
+		if (context.owner() == null) {
+			recordMergeReject(context.connection(),context.stats());
+			log.warn("Rejected LATTICE_VALUE on an unassigned connection");
+			returnLatticeResult(message,Result.error(ErrorCodes.TRUST,
+				"Lattice access requires an operator-assigned propagator connection"));
+		} else if (context.acquired()) {
+			processLatticeValue(message,context.owner());
+		} else {
+			prepareLatticeValue(message,context.owner(),context.stats());
+		}
+	}
+
+	/** Enforces trust and view assignment before staging DATA cells. */
+	private void dispatchData(Message message,InboundMessageContext context)
+			throws BadFormatException, IOException {
+		if (context.connection() != null && !context.connection().isTrusted()) {
+			recordMergeReject(context.connection(),context.stats());
+			log.debug("Rejected unsolicited DATA from an unverified connection");
+		} else if (context.owner() == null) {
+			recordMergeReject(context.connection(),context.stats());
+			log.warn("Rejected DATA on an unassigned connection");
+		} else {
+			processData(message,context.owner(),context.stats());
+		}
+	}
+
+	/** Runs a complete application protocol message on the ordered dispatcher. */
+	private void dispatchApplicationMessage(Message message,InboundMessageContext context) {
+		Predicate<Message> handler=applicationMessageHandler;
+		if (handler!=null && handler.test(message)) {
+			recordNonMergeAccept(context.stats());
+		} else {
+			recordMergeReject(context.connection(),context.stats());
+			log.debug("Rejected unhandled application message");
+		}
+	}
+
+	/** Contains a protocol-handler failure at the per-message boundary. */
+	private void returnHandlerFailure(Message message,Exception failure) {
+		log.warn("Error handling message: {}",failure.getMessage());
+		try {
+			ACell id=message.getRequestID();
+			if (id!=null) message.returnResult(Result.fromException(failure));
+		} catch (Exception ignored) {
+			// Best effort: the connection may already be unusable.
 		}
 	}
 
@@ -810,6 +821,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
+	/** Retry path used after Netty has paused reads for a full inbound queue. */
 	private boolean offerInboundBlocking(Message message) {
 		if (!acceptingInbound) return false;
 		try {
@@ -825,6 +837,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
+	/** Starts the sole ordered consumer and opens both message and acquisition gates. */
 	private synchronized void startInboundDispatcher() {
 		if (inboundRunning) return;
 		if (inboundThread != null) {
@@ -840,6 +853,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		inboundThread.start();
 	}
 
+	/** Drains accepted messages until close has stopped admission and emptied the queue. */
 	private void inboundLoop() {
 		try {
 			while (inboundRunning || !inboundQueue.isEmpty()) {
@@ -1073,8 +1087,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
+	/** Answers only challenges carrying the fixed lattice-peer protocol context. */
 	private void processChallenge(Message message) {
-		message.respondToChallenge(mergeContext.getSigningKey(),
+		message.respondToChallenge(transportKeyPair,
 			Message.LATTICE_PEER_CHALLENGE_CONTEXT::equals);
 	}
 
@@ -1100,6 +1115,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 			return false;
 		}
 	}
+
+	// ========== Missing-cell Acquisition ==========
 
 	/**
 	 * Persists a complete inbound value in its owning propagator store before
@@ -1403,19 +1420,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// primary-store publication on the dispatcher thread, never on a Netty event loop.
 			cursor.sync();
 
-			// If P2P node data changed, update desired peers on connection managers
-			if (path.length == 0 || Keywords.P2P.equals(path[0])) {
-				maybeUpdateDesiredPeers();
-			}
 		}
 
-		// Operator assignment admitted this physical inbound connection to a view,
-		// but did not authenticate it. Only after a valid lattice merge (normally the
-		// node's signed NodeInfo push) do we start the separate challenge which may
-		// explicitly upgrade it into an outbound propagation route.
-		if (conn != null && !outboundPropagators.containsKey(conn)) {
-			inboundVerifier.maybeStart(conn, owner, claimedNodeKey(path, value));
-		}
+		notifyInboundLatticeListener(conn,owner,path,value,changed);
 
 		// The response is deliberately empty: completion is the acknowledgement, and
 		// returning the merged value would duplicate a potentially large lattice tree.
@@ -1429,22 +1436,16 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
-	/**
-	 * Extracts the single owner-bound node identity used to address an inbound
-	 * possession challenge. Arbitrary lattice traffic cannot choose the trusted
-	 * key: only a valid one-entry update at {@code [:p2p :nodes]} can do so.
-	 */
-	@SuppressWarnings("unchecked")
-	private AccountKey claimedNodeKey(ACell[] path, ACell value) {
-		if (path.length != 2 || !Keywords.P2P.equals(path[0])
-				|| !Keywords.NODES.equals(path[1])) return null;
-		if (!(value instanceof AHashMap<?,?> raw) || raw.count() != 1) return null;
-		AHashMap<ACell,ACell> nodes=(AHashMap<ACell,ACell>) raw;
-		java.util.Map.Entry<ACell,ACell> entry=nodes.entrySet().iterator().next();
-		AccountKey ownerKey=RT.ensureAccountKey(entry.getKey());
-		if (ownerKey==null || !(entry.getValue() instanceof SignedData<?> signed)) return null;
-		if (!ownerKey.equals(signed.getAccountKey()) || !signed.checkSignature()) return null;
-		return ownerKey;
+	/** Notifies application policy without changing an already completed merge. */
+	private void notifyInboundLatticeListener(AConnection connection,
+			LatticePropagator owner,ACell[] path,ACell value,boolean changed) {
+		InboundLatticeListener listener=inboundLatticeListener;
+		if (listener==null) return;
+		try {
+			listener.onAccepted(connection,owner,path,value,changed);
+		} catch (RuntimeException e) {
+			log.warn("Inbound lattice listener failed after an accepted merge",e);
+		}
 	}
 
 	/**
@@ -1821,6 +1822,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return new InboundStats(conns, recv, acc, rej, dec);
 	}
 
+	// ========== Pull and Merge API ==========
+
 	/**
 	 * Pulls the latest lattice value from a specific peer and merges it locally.
 	 *
@@ -1841,7 +1844,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// may not yet have been published, and the raw peer value must never become
 			// the persisted or announced root independently of the merged cursor.
 			cursor.sync();
-			maybeUpdateDesiredPeers();
 			return cursor.get();
 		});
 	}
@@ -1864,19 +1866,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 		return propagators.get(0).pullPath(convex,path).thenApply(acquired -> {
 			ALatticeCursor<ACell> target=cursor.path(path);
-			ACell before=target.get();
-			boolean accepted=(acquired==null)||mergeIncoming(target,acquired);
-			ACell after=target.get();
+			if (acquired!=null) mergeIncoming(target,acquired);
 
 			// Publish any pending local writes even when this pull was absent,
 			// rejected or dominated, matching root pull semantics.
 			cursor.sync();
 
-			boolean changed=accepted&&(before!=after)
-					&&((before==null)||!before.equals(after));
-			if (changed&&(path.length>0)&&Keywords.P2P.equals(path[0])) {
-				maybeUpdateDesiredPeers();
-			}
 			return target.get();
 		});
 	}
@@ -1904,7 +1899,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 			// Persist and announce the combined root once, never an individual peer's
 			// pre-merge value.
 			cursor.sync();
-			maybeUpdateDesiredPeers();
 			return true;
 		} catch (Exception e) {
 			log.warn("Pull failed: {}", e.getMessage());
@@ -1953,6 +1947,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return cursor.merge(receivedValue);
 	}
 
+	// ========== Compatibility Peer API ==========
+
 	/**
 	 * Adds a peer connection to the primary propagator.
 	 *
@@ -1980,6 +1976,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		if (propagators.isEmpty()) return;
 		propagators.get(0).removePeer(peerKey);
 	}
+
+	// ========== State and Configuration API ==========
 
 	/**
 	 * Gets the current local lattice value.
@@ -2026,8 +2024,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * <p><b>Configuration-only (#568).</b> This must be called before {@link #launch()}.
 	 * The context is then read by pull operations and the inbound dispatcher thread
-	 * ({@code publishNodeInfo}, {@code maybeUpdateDesiredPeers}, root merges),
-	 * and is safely published to them via the happens-before edge of thread start — so
+	 * (root validation and merges), and is safely published to them via the
+	 * happens-before edge of thread start — so
 	 * the field is deliberately non-volatile. Setting it after launch is rejected: those
 	 * threads could otherwise observe a stale reference indefinitely, and any in-flight
 	 * merge would already have captured the old context, giving non-deterministic
@@ -2047,9 +2045,25 @@ public class NodeServer<V extends ACell> implements Closeable {
 		cursor.setContext(mergeContext);
 	}
 
-	/** Signing key used for node-to-node challenge/response, or null. */
-	AKeyPair getSigningKey() {
-		return mergeContext.getSigningKey();
+	/**
+	 * Sets the key used exclusively for node-to-node transport challenge/response.
+	 *
+	 * <p>This is deliberately independent of {@link #setMergeContext}. A transport
+	 * identity neither authorises application data nor has to be the key used by a
+	 * signed lattice. When a particular application intentionally binds the two,
+	 * its wrapper must supply that same key to both configurations explicitly.</p>
+	 *
+	 * @param keyPair transport identity key, or null to disable authenticated routes
+	 * @throws IllegalStateException if called after the first launch begins
+	 */
+	public synchronized void setTransportKeyPair(AKeyPair keyPair) {
+		requireNewLifecycle("setTransportKeyPair");
+		this.transportKeyPair=keyPair;
+	}
+
+	/** Transport challenge key used by the inbound verifier, or null. */
+	AKeyPair getTransportKeyPair() {
+		return transportKeyPair;
 	}
 
 	/**
@@ -2172,20 +2186,97 @@ public class NodeServer<V extends ACell> implements Closeable {
 		propagators.add(propagator);
 	}
 
-	/** Sets complete-value inbound admission/projection policy before launch. */
+	/**
+	 * Sets complete-value inbound admission/projection policy before launch.
+	 *
+	 * <p>The filter runs only after a full value has been decoded or acquired and
+	 * before the authoritative merge. Returning null rejects the value. This is an
+	 * interest/admission projection, not signature verification; the selected
+	 * path's lattice still validates the returned value.</p>
+	 */
 	public synchronized void setIngressFilter(LatticeIngressFilter filter) {
 		requireNewLifecycle("setIngressFilter");
 		if (filter==null) throw new IllegalArgumentException("Ingress filter must not be null");
 		this.ingressFilter=filter;
 	}
 
-	/** Sets the primary persisted/replicated projection before launch. */
+	/**
+	 * Sets the projection applied by the primary publication pipeline before its
+	 * store, root pointer and outbound deltas are updated. Secondary propagators
+	 * retain their own independent filters.
+	 */
 	public synchronized void setPublicationFilter(LatticeFilter<V> filter) {
 		requireNewLifecycle("setPublicationFilter");
 		if (filter==null) throw new IllegalArgumentException("Publication filter must not be null");
 		this.publicationFilter=filter;
 	}
 
+	/**
+	 * Sets the handler for complete application-defined messages whose core
+	 * {@link MessageType} is {@link MessageType#UNKNOWN}. The predicate executes on
+	 * the bounded ordered dispatcher and therefore must not block. Returning false
+	 * records a rejected message against the originating connection.
+	 *
+	 * <p>Complete UNKNOWN messages may arrive on a zero-trust inbound connection.
+	 * The handler is responsible for its application signature, audience and replay
+	 * rules; transport arrival alone conveys no authority.</p>
+	 *
+	 * @param handler application message validator/handler, or null to reject all
+	 */
+	public synchronized void setApplicationMessageHandler(Predicate<Message> handler) {
+		requireNewLifecycle("setApplicationMessageHandler");
+		this.applicationMessageHandler=handler;
+	}
+
+	/**
+	 * Sets an application observer for accepted inbound lattice values.
+	 *
+	 * <p>The observer is intentionally generic: NodeServer supplies the accepted
+	 * path and value but knows nothing about their application meaning. It executes
+	 * on the ordered dispatcher after merge and publication, so it must not block.
+	 * An exception is logged and contained because the merge has already completed.</p>
+	 *
+	 * @param listener application observer, or null for none
+	 */
+	public synchronized void setInboundLatticeListener(InboundLatticeListener listener) {
+		requireNewLifecycle("setInboundLatticeListener");
+		this.inboundLatticeListener=listener;
+	}
+
+	/**
+	 * Starts non-blocking possession verification for a physically inbound route.
+	 *
+	 * <p>This method is a transport primitive, not identity discovery. The caller
+	 * must derive {@code expectedKey} from application data that its lattice has
+	 * already accepted and must first admit that key to the selected propagator's
+	 * bounded desired-peer set. A successful challenge marks the connection trusted
+	 * and explicitly upgrades it into an outbound route for that propagator.</p>
+	 *
+	 * @param connection physically inbound connection to authenticate
+	 * @param propagator immutable view already assigned to the connection
+	 * @param expectedKey remote node key expected to answer the challenge
+	 * @throws IllegalArgumentException for null arguments
+	 * @throws IllegalStateException if the connection is not assigned to the supplied view
+	 */
+	public void authenticateInboundRoute(AConnection connection,
+			LatticePropagator propagator,AccountKey expectedKey) {
+		if (connection==null || propagator==null || expectedKey==null) {
+			throw new IllegalArgumentException(
+				"Connection, propagator and expected key must not be null");
+		}
+		if (outboundPropagators.containsKey(connection)) return;
+		if (resolveInboundPropagator(connection)!=propagator) {
+			throw new IllegalStateException(
+				"Inbound connection is not assigned to the supplied propagator");
+		}
+		inboundVerifier.maybeStart(connection,propagator,expectedKey);
+	}
+
+	/**
+	 * Publishes one authoritative application snapshot through the primary
+	 * propagator, then asynchronously fans the same source snapshot to secondary
+	 * filtered views.
+	 */
 	private V publishApplicationRoot(V value) {
 		if (propagators.isEmpty()) {
 			throw new IllegalStateException("NodeServer has no primary publication pipeline");
@@ -2272,6 +2363,8 @@ public class NodeServer<V extends ACell> implements Closeable {
 		}
 	}
 
+	// ========== Explicit Persistence and Shutdown ==========
+
 	/**
 	 * Persists and durably flushes the given lattice value to the primary
 	 * propagator's store. Delegates to the primary propagator's explicit persist
@@ -2300,6 +2393,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 		return propagators.get(0).checkpoint();
 	}
 
+	/** Removes this exact registered hook once shutdown ownership returns to the caller. */
 	private void removeShutdownHook() {
 		if (!shutdownHookRegistered) return;
 		Shutdown.removeHook(Shutdown.SERVER, shutdownHook);

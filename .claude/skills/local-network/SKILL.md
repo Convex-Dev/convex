@@ -60,6 +60,17 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
+`NodeServer` is the schema-independent CAD036 replication transport. It does not
+publish or interpret `NodeInfo`, inspect `:p2p` / `:social` paths, or implement
+discovery policy. `P2PNode` composes that transport; its `NodeDirectory` owns
+signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
+metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
+`P2PNode` also configures its node key explicitly as both its transport challenge
+identity and its signed `NodeInfo` owner. A generic `NodeServer` does not infer a
+transport key from `LatticeContext`; direct transport tests must call
+`setTransportKeyPair`. Social user DIDs and their account keys remain a separate
+application concern.
+
 For a small lattice network test:
 
 > **Security model:** P2P data is public, so `serveAllInbound()` may assign an
@@ -74,8 +85,9 @@ For a small lattice network test:
 > NodeInfo. Desired peers and inbound connections are bounded by `NodeConfig`.
 
 1. Give each node its own store and key pair.
-2. Use `NodeConfig.localNetwork()`. It binds port `0`, then publishes the actual
-   OS-assigned loopback port in the node's signed `NodeInfo`.
+2. Use `NodeConfig.localNetwork()`. The generic server binds port `0`; after it
+   reports the actual OS-assigned port, `P2PNode` publishes that loopback endpoint
+   in the node's signed `NodeInfo`.
 3. Set an inbound propagator policy before launch. `P2PNode.serveAllInbound()` is
    suitable for a deliberately public test node.
 4. Tell one node about the other with
@@ -101,6 +113,13 @@ For a small lattice network test:
    `serveAllInbound()` on that leaf. Prove reverse propagation with an application
    write made after the rendezvous node's upgrade future completes; a bootstrap pull
    alone does not prove that the original outbound socket carries traffic both ways.
+   For Point of Presence routing, configure each outbound-only leaf with
+   `pointsOfPresence(relayKey)` before launch and opt the public node in with
+   `relayMessages()`. Connect both leaves only to that relay, await both inbound
+   upgrade futures on the relay, then complete a destination-side message-handler
+   future from `sendMessage` or `sendPrivateMessage`. Point messages are transient
+   and need no application-root `sync()`. Include a wrong-key signature case before
+   a valid message on the same ordered route when testing relay authentication.
 5. After an application write, call the root application's `sync()` to publish
    the node's filtered root view.
    When batching several edits for one signed social owner, fork the

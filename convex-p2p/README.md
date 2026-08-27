@@ -10,10 +10,10 @@ bundles the application regions those nodes serve, so one dependency gives you a
 complete node.
 
 > **Status: early implementation.** Authenticated one-peer bootstrap, signed
-> NodeInfo discovery, bounded desired-peer state, follow-filtered social replication
-> and outbound-only NAT leaf nodes work over TCP. Public relay nodes, on-chain
-> bootstrap, region-aware connection selection and additional transports remain to
-> be built.
+> NodeInfo discovery, bounded desired-peer state, follow-filtered social replication,
+> outbound-only NAT leaf nodes and opt-in public Point of Presence message relay work
+> over TCP. On-chain bootstrap, direct hole punching, region-aware connection selection
+> and additional transports remain to be built.
 
 ## Lattice structure
 
@@ -23,16 +23,17 @@ none of the application regions from `Lattice.ROOT`:
 ```
 P2PLattice.ROOT (KeyedLattice)
 ├── :p2p → KeyedLattice                        shared node registry
-│     └── :nodes → OwnerLattice(LWWLattice)      user key → Signed(NodeInfo)
+│     └── :nodes → OwnerLattice(LWWLattice)      node key → Signed(NodeInfo)
 ├── :id  → OwnerLattice(LWWLattice)            user key → Signed(IdentityInfo)
 └── :kad → ReservedLattice                     reserved, nothing merges yet
 ```
 
-**`:p2p`** — the shared node registry. Each P2P user publishes a signed, LWW `NodeInfo`
-(transports, regions, version, timestamp) under their own `AccountKey` at
-`[:p2p :nodes <userKey>]`. Reuses core's region instance directly, so registry merge
+**`:p2p`** — the shared node registry. Each node publishes a signed, LWW `NodeInfo`
+(transports, PoPs, relay willingness, regions, version, timestamp) under its node
+`AccountKey` at `[:p2p :nodes <nodeKey>]`. Reuses core's region instance directly, so registry merge
 semantics cannot drift between this root and `Lattice.ROOT`, and
-`NodeServer.publishNodeInfo` works unchanged.
+`NodeDirectory` publishes and validates this application-owned path while the
+generic `NodeServer` transports it without interpreting its schema.
 
 **`:id`** — P2P user identity, separate from transport details, so one identity can
 advertise several nodes and change its claims without republishing node records.
@@ -219,10 +220,10 @@ desired social-owner slots. It never bootstraps from an unrestricted full root.
 A node joining an established network therefore obtains its follow-filtered view
 without waiting for another publication or periodic root sync.
 
-For a node behind NAT, use a local-only `NodeServer` configuration. It signs and
-publishes NodeInfo with an empty `:transports` vector, so other nodes know its identity
-without trying to dial it. The node's authenticated outbound connection remains
-full-duplex:
+For a node behind NAT, give `P2PNode` a local-only transport configuration. Its
+`NodeDirectory` signs and publishes NodeInfo with an empty `:transports` vector, so
+other nodes know its identity without trying to dial it. The node's authenticated
+outbound connection remains full-duplex:
 
 ```java
 P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey);
@@ -240,6 +241,26 @@ becomes an outbound gossip route only after challenge/response proves the node k
 that key has an admitted signed NodeInfo record. A NAT leaf does not need
 `serveAllInbound()` merely to receive reverse traffic from a peer it connected to and
 authenticated; arbitrary incoming sockets remain denied by default.
+
+For routed point-to-point messages, the leaf declares that same peer as a PoP and the
+public node opts into relay service:
+
+```java
+P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey)
+    .pointsOfPresence(bobKey.getAccountKey());
+P2PNode bob = P2PNode.create(bobStore, NodeConfig.localNetwork(), bobKey)
+    .serveAllInbound()
+    .relayMessages();
+
+dave.setMessageHandler(message -> consume(message.sender(), message.value()));
+alice.sendMessage(daveKey.getAccountKey(), Strings.create("hello"));
+alice.sendPrivateMessage(daveKey.getAccountKey(), Strings.create("secret"));
+```
+
+Messages are end-to-end signed by the source node. Private bodies use the existing
+ECIES wrapper; relays see only routing metadata and ciphertext. See
+[Points of Presence](docs/POINTS_OF_PRESENCE.md) for the wire format, routing rules,
+bounds and trust model.
 
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a

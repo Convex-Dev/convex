@@ -71,7 +71,7 @@ final class LatticeInboundVerifier {
 
 	private void verify(AConnection connection, PendingVerification pending) {
 		try {
-			AKeyPair keyPair = server.getSigningKey();
+			AKeyPair keyPair = server.getTransportKeyPair();
 			if (keyPair == null) return;
 
 			Hash token = Blob.createRandom(random, 16).getHash();

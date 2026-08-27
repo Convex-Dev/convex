@@ -1,5 +1,7 @@
 package convex.lattice;
 
+import java.util.HashSet;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -11,6 +13,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.LWWLattice;
@@ -39,6 +42,10 @@ import convex.lattice.generic.OwnerLattice;
  *       (e.g. {@code "tcp://peer.example.com:18888"}, {@code "wss://peer.example.com:443"}).
  *       Advertised entries must be publicly reachable; an empty vector explicitly
  *       identifies an outbound-only node with no dialable transport.</li>
+ *   <li>{@code :pops} — {@code AVector<AccountKey>} of Point of Presence nodes
+ *       through which this node expects to be reachable (optional)</li>
+ *   <li>{@code :relay} — whether this node is willing to relay bounded signed
+ *       point-to-point messages (optional, defaults to false)</li>
  *   <li>{@code :type} — {@code AString} node software type (e.g. {@code "Convex Lattice Node"})</li>
  *   <li>{@code :version} — {@code AString} software version</li>
  *   <li>{@code :regions} — {@code AVector<AString>} region/location tags (optional)</li>
@@ -47,6 +54,8 @@ import convex.lattice.generic.OwnerLattice;
  * @see LocalLattice
  */
 public class P2PLattice {
+	/** Maximum Point of Presence declarations accepted in one NodeInfo record. */
+	public static final int MAX_POINTS_OF_PRESENCE = 16;
 
 	/**
 	 * OwnerLattice for {@code :nodes} — each node owns a signed LWW NodeInfo map.
@@ -65,7 +74,8 @@ public class P2PLattice {
 	 *
 	 * <p>The timestamp is supplied by the caller — the driving (merging or test) process —
 	 * rather than read from the system clock here; a node stamps its published NodeInfo from
-	 * its {@code LatticeContext} (see {@code NodeServer.publishNodeInfo}).</p>
+ * its {@code LatticeContext}; publication policy belongs to the P2P application
+ * layer rather than the generic lattice transport.</p>
 	 *
 	 * @param transports Public transport URIs, or empty for an outbound-only node
 	 * @param type Node software type (e.g. "Convex Lattice Node")
@@ -77,11 +87,52 @@ public class P2PLattice {
 	public static AHashMap<Keyword, ACell> createNodeInfo(
 			AVector<AString> transports, AString type, AString version,
 			AVector<AString> regions, long timestamp) {
+		return createNodeInfo(transports,type,version,regions,null,false,timestamp);
+	}
+
+	/**
+	 * Creates a NodeInfo map including Point of Presence routing metadata.
+	 *
+	 * @param transports Public transport URIs, or empty for an outbound-only node
+	 * @param type Node software type
+	 * @param version Software version string
+	 * @param pops Node keys for configured Points of Presence (may be null or empty)
+	 * @param relay Whether this node is willing to relay signed point messages
+	 * @param timestamp Timestamp in millis
+	 * @return NodeInfo map
+	 */
+	public static AHashMap<Keyword, ACell> createNodeInfo(
+			AVector<AString> transports, AString type, AString version,
+			AVector<AccountKey> pops, boolean relay, long timestamp) {
+		return createNodeInfo(transports,type,version,null,pops,relay,timestamp);
+	}
+
+	/**
+	 * Creates a complete NodeInfo map including optional regions and PoP metadata.
+	 */
+	public static AHashMap<Keyword, ACell> createNodeInfo(
+			AVector<AString> transports, AString type, AString version,
+			AVector<AString> regions, AVector<AccountKey> pops, boolean relay,
+			long timestamp) {
+		if (pops!=null && pops.count()>MAX_POINTS_OF_PRESENCE) {
+			throw new IllegalArgumentException("Too many Points of Presence: "+pops.count());
+		}
+		if (pops!=null) {
+			HashSet<AccountKey> unique=new HashSet<>();
+			for (long i=0; i<pops.count(); i++) {
+				AccountKey pop=pops.get(i);
+				if (pop==null || !unique.add(pop)) {
+					throw new IllegalArgumentException("Points of Presence must be unique node keys");
+				}
+			}
+		}
 		AHashMap<Keyword, ACell> info = Maps.of(
 			Keywords.TIMESTAMP, CVMLong.create(timestamp),
 			Keywords.TRANSPORTS, (transports != null) ? transports : Vectors.empty(),
 			Keywords.TYPE, type,
-			Keywords.VERSION, version
+			Keywords.VERSION, version,
+			Keywords.POPS, (pops != null) ? pops : Vectors.empty(),
+			Keywords.RELAY, CVMBool.create(relay)
 		);
 		if (regions != null && !regions.isEmpty()) {
 			info = info.assoc(Keywords.REGIONS, regions);

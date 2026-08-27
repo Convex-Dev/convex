@@ -175,6 +175,8 @@ public class Keywords {
 
 	// NodeInfo field keys
 	public static final Keyword TRANSPORTS = Keyword.intern("transports");
+	public static final Keyword POPS = Keyword.intern("pops");
+	public static final Keyword RELAY = Keyword.intern("relay");
 	public static final Keyword VERSION = Keyword.intern("version");
 	public static final Keyword REGIONS = Keyword.intern("regions");
 

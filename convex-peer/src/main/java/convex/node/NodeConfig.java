@@ -24,6 +24,10 @@ import convex.core.lang.RT;
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
  * overlap (port, persist, restore, store) so configurations are consistent
  * across peer and lattice node servers.
+ *
+ * <p>Some fields, notably {@link #URL}, are optional metadata for application
+ * wrappers and discovery adapters. The schema-independent {@link NodeServer}
+ * does not publish or interpret them.</p>
  */
 public class NodeConfig {
 
@@ -41,9 +45,8 @@ public class NodeConfig {
 	/** Interval between periodic persistence runs in ms (Long, default 30000). */
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
-	/** Advertised URL for this node (AString). If set, node advertises itself in
-	 *  :p2p :nodes. Must be publicly reachable unless {@link #ALLOW_PRIVATE_URL} is
-	 *  deliberately enabled for a development network. */
+	/** Optional advertised URL consumed by a discovery adapter (AString).
+	 *  {@link NodeServer} itself ignores this field. */
 	public static final AString URL = Strings.intern("url");
 
 	/** Maximum memory size (bytes) of an inbound LATTICE_VALUE accepted for merge (#564). */
@@ -210,8 +213,8 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Get the advertised URL for this node.
-	 * If set, the node will advertise itself in the {@code :p2p :nodes} lattice.
+	 * Gets the optional URL available to an application discovery adapter.
+	 * NodeServer does not advertise it itself.
 	 * @return advertised URL string, or null if not configured (private node)
 	 */
 	public AString getURL() {
@@ -260,9 +263,10 @@ public class NodeConfig {
 
 	/**
 	 * Whether a private, loopback or link-local {@link #URL} is permitted (#567).
-	 * Defaults to false, so a misconfigured private URL fails at launch rather than
-	 * polluting the {@code [:p2p :nodes]} registry with an unreachable address. Set
-	 * true only on dev networks where private addressing is intentional.
+	 * Defaults to false, allowing an advertising application such as P2PNode to
+	 * fail before publishing an unreachable address. NodeServer does not apply this
+	 * policy because it does not publish discovery records. Set true only on dev
+	 * networks where private addressing is intentional.
 	 *
 	 * @return true if private URLs are permitted
 	 */
@@ -403,7 +407,7 @@ public class NodeConfig {
 	// ========== URL validation (#567) ==========
 
 	/**
-	 * Validates a public node URL for advertisement in the {@code [:p2p :nodes]} lattice (#567).
+	 * Validates a public node URL for use by an advertising application (#567).
 	 *
 	 * <p>This is a purely <em>local</em> check: it never resolves DNS or probes reachability.
 	 * A node cannot verify its own external reachability, and resolving an operator- or
