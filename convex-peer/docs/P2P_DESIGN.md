@@ -207,7 +207,9 @@ The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain meta
 **Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
 AccountKey and TCP address. After challenge/response verifies that endpoint, the
 connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
-post-merge acknowledgement. The receiving node ingests that NodeInfo and establishes
+post-merge acknowledgement. It then pulls and merges the bootstrap node's current
+announced root, so a late joiner receives existing configured regions without waiting
+for another publication. The receiving node ingests the new NodeInfo and establishes
 the reverse persistent connection, enabling bidirectional lattice gossip.
 
 **Proposed on-chain bootstrap path**: A new node reads the on-chain peer list

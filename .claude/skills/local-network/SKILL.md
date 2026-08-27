@@ -69,15 +69,21 @@ For a small lattice network test:
    suitable for a deliberately public test node.
 4. Tell one node about the other with
    `nodeA.connect(nodeBKey, nodeB.getNodeServer().getHostAddress())`. The future
-   completes after B proves its node key and A's own signed `[:p2p :nodes]`
-   record has been merged by B. B then discovers A from that path-scoped lattice
-   update and establishes the reverse authenticated connection automatically.
+   completes after B proves its node key, A's own signed `[:p2p :nodes]` record
+   has been merged by B, and A has pulled and merged B's current announced root.
+   B discovers A from the path-scoped identity update and establishes the reverse
+   authenticated connection automatically. This full-root bootstrap makes a late
+   join deterministic for the regions configured on A; it does not yet implement
+   region subscriptions or follow-filtered ingestion.
    Use `nodeB.whenConnected(nodeAKey)` when a test must wait for that reverse
    admission before publishing in both directions.
    For three nodes, a useful discovery topology is to tell both leaves only
    about one rendezvous node. Wait until its signed registry has reached both
    leaves, then use `whenConnected` to prove the leaves discovered each other
    without another configured endpoint.
+   To test late joining, converge the initial nodes before creating the newcomer,
+   tell only the newcomer about the rendezvous node, and require `connect()` itself
+   to deliver the existing state without a manual rendezvous-node `sync()`.
 5. After an application write, call the root application's `sync()` to publish
    the complete root.
    When batching several edits for one signed social owner, fork the

@@ -28,12 +28,13 @@ import convex.social.Social;
 import convex.social.SocialPost;
 import convex.social.SocialUser;
 
-/** End-to-end social graph replication over three in-process P2P nodes. */
+/** End-to-end social graph replication with a fourth node joining late. */
 public class P2PSocialSyncTest {
 
 	private final AKeyPair aliceNodeKeyPair=AKeyPair.generate();
 	private final AKeyPair bobNodeKeyPair=AKeyPair.generate();
 	private final AKeyPair carolNodeKeyPair=AKeyPair.generate();
+	private final AKeyPair daveNodeKeyPair=AKeyPair.generate();
 
 	// Application users have distinct signing keys from their transport nodes. The
 	// current Social API still identifies users by AccountKey; its documented DID
@@ -41,13 +42,16 @@ public class P2PSocialSyncTest {
 	private final AKeyPair aliceUserKeyPair=AKeyPair.generate();
 	private final AKeyPair bobUserKeyPair=AKeyPair.generate();
 	private final AKeyPair carolUserKeyPair=AKeyPair.generate();
+	private final AKeyPair daveUserKeyPair=AKeyPair.generate();
 
 	private EtchStore aliceStore;
 	private EtchStore bobStore;
 	private EtchStore carolStore;
+	private EtchStore daveStore;
 	private P2PNode aliceNode;
 	private P2PNode bobNode;
 	private P2PNode carolNode;
+	private P2PNode daveNode;
 
 	@BeforeEach
 	public void setUp() throws Exception {
@@ -63,7 +67,7 @@ public class P2PSocialSyncTest {
 			.serveAllInbound();
 	}
 
-	private void launchNetwork() throws Exception {
+	private void launchInitialNetwork() throws Exception {
 		aliceNode.launch();
 		bobNode.launch();
 		carolNode.launch();
@@ -99,7 +103,6 @@ public class P2PSocialSyncTest {
 		CompletableFuture<Void> carolHasRegistry=awaitCondition(carolNode,
 			() -> knowsNode(carolNode,aliceNodeKeyPair)
 				&& knowsNode(carolNode,bobNodeKeyPair));
-		bobNode.getApplication().sync();
 		CompletableFuture.allOf(aliceHasRegistry,carolHasRegistry).get(5,TimeUnit.SECONDS);
 
 		// Registry convergence lets the leaves discover each other without another
@@ -114,16 +117,18 @@ public class P2PSocialSyncTest {
 
 	@AfterEach
 	public void tearDown() throws Exception {
+		if (daveNode!=null) daveNode.close();
 		if (aliceNode!=null) aliceNode.close();
 		if (bobNode!=null) bobNode.close();
 		if (carolNode!=null) carolNode.close();
+		if (daveStore!=null) daveStore.close();
 		if (aliceStore!=null) aliceStore.close();
 		if (bobStore!=null) bobStore.close();
 		if (carolStore!=null) carolStore.close();
 	}
 
 	@Test
-	public void testThreeUsersSynchroniseFollowGraphAndFeedsAcrossNodes() throws Exception {
+	public void testLateJoiningFourthUserSynchronisesFollowGraphAndFeeds() throws Exception {
 		Social aliceSocial=Social.connect(aliceNode.getApplication(),aliceUserKeyPair);
 		Social bobSocial=Social.connect(bobNode.getApplication(),bobUserKeyPair);
 		Social carolSocial=Social.connect(carolNode.getApplication(),carolUserKeyPair);
@@ -162,7 +167,7 @@ public class P2PSocialSyncTest {
 
 		// The first announced value for every node now contains one complete signed
 		// user state, avoiding publication of intermediate user actions.
-		launchNetwork();
+		launchInitialNetwork();
 		assertEquals(Set.of(bobUserKeyPair.getAccountKey(),carolUserKeyPair.getAccountKey()),
 			aliceSocial.user(aliceUserKeyPair.getAccountKey()).follows().getActive());
 		assertEquals(Set.of(aliceUserKeyPair.getAccountKey()),
@@ -198,6 +203,83 @@ public class P2PSocialSyncTest {
 			"Alice and Bob should converge");
 		assertEquals(aliceNode.getCursor().get(),carolNode.getCursor().get(),
 			"Alice and Carol should converge");
+
+		// Dave is created and launched only after the original three-node network has
+		// converged. His local user value exists before joining, so one bootstrap must
+		// merge existing remote state without discarding his independently signed state.
+		daveStore=EtchStore.createTemp("p2p-social-dave");
+		daveNode=P2PNode.create(daveStore,NodeConfig.localNetwork(),daveNodeKeyPair)
+			.serveAllInbound();
+		Social daveSocial=Social.connect(daveNode.getApplication(),daveUserKeyPair);
+		SocialUser daveWork=daveSocial.user(daveUserKeyPair.getAccountKey()).fork();
+		Blob davePost=daveWork.feed().post("Hello from Dave");
+		daveWork.follows().follow(carolUserKeyPair.getAccountKey());
+		daveWork.sync();
+		daveNode.launch();
+
+		assertNotEquals(daveNodeKeyPair.getAccountKey(),daveUserKeyPair.getAccountKey());
+		assertEquals(4,Set.of(aliceNode.getPort(),bobNode.getPort(),carolNode.getPort(),
+			daveNode.getPort()).size(),"Dave must use another OS-assigned port");
+
+		CompletableFuture<Void> aliceHasDave=awaitCondition(aliceNode,
+			() -> hasExpectedLateJoinState(aliceNode,aliceSocial,
+				alicePost,bobPost,carolPost,davePost));
+		CompletableFuture<Void> bobHasDave=awaitCondition(bobNode,
+			() -> hasExpectedLateJoinState(bobNode,bobSocial,
+				alicePost,bobPost,carolPost,davePost));
+		CompletableFuture<Void> carolHasDave=awaitCondition(carolNode,
+			() -> hasExpectedLateJoinState(carolNode,carolSocial,
+				alicePost,bobPost,carolPost,davePost));
+		CompletableFuture<Void> daveConverged=awaitCondition(daveNode,
+			() -> hasExpectedLateJoinState(daveNode,daveSocial,
+				alicePost,bobPost,carolPost,davePost));
+
+		// Dave is told only about Bob. connect() pushes Dave's signed NodeInfo and
+		// pulls Bob's current root, which publishes Dave's merged local+remote state.
+		Convex daveToBob=daveNode.connect(
+			bobNodeKeyPair.getAccountKey(),bobNode.getNodeServer().getHostAddress())
+			.get(5,TimeUnit.SECONDS);
+		Convex bobToDave=bobNode.whenConnected(daveNodeKeyPair.getAccountKey())
+			.get(5,TimeUnit.SECONDS);
+		assertEquals(bobNodeKeyPair.getAccountKey(),daveToBob.getVerifiedPeer());
+		assertEquals(daveNodeKeyPair.getAccountKey(),bobToDave.getVerifiedPeer());
+		assertNotNull(bobNode.p2p(daveNodeKeyPair.getAccountKey()).node().getNodeInfo(),
+			"Bob should acknowledge Dave's signed node identity before connect completes");
+		assertTrue(hasExpectedLateJoinState(daveNode,daveSocial,
+			alicePost,bobPost,carolPost,davePost),
+			"connect should merge the existing network into Dave before completing");
+
+		CompletableFuture.allOf(aliceHasDave,bobHasDave,carolHasDave,daveConverged)
+			.get(5,TimeUnit.SECONDS);
+		Convex daveToAlice=daveNode.whenConnected(aliceNodeKeyPair.getAccountKey())
+			.get(5,TimeUnit.SECONDS);
+		Convex daveToCarol=daveNode.whenConnected(carolNodeKeyPair.getAccountKey())
+			.get(5,TimeUnit.SECONDS);
+		assertEquals(aliceNodeKeyPair.getAccountKey(),daveToAlice.getVerifiedPeer());
+		assertEquals(carolNodeKeyPair.getAccountKey(),daveToCarol.getVerifiedPeer());
+
+		assertExpectedLateJoinState(aliceSocial,alicePost,bobPost,carolPost,davePost);
+		assertExpectedLateJoinState(bobSocial,alicePost,bobPost,carolPost,davePost);
+		assertExpectedLateJoinState(carolSocial,alicePost,bobPost,carolPost,davePost);
+		assertExpectedLateJoinState(daveSocial,alicePost,bobPost,carolPost,davePost);
+		assertEquals(aliceNode.getCursor().get(),bobNode.getCursor().get(),
+			"Alice and Bob should retain convergence after Dave joins");
+		assertEquals(aliceNode.getCursor().get(),carolNode.getCursor().get(),
+			"Alice and Carol should retain convergence after Dave joins");
+		assertEquals(aliceNode.getCursor().get(),daveNode.getCursor().get(),
+			"Dave should converge with the existing network");
+	}
+
+	private boolean hasExpectedLateJoinState(P2PNode node, Social social,
+			Blob alicePost, Blob bobPost, Blob carolPost, Blob davePost) {
+		return hasExpectedSocialState(social,alicePost,bobPost,carolPost)
+			&& social.user(daveUserKeyPair.getAccountKey()).feed().getPost(davePost)!=null
+			&& Set.of(carolUserKeyPair.getAccountKey()).equals(
+				social.user(daveUserKeyPair.getAccountKey()).follows().getActive())
+			&& knowsNode(node,aliceNodeKeyPair)
+			&& knowsNode(node,bobNodeKeyPair)
+			&& knowsNode(node,carolNodeKeyPair)
+			&& knowsNode(node,daveNodeKeyPair);
 	}
 
 	private boolean hasExpectedSocialState(
@@ -259,6 +341,18 @@ public class P2PSocialSyncTest {
 		assertFalse(carolFollows.isFollowing(aliceUserKeyPair.getAccountKey()));
 		assertFalse(bobFollows.isFollowing(carolUserKeyPair.getAccountKey()));
 		assertFalse(carolFollows.isFollowing(bobUserKeyPair.getAccountKey()));
+	}
+
+	private void assertExpectedLateJoinState(Social social,
+			Blob alicePost, Blob bobPost, Blob carolPost, Blob davePost) {
+		assertExpectedSocialState(social,alicePost,bobPost,carolPost);
+		assertEquals("Hello from Dave",SocialPost.getText(
+			social.user(daveUserKeyPair.getAccountKey()).feed().getPost(davePost)));
+		Follows daveFollows=social.user(daveUserKeyPair.getAccountKey()).follows();
+		assertEquals(Set.of(carolUserKeyPair.getAccountKey()),daveFollows.getActive());
+		assertTrue(daveFollows.isFollowing(carolUserKeyPair.getAccountKey()));
+		assertFalse(social.user(carolUserKeyPair.getAccountKey()).follows()
+			.isFollowing(daveUserKeyPair.getAccountKey()));
 	}
 
 	/** Waits only on real root-announcement signals until the expected state exists. */

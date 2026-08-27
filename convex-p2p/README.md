@@ -198,19 +198,22 @@ P2PNode bob = P2PNode.create(bobStore, NodeConfig.localNetwork(), bobKey)
 alice.launch();
 bob.launch();
 
-// Bob proves his key; Alice then pushes only her own signed NodeInfo entry.
+// Bob proves his key; Alice pushes only her own signed NodeInfo entry, then
+// pulls and merges Bob's current announced root.
 alice.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
 
 // Bob learns Alice's transport from that entry and connects back automatically.
 bob.whenConnected(aliceKey.getAccountKey()).join();
 
-// Subsequent application syncs gossip in both directions.
+// Subsequent application changes gossip in both directions.
 alice.getApplication().sync();
 ```
 
 `connect` completes after the bootstrap endpoint is authenticated and has
-acknowledged the path-scoped `[:p2p :nodes]` update. It does not send the whole
-application root as part of discovery.
+acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
+node has pulled and merged the bootstrap node's current announced root. A node
+joining an established network therefore obtains its existing configured regions
+without waiting for another publication or periodic root sync.
 
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a

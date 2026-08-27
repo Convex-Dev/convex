@@ -51,9 +51,10 @@ import convex.node.NodeServer;
  *
  * <p><b>Bootstrap discovery.</b> A node can be told about one authenticated peer with
  * {@link #connect(AccountKey, InetSocketAddress)}. It pushes its own signed NodeInfo,
- * allowing the remote node to discover it and establish the reverse connection.
- * On-chain bootstrap, region subscription and bounded replication policy remain to
- * be built on top.
+ * then pulls and merges the bootstrap node's current root. This lets both existing
+ * and late-joining nodes discover each other and synchronise the configured regions
+ * without an additional publication trigger. On-chain bootstrap, region subscription
+ * and bounded replication policy remain to be built on top.
  *
  * <p><b>Inbound policy.</b> A NodeServer denies all network lattice traffic until an
  * operator assigns inbound connections to a propagator. {@link #create} leaves that
@@ -183,14 +184,17 @@ public class P2PNode implements Closeable {
 	 *
 	 * <p>After the remote endpoint proves {@code peerKey}, this node pushes only its
 	 * own signed {@code [:p2p :nodes]} entry and waits for the merge acknowledgement.
-	 * The remote node can then discover this node's advertised transport and open the
-	 * reverse connection needed for bidirectional lattice gossip. The node must have
-	 * published a NodeInfo record, normally through {@link NodeConfig#URL} or
+	 * It then pulls and merges the remote node's current announced root. The remote
+	 * node can discover this node's advertised transport and open the reverse
+	 * connection needed for bidirectional lattice gossip, while a late joiner obtains
+	 * the existing configured regions immediately. The node must have published a
+	 * NodeInfo record, normally through {@link NodeConfig#URL} or
 	 * {@link NodeConfig#localNetwork()}.</p>
 	 *
 	 * @param peerKey expected AccountKey of the bootstrap node
 	 * @param address bootstrap node's TCP address
-	 * @return future completing after connection admission and own-identity merge
+	 * @return future completing after connection admission, own-identity merge and
+	 *         local merge of the bootstrap node's announced root
 	 */
 	public CompletableFuture<Convex> connect(AccountKey peerKey, InetSocketAddress address) {
 		if (!server.isRunning()) {
@@ -198,7 +202,9 @@ public class P2PNode implements Closeable {
 				new IllegalStateException("P2P node must be launched before connecting"));
 		}
 		return server.getPropagator().getConnectionManager().connectPeer(peerKey,address)
-			.thenCompose(peer -> pushOwnNodeInfo(peer).thenApply(ignored -> peer));
+			.thenCompose(peer -> pushOwnNodeInfo(peer)
+				.thenCompose(ignored -> server.pull(peer))
+				.thenApply(ignored -> peer));
 	}
 
 	/**
