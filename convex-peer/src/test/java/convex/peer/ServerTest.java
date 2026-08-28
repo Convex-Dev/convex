@@ -499,23 +499,36 @@ public class ServerTest {
 	public void testTransactionPersistedAtIntake() throws Exception {
 		Server server = network.SERVER;
 		Convex convex = network.CONVEX;
+		TransactionHandler transactionHandler=server.getTransactionHandler();
+		CompletableFuture<SignedData<ATransaction>> accepted=new CompletableFuture<>();
 		// Transaction sequencing is owned by the shared client. Hold its monitor
 		// across sequence selection, signing and submission so concurrently running
 		// tests cannot allocate the same sequence between these operations.
-		synchronized (convex) {
-			// Use a non-trivial command to ensure the signed cell has child refs
-			ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
-					Reader.read("(do (def x 1) (def y 2) (+ x y))"));
-			SignedData<ATransaction> signed = network.HERO_KEYPAIR.signData(tx);
+		SignedData<ATransaction> signed;
+		try {
+			synchronized (convex) {
+				// Use a non-trivial command to ensure the signed cell has child refs
+				ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
+						Reader.read("(do (def x 1) (def y 2) (+ x y))"));
+				signed = network.HERO_KEYPAIR.signData(tx);
+				Hash expectedHash=signed.getHash();
+				transactionHandler.setRequestObserver(observed -> {
+					if (expectedHash.equals(observed.getHash())) accepted.complete(observed);
+				});
+				convex.transact(signed);
+			}
 
-			Result r = convex.transactSync(signed, 5000);
-			assertFalse(r.isError(), () -> "Valid tx should succeed: " + r);
+			SignedData<ATransaction> observed=accepted.get(
+				Config.DEFAULT_CLIENT_TIMEOUT,TimeUnit.MILLISECONDS);
+			assertEquals(signed.getHash(),observed.getHash());
 
-			// After successful response, the SignedData must be in the peer's store
+			// The intake observer runs only after full persistence and queue admission.
 			Ref<?> ref = server.getStore().refForHash(signed.getHash());
 			assertNotNull(ref, "SignedData must be persisted in peer store after intake");
 			assertTrue(ref.getStatus() >= Ref.PERSISTED,
 				"SignedData ref must be at PERSISTED status or higher");
+		} finally {
+			transactionHandler.setRequestObserver(null);
 		}
 	}
 
