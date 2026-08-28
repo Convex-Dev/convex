@@ -28,9 +28,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `did:convex`, and authenticated `did:web`/`alsoKnownAs` key authorisation. The
   top-level `:following` value uses LWP over a DID-keyed `:follows` map with whole-record
   LWW edits and a cached last-validated signer.
+- The supported `convex.peer` module API now exports `convex.node`. Host settings
+  use `NodeConfig`, while each independently composed propagation group uses
+  `LatticePropagatorConfig` and exposes lifecycle and contained-failure status for
+  application supervision.
 
 ### Changed
 
+- Convex clients preserve reserved transaction sequences after timeouts and CVM
+  errors, preventing a shared client from reusing a sequence whose outcome is
+  unknown or which the transaction consumed.
 - CAD036 lattice paths now use one canonical vector representation. Lattice nodes
   use `[:LV path value]` for optimistic pushes and `[:LV id path value]` for
   confirmed pushes, and reject scalar, missing or ambiguous paths.

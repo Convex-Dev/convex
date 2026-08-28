@@ -72,9 +72,10 @@ public abstract class AConvexConnected extends Convex {
 	 *
 	 * @param resultID ID of result message to await
 	 * @param timeout Timeout in milliseconds, or 0 for no timeout
+	 * @param transaction {@code true} if this request submits a transaction
 	 * @return CompletableFuture for the Result
 	 */
-	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout) {
+	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout, boolean transaction) {
 		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
 
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
@@ -89,7 +90,6 @@ public abstract class AConvexConnected extends Convex {
 			awaiting.remove(resultID);
 
 			if (e!=null) {
-				sequence=null;
 				return Result.fromException(e);
 			}
 
@@ -97,13 +97,10 @@ public abstract class AConvexConnected extends Convex {
 				m.getPayload(getStore());
 			} catch (BadFormatException e1) {
 				log.warn("Bad message format in result: {}",e1.getMessage());
-				sequence=null;
 				return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+e1.getMessage()));
 			}
 			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
-			}
+			if (transaction) observeTransactionResult(r);
 			return r;
 		});
 		return cr;
@@ -259,7 +256,7 @@ public abstract class AConvexConnected extends Convex {
 			}
 
 			// Register future BEFORE send — response handler can find it immediately
-			CompletableFuture<Result> cf = awaitResult(id, timeout);
+			CompletableFuture<Result> cf = awaitResult(id, timeout, m.getType()==MessageType.TRANSACT);
 			boolean sent = conn.sendMessage(m);
 			if (!sent) {
 				awaiting.remove(id);

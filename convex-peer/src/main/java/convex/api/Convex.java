@@ -402,8 +402,10 @@ public abstract class Convex implements AutoCloseable {
 	 * transaction has been successfully queued. Signs the transaction with the
 	 * currently set key pair.
 	 *
-	 * Should be thread safe as long as multiple clients do not attempt to submit
-	 * transactions for the same account concurrently.
+	 * A single client may submit transactions concurrently: sequence allocation is
+	 * serialised so that each transaction receives a distinct sequence number.
+	 * Multiple client instances must not independently submit transactions for the
+	 * same account without coordinating their sequences.
 	 * 
 	 * May block briefly if the send buffer is full.
 	 *
@@ -663,14 +665,30 @@ public abstract class Convex implements AutoCloseable {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
-			if (result.getErrorCode()!=null) {
-				// On error, clear cached sequence, it is possibly invalid
-				sequence=null;
-			}
+			observeTransactionResult(result);
 			return result;
 		} catch (ExecutionException | TimeoutException e) {
-			return Result.fromException(e);
+			result=Result.fromException(e);
+			observeTransactionResult(result);
+			return result;
 		} 
+	}
+
+	/**
+	 * Updates auto-sequencing state from a completed transaction request.
+	 *
+	 * <p>Only a definite {@link ErrorCodes#SEQUENCE} rejection proves that the
+	 * cached sequence is wrong. Other errors may have consumed the sequence, while
+	 * a timeout or communication failure leaves the outcome unknown. Rewinding the
+	 * cache for either case can reuse a sequence belonging to an in-flight or
+	 * completed transaction.</p>
+	 *
+	 * @param result transaction result, or {@code null}
+	 */
+	protected final void observeTransactionResult(Result result) {
+		if ((result!=null)&&ErrorCodes.SEQUENCE.equals(result.getErrorCode())) {
+			sequence=null;
+		}
 	}
 
 	/**
@@ -695,9 +713,12 @@ public abstract class Convex implements AutoCloseable {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
+			observeTransactionResult(result);
 			return result;
 		} catch (ExecutionException | TimeoutException e) {
-			return Result.fromException(e);
+			result=Result.fromException(e);
+			observeTransactionResult(result);
+			return result;
 		} finally {
 			cf.cancel(true);
 		}
