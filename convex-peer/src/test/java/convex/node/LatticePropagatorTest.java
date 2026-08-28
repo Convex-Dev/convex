@@ -204,8 +204,12 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		// Synchronous commit persists the authoritative node root.
+		CompletableFuture<ACell> published=nextAnnounceMatching(propagator2,
+			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+		// Synchronous commit persists the authoritative node root; propagation-view
+		// materialisation completes independently on the future above.
 		server2.getCursor().sync();
+		published.get(5,TimeUnit.SECONDS);
 
 		// Pull from server2 into server1
 		assertTrue(server1.pull(propagator1), "Pull should complete successfully");
@@ -224,17 +228,14 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
-		long acceptedBefore=propagator2.getInboundStats().mergesAccepted();
-		CompletableFuture<ACell> received=propagator2.nextAnnounce();
+		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getCursor().sync();
 
 		received.get(5,TimeUnit.SECONDS);
 		assertEquals(1L, propagator1.getBroadcastCount(),
 			"source should send one delta broadcast");
-		LatticePropagator.InboundStats inbound = propagator2.getInboundStats();
-		assertTrue(inbound.mergesAccepted()>=acceptedBefore+1,
-			"receiver should accept the pushed lattice merge: " + inbound);
 		ACell merged = server2.getLocalValue();
 		assertEquals(expected, RT.getIn(merged, dataKeyword, expectedHash),
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
@@ -252,8 +253,9 @@ public class LatticePropagatorTest {
 		}
 
 		propagator1.setMaxDeltaMessageSize(700);
-		long acceptedBefore=propagator2.getInboundStats().mergesAccepted();
-		CompletableFuture<ACell> received=propagator2.nextAnnounce();
+		Index<Hash,ACell> expectedValues=values;
+		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getCursor().sync();
 
@@ -262,7 +264,6 @@ public class LatticePropagatorTest {
 		LatticePropagator.InboundStats inbound=propagator2.getInboundStats();
 		assertTrue(inbound.messagesReceived()>1,
 			"chunked delta should arrive as DATA batches plus one root: "+inbound);
-		assertTrue(inbound.mergesAccepted()>=acceptedBefore+1);
 	}
 
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
@@ -624,8 +625,12 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			// Synchronous commit persists the authoritative node root.
+			CompletableFuture<ACell> published=nextAnnounceMatching(propagator1,
+				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+			// Synchronous commit persists the authoritative node root; wait for the
+			// source group to expose that exact root before pulling it.
 			server1.getCursor().sync();
+			published.get(5,TimeUnit.SECONDS);
 
 			// Pull from server1 into server2
 			assertTrue(server2.pull(propagator2),
