@@ -498,8 +498,11 @@ public class ServerTest {
 	@Test
 	public void testTransactionPersistedAtIntake() throws Exception {
 		Server server = network.SERVER;
-		synchronized (network.SERVER) {
-			Convex convex = network.CONVEX;
+		Convex convex = network.CONVEX;
+		// Transaction sequencing is owned by the shared client. Hold its monitor
+		// across sequence selection, signing and submission so concurrently running
+		// tests cannot allocate the same sequence between these operations.
+		synchronized (convex) {
 			// Use a non-trivial command to ensure the signed cell has child refs
 			ATransaction tx = Invoke.create(network.HERO, convex.getSequence() + 1,
 					Reader.read("(do (def x 1) (def y 2) (+ x y))"));
