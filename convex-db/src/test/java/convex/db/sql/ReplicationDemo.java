@@ -16,6 +16,7 @@ import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 
 /**
  * Demo: Replicated Lattice SQL Database over a real network.
@@ -55,9 +56,11 @@ public class ReplicationDemo {
 		NodeServer<?> serverTokyo  = new NodeServer<>(
 				ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo);
 		LatticePropagator propagatorLondon=new LatticePropagator(
-			storeLondon,ConvexDB.DATABASE_MAP_LATTICE,value -> value,configLondon);
+			storeLondon,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
+			LatticePropagatorConfig.create());
 		LatticePropagator propagatorTokyo=new LatticePropagator(
-			storeTokyo,ConvexDB.DATABASE_MAP_LATTICE,value -> value,configTokyo);
+			storeTokyo,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
+			LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
 		serverTokyo.addPropagator(propagatorTokyo);
 		serverLondon.setInboundPropagatorSelector(connection -> propagatorLondon);

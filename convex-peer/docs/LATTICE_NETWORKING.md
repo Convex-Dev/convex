@@ -39,6 +39,7 @@ NodeConfig nodeConfig = NodeConfig.port(0);
 NodeServer<MyValue> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
 node.setMergeContext(nodeContext);
 
+LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
 LatticePropagator publicGroup = new LatticePropagator(
     servingStore, lattice, publicProjection, groupConfig);
 publicGroup.setMergeContext(groupContext);
@@ -51,14 +52,17 @@ node.setInboundPropagatorSelector(connection -> publicGroup);
 node.launch();
 ```
 
-`NodeServer.addPropagator` does not copy the node lattice, context, key, filters,
-handlers or configuration. This prevents a generic host from silently inventing
-network policy. An application with several groups retains their references and
-selects the intended group explicitly for pulls and connection assignment.
+`NodeConfig` contains host listener, authoritative persistence and application
+advertisement settings. `LatticePropagatorConfig` contains one group's route,
+queue, acquisition and publication limits. `NodeServer.addPropagator` copies
+neither object and does not copy the node lattice, context, key, filters or
+handlers. An application with several groups retains their references and selects
+the intended group explicitly for pulls and connection assignment.
 
-The node's listener settings and a group's protocol settings may use the same
-`NodeConfig` object for convenience, but that is an application choice rather
-than inheritance.
+The deprecated propagator constructors and
+`LatticePropagatorConfig.from(NodeConfig)` preserve combined-map callers during
+migration. New composition should construct the two configurations separately;
+matching key names do not imply inheritance.
 
 ## Connection capabilities
 
@@ -156,6 +160,13 @@ from the node's authoritative value during launch.
 There is no implicit/default group. A group that fails to materialise, start or
 receive a notification is logged and isolated; it cannot fail node publication
 or prevent another group from progressing.
+
+Applications can inspect `propagator.getStatus()` for lifecycle, failure count
+and the most recent contained failure. `propagator.nextFailure()` returns a
+one-shot future for the next failure, allowing supervision without polling or
+coupling recovery policy to `NodeServer`. A running group may report prior or
+intermittent failures; `Status.isOperational()` describes lifecycle, while
+`Status.hasFailures()` describes observed degradation.
 
 Shutdown closes listener admission, asks every endpoint to drain, publishes the
 final authoritative root, drains each group and completes the node-store

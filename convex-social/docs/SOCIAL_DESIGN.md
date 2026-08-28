@@ -97,10 +97,11 @@ The challenge has a cryptographically random nonce, the responder key as audienc
 and the `convex-lattice-peer-v1` context. The response signs the same nonce, the
 challenger key as audience, and the same context. Both signatures are verified.
 
-`NodeConfig.maxConnections` bounds inbound sockets and
-`NodeConfig.maxDesiredPeers` bounds configured plus discovery-driven peers (both
-default to 256). Existing message, queue, acquisition and rejection limits provide
-the remaining generic resource bounds.
+`NodeConfig.maxConnections` bounds sockets accepted by the shared listener, while
+`LatticePropagatorConfig.maxDesiredPeers` bounds configured plus discovery-driven
+peer intent for each propagation group (both default to 256). Group message,
+queue, acquisition and rejection limits provide the remaining generic resource
+bounds.
 
 ## Current correctness coverage
 

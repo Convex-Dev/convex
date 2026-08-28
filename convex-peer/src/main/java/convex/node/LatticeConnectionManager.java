@@ -89,13 +89,13 @@ public class LatticeConnectionManager extends AConnectionManager {
 	private static final Logger log = LoggerFactory.getLogger(LatticeConnectionManager.class.getName());
 
 	/** Receive limit before the remote AccountKey is verified. */
-	private volatile int untrustedMessageLimit = NodeConfig.DEFAULT_MAX_MESSAGE_SIZE;
+	private volatile int untrustedMessageLimit = LatticePropagatorConfig.DEFAULT_MAX_MESSAGE_SIZE;
 
 	/** Receive limit after challenge/response proves the expected remote AccountKey. */
-	private volatile int trustedMessageLimit = NodeConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
+	private volatile int trustedMessageLimit = LatticePropagatorConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
 
 	/** Hard cap for operator- and discovery-supplied desired peer identities. */
-	private volatile int maxDesiredPeers = NodeConfig.DEFAULT_MAX_DESIRED_PEERS;
+	private volatile int maxDesiredPeers = LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS;
 
 	// ========== Constants ==========
 

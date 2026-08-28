@@ -22,6 +22,8 @@ import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeServer;
 import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
+import convex.node.NodeConfig;
 
 /**
  * Standalone entry point demonstrating a complete NodeServer-hosted DLFS stack.
@@ -62,12 +64,13 @@ public final class Main {
 		AStore store=openStore(config,keyPair);
 		Keyword[] regionPath=config.getRegionPath();
 		KeyedLattice root=createRoot(regionPath);
+		NodeConfig nodeConfig=config.getNodeConfig();
 		NodeServer<Index<Keyword,ACell>> node=
-			new NodeServer<>(root,store,config.getNodeConfig());
+			new NodeServer<>(root,store,nodeConfig);
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		node.setMergeContext(context);
 		LatticePropagator propagator=new LatticePropagator(
-			store,root,value -> value,config.getNodeConfig());
+			store,root,value -> value,LatticePropagatorConfig.from(nodeConfig));
 		propagator.setMergeContext(context);
 		propagator.setTransportKeyPair(keyPair);
 		node.addPropagator(propagator);

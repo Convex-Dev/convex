@@ -61,7 +61,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 
 	private final LatticePropagator propagator;
 	private final NodeServer<?> node;
-	private final NodeConfig config;
+	private final LatticePropagatorConfig config;
 	private final AStore store;
 	private final BoundedMessageQueue inboundQueue;
 	private final Semaphore acquisitionPermits;
@@ -94,7 +94,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 	private Predicate<Message> applicationMessageHandler;
 	private InboundLatticeListener inboundLatticeListener;
 
-	LatticeProtocolEndpoint(LatticePropagator propagator,NodeServer<?> node,NodeConfig config) {
+	LatticeProtocolEndpoint(LatticePropagator propagator,NodeServer<?> node,
+			LatticePropagatorConfig config) {
 		this.propagator=propagator;
 		this.node=node;
 		this.config=config;
@@ -349,6 +350,7 @@ final class LatticeProtocolEndpoint implements Closeable {
 			else recordMergeReject(context.connection(),context.stats());
 		} catch (RuntimeException | StackOverflowError e) {
 			recordMergeReject(context.connection(),context.stats());
+			propagator.recordFailure("application message handler",e);
 			log.warn("Propagation-group application handler failed",e);
 		}
 	}

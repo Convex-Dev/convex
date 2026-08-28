@@ -82,7 +82,7 @@ public class LatticeDemo {
 				NodeConfig config=NodeConfig.port(0);
 				NodeServer<?> server = new NodeServer<>(lattice,store,config);
 				LatticePropagator propagator=new LatticePropagator(
-					store,lattice,value -> value,config);
+					store,lattice,value -> value,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
 				server.setInboundPropagatorSelector(connection -> propagator);
 				server.launch();

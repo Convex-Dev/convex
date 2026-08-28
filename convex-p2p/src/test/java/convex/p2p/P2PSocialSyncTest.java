@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 import org.junit.jupiter.api.AfterEach;
@@ -33,13 +34,19 @@ import convex.core.message.Message;
 import convex.core.message.MessageTag;
 import convex.core.message.MessageType;
 import convex.etch.EtchStore;
+import convex.core.store.MemoryStore;
+import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 import convex.node.NodeConfig;
 import convex.social.Social;
 import convex.social.SocialLattice;
 import convex.social.SocialPost;
 import convex.social.SocialUser;
 
-/** End-to-end one-hop social replication with a fourth node joining late. */
+/**
+ * End-to-end follow-filtered social replication, independent served views and
+ * failure containment, with a fourth node joining late.
+ */
 public class P2PSocialSyncTest {
 
 	private final AKeyPair aliceNodeKey=AKeyPair.generate();
@@ -58,15 +65,22 @@ public class P2PSocialSyncTest {
 
 	private EtchStore aliceStore,bobStore,carolStore,daveStore;
 	private P2PNode aliceNode,bobNode,carolNode,daveNode;
+	private LatticePropagator bobInfrastructureView,bobBrokenView;
 
 	@BeforeEach
 	public void setUp() throws Exception {
 		aliceStore=EtchStore.createTemp("p2p-social-alice");
 		bobStore=EtchStore.createTemp("p2p-social-bob");
 		carolStore=EtchStore.createTemp("p2p-social-carol");
-		aliceNode=P2PNode.create(aliceStore,NodeConfig.localNetwork(),aliceNodeKey).serveAllInbound();
-		bobNode=P2PNode.create(bobStore,NodeConfig.localNetwork(),bobNodeKey).serveAllInbound();
-		carolNode=P2PNode.create(carolStore,NodeConfig.localNetwork(),carolNodeKey).serveAllInbound();
+		NodeConfig aliceHost=NodeConfig.localNetwork();
+		NodeConfig bobHost=NodeConfig.localNetwork();
+		NodeConfig carolHost=NodeConfig.localNetwork();
+		aliceNode=P2PNode.create(aliceStore,aliceHost,
+			LatticePropagatorConfig.create(),aliceNodeKey).serveAllInbound();
+		bobNode=P2PNode.create(bobStore,bobHost,
+			LatticePropagatorConfig.create(),bobNodeKey).serveAllInbound();
+		carolNode=P2PNode.create(carolStore,carolHost,
+			LatticePropagatorConfig.create(),carolNodeKey).serveAllInbound();
 	}
 
 	@AfterEach
@@ -99,9 +113,40 @@ public class P2PSocialSyncTest {
 		bw.sync();
 		cw.sync();
 
+		// Bob also publishes an infrastructure-only view from a separate serving
+		// store. A third transiently broken view proves failure containment and
+		// recovery without replacing the real follow-aware propagation group.
+		bobInfrastructureView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
+			value -> value.dissoc(Social.KEY_SOCIAL),LatticePropagatorConfig.create());
+		AtomicBoolean failBrokenViewOnce=new AtomicBoolean();
+		bobBrokenView=new LatticePropagator(new MemoryStore(),P2PLattice.NODE_ROOT,
+			value -> {
+				if (failBrokenViewOnce.compareAndSet(false,true)) {
+					throw new IllegalStateException("simulated filtered-view failure");
+				}
+				return value.dissoc(Social.KEY_SOCIAL);
+			},LatticePropagatorConfig.create());
+		bobNode.getNodeServer().addPropagator(bobInfrastructureView);
+		bobNode.getNodeServer().addPropagator(bobBrokenView);
+		CompletableFuture<LatticePropagator.Failure> brokenViewFailure=
+			bobBrokenView.nextFailure();
+
 		aliceNode.launch();
 		bobNode.launch();
 		carolNode.launch();
+		LatticePropagator.Failure contained=brokenViewFailure.get(5,TimeUnit.SECONDS);
+		assertEquals("initial view materialisation",contained.operation());
+		assertTrue(bobBrokenView.getStatus().isOperational());
+		assertTrue(bobBrokenView.getStatus().hasFailures());
+		assertTrue(bobInfrastructureView.getStatus().isOperational());
+		assertFalse(bobInfrastructureView.getStatus().hasFailures());
+		assertTrue(bobNode.propagationGroup().getStatus().isOperational());
+		assertFalse(bobNode.propagationGroup().getStatus().hasFailures());
+		@SuppressWarnings("unchecked")
+		Index<Keyword,ACell> infrastructure=(Index<Keyword,ACell>)
+			bobInfrastructureView.getLastAnnouncedValue();
+		assertNull(infrastructure.get(Social.KEY_SOCIAL));
+		assertTrue(infrastructure.get(P2PLattice.KEY_P2P)!=null);
 		assertEquals(3,Set.of(aliceNode.getPort(),bobNode.getPort(),carolNode.getPort()).size());
 
 		Convex aliceToBob=aliceNode.connect(bobNodeKey.getAccountKey(),
@@ -150,7 +195,9 @@ public class P2PSocialSyncTest {
 
 		// Dave is outbound-only, is told only about Bob, and follows Carol.
 		daveStore=EtchStore.createTemp("p2p-social-dave");
-		daveNode=P2PNode.create(daveStore,NodeConfig.port(-1),daveNodeKey);
+		NodeConfig daveHost=NodeConfig.port(-1);
+		daveNode=P2PNode.create(daveStore,daveHost,
+			LatticePropagatorConfig.create(),daveNodeKey);
 		Social dave=daveNode.social(daveDid,daveUserKey);
 		SocialUser dw=dave.user(daveDid).fork();
 		Blob davePost=dw.feed().post("Hello from Dave");
@@ -185,6 +232,17 @@ public class P2PSocialSyncTest {
 		assertFalse(hasPost(alice,daveDid,davePost));
 		assertFalse(hasPost(bob,daveDid,davePost));
 		assertFalse(hasPost(carol,daveDid,davePost));
+		assertTrue(bobNode.isRunning(),"a failed secondary view must not stop the node");
+		assertEquals(1L,bobBrokenView.getStatus().failureCount());
+		@SuppressWarnings("unchecked")
+		Index<Keyword,ACell> recoveredView=(Index<Keyword,ACell>)
+			bobBrokenView.getLastAnnouncedValue();
+		assertTrue(recoveredView!=null,"the failed view should recover on a later update");
+		assertNull(recoveredView.get(Social.KEY_SOCIAL));
+		@SuppressWarnings("unchecked")
+		Index<Keyword,ACell> finalInfrastructure=(Index<Keyword,ACell>)
+			bobInfrastructureView.getLastAnnouncedValue();
+		assertNull(finalInfrastructure.get(Social.KEY_SOCIAL));
 
 		// A public, unverified connection may offer complete data, but possession
 		// of an unrelated key cannot mutate Alice's DID-owned feed.

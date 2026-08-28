@@ -5,6 +5,7 @@ module convex.peer {
 	exports convex.peer.signing;
 	exports convex.net.store;
 	exports convex.api;
+	exports convex.node;
 
 	requires transitive convex.core;
 	requires java.net.http;

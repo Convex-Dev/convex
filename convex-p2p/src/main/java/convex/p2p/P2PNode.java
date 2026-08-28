@@ -42,6 +42,7 @@ import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.LatticeConnectionManager;
 import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 import convex.social.Social;
 
 /**
@@ -131,7 +132,24 @@ public class P2PNode implements Closeable {
 	 * @return A new (unlaunched) P2PNode
 	 */
 	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair) {
-		return create(store, config, keyPair, P2PLattice.NODE_ROOT);
+		return create(store,config,LatticePropagatorConfig.from(config),keyPair,
+			P2PLattice.NODE_ROOT,DIDKeyAuthorizer.CONVEX);
+	}
+
+	/**
+	 * Creates a P2P node with independently supplied host and propagation-group
+	 * configuration.
+	 *
+	 * @param store authoritative node store
+	 * @param nodeConfig listener and persistence configuration, or {@code null}
+	 * @param propagatorConfig route, queue and publication limits, or {@code null}
+	 * @param keyPair node transport and NodeInfo key, or {@code null}
+	 * @return unlaunched P2P node
+	 */
+	public static P2PNode create(AStore store,NodeConfig nodeConfig,
+			LatticePropagatorConfig propagatorConfig,AKeyPair keyPair) {
+		return create(store,nodeConfig,propagatorConfig,keyPair,
+			P2PLattice.NODE_ROOT,DIDKeyAuthorizer.CONVEX);
 	}
 
 	/**
@@ -153,24 +171,46 @@ public class P2PNode implements Closeable {
 	 */
 	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair,
 			KeyedLattice root) {
-		return create(store,config,keyPair,root,DIDKeyAuthorizer.CONVEX);
+		return create(store,config,LatticePropagatorConfig.from(config),keyPair,root,
+			DIDKeyAuthorizer.CONVEX);
 	}
 
 	/** Creates a node with an authenticated DID resolution policy. */
 	public static P2PNode create(AStore store, NodeConfig config, AKeyPair keyPair,
 			KeyedLattice root,DIDKeyAuthorizer didAuthorizer) {
+		return create(store,config,LatticePropagatorConfig.from(config),keyPair,root,
+			didAuthorizer);
+	}
+
+	/**
+	 * Creates a P2P node with explicit regions, independent host and propagation
+	 * configuration, and an authenticated DID resolution policy.
+	 *
+	 * @param store authoritative node store
+	 * @param nodeConfig listener and persistence configuration, or {@code null}
+	 * @param propagatorConfig route, queue and publication limits, or {@code null}
+	 * @param keyPair node transport and NodeInfo key, or {@code null}
+	 * @param root regions served by this node
+	 * @param didAuthorizer DID-to-signing-key authorisation policy
+	 * @return unlaunched P2P node
+	 */
+	public static P2PNode create(AStore store,NodeConfig nodeConfig,
+			LatticePropagatorConfig propagatorConfig,AKeyPair keyPair,
+			KeyedLattice root,DIDKeyAuthorizer didAuthorizer) {
 		if (store == null) throw new IllegalArgumentException("Store must not be null");
 		if (root == null) throw new IllegalArgumentException("Root lattice must not be null");
 		if (didAuthorizer == null) throw new IllegalArgumentException("DID authorizer must not be null");
 
-		NodeConfig effectiveConfig=(config==null) ? NodeConfig.create() : config;
+		NodeConfig effectiveConfig=(nodeConfig==null) ? NodeConfig.create() : nodeConfig;
+		LatticePropagatorConfig effectivePropagatorConfig=(propagatorConfig==null)
+			? LatticePropagatorConfig.create() : propagatorConfig;
 		LatticeContext mergeContext=LatticeContext.create(
 			null,keyPair,didAuthorizer::verifiesOwner);
 		NodeServer<Index<Keyword, ACell>> server = new NodeServer<>(root,store,effectiveConfig);
 		server.setMergeContext(mergeContext);
 		LatticeConnectionManager manager=new LatticeConnectionManager(store);
 		LatticePropagator propagator=new LatticePropagator(
-			store,manager,root,value -> value,effectiveConfig);
+			store,manager,root,value -> value,effectivePropagatorConfig);
 		propagator.setMergeContext(mergeContext);
 		propagator.setTransportKeyPair(keyPair);
 		P2PNode node=new P2PNode(server,propagator,keyPair,didAuthorizer);

@@ -565,9 +565,11 @@ public class NodeServer<V extends ACell> implements Closeable {
 			action.run();
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
+			propagator.recordFailure(operation,e);
 			log.warn("Contained propagation-group stack overflow during {}: {}",
 				operation,propagator,e);
 		} catch (Throwable e) {
+			propagator.recordFailure(operation,e);
 			log.warn("Propagation group failed during {} and was isolated: {}",
 				operation,propagator,e);
 		}

@@ -94,7 +94,7 @@ public class LatticeNetworkTest {
 			NodeConfig config=NodeConfig.port(0);
 			NodeServer<?> server = new NodeServer<>(commonLattice, store, config);
 			LatticePropagator propagator=new LatticePropagator(
-				store,commonLattice,value -> value,config);
+				store,commonLattice,value -> value,LatticePropagatorConfig.create());
 			server.addPropagator(propagator);
 			server.setInboundPropagatorSelector(connection -> propagator);
 			propagators.add(propagator);

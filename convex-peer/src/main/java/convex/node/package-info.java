@@ -11,6 +11,10 @@
  *   <li>{@link convex.node.LatticePropagator} owns one application-configured
  *       policy group: its routes, protocol endpoint, filters, serving store,
  *       delta generation and root announcements.</li>
+ *   <li>{@link convex.node.NodeConfig} configures the host listener and
+ *       authoritative persistence, while
+ *       {@link convex.node.LatticePropagatorConfig} independently configures
+ *       one policy group's routes, queues and publication limits.</li>
  *   <li>{@link convex.node.LatticeConnectionManager} owns bounded connection
  *       intent, outbound dialing, remote-key admission and outbound routes for
  *       exactly one propagator. Discovery adapters supply transport metadata.</li>
@@ -53,6 +57,12 @@
  *   <li>An optional {@link convex.node.InboundLatticeListener} may observe the
  *       accepted path and value without changing the merge outcome.</li>
  * </ol>
+ *
+ * <p>Contained group failures are observable through
+ * {@link convex.node.LatticePropagator#getStatus()} and
+ * {@link convex.node.LatticePropagator#nextFailure()}. They do not become node
+ * failures: the application decides whether a degraded group should be restarted,
+ * replaced or left running.</p>
  *
  * <p>The calling application constructs and configures every propagation group
  * before attaching it. {@code NodeServer} creates no default group and a node

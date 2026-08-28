@@ -86,8 +86,8 @@ a future) and signed transactions once an address and key pair are set.
 | `Convex` | Client API (`convex.api`) for queries and transactions against a peer |
 | `ConnectionManager` | Manages peer-to-peer network connections |
 | `BeliefPropagator` | Handles CPoS belief propagation protocol |
-| `NodeServer` | Lattice node server (`convex.node`) for syncing lattice data regions |
-| `LatticePropagator` | Persists, filters and broadcasts lattice updates for a `NodeServer` |
+| `NodeServer` | Authoritative lattice host (`convex.node`): merge, persistence, listener and group notifications |
+| `LatticePropagator` | Owns one filtered serving view, protocol endpoint and external route set |
 | `LatticeConnectionManager` | Maintains bounded connection intent and authenticated routes for one propagator; discovery schemas live in application modules |
 
 ## Lattice Node
@@ -101,15 +101,18 @@ module layers node discovery, social selection and PoP routing on it.
 
 - **Construction** - Create a `NodeServer` with a lattice (defining merge
   semantics), a store and an optional `NodeConfig`, then call `launch()`.
-- **Configuration** - `NodeConfig` carries the tuning knobs: port, persistence
-  and restore behaviour, public URL, message size limits, connection cap,
-  inbound queue capacity and shutdown drain timeout.
+- **Configuration** - `NodeConfig` controls the shared listener, authoritative
+  persistence and application advertisement metadata. Each independently
+  constructed `LatticePropagatorConfig` controls one group's routes, protocol
+  queue, acquisition and publication limits.
 - **Bounded inbound path** - Inbound messages are admitted to a bounded queue
-  sized by `NodeConfig`; decode and merge run on a dispatcher thread off the
-  network I/O thread, and a full queue applies backpressure to the connection.
+  sized by the selected group's `LatticePropagatorConfig`; decode and merge run
+  on a dispatcher thread off the network I/O thread, and a full queue applies
+  backpressure to the connection.
 - **Propagators** - Each `LatticePropagator` owns a store and a
-  `LatticeFilter` which projects values before they are announced, persisted
-  or broadcast, so private data never leaves that propagator's view.
+  `LatticeFilter` which projects values before they are announced or broadcast,
+  so data outside that group's policy never enters its serving store. Contained
+  failures are available through `getStatus()` and `nextFailure()`.
 - **Inbound policy** - `setInboundPropagatorSelector` assigns each inbound
   connection to exactly one propagator, which determines both the query view
   and the store used for acquisition. No default policy is installed: inbound

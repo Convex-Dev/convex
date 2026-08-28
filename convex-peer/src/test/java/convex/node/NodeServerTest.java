@@ -209,6 +209,8 @@ public class NodeServerTest {
 		maxNodeServer.close();
 
 		assertTrue(group.closed);
+		assertTrue(group.manager.closed,
+			"pre-launch shutdown must release manager-owned routes");
 		assertEquals(NodeServer.LifecycleState.STOPPED,maxNodeServer.getLifecycleState());
 	}
 
@@ -218,12 +220,18 @@ public class NodeServerTest {
 		maxNodeServer=new NodeServer<>(MaxLattice.create(),store,NodeConfig.port(-1));
 		FailingPropagator broken=new FailingPropagator(store);
 		LatticePropagator healthy=new LatticePropagator(
-			store,MaxLattice.create(),value -> value,NodeConfig.port(-1));
+			store,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
 		maxNodeServer.addPropagator(broken);
 		maxNodeServer.addPropagator(healthy);
+		CompletableFuture<LatticePropagator.Failure> failureSignal=broken.nextFailure();
 
 		maxNodeServer.launch();
 		assertTrue(maxNodeServer.isRunning(),"a failed propagation group must not fail launch");
+		assertEquals("initial view materialisation",
+			failureSignal.get(5,TimeUnit.SECONDS).operation());
+		assertTrue(broken.getStatus().hasFailures());
+		assertFalse(healthy.getStatus().hasFailures());
+		assertTrue(healthy.getStatus().isOperational());
 		CompletableFuture<ACell> announced=healthy.nextAnnounce();
 		maxNodeServer.getCursor().set(CVMLong.create(23));
 		maxNodeServer.getCursor().sync();
@@ -236,7 +244,8 @@ public class NodeServerTest {
 
 	private static final class FailingPropagator extends LatticePropagator {
 		FailingPropagator(AStore store) {
-			super(store,MaxLattice.create(),value -> value,NodeConfig.port(-1));
+			super(store,MaxLattice.create(),value -> value,
+				LatticePropagatorConfig.create());
 		}
 
 		@Override public ACell processSnapshot(ACell value) {
@@ -262,9 +271,30 @@ public class NodeServerTest {
 
 	private static final class CloseTrackingPropagator extends LatticePropagator {
 		boolean closed;
+		final CloseTrackingConnectionManager manager;
 
 		CloseTrackingPropagator(AStore store) {
-			super(store,MaxLattice.create(),value -> value,NodeConfig.port(-1));
+			this(store,new CloseTrackingConnectionManager(store));
+		}
+
+		private CloseTrackingPropagator(AStore store,CloseTrackingConnectionManager manager) {
+			super(store,manager,MaxLattice.create(),value -> value,
+				LatticePropagatorConfig.create());
+			this.manager=manager;
+		}
+
+		@Override public void close() {
+			closed=true;
+			super.close();
+		}
+	}
+
+	private static final class CloseTrackingConnectionManager
+			extends LatticeConnectionManager {
+		boolean closed;
+
+		CloseTrackingConnectionManager(AStore store) {
+			super(store);
 		}
 
 		@Override public void close() {
@@ -416,64 +446,73 @@ public class NodeServerTest {
 	}
 
 	@Test
-	public void testProductionInboundDefaultsAndOverrides() {
-		NodeConfig defaults = NodeConfig.create();
-		assertEquals(4 * 1024 * 1024, defaults.getMaxMessageSize());
-		assertEquals(defaults.getMaxMessageSize(), defaults.getMaxDeltaMessageSize());
-		assertEquals(16 * 1024 * 1024, defaults.getMaxDeltaBroadcastSize());
+	public void testHostAndPropagationDefaultsAndOverrides() {
+		NodeConfig hostDefaults=NodeConfig.create();
+		assertEquals(4*1024*1024,hostDefaults.getMaxMessageSize());
+		assertEquals(256,hostDefaults.getMaxConnections());
+		assertEquals(30_000L,hostDefaults.getMaxFutureTimestampSkew());
+
+		LatticePropagatorConfig groupDefaults=LatticePropagatorConfig.create();
+		assertEquals(groupDefaults.getMaxMessageSize(),groupDefaults.getMaxDeltaMessageSize());
+		assertEquals(16*1024*1024,groupDefaults.getMaxDeltaBroadcastSize());
 		assertEquals(convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH,
-			defaults.getMaxTrustedMessageSize());
-		assertEquals(defaults.getMaxMessageSize(), defaults.getMaxInboundValueSize());
-		assertEquals(256, defaults.getMaxConnections());
-		assertEquals(1024, defaults.getInboundQueueSize());
-		assertEquals(16 * 1024 * 1024, defaults.getMaxInboundQueueBytes());
-		assertEquals(10_000L, defaults.getInboundShutdownTimeout());
-		assertEquals(30_000L, defaults.getMaxFutureTimestampSkew());
+			groupDefaults.getMaxTrustedMessageSize());
+		assertEquals(groupDefaults.getMaxMessageSize(),groupDefaults.getMaxInboundValueSize());
+		assertEquals(256,groupDefaults.getMaxConnections());
+		assertEquals(1024,groupDefaults.getInboundQueueSize());
+		assertEquals(16*1024*1024,groupDefaults.getMaxInboundQueueBytes());
+		assertEquals(10_000L,groupDefaults.getInboundShutdownTimeout());
 
-		NodeConfig configured = NodeConfig.create(Maps.of(
+		NodeConfig host = NodeConfig.create(Maps.of(
 			NodeConfig.MAX_MESSAGE_SIZE, CVMLong.create(8192),
-			NodeConfig.MAX_DELTA_MESSAGE_SIZE, CVMLong.create(16384),
-			NodeConfig.MAX_DELTA_BROADCAST_SIZE, CVMLong.create(32768),
-			NodeConfig.MAX_TRUSTED_MESSAGE_SIZE, CVMLong.create(65536),
 			NodeConfig.MAX_CONNECTIONS, CVMLong.create(12),
-			NodeConfig.INBOUND_QUEUE_SIZE, CVMLong.create(34),
-			NodeConfig.MAX_INBOUND_QUEUE_BYTES, CVMLong.create(65536),
-			NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(56),
 			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(78)));
-		assertEquals(8192, configured.getMaxMessageSize());
-		assertEquals(16384, configured.getMaxDeltaMessageSize());
-		assertEquals(32768, configured.getMaxDeltaBroadcastSize());
-		assertEquals(65536, configured.getMaxTrustedMessageSize());
-		assertEquals(12, configured.getMaxConnections());
-		assertEquals(34, configured.getInboundQueueSize());
-		assertEquals(65536, configured.getMaxInboundQueueBytes());
-		assertEquals(56, configured.getInboundShutdownTimeout());
-		assertEquals(78, configured.getMaxFutureTimestampSkew());
+		assertEquals(8192,host.getMaxMessageSize());
+		assertEquals(12,host.getMaxConnections());
+		assertEquals(78,host.getMaxFutureTimestampSkew());
 
-		NodeConfig invalid = NodeConfig.create(Maps.of(
-			NodeConfig.INBOUND_QUEUE_SIZE, CVMLong.ZERO));
-		assertThrows(IllegalArgumentException.class, invalid::getInboundQueueSize);
-		NodeConfig invalidTimeout = NodeConfig.create(Maps.of(
-			NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.ZERO));
+		LatticePropagatorConfig group=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_MESSAGE_SIZE,CVMLong.create(8192),
+			LatticePropagatorConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(16384),
+			LatticePropagatorConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(32768),
+			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,CVMLong.create(65536),
+			LatticePropagatorConfig.MAX_CONNECTIONS,CVMLong.create(12),
+			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.create(34),
+			LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(65536),
+			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(56)));
+		assertEquals(8192,group.getMaxMessageSize());
+		assertEquals(16384,group.getMaxDeltaMessageSize());
+		assertEquals(32768,group.getMaxDeltaBroadcastSize());
+		assertEquals(65536,group.getMaxTrustedMessageSize());
+		assertEquals(12,group.getMaxConnections());
+		assertEquals(34,group.getInboundQueueSize());
+		assertEquals(65536,group.getMaxInboundQueueBytes());
+		assertEquals(56,group.getInboundShutdownTimeout());
+
+		LatticePropagatorConfig invalid=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.INBOUND_QUEUE_SIZE,CVMLong.ZERO));
+		assertThrows(IllegalArgumentException.class,invalid::getInboundQueueSize);
+		LatticePropagatorConfig invalidTimeout=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.ZERO));
 		assertThrows(IllegalArgumentException.class, invalidTimeout::getInboundShutdownTimeout);
 		NodeConfig invalidSkew = NodeConfig.create(Maps.of(
 			NodeConfig.MAX_FUTURE_TIMESTAMP_SKEW, CVMLong.create(-1)));
 		assertThrows(IllegalArgumentException.class, invalidSkew::getMaxFutureTimestampSkew);
-		NodeConfig invalidDeltaBudget=NodeConfig.create(Maps.of(
-			NodeConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(4096),
-			NodeConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(2048)));
+		LatticePropagatorConfig invalidDeltaBudget=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(4096),
+			LatticePropagatorConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(2048)));
 		assertThrows(IllegalArgumentException.class,invalidDeltaBudget::getMaxDeltaBroadcastSize);
-		NodeConfig invalidInboundBytes=NodeConfig.create(Maps.of(
-			NodeConfig.MAX_MESSAGE_SIZE,CVMLong.create(4096),
-			NodeConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(2048)));
+		LatticePropagatorConfig invalidInboundBytes=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_MESSAGE_SIZE,CVMLong.create(4096),
+			LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES,CVMLong.create(2048)));
 		assertThrows(IllegalArgumentException.class,invalidInboundBytes::getMaxInboundQueueBytes);
 		assertThrows(IllegalArgumentException.class,
 			() -> new LatticePropagator(
 				store,MaxLattice.create(),value -> value,invalidTimeout),
 			"invalid endpoint policy must be rejected while the application configures the group");
 
-		NodeConfig aboveProtocolMaximum = NodeConfig.create(Maps.of(
-			NodeConfig.MAX_TRUSTED_MESSAGE_SIZE,
+		LatticePropagatorConfig aboveProtocolMaximum=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,
 			CVMLong.create(convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH + 1)));
 		assertThrows(IllegalArgumentException.class, aboveProtocolMaximum::getMaxTrustedMessageSize);
 	}
@@ -1175,13 +1214,13 @@ public class NodeServerTest {
 			// without dereferencing the incomplete lattice value a second time.
 			ingressStore.blockedHash = missingBranch.getHash();
 
-			NodeConfig config = NodeConfig.create(Maps.of(
-				NodeConfig.PORT, CVMLong.ZERO,
-				NodeConfig.INBOUND_SHUTDOWN_TIMEOUT, CVMLong.create(100)));
+			NodeConfig config=NodeConfig.port(0);
+			LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+				LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT,CVMLong.create(100)));
 			LatticePropagator primary = new LatticePropagator(
-				primaryStore,SetLattice.create(),value -> value,config);
+				primaryStore,SetLattice.create(),value -> value,groupConfig);
 			LatticePropagator ingress = new LatticePropagator(
-				ingressStore,SetLattice.create(),value -> value,config);
+				ingressStore,SetLattice.create(),value -> value,groupConfig);
 			receiver = new NodeServer<>(SetLattice.create(), primaryStore, config);
 			receiver.addPropagator(primary);
 			receiver.addPropagator(ingress);
@@ -1317,7 +1356,7 @@ public class NodeServerTest {
 		BlockingRootStore testStore = new BlockingRootStore();
 		NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), testStore, NodeConfig.port(-1));
 		LatticePropagator primary = new LatticePropagator(
-			testStore,MaxLattice.create(),value -> value,NodeConfig.port(-1));
+			testStore,MaxLattice.create(),value -> value,LatticePropagatorConfig.create());
 		node.addPropagator(primary);
 		node.setMergeContext(LatticeContext.EMPTY);
 
@@ -1623,13 +1662,12 @@ public class NodeServerTest {
 	 */
 	@Test
 	public void testCircuitBreakerAndInboundStats() {
-		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.PORT, CVMLong.create(-1),
-			NodeConfig.MAX_CONSECUTIVE_REJECTS, CVMLong.create(3)
-		));
-		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, cfg);
+		NodeConfig hostConfig=NodeConfig.port(-1);
+		LatticePropagatorConfig groupConfig=LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS,CVMLong.create(3)));
+		maxNodeServer = new NodeServer<>(MaxLattice.create(), store, hostConfig);
 		maxNodeServer.addPropagator(new LatticePropagator(
-			store,MaxLattice.create(),value -> value,cfg));
+			store,MaxLattice.create(),value -> value,groupConfig));
 		allowSingleGroupInbound(maxNodeServer);
 		LatticePropagator endpoint=propagator(maxNodeServer);
 

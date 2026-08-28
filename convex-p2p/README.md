@@ -109,7 +109,8 @@ decision, and the only place that decision is recorded.
         ├─────────────┴─────────────┴─────────────┤
         │        :p2p    :id    :kad              │   infrastructure floor (always on)
         ├─────────────────────────────────────────┤
-        │   NodeServer — merge, gossip, transport │   convex-peer
+        │ NodeServer — authoritative merge + host │   convex-peer
+        │ Propagator — filtered view + routes      │
         ├─────────────────────────────────────────┤
         │   lattice types, cursors, CAD3, Etch    │   convex-core
         └─────────────────────────────────────────┘

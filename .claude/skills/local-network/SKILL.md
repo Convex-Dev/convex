@@ -97,16 +97,19 @@ For a small lattice network test:
 > retains only local users, operator pins and direct active follows. The separate
 > inbound upgrade verifies both challenge signatures, a random nonce, responder and
 > challenger audiences, the fixed lattice-peer context and an admitted signed
-> NodeInfo. Desired peers and inbound connections are bounded by `NodeConfig`.
+> NodeInfo. Shared-listener connections are bounded by `NodeConfig`; each
+> propagation group's desired peers, protocol state and queues are bounded by
+> `LatticePropagatorConfig`.
 
 For a direct `NodeServer` network test, the minimum composition is explicit:
 
 ```java
-NodeConfig config = NodeConfig.localNetwork();
-NodeServer<V> node = new NodeServer<>(lattice, nodeStore, config);
+NodeConfig nodeConfig = NodeConfig.localNetwork();
+LatticePropagatorConfig groupConfig = LatticePropagatorConfig.create();
+NodeServer<V> node = new NodeServer<>(lattice, nodeStore, nodeConfig);
 node.setMergeContext(nodeContext);
 LatticePropagator group = new LatticePropagator(
-    servingStore, lattice, value -> value, config);
+    servingStore, lattice, value -> value, groupConfig);
 group.setMergeContext(groupContext);
 group.setTransportKeyPair(nodeKey);
 node.addPropagator(group);
@@ -157,6 +160,11 @@ the node merely to treat the first group as a privileged "primary" group.
    the authoritative node root. This schedules each propagator independently;
    its publication filter and serving-store materialisation run on that group's
    worker.
+   Use the social test's independent filtered groups when testing this boundary:
+   `P2PSocialSyncTest` retains the ordinary follow-aware P2P group while Bob also
+   serves an infrastructure-only view from another store. A deliberately broken
+   third view proves that `getStatus()` / `nextFailure()` report degradation while
+   the node and healthy views continue.
    When batching several edits for one signed social owner, fork the
    `SocialUser`, apply its feed and follow actions, sync that fork once, then
    sync the application root. A `Social` fork is outside the owner boundary and
@@ -171,6 +179,13 @@ the node merely to treat the first group as a privileged "primary" group.
    only when the test is specifically about pull synchronisation. A ping only
    establishes transport ordering and does not prove acquisition is complete.
 7. Close nodes before closing their stores.
+
+Host and propagation configuration are deliberately independent. Use
+`NodeConfig` for the shared listener and authoritative persistence, and
+`LatticePropagatorConfig` for each group's routes, protocol queue and publication
+limits. `LatticePropagatorConfig.from(nodeConfig)` exists only to migrate old
+combined-map callers; do not use it in new tests merely because both objects use
+the same underlying CAD map representation.
 
 Treat a node key as its P2P/transport signer, not automatically as an
 application user's identity or signing key. For an `OwnerLattice` keyed by an

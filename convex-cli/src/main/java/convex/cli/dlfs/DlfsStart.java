@@ -30,6 +30,7 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
 import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 import convex.node.NodeServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -133,7 +134,7 @@ public class DlfsStart extends ACommand {
 		LatticeContext context=LatticeContext.create(null,keyPair);
 		nodeServer.setMergeContext(context);
 		LatticePropagator propagator=new LatticePropagator(
-			store,Lattice.ROOT,value -> value,config);
+			store,Lattice.ROOT,value -> value,LatticePropagatorConfig.from(config));
 		propagator.setMergeContext(context);
 		propagator.setTransportKeyPair(keyPair);
 		nodeServer.addPropagator(propagator);

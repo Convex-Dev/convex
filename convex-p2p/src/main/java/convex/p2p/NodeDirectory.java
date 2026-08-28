@@ -44,9 +44,10 @@ import convex.node.NodeServer;
  * concerns; authoritative merge remains a NodeServer concern. Conversely, none
  * of those generic transport classes knows the registry path or NodeInfo schema.</p>
  *
- * <p>The in-memory index is bounded by {@link NodeConfig#getMaxDesiredPeers()} and
- * additive/update-only. Lattice absence is not interpreted as revocation because
- * the current Owner/LWW registry has no deletion contract.</p>
+ * <p>The in-memory index is bounded by the propagation group's
+ * {@link LatticeConnectionManager#getMaxDesiredPeers()} and additive/update-only.
+ * Lattice absence is not interpreted as revocation because the current Owner/LWW
+ * registry has no deletion contract.</p>
  */
 final class NodeDirectory {
 
@@ -156,7 +157,7 @@ final class NodeDirectory {
 		ACell value=server.getCursor().get(P2PLattice.KEY_P2P,P2PLattice.KEY_NODES);
 		if (!(value instanceof AHashMap<?,?> rawNodes)) return;
 		AHashMap<ACell,SignedData<ACell>> nodes=(AHashMap<ACell,SignedData<ACell>>)rawNodes;
-		int limit=server.getConfig().getMaxDesiredPeers();
+		int limit=propagator.getConnectionManager().getMaxDesiredPeers();
 		for (Map.Entry<ACell,SignedData<ACell>> entry:nodes.entrySet()) {
 			AccountKey peerKey=RT.ensureAccountKey(entry.getKey());
 			if (peerKey==null) continue;

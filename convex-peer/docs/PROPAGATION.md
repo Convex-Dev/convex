@@ -102,8 +102,8 @@ protocol limits:
 
 | Retained or materialised state | Default bound | Control |
 |---|---:|---|
-| Lattice delta message or DATA body | 4 MiB | `NodeConfig.maxDeltaMessageSize` |
-| One eager lattice propagation | 16 MiB | `NodeConfig.maxDeltaBroadcastSize` |
+| Lattice delta message or DATA body | 4 MiB | `LatticePropagatorConfig.maxDeltaMessageSize` |
+| One eager lattice propagation | 16 MiB | `LatticePropagatorConfig.maxDeltaBroadcastSize` |
 | Node inbound processing queue | 1,024 messages and 16 MiB | `inboundQueueSize`, `maxInboundQueueBytes` |
 | Belief delta message or DATA body | 4 MiB | `:max-belief-delta-message-size` |
 | One eager Belief propagation | 16 MiB | `:max-belief-delta-broadcast-size` |
@@ -114,10 +114,11 @@ protocol limits:
 | Novelty references collected per attempt | at most 65,536, also byte-budgeted | `Cells.MAX_NOVELTY_CELLS` |
 
 The complete inbound lattice-value limit is separately configured with
-`NodeConfig.maxInboundValueSize`; it does not need to equal the delta-message
-limit. Public and trusted encoded frame limits are configured with
-`maxMessageSize` and `maxTrustedMessageSize` and must remain within the protocol
-maximum.
+`LatticePropagatorConfig.maxInboundValueSize`; it does not need to equal the
+delta-message limit. Public and trusted encoded frame limits are configured per
+group with `maxMessageSize` and `maxTrustedMessageSize` and must remain within
+the protocol maximum. `NodeConfig.maxMessageSize` independently protects the
+shared physical listener before a connection has been assigned to a group.
 
 These bounds cover application-retained encoded bodies and explicit queues. They
 are not a whole-process heap bound: decoded cells, the store cache, Netty

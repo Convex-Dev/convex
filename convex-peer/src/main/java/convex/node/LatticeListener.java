@@ -99,6 +99,7 @@ final class LatticeListener implements Closeable {
 
 	private Predicate<Message> containFailure(AConnection connection,
 			LatticePropagator propagator,Throwable failure) {
+		propagator.recordFailure("inbound delivery",failure);
 		log.warn("Propagation group failed while receiving; closing its connection",failure);
 		assignments.remove(connection,propagator);
 		try {

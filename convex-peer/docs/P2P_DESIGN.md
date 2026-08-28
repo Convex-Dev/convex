@@ -10,7 +10,10 @@
 
 This document proposes the design for the Convex peer-to-peer network layer. The network enables peers to discover each other, establish authenticated connections over multiple transports, synchronise consensus state, and serve client requests.
 
-The design builds on the existing `NodeServer` infrastructure, which already implements lattice value propagation, path-based merges, and delta gossip. The proposal extends this with:
+The design builds on the existing `convex.node` infrastructure: `NodeServer`
+owns authoritative path merges and persistence, while application-configured
+`LatticePropagator` groups own protocol processing, filtered views and delta
+gossip. The proposal extends this with:
 
 - **Consensus beliefs as a lattice region** — Belief merge (CPoS) becomes part of the unified lattice, not a separate subsystem
 - **P2P peer discovery lattice** — signed peer metadata with multiple routing strategies
@@ -34,14 +37,16 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 
 ### 2.2 NodeServer
 
-`NodeServer<V>` is the main implementation for serving and propagating lattice state. It handles:
+`NodeServer<V>` is the authoritative lattice host. It owns path merges, the
+durable root, the shared listener and isolated notifications to attached policy
+groups. Each group's `LatticeProtocolEndpoint` handles:
 
 - **LATTICE_VALUE** — `[:LV [*path*] value]` is an optimistic push; `[:LV id [*path*] value]` is a confirmed push returning a post-merge Result
 - **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
 - **DATA_REQUEST** (`[:DR id hash1 hash2 ...]`) — Serve content-addressable data from the store
 - **PING** (`[:PING id]`) — Liveness check returning `Result(id, timestamp)`
 
-Key features:
+Key features across the host and its groups:
 - **Authenticated missing data recovery** — verified source connections may resolve
   missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
@@ -546,7 +551,7 @@ If a peer advertises multiple transports in `[:p2p :nodes]`, `Convex.connect()` 
 
 On reconnect, if the current transport repeatedly fails, the next is tried.
 
-## 9. Generic NodeServer beneath P2P [PROPOSED]
+## 9. Generic NodeServer beneath P2P [EXISTS]
 
 ### 9.1 Architecture
 
@@ -564,12 +569,13 @@ P2PNode / NodeDirectory (P2P schema, discovery and policy)
 
 ### 9.2 Message Routing
 
-Messages are currently split between `NodeServer` (generic lattice operations) and
-`Server` (consensus and client-facing). As more message types migrate to the lattice
-protocol, `NodeServer` may transport an increasing share without acquiring knowledge of
-their lattice paths or record schemas.
+Messages are currently split between propagation-group endpoints (generic lattice
+protocol), P2P application handlers and `Server` (consensus and client-facing).
+As more message types migrate to the lattice protocol, propagators may transport
+an increasing share without `NodeServer` acquiring knowledge of their records or
+connection sets.
 
-**NodeServer** handles lattice messages directly:
+**LatticeProtocolEndpoint** handles lattice messages for its selected group:
 
 | Message | Handler | Notes |
 |---------|---------|-------|

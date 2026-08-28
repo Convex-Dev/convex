@@ -60,7 +60,7 @@ public class KVReplicationDemo {
 				NodeConfig config=NodeConfig.port(0);
 				NodeServer<?> server = new NodeServer<>(Lattice.ROOT,store,config);
 				LatticePropagator propagator=new LatticePropagator(
-					store,Lattice.ROOT,value -> value,config);
+					store,Lattice.ROOT,value -> value,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
 				server.setInboundPropagatorSelector(connection -> propagator);
 				server.launch();

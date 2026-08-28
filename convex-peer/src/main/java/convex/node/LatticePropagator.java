@@ -85,7 +85,7 @@ public class LatticePropagator implements Closeable {
 	private final LatticeConnectionManager connectionManager;
 
 	/** Limits and timing selected by the calling application for this group. */
-	private final NodeConfig config;
+	private final LatticePropagatorConfig config;
 
 	/** Lattice used to reconcile this propagator's own subset with new snapshots. */
 	private ALattice<ACell> lattice;
@@ -120,6 +120,11 @@ public class LatticePropagator implements Closeable {
 	/** Whether this group's workers are running. */
 	private volatile boolean running = false;
 
+	/** Serialises observable lifecycle and failure reporting. */
+	private final Object statusLock=new Object();
+	private volatile Status status=new Status(State.NEW,0L,null);
+	private volatile CompletableFuture<Failure> nextFailureFuture=new CompletableFuture<>();
+
 	/**
 	 * Queue for receiving lattice values to process.
 	 * Uses LatestUpdateQueue which only stores the most recent value,
@@ -132,10 +137,11 @@ public class LatticePropagator implements Closeable {
 	private volatile boolean persistenceEnabled = true;
 
 	/** Maximum encoded body size for one outbound delta or DATA-ahead chunk. */
-	private volatile int maxDeltaMessageSize = NodeConfig.DEFAULT_MAX_MESSAGE_SIZE;
+	private volatile int maxDeltaMessageSize = LatticePropagatorConfig.DEFAULT_MAX_MESSAGE_SIZE;
 
 	/** Maximum combined encoded bodies materialised for one eager delta broadcast. */
-	private volatile int maxDeltaBroadcastSize = NodeConfig.DEFAULT_MAX_DELTA_BROADCAST_SIZE;
+	private volatile int maxDeltaBroadcastSize =
+		LatticePropagatorConfig.DEFAULT_MAX_DELTA_BROADCAST_SIZE;
 
 	/** Whether root publication has changed the persistent store since its last checkpoint. */
 	private boolean dirty;
@@ -193,21 +199,38 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
+	 * @deprecated Use a lattice-configured constructor before attachment.
 	 */
+	@Deprecated
 	public LatticePropagator(AStore store, LatticeConnectionManager connectionManager) {
-		this(store,connectionManager,NodeConfig.create());
+		this(store,connectionManager,LatticePropagatorConfig.create());
 	}
 
 	/**
-	 * Creates a propagation group with application-supplied transport limits and
-	 * no lattice projection.
+	 * Compatibility constructor accepting the former combined configuration.
+	 *
+	 * @param store serving store for delta tracking and data resolution
+	 * @param connectionManager connection manager for outbound routes
+	 * @param config legacy combined configuration
+	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
+	 */
+	@Deprecated
+	public LatticePropagator(AStore store,LatticeConnectionManager connectionManager,
+			NodeConfig config) {
+		this(store,connectionManager,legacyConfig(config));
+	}
+
+	/**
+	 * Creates a propagation group with application-supplied limits and no lattice
+	 * projection. Such a standalone compatibility group cannot be attached until
+	 * a lattice is supplied through a lattice-configured constructor.
 	 *
 	 * @param store serving store for delta tracking and data resolution
 	 * @param connectionManager connection manager for outbound routes
 	 * @param config queue, transport and publication limits
 	 */
 	public LatticePropagator(AStore store,LatticeConnectionManager connectionManager,
-			NodeConfig config) {
+			LatticePropagatorConfig config) {
 		if (store == null) throw new IllegalArgumentException("Store must not be null");
 		if (connectionManager == null) throw new IllegalArgumentException("ConnectionManager must not be null");
 		if (config==null) throw new IllegalArgumentException("Propagation config must not be null");
@@ -229,9 +252,11 @@ public class LatticePropagator implements Closeable {
 	 * and no lattice projection.
 	 *
 	 * @param store serving store for delta tracking and peer data resolution
+	 * @deprecated Use a lattice-configured constructor before attachment.
 	 */
+	@Deprecated
 	public LatticePropagator(AStore store) {
-		this(store,new LatticeConnectionManager(store),NodeConfig.create());
+		this(store,new LatticeConnectionManager(store),LatticePropagatorConfig.create());
 	}
 
 	/**
@@ -246,7 +271,25 @@ public class LatticePropagator implements Closeable {
 	@SuppressWarnings("unchecked")
 	public <V extends ACell> LatticePropagator(AStore store, ALattice<V> lattice,
 			LatticeFilter<V> filter) {
-		this(store,new LatticeConnectionManager(store),lattice,filter,NodeConfig.create());
+		this(store,new LatticeConnectionManager(store),lattice,filter,
+			LatticePropagatorConfig.create());
+	}
+
+	/**
+	 * Creates a lattice-configured propagation group with a new connection manager
+	 * and application-supplied limits.
+	 *
+	 * @param store serving store for this group
+	 * @param lattice merge semantics for the served view
+	 * @param filter publication projection
+	 * @param config legacy combined configuration
+	 * @param <V> served lattice value type
+	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
+	 */
+	@Deprecated
+	public <V extends ACell> LatticePropagator(AStore store,ALattice<V> lattice,
+			LatticeFilter<V> filter,NodeConfig config) {
+		this(store,new LatticeConnectionManager(store),lattice,filter,legacyConfig(config));
 	}
 
 	/**
@@ -260,7 +303,7 @@ public class LatticePropagator implements Closeable {
 	 * @param <V> served lattice value type
 	 */
 	public <V extends ACell> LatticePropagator(AStore store,ALattice<V> lattice,
-			LatticeFilter<V> filter,NodeConfig config) {
+			LatticeFilter<V> filter,LatticePropagatorConfig config) {
 		this(store,new LatticeConnectionManager(store),lattice,filter,config);
 	}
 
@@ -278,7 +321,28 @@ public class LatticePropagator implements Closeable {
 	public <V extends ACell> LatticePropagator(AStore store,
 			LatticeConnectionManager connectionManager, ALattice<V> lattice,
 			LatticeFilter<V> filter) {
-		this(store,connectionManager,lattice,filter,NodeConfig.create());
+		this(store,connectionManager,lattice,filter,LatticePropagatorConfig.create());
+	}
+
+	/**
+	 * Creates a lattice-configured propagation group with an explicit connection
+	 * manager and limits. Identity, admission and application hooks remain optional
+	 * application policy configured before attachment.
+	 *
+	 * @param store serving store for this group
+	 * @param connectionManager connection manager for outbound routes
+	 * @param lattice merge semantics for the served view
+	 * @param filter publication projection
+	 * @param config legacy combined configuration
+	 * @param <V> served lattice value type
+	 * @deprecated Supply {@link LatticePropagatorConfig} explicitly.
+	 */
+	@Deprecated
+	@SuppressWarnings("unchecked")
+	public <V extends ACell> LatticePropagator(AStore store,
+			LatticeConnectionManager connectionManager,ALattice<V> lattice,
+			LatticeFilter<V> filter,NodeConfig config) {
+		this(store,connectionManager,lattice,filter,legacyConfig(config));
 	}
 
 	/**
@@ -296,12 +360,118 @@ public class LatticePropagator implements Closeable {
 	@SuppressWarnings("unchecked")
 	public <V extends ACell> LatticePropagator(AStore store,
 			LatticeConnectionManager connectionManager,ALattice<V> lattice,
-			LatticeFilter<V> filter,NodeConfig config) {
+			LatticeFilter<V> filter,LatticePropagatorConfig config) {
 		this(store,connectionManager,config);
 		if (lattice == null) throw new IllegalArgumentException("Lattice must not be null");
 		if (filter == null) throw new IllegalArgumentException("Lattice filter must not be null");
 		this.lattice = (ALattice<ACell>) lattice;
 		this.filter = (LatticeFilter<ACell>) filter;
+	}
+
+	private static LatticePropagatorConfig legacyConfig(NodeConfig config) {
+		if (config==null) throw new IllegalArgumentException("Propagation config must not be null");
+		return LatticePropagatorConfig.from(config);
+	}
+
+	/** Observable lifecycle of one propagation policy group. */
+	public enum State {
+		/** Constructed and not started. */
+		NEW,
+		/** Group resources are starting. */
+		STARTING,
+		/** Group workers are active. */
+		RUNNING,
+		/** Group resources are shutting down. */
+		STOPPING,
+		/** Group resources have stopped or failed to start. */
+		STOPPED
+	}
+
+	/**
+	 * One contained propagation-group failure.
+	 *
+	 * @param sequence monotonically increasing failure sequence
+	 * @param operation operation which failed
+	 * @param cause contained failure
+	 * @param timestamp wall-clock time in milliseconds
+	 */
+	public record Failure(long sequence,String operation,Throwable cause,long timestamp) {}
+
+	/**
+	 * Immutable operational snapshot for one propagation policy group.
+	 *
+	 * @param state current lifecycle state
+	 * @param failureCount contained failures since construction
+	 * @param lastFailure most recent contained failure, or {@code null}
+	 */
+	public record Status(State state,long failureCount,Failure lastFailure) {
+		/**
+		 * Returns whether the group's workers are active.
+		 *
+		 * @return {@code true} while the group is running
+		 */
+		public boolean isOperational() {
+			return state==State.RUNNING;
+		}
+
+		/**
+		 * Returns whether this group has reported a contained failure.
+		 *
+		 * @return {@code true} after at least one contained failure
+		 */
+		public boolean hasFailures() {
+			return failureCount>0L;
+		}
+	}
+
+	/**
+	 * Returns the current lifecycle and failure snapshot.
+	 *
+	 * @return immutable status snapshot
+	 */
+	public Status getStatus() {
+		return status;
+	}
+
+	/**
+	 * Returns a future for the next contained failure after this call.
+	 *
+	 * @return next failure signal
+	 */
+	public CompletableFuture<Failure> nextFailure() {
+		return nextFailureFuture;
+	}
+
+	private void transition(State state) {
+		synchronized (statusLock) {
+			Status current=status;
+			status=new Status(state,current.failureCount(),current.lastFailure());
+		}
+	}
+
+	/** Records a contained component failure without throwing into the node host. */
+	final void recordFailure(String operation,Throwable cause) {
+		if (cause==null) return;
+		CompletableFuture<Failure> signal;
+		Failure failure;
+		synchronized (statusLock) {
+			Status current=status;
+			Failure previous=current.lastFailure();
+			if (previous!=null && previous.cause()==cause
+					&& java.util.Objects.equals(previous.operation(),operation)) return;
+			long sequence=current.failureCount()+1L;
+			failure=new Failure(sequence,operation,cause,Utils.getCurrentTimestamp());
+			status=new Status(current.state(),sequence,failure);
+			signal=nextFailureFuture;
+			nextFailureFuture=new CompletableFuture<>();
+		}
+		try {
+			signal.complete(failure);
+		} catch (RuntimeException | StackOverflowError observerFailure) {
+			// Health observers are application policy too. Reporting degradation must
+			// not turn it into a NodeServer failure.
+			log.warn("Propagation failure observer failed",observerFailure);
+		}
 	}
 
 	/**
@@ -581,9 +751,11 @@ public class LatticePropagator implements Closeable {
 	 *
 	 * @param peerKey expected remote node key
 	 * @param peer connected client to admit
+	 * @return future completed with the admitted client after any required identity
+	 *         challenge, or exceptionally when admission fails
 	 */
-	public void addPeer(AccountKey peerKey, Convex peer) {
-		connectionManager.addPeer(peerKey, peer);
+	public CompletableFuture<Convex> addPeer(AccountKey peerKey, Convex peer) {
+		return connectionManager.addPeer(peerKey, peer);
 	}
 
 	/**
@@ -709,6 +881,7 @@ public class LatticePropagator implements Closeable {
 			return;
 		}
 
+		transition(State.STARTING);
 		LatticeProtocolEndpoint protocol=endpoint;
 		try {
 			if (protocol!=null) {
@@ -728,6 +901,7 @@ public class LatticePropagator implements Closeable {
 			propagationThread.start();
 		} catch (RuntimeException | Error failure) {
 			running=false;
+			recordFailure("launch",failure);
 			if (protocol!=null) {
 				try {
 					protocol.close();
@@ -740,9 +914,11 @@ public class LatticePropagator implements Closeable {
 			} catch (RuntimeException cleanupFailure) {
 				failure.addSuppressed(cleanupFailure);
 			}
+			transition(State.STOPPED);
 			throw failure;
 		}
 
+		transition(State.RUNNING);
 		log.debug("LatticePropagator started");
 	}
 
@@ -757,7 +933,12 @@ public class LatticePropagator implements Closeable {
 	 * @param finalValue final value to process before stopping, or {@code null}
 	 */
 	public void triggerAndClose(ACell finalValue) {
-		if (!running && propagationThread == null) return;
+		transition(State.STOPPING);
+		if (!running && propagationThread == null) {
+			closeRoutes();
+			transition(State.STOPPED);
+			return;
+		}
 
 		running = false;
 
@@ -793,12 +974,9 @@ public class LatticePropagator implements Closeable {
 			processSnapshotSafe(remaining);
 		}
 
-		try {
-			connectionManager.close();
-		} catch (RuntimeException e) {
-			log.warn("Unable to close propagation routes cleanly",e);
-		}
+		closeRoutes();
 
+		transition(State.STOPPED);
 		log.debug("LatticePropagator closed (sent {} delta broadcasts, {} root syncs)",
 			broadcastCount, rootSyncCount);
 	}
@@ -822,9 +1000,23 @@ public class LatticePropagator implements Closeable {
 		try {
 			stopIngress();
 		} catch (IOException e) {
+			recordFailure("ingress shutdown",e);
 			log.warn("Unable to drain propagation protocol endpoint cleanly",e);
+		} catch (RuntimeException | StackOverflowError e) {
+			recordFailure("ingress shutdown",e);
+			log.warn("Unable to stop propagation protocol endpoint cleanly",e);
 		}
 		triggerAndClose(null);
+	}
+
+	/** Closes manager-owned routes even when the group was never started. */
+	private void closeRoutes() {
+		try {
+			connectionManager.close();
+		} catch (RuntimeException | StackOverflowError e) {
+			recordFailure("route shutdown",e);
+			log.warn("Unable to close propagation routes cleanly",e);
+		}
 	}
 
 	// ========== Trigger API ==========
@@ -898,11 +1090,13 @@ public class LatticePropagator implements Closeable {
 			processSnapshot(value);
 		} catch (VirtualMachineError e) {
 			if (!(e instanceof StackOverflowError)) throw e;
+			recordFailure("publication",e);
 			log.warn("Contained stack overflow in propagation policy group",e);
 		} catch (Throwable e) {
 			// A broken filter, store cache or connection implementation belongs to
 			// this policy group. It must never terminate NodeServer publication or
 			// another propagator's worker.
+			recordFailure("publication",e);
 			log.warn("Isolated propagation policy failure",e);
 		}
 	}

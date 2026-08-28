@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -78,8 +80,10 @@ public class LatticePropagatorTest {
 		AKeyPair nodeKey2=AKeyPair.generate();
 		server1.setMergeContext(LatticeContext.create(null,nodeKey1));
 		server2.setMergeContext(LatticeContext.create(null,nodeKey2));
-		propagator1=new LatticePropagator(store1,lattice,value -> value,NodeConfig.port(0));
-		propagator2=new LatticePropagator(store2,lattice,value -> value,NodeConfig.port(0));
+		propagator1=new LatticePropagator(store1,lattice,value -> value,
+			LatticePropagatorConfig.create());
+		propagator2=new LatticePropagator(store2,lattice,value -> value,
+			LatticePropagatorConfig.create());
 		propagator1.setMergeContext(LatticeContext.create(null,nodeKey1));
 		propagator2.setMergeContext(LatticeContext.create(null,nodeKey2));
 		propagator1.setTransportKeyPair(nodeKey1);
@@ -111,13 +115,11 @@ public class LatticePropagatorTest {
 			InetSocketAddress server2Address = server2.getHostAddress();
 
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
-			propagator1.getConnectionManager()
-				.addPeer(nodeKey2.getAccountKey(),peer1to2)
+			propagator1.addPeer(nodeKey2.getAccountKey(),peer1to2)
 				.get(5,TimeUnit.SECONDS);
 
 			Convex peer2to1 = ConvexRemote.connect(server1Address);
-			propagator2.getConnectionManager()
-				.addPeer(nodeKey1.getAccountKey(),peer2to1)
+			propagator2.addPeer(nodeKey1.getAccountKey(),peer2to1)
 				.get(5,TimeUnit.SECONDS);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to establish peer connections", e);
@@ -152,6 +154,16 @@ public class LatticePropagatorTest {
 		assertSame(propagator2,server2.getPropagators().get(0),
 			"Node should retain the application-supplied propagator");
 		assertTrue(propagator2.isRunning(), "Propagator should be running");
+	}
+
+	@Test
+	public void testAddPeerReportsIdentityFailure() throws Exception {
+		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
+		Convex peer=ConvexRemote.connect(server2.getHostAddress());
+
+		assertThrows(ExecutionException.class,
+			()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
+		assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
 	}
 
 	/**
