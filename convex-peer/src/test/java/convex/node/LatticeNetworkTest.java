@@ -53,6 +53,7 @@ public class LatticeNetworkTest {
 
 	/** Explicit propagation-policy group owned by the application for each node. */
 	private List<LatticePropagator> propagators;
+	private List<LatticeListener> transports;
 
 	/**
 	 * List of stores for each NodeServer.
@@ -82,6 +83,7 @@ public class LatticeNetworkTest {
 		// Initialize lists
 		nodeServers = new ArrayList<>(NETWORK_SIZE);
 		propagators = new ArrayList<>(NETWORK_SIZE);
+		transports = new ArrayList<>(NETWORK_SIZE);
 		stores = new ArrayList<>(NETWORK_SIZE);
 
 		// Create and launch NodeServers
@@ -96,14 +98,18 @@ public class LatticeNetworkTest {
 			LatticePropagator propagator=new LatticePropagator(
 				store,commonLattice,value -> value,LatticePropagatorConfig.create());
 			server.addPropagator(propagator);
-			server.setInboundPropagatorSelector(connection -> propagator);
+			LatticeListener transport=new LatticeListener(config);
+			transport.registerPropagator(propagator);
+			transport.setSelector(connection -> propagator);
 			propagators.add(propagator);
+			transports.add(transport);
 			nodeServers.add(server);
 
 			server.launch();
+			transport.launch();
 
 			assertTrue(server.isRunning(), "NodeServer " + i + " should be running after launch");
-			assertNotNull(server.getHostAddress(), "NodeServer " + i + " should have a host address");
+			assertNotNull(transport.getHostAddress(), "Transport " + i + " should have a host address");
 		}
 
 		// Establish Convex peer connections between all servers
@@ -114,8 +120,7 @@ public class LatticeNetworkTest {
 				if (i == j)
 					continue;
 
-				NodeServer<?> otherServer = nodeServers.get(j);
-				InetSocketAddress otherAddress = otherServer.getHostAddress();
+				InetSocketAddress otherAddress = transports.get(j).getHostAddress();
 				assertNotNull(otherAddress, "Other server " + j + " should have a host address");
 
 				try {
@@ -138,6 +143,8 @@ public class LatticeNetworkTest {
 	 */
 	@AfterAll
 	public void tearDownNetwork() throws IOException {
+		for (LatticeListener transport:transports) transport.close();
+		transports.clear();
 		for (NodeServer<?> server : nodeServers) {
 			server.close();
 		}

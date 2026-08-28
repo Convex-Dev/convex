@@ -62,6 +62,7 @@ public class LatticeDemo {
 		// Collections to hold our nodes and their storage
 		List<NodeServer<?>> servers = new ArrayList<>();
 		List<LatticePropagator> propagators=new ArrayList<>();
+		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 
 		// Use Lattice.ROOT - the standard Convex lattice with :data keyword for storage
@@ -84,12 +85,16 @@ public class LatticeDemo {
 				LatticePropagator propagator=new LatticePropagator(
 					store,lattice,value -> value,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
-				server.setInboundPropagatorSelector(connection -> propagator);
+				LatticeListener transport=new LatticeListener(config);
+				transport.registerPropagator(propagator);
+				transport.setSelector(connection -> propagator);
 				server.launch();
+				transport.launch();
 				servers.add(server);
 				propagators.add(propagator);
+				transports.add(transport);
 
-				System.out.println("Node " + (i + 1) + " started on port " + server.getPort());
+				System.out.println("Node " + (i + 1) + " started on port " + transport.getPort());
 			}
 
 			System.out.println("\nEstablishing peer connections (full mesh)...");
@@ -98,11 +103,10 @@ public class LatticeDemo {
 			// Each node connects to every other node as a peer
 			// This creates a fully decentralized network with no single point of failure
 			for (int i = 0; i < NUM_NODES; i++) {
-				NodeServer<?> server = servers.get(i);
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {  // Don't connect to self
 						// Create a connection to the remote node
-						InetSocketAddress peerAddress=servers.get(j).getHostAddress();
+						InetSocketAddress peerAddress=transports.get(j).getHostAddress();
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
 						Convex peer = ConvexRemote.connect(peerAddress);
 
@@ -254,7 +258,10 @@ public class LatticeDemo {
 			// CLEANUP: Always close resources properly
 			System.out.println("\nShutting down nodes...");
 
-			// Close all servers (stops network listeners and propagators)
+			// Close transports before the authoritative nodes drain propagators.
+			for (LatticeListener transport:transports) transport.close();
+
+			// Close all servers and propagators.
 			for (int i = 0; i < servers.size(); i++) {
 				servers.get(i).close();
 				System.out.println("Node " + (i + 1) + " shutdown complete");

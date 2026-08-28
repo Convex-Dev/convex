@@ -117,8 +117,8 @@ The complete inbound lattice-value limit is separately configured with
 `LatticePropagatorConfig.maxInboundValueSize`; it does not need to equal the
 delta-message limit. Public and trusted encoded frame limits are configured per
 group with `maxMessageSize` and `maxTrustedMessageSize` and must remain within
-the protocol maximum. `NodeConfig.maxMessageSize` independently protects the
-shared physical listener before a connection has been assigned to a group.
+the protocol maximum. `NodeConfig.maxMessageSize` independently protects each
+standard `LatticeListener` before a connection has been assigned to a group.
 
 These bounds cover application-retained encoded bodies and explicit queues. They
 are not a whole-process heap bound: decoded cells, the store cache, Netty

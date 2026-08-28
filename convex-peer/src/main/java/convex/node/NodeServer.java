@@ -2,14 +2,12 @@ package convex.node;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +16,6 @@ import convex.api.Convex;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.exceptions.StoreException;
-import convex.core.message.AConnection;
 import convex.core.store.AStore;
 import convex.core.util.Shutdown;
 import convex.lattice.ALattice;
@@ -32,10 +29,11 @@ import convex.lattice.cursor.RootLatticeCursor;
  * Hosts one authoritative lattice value and its durable root.
  *
  * <p>{@code NodeServer} owns application-state merge, root publication,
- * persistence, the shared listener lifecycle and update notification. It does
- * not own peer sets, connection trust, protocol decoding, missing-cell
- * acquisition, ingress filtering or publication filtering. Those are policies
- * and resources of {@link LatticePropagator}.</p>
+ * persistence and update notification. It does not own peer sets, connection
+ * trust, protocol decoding, missing-cell
+ * acquisition, ingress filtering, publication filtering, sockets or transport
+ * lifecycle. Those are policies and resources of {@link LatticePropagator} and
+ * application-owned transports such as {@link LatticeListener}.</p>
  *
  * <p>The calling application constructs and completely configures each
  * propagator before attaching it with {@link #addPropagator(LatticePropagator)}.
@@ -43,18 +41,18 @@ import convex.lattice.cursor.RootLatticeCursor;
  * the node lattice, merge context, transport key or filters into the group. A
  * node with no propagators is a valid local, store-backed lattice host.</p>
  *
- * <p>For inbound networking, the application may install a selector with
- * {@link #setInboundPropagatorSelector(Function)}. The thin shared listener
- * assigns each accepted socket once, then the selected propagator owns all work
- * and state for that connection. Returning {@code null}, or installing no
- * selector, denies lattice protocol access.</p>
+ * <p>The calling application separately owns transport composition. It may
+ * register one or more attached groups with a shared {@link LatticeListener},
+ * give groups independent transports, or run this node without networking.
+ * Transports must be closed before this server so no new ingress reaches groups
+ * while they drain.</p>
  *
-	 * <p><b>Failure isolation.</b> Authoritative root publication is the mandatory
+ * <p><b>Failure isolation.</b> Authoritative root publication is the mandatory
  * part of a root sync. Propagator initialisation, notification, worker and
  * shutdown failures are contained and logged independently; one propagation
  * policy group cannot fail a cursor sync, the server maintenance loop or another
- * group. Only failures of the node's own listener or authoritative store are
- * surfaced by this class.</p>
+ * group. Only failures of the authoritative store are surfaced by this class;
+ * transport failures remain visible to their application owner.</p>
  *
  * @param <V> authoritative lattice value type
  */
@@ -69,7 +67,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	private final RootComponent<V> rootComponent;
 	private final List<LatticePropagator> propagators=new ArrayList<>();
 	private final Set<LatticePropagator> attachedPropagators=ConcurrentHashMap.newKeySet();
-	private final LatticeListener latticeListener;
 
 	/** Serialises all authoritative cell announcement, root-pointer and flush work. */
 	private final Object persistenceLock=new Object();
@@ -77,7 +74,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private LatticeContext mergeContext;
 	private boolean rootPublicationConfigured;
-	private Integer port;
 	private Thread maintenanceThread;
 	private final Object maintenanceSignal=new Object();
 	private final Runnable shutdownHook=this::shutdownPersist;
@@ -96,7 +92,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	 *
 	 * @param lattice authoritative merge semantics
 	 * @param store authoritative cell store
-	 * @param config node listener and persistence configuration, or {@code null}
+	 * @param config authoritative persistence and validation configuration, or {@code null}
 	 */
 	public NodeServer(ALattice<V> lattice,AStore store,NodeConfig config) {
 		if (lattice==null) throw new IllegalArgumentException("Lattice must not be null");
@@ -104,16 +100,14 @@ public class NodeServer<V extends ACell> implements Closeable {
 		this.lattice=lattice;
 		this.store=store;
 		this.config=(config==null) ? NodeConfig.create() : config;
-		this.port=this.config.getPort();
 		this.mergeContext=LatticeContext.EMPTY.withMaxFutureTimestampSkew(
 			this.config.getMaxFutureTimestampSkew());
 		this.cursor=Cursors.createLattice(lattice,lattice.zero(),mergeContext);
 		this.rootComponent=new RootComponent<>(cursor,store);
-		this.latticeListener=new LatticeListener(this.config,attachedPropagators);
 	}
 
 	/**
-	 * Creates a lattice host with default listener and persistence configuration.
+	 * Creates a lattice host with default persistence and validation configuration.
 	 *
 	 * @param lattice authoritative merge semantics
 	 * @param store authoritative cell store
@@ -124,10 +118,9 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	/**
 	 * Restores and publishes the authoritative root, starts every attached policy
-	 * group independently, then opens the shared listener.
+	 * group independently, then starts authoritative persistence maintenance.
 	 *
-	 * @throws IOException if authoritative store or listener initialisation fails
-	 * @throws InterruptedException if listener launch is interrupted
+	 * @throws IOException if authoritative store initialisation fails
 	 */
 	public synchronized void launch() throws IOException,InterruptedException {
 		validateLaunchRequest();
@@ -137,14 +130,12 @@ public class NodeServer<V extends ACell> implements Closeable {
 			restorePersistedRoot();
 			seedPropagationViews();
 			startPropagationServices();
-			latticeListener.launch();
-			port=latticeListener.getPort();
 			startMaintenanceService();
 			registerShutdownPersistenceHook();
 			lifecycleState=LifecycleState.RUNNING;
-			log.debug("NodeServer started on port {} with {} propagation group(s)",
-				port,propagators.size());
-		} catch (IOException | InterruptedException | RuntimeException | Error e) {
+			log.debug("NodeServer started with {} propagation group(s)",
+				propagators.size());
+		} catch (IOException | RuntimeException | Error e) {
 			abortFailedLaunch(e);
 			throw e;
 		}
@@ -199,11 +190,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 
 	private void abortFailedLaunch(Throwable failure) {
 		lifecycleState=LifecycleState.STOPPING;
-		try {
-			latticeListener.close();
-		} catch (Throwable cleanupFailure) {
-			addCleanupFailure(failure,cleanupFailure);
-		}
 		stopMaintenance();
 		for (LatticePropagator propagator:List.copyOf(propagators)) {
 			try {
@@ -397,25 +383,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Returns the configured port before launch and the actual bound port after
-	 * launch. A negative value means that no listener is configured.
-	 *
-	 * @return configured or bound port
-	 */
-	public Integer getPort() {
-		return port;
-	}
-
-	/**
-	 * Returns the bound listener address while running.
-	 *
-	 * @return bound address, or {@code null} while not running
-	 */
-	public InetSocketAddress getHostAddress() {
-		return lifecycleState==LifecycleState.RUNNING ? latticeListener.getHostAddress() : null;
-	}
-
-	/**
 	 * Returns the caller-owned authoritative node store.
 	 *
 	 * @return authoritative store
@@ -497,18 +464,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 		propagator.attach(this);
 		propagators.add(propagator);
 		attachedPropagators.add(propagator);
-	}
-
-	/**
-	 * Configures the shared listener's one-time connection-to-group assignment
-	 * policy. This selects an attached group; it does not configure that group.
-	 *
-	 * @param selector application policy, or {@code null} to deny inbound protocol access
-	 */
-	public synchronized void setInboundPropagatorSelector(
-			Function<AConnection,LatticePropagator> selector) {
-		requireNewLifecycle("setInboundPropagatorSelector");
-		latticeListener.setSelector(selector);
 	}
 
 	private void requireAttached(LatticePropagator propagator) {
@@ -720,7 +675,7 @@ public class NodeServer<V extends ACell> implements Closeable {
 	}
 
 	/**
-	 * Stops listener admission, drains each group independently, publishes the
+	 * Drains each group independently, publishes the
 	 * final authoritative root and completes the node-store durability barrier.
 	 *
 	 * @throws IOException if final authoritative publication or persistence fails
@@ -743,7 +698,6 @@ public class NodeServer<V extends ACell> implements Closeable {
 				"Cannot close NodeServer re-entrantly while launch is in progress");
 		}
 		lifecycleState=LifecycleState.STOPPING;
-		latticeListener.close();
 		stopMaintenance();
 
 		for (LatticePropagator propagator:List.copyOf(propagators)) {

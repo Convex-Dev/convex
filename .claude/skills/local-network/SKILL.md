@@ -60,16 +60,20 @@ replication, use `NodeServer`; for the bundled P2P and social regions, use
 `P2PNode`. See `convex-peer/src/test/java/convex/node/LatticeNetworkTest.java`
 and `convex-p2p/src/test/java/convex/p2p/P2PSocialSyncTest.java`.
 
-`NodeServer` is the schema-independent CAD036 authoritative lattice host. It
-owns merge, node-root persistence, the shared listener and isolated update
-notification, but does not publish or interpret `NodeInfo`, inspect `:p2p` /
-`:social` paths, or implement discovery policy. The calling application must
-construct and configure every `LatticePropagator` before attaching it; there is
-no implicit/default group. A zero-propagator node is a valid local persistent
-host. Each propagator owns its connection manager, transport identity, trust,
-bounded protocol endpoint, filters and serving store.
+`NodeServer` is the schema-independent authoritative lattice host. It owns
+merge, node-root persistence, attached-propagator lifecycle and isolated update
+notification, but no socket or transport. It does not publish or interpret
+`NodeInfo`, inspect `:p2p` / `:social` paths, or implement discovery policy. The
+calling application must construct and configure every `LatticePropagator`
+before attaching it; there is no implicit/default group. A zero-propagator node
+is a valid local persistent host. Each propagator owns its connection manager,
+transport identity, trust, bounded protocol endpoint, filters and serving store.
 
-`P2PNode` performs this composition; its `NodeDirectory` owns
+The calling application separately owns any `LatticeListener`: register every
+eligible propagator, install a one-time connection selector, launch the listener
+after the node, and close it before the node. One listener may route connections
+to several groups, and groups may instead use independent listeners or custom
+transports. `P2PNode` performs this composition; its `NodeDirectory` owns
 signed `[:p2p :nodes]` publication, validation, discovery translation and PoP
 metadata. Keep tests for those behaviours in `convex-p2p`, not `convex-peer`.
 `P2PNode` also configures its node key explicitly as both its transport challenge
@@ -113,21 +117,24 @@ LatticePropagator group = new LatticePropagator(
 group.setMergeContext(groupContext);
 group.setTransportKeyPair(nodeKey);
 node.addPropagator(group);
-node.setInboundPropagatorSelector(connection -> group);
+LatticeListener transport = new LatticeListener(nodeConfig);
+transport.registerPropagator(group);
+transport.setSelector(connection -> group);
 node.launch();
+transport.launch();
 ```
 
 Retain `group` and pass it to explicit pull/route APIs. Do not recover it from
 the node merely to treat the first group as a privileged "primary" group.
 
 1. Give each node its own store and key pair.
-2. Use `NodeConfig.localNetwork()`. The generic server binds port `0`; after it
-   reports the actual OS-assigned port, `P2PNode` publishes that loopback endpoint
-   in the node's signed `NodeInfo`.
+2. Use `NodeConfig.localNetwork()`. The application-owned listener binds port
+   `0`; after it reports the actual OS-assigned port, `P2PNode` publishes that
+   loopback endpoint in the node's signed `NodeInfo`.
 3. Set an inbound propagator policy before launch. `P2PNode.serveAllInbound()` is
    suitable for a deliberately public test node.
 4. Tell one node about the other with
-   `nodeA.connect(nodeBKey, nodeB.getNodeServer().getHostAddress())`. The future
+   `nodeA.connect(nodeBKey, nodeB.getHostAddress())`. The future
    completes after B proves its node key, A's own signed `[:p2p :nodes]` record
    has been merged by B, and A has pulled and merged B's `:p2p`, `:id`, and
    currently desired complete social-owner paths.
@@ -178,10 +185,12 @@ the node merely to treat the first group as a privileged "primary" group.
    `receivingServer.pull(group, connection).get(timeout)`
    only when the test is specifically about pull synchronisation. A ping only
    establishes transport ordering and does not prove acquisition is complete.
-7. Close nodes before closing their stores.
+7. Close listeners before nodes, then close their stores.
 
 Host and propagation configuration are deliberately independent. Use
-`NodeConfig` for the shared listener and authoritative persistence, and
+`NodeConfig` for authoritative persistence and the standard listener, supplying
+it independently to each component; passing it to `NodeServer` never creates a
+transport. Use
 `LatticePropagatorConfig` for each group's routes, protocol queue and publication
 limits. `LatticePropagatorConfig.from(nodeConfig)` exists only to migrate old
 combined-map callers; do not use it in new tests merely because both objects use
@@ -207,4 +216,4 @@ as a wire-format validity check.
 The rules in `AGENTS.md` apply: never bind fixed ports and never sleep. Wait on
 futures, latches or another API whose contract represents the required state.
 
-Stop the network when finished — it holds ports and a temporary store.
+Stop the network when finished: close listeners before nodes, then close stores.

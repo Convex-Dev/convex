@@ -19,7 +19,6 @@ import convex.lattice.cursor.ALatticeCursor;
 import convex.lattice.cursor.Cursors;
 import convex.lattice.generic.KeyedLattice;
 import convex.lattice.generic.MapLattice;
-import convex.node.NodeConfig;
 import convex.node.NodeServer;
 
 /**
@@ -177,7 +176,7 @@ public class ConvexDB extends ALatticeComponent<AHashMap<AString, Index<Keyword,
 	 * @return NodeServer configured for SQL database lattice (local-only, no network)
 	 */
 	public static NodeServer<AHashMap<AString, Index<Keyword, ACell>>> createNodeServer(AStore store) {
-		return new NodeServer<>(DATABASE_MAP_LATTICE, store, NodeConfig.port(-1));
+		return new NodeServer<>(DATABASE_MAP_LATTICE,store);
 	}
 
 	/**

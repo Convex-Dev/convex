@@ -4,10 +4,10 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-p2p/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-p2p)
 
 Rollup package for Convex P2P nodes. Builds on the lattice data structures in
-`convex-core` and the `NodeServer` binary networking in `convex-peer` to provide nodes
-that discover each other, exchange lattice values and converge on shared state — and
-bundles the application regions those nodes serve, so one dependency gives you a
-complete node.
+`convex-core` and the authoritative node, propagator and transport components in
+`convex-peer` to provide nodes that discover each other, exchange lattice values
+and converge on shared state — and bundles the application regions those nodes
+serve, so one dependency gives you a complete node.
 
 > **Status: early implementation.** Authenticated one-peer bootstrap, signed
 > NodeInfo discovery, bounded desired-peer state, follow-filtered social replication,
@@ -33,7 +33,7 @@ P2PLattice.ROOT (KeyedLattice)
 `AccountKey` at `[:p2p :nodes <nodeKey>]`. Reuses core's region instance directly, so registry merge
 semantics cannot drift between this root and `Lattice.ROOT`, and
 `NodeDirectory` publishes and validates this application-owned path while the
-generic `NodeServer` transports it without interpreting its schema.
+generic propagation layer transports it without interpreting its schema.
 
 **`:id`** — P2P user identity, separate from transport details, so one identity can
 advertise several nodes and change its claims without republishing node records.
@@ -204,7 +204,7 @@ bob.launch();
 
 // Bob proves his key; Alice pushes only her own signed NodeInfo entry, then
 // pulls :p2p, :id and Alice's currently desired social-owner paths.
-alice.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
+alice.connect(bobKey.getAccountKey(), bob.getHostAddress()).join();
 
 // Bob independently authenticates Alice on that same socket before upgrading it
 // from an inbound connection to an outbound propagation route.
@@ -229,7 +229,7 @@ outbound connection remains full-duplex:
 ```java
 P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey);
 dave.launch();
-dave.connect(bobKey.getAccountKey(), bob.getNodeServer().getHostAddress()).join();
+dave.connect(bobKey.getAccountKey(), bob.getHostAddress()).join();
 
 // Bob may send lattice updates back through Dave's original outbound socket only
 // after Dave has answered Bob's independent challenge.
@@ -304,9 +304,10 @@ java -cp convex.jar convex.p2p.P2PNode [etch-file]
 Inbound network lattice traffic is **denied by default**. A node serves queries and
 accepts values only once the operator assigns inbound connections to a propagator —
 either via `serveAllInbound()` for a public single-view node, or a custom policy set
-with `NodeServer.setInboundPropagatorSelector`. See `convex-peer`'s `NodeServer` for
-the full capability model. Operator assignment is not authentication and does not add
-the connection to outbound gossip. That separate upgrade requires live
+on the application-owned listener returned by `getTransport()`. See
+`convex-peer`'s `LatticeListener` and `NodeServer` for the full capability model.
+Operator assignment is not authentication and does not add the connection to
+outbound gossip. That separate upgrade requires live
 challenge/response plus an admitted node identity. The challenge and response both
 have verified Ed25519 signatures and bind a random nonce, the opposite party's node
 key as audience, and the fixed `convex-lattice-peer-v1` context.

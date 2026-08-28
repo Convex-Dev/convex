@@ -20,8 +20,8 @@ import convex.net.AServer;
 import convex.net.impl.netty.NettyServer;
 
 /**
- * Thin shared TCP listener that assigns each physical inbound connection to one
- * {@link LatticePropagator}.
+ * Application-owned TCP transport that assigns each physical inbound
+ * connection to one {@link LatticePropagator}.
  *
  * <p>The listener owns only socket acceptance and the immutable assignment map.
  * Once selected, the propagator owns every capability and resource associated
@@ -29,42 +29,98 @@ import convex.net.impl.netty.NettyServer;
  * store and eventual route upgrade. The listener never decodes a lattice value,
  * accesses a serving store or calls {@link NodeServer}; it may inspect only a
  * bounded top-level envelope to return a correlated admission denial.</p>
+ *
+ * <p>A calling application may register several propagators with one listener,
+ * or give different propagators independent listeners. Registration grants
+ * only eligibility for the application selector; it does not attach, start or
+ * close a propagator. The application must start the authoritative node and its
+ * attached groups before opening this listener, then close the listener before
+ * closing those groups.</p>
  */
-final class LatticeListener implements Closeable {
+public final class LatticeListener implements Closeable {
 
 	private static final Logger log=LoggerFactory.getLogger(LatticeListener.class);
 
 	private final NodeConfig config;
-	private final Set<LatticePropagator> allowedPropagators;
+	private final Set<LatticePropagator> allowedPropagators=
+		ConcurrentHashMap.newKeySet();
 	private final ConcurrentHashMap<AConnection,LatticePropagator> assignments=
 		new ConcurrentHashMap<>();
 	private Function<AConnection,LatticePropagator> selector;
 	private AServer server;
 	private Integer port;
+	private boolean launchStarted;
+	private boolean running;
 
-	LatticeListener(NodeConfig config,Set<LatticePropagator> allowedPropagators) {
-		this.config=config;
-		this.allowedPropagators=allowedPropagators;
-		this.port=config.getPort();
+	/**
+	 * Creates a TCP lattice listener. No propagation group is admitted until it
+	 * is explicitly registered and selected.
+	 *
+	 * @param config host limits and port, or {@code null} for defaults
+	 */
+	public LatticeListener(NodeConfig config) {
+		this.config=(config==null) ? NodeConfig.create() : config;
+		this.port=this.config.getPort();
 	}
 
-	/** Configures the operator policy used once for each new inbound socket. */
-	void setSelector(Function<AConnection,LatticePropagator> selector) {
-		if (server!=null) throw new IllegalStateException("Inbound selector must be configured before launch");
+	/**
+	 * Registers a propagation group as an eligible target of this transport.
+	 * The listener does not take lifecycle ownership of the group.
+	 *
+	 * @param propagator group which may receive accepted connections
+	 */
+	public synchronized void registerPropagator(LatticePropagator propagator) {
+		if (propagator==null) throw new IllegalArgumentException("Propagator must not be null");
+		requireNotLaunched("registerPropagator");
+		allowedPropagators.add(propagator);
+	}
+
+	/**
+	 * Configures the application policy used once for each new inbound socket.
+	 * The returned group must have been registered with this listener.
+	 *
+	 * @param selector assignment policy, or {@code null} to deny every connection
+	 */
+	public synchronized void setSelector(Function<AConnection,LatticePropagator> selector) {
+		requireNotLaunched("setSelector");
 		this.selector=selector;
 	}
 
-	/** Starts the optional listener; a negative port represents an outbound-only node. */
-	void launch() throws IOException,InterruptedException {
-		if (port!=null && port<0) return;
+	/**
+	 * Opens the listener. A negative port represents an intentionally absent
+	 * inbound transport and completes launch without binding a socket.
+	 *
+	 * @throws IOException if the transport cannot bind or start
+	 * @throws InterruptedException if launch is interrupted
+	 */
+	public synchronized void launch() throws IOException,InterruptedException {
+		requireNotLaunched("launch");
+		launchStarted=true;
+		if (port!=null && port<0) {
+			running=true;
+			return;
+		}
 		NettyServer netty=new NettyServer(port);
 		netty.setMessageDelivery(this::deliver);
 		netty.setDisconnectAction(this::removeConnection);
 		netty.setMaxClientConnections(config.getMaxConnections());
 		netty.setMaxMessageLength(config.getMaxMessageSize());
 		server=netty;
-		server.launch();
-		port=server.getPort();
+		try {
+			server.launch();
+			port=server.getPort();
+			running=true;
+		} catch (IOException | InterruptedException | RuntimeException | Error e) {
+			server.close();
+			server=null;
+			throw e;
+		}
+	}
+
+	private void requireNotLaunched(String operation) {
+		if (launchStarted) {
+			throw new IllegalStateException(operation+" must precede listener launch");
+		}
 	}
 
 	private Predicate<Message> deliver(Message message) {
@@ -148,7 +204,7 @@ final class LatticeListener implements Closeable {
 			LatticePropagator selected=policy.apply(connection);
 			if (selected==null) return null;
 			if (!allowedPropagators.contains(selected)) {
-				log.warn("Inbound policy selected a propagator not attached to this node");
+				log.warn("Inbound policy selected a propagator not registered with this listener");
 				return null;
 			}
 			return selected;
@@ -163,7 +219,7 @@ final class LatticeListener implements Closeable {
 	}
 
 	/** Releases the assignment and delegates all connection cleanup to its owner. */
-	void removeConnection(AConnection connection) {
+	private void removeConnection(AConnection connection) {
 		LatticePropagator propagator=assignments.remove(connection);
 		if (propagator==null) return;
 		try {
@@ -176,19 +232,27 @@ final class LatticeListener implements Closeable {
 		}
 	}
 
-	Integer getPort() {
+	/** Returns the configured port, or the actual bound port after launch. */
+	public Integer getPort() {
 		return port;
 	}
 
-	InetSocketAddress getHostAddress() {
+	/** Returns the bound TCP address, or {@code null} when no socket is open. */
+	public InetSocketAddress getHostAddress() {
 		return server==null ? null : server.getHostAddress();
 	}
 
+	/** Returns whether launch completed and the listener has not been closed. */
+	public boolean isRunning() {
+		return running;
+	}
+
 	@Override
-	public void close() {
+	public synchronized void close() {
 		AServer current=server;
 		if (current!=null) current.close();
 		for (AConnection connection:Set.copyOf(assignments.keySet())) removeConnection(connection);
 		server=null;
+		running=false;
 	}
 }

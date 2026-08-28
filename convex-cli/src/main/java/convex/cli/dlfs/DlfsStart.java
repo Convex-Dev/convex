@@ -29,6 +29,7 @@ import convex.gui.utils.TrayManager;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
+import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.node.NodeServer;
@@ -138,14 +139,23 @@ public class DlfsStart extends ACommand {
 		propagator.setMergeContext(context);
 		propagator.setTransportKeyPair(keyPair);
 		nodeServer.addPropagator(propagator);
+		LatticeListener latticeTransport=new LatticeListener(config);
+		latticeTransport.registerPropagator(propagator);
 
 		try {
 			nodeServer.launch();
+			latticeTransport.launch();
 		} catch (Exception e) {
+			latticeTransport.close();
+			try {
+				nodeServer.close();
+			} catch (Exception closeError) {
+				e.addSuppressed(closeError);
+			}
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to launch NodeServer: " + e.getMessage(), e);
 		}
-		inform("Lattice node started on port " + nodeServer.getPort());
+		inform("Lattice transport started on port " + latticeTransport.getPort());
 
 		// Connect to remote peers
 		connectPeers(propagator);
@@ -176,6 +186,7 @@ public class DlfsStart extends ACommand {
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
+			latticeTransport.close();
 			try {
 				nodeServer.close();
 			} catch (Exception closeError) {
@@ -195,6 +206,7 @@ public class DlfsStart extends ACommand {
 		Runnable shutdown=()->{
 			if (!closing.compareAndSet(false,true)) return;
 			dlfsServer.close();
+			latticeTransport.close();
 			try {
 				nodeServer.close();
 			} catch (Exception e) {

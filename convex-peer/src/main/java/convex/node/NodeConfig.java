@@ -15,8 +15,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 /**
- * Immutable listener and authoritative-persistence configuration for one
- * {@link NodeServer}.
+ * Immutable application configuration shared by an authoritative
+ * {@link NodeServer} and, when present, its standard {@link LatticeListener}.
  *
  * <p>Follows the same {@link AMap}{@code <AString, ACell>} pattern as
  * {@link convex.peer.PeerConfig}, providing typed accessors with sensible
@@ -25,6 +25,11 @@ import convex.core.lang.RT;
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
  * overlap (port, persist and restore) so configurations are consistent
  * across peer and lattice node servers.</p>
+ *
+ * <p>{@code NodeServer} consumes persistence and validation settings only.
+ * {@code LatticeListener} independently consumes the port and physical inbound
+ * limits. Passing this object to a server does not create, configure or own a
+ * transport.</p>
  *
  * <p>Propagation-group queue, route, acquisition and publication limits belong
  * to {@link LatticePropagatorConfig}. Deprecated group accessors remain here only
@@ -40,7 +45,7 @@ public class NodeConfig {
 	// ========== Config keys ==========
 
 	/**
-	 * Inbound listener port (Long). Zero selects an available port; negative
+	 * Standard {@link LatticeListener} port (Long). Zero selects an available port; negative
 	 * disables the listener.
 	 */
 	public static final AString PORT = Strings.intern("port");
@@ -74,7 +79,7 @@ public class NodeConfig {
 	public static final AString MAX_CONSECUTIVE_REJECTS =
 		LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS;
 
-	/** Maximum encoded inbound network message size in bytes (Long, default 4 MiB). */
+	/** Maximum encoded inbound listener message size in bytes (Long, default 4 MiB). */
 	public static final AString MAX_MESSAGE_SIZE = Strings.intern("maxMessageSize");
 
 	/** @deprecated Use {@link LatticePropagatorConfig#MAX_DELTA_MESSAGE_SIZE}. */
@@ -92,7 +97,7 @@ public class NodeConfig {
 	public static final AString MAX_TRUSTED_MESSAGE_SIZE =
 		LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE;
 
-	/** Maximum simultaneous inbound network connections (Long, default 256). */
+	/** Maximum simultaneous listener connections (Long, default 256). */
 	public static final AString MAX_CONNECTIONS = Strings.intern("maxConnections");
 
 	/** @deprecated Use {@link LatticePropagatorConfig#MAX_DESIRED_PEERS}. */
@@ -185,7 +190,7 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Creates a configuration with a specific listener port.
+	 * Creates a configuration with a specific standard-listener port.
 	 *
 	 * @param port inbound port; zero selects an available port and negative disables listening
 	 * @return node configuration with the port set
@@ -223,7 +228,7 @@ public class NodeConfig {
 	// ========== Typed accessors ==========
 
 	/**
-	 * Returns the configured listener port.
+	 * Returns the configured standard-listener port.
 	 *
 	 * @return port number, or {@code null} to use the transport default with fallback
 	 */

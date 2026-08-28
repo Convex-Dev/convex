@@ -60,6 +60,8 @@ public class LatticePropagatorTest {
 	private NodeServer<?> server2;
 	private LatticePropagator propagator1;
 	private LatticePropagator propagator2;
+	private LatticeListener transport1;
+	private LatticeListener transport2;
 	private AStore store1;
 	private AStore store2;
 
@@ -90,15 +92,19 @@ public class LatticePropagatorTest {
 		propagator2.setTransportKeyPair(nodeKey2);
 		server1.addPropagator(propagator1);
 		server2.addPropagator(propagator2);
+		transport1=new LatticeListener(NodeConfig.port(0));
+		transport2=new LatticeListener(NodeConfig.port(0));
+		transport1.registerPropagator(propagator1);
+		transport2.registerPropagator(propagator2);
 		// These propagation unit tests model routes after authentication. The
 		// challenge/response and inbound-upgrade paths are exercised separately by
 		// NodeServerTest and P2PSocialSyncTest; assigning the proven remote key here
 		// ensures DATA-ahead is never tested over an unverified connection.
-		server1.setInboundPropagatorSelector(connection -> {
+		transport1.setSelector(connection -> {
 			connection.setTrustedKey(nodeKey2.getAccountKey());
 			return propagator1;
 		});
-		server2.setInboundPropagatorSelector(connection -> {
+		transport2.setSelector(connection -> {
 			connection.setTrustedKey(nodeKey1.getAccountKey());
 			return propagator2;
 		});
@@ -106,13 +112,15 @@ public class LatticePropagatorTest {
 		// Launch both servers
 		server1.launch();
 		server2.launch();
+		transport1.launch();
+		transport2.launch();
 
 		// Establish bidirectional peer connections
 		// Server1 -> Server2 (so server1 can broadcast to server2)
 		// Server2 -> Server1 (so server2 can broadcast to server1)
 		try {
-			InetSocketAddress server1Address = server1.getHostAddress();
-			InetSocketAddress server2Address = server2.getHostAddress();
+			InetSocketAddress server1Address = transport1.getHostAddress();
+			InetSocketAddress server2Address = transport2.getHostAddress();
 
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
 			propagator1.addPeer(nodeKey2.getAccountKey(),peer1to2)
@@ -128,6 +136,8 @@ public class LatticePropagatorTest {
 
 	@AfterEach
 	public void tearDown() throws IOException {
+		if (transport1!=null) transport1.close();
+		if (transport2!=null) transport2.close();
 		if (server1 != null) {
 			server1.close();
 		}
@@ -159,7 +169,7 @@ public class LatticePropagatorTest {
 	@Test
 	public void testAddPeerReportsIdentityFailure() throws Exception {
 		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
-		Convex peer=ConvexRemote.connect(server2.getHostAddress());
+		Convex peer=ConvexRemote.connect(transport2.getHostAddress());
 
 		assertThrows(ExecutionException.class,
 			()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));

@@ -42,11 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   use `[:LV path value]` for optimistic pushes and `[:LV id path value]` for
   confirmed pushes, and reject scalar, missing or ambiguous paths.
 - `NodeServer` now owns only the authoritative lattice merge, node-store root,
-  listener lifecycle and isolated update notification. Calling applications must
-  construct and configure each `LatticePropagator`; nodes no longer create an
-  implicit primary group. Propagators own their connection sets, trust, protocol
-  queues, acquisition, filters and serving stores, and a failed group cannot break
-  node publication or another group.
+  attached-group lifecycle and isolated update notification. Calling applications
+  must construct and configure each `LatticePropagator`; nodes no longer create
+  an implicit primary group. Applications also own `LatticeListener` transport
+  composition, permitting shared connection routing or independent transports;
+  `NodeServer` no longer exposes a port, address or inbound selector. Propagators
+  own their connection sets, trust, protocol queues, acquisition, filters and
+  serving stores, and a failed group cannot break node publication or another
+  group.
 
 ### Fixed
 

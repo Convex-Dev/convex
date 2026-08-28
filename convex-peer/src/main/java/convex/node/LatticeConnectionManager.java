@@ -52,7 +52,7 @@ import convex.peer.AConnectionManager;
  *       verification limbo.</li>
  *   <li>Active connections are admitted manager-owned outbound clients.</li>
  *   <li>Upgraded inbound routes are authenticated sockets physically owned by
- *       the shared listener and assigned endpoint; this manager owns only their
+ *       an application transport and assigned endpoint; this manager owns only their
  *       outbound capability.</li>
  * </ol>
  *

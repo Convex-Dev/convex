@@ -47,6 +47,7 @@ public class KVReplicationDemo {
 
 		List<NodeServer<?>> servers = new ArrayList<>();
 		List<LatticePropagator> propagators=new ArrayList<>();
+		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 		List<KVDatabase> databases = new ArrayList<>();
 
@@ -62,15 +63,19 @@ public class KVReplicationDemo {
 				LatticePropagator propagator=new LatticePropagator(
 					store,Lattice.ROOT,value -> value,LatticePropagatorConfig.create());
 				server.addPropagator(propagator);
-				server.setInboundPropagatorSelector(connection -> propagator);
+				LatticeListener transport=new LatticeListener(config);
+				transport.registerPropagator(propagator);
+				transport.setSelector(connection -> propagator);
 				server.launch();
+				transport.launch();
 				servers.add(server);
 				propagators.add(propagator);
+				transports.add(transport);
 
 				KVDatabase db = KVDatabase.create(DB_NAME, kp, Strings.create("node-" + i));
 				databases.add(db);
 
-				System.out.println("Node " + i + " started on port " + server.getPort()
+				System.out.println("Node " + i + " started on port " + transport.getPort()
 					+ "  key=" + kp.getAccountKey().toHexString(6) + "...");
 			}
 
@@ -80,7 +85,7 @@ public class KVReplicationDemo {
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
-						Convex peer=ConvexRemote.connect(servers.get(j).getHostAddress());
+						Convex peer=ConvexRemote.connect(transports.get(j).getHostAddress());
 						propagators.get(i).addPeer(peerKey,peer);
 					}
 				}
@@ -177,6 +182,7 @@ public class KVReplicationDemo {
 
 		} finally {
 			System.out.println("\nShutting down...");
+			for (LatticeListener transport:transports) transport.close();
 			for (NodeServer<?> s : servers) s.close();
 			for (AStore s : stores) s.close();
 		}

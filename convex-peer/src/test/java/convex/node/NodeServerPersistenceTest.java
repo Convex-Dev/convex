@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,21 +102,35 @@ public class NodeServerPersistenceTest {
 	private NodeServer<?> backup;
 	private AStore primaryStore;
 	private AStore backupStore;
+	private final ConcurrentHashMap<NodeServer<?>,LatticeListener> transports=
+		new ConcurrentHashMap<>();
 
 	/** Attaches the explicit identity-view group used by replication tests. */
-	private static LatticePropagator addPropagationGroup(NodeServer<?> node) {
+	private LatticePropagator addPropagationGroup(NodeServer<?> node) {
 		LatticePropagator propagator=new LatticePropagator(
 			node.getStore(),node.getLattice(),value -> value,
 			LatticePropagatorConfig.create());
 		node.addPropagator(propagator);
+		transport(node).registerPropagator(propagator);
 		return propagator;
 	}
 
 	/** Exposes the configured group on every inbound test connection. */
-	private static LatticePropagator serveInbound(NodeServer<?> node) {
+	private LatticePropagator serveInbound(NodeServer<?> node) {
 		LatticePropagator propagator=addPropagationGroup(node);
-		node.setInboundPropagatorSelector(connection -> propagator);
+		transport(node).setSelector(connection -> propagator);
 		return propagator;
+	}
+
+	private LatticeListener transport(NodeServer<?> node) {
+		return transports.computeIfAbsent(node,ignored ->
+			new LatticeListener(NodeConfig.port(0)));
+	}
+
+	private InetSocketAddress address(NodeServer<?> node) throws Exception {
+		LatticeListener transport=transport(node);
+		if (!transport.isRunning()) transport.launch();
+		return transport.getHostAddress();
 	}
 
 	/** Returns the one application-owned group expected by a replication fixture. */
@@ -141,6 +156,8 @@ public class NodeServerPersistenceTest {
 		sharedBackupStore.setFlushHook(null);
 		sharedPrimaryStore.setFlushCompleteHook(null);
 		sharedBackupStore.setFlushCompleteHook(null);
+		for (LatticeListener transport:transports.values()) transport.close();
+		transports.clear();
 		if (primary != null) primary.close();
 		if (backup != null) backup.close();
 		if (primaryStore != null && primaryStore != sharedPrimaryStore) primaryStore.close();
@@ -180,7 +197,7 @@ public class NodeServerPersistenceTest {
 	 * Helper: connect primary → backup (primary broadcasts to backup).
 	 */
 	private void connectPrimaryToBackup() throws Exception {
-		InetSocketAddress backupAddr = backup.getHostAddress();
+		InetSocketAddress backupAddr = address(backup);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(backupAddr);
 		propagationGroup(primary).addPeer(peerKey, conn);
@@ -218,7 +235,7 @@ public class NodeServerPersistenceTest {
 
 	/** Pulls the currently announced primary snapshot without syncing it first. */
 	private void pullBackupFromPrimary() throws Exception {
-		InetSocketAddress primaryAddr = primary.getHostAddress();
+		InetSocketAddress primaryAddr = address(primary);
 		AccountKey peerKey = AKeyPair.generate().getAccountKey();
 		Convex conn = ConvexRemote.connect(primaryAddr);
 		LatticePropagator group=propagationGroup(backup);

@@ -73,9 +73,9 @@ public class PointOfPresenceTest {
 		bob.launch();
 		alice.launch();
 		dave.launch();
-		Convex aliceToBob=alice.connect(bobNodeKey,bob.getNodeServer().getHostAddress())
+		Convex aliceToBob=alice.connect(bobNodeKey,bob.getHostAddress())
 			.get(5,TimeUnit.SECONDS);
-		dave.connect(bobNodeKey,bob.getNodeServer().getHostAddress())
+		dave.connect(bobNodeKey,bob.getHostAddress())
 			.get(5,TimeUnit.SECONDS);
 		bob.whenInboundConnectionUpgraded(aliceKey.getAccountKey())
 			.get(5,TimeUnit.SECONDS);

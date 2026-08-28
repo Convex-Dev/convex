@@ -150,9 +150,9 @@ public class P2PSocialSyncTest {
 		assertEquals(3,Set.of(aliceNode.getPort(),bobNode.getPort(),carolNode.getPort()).size());
 
 		Convex aliceToBob=aliceNode.connect(bobNodeKey.getAccountKey(),
-			bobNode.getNodeServer().getHostAddress()).get(5,TimeUnit.SECONDS);
+			bobNode.getHostAddress()).get(5,TimeUnit.SECONDS);
 		Convex carolToBob=carolNode.connect(bobNodeKey.getAccountKey(),
-			bobNode.getNodeServer().getHostAddress()).get(5,TimeUnit.SECONDS);
+			bobNode.getHostAddress()).get(5,TimeUnit.SECONDS);
 		AConnection bobToAlice=bobNode.whenInboundConnectionUpgraded(
 			aliceNodeKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 		AConnection bobToCarol=bobNode.whenInboundConnectionUpgraded(
@@ -207,7 +207,7 @@ public class P2PSocialSyncTest {
 		assertEquals(Vectors.empty(),daveNode.p2p().node().getNodeInfo().get(Keywords.TRANSPORTS));
 
 		Convex daveToBob=daveNode.connect(bobNodeKey.getAccountKey(),
-			bobNode.getNodeServer().getHostAddress()).get(5,TimeUnit.SECONDS);
+			bobNode.getHostAddress()).get(5,TimeUnit.SECONDS);
 		AConnection bobToDave=bobNode.whenInboundConnectionUpgraded(
 			daveNodeKey.getAccountKey()).get(5,TimeUnit.SECONDS);
 		assertEquals(bobNodeKey.getAccountKey(),daveToBob.getVerifiedPeer());
@@ -257,7 +257,7 @@ public class P2PSocialSyncTest {
 			aliceDid,forgedSigned);
 		Message forgedUpdate=Message.create(MessageType.LATTICE_VALUE,Vectors.create(
 			MessageTag.LATTICE_VALUE,null,Vectors.of(Social.KEY_SOCIAL),forgedOwners));
-		try (Convex attacker=Convex.connect(aliceNode.getNodeServer().getHostAddress(),
+		try (Convex attacker=Convex.connect(aliceNode.getHostAddress(),
 				null,attackerKey)) {
 			Result rejected=attacker.request(forgedUpdate).get(5,TimeUnit.SECONDS);
 			assertTrue(rejected.isError());

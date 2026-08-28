@@ -78,6 +78,8 @@ public class NodeServerTest {
 	private NodeServer<AInteger> maxNodeServer;
 	private NodeServer<ASet<ACell>> setNodeServer;
 	private AStore store;
+	private final ConcurrentHashMap<NodeServer<?>,LatticeListener> transports=
+		new ConcurrentHashMap<>();
 
 	@BeforeEach
 	public void setUp() {
@@ -86,6 +88,8 @@ public class NodeServerTest {
 
 	@AfterEach
 	public void tearDown() throws IOException {
+		for (LatticeListener transport:transports.values()) transport.close();
+		transports.clear();
 		if (maxNodeServer != null) {
 			maxNodeServer.close();
 		}
@@ -116,9 +120,35 @@ public class NodeServerTest {
 	}
 
 	/** Explicit public test policy: every network connection uses one configured view. */
-	private static void allowSingleGroupInbound(NodeServer<?> node) {
+	private void allowSingleGroupInbound(NodeServer<?> node) {
 		LatticePropagator propagator=propagator(node);
-		node.setInboundPropagatorSelector(connection -> propagator);
+		selectInboundPropagator(node,connection -> propagator);
+	}
+
+	private LatticeListener transport(NodeServer<?> node) {
+		return transports.computeIfAbsent(node,ignored ->
+			new LatticeListener(NodeConfig.port(0)));
+	}
+
+	private void selectInboundPropagator(NodeServer<?> node,
+			java.util.function.Function<AConnection,LatticePropagator> selector) {
+		LatticeListener transport=transport(node);
+		for (LatticePropagator propagator:node.getPropagators()) {
+			transport.registerPropagator(propagator);
+		}
+		transport.setSelector(selector);
+	}
+
+	private InetSocketAddress address(NodeServer<?> node)
+			throws IOException,InterruptedException {
+		LatticeListener transport=transport(node);
+		if (!transport.isRunning()) {
+			for (LatticePropagator propagator:node.getPropagators()) {
+				transport.registerPropagator(propagator);
+			}
+			transport.launch();
+		}
+		return transport.getHostAddress();
 	}
 
 	/** Syncs the authoritative root, then waits for the separately owned view. */
@@ -665,7 +695,7 @@ public class NodeServerTest {
 		assertNotNull(propagator);
 
 		// Create Convex connections to the server (using loopback addresses for testing)
-		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		InetSocketAddress serverAddress = address(maxNodeServer);
 		ConvexRemote peer1 = ConvexRemote.connect(serverAddress);
 		ConvexRemote peer2 = ConvexRemote.connect(serverAddress);
 
@@ -707,7 +737,7 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		// Create a Convex connection to the server
-		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		InetSocketAddress serverAddress = address(maxNodeServer);
 		ConvexRemote peer = ConvexRemote.connect(serverAddress);
 		
 		try {
@@ -761,28 +791,6 @@ public class NodeServerTest {
 	}
 
 	/**
-	 * Test port configuration
-	 */
-	@Test
-	public void testPortConfiguration() {
-		ALattice<AInteger> lattice = MaxLattice.create();
-		
-		// Test with null port
-		maxNodeServer = new NodeServer<>(lattice, store);
-		assertEquals(null, maxNodeServer.getPort());
-
-		// Test with specific port
-		NodeServer<AInteger> server2 = new NodeServer<>(lattice, store, NodeConfig.port(19999));
-		assertEquals(Integer.valueOf(19999), server2.getPort());
-		
-		try {
-			server2.close();
-		} catch (IOException e) {
-			// Ignore
-		}
-	}
-
-	/**
 	 * Test that getLocalValue returns current cursor value
 	 */
 	@Test
@@ -815,7 +823,7 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.isRunning());
 		
 		// Get the server address
-		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		InetSocketAddress serverAddress = address(maxNodeServer);
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
 		// Connect with ConvexRemote
@@ -842,7 +850,7 @@ public class NodeServerTest {
 		assertTrue(maxNodeServer.isRunning());
 		
 		// Get the server address
-		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		InetSocketAddress serverAddress = address(maxNodeServer);
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
 		// Connect with ConvexRemote
@@ -889,7 +897,7 @@ public class NodeServerTest {
 		maxNodeServer.getCursor().sync();
 		
 		// Get the server address
-		InetSocketAddress serverAddress = maxNodeServer.getHostAddress();
+		InetSocketAddress serverAddress = address(maxNodeServer);
 		assertNotNull(serverAddress, "Server should have a host address after launch");
 		
 		// Connect with ConvexRemote
@@ -946,7 +954,7 @@ public class NodeServerTest {
 		Hash rootHash = expected.getHash();
 
 		try (AStore peerStore = new MemoryStore();
-				ConvexRemote peer = ConvexRemote.connect(setNodeServer.getHostAddress())) {
+				ConvexRemote peer = ConvexRemote.connect(address(setNodeServer))) {
 			peer.setStore(peerStore);
 			AVector<?> query = Vectors.create(
 				MessageTag.LATTICE_QUERY, CVMLong.create(70), Vectors.empty());
@@ -973,7 +981,7 @@ public class NodeServerTest {
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
 		maxNodeServer.launch();
 
-		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
 			Message request = Message.createDataRequest(CVMLong.create(71), privateValue.getHash());
 			Result denied=convex.message(request).get(5,TimeUnit.SECONDS);
 			assertEquals(ErrorCodes.TRUST,denied.getErrorCode());
@@ -989,7 +997,7 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 		Blob unsolicited=Blobs.createRandom(400);
 
-		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
 			assertTrue(convex.trySend(Message.createDataMessage(
 				List.of(unsolicited),(int)CPoSConstants.MAX_MESSAGE_LENGTH)));
 
@@ -1013,9 +1021,9 @@ public class NodeServerTest {
 					LatticePropagator ingress=unattachedPropagator(node);
 					ingress.setIngressFilter((path,received) -> null);
 					node.addPropagator(ingress);
-					node.setInboundPropagatorSelector(connection -> ingress);
+					selectInboundPropagator(node,connection -> ingress);
 				node.launch();
-				try (ConvexRemote peer=ConvexRemote.connect(node.getHostAddress())) {
+				try (ConvexRemote peer=ConvexRemote.connect(address(node))) {
 					AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,
 						null,Vectors.empty(),value);
 					Result result=peer.request(Message.create(
@@ -1044,10 +1052,10 @@ public class NodeServerTest {
 			try (NodeServer<AInteger> node = new NodeServer<>(MaxLattice.create(), primaryStore)) {
 				node.addPropagator(primary);
 				node.addPropagator(publicPropagator);
-				node.setInboundPropagatorSelector(connection -> publicPropagator);
+				selectInboundPropagator(node,connection -> publicPropagator);
 				node.launch();
 
-				try (ConvexRemote peer = ConvexRemote.connect(node.getHostAddress())) {
+				try (ConvexRemote peer = ConvexRemote.connect(address(node))) {
 					Message request = Message.createDataRequest(CVMLong.create(74),
 						publicValue.getHash(), privateValue.getHash());
 					Result result = peer.message(request).get(5, TimeUnit.SECONDS);
@@ -1068,7 +1076,7 @@ public class NodeServerTest {
 		maxNodeServer = new NodeServer<>(MaxLattice.create(), store);
 		maxNodeServer.launch();
 
-		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
 			AVector<?> payload = Vectors.create(
 				MessageTag.LATTICE_QUERY, CVMLong.create(73), Vectors.empty());
 			Result denied=convex.message(Message.create(MessageType.LATTICE_QUERY,payload))
@@ -1157,11 +1165,11 @@ public class NodeServerTest {
 					SetLattice.create(),primaryStore)) {
 				receiver.addPropagator(primary);
 				receiver.addPropagator(ingress);
-				receiver.setInboundPropagatorSelector(connection -> ingress);
+				selectInboundPropagator(receiver,connection -> ingress);
 				receiver.launch();
 
 				LatticeConnectionManager sourceManager = new LatticeConnectionManager(sourceStore);
-				ConvexRemote source = ConvexRemote.connect(receiver.getHostAddress());
+				ConvexRemote source = ConvexRemote.connect(address(receiver));
 				try {
 					sourceManager.addPeer(AKeyPair.generate().getAccountKey(), source);
 					AVector<?> payload = Vectors.create(
@@ -1225,14 +1233,14 @@ public class NodeServerTest {
 			receiver.addPropagator(primary);
 			receiver.addPropagator(ingress);
 			AKeyPair sourceKey=AKeyPair.generate();
-			receiver.setInboundPropagatorSelector(connection -> {
+			selectInboundPropagator(receiver,connection -> {
 				connection.setTrustedKey(sourceKey.getAccountKey());
 				return ingress;
 			});
 			receiver.launch();
 
 			sourceManager = new LatticeConnectionManager(sourceStore);
-			source = ConvexRemote.connect(receiver.getHostAddress());
+			source = ConvexRemote.connect(address(receiver));
 			sourceManager.addPeer(sourceKey.getAccountKey(), source);
 
 			AVector<?> payload = Vectors.create(
@@ -1489,13 +1497,12 @@ public class NodeServerTest {
 		}
 	}
 
-	/** A failed publication checkpoint must roll back every service started by launch(). */
+	/** A failed publication checkpoint must roll back every node-owned service. */
 	@Test
 	public void testPublicationFailureAbortsLaunch() throws Exception {
 		FailingMemoryStore testStore = new FailingMemoryStore();
 		testStore.failOnRootWrite = 1; // generic initial root publication fails
-		NodeConfig cfg = NodeConfig.create(Maps.of(
-			NodeConfig.PORT, CVMLong.ZERO));
+		NodeConfig cfg = NodeConfig.create();
 		NodeServer<Index<Keyword, ACell>> node = new NodeServer<>(Lattice.ROOT, testStore, cfg);
 
 		try {
@@ -1503,13 +1510,6 @@ public class NodeServerTest {
 			assertFalse(node.isRunning(), "a failed launch must not report a live node");
 			assertEquals(NodeServer.LifecycleState.STOPPED, node.getLifecycleState(),
 				"complete launch rollback must publish a retryable stopped state");
-			InetSocketAddress closedAddress = new InetSocketAddress("127.0.0.1", node.getPort());
-			try (java.net.Socket socket = new java.net.Socket()) {
-				assertThrows(IOException.class,
-					() -> socket.connect(closedAddress, 1000),
-					"the listener opened earlier in launch must be closed before the failure returns");
-			}
-
 			testStore.failOnRootWrite = -1;
 			node.launch();
 			assertTrue(node.isRunning(), "the same NodeServer should be launchable after cleanup");
@@ -1536,7 +1536,7 @@ public class NodeServerTest {
 			maxNodeServer.getCursor().set(CVMLong.create(10));
 			syncAndAwaitPropagator(maxNodeServer);
 
-			try (ConvexRemote peer = ConvexRemote.connect(remote.getHostAddress())) {
+			try (ConvexRemote peer = ConvexRemote.connect(address(remote))) {
 				assertEquals(CVMLong.create(10),
 					maxNodeServer.pull(propagator(maxNodeServer),peer).get(5, TimeUnit.SECONDS));
 			}
@@ -1768,7 +1768,7 @@ public class NodeServerTest {
 			// This exercises the full incoming path:
 			//   network → processLatticeValue → mergeIncoming → sync (internal)
 			// We do NOT call sync() here — processLatticeValue must do it.
-			ConvexRemote convex = ConvexRemote.connect(node.getHostAddress());
+			ConvexRemote convex = ConvexRemote.connect(address(node));
 			try {
 				// Capture the announce future BEFORE sending, so the announce
 				// triggered by the incoming message cannot be missed
@@ -1813,7 +1813,7 @@ public class NodeServerTest {
 			allowSingleGroupInbound(node);
 			node.launch();
 			CompletableFuture<ACell> announced = propagator(node).nextAnnounce();
-			try (ConvexRemote convex = ConvexRemote.connect(node.getHostAddress())) {
+			try (ConvexRemote convex = ConvexRemote.connect(address(node))) {
 				AVector<?> payload = Vectors.create(
 					MessageTag.LATTICE_VALUE, null, Vectors.empty(), CVMLong.create(42));
 				convex.message(Message.create(MessageType.LATTICE_VALUE, payload));
@@ -1843,7 +1843,7 @@ public class NodeServerTest {
 			source.getCursor().path(regionB).merge(CVMLong.create(222));
 			syncAndAwaitPropagator(source);
 
-			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertEquals(CVMLong.create(111),
 						target.pullPath(peer,regionA).get(5,TimeUnit.SECONDS));
 				assertNull(target.getCursor().get(regionB));
@@ -1868,7 +1868,7 @@ public class NodeServerTest {
 			source.getCursor().path(regionB).merge(CVMLong.create(222));
 			syncAndAwaitPropagator(source);
 
-			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				CompletableFuture<ACell> a=target.pullPath(peer,regionA);
 				CompletableFuture<ACell> b=target.pullPath(peer,regionB);
 				assertEquals(CVMLong.create(111),a.get(5,TimeUnit.SECONDS));
@@ -1893,7 +1893,7 @@ public class NodeServerTest {
 			source.getCursor().path(region).merge(expected);
 			syncAndAwaitPropagator(source);
 
-			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertEquals(expected,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
 				assertNotNull(target.getStore().refForHash(branch.getHash()));
 			}
@@ -1920,7 +1920,7 @@ public class NodeServerTest {
 			source.getCursor().path(rejected).merge(Sets.of(CVMLong.ONE));
 			syncAndAwaitPropagator(source);
 
-			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertNull(target.pullPath(peer,absent).get(5,TimeUnit.SECONDS));
 				assertEquals(CVMLong.create(7),
 						target.pullPath(peer,rejected).get(5,TimeUnit.SECONDS));
@@ -1944,7 +1944,7 @@ public class NodeServerTest {
 			source.getCursor().path(outer,inner).merge(CVMLong.create(42));
 			syncAndAwaitPropagator(source);
 
-			try (ConvexRemote peer=ConvexRemote.connect(source.getHostAddress())) {
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
 				assertEquals(CVMLong.create(42),
 						target.pullPath(peer,outer,inner).get(5,TimeUnit.SECONDS));
 			}
@@ -1957,7 +1957,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote peer=ConvexRemote.connect(address(maxNodeServer))) {
 			AVector<?> payload=Vectors.create(
 					MessageTag.LATTICE_QUERY,null,Keyword.create("not-a-vector"));
 			Result result=peer.request(Message.create(MessageType.LATTICE_QUERY,payload))
@@ -1972,7 +1972,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote peer=ConvexRemote.connect(address(maxNodeServer))) {
 			AVector<?> payload=Vectors.create(
 				MessageTag.LATTICE_QUERY,CVMLong.create(84));
 			Result result=peer.message(Message.create(MessageType.LATTICE_QUERY,payload))
@@ -1987,7 +1987,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote peer=ConvexRemote.connect(address(maxNodeServer))) {
 			AVector<?> payload=Vectors.create(MessageTag.LATTICE_VALUE,
 				CVMLong.create(85),Keyword.create("not-a-vector"),CVMLong.create(42));
 			Result result=peer.message(Message.create(MessageType.LATTICE_VALUE,payload))
@@ -2005,7 +2005,7 @@ public class NodeServerTest {
 		maxNodeServer.launch();
 
 		CompletableFuture<ACell> announced=propagator(maxNodeServer).nextAnnounce();
-		try (ConvexRemote peer=ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote peer=ConvexRemote.connect(address(maxNodeServer))) {
 			AVector<?> payload=Vectors.create(
 				MessageTag.LATTICE_VALUE,Vectors.empty(),CVMLong.create(42));
 			Message optimistic=Message.create(MessageType.LATTICE_VALUE,payload);
@@ -2023,7 +2023,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
 			CVMLong mergeID = CVMLong.create(83);
 			AVector<?> payload = Vectors.create(MessageTag.LATTICE_VALUE, mergeID,
 				Vectors.empty(), Strings.create("not-an-integer"));
@@ -2043,7 +2043,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		try (ConvexRemote convex = ConvexRemote.connect(maxNodeServer.getHostAddress())) {
+		try (ConvexRemote convex = ConvexRemote.connect(address(maxNodeServer))) {
 			CVMLong queryId = CVMLong.create(3);
 			AVector<?> payload = Vectors.create(MessageTag.LATTICE_QUERY, queryId, Vectors.empty());
 			Result result = convex.message(Message.create(MessageType.LATTICE_QUERY, payload))
@@ -2064,7 +2064,7 @@ public class NodeServerTest {
 			node.launch();
 			int launchWrites = testStore.rootWrites.get();
 			LatticePropagator propagator = propagator(node);
-			try (ConvexRemote convex = ConvexRemote.connect(node.getHostAddress())) {
+			try (ConvexRemote convex = ConvexRemote.connect(address(node))) {
 				AVector<?> payload = Vectors.create(
 					MessageTag.LATTICE_VALUE, CVMLong.create(82), Vectors.empty(), CVMLong.create(42));
 				Message value = Message.create(MessageType.LATTICE_VALUE, payload);
@@ -2163,7 +2163,7 @@ public class NodeServerTest {
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote peer = ConvexRemote.connect(addr);
 
 		LatticeConnectionManager cm = propagator(maxNodeServer).getConnectionManager();
@@ -2211,13 +2211,13 @@ public class NodeServerTest {
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKey);
 		maxNodeServer.addPropagator(serverPropagator);
-		maxNodeServer.setInboundPropagatorSelector(connection -> serverPropagator);
+		selectInboundPropagator(maxNodeServer,connection -> serverPropagator);
 		maxNodeServer.launch();
 
 		LatticeConnectionManager cm=serverPropagator.getConnectionManager();
 		// Model a distinct outbound node connecting to this test server.
 		cm.setKeyPair(clientKey);
-		ConvexRemote verified = ConvexRemote.connect(maxNodeServer.getHostAddress(), 4096);
+		ConvexRemote verified = ConvexRemote.connect(address(maxNodeServer), 4096);
 		try {
 			assertEquals(4096, verified.getMaxInboundMessageLength());
 			CompletableFuture<Convex> admitted = cm.addPeer(serverKey.getAccountKey(), verified);
@@ -2376,7 +2376,7 @@ public class NodeServerTest {
 		propagator(maxNodeServer);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote peer = ConvexRemote.connect(addr);
 
 		LatticeConnectionManager cm = propagator(maxNodeServer).getConnectionManager();
@@ -2453,10 +2453,10 @@ public class NodeServerTest {
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
-		maxNodeServer.setInboundPropagatorSelector(connection -> serverPropagator);
+		selectInboundPropagator(maxNodeServer,connection -> serverPropagator);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
@@ -2484,10 +2484,10 @@ public class NodeServerTest {
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
-		maxNodeServer.setInboundPropagatorSelector(connection -> serverPropagator);
+		selectInboundPropagator(maxNodeServer,connection -> serverPropagator);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
@@ -2515,10 +2515,10 @@ public class NodeServerTest {
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
-		maxNodeServer.setInboundPropagatorSelector(connection -> serverPropagator);
+		selectInboundPropagator(maxNodeServer,connection -> serverPropagator);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
@@ -2549,7 +2549,7 @@ public class NodeServerTest {
 		allowSingleGroupInbound(maxNodeServer);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {
@@ -2576,10 +2576,10 @@ public class NodeServerTest {
 		LatticePropagator serverPropagator=unattachedPropagator(maxNodeServer);
 		serverPropagator.setTransportKeyPair(serverKP);
 		maxNodeServer.addPropagator(serverPropagator);
-		maxNodeServer.setInboundPropagatorSelector(connection -> serverPropagator);
+		selectInboundPropagator(maxNodeServer,connection -> serverPropagator);
 		maxNodeServer.launch();
 
-		InetSocketAddress addr = maxNodeServer.getHostAddress();
+		InetSocketAddress addr = address(maxNodeServer);
 		ConvexRemote convex = Convex.connect(addr, null, clientKP);
 
 		try {

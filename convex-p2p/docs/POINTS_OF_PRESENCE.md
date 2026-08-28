@@ -32,7 +32,7 @@ P2PNode relay = P2PNode.create(relayStore, NodeConfig.localNetwork(), relayKey)
 
 relay.launch();
 leaf.launch();
-leaf.connect(relayKey.getAccountKey(), relay.getNodeServer().getHostAddress()).join();
+leaf.connect(relayKey.getAccountKey(), relay.getHostAddress()).join();
 ```
 
 `serveAllInbound()` is shown because this relay intentionally accepts public

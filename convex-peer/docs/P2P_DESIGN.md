@@ -38,7 +38,7 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 ### 2.2 NodeServer
 
 `NodeServer<V>` is the authoritative lattice host. It owns path merges, the
-durable root, the shared listener and isolated notifications to attached policy
+durable root and isolated notifications to attached policy
 groups. Each group's `LatticeProtocolEndpoint` handles:
 
 - **LATTICE_VALUE** — `[:LV [*path*] value]` is an optimistic push; `[:LV id [*path*] value]` is a confirmed push returning a post-merge Result
@@ -290,7 +290,9 @@ its configured lattice.
 │            Lattice Regions              │
 │  (Consensus, P2P, Data, FS, KV, ...)   │
 ├─────────────────────────────────────────┤
-│      NodeServer (merge + propagate)     │
+│       NodeServer (merge + persist)      │
+├─────────────────────────────────────────┤
+│ LatticePropagator (policy + protocol)  │
 ├─────────────────────────────────────────┤
 │   Binary Protocol Messages (CAD3)       │
 ├─────────────────────────────────────────┤
@@ -301,7 +303,12 @@ its configured lattice.
 └──────┴──────────┴──────────┴────────────┘
 ```
 
-`NodeServer` sits at the centre, managing lattice state and dispatching to/from transport adapters. This is the key difference from the current architecture where `Server` manages consensus separately from `NodeServer`.
+`NodeServer` owns authoritative lattice merge and persistence, while each
+`LatticePropagator` owns one filtered replication policy and its protocol state.
+The application composes those groups with shared or independent transport
+adapters; the server neither opens sockets nor dispatches transport messages.
+This is the key difference from the consensus `Server`, which manages its own
+networking resources.
 
 ### 5.2 Transport Comparison
 
@@ -555,13 +562,14 @@ On reconnect, if the current transport repeatedly fails, the next is tried.
 
 ### 9.1 Architecture
 
-`NodeServer` remains the schema-independent authoritative lattice host and shared
-listener. The calling application constructs its propagation groups, while P2P
-policy stays above both layers:
+`NodeServer` remains the schema-independent authoritative lattice host. The
+calling application constructs its propagation groups and transport hosts, while
+P2P policy stays above all three layers:
 
 ```
 P2PNode / NodeDirectory (P2P schema, discovery and policy)
-├── NodeServer (authoritative merge, persistence, listener and notifications)
+├── NodeServer (authoritative merge, persistence and notifications)
+├── LatticeListener (application-owned inbound TCP and group routing)
 └── LatticePropagator (application-configured replication policy group)
     ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)
     └── LatticeConnectionManager (external routes and desired-peer bounds)

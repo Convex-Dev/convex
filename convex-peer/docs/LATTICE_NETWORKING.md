@@ -8,6 +8,7 @@ The central boundary is simple:
 
 - `NodeServer` hosts one authoritative lattice value.
 - The calling application constructs propagation policy groups.
+- The calling application composes inbound transports independently.
 - Each `LatticePropagator` owns its routes, serving view and protocol work.
 - Attaching a propagator supplies a merge destination; it does not configure the
   propagator.
@@ -18,17 +19,18 @@ A node with no propagators is a valid local, store-backed lattice host.
 
 | Component | Owns | Does not own |
 |---|---|---|
-| `NodeServer` | Authoritative lattice cursor, merge context, node store root, persistence barriers, listener lifecycle, attached-group lifecycle and update fan-out | Peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
-| `LatticeListener` | TCP acceptance and one immutable connection-to-group assignment | Per-connection protocol state, serving stores, trust or lattice merge |
+| `NodeServer` | Authoritative lattice cursor, merge context, node store root, persistence barriers, attached-group lifecycle and update fan-out | Sockets, peer sets, transport identity, trust, protocol decoding, acquisition, filters, discovery or application messages |
+| `LatticeListener` | Application-owned TCP acceptance, physical limits and one immutable connection-to-group assignment | Propagator lifecycle, per-connection protocol state, serving stores, trust or lattice merge |
 | `LatticePropagator` | One propagation policy group: publication projection, serving store, connection manager, protocol endpoint, novelty tracking and broadcast worker | Authoritative node root or application composition |
 | `LatticeProtocolEndpoint` | The group's bounded ingress queue, complete-message decoding, acquisition, ingress policy, challenge state, statistics and extension handler | Node persistence, peer discovery or application schemas |
 | `LatticeConnectionManager` | Bounded desired-peer intent, dialing, retry, possession verification and admitted outbound routes | Discovery records, listener assignment, lattice merge or application-owner validation |
 | `ALattice` / `LatticeContext` | Value validation, merge semantics and application signing authority | Transport identity and routing |
-| Application wrapper | Construction, policy configuration, connection assignment, discovery translation and application handlers | Generic transport internals |
+| Application wrapper | Construction, lifecycle order, transport composition, connection assignment, discovery translation and application handlers | Generic protocol internals |
 
-`LatticeListener` and `LatticeProtocolEndpoint` are package-private deliberately.
-Applications compose `NodeServer`, `LatticePropagator` and
-`LatticeConnectionManager`; they do not wire transport internals themselves.
+`LatticeListener` is the public standard TCP transport.
+`LatticeProtocolEndpoint` remains package-private behind the transport-facing
+methods on `LatticePropagator`, so alternate transports need not access protocol
+internals.
 
 ## Application composition
 
@@ -48,12 +50,21 @@ publicGroup.setIngressFilter(ingressPolicy);
 publicGroup.setApplicationMessageHandler(extensionHandler);
 
 node.addPropagator(publicGroup);
-node.setInboundPropagatorSelector(connection -> publicGroup);
+LatticeListener transport = new LatticeListener(nodeConfig);
+transport.registerPropagator(publicGroup);
+transport.setSelector(connection -> publicGroup);
 node.launch();
+transport.launch();
+
+// Shutdown order: stop ingress before draining groups and persistence.
+transport.close();
+node.close();
 ```
 
-`NodeConfig` contains host listener, authoritative persistence and application
-advertisement settings. `LatticePropagatorConfig` contains one group's route,
+`NodeConfig` contains authoritative persistence, standard-listener and application
+advertisement settings. Passing it to `NodeServer` does not create a listener;
+the application supplies it independently to `LatticeListener`.
+`LatticePropagatorConfig` contains one group's route,
 queue, acquisition and publication limits. `NodeServer.addPropagator` copies
 neither object and does not copy the node lattice, context, key, filters or
 handlers. An application with several groups retains their references and selects
@@ -154,8 +165,12 @@ from the node's authoritative value during launch.
 2. restore and publish the authoritative node root;
 3. offer the initial value to each attached group independently;
 4. start every group independently;
-5. open the shared listener; and
-6. start node persistence maintenance.
+5. start node persistence maintenance.
+
+The application opens its transport only after `NodeServer.launch()` has made
+the attached endpoints ready. A transport failure does not change authoritative
+node state; the application decides whether to retry, replace the transport or
+close the complete composition.
 
 There is no implicit/default group. A group that fails to materialise, start or
 receive a notification is logged and isolated; it cannot fail node publication
@@ -168,14 +183,15 @@ coupling recovery policy to `NodeServer`. A running group may report prior or
 intermittent failures; `Status.isOperational()` describes lifecycle, while
 `Status.hasFailures()` describes observed degradation.
 
-Shutdown closes listener admission, asks every endpoint to drain, publishes the
+Shutdown is composed in the opposite order: the application closes every
+transport, then `NodeServer.close()` asks each endpoint to drain, publishes the
 final authoritative root, drains each group and completes the node-store
 durability barrier. Each group cleanup is independent. Endpoint cleanup also
 continues after a timed-out acquisition so one stuck resource does not suppress
 the remaining cleanup steps.
 
-Failures of the node's own authoritative store or listener are still surfaced:
-those resources are the responsibility of `NodeServer`, not optional policy.
+Failures of the authoritative store are surfaced by `NodeServer`. Listener
+failures are surfaced independently to the application that owns the transport.
 
 ## Naming
 

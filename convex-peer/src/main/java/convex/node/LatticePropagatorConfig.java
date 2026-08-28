@@ -14,8 +14,10 @@ import convex.core.lang.RT;
  * {@link LatticePropagator}.
  *
  * <p>The calling application supplies this configuration directly to the
- * propagator. {@link NodeServer} neither consumes nor copies it. Host listener
- * and authoritative persistence settings belong to {@link NodeConfig}.</p>
+ * propagator. {@link NodeServer} neither consumes nor copies it. Authoritative
+ * persistence and standard {@link LatticeListener} settings belong to
+ * {@link NodeConfig}, which the application supplies to those components
+ * independently.</p>
  */
 public final class LatticePropagatorConfig {
 

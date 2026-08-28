@@ -15,6 +15,7 @@ import convex.etch.EtchStore;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 
@@ -63,24 +64,30 @@ public class ReplicationDemo {
 			LatticePropagatorConfig.create());
 		serverLondon.addPropagator(propagatorLondon);
 		serverTokyo.addPropagator(propagatorTokyo);
-		serverLondon.setInboundPropagatorSelector(connection -> propagatorLondon);
-		serverTokyo.setInboundPropagatorSelector(connection -> propagatorTokyo);
+		LatticeListener transportLondon=new LatticeListener(configLondon);
+		LatticeListener transportTokyo=new LatticeListener(configTokyo);
+		transportLondon.registerPropagator(propagatorLondon);
+		transportTokyo.registerPropagator(propagatorTokyo);
+		transportLondon.setSelector(connection -> propagatorLondon);
+		transportTokyo.setSelector(connection -> propagatorTokyo);
 
 		try {
 			// ── 1. Launch two nodes ─────────────────────────────────────
 			serverLondon.launch();
 			serverTokyo.launch();
+			transportLondon.launch();
+			transportTokyo.launch();
 
 			section("1. Two lattice nodes launched");
-			System.out.println("  London node: port " + serverLondon.getPort());
-			System.out.println("  Tokyo  node: port " + serverTokyo.getPort());
+			System.out.println("  London node: port " + transportLondon.getPort());
+			System.out.println("  Tokyo  node: port " + transportTokyo.getPort());
 
 			// ── 2. Establish peer connections (bidirectional) ────────────
 			// Each node connects to the other as a peer. The LatticePropagator
 			// will automatically broadcast deltas over these connections.
 
-			InetSocketAddress addrLondon = serverLondon.getHostAddress();
-			InetSocketAddress addrTokyo  = serverTokyo.getHostAddress();
+			InetSocketAddress addrLondon = transportLondon.getHostAddress();
+			InetSocketAddress addrTokyo  = transportTokyo.getHostAddress();
 
 			AccountKey keyL = AKeyPair.generate().getAccountKey();
 			AccountKey keyT = AKeyPair.generate().getAccountKey();
@@ -212,6 +219,8 @@ public class ReplicationDemo {
 
 		} finally {
 			// Clean shutdown
+			transportLondon.close();
+			transportTokyo.close();
 			serverLondon.close();
 			serverTokyo.close();
 			storeLondon.close();

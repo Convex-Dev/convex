@@ -60,6 +60,7 @@ public class NodeNetworkTest {
 
 	/** Explicit propagation-policy group owned by the application for each node. */
 	private List<LatticePropagator> propagators;
+	private List<LatticeListener> transports;
 	
 	/**
 	 * List of stores for each NodeServer
@@ -88,6 +89,7 @@ public class NodeNetworkTest {
 		// Initialize lists
 		nodeServers = new ArrayList<>(NETWORK_SIZE);
 		propagators = new ArrayList<>(NETWORK_SIZE);
+		transports = new ArrayList<>(NETWORK_SIZE);
 		stores = new ArrayList<>(NETWORK_SIZE);
 		
 		// Create and launch three NodeServers
@@ -104,16 +106,20 @@ public class NodeNetworkTest {
 			LatticePropagator propagator=new LatticePropagator(
 				store,commonLattice,value -> value,LatticePropagatorConfig.create());
 			server.addPropagator(propagator);
-			server.setInboundPropagatorSelector(connection -> propagator);
+			LatticeListener transport=new LatticeListener(config);
+			transport.registerPropagator(propagator);
+			transport.setSelector(connection -> propagator);
 			propagators.add(propagator);
+			transports.add(transport);
 			nodeServers.add(server);
 			
 			// Launch the server
 			server.launch();
+			transport.launch();
 			
 			// Verify server is running
 			assertTrue(server.isRunning(), "NodeServer " + i + " should be running after launch");
-			assertNotNull(server.getHostAddress(), "NodeServer " + i + " should have a host address");
+			assertNotNull(transport.getHostAddress(), "Transport " + i + " should have a host address");
 		}
 		
 		// Set up peer connections: make all servers peers of each other
@@ -124,8 +130,7 @@ public class NodeNetworkTest {
 			// Add all other servers as peers using Convex connections
 			for (int j = 0; j < NETWORK_SIZE; j++) {
 				if (i != j) {
-					NodeServer<?> otherServer = nodeServers.get(j);
-					InetSocketAddress otherAddress = otherServer.getHostAddress();
+					InetSocketAddress otherAddress = transports.get(j).getHostAddress();
 					try {
 						Convex peerConnection = ConvexRemote.connect(otherAddress);
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
@@ -145,6 +150,8 @@ public class NodeNetworkTest {
 	 */
 	@AfterAll
 	public void tearDownNetwork() throws IOException {
+		for (LatticeListener transport:transports) transport.close();
+		transports.clear();
 		// Close all NodeServers
 		for (NodeServer<?> server : nodeServers) {
 			server.close();
@@ -214,7 +221,7 @@ public class NodeNetworkTest {
 		AVector<ACell> queryPath = Vectors.create(dataKeyword, valueHash);
 		
 		// Verify server 0 has the value at [:data valueHash] by sending a LATTICE_QUERY via ConvexRemote
-		InetSocketAddress server0Address = server0.getHostAddress();
+		InetSocketAddress server0Address = transports.get(0).getHostAddress();
 		assertNotNull(server0Address, "Server 0 should have a host address");
 		ConvexRemote convex0 = ConvexRemote.connect(server0Address);
 		assertNotNull(convex0, "ConvexRemote connection to server 0 should be created");
@@ -247,7 +254,7 @@ public class NodeNetworkTest {
 		assertTrue(lastServer.pull(propagators.get(NETWORK_SIZE - 1)), "Pull should succeed");
 		
 		// Verify the last server has the new data value at [:data valueHash] path via LATTICE_QUERY
-		InetSocketAddress lastServerAddress = lastServer.getHostAddress();
+		InetSocketAddress lastServerAddress = transports.get(NETWORK_SIZE-1).getHostAddress();
 		assertNotNull(lastServerAddress, "Last server should have a host address");
 		ConvexRemote convexLast = ConvexRemote.connect(lastServerAddress);
 		assertNotNull(convexLast, "ConvexRemote connection to last server should be created");

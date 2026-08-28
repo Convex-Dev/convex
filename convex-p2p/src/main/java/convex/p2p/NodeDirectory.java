@@ -25,6 +25,7 @@ import convex.core.lang.RT;
 import convex.core.message.AConnection;
 import convex.core.util.Utils;
 import convex.node.LatticeConnectionManager;
+import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
@@ -36,13 +37,14 @@ import convex.node.NodeServer;
  * {@code [:p2p :nodes]} lattice and generic connection intent. It publishes this
  * node's signed {@code NodeInfo}, validates and indexes remote records, translates
  * their transport declarations into {@link LatticeConnectionManager} intent, and
- * asks the transport to authenticate an inbound route only after a valid owned
- * NodeInfo update has been accepted by the lattice.</p>
+ * asks the propagation group to authenticate an inbound route only after a valid
+ * owned NodeInfo update has been accepted by the lattice.</p>
  *
  * <p>It deliberately does not open sockets itself, mark connections trusted or
  * merge lattice values. Socket admission and trust remain propagation-group
  * concerns; authoritative merge remains a NodeServer concern. Conversely, none
- * of those generic transport classes knows the registry path or NodeInfo schema.</p>
+ * of those generic replication components knows the registry path or NodeInfo
+ * schema.</p>
  *
  * <p>The in-memory index is bounded by the propagation group's
  * {@link LatticeConnectionManager#getMaxDesiredPeers()} and additive/update-only.
@@ -55,6 +57,8 @@ final class NodeDirectory {
 
 	private final NodeServer<?> server;
 	private final LatticePropagator propagator;
+	private final LatticeListener transport;
+	private final NodeConfig config;
 	private final AKeyPair keyPair;
 	private final AccountKey ownKey;
 	private final ConcurrentHashMap<AccountKey,NodeRecord> records=
@@ -63,19 +67,22 @@ final class NodeDirectory {
 	private AVector<AccountKey> pointsOfPresence=Vectors.empty();
 	private boolean relay;
 
-	NodeDirectory(NodeServer<?> server,LatticePropagator propagator,AKeyPair keyPair) {
+	NodeDirectory(NodeServer<?> server,LatticePropagator propagator,
+			LatticeListener transport,NodeConfig config,AKeyPair keyPair) {
 		this.server=server;
 		this.propagator=propagator;
+		this.transport=transport;
+		this.config=config;
 		this.keyPair=keyPair;
 		this.ownKey=(keyPair==null) ? null : keyPair.getAccountKey();
 	}
 
 	/** Validates P2P advertisement settings before the generic server opens resources. */
 	void validateLaunchConfiguration() {
-		AString configured=server.getConfig().getURL();
+		AString configured=config.getURL();
 		if (configured==null) return;
 		String reason=NodeConfig.validatePublicURL(
-			configured.toString(),server.getConfig().isAllowPrivateURL());
+			configured.toString(),config.isAllowPrivateURL());
 		if (reason!=null) {
 			throw new IllegalStateException("Invalid node URL configuration: "+reason);
 		}
@@ -113,7 +120,7 @@ final class NodeDirectory {
 			throw new IllegalStateException("P2PNode root does not contain [:p2p :nodes]");
 		}
 
-		AString url=server.getConfig().getAdvertisedURL(server.getPort());
+		AString url=config.getAdvertisedURL(transport.getPort());
 		AVector<AString> transports=(url==null) ? Vectors.empty() : Vectors.of(url);
 		AString type=Strings.create("Convex Lattice Node");
 		String currentVersion=Utils.getVersion();
@@ -132,7 +139,7 @@ final class NodeDirectory {
 	}
 
 	/**
-	 * Handles the generic transport's notification for one accepted inbound value.
+	 * Handles a propagation group's notification for one accepted inbound value.
 	 * Root, {@code :p2p} and exact registry merges can refresh discovery; only a
 	 * strict one-record update at the exact registry path can claim the identity
 	 * used to start inbound possession proof.

@@ -5,9 +5,12 @@
  *
  * <ul>
  *   <li>{@link convex.node.NodeServer} owns the authoritative lattice root,
- *       node-store publication and durability, physical listener lifecycle and
- *       isolated update notifications. It never interprets application paths
- *       or records.</li>
+ *       node-store publication and durability, attached-group lifecycle and
+ *       isolated update notifications. It owns no socket or transport and never
+ *       interprets application paths or records.</li>
+ *   <li>{@link convex.node.LatticeListener} is the standard application-owned
+ *       TCP transport. It may route connections to several registered groups;
+ *       groups may instead use independent listeners or custom transports.</li>
  *   <li>{@link convex.node.LatticePropagator} owns one application-configured
  *       policy group: its routes, protocol endpoint, filters, serving store,
  *       delta generation and root announcements.</li>
@@ -46,7 +49,7 @@
  * <h2>Inbound value pipeline</h2>
  *
  * <ol>
- *   <li>The shared listener assigns the connection to one application-selected
+ *   <li>An application transport assigns the connection to one selected
  *       propagation group.</li>
  *   <li>That group's endpoint performs a bounded queue offer.</li>
  *   <li>Untrusted input is decoded without a store. Trusted partial input may
@@ -65,8 +68,9 @@
  * replaced or left running.</p>
  *
  * <p>The calling application constructs and configures every propagation group
- * before attaching it. {@code NodeServer} creates no default group and a node
- * with no groups remains a valid local store-backed lattice host.</p>
+ * before attaching it, then composes any transports separately. {@code NodeServer}
+ * creates no default group or listener, and a node with no groups remains a valid
+ * local store-backed lattice host.</p>
  *
  * <p>Application modules own discovery schemas, selective replication and
  * transient application protocols. They compose those policies through lattice,

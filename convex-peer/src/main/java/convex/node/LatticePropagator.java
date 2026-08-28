@@ -665,7 +665,7 @@ public class LatticePropagator implements Closeable {
 	 * Assignment permits this endpoint to process the connection; it does not
 	 * authenticate the remote node or add an outbound route.
 	 */
-	void attachInboundConnection(AConnection connection) {
+	public void attachInboundConnection(AConnection connection) {
 		requireEndpoint().attachInbound(connection);
 	}
 
@@ -674,13 +674,26 @@ public class LatticePropagator implements Closeable {
 		return endpoint!=null && endpoint.ownsInbound(connection);
 	}
 
-	/** Non-blocking delivery hook used by the shared lattice listener. */
-	Predicate<Message> deliverIncomingMessage(Message message) {
+	/**
+	 * Delivers one transport message without blocking the transport event loop.
+	 * Custom inbound transports call this only after assigning the message's
+	 * physical connection with {@link #attachInboundConnection(AConnection)}.
+	 *
+	 * @param message inbound message carrying its physical connection
+	 * @return backpressure predicate, or {@code null} when delivery was accepted
+	 */
+	public Predicate<Message> deliverIncomingMessage(Message message) {
 		return requireEndpoint().deliver(message);
 	}
 
-	/** Releases all state held by this group for a closed physical connection. */
-	void removeInboundConnection(AConnection connection) {
+	/**
+	 * Releases all state held by this group for a closed physical connection.
+	 * Custom transports must call this when a previously assigned connection
+	 * disconnects.
+	 *
+	 * @param connection disconnected physical connection
+	 */
+	public void removeInboundConnection(AConnection connection) {
 		if (endpoint!=null) endpoint.removeConnection(connection);
 	}
 

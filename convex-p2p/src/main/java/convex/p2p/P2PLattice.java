@@ -75,7 +75,7 @@ import convex.social.Social;
  * carries an optimistic {@code [:LV [*path*] value]} or confirmed
  * {@code [:LV id [*path*] value]} push, and the receiver merges at that literal path.
  * {@link NodeDirectory} owns publication and discovery at exactly this path; the generic
- * {@code NodeServer} transports it without interpreting the path.
+ * generic propagation layer transports it without interpreting the path.
  *
  * <h2>Relationship to {@code convex.lattice.P2PLattice}</h2>
  *

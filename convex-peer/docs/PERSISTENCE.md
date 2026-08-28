@@ -131,8 +131,7 @@ propagator workers.
 Authoritative failures are visible:
 
 - a node-store announce or root-write failure makes `sync()` fail;
-- a launch-time node-store or listener failure aborts launch and unwinds node
-  resources; and
+- a launch-time node-store failure aborts launch and unwinds node resources;
 - a shutdown checkpoint failure is returned from `close()`.
 
 The in-memory cursor is not rolled back after a publication failure. Recovery is
@@ -160,17 +159,19 @@ Launch order protects serving consistency:
 3. announce and retain the authoritative root;
 4. seed every attached serving view independently;
 5. start propagator workers;
-6. open the listener; and
-7. start persistence maintenance.
+6. start persistence maintenance.
+
+The application opens any `LatticeListener` only after node launch has prepared
+the attached propagation endpoints.
 
 Shutdown order prevents new work racing store closure:
 
-1. stop listener admission and detach sockets;
-2. stop node maintenance;
-3. ask each endpoint to stop acquisitions and drain accepted messages;
-4. publish the final authoritative root;
-5. drain and close each propagator independently; and
-6. flush the authoritative store.
+1. the application closes its transports to stop admission and detach sockets;
+2. `NodeServer.close()` stops node maintenance;
+3. each endpoint stops acquisitions and drains accepted messages;
+4. the node publishes the final authoritative root;
+5. each propagator drains and closes independently; and
+6. the authoritative store is flushed.
 
 `NodeServer` does not close application-supplied stores. Store ownership remains
 with the caller that created them.

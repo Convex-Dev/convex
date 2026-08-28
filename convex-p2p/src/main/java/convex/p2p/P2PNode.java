@@ -41,6 +41,7 @@ import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
 import convex.node.LatticeConnectionManager;
+import convex.node.LatticeListener;
 import convex.node.LatticePropagator;
 import convex.node.LatticePropagatorConfig;
 import convex.social.Social;
@@ -50,9 +51,9 @@ import convex.social.Social;
  *
  * <p>This is the main entry point for convex-p2p — a rollup package, so this is the
  * <em>only</em> node server, with no separate social or per-application node. It composes
- * a region set with the {@link NodeServer} networking provided by convex-peer, giving a
- * node that can query, merge and propagate lattice values with other nodes over the
- * binary protocol.</p>
+ * a region set with the authoritative {@link NodeServer} and an application-owned
+ * {@link LatticeListener}, giving a node that can query, merge and propagate lattice
+ * values with other nodes over the binary protocol.</p>
  *
  * <p><b>Regions are configuration.</b> {@link #create(AStore, NodeConfig, AKeyPair)}
  * serves {@link P2PLattice#NODE_ROOT} — the P2P regions plus the bundled application
@@ -68,17 +69,18 @@ import convex.social.Social;
  * late-joining nodes discover each other without accepting unrelated social owners.
  * On-chain bootstrap and public PoP selection remain to be built on top.</p>
  *
- * <p><b>Inbound policy.</b> A NodeServer denies all network lattice traffic until an
- * operator assigns inbound connections to a propagator. {@link #create} leaves that
- * policy unset (deny-by-default); use {@link #serveAllInbound()} for an intentionally
- * public single-view node, or set a custom policy via
- * {@link NodeServer#setInboundPropagatorSelector} before {@link #launch()}.
+ * <p><b>Inbound policy.</b> The application-owned listener denies all network
+ * lattice traffic until an operator assigns inbound connections to a propagator.
+ * {@link #create} leaves that policy unset (deny-by-default); use
+ * {@link #serveAllInbound()} for an intentionally public single-view node, or
+ * configure the listener returned by {@link #getTransport()} before {@link #launch()}.
  * Assignment permits zero-trust public access but does not authenticate or upgrade the
  * connection. Complete social values still pass follow-aware DID admission before
  * persistence.</p>
  *
- * <p><b>Layering.</b> {@link NodeServer} is only the schema-independent CAD036
- * replication transport. This class owns P2P policy: {@link NodeDirectory}
+ * <p><b>Layering.</b> {@link NodeServer} is only the schema-independent
+ * authoritative lattice host. This class separately owns its TCP transport and
+ * P2P policy: {@link NodeDirectory}
  * publishes and interprets {@code [:p2p :nodes]}, {@link SocialReplicationPolicy}
  * selects social data, and {@link PointOfPresence} handles transient routed
  * messages. None of those application structures are interpreted by NodeServer.
@@ -91,6 +93,7 @@ public class P2PNode implements Closeable {
 
 	private final NodeServer<Index<Keyword, ACell>> server;
 	private final LatticePropagator propagator;
+	private final LatticeListener transport;
 	private final P2PApplication application;
 	private final AKeyPair keyPair;
 	private final DIDKeyAuthorizer didAuthorizer;
@@ -104,15 +107,16 @@ public class P2PNode implements Closeable {
 
 	@SuppressWarnings("unchecked")
 	private P2PNode(NodeServer<Index<Keyword, ACell>> server,
-			LatticePropagator propagator,AKeyPair keyPair,
+			LatticePropagator propagator,LatticeListener transport,NodeConfig config,AKeyPair keyPair,
 			DIDKeyAuthorizer didAuthorizer) {
 		this.server = server;
 		this.propagator=propagator;
+		this.transport=transport;
 		this.application=P2PApplication.connect(server.getRootComponent());
 		this.keyPair = keyPair;
 		this.didAuthorizer=didAuthorizer;
 		this.socialPolicy=new SocialReplicationPolicy(server,didAuthorizer);
-		this.nodeDirectory=new NodeDirectory(server,propagator,keyPair);
+		this.nodeDirectory=new NodeDirectory(server,propagator,transport,config,keyPair);
 		this.pointOfPresence=new PointOfPresence(server,propagator,keyPair,nodeDirectory);
 		propagator.setIngressFilter(socialPolicy::filterIngress);
 		propagator.setPublicationFilter(value -> (Index<Keyword,ACell>)socialPolicy.filterPublication(
@@ -141,7 +145,7 @@ public class P2PNode implements Closeable {
 	 * configuration.
 	 *
 	 * @param store authoritative node store
-	 * @param nodeConfig listener and persistence configuration, or {@code null}
+	 * @param nodeConfig standard-listener and persistence configuration, or {@code null}
 	 * @param propagatorConfig route, queue and publication limits, or {@code null}
 	 * @param keyPair node transport and NodeInfo key, or {@code null}
 	 * @return unlaunched P2P node
@@ -187,7 +191,7 @@ public class P2PNode implements Closeable {
 	 * configuration, and an authenticated DID resolution policy.
 	 *
 	 * @param store authoritative node store
-	 * @param nodeConfig listener and persistence configuration, or {@code null}
+	 * @param nodeConfig standard-listener and persistence configuration, or {@code null}
 	 * @param propagatorConfig route, queue and publication limits, or {@code null}
 	 * @param keyPair node transport and NodeInfo key, or {@code null}
 	 * @param root regions served by this node
@@ -213,7 +217,9 @@ public class P2PNode implements Closeable {
 			store,manager,root,value -> value,effectivePropagatorConfig);
 		propagator.setMergeContext(mergeContext);
 		propagator.setTransportKeyPair(keyPair);
-		P2PNode node=new P2PNode(server,propagator,keyPair,didAuthorizer);
+		LatticeListener transport=new LatticeListener(effectiveConfig);
+		transport.registerPropagator(propagator);
+		P2PNode node=new P2PNode(server,propagator,transport,effectiveConfig,keyPair,didAuthorizer);
 		server.addPropagator(propagator);
 		return node;
 	}
@@ -279,7 +285,7 @@ public class P2PNode implements Closeable {
 	 * @return this node, for chaining
 	 */
 	public P2PNode serveAllInbound() {
-		server.setInboundPropagatorSelector(connection -> propagator);
+		transport.setSelector(connection -> propagator);
 		return this;
 	}
 
@@ -349,10 +355,10 @@ public class P2PNode implements Closeable {
 		ACell value,boolean encrypted) {}
 
 	/**
-	 * Launches the generic replication transport, installs P2P peer-initialisation
-	 * policy, then publishes this node's signed NodeInfo using the actual bound port.
-	 * Failure during P2P publication closes the already-started transport before the
-	 * exception is returned.
+	 * Launches the authoritative node and application-owned TCP transport, installs
+	 * P2P peer-initialisation policy, then publishes this node's signed NodeInfo using
+	 * the actual bound port. Failure during transport launch or P2P publication closes
+	 * every already-started component before the exception is returned.
 	 *
 	 * @throws IOException If an IO error occurs during launch
 	 * @throws InterruptedException If the operation is interrupted
@@ -371,15 +377,17 @@ public class P2PNode implements Closeable {
 			}));
 		server.launch();
 		try {
+			transport.launch();
 			nodeDirectory.publishOwnRecord();
 			for (Convex peer:manager.getPeers()) initialisePeer(peer);
-			Integer port = server.getPort();
+			Integer port = transport.getPort();
 			if (port != null && port >= 0) {
 				log.info("Convex P2P node listening on port {}", port);
 			} else {
 				log.info("Convex P2P node started in local-only mode");
 			}
-		} catch (RuntimeException | Error e) {
+		} catch (IOException | InterruptedException | RuntimeException | Error e) {
+			transport.close();
 			try {
 				server.close();
 			} catch (IOException closeFailure) {
@@ -538,12 +546,23 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Gets the underlying NodeServer, for configuration and networking access.
+	 * Gets the underlying authoritative NodeServer for lattice and persistence access.
 	 *
 	 * @return The NodeServer for this node
 	 */
 	public NodeServer<Index<Keyword, ACell>> getNodeServer() {
 		return server;
+	}
+
+	/**
+	 * Gets this application's standard inbound TCP transport. Applications may
+	 * register additional attached propagators and install a routing selector
+	 * before launch.
+	 *
+	 * @return application-owned lattice listener
+	 */
+	public LatticeListener getTransport() {
+		return transport;
 	}
 
 	/** Package test hook for this wrapper's application-owned propagation group. */
@@ -552,12 +571,18 @@ public class P2PNode implements Closeable {
 	}
 
 	/**
-	 * Gets the port this node is listening on.
+	 * Gets the configured listener port before launch and the actual bound port
+	 * afterwards. A negative value means no inbound socket is configured.
 	 *
-	 * @return Port number, or null if not launched
+	 * @return configured or bound port, or {@code null} when unspecified
 	 */
 	public Integer getPort() {
-		return server.getPort();
+		return transport.getPort();
+	}
+
+	/** Returns the bound inbound TCP address, or {@code null} when none is open. */
+	public InetSocketAddress getHostAddress() {
+		return transport.getHostAddress();
 	}
 
 	/**
@@ -566,11 +591,12 @@ public class P2PNode implements Closeable {
 	 * @return true if the node has been launched and not closed
 	 */
 	public boolean isRunning() {
-		return server.isRunning();
+		return server.isRunning() && transport.isRunning();
 	}
 
 	@Override
 	public void close() throws IOException {
+		transport.close();
 		server.close();
 	}
 
