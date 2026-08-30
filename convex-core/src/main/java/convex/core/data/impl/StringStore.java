@@ -1,7 +1,7 @@
 package convex.core.data.impl;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
@@ -14,39 +14,52 @@ import convex.core.data.Symbol;
 
 /**
  * Internal caching for permanently interned Strings and symbolic values
- * 
+ *
  * Don't use this for anything sent in externally!
+ *
+ * <p>Thread safety: interning happens from arbitrary threads (any runtime
+ * {@code Strings.intern} call), while lookups happen on every
+ * {@code StringShort.create}, {@code Keyword.create} and {@code Symbol.create}.
+ * Lookups are lock-free reads of concurrent maps. Interning builds the entry
+ * outside any lock and then publishes it under the class lock, so both
+ * indexes change together and every distinct string ends up with exactly one
+ * {@link Entry}; a racing loser discards its candidate. Nothing but map
+ * operations runs under the lock: {@code StringShort}'s own static
+ * initialiser interns, so holding the lock across value construction could
+ * deadlock against class initialisation on another thread. A plain HashMap
+ * here is corrupted by concurrent puts, after which lookups recurse until
+ * StackOverflowError.</p>
  */
 public class StringStore {
-	
-	
-	static HashMap<String,Entry> stringIndex=new HashMap<>();
-	
-	static HashMap<Blob,Entry> blobIndex=new HashMap<>();
+
+	static final ConcurrentHashMap<String,Entry> stringIndex=new ConcurrentHashMap<>();
+
+	static final ConcurrentHashMap<Blob,Entry> blobIndex=new ConcurrentHashMap<>();
 
 
 	public static class Entry {
-		String string=null;
-		StringShort astring=null;
-		Keyword keyword=null;
-		Symbol symbol = null;
-		Blob blob;
-		
+		volatile String string=null;
+		volatile StringShort astring=null;
+		volatile Keyword keyword=null;
+		volatile Symbol symbol = null;
+		final Blob blob;
+
 		public Entry(Blob b) {
 			this.blob=b;
 		}
-		
+
 		/**
 		 * Gets the StringShort version of an interned String
 		 * @return StringShort
 		 */
 		public StringShort getStringShort() {
 			StringShort result=astring;
-			if (result==null) {
-				result=Cells.intern(StringShort.wrap(blob));
-				astring = result;
+			if (result!=null) return result;
+			StringShort fresh=Cells.intern(StringShort.wrap(blob));
+			synchronized (this) {
+				if (astring==null) astring=fresh;
+				return astring;
 			}
-			return result;
 		}
 
 		/**
@@ -55,89 +68,85 @@ public class StringStore {
 		 */
 		public Keyword getKeyword() {
 			Keyword result=keyword;
-			if (result==null) {
-				StringShort ss=getStringShort();
-				if (!ASymbolic.validateName(ss)) return null;
-				result=Cells.intern(Keyword.unsafeCreate(ss));
-				keyword = result;
+			if (result!=null) return result;
+			StringShort ss=getStringShort();
+			if (!ASymbolic.validateName(ss)) return null;
+			Keyword fresh=Cells.intern(Keyword.unsafeCreate(ss));
+			synchronized (this) {
+				if (keyword==null) keyword=fresh;
+				return keyword;
 			}
-			return result;
 		}
-		
+
 		/**
-		 * Gets the Keyword version of an interned String
-		 * @return Keyword instance, or null if not a valid Keyword
+		 * Gets the Symbol version of an interned String
+		 * @return Symbol instance, or null if not a valid Symbol
 		 */
 		public Symbol getSymbol() {
 			Symbol result=symbol;
-			if (result==null) {
-				StringShort ss=getStringShort();
-				if (!ASymbolic.validateName(ss)) return null;
-				result=Cells.intern(Symbol.unsafeCreate(ss));
-				symbol = result;
+			if (result!=null) return result;
+			StringShort ss=getStringShort();
+			if (!ASymbolic.validateName(ss)) return null;
+			Symbol fresh=Cells.intern(Symbol.unsafeCreate(ss));
+			synchronized (this) {
+				if (symbol==null) symbol=fresh;
+				return symbol;
 			}
-			return result;
 		}
 	}
 
-	
+
 	public static Entry get(String string) {
 		Entry e=stringIndex.get(string);
 		return e;
 	}
-	
+
 	public static Entry get(AString name) {
 		return get(name.toBlob());
 	}
-	
+
 	public static Entry get(ABlob blob) {
 		Entry e=blobIndex.get(blob);
 		return e;
 	}
-	
+
 	public static StringShort intern(String s) {
 		Entry e=get(s);
-		if (e==null) {
-			Blob b=Blob.wrap(s.getBytes(StandardCharsets.UTF_8));
-			if (b.count()>StringShort.MAX_LENGTH) throw new IllegalArgumentException("String too large to intern");
-			e=new Entry(b);
-			e.string=s;
-			
-			StringShort astring=StringShort.wrap(b);
-			astring=Cells.intern(astring);
-			e.astring=astring;
-			
-			stringIndex.put(s, e);
-			blobIndex.put(b, e);
-			
-			return astring;
-		} else {
-			return e.getStringShort();
-		}
+		if (e!=null) return e.getStringShort();
+		Blob b=Blob.wrap(s.getBytes(StandardCharsets.UTF_8));
+		if (b.count()>StringShort.MAX_LENGTH) throw new IllegalArgumentException("String too large to intern");
+		Entry fresh=new Entry(b);
+		fresh.string=s;
+		fresh.astring=Cells.intern(StringShort.wrap(b));
+		return publish(s, b, fresh).getStringShort();
 	}
-	
+
 	public static StringShort intern(AString s) {
 		if (s.count()>StringShort.MAX_LENGTH) throw new IllegalArgumentException("String too large to intern");
 		Blob b=s.toFlatBlob();
 		Entry e=get(b);
-		if (e==null) {
-			
-			e=new Entry(b);
-			StringShort astring=(s instanceof StringShort ss)?ss:StringShort.wrap(b);
-			astring=Cells.intern(astring);
-			e.astring=astring;
-			
-			String js=astring.toString();
-			e.string=js;
-			
-			stringIndex.put(js, e);
-			blobIndex.put(b, e);
-			
-			return astring;
-		} else {
-			return e.getStringShort();
-		}
+		if (e!=null) return e.getStringShort();
+		Entry fresh=new Entry(b);
+		StringShort astring=(s instanceof StringShort ss)?ss:StringShort.wrap(b);
+		fresh.astring=Cells.intern(astring);
+		fresh.string=astring.toString();
+		return publish(fresh.string, b, fresh).getStringShort();
 	}
 
+	/**
+	 * Publishes a candidate entry in both indexes unless another thread got
+	 * there first, in which case the existing entry wins and the candidate is
+	 * discarded. Only map operations happen under the lock.
+	 */
+	private static Entry publish(String s, Blob b, Entry fresh) {
+		synchronized (StringStore.class) {
+			Entry e=stringIndex.get(s);
+			if (e==null) e=blobIndex.get(b);
+			if (e!=null) return e;
+			blobIndex.put(b, fresh);
+			stringIndex.put(s, fresh);
+			return fresh;
+		}
+	}
 
 }

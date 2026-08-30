@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- String interning is thread-safe. `StringStore` kept the process-wide intern
+  index in plain `HashMap`s written without synchronisation, so concurrent
+  `Strings.intern` calls could corrupt it and later lookups then recursed in
+  `HashMap$TreeNode.find` until `StackOverflowError`. Entries are now published
+  under a lock onto concurrent maps; `LoadMonitor`'s per-thread map is synchronised.
 - Social cached follow signers recognise canonical 32-byte Blob keys after CAD3 decode,
   while active follow identities remain DIDs.
 
