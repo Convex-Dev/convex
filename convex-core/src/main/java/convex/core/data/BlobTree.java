@@ -323,6 +323,12 @@ public class BlobTree extends ABlob {
 		return pos;
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then child refs
+		return 1+Format.getVLQCountLength(count);
+	}
+
 	/**
 	 * Maximum byte length of an encoded BlobTree node. 
 	 * Note: 

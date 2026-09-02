@@ -105,6 +105,12 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 		pos = Format.writeVLQCount(bs, pos, code);
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ core code, no refs
+		return 1+Format.getVLQCountLength(code);
+	}
 	
 	@Override
 	public int getRefCount() {

@@ -196,6 +196,14 @@ public final class CVMBigInteger extends AInteger {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag, VLQ byte count and the raw magnitude bytes; small values encode as CVMLong
+		if (!isCanonical()) return getCanonical().calcHeaderLength();
+		int n=byteLength();
+		return 1+Format.getVLQCountLength(n)+n;
+	}
+
+	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		long space=limit-sb.count();
 		long blen=byteLength();

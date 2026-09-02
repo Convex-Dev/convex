@@ -205,6 +205,12 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical vector encodes
+		return getCanonical().calcHeaderLength();
+	}
+
+	@Override
 	protected Ref<T> getElementRefUnsafe(long i) {
 		return toVector().getElementRefUnsafe(i);
 	}

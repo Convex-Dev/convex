@@ -99,6 +99,12 @@ public abstract class ADerivedBlob extends ABlob {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical blob encodes
+		return getCanonical().calcHeaderLength();
+	}
+
+	@Override
 	public boolean equalsBytes(ABlob b) {
 		ABlob can=getCanonical();
 		return can.equalsBytes(b);

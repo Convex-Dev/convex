@@ -28,6 +28,12 @@ public abstract class AFlatMultiOp<T extends ACell> extends AMultiOp<T> {
 		epos=ops.encodeRaw(bs, epos);
 		return epos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// op tag stands in for the vector tag, then the raw ops vector body
+		return ops.calcHeaderLength();
+	}
 	
 	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {

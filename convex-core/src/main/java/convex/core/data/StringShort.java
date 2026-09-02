@@ -157,6 +157,13 @@ public final class StringShort extends AString {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag, VLQ length and the UTF-8 bytes; longer strings encode as a StringTree
+		if (!isCanonical()) return getCanonical().calcHeaderLength();
+		return 1+Format.getVLQCountLength(length)+(int)length;
+	}
+
+	@Override
 	public int writeRawData(byte[] bs, int pos) {
 		return data.getBytes(bs, pos);
 	}

@@ -142,6 +142,12 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical set encodes
+		return getCanonical().calcHeaderLength();
+	}
+
+	@Override
 	protected AHashSet<K> toCanonical() {
 		throw new TODOException();
 		// return map.buildKeySet();

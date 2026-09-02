@@ -495,6 +495,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag, VLQ count, shift byte and two-byte mask, then child refs
+		return 1+Format.getVLQCountLength(count)+3;
+	}
+
+	@Override
 	public int estimatedEncodingSize() {
 		// allow space for tag, shift byte byte, 2 byte mask, embedded child refs
 		return 4 + Format.MAX_EMBEDDED_LENGTH * children.length;

@@ -43,6 +43,12 @@ public class StringSlice extends AString {
 	public int encodeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("Can't encode StringSlice");
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical string encodes
+		return getCanonical().calcHeaderLength();
+	}
 	
 	@Override
 	public int writeRawData(byte[] bs, int pos) {

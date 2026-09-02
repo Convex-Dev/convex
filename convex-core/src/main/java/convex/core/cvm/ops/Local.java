@@ -81,6 +81,12 @@ public class Local<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ position, no refs
+		return 1+Format.getVLQCountLength(position);
+	}
+
+	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {
 		throw new Error(ErrorMessages.UNREACHABLE);
 	}

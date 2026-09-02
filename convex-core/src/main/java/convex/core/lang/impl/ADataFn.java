@@ -46,6 +46,12 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical data value encodes
+		return getCanonical().calcHeaderLength();
+	}
+
+	@Override
 	public boolean isCanonical() {
 		return false;
 	}

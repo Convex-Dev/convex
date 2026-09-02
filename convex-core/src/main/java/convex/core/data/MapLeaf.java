@@ -326,6 +326,12 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then key and value refs for each entry
+		return 1+Format.getVLQCountLength(count);
+	}
+
+	@Override
 	public int estimatedEncodingSize() {
 		// allow space for header, size byte, 2 refs per entry
 		return 2 + 2* Format.MAX_EMBEDDED_LENGTH * size();

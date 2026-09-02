@@ -52,6 +52,12 @@ public abstract class AByteFlag extends APrimitive {
 		return pos;
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// tag only
+		return 1;
+	}
+
 	/**
 	 * Create a Byte Flag for the given value (0..15 where 0=false, 1=true .... )
 	 * @param value Value for byte flag (0-15)

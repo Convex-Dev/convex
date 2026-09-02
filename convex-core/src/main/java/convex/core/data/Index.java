@@ -845,27 +845,25 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count; multiple entries add the entry marker, VLQ depth and mask
+		int hl=1+Format.getVLQCountLength(count);
+		if (count>1) hl+=1+Format.getVLQCountLength(depth)+2;
+		return hl;
+	}
+
+	@Override
 	public int getEncodingLength() {
 		if (encoding!=null) return encoding.size();
-		
-		if (count==0) return 2; // empty index tag plus zero count
-		int el=1+Format.getVLQCountLength(count); // tag plus count
-		
+
+		int el=calcHeaderLength();
 		if (entry!=null) {
-			// need to encode entry vector
 			el+=entry.getKeyRef().getEncodingLength();
 			el+=entry.getValueRef().getEncodingLength();
-		} 
-		if (count==1) return el; // no children / depth to consider
-		el+=1; // entry tag for the case count>1
-		
-		// account for depth and mask
-		el+=Format.getVLQCountLength(depth)+2;
-		
+		}
 		for (Ref<Index<K, V>> cref : children) {
 			el+=cref.getEncodingLength();
 		}
-		
 		return el;
 	}
 	

@@ -73,6 +73,12 @@ public class CodedValue extends ACell {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag only: code and value are refs
+		return 1;
+	}
+
+	@Override
 	public boolean isCanonical() {
 		// TODO Auto-generated method stub
 		return true;

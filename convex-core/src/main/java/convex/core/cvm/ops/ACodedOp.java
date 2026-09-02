@@ -35,6 +35,12 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 		epos=value.encode(bs, epos);
 		return epos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag only: code and value are refs
+		return 1;
+	}
 	
 	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {

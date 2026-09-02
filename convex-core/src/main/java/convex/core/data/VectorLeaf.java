@@ -303,6 +303,12 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then item refs and any prefix ref
+		return 1+Format.getVLQCountLength(count);
+	}
+
+	@Override
 	public int estimatedEncodingSize() {
 		if (count<2) {
 			if (count==0) return 2;
@@ -318,8 +324,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public int getEncodingLength() {
 		if (encoding!=null) return encoding.size();
 		
-		// tag and count
-		int length=1+Format.getVLQCountLength(count);
+		int length=calcHeaderLength();
 		int n = items.length;
 		if (prefix!=null) length+=prefix.getEncodingLength();
 		for (int i = 0; i < n; i++) {

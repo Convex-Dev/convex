@@ -49,6 +49,12 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		if (result>limit) return 0;
 		return result;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag, one length byte and the UTF-8 name bytes: see Keyword and Symbol encodeRaw
+		return 2+(int)name.count();
+	}
 	
 	/**
 	 * Gets the name of this symbolic value

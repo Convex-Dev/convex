@@ -48,6 +48,12 @@ public class StringTree extends AString {
 	public int encodeRaw(byte[] bs, int pos) {
 		return data.encodeRaw(bs, pos);
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// string tag stands in for the blob tag, then the raw BlobTree body
+		return data.calcHeaderLength();
+	}
 	
 	@Override
 	public int writeRawData(byte[] bs, int pos) {

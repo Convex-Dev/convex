@@ -124,6 +124,12 @@ public final class CVMDouble extends ANumeric {
 		long doubleBits=Double.doubleToRawLongBits(value); // note same as doubleToLongBits assuming we are valid and canonical
 		return Utils.writeLong(bs,pos,doubleBits);
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus eight raw bytes, no refs
+		return MAX_ENCODING_LENGTH;
+	}
 	
 	@Override
 	public String toString() {

@@ -214,6 +214,12 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag plus one to four UTF-8 bytes, no refs
+		return 1+encodedCharLength(value);
+	}
+
+	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		// Prints like EDN.
 		// Characters are preceded by a backslash: \c, \newline, \return, \space and

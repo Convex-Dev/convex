@@ -43,6 +43,12 @@ public class DummyCell extends ACell {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag only
+		return 1;
+	}
+
+	@Override
 	public boolean isCanonical() {
 		return true;
 	}

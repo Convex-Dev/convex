@@ -140,6 +140,12 @@ public final class CVMLong extends AInteger {
 		}
 		return pos+numBytes;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag carrying the byte count, then that many raw bytes, no refs
+		return 1+Format.getLongLength(value);
+	}
 	
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {

@@ -287,6 +287,22 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
+	 * Calculates the length of this Cell's header content: every byte of the
+	 * encoding that is not part of a child Ref encoding. The invariant for every
+	 * Cell is
+	 *
+	 * <pre>encoding length == calcHeaderLength() + sum of getRef(i).getEncodingLength()</pre>
+	 *
+	 * over the Refs reported by {@link #getRefCount()} and {@link #getRef(int)}.
+	 * Implementations must be fast and allocation-free: typically the tag, a VLQ
+	 * count and a few fixed bytes, mirroring {@code encodeRaw}. Non-canonical
+	 * Cells delegate to their canonical form.
+	 *
+	 * @return Header length in bytes, including the tag
+	 */
+	public abstract int calcHeaderLength();
+
+	/**
 	 * Gets the encoding length, or 0 if limit exceeded. Useful for efficient embedding calculations
 	 * @param limit
 	 * @return encodingLength, or 0 if beyond limit

@@ -77,6 +77,12 @@ public class ExtensionValue extends AExtensionValue {
 		return pos;
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ value, no refs
+		return 1+Format.getVLQCountLength(value);
+	}
+
 
 	@Override
 	public boolean isCVMValue() {

@@ -179,13 +179,18 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then child refs
+		return 1+Format.getVLQCountLength(count);
+	}
 	
 	@Override
 	public int getEncodingLength() {
 		if (encoding!=null) return encoding.size();
 		
-		// tag and count
-		int length=1+Format.getVLQCountLength(count);
+		int length=calcHeaderLength();
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			length+=children[i].getEncodingLength();
