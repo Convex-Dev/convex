@@ -22,7 +22,7 @@ import convex.test.Samples;
  * 
  * "Testing leads to failure, and failure leads to understanding." - Burt Rutan
  */
-public class FuzzTestFormat {
+public class FormatFuzzTest {
 
 	private static final int NUM_FUZZ = 5000;
 	private static Random r = new Random(3244);

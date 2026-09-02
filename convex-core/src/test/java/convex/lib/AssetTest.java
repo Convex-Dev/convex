@@ -28,7 +28,7 @@ import convex.test.Samples;
  * 
  * Generic tests for ANY digital asset compatible with the convex.asset API
  */
-public class AssetTester extends ACVMTest {
+public class AssetTest extends ACVMTest {
 
 	static final AKeyPair TEST_KP = AKeyPair.generate();
 
@@ -190,7 +190,7 @@ public class AssetTester extends ACVMTest {
 			Long smallBal = BAL / 3;
 			c = step(c, "(asset/transfer " + user2 + " [token " + smallBal + "])");
 
-			AssetTester.doAssetTests(c, token, user, user2);
+			AssetTest.doAssetTests(c, token, user, user2);
 		}
 
 		// Test transfers to actor: failure cases

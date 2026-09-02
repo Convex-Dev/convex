@@ -24,7 +24,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
-import convex.lib.AssetTester;
+import convex.lib.AssetTest;
 
 public class PaisleyTest extends ACVMTest  {
 
@@ -75,7 +75,7 @@ public class PaisleyTest extends ACVMTest  {
 	
 	@Test public void testPAIToken() {
 		Context c=context();
-		AssetTester.doFungibleTests(c, PAI, c.getAddress());
+		AssetTest.doFungibleTests(c, PAI, c.getAddress());
 	}
 	
 	/**
@@ -92,7 +92,7 @@ public class PaisleyTest extends ACVMTest  {
 		assertEquals(1000000,evalL(c,"(asset/balance aid)")); // minted quantity
 		assertEquals(0,evalL(c,"(asset/balance aid #0)")); // zero account has no holding
 		
-		AssetTester.doFungibleTests(c, AID, c.getAddress());
+		AssetTest.doFungibleTests(c, AID, c.getAddress());
 	}
 	
 	/**
@@ -120,7 +120,7 @@ public class PaisleyTest extends ACVMTest  {
 		c=exec(c,"(eval-as member-acct `(@convex.asset/transfer ~*address* [~aid 10000]))");
 		
 		// Run generic tests (as HERO who should now have 10000 units)
-		AssetTester.doFungibleTests(c, AID, c.getAddress());
+		AssetTest.doFungibleTests(c, AID, c.getAddress());
 	}
 	
 	

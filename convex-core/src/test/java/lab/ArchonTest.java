@@ -19,7 +19,7 @@ import convex.core.data.Strings;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
-import convex.lib.AssetTester;
+import convex.lib.AssetTest;
 
 public class ArchonTest extends ACVMTest  {
 
@@ -69,7 +69,7 @@ public class ArchonTest extends ACVMTest  {
 	@Test public void testArchonNFTs() {
 		Context ctx=context();
 		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" [archon #{0x0123}])");
-		AssetTester.doAssetTests(ctx, ARCHON, HERO, VILLAIN);
+		AssetTest.doAssetTests(ctx, ARCHON, HERO, VILLAIN);
 	}
 	
 	@Test public void testPeaceSetup() {

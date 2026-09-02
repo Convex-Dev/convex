@@ -1,14 +1,13 @@
 package convex.core.lang;
 
 import static convex.test.Assertions.assertCVMEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Context;
@@ -25,14 +24,24 @@ import convex.core.init.InitTest;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-@RunWith(Parameterized.class)
-public class ParamTestJuice {
+public class JuiceParamTest {
 
 	private static final long JUICE_SYM_LOOKUP = Juice.LOOKUP_SYM;
 	private static final long JUICE_EMPTY_MAP = Juice.CONSTANT; // consider: (hash-map) vs {}
 	private static final long JUICE_IDENTITY_FN = (Juice.LAMBDA);
 
-	@Parameterized.Parameters(name = "{index}: {0}")
+	private static final State INITIAL = TestState.STATE;
+	private static final long INITIAL_JUICE = 10000;
+	private static final Context INITIAL_CONTEXT;
+
+	static {
+		try {
+			INITIAL_CONTEXT = Context.create(INITIAL, InitTest.HERO, INITIAL_JUICE);
+		} catch (Throwable e) {
+			throw new Error(e);
+		}
+	}
+
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] {
 			    { "3", 3L, Juice.CONSTANT },
@@ -51,33 +60,11 @@ public class ParamTestJuice {
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L,
 						Juice.DO + Juice.LET + Juice.CONSTANT * 1 + JUICE_SYM_LOOKUP + Juice.LOOKUP + JUICE_IDENTITY_FN
 								+ Juice.DEF },
-				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT }, 
+				{ "(let [a 1] a)", 1L, Juice.LET + Juice.LOOKUP + Juice.CONSTANT },
 				// compiler executes + in advance, so this is constant in execution
-				{ "~(+ 1 2)", 3L, Juice.CONSTANT }, 
+				{ "~(+ 1 2)", 3L, Juice.CONSTANT },
 				{ "*depth*", 0L, Juice.SPECIAL },
 				{ "(= true true)", true, Juice.CORE+ (2 * Juice.CONSTANT) + Juice.EQUALS } });
-	}
-
-	private String source;
-	private long expectedJuice;
-	private Object expectedResult;
-
-	public ParamTestJuice(String source, Object expectedResult, Long expectedJuice) {
-		this.source = source;
-		this.expectedJuice = expectedJuice;
-		this.expectedResult = expectedResult;
-	}
-
-	private static final State INITIAL = TestState.STATE;
-	private static final long INITIAL_JUICE = 10000;
-	private static final Context INITIAL_CONTEXT;
-
-	static {
-		try {
-			INITIAL_CONTEXT = Context.create(INITIAL, InitTest.HERO, INITIAL_JUICE);
-		} catch (Throwable e) {
-			throw new Error(e);
-		}
 	}
 
 	public static <T extends ACell> AOp<T> compile(String source) {
@@ -101,8 +88,9 @@ public class ParamTestJuice {
 		}
 	}
 
-	@Test
-	public void testOpRoundTrip() throws BadFormatException {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testOpRoundTrip(String source, Object expectedResult, long expectedJuice) throws BadFormatException {
 		AOp<?> op = compile(source);
 		Blob b = Cells.encode(op);
 		AOp<?> op2 = Samples.TEST_STORE.decode(b);
@@ -110,8 +98,9 @@ public class ParamTestJuice {
 		assertEquals(b, b2);
 	}
 
-	@Test
-	public void testResultAndJuice() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testResultAndJuice(String source, Object expectedResult, long expectedJuice) {
 		Context c = eval(source);
 
 		ACell result = c.getResult();
@@ -119,6 +108,5 @@ public class ParamTestJuice {
 
 		long juiceUsed = c.getJuiceUsed();
 		assertEquals(expectedJuice, juiceUsed);
-
 	}
 }

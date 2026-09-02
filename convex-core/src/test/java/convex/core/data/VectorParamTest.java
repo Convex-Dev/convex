@@ -1,15 +1,14 @@
 package convex.core.data;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
@@ -20,15 +19,8 @@ import convex.test.Samples;
  * Parameterised test class for a bunch of vectors.
  *
  */
-@RunWith(Parameterized.class)
-public class ParamTestVector {
-	private AVector<?> v;
+public class VectorParamTest {
 
-	public ParamTestVector(String label, AVector<?> v) {
-		this.v = v;
-	}
-
-	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays
 				.asList(new Object[][] { { "Empty Vector", Vectors.empty() }, { "Single value vector", Vectors.of(7L) },
@@ -41,18 +33,21 @@ public class ParamTestVector {
 						{ "Length 256 tree vector", Samples.INT_VECTOR_256 } });
 	}
 
-	@Test
-	public void testGenericProperties() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testGenericProperties(String label, AVector<?> v) {
 		VectorsTest.doVectorTests(v);
 	}
 
-	@Test
-	public void testCanonical() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testCanonical(String label, AVector<?> v) {
 		assertTrue(v.toCanonical().isCanonical());
 	}
 
-	@Test
-	public void testElements() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testElements(String label, AVector<?> v) {
 		int n = v.size();
 		for (int i = 0; i < n; i++) {
 			ACell o = v.get(i);

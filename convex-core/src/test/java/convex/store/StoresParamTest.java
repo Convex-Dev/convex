@@ -30,7 +30,7 @@ import convex.test.Samples;
 /**
  * Parameterised store contract tests that run against both MemoryStore and EtchStore.
  */
-public class ParamTestStores {
+public class StoresParamTest {
 
 	/**
 	 * Shared store instances: tests use distinct values, so instances are safely

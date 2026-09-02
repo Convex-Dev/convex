@@ -17,7 +17,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.RT;
-import convex.lib.AssetTester;
+import convex.lib.AssetTest;
 
 public class TorusTest extends ACVMTest {
 
@@ -180,22 +180,22 @@ public class TorusTest extends ACVMTest {
 		// Set up some liquidity
 		ctx=step(ctx,"(torus/add-liquidity USD 100 10000)");
 		
-		AssetTester.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
+		AssetTest.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
 		
 		// Withdraw some liquidity
 		ctx=step(ctx,"(torus/withdraw-liquidity USD 500)");
 
-		AssetTester.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
+		AssetTest.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
 
 		// Withdraw remaining liquidity, should cause fungible tests to fail because no balance to test
 		final Context fctx=step(ctx,"(torus/withdraw-liquidity USD 500)");		
 		assertThrows(Throwable.class,()->{
-			AssetTester.doFungibleTests(fctx, USD_MARKET, fctx.getAddress());
+			AssetTest.doFungibleTests(fctx, USD_MARKET, fctx.getAddress());
 		});
 		
 		// Tests should fail for a non-existent market
 		assertThrows(Throwable.class,()->{
-			AssetTester.doFungibleTests(fctx, eval(fctx,"(torus/get-market GBP)"), fctx.getAddress());
+			AssetTest.doFungibleTests(fctx, eval(fctx,"(torus/get-market GBP)"), fctx.getAddress());
 		});
 	}
 
@@ -375,7 +375,7 @@ public class TorusTest extends ACVMTest {
 		assertEquals(1000000000000L,evalL(ctx,"(balance USDM)")); // Convex balance back to start
 
 		// Generic fungible test on shares
-		AssetTester.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,USD_MARKET,ctx.getAddress());
 
 		// ============================================================
 		// FORTH TEST - buy half of all tokens ($50k)

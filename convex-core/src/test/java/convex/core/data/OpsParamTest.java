@@ -6,9 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Context;
@@ -27,19 +26,10 @@ import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 
-@RunWith(Parameterized.class)
-public class ParamTestOps {
-	private AOp<?> op;
-	private Object expected;
+public class OpsParamTest {
 
 	private static final State INITIAL_STATE = TestState.STATE;
 
-	public ParamTestOps(String label, AOp<?> v, Object expected) {
-		this.op = v;
-		this.expected = expected;
-	}
-
-	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() throws BadFormatException {
 		return Arrays
 				.asList(new Object[][] {
@@ -58,8 +48,9 @@ public class ParamTestOps {
 						{ "Def", Def.create("foo", Constant.of(1L)), 1L } });
 	}
 
-	@Test
-	public void testExpectedResult() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testExpectedResult(String label, AOp<?> op, Object expected) {
 		long JUICE = 10000;
 		Context c = Context.create(INITIAL_STATE, InitTest.HERO, JUICE);
 		Context c2 = c.execute(op);
@@ -67,13 +58,15 @@ public class ParamTestOps {
 		assertCVMEquals(expected, c2.getResult());
 	}
 
-	@Test
-	public void testCanonical() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testCanonical(String label, AOp<?> op, Object expected) {
 		assertTrue(op.isCanonical());
 	}
 
-	@Test
-	public void testGeneric() throws InvalidDataException, ValidationException {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testGeneric(String label, AOp<?> op, Object expected) throws InvalidDataException, ValidationException {
 		ObjectsTest.doAnyValueTests(op);
 	}
 }

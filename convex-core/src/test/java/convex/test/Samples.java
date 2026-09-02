@@ -1,12 +1,10 @@
 package convex.test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Random;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
@@ -56,8 +54,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.etch.EtchStore;
@@ -318,15 +314,6 @@ public class Samples {
 		return (T) a;
 	}
 
-
-	@Test
-	public void validateDataObjects() throws InvalidDataException, ValidationException {
-		INT_VECTOR_300.validate();
-		assertTrue(INT_VECTOR_300.isCanonical());
-		INT_VECTOR_10.validate();
-		assertTrue(INT_VECTOR_10.isCanonical());
-		BAD_HASH.validate();
-	}
 
 	public static ACell[] VALUES=new ACell[] {
 			null,

@@ -85,6 +85,6 @@ public class BasicNFTTest extends ACVMTest {
 		ctx=step(ctx,"(asset/transfer "+user2+" [nft #{"+b1+"}])");
 		assertEquals(Sets.of(b1),ctx.getResult());
 		
-		AssetTester.doAssetTests(ctx, NFT, user1, user2);
+		AssetTest.doAssetTests(ctx, NFT, user1, user2);
 	}
 }

@@ -1,34 +1,25 @@
 package convex.comms;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.FuzzTestFormat;
+import convex.core.data.FormatFuzzTest;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.test.Samples;
 
-@RunWith(Parameterized.class)
 public class VLCParamTest {
-	private ACell value;
 
-	public VLCParamTest(Object value) {
-		// create using CVM-coerced values
-		this.value = RT.cvm(value);
-	}
-
-	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] { { 0L }, { 63L }, { 64L }, { -63L }, { -64L }, { -65L }, { 1234L },
 				{ 1234578 }, { -1234578 }, { CVMLong.create(1) }, { CVMLong.create(255) }, { Long.MAX_VALUE }, { Long.MIN_VALUE },
@@ -39,8 +30,11 @@ public class VLCParamTest {
 		});
 	}
 
-	@Test
-	public void testRoundTrip() throws BadFormatException {
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("dataExamples")
+	public void testRoundTrip(Object source) throws BadFormatException {
+		// create using CVM-coerced values
+		ACell value = RT.cvm(source);
 		Blob b = Cells.encode(value);
 		ACell v2 = Samples.TEST_STORE.decode(b);
 		assertEquals(value, v2);
@@ -51,6 +45,6 @@ public class VLCParamTest {
 			assertEquals(1 + Format.getLongLength(cl.longValue()), b.count());
 		}
 
-		FuzzTestFormat.doMutationTest(b);
+		FormatFuzzTest.doMutationTest(b);
 	}
 }

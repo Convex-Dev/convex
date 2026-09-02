@@ -74,7 +74,7 @@ public class MultiTokenTest extends ACVMTest {
 		ctx=exec(ctx,"(asset/mint [mt :FOOSD] 2023)");		
 		
 		// Fungible tests
-		AssetTester.doFungibleTests(ctx, token, HERO);		
+		AssetTest.doFungibleTests(ctx, token, HERO);		
 		
 		// Test change of control
 		TrustTest.testChangeControl(ctx, token);
