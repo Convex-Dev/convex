@@ -32,11 +32,14 @@ import convex.core.util.Utils;
  */
 public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex<K, V> {
 	/**
-	 * Maximum depth handled with the original recursive algorithms. Keeping this
-	 * at the historical Index limit means ordinary keys take exactly the old path;
-	 * explicit stacks are reserved for extended-depth indexes.
+	 * Maximum depth (in hex digits, i.e. 64 bytes of key) handled with the
+	 * allocation-free recursive algorithms. Each recursive level adds at least one
+	 * hex digit, so this also bounds recursion depth. Beyond it the explicit-stack
+	 * variants take over. Note this gates on key length rather than on the number
+	 * of node levels actually descended, so it is deliberately generous; gating on
+	 * recursion level instead is tracked in Convex-Dev/convex#727.
 	 */
-	private static final int MAX_RECURSIVE_DEPTH=64;
+	private static final int MAX_RECURSIVE_DEPTH=128;
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Ref<Index>[] EMPTY_CHILDREN = new Ref[0];
@@ -1385,7 +1388,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				continue;
 			}
 
-			boolean takeA=(be==null)||(ae!=null&&ae.getKey().compareTo(be.getKey().toBlob())<0);
+			boolean takeA=(be==null)||(ae!=null&&ae.getKey().compareTo(be.getKey())<0);
 			MapEntry<K,V> me=takeA ? ae : be;
 			V oldValue=me.getValue();
 			V nv=takeA ? func.merge(me.getKey(),oldValue,null)
