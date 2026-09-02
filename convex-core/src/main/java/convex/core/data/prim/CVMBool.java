@@ -119,7 +119,7 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	
 	@Override
 	protected int getEncodingLength(int limit) {
-		return 1;
+		return (limit>0)?1:0;
 	}
 
 	@Override

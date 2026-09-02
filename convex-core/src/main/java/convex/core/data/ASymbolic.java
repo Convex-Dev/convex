@@ -45,7 +45,9 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	
 	@Override
 	protected int getEncodingLength(int limit) {
-		return estimatedEncodingSize();
+		int result= estimatedEncodingSize();
+		if (result>limit) return 0;
+		return result;
 	}
 	
 	/**

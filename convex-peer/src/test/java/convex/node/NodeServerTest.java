@@ -1900,6 +1900,48 @@ public class NodeServerTest {
 		}
 	}
 
+	/**
+	 * Regression for Convex-Dev/convex#723: a pulled value holding an Index node
+	 * beyond depth 64 with hashed children must decode on the requesting client
+	 * before any of those children are in a store. Both message shapes are covered:
+	 * an embedded node inline in the reply, and a non-embedded node sent as its own
+	 * trailing cell.
+	 */
+	@Test
+	public void testPullPathDecodesDeepIndex() throws Exception {
+		Keyword region=Keyword.create("region");
+		KeyedLattice lattice=KeyedLattice.create(region,SetLattice.create());
+		ASet<ACell> expected=Sets.of(
+				Vectors.of(deepIndex(2),CVMLong.ONE),
+				Vectors.of(deepIndex(5),CVMLong.ONE));
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			allowSingleGroupInbound(source);
+			propagator(target);
+			source.launch();
+			target.launch();
+			source.getCursor().path(region).merge(expected);
+			syncAndAwaitPropagator(source);
+
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
+				assertEquals(expected,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
+			}
+		}
+	}
+
+	/** Entry-less node at depth 200 whose single-entry children all exceed the embedded limit. */
+	private static Index<Blob,CVMLong> deepIndex(int children) {
+		Index<Blob,CVMLong> index=Index.none();
+		for (int i=0;i<children;i++) {
+			byte[] bs=new byte[137];
+			java.util.Arrays.fill(bs,0,100,(byte)0xAB);
+			java.util.Arrays.fill(bs,100,137,(byte)(0x11*i));
+			index=index.assoc(Blob.wrap(bs),CVMLong.create(i));
+		}
+		return index;
+	}
+
 	@Test
 	public void testPullPathAbsentAndRejectedValues() throws Exception {
 		Keyword absent=Keyword.create("absent");

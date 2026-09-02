@@ -314,6 +314,8 @@ public class ObjectsTest {
 		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
 		assertSame(encoding,a.getEncoding()); // should be same cached encoding
 		assertEquals(encoding.count,a.getEncodingLength());
+		assertEquals(encoding.count,a.getEncodingLength((int) encoding.count));
+		assertEquals(0,a.getEncodingLength((int) encoding.count-1));
 
 		if (a.isCVMValue()) {
 			assertNotNull(a.getType());

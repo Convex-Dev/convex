@@ -90,12 +90,14 @@ public final class CVMDouble extends ANumeric {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+8;
+		return MAX_ENCODING_LENGTH;
 	}
 	
 	@Override
 	protected int getEncodingLength(int limit) {
-		return estimatedEncodingSize();
+		int result= MAX_ENCODING_LENGTH;
+		if (result>limit) return 0;
+		return result;
 	}
 
 	@Override

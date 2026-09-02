@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Multi-cell messages containing an `Index` node deeper than 64 hex digits with
+  non-embedded children could not be decoded by a receiver that did not already
+  hold those children, because the embedding check dereferenced them. A lattice
+  query for such a value failed on the requesting node, so a joining node could
+  not bootstrap from a peer holding it (#723). `Index` now computes its encoding
+  length from its refs without loading any child.
 - DLFS directory entries with names longer than the embedded string limit (138 to
   254 bytes) were listed but could not be opened, statted, moved or deleted once
   their directory index had been reloaded from an Etch store, for example after a

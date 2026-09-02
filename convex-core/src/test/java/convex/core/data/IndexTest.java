@@ -12,9 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -24,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Symbols;
@@ -963,5 +967,152 @@ public class IndexTest {
 				second.close();
 			}
 		}
+	}
+
+	/**
+	 * Regression for Convex-Dev/convex#723. A node beyond depth 64 whose children
+	 * are hashed must decode from a multi-cell message without touching any store:
+	 * its embedded status follows from the ref flags and the inline lengths alone.
+	 * Covers the inline shape (an embedded node inside a vector) and the trailing
+	 * shape (a non-embedded node as its own message cell). The embedding check used
+	 * to dereference the hashed children and fail on a receiver that lacked them.
+	 */
+	@Test
+	public void testDeepIndexDecodesFromMultiCellMessage() throws IOException, BadFormatException, InvalidDataException {
+		Index<Blob,CVMLong> inline=deepIndex(2);
+		Index<Blob,CVMLong> trailing=deepIndex(5);
+		assertEquals(200L,inline.getDepth());
+		assertTrue(inline.isEmbedded(),"two hashed children fit within the embedded limit");
+		assertFalse(trailing.isEmbedded(),"five hashed children exceed the embedded limit");
+
+		for (Index<Blob,CVMLong> deep : java.util.List.of(inline,trailing)) {
+			for (int i=0;i<deep.getRefCount();i++) assertFalse(deep.getRef(i).isEmbedded());
+			AVector<ACell> value=Vectors.of(deep,CVMLong.ONE);
+			Blob message=Format.encodeMultiCell(value,true);
+
+			// Storeless decode: any store access would throw MissingDataException
+			ACell decoded=CVMEncoder.INSTANCE.decodeMultiCell(message);
+			assertEquals(value,decoded);
+			checkDecodedDeepIndex(deep,decoded);
+
+			// Store-backed decode against a store holding none of the cells
+			try (EtchStore empty=EtchStore.createTemp("index-deep-decode")) {
+				ACell viaStore=empty.decodeMultiCell(message);
+				assertEquals(value,viaStore);
+				checkDecodedDeepIndex(deep,viaStore);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void checkDecodedDeepIndex(Index<Blob,CVMLong> expected, ACell decoded) throws InvalidDataException {
+		Index<Blob,CVMLong> index=(Index<Blob,CVMLong>)((AVector<ACell>)decoded).get(0);
+		assertEquals(expected.count(),index.count());
+		for (long i=0;i<expected.count();i++) assertEquals(CVMLong.create(i),index.get(deepKey((int)i)));
+		assertEquals(expected.getEncodingLength(),index.getEncodingLength());
+		index.validate();
+	}
+
+	/**
+	 * Builds an entry-less node at depth 200 whose children are all hashed: a
+	 * 100-byte shared prefix and 137-byte keys, so each single-entry child exceeds
+	 * the embedded limit while its key stays embedded.
+	 */
+	private static Index<Blob,CVMLong> deepIndex(int children) {
+		Index<Blob,CVMLong> index=Index.none();
+		for (int i=0;i<children;i++) index=index.assoc(deepKey(i),CVMLong.create(i));
+		return index;
+	}
+
+	private static Blob deepKey(int i) {
+		byte[] bs=new byte[137];
+		Arrays.fill(bs,0,100,(byte)0xAB);
+		Arrays.fill(bs,100,137,(byte)(0x11*i));
+		return Blob.wrap(bs);
+	}
+
+	/**
+	 * Index computes its encoding length arithmetically from its refs rather than
+	 * by building the encoding, so the embedding check never dereferences a hashed
+	 * child. Every node of a fresh structure must report the exact size of the
+	 * encoding it later produces, and agree on embedding, before any encoding
+	 * exists. Covers the shapes the arithmetic distinguishes: empty, single entries
+	 * with embedded and hashed keys and values, entry-bearing branch nodes, one- and
+	 * two-byte counts and depths, and embedded and hashed children.
+	 */
+	@Test
+	public void testEncodingLengthWithoutEncoding() throws BadFormatException {
+		Index<ABlob,ACell> mixed=Index.none();
+		for (int i=0;i<130;i++) mixed=mixed.assoc(patternKey(i,1+(i*37)%255),patternValue(i));
+		Index<ABlob,ACell> longKeys=Index.none();
+		for (int i=0;i<300;i++) longKeys=longKeys.assoc(patternKey(i,64+(i*37)%192),patternValue(i));
+		Index<ABlob,ACell> prefixChain=Index.none();
+		for (int i=1;i<=4;i++) prefixChain=prefixChain.assoc(patternKey(7,i),CVMLong.create(i));
+
+		java.util.List<ACell> shapes=java.util.List.of(
+			Index.none(),
+			Index.of(patternKey(1,3),CVMLong.ONE),
+			Index.of(patternKey(2,150),CVMLong.ONE), // hashed key
+			Index.of(patternKey(3,255),Blobs.createFilled(1,500)), // hashed key and value
+			prefixChain,mixed,longKeys,deepIndex(2),deepIndex(5),comb(64));
+
+		for (ACell shape : shapes) {
+			checkEncodingLengths(shape);
+			checkEncodingLengths(CVMEncoder.INSTANCE.decodeMultiCell(Format.encodeMultiCell(shape,true)));
+		}
+	}
+
+	private static void checkEncodingLengths(ACell root) {
+		ArrayList<Index<?,?>> nodes=new ArrayList<>();
+		collectIndexNodes(root,nodes,new IdentityHashMap<>());
+		assertFalse(nodes.isEmpty());
+		int n=nodes.size();
+		int[] lengths=new int[n];
+		boolean[] embedded=new boolean[n];
+		// Record every node before any encoding exists
+		for (int i=0;i<n;i++) {
+			lengths[i]=nodes.get(i).getEncodingLength();
+			embedded[i]=nodes.get(i).isEmbedded();
+		}
+		for (int i=0;i<n;i++) {
+			Index<?,?> node=nodes.get(i);
+			int actual=node.getEncoding().size();
+			assertEquals(actual,lengths[i],"encoding length of node with count "+node.count());
+			assertEquals(actual<=Format.MAX_EMBEDDED_LENGTH,embedded[i],"embedding of node with count "+node.count());
+		}
+	}
+
+	private static void collectIndexNodes(ACell cell, ArrayList<Index<?,?>> out, IdentityHashMap<ACell,Boolean> seen) {
+		if (cell==null||seen.put(cell,Boolean.TRUE)!=null) return;
+		if (cell instanceof Index) out.add((Index<?,?>)cell);
+		int n=cell.getRefCount();
+		for (int i=0;i<n;i++) collectIndexNodes(cell.getRef(i).getValue(),out,seen);
+	}
+
+	private static Blob patternKey(int i, int len) {
+		byte[] bs=new byte[len];
+		for (int j=0;j<len;j++) bs[j]=(byte)(i*31+j*17);
+		return Blob.wrap(bs);
+	}
+
+	private static ACell patternValue(int i) {
+		switch (i%4) {
+			case 0: return CVMLong.create(i);
+			case 1: return Blobs.createFilled(i&0xff,200); // hashed value
+			case 2: return Blobs.createFilled(i&0xff,100); // large embedded value
+			default: return Vectors.of(CVMLong.create(i),Strings.create("v"+i));
+		}
+	}
+
+	/** One divergent key at every nibble of a zero prefix: a spine of nested branch nodes. */
+	private static Index<Blob,CVMLong> comb(int prefixBytes) {
+		byte[] zero=new byte[prefixBytes];
+		Index<Blob,CVMLong> built=Index.of(Blob.create(zero),-1);
+		for (int digit=prefixBytes*2-1;digit>=0;digit--) {
+			byte[] kb=zero.clone();
+			kb[digit>>>1]=(byte)(((digit&1)==0)?0x10:0x01);
+			built=built.assoc(Blob.create(kb),CVMLong.create(digit));
+		}
+		return built;
 	}
 }

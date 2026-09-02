@@ -106,12 +106,14 @@ public final class CVMLong extends AInteger {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+Format.MAX_VLQ_LONG_LENGTH;
+		return 1+8;
 	}
 	
 	@Override
 	protected int getEncodingLength(int limit) {
-		return 1+Format.getVLQLongLength(value);
+		int result= 1+Format.getLongLength(value);
+		if (result>limit) return 0;
+		return result;
 	}
 
 	@Override
