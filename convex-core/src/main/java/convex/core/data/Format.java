@@ -571,6 +571,15 @@ public class Format {
 	}
 
 	/**
+	 * Encode a Result down to the encodings of each vector element, with no maximum size
+	 * @param result Result containing a Vector value
+	 * @return Multi-cell encoding of Result
+	 */
+	public static Blob encodeDataResult(Result result) {
+		return encodeDataResult(result,0);
+	}
+
+	/**
 	 * Encode a Result down to the encodings of each vector element
 	 * @param result Result containing a Vector value
 	 * @param maxSize Maximum encoded size in bytes, or zero (or less) for no maximum
