@@ -827,4 +827,67 @@ public class IndexTest {
 			}
 		}
 	}
+
+	/**
+	 * Keys beyond MAX_KEY_BYTES are clamped to MAX_DEPTH and alias on their first
+	 * 255 bytes. The clamp must also apply when a non-embedded oversized key is
+	 * resolved lazily after a store reload, and a depth outside the range must be
+	 * rejected at construction rather than truncated.
+	 */
+	@Test
+	public void testOversizedKeysClampDepthAcrossStoreReload() throws Exception {
+		byte[] base=new byte[300];
+		Arrays.fill(base,(byte)0x51);
+		Blob huge=Blob.wrap(base); // non-embedded and beyond MAX_KEY_BYTES
+		byte[] aliasBytes=Arrays.copyOf(base,1000);
+		aliasBytes[999]=0x77;
+		Blob hugeAlias=Blob.wrap(aliasBytes); // same first 255 bytes, different tail
+		Blob sibling=Blob.wrap(Arrays.copyOf(base,254)); // shorter key on the same prefix
+		Blob other=Blob.fromHex("ff");
+
+		Index<ABlob,CVMLong> single=Index.of(huge,CVMLong.ONE);
+		assertEquals(Index.MAX_DEPTH,single.getDepth());
+		Index<ABlob,CVMLong> index=Index.of(huge,CVMLong.ONE,sibling,CVMLong.create(2),other,CVMLong.ZERO);
+		assertEquals(3,index.count());
+
+		for (Index<ABlob,CVMLong> original : java.util.List.of(single,index)) {
+			EtchStore store=EtchStore.createTemp("index-oversized");
+			File file=store.getFile();
+			Hash hash=Cells.persist(original,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				assertEquals(original.count(),reloaded.count());
+				assertEquals(CVMLong.ONE,reloaded.get(huge));
+				assertEquals(CVMLong.ONE,reloaded.get(hugeAlias),"oversized keys alias on the first 255 bytes");
+				assertEquals(huge,reloaded.getEntry(hugeAlias).getKey());
+				reloaded.validate();
+				assertEquals(original,reloaded);
+
+				// The reloaded oversized entry resolves to exactly MAX_DEPTH
+				Index<ABlob,CVMLong> only=reloaded.dissoc(other).dissoc(sibling);
+				assertEquals(1,only.count());
+				assertEquals(Index.MAX_DEPTH,only.getDepth());
+
+				// Aliasing keys replace and remove the same entry
+				Index<ABlob,CVMLong> replaced=reloaded.assoc(hugeAlias,CVMLong.create(9));
+				assertEquals(reloaded.count(),replaced.count());
+				assertEquals(CVMLong.create(9),replaced.get(huge));
+				Index<ABlob,CVMLong> removed=reloaded.dissoc(hugeAlias);
+				assertEquals(reloaded.count()-1,removed.count());
+				assertNull(removed.get(huge));
+			} finally {
+				reopened.close();
+			}
+		}
+
+		// Out-of-range depths are rejected, never silently truncated to int
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.MAX_DEPTH+1,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Long.MAX_VALUE,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(-2,null,Index.EMPTY_CHILDREN,0,0));
+	}
 }

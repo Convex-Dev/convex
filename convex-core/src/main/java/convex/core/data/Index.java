@@ -103,6 +103,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
 			short mask, long count) {
 		super(count);
+		if (depth<UNRESOLVED_DEPTH||depth>MAX_DEPTH) throw new IllegalArgumentException("Index depth out of range: "+depth);
 		this.depth = (int)depth;
 		this.entry = entry;
 		this.children = (Ref[]) entries;
