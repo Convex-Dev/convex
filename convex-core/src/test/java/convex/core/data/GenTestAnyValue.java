@@ -58,7 +58,7 @@ public class GenTestAnyValue {
 	@Property
 	public void testFuzzing(@From(ValueGen.class) ACell o) throws InvalidDataException  {
 		Blob b=Cells.encode(o);
-		FuzzTestFormat.doMutationTest(b);
+		FormatFuzzTest.doMutationTest(b);
 		
 		if (o instanceof ACell) {
 			// break all the refs! This should still pass validateCell(), since it won't change structure.

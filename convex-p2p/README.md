@@ -4,13 +4,16 @@
 [![javadoc](https://javadoc.io/badge2/world.convex/convex-p2p/javadoc.svg)](https://javadoc.io/doc/world.convex/convex-p2p)
 
 Rollup package for Convex P2P nodes. Builds on the lattice data structures in
-`convex-core` and the `NodeServer` binary networking in `convex-peer` to provide nodes
-that discover each other, exchange lattice values and converge on shared state — and
-bundles the application regions those nodes serve, so one dependency gives you a
-complete node.
+`convex-core` and the authoritative node, propagator and transport components in
+`convex-peer` to provide nodes that discover each other, exchange lattice values
+and converge on shared state — and bundles the application regions those nodes
+serve, so one dependency gives you a complete node.
 
-> **Status: early stub.** The module scaffolding and entry point are in place;
-> discovery, region subscription and replication policy are still to be built.
+> **Status: early implementation.** Authenticated one-peer bootstrap, signed
+> NodeInfo discovery, bounded desired-peer state, follow-filtered social replication,
+> outbound-only NAT leaf nodes and opt-in public Point of Presence message relay work
+> over TCP. On-chain bootstrap, direct hole punching, region-aware connection selection
+> and additional transports remain to be built.
 
 ## Lattice structure
 
@@ -20,16 +23,17 @@ none of the application regions from `Lattice.ROOT`:
 ```
 P2PLattice.ROOT (KeyedLattice)
 ├── :p2p → KeyedLattice                        shared node registry
-│     └── :nodes → OwnerLattice(LWWLattice)      user key → Signed(NodeInfo)
+│     └── :nodes → OwnerLattice(LWWLattice)      node key → Signed(NodeInfo)
 ├── :id  → OwnerLattice(LWWLattice)            user key → Signed(IdentityInfo)
 └── :kad → ReservedLattice                     reserved, nothing merges yet
 ```
 
-**`:p2p`** — the shared node registry. Each P2P user publishes a signed, LWW `NodeInfo`
-(transports, regions, version, timestamp) under their own `AccountKey` at
-`[:p2p :nodes <userKey>]`. Reuses core's region instance directly, so registry merge
+**`:p2p`** — the shared node registry. Each node publishes a signed, LWW `NodeInfo`
+(transports, PoPs, relay willingness, regions, version, timestamp) under its node
+`AccountKey` at `[:p2p :nodes <nodeKey>]`. Reuses core's region instance directly, so registry merge
 semantics cannot drift between this root and `Lattice.ROOT`, and
-`NodeServer.publishNodeInfo` works unchanged.
+`NodeDirectory` publishes and validates this application-owned path while the
+generic propagation layer transports it without interpreting its schema.
 
 **`:id`** — P2P user identity, separate from transport details, so one identity can
 advertise several nodes and change its claims without republishing node records.
@@ -105,7 +109,8 @@ decision, and the only place that decision is recorded.
         ├─────────────┴─────────────┴─────────────┤
         │        :p2p    :id    :kad              │   infrastructure floor (always on)
         ├─────────────────────────────────────────┤
-        │   NodeServer — merge, gossip, transport │   convex-peer
+        │ NodeServer — authoritative merge + host │   convex-peer
+        │ Propagator — filtered view + routes      │
         ├─────────────────────────────────────────┤
         │   lattice types, cursors, CAD3, Etch    │   convex-core
         └─────────────────────────────────────────┘
@@ -186,6 +191,78 @@ try (P2PNode node = P2PNode.create(store, NodeConfig.port(18888), keyPair)) {
 }
 ```
 
+For an isolated two-node network, use OS-assigned ports and tell only one node
+about the other:
+
+```java
+P2PNode alice = P2PNode.create(aliceStore, NodeConfig.localNetwork(), aliceKey)
+    .serveAllInbound();
+P2PNode bob = P2PNode.create(bobStore, NodeConfig.localNetwork(), bobKey)
+    .serveAllInbound();
+alice.launch();
+bob.launch();
+
+// Bob proves his key; Alice pushes only her own signed NodeInfo entry, then
+// pulls :p2p, :id and Alice's currently desired social-owner paths.
+alice.connect(bobKey.getAccountKey(), bob.getHostAddress()).join();
+
+// Bob independently authenticates Alice on that same socket before upgrading it
+// from an inbound connection to an outbound propagation route.
+bob.whenInboundConnectionUpgraded(aliceKey.getAccountKey()).join();
+
+// Subsequent application changes gossip in both directions.
+alice.getApplication().sync();
+```
+
+`connect` completes after the bootstrap endpoint is authenticated and has
+acknowledged the path-scoped `[:p2p :nodes]` update, and after the connecting
+node has pulled and merged the bootstrap node's infrastructure regions and current
+desired social-owner slots. It never bootstraps from an unrestricted full root.
+A node joining an established network therefore obtains its follow-filtered view
+without waiting for another publication or periodic root sync.
+
+For a node behind NAT, give `P2PNode` a local-only transport configuration. Its
+`NodeDirectory` signs and publishes NodeInfo with an empty `:transports` vector, so
+other nodes know its identity without trying to dial it. The node's authenticated
+outbound connection remains full-duplex:
+
+```java
+P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey);
+dave.launch();
+dave.connect(bobKey.getAccountKey(), bob.getHostAddress()).join();
+
+// Bob may send lattice updates back through Dave's original outbound socket only
+// after Dave has answered Bob's independent challenge.
+bob.whenInboundConnectionUpgraded(daveKey.getAccountKey()).join();
+```
+
+This distinction is intentional. Assigning an inbound socket to a propagator permits
+the operator-selected inbound lattice view, but leaves the connection untrusted. It
+becomes an outbound gossip route only after challenge/response proves the node key and
+that key has an admitted signed NodeInfo record. A NAT leaf does not need
+`serveAllInbound()` merely to receive reverse traffic from a peer it connected to and
+authenticated; arbitrary incoming sockets remain denied by default.
+
+For routed point-to-point messages, the leaf declares that same peer as a PoP and the
+public node opts into relay service:
+
+```java
+P2PNode dave = P2PNode.create(daveStore, NodeConfig.port(-1), daveKey)
+    .pointsOfPresence(bobKey.getAccountKey());
+P2PNode bob = P2PNode.create(bobStore, NodeConfig.localNetwork(), bobKey)
+    .serveAllInbound()
+    .relayMessages();
+
+dave.setMessageHandler(message -> consume(message.sender(), message.value()));
+alice.sendMessage(daveKey.getAccountKey(), Strings.create("hello"));
+alice.sendPrivateMessage(daveKey.getAccountKey(), Strings.create("secret"));
+```
+
+Messages are end-to-end signed by the source node. Private bodies use the existing
+ECIES wrapper; relays see only routing metadata and ciphertext. See
+[Points of Presence](docs/POINTS_OF_PRESENCE.md) for the wire format, routing rules,
+bounds and trust model.
+
 `P2PNode` is the network bootstrap and lifecycle owner. `P2PApplication` is the
 host-neutral lattice application component; it can also be connected directly to a
 standalone `RootComponent` for local use.
@@ -227,8 +304,21 @@ java -cp convex.jar convex.p2p.P2PNode [etch-file]
 Inbound network lattice traffic is **denied by default**. A node serves queries and
 accepts values only once the operator assigns inbound connections to a propagator —
 either via `serveAllInbound()` for a public single-view node, or a custom policy set
-with `NodeServer.setInboundPropagatorSelector`. See `convex-peer`'s `NodeServer` for
-the full capability model.
+on the application-owned listener returned by `getTransport()`. See
+`convex-peer`'s `LatticeListener` and `NodeServer` for the full capability model.
+Operator assignment is not authentication and does not add the connection to
+outbound gossip. That separate upgrade requires live
+challenge/response plus an admitted node identity. The challenge and response both
+have verified Ed25519 signatures and bind a random nonce, the opposite party's node
+key as audience, and the fixed `convex-lattice-peer-v1` context.
+
+An unverified assigned connection may submit complete `LATTICE_VALUE` messages, because
+the P2P data is public, but it cannot stage unsolicited `DATA` or trigger missing-cell
+acquisition. Complete values pass the configured path-aware ingress policy before
+persistence. The default social policy admits and publishes only locally registered
+social DIDs, explicit pins and their direct active follows; every social slot must have
+a valid signature from a key authorised for its DID. `maxConnections` bounds inbound
+sockets and `maxDesiredPeers` bounds explicit plus discovery-driven peers.
 
 ## License
 

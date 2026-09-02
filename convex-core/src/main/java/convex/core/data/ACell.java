@@ -5,6 +5,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 import convex.core.util.Utils;
 
 /**
@@ -19,7 +20,7 @@ import convex.core.util.Utils;
  */
 public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
-	 * We cache the computed memorySize. May be 0 for embedded objects
+	 * We cache the computed memorySize. Will be 0 for fully embedded objects with no branches
 	 * -1 is initial value for when size is not calculated
 	 */
 	protected long memorySize=-1;
@@ -183,29 +184,26 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Creates the encoding for this cell. Cell must be canonical, or else an error may occur.
-	 * 
-	 * The encoding itself is a raw Blob, which may be non-canonical. 
+	 *
+	 * Allocates exactly the calculated encoding length and verifies that the encoder
+	 * wrote that many bytes, so any header arithmetic that disagrees with the
+	 * encoder fails loudly here rather than corrupting embedding or memory accounting.
+	 *
+	 * The encoding itself is a raw Blob, which may be non-canonical.
 	 */
 	@Override
 	protected final Blob createEncoding() {
-		int capacity=estimatedEncodingSize();
-		byte[] bs;
-		int pos=0;
-		while (true) {
-			try {
-				bs=new byte[capacity];
-				pos=encode(bs,pos);
-				break;
-			} catch (IndexOutOfBoundsException be) {
-				if (capacity>Format.LIMIT_ENCODING_LENGTH) throw new IllegalStateException("Encoding size limit exceeded in cell: "+this);
-				
-				// We really want to eliminate these, because exception handling is expensive
-				// However don't want to be too conservative or we waste memory
-				// System.out.println("Insufficient encoding size: "+capacity+ " for "+this.getClass());
-				capacity=capacity*2+10;
-			}
+		int length=getEncodingLength();
+		if (length>Format.LIMIT_ENCODING_LENGTH) throw new IllegalStateException("Encoding size limit exceeded in cell: "+this);
+		byte[] bs=new byte[length];
+		int pos;
+		try {
+			pos=encode(bs,0);
+		} catch (IndexOutOfBoundsException e) {
+			throw new Panic("Encoding exceeded calculated length "+length+" for "+getClass().getName(),e);
 		}
-		return Blob.wrap(bs,0,pos);
+		if (pos!=length) throw new Panic("Encoding length mismatch for "+getClass().getName()+": calculated "+length+" but encoded "+pos);
+		return Blob.wrap(bs);
 	}
 	
 	/**
@@ -277,13 +275,105 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Method to calculate the encoding length of a Cell. May be overridden to avoid
-	 * creating encodings during memory size calculations. This reduces hashing!
-	 * 
+	 * Gets the exact encoding length of this Cell without creating the encoding:
+	 * the header content plus the encoding length of each child Ref, as defined
+	 * by {@link #calcHeaderLength()}. Uses a cached encoding when one exists.
+	 *
 	 * @return Exact encoding length of this Cell
 	 */
-	public int getEncodingLength() {
-		return getEncoding().size();
+	public final int getEncodingLength() {
+		Blob enc=encoding;
+		if (enc!=null) return enc.size();
+		if (!isCanonical()) return getCanonical().getEncodingLength();
+		int length=calcHeaderLength();
+		int n=getRefCount();
+		boolean fullyEmbedded=true;
+		for (int i=0; i<n; i++) {
+			Ref<?> ref=getRef(i);
+			length+=ref.getEncodingLength();
+			if (fullyEmbedded) fullyEmbedded=isFullyEmbedded(ref);
+		}
+		noteEncodingLength(length,fullyEmbedded);
+		return length;
+	}
+	
+	/**
+	 * Calculates the length of this Cell's header content: every byte of the
+	 * encoding that is not part of a child Ref encoding. The invariant for every
+	 * Cell is
+	 *
+	 * <pre>encoding length == calcHeaderLength() + sum of getRef(i).getEncodingLength()</pre>
+	 *
+	 * over the Refs reported by {@link #getRefCount()} and {@link #getRef(int)}.
+	 * Implementations must be fast and allocation-free: typically the tag, a VLQ
+	 * count and a few fixed bytes, mirroring {@code encodeRaw}. Non-canonical
+	 * Cells delegate to their canonical form.
+	 *
+	 * @return Header length in bytes, including the tag
+	 */
+	public abstract int calcHeaderLength();
+
+	/**
+	 * Gets the encoding length if it does not exceed the given limit, or 0 if it
+	 * does. Stops summing child Refs as soon as the limit is exceeded, so an
+	 * embedding check touches no more of a large Cell than necessary. Each child
+	 * is judged against the embedded limit for its own status and against the
+	 * remaining budget for its contribution.
+	 *
+	 * @param limit Maximum encoding length of interest
+	 * @return Exact encoding length, or 0 if beyond limit
+	 */
+	protected final int getEncodingLength(int limit) {
+		Blob enc=encoding;
+		if (enc!=null) {
+			int result=enc.size();
+			return (result>limit)?0:result;
+		}
+		if (!isCanonical()) return getCanonical().getEncodingLength(limit);
+		int length=calcHeaderLength();
+		if (length>limit) return 0;
+		int n=getRefCount();
+		boolean fullyEmbedded=true;
+		for (int i=0; i<n; i++) {
+			Ref<?> ref=getRef(i);
+			int refLength=ref.getEncodingLength(limit-length);
+			if (refLength==0) return 0;
+			length+=refLength;
+			if (fullyEmbedded) fullyEmbedded=isFullyEmbedded(ref);
+		}
+		noteEncodingLength(length,fullyEmbedded);
+		return length;
+	}
+
+	/**
+	 * Records what a completed length calculation has established for free: the
+	 * embedded status of this Cell on its cached Ref, and a zero memory size when
+	 * this Cell is embedded and every child is a direct Ref to a fully embedded
+	 * value, so neither needs computing again.
+	 *
+	 * @param length Exact encoding length just calculated
+	 * @param fullyEmbedded True if every child Ref satisfied {@link #isFullyEmbedded(Ref)}
+	 */
+	private void noteEncodingLength(int length, boolean fullyEmbedded) {
+		boolean embedded=length<=Format.MAX_EMBEDDED_LENGTH;
+		Ref<ACell> ref=cachedRef;
+		if (ref!=null) ref.flags|=embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
+		if (embedded&&fullyEmbedded&&(memorySize<0)) memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
+	}
+
+	/**
+	 * Checks whether a child Ref is direct and refers to null or a value already
+	 * known to be fully embedded, i.e. with zero memory size. Only reads fields:
+	 * the Ref's embedded status must already have been established.
+	 *
+	 * @param ref Child Ref whose encoding length has just been calculated
+	 * @return True if the child contributes nothing to memory size
+	 */
+	private static boolean isFullyEmbedded(Ref<?> ref) {
+		if (!ref.isDirect()) return false;
+		if (!ref.isEmbedded()) return false;
+		ACell value=ref.getValue();
+		return (value==null)||(value.memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE);
 	}
 
 	/**
@@ -332,7 +422,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		} else {
 			cachedRef=createRef();
 		}
-		boolean embedded= getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH;
+		boolean embedded= getEncodingLength(Format.MAX_EMBEDDED_LENGTH)>0;
 		cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}

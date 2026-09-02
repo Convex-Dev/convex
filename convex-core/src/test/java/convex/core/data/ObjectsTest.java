@@ -314,6 +314,17 @@ public class ObjectsTest {
 		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
 		assertSame(encoding,a.getEncoding()); // should be same cached encoding
 		assertEquals(encoding.count,a.getEncodingLength());
+		assertEquals(encoding.count,a.getEncodingLength((int) encoding.count));
+		assertEquals(0,a.getEncodingLength((int) encoding.count-1));
+
+		// Invariant: encoding length is the header content plus the encoding length of each child Ref
+		ACell canonical=a.getCanonical();
+		long expectedLength=canonical.calcHeaderLength();
+		int refCount=canonical.getRefCount();
+		for (int i=0; i<refCount; i++) {
+			expectedLength+=canonical.getRef(i).getEncodingLength();
+		}
+		assertEquals(encoding.count,expectedLength,()->"Header plus child Refs should equal encoding length for "+Utils.getClassName(canonical));
 
 		if (a.isCVMValue()) {
 			assertNotNull(a.getType());

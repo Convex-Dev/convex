@@ -155,12 +155,6 @@ public final class CVMBigInteger extends AInteger {
 		return signum().equals(CVMLong.ONE);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		if (blob!=null) return blob.estimatedEncodingSize();
-		return (int) Math.min(Blob.MAX_ENCODING_LENGTH,byteLength()+10);
-	}
-
 
 	@Override
 	public double doubleValue() {
@@ -193,6 +187,14 @@ public final class CVMBigInteger extends AInteger {
 	public int encodeRaw(byte[] bs, int pos) {
 		ABlob b=blob();
 		return b.encodeRaw(bs, pos);
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag, VLQ byte count and the raw magnitude bytes; small values encode as CVMLong
+		if (!isCanonical()) return getCanonical().calcHeaderLength();
+		int n=byteLength();
+		return 1+Format.getVLQCountLength(n)+n;
 	}
 
 	@Override

@@ -8,33 +8,26 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.test.Samples;
 
-@RunWith(Parameterized.class)
-public class ParamTestRefs {
-	private AStore store;
+public class RefsParamTest {
 
-	public ParamTestRefs(String label,AStore store) {
-		this.store = store;
-	}
-
-	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays
 				.asList(new Object[][] {
 					    { "Memory Store", new MemoryStore() },
 						{ "Shared Etch Store", Samples.TEST_STORE } });
 	}
-	
-	@Test
-	public void testStoreUsage() throws IOException {
+
+	@ParameterizedTest(name = "{index}: {0}", autoCloseArguments = false)
+	@MethodSource("dataExamples")
+	public void testStoreUsage(String label, AStore store) throws IOException {
 		{ // single embedded value
 			CVMLong n=CVMLong.create(1567565765677L);
 			Ref<CVMLong> r=Ref.get(n);
@@ -43,7 +36,6 @@ public class ParamTestRefs {
 			assertTrue(r.isEmbedded());
 			assertSame(n,r2.getValue());
 		}
-
 
 		{ // structure with embedded value
 			AVector<CVMLong> v=Vectors.of(6759578996496L);
@@ -67,6 +59,4 @@ public class ParamTestRefs {
 			assertEquals(Ref.PERSISTED,me2.getRef(1).getStatus());
 		}
 	}
-
-
 }

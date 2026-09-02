@@ -1,11 +1,14 @@
 package convex.social;
 
+import convex.auth.did.DID;
+import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AHashMap;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.cvm.Keywords;
 import convex.lattice.ALatticeComponent;
@@ -18,14 +21,15 @@ import convex.lattice.generic.OwnerLattice;
  * Cursor-based application layer for the Convex social network.
  *
  * <p>{@code Social} wraps a lattice cursor at the {@code :social} level
- * (an {@link OwnerLattice} mapping owner keys to signed per-user state)
+ * (an {@link OwnerLattice} mapping canonical DIDs to signed per-user state)
  * and provides domain-specific accessors for users, feeds, and follows.</p>
  *
  * <h2>Usage</h2>
  * <pre>{@code
  * // Standalone
  * Social social = Social.create(myKeyPair);
- * social.user(myKeyPair.getAccountKey()).feed().post("Hello!");
+ * AString myDid = DID.forKey(myKeyPair.getAccountKey());
+ * social.user(myDid).feed().post("Hello!");
  *
  * // Connected beneath a hosted application component
  * Social social = Social.connect(application, myKeyPair);
@@ -65,14 +69,58 @@ public class Social extends ALatticeComponent<
 	public static final Keyword KEY_SOCIAL = Keyword.intern("social");
 
 	/**
-	 * The social lattice: OwnerLattice mapping owner keys to signed per-user state.
+	 * The social lattice: OwnerLattice mapping canonical DIDs to signed per-user state.
 	 *
-	 * <p>Each owner's value is wrapped in {@code SignedData} — only the owner's
-	 * Ed25519 key can sign updates. The inner value is a {@link SocialLattice}
-	 * containing :feed, :profile, and :follows.</p>
+	 * <p>Each owner's value is wrapped in {@code SignedData}; its signer must be an
+	 * Ed25519 key authorised for the DID. The inner value is a {@link SocialLattice}
+	 * containing {@code :feed}, {@code :profile}, and {@code :following}.</p>
 	 */
 	public static final OwnerLattice<Index<Keyword, ACell>> SOCIAL_LATTICE =
-		OwnerLattice.create(SocialLattice.INSTANCE);
+		new DIDOwnerLattice();
+
+	/** Owner boundary which admits canonical DID keys only. */
+	private static final class DIDOwnerLattice
+			extends OwnerLattice<Index<Keyword,ACell>> {
+
+		DIDOwnerLattice() {
+			super(SocialLattice.INSTANCE);
+		}
+
+		@Override
+		public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
+				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own,
+				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other) {
+			return super.merge(own,sanitise(other,null));
+		}
+
+		@Override
+		public AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merge(
+				LatticeContext context,
+				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own,
+				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other) {
+			return super.merge(context,own,sanitise(other,context));
+		}
+
+		@SuppressWarnings({"unchecked","rawtypes"})
+		private AHashMap<ACell,SignedData<Index<Keyword,ACell>>> sanitise(
+				AHashMap<ACell,SignedData<Index<Keyword,ACell>>> other,
+				LatticeContext context) {
+			if (other==null) return null;
+			AHashMap<ACell,SignedData<Index<Keyword,ACell>>> clean=Maps.empty();
+			for (Object item:((AHashMap)other).entrySet()) {
+				java.util.Map.Entry<?,?> entry=(java.util.Map.Entry<?,?>)item;
+				if (!(entry.getKey() instanceof convex.core.data.AString did)
+						|| !DID.isCanonicalBase(did)) continue;
+				if (!(entry.getValue() instanceof SignedData<?> signed)) continue;
+				// did:key is self-certifying. Indirect DIDs must never fall through
+				// LatticeContext's compatibility-lenient no-verifier behaviour.
+				if (DID.keyFromDID(did)==null
+						&& (context==null || context.getOwnerVerifier()==null)) continue;
+				clean=clean.assoc(did,(SignedData<Index<Keyword,ACell>>)signed);
+			}
+			return clean;
+		}
+	}
 
 	Social(ALatticeCursor<AHashMap<ACell, SignedData<Index<Keyword, ACell>>>> cursor) {
 		super(cursor);
@@ -90,7 +138,7 @@ public class Social extends ALatticeComponent<
 	 * @return New Social instance
 	 */
 	public static Social create(AKeyPair keyPair) {
-		return create(LatticeContext.create(null,keyPair));
+		return create(LatticeContext.create(null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
 	}
 
 	/**
@@ -117,7 +165,8 @@ public class Social extends ALatticeComponent<
 	 * @return Social instance connected to the root cursor
 	 */
 	public static Social connect(ALatticeCursor<?> rootCursor, AKeyPair keyPair) {
-		return connect(rootCursor,LatticeContext.create(null,keyPair));
+		return connect(rootCursor,LatticeContext.create(
+			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
 	}
 
 	/** Connects to an existing root cursor using an application context policy. */
@@ -138,8 +187,14 @@ public class Social extends ALatticeComponent<
 	 * @return Social instance connected beneath the parent component
 	 */
 	public static Social connect(ALatticeComponent<?> parent, AKeyPair keyPair) {
+		return connect(parent,LatticeContext.create(
+			null,keyPair,DIDKeyAuthorizer.CONVEX::verifiesOwner));
+	}
+
+	/** Connects beneath a component using an explicit application policy. */
+	public static Social connect(ALatticeComponent<?> parent,LatticeContext context) {
 		Social social=connect(parent);
-		social.cursor.setContext(LatticeContext.create(null,keyPair));
+		social.cursor.setContext(context);
 		return social;
 	}
 
@@ -162,16 +217,25 @@ public class Social extends ALatticeComponent<
 	 *
 	 * <p>The returned {@link SocialUser} wraps a cursor at the per-user
 	 * {@link SocialLattice} level. Writes are automatically signed by the context's
-	 * signing policy, which is asked for a signer authorised for {@code ownerKey} —
+	 * signing policy, which is asked for a signer authorised for {@code ownerDid} —
 	 * not necessarily its primary account.</p>
 	 *
-	 * @param ownerKey The user's account key (Ed25519 public key)
+	 * @param ownerDid the user's canonical base DID
 	 * @return SocialUser for the specified owner
 	 */
-	public SocialUser user(AccountKey ownerKey) {
+	public SocialUser user(convex.core.data.AString ownerDid) {
+		if (!DID.isCanonicalBase(ownerDid)) {
+			throw new IllegalArgumentException("Social owner must be a canonical base DID");
+		}
 		ALatticeCursor<Index<Keyword, ACell>> userCursor =
-			cursor.path(ownerKey, Keywords.VALUE);
-		return new SocialUser(this,userCursor,ownerKey);
+			cursor.path(ownerDid, Keywords.VALUE);
+		return new SocialUser(this,userCursor,ownerDid);
+	}
+
+	/** Convenience migration overload mapping an Ed25519 key to its {@code did:key}. */
+	public SocialUser user(AccountKey ownerKey) {
+		if (ownerKey==null) throw new IllegalArgumentException("Owner key must not be null");
+		return user(DID.forKey(ownerKey));
 	}
 
 	/**

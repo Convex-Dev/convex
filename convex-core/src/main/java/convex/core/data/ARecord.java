@@ -47,12 +47,7 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	public AType getType() {
 		return Types.RECORD;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return (int) (Format.MAX_EMBEDDED_LENGTH*count);
-	}
-	
+		
 	@Override
 	public boolean isCanonical() {
 		// Records should always be canonical

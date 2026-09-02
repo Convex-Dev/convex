@@ -24,11 +24,6 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
-	@Override
 	public ASet<K> include(K a) {
 		return getCanonicalSet().include(a);
 	}
@@ -139,6 +134,12 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical set encodes
+		return getCanonical().calcHeaderLength();
 	}
 
 	@Override

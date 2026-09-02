@@ -67,4 +67,10 @@ public abstract class ADenseRecord extends ARecord<ACell,ACell> {
 		return values.encodeRaw(bs, pos);
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// record tag stands in for the vector tag, then the raw values vector body
+		return values.calcHeaderLength();
+	}
+
 }

@@ -30,12 +30,6 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		// tag VLC bytes
-		return 1 + Format.MAX_VLQ_COUNT_LENGTH;
-	}
-
-	@Override
 	public Blob slice(long start, long end) {
 		return toFlatBlob().slice(start,end);
 	}

@@ -113,12 +113,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public long longValue() {
 		return 0xffffffffl&value;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 4;
-	}
-	
+		
 	/**
 	 * Get the number of UTF-8 bytes as encoded within the encoding tag
 	 * @param tag Tag byte
@@ -211,6 +206,12 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("Encoding requires a length in bytes");
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus one to four UTF-8 bytes, no refs
+		return 1+encodedCharLength(value);
 	}
 
 	@Override

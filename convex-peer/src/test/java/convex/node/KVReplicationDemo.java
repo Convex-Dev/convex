@@ -1,6 +1,5 @@
 package convex.node;
 
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,13 +40,14 @@ import convex.lattice.kv.KVDatabase;
 public class KVReplicationDemo {
 
 	private static final int NUM_NODES = 3;
-	private static final int BASE_PORT = 19800;
 	private static final String DB_NAME = "shared";
 
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== KV Store Replication Demo ===\n");
 
 		List<NodeServer<?>> servers = new ArrayList<>();
+		List<LatticePropagator> propagators=new ArrayList<>();
+		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 		List<KVDatabase> databases = new ArrayList<>();
 
@@ -58,14 +58,24 @@ public class KVReplicationDemo {
 				AStore store = new MemoryStore();
 				stores.add(store);
 
-				NodeServer<?> server = new NodeServer<>(Lattice.ROOT, store, NodeConfig.port(BASE_PORT + i));
+				NodeConfig config=NodeConfig.port(0);
+				NodeServer<?> server = new NodeServer<>(Lattice.ROOT,store,config);
+				LatticePropagator propagator=new LatticePropagator(
+					store,Lattice.ROOT,value -> value,LatticePropagatorConfig.create());
+				server.addPropagator(propagator);
+				LatticeListener transport=new LatticeListener(config);
+				transport.registerPropagator(propagator);
+				transport.setSelector(connection -> propagator);
 				server.launch();
+				transport.launch();
 				servers.add(server);
+				propagators.add(propagator);
+				transports.add(transport);
 
 				KVDatabase db = KVDatabase.create(DB_NAME, kp, Strings.create("node-" + i));
 				databases.add(db);
 
-				System.out.println("Node " + i + " started on port " + (BASE_PORT + i)
+				System.out.println("Node " + i + " started on port " + transport.getPort()
 					+ "  key=" + kp.getAccountKey().toHexString(6) + "...");
 			}
 
@@ -75,9 +85,8 @@ public class KVReplicationDemo {
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
-						Convex peer = ConvexRemote.connect(
-							new InetSocketAddress("localhost", BASE_PORT + j));
-						servers.get(i).getPropagator().addPeer(peerKey, peer);
+						Convex peer=ConvexRemote.connect(transports.get(j).getHostAddress());
+						propagators.get(i).addPeer(peerKey,peer);
 					}
 				}
 			}
@@ -119,9 +128,8 @@ public class KVReplicationDemo {
 
 			// --- Pull from peers ---
 			System.out.println("Pulling from peers...");
-			for (NodeServer<?> server : servers) server.pull();
-			Thread.sleep(500);
-			for (NodeServer<?> server : servers) server.pull();
+			for (int i=0; i<servers.size(); i++) servers.get(i).pull(propagators.get(i));
+			for (int i=0; i<servers.size(); i++) servers.get(i).pull(propagators.get(i));
 
 			// --- Verify lattice convergence ---
 			System.out.println("\n=== Lattice Convergence ===");
@@ -166,7 +174,7 @@ public class KVReplicationDemo {
 			// --- Propagator stats ---
 			System.out.println("\n=== Propagator Stats ===");
 			for (int i = 0; i < NUM_NODES; i++) {
-				LatticePropagator p = servers.get(i).getPropagator();
+				LatticePropagator p=propagators.get(i);
 				System.out.println("Node " + i + ": "
 					+ p.getBroadcastCount() + " broadcasts, "
 					+ p.getRootSyncCount() + " root syncs");
@@ -174,6 +182,7 @@ public class KVReplicationDemo {
 
 		} finally {
 			System.out.println("\nShutting down...");
+			for (LatticeListener transport:transports) transport.close();
 			for (NodeServer<?> s : servers) s.close();
 			for (AStore s : stores) s.close();
 		}

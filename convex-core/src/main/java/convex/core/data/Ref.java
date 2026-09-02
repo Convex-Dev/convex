@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.function.Consumer;
 
 import convex.core.Constants;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
@@ -525,7 +524,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		if (value==null) {
 			em=true;
 		} else {
-			em=value.isEmbedded();
+			int el=value.getEncodingLength(Format.MAX_EMBEDDED_LENGTH);
+			em=el>0;
 		}
 		flags=flags|(em?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
 		return em;
@@ -618,9 +618,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
 	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH
 	 *  
-	 * @return Exact length of encoding
+	 * @return Exact length of Ref encoding
 	 */
-	public final long getEncodingLength() {
+	public final int getEncodingLength() {
 		if (isEmbedded()) {
 			T value=getValue();
 			if (value==null) return 1;
@@ -628,6 +628,32 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		} else {
 			return Ref.INDIRECT_ENCODING_LENGTH;
 		}
+	}
+	
+	/**
+	 * Gets the encoding length for writing this Ref, or 0 if it exceeds the given
+	 * limit. The value's embedded status is always judged against the embedded
+	 * limit (and cached in the flags); only its contribution is compared with the
+	 * caller's remaining budget, since an embedded value must be inlined however
+	 * little room its parent has left.
+	 *
+	 * @param limit Maximum length of interest
+	 * @return Exact length of Ref encoding, or 0 if it exceeds limit
+	 */
+	public final int getEncodingLength(int limit) {
+		int result;
+		if (isEmbedded()) {
+			T value=getValue();
+			if (value==null) {
+				result=1;
+			} else {
+				result=value.getEncodingLength(limit);
+				if (result==0) return 0;
+			}
+		} else {
+			result=Ref.INDIRECT_ENCODING_LENGTH;
+		}
+		return (result>limit)?0:result;
 	}
 
 	/**

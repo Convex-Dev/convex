@@ -149,11 +149,6 @@ public class AccountStatus extends ARecordGeneric {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return 30+Format.estimateEncodingSize(environment)+Format.estimateEncodingSize(holdings)+Format.estimateEncodingSize(controller)+33;
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return true;
 	}

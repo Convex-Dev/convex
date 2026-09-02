@@ -33,7 +33,8 @@ import convex.core.data.prim.CVMLong;
  */
 public abstract class AConnection {
 
-	private AccountKey trustedKey=null;
+	/** Published across network, verification and dispatcher threads. */
+	private volatile AccountKey trustedKey=null;
 	private final AtomicLong requestCounter=new AtomicLong();
 
 	/**

@@ -29,6 +29,9 @@ import convex.gui.utils.TrayManager;
 import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.node.NodeConfig;
+import convex.node.LatticeListener;
+import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 import convex.node.NodeServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -129,18 +132,33 @@ public class DlfsStart extends ACommand {
 
 		// Create and configure NodeServer
 		NodeServer<?> nodeServer = new NodeServer<>(Lattice.ROOT, store, config);
-		nodeServer.setMergeContext(LatticeContext.create(null, keyPair));
+		LatticeContext context=LatticeContext.create(null,keyPair);
+		nodeServer.setMergeContext(context);
+		LatticePropagator propagator=new LatticePropagator(
+			store,Lattice.ROOT,value -> value,LatticePropagatorConfig.from(config));
+		propagator.setMergeContext(context);
+		propagator.setTransportKeyPair(keyPair);
+		nodeServer.addPropagator(propagator);
+		LatticeListener latticeTransport=new LatticeListener(config);
+		latticeTransport.registerPropagator(propagator);
 
 		try {
 			nodeServer.launch();
+			latticeTransport.launch();
 		} catch (Exception e) {
+			latticeTransport.close();
+			try {
+				nodeServer.close();
+			} catch (Exception closeError) {
+				e.addSuppressed(closeError);
+			}
 			store.close();
 			throw new CLIError(ExitCodes.CONFIG, "Failed to launch NodeServer: " + e.getMessage(), e);
 		}
-		inform("Lattice node started on port " + nodeServer.getPort());
+		inform("Lattice transport started on port " + latticeTransport.getPort());
 
 		// Connect to remote peers
-		connectPeers(nodeServer);
+		connectPeers(propagator);
 
 		// Attach the user's drives component at :fs → accountKey → :value.
 		// This traverses OwnerLattice → SignedLattice → MapLattice<DLFSLattice>
@@ -168,6 +186,7 @@ public class DlfsStart extends ACommand {
 			dlfsServer.start(port);
 		} catch (RuntimeException e) {
 			dlfsServer.close();
+			latticeTransport.close();
 			try {
 				nodeServer.close();
 			} catch (Exception closeError) {
@@ -187,6 +206,7 @@ public class DlfsStart extends ACommand {
 		Runnable shutdown=()->{
 			if (!closing.compareAndSet(false,true)) return;
 			dlfsServer.close();
+			latticeTransport.close();
 			try {
 				nodeServer.close();
 			} catch (Exception e) {
@@ -261,7 +281,7 @@ public class DlfsStart extends ACommand {
 		return NodeConfig.create(configMap);
 	}
 
-	private void connectPeers(NodeServer<?> nodeServer) {
+	private void connectPeers(LatticePropagator propagator) {
 		if (peers == null) return;
 		for (int i = 0; i < peers.length; i++) {
 			String peer = peers[i];
@@ -279,7 +299,7 @@ public class DlfsStart extends ACommand {
 				// choose to trust these peers the exact key may not matter, but ideally
 				// this would be the peer's real key from a handshake. See #629
 				AccountKey peerKey = AccountKey.dummy(Integer.toHexString(i + 1));
-				nodeServer.getPropagator().addPeer(peerKey, connection);
+				propagator.addPeer(peerKey, connection);
 				inform("Connected to peer: " + peer);
 			} catch (Exception e) {
 				informWarning("Failed to connect to peer " + peer + ": " + e.getMessage());

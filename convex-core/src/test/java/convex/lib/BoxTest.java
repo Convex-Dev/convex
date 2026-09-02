@@ -69,6 +69,6 @@ public class BoxTest extends ACVMTest {
 		ctx=step(ctx,"(asset/transfer "+user2+" ["+BOX+" #{"+BAL.get(0)+"}])");
 		assertNotError(ctx);
 		
-		AssetTester.doAssetTests(ctx, BOX, ctx.getAddress(), user2);
+		AssetTest.doAssetTests(ctx, BOX, ctx.getAddress(), user2);
 	}
 }

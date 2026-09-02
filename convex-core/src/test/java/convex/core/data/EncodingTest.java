@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -460,26 +461,99 @@ public class EncodingTest {
 		return (T) decoded;
 	}
 	
-	@Test public void testEncodingSizeAssumptions() {
-		// These should be exact
-		checkExactCodingSize(Hash.EMPTY_HASH);
-		checkExactCodingSize(CVMBool.TRUE);
-		checkExactCodingSize(CVMDouble.NaN);
-		
-		// These should have sufficient size
-		checkSufficientCodingSize(Strings.EMPTY);
-		checkSufficientCodingSize(Symbols.FOO);
-		checkSufficientCodingSize(CVMLong.ZERO);
-	}
-	
-	public static void checkExactCodingSize(ACell c) {
-		assertEquals(c.getEncodingLength(),c.estimatedEncodingSize());
-		checkCodingSize(c);
+	@Test public void testEncodingSizes() {
+		checkCodingSize(Hash.EMPTY_HASH);
+		checkCodingSize(CVMBool.TRUE);
+		checkCodingSize(CVMDouble.NaN);
+		checkCodingSize(Strings.EMPTY);
+		checkCodingSize(Symbols.FOO);
+		checkCodingSize(CVMLong.ZERO);
 	}
 
-	public static void checkSufficientCodingSize(ACell c) {
-		assertTrue(c.getEncodingLength()<=c.estimatedEncodingSize());
-		checkCodingSize(c);
+	/**
+	 * A multi-cell encoding is never silently truncated. With a maximum size it is
+	 * exact at that size and throws one byte below it, before allocating; zero or a
+	 * negative maximum means no limit. The encoder knows nothing of message limits.
+	 */
+	@Test public void testMultiCellSizeLimit() {
+		AVector<ACell> value=Vectors.create(Blobs.createFilled(1,300),Blobs.createFilled(2,300),CVMLong.ONE);
+		Blob full=Format.encodeMultiCell(value,true);
+		assertTrue(full.count()>600);
+		assertEquals(full,Format.encodeMultiCell(value,true,0));
+		assertEquals(full,Format.encodeMultiCell(value,true,-1));
+		assertEquals(full,Format.encodeMultiCell(value,true,full.count()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(value,true,full.count()-1));
+
+		// Direct branches only: smaller, and bounded the same way
+		Blob shallow=Format.encodeMultiCell(value,false);
+		assertEquals(shallow,Format.encodeMultiCell(value,false,shallow.count()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(value,false,shallow.count()-1));
+
+		// A single cell is bounded too
+		Blob big=Blobs.createFilled(3,1000).toFlatBlob();
+		assertEquals(big.getEncoding(),Format.encodeMultiCell(big,true,big.getEncodingLength()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(big,true,big.getEncodingLength()-1));
+	}
+
+	/**
+	 * AccountKey and Hash encode exactly as 32-byte Blobs, so they are canonical:
+	 * canonical form is about the CAD3 representation, not the Java type. Length
+	 * and encoding calculations must not replace them with plain Blobs, which
+	 * would lose the type for anything built from them afterwards.
+	 */
+	@Test public void testTypedBlobsAreCanonical() {
+		AccountKey key=AccountKey.wrap(new byte[AccountKey.LENGTH]);
+		Hash hash=Hash.wrap(new byte[Hash.LENGTH]);
+		assertTrue(key.isCanonical());
+		assertTrue(hash.isCanonical());
+		assertSame(key,key.getCanonical());
+		assertSame(hash,hash.getCanonical());
+		assertEquals(2+AccountKey.LENGTH,key.getEncodingLength());
+		assertEquals(2+Hash.LENGTH,hash.getEncodingLength());
+
+		AVector<ACell> v=Vectors.create(key,hash);
+		assertTrue(v.isEmbedded());
+		assertEquals(v.getEncoding().size(),v.getEncodingLength());
+		assertTrue(v.get(0) instanceof AccountKey);
+		assertTrue(v.get(1) instanceof Hash);
+		assertTrue(key.getRef().getValue() instanceof AccountKey);
+		assertTrue(hash.getRef().getValue() instanceof Hash);
+	}
+
+	/**
+	 * A length calculation learns two things for free and must record them: the
+	 * cell's embedded status on its cached Ref, and a zero memory size when the
+	 * cell is embedded and every child is a direct Ref to a fully embedded value.
+	 * Neither may create an encoding.
+	 */
+	@Test public void testLengthCalculationSideEffects() {
+		// Fresh vector of longs: embedded, and every child is fully embedded
+		AVector<CVMLong> small=Vectors.create(CVMLong.create(1000),CVMLong.create(2000),CVMLong.create(3000));
+		assertTrue(small.memorySize<0);
+		assertTrue(small.isEmbedded());
+		assertNull(small.cachedEncoding());
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE,small.memorySize);
+
+		// Nested fresh vectors resolve bottom-up in the same pass
+		AVector<ACell> nested=Vectors.create(Vectors.create(CVMLong.ONE,CVMLong.TWO),CVMLong.create(3000));
+		assertTrue(nested.isEmbedded());
+		assertNull(nested.cachedEncoding());
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE,nested.memorySize);
+		assertEquals(Format.FULL_EMBEDDED_MEMORY_SIZE,nested.get(0).memorySize);
+
+		// A hashed child leaves the memory size to be computed properly
+		AVector<ACell> branching=Vectors.create(Blobs.createFilled(1,200),CVMLong.ONE);
+		assertTrue(branching.isEmbedded());
+		assertTrue(branching.memorySize<0);
+		assertTrue(branching.getMemorySize()>0);
+
+		// An unlimited length calculation records non-embedded status on the cached Ref
+		AVector<ACell> big=Vectors.create(Blobs.createFilled(2,100),Blobs.createFilled(3,100));
+		Ref<?> ref=big.getRef();
+		assertEquals(0,ref.getFlags()&Ref.EMBEDDING_MASK);
+		assertTrue(big.getEncodingLength()>Format.MAX_EMBEDDED_LENGTH);
+		assertNull(big.cachedEncoding());
+		assertTrue((ref.getFlags()&Ref.NON_EMBEDDED_MASK)!=0);
 	}
 	
 	public static void checkCodingSize(ACell c) {

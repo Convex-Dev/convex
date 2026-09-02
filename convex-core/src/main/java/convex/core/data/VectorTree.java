@@ -179,26 +179,13 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 		return pos;
 	}
-	
-	@Override
-	public int getEncodingLength() {
-		if (encoding!=null) return encoding.size();
-		
-		// tag and count
-		int length=1+Format.getVLQCountLength(count);
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			length+=children[i].getEncodingLength();
-		}
-		return length;
-	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		// Allow tag, long count, 80 bytes per child average plus some headroom
-		return 12 + (64 * (children.length+3));
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then child refs
+		return 1+Format.getVLQCountLength(count);
 	}
-	
+		
 
 	@Override
 	public AVector<T> mergeWith(AVector<T> b, MergeFunction<T> func) {

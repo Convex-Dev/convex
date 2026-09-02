@@ -32,8 +32,11 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -156,6 +159,14 @@ public class MessageTest {
 		Message fireAndForget=Message.create(MessageType.LATTICE_VALUE,
 			Vectors.of(MessageTag.LATTICE_VALUE,null,Vectors.empty(),42));
 		assertNull(fireAndForget.getRequestID());
+
+		Message optimistic=Message.create(MessageType.LATTICE_VALUE,
+			Vectors.of(MessageTag.LATTICE_VALUE,Vectors.empty(),42));
+		assertNull(optimistic.getRequestID());
+		Message upgraded=optimistic.withID(CVMLong.create(14));
+		assertEquals(Vectors.of(MessageTag.LATTICE_VALUE,14,Vectors.empty(),42),
+			upgraded.getPayload());
+		assertEquals(CVMLong.create(14),upgraded.getRequestID());
 	}
 	
 	@Test public void testTransact() throws BadFormatException {
@@ -474,6 +485,54 @@ public class MessageTest {
 		assertEquals(CVMLong.create(2),retagged.getRequestID());
 	}
 
+	@Test public void testChallengeResponseRequiresValidSignature() {
+		AKeyPair challenger=AKeyPair.generate();
+		AKeyPair responder=AKeyPair.generate();
+		Hash token=Blob.createRandom(new Random(42),16).getHash();
+		ACell context=Reader.read("[:lattice-peer 1]");
+		AVector<ACell> values=Vectors.of(token,challenger.getAccountKey(),context);
+		SignedData<ACell> challenge=Message.signChallenge(challenger,token,
+			responder.getAccountKey(),context);
+		Result answer=Message.answerChallenge(responder,challenge,context::equals);
+		assertEquals(responder.getAccountKey(),Message.verifyChallengeResponse(
+			answer,token,challenger.getAccountKey(),context,responder.getAccountKey()));
+		assertTrue(Message.answerChallenge(responder,
+			Message.signChallenge(challenger,token,AKeyPair.generate().getAccountKey(),context),
+			context::equals).isError(),"the challenge must address the responder");
+		assertTrue(Message.answerChallenge(responder,challenge,value -> false).isError(),
+			"the responder must enforce its challenge context");
+		SignedData<ACell> otherChallenge=challenger.signData(CVMLong.ONE);
+		SignedData<ACell> forgedChallenge=SignedData.create(challenger.getAccountKey(),
+			otherChallenge.getSignature(),challenge.getValueRef());
+		assertTrue(Message.answerChallenge(responder,forgedChallenge,context::equals).isError(),
+			"the challenger must prove possession of its claimed key");
+
+		SignedData<ACell> valid=responder.signData(values);
+		assertEquals(responder.getAccountKey(),Message.verifyChallengeResponse(
+			Result.create(CVMLong.ONE,valid),token,challenger.getAccountKey(),context,
+			responder.getAccountKey()));
+		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+			Blob.createRandom(new Random(43),16).getHash(),challenger.getAccountKey(),context,
+			responder.getAccountKey()),"a response cannot be replayed for another nonce");
+		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+			token,AKeyPair.generate().getAccountKey(),context,responder.getAccountKey()),
+			"the challenger key is the response audience");
+		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+			token,challenger.getAccountKey(),Strings.create("other-context"),
+			responder.getAccountKey()),"the protocol context is bound into the response");
+		assertNull(Message.verifyChallengeResponse(Result.create(CVMLong.ONE,valid),
+			token,challenger.getAccountKey(),context,AKeyPair.generate().getAccountKey()),
+			"the response signer must be the expected remote key");
+
+		SignedData<ACell> other=responder.signData(CVMLong.ONE);
+		SignedData<ACell> forged=SignedData.create(responder.getAccountKey(),
+			other.getSignature(),Ref.get(values));
+		assertFalse(forged.checkSignature());
+		assertNull(Message.verifyChallengeResponse(
+			Result.create(CVMLong.ONE,forged),token,challenger.getAccountKey(),context,
+			responder.getAccountKey()));
+	}
+
 	@Test public void testConnectionRequestIDsAreUniqueUnderConcurrency() {
 		LocalConnection conn = LocalConnection.create(m -> true);
 		int count=10_000;
@@ -543,5 +602,28 @@ public class MessageTest {
 		} catch (BadFormatException e) {
 			fail("Bad format: "+m,e);
 		}
+	}
+
+	/**
+	 * A payload that cannot fit one legal frame is rejected when its data is
+	 * generated, never silently truncated: the maximum message length is applied
+	 * at the Message boundary, not inside the encoder.
+	 */
+	@Test
+	public void testOversizedPayloadRejected() {
+		// Distinct 4 KB blobs, since identical cells are encoded once
+		Random r=new Random(7);
+		int n=(int)(CPoSConstants.MAX_MESSAGE_LENGTH/Blob.CHUNK_LENGTH)+64;
+		ACell[] blobs=new ACell[n];
+		for (int i=0; i<n; i++) blobs[i]=Blob.createRandom(r,Blob.CHUNK_LENGTH);
+		AVector<ACell> payload=Vectors.create(blobs);
+
+		Message m=Message.create(MessageType.RESULT,Result.create(CVMLong.ONE,payload));
+		assertThrows(IllegalArgumentException.class,()->m.getMessageData());
+
+		// The same value is still encodable with no maximum, and exact at its own size
+		Blob full=Format.encodeMultiCell(payload,true);
+		assertTrue(full.count()>CPoSConstants.MAX_MESSAGE_LENGTH);
+		assertEquals(full,Format.encodeMultiCell(payload,true,full.count()));
 	}
 }

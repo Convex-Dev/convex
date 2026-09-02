@@ -441,7 +441,7 @@ any nested lattice path without depending on NodeServer:
 KeyedLattice lattice = KeyedLattice.create(
     Keyword.intern("documents"), DLFSRegion.LATTICE);
 NodeServer<Index<Keyword, ACell>> node =
-    new NodeServer<>(lattice, store, NodeConfig.port(0));
+    new NodeServer<>(lattice, store);
 node.launch();
 
 DLFSApplication<Index<Keyword, ACell>> app = DLFSApplication.connect(

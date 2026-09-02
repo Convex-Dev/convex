@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -13,8 +14,10 @@ import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,7 @@ import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.message.Message;
+import convex.core.message.MessageTag;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.etch.EtchStore;
@@ -54,6 +58,10 @@ public class LatticePropagatorTest {
 	private ALattice<?> lattice;
 	private NodeServer<?> server1;
 	private NodeServer<?> server2;
+	private LatticePropagator propagator1;
+	private LatticePropagator propagator2;
+	private LatticeListener transport1;
+	private LatticeListener transport2;
 	private AStore store1;
 	private AStore store2;
 
@@ -70,27 +78,57 @@ public class LatticePropagatorTest {
 		// Peer connections below use getHostAddress(), which reflects the actual ports.
 		server1 = new NodeServer<>(lattice, store1, NodeConfig.port(0));
 		server2 = new NodeServer<>(lattice, store2, NodeConfig.port(0));
-		server1.setInboundPropagatorSelector(connection -> server1.getPropagator());
-		server2.setInboundPropagatorSelector(connection -> server2.getPropagator());
+		AKeyPair nodeKey1=AKeyPair.generate();
+		AKeyPair nodeKey2=AKeyPair.generate();
+		server1.setMergeContext(LatticeContext.create(null,nodeKey1));
+		server2.setMergeContext(LatticeContext.create(null,nodeKey2));
+		propagator1=new LatticePropagator(store1,lattice,value -> value,
+			LatticePropagatorConfig.create());
+		propagator2=new LatticePropagator(store2,lattice,value -> value,
+			LatticePropagatorConfig.create());
+		propagator1.setMergeContext(LatticeContext.create(null,nodeKey1));
+		propagator2.setMergeContext(LatticeContext.create(null,nodeKey2));
+		propagator1.setTransportKeyPair(nodeKey1);
+		propagator2.setTransportKeyPair(nodeKey2);
+		server1.addPropagator(propagator1);
+		server2.addPropagator(propagator2);
+		transport1=new LatticeListener(NodeConfig.port(0));
+		transport2=new LatticeListener(NodeConfig.port(0));
+		transport1.registerPropagator(propagator1);
+		transport2.registerPropagator(propagator2);
+		// These propagation unit tests model routes after authentication. The
+		// challenge/response and inbound-upgrade paths are exercised separately by
+		// NodeServerTest and P2PSocialSyncTest; assigning the proven remote key here
+		// ensures DATA-ahead is never tested over an unverified connection.
+		transport1.setSelector(connection -> {
+			connection.setTrustedKey(nodeKey2.getAccountKey());
+			return propagator1;
+		});
+		transport2.setSelector(connection -> {
+			connection.setTrustedKey(nodeKey1.getAccountKey());
+			return propagator2;
+		});
 
 		// Launch both servers
 		server1.launch();
 		server2.launch();
+		transport1.launch();
+		transport2.launch();
 
 		// Establish bidirectional peer connections
 		// Server1 -> Server2 (so server1 can broadcast to server2)
 		// Server2 -> Server1 (so server2 can broadcast to server1)
 		try {
-			InetSocketAddress server1Address = server1.getHostAddress();
-			InetSocketAddress server2Address = server2.getHostAddress();
+			InetSocketAddress server1Address = transport1.getHostAddress();
+			InetSocketAddress server2Address = transport2.getHostAddress();
 
-			AccountKey key1 = AKeyPair.generate().getAccountKey();
 			Convex peer1to2 = ConvexRemote.connect(server2Address);
-			server1.getPropagator().addPeer(key1, peer1to2);
+			propagator1.addPeer(nodeKey2.getAccountKey(),peer1to2)
+				.get(5,TimeUnit.SECONDS);
 
-			AccountKey key2 = AKeyPair.generate().getAccountKey();
 			Convex peer2to1 = ConvexRemote.connect(server1Address);
-			server2.getPropagator().addPeer(key2, peer2to1);
+			propagator2.addPeer(nodeKey1.getAccountKey(),peer2to1)
+				.get(5,TimeUnit.SECONDS);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to establish peer connections", e);
 		}
@@ -98,6 +136,8 @@ public class LatticePropagatorTest {
 
 	@AfterEach
 	public void tearDown() throws IOException {
+		if (transport1!=null) transport1.close();
+		if (transport2!=null) transport2.close();
 		if (server1 != null) {
 			server1.close();
 		}
@@ -117,11 +157,23 @@ public class LatticePropagatorTest {
 	 */
 	@Test
 	public void testPropagatorAutoStart() {
-		assertNotNull(server1.getPropagator(), "Propagator should be created on launch");
-		assertTrue(server1.getPropagator().isRunning(), "Propagator should be running");
+		assertSame(propagator1,server1.getPropagators().get(0),
+			"Node should retain the application-supplied propagator");
+		assertTrue(propagator1.isRunning(), "Propagator should be running");
 
-		assertNotNull(server2.getPropagator(), "Propagator should be created on launch");
-		assertTrue(server2.getPropagator().isRunning(), "Propagator should be running");
+		assertSame(propagator2,server2.getPropagators().get(0),
+			"Node should retain the application-supplied propagator");
+		assertTrue(propagator2.isRunning(), "Propagator should be running");
+	}
+
+	@Test
+	public void testAddPeerReportsIdentityFailure() throws Exception {
+		AccountKey wrongKey=AKeyPair.generate().getAccountKey();
+		Convex peer=ConvexRemote.connect(transport2.getHostAddress());
+
+		assertThrows(ExecutionException.class,
+			()->propagator1.addPeer(wrongKey,peer).get(5,TimeUnit.SECONDS));
+		assertFalse(propagator1.getConnectionManager().isConnected(wrongKey));
 	}
 
 	/**
@@ -152,11 +204,15 @@ public class LatticePropagatorTest {
 		}
 		Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 		server2.getCursor().assoc(dataKeyword, updatedDataIndex);
-		// Synchronous commit: sync() returns after primary announce + setRootData
+		CompletableFuture<ACell> published=nextAnnounceMatching(propagator2,
+			value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+		// Synchronous commit persists the authoritative node root; propagation-view
+		// materialisation completes independently on the future above.
 		server2.getCursor().sync();
+		published.get(5,TimeUnit.SECONDS);
 
 		// Pull from server2 into server1
-		assertTrue(server1.pull(), "Pull should complete successfully");
+		assertTrue(server1.pull(propagator1), "Pull should complete successfully");
 
 		// Verify server1 received the value from server2
 		assertEquals(testValue, RT.getIn(server1.getLocalValue(), dataKeyword, valueHash),
@@ -172,16 +228,14 @@ public class LatticePropagatorTest {
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
 		values = values.assoc(expectedHash, expected);
+		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+			value -> expected.equals(RT.getIn(value,dataKeyword,expectedHash)));
 		server1.getCursor().assoc(dataKeyword, values);
 		server1.getCursor().sync();
 
-		Convex connection = server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5, TimeUnit.SECONDS);
-		assertEquals(1L, server1.getPropagator().getBroadcastCount(),
+		received.get(5,TimeUnit.SECONDS);
+		assertEquals(1L, propagator1.getBroadcastCount(),
 			"source should send one delta broadcast");
-		NodeServer.InboundStats inbound = server2.getInboundStats();
-		assertEquals(1L, inbound.mergesAccepted,
-			"receiver should accept the pushed lattice merge: " + inbound);
 		ACell merged = server2.getLocalValue();
 		assertEquals(expected, RT.getIn(merged, dataKeyword, expectedHash),
 			"receiver should decode the LATTICE_VALUE tag/path before merging the delta");
@@ -198,35 +252,47 @@ public class LatticePropagatorTest {
 			values=values.assoc(value.getHash(),value);
 		}
 
-		server1.getPropagator().setMaxDeltaMessageSize(700);
+		propagator1.setMaxDeltaMessageSize(700);
+		Index<Hash,ACell> expectedValues=values;
+		CompletableFuture<ACell> received=nextAnnounceMatching(propagator2,
+			value -> expectedValues.equals(RT.getIn(value,dataKeyword)));
 		server1.getCursor().assoc(dataKeyword,values);
 		server1.getCursor().sync();
 
-		Convex connection=server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5,TimeUnit.SECONDS);
+		received.get(5,TimeUnit.SECONDS);
 		assertEquals(values,RT.getIn(server2.getLocalValue(),dataKeyword));
-		NodeServer.InboundStats inbound=server2.getInboundStats();
-		assertTrue(inbound.messagesReceived>1,
+		LatticePropagator.InboundStats inbound=propagator2.getInboundStats();
+		assertTrue(inbound.messagesReceived()>1,
 			"chunked delta should arrive as DATA batches plus one root: "+inbound);
-		assertEquals(1L,inbound.mergesAccepted);
 	}
 
 	/** A delta encoding failure must not hide the newly announced root from recovery. */
 	@Test
 	public void testFailedDeltaStillAdvancesRootSyncAndAnnounceFuture() throws Exception {
 		Blob value=Blobs.createRandom(400);
-		CompletableFuture<ACell> announced=server1.getPropagator().nextAnnounce();
-		server1.getPropagator().setMaxDeltaMessageSize(1);
 		server1.getCursor().assoc(Keyword.intern("failed-delta"),value);
+		ACell expected=server1.getLocalValue();
 
-		server1.getCursor().sync();
+		// Use an isolated publisher so node fan-out cannot race this synchronous API
+		// assertion. Borrowing a live route is safe: the one-byte limit rejects the
+		// root before any message is queued on it.
+		try (MemoryStore isolatedStore=new MemoryStore()) {
+			LatticeConnectionManager manager=new LatticeConnectionManager(isolatedStore);
+			Convex livePeer=propagator1.getPeers().iterator().next();
+			manager.addPeer(livePeer.getVerifiedPeer(),livePeer).get(5,TimeUnit.SECONDS);
+			LatticePropagator isolated=new LatticePropagator(
+				isolatedStore,manager,lattice,candidate -> candidate);
+			isolated.setMaxDeltaMessageSize(1);
+			CompletableFuture<ACell> announced=isolated.nextAnnounce();
+			ACell published=isolated.processSnapshot(expected);
 
-		assertEquals(server1.getLocalValue(),announced.get(5,TimeUnit.SECONDS));
-		assertEquals(server1.getLocalValue().getHash(),
-			rootSyncValueHash(server1.getPropagator().createRootSyncMessage()));
+			assertEquals(published,announced.get(5,TimeUnit.SECONDS));
+			assertEquals(published.getHash(),
+				rootSyncValueHash(isolated.createRootSyncMessage()));
+		}
 	}
 
-	/** Consecutive explicit syncs must each propagate rather than drop the latter delta. */
+	/** Consecutive explicit syncs may coalesce, but the latest value must converge. */
 	@Test
 	public void testConsecutiveSyncsEachBroadcast() throws Exception {
 		Keyword dataKeyword = Keyword.intern("data");
@@ -234,6 +300,11 @@ public class LatticePropagatorTest {
 		ACell second = CVMLong.create(4302);
 		@SuppressWarnings("unchecked")
 		Index<Hash, ACell> values = (Index<Hash, ACell>) Index.EMPTY;
+		CompletableFuture<ACell> firstMerge=propagator2.nextAnnounce();
+		CompletableFuture<ACell> secondMerge=firstMerge.thenCompose(
+			value -> second.equals(RT.getIn(value,dataKeyword,second.getHash()))
+				? CompletableFuture.completedFuture(value)
+				: propagator2.nextAnnounce());
 
 		server1.getCursor().assoc(dataKeyword, values.assoc(first.getHash(), first));
 		server1.getCursor().sync();
@@ -241,10 +312,9 @@ public class LatticePropagatorTest {
 			values.assoc(first.getHash(), first).assoc(second.getHash(), second));
 		server1.getCursor().sync();
 
-		Convex connection = server1.getPropagator().getPeers().iterator().next();
-		connection.ping().get(5, TimeUnit.SECONDS);
-		assertEquals(2L, server1.getPropagator().getBroadcastCount(),
-			"a rapid follow-up sync must not be lost behind the broadcast throttle");
+		secondMerge.get(5,TimeUnit.SECONDS);
+		assertTrue(propagator1.getBroadcastCount()>=1,
+			"the coalesced latest value must be broadcast");
 		assertEquals(second, RT.getIn(server2.getLocalValue(), dataKeyword, second.getHash()));
 	}
 
@@ -279,7 +349,42 @@ public class LatticePropagatorTest {
 
 	private static Hash rootSyncValueHash(Message message) {
 		AVector<?> payload = message.getPayload();
-		return payload.getRef(3).getHash();
+		assertEquals(MessageTag.LATTICE_VALUE,payload.get(0));
+		assertEquals(3L,payload.count(),"root sync should be an optimistic push");
+		return payload.getRef(2).getHash();
+	}
+
+	/** Waits on announce signals until the expected value arrives, without polling. */
+	private static CompletableFuture<ACell> nextAnnounceMatching(
+			LatticePropagator propagator,Predicate<ACell> predicate) {
+		CompletableFuture<ACell> result=new CompletableFuture<>();
+		awaitMatching(propagator,predicate,result,16);
+		return result;
+	}
+
+	private static void awaitMatching(LatticePropagator propagator,
+			Predicate<ACell> predicate,CompletableFuture<ACell> result,int remaining) {
+		propagator.nextAnnounce().whenComplete((value,error) -> {
+			if (error!=null) {
+				result.completeExceptionally(error);
+			} else {
+				boolean matches;
+				try {
+					matches=predicate.test(value);
+				} catch (Throwable predicateFailure) {
+					result.completeExceptionally(predicateFailure);
+					return;
+				}
+				if (matches) {
+					result.complete(value);
+				} else if (remaining<=1) {
+					result.completeExceptionally(
+						new AssertionError("Expected announcement did not arrive"));
+				} else {
+					awaitMatching(propagator,predicate,result,remaining-1);
+				}
+			}
+		});
 	}
 
 	/** Filtering belongs to the propagator and runs before its store boundary. */
@@ -345,46 +450,20 @@ public class LatticePropagatorTest {
 		}
 	}
 
-	/** The primary publishes the authoritative snapshot rather than retaining an old tie. */
+	/** The authoritative node store publishes an explicitly selected local snapshot. */
 	@Test
 	public void testPrimarySnapshotReplacesEqualTimestampPublication() throws Exception {
 		LWWLattice<CVMLong> lww = LWWLattice.create(value -> 1L);
 		try (MemoryStore primaryStore = new MemoryStore()) {
-			LatticePropagator propagator = new LatticePropagator(primaryStore, lww,
-				value -> value);
-			propagator.configure(lww, LatticeContext.EMPTY, true);
 			CVMLong old = CVMLong.create(10_011);
 			CVMLong authoritative = CVMLong.create(10_012);
-
-			propagator.processSnapshot(old);
-			assertSame(authoritative, propagator.processSnapshot(authoritative));
-			assertSame(authoritative, primaryStore.getRootData());
-		}
-	}
-
-	/** Inbound staging remains complete; filtering applies only on publication. */
-	@Test
-	public void testInboundWorkingValueMergesBeforeNextSnapshot() throws Exception {
-		SetLattice<ACell> setLattice = SetLattice.create();
-		CVMLong initial = CVMLong.create(301);
-		CVMLong incoming = CVMLong.create(302);
-		CVMLong primaryUpdate = CVMLong.create(303);
-		Blob hidden = Blobs.createRandom(400);
-		try (MemoryStore viewStore = new MemoryStore()) {
-			LatticePropagator propagator = new LatticePropagator(viewStore, setLattice,
-				value -> value.exclude(hidden));
-			propagator.processSnapshot(Sets.of(initial));
-
-			ACell staged = propagator.mergeInbound(new ACell[0], Sets.of(incoming, hidden));
-			assertEquals(Sets.of(initial, incoming, hidden), staged,
-				"inbound staging must retain data until primary reconciliation");
-			assertNull(viewStore.refForHash(hidden.getHash()),
-				"staging must not announce inbound data to the outbound store");
-
-			ACell announced = propagator.processSnapshot(Sets.of(initial, primaryUpdate));
-			assertEquals(Sets.of(initial, incoming, primaryUpdate), announced,
-				"the outbound filter applies after pending inbound reconciliation");
-			assertNull(viewStore.refForHash(hidden.getHash()));
+			try (NodeServer<CVMLong> node=new NodeServer<>(lww,primaryStore,NodeConfig.port(-1))) {
+				node.getCursor().set(old);
+				node.launch();
+				node.getCursor().set(authoritative);
+				node.getCursor().sync();
+				assertSame(authoritative,primaryStore.getRootData());
+			}
 		}
 	}
 
@@ -439,8 +518,8 @@ public class LatticePropagatorTest {
 			assertNull(publicStore.refForHash(hidden.getHash()));
 
 			node.close();
-			assertEquals(Sets.of(initialVisible, laterVisible), publicStore.getRootData(),
-				"orderly close must persist the filtered view, not the primary snapshot");
+			assertEquals(Sets.of(initialVisible, laterVisible), publicView.getLastAnnouncedValue(),
+				"orderly close must leave the filtered serving view current");
 			assertNull(publicStore.refForHash(hidden.getHash()));
 		}
 	}
@@ -546,11 +625,16 @@ public class LatticePropagatorTest {
 			}
 			Index<Hash, ACell> updatedDataIndex = dataIndex.assoc(valueHash, testValue);
 			server1.getCursor().assoc(dataKeyword, updatedDataIndex);
-			// Synchronous commit: sync() returns after primary announce + setRootData
+			CompletableFuture<ACell> published=nextAnnounceMatching(propagator1,
+				value -> testValue.equals(RT.getIn(value,dataKeyword,valueHash)));
+			// Synchronous commit persists the authoritative node root; wait for the
+			// source group to expose that exact root before pulling it.
 			server1.getCursor().sync();
+			published.get(5,TimeUnit.SECONDS);
 
 			// Pull from server1 into server2
-			assertTrue(server2.pull(), "Pull should complete successfully for update " + (i + 1));
+			assertTrue(server2.pull(propagator2),
+				"Pull should complete successfully for update " + (i + 1));
 
 			// Verify server2 received this specific value
 			assertEquals(testValue, RT.getIn(server2.getLocalValue(), dataKeyword, valueHash),

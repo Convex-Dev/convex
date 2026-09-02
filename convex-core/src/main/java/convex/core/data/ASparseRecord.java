@@ -28,4 +28,10 @@ public abstract class ASparseRecord extends ARecord<ACell,ACell> {
 		}
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then one ref per field
+		return 1+Format.getVLQCountLength(count());
+	}
 }

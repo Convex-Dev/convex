@@ -198,7 +198,9 @@ public class NettyConnection extends AConnection {
 	public boolean sendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		int bytes=Utils.checkedInt(m.getMessageData().count());
+		long length=encodedLength(m);
+		if (length<0) return false;
+		int bytes=Utils.checkedInt(length);
 		boolean reserved=false;
 		try {
 			reserved=reserveOutbound(bytes,Config.DEFAULT_INTERNAL_TIMEOUT);
@@ -230,7 +232,9 @@ public class NettyConnection extends AConnection {
 	public boolean trySendMessage(Message m) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		int bytes=Utils.checkedInt(m.getMessageData().count());
+		long length=encodedLength(m);
+		if (length<0) return false;
+		int bytes=Utils.checkedInt(length);
 		try {
 			if (!reserveOutbound(bytes,0)) return false;
 		} catch (InterruptedException e) {
@@ -251,11 +255,25 @@ public class NettyConnection extends AConnection {
 		return queued;
 	}
 
+	/**
+	 * Encodes a message for sending and returns its length, or -1 (logged) if the
+	 * payload cannot fit one legal frame. Nothing is ever sent truncated.
+	 */
+	static long encodedLength(Message m) {
+		try {
+			return m.getMessageData().count();
+		} catch (IllegalArgumentException e) {
+			log.warn("Not sending {} message: {}",m.getType(),e.getMessage());
+			return -1;
+		}
+	}
+
 	@Override
 	public boolean trySendPriorityMessage(Message m) {
 		Channel ch=channel;
 		if (ch==null || !ch.isActive()) return false;
-		long size=m.getMessageData().count();
+		long size=encodedLength(m);
+		if (size<0) return false;
 		if (size>Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT) return trySendMessage(m);
 		priorityOutbound.set(m);
 		if (!ch.isActive()) {

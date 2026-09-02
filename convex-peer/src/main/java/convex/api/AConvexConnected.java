@@ -54,6 +54,13 @@ public abstract class AConvexConnected extends Convex {
 	 */
 	private volatile Consumer<Message> dataRequestHandler;
 
+	/**
+	 * Handler for unsolicited protocol messages received from the remote endpoint.
+	 * Null preserves ordinary client behaviour, where messages other than correlated
+	 * results, challenges and explicitly enabled DATA_REQUESTs are ignored.
+	 */
+	private volatile Consumer<Message> unsolicitedMessageHandler;
+
 	protected AConvexConnected(Address address, AKeyPair keyPair) {
 		super(address, keyPair);
 	}
@@ -65,9 +72,10 @@ public abstract class AConvexConnected extends Convex {
 	 *
 	 * @param resultID ID of result message to await
 	 * @param timeout Timeout in milliseconds, or 0 for no timeout
+	 * @param transaction {@code true} if this request submits a transaction
 	 * @return CompletableFuture for the Result
 	 */
-	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout) {
+	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout, boolean transaction) {
 		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
 
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
@@ -82,7 +90,6 @@ public abstract class AConvexConnected extends Convex {
 			awaiting.remove(resultID);
 
 			if (e!=null) {
-				sequence=null;
 				return Result.fromException(e);
 			}
 
@@ -90,13 +97,10 @@ public abstract class AConvexConnected extends Convex {
 				m.getPayload(getStore());
 			} catch (BadFormatException e1) {
 				log.warn("Bad message format in result: {}",e1.getMessage());
-				sequence=null;
 				return Result.error(ErrorCodes.FORMAT, Strings.create("Bad message format: "+e1.getMessage()));
 			}
 			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
-			}
+			if (transaction) observeTransactionResult(r);
 			return r;
 		});
 		return cr;
@@ -117,22 +121,40 @@ public abstract class AConvexConnected extends Convex {
 				CompletableFuture<Message> cf = awaiting.remove(id);
 				if (cf != null) {
 					cf.complete(m);
+					return;
 				}
-				return;
 			}
 
-			// Non-RESULT message — check for server-initiated CHALLENGE
-			m.getPayload(null);
+			// Built-in reverse messages are embedded and safe to inspect storelessly.
+			// A lattice delta may legitimately reference the node's serving store, so
+			// delegate it undecoded for NodeServer acquisition instead of dropping it.
+			try {
+				m.getPayload(null);
+			} catch (Exception e) {
+				Consumer<Message> handler = unsolicitedMessageHandler;
+				if (handler != null) {
+					handler.accept(m);
+					return;
+				}
+				throw e;
+			}
 			MessageType type = m.getType();
 			if (type == MessageType.CHALLENGE) {
 				AKeyPair kp = keyPair;
 				if (kp != null) {
 					m.respondToChallenge(kp, null);
 				}
+				return;
 			} else if (type == MessageType.DATA_REQUEST) {
 				Consumer<Message> handler = dataRequestHandler;
-				if (handler != null) handler.accept(m);
+				if (handler != null) {
+					handler.accept(m);
+				}
+				return;
 			}
+
+			Consumer<Message> handler = unsolicitedMessageHandler;
+			if (handler != null) handler.accept(m);
 		} catch (Exception e) {
 			log.warn("Error in return message handler: {}",e.getMessage());
 		}
@@ -150,6 +172,18 @@ public abstract class AConvexConnected extends Convex {
 	 */
 	public void setDataRequestHandler(Consumer<Message> handler) {
 		this.dataRequestHandler = handler;
+	}
+
+	/**
+	 * Sets a handler for unsolicited messages that are not consumed by the normal
+	 * client result, challenge or DATA_REQUEST paths. Lattice nodes use this only
+	 * after the remote endpoint has been authenticated, allowing an outbound client
+	 * socket to carry reverse lattice propagation without becoming a general server.
+	 *
+	 * @param handler unsolicited message handler, or null to ignore such messages
+	 */
+	public void setUnsolicitedMessageHandler(Consumer<Message> handler) {
+		this.unsolicitedMessageHandler = handler;
 	}
 
 	/**
@@ -222,7 +256,7 @@ public abstract class AConvexConnected extends Convex {
 			}
 
 			// Register future BEFORE send — response handler can find it immediately
-			CompletableFuture<Result> cf = awaitResult(id, timeout);
+			CompletableFuture<Result> cf = awaitResult(id, timeout, m.getType()==MessageType.TRANSACT);
 			boolean sent = conn.sendMessage(m);
 			if (!sent) {
 				awaiting.remove(id);
@@ -258,6 +292,8 @@ public abstract class AConvexConnected extends Convex {
 		}
 		connection = null;
 		verifiedPeer = null;
+		dataRequestHandler = null;
+		unsolicitedMessageHandler = null;
 		awaiting.forEach((id,future) -> future.completeExceptionally(
 				new IllegalStateException("Connection closed")));
 		awaiting.clear();

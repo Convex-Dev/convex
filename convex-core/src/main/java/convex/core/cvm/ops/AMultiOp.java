@@ -39,12 +39,13 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 		pos = Format.write(bs,pos, ops);
 		return pos;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 10+ops.estimatedEncodingSize();
-	}
 
+	@Override
+	public int calcHeaderLength() {
+		// tag, opcode, then the full ops vector whose refs this op exposes
+		return 2+ops.calcHeaderLength();
+	}
+	
 	@Override
 	public AMultiOp<T> updateRefs(IRefFunction func) {
 		AVector<AOp<ACell>> newOps = ops.updateRefs(func);

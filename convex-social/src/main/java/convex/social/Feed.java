@@ -4,6 +4,7 @@ import java.util.function.LongFunction;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Index;
@@ -28,9 +29,9 @@ import convex.lattice.cursor.ALatticeCursor;
  */
 public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 
-	private final AccountKey author;
+	private final AString author;
 
-	Feed(SocialUser parent, ALatticeCursor<Index<Blob, ACell>> cursor, AccountKey author) {
+	Feed(SocialUser parent, ALatticeCursor<Index<Blob, ACell>> cursor, AString author) {
 		super(parent,cursor);
 		this.author = author;
 	}
@@ -54,6 +55,14 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 * @return The 8-byte timestamp key assigned to this reply
 	 */
 	public Blob reply(String text, Blob parentKey, AccountKey parentAuthor) {
+		return reply(text,parentKey,convex.auth.did.DID.forKey(parentAuthor));
+	}
+
+	/** Posts a reply addressed to the stable DID of the parent author. */
+	public Blob reply(String text, Blob parentKey, AString parentAuthor) {
+		if (!convex.auth.did.DID.isCanonicalBase(parentAuthor)) {
+			throw new IllegalArgumentException("Parent author must be a canonical base DID");
+		}
 		return addEntry(ts -> SocialPost.createReply(text, ts, parentKey, parentAuthor));
 	}
 
@@ -139,7 +148,7 @@ public class Feed extends ALatticeComponent<Index<Blob, ACell>> {
 	 *
 	 * @return The feed owner's key
 	 */
-	public AccountKey getAuthor() {
+	public AString getAuthor() {
 		return author;
 	}
 

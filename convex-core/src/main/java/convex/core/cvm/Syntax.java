@@ -198,6 +198,12 @@ public final class Syntax extends ACell {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag, then the inline metadata map: nil, or its header since its refs are exposed as ours
+		return 1+(meta.isEmpty()?1:meta.calcHeaderLength());
+	}
+
+	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		if (meta==null) {
 			bb.append(EMPTY_META_PREFIX);
@@ -228,11 +234,6 @@ public final class Syntax extends ACell {
 			}
 		}
 		meta.validateStructure();
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+meta.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@Override

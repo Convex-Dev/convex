@@ -10,7 +10,7 @@ import java.util.Set;
 
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.AccountKey;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -30,28 +30,28 @@ public class SocialHelpers {
 	 * Gets a user's social state from the social lattice value.
 	 *
 	 * @param socialValue The social lattice value (owner → SignedData)
-	 * @param userKey The user's account key
+	 * @param userDid the user's canonical base DID
 	 * @return The user's social state, or null if not present
 	 */
 	@SuppressWarnings("unchecked")
 	public static Index<Keyword, ACell> getUserState(
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> socialValue,
-			AccountKey userKey) {
+			AString userDid) {
 		if (socialValue == null) return null;
-		SignedData<Index<Keyword, ACell>> signed = socialValue.get(userKey);
+		SignedData<Index<Keyword, ACell>> signed = socialValue.get(userDid);
 		if (signed == null) return null;
 		return signed.getValue();
 	}
 
 	/**
-	 * Gets the set of actively followed account keys from a user's follows map.
+	 * Gets the set of actively followed DIDs from a user's follows map.
 	 *
 	 * @param follows The follows map (key → {active, timestamp})
-	 * @return Set of actively followed AccountKeys
+	 * @return Set of canonical base DIDs
 	 */
 	@SuppressWarnings("unchecked")
-	public static Set<AccountKey> getActiveFollows(AHashMap<ACell, ACell> follows) {
-		Set<AccountKey> result = new HashSet<>();
+	public static Set<AString> getActiveFollows(AHashMap<ACell, ACell> follows) {
+		Set<AString> result = new HashSet<>();
 		if (follows == null || follows.isEmpty()) return result;
 
 		long n = follows.count();
@@ -62,8 +62,9 @@ public class SocialHelpers {
 
 			if (value instanceof AHashMap<?,?> record) {
 				ACell active = ((AHashMap<Keyword, ACell>) record).get(SocialPost.ACTIVE);
-				if (CVMBool.TRUE.equals(active) && key instanceof AccountKey ak) {
-					result.add(ak);
+				if (CVMBool.TRUE.equals(active) && key instanceof AString did
+						&& convex.auth.did.DID.isCanonicalBase(did)) {
+					result.add(did);
 				}
 			}
 		}
@@ -74,18 +75,18 @@ public class SocialHelpers {
 	 * Computes the union of all actively followed keys across multiple local users.
 	 *
 	 * @param socialValue The social lattice value
-	 * @param localUserKeys Set of local user account keys
-	 * @return Combined set of all followed account keys
+	 * @param localUserDids set of local user DIDs
+	 * @return combined set of all directly followed DIDs
 	 */
 	@SuppressWarnings("unchecked")
-	public static Set<AccountKey> computeFollowSet(
+	public static Set<AString> computeFollowSet(
 			AHashMap<ACell, SignedData<Index<Keyword, ACell>>> socialValue,
-			Set<AccountKey> localUserKeys) {
-		Set<AccountKey> result = new HashSet<>();
+			Set<AString> localUserDids) {
+		Set<AString> result = new HashSet<>();
 		if (socialValue == null) return result;
 
-		for (AccountKey userKey : localUserKeys) {
-			Index<Keyword, ACell> userState = getUserState(socialValue, userKey);
+		for (AString userDid : localUserDids) {
+			Index<Keyword, ACell> userState = getUserState(socialValue, userDid);
 			if (userState == null) continue;
 			AHashMap<ACell, ACell> follows = SocialLattice.getFollows(userState);
 			result.addAll(getActiveFollows(follows));
@@ -107,7 +108,7 @@ public class SocialHelpers {
 	 */
 	@SuppressWarnings("unchecked")
 	public static List<TimelineEntry> buildTimeline(
-			Map<AccountKey, Index<Blob, ACell>> feeds,
+			Map<AString, Index<Blob, ACell>> feeds,
 			long beforeTimestamp, int limit) {
 
 		if (feeds == null || feeds.isEmpty() || limit <= 0) {
@@ -119,8 +120,8 @@ public class SocialHelpers {
 			Long.compare(b.timestamp, a.timestamp));
 
 		// Seed the heap with the last entry from each feed
-		for (Map.Entry<AccountKey, Index<Blob, ACell>> e : feeds.entrySet()) {
-			AccountKey author = e.getKey();
+		for (Map.Entry<AString, Index<Blob, ACell>> e : feeds.entrySet()) {
+			AString author = e.getKey();
 			Index<Blob, ACell> feed = e.getValue();
 			if (feed == null || feed.isEmpty()) continue;
 
@@ -176,7 +177,7 @@ public class SocialHelpers {
 	 * Internal cursor for tracking position in a feed during K-way merge.
 	 */
 	private record FeedCursor(
-		AccountKey author,
+		AString author,
 		Index<Blob, ACell> feed,
 		long position,
 		MapEntry<Blob, ACell> entry,

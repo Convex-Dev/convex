@@ -116,7 +116,7 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	public boolean booleanValue() {
 		return value;
 	}
-
+	
 	@Override
 	public final byte getTag() {
 		return (value) ? CVMTag.TRUE : CVMTag.FALSE;

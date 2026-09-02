@@ -14,7 +14,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.FuzzTestFormat;
+import convex.core.data.FormatFuzzTest;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
@@ -33,7 +33,7 @@ public class GenTestFormat {
 		assertEquals(s, s2);
 		assertEquals(b, Cells.encode(s2));
 
-		FuzzTestFormat.doMutationTest(b);
+		FormatFuzzTest.doMutationTest(b);
 	}
 
 	@Property
@@ -47,7 +47,7 @@ public class GenTestFormat {
 		assertEquals(prim, o);
 		assertEquals(b, Cells.encode(o));
 
-		FuzzTestFormat.doMutationTest(b);
+		FormatFuzzTest.doMutationTest(b);
 	}
 
 	@Property
@@ -61,7 +61,7 @@ public class GenTestFormat {
 			assertEquals(b, Cells.encode(o));
 			assertEquals(pref.getValue(), o);
 
-			FuzzTestFormat.doMutationTest(b);
+			FormatFuzzTest.doMutationTest(b);
 		} catch (BadFormatException e) {
 			System.err.println("Bad format in GenTestFromat: "+b);
 			throw e;

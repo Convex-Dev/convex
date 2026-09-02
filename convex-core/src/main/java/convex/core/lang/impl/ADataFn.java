@@ -16,11 +16,6 @@ import convex.core.lang.RT;
 public abstract class ADataFn<T extends ACell> extends AFn<T> {
 
 	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
-	@Override
 	public AFn<T> updateRefs(IRefFunction func) {
 		return RT.castFunction(getCanonical().updateRefs(func));
 	}
@@ -43,6 +38,12 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		return getCanonical().encodeRaw(bs, pos);
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical data value encodes
+		return getCanonical().calcHeaderLength();
 	}
 
 	@Override

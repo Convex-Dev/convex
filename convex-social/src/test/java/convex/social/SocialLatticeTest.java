@@ -9,15 +9,18 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.LatticeContext;
 import convex.lattice.Lattice;
@@ -116,11 +119,11 @@ public class SocialLatticeTest {
 		AKeyPair kp = AKeyPair.generate();
 		Blob parentKey = SocialPost.createKey(1000L);
 		AHashMap<Keyword, ACell> reply = SocialPost.createReply(
-			"Great post!", 2000L, parentKey, kp.getAccountKey());
+			"Great post!", 2000L, parentKey, DID.forKey(kp.getAccountKey()));
 
 		assertEquals("Great post!", SocialPost.getText(reply));
 		assertEquals(parentKey, reply.get(SocialPost.REPLY_TO));
-		assertEquals(kp.getAccountKey(), reply.get(SocialPost.REPLY_DID));
+		assertEquals(DID.forKey(kp.getAccountKey()), reply.get(SocialPost.REPLY_DID));
 	}
 
 	// ===== Profile Tests =====
@@ -149,7 +152,7 @@ public class SocialLatticeTest {
 	@Test
 	public void testFollowToggle() {
 		AKeyPair kpTarget = AKeyPair.generate();
-		AccountKey targetKey = kpTarget.getAccountKey();
+		AString targetDid = DID.forKey(kpTarget.getAccountKey());
 
 		// Follow
 		AHashMap<Keyword, ACell> followRecord = SocialPost.createFollowRecord(1000L, true);
@@ -160,18 +163,16 @@ public class SocialLatticeTest {
 		assertFalse(SocialPost.isActiveFollow(unfollowRecord));
 
 		// LWW merge: unfollow wins (later timestamp)
-		AHashMap<ACell, ACell> followsA = Maps.of(targetKey, followRecord);
-		AHashMap<ACell, ACell> followsB = Maps.of(targetKey, unfollowRecord);
+		AHashMap<ACell, ACell> followsA = Maps.of(targetDid, followRecord);
+		AHashMap<ACell, ACell> followsB = Maps.of(targetDid, unfollowRecord);
 
-		Index<Keyword, ACell> stateA = Index.<Keyword, ACell>none()
-			.assoc(SocialLattice.KEY_FOLLOWS, followsA);
-		Index<Keyword, ACell> stateB = Index.<Keyword, ACell>none()
-			.assoc(SocialLattice.KEY_FOLLOWS, followsB);
+		Index<Keyword, ACell> stateA = followingState(1000L,followsA);
+		Index<Keyword, ACell> stateB = followingState(2000L,followsB);
 
 		Index<Keyword, ACell> merged = SocialLattice.INSTANCE.merge(stateA, stateB);
 		AHashMap<ACell, ACell> follows = SocialLattice.getFollows(merged);
 
-		Set<AccountKey> active = SocialHelpers.getActiveFollows(follows);
+		Set<AString> active = SocialHelpers.getActiveFollows(follows);
 		assertTrue(active.isEmpty(), "Unfollowed user should not be in active set");
 	}
 
@@ -182,15 +183,78 @@ public class SocialLatticeTest {
 		AKeyPair kp3 = AKeyPair.generate();
 
 		AHashMap<ACell, ACell> follows = Maps.of(
-			kp1.getAccountKey(), SocialPost.createFollowRecord(1000L, true),
-			kp2.getAccountKey(), SocialPost.createFollowRecord(1000L, true),
-			kp3.getAccountKey(), SocialPost.createFollowRecord(2000L, false));
+			DID.forKey(kp1.getAccountKey()), SocialPost.createFollowRecord(1000L, true),
+			DID.forKey(kp2.getAccountKey()), SocialPost.createFollowRecord(1000L, true),
+			DID.forKey(kp3.getAccountKey()), SocialPost.createFollowRecord(2000L, false));
 
-		Set<AccountKey> active = SocialHelpers.getActiveFollows(follows);
+		Set<AString> active = SocialHelpers.getActiveFollows(follows);
 		assertEquals(2, active.size());
-		assertTrue(active.contains(kp1.getAccountKey()));
-		assertTrue(active.contains(kp2.getAccountKey()));
-		assertFalse(active.contains(kp3.getAccountKey()));
+		assertTrue(active.contains(DID.forKey(kp1.getAccountKey())));
+		assertTrue(active.contains(DID.forKey(kp2.getAccountKey())));
+		assertFalse(active.contains(DID.forKey(kp3.getAccountKey())));
+	}
+
+	@Test
+	public void testSignedOwnerCanAdvanceFromPostToMultipleFollows() {
+		AKeyPair alice=AKeyPair.generate();
+		AKeyPair receiver=AKeyPair.generate();
+		AKeyPair bob=AKeyPair.generate();
+		AKeyPair carol=AKeyPair.generate();
+
+		Index<Blob,ACell> feed=Index.<Blob,ACell>none().assoc(
+			SocialPost.createKey(1000L),SocialPost.createPost("Hello",1000L));
+		Index<Keyword,ACell> postOnly=Index.<Keyword,ACell>none()
+			.assoc(SocialLattice.KEY_FEED,feed);
+		AHashMap<ACell,ACell> follows=Maps.of(
+			DID.forKey(bob.getAccountKey()),SocialPost.createFollowRecord(2000L,true),
+			DID.forKey(carol.getAccountKey()),SocialPost.createFollowRecord(2001L,true));
+		Index<Keyword,ACell> complete=postOnly.assoc(SocialLattice.KEY_FOLLOWING,
+			followingState(2001L,follows).get(SocialLattice.KEY_FOLLOWING));
+
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> own=
+			Maps.of(DID.forKey(alice.getAccountKey()),alice.signData(postOnly));
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> update=
+			Maps.of(DID.forKey(alice.getAccountKey()),alice.signData(complete));
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> merged=Social.SOCIAL_LATTICE.merge(
+			LatticeContext.create(null,receiver),own,update);
+
+		assertEquals(complete,merged.get(DID.forKey(alice.getAccountKey())).getValue());
+		assertEquals(Set.of(DID.forKey(bob.getAccountKey()),DID.forKey(carol.getAccountKey())),
+			SocialHelpers.getActiveFollows(
+				SocialLattice.getFollows(merged.get(DID.forKey(alice.getAccountKey())).getValue())));
+	}
+
+	@Test
+	public void testFollowingLWPCombinesDisjointReplicaEdits() {
+		AString bob=DID.forKey(AKeyPair.generate().getAccountKey());
+		AString carol=DID.forKey(AKeyPair.generate().getAccountKey());
+		Index<Keyword,ACell> earlier=followingState(1000L,
+			Maps.of(bob,SocialPost.createFollowRecord(1000L,true)));
+		Index<Keyword,ACell> later=followingState(2000L,
+			Maps.of(carol,SocialPost.createFollowRecord(2000L,true)));
+
+		Index<Keyword,ACell> merged=SocialLattice.INSTANCE.merge(earlier,later);
+		assertEquals(Set.of(bob,carol),SocialHelpers.getActiveFollows(
+			SocialLattice.getFollows(merged)));
+		assertEquals(CVMLong.create(2000L),SocialLattice.getFollowing(merged)
+			.get(SocialPost.TIMESTAMP));
+	}
+
+	@Test
+	public void testFollowingLWWResolvesOneTargetOnly() {
+		AString bob=DID.forKey(AKeyPair.generate().getAccountKey());
+		AString carol=DID.forKey(AKeyPair.generate().getAccountKey());
+		Index<Keyword,ACell> earlier=followingState(1000L,Maps.of(
+			bob,SocialPost.createFollowRecord(1000L,true),
+			carol,SocialPost.createFollowRecord(1000L,true)));
+		Index<Keyword,ACell> later=followingState(2000L,Maps.of(
+			bob,SocialPost.createFollowRecord(2000L,false)));
+
+		AHashMap<ACell,ACell> follows=SocialLattice.getFollows(
+			SocialLattice.INSTANCE.merge(earlier,later));
+		assertEquals(Set.of(carol),SocialHelpers.getActiveFollows(follows));
+		assertEquals(CVMBool.FALSE,
+			((AHashMap<?,?>)follows.get(bob)).get(SocialPost.ACTIVE));
 	}
 
 	// ===== Owner Lattice Integration =====
@@ -219,10 +283,12 @@ public class SocialLatticeTest {
 		SignedData<Index<Keyword, ACell>> bobSigned = bob.signData(bobState);
 
 		// Build owner lattice values
+		AString aliceDid=DID.forKey(alice.getAccountKey());
+		AString bobDid=DID.forKey(bob.getAccountKey());
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> nodeA = Maps.of(
-			alice.getAccountKey(), aliceSigned);
+			aliceDid, aliceSigned);
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> nodeB = Maps.of(
-			bob.getAccountKey(), bobSigned);
+			bobDid, bobSigned);
 
 		// Merge
 		LatticeContext ctx = LatticeContext.create(null, alice);
@@ -230,12 +296,12 @@ public class SocialLatticeTest {
 			socialLattice.merge(ctx, nodeA, nodeB);
 
 		// Both users present
-		assertNotNull(merged.get(alice.getAccountKey()));
-		assertNotNull(merged.get(bob.getAccountKey()));
+		assertNotNull(merged.get(aliceDid));
+		assertNotNull(merged.get(bobDid));
 
 		// Verify content
-		Index<Keyword, ACell> aliceResult = merged.get(alice.getAccountKey()).getValue();
-		Index<Keyword, ACell> bobResult = merged.get(bob.getAccountKey()).getValue();
+		Index<Keyword, ACell> aliceResult = merged.get(aliceDid).getValue();
+		Index<Keyword, ACell> bobResult = merged.get(bobDid).getValue();
 		assertEquals(1, SocialLattice.getFeed(aliceResult).count());
 		assertEquals(1, SocialLattice.getFeed(bobResult).count());
 	}
@@ -257,9 +323,9 @@ public class SocialLatticeTest {
 			.assoc(SocialPost.createKey(2000L), SocialPost.createPost("Bob first", 2000L))
 			.assoc(SocialPost.createKey(4000L), SocialPost.createPost("Bob second", 4000L));
 
-		Map<AccountKey, Index<Blob, ACell>> feeds = new HashMap<>();
-		feeds.put(alice.getAccountKey(), aliceFeed);
-		feeds.put(bob.getAccountKey(), bobFeed);
+		Map<AString, Index<Blob, ACell>> feeds = new HashMap<>();
+		feeds.put(DID.forKey(alice.getAccountKey()), aliceFeed);
+		feeds.put(DID.forKey(bob.getAccountKey()), bobFeed);
 
 		// Get all posts, newest first
 		List<TimelineEntry> timeline = SocialHelpers.buildTimeline(feeds, 0, 10);
@@ -281,7 +347,7 @@ public class SocialLatticeTest {
 			.assoc(SocialPost.createKey(3000L), SocialPost.createPost("Post 3", 3000L))
 			.assoc(SocialPost.createKey(4000L), SocialPost.createPost("Post 4", 4000L));
 
-		Map<AccountKey, Index<Blob, ACell>> feeds = Map.of(alice.getAccountKey(), feed);
+		Map<AString, Index<Blob, ACell>> feeds = Map.of(DID.forKey(alice.getAccountKey()), feed);
 
 		// Page 1: limit 2
 		List<TimelineEntry> page1 = SocialHelpers.buildTimeline(feeds, 0, 2);
@@ -308,7 +374,7 @@ public class SocialLatticeTest {
 			.assoc(SocialPost.createKey(1000L), SocialPost.createPost("Visible", 1000L))
 			.assoc(SocialPost.createKey(2000L), deletedPost);
 
-		Map<AccountKey, Index<Blob, ACell>> feeds = Map.of(alice.getAccountKey(), feed);
+		Map<AString, Index<Blob, ACell>> feeds = Map.of(DID.forKey(alice.getAccountKey()), feed);
 		List<TimelineEntry> timeline = SocialHelpers.buildTimeline(feeds, 0, 10);
 
 		assertEquals(1, timeline.size());
@@ -329,7 +395,7 @@ public class SocialLatticeTest {
 			.assoc(SocialLattice.KEY_FEED, Index.none());
 
 		assertSame(state, SocialLattice.INSTANCE.merge(state, null));
-		assertEquals(state, SocialLattice.INSTANCE.merge(null, state));
+		assertEquals(SocialLattice.INSTANCE.zero(),SocialLattice.INSTANCE.merge(null,state));
 	}
 
 	@Test
@@ -355,5 +421,13 @@ public class SocialLatticeTest {
 		assertNotNull(root);
 		// Should be able to resolve the :social path
 		assertNotNull(root.path(Social.KEY_SOCIAL));
+	}
+
+	private static Index<Keyword,ACell> followingState(long timestamp,
+			AHashMap<ACell,ACell> follows) {
+		Index<Keyword,ACell> following=Index.<Keyword,ACell>none()
+			.assoc(SocialPost.TIMESTAMP,CVMLong.create(timestamp))
+			.assoc(SocialLattice.KEY_FOLLOWS,follows);
+		return Index.<Keyword,ACell>none().assoc(SocialLattice.KEY_FOLLOWING,following);
 	}
 }

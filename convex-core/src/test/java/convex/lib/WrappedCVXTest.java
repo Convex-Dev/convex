@@ -46,7 +46,7 @@ public class WrappedCVXTest extends ACVMTest {
 		assertNotError(ctx);
 
 		// generic tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
@@ -102,7 +102,7 @@ public class WrappedCVXTest extends ACVMTest {
 		assertEquals(NBAL+50,evalL(ctx,"*balance*"));
 
 		// do Generic Tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 	}
 
 

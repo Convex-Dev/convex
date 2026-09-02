@@ -1,12 +1,19 @@
 # Convex Peer Network Design — PROPOSAL
 
-> **Status**: Design proposal. Sections marked **[EXISTS]** describe current implementation; sections marked **[PROPOSED]** describe new work. Items marked **[DECISION]** require further discussion.
+> **Status**: Design proposal with a partial implementation. Sections marked
+> **[EXISTS]** describe current implementation; sections marked **[PARTIAL]**
+> have a working vertical slice with remaining policy work; sections marked
+> **[PROPOSED]** describe new work. Items marked **[DECISION]** require further
+> discussion.
 
 ## 1. Overview
 
 This document proposes the design for the Convex peer-to-peer network layer. The network enables peers to discover each other, establish authenticated connections over multiple transports, synchronise consensus state, and serve client requests.
 
-The design builds on the existing `NodeServer` infrastructure, which already implements lattice value propagation, path-based merges, and delta gossip. The proposal extends this with:
+The design builds on the existing `convex.node` infrastructure: `NodeServer`
+owns authoritative path merges and persistence, while application-configured
+`LatticePropagator` groups own protocol processing, filtered views and delta
+gossip. The proposal extends this with:
 
 - **Consensus beliefs as a lattice region** — Belief merge (CPoS) becomes part of the unified lattice, not a separate subsystem
 - **P2P peer discovery lattice** — signed peer metadata with multiple routing strategies
@@ -17,6 +24,11 @@ The core design principle is **separation of the message protocol from the trans
 
 ## 2. Current Architecture [EXISTS]
 
+The implementation-level ownership, lifecycle and connection-state map for
+`NodeServer`, `LatticePropagator` and `LatticeConnectionManager` is maintained in
+[LATTICE_NETWORKING.md](LATTICE_NETWORKING.md). This proposal uses its terms
+`desired`, `pending`, `active`, `assigned`, `trusted` and `upgraded` precisely.
+
 ### 2.1 Lattice ROOT
 
 The global base lattice is defined by `Lattice.ROOT` (`KeyedLattice`). See [LATTICE_REGIONS.md](../../convex-core/docs/LATTICE_REGIONS.md) for the canonical region listing, types, and paths.
@@ -25,18 +37,27 @@ Each region uses the same algebraic foundations: join-semilattices, SignedData v
 
 ### 2.2 NodeServer
 
-`NodeServer<V>` is the main implementation for serving and propagating lattice state. It handles:
+`NodeServer<V>` is the authoritative lattice host. It owns path merges, the
+durable root and isolated notifications to attached policy
+groups. Each group's `LatticeProtocolEndpoint` handles:
 
-- **LATTICE_VALUE** (`[:LV id [*path*] value]`) — Receive and atomically merge a value at a path; a non-null ID requests a post-merge Result
+- **LATTICE_VALUE** — `[:LV [*path*] value]` is an optimistic push; `[:LV id [*path*] value]` is a confirmed push returning a post-merge Result
 - **LATTICE_QUERY** (`[:LQ id [*path*]]`) — Respond with current value at a lattice path
 - **DATA_REQUEST** (`[:DR id hash1 hash2 ...]`) — Serve content-addressable data from the store
-- **PING** — Liveness check
+- **PING** (`[:PING id]`) — Liveness check returning `Result(id, timestamp)`
 
-Key features:
-- **Automatic missing data recovery** — on `MissingDataException` during merge, acquires data from peers and retries
+Key features across the host and its groups:
+- **Authenticated missing data recovery** — verified source connections may resolve
+  missing cells through correlated requests; unverified sources must send complete values
 - **Copy-on-write cursor** — atomic updates via `cursor.updateAndGet()`
 - **LatticeContext** — carries signing keys through the lattice hierarchy for `OwnerLattice`/`SignedLattice` verification
-- **LatticePropagator** — manages gossip to connected peers (primary propagator at index 0)
+- **LatticePropagator** — an application-configured propagation policy group
+  owning its routes, serving store, filters and protocol endpoint
+
+`NodeServer` is schema-independent. It does not recognise `:p2p`, publish NodeInfo,
+refresh discovery state or apply social/PoP policy. `P2PNode` composes those concerns;
+its `NodeDirectory` translates validated `[:p2p :nodes]` records into the generic
+connection intent accepted by `LatticeConnectionManager`.
 
 ### 2.3 Consensus (Server + BeliefPropagator)
 
@@ -53,9 +74,9 @@ Current `MessageType` enum (16 types):
 
 | Code | Type | Purpose |
 |------|------|---------|
-| 1 | CHALLENGE | Ed25519 auth challenge `[token, networkId, toPeer]` |
-| 2 | RESPONSE | Auth response `[token, networkId, fromPeer, challengeHash]` |
-| 3 | DATA | Content-addressable data relay |
+| 1 | CHALLENGE | Signed Ed25519 auth challenge `[nonce, responderKey, context]` |
+| 2 | RESPONSE | Legacy response tag; lattice challenges return a correlated RESULT |
+| 3 | DATA | Content-addressable delta data; unverified network DATA is rejected |
 | 4 | COMMAND | Control command to peer (trusted senders only) |
 | 5 | DATA_REQUEST | Request missing data by hash |
 | 6 | QUERY | Read-only CVM query `[:Q id form address?]` |
@@ -66,9 +87,9 @@ Current `MessageType` enum (16 types):
 | 11 | GOODBYE | Connection shutdown `[:BYE message?]` |
 | 12 | STATUS | Request peer status |
 | 13 | UNKNOWN | Unrecognised message type |
-| 14 | LATTICE_VALUE | Lattice delta `[:LV id [*path*] value]`; null ID is fire-and-forget |
-| 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]` |
-| 16 | PING | Connectivity check `[:PING id]` |
+| 14 | LATTICE_VALUE | Optimistic push `[:LV [*path*] value]` or confirmed push `[:LV id [*path*] value]` |
+| 15 | LATTICE_QUERY | Query lattice value `[:LQ id [*path*]]`; the path is always a vector |
+| 16 | PING | Connectivity check `[:PING id]`, returning `Result(id, timestamp)` |
 
 ### 2.5 Transport [EXISTS]
 
@@ -148,7 +169,7 @@ The genesis hash uniquely identifies a Convex network. Using it in the lattice p
 
 The `:convex` keyword at the root level is a namespace for Convex-native protocol state (consensus, peer status, governance). Application-level regions (`:data`, `:fs`, `:kv`, `:queue`) remain at their existing root-level paths.
 
-## 4. P2P Discovery Lattice [PROPOSED]
+## 4. P2P Discovery Lattice [PARTIAL]
 
 ### 4.1 Lattice Paths
 
@@ -177,14 +198,23 @@ This uses `OwnerLattice` — the same pattern as `:kv` and `:fs`. The AccountKey
 
 ```clojure
 ;; NodeInfo (wrapped in SignedData)
-{:transports  #{"tcp://peer.convex.world:18888"
+{:transports  ["tcp://peer.convex.world:18888"
                 "wss://peer.convex.world/ws"
-                "https://peer.convex.world"}
+                "https://peer.convex.world"]
  :timestamp   1708000000000       ;; monotonic, milliseconds
+ :pops        [0xdef456...]        ;; node keys providing a return path
+ :relay       true                ;; willing to relay bounded signed messages
  :regions     #{:convex :p2p :data :fs :kv}  ;; lattice regions this peer serves
  :version     "0.8.3"             ;; protocol version
  :metadata    {...}}              ;; optional additional metadata
 ```
+
+`:transports` may be an empty vector. That is an explicit, signed statement that
+the node is identifiable but not directly dialable, as for an outbound-only node
+behind NAT. Private or guessed addresses must not be advertised as public transports.
+`:pops` contains at most 16 unique remote node keys and `:relay` defaults to false
+when absent. These fields advertise routing intent; they do not authenticate or open
+a connection.
 
 #### Merge Function
 
@@ -200,7 +230,22 @@ On-chain `PeerStatus` (in global consensus state) is the **single source of trut
 
 The P2P node registry at `[:p2p :nodes]` provides **supplementary off-chain metadata** for operational convenience: multiple transport URIs, supported lattice regions, protocol version, and capabilities. This data propagates faster than on-chain updates (gossip vs. consensus finality) but has weaker guarantees (no finality, latest-timestamp-wins). It is always subordinate to the on-chain record.
 
-**Bootstrap path**: A new node reads the on-chain peer list (PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then pulls the P2P node registry to discover richer transport metadata. The on-chain URL is always the fallback when P2P metadata is unavailable.
+**Implemented bootstrap path**: An operator gives `P2PNode.connect` one node
+AccountKey and TCP address. After challenge/response verifies that endpoint, the
+connecting node pushes only its own signed `[:p2p :nodes]` entry and waits for a
+post-merge acknowledgement. It then pulls and merges the bootstrap node's `:p2p` and
+`:id` regions plus each currently desired complete social-owner slot. A late joiner
+therefore receives its follow-filtered view without an unrestricted full-root pull or
+waiting for another publication. The receiving node independently challenges the connecting
+node over the same full-duplex socket. Only after the live connection proves the key
+of an admitted signed NodeInfo record is that physically inbound connection upgraded
+into an outbound propagation route. A node with empty `:transports` therefore supports
+bidirectional gossip without a reverse TCP connection.
+
+**Proposed on-chain bootstrap path**: A new node reads the on-chain peer list
+(PeerStatus records with hostnames), connects to a peer via the on-chain `:url`, then
+pulls the P2P node registry to discover richer transport metadata. The on-chain URL is
+the fallback when P2P metadata is unavailable.
 
 **Validation**: Nodes should validate P2P entries against on-chain state — reject NodeInfo from AccountKeys not registered on-chain, or from peers with zero stake. The on-chain PeerStatus is the trust anchor; the P2P lattice is a convenience cache.
 
@@ -216,7 +261,11 @@ When implemented, Kademlia routing state would be **node-local** (not propagated
 
 A node uses multiple strategies to discover and maintain connections, in order:
 
-1. **Configured peers** — Explicitly configured connection endpoints (bootstrap nodes, operator preferences). These are tried first and maintained persistently.
+1. **Configured peers** — Explicitly supplied connection endpoints (bootstrap
+   nodes, operator preferences). `P2PNode.connect` and
+   `LatticeConnectionManager.connectPeer` implement the one-peer case; configuration
+   file integration remains future work. Connections are authenticated and maintained
+   persistently.
 
 2. **On-chain peer registry** — `PeerStatus` entries in consensus state provide hostname/URL for staked peers. Used for bootstrapping and as fallback. `ConnectionManager` already uses stake-weighted random selection from this registry.
 
@@ -228,7 +277,9 @@ A node uses multiple strategies to discover and maintain connections, in order:
 
 Nodes only propagate lattice regions they participate in. A lightweight data node need not propagate consensus beliefs. A consensus validator need not propagate DLFS file systems. The P2P node registry advertises which regions each peer serves, enabling efficient gossip targeting.
 
-This is already natural in the `NodeServer` model — propagators only transmit deltas for paths that have changed, and nodes only merge values for lattice types they have registered.
+This is natural in the `NodeServer` model: the application attaches propagators
+with the appropriate filtered views, while a node only merges values governed by
+its configured lattice.
 
 ## 5. Transport Layer [PROPOSED]
 
@@ -239,7 +290,9 @@ This is already natural in the `NodeServer` model — propagators only transmit 
 │            Lattice Regions              │
 │  (Consensus, P2P, Data, FS, KV, ...)   │
 ├─────────────────────────────────────────┤
-│      NodeServer (merge + propagate)     │
+│       NodeServer (merge + persist)      │
+├─────────────────────────────────────────┤
+│ LatticePropagator (policy + protocol)  │
 ├─────────────────────────────────────────┤
 │   Binary Protocol Messages (CAD3)       │
 ├─────────────────────────────────────────┤
@@ -250,7 +303,12 @@ This is already natural in the `NodeServer` model — propagators only transmit 
 └──────┴──────────┴──────────┴────────────┘
 ```
 
-`NodeServer` sits at the centre, managing lattice state and dispatching to/from transport adapters. This is the key difference from the current architecture where `Server` manages consensus separately from `NodeServer`.
+`NodeServer` owns authoritative lattice merge and persistence, while each
+`LatticePropagator` owns one filtered replication policy and its protocol state.
+The application composes those groups with shared or independent transport
+adapters; the server neither opens sockets nor dispatches transport messages.
+This is the key difference from the consensus `Server`, which manages its own
+networking resources.
 
 ### 5.2 Transport Comparison
 
@@ -356,35 +414,68 @@ On-chain `PeerStatus` is the authoritative peer registry. Its metadata includes 
 
 ### 7.1 Raw TCP (Peer-to-Peer) [EXISTS]
 
-No per-connection authentication needed. Every lattice value and consensus message is wrapped in **SignedData** — signed by the originating peer's Ed25519 key. Any recipient validates the signature against the AccountKey before accepting the merge. Invalid signatures are silently dropped.
+Every owner-authenticated lattice value is wrapped in **SignedData** and validated
+against its owner before merge. This end-to-end integrity does not, however, make a
+new TCP connection trusted or grant it routing and store capabilities.
 
-This is fundamental: SignedData provides **end-to-end** authentication independent of transport.
+An `AConnection` starts untrusted. Operator assignment may permit its inbound messages
+to one propagator view, but this is access policy rather than peer authentication. A
+connection receives trusted-peer limits or becomes an outbound propagation route only
+after challenge/response proves the live remote node key.
 
 ### 7.2 Ed25519 Challenge/Response [EXISTS]
 
-`CHALLENGE` (type 1) and `RESPONSE` (type 2) messages already exist for identity verification. The peer verifies that the connecting party possesses the private key for a claimed AccountKey:
+The lattice challenge protocol verifies that the connecting party possesses the private
+key for a claimed AccountKey:
 
 ```
-Client                              Peer
-  │                                   │
-  ├── CHALLENGE request ──────────────→
-  │                                   │
-  ←── CHALLENGE [token, networkId,    │
-  │               toPeer] ────────────┤
-  │                                   │
-  ├── RESPONSE [token, networkId,     │
-  │            fromPeer, sig] ────────→
-  │                                   │
-  ←── AUTHENTICATED ──────────────────┤
+Challenger                           Responder
+  │                                     │
+  ├── CHALLENGE Signed([nonce,           │
+  │       responderKey, context]) ──────→│
+  │                                     │
+  │←── RESULT Signed([nonce,             │
+  │       challengerKey, context]) ──────┤
+  │                                     │
+  └── AUTHENTICATED ROUTE                │
 ```
 
-The challenge includes `networkId` (genesis hash) to prevent cross-network replay, and the token is server-generated random bytes.
+The nonce is generated with `SecureRandom`. The responder key is the challenge audience,
+the challenger key is the response audience, and `convex-lattice-peer-v1` is the fixed
+domain context. Both signatures, the exact vector shape, nonce, audience and context are
+verified. A fresh challenge is required on every connection.
 
-### 7.3 Re-authentication on Reconnect
+### 7.3 Inbound-to-outbound route upgrade [EXISTS]
+
+TCP is full-duplex regardless of which node opened the socket, but physical direction
+and logical capability are kept separate:
+
+```
+INBOUND / UNTRUSTED
+    │ operator assigns one inbound propagator view
+    │ signed NodeInfo is accepted for key K
+    │ live challenge/response proves K on this connection
+    ▼
+INBOUND / AUTHENTICATED / OUTBOUND-PROPAGATION ROUTE
+```
+
+`NodeServer` owns the physical inbound connection throughout. The explicit upgrade
+adds it to `LatticeConnectionManager`'s outbound broadcast routes; it does not turn it
+into a `Convex` client or transfer connection ownership. The upgrade method rejects an
+untrusted connection and a proven key with no admitted node identity. Disconnect
+revokes both the trust-bound route and all ordinary inbound per-connection state.
+
+Manager-owned outbound clients have the mirror behaviour. After authenticating their
+remote endpoint, they may deliver unsolicited reverse lattice messages into their
+owning propagator. This path does not consult the arbitrary-inbound selector because
+the manager already selected and authenticated that peer; it is still bounded by the
+normal NodeServer ingress queue and merge policy.
+
+### 7.4 Re-authentication on Reconnect
 
 On reconnect, challenge/response is re-run (cheap: one Ed25519 sign + verify). The peer can restore session state (subscriptions, pending responses) keyed by AccountKey.
 
-## 8. Connection Management [PROPOSED]
+## 8. Connection Management [EXISTS + PROPOSED]
 
 ### 8.1 Connection Lifecycle
 
@@ -405,18 +496,57 @@ CONNECTING → CONNECTED → DISCONNECTED
 - Polls random peers for latest belief
 - Broadcasts messages to all live connections (shuffled order)
 
-### 8.3 Reconnection [PROPOSED]
+For lattice nodes, `LatticeConnectionManager` separately maintains identity-keyed
+desired, pending and admitted connections. A configured node key keeps a socket in
+capability-free limbo until challenge/response succeeds. Desired peers are populated
+through generic connection APIs; in the P2P application, `NodeDirectory` validates
+correctly owner-signed `[:p2p :nodes]` records and translates their transport fields.
+The connection manager itself never reads that lattice path or parses NodeInfo. Callers
+can await admission without polling. Explicit and discovered desired peers share the
+configurable `maxDesiredPeers` cap (256 by default).
+It also keeps authenticated inbound connections in a separate upgraded-route map.
+Ordinary inbound sockets never appear in broadcasts; an upgraded route is selected
+only when no live manager-owned outbound client already serves the same peer key.
+
+### 8.3 Reconnection [EXISTS — lattice nodes]
 
 Automatic reconnection with exponential backoff:
 
 - **Initial delay**: 1 second
 - **Max delay**: 30 seconds (exponential growth with jitter)
-- **Max retries**: Configurable (default: unlimited for configured peers, limited for discovered peers)
+- **Max retries**: Currently unlimited for desired lattice peers. Separate configured
+  and discovered retry policies remain proposed.
 
 Per message type:
 - **Transactions**: Fail-fast on disconnect. Caller must handle sequence number management.
 - **Queries**: Fail-fast. Idempotent — caller can re-issue.
 - **Lattice subscriptions**: Auto-resubscribe on reconnect.
+
+### 8.4 NAT traversal and Points of Presence [PARTIAL]
+
+The implemented first step supports an outbound-only leaf behind NAT:
+
+1. The leaf publishes signed NodeInfo with empty `:transports`.
+2. It opens and maintains an outbound TCP connection to a dialable node.
+3. The dialable node authenticates the leaf and upgrades that same inbound socket to
+   an outbound propagation route as described in §7.3.
+4. Both nodes send lattice deltas and missing-data requests over the one full-duplex
+   connection. No reverse dial, STUN or hole punching is required.
+
+This is sufficient for lattice propagation when the leaf can keep at least one
+connection to a public node. The first Point of Presence layer is also implemented:
+a leaf advertises its PoP node keys in `:pops`, a willing node advertises `:relay true`,
+and the PoP forwards bounded point messages without replacing their end-to-end source
+signature. Private bodies use ECIES and outgoing relay hops use only authenticated
+node routes. See
+[Points of Presence](../../convex-p2p/docs/POINTS_OF_PRESENCE.md) for the current wire
+format, API and limits.
+
+Public relay deployment, discovery and operational policy remain tracked in
+[issue #710](https://github.com/Convex-Dev/convex/issues/710). A production relay
+service still needs redundant provider selection, abuse policy and monitoring.
+Direct communication between two NATed nodes may later add ICE/STUN candidate exchange
+and hole punching, with relay fallback still required for CGNAT and symmetric NAT.
 
 ### 8.4 Transport Failover [PROPOSED]
 
@@ -428,39 +558,39 @@ If a peer advertises multiple transports in `[:p2p :nodes]`, `Convex.connect()` 
 
 On reconnect, if the current transport repeatedly fails, the next is tried.
 
-## 9. NodeServer as P2P Core [PROPOSED]
+## 9. Generic NodeServer beneath P2P [EXISTS]
 
 ### 9.1 Architecture
 
-`NodeServer` becomes the unified core for all lattice propagation, including consensus:
+`NodeServer` remains the schema-independent authoritative lattice host. The
+calling application constructs its propagation groups and transport hosts, while
+P2P policy stays above all three layers:
 
 ```
-NodeServer (lattice merge + propagate)
-├── LatticePropagator[0] — primary (peers, gossip)
-├── LatticePropagator[1..N] — additional propagators
-├── BeliefPropagator — consensus-specific timing (gradual migration)
-│   └── Currently: BELIEF messages
-│   └── Future: LATTICE_VALUE at [:convex <genesis> :peers]
-├── ConnectionManager — outbound peer connections
-│   └── Manages Convex clients, stake-weighted selection from on-chain PeerStatus
-└── Transport
-    ├── NettyServer (TCP :18888)           [EXISTS] — peer binary protocol
-    ├── NettyServer (WSS :443)             [PROPOSED] — client binary protocol
-    └── Javalin (HTTPS + MCP)              [EXISTS] — web/API/MCP
+P2PNode / NodeDirectory (P2P schema, discovery and policy)
+├── NodeServer (authoritative merge, persistence and notifications)
+├── LatticeListener (application-owned inbound TCP and group routing)
+└── LatticePropagator (application-configured replication policy group)
+    ├── LatticeProtocolEndpoint (CAD036 queues, acquisition and trust)
+    └── LatticeConnectionManager (external routes and desired-peer bounds)
 ```
 
 ### 9.2 Message Routing
 
-Messages are currently split between `NodeServer` (lattice operations) and `Server` (consensus and client-facing). As more message types migrate to the lattice protocol, `NodeServer` will handle an increasing share.
+Messages are currently split between propagation-group endpoints (generic lattice
+protocol), P2P application handlers and `Server` (consensus and client-facing).
+As more message types migrate to the lattice protocol, propagators may transport
+an increasing share without `NodeServer` acquiring knowledge of their records or
+connection sets.
 
-**NodeServer** handles lattice messages directly:
+**LatticeProtocolEndpoint** handles lattice messages for its selected group:
 
 | Message | Handler | Notes |
 |---------|---------|-------|
 | LATTICE_VALUE | `processLatticeValue()` → `cursor.path(path).merge(value)` | Navigate, merge, then respond when ID is non-null |
 | LATTICE_QUERY | `processLatticeQuery()` | Respond with value at path |
 | DATA_REQUEST | `processDataRequest()` | Serve content-addressable data |
-| PING | `processPing()` | Respond with RESULT |
+| PING | `processPing()` | Respond with `Result(id, timestamp)` |
 
 **Server** handles consensus and client-facing messages:
 
@@ -493,7 +623,7 @@ SignedData is fundamental to all lattice operations. Every belief, every peer me
 
 | Transport | Confidentiality | Integrity | Authentication |
 |---|---|---|---|
-| TCP :18888 | None | SignedData per value | AccountKey in SignedData |
+| TCP :18888 | None | SignedData per value | Challenge/response for connection capabilities |
 | WSS :443 | TLS | TLS + SignedData | Challenge/response |
 | HTTPS :443 | TLS | TLS + SignedData | Challenge/response or bearer token |
 | SSE :443 | TLS | TLS + SignedData | Session ID + challenge/response |

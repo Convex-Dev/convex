@@ -10,25 +10,44 @@ import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
 /**
- * Typed configuration for a {@link NodeServer}.
+ * Immutable application configuration shared by an authoritative
+ * {@link NodeServer} and, when present, its standard {@link LatticeListener}.
  *
  * <p>Follows the same {@link AMap}{@code <AString, ACell>} pattern as
  * {@link convex.peer.PeerConfig}, providing typed accessors with sensible
- * defaults. The config map is immutable once created.
+ * defaults. The underlying config map is immutable.</p>
  *
  * <p>Key names reuse {@link convex.peer.PeerConfig} constants where they
- * overlap (port, persist, restore, store) so configurations are consistent
- * across peer and lattice node servers.
+ * overlap (port, persist and restore) so configurations are consistent
+ * across peer and lattice node servers.</p>
+ *
+ * <p>{@code NodeServer} consumes persistence and validation settings only.
+ * {@code LatticeListener} independently consumes the port and physical inbound
+ * limits. Passing this object to a server does not create, configure or own a
+ * transport.</p>
+ *
+ * <p>Propagation-group queue, route, acquisition and publication limits belong
+ * to {@link LatticePropagatorConfig}. Deprecated group accessors remain here only
+ * to migrate callers which previously used one combined map. Attaching a group
+ * never copies configuration from the node.</p>
+ *
+ * <p>Some fields, notably {@link #URL}, are optional metadata for application
+ * wrappers and discovery adapters. The schema-independent {@link NodeServer}
+ * does not publish or interpret them.</p>
  */
 public class NodeConfig {
 
 	// ========== Config keys ==========
 
-	/** Network port for incoming connections (Long). Null = auto-select. */
+	/**
+	 * Standard {@link LatticeListener} port (Long). Zero selects an available port; negative
+	 * disables the listener.
+	 */
 	public static final AString PORT = Strings.intern("port");
 
 	/** Whether to persist state to store (Boolean, default true). */
@@ -37,46 +56,69 @@ public class NodeConfig {
 	/** Whether to restore state from store on startup (Boolean, default true). */
 	public static final AString RESTORE = Strings.intern("restore");
 
-	/** Interval between periodic persistence runs in ms (Long, default 30000). */
+	/** Interval between periodic persistence runs in milliseconds (Long, default 30000). */
 	public static final AString PERSIST_INTERVAL = Strings.intern("persistInterval");
 
-	/** Public URL for this node (AString). If set, node advertises itself in :p2p :nodes.
-	 *  Must be publicly reachable on the internet — never localhost or private addresses. */
+	/** Optional advertised URL consumed by a discovery adapter (AString).
+	 *  {@link NodeServer} itself ignores this field. */
 	public static final AString URL = Strings.intern("url");
 
-	/** Maximum memory size (bytes) of an inbound LATTICE_VALUE accepted for merge (#564). */
-	public static final AString MAX_INBOUND_VALUE_SIZE = Strings.intern("maxInboundValueSize");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_INBOUND_VALUE_SIZE}. */
+	@Deprecated
+	public static final AString MAX_INBOUND_VALUE_SIZE =
+		LatticePropagatorConfig.MAX_INBOUND_VALUE_SIZE;
 
-	/** Whether to permit a private/loopback {@link #URL} for dev networks (Boolean, default false). #567 */
+	/**
+	 * Whether development networks may publish a private or loopback {@link #URL}
+	 * (Boolean, default false).
+	 */
 	public static final AString ALLOW_PRIVATE_URL = Strings.intern("allowPrivateURL");
 
-	/** Consecutive rejected/undecodable inbound messages from a single connection before the
-	 *  circuit-breaker closes it (Long, default 100; 0 disables). #566 */
-	public static final AString MAX_CONSECUTIVE_REJECTS = Strings.intern("maxConsecutiveRejects");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_CONSECUTIVE_REJECTS}. */
+	@Deprecated
+	public static final AString MAX_CONSECUTIVE_REJECTS =
+		LatticePropagatorConfig.MAX_CONSECUTIVE_REJECTS;
 
-	/** Maximum encoded inbound network message size in bytes (Long, default 4 MiB). */
+	/** Maximum encoded inbound listener message size in bytes (Long, default 4 MiB). */
 	public static final AString MAX_MESSAGE_SIZE = Strings.intern("maxMessageSize");
 
-	/** Maximum encoded outbound lattice delta chunk size in bytes. */
-	public static final AString MAX_DELTA_MESSAGE_SIZE = Strings.intern("maxDeltaMessageSize");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_DELTA_MESSAGE_SIZE}. */
+	@Deprecated
+	public static final AString MAX_DELTA_MESSAGE_SIZE =
+		LatticePropagatorConfig.MAX_DELTA_MESSAGE_SIZE;
 
-	/** Maximum combined encoded bytes materialised for one outbound lattice delta. */
-	public static final AString MAX_DELTA_BROADCAST_SIZE = Strings.intern("maxDeltaBroadcastSize");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_DELTA_BROADCAST_SIZE}. */
+	@Deprecated
+	public static final AString MAX_DELTA_BROADCAST_SIZE =
+		LatticePropagatorConfig.MAX_DELTA_BROADCAST_SIZE;
 
-	/** Maximum encoded message size from a cryptographically verified Peer. */
-	public static final AString MAX_TRUSTED_MESSAGE_SIZE = Strings.intern("maxTrustedMessageSize");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_TRUSTED_MESSAGE_SIZE}. */
+	@Deprecated
+	public static final AString MAX_TRUSTED_MESSAGE_SIZE =
+		LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE;
 
-	/** Maximum simultaneous inbound network connections (Long, default 256). */
+	/** Maximum simultaneous listener connections (Long, default 256). */
 	public static final AString MAX_CONNECTIONS = Strings.intern("maxConnections");
 
-	/** Capacity of the bounded inbound processing queue (Long, default 1024). */
-	public static final AString INBOUND_QUEUE_SIZE = Strings.intern("inboundQueueSize");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_DESIRED_PEERS}. */
+	@Deprecated
+	public static final AString MAX_DESIRED_PEERS =
+		LatticePropagatorConfig.MAX_DESIRED_PEERS;
 
-	/** Maximum encoded bytes retained by the inbound processing queue. */
-	public static final AString MAX_INBOUND_QUEUE_BYTES = Strings.intern("maxInboundQueueBytes");
+	/** @deprecated Use {@link LatticePropagatorConfig#INBOUND_QUEUE_SIZE}. */
+	@Deprecated
+	public static final AString INBOUND_QUEUE_SIZE =
+		LatticePropagatorConfig.INBOUND_QUEUE_SIZE;
 
-	/** Time allowed for the ordered inbound dispatcher to drain during shutdown. */
-	public static final AString INBOUND_SHUTDOWN_TIMEOUT = Strings.intern("inboundShutdownTimeout");
+	/** @deprecated Use {@link LatticePropagatorConfig#MAX_INBOUND_QUEUE_BYTES}. */
+	@Deprecated
+	public static final AString MAX_INBOUND_QUEUE_BYTES =
+		LatticePropagatorConfig.MAX_INBOUND_QUEUE_BYTES;
+
+	/** @deprecated Use {@link LatticePropagatorConfig#INBOUND_SHUTDOWN_TIMEOUT}. */
+	@Deprecated
+	public static final AString INBOUND_SHUTDOWN_TIMEOUT =
+		LatticePropagatorConfig.INBOUND_SHUTDOWN_TIMEOUT;
 
 	/** Maximum accepted wall-clock lead for timestamp-ordered lattice values. */
 	public static final AString MAX_FUTURE_TIMESTAMP_SKEW = Strings.intern("maxFutureTimestampSkew");
@@ -84,24 +126,38 @@ public class NodeConfig {
 	/** Conservative public-node default: large lattice trees are transferred via DATA_REQUEST. */
 	public static final int DEFAULT_MAX_MESSAGE_SIZE = 4 * 1024 * 1024;
 
-	/** Default eager delta working set: four public-size chunks, capped by protocol. */
-	public static final int DEFAULT_MAX_DELTA_BROADCAST_SIZE = 16 * 1024 * 1024;
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_MAX_DELTA_BROADCAST_SIZE}. */
+	@Deprecated
+	public static final int DEFAULT_MAX_DELTA_BROADCAST_SIZE =
+		LatticePropagatorConfig.DEFAULT_MAX_DELTA_BROADCAST_SIZE;
 
-	/** Verified Peers may use the full protocol message allowance. */
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_MAX_TRUSTED_MESSAGE_SIZE}. */
+	@Deprecated
 	public static final int DEFAULT_MAX_TRUSTED_MESSAGE_SIZE =
-		(int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
+		LatticePropagatorConfig.DEFAULT_MAX_TRUSTED_MESSAGE_SIZE;
 
 	/** Conservative public-node connection cap. */
 	public static final int DEFAULT_MAX_CONNECTIONS = 256;
 
-	/** Default number of decoded messages awaiting lattice processing. */
-	public static final int DEFAULT_INBOUND_QUEUE_SIZE = 1024;
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_MAX_DESIRED_PEERS}. */
+	@Deprecated
+	public static final int DEFAULT_MAX_DESIRED_PEERS =
+		LatticePropagatorConfig.DEFAULT_MAX_DESIRED_PEERS;
 
-	/** Default encoded bytes awaiting lattice processing. */
-	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES = 16 * 1024 * 1024;
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_INBOUND_QUEUE_SIZE}. */
+	@Deprecated
+	public static final int DEFAULT_INBOUND_QUEUE_SIZE =
+		LatticePropagatorConfig.DEFAULT_INBOUND_QUEUE_SIZE;
 
-	/** Default time allowed for accepted inbound work to finish during shutdown. */
-	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT = 10_000L;
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_MAX_INBOUND_QUEUE_BYTES}. */
+	@Deprecated
+	public static final int DEFAULT_MAX_INBOUND_QUEUE_BYTES =
+		LatticePropagatorConfig.DEFAULT_MAX_INBOUND_QUEUE_BYTES;
+
+	/** @deprecated Use {@link LatticePropagatorConfig#DEFAULT_INBOUND_SHUTDOWN_TIMEOUT}. */
+	@Deprecated
+	public static final long DEFAULT_INBOUND_SHUTDOWN_TIMEOUT =
+		LatticePropagatorConfig.DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
 
 	/** Default wall-clock lead accepted from timestamp-ordered lattice values. */
 	public static final long DEFAULT_MAX_FUTURE_TIMESTAMP_SKEW = 30_000L;
@@ -115,34 +171,55 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Create a NodeConfig wrapping the given config map.
-	 * @param config Config map, or null for defaults
-	 * @return New NodeConfig instance
+	 * Creates a configuration wrapping the given immutable map.
+	 *
+	 * @param config config map, or {@code null} for defaults
+	 * @return node configuration
 	 */
 	public static NodeConfig create(AMap<AString, ACell> config) {
 		return new NodeConfig(config);
 	}
 
 	/**
-	 * Create a NodeConfig with all defaults.
-	 * @return New NodeConfig instance with empty config
+	 * Creates a configuration containing only defaults.
+	 *
+	 * @return default node configuration
 	 */
 	public static NodeConfig create() {
 		return new NodeConfig(null);
 	}
 
 	/**
-	 * Create a NodeConfig with a specific port.
-	 * @param port Port number for incoming connections
-	 * @return New NodeConfig instance with port set
+	 * Creates a configuration with a specific standard-listener port.
+	 *
+	 * @param port inbound port; zero selects an available port and negative disables listening
+	 * @return node configuration with the port set
 	 */
 	public static NodeConfig port(int port) {
 		return new NodeConfig(Maps.of(PORT, CVMLong.create(port)));
 	}
 
 	/**
-	 * Get the raw config map.
-	 * @return Underlying config map (never null)
+	 * Creates a configuration for an isolated local lattice network. The listener
+	 * binds to an OS-assigned port and advertises that resolved port on loopback.
+	 *
+	 * <p>This is intended for local development and in-process integration tests.
+	 * Private transport advertisement is deliberately enabled; production nodes
+	 * should configure an explicit publicly reachable {@link #URL} instead.</p>
+	 *
+	 * @return local-network configuration using an OS-assigned port
+	 */
+	public static NodeConfig localNetwork() {
+		return new NodeConfig(Maps.of(
+			PORT, CVMLong.ZERO,
+			URL, Strings.create("tcp://localhost:0"),
+			ALLOW_PRIVATE_URL, CVMBool.TRUE));
+	}
+
+	/**
+	 * Returns the underlying immutable config map.
+	 *
+	 * @return config map, never {@code null}
 	 */
 	public AMap<AString, ACell> getMap() {
 		return config;
@@ -151,8 +228,9 @@ public class NodeConfig {
 	// ========== Typed accessors ==========
 
 	/**
-	 * Get the network port.
-	 * @return Port number, or null for auto-select
+	 * Returns the configured standard-listener port.
+	 *
+	 * @return port number, or {@code null} to use the transport default with fallback
 	 */
 	public Integer getPort() {
 		CVMLong v = RT.ensureLong(config.get(PORT));
@@ -160,24 +238,27 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Whether to persist state to the store.
-	 * @return true if persist enabled (default: true)
+	 * Returns whether authoritative state is persisted to the node store.
+	 *
+	 * @return {@code true} when persistence is enabled
 	 */
 	public boolean isPersist() {
 		return getBool(PERSIST, true);
 	}
 
 	/**
-	 * Whether to restore state from the store on startup.
-	 * @return true if restore enabled (default: true)
+	 * Returns whether authoritative state is restored from the node store at launch.
+	 *
+	 * @return {@code true} when restoration is enabled
 	 */
 	public boolean isRestore() {
 		return getBool(RESTORE, true);
 	}
 
 	/**
-	 * Get the interval between periodic persistence runs.
-	 * @return Interval in milliseconds (default: 30000)
+	 * Returns the interval between periodic persistence barriers.
+	 *
+	 * @return interval in milliseconds
 	 */
 	public long getPersistInterval() {
 		CVMLong v = RT.ensureLong(config.get(PERSIST_INTERVAL));
@@ -185,54 +266,83 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Get the public URL for this node.
-	 * If set, the node will advertise itself in the {@code :p2p :nodes} lattice.
-	 * @return Public URL string, or null if not configured (private node)
+	 * Returns the optional URL available to an application discovery adapter.
+	 * {@link NodeServer} does not advertise it.
+	 *
+	 * @return advertised URL, or {@code null} if not configured
 	 */
 	public AString getURL() {
 		return RT.ensureString(config.get(URL));
 	}
 
 	/**
-	 * Maximum memory size (bytes) of an inbound LATTICE_VALUE this node will merge (#564).
-	 * Larger values are rejected before the merge runs, bounding merge cost from untrusted
-	 * peers. Defaults to this node's configured encoded-message cap, providing a
-	 * consistent conservative limit for public nodes.
+	 * Returns the transport URL to publish after the listener has bound. A configured
+	 * port of zero is replaced with the actual OS-assigned listener port, preserving
+	 * the remaining URI components.
 	 *
-	 * @return maximum inbound value size in bytes
+	 * @param boundPort actual listener port, or {@code null} when no listener exists
+	 * @return resolved advertised URL, or {@code null} when no URL is configured
 	 */
-	public long getMaxInboundValueSize() {
-		CVMLong v = RT.ensureLong(config.get(MAX_INBOUND_VALUE_SIZE));
-		return (v != null) ? v.longValue() : getMaxMessageSize();
+	public AString getAdvertisedURL(Integer boundPort) {
+		AString configured=getURL();
+		if (configured==null) return null;
+
+		try {
+			URI uri=new URI(configured.toString().trim());
+			if (uri.getPort()!=0) return configured;
+			if (boundPort==null || boundPort<=0) {
+				throw new IllegalStateException(
+					"A transport URL with port 0 requires a bound network listener");
+			}
+			URI resolved=new URI(uri.getScheme(),uri.getUserInfo(),uri.getHost(),boundPort,
+				uri.getPath(),uri.getQuery(),uri.getFragment());
+			return Strings.create(resolved.toString());
+		} catch (URISyntaxException e) {
+			throw new IllegalStateException("Invalid node URL configuration: "+configured,e);
+		}
 	}
 
 	/**
-	 * Whether a private, loopback or link-local {@link #URL} is permitted (#567).
-	 * Defaults to false, so a misconfigured private URL fails at launch rather than
-	 * polluting the {@code [:p2p :nodes]} registry with an unreachable address. Set
-	 * true only on dev networks where private addressing is intentional.
+	 * Returns the maximum memory size of a complete inbound lattice value admitted
+	 * by a propagation endpoint. Larger values are rejected before the authoritative
+	 * merge, bounding work from untrusted peers. The default is the configured message cap.
 	 *
-	 * @return true if private URLs are permitted
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxInboundValueSize()}.
+	 * @return maximum inbound value size in bytes
+	 */
+	@Deprecated
+	public long getMaxInboundValueSize() {
+		return LatticePropagatorConfig.from(this).getMaxInboundValueSize();
+	}
+
+	/**
+	 * Returns whether a private, loopback or link-local {@link #URL} is permitted.
+	 * Defaults to false, allowing an advertising application such as P2PNode to
+	 * fail before publishing an unreachable address. {@link NodeServer} does not apply this
+	 * policy because it does not publish discovery records. Set true only on dev
+	 * networks where private addressing is intentional.
+	 *
+	 * @return {@code true} if private URLs are permitted
 	 */
 	public boolean isAllowPrivateURL() {
 		return getBool(ALLOW_PRIVATE_URL, false);
 	}
 
 	/**
-	 * Consecutive rejected or undecodable inbound messages from a single connection before
-	 * the circuit-breaker closes it (#566). A single accepted merge resets the streak.
-	 * Defaults to 100 — generous enough not to bite a trusted peer, tight enough to cut off
-	 * a peer streaming malformed values indefinitely. Set to 0 to disable the breaker.
+	 * Returns the number of consecutive rejected or undecodable inbound messages
+	 * allowed per connection before its circuit breaker closes it. An accepted
+	 * merge resets the streak; zero disables the breaker.
 	 *
-	 * @return consecutive-reject limit, or 0 if the circuit-breaker is disabled
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxConsecutiveRejects()}.
+	 * @return consecutive-reject limit, or zero when disabled
 	 */
+	@Deprecated
 	public long getMaxConsecutiveRejects() {
-		CVMLong v = RT.ensureLong(config.get(MAX_CONSECUTIVE_REJECTS));
-		return (v != null) ? v.longValue() : 100L;
+		return LatticePropagatorConfig.from(this).getMaxConsecutiveRejects();
 	}
 
 	/**
-	 * Gets the maximum encoded inbound network message size. This limit is applied by
+	 * Returns the maximum encoded inbound network message size. This limit is applied by
 	 * Netty before allocating the complete message byte array.
 	 *
 	 * @return maximum encoded message size in bytes
@@ -242,46 +352,46 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Gets the maximum encoded body size used for outbound lattice delta chunks.
+	 * Returns the maximum encoded body size used for outbound lattice delta chunks.
 	 * This is independent of the complete inbound value-size policy. It defaults
 	 * to the conservative public frame limit advertised by this node.
 	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxDeltaMessageSize()}.
 	 * @return maximum outbound delta chunk size in bytes
 	 */
+	@Deprecated
 	public int getMaxDeltaMessageSize() {
-		return getMessageSize(MAX_DELTA_MESSAGE_SIZE, getMaxMessageSize());
+		return LatticePropagatorConfig.from(this).getMaxDeltaMessageSize();
 	}
 
 	/**
-	 * Gets the total encoded-byte budget for one eager lattice propagation.
+	 * Returns the total encoded-byte budget for one eager lattice propagation.
 	 * This bounds novelty references plus DATA message bodies independently of
 	 * the size of the complete lattice value in the store.
+	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxDeltaBroadcastSize()}.
+	 * @return maximum eager-delta working set in encoded bytes
 	 */
+	@Deprecated
 	public int getMaxDeltaBroadcastSize() {
-		int messageLimit=getMaxDeltaMessageSize();
-		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_DELTA_BROADCAST_SIZE);
-		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
-		int value=getMessageSize(MAX_DELTA_BROADCAST_SIZE,defaultValue);
-		if (value<messageLimit) {
-			throw new IllegalArgumentException(MAX_DELTA_BROADCAST_SIZE
-				+" must be at least "+MAX_DELTA_MESSAGE_SIZE+": "+value+" < "+messageLimit);
-		}
-		return value;
+		return LatticePropagatorConfig.from(this).getMaxDeltaBroadcastSize();
 	}
 
 	/**
-	 * Gets the encoded-message limit used after an outbound Peer's AccountKey has
+	 * Returns the encoded-message limit used after an outbound Peer's AccountKey has
 	 * passed challenge/response verification. Unverified connections always remain
 	 * subject to {@link #getMaxMessageSize()}.
 	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxTrustedMessageSize()}.
 	 * @return trusted peer message limit in bytes
 	 */
+	@Deprecated
 	public int getMaxTrustedMessageSize() {
-		return getMessageSize(MAX_TRUSTED_MESSAGE_SIZE, DEFAULT_MAX_TRUSTED_MESSAGE_SIZE);
+		return LatticePropagatorConfig.from(this).getMaxTrustedMessageSize();
 	}
 
 	/**
-	 * Gets the maximum number of simultaneous inbound network connections.
+	 * Returns the maximum number of simultaneous inbound network connections.
 	 *
 	 * @return inbound connection cap
 	 */
@@ -290,45 +400,53 @@ public class NodeConfig {
 	}
 
 	/**
-	 * Gets the capacity of the bounded inbound processing queue.
+	 * Returns the maximum desired peers retained by each propagator.
 	 *
-	 * @return inbound queue capacity
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxDesiredPeers()}.
+	 * @return desired-peer cap
 	 */
-	public int getInboundQueueSize() {
-		return getPositiveInt(INBOUND_QUEUE_SIZE, DEFAULT_INBOUND_QUEUE_SIZE);
-	}
-
-	/** Gets the encoded-byte capacity of the inbound dispatcher queue. */
-	public int getMaxInboundQueueBytes() {
-		int messageLimit=getMaxMessageSize();
-		int defaultValue=Math.max(messageLimit,DEFAULT_MAX_INBOUND_QUEUE_BYTES);
-		defaultValue=(int)Math.min(defaultValue,convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH);
-		int value=getMessageSize(MAX_INBOUND_QUEUE_BYTES,defaultValue);
-		if (value<messageLimit) {
-			throw new IllegalArgumentException(MAX_INBOUND_QUEUE_BYTES
-				+" must be at least "+MAX_MESSAGE_SIZE+": "+value+" < "+messageLimit);
-		}
-		return value;
+	@Deprecated
+	public int getMaxDesiredPeers() {
+		return LatticePropagatorConfig.from(this).getMaxDesiredPeers();
 	}
 
 	/**
-	 * Gets the time allowed for the ordered inbound dispatcher to drain during
+	 * Returns the capacity of each propagation endpoint's inbound processing queue.
+	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getInboundQueueSize()}.
+	 * @return inbound queue capacity
+	 */
+	@Deprecated
+	public int getInboundQueueSize() {
+		return LatticePropagatorConfig.from(this).getInboundQueueSize();
+	}
+
+	/**
+	 * Returns the encoded-byte capacity of each propagation endpoint's inbound queue.
+	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getMaxInboundQueueBytes()}.
+	 * @return queue capacity in encoded bytes
+	 */
+	@Deprecated
+	public int getMaxInboundQueueBytes() {
+		return LatticePropagatorConfig.from(this).getMaxInboundQueueBytes();
+	}
+
+	/**
+	 * Returns the time allowed for an ordered inbound dispatcher to drain during
 	 * shutdown. A timeout does not abandon the dispatcher: shutdown remains
 	 * incomplete and may be retried once the current operation finishes.
 	 *
+	 * @deprecated Use {@link LatticePropagatorConfig#getInboundShutdownTimeout()}.
 	 * @return dispatcher shutdown timeout in milliseconds
 	 */
+	@Deprecated
 	public long getInboundShutdownTimeout() {
-		CVMLong v = RT.ensureLong(config.get(INBOUND_SHUTDOWN_TIMEOUT));
-		long value = (v != null) ? v.longValue() : DEFAULT_INBOUND_SHUTDOWN_TIMEOUT;
-		if (value <= 0) {
-			throw new IllegalArgumentException(INBOUND_SHUTDOWN_TIMEOUT + " must be positive: " + value);
-		}
-		return value;
+		return LatticePropagatorConfig.from(this).getInboundShutdownTimeout();
 	}
 
 	/**
-	 * Gets the maximum accepted lead over this node's clock for lattice values
+	 * Returns the maximum accepted lead over the local clock for lattice values
 	 * that use wall-clock conflict ordering. Zero requires timestamps no later
 	 * than the local clock.
 	 *
@@ -343,10 +461,10 @@ public class NodeConfig {
 		return value;
 	}
 
-	// ========== URL validation (#567) ==========
+	// ========== URL validation ==========
 
 	/**
-	 * Validates a public node URL for advertisement in the {@code [:p2p :nodes]} lattice (#567).
+	 * Validates a public node URL for use by an advertising application.
 	 *
 	 * <p>This is a purely <em>local</em> check: it never resolves DNS or probes reachability.
 	 * A node cannot verify its own external reachability, and resolving an operator- or

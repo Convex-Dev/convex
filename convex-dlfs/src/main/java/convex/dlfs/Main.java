@@ -21,9 +21,14 @@ import convex.lattice.Lattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.generic.KeyedLattice;
 import convex.node.NodeServer;
+import convex.node.LatticeListener;
+import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
+import convex.node.NodeConfig;
 
 /**
- * Standalone entry point demonstrating a complete NodeServer-hosted DLFS stack.
+ * Standalone entry point demonstrating a complete NodeServer-hosted DLFS stack
+ * with an independently composed lattice transport.
  *
  * <p>This boots {@link NodeServer}, attaches {@link DLFSApplication} at its
  * configured lattice path, routes one owner's drives and starts the HTTP
@@ -61,21 +66,31 @@ public final class Main {
 		AStore store=openStore(config,keyPair);
 		Keyword[] regionPath=config.getRegionPath();
 		KeyedLattice root=createRoot(regionPath);
+		NodeConfig nodeConfig=config.getNodeConfig();
 		NodeServer<Index<Keyword,ACell>> node=
-			new NodeServer<>(root,store,config.getNodeConfig());
-		node.setMergeContext(LatticeContext.create(null,keyPair));
-		if (config.isPublicLatticeInbound()) {
-			node.setInboundPropagatorSelector(connection->node.getPropagator());
-		}
+			new NodeServer<>(root,store,nodeConfig);
+		LatticeContext context=LatticeContext.create(null,keyPair);
+		node.setMergeContext(context);
+		LatticePropagator propagator=new LatticePropagator(
+			store,root,value -> value,LatticePropagatorConfig.from(nodeConfig));
+		propagator.setMergeContext(context);
+		propagator.setTransportKeyPair(keyPair);
+		node.addPropagator(propagator);
+		LatticeListener transport=new LatticeListener(nodeConfig);
+		transport.registerPropagator(propagator);
+		if (config.isPublicLatticeInbound()) transport.setSelector(connection->propagator);
 		try {
 			node.launch();
+			transport.launch();
 		} catch (IOException | InterruptedException | RuntimeException e) {
+			transport.close();
+			closeNode(node);
 			store.close();
 			throw e;
 		}
 		for (DLFSConfig.BootstrapPeer peer:config.getBootstrapPeers()) {
 			if (!keyPair.getAccountKey().equals(peer.key())) {
-				node.getPropagator().getConnectionManager().addPeer(peer.key(),peer.address());
+				propagator.getConnectionManager().addPeer(peer.key(),peer.address());
 			}
 		}
 
@@ -85,7 +100,7 @@ public final class Main {
 		String driveName=config.getDriveName();
 		if (!localDrives.driveNames().contains(driveName)
 				&&(localDrives.createDrive(driveName)==null)) {
-			closeNode(node);
+			closeNode(transport,node);
 			store.close();
 			throw new IllegalStateException("Could not create drive: "+driveName);
 		}
@@ -106,7 +121,7 @@ public final class Main {
 		try {
 			application.sync();
 		} catch (RuntimeException e) {
-			closeNode(node);
+			closeNode(transport,node);
 			store.close();
 			throw e;
 		}
@@ -123,7 +138,7 @@ public final class Main {
 		try {
 			server.start(config.getHTTPPort());
 		} catch (RuntimeException e) {
-			closeNode(node);
+			closeNode(transport,node);
 			store.close();
 			throw e;
 		}
@@ -132,8 +147,8 @@ public final class Main {
 		System.out.println("DLFS region: "+Arrays.toString(regionPath));
 		System.out.println("DLFS drive: http://"+config.getHTTPBindHost()+":"+server.getPort()+
 			"/dlfs/"+driveName+"/");
-		System.out.println("Lattice node port: "+node.getPort()+
-			(config.isPublicLatticeInbound()?" (public primary view)":" (inbound denied)"));
+		System.out.println("Lattice node port: "+transport.getPort()+
+			(config.isPublicLatticeInbound()?" (public propagation view)":" (inbound denied)"));
 		System.out.println("Bootstrap peers: "+config.getBootstrapPeers().size());
 		System.out.println("Store: "+config.getStorePath());
 		System.out.println("Press Ctrl+C to stop.");
@@ -148,7 +163,7 @@ public final class Main {
 			} catch (Exception e) {
 				System.err.println("Failed to publish DLFS state: "+e.getMessage());
 			}
-			closeNode(node);
+			closeNode(transport,node);
 			try {
 				application.flush();
 			} catch (Exception e) {
@@ -272,6 +287,11 @@ public final class Main {
 		} catch (Exception e) {
 			System.err.println("Failed to close lattice node: "+e.getMessage());
 		}
+	}
+
+	private static void closeNode(LatticeListener transport,NodeServer<?> node) {
+		transport.close();
+		closeNode(node);
 	}
 
 	private static void printUsage() {

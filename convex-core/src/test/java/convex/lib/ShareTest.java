@@ -93,7 +93,7 @@ public class ShareTest extends ACVMTest {
 		
 		AVector<ACell> token=eval(ctx,"SSS");
 		assertEquals(shareActor,token.get(0)); 
-		AssetTester.doFungibleTests(ctx, token, HERO);
+		AssetTest.doFungibleTests(ctx, token, HERO);
 		
 		// Test change of control
 		TrustTest.testChangeControl(ctx, token);

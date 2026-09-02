@@ -1,6 +1,7 @@
 package convex.auth.did;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AString;
+import convex.core.data.Strings;
 
 public class DIDTest {
     
@@ -269,6 +271,19 @@ public class DIDTest {
     	DID parsed = DID.fromString(did.toString());
     	assertEquals("key", parsed.getMethod());
     }
+
+	@Test
+	void testCanonicalBaseDID() {
+		AString web=Strings.create("did:web:example.com%3A8080:13");
+		assertTrue(DID.isCanonicalBase(web));
+		assertTrue(DID.isCanonicalBase(Strings.create("did:convex:id.foo")));
+		assertTrue(DID.isCanonicalBase(DID.forKey(AKeyPair.generate().getAccountKey())));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:Web:example.com")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com/path")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com?x=1")));
+		assertFalse(DID.isCanonicalBase(Strings.create("did:web:example.com#key-1")));
+	}
 
 	private void doDIDTest(DID did) {
 		String ds=did.toString();

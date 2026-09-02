@@ -1,14 +1,13 @@
 package convex.util;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.data.AArrayBlob;
 import convex.core.data.Blob;
@@ -16,17 +15,10 @@ import convex.core.data.prim.BigIntegerTest;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.util.Utils;
 
-@RunWith(Parameterized.class)
 public class BigIntegerParamTest {
-	private BigInteger num;
 
-	public BigIntegerParamTest(String label, BigInteger num) {
-		this.num = num;
-	}
-
-	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays.asList(new Object[][] { 
+		return Arrays.asList(new Object[][] {
 			{ "Zero", BigInteger.ZERO },
 			{ "Max Long", BigInteger.valueOf(Long.MAX_VALUE) },
 			{ "Min Long", BigInteger.valueOf(Long.MIN_VALUE) },
@@ -38,8 +30,9 @@ public class BigIntegerParamTest {
 							.negate() } });
 	}
 
-	@Test
-	public void testHexRoundTrip() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testHexRoundTrip(String label, BigInteger num) {
 		if (num.signum() < 0) return;
 		String s = Utils.toHexString(num, (num.bitLength() / 4 + 2) & 0xFFFE);
 		AArrayBlob d = Blob.fromHex(s);
@@ -47,13 +40,13 @@ public class BigIntegerParamTest {
 		BigInteger b = new BigInteger(1, bs);
 		assertEquals(num, b);
 	}
-	
-	@Test
-	public void testCVMBigInteger() {
+
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testCVMBigInteger(String label, BigInteger num) {
 		CVMBigInteger bi=CVMBigInteger.wrap(num);
 		assertEquals(num,bi.getBigInteger());
-		
+
 		BigIntegerTest.doBigTest(bi);
 	}
-
 }

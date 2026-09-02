@@ -183,27 +183,15 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		// never canonical, since the canonical version is a Blob
-		return false;
+		// canonical: a Hash encodes exactly as a 32-byte Blob, the Java type is a specialisation
+		return true;
 	}
 	
 	@Override
-	public Blob toCanonical() {
-		return toFlatBlob();
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// tag plus length plis raw data
-		return 2 + LENGTH;
+	public Hash toCanonical() {
+		return this;
 	}
 	
-	@Override
-	public int getEncodingLength() {
-		// Always a fixed encoding length, tag plus count plus length
-		return 2 + LENGTH;
-	}
-
 	@Override
 	public Blob getChunk(long i) {
 		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));

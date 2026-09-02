@@ -107,6 +107,7 @@ public class AccountKey extends AArrayBlob {
 
 	public boolean equals(AccountKey o) {
 		if (o == this) return true;
+		if (o == null) return false;
 		return Utils.arrayEquals(o.store, o.offset, this.store, this.offset, LENGTH);
 	}
 
@@ -235,19 +236,7 @@ public class AccountKey extends AArrayBlob {
 		if (pos+LENGTH>b.count()) throw new IndexOutOfBoundsException("wrapping AccountKey beyond bound");
 		return AccountKey.wrap(data,off+pos);
 	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// tag plus LENGTH bytes
-		return 3 + LENGTH;
-	}
 	
-	@Override
-	public int getEncodingLength() {
-		// Always a fixed encoding length, tag plus count plus length
-		return 2 + LENGTH;
-	}
-
 	@Override
 	public Blob getChunk(long i) {
 		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
@@ -274,12 +263,13 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		return false;
+		// canonical: an AccountKey encodes exactly as a 32-byte Blob, the Java type is a specialisation
+		return true;
 	}
 
 	@Override
-	protected Blob toCanonical() {
-		return toFlatBlob();
+	protected AccountKey toCanonical() {
+		return this;
 	}
 
 }

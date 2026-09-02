@@ -77,8 +77,9 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return HEADER_LENGTH + LENGTH;
+	public int calcHeaderLength() {
+		// tag, one length byte and eight raw bytes, no refs
+		return HEADER_LENGTH+LENGTH;
 	}
 
 	@Override

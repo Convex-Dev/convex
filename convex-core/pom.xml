@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.8.15</version>
+		<version>0.8.16-SNAPSHOT</version>
 	</parent>
 
 	<properties>
@@ -15,6 +15,17 @@
 		     mismatched set in the signing path. Wait for a coordinated release. -->
 		<bc.version>1.85</bc.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- Tests run on the module path, patched into convex.core. JUnit lives in the
+		     unnamed module and instantiates helpers in convex.test reflectively, but
+		     Surefire only opens packages that contain a selected test class, so a
+		     filtered run (-Dtest=...) that leaves convex.test.Samples out fails with
+		     IllegalAccessException. Open the helper packages explicitly. -->
+		<argLine>
+			--add-opens=java.base/java.util=ALL-UNNAMED
+			--add-opens=convex.core/convex.test=ALL-UNNAMED
+			--add-opens=convex.core/convex.test.generators=ALL-UNNAMED
+			-Dslf4j.internal.verbosity=ERROR
+		</argLine>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>

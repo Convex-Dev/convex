@@ -15,6 +15,9 @@ import convex.etch.EtchStore;
 import convex.db.lattice.SQLDatabase;
 import convex.node.NodeConfig;
 import convex.node.NodeServer;
+import convex.node.LatticeListener;
+import convex.node.LatticePropagator;
+import convex.node.LatticePropagatorConfig;
 
 /**
  * Demo: Replicated Lattice SQL Database over a real network.
@@ -36,9 +39,6 @@ import convex.node.NodeServer;
  */
 public class ReplicationDemo {
 
-	private static final int PORT_LONDON = 19800;
-	private static final int PORT_TOKYO  = 19801;
-
 	public static void main(String[] args) throws Exception {
 		System.out.println("==================================================");
 		System.out.println("     Convex Replicated Lattice SQL Database");
@@ -50,35 +50,53 @@ public class ReplicationDemo {
 		EtchStore storeTokyo  = EtchStore.createTemp("tokyo");
 
 		// Create NodeServers using the SQL database lattice
+		NodeConfig configLondon=NodeConfig.port(0);
+		NodeConfig configTokyo=NodeConfig.port(0);
 		NodeServer<?> serverLondon = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE, storeLondon, NodeConfig.port(PORT_LONDON));
+				ConvexDB.DATABASE_MAP_LATTICE,storeLondon,configLondon);
 		NodeServer<?> serverTokyo  = new NodeServer<>(
-				ConvexDB.DATABASE_MAP_LATTICE, storeTokyo,  NodeConfig.port(PORT_TOKYO));
+				ConvexDB.DATABASE_MAP_LATTICE,storeTokyo,configTokyo);
+		LatticePropagator propagatorLondon=new LatticePropagator(
+			storeLondon,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
+			LatticePropagatorConfig.create());
+		LatticePropagator propagatorTokyo=new LatticePropagator(
+			storeTokyo,ConvexDB.DATABASE_MAP_LATTICE,value -> value,
+			LatticePropagatorConfig.create());
+		serverLondon.addPropagator(propagatorLondon);
+		serverTokyo.addPropagator(propagatorTokyo);
+		LatticeListener transportLondon=new LatticeListener(configLondon);
+		LatticeListener transportTokyo=new LatticeListener(configTokyo);
+		transportLondon.registerPropagator(propagatorLondon);
+		transportTokyo.registerPropagator(propagatorTokyo);
+		transportLondon.setSelector(connection -> propagatorLondon);
+		transportTokyo.setSelector(connection -> propagatorTokyo);
 
 		try {
 			// ── 1. Launch two nodes ─────────────────────────────────────
 			serverLondon.launch();
 			serverTokyo.launch();
+			transportLondon.launch();
+			transportTokyo.launch();
 
 			section("1. Two lattice nodes launched");
-			System.out.println("  London node: port " + PORT_LONDON);
-			System.out.println("  Tokyo  node: port " + PORT_TOKYO);
+			System.out.println("  London node: port " + transportLondon.getPort());
+			System.out.println("  Tokyo  node: port " + transportTokyo.getPort());
 
 			// ── 2. Establish peer connections (bidirectional) ────────────
 			// Each node connects to the other as a peer. The LatticePropagator
 			// will automatically broadcast deltas over these connections.
 
-			InetSocketAddress addrLondon = new InetSocketAddress("localhost", PORT_LONDON);
-			InetSocketAddress addrTokyo  = new InetSocketAddress("localhost", PORT_TOKYO);
+			InetSocketAddress addrLondon = transportLondon.getHostAddress();
+			InetSocketAddress addrTokyo  = transportTokyo.getHostAddress();
 
 			AccountKey keyL = AKeyPair.generate().getAccountKey();
 			AccountKey keyT = AKeyPair.generate().getAccountKey();
 
 			Convex londonToTokyo = ConvexRemote.connect(addrTokyo);
-			serverLondon.getPropagator().addPeer(keyT, londonToTokyo);
+			propagatorLondon.addPeer(keyT, londonToTokyo);
 
 			Convex tokyoToLondon = ConvexRemote.connect(addrLondon);
-			serverTokyo.getPropagator().addPeer(keyL, tokyoToLondon);
+			propagatorTokyo.addPeer(keyL, tokyoToLondon);
 
 			section("2. Peer connections established (bidirectional)");
 
@@ -119,10 +137,10 @@ public class ReplicationDemo {
 			// Two rounds ensure both sides have each other's data
 			// (first round may not reflect the other's merge result).
 
-			serverLondon.pull();
-			serverTokyo.pull();
-			serverLondon.pull();
-			serverTokyo.pull();
+			serverLondon.pull(propagatorLondon);
+			serverTokyo.pull(propagatorTokyo);
+			serverLondon.pull(propagatorLondon);
+			serverTokyo.pull(propagatorTokyo);
 
 			section("5. Network sync complete");
 			System.out.println("  London: " + dbLondon.tables().getRowCount("products") + " rows");
@@ -145,10 +163,10 @@ public class ReplicationDemo {
 			System.out.println("  Tokyo:  id=1 -> 'Widget Ultra' @ 15.99 (later timestamp)");
 
 			// Sync (two rounds for full convergence with Etch stores)
-			serverLondon.pull();
-			serverTokyo.pull();
-			serverLondon.pull();
-			serverTokyo.pull();
+			serverLondon.pull(propagatorLondon);
+			serverTokyo.pull(propagatorTokyo);
+			serverLondon.pull(propagatorLondon);
+			serverTokyo.pull(propagatorTokyo);
 
 			System.out.println();
 			System.out.println("  After sync -- both nodes see Tokyo's later write:");
@@ -162,13 +180,13 @@ public class ReplicationDemo {
 			serverTokyo.getCursor().sync();
 			System.out.println("  Tokyo deletes id=6 (Transistor)");
 
-			serverLondon.pull();
+			serverLondon.pull(propagatorLondon);
 			System.out.println("  London syncs -> " + dbLondon.tables().getRowCount("products") + " rows");
 
 			// ── 8. Final converged state ────────────────────────────────
 
 			// One more full sync to ensure both are identical
-			serverTokyo.pull();
+			serverTokyo.pull(propagatorTokyo);
 
 			section("8. Final converged state");
 			showTable("London", dbLondon);
@@ -201,6 +219,8 @@ public class ReplicationDemo {
 
 		} finally {
 			// Clean shutdown
+			transportLondon.close();
+			transportTokyo.close();
 			serverLondon.close();
 			serverTokyo.close();
 			storeLondon.close();

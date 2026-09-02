@@ -180,6 +180,12 @@ public final class Address extends AExtensionValue {
 	public int encodeRaw(byte[] bs, int pos) {
 		return Format.writeVLQCount(bs, pos, value);
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ address value, no refs
+		return 1+Format.getVLQCountLength(value);
+	}
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {

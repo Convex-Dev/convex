@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,8 +39,11 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
+import convex.etch.EtchStore;
 import convex.lattice.ALattice;
 import convex.lattice.LatticeContext;
 import convex.lattice.LatticeTest;
@@ -1073,4 +1077,42 @@ public class DLFSTest {
 		}
 	}
 
+
+	/**
+	 * Regression for covia#469: a directory entry whose name exceeded the embedded
+	 * string limit was listed but could not be resolved once its directory index had
+	 * been reloaded from a store, because the decoded single-entry Index node
+	 * assumed the maximum key depth.
+	 */
+	@Test
+	public void testLongNamesResolveAfterStoreReload() throws IOException {
+		DLFSLocal fs=DLFS.createLocal();
+		String longName="n".repeat(200);
+		Files.write(fs.getPath("/"+longName),new byte[] {7});
+		Files.write(fs.getPath("/short"),new byte[] {8});
+
+		EtchStore store=EtchStore.createTemp("dlfs-reload");
+		File file=store.getFile();
+		Hash hash=Cells.persist(fs.getNode(fs.getRoot()),store).getHash();
+		store.close();
+		EtchStore reopened=EtchStore.create(file);
+		try {
+			AVector<ACell> root=reopened.<AVector<ACell>>refForHash(hash).getValue();
+			DLFSLocal reloaded=new DLFSLocal(DLFS.provider(),null,root);
+			int listed=0;
+			try (DirectoryStream<Path> stream=Files.newDirectoryStream(reloaded.getRoot())) {
+				for (Path p : stream) {
+					listed++;
+					assertTrue(Files.exists(p),"listed entry must resolve: "+p);
+				}
+			}
+			assertEquals(2,listed);
+			Path path=reloaded.getPath("/"+longName);
+			assertArrayEquals(new byte[] {7},Files.readAllBytes(path));
+			Files.delete(path);
+			assertFalse(Files.exists(path));
+		} finally {
+			reopened.close();
+		}
+	}
 }

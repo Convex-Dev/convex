@@ -110,11 +110,6 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 		return new VectorArrayIterator(0);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public T get(long i) {
@@ -202,6 +197,12 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		return toVector().encodeRaw(bs, pos);
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// non-canonical: the canonical vector encodes
+		return getCanonical().calcHeaderLength();
 	}
 
 	@Override

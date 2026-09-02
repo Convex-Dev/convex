@@ -87,12 +87,7 @@ public final class CVMDouble extends ANumeric {
 		if (Double.isNaN(value)) return NaN; // NaN special case
 		return this;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+8;
-	}
-
+		
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// always OK, though might not be CVM value
@@ -116,6 +111,12 @@ public final class CVMDouble extends ANumeric {
 	public int encodeRaw(byte[] bs, int pos) {
 		long doubleBits=Double.doubleToRawLongBits(value); // note same as doubleToLongBits assuming we are valid and canonical
 		return Utils.writeLong(bs,pos,doubleBits);
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus eight raw bytes, no refs
+		return MAX_ENCODING_LENGTH;
 	}
 	
 	@Override

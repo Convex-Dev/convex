@@ -323,17 +323,18 @@ public class BlobTree extends ABlob {
 		return pos;
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ count, then child refs
+		return 1+Format.getVLQCountLength(count);
+	}
+
 	/**
 	 * Maximum byte length of an encoded BlobTree node. 
 	 * Note: 
 	 * - Last child might be embedded, others cannot
 	 */
 	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLQ_COUNT_LENGTH+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 1 + Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
-	}
 
 	/**
 	 * Appends another blob to this BlobTree. Potentially O(n) but can be faster.

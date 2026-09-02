@@ -50,12 +50,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	public final int getRefCount() {
 		return values.getRefCount();
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return values.estimatedEncodingSize();
-	}
-	
+		
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
@@ -69,6 +64,12 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	@Override
 	public final int encodeRaw(byte[] bs, int pos) {
 		return values.encodeRaw(bs, pos);
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// record tag stands in for the vector tag, then the raw values vector body
+		return values.calcHeaderLength();
 	}
 	
 	@Override 

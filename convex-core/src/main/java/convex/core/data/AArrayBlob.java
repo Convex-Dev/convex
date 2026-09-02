@@ -141,6 +141,13 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
+	public int calcHeaderLength() {
+		// tag, VLQ count and the raw bytes; beyond a chunk the canonical BlobTree encodes
+		if (count>Blob.CHUNK_LENGTH) return getCanonical().calcHeaderLength();
+		return 1+Format.getVLQCountLength(count)+(int)count;
+	}
+
+	@Override
 	public final boolean appendHex(BlobBuilder bb, long hexLength) {
 		if (hexLength<0) return false;
 		long nbytes= Math.min(hexLength/2, this.count); // Bytes to print

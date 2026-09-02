@@ -118,10 +118,13 @@ public enum MessageType {
 	/**
 	 * Lattice value message, announcement of a changed lattice value
 	 * 
-	 * Payload is: [:LV id [*path*] value]
+	 * Optimistic push payload: [:LV [*path*] value]
 	 *
-	 * A null ID makes the message fire-and-forget. A non-null ID requests a
-	 * Result after the receiving NodeServer has merged the value.
+	 * Confirmed push payload: [:LV id [*path*] value]
+	 *
+	 * The three-field form is fire-and-forget. An ID requests a Result after the
+	 * receiving NodeServer has merged the value. Four-field messages with a null
+	 * ID are also accepted as fire-and-forget for wire compatibility.
 	 */
 	LATTICE_VALUE(14),
 	
@@ -129,6 +132,7 @@ public enum MessageType {
 	 * Lattice query message = request for a lattice value
 	 * 
 	 * Payload is: [:LQ id [*path*]]
+	 * The path is always a vector; the empty vector selects the root.
 	 */
 	LATTICE_QUERY(15),
 	

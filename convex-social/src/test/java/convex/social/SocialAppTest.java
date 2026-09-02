@@ -7,11 +7,16 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import convex.auth.did.DID;
+import convex.auth.did.DIDKeyAuthorizer;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -113,7 +118,7 @@ public class SocialAppTest {
 		assertNotNull(reply);
 		assertEquals("Great post!", SocialPost.getText(reply));
 		assertEquals(parentKey, reply.get(SocialPost.REPLY_TO));
-		assertEquals(alice.getAccountKey(), reply.get(SocialPost.REPLY_DID));
+		assertEquals(DID.forKey(alice.getAccountKey()), reply.get(SocialPost.REPLY_DID));
 	}
 
 	@Test
@@ -146,12 +151,38 @@ public class SocialAppTest {
 		// Follow Bob
 		follows.follow(bob.getAccountKey());
 		assertTrue(follows.isFollowing(bob.getAccountKey()));
-		assertEquals(Set.of(bob.getAccountKey()), follows.getActive());
+		assertEquals(Set.of(DID.forKey(bob.getAccountKey())), follows.getActive());
 
 		// Unfollow Bob
 		follows.unfollow(bob.getAccountKey());
 		assertFalse(follows.isFollowing(bob.getAccountKey()));
 		assertTrue(follows.getActive().isEmpty());
+	}
+
+	@Test
+	public void testValidatedFollowKeyCachePreservesIntent() throws Exception {
+		AKeyPair alice=AKeyPair.generate();
+		AKeyPair bob=AKeyPair.generate();
+		AString bobDid=convex.core.data.Strings.create("did:web:bob.example");
+		Social social=Social.create(alice);
+		Follows follows=social.user(alice.getAccountKey()).follows();
+
+		assertThrows(IllegalStateException.class,
+			() -> follows.cacheValidatedKey(bobDid,bob.getAccountKey()));
+		follows.follow(bobDid);
+		follows.cacheValidatedKey(bobDid,bob.getAccountKey());
+		assertTrue(follows.isFollowing(bobDid));
+		assertEquals(bob.getAccountKey(),follows.getCachedAccountKey(bobDid));
+
+		SignedData<?> signed=social.cursor().get().get(DID.forKey(alice.getAccountKey()));
+		SignedData<?> decoded=(SignedData<?>)CVMEncoder.INSTANCE.decodeMultiCell(
+			Format.encodeMultiCell(signed,true));
+		@SuppressWarnings("unchecked")
+		AHashMap<ACell,ACell> encodedFollows=SocialLattice.getFollows(
+			(Index<Keyword,ACell>)decoded.getValue());
+		ACell encodedKey=((AHashMap<?,?>)encodedFollows.get(bobDid))
+			.get(Follows.KEY_ACCOUNT_KEY);
+		assertEquals(bob.getAccountKey(),AccountKey.parse(encodedKey));
 	}
 
 	@Test
@@ -165,10 +196,10 @@ public class SocialAppTest {
 		follows.follow(bob.getAccountKey());
 		follows.follow(carol.getAccountKey());
 
-		Set<AccountKey> active = follows.getActive();
+		Set<AString> active = follows.getActive();
 		assertEquals(2, active.size());
-		assertTrue(active.contains(bob.getAccountKey()));
-		assertTrue(active.contains(carol.getAccountKey()));
+		assertTrue(active.contains(DID.forKey(bob.getAccountKey())));
+		assertTrue(active.contains(DID.forKey(carol.getAccountKey())));
 	}
 
 	@Test
@@ -216,6 +247,33 @@ public class SocialAppTest {
 		// Both users' posts visible in original
 		assertEquals(1, social.user(alice.getAccountKey()).feed().count());
 		assertEquals(1, social.user(bob.getAccountKey()).feed().count());
+	}
+
+	@Test
+	@SuppressWarnings("unchecked")
+	public void testUserForkBatchedValueSurvivesEncodingRoundTrip() throws Exception {
+		AKeyPair alice=AKeyPair.generate();
+		AKeyPair bob=AKeyPair.generate();
+		Social social=Social.create(alice);
+		SocialUser work=social.user(alice.getAccountKey()).fork();
+
+		Blob post=work.feed().post("Hello from Alice");
+		work.follows().follow(bob.getAccountKey());
+		assertEquals(0,social.user(alice.getAccountKey()).feed().count());
+		assertTrue(social.user(alice.getAccountKey()).follows().getActive().isEmpty());
+		work.sync();
+
+		SignedData<Index<Keyword,ACell>> signed=
+			(SignedData<Index<Keyword,ACell>>)social.cursor().get().get(
+				DID.forKey(alice.getAccountKey()));
+		SignedData<Index<Keyword,ACell>> decoded=
+			(SignedData<Index<Keyword,ACell>>)CVMEncoder.INSTANCE.decodeMultiCell(
+				Format.encodeMultiCell(signed,true));
+
+		assertTrue(decoded.checkSignature());
+		assertNotNull(SocialLattice.getFeed(decoded.getValue()).get(post));
+		assertEquals(Set.of(DID.forKey(bob.getAccountKey())),SocialHelpers.getActiveFollows(
+			SocialLattice.getFollows(decoded.getValue())));
 	}
 
 	@Test
@@ -302,7 +360,7 @@ public class SocialAppTest {
 		AKeyPair kp = AKeyPair.generate();
 		Social social = Social.create(kp);
 		Feed feed = social.user(kp.getAccountKey()).feed();
-		assertEquals(kp.getAccountKey(), feed.getAuthor());
+		assertEquals(DID.forKey(kp.getAccountKey()), feed.getAuthor());
 	}
 
 	@Test
@@ -363,9 +421,11 @@ public class SocialAppTest {
 		SignedData<Index<Keyword, ACell>> forgedSigned = alice.signData(forgedState);
 
 		// Alice's node: contains Alice's legit data + forgery under Bob's key
+		AString aliceDid=DID.forKey(alice.getAccountKey());
+		AString bobDid=DID.forKey(bob.getAccountKey());
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> attackerNode = Maps.of(
-			alice.getAccountKey(), aliceSigned,
-			bob.getAccountKey(), forgedSigned);  // forgery!
+			aliceDid, aliceSigned,
+			bobDid, forgedSigned);  // forgery!
 
 		// Bob's node: contains Bob's legitimate data
 		AHashMap<Keyword, ACell> bobPost = SocialPost.createPost("Bob legit", 3000L);
@@ -376,7 +436,7 @@ public class SocialAppTest {
 		SignedData<Index<Keyword, ACell>> bobSigned = bob.signData(bobState);
 
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> honestNode = Maps.of(
-			bob.getAccountKey(), bobSigned);
+			bobDid, bobSigned);
 
 		// Network merge: Bob's node receives Alice's node state
 		OwnerLattice<Index<Keyword, ACell>> ownerLattice = Social.SOCIAL_LATTICE;
@@ -386,13 +446,13 @@ public class SocialAppTest {
 			ownerLattice.merge(ctx, honestNode, attackerNode);
 
 		// Alice's legitimate entry survives (correctly signed by Alice under Alice's key)
-		SignedData<Index<Keyword, ACell>> aliceResult = merged.get(alice.getAccountKey());
+		SignedData<Index<Keyword, ACell>> aliceResult = merged.get(aliceDid);
 		assertNotNull(aliceResult, "Alice's legitimate entry should survive merge");
 		assertEquals(alice.getAccountKey(), aliceResult.getAccountKey());
 		assertEquals(1, SocialLattice.getFeed(aliceResult.getValue()).count());
 
 		// Bob's legitimate entry survives (correctly signed by Bob under Bob's key)
-		SignedData<Index<Keyword, ACell>> bobResult = merged.get(bob.getAccountKey());
+		SignedData<Index<Keyword, ACell>> bobResult = merged.get(bobDid);
 		assertNotNull(bobResult, "Bob's legitimate entry should survive merge");
 		assertEquals(bob.getAccountKey(), bobResult.getAccountKey(),
 			"Bob's entry should be signed by Bob, not Alice");
@@ -424,7 +484,7 @@ public class SocialAppTest {
 		SignedData<Index<Keyword, ACell>> forgedSigned = alice.signData(forgedState);
 
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> attackerData = Maps.of(
-			bob.getAccountKey(), forgedSigned);
+			DID.forKey(bob.getAccountKey()), forgedSigned);
 
 		// Receiving node has nothing
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> emptyNode = Maps.empty();
@@ -436,9 +496,32 @@ public class SocialAppTest {
 			ownerLattice.merge(ctx, emptyNode, attackerData);
 
 		// Forgery should be rejected — Bob's slot should remain empty
-		SignedData<Index<Keyword, ACell>> bobResult = merged.get(bob.getAccountKey());
+		SignedData<Index<Keyword, ACell>> bobResult = merged.get(DID.forKey(bob.getAccountKey()));
 		assertNull(bobResult,
 			"Forgery into empty slot should be rejected: signer (Alice) != owner (Bob)");
+	}
+
+	@Test
+	public void testIndirectDIDRequiresAuthenticatedResolver() {
+		AKeyPair signer=AKeyPair.generate();
+		AString webDid=convex.core.data.Strings.create("did:web:alice.example");
+		Index<Keyword,ACell> state=Index.<Keyword,ACell>none().assoc(
+			SocialLattice.KEY_FEED,Index.none());
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> update=Maps.of(
+			webDid,signer.signData(state));
+
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> denied=
+			Social.SOCIAL_LATTICE.merge(LatticeContext.EMPTY,Maps.empty(),update);
+		assertNull(denied.get(webDid));
+
+		DIDKeyAuthorizer aliases=DIDKeyAuthorizer.fromAlsoKnownAs(did ->
+			did.equals(webDid)?java.util.List.of(DID.forKey(signer.getAccountKey()))
+				:java.util.List.of());
+		LatticeContext authorised=LatticeContext.create(
+			null,null,aliases::verifiesOwner);
+		AHashMap<ACell,SignedData<Index<Keyword,ACell>>> accepted=
+			Social.SOCIAL_LATTICE.merge(authorised,Maps.empty(),update);
+		assertNotNull(accepted.get(webDid));
 	}
 
 	/**
@@ -456,6 +539,6 @@ public class SocialAppTest {
 			()->social.user(bob.getAccountKey()).feed().post("Forged!"));
 
 		AHashMap<ACell, SignedData<Index<Keyword, ACell>>> ownerMap = social.cursor().get();
-		assertNull(ownerMap.get(bob.getAccountKey()));
+		assertNull(ownerMap.get(DID.forKey(bob.getAccountKey())));
 	}
 }

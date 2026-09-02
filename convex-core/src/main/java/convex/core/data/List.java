@@ -249,15 +249,16 @@ public class List<T extends ACell> extends AList<T> {
 		pos = data.encodeRaw(bs,pos);
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// list tag stands in for the vector tag, then the raw data vector body
+		return data.calcHeaderLength();
+	}
 	
 	@Override
 	public Iterator<T> iterator() {
 		return listIterator();
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
 	}
 
 	/**

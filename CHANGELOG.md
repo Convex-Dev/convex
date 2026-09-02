@@ -5,6 +5,112 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.16] - 2026-09-02
+
+### Added
+
+- P2P nodes can advertise Point of Presence node keys and explicit relay
+  willingness in signed NodeInfo. Opt-in PoP nodes forward bounded end-to-end
+  signed messages over authenticated routes; outbound-only nodes can exchange
+  public values or ECIES-encrypted private values through a shared PoP.
+- P2P lattice nodes can bootstrap from one authenticated node key and TCP address.
+  The connecting node pushes only its own signed NodeInfo entry, allowing the remote
+  node to challenge it on the same full-duplex socket and explicitly upgrade that
+  inbound connection into an authenticated outbound propagation route, then pulls
+  `:p2p`, `:id` and currently desired social-owner paths so late joiners receive their
+  follow-filtered application state. Outbound-only nodes may publish an empty transport vector and
+  synchronise through that original connection without a listener or reverse dial.
+  `NodeConfig.localNetwork()` provides loopback NodeInfo publication with OS-assigned
+  ports for isolated development networks.
+- Social users support owner-scoped forks, allowing several feed and follow actions to
+  be published as one signed user value.
+- Social owners and follow targets are canonical DIDs, with `did:key`, pinned numeric
+  `did:convex`, and authenticated `did:web`/`alsoKnownAs` key authorisation. The
+  top-level `:following` value uses LWP over a DID-keyed `:follows` map with whole-record
+  LWW edits and a cached last-validated signer.
+- The supported `convex.peer` module API now exports `convex.node`. Host settings
+  use `NodeConfig`, while each independently composed propagation group uses
+  `LatticePropagatorConfig` and exposes lifecycle and contained-failure status for
+  application supervision.
+
+### Changed
+
+- `Format.encodeMultiCell` no longer knows about message limits and never silently
+  drops cells: a new overload takes a maximum size and throws `IllegalArgumentException`
+  when it would be exceeded, with zero or less meaning no maximum. `Message.getMessageData`
+  applies the maximum message length at the transport boundary, and connections refuse
+  to send, with a logged warning, a message that cannot fit one frame (#726).
+- Lattice query replies are sized by the requesting connection's trust and decided from
+  cached memory sizes, so a query never makes a node encode more than it will send. An
+  untrusted connection receives a value in full only when it fits one message of the
+  size the node accepts from it, and otherwise the root alone to acquire the rest; a
+  trusted connection also receives bounded `DATA` chunks ahead of the root, as a
+  broadcast would.
+- Cells now compute their encoding length arithmetically from a per-type header
+  length plus their child refs, never by rendering an encoding, and `createEncoding`
+  allocates the exact size. `estimatedEncodingSize` has been removed from
+  `IWriteable`, `ACell` and `Ref`; callers needing a size should use
+  `getEncodingLength`.
+- `Hash` and `AccountKey` are now canonical cells: they encode exactly as 32-byte
+  blobs, so `getCanonical()` returns the same instance rather than a plain `Blob`.
+- Convex clients preserve reserved transaction sequences after timeouts and CVM
+  errors, preventing a shared client from reusing a sequence whose outcome is
+  unknown or which the transaction consumed.
+- CAD036 lattice paths now use one canonical vector representation. Lattice nodes
+  use `[:LV path value]` for optimistic pushes and `[:LV id path value]` for
+  confirmed pushes, and reject scalar, missing or ambiguous paths.
+- `NodeServer` now owns only the authoritative lattice merge, node-store root,
+  attached-group lifecycle and isolated update notification. Calling applications
+  must construct and configure each `LatticePropagator`; nodes no longer create
+  an implicit primary group. Applications also own `LatticeListener` transport
+  composition, permitting shared connection routing or independent transports;
+  `NodeServer` no longer exposes a port, address or inbound selector. Propagators
+  own their connection sets, trust, protocol queues, acquisition, filters and
+  serving stores, and a failed group cannot break node publication or another
+  group.
+
+### Fixed
+
+- `LatticePropagator.pullPath` merged a partial reply as if complete when its store
+  held the root without every branch, since `MemoryStore` returns a missing ref rather
+  than throwing. Completeness is now checked explicitly and a partial value is acquired
+  from the peer before it is merged; the peer client is given the propagator store before
+  the query so a partial reply decodes lazily instead of being rejected.
+- Multi-cell messages containing an `Index` node deeper than 64 hex digits with
+  non-embedded children could not be decoded by a receiver that did not already
+  hold those children, because the embedding check dereferenced them. A lattice
+  query for such a value failed on the requesting node, so a joining node could
+  not bootstrap from a peer holding it (#723). `Index` now computes its encoding
+  length from its refs without loading any child.
+- DLFS directory entries with names longer than the embedded string limit (138 to
+  254 bytes) were listed but could not be opened, statted, moved or deleted once
+  their directory index had been reloaded from an Etch store, for example after a
+  restart or when a cached node was evicted from memory. Single-entry `Index` nodes
+  decoded with a non-embedded key now derive their depth from the key instead of
+  assuming the maximum, so lookups agree with iteration.
+- String interning is thread-safe. `StringStore` kept the process-wide intern
+  index in plain `HashMap`s written without synchronisation, so concurrent
+  `Strings.intern` calls could corrupt it and later lookups then recursed in
+  `HashMap$TreeNode.find` until `StackOverflowError`. Entries are now published
+  under a lock onto concurrent maps; `LoadMonitor`'s per-thread map is synchronised.
+- Social cached follow signers recognise canonical 32-byte Blob keys after CAD3 decode,
+  while active follow identities remain DIDs.
+
+### Security
+
+- Point-message relays verify the invariant source signature, destination,
+  lifetime and path before forwarding, use authenticated routes only, and bound
+  message size, hops, fan-out, recent replay state and inbound rate.
+- Lattice peer trust now requires a valid two-sided Ed25519 challenge/response binding
+  a random nonce, both node-key audiences and a fixed protocol context. An assigned
+  inbound socket remains an untrusted public route until that proof and an admitted
+  owner-signed NodeInfo both succeed.
+- Unverified connections can submit only complete, size-bounded lattice values and
+  cannot stage unsolicited `DATA` or trigger missing-cell acquisition. P2P social
+  ingress validates the complete signed owner slot and DID signer before persistence,
+  retains only local users, pins and direct follows, and bounds explicit plus discovered
+  desired peers with `maxDesiredPeers`.
+
 ## [0.8.15] - 2026-08-24
 
 ### Added
@@ -654,5 +760,3 @@ NOTE: Due to to an apparent issue in Maven Central, this release was only partia
 - Command Line Interface (CLI)
 - GUI Testing Interface
 - Benchmark Suites
-
-

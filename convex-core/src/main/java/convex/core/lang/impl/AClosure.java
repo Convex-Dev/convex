@@ -42,15 +42,16 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 		return data.encodeRaw(bs, pos);
 	}
 
+	@Override
+	public int calcHeaderLength() {
+		// function tag stands in for the vector tag, then the raw data vector body
+		return data.calcHeaderLength();
+	}
+
 	public final byte getTag() {
 		return CVMTag.FN;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
-	}
-	
+		
 	@Override
 	public int getRefCount() {
 		return data.getRefCount();

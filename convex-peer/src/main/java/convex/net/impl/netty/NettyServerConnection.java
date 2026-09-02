@@ -30,7 +30,7 @@ class NettyServerConnection extends AConnection {
 		if (ch == null || !ch.isActive() || !ch.isWritable()) return false;
 		// Message encoding can traverse a large cell tree. Do it on the NodeServer
 		// dispatcher (or other caller), never lazily in NettyOutboundHandler.
-		msg.getMessageData();
+		if (NettyConnection.encodedLength(msg)<0) return false; // too large for a frame: logged, not sent
 		if (!ch.isActive() || !ch.isWritable()) return false;
 		ch.writeAndFlush(msg);
 		return true;

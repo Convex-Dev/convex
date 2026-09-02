@@ -216,12 +216,6 @@ public class Blob extends AArrayBlob {
 		}
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		// space for tag, generous VLC length, plus raw data
-		return 1 + Format.MAX_VLQ_LONG_LENGTH + size();
-	}
-
 	/**
 	 * Maximum encoding size for a regular Blob
 	 */

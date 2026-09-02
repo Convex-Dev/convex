@@ -205,6 +205,12 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag, raw public key and raw signature, then the value ref
+		return 1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH;
+	}
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -213,11 +219,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 		return super.print(sb,limit);
 	}
 
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH+Format.MAX_EMBEDDED_LENGTH;
-	}
 
 	/**
 	 * Validates the signature in this SignedData instance. Caches result

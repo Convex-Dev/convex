@@ -54,7 +54,6 @@ public class LatticeDemo {
 	private static final int NUM_NODES = 3;      // Number of independent nodes in the network
 	private static final int MERGES = 1000;       // Number of merge batches to perform
 	private static final int MODS = 1000;         // Number of modifications per merge batch
-	private static final int BASE_PORT = 19700;  // Starting port number for nodes
 
 	public static void main(String[] args) throws Exception {
 		System.out.println("=== Lattice Synchronization Demo ===");
@@ -62,6 +61,8 @@ public class LatticeDemo {
 
 		// Collections to hold our nodes and their storage
 		List<NodeServer<?>> servers = new ArrayList<>();
+		List<LatticePropagator> propagators=new ArrayList<>();
+		List<LatticeListener> transports=new ArrayList<>();
 		List<AStore> stores = new ArrayList<>();
 
 		// Use Lattice.ROOT - the standard Convex lattice with :data keyword for storage
@@ -69,7 +70,7 @@ public class LatticeDemo {
 
 		try {
 			// STEP 1: Create and launch independent nodes
-			// Each node has its own memory store and listens on a different port
+			// Each node has its own memory store and an OS-assigned port
 			for (int i = 0; i < NUM_NODES; i++) {
 				// Create an in-memory store for this node's data
 				AStore store = new MemoryStore();
@@ -79,11 +80,21 @@ public class LatticeDemo {
 				// - Takes the lattice definition (what data structure to use)
 				// - Takes a store (where to persist data)
 				// - Takes a port number (how other nodes can connect to it)
-				NodeServer<?> server = new NodeServer<>(lattice, store, NodeConfig.port(BASE_PORT + i));
-				server.launch();  // This automatically starts the LatticePropagator
+				NodeConfig config=NodeConfig.port(0);
+				NodeServer<?> server = new NodeServer<>(lattice,store,config);
+				LatticePropagator propagator=new LatticePropagator(
+					store,lattice,value -> value,LatticePropagatorConfig.create());
+				server.addPropagator(propagator);
+				LatticeListener transport=new LatticeListener(config);
+				transport.registerPropagator(propagator);
+				transport.setSelector(connection -> propagator);
+				server.launch();
+				transport.launch();
 				servers.add(server);
+				propagators.add(propagator);
+				transports.add(transport);
 
-				System.out.println("Node " + (i + 1) + " started on port " + (BASE_PORT + i));
+				System.out.println("Node " + (i + 1) + " started on port " + transport.getPort());
 			}
 
 			System.out.println("\nEstablishing peer connections (full mesh)...");
@@ -92,17 +103,16 @@ public class LatticeDemo {
 			// Each node connects to every other node as a peer
 			// This creates a fully decentralized network with no single point of failure
 			for (int i = 0; i < NUM_NODES; i++) {
-				NodeServer<?> server = servers.get(i);
 				for (int j = 0; j < NUM_NODES; j++) {
 					if (i != j) {  // Don't connect to self
 						// Create a connection to the remote node
-						InetSocketAddress peerAddress = new InetSocketAddress("localhost", BASE_PORT + j);
+						InetSocketAddress peerAddress=transports.get(j).getHostAddress();
 						AccountKey peerKey = AKeyPair.generate().getAccountKey();
 						Convex peer = ConvexRemote.connect(peerAddress);
 
 						// Add this peer to the node's peer list
 						// Now this node can send broadcasts to this peer
-						server.getPropagator().addPeer(peerKey, peer);
+						propagators.get(i).addPeer(peerKey,peer);
 					}
 				}
 				System.out.println("Node " + (i + 1) + " connected to " + (NUM_NODES - 1) + " peers");
@@ -175,7 +185,7 @@ public class LatticeDemo {
 				// pull() queries all peers for their current state and merges it locally
 				// This ensures this node has the latest data from everyone
 				// In production, this happens automatically - we're just being explicit here
-				boolean pullResult = server.pull();
+				boolean pullResult=server.pull(propagators.get(i));
 				System.out.println("Node " + (i + 1) + " pull: " + (pullResult ? "SUCCESS" : "FAILED"));
 			}
 			long syncTime = System.currentTimeMillis() - syncStart;
@@ -232,7 +242,7 @@ public class LatticeDemo {
 				// This is because the propagator intelligently batches and only sends deltas
 				System.out.println("\nPropagator Statistics (how automatic sync worked):");
 				for (int i = 0; i < NUM_NODES; i++) {
-					LatticePropagator propagator = servers.get(i).getPropagator();
+					LatticePropagator propagator=propagators.get(i);
 					System.out.println("  Node " + (i + 1) + ": " +
 						propagator.getBroadcastCount() + " delta broadcasts, " +
 						propagator.getRootSyncCount() + " root syncs");
@@ -248,7 +258,10 @@ public class LatticeDemo {
 			// CLEANUP: Always close resources properly
 			System.out.println("\nShutting down nodes...");
 
-			// Close all servers (stops network listeners and propagators)
+			// Close transports before the authoritative nodes drain propagators.
+			for (LatticeListener transport:transports) transport.close();
+
+			// Close all servers and propagators.
 			for (int i = 0; i < servers.size(); i++) {
 				servers.get(i).close();
 				System.out.println("Node " + (i + 1) + " shutdown complete");

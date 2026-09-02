@@ -45,7 +45,7 @@ Path: `[:queue <ownerKey> :value <topicName>]`
 
 `P2PLattice` (`KeyedLattice`) with one sub-region:
 
-- **`:nodes`** — `OwnerLattice(LWWLattice)`. Each peer publishes `SignedData<NodeInfo>` containing transport URIs, supported regions, protocol version, and timestamp. LWW merge ensures the latest metadata wins. Validated against on-chain `PeerStatus`.
+- **`:nodes`** — `OwnerLattice(LWWLattice)`. Each node publishes `SignedData<NodeInfo>` containing transport URIs, Point of Presence node keys, relay willingness, supported regions, protocol version, and timestamp. LWW merge ensures the latest metadata wins.
 
 Path: `[:p2p :nodes <accountKey>]`
 

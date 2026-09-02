@@ -46,6 +46,9 @@ import convex.core.util.Utils;
  * <p>Messages contain a payload, which can be any data value.</p>
  */
 public class Message {
+	/** Domain separator for authenticated lattice-node routes. */
+	public static final AString LATTICE_PEER_CHALLENGE_CONTEXT =
+		Strings.intern("convex-lattice-peer-v1");
 
 	private static final Message BYE_MESSAGE = Message.create(MessageType.GOODBYE,Vectors.create(MessageTag.BYE));
 
@@ -82,7 +85,7 @@ public class Message {
 		// This is a bit special because we don't want to have a full payload.
 		Result result= Result.create(id,Vectors.create(cells));
 		Message m = create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
-		m.messageData=Format.encodeDataResult(result);		
+		m.messageData=Format.encodeDataResult(result,CPoSConstants.MAX_MESSAGE_LENGTH);
 		return m;
 	}
 
@@ -245,67 +248,71 @@ public class Message {
 	@SuppressWarnings("unchecked")
 	public void respondToChallenge(AKeyPair keyPair, Predicate<ACell> contextValidator) {
 		try {
-			if (keyPair == null) {
-				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("No signing key")));
-				return;
-			}
-
 			// Message payload is [tag, id, signedData]
 			AVector<ACell> msgPayload = getPayload();
-			if (msgPayload == null || msgPayload.count() < 3) {
+			if (msgPayload == null || msgPayload.count() != 3) {
 				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge format")));
 				return;
 			}
-			SignedData<ACell> signedData = (SignedData<ACell>) msgPayload.get(2);
-			if (signedData == null) {
+			ACell rawChallenge=msgPayload.get(2);
+			if (!(rawChallenge instanceof SignedData<?> rawSigned)) {
 				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Missing signed data")));
 				return;
 			}
-
-			AVector<ACell> challengeValues = (AVector<ACell>) signedData.getValue();
-			if (challengeValues == null) {
-				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Invalid challenge data")));
-				return;
-			}
-
-			long n = challengeValues.count();
-			if (n < 2 || n > 3) {
-				returnResult(Result.error(ErrorCodes.FORMAT, Strings.create("Wrong element count")));
-				return;
-			}
-
-			// Verify challenge is addressed to this key (null targetKey = accept any)
-			ACell rawTarget = challengeValues.get(1);
-			if (rawTarget != null) {
-				AccountKey targetKey = RT.ensureAccountKey(rawTarget);
-				if (targetKey == null || !keyPair.getAccountKey().equals(targetKey)) {
-					returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Wrong target key")));
-					return;
-				}
-			}
-
-			// Optional contextID validation
-			ACell contextID = (n == 3) ? challengeValues.get(2) : null;
-			if (contextID != null && contextValidator != null && !contextValidator.test(contextID)) {
-				returnResult(Result.error(ErrorCodes.TRUST, Strings.create("Context mismatch")));
-				return;
-			}
-
-			ACell token = challengeValues.get(0);
-			AccountKey challengerKey = signedData.getAccountKey();
-
-			// Build response: [token, challengerKey, contextID?]
-			AVector<ACell> responseValues = (contextID != null)
-				? Vectors.of(token, challengerKey, contextID)
-				: Vectors.of(token, challengerKey);
-			SignedData<ACell> response = keyPair.signData(responseValues);
-			returnResult(Result.value(response));
+			returnResult(answerChallenge(keyPair,(SignedData<ACell>)rawSigned,contextValidator));
 		} catch (Exception e) {
 			try {
 				returnResult(Result.error(ErrorCodes.UNEXPECTED, Strings.create(e.getMessage())));
 			} catch (Exception e2) {
 				// best effort
 			}
+		}
+	}
+
+	/**
+	 * Validates and answers one signed possession challenge. This shared path is used
+	 * by both message-based and direct in-process transports.
+	 */
+	@SuppressWarnings("unchecked")
+	public static Result answerChallenge(AKeyPair keyPair,SignedData<ACell> signedData,
+			Predicate<ACell> contextValidator) {
+		try {
+			if (keyPair==null) return Result.error(ErrorCodes.TRUST,Strings.create("No signing key"));
+			if (signedData==null) return Result.error(ErrorCodes.FORMAT,Strings.create("Missing signed data"));
+			if (!signedData.checkSignature()) {
+				return Result.error(ErrorCodes.TRUST,Strings.create("Invalid challenge signature"));
+			}
+			ACell challenge=signedData.getValue();
+			if (!(challenge instanceof AVector<?> rawValues)) {
+				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge data"));
+			}
+			AVector<ACell> values=(AVector<ACell>)rawValues;
+			long n=values.count();
+			Hash token=(n>=1)?RT.ensureHash(values.get(0)):null;
+			if (n<2 || n>3 || token==null) {
+				return Result.error(ErrorCodes.FORMAT,Strings.create("Invalid challenge elements"));
+			}
+
+			ACell rawTarget=values.get(1);
+			if (rawTarget!=null) {
+				AccountKey targetKey=RT.ensureAccountKey(rawTarget);
+				if (targetKey==null || !keyPair.getAccountKey().equals(targetKey)) {
+					return Result.error(ErrorCodes.TRUST,Strings.create("Wrong target key"));
+				}
+			}
+
+			ACell contextID=(n==3)?values.get(2):null;
+			if (contextValidator!=null && !contextValidator.test(contextID)) {
+				return Result.error(ErrorCodes.TRUST,Strings.create("Context mismatch"));
+			}
+
+			AccountKey challengerKey=signedData.getAccountKey();
+			AVector<ACell> responseValues=(contextID!=null)
+				?Vectors.of(token,challengerKey,contextID)
+				:Vectors.of(token,(ACell)challengerKey);
+			return Result.value(keyPair.signData(responseValues));
+		} catch (Exception e) {
+			return Result.error(ErrorCodes.UNEXPECTED,Strings.create(e.getMessage()));
 		}
 	}
 
@@ -342,6 +349,7 @@ public class Message {
 		ACell rv = result.getValue();
 		if (!(rv instanceof SignedData)) return null;
 		SignedData<ACell> response = (SignedData<ACell>) rv;
+		if (!response.checkSignature()) return null;
 		AccountKey remoteKey = response.getAccountKey();
 
 		if (expectedKey != null && !expectedKey.equals(remoteKey)) return null;
@@ -350,10 +358,10 @@ public class Message {
 		if (!(inner instanceof AVector)) return null;
 		AVector<ACell> values = (AVector<ACell>) inner;
 		long n = values.count();
-		if (n < 2 || n > 3) return null;
+		if (n != ((contextID == null) ? 2 : 3)) return null;
 		if (!token.equals(values.get(0))) return null;
 		if (!ownKey.equals(values.get(1))) return null;
-		if (n == 3 && !Utils.equals(contextID, values.get(2))) return null;
+		if (contextID != null && !Utils.equals(contextID, values.get(2))) return null;
 
 		return remoteKey;
 	}
@@ -417,8 +425,11 @@ public class Message {
 	}
 	
 	/**
-	 * Gets the encoded data for this message. Generates a single cell encoding if required.
+	 * Gets the encoded data for this message. Generates a multi-cell encoding of the
+	 * payload if required, applying the maximum message length: this is the boundary
+	 * at which a payload too large for one legal frame is rejected, never truncated.
 	 * @return Blob containing message data
+	 * @throws IllegalArgumentException if the payload cannot be encoded within the maximum message length
 	 */
 	public Blob getMessageData() {
 		if (messageData!=null) return messageData;
@@ -427,8 +438,8 @@ public class Message {
 			case MessageType.BELIEF:
 				// throw new Error("Received belief message should already have partial data encoding");
 			default:
-				messageData=Format.encodeMultiCell(payload,true);
-		
+				messageData=Format.encodeMultiCell(payload,true,CPoSConstants.MAX_MESSAGE_LENGTH);
+
 		}
 		return messageData;
 	}
@@ -550,13 +561,19 @@ public class Message {
 	public ACell getRequestID() {
 		if (payload==null) return null; // not yet decoded, can't extract ID
 		switch (getType()) {
+			// The optimistic [:LV path value] form is necessarily unsolicited. Only
+			// the confirmed four-field form has an ID in position 1.
+			case LATTICE_VALUE: {
+				AVector<?> v=RT.ensureVector(getPayload());
+				if (v==null || v.count()!=4) return null;
+				return RT.ensureLong(v.get(1));
+			}
 
 			// ID in position 1
 			case STATUS:
 			case TRANSACT:
 			case QUERY:
 			case DATA_REQUEST:
-			case LATTICE_VALUE:
 			case LATTICE_QUERY:
 			case PING:
 			case CHALLENGE:{
@@ -610,13 +627,26 @@ public class Message {
 				// Result is a special record type
 				case RESULT: 
 					return Message.create(type, ((Result)getPayload()).withID(id));
+
+				// Adding an ID to an optimistic push upgrades it to a confirmed push
+				// without overwriting its path.
+				case LATTICE_VALUE: {
+					ACell o=getPayload();
+					if (!(o instanceof AVector)) return null;
+					AVector<ACell> v=(AVector<ACell>)o;
+					if (v.count()==4) return Message.create(type,v.assoc(1,id));
+					if (v.count()==3) {
+						return Message.create(type,Vectors.create(
+							v.get(0),id,v.get(1),v.get(2)));
+					}
+					return null;
+				}
 					
 				// Using a vector [key ID ...]
 				case STATUS: 
 				case TRANSACT: 
 				case QUERY:
 				case DATA_REQUEST:
-				case LATTICE_VALUE:
 				case LATTICE_QUERY:
 				case PING:
 				case CHALLENGE: {

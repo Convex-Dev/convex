@@ -11,9 +11,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -23,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMEncoder;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Symbols;
@@ -35,6 +40,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.store.NullStore;
+import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class IndexTest {
@@ -163,6 +169,9 @@ public class IndexTest {
 		}
 		assertEquals(100L, m.count());
 		m.validate();
+		
+		final Index<ABlob, CVMLong>sm=m;
+		assertEquals(m.getEncodingLength(),m.getEncoding().size());
 
 		doIndexTests(m);
 
@@ -780,5 +789,330 @@ public class IndexTest {
 		assertEquals(Types.INDEX,m.getType());
 
 		CollectionsTest.doMapTests(m);
+	}
+
+	/**
+	 * A single-entry node does not encode its depth, and a key over the embedded
+	 * limit is not loaded when the node is decoded. The depth must then be derived
+	 * from the key on first use: assuming MAX_DEPTH made every such entry invisible
+	 * to lookup after a store reload while iteration still listed it (covia#469).
+	 */
+	@Test
+	public void testNonEmbeddedSingleEntryKeySurvivesStoreReload() throws Exception {
+		for (int len : new int[] {150, 180, Index.MAX_DEPTH/2-1}) {
+			byte[] bytes=new byte[len];
+			Arrays.fill(bytes,(byte)0x42);
+			Blob longKey=Blob.wrap(bytes);
+			Blob shortKey=Blob.fromHex("ff");
+			assertFalse(longKey.isEmbedded());
+			Index<ABlob,CVMLong> index=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+
+			EtchStore store=EtchStore.createTemp("index-reload");
+			File file=store.getFile();
+			Hash hash=Cells.persist(index,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				assertEquals(2,reloaded.count());
+				assertEquals(longKey,reloaded.entryAt(0).getKey());
+				assertEquals(CVMLong.ONE,reloaded.get(longKey),"key length "+len);
+				assertEquals(CVMLong.ZERO,reloaded.get(shortKey));
+				reloaded.validate();
+				assertEquals(index,reloaded);
+				assertEquals(index.dissoc(longKey),reloaded.dissoc(longKey));
+
+				// A longer key extending the reloaded key must still branch correctly
+				Blob extended=longKey.append(Blob.fromHex("01")).toFlatBlob();
+				Index<ABlob,CVMLong> grown=reloaded.assoc(extended,CVMLong.create(2));
+				assertNotNull(grown);
+				assertEquals(3,grown.count());
+				assertEquals(CVMLong.create(2),grown.get(extended));
+				assertEquals(CVMLong.ONE,grown.get(longKey));
+			} finally {
+				reopened.close();
+			}
+		}
+	}
+
+	/**
+	 * Keys beyond MAX_KEY_BYTES are clamped to MAX_DEPTH and alias on their first
+	 * 255 bytes. The clamp must also apply when a non-embedded oversized key is
+	 * resolved lazily after a store reload, and a depth outside the range must be
+	 * rejected at construction rather than truncated.
+	 */
+	@Test
+	public void testOversizedKeysClampDepthAcrossStoreReload() throws Exception {
+		byte[] base=new byte[300];
+		Arrays.fill(base,(byte)0x51);
+		Blob huge=Blob.wrap(base); // non-embedded and beyond MAX_KEY_BYTES
+		byte[] aliasBytes=Arrays.copyOf(base,1000);
+		aliasBytes[999]=0x77;
+		Blob hugeAlias=Blob.wrap(aliasBytes); // same first 255 bytes, different tail
+		Blob sibling=Blob.wrap(Arrays.copyOf(base,254)); // shorter key on the same prefix
+		Blob other=Blob.fromHex("ff");
+
+		Index<ABlob,CVMLong> single=Index.of(huge,CVMLong.ONE);
+		assertEquals(Index.MAX_DEPTH,single.getDepth());
+		Index<ABlob,CVMLong> index=Index.of(huge,CVMLong.ONE,sibling,CVMLong.create(2),other,CVMLong.ZERO);
+		assertEquals(3,index.count());
+
+		for (Index<ABlob,CVMLong> original : java.util.List.of(single,index)) {
+			EtchStore store=EtchStore.createTemp("index-oversized");
+			File file=store.getFile();
+			Hash hash=Cells.persist(original,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				assertEquals(original.count(),reloaded.count());
+				assertEquals(CVMLong.ONE,reloaded.get(huge));
+				assertEquals(CVMLong.ONE,reloaded.get(hugeAlias),"oversized keys alias on the first 255 bytes");
+				assertEquals(huge,reloaded.getEntry(hugeAlias).getKey());
+				reloaded.validate();
+				assertEquals(original,reloaded);
+
+				// The reloaded oversized entry resolves to exactly MAX_DEPTH
+				Index<ABlob,CVMLong> only=reloaded.dissoc(other).dissoc(sibling);
+				assertEquals(1,only.count());
+				assertEquals(Index.MAX_DEPTH,only.getDepth());
+
+				// Aliasing keys replace and remove the same entry
+				Index<ABlob,CVMLong> replaced=reloaded.assoc(hugeAlias,CVMLong.create(9));
+				assertEquals(reloaded.count(),replaced.count());
+				assertEquals(CVMLong.create(9),replaced.get(huge));
+				Index<ABlob,CVMLong> removed=reloaded.dissoc(hugeAlias);
+				assertEquals(reloaded.count()-1,removed.count());
+				assertNull(removed.get(huge));
+			} finally {
+				reopened.close();
+			}
+		}
+
+		// Out-of-range depths are rejected, never silently truncated to int
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.MAX_DEPTH+1,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Long.MAX_VALUE,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(-2,null,Index.EMPTY_CHILDREN,0,0));
+	}
+
+	/**
+	 * A decoded single-entry node with a non-embedded key holds UNRESOLVED_DEPTH
+	 * until first use. The sentinel must never reach an encoding: a single-entry
+	 * node encodes no depth, every multi-entry construction resolves it first, and
+	 * the constructor refuses it for anything but a single-entry node.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testUnresolvedDepthIsNeverEncoded() throws Exception {
+		byte[] bytes=new byte[200];
+		Arrays.fill(bytes,(byte)0x37);
+		Blob longKey=Blob.wrap(bytes);
+		Blob shortKey=Blob.fromHex("ff");
+		Index<ABlob,CVMLong> single=Index.of(longKey,CVMLong.ONE);
+		Index<ABlob,CVMLong> pair=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+
+		// Encode a sentinel node directly: no cached encoding, so encodeRaw runs
+		MapEntry<ABlob,CVMLong> entry=MapEntry.create(longKey,CVMLong.ONE);
+		Index<ABlob,CVMLong> unresolved=Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,1);
+		assertEquals(single.getEncoding(),unresolved.getEncoding());
+		assertEquals(single.getEncodingLength(),unresolved.getEncodingLength());
+		assertEquals(single.getHash(),unresolved.getHash());
+		assertEquals(single.isEmbedded(),unresolved.isEmbedded());
+		assertEquals(CVMLong.ONE,unresolved.get(longKey));
+		assertEquals(longKey.hexLength(),unresolved.getDepth());
+		unresolved.validate();
+
+		// Growing a sentinel node resolves the depth before any multi-entry node is built
+		Index<ABlob,CVMLong> fresh=Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,1);
+		Index<ABlob,CVMLong> grown=fresh.assoc(shortKey,CVMLong.ZERO);
+		assertEquals(pair.getEncoding(),grown.getEncoding());
+		assertEquals(pair,grown);
+		grown.validate();
+
+		// The sentinel is only legal on a single-entry node
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,null,Index.EMPTY_CHILDREN,0,1));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,2));
+
+		// Reload from a store, then persist again into a second store before any lookup
+		for (Index<ABlob,CVMLong> original : java.util.List.of(single,pair)) {
+			Blob expected=original.getEncoding();
+			EtchStore store=EtchStore.createTemp("index-unresolved");
+			File file=store.getFile();
+			Hash hash=Cells.persist(original,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			EtchStore second=EtchStore.createTemp("index-unresolved-2");
+			File secondFile=second.getFile();
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				Hash again=Cells.persist(reloaded,second).getHash();
+				assertEquals(hash,again);
+				second.close();
+				second=EtchStore.create(secondFile);
+				Index<ABlob,CVMLong> twice=second.<Index<ABlob,CVMLong>>refForHash(again).getValue();
+				assertEquals(expected,twice.getEncoding());
+				assertEquals(CVMLong.ONE,twice.get(longKey));
+				assertEquals(original,twice);
+				twice.validate();
+				assertEquals(expected,reopened.decode(expected).getEncoding());
+			} finally {
+				reopened.close();
+				second.close();
+			}
+		}
+	}
+
+	/**
+	 * Regression for Convex-Dev/convex#723. A node beyond depth 64 whose children
+	 * are hashed must decode from a multi-cell message without touching any store:
+	 * its embedded status follows from the ref flags and the inline lengths alone.
+	 * Covers the inline shape (an embedded node inside a vector) and the trailing
+	 * shape (a non-embedded node as its own message cell). The embedding check used
+	 * to dereference the hashed children and fail on a receiver that lacked them.
+	 */
+	@Test
+	public void testDeepIndexDecodesFromMultiCellMessage() throws IOException, BadFormatException, InvalidDataException {
+		Index<Blob,CVMLong> inline=deepIndex(2);
+		Index<Blob,CVMLong> trailing=deepIndex(5);
+		assertEquals(200L,inline.getDepth());
+		assertTrue(inline.isEmbedded(),"two hashed children fit within the embedded limit");
+		assertFalse(trailing.isEmbedded(),"five hashed children exceed the embedded limit");
+
+		for (Index<Blob,CVMLong> deep : java.util.List.of(inline,trailing)) {
+			for (int i=0;i<deep.getRefCount();i++) assertFalse(deep.getRef(i).isEmbedded());
+			AVector<ACell> value=Vectors.of(deep,CVMLong.ONE);
+			Blob message=Format.encodeMultiCell(value,true);
+
+			// Storeless decode: any store access would throw MissingDataException
+			ACell decoded=CVMEncoder.INSTANCE.decodeMultiCell(message);
+			assertEquals(value,decoded);
+			checkDecodedDeepIndex(deep,decoded);
+
+			// Store-backed decode against a store holding none of the cells
+			try (EtchStore empty=EtchStore.createTemp("index-deep-decode")) {
+				ACell viaStore=empty.decodeMultiCell(message);
+				assertEquals(value,viaStore);
+				checkDecodedDeepIndex(deep,viaStore);
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private static void checkDecodedDeepIndex(Index<Blob,CVMLong> expected, ACell decoded) throws InvalidDataException {
+		Index<Blob,CVMLong> index=(Index<Blob,CVMLong>)((AVector<ACell>)decoded).get(0);
+		assertEquals(expected.count(),index.count());
+		for (long i=0;i<expected.count();i++) assertEquals(CVMLong.create(i),index.get(deepKey((int)i)));
+		assertEquals(expected.getEncodingLength(),index.getEncodingLength());
+		index.validate();
+	}
+
+	/**
+	 * Builds an entry-less node at depth 200 whose children are all hashed: a
+	 * 100-byte shared prefix and 137-byte keys, so each single-entry child exceeds
+	 * the embedded limit while its key stays embedded.
+	 */
+	private static Index<Blob,CVMLong> deepIndex(int children) {
+		Index<Blob,CVMLong> index=Index.none();
+		for (int i=0;i<children;i++) index=index.assoc(deepKey(i),CVMLong.create(i));
+		return index;
+	}
+
+	private static Blob deepKey(int i) {
+		byte[] bs=new byte[137];
+		Arrays.fill(bs,0,100,(byte)0xAB);
+		Arrays.fill(bs,100,137,(byte)(0x11*i));
+		return Blob.wrap(bs);
+	}
+
+	/**
+	 * Index computes its encoding length arithmetically from its refs rather than
+	 * by building the encoding, so the embedding check never dereferences a hashed
+	 * child. Every node of a fresh structure must report the exact size of the
+	 * encoding it later produces, and agree on embedding, before any encoding
+	 * exists. Covers the shapes the arithmetic distinguishes: empty, single entries
+	 * with embedded and hashed keys and values, entry-bearing branch nodes, one- and
+	 * two-byte counts and depths, and embedded and hashed children.
+	 */
+	@Test
+	public void testEncodingLengthWithoutEncoding() throws BadFormatException {
+		Index<ABlob,ACell> mixed=Index.none();
+		for (int i=0;i<130;i++) mixed=mixed.assoc(patternKey(i,1+(i*37)%255),patternValue(i));
+		Index<ABlob,ACell> longKeys=Index.none();
+		for (int i=0;i<300;i++) longKeys=longKeys.assoc(patternKey(i,64+(i*37)%192),patternValue(i));
+		Index<ABlob,ACell> prefixChain=Index.none();
+		for (int i=1;i<=4;i++) prefixChain=prefixChain.assoc(patternKey(7,i),CVMLong.create(i));
+
+		java.util.List<ACell> shapes=java.util.List.of(
+			Index.none(),
+			Index.of(patternKey(1,3),CVMLong.ONE),
+			Index.of(patternKey(2,150),CVMLong.ONE), // hashed key
+			Index.of(patternKey(3,255),Blobs.createFilled(1,500)), // hashed key and value
+			prefixChain,mixed,longKeys,deepIndex(2),deepIndex(5),comb(64));
+
+		for (ACell shape : shapes) {
+			checkEncodingLengths(shape);
+			checkEncodingLengths(CVMEncoder.INSTANCE.decodeMultiCell(Format.encodeMultiCell(shape,true)));
+		}
+	}
+
+	private static void checkEncodingLengths(ACell root) {
+		ArrayList<Index<?,?>> nodes=new ArrayList<>();
+		collectIndexNodes(root,nodes,new IdentityHashMap<>());
+		assertFalse(nodes.isEmpty());
+		int n=nodes.size();
+		int[] lengths=new int[n];
+		boolean[] embedded=new boolean[n];
+		// Record every node before any encoding exists
+		for (int i=0;i<n;i++) {
+			lengths[i]=nodes.get(i).getEncodingLength();
+			embedded[i]=nodes.get(i).isEmbedded();
+		}
+		for (int i=0;i<n;i++) {
+			Index<?,?> node=nodes.get(i);
+			int actual=node.getEncoding().size();
+			assertEquals(actual,lengths[i],"encoding length of node with count "+node.count());
+			assertEquals(actual<=Format.MAX_EMBEDDED_LENGTH,embedded[i],"embedding of node with count "+node.count());
+		}
+	}
+
+	private static void collectIndexNodes(ACell cell, ArrayList<Index<?,?>> out, IdentityHashMap<ACell,Boolean> seen) {
+		if (cell==null||seen.put(cell,Boolean.TRUE)!=null) return;
+		if (cell instanceof Index) out.add((Index<?,?>)cell);
+		int n=cell.getRefCount();
+		for (int i=0;i<n;i++) collectIndexNodes(cell.getRef(i).getValue(),out,seen);
+	}
+
+	private static Blob patternKey(int i, int len) {
+		byte[] bs=new byte[len];
+		for (int j=0;j<len;j++) bs[j]=(byte)(i*31+j*17);
+		return Blob.wrap(bs);
+	}
+
+	private static ACell patternValue(int i) {
+		switch (i%4) {
+			case 0: return CVMLong.create(i);
+			case 1: return Blobs.createFilled(i&0xff,200); // hashed value
+			case 2: return Blobs.createFilled(i&0xff,100); // large embedded value
+			default: return Vectors.of(CVMLong.create(i),Strings.create("v"+i));
+		}
+	}
+
+	/** One divergent key at every nibble of a zero prefix: a spine of nested branch nodes. */
+	private static Index<Blob,CVMLong> comb(int prefixBytes) {
+		byte[] zero=new byte[prefixBytes];
+		Index<Blob,CVMLong> built=Index.of(Blob.create(zero),-1);
+		for (int digit=prefixBytes*2-1;digit>=0;digit--) {
+			byte[] kb=zero.clone();
+			kb[digit>>>1]=(byte)(((digit&1)==0)?0x10:0x01);
+			built=built.assoc(Blob.create(kb),CVMLong.create(digit));
+		}
+		return built;
 	}
 }

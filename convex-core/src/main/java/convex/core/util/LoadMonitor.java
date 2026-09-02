@@ -1,5 +1,7 @@
 package convex.core.util;
 
+import java.util.Collections;
+import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
@@ -24,7 +26,9 @@ public class LoadMonitor {
 
 	}
 	
-	private static final WeakHashMap<Thread, LoadMetrics> loads=new WeakHashMap<>();
+	// Written from every monitored thread: a bare WeakHashMap corrupts under
+	// concurrent puts, so all access goes through the synchronized view.
+	private static final Map<Thread, LoadMetrics> loads=Collections.synchronizedMap(new WeakHashMap<>());
 	
     private static LoadMetrics createValue() {
 		LoadMetrics lm=new LoadMetrics();

@@ -49,7 +49,7 @@ public class FungibleTest extends ACVMTest {
 		assertNotNull(token);
 
 		// generic tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 		
 		// Control change
 		// TrustTest.testChangeControl(ctx, token);
@@ -138,7 +138,7 @@ public class FungibleTest extends ACVMTest {
 		assertFundsError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
 		
 		// GEnric tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 	}
 	
@@ -170,7 +170,7 @@ public class FungibleTest extends ACVMTest {
 		assertEquals(100,evalL(ctx,"(fungible/total-supply token)"));
 
 		// do Generic Tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		AssetTest.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		Long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -248,7 +248,7 @@ public class FungibleTest extends ACVMTest {
 				+ "(trust/add-controller)"
 				+ "]))");
 		Address T1=ctx.getResult();
-		AssetTester.doFungibleTests(ctx, T1, ctx.getAddress());
+		AssetTest.doFungibleTests(ctx, T1, ctx.getAddress());
 		
 		assertStateError(step(ctx,"(asset/mint T1 1000)"));
 		
@@ -258,7 +258,7 @@ public class FungibleTest extends ACVMTest {
 				+ "(trust/add-controller)"
 				+ "]))");
 		Address T2=ctx.getResult();
-		AssetTester.doFungibleTests(ctx, T2, ctx.getAddress());
+		AssetTest.doFungibleTests(ctx, T2, ctx.getAddress());
 		
 		assertCVMEquals(1001000,eval(ctx,"(asset/mint T2 1000)"));
 		assertStateError(step(ctx,"(asset/mint T2 999999999999)"));

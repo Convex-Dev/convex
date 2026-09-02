@@ -1,16 +1,14 @@
 package convex.core.lang;
 
 import static convex.test.Assertions.assertCVMEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
@@ -25,14 +23,12 @@ import convex.core.init.InitTest;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-@RunWith(Parameterized.class)
-public class ParamTestEvals {
+public class EvalsParamTest {
 
 	private static final Context INITIAL_CONTEXT = TestState.CONTEXT.fork();
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
 
-	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] {
 				{ "(do)", null },
@@ -58,20 +54,12 @@ public class ParamTestEvals {
 				{ "(let [f (fn [] *depth*)] (f))", 2L }, // let, invoke, *depth*
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
-				{ "(do (def a 2) (let [a 13] a))", 13L }, 
+				{ "(do (def a 2) (let [a 13] a))", 13L },
 				{ "*juice*", 0 }, // Initial juice used
 				{ "(- *juice* *juice*)", -Juice.SPECIAL },
 				{ "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L }, { "1", 1L }, { "(not true)", false },
 				{ "(= true true)", true } });
-	}
-
-	private String source;
-	private Object expectedResult;
-
-	public ParamTestEvals(String source, Object expectedResult) {
-		this.source = source;
-		this.expectedResult = expectedResult;
 	}
 
 	public <T extends ACell> AOp<T> compile(String source) {
@@ -104,8 +92,9 @@ public class ParamTestEvals {
 		}
 	}
 
-	@Test
-	public void testOpRoundTrip() throws BadFormatException, IOException {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testOpRoundTrip(String source, Object expectedResult) throws BadFormatException, IOException {
 		AOp<?> op = compile(source);
 		Blob b = Cells.encode(op);
 		Cells.persist(op, Samples.TEST_STORE); // persist to allow re-creation
@@ -118,8 +107,9 @@ public class ParamTestEvals {
 		assertCVMEquals(expectedResult, result);
 	}
 
-	@Test
-	public void testResultAndJuice() {
+	@ParameterizedTest(name = "{index}: {0}")
+	@MethodSource("dataExamples")
+	public void testResultAndJuice(String source, Object expectedResult) {
 		Context c = eval(source);
 
 		ACell result = c.getResult();

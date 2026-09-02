@@ -97,6 +97,15 @@ in `design/docs/cad/<nnn>_<slug>/index.md`. Do not assume it is present.
 | 038 | `lattice_auth` | Lattice authentication |
 | 043 | `did` | Decentralised identity |
 
+For a DID used as a lattice owner or signed application subject, read CAD043, CAD038 and
+CAD004 together. Use CAD043 for DID method syntax and resolution, CAD038 for
+merge-boundary signer authorisation, and CAD004 for account keys, rotation and
+controllers. Check the authorisation boundary of each independently mergeable signed
+value; do not assume that a signature around a mutable aggregate remains valid after a
+structural merge. For a recursive merge beneath `SignedLattice`, identify which authorised
+owner context can re-sign a synthesised result and how a non-owner relay behaves when it
+cannot. Raise any cross-CAD mismatch rather than copying an example silently.
+
 ## Integration
 
 | CAD | Slug | Covers |

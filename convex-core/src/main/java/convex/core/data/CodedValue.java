@@ -21,11 +21,6 @@ public class CodedValue extends ACell {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to do
 	}
@@ -70,6 +65,12 @@ public class CodedValue extends ACell {
 		pos=codeRef.encode(bs, pos);
 		pos=valueRef.encode(bs, pos);
 		return pos;
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag only: code and value are refs
+		return 1;
 	}
 
 	@Override

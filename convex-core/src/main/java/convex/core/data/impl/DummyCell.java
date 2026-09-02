@@ -1,6 +1,7 @@
 package convex.core.data.impl;
 
 import convex.core.data.ACell;
+import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -9,11 +10,6 @@ import convex.core.exceptions.InvalidDataException;
  * A dummy cell implementation, not a valid CVM value
  */
 public class DummyCell extends ACell {
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 1;
-	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
@@ -40,6 +36,22 @@ public class DummyCell extends ACell {
 	public int encodeRaw(byte[] bs, int pos) {
 		// Nothing to encode
 		return pos;
+	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag only
+		return 1;
+	}
+
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
+
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@Override

@@ -6,7 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -122,6 +129,39 @@ public class ConvexLocalTest {
 		for (int i = 0; i < n; i++) {
 			Result r = rs[i].get(12000, TimeUnit.MILLISECONDS);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
+		}
+	}
+
+	@Test
+	public void testConcurrentTransactionsOnSharedClient() throws Exception {
+		ConvexLocal convex=network.getLocalClient();
+		Address address=convex.getAddress();
+		int n=20;
+		CyclicBarrier start=new CyclicBarrier(n);
+		List<CompletableFuture<Result>> results=new ArrayList<>(n);
+
+		try (ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor()) {
+			for (int i=0;i<n;i++) {
+				final int value=i;
+				CompletableFuture<Result> result=CompletableFuture.supplyAsync(()->{
+					try {
+						start.await();
+					} catch (Exception e) {
+						throw new CompletionException(e);
+					}
+					return convex.transact(Invoke.create(address,0,Constant.of(value)));
+				},executor).thenCompose(f->f);
+				results.add(result);
+			}
+
+			CompletableFuture.allOf(results.toArray(CompletableFuture[]::new))
+				.get(12000,TimeUnit.MILLISECONDS);
+		}
+
+		for (int i=0;i<n;i++) {
+			Result result=results.get(i).join();
+			assertNull(result.getErrorCode(),"Error: "+result);
+			assertEquals(CVMLong.create(i),result.getValue());
 		}
 	}
 

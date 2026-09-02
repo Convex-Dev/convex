@@ -158,6 +158,12 @@ public class Special<T extends ACell> extends AOp<T> {
 		pos=Format.writeVLQCount(bs, pos, specialCode);
 		return pos;
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// tag plus VLQ special code, no refs
+		return 1+Format.getVLQCountLength(specialCode);
+	}
 	
 
 	@Override

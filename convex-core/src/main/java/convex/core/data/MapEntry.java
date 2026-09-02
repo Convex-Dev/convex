@@ -239,16 +239,17 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		pos = Format.writeVLQCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRefs(bs,pos);
 	}
+
+	@Override
+	public int calcHeaderLength() {
+		// vector tag plus one-byte count of 2, then key and value refs
+		return 2;
+	}
 	
 	int encodeRefs(byte[] bs, int pos) {
 		pos = keyRef.encode(bs,pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
-	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 2+Format.MAX_EMBEDDED_LENGTH*2; // header plus count two embedded objects
 	}
 
 	@SuppressWarnings("unchecked")
