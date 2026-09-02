@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.8.16-SNAPSHOT</version>
+	<version>0.8.16</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -43,7 +43,7 @@
 		<netty.version>4.2.17.Final</netty.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2026-08-24T11:49:43Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2026-09-02T18:05:18Z</project.build.outputTimestamp>
 		<!-- slf4j.internal.verbosity=ERROR silences SLF4J's informational init-replay
 		     notice in test output (at the cost of hiding e.g. multiple-provider warnings). -->
 		<argLine>

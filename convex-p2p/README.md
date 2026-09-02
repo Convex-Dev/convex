@@ -157,14 +157,14 @@ up with the option to switch it off.
 <dependency>
     <groupId>world.convex</groupId>
     <artifactId>convex-p2p</artifactId>
-    <version>0.8.15</version>
+    <version>0.8.16</version>
 </dependency>
 ```
 
 ### Gradle
 
 ```groovy
-implementation 'world.convex:convex-p2p:0.8.15'
+implementation 'world.convex:convex-p2p:0.8.16'
 ```
 
 ## Usage
