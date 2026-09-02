@@ -43,6 +43,11 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		return (int)(2+name.count());
 	}
 	
+	@Override
+	protected int getEncodingLength(int limit) {
+		return estimatedEncodingSize();
+	}
+	
 	/**
 	 * Gets the name of this symbolic value
 	 * @return Name as a short CVM String

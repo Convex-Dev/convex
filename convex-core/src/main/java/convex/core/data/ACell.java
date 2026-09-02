@@ -285,6 +285,17 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public int getEncodingLength() {
 		return getEncoding().size();
 	}
+	
+	/**
+	 * Gets the encoding length, or 0 if limit exceeded. Useful for efficient embedding calculations
+	 * @param limit
+	 * @return encodingLength, or 0 if beyond limit
+	 */
+	protected int getEncodingLength(int limit) {
+		int result=getEncodingLength();
+		if (result>limit) return 0;
+		return result;
+	}
 
 	/**
 	 * Gets the Memory Size of this Cell, computing it if required.
@@ -332,7 +343,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		} else {
 			cachedRef=createRef();
 		}
-		boolean embedded= getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH;
+		boolean embedded= getEncodingLength(Format.MAX_EMBEDDED_LENGTH)>0;
 		cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}

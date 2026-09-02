@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.function.Consumer;
 
 import convex.core.Constants;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;

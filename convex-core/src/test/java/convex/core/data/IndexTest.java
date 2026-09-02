@@ -165,6 +165,9 @@ public class IndexTest {
 		}
 		assertEquals(100L, m.count());
 		m.validate();
+		
+		final Index<ABlob, CVMLong>sm=m;
+		assertEquals(m.getEncodingLength(),m.getEncoding().size());
 
 		doIndexTests(m);
 

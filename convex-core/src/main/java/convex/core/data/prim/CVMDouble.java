@@ -92,6 +92,11 @@ public final class CVMDouble extends ANumeric {
 	public int estimatedEncodingSize() {
 		return 1+8;
 	}
+	
+	@Override
+	protected int getEncodingLength(int limit) {
+		return estimatedEncodingSize();
+	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

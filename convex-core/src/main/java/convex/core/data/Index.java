@@ -1,10 +1,8 @@
 package convex.core.data;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -95,9 +93,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * Not part of the encoding. Nodes with an entry use the entry key directly.
 	 */
 	private ABlob cachedPrefix;
-
-	/** Exact encoding length cache used by the extended-depth stack-safe path. */
-	private int cachedEncodingLength=-1;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
@@ -849,6 +844,31 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return pos;
 	}
 	
+	@Override
+	public int getEncodingLength() {
+		if (encoding!=null) return encoding.size();
+		
+		if (count==0) return 2; // empty index tag plus zero count
+		int el=1+Format.getVLQCountLength(count); // tag plus count
+		
+		if (entry!=null) {
+			// need to encode entry vector
+			el+=entry.getKeyRef().getEncodingLength();
+			el+=entry.getValueRef().getEncodingLength();
+		} 
+		if (count==1) return el; // no children / depth to consider
+		el+=1; // entry tag for the case count>1
+		
+		// account for depth and mask
+		el+=Format.getVLQCountLength(depth)+2;
+		
+		for (Ref<Index<K, V>> cref : children) {
+			el+=cref.getEncodingLength();
+		}
+		
+		return el;
+	}
+	
 	private int encodeChild(byte[] bs, int pos, int i) {
 		Ref<Index<K, V>> cref = children[i];
 		return cref.encode(bs, pos);
@@ -868,88 +888,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public int estimatedEncodingSize() {
 		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
 	}
-
-	@Override
-	public int getEncodingLength() {
-		if (count<=1 || getDepth()<=MAX_RECURSIVE_DEPTH) return super.getEncodingLength();
-		if (encoding!=null) return encoding.size();
-		int result=cachedEncodingLength;
-		if (result>=0) return result;
-		return computeDeepEncodingLengths();
-	}
-
-	/**
-	 * Computes Index encoding lengths bottom-up, preventing embedding checks from
-	 * recursively walking an extended radix spine. Only used beyond the historical
-	 * depth limit.
-	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private int computeDeepEncodingLengths() {
-		int rootLength=-1;
-		ArrayList<Index> nodes=new ArrayList<>();
-		ArrayDeque<Index> pending=new ArrayDeque<>();
-		IdentityHashMap<Index,Boolean> seen=new IdentityHashMap<>();
-		pending.push(this);
-		while (!pending.isEmpty()) {
-			Index node=pending.pop();
-			if (node.cachedEncodingLength>=0||seen.put(node,Boolean.TRUE)!=null) continue;
-			nodes.add(node);
-			for (Ref<Index> childRef : (Ref<Index>[])node.children) {
-				ACell child=childRef.getValue();
-				if (child instanceof Index) pending.push((Index)child);
-			}
-		}
-		nodes.sort((a,b) -> Long.compare(sortDepth(b),sortDepth(a)));
-
-		for (int i=0;i<nodes.size();i++) {
-			Index node=nodes.get(i);
-			int length=1+Format.getVLQCountLength(node.count); // tag and count
-			if (node.count==1) {
-				length+=node.entry.getKeyRef().getEncodingLength();
-				length+=node.entry.getValueRef().getEncodingLength();
-			} else if (node.count>1) {
-				length++; // entry marker
-				if (node.entry!=null) {
-					length+=node.entry.getKeyRef().getEncodingLength();
-					length+=node.entry.getValueRef().getEncodingLength();
-				}
-				length+=Format.getVLQCountLength(node.getDepth())+2; // depth and mask
-				for (Ref<Index> childRef : (Ref<Index>[])node.children) {
-					ACell child=childRef.getValue();
-					if (child instanceof Index) {
-						int childLength=((Index)child).getEncodingLength();
-						length+=(childLength<=Format.MAX_EMBEDDED_LENGTH)
-								? childLength : Ref.INDIRECT_ENCODING_LENGTH;
-					} else {
-						length+=childRef.getEncodingLength();
-					}
-				}
-			}
-			if (node==this) {
-				rootLength=length; // publish only after descendant hashes are ready
-			} else {
-				node.cachedEncodingLength=length;
-			}
-			// Cache the corresponding Ref flag now, so actual encoding only nests the
-			// few genuinely embedded levels rather than rediscovering the whole spine.
-			if (node!=this) node.isEmbedded();
-		}
-		// Non-embedded refs need child hashes while the parent is encoded. Prepare
-		// descendants bottom-up as well; otherwise hashing would recreate the same
-		// key-controlled call chain even though embedding lengths are cached.
-		for (int i=0;i<nodes.size();i++) {
-			Index node=nodes.get(i);
-			if (node!=this) node.getHash();
-		}
-		cachedEncodingLength=rootLength;
-		return rootLength;
-	}
 	
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
 		throw new UnsupportedOperationException();
 	}
-
 
 	private static long effectiveLength(ABlobLike<?> prefix) {
 		return Math.min(MAX_DEPTH, prefix.hexLength());
@@ -968,14 +911,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		d=(k instanceof ABlobLike<?> key)?(int)effectiveLength(key):0;
 		depth=d;
 		return d;
-	}
-
-	/**
-	 * Depth ordering key for bottom-up encoding length computation. A single-entry
-	 * node has no children, so it sorts deepest without loading a non-embedded key.
-	 */
-	private static long sortDepth(Index<?,?> node) {
-		return (node.count<=1)?Long.MAX_VALUE:node.getDepth();
 	}
 
 	@Override
@@ -1094,6 +1029,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			for (int i = 0; i < node.children.length; i++) {
 				ACell cell = node.children[i].getValue();
 				if (!(cell instanceof Index)) continue; // malformed child, treat as empty
+				@SuppressWarnings("unchecked")
 				Index<K,V> child=(Index<K,V>)cell;
 				long cc=child.count();
 				if (ix < cc) {

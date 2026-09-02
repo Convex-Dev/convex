@@ -116,6 +116,11 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	public boolean booleanValue() {
 		return value;
 	}
+	
+	@Override
+	protected int getEncodingLength(int limit) {
+		return 1;
+	}
 
 	@Override
 	public final byte getTag() {
