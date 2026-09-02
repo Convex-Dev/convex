@@ -128,11 +128,6 @@ public class State extends ARecordGeneric {
 	}
 
 	@Override
-	public int getEncodingLength() {
-		return values.getEncodingLength();
-	}
-
-	@Override
 	public int estimatedEncodingSize() {
 		return values.estimatedEncodingSize();
 	}

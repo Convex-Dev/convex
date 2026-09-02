@@ -44,13 +44,6 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	}
 	
 	@Override
-	protected int getEncodingLength(int limit) {
-		int result= estimatedEncodingSize();
-		if (result>limit) return 0;
-		return result;
-	}
-
-	@Override
 	public int calcHeaderLength() {
 		// tag, one length byte and the UTF-8 name bytes: see Keyword and Symbol encodeRaw
 		return 2+(int)name.count();

@@ -199,12 +199,6 @@ public class Hash extends AArrayBlob {
 	}
 	
 	@Override
-	public int getEncodingLength() {
-		// Always a fixed encoding length, tag plus count plus length
-		return 2 + LENGTH;
-	}
-
-	@Override
 	public Blob getChunk(long i) {
 		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return toFlatBlob();

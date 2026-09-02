@@ -110,13 +110,6 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
-	protected int getEncodingLength(int limit) {
-		int result= 1+Format.getLongLength(value);
-		if (result>limit) return 0;
-		return result;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid
 	}

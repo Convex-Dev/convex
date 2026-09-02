@@ -118,11 +118,6 @@ public final class CVMBool extends AByteFlag implements Comparable<CVMBool> {
 	}
 	
 	@Override
-	protected int getEncodingLength(int limit) {
-		return (limit>0)?1:0;
-	}
-
-	@Override
 	public final byte getTag() {
 		return (value) ? CVMTag.TRUE : CVMTag.FALSE;
 	}

@@ -319,20 +319,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		int ESTIMATED_REF_SIZE=70;
 		return 1 + 9 + ESTIMATED_REF_SIZE * (items.length + 2);
 	}
-	
-	@Override
-	public int getEncodingLength() {
-		if (encoding!=null) return encoding.size();
-		
-		int length=calcHeaderLength();
-		int n = items.length;
-		if (prefix!=null) length+=prefix.getEncodingLength();
-		for (int i = 0; i < n; i++) {
-			length+=items[i].getEncodingLength();
-		}
-		return length;
-	}
-	 
+		 
 	public static final int MAX_ENCODING_LENGTH = 1 + Format.MAX_VLQ_COUNT_LENGTH + VectorTree.MAX_EMBEDDED_LENGTH+Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE);
 
 	/**

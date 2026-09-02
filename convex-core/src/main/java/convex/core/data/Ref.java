@@ -631,26 +631,29 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 	
 	/**
-	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
-	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH. Returns zero if this value
-	 * exceeds limit
-	 *  
-	 * @return Exact length of Ref encoding, or 0 if exceedes limit
+	 * Gets the encoding length for writing this Ref, or 0 if it exceeds the given
+	 * limit. The value's embedded status is always judged against the embedded
+	 * limit (and cached in the flags); only its contribution is compared with the
+	 * caller's remaining budget, since an embedded value must be inlined however
+	 * little room its parent has left.
+	 *
+	 * @param limit Maximum length of interest
+	 * @return Exact length of Ref encoding, or 0 if it exceeds limit
 	 */
-	public int getEncodingLength(int limit) {
+	public final int getEncodingLength(int limit) {
 		int result;
-		if ((flags&NON_EMBEDDED_MASK)!=0) {
-			result= Ref.INDIRECT_ENCODING_LENGTH;
-		} else {
-			result=getValue().getEncodingLength(limit);
-			if (result>Format.MAX_EMBEDDED_LENGTH) {
-				flags|=NON_EMBEDDED_MASK;
-				result=Ref.INDIRECT_ENCODING_LENGTH;
+		if (isEmbedded()) {
+			T value=getValue();
+			if (value==null) {
+				result=1;
+			} else {
+				result=value.getEncodingLength(limit);
+				if (result==0) return 0;
 			}
+		} else {
+			result=Ref.INDIRECT_ENCODING_LENGTH;
 		}
-		
-		if (result>limit) return 0;
-		return result;
+		return (result>limit)?0:result;
 	}
 
 	/**

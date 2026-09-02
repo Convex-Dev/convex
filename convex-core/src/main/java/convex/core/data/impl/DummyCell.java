@@ -1,6 +1,7 @@
 package convex.core.data.impl;
 
 import convex.core.data.ACell;
+import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
@@ -46,6 +47,16 @@ public class DummyCell extends ACell {
 	public int calcHeaderLength() {
 		// tag only
 		return 1;
+	}
+
+	@Override
+	public int getRefCount() {
+		return 0;
+	}
+
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@Override

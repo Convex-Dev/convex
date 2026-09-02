@@ -187,18 +187,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 	
 	@Override
-	public int getEncodingLength() {
-		if (encoding!=null) return encoding.size();
-		
-		int length=calcHeaderLength();
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			length+=children[i].getEncodingLength();
-		}
-		return length;
-	}
-
-	@Override
 	public int estimatedEncodingSize() {
 		// Allow tag, long count, 80 bytes per child average plus some headroom
 		return 12 + (64 * (children.length+3));

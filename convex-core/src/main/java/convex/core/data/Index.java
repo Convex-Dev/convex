@@ -218,20 +218,27 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public int getRefCount() {
-		// note entry might be null
-		return Cells.refCount(entry) + children.length;
+		// Refs as encoded, mirroring encodeRaw: an empty node has none, a single
+		// entry contributes only its key and value, larger nodes add their children.
+		// Keeps the encoding length invariant even for malformed nodes.
+		if (count==0) return 0;
+		int erc=Cells.refCount(entry); // note entry might be null
+		if (count==1) return erc;
+		return erc + children.length;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		if (entry != null) {
+		if (count>0 && entry != null) {
 			int erc = entry.getRefCount();
 			if (i < erc) return entry.getRef(i);
 			i -= erc;
 		}
-		int cl = children.length;
-		if (i < cl) return (Ref<R>) children[i];
+		if (count>1) {
+			int cl = children.length;
+			if (i < cl) return (Ref<R>) children[i];
+		}
 		throw new IndexOutOfBoundsException("No ref for index:" + i);
 	}
 	
@@ -850,21 +857,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		int hl=1+Format.getVLQCountLength(count);
 		if (count>1) hl+=1+Format.getVLQCountLength(depth)+2;
 		return hl;
-	}
-
-	@Override
-	public int getEncodingLength() {
-		if (encoding!=null) return encoding.size();
-
-		int el=calcHeaderLength();
-		if (entry!=null) {
-			el+=entry.getKeyRef().getEncodingLength();
-			el+=entry.getValueRef().getEncodingLength();
-		}
-		for (Ref<Index<K, V>> cref : children) {
-			el+=cref.getEncodingLength();
-		}
-		return el;
 	}
 	
 	private int encodeChild(byte[] bs, int pos, int i) {

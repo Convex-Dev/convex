@@ -94,13 +94,6 @@ public final class CVMDouble extends ANumeric {
 	}
 	
 	@Override
-	protected int getEncodingLength(int limit) {
-		int result= MAX_ENCODING_LENGTH;
-		if (result>limit) return 0;
-		return result;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// always OK, though might not be CVM value
 	}
