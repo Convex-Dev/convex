@@ -51,12 +51,7 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	public final byte getTag() {
 		return CVMTag.FN;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
-	}
-	
+		
 	@Override
 	public int getRefCount() {
 		return data.getRefCount();

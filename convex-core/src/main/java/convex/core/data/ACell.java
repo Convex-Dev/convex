@@ -287,9 +287,13 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (!isCanonical()) return getCanonical().getEncodingLength();
 		int length=calcHeaderLength();
 		int n=getRefCount();
+		boolean fullyEmbedded=true;
 		for (int i=0; i<n; i++) {
-			length+=getRef(i).getEncodingLength();
+			Ref<?> ref=getRef(i);
+			length+=ref.getEncodingLength();
+			if (fullyEmbedded) fullyEmbedded=isFullyEmbedded(ref);
 		}
+		noteEncodingLength(length,fullyEmbedded);
 		return length;
 	}
 	
@@ -329,12 +333,47 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		int length=calcHeaderLength();
 		if (length>limit) return 0;
 		int n=getRefCount();
+		boolean fullyEmbedded=true;
 		for (int i=0; i<n; i++) {
-			int refLength=getRef(i).getEncodingLength(limit-length);
+			Ref<?> ref=getRef(i);
+			int refLength=ref.getEncodingLength(limit-length);
 			if (refLength==0) return 0;
 			length+=refLength;
+			if (fullyEmbedded) fullyEmbedded=isFullyEmbedded(ref);
 		}
+		noteEncodingLength(length,fullyEmbedded);
 		return length;
+	}
+
+	/**
+	 * Records what a completed length calculation has established for free: the
+	 * embedded status of this Cell on its cached Ref, and a zero memory size when
+	 * this Cell is embedded and every child is a direct Ref to a fully embedded
+	 * value, so neither needs computing again.
+	 *
+	 * @param length Exact encoding length just calculated
+	 * @param fullyEmbedded True if every child Ref satisfied {@link #isFullyEmbedded(Ref)}
+	 */
+	private void noteEncodingLength(int length, boolean fullyEmbedded) {
+		boolean embedded=length<=Format.MAX_EMBEDDED_LENGTH;
+		Ref<ACell> ref=cachedRef;
+		if (ref!=null) ref.flags|=embedded?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
+		if (embedded&&fullyEmbedded&&(memorySize<0)) memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
+	}
+
+	/**
+	 * Checks whether a child Ref is direct and refers to null or a value already
+	 * known to be fully embedded, i.e. with zero memory size. Only reads fields:
+	 * the Ref's embedded status must already have been established.
+	 *
+	 * @param ref Child Ref whose encoding length has just been calculated
+	 * @return True if the child contributes nothing to memory size
+	 */
+	private static boolean isFullyEmbedded(Ref<?> ref) {
+		if (!ref.isDirect()) return false;
+		if (!ref.isEmbedded()) return false;
+		ACell value=ref.getValue();
+		return (value==null)||(value.memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE);
 	}
 
 	/**

@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Cells now compute their encoding length arithmetically from a per-type header
+  length plus their child refs, never by rendering an encoding, and `createEncoding`
+  allocates the exact size. `estimatedEncodingSize` has been removed from
+  `IWriteable`, `ACell` and `Ref`; callers needing a size should use
+  `getEncodingLength`.
+- `Hash` and `AccountKey` are now canonical cells: they encode exactly as 32-byte
+  blobs, so `getCanonical()` returns the same instance rather than a plain `Blob`.
 - Convex clients preserve reserved transaction sequences after timeouts and CVM
   errors, preventing a shared client from reusing a sequence whose outcome is
   unknown or which the transaction consumed.

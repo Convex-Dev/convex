@@ -237,11 +237,6 @@ public final class Syntax extends ACell {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 1+meta.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
-	}
-
-	@Override
 	public int getRefCount() {
 		return 1 + meta.getRefCount();
 	}

@@ -47,11 +47,6 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return 10+ops.estimatedEncodingSize();
-	}
-
-	@Override
 	public AMultiOp<T> updateRefs(IRefFunction func) {
 		AVector<AOp<ACell>> newOps = ops.updateRefs(func);
 		return recreate(newOps);

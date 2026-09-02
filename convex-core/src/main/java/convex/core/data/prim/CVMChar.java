@@ -113,12 +113,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public long longValue() {
 		return 0xffffffffl&value;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 4;
-	}
-	
+		
 	/**
 	 * Get the number of UTF-8 bytes as encoded within the encoding tag
 	 * @param tag Tag byte

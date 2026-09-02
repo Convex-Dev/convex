@@ -21,11 +21,6 @@ public class CodedValue extends ACell {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to do
 	}

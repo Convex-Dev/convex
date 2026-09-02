@@ -155,12 +155,6 @@ public final class CVMBigInteger extends AInteger {
 		return signum().equals(CVMLong.ONE);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		if (blob!=null) return blob.estimatedEncodingSize();
-		return (int) Math.min(Blob.MAX_ENCODING_LENGTH,byteLength()+10);
-	}
-
 
 	@Override
 	public double doubleValue() {

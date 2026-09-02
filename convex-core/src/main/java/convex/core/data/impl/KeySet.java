@@ -24,11 +24,6 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
-	@Override
 	public ASet<K> include(K a) {
 		return getCanonicalSet().include(a);
 	}

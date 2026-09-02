@@ -56,11 +56,6 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return false;
 	}
@@ -71,7 +66,8 @@ public class StringSlice extends AString {
 
 	@Override
 	public int getRefCount() {
-		return 0;
+		// non-canonical: report the refs of the canonical string that encodes
+		return getCanonical().getRefCount();
 	}
 	
 	@Override

@@ -127,11 +127,6 @@ public class Ed25519Signature extends ASignature {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 1+SIGNATURE_LENGTH;
-	}
-
-	@Override
 	public Blob getChunk(long i) {
 		return Blob.create(store).getChunk(i);
 	}

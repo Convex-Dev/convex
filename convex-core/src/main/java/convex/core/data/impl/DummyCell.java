@@ -12,11 +12,6 @@ import convex.core.exceptions.InvalidDataException;
 public class DummyCell extends ACell {
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 1;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		throw new InvalidDataException("This is a dummy value",this);
 	}

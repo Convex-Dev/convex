@@ -140,13 +140,7 @@ public final class Block extends ARecordGeneric {
 		return Utils.checkedInt(getTransactions().count());
 	}
 
-	
-	@Override
-	public int estimatedEncodingSize() {
-		// allow for embedded transaction, timestamp always small
-		return 160;
-	}
-	
+		
 	/**
 	 * Get the vector of transactions in this Block
 	 * @return Vector of transactions

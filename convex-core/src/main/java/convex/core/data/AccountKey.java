@@ -236,12 +236,6 @@ public class AccountKey extends AArrayBlob {
 		if (pos+LENGTH>b.count()) throw new IndexOutOfBoundsException("wrapping AccountKey beyond bound");
 		return AccountKey.wrap(data,off+pos);
 	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// tag plus LENGTH bytes
-		return 3 + LENGTH;
-	}
 	
 	@Override
 	public Blob getChunk(long i) {
@@ -269,12 +263,13 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		return false;
+		// canonical: an AccountKey encodes exactly as a 32-byte Blob, the Java type is a specialisation
+		return true;
 	}
 
 	@Override
-	protected Blob toCanonical() {
-		return toFlatBlob();
+	protected AccountKey toCanonical() {
+		return this;
 	}
 
 }

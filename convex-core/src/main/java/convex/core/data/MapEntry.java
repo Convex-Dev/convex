@@ -252,11 +252,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return pos;
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 2+Format.MAX_EMBEDDED_LENGTH*2; // header plus count two embedded objects
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public void visitElementRefs(Consumer<Ref<ACell>> f) {

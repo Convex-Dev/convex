@@ -24,12 +24,7 @@ public class DenseRecord extends ACAD3Record {
 		
 		return new DenseRecord((byte)tag,(AVector<ACell>) data);
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
-	}
-	
+		
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		return data.encodeRaw(bs, pos);

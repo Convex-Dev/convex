@@ -87,12 +87,7 @@ public final class CVMDouble extends ANumeric {
 		if (Double.isNaN(value)) return NaN; // NaN special case
 		return this;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return MAX_ENCODING_LENGTH;
-	}
-	
+		
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// always OK, though might not be CVM value

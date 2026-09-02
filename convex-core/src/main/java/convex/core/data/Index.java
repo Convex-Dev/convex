@@ -873,12 +873,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 //		}
 //		return pos;
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
-	}
-	
+		
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
 		throw new UnsupportedOperationException();

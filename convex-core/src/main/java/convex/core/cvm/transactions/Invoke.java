@@ -91,13 +91,6 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		// tag (1), sequence(<12) and target (33)
-		// plus allowance for Amount
-		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLQ_LONG_LENGTH;
-	}
-
-	@Override
 	public Invoke withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
 		return create(origin,newSequence,command);

@@ -127,11 +127,6 @@ public class State extends ARecordGeneric {
 		return new State(accounts, peers, globals, schedule);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return values.estimatedEncodingSize();
-	}
-
 	/**
 	 * Get all Accounts in this State
 	 * @return Vector of Accounts

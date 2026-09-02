@@ -67,11 +67,6 @@ public class Call extends ATransaction {
 
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
-
-	@Override
 	public Context apply(Context ctx) {
 		// A Call decoded from its encoding has a null args field until getArgs()
 		// populates it, so the field must not be read directly here

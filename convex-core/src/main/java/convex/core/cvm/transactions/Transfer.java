@@ -70,13 +70,6 @@ public class Transfer extends ATransaction {
 	
 
 	@Override
-	public int estimatedEncodingSize() {
-		// tag (1), sequence(<12) and target (33)
-		// plus allowance for Amount
-		return 1 + 12 + 33 + Format.MAX_VLQ_LONG_LENGTH;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if (!Coin.isValidAmount(amount)) throw new InvalidDataException("Invalid amount", this);
 		if (target == null) throw new InvalidDataException("Null Address", this);

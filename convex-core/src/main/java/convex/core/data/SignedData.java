@@ -220,11 +220,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	}
 
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+AccountKey.LENGTH+Ed25519Signature.SIGNATURE_LENGTH+Format.MAX_EMBEDDED_LENGTH;
-	}
-
 	/**
 	 * Validates the signature in this SignedData instance. Caches result
 	 *

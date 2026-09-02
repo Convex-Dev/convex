@@ -183,11 +183,6 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return isEmbedded()?Format.MAX_EMBEDDED_LENGTH: INDIRECT_ENCODING_LENGTH;
-	}
-
-	@Override
 	public Ref<T> ensureCanonical() {
 		return this;
 	}

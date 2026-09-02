@@ -103,12 +103,7 @@ public final class CVMLong extends AInteger {
 	public CVMDouble toDouble() {
 		return CVMDouble.create(doubleValue());
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+8;
-	}
-	
+		
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid

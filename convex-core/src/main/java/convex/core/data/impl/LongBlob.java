@@ -83,11 +83,6 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return HEADER_LENGTH + LENGTH;
-	}
-
-	@Override
 	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		if (b == this) return length;
 		long end = start + length;

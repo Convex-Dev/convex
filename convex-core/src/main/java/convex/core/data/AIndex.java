@@ -109,7 +109,4 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 	
 	public abstract MapEntry<K, V> getEntry(K key);
 
-	@Override
-	public abstract int estimatedEncodingSize();
-
 }

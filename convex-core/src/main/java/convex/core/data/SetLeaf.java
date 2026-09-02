@@ -223,12 +223,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		// tag plus VLQ count, then element refs
 		return 1+Format.getVLQCountLength(count());
 	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		// allow space for header, size byte, 2 refs per entry
-		return 2 + Format.MAX_EMBEDDED_LENGTH * size();
-	}
 	
 	public static int MAX_ENCODING_LENGTH=  2 + MAX_ELEMENTS * Format.MAX_EMBEDDED_LENGTH;
 

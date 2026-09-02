@@ -12,11 +12,6 @@ import convex.core.exceptions.InvalidDataException;
 public abstract class AByteFlag extends APrimitive {
 	
 	public static final int MAX_ENCODING_LENGTH = 1;
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 1;
-	}
 	
 	public static AByteFlag read(byte tag) {
 		tag&=0xF;

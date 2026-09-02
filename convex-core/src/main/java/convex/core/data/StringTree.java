@@ -62,11 +62,6 @@ public class StringTree extends AString {
 	
 
 	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return data.isCanonical();
 	}

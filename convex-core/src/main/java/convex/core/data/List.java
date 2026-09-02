@@ -261,11 +261,6 @@ public class List<T extends ACell> extends AList<T> {
 		return listIterator();
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return data.estimatedEncodingSize();
-	}
-
 	/**
 	 * Prepends an element to the list in first position.
 	 * 

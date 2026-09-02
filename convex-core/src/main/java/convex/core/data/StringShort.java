@@ -169,11 +169,6 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 3 + (int) length;
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return (length <= MAX_LENGTH);
 	}

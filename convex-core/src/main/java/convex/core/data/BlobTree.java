@@ -336,11 +336,6 @@ public class BlobTree extends ABlob {
 	 */
 	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLQ_COUNT_LENGTH+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 1 + Format.MAX_VLQ_LONG_LENGTH + Ref.INDIRECT_ENCODING_LENGTH * children.length;
-	}
-
 	/**
 	 * Appends another blob to this BlobTree. Potentially O(n) but can be faster.
 	 * 

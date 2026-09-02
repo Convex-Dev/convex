@@ -50,12 +50,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	public final int getRefCount() {
 		return values.getRefCount();
 	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return values.estimatedEncodingSize();
-	}
-	
+		
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;

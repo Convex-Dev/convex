@@ -10,7 +10,6 @@ import convex.core.data.AMap;
 import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Format;
 import convex.core.data.List;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -96,11 +95,6 @@ public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
 		return RT.print(sb,value.getValue(),limit);
 	}
 	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+Format.MAX_EMBEDDED_LENGTH;
-	}
-
 	public T getValue() {
 		return value.getValue();
 	}

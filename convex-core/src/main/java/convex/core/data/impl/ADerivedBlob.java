@@ -20,11 +20,6 @@ public abstract class ADerivedBlob extends ABlob {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
-	@Override
 	public final ABlob slice(long start, long end) {
 		if (start < 0) return null;
 		if (end > this.count) return null;
@@ -145,7 +140,8 @@ public abstract class ADerivedBlob extends ABlob {
 
 	@Override
 	public int getRefCount() {
-		throw new UnsupportedOperationException();
+		// non-canonical: report the refs of the canonical blob that encodes
+		return getCanonical().getRefCount();
 	}
 
 

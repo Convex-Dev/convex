@@ -2,7 +2,6 @@ package convex.core.cvm;
 
 import convex.core.data.ACell;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -36,11 +35,6 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 		return Types.OP;
 	}
 	
-	@Override
-	public int estimatedEncodingSize() {
-		return 10+Format.MAX_EMBEDDED_LENGTH;
-	}
-
 	@Override
 	public boolean isCanonical() {
 		return true;

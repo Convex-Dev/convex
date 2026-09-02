@@ -110,11 +110,6 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 		return new VectorArrayIterator(0);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return getCanonical().estimatedEncodingSize();
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public T get(long i) {

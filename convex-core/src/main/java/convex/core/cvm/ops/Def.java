@@ -110,11 +110,6 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 		return sb.check(limit);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 100;
-	}
-
 
 	@Override
 	public void validateCell() throws InvalidDataException {

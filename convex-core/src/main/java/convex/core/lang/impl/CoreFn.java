@@ -135,11 +135,6 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return 5;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		symbol.validateCell();
 	}

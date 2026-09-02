@@ -36,13 +36,7 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		// always embedded and no child Refs, so memory size == 0
 		return 0;
 	}
-	
-	@Override
-	public final int estimatedEncodingSize() {
-		// name length plus tag and 1 byte for count
-		return (int)(2+name.count());
-	}
-	
+		
 	@Override
 	public int calcHeaderLength() {
 		// tag, one length byte and the UTF-8 name bytes: see Keyword and Symbol encodeRaw
