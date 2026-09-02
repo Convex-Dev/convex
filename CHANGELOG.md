@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- DLFS directory entries with names longer than the embedded string limit (138 to
+  254 bytes) were listed but could not be opened, statted, moved or deleted once
+  their directory index had been reloaded from an Etch store, for example after a
+  restart or when a cached node was evicted from memory. Single-entry `Index` nodes
+  decoded with a non-embedded key now derive their depth from the key instead of
+  assuming the maximum, so lookups agree with iteration.
 - String interning is thread-safe. `StringStore` kept the process-wide intern
   index in plain `HashMap`s written without synchronisation, so concurrent
   `Strings.intern` calls could corrupt it and later lookups then recursed in

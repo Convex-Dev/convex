@@ -538,9 +538,13 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			me = MapEntry.fromRefs(kr, vr);
 
 			if (count == 1) {
-				// Single entry — depth derived from key. If not embedded must be > MAX_DEPTH
-				long depth = kr.isEmbedded() ? kr.getValue().hexLength() : Index.MAX_DEPTH;
-				depth = Math.min(depth, Index.MAX_DEPTH);
+				// Single entry: depth is the key's hex length. A non-embedded key is not
+				// loaded during decode, so the depth is derived on first use rather than
+				// assumed to be MAX_DEPTH, which is wrong for keys between the embedded
+				// limit and MAX_DEPTH bytes and hid such entries from lookup.
+				long depth = kr.isEmbedded()
+					? Math.min(kr.getValue().hexLength(), Index.MAX_DEPTH)
+					: Index.UNRESOLVED_DEPTH;
 				return new Index<K, V>(depth, me, Index.EMPTY_CHILDREN, (short) 0, 1L);
 			}
 		} else {

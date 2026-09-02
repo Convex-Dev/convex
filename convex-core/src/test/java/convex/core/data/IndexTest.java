@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.store.NullStore;
+import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class IndexTest {
@@ -780,5 +782,49 @@ public class IndexTest {
 		assertEquals(Types.INDEX,m.getType());
 
 		CollectionsTest.doMapTests(m);
+	}
+
+	/**
+	 * A single-entry node does not encode its depth, and a key over the embedded
+	 * limit is not loaded when the node is decoded. The depth must then be derived
+	 * from the key on first use: assuming MAX_DEPTH made every such entry invisible
+	 * to lookup after a store reload while iteration still listed it (covia#469).
+	 */
+	@Test
+	public void testNonEmbeddedSingleEntryKeySurvivesStoreReload() throws Exception {
+		for (int len : new int[] {150, 180, Index.MAX_DEPTH/2-1}) {
+			byte[] bytes=new byte[len];
+			Arrays.fill(bytes,(byte)0x42);
+			Blob longKey=Blob.wrap(bytes);
+			Blob shortKey=Blob.fromHex("ff");
+			assertFalse(longKey.isEmbedded());
+			Index<ABlob,CVMLong> index=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+
+			EtchStore store=EtchStore.createTemp("index-reload");
+			File file=store.getFile();
+			Hash hash=Cells.persist(index,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				assertEquals(2,reloaded.count());
+				assertEquals(longKey,reloaded.entryAt(0).getKey());
+				assertEquals(CVMLong.ONE,reloaded.get(longKey),"key length "+len);
+				assertEquals(CVMLong.ZERO,reloaded.get(shortKey));
+				reloaded.validate();
+				assertEquals(index,reloaded);
+				assertEquals(index.dissoc(longKey),reloaded.dissoc(longKey));
+
+				// A longer key extending the reloaded key must still branch correctly
+				Blob extended=longKey.append(Blob.fromHex("01")).toFlatBlob();
+				Index<ABlob,CVMLong> grown=reloaded.assoc(extended,CVMLong.create(2));
+				assertNotNull(grown);
+				assertEquals(3,grown.count());
+				assertEquals(CVMLong.create(2),grown.get(extended));
+				assertEquals(CVMLong.ONE,grown.get(longKey));
+			} finally {
+				reopened.close();
+			}
+		}
 	}
 }
