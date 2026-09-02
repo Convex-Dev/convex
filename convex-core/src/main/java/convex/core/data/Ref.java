@@ -524,7 +524,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		if (value==null) {
 			em=true;
 		} else {
-			em=value.isEmbedded();
+			int el=value.getEncodingLength(Format.MAX_EMBEDDED_LENGTH);
+			em=el>0;
 		}
 		flags=flags|(em?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
 		return em;
@@ -617,9 +618,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
 	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH
 	 *  
-	 * @return Exact length of encoding
+	 * @return Exact length of Ref encoding
 	 */
-	public final long getEncodingLength() {
+	public final int getEncodingLength() {
 		if (isEmbedded()) {
 			T value=getValue();
 			if (value==null) return 1;
@@ -627,6 +628,29 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		} else {
 			return Ref.INDIRECT_ENCODING_LENGTH;
 		}
+	}
+	
+	/**
+	 * Gets the encoding length for writing this Ref. Will be equal to the encoding length
+	 * of the Ref's value if embedded, otherwise INDIRECT_ENCODING_LENGTH. Returns zero if this value
+	 * exceeds limit
+	 *  
+	 * @return Exact length of Ref encoding, or 0 if exceedes limit
+	 */
+	public int getEncodingLength(int limit) {
+		int result;
+		if ((flags&NON_EMBEDDED_MASK)!=0) {
+			result= Ref.INDIRECT_ENCODING_LENGTH;
+		} else {
+			result=getValue().getEncodingLength(limit);
+			if (result>Format.MAX_EMBEDDED_LENGTH) {
+				flags|=NON_EMBEDDED_MASK;
+				result=Ref.INDIRECT_ENCODING_LENGTH;
+			}
+		}
+		
+		if (result>limit) return 0;
+		return result;
 	}
 
 	/**

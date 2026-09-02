@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  */
 public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
-	 * We cache the computed memorySize. May be 0 for embedded objects
+	 * We cache the computed memorySize. Will be 0 for fully embedded objects with no branches
 	 * -1 is initial value for when size is not calculated
 	 */
 	protected long memorySize=-1;
