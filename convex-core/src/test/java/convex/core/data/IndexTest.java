@@ -890,4 +890,75 @@ public class IndexTest {
 		assertThrows(IllegalArgumentException.class,
 			() -> Index.unsafeCreate(-2,null,Index.EMPTY_CHILDREN,0,0));
 	}
+
+	/**
+	 * A decoded single-entry node with a non-embedded key holds UNRESOLVED_DEPTH
+	 * until first use. The sentinel must never reach an encoding: a single-entry
+	 * node encodes no depth, every multi-entry construction resolves it first, and
+	 * the constructor refuses it for anything but a single-entry node.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test
+	public void testUnresolvedDepthIsNeverEncoded() throws Exception {
+		byte[] bytes=new byte[200];
+		Arrays.fill(bytes,(byte)0x37);
+		Blob longKey=Blob.wrap(bytes);
+		Blob shortKey=Blob.fromHex("ff");
+		Index<ABlob,CVMLong> single=Index.of(longKey,CVMLong.ONE);
+		Index<ABlob,CVMLong> pair=Index.of(longKey,CVMLong.ONE,shortKey,CVMLong.ZERO);
+
+		// Encode a sentinel node directly: no cached encoding, so encodeRaw runs
+		MapEntry<ABlob,CVMLong> entry=MapEntry.create(longKey,CVMLong.ONE);
+		Index<ABlob,CVMLong> unresolved=Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,1);
+		assertEquals(single.getEncoding(),unresolved.getEncoding());
+		assertEquals(single.getEncodingLength(),unresolved.getEncodingLength());
+		assertEquals(single.getHash(),unresolved.getHash());
+		assertEquals(single.isEmbedded(),unresolved.isEmbedded());
+		assertEquals(CVMLong.ONE,unresolved.get(longKey));
+		assertEquals(longKey.hexLength(),unresolved.getDepth());
+		unresolved.validate();
+
+		// Growing a sentinel node resolves the depth before any multi-entry node is built
+		Index<ABlob,CVMLong> fresh=Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,1);
+		Index<ABlob,CVMLong> grown=fresh.assoc(shortKey,CVMLong.ZERO);
+		assertEquals(pair.getEncoding(),grown.getEncoding());
+		assertEquals(pair,grown);
+		grown.validate();
+
+		// The sentinel is only legal on a single-entry node
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,null,Index.EMPTY_CHILDREN,0,0));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,null,Index.EMPTY_CHILDREN,0,1));
+		assertThrows(IllegalArgumentException.class,
+			() -> Index.unsafeCreate(Index.UNRESOLVED_DEPTH,entry,Index.EMPTY_CHILDREN,0,2));
+
+		// Reload from a store, then persist again into a second store before any lookup
+		for (Index<ABlob,CVMLong> original : java.util.List.of(single,pair)) {
+			Blob expected=original.getEncoding();
+			EtchStore store=EtchStore.createTemp("index-unresolved");
+			File file=store.getFile();
+			Hash hash=Cells.persist(original,store).getHash();
+			store.close();
+			EtchStore reopened=EtchStore.create(file);
+			EtchStore second=EtchStore.createTemp("index-unresolved-2");
+			File secondFile=second.getFile();
+			try {
+				Index<ABlob,CVMLong> reloaded=reopened.<Index<ABlob,CVMLong>>refForHash(hash).getValue();
+				Hash again=Cells.persist(reloaded,second).getHash();
+				assertEquals(hash,again);
+				second.close();
+				second=EtchStore.create(secondFile);
+				Index<ABlob,CVMLong> twice=second.<Index<ABlob,CVMLong>>refForHash(again).getValue();
+				assertEquals(expected,twice.getEncoding());
+				assertEquals(CVMLong.ONE,twice.get(longKey));
+				assertEquals(original,twice);
+				twice.validate();
+				assertEquals(expected,reopened.decode(expected).getEncoding());
+			} finally {
+				reopened.close();
+				second.close();
+			}
+		}
+	}
 }

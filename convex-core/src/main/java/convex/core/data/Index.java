@@ -104,6 +104,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			short mask, long count) {
 		super(count);
 		if (depth<UNRESOLVED_DEPTH||depth>MAX_DEPTH) throw new IllegalArgumentException("Index depth out of range: "+depth);
+		if (depth==UNRESOLVED_DEPTH&&(count!=1||entry==null)) throw new IllegalArgumentException("Unresolved depth requires a single-entry node");
 		this.depth = (int)depth;
 		this.entry = entry;
 		this.children = (Ref[]) entries;
