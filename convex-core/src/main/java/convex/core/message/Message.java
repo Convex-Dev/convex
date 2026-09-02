@@ -85,7 +85,7 @@ public class Message {
 		// This is a bit special because we don't want to have a full payload.
 		Result result= Result.create(id,Vectors.create(cells));
 		Message m = create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
-		m.messageData=Format.encodeDataResult(result);		
+		m.messageData=Format.encodeDataResult(result,CPoSConstants.MAX_MESSAGE_LENGTH);
 		return m;
 	}
 
@@ -425,8 +425,11 @@ public class Message {
 	}
 	
 	/**
-	 * Gets the encoded data for this message. Generates a single cell encoding if required.
+	 * Gets the encoded data for this message. Generates a multi-cell encoding of the
+	 * payload if required, applying the maximum message length: this is the boundary
+	 * at which a payload too large for one legal frame is rejected, never truncated.
 	 * @return Blob containing message data
+	 * @throws IllegalArgumentException if the payload cannot be encoded within the maximum message length
 	 */
 	public Blob getMessageData() {
 		if (messageData!=null) return messageData;
@@ -435,8 +438,8 @@ public class Message {
 			case MessageType.BELIEF:
 				// throw new Error("Received belief message should already have partial data encoding");
 			default:
-				messageData=Format.encodeMultiCell(payload,true);
-		
+				messageData=Format.encodeMultiCell(payload,true,CPoSConstants.MAX_MESSAGE_LENGTH);
+
 		}
 		return messageData;
 	}

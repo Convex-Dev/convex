@@ -306,6 +306,10 @@ public class Connection extends AConnection {
 			return sendBuffer(msg.getMessageData());
 		} catch (IOException e) {
 			return false;
+		} catch (IllegalArgumentException e) {
+			// payload cannot fit one legal frame: logged, never truncated
+			log.warn("Not sending {} message: {}",msg.getType(),e.getMessage());
+			return false;
 		}
 	}
 

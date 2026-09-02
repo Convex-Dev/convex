@@ -471,6 +471,31 @@ public class EncodingTest {
 	}
 
 	/**
+	 * A multi-cell encoding is never silently truncated. With a maximum size it is
+	 * exact at that size and throws one byte below it, before allocating; zero or a
+	 * negative maximum means no limit. The encoder knows nothing of message limits.
+	 */
+	@Test public void testMultiCellSizeLimit() {
+		AVector<ACell> value=Vectors.create(Blobs.createFilled(1,300),Blobs.createFilled(2,300),CVMLong.ONE);
+		Blob full=Format.encodeMultiCell(value,true);
+		assertTrue(full.count()>600);
+		assertEquals(full,Format.encodeMultiCell(value,true,0));
+		assertEquals(full,Format.encodeMultiCell(value,true,-1));
+		assertEquals(full,Format.encodeMultiCell(value,true,full.count()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(value,true,full.count()-1));
+
+		// Direct branches only: smaller, and bounded the same way
+		Blob shallow=Format.encodeMultiCell(value,false);
+		assertEquals(shallow,Format.encodeMultiCell(value,false,shallow.count()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(value,false,shallow.count()-1));
+
+		// A single cell is bounded too
+		Blob big=Blobs.createFilled(3,1000).toFlatBlob();
+		assertEquals(big.getEncoding(),Format.encodeMultiCell(big,true,big.getEncodingLength()));
+		assertThrows(IllegalArgumentException.class,()->Format.encodeMultiCell(big,true,big.getEncodingLength()-1));
+	}
+
+	/**
 	 * AccountKey and Hash encode exactly as 32-byte Blobs, so they are canonical:
 	 * canonical form is about the CAD3 representation, not the Java type. Length
 	 * and encoding calculations must not replace them with plain Blobs, which

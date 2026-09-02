@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +24,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
@@ -311,7 +313,78 @@ final class LatticeProtocolEndpoint implements Closeable {
 		Root<ACell> announced=propagator.getAnnouncedCursor();
 		ACell value=(path.count()==0) ? announced.get()
 			: convex.core.lang.RT.getIn(announced.get(),path.toCellArray());
-		message.returnResult(Result.create(id,value));
+		returnLatticeValue(message,Result.create(id,value));
+	}
+
+	/**
+	 * Returns a lattice query result within the work this node is prepared to do for
+	 * the requesting connection, deciding from cached memory sizes rather than by
+	 * attempting an encoding, so a query can never make this node encode more than
+	 * it will send.
+	 *
+	 * <p>An untrusted connection receives the whole value only when it fits one
+	 * message of the size this node would accept from it; otherwise it receives the
+	 * root alone and must acquire the rest itself, one bounded DATA_REQUEST at a
+	 * time. A trusted connection additionally receives a bounded delta of DATA
+	 * chunks ahead of the root, as a broadcast would. The root-only reply carries the
+	 * result and the value's top cell, which the receiver completes through its
+	 * acquire fallback.</p>
+	 */
+	private void returnLatticeValue(Message message, Result result) {
+		AConnection connection=message.getConnection();
+		boolean trusted=(connection!=null)&&connection.isTrusted();
+		int singleLimit=trusted ? propagator.getMaxDeltaMessageSize() : config.getMaxMessageSize();
+
+		// Upper bound on a complete reply: every non-embedded cell with its storage
+		// overhead, plus the top-level encoding. Cached, so O(1) for announced values.
+		long bound=result.getMemorySize()+result.getEncodingLength();
+		if (bound<=singleLimit) {
+			message.returnMessage(Message.create(MessageType.RESULT,result,
+				Format.encodeMultiCell(result,true,singleLimit)));
+			return;
+		}
+
+		if (trusted) {
+			long budget=propagator.getMaxDeltaBroadcastSize();
+			ArrayList<ACell> cells=(bound<=budget) ? collectBranches(result.getValue(),budget) : null;
+			if (cells!=null && !cells.isEmpty()) {
+				try {
+					List<Message> chunks=Message.createDataMessages(cells,singleLimit,budget);
+					for (Message chunk : chunks) {
+						// A chunk that cannot be queued is simply acquired by the receiver later
+						if (!message.returnMessage(chunk)) break;
+					}
+				} catch (IllegalArgumentException e) {
+					// A single cell exceeds the chunk limit: the receiver acquires instead
+				}
+			}
+		}
+
+		// Root only: the result and the value's top cell, always small
+		message.returnMessage(Message.create(MessageType.RESULT,result,
+			Format.encodeMultiCell(result,false,0)));
+	}
+
+	/**
+	 * Collects every non-embedded cell reachable from a value, or returns null if
+	 * their encodings exceed the byte budget.
+	 */
+	private static ArrayList<ACell> collectBranches(ACell value, long byteBudget) {
+		ArrayList<ACell> cells=new ArrayList<>();
+		ArrayList<Ref<?>> stack=new ArrayList<>();
+		HashSet<Ref<?>> seen=new HashSet<>();
+		Cells.visitBranchRefs(value,stack::add);
+		long total=0;
+		while (!stack.isEmpty()) {
+			Ref<?> ref=stack.remove(stack.size()-1);
+			if (!seen.add(ref)) continue;
+			ACell cell=ref.getValue();
+			total+=cell.getEncodingLength();
+			if (total>byteBudget) return null;
+			cells.add(cell);
+			Cells.visitBranchRefs(cell,stack::add);
+		}
+		return cells;
 	}
 
 	private void processData(Message message,ConnectionStats stats)

@@ -1942,6 +1942,117 @@ public class NodeServerTest {
 		return index;
 	}
 
+	/**
+	 * Group configuration with small message limits, so lattice query replies for a
+	 * value of a few kilobytes exercise every size tier without large fixtures.
+	 */
+	private static LatticePropagatorConfig smallReplyLimits() {
+		return LatticePropagatorConfig.create(Maps.of(
+			LatticePropagatorConfig.MAX_MESSAGE_SIZE,CVMLong.create(4096),
+			LatticePropagatorConfig.MAX_DELTA_MESSAGE_SIZE,CVMLong.create(8192),
+			LatticePropagatorConfig.MAX_DELTA_BROADCAST_SIZE,CVMLong.create(32768),
+			LatticePropagatorConfig.MAX_TRUSTED_MESSAGE_SIZE,CVMLong.create(65536)));
+	}
+
+	/** A set of distinct 4 KB blobs: about 4 KB of branch encoding per element. */
+	private static ASet<ACell> branchySet(int branches) {
+		ASet<ACell> result=Sets.empty();
+		for (int i=0;i<branches;i++) result=result.include(Blobs.createRandom(4000));
+		return result;
+	}
+
+	/**
+	 * Regression for Convex-Dev/convex#726: a lattice query reply is sized by trust and
+	 * decided from cached memory sizes. An untrusted connection asking for a value
+	 * larger than one message of the size this node accepts from it receives the root
+	 * alone, and the puller completes the value through its acquire fallback rather
+	 * than the node encoding a reply it would never send.
+	 */
+	@Test
+	public void testPullPathLargeValueUntrustedAcquiresRest() throws Exception {
+		Keyword region=Keyword.create("region");
+		KeyedLattice lattice=KeyedLattice.create(region,SetLattice.create());
+		ASet<ACell> expected=branchySet(6); // ~24 KB: beyond both single-message limits
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			LatticePropagator sourcePropagator=new LatticePropagator(
+				source.getStore(),lattice,value -> value,smallReplyLimits());
+			sourcePropagator.setMergeContext(source.getCursor().getContext());
+			source.addPropagator(sourcePropagator);
+			selectInboundPropagator(source,connection -> sourcePropagator);
+			propagator(target);
+			source.launch();
+			target.launch();
+			source.getCursor().path(region).merge(expected);
+			syncAndAwaitPropagator(source);
+
+			try (ConvexRemote peer=ConvexRemote.connect(address(source))) {
+				assertEquals(expected,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
+				for (ACell branch : expected) {
+					assertNotNull(target.getStore().refForHash(branch.getHash()),"branch acquired into target store");
+				}
+			}
+		}
+	}
+
+	/**
+	 * A trusted connection asking for a value beyond one message but within the delta
+	 * budget receives DATA chunks ahead of the root, as a broadcast would, staged into
+	 * the puller's store by its manager-owned peer client; a value beyond the budget
+	 * falls back to the root alone and is acquired.
+	 */
+	@Test
+	public void testPullPathLargeValueTrustedReceivesDelta() throws Exception {
+		Keyword region=Keyword.create("region");
+		KeyedLattice lattice=KeyedLattice.create(region,SetLattice.create());
+		AKeyPair sourceKey=AKeyPair.generate();
+		AKeyPair targetKey=AKeyPair.generate();
+
+		try (NodeServer<Index<Keyword,ACell>> source=new NodeServer<>(lattice,new MemoryStore());
+				NodeServer<Index<Keyword,ACell>> target=new NodeServer<>(lattice,new MemoryStore())) {
+			LatticePropagator sourcePropagator=new LatticePropagator(
+				source.getStore(),lattice,value -> value,smallReplyLimits());
+			sourcePropagator.setMergeContext(source.getCursor().getContext());
+			sourcePropagator.setTransportKeyPair(sourceKey);
+			source.addPropagator(sourcePropagator);
+			// Test hook: every inbound connection to the source is treated as verified
+			selectInboundPropagator(source,connection -> {
+				connection.setTrustedKey(targetKey.getAccountKey());
+				return sourcePropagator;
+			});
+			LatticePropagator targetPropagator=propagator(target);
+			LatticeConnectionManager cm=targetPropagator.getConnectionManager();
+			cm.setKeyPair(targetKey);
+			source.launch();
+			target.launch();
+
+			ConvexRemote peer=ConvexRemote.connect(address(source));
+			try {
+				assertSame(peer,cm.addPeer(sourceKey.getAccountKey(),peer).get(5,TimeUnit.SECONDS));
+
+				// Within the delta budget: chunks then root
+				ASet<ACell> withinBudget=branchySet(6); // ~24 KB
+				source.getCursor().path(region).merge(withinBudget);
+				syncAndAwaitPropagator(source);
+				assertEquals(withinBudget,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
+
+				// Beyond the delta budget: root only, then acquired
+				ASet<ACell> beyondBudget=withinBudget;
+				for (ACell branch : branchySet(6)) beyondBudget=beyondBudget.include(branch); // ~48 KB
+				source.getCursor().path(region).merge(beyondBudget);
+				syncAndAwaitPropagator(source);
+				assertEquals(beyondBudget,target.pullPath(peer,region).get(5,TimeUnit.SECONDS));
+				for (ACell branch : beyondBudget) {
+					assertNotNull(target.getStore().refForHash(branch.getHash()),"branch present in target store");
+				}
+			} finally {
+				cm.removePeer(sourceKey.getAccountKey());
+				peer.close();
+			}
+		}
+	}
+
 	@Test
 	public void testPullPathAbsentAndRejectedValues() throws Exception {
 		Keyword absent=Keyword.create("absent");

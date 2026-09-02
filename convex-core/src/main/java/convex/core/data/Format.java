@@ -479,17 +479,34 @@ public class Format {
 
 
 	/**
-	 * Encode a Cell completely in multi-cell message format. Format places top level
-	 * cell first, following cells in arbitrary order.
-	 * 
+	 * Encode a Cell completely in multi-cell message format, with no maximum size.
+	 * Format places top level cell first, following cells in arbitrary order.
+	 *
 	 * @param a Cell to Encode
 	 * @param everything If true, attempt to traverse the entire Cell tree
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a, boolean everything) {
+		return encodeMultiCell(a,everything,0);
+	}
+
+	/**
+	 * Encode a Cell completely in multi-cell message format. Format places top level
+	 * cell first, following cells in arbitrary order.
+	 *
+	 * The encoder knows nothing about message limits: a caller that must fit a
+	 * bounded frame passes its limit here and handles the exception, since a
+	 * multi-cell encoding is never silently truncated.
+	 *
+	 * @param a Cell to Encode
+	 * @param everything If true, attempt to traverse the entire Cell tree
+	 * @param maxSize Maximum encoded size in bytes, or zero (or less) for no maximum
+	 * @return Blob encoding
+	 * @throws IllegalArgumentException if the encoding would exceed maxSize
+	 */
+	public static Blob encodeMultiCell(ACell a, boolean everything, long maxSize) {
 		if (a==null) return Blob.NULL_ENCODING;
-		if (a.getRefCount()==0) return a.getEncoding();
-		
+		if (a.getRefCount()==0) return checkMultiCellSize(a.getEncoding(),maxSize);
 
 		// Add any non-embedded child cells to stack
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
@@ -497,39 +514,45 @@ public class Format {
 		Cells.visitBranchRefs(a, addToStackFunc);
 		if (cells.isEmpty()) {
 			// single cell only
-			return a.getEncoding();
+			return checkMultiCellSize(a.getEncoding(),maxSize);
 		}
-		return encodeMultiCell(a,cells,everything);
+		return encodeMultiCell(a,cells,everything,maxSize);
 	}
 
-	private static Blob encodeMultiCell(ACell topCell, ArrayList<Ref<?>> branches, boolean everything) {
+	private static Blob checkMultiCellSize(Blob encoding, long maxSize) {
+		if ((maxSize>0)&&(encoding.count()>maxSize)) throw multiCellTooLong(maxSize);
+		return encoding;
+	}
+
+	private static IllegalArgumentException multiCellTooLong(long maxSize) {
+		return new IllegalArgumentException("Multi-cell encoding exceeds maximum size of "+maxSize+" bytes");
+	}
+
+	private static Blob encodeMultiCell(ACell topCell, ArrayList<Ref<?>> branches, boolean everything, long maxSize) {
 		Blob topCellEncoding=Cells.encode(topCell);
+		long limit=(maxSize>0)?maxSize:Long.MAX_VALUE;
+		if (topCellEncoding.count()>limit) throw multiCellTooLong(maxSize);
 		Consumer<Ref<?>> addToStackFunc=r->{branches.add(r);};
-		
+
 		// Visit refs in stack to add to message, accumulating message size required
-		int[] ml=new int[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
+		long[] ml=new long[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
 		HashSet<Ref<?>> refs=new HashSet<>();
 		Trees.visitStack(branches, cr->{
 			if (!refs.contains(cr)) {
 				ACell c=cr.getValue();
 				int encLength=c.getEncodingLength();
 				int lengthFieldSize=Format.getVLQCountLength(encLength);
-				
-				int cellLength=lengthFieldSize+encLength;
-				
-				int newLength=ml[0]+cellLength;
-				if (newLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
-					System.err.println("Exceeded max message length when encoding");
-					return;
-				}
+
+				long newLength=ml[0]+lengthFieldSize+encLength;
+				if (newLength>limit) throw multiCellTooLong(maxSize);
 				ml[0]=newLength;
 				refs.add(cr);
 				if (everything) Cells.visitBranchRefs(c, addToStackFunc);
 			}
 		});
-		int messageLength=ml[0];
+		int messageLength=Utils.checkedInt(ml[0]);
 		byte[] msg=new byte[messageLength];
-		
+
 		// Write top encoding, then ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
 		int ix=topCellEncoding.size();
@@ -537,32 +560,34 @@ public class Format {
 			ACell c=r.getValue();
 			Blob enc=Cells.encode(c);
 			int encLength=enc.size();
-			
+
 			// Write count then Blob encoding
 			ix=Format.writeVLQCount(msg, ix, encLength);
 			ix=enc.getBytes(msg, ix);
 		}
-		if (ix!=messageLength) throw new IllegalArgumentException("Bad message length expected "+ml[0]+" but was: "+ix);
-		
+		if (ix!=messageLength) throw new Panic("Bad message length expected "+messageLength+" but was: "+ix);
+
 		return Blob.wrap(msg);
 	}
-	
+
 	/**
 	 * Encode a Result down to the encodings of each vector element
 	 * @param result Result containing a Vector value
+	 * @param maxSize Maximum encoded size in bytes, or zero (or less) for no maximum
 	 * @return Multi-cell encoding of Result
+	 * @throws IllegalArgumentException if the encoding would exceed maxSize
 	 */
-	public static Blob encodeDataResult(Result result) {
+	public static Blob encodeDataResult(Result result, long maxSize) {
 		AVector<?> v=RT.ensureVector(result.getValue());
 		if (v==null) throw new IllegalArgumentException("Data result must contain a vector value");
-		
+
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
-		
+
 		// Add the top level vector as a branch iff it is not embedded in the Result
 		if (!v.isEmbedded()) {
 			cells.add(v.getRef());
 		}
-		
+
 		v.visitAllChildren(vc->{
 			Ref<?> r=vc.getRef();
 			if (!r.isEmbedded()) {
@@ -577,12 +602,10 @@ public class Format {
 				cells.add(r);
 			};
 		});
-		
+
 		// Note false to prevent traversing all extra branches
-		return encodeMultiCell(result,cells,false);
+		return encodeMultiCell(result,cells,false,maxSize);
 	}
-	
-	
 	/**
 	 * Encodes a flat list of cells in order specified in multi-cell format
 	 * 

@@ -3,6 +3,7 @@ package convex.node;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -23,7 +24,6 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.exceptions.MissingDataException;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
@@ -1339,6 +1339,11 @@ public class LatticePropagator implements Closeable {
 						MessageTag.LATTICE_QUERY, null, Vectors.create(path));
 				Message queryMessage = Message.create(MessageType.LATTICE_QUERY, queryPayload);
 
+				// A large value comes back as a partial reply (root plus direct branches,
+				// possibly preceded by DATA chunks). It must decode against this store so
+				// missing branches resolve lazily and the acquire fallback can complete it.
+				if (peer.getStore() == null) peer.setStore(store);
+
 				CompletableFuture<Result> resultFuture = peer.request(queryMessage);
 				Result result = resultFuture.get(10, TimeUnit.SECONDS);
 
@@ -1349,14 +1354,18 @@ public class LatticePropagator implements Closeable {
 				ACell receivedValue = result.getValue();
 				if (receivedValue == null) return null;
 
-				// 2. Store the received value locally. For small values that are
-				// fully encoded in the result, announce succeeds immediately.
-				// For large values with missing children, fall back to acquire.
+				// 2. Store the received value locally. A complete reply is announced
+				// directly. A partial reply (root only, or root after DATA chunks) is
+				// completed by acquiring from the peer: any cells the reply or its
+				// chunks staged in the store are found there and not fetched again.
+				// Completeness is checked explicitly, since a store may hold a partial
+				// value without throwing.
 				ACell acquired;
-				try {
+				HashSet<Hash> missing = new HashSet<>();
+				Ref.get(receivedValue).findMissing(missing, 1);
+				if (missing.isEmpty()) {
 					acquired = Cells.announce(receivedValue, r -> {}, store);
-				} catch (MissingDataException mde) {
-					// Value has children not in our store — acquire full tree from peer
+				} else {
 					Hash rootHash = Hash.get(receivedValue);
 					acquired = peer.acquire(rootHash, store).get(30, TimeUnit.SECONDS);
 				}

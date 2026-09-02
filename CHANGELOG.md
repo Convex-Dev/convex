@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Format.encodeMultiCell` no longer knows about message limits and never silently
+  drops cells: a new overload takes a maximum size and throws `IllegalArgumentException`
+  when it would be exceeded, with zero or less meaning no maximum. `Message.getMessageData`
+  applies the maximum message length at the transport boundary, and connections refuse
+  to send, with a logged warning, a message that cannot fit one frame (#726).
+- Lattice query replies are sized by the requesting connection's trust and decided from
+  cached memory sizes, so a query never makes a node encode more than it will send. An
+  untrusted connection receives a value in full only when it fits one message of the
+  size the node accepts from it, and otherwise the root alone to acquire the rest; a
+  trusted connection also receives bounded `DATA` chunks ahead of the root, as a
+  broadcast would.
 - Cells now compute their encoding length arithmetically from a per-type header
   length plus their child refs, never by rendering an encoding, and `createEncoding`
   allocates the exact size. `estimatedEncodingSize` has been removed from
@@ -60,6 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `LatticePropagator.pullPath` merged a partial reply as if complete when its store
+  held the root without every branch, since `MemoryStore` returns a missing ref rather
+  than throwing. Completeness is now checked explicitly and a partial value is acquired
+  from the peer before it is merged; the peer client is given the propagator store before
+  the query so a partial reply decodes lazily instead of being rejected.
 - Multi-cell messages containing an `Index` node deeper than 64 hex digits with
   non-embedded children could not be decoded by a receiver that did not already
   hold those children, because the embedding check dereferenced them. A lattice
