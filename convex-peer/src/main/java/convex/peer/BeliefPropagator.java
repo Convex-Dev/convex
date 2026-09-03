@@ -215,11 +215,10 @@ public class BeliefPropagator extends AThreadedComponent {
 				boolean fullDue=(lastFullBroadcastTime<0)
 					||(ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY);
 				boolean attempted=false;
+				// Publish our own signed Order first. Full Belief announcement and
+				// delta encoding are best-effort work and must not delay our vote.
+				attempted=broadcastQuickUpdate();
 				if (fullDue) {
-					// Publish our own signed Order first. Full Belief announcement and
-					// delta encoding are best-effort work and must not delay our vote.
-					Message ownOrder=createQuickUpdateMessage();
-					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
 					List<Message> messages=createFullUpdateMessages();
 					lastFullBroadcastTime=ts;
 					if (!messages.isEmpty()) {
@@ -230,9 +229,6 @@ public class BeliefPropagator extends AThreadedComponent {
 								result.dropped());
 						}
 					}
-				} else {
-					Message ownOrder=createQuickUpdateMessage();
-					if (ownOrder!=null) attempted=server.manager.broadcastPriority(ownOrder)>0;
 				}
 				if (attempted) {
 					beliefBroadcastCount++;
@@ -511,43 +507,79 @@ public class BeliefPropagator extends AThreadedComponent {
 			Config.getBeliefDeltaMessageSize(server.getConfig()),broadcastLimit);
 	}
 	
+	/**
+	 * Creates the single message form of the quick own-Order update: the priority
+	 * delta when the novelty fits it, otherwise the root of the DATA-ahead sequence.
+	 * Test and diagnostic hook; broadcasting uses {@link #broadcastQuickUpdate()}.
+	 */
 	protected Message createQuickUpdateMessage() throws IOException {
-		return createOwnOrderMessage();
+		List<Message> messages=createQuickUpdateMessages();
+		return messages.isEmpty()?null:messages.get(messages.size()-1);
 	}
 
 	/**
-	 * Creates the signed own-Order message used for priority consensus participation.
+	 * Broadcasts our signed own Order with its novel cells so receivers can merge it
+	 * at once. A small update goes through the replaceable priority slot; a larger one
+	 * goes as a DATA-ahead sequence on the ordinary queue.
 	 *
-	 * <p>The message carries the Order's novel cells inline whenever they fit the
-	 * priority message limit, so receivers can merge the Order immediately. Announcing
-	 * here consumes announce-novelty for the whole Order tree — including new Blocks —
-	 * so a root-only message would leave later full broadcasts without that data and
-	 * force receivers onto status polling for every confirmation round (observed as
-	 * multi-second transaction confirmation on otherwise idle networks). When the
-	 * novelty exceeds the priority limit the root-only fallback still applies, and
-	 * full broadcasts plus polling recover as before.</p>
+	 * @return true if the update was offered to at least one peer
 	 */
-	private Message createOwnOrderMessage() throws IOException {
+	private boolean broadcastQuickUpdate() throws IOException {
+		List<Message> messages=createQuickUpdateMessages();
+		if (messages.isEmpty()) return false;
+		if (messages.size()==1) return server.manager.broadcastPriority(messages.get(0))>0;
+		var result=server.manager.broadcastSequence(messages,null);
+		if (result.dropped()>0) {
+			log.debug("Dropped own Order delta for {} peer(s); full broadcast and polling will recover",
+				result.dropped());
+		}
+		return result.peers()>0;
+	}
+
+	/**
+	 * Creates the signed own-Order update used for priority consensus participation.
+	 *
+	 * <p>Announcing the Order consumes announce-novelty for its whole tree, new Blocks
+	 * included, so everything announced here must actually be sent: a root-only
+	 * message would leave later full broadcasts without that data and force receivers
+	 * onto status polling for every confirmation round (observed as a 2 s stall per
+	 * large Block). The novelty is therefore collected up to the full broadcast limit.
+	 * When it fits the priority message limit the result is one delta for the priority
+	 * slot; otherwise it is a bounded DATA-ahead sequence ending in the Order, for the
+	 * ordinary queue. Only novelty beyond the broadcast limit is left to polling.</p>
+	 */
+	private List<Message> createQuickUpdateMessages() throws IOException {
 		AccountKey key=server.getPeerKey();
 		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=orders.get(key);
-		if (order==null) return null;
-		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
+		if (order==null) return List.of();
+		int broadcastLimit=Config.getBeliefDeltaBroadcastSize(server.getConfig());
+		Cells.NoveltyCollector novelty=new Cells.NoveltyCollector(broadcastLimit);
 		order=Cells.announce(order,novelty,server.getStore());
 		orders=orders.assoc(key,order);
 		belief=belief.withOrders(orders);
 		if (novelty.getOmittedCount()>0) {
-			// More novelty than the quick path can carry: skip eager delivery. The
-			// collected tail still folds into the next full broadcast; polling
-			// recovers anything the collector had to omit.
-			addQuickNovelty(novelty.getCells());
-			return Message.create(MessageType.BELIEF,order,order.getEncoding());
+			log.debug("Own Order novelty exceeds the broadcast limit; {} cell(s) left to polling",
+				novelty.getOmittedCount());
 		}
-		addQuickNovelty(novelty.getCells());
-		List<Message> messages=createPartialBeliefMessages(order,new ArrayList<>(quickNovelty),
-			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT);
-		if (messages.size()==1) return messages.get(0);
-		return Message.create(MessageType.BELIEF,order,order.getEncoding());
+		// This update's novelty in full, plus the resend window of earlier priority
+		// deltas. The window is bounded in cells and must never truncate the current
+		// novelty: a Block with more cells than the window would otherwise lose its
+		// oldest cells from the delta and be undecodable until the next poll.
+		ArrayList<ACell> cells=new ArrayList<>(quickNovelty);
+		cells.addAll(novelty.getCells());
+		List<Message> messages=createPartialBeliefMessages(order,cells,
+			Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT,broadcastLimit);
+		if (messages.size()==1) {
+			// A priority delta can be superseded before it is sent: keep its cells for
+			// resending in the next delta until a full broadcast carries them.
+			addQuickNovelty(novelty.getCells());
+		} else {
+			// An ordered sequence on the ordinary queue is not superseded, so the
+			// window it existed for can start afresh.
+			quickNovelty.clear();
+		}
+		return messages;
 	}
 
 	/**

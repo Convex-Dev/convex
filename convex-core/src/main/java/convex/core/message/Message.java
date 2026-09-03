@@ -1,6 +1,7 @@
 package convex.core.message;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -17,6 +18,7 @@ import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -106,19 +108,43 @@ public class Message {
 
 		ACell[] values=new ACell[cells.size()+1];
 		values[0]=MessageTag.DATA;
-		ArrayList<ACell> delta=new ArrayList<>(cells.size()+1);
 		for (int i=0; i<cells.size(); i++) {
 			ACell cell=cells.get(i);
 			if (cell==null || cell.isEmbedded()) {
 				throw new IllegalArgumentException("DATA cells must be non-null and non-embedded");
 			}
 			values[i+1]=cell;
-			delta.add(cell);
 		}
 		AVector<?> payload=Vectors.create(values);
-		delta.add(payload);
-		Blob data=Format.encodeDelta(delta,maxMessageLength);
+		Blob data=Format.encodeDelta(dataDelta(cells,payload),maxMessageLength);
 		return create(MessageType.DATA,payload,data);
+	}
+
+	/**
+	 * Builds the delta for a DATA message: the cells, then the payload Vector's own
+	 * branch nodes, then the payload as the top cell. A Vector of more than one chunk
+	 * of cells is a tree whose chunk leaves are cells in their own right; without them
+	 * the receiver cannot read any element, not even the DATA tag, and the message is
+	 * undecodable. The walk stops at the cells themselves, which may be Vectors too.
+	 */
+	private static ArrayList<ACell> dataDelta(List<? extends ACell> cells, AVector<?> payload) {
+		ArrayList<ACell> delta=new ArrayList<>(cells.size()+2);
+		delta.addAll(cells);
+		HashSet<Hash> elements=new HashSet<>(cells.size()*2);
+		for (ACell cell: cells) elements.add(Cells.getHash(cell));
+		addVectorNodes(payload,elements,delta);
+		delta.add(payload);
+		return delta;
+	}
+
+	private static void addVectorNodes(ACell node, HashSet<Hash> elements, ArrayList<ACell> delta) {
+		Cells.visitBranchRefs(node, ref -> {
+			if (elements.contains(ref.getHash())) return; // a DATA cell, already in the delta
+			ACell child=ref.getValue();
+			if (child==null) return;
+			delta.add(child);
+			addVectorNodes(child,elements,delta);
+		});
 	}
 
 	/**
@@ -195,10 +221,7 @@ public class Message {
 		values[0]=MessageTag.DATA;
 		for (int i=0; i<cells.size(); i++) values[i+1]=cells.get(i);
 		AVector<?> payload=Vectors.create(values);
-		ArrayList<ACell> delta=new ArrayList<>(cells.size()+1);
-		delta.addAll(cells);
-		delta.add(payload);
-		return Format.getDeltaEncodingLength(delta);
+		return Format.getDeltaEncodingLength(dataDelta(cells,payload));
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {

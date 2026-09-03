@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consensus: a Block whose novelty exceeded the 64 KB priority message limit was
+  announced to other peers as a root-only update, so they could not decode it
+  until the 2 s status poll. Any burst of more than a few hundred transactions
+  therefore cost about 2 s per Block. Such updates now go out as a DATA-ahead
+  sequence on the ordinary queue, and the resend window can no longer truncate a
+  large Block's cells.
+- Messaging: a DATA message carrying more than 16 cells was undecodable by the
+  receiver, because the Vector holding the cells became a tree whose chunk
+  leaves were not in the message. DATA-ahead chunks were silently dropped as
+  unrecognised messages. The chunk leaves now travel with the message.
 - Peer server: replies to client connections were dropped whenever a
   connection's Netty write buffer was momentarily full, so a client submitting
   thousands of transactions over one connection saw bursts of `:TIMEOUT`
