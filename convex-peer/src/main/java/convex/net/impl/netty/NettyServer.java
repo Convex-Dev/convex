@@ -56,6 +56,10 @@ public class NettyServer extends AServer {
 	/** Maximum encoded inbound message length, enforced before full message allocation. */
 	private volatile int maxMessageLength = (int) convex.core.cpos.CPoSConstants.MAX_MESSAGE_LENGTH;
 
+	/** Shared, byte-bounded queue of replies to all inbound connections. */
+	private final ServerOutboundQueue outbound = new ServerOutboundQueue(
+		Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT, Config.OUTBOUND_QUEUE_BYTE_LIMIT);
+
 	/**
 	 * Delivery function for inbound messages. Returns null if accepted,
 	 * or a blocking retry predicate if the queue was full.
@@ -142,7 +146,7 @@ public class NettyServer extends AServer {
 				 Function<Message, Predicate<Message>> deliverFn =
 					 (deliver != null) ? deliver : wrapReceiveAction();
 				 NettyInboundHandler inbound=new NettyInboundHandler(deliverFn,null,maxMessageLength);
-            	 NettyServerConnection conn=new NettyServerConnection(ch,inbound);
+            	 NettyServerConnection conn=new NettyServerConnection(ch,inbound,outbound);
             	 inbound.setConnection(conn);
             	 inbound.setDisconnectAction(getDisconnectAction()); // #566: eager per-connection cleanup
                  ch.pipeline().addLast(inbound,new NettyOutboundHandler());
@@ -234,6 +238,7 @@ public class NettyServer extends AServer {
 			if (serverClose != null) serverClose.syncUninterruptibly();
 			clientsClose.awaitUninterruptibly();
 		}
+		outbound.close();
 	}
 
 	public void waitForClose() throws InterruptedException {

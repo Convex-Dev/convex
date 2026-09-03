@@ -205,7 +205,8 @@ public class NettyServerTest {
 	@Test public void testChannelInactiveFiresDisconnect() {
 		NettyInboundHandler handler = new NettyInboundHandler(msg -> null, null);
 		EmbeddedChannel ch = new EmbeddedChannel(handler);
-		NettyServerConnection conn = new NettyServerConnection(ch, handler);
+		ServerOutboundQueue outbound = new ServerOutboundQueue(1 << 20, 1 << 20);
+		NettyServerConnection conn = new NettyServerConnection(ch, handler, outbound);
 		handler.setConnection(conn);
 
 		CompletableFuture<AConnection> disconnected = new CompletableFuture<>();

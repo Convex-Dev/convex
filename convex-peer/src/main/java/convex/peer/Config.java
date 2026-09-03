@@ -161,6 +161,14 @@ public class Config {
 	/** Maximum ordinary encoded bytes queued per outbound Peer connection. */
 	public static final int OUTBOUND_QUEUE_BYTE_LIMIT = 16 * 1024 * 1024;
 
+	/**
+	 * Maximum encoded bytes of replies queued across all inbound connections of a
+	 * server, counted until Netty reports each write complete. One shared bound
+	 * absorbs bursts of results; each connection may hold at most
+	 * {@link #OUTBOUND_QUEUE_BYTE_LIMIT} of it.
+	 */
+	public static final int SERVER_OUTBOUND_QUEUE_BYTE_LIMIT = 128 * 1024 * 1024;
+
 	/** A coalesced priority message must remain a small consensus/control root. */
 	public static final int PRIORITY_OUTBOUND_MESSAGE_LIMIT = 64 * 1024;
 

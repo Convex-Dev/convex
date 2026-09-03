@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Peer server: replies to client connections were dropped whenever a
+  connection's Netty write buffer was momentarily full, so a client submitting
+  thousands of transactions over one connection saw bursts of `:TIMEOUT`
+  results and 20 s stalls. Replies now go through one server-wide queue bounded
+  by total bytes (128 MB, at most 16 MB per connection), drained by a single
+  writer, so bursts are absorbed instead of lost.
 - Consensus: a peer's quick own-Order update was sent without its signed Order
   whenever that signed Order was small enough to be embedded, which happens
   periodically as the Block vector grows. Other peers then only learned of the
