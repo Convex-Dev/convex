@@ -583,19 +583,13 @@ public class BeliefPropagator extends AThreadedComponent {
 			throw new IllegalArgumentException("Belief broadcast limit must be between "
 				+maxMessageLength+" and "+CPoSConstants.MAX_MESSAGE_LENGTH+": "+maxBroadcastLength);
 		}
-		int n=novelty.size();
-		if (n==0) {
-			//log.warn("No novelty in Belief");
-			novelty.add(payload);
-		} else if (!payload.equals(novelty.get(n-1))) {
-			//log.warn("Last element not Belief out of "+novelty.size());
-			novelty.add(payload);
-		}
-		novelty.removeIf(ACell::isEmbedded);
-		if (!payload.isEmbedded()
-				&& (novelty.isEmpty() || !payload.equals(novelty.get(novelty.size()-1)))) {
-			novelty.add(payload);
-		}
+		// The payload is always the top cell of the delta, embedded or not. Embedded
+		// novelty cells travel inside their parents and are dropped, but the payload
+		// itself may legitimately be embedded: a SignedData wrapping a branch Order is
+		// only 130 bytes. Dropping it left a peer's own Order out of every quick update
+		// until the next status poll (#706).
+		novelty.removeIf(c -> c.isEmbedded() || payload.equals(c));
+		novelty.add(payload);
 		if (Format.getDeltaEncodingLength(novelty)<=maxMessageLength) {
 			Blob data=Format.encodeDelta(novelty,maxMessageLength);
 			return List.of(Message.create(MessageType.BELIEF,payload,data));

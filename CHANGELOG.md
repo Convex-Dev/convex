@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Consensus: a peer's quick own-Order update was sent without its signed Order
+  whenever that signed Order was small enough to be embedded, which happens
+  periodically as the Block vector grows. Other peers then only learned of the
+  proposal from the 2 s status poll, stalling roughly one transaction in fifteen
+  for 5-7 s on local networks (#706).
+
 ## [0.8.16] - 2026-09-02
 
 ### Added

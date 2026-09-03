@@ -29,6 +29,8 @@ import convex.api.ConvexRemote;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -568,6 +570,54 @@ public class ServerTest {
 		List<Message> bounded=BeliefPropagator.createPartialBeliefMessages(
 			belief,boundedNovelty,limit,2200);
 		assertTrue(bounded.stream().mapToLong(m -> m.getMessageData().count()).sum()<=2200);
+	}
+
+	/**
+	 * A SignedData wrapping a branch Order is only 130 bytes and therefore embedded,
+	 * even though the Order it signs is not. The quick own-Order update must still
+	 * carry that signed Order as its top cell, with or without novelty (#706).
+	 */
+	@Test
+	public void testPartialBeliefMessagesEmbeddedSignedOrder() throws Exception {
+		AKeyPair kp=AKeyPair.createSeeded(1337);
+		Order order=Order.create();
+		for (int i=0; (i<64)&&order.isEmbedded(); i++) {
+			SignedData<ATransaction> tx=kp.signData(Invoke.create(Address.create(11),i,"(def c "+i+")"));
+			order=order.append(kp.signData(Block.create(1000+i,List.of(tx))));
+		}
+		assertFalse(order.isEmbedded());
+		SignedData<Order> signed=kp.signData(order);
+		assertTrue(signed.isEmbedded());
+		int limit=Config.PRIORITY_OUTBOUND_MESSAGE_LIMIT;
+		MemoryStore store=new MemoryStore();
+
+		// With novelty: the Order travels with its signed wrapper as the top cell
+		List<Message> messages=BeliefPropagator.createPartialBeliefMessages(
+			signed,new ArrayList<>(List.of(order)),limit);
+		assertEquals(1,messages.size());
+		ACell payload=messages.get(0).getPayload(store);
+		assertEquals(signed,payload);
+		SignedData<Order> received=Belief.extractOrders(payload).iterator().next();
+		assertEquals(order.getBlockCount(),received.getValue().getBlockCount());
+
+		// Without novelty: the message is still the signed Order, never empty
+		Message rebroadcast=BeliefPropagator.createPartialBeliefMessages(
+			signed,new ArrayList<>(),limit).get(0);
+		assertTrue(rebroadcast.getMessageData().count()>0);
+		assertEquals(signed,rebroadcast.getPayload(store));
+	}
+
+	/**
+	 * Every transaction must confirm promptly as the peer's own Order crosses the
+	 * embedding boundary, which happens as its block vector grows (#706).
+	 */
+	@Test
+	public void testSequentialTransactionsConfirmPromptly() throws Exception {
+		Convex client=network.getClient();
+		for (int i=0; i<40; i++) {
+			Result r=client.transact("(def c "+i+")").get(3000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError(),r.toString());
+		}
 	}
 
 	@Test
