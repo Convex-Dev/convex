@@ -6,17 +6,21 @@ import java.util.concurrent.atomic.AtomicLong;
 import convex.core.message.Message;
 import convex.core.message.AConnection;
 import convex.core.util.Utils;
+import convex.peer.Config;
 import io.netty.channel.Channel;
 
 /**
  * AConnection for server-side inbound Netty channels.
  *
- * Encodes on the caller thread, then offers the message to the server's shared
- * {@link ServerOutboundQueue}. Replies are refused only when that queue's byte
- * bound is full, or when this channel already holds more than its cap of bytes
- * handed to Netty and unwritten, so a burst of results is absorbed rather than
- * dropped while the channel is briefly unwritable, and a reader that stalls
- * loses only its own replies. One instance per accepted client channel.
+ * <p>Encodes on the caller thread, then offers the message to the server's shared
+ * {@link ServerOutboundQueue}. {@link #trySendMessage} and {@link #returnMessage}
+ * never wait and are safe on an I/O thread. {@link #sendMessage} and
+ * {@link #returnMessageBlocking} wait a bounded time for space in the shared
+ * queue, applying backpressure to handler threads that report client results
+ * rather than dropping them under load. Neither form waits for this channel
+ * itself: a channel that is closed, or already holds more than its cap of bytes
+ * handed to Netty and unwritten, has its reply refused at once, so a reader that
+ * stalls loses only its own replies. One instance per accepted client channel.</p>
  */
 class NettyServerConnection extends AConnection {
 
@@ -35,13 +39,34 @@ class NettyServerConnection extends AConnection {
 
 	@Override
 	public boolean sendMessage(Message msg) {
+		return send(msg, true);
+	}
+
+	@Override
+	public boolean trySendMessage(Message msg) {
+		return send(msg, false);
+	}
+
+	@Override
+	public boolean returnMessageBlocking(Message msg) {
+		return send(msg, true);
+	}
+
+	private boolean send(Message msg, boolean mayBlock) {
 		Channel ch = channel;
 		if (ch == null || !ch.isActive()) return false;
-		// Message encoding can traverse a large cell tree. Do it on the NodeServer
-		// dispatcher (or other caller), never lazily in NettyOutboundHandler.
+		// Message encoding can traverse a large cell tree. Do it on the caller's
+		// thread, never lazily in NettyOutboundHandler.
 		long length = NettyConnection.encodedLength(msg);
 		if (length < 0) return false; // too large for a frame: logged, not sent
-		return outbound.offer(this, ch, msg, Utils.checkedInt(length));
+		int bytes = Utils.checkedInt(length);
+		if (!mayBlock) return outbound.offer(this, ch, msg, bytes);
+		try {
+			return outbound.offerBlocking(this, ch, msg, bytes, Config.DEFAULT_INTERNAL_TIMEOUT);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
 	}
 
 	void addPendingBytes(int delta) {
@@ -50,11 +75,6 @@ class NettyServerConnection extends AConnection {
 
 	long getPendingBytes() {
 		return pendingBytes.get();
-	}
-
-	@Override
-	public boolean trySendMessage(Message msg) {
-		return sendMessage(msg);
 	}
 
 	@Override

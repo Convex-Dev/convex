@@ -462,17 +462,30 @@ trigger its own TCP write.
 `NettyOutboundHandler.write()` never calls `flush()` — the caller controls when
 flushing happens, enabling batching at the connection level.
 
-### Server Result Return (Not Batched)
+### Server Result Return
 
-`reportTransactions()` calls `m.returnResult(res)` per result, which triggers
-`ch.writeAndFlush(m)` — one TCP flush per result. This is intentionally not batched:
+`reportTransactions()` calls `m.returnResultBlocking(res)` per result. On a Netty
+server connection this offers the encoded result to the server's single
+`ServerOutboundQueue`, shared by every inbound connection and bounded by the bytes it
+holds (`Config.SERVER_OUTBOUND_QUEUE_BYTE_LIMIT`). One writer thread hands queued
+messages to Netty and flushes each touched channel once per batch, so bursts of
+results coalesce into few TCP segments without `TransactionHandler` ever seeing a
+channel.
 
-- Results are small (~100 bytes each)
-- Batching would require exposing Netty channels to TransactionHandler, breaking the
-  clean separation where Server never sees a channel
-- Real-world clients won't sustain 100k+ TPS — the per-result overhead is negligible
-  at normal load levels
-- Latency benefits from immediate result delivery outweigh throughput gains from batching
+The queue applies three policies:
+
+- **Backpressure, not loss.** If the shared bound is full, the reporting thread
+  (the `CVMExecutor`) waits for space, up to `Config.DEFAULT_INTERNAL_TIMEOUT`.
+  Delaying state updates is preferable to dropping results globally. Consensus is
+  unaffected: Belief propagation runs on outbound connections with their own queues,
+  and hands beliefs to the executor through a latest-value slot that never blocks.
+- **A stalled reader loses only its own replies.** Bytes handed to Netty but not
+  yet written are capped per connection (`Config.SERVER_CONNECTION_PENDING_BYTE_LIMIT`).
+  Over that cap the connection's results are refused at once, never waited for, and
+  logged at debug. The client sees a `:TIMEOUT`.
+- **Trusted peers first.** Replies to verified peer connections go into a lane the
+  writer drains first and that is exempt from the shared bound, so consensus and
+  lattice replies never queue behind client results.
 
 ### Test Tool
 

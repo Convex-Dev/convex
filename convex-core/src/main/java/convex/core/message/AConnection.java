@@ -92,6 +92,20 @@ public abstract class AConnection {
 	}
 
 	/**
+	 * Returns a message to the remote end, waiting a bounded time if the
+	 * connection's shared outbound capacity is exhausted. For handler threads that
+	 * report client results and may apply backpressure; never call from an I/O
+	 * thread. A connection that cannot accept the message for its own reasons
+	 * (closed, or its reader is not draining) still refuses at once.
+	 *
+	 * @param msg Message to return
+	 * @return true if the message was accepted for delivery
+	 */
+	public boolean returnMessageBlocking(Message msg) {
+		return returnMessage(msg);
+	}
+
+	/**
 	 * Checks if this connection supports general message sending (as opposed
 	 * to result-only delivery via {@link #returnMessage(Message)}).
 	 *

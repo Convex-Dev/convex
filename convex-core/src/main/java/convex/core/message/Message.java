@@ -677,12 +677,29 @@ public class Message {
 	 * @throws IllegalStateException if original message did not specify a return ID
 	 */
 	public boolean returnResult(Result res) {
+		return returnMessage(createReturnResult(res));
+	}
+
+	/**
+	 * Returns a Result for this message, waiting a bounded time if the connection's
+	 * shared outbound capacity is exhausted. For handler threads only; see
+	 * {@link AConnection#returnMessageBlocking(Message)}.
+	 *
+	 * @param res Result to return
+	 * @return true if the result was accepted for delivery
+	 */
+	public boolean returnResultBlocking(Result res) {
+		Message msg=createReturnResult(res);
+		AConnection conn=connection;
+		if (conn==null) throw new IllegalStateException("No connection for return message");
+		return conn.returnMessageBlocking(msg);
+	}
+
+	private Message createReturnResult(Result res) {
 		ACell id=getRequestID(); // what was the request ID of original message?
 		if (id!=null) {
 			// Make sure Result has correct result ID
-			res=res.withID(id);
-			Message msg=Message.createResult(res);
-			return returnMessage(msg);
+			return Message.createResult(res.withID(id));
 		} else {
 			throw new IllegalStateException("Trying to return result with no original request ID in "+this);
 		}

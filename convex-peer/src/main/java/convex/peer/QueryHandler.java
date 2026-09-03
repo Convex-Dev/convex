@@ -104,7 +104,7 @@ public class QueryHandler extends AThreadedComponent {
 			Message response=m.makeDataResponse(server.getStore());
 			boolean sent = m.returnMessage(response);
 			if (!sent) {
-				log.info("Can't send data request response due to full buffer");
+				log.debug("Dropped data request response for connection {}", m.getConnection());
 			} else {
 				// log.info("Missing data request handled. Load = "+LoadMonitor.getLoad());
 			}
@@ -134,10 +134,10 @@ public class QueryHandler extends AThreadedComponent {
 			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.returnResult(result);
-	
+			boolean resultReturned= m.returnResultBlocking(result);
+
 			if (!resultReturned) {
-				log.warn("Failed to send query result back to client with ID: {}", id);
+				log.debug("Dropped query result {} for connection {}", id, m.getConnection());
 			}
 		} catch (Exception e) {
 			log.debug("Terminated client: "+e.getMessage());

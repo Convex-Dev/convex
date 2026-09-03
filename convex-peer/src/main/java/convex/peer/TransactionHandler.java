@@ -336,9 +336,12 @@ public class TransactionHandler extends AThreadedComponent {
 					res=Result.error(ErrorCodes.FATAL, "Failed to produce result").withSource(SourceCodes.PEER);
 				}
 
-				boolean reported = m.returnResult(res);
-				if (!reported) {
-					// ignore?
+				// Waits for shared outbound capacity (backpressure on state updates is
+				// preferable to losing results); refused only if this client's connection
+				// is closed or its reader is not draining, which is normal operation.
+				boolean reported = m.returnResultBlocking(res);
+				if (!reported && log.isDebugEnabled()) {
+					log.debug("Dropped transaction result for connection {}", m.getConnection());
 				}
 				observeTransactionResponse(t,res);
 				interests.remove(h);
