@@ -178,7 +178,7 @@ trust in a specific peer for submission is a separate, explicit choice.
 
 - **Fork recovery is disabled** (`ENABLE_FORK_RECOVERY`): peers filter Orders
   inconsistent with their own consensus rather than reorganising. Enabling it
-  is tracked in [#492](https://github.com/Convex-Dev/convex/issues/492).
+  is tracked in [#480](https://github.com/Convex-Dev/convex/issues/480).
 - **Proposal-switching patience** (`KEEP_PROPOSAL_TIME`) is fixed;
   randomisation to reduce synchronised flapping is a noted refinement.
 - **`create-peer` accepts any 32-byte key**, so a peer record can be squatted
