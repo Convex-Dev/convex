@@ -102,9 +102,6 @@ public class Message {
 	 */
 	public static Message createDataMessage(List<? extends ACell> cells, int maxMessageLength) {
 		if (cells.isEmpty()) throw new IllegalArgumentException("DATA message requires at least one cell");
-		if (cells.size()>CPoSConstants.MISSING_LIMIT) {
-			throw new IllegalArgumentException("Too many cells in DATA message: "+cells.size());
-		}
 
 		ACell[] values=new ACell[cells.size()+1];
 		values[0]=MessageTag.DATA;
@@ -186,9 +183,8 @@ public class Message {
 		for (ACell cell:cells) {
 			if (cell==null || cell.isEmbedded()) continue;
 			batch.add(cell);
-			boolean tooMany=batch.size()>CPoSConstants.MISSING_LIMIT;
-			boolean tooLarge=!tooMany && dataMessageLength(batch)>maxMessageLength;
-			if (tooMany || tooLarge) {
+			// Bounded by encoded bytes only: novelty carries no cell-count limit
+			if (dataMessageLength(batch)>maxMessageLength) {
 				batch.remove(batch.size()-1);
 				if (batch.isEmpty()) {
 					throw new IllegalArgumentException("Cell cannot fit in DATA message limit of "

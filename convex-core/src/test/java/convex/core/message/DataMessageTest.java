@@ -39,7 +39,8 @@ public class DataMessageTest {
 
 	@Test
 	public void testDataMessageBeyondOneChunk() throws BadFormatException {
-		for (int n : new int[] { 1, Vectors.CHUNK_SIZE - 1, Vectors.CHUNK_SIZE, Vectors.CHUNK_SIZE + 1, 100, 254 }) {
+		// No cell-count limit: only the encoded size bounds a DATA message
+		for (int n : new int[] { 1, Vectors.CHUNK_SIZE - 1, Vectors.CHUNK_SIZE, Vectors.CHUNK_SIZE + 1, 100, 1000 }) {
 			List<ACell> cells = cells(n);
 			Message m = Message.createDataMessage(cells, 1 << 20);
 			assertRoundTrip(m, cells);

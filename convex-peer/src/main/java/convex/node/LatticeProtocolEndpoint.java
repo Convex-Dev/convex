@@ -391,8 +391,8 @@ final class LatticeProtocolEndpoint implements Closeable {
 			throws BadFormatException,IOException {
 		AConnection connection=message.getConnection();
 		AVector<?> payload=convex.core.lang.RT.ensureVector(message.getPayload());
-		if (payload==null || payload.count()<2 || payload.count()>CPoSConstants.MISSING_LIMIT+1
-				|| !MessageTag.DATA.equals(payload.get(0))) {
+		// Bounded by the inbound message length only: novelty has no cell-count limit
+		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
 			recordMergeReject(connection,stats);
 			throw new BadFormatException("Invalid DATA message format");
 		}

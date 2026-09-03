@@ -615,9 +615,8 @@ public class Server implements Closeable {
 	/** Stages a previously authorised DATA message on the Belief propagator thread. */
 	void stageData(Message message) throws IOException, convex.core.exceptions.BadFormatException {
 		AVector<?> payload=RT.ensureVector(message.getPayload());
-		if (payload==null || payload.count()<2
-				|| payload.count()>CPoSConstants.MISSING_LIMIT+1
-				|| !MessageTag.DATA.equals(payload.get(0))) {
+		// Bounded by the inbound message length only: novelty has no cell-count limit
+		if (payload==null || payload.count()<2 || !MessageTag.DATA.equals(payload.get(0))) {
 			throw new convex.core.exceptions.BadFormatException("Invalid DATA message format");
 		}
 		for (long i=1; i<payload.count(); i++) {
